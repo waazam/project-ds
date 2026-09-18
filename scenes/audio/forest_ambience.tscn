@@ -1,0 +1,65 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/audio/ForestAmbienceManager.cs" id="1_mgr"]
+[ext_resource type="Script" path="res://scripts/audio/AmbienceLoop.cs" id="2_loop"]
+[ext_resource type="Script" path="res://scripts/audio/BirdCallEmitter.cs" id="3_birds"]
+[ext_resource type="Script" path="res://scripts/audio/PointSourceSpawner.cs" id="4_points"]
+
+[node name="ForestAmbience" type="Node"]
+script = ExtResource("1_mgr")
+
+[node name="Wind" type="AudioStreamPlayer" parent="."]
+bus = &"Wind"
+
+[node name="Loop" type="Node" parent="Wind"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/wind_loop.wav"
+BaseVolumeDb = -8.0
+
+[node name="Leaves" type="AudioStreamPlayer" parent="."]
+bus = &"Wind"
+
+[node name="Loop" type="Node" parent="Leaves"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/leaves_loop.wav"
+BaseVolumeDb = -14.0
+
+[node name="Insects" type="AudioStreamPlayer" parent="."]
+bus = &"Insects"
+
+[node name="Loop" type="Node" parent="Insects"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/insects_loop.wav"
+BaseVolumeDb = -15.0
+
+[node name="Distant" type="AudioStreamPlayer" parent="."]
+bus = &"Distant"
+
+[node name="Loop" type="Node" parent="Distant"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/distant_loop.wav"
+BaseVolumeDb = -10.0
+
+[node name="Drone" type="AudioStreamPlayer" parent="."]
+bus = &"Unnatural"
+
+[node name="Loop" type="Node" parent="Drone"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/drone_loop.wav"
+BaseVolumeDb = -14.0
+SilenceFade = Vector2(0.7, 1)
+
+[node name="Ringing" type="AudioStreamPlayer" parent="."]
+bus = &"Unnatural"
+
+[node name="Loop" type="Node" parent="Ringing"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/ringing_loop.wav"
+BaseVolumeDb = -34.0
+SilenceFade = Vector2(0.88, 1)
+
+[node name="BirdCalls" type="Node3D" parent="."]
+script = ExtResource("3_birds")
+
+[node name="StreamSources" type="Node" parent="."]
+script = ExtResource("4_points")

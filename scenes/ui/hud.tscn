@@ -1,0 +1,32 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" path="res://assets/shaders/ps2_post.gdshader" id="1_post"]
+[ext_resource type="Script" path="res://scripts/ui/ScreenFader.cs" id="2_fader"]
+[ext_resource type="Script" path="res://scripts/ui/PauseMenu.cs" id="3_pause"]
+[ext_resource type="Script" path="res://scripts/ui/DebugOverlay.cs" id="4_debug"]
+
+[sub_resource type="ShaderMaterial" id="PostMat"]
+shader = ExtResource("1_post")
+
+[node name="Hud" type="Node"]
+
+[node name="PostProcess" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Screen" type="ColorRect" parent="PostProcess"]
+material = SubResource("PostMat")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ScreenFader" type="CanvasLayer" parent="."]
+script = ExtResource("2_fader")
+
+[node name="PauseMenu" type="CanvasLayer" parent="."]
+script = ExtResource("3_pause")
+
+[node name="DebugOverlay" type="CanvasLayer" parent="."]
+script = ExtResource("4_debug")

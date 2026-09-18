@@ -1,0 +1,107 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/player/PlayerController.cs" id="1_ctrl"]
+[ext_resource type="Script" path="res://scripts/player/PlayerInput.cs" id="2_input"]
+[ext_resource type="Script" path="res://scripts/player/PlayerCameraRig.cs" id="3_rig"]
+[ext_resource type="Script" path="res://scripts/player/PlayerFootsteps.cs" id="4_steps"]
+[ext_resource type="Script" path="res://scripts/player/PlayerBreathing.cs" id="5_breath"]
+
+[sub_resource type="CapsuleShape3D" id="Body"]
+radius = 0.3
+height = 1.75
+
+[sub_resource type="StandardMaterial3D" id="Jacket"]
+albedo_color = Color(0.29, 0.33, 0.3, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Jeans"]
+albedo_color = Color(0.2, 0.22, 0.27, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Skin"]
+albedo_color = Color(0.68, 0.55, 0.47, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Pack"]
+albedo_color = Color(0.45, 0.28, 0.2, 1)
+roughness = 1.0
+
+[sub_resource type="CapsuleMesh" id="TorsoMesh"]
+material = SubResource("Jacket")
+radius = 0.22
+height = 0.8
+radial_segments = 8
+rings = 2
+
+[sub_resource type="CapsuleMesh" id="LegsMesh"]
+material = SubResource("Jeans")
+radius = 0.17
+height = 0.9
+radial_segments = 8
+rings = 2
+
+[sub_resource type="SphereMesh" id="HeadMesh"]
+material = SubResource("Skin")
+radius = 0.12
+height = 0.26
+radial_segments = 8
+rings = 5
+
+[sub_resource type="BoxMesh" id="PackMesh"]
+material = SubResource("Pack")
+size = Vector3(0.34, 0.46, 0.18)
+
+[sub_resource type="SphereShape3D" id="CamProbe"]
+radius = 0.18
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_ctrl")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.875, 0)
+shape = SubResource("Body")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Legs" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("LegsMesh")
+
+[node name="Torso" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, 0)
+mesh = SubResource("TorsoMesh")
+
+[node name="Head" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.68, -0.02)
+mesh = SubResource("HeadMesh")
+
+[node name="Backpack" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0.22)
+mesh = SubResource("PackMesh")
+
+[node name="Input" type="Node" parent="."]
+script = ExtResource("2_input")
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("3_rig")
+
+[node name="SpringArm" type="SpringArm3D" parent="CameraRig"]
+collision_mask = 1
+shape = SubResource("CamProbe")
+spring_length = 3.2
+margin = 0.1
+
+[node name="Camera" type="Camera3D" parent="CameraRig"]
+current = true
+fov = 62.0
+near = 0.05
+far = 400.0
+
+[node name="Footsteps" type="Node" parent="."]
+script = ExtResource("4_steps")
+
+[node name="Breathing" type="AudioStreamPlayer" parent="."]
+bus = &"Player"
+script = ExtResource("5_breath")

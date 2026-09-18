@@ -1,0 +1,93 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
+[ext_resource type="PackedScene" path="res://scenes/audio/forest_ambience.tscn" id="3_amb"]
+[ext_resource type="Script" path="res://scripts/systems/GameFlow.cs" id="4_flow"]
+[ext_resource type="Script" path="res://scripts/audio/SilenceZone.cs" id="5_zone"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.32, 0.36, 0.34, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.45, 0.48, 0.46, 1)
+fog_enabled = true
+fog_light_color = Color(0.32, 0.36, 0.34, 1)
+fog_density = 0.02
+
+[sub_resource type="StandardMaterial3D" id="Ground"]
+albedo_color = Color(0.3, 0.34, 0.25, 1)
+
+[sub_resource type="StandardMaterial3D" id="Block"]
+albedo_color = Color(0.55, 0.5, 0.45, 1)
+
+[sub_resource type="Curve3D" id="TrailCurve"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, -15, 0, 0, 0, 0, 0, 0, -4, 0, -30, 0, 0, 0, 0, 0, 0, 0, 0, -40),
+"tilts": PackedFloat32Array(0, 0, 0, 0)
+}
+point_count = 4
+
+[node name="TestRange" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 0, 10, 0)
+shadow_enabled = true
+
+[node name="Ground" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+use_collision = true
+size = Vector3(120, 1, 120)
+material = SubResource("Ground")
+
+[node name="Wall" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 1.5, -12)
+use_collision = true
+size = Vector3(10, 3, 1)
+material = SubResource("Block")
+
+[node name="Pillar" type="CSGCylinder3D" parent="." groups=["autotest_obstacle"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 2, -6)
+use_collision = true
+radius = 0.4
+height = 4.0
+material = SubResource("Block")
+
+[node name="Ramp" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.94, 0.342, 0, -0.342, 0.94, -8, 0.8, -6)
+use_collision = true
+size = Vector3(3, 0.5, 8)
+material = SubResource("Block")
+
+[node name="StairZone" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -45)
+
+[node name="SilenceZone" type="Node3D" parent="StairZone"]
+script = ExtResource("5_zone")
+InnerRadius = 6.0
+OuterRadius = 38.0
+
+[node name="Marker" type="CSGBox3D" parent="StairZone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+use_collision = true
+size = Vector3(1.2, 2, 3)
+material = SubResource("Block")
+
+[node name="PlayerSpawn" type="Marker3D" parent="." groups=["player_spawn"]]
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+
+[node name="ForestAmbience" parent="." instance=ExtResource("3_amb")]
+
+[node name="Hud" parent="." instance=ExtResource("2_hud")]
+
+[node name="GameFlow" type="Node" parent="."]
+script = ExtResource("4_flow")
+FaderPath = NodePath("../Hud/ScreenFader")
+PauseMenuPath = NodePath("../Hud/PauseMenu")
+
+[node name="Trail" type="Path3D" parent="." groups=["trail"]]
+curve = SubResource("TrailCurve")
