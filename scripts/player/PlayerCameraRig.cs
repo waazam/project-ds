@@ -4,18 +4,37 @@ using ProjectDS.Systems;
 namespace ProjectDS.Player;
 
 /// <summary>
-/// Over-the-shoulder orbit camera. The rig is top-level: it follows a pivot
-/// above the player with smoothing and yaws/pitches from PlayerInput. A
-/// SpringArm3D probes for walls, and the camera pulls in instantly on a hit and
-/// eases back out, so it never clips but never snaps outward either.
+/// The player's camera, in one of two modes (GameSettings.Camera):
+///
+/// FirstPerson (current design): the camera sits at eye height. The body is
+/// hidden but still casts its shadow, and a small head bob follows the stride.
+///
+/// ThirdPerson (kept for later): an over-the-shoulder orbit. A SpringArm3D
+/// probes for walls, and the camera pulls in instantly on a hit and eases back
+/// out, so it never clips but never snaps outward either.
+///
+/// Either way the rig is top-level, follows the player with smoothing, and
+/// yaws/pitches from PlayerInput.
 /// </summary>
 public partial class PlayerCameraRig : Node3D
 {
 	[Export] public NodePath TargetPath = "..";
 	[Export] public NodePath SpringArmPath = "SpringArm";
 	[Export] public NodePath CameraPath = "Camera";
+
+	[ExportGroup("First person")]
+	[Export] public float EyeHeight = 1.62f;
+	[Export] public float FirstPersonFov = 70f;
+	[Export] public float FirstPersonMinPitch = -80f;
+	[Export] public float FirstPersonMaxPitch = 80f;
+	[Export] public float EyeVerticalSharpness = 18f;   // smooths stairs without feeling floaty
+	[Export] public float BobHeight = 0.022f;
+	[Export] public float BobSway = 0.012f;
+
+	[ExportGroup("Third person")]
 	[Export] public float PivotHeight = 1.5f;
 	[Export] public float ShoulderOffset = 0.38f;
+	[Export] public float ThirdPersonFov = 62f;
 	[Export] public float MinDistance = 1.6f;
 	[Export] public float MaxDistance = 5.5f;
 	[Export] public float MinPitch = -65f;
@@ -25,13 +44,17 @@ public partial class PlayerCameraRig : Node3D
 	[Export] public float ZoomOutSharpness = 4f;
 
 	public float Yaw { get; private set; }
-	public float Pitch { get; private set; } = Mathf.DegToRad(-12f);
+	public float Pitch { get; private set; }
 	public Basis YawBasis => new Basis(Vector3.Up, Yaw);
 	public Camera3D Camera { get; private set; }
+	public bool IsFirstPerson => _mode == CameraMode.FirstPerson;
 
 	private PlayerController _target;
 	private SpringArm3D _arm;
 	private float _currentLength;
+	private CameraMode _mode = (CameraMode)(-1);
+	private float _bobPhase;
+	private float _bobAmount;
 
 	public override void _Ready()
 	{
@@ -40,8 +63,9 @@ public partial class PlayerCameraRig : Node3D
 		_arm = GetNode<SpringArm3D>(SpringArmPath);
 		Camera = GetNode<Camera3D>(CameraPath);
 		_arm.AddExcludedObject(_target.GetRid());
-		GlobalPosition = PivotPosition();
 		_currentLength = GameSettings.Instance.CameraDistance;
+		// Mode (and body shadow setup) is applied on the first frame: the body isn't ready yet.
+		GlobalPosition = PivotPosition();
 		ApplyRotation();
 	}
 
@@ -52,9 +76,32 @@ public partial class PlayerCameraRig : Node3D
 		ApplyRotation();
 	}
 
+	private void ApplyMode(CameraMode mode)
+	{
+		if (mode == _mode) return;
+		_mode = mode;
+		bool fp = mode == CameraMode.FirstPerson;
+		Camera.Fov = fp ? FirstPersonFov : ThirdPersonFov;
+		Camera.Position = Vector3.Zero;
+		Pitch = fp ? 0f : Mathf.DegToRad(-12f);
+		// First person: you never see your own body, but its shadow stays in the world.
+		foreach (var node in _target.Visual.FindChildren("*", "GeometryInstance3D", true, false))
+			((GeometryInstance3D)node).CastShadow = fp
+				? GeometryInstance3D.ShadowCastingSetting.ShadowsOnly
+				: GeometryInstance3D.ShadowCastingSetting.On;
+		_arm.ProcessMode = fp ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
+	}
+
 	public override void _UnhandledInput(InputEvent e)
 	{
-		if (e is InputEventMouseButton mb && mb.Pressed && Input.MouseMode == Input.MouseModeEnum.Captured)
+		// F5: dev toggle for the dormant third-person camera.
+		if (e is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F5 })
+		{
+			var s = GameSettings.Instance;
+			s.Camera = s.Camera == CameraMode.FirstPerson ? CameraMode.ThirdPerson : CameraMode.FirstPerson;
+			return;
+		}
+		if (!IsFirstPerson && e is InputEventMouseButton mb && mb.Pressed && Input.MouseMode == Input.MouseModeEnum.Captured)
 		{
 			var s = GameSettings.Instance;
 			if (mb.ButtonIndex == MouseButton.WheelUp) s.CameraDistance -= 0.3f;
@@ -66,10 +113,42 @@ public partial class PlayerCameraRig : Node3D
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
-		Vector2 look = _target.PlayerInput.ConsumeLook();
-		Yaw = Mathf.Wrap(Yaw + look.X, -Mathf.Pi, Mathf.Pi);
-		Pitch = Mathf.Clamp(Pitch + look.Y, Mathf.DegToRad(MinPitch), Mathf.DegToRad(MaxPitch));
+		ApplyMode(GameSettings.Instance.Camera);
 
+		Vector2 look = _target.PlayerInput.ConsumeLook();
+		float minPitch = IsFirstPerson ? FirstPersonMinPitch : MinPitch;
+		float maxPitch = IsFirstPerson ? FirstPersonMaxPitch : MaxPitch;
+		Yaw = Mathf.Wrap(Yaw + look.X, -Mathf.Pi, Mathf.Pi);
+		Pitch = Mathf.Clamp(Pitch + look.Y, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
+
+		if (IsFirstPerson) UpdateFirstPerson(dt);
+		else UpdateThirdPerson(dt);
+	}
+
+	private void UpdateFirstPerson(float dt)
+	{
+		// Head locked to the body horizontally; vertical eased so stairs don't jolt.
+		Vector3 goal = PivotPosition();
+		Vector3 pos = GlobalPosition;
+		pos.X = goal.X;
+		pos.Z = goal.Z;
+		pos.Y = Mathf.Lerp(pos.Y, goal.Y, 1f - Mathf.Exp(-EyeVerticalSharpness * dt));
+		GlobalPosition = pos;
+		ApplyRotation();
+
+		// Head bob: one vertical dip per footstep, one sway per stride pair.
+		float speed = _target.IsOnFloor() ? _target.GroundSpeed : 0f;
+		float stride = _target.IsRunning ? 1.15f : 0.72f;   // matches PlayerFootsteps
+		_bobPhase += speed / stride * Mathf.Pi * dt;
+		_bobAmount = Mathf.Lerp(_bobAmount, Mathf.Clamp(speed / 2f, 0f, 1.4f), 1f - Mathf.Exp(-6f * dt));
+		Camera.Position = new Vector3(
+			Mathf.Sin(_bobPhase) * BobSway * _bobAmount,
+			-Mathf.Abs(Mathf.Cos(_bobPhase)) * BobHeight * _bobAmount,
+			0f);
+	}
+
+	private void UpdateThirdPerson(float dt)
+	{
 		// Follow: tight horizontally, softer vertically.
 		Vector3 goal = PivotPosition();
 		Vector3 pos = GlobalPosition;
@@ -90,11 +169,12 @@ public partial class PlayerCameraRig : Node3D
 		Camera.Position = _arm.Position + new Vector3(0, 0, _currentLength);
 	}
 
-	private Vector3 PivotPosition() => _target.GlobalPosition + new Vector3(0, PivotHeight, 0);
+	private Vector3 PivotPosition() =>
+		_target.GlobalPosition + new Vector3(0, IsFirstPerson ? EyeHeight : PivotHeight, 0);
 
 	private void ApplyRotation()
 	{
 		Rotation = new Vector3(Pitch, Yaw, 0);
-		_arm.Position = new Vector3(ShoulderOffset, 0, 0);
+		_arm.Position = new Vector3(IsFirstPerson ? 0f : ShoulderOffset, 0, 0);
 	}
 }

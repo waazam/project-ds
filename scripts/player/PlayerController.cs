@@ -76,9 +76,11 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateVisual(Vector3 wish, float dt)
 	{
-		if (wish.LengthSquared() > 0.01f)
+		// First person: the body faces where you look. Third person: it faces travel.
+		bool faceLook = CameraRig.IsFirstPerson;
+		if (faceLook || wish.LengthSquared() > 0.01f)
 		{
-			float targetYaw = Mathf.Atan2(-wish.X, -wish.Z);
+			float targetYaw = faceLook ? CameraRig.Yaw : Mathf.Atan2(-wish.X, -wish.Z);
 			var rot = Visual.Rotation;
 			rot.Y = Mathf.LerpAngle(rot.Y, targetYaw, 1f - Mathf.Exp(-TurnSpeed * dt));
 			Visual.Rotation = rot;

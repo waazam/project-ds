@@ -264,46 +264,54 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 40, r.R(0.24, 0.3));
 	}
 
-	/// <summary>Wooden plank: modal knock (hollow) + transient click, optional stick-slip creak.</summary>
+	// A boot on planks: almost all damped noise, no ringing partials (sine
+	// modes read as hand drums). Heel strike = dull weight + a low-Q board knock
+	// + a dry click; the toe lands softer 60-110 ms later; a little grit scuffs
+	// between them. Even-numbered variants add a faint board creak.
 	public static double[] StepWood(Rng r, int sr, bool creak)
 	{
-		var x = Buf(sr, creak ? 0.6 : 0.45);
-		double f0 = r.R(150, 210);
-		double[] ratios = { 1, 2.32, 3.87, 5.61, 8.1 }, taus = { 0.09, 0.06, 0.035, 0.022, 0.012 }, amps = { 1, 0.55, 0.35, 0.2, 0.12 };
-		var fr = ratios.Select(q => f0 * q * r.R(0.97, 1.03)).ToArray();
-		var tv = taus.Select(tau => tau * r.R(0.85, 1.2)).ToArray();
-		var clickHp = Biquad.Hp(sr, 1200);
-		var body = Biquad.Lp(sr, 220);
-		double second = r.R(0.012, 0.03), sa = r.R(0.25, 0.5);
-		for (int i = 0; i < x.Length; i++)
+		var x = Buf(sr, creak ? 0.5 : 0.38);
+		double knockF = r.R(330, 480), clickF = r.R(1400, 2200);
+		double[] contacts = { 0.0, r.R(0.06, 0.11) };
+		double[] gains = { 1.0, r.R(0.35, 0.5) };
+		for (int c = 0; c < contacts.Length; c++)
 		{
-			double tt = (double)i / sr, v = 0;
-			for (int m = 0; m < fr.Length; m++)
+			var weight = Biquad.Lp(sr, 160);
+			var knock = Biquad.Bp(sr, knockF * r.R(0.95, 1.05), 1.1);
+			var click = Biquad.Bp(sr, clickF * r.R(0.9, 1.1), 1.4);
+			int s0 = (int)(contacts[c] * sr);
+			double a = gains[c];
+			for (int i = 0; i + s0 < x.Length && i < 0.09 * sr; i++)
 			{
-				v += amps[m] * Math.Sin(TwoPi * fr[m] * tt) * Perc(tt, 0.0008, tv[m]);
-				v += sa * amps[m] * Math.Sin(TwoPi * fr[m] * 1.01 * (tt - second)) * Perc(tt - second, 0.0008, tv[m] * 0.7);
+				double tt = (double)i / sr;
+				double v = weight.P(r.W()) * Perc(tt, 0.002, 0.018) * 2.2
+					+ knock.P(r.W()) * Perc(tt, 0.0006, 0.014) * 2.4
+					+ click.P(r.W()) * Perc(tt, 0.0002, 0.004) * 1.2;
+				x[s0 + i] += a * v;
 			}
-			v += clickHp.P(r.W()) * Perc(tt, 0.0002, 0.004) * 3.0;
-			v += body.P(r.W()) * Perc(tt, 0.001, 0.03) * 1.5;
-			x[i] += v;
 		}
+		// Grit under the sole.
+		var grit = Biquad.Hp(sr, 2600);
+		int g0 = (int)(r.R(0.01, 0.03) * sr), gLen = (int)(r.R(0.05, 0.09) * sr);
+		for (int i = 0; i < gLen && g0 + i < x.Length; i++)
+			x[g0 + i] += grit.P(r.W()) * 0.1 * Env((double)i / gLen, 0.3, 0.6) * (r.Chance(0.15) ? 2.5 : 1.0);
 		if (creak)
 		{
-			var c1 = Biquad.Bp(sr, r.R(600, 800), 14); var c2 = Biquad.Bp(sr, r.R(1250, 1500), 10);
-			double cs = r.R(0.07, 0.13), cd = r.R(0.15, 0.24), rate0 = r.R(70, 95), rate1 = rate0 * r.R(1.3, 1.7);
+			var c1 = Biquad.Bp(sr, r.R(520, 700), 9); var c2 = Biquad.Bp(sr, r.R(1100, 1400), 7);
+			double cs = r.R(0.08, 0.14), cd = r.R(0.12, 0.2), rate0 = r.R(55, 80), rate1 = rate0 * r.R(1.2, 1.5);
 			double ph = 0;
 			for (int i = 0; i < cd * sr; i++)
 			{
 				double u = i / (cd * sr);
 				ph += (rate0 + (rate1 - rate0) * u) / sr;
 				double imp = 0;
-				if (ph >= 1) { ph -= 1; imp = r.R(0.6, 1.0); }
-				double v = (c1.P(imp) + 0.6 * c2.P(imp)) * Env(u, 0.25, 0.45);
+				if (ph >= 1) { ph -= 1; imp = r.R(0.5, 1.0); }
+				double v = (c1.P(imp) + 0.5 * c2.P(imp)) * Env(u, 0.3, 0.5);
 				int idx = (int)(cs * sr) + i;
-				if (idx < x.Length) x[idx] += v * 1.6;
+				if (idx < x.Length) x[idx] += v * 0.5;
 			}
 		}
-		return FinishOneShot(x, sr, -3, 40);
+		return FinishOneShot(x, sr, -3, 30, 0.24);
 	}
 
 	// ---------------------------------------------------------------- cloth

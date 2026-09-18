@@ -62,7 +62,8 @@ public partial class PauseMenu : CanvasLayer
 		var s = GameSettings.Instance;
 		AddSlider(box, "Mouse sensitivity", 0.0005, 0.008, s.MouseSensitivity, v => s.MouseSensitivity = (float)v);
 		AddSlider(box, "Stick sensitivity", 0.8, 5.0, s.StickSensitivity, v => s.StickSensitivity = (float)v);
-		AddSlider(box, "Camera distance", 1.6, 5.5, s.CameraDistance, v => s.CameraDistance = (float)v);
+		if (s.Camera == CameraMode.ThirdPerson)
+			AddSlider(box, "Camera distance", 1.6, 5.5, s.CameraDistance, v => s.CameraDistance = (float)v);
 
 		var invert = new CheckBox { Text = "Invert Y", ButtonPressed = s.InvertY };
 		invert.AddThemeFontSizeOverride("font_size", 9);

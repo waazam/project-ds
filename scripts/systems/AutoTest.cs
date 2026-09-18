@@ -88,6 +88,11 @@ public partial class AutoTest : Node
 		await Wait(1.5);
 		Check("player spawned on ground", _player.IsOnFloor(), $"pos {_player.GlobalPosition}");
 		Screenshot("spawn");
+		if (GameSettings.Instance.Camera == CameraMode.FirstPerson)
+		{
+			float eye = _player.CameraRig.Camera.GlobalPosition.Y - _player.GlobalPosition.Y;
+			Check("first-person camera at eye height", Mathf.Abs(eye - _player.CameraRig.EyeHeight) < 0.1f, $"{eye:0.00} m");
+		}
 
 		// Audio sanity at the start: living forest.
 		await Wait(2.0);

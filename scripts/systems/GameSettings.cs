@@ -1,6 +1,9 @@
+using System.Linq;
 using Godot;
 
 namespace ProjectDS.Systems;
+
+public enum CameraMode { FirstPerson, ThirdPerson }
 
 /// <summary>
 /// Autoload. Player-facing settings plus input-map registration.
@@ -18,6 +21,8 @@ public partial class GameSettings : Node
 	public float StickSensitivity = 2.6f;      // radians per second at full tilt
 	public bool InvertY = false;
 	public float CameraDistance = 3.2f;        // metres, clamped by the camera rig
+	/// <summary>First person is the current design. Third person is kept working for later.</summary>
+	public CameraMode Camera = CameraMode.FirstPerson;
 
 	// Command-line flags (after "--" on the godot command line)
 	public bool AutoTest { get; private set; }
@@ -27,10 +32,11 @@ public partial class GameSettings : Node
 	public override void _EnterTree()
 	{
 		Instance = this;
-		foreach (var arg in OS.GetCmdlineUserArgs())
-			if (arg == "--autotest") AutoTest = true;
+		var args = OS.GetCmdlineUserArgs();
+		AutoTest = args.Contains("--autotest");
 		RegisterInputActions();
 		Load();
+		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
 	}
 
 	public void Save()
@@ -40,6 +46,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("camera", "stick_sensitivity", StickSensitivity);
 		cfg.SetValue("camera", "invert_y", InvertY);
 		cfg.SetValue("camera", "distance", CameraDistance);
+		cfg.SetValue("camera", "mode", (int)Camera);
 		cfg.Save(SavePath);
 		EmitSignal(SignalName.Changed);
 	}
@@ -53,6 +60,7 @@ public partial class GameSettings : Node
 		StickSensitivity = (float)cfg.GetValue("camera", "stick_sensitivity", StickSensitivity);
 		InvertY = (bool)cfg.GetValue("camera", "invert_y", InvertY);
 		CameraDistance = (float)cfg.GetValue("camera", "distance", CameraDistance);
+		Camera = (CameraMode)(int)cfg.GetValue("camera", "mode", (int)Camera);
 	}
 
 	private static void RegisterInputActions()
