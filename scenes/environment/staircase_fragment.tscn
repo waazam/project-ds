@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/StaircaseBuilder.cs" id="1_stairs"]
+[ext_resource type="Script" path="res://scripts/audio/SilenceZone.cs" id="2_silence"]
+
+[node name="StaircaseFragment" type="Node3D"]
+script = ExtResource("1_stairs")
+Steps = 7
+IncludeLanding = false
+
+[node name="SilenceZone" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, -0.6)
+script = ExtResource("2_silence")
+InnerRadius = 3.0
+OuterRadius = 30.0
+Strength = 0.7

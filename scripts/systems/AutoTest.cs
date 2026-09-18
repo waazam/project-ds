@@ -36,6 +36,8 @@ public partial class AutoTest : Node
 	{
 		ProcessMode = ProcessModeEnum.Always;
 		DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(OutDir));
+		// Keep the editor from importing screenshots as project assets.
+		using (FileAccess.Open($"{OutDir}/.gdignore", FileAccess.ModeFlags.Write)) { }
 		_ = Run();
 	}
 

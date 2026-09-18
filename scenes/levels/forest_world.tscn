@@ -1,0 +1,389 @@
+[gd_scene load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/ForestTerrain.cs" id="1_terrain"]
+[ext_resource type="Script" path="res://scripts/world/ForestScatter.cs" id="2_scatter"]
+[ext_resource type="Script" path="res://scripts/world/ForestAtmosphere.cs" id="3_atmo"]
+[ext_resource type="Script" path="res://scripts/world/GroundSnap.cs" id="4_snap"]
+[ext_resource type="Script" path="res://scripts/world/ParkProp.cs" id="5_prop"]
+[ext_resource type="Script" path="res://scripts/world/TrailAnchor.cs" id="6_anchor"]
+[ext_resource type="Script" path="res://scripts/world/TrailMarkerSet.cs" id="7_markers"]
+[ext_resource type="Script" path="res://scripts/world/VanishingProp.cs" id="8_vanish"]
+[ext_resource type="Script" path="res://scripts/world/ClearZone.cs" id="9_clear"]
+[ext_resource type="PackedScene" path="res://scenes/environment/staircase_interior.tscn" id="10_stairs"]
+[ext_resource type="PackedScene" path="res://scenes/environment/staircase_fragment.tscn" id="11_fragment"]
+[ext_resource type="PackedScene" path="res://scenes/environment/footbridge.tscn" id="12_bridge"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.17, 0.19, 0.19, 1)
+sky_horizon_color = Color(0.27, 0.3, 0.28, 1)
+sky_curve = 0.2
+ground_bottom_color = Color(0.08, 0.09, 0.08, 1)
+ground_horizon_color = Color(0.27, 0.3, 0.28, 1)
+sun_angle_max = 1.0
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 2
+ambient_light_color = Color(0.42, 0.47, 0.45, 1)
+ambient_light_energy = 0.55
+reflected_light_source = 1
+tonemap_mode = 2
+tonemap_exposure = 1.05
+fog_enabled = true
+fog_mode = 0
+fog_light_color = Color(0.25, 0.285, 0.265, 1)
+fog_light_energy = 1.0
+fog_sun_scatter = 0.06
+fog_density = 0.021
+fog_sky_affect = 1.0
+
+[sub_resource type="Curve3D" id="Curve_trail"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0.1667, 0, -2.5, 0, 0, 20, 0.5, 0, 6.6667, -0.5, 0, -6.6667, 1, 0, 5, 2, 0, 8.3333, -2, 0, -8.3333, -3, 0, -20, 2.5, 0, 8, -2.5, 0, -8, -11, 0, -45, -0.8333, 0, 7.5, 0.8333, 0, -7.5, -18, 0, -68, -4, 0, 7, 4, 0, -7, -6, 0, -90, -2.3333, 0, 7.5, 2.3333, 0, -7.5, 6, 0, -110, 0, 0, 8.3333, 0, 0, -8.3333, 8, 0, -135, 1, 0, 7.8333, -1, 0, -7.8333, 6, 0, -160, 2.3333, 0, 7.3333, -2.3333, 0, -7.3333, 2, 0, -182, 2.6667, 0, 7.6667, -2.6667, 0, -7.6667, -8, 0, -204, 0.1667, 0, 8, -0.1667, 0, -8, -14, 0, -228, -2, 0, 7.3333, 2, 0, -7.3333, -9, 0, -252, -1.5, 0, 6.1667, 1.5, 0, -6.1667, -2, 0, -272, -0.3333, 0, 2.8333, 0, 0, 0, 0, 0, -289),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 15
+
+[sub_resource type="Curve3D" id="Curve_road"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0.0833, 0, 1.6667, 0, 0, 36, -0.5, 0, -3.6667, 0.5, 0, 3.6667, 0.5, 0, 46, -0.75, 0, -3.3333, 0.75, 0, 3.3333, 3, 0, 58, -0.3333, 0, -1.3333, 0, 0, 0, 5, 0, 66),
+"tilts": PackedFloat32Array(0, 0, 0, 0)
+}
+point_count = 4
+
+[sub_resource type="Curve3D" id="Curve_sight"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, -2.6667, 0, -3, -14, 0, -62, 5.5, 0, 6.1667, -5.5, 0, -6.1667, -30, 0, -80, 2.8333, 0, 3.1667, 0, 0, 0, -47, 0, -99),
+"tilts": PackedFloat32Array(0, 0, 0)
+}
+point_count = 3
+
+[node name="ForestWorld" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.4067, 0.3716, -0.8346, 0, 0.9135, 0.4067, 0.9135, -0.1654, 0.3716, 0, 40, 0)
+light_color = Color(0.93, 0.86, 0.74, 1)
+light_energy = 0.65
+shadow_enabled = true
+shadow_opacity = 0.8
+shadow_blur = 1.5
+directional_shadow_mode = 1
+directional_shadow_max_distance = 60.0
+
+[node name="Atmosphere" type="Node" parent="."]
+script = ExtResource("3_atmo")
+
+[node name="Terrain" type="Node3D" parent="."]
+script = ExtResource("1_terrain")
+ValleyPaths = Array[NodePath]([NodePath("SightValley")])
+
+[node name="Trail" type="Path3D" parent="Terrain" groups=["trail"]]
+curve = SubResource("Curve_trail")
+
+[node name="Road" type="Path3D" parent="Terrain"]
+curve = SubResource("Curve_road")
+
+[node name="SightValley" type="Path3D" parent="Terrain"]
+curve = SubResource("Curve_sight")
+
+[node name="Stream" type="Node3D" parent="Terrain"]
+
+[node name="S00" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126, 27.34, -145.1)
+
+[node name="S01" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -111.2, 26.51, -142.9)
+
+[node name="S02" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96.2, 23.78, -143)
+
+[node name="S03" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -82.5, 23.72, -149)
+
+[node name="S04" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -70.1, 22.98, -157.5)
+
+[node name="S05" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56.9, 20.88, -164.5)
+
+[node name="S06" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 14.73, -165.8)
+
+[node name="S07" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27.2, 9.76, -163.2)
+
+[node name="S08" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.3, 4.15, -161.8)
+
+[node name="S09" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0.04, -161.1)
+
+[node name="S10" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.1, -0.02, -157.1)
+
+[node name="S11" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30.7, -0.08, -150.6)
+
+[node name="S12" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.2, -0.14, -147)
+
+[node name="S13" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 59.6, -0.2, -150.8)
+
+[node name="S14" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 72.7, -0.26, -158.1)
+
+[node name="S15" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86.4, -0.32, -164.2)
+
+[node name="S16" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 101.1, -0.38, -166.9)
+
+[node name="S17" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 115.9, -0.44, -169.4)
+
+[node name="S18" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126, -0.48, -172.2)
+
+[node name="Forest" type="Node3D" parent="."]
+script = ExtResource("2_scatter")
+
+[node name="PlayerSpawn" type="Marker3D" parent="." groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 19)
+
+[node name="GroundSnap" type="Node" parent="PlayerSpawn"]
+script = ExtResource("4_snap")
+Offset = 0.02
+
+[node name="SpawnClear" type="Node3D" parent="PlayerSpawn"]
+script = ExtResource("9_clear")
+Radius = 2.0
+
+[node name="Trailhead" type="Node3D" parent="."]
+
+[node name="TrailheadSign" type="Node3D" parent="Trailhead"]
+transform = Transform3D(0.9063, 0, 0.4226, 0, 1, 0, -0.4226, 0, 0.9063, -2.6, 0, 15.5)
+script = ExtResource("5_prop")
+Kind = 0
+ClearRadius = 2.5
+
+[node name="GroundSnap" type="Node" parent="Trailhead/TrailheadSign"]
+script = ExtResource("4_snap")
+Offset = -0.04
+FootprintRadius = 0.3
+
+[node name="InfoBoard" type="Node3D" parent="Trailhead"]
+transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 3.4, 0, 19.8)
+script = ExtResource("5_prop")
+Kind = 1
+ClearRadius = 2.5
+
+[node name="GroundSnap" type="Node" parent="Trailhead/InfoBoard"]
+script = ExtResource("4_snap")
+Offset = -0.04
+FootprintRadius = 0.3
+
+[node name="TrashCan" type="Node3D" parent="Trailhead"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 7.5, 0, 22.4)
+script = ExtResource("5_prop")
+Kind = 2
+ClearRadius = 1.5
+
+[node name="GroundSnap" type="Node" parent="Trailhead/TrashCan"]
+script = ExtResource("4_snap")
+Offset = -0.04
+FootprintRadius = 0.3
+
+[node name="VaultToilet" type="Node3D" parent="Trailhead"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -9.8, 0, 18.6)
+script = ExtResource("5_prop")
+Kind = 3
+ClearRadius = 4.0
+
+[node name="GroundSnap" type="Node" parent="Trailhead/VaultToilet"]
+script = ExtResource("4_snap")
+Offset = -0.04
+FootprintRadius = 1.2
+
+[node name="Bumper1" type="Node3D" parent="Trailhead"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.2, 0, 24.2)
+script = ExtResource("5_prop")
+Kind = 4
+
+
+[node name="GroundSnap" type="Node" parent="Trailhead/Bumper1"]
+script = ExtResource("4_snap")
+Offset = -0.03
+FootprintRadius = 0.3
+
+[node name="Bumper2" type="Node3D" parent="Trailhead"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 24.2)
+script = ExtResource("5_prop")
+Kind = 4
+
+
+[node name="GroundSnap" type="Node" parent="Trailhead/Bumper2"]
+script = ExtResource("4_snap")
+Offset = -0.03
+FootprintRadius = 0.3
+
+[node name="Bumper3" type="Node3D" parent="Trailhead"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 24.2)
+script = ExtResource("5_prop")
+Kind = 4
+
+
+[node name="GroundSnap" type="Node" parent="Trailhead/Bumper3"]
+script = ExtResource("4_snap")
+Offset = -0.03
+FootprintRadius = 0.3
+
+[node name="Bumper4" type="Node3D" parent="Trailhead"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.2, 0, 24.2)
+script = ExtResource("5_prop")
+Kind = 4
+
+
+[node name="GroundSnap" type="Node" parent="Trailhead/Bumper4"]
+script = ExtResource("4_snap")
+Offset = -0.03
+FootprintRadius = 0.3
+
+[node name="TrailheadBoulder" type="Node3D" parent="Trailhead" groups=["autotest_obstacle"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.2, 0.73, 11.2)
+script = ExtResource("5_prop")
+Kind = 10
+ClearRadius = 3.0
+Seed = 4
+
+[node name="GroundSnap" type="Node" parent="Trailhead/TrailheadBoulder"]
+script = ExtResource("4_snap")
+Offset = 0.3
+
+[node name="LineClear" type="Node3D" parent="Trailhead"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 15.1)
+script = ExtResource("9_clear")
+Radius = 3.2
+
+[node name="TrailMarkers" type="Node3D" parent="."]
+script = ExtResource("7_markers")
+
+[node name="Footbridge" parent="." instance=ExtResource("12_bridge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.27, -160)
+
+[node name="Props" type="Node3D" parent="."]
+
+[node name="DroppedBackpack" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 6
+ClearRadius = 0.9
+ClearFoliage = true
+
+[node name="TrailAnchor" type="Node" parent="Props/DroppedBackpack"]
+script = ExtResource("6_anchor")
+Distance = 76.0
+Offset = -3.1
+YawDegrees = 55.0
+HeightOffset = 0.0
+
+[node name="LostBoot" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 7
+ClearRadius = 0.6
+ClearFoliage = true
+
+[node name="TrailAnchor" type="Node" parent="Props/LostBoot"]
+script = ExtResource("6_anchor")
+Distance = 212.0
+Offset = 2.2
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="SnappedStick" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 8
+ClearRadius = 0.0
+ClearFoliage = true
+
+[node name="TrailAnchor" type="Node" parent="Props/SnappedStick"]
+script = ExtResource("6_anchor")
+Distance = 247.0
+Offset = -1.05
+YawDegrees = 30.0
+HeightOffset = 0.0
+
+[node name="CutLog" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 9
+ClearRadius = 7.5
+ClearFoliage = false
+
+[node name="TrailAnchor" type="Node" parent="Props/CutLog"]
+script = ExtResource("6_anchor")
+Distance = 232.0
+Offset = 0
+YawDegrees = 0.0
+HeightOffset = -0.06
+
+[node name="Vanishing" type="Node3D" parent="."]
+transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, -45, 1.35, -97)
+script = ExtResource("8_vanish")
+
+[node name="GroundSnap" type="Node" parent="Vanishing"]
+script = ExtResource("4_snap")
+Offset = -0.03
+FootprintRadius = 0.8
+
+[node name="StaircaseFragment" parent="Vanishing" instance=ExtResource("11_fragment")]
+
+[node name="Clear" type="Node3D" parent="Vanishing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.6)
+script = ExtResource("9_clear")
+Radius = 5.5
+ClearFoliage = false
+
+[node name="SightLine0" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, -65.5)
+script = ExtResource("9_clear")
+Radius = 4.0
+ClearFoliage = false
+
+[node name="SightLine1" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25, 0, -72)
+script = ExtResource("9_clear")
+Radius = 5.0
+ClearFoliage = false
+
+[node name="SightLine2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0, -79.5)
+script = ExtResource("9_clear")
+Radius = 5.5
+ClearFoliage = false
+
+[node name="SightLine3" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37, 0, -87)
+script = ExtResource("9_clear")
+Radius = 5.5
+ClearFoliage = false
+
+[node name="Clearing" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.91, -302)
+
+[node name="Stairs" parent="Clearing" instance=ExtResource("10_stairs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.2)
+
+[node name="GroundSnap" type="Node" parent="Clearing/Stairs"]
+script = ExtResource("4_snap")
+Offset = -0.02
+FootprintRadius = 1.2
+
+[node name="StairsClear" type="Node3D" parent="Clearing"]
+script = ExtResource("9_clear")
+Radius = 2.7

@@ -1,8 +1,24 @@
 [gd_scene format=3]
 
+[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/audio/forest_ambience.tscn" id="3_amb"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
+[ext_resource type="Script" path="res://scripts/systems/GameFlow.cs" id="5_flow"]
+
 [node name="TrailSlice" type="Node3D"]
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4)
+[node name="ForestWorld" parent="." instance=ExtResource("1_world")]
 
-[node name="Box" type="CSGBox3D" parent="."]
+[node name="Player" parent="." instance=ExtResource("2_player")]
+
+[node name="ForestAmbience" parent="." instance=ExtResource("3_amb")]
+
+[node name="Hud" parent="." instance=ExtResource("4_hud")]
+
+[node name="GameFlow" type="Node" parent="."]
+script = ExtResource("5_flow")
+FaderPath = NodePath("../Hud/ScreenFader")
+PauseMenuPath = NodePath("../Hud/PauseMenu")
+OpeningTitle = "late October"
+OpeningSubtitle = "the trailhead lot was empty except for my car"
