@@ -1,0 +1,29 @@
+# Godot generated
+.godot/
+.import/
+*.translation
+export.cfg
+export_credentials.cfg
+
+# .NET build output
+.mono/
+bin/
+obj/
+*.user
+mono_crash.*
+
+# Local builds / test output
+/build/
+/test-output/
+
+# IDE / OS junk
+.vs/
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local tooling state
+.claude/

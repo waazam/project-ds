@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[node name="TrailSlice" type="Node3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4)
+
+[node name="Box" type="CSGBox3D" parent="."]
