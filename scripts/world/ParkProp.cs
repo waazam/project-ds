@@ -17,7 +17,7 @@ public partial class ParkProp : Node3D
 	public enum PropKind
 	{
 		TrailheadSign, InfoBoard, TrashCan, VaultToilet, ParkingBumper, TrailMarker,
-		Backpack, Boot, WalkingStick, CutLog, Boulder,
+		Backpack, Boot, WalkingStick, CutLog, Boulder, TornMap, Tent,
 	}
 
 	[Export] public PropKind Kind = PropKind.TrailMarker;
@@ -58,6 +58,8 @@ public partial class ParkProp : Node3D
 			case PropKind.WalkingStick: WalkingStick(); break;
 			case PropKind.CutLog: CutLog(); break;
 			case PropKind.Boulder: Boulder(); break;
+			case PropKind.TornMap: TornMap(); break;
+			case PropKind.Tent: Tent(); break;
 		}
 		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");
 		if (ClearRadius > 0f && !Engine.IsEditorHint())
@@ -365,5 +367,56 @@ public partial class ParkProp : Node3D
 			_gen.AddChild(_body);
 			_body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.85f } });
 		}
+	}
+
+	private void TornMap()
+	{
+		// A trail map, dropped and rained on: one corner curled up, one torn away.
+		var map = ProcTextures.MapMat;
+		_k.Xf = new Transform3D(Basis.FromEuler(new Vector3(0, 0.5f, 0)), Vector3.Zero);
+		_k.Mat(map);
+		Vector3 crease0 = new(-0.21f, 0.01f, -0.09f), crease1 = new(0.21f, 0.01f, -0.09f);
+		Vector3 far0 = new(-0.19f, 0.03f, 0.29f), far1 = new(0.21f, 0.02f, 0.27f);
+		Vector3 curl0 = new(-0.16f, 0.07f, -0.28f), curl1 = new(0.21f, 0f, -0.29f);   // the curled/torn near edge
+		_k.Color = new Color(0.9f, 0.88f, 0.8f);
+		_k.Quad(curl0, curl1, crease1, crease0, Vector3.Up, new Vector2(0.08f, 0.92f), new Vector2(0.9f, 0.94f), new Vector2(0.92f, 0.5f), new Vector2(0.06f, 0.52f));
+		_k.Color = new Color(0.78f, 0.76f, 0.64f);
+		_k.Quad(crease0, crease1, far1, far0, Vector3.Up, new Vector2(0.06f, 0.5f), new Vector2(0.92f, 0.5f), new Vector2(0.88f, 0.06f), new Vector2(0.1f, 0.08f));
+		_k.Color = Colors.White;
+		_k.Xf = Transform3D.Identity;
+	}
+
+	private void Tent()
+	{
+		// A small ridge tent, settled and leaning: same two-slope roof technique as InfoBoard's gable,
+		// just low and narrow, tilted a few degrees as if one guy-line let go.
+		var canvas = Tint("tent_canvas", new Color(0.30f, 0.34f, 0.22f));
+		var canvasShade = Tint("tent_canvas_shade", new Color(0.19f, 0.23f, 0.14f));
+		var pole = Tint("tent_pole", new Color(0.35f, 0.33f, 0.30f));
+
+		float length = 1.3f, halfWidth = 0.55f, ridgeH = 0.62f, eaveH = 0.05f;
+		var tilt = new Vector3(0, ridgeH - eaveH, halfWidth);
+		float ang = Mathf.Atan2(tilt.Y, tilt.Z);
+		float slopeLen = tilt.Length();
+
+		// The whole tent leans, as if it's settling unevenly into the ground.
+		_k.Xf = new Transform3D(Basis.FromEuler(new Vector3(0.05f, 0.15f, 0.1f)), Vector3.Zero);
+
+		_k.Color = Colors.White;
+		_k.Mat(canvas);
+		_k.Box(new Vector3(0, (ridgeH + eaveH) * 0.5f, halfWidth * 0.5f), new Vector3(length, 0.04f, slopeLen), 1f, Basis.FromEuler(new Vector3(ang, 0, 0)));
+		_k.Mat(canvasShade);
+		_k.Box(new Vector3(0, (ridgeH + eaveH) * 0.5f, -halfWidth * 0.5f), new Vector3(length, 0.04f, slopeLen), 1f, Basis.FromEuler(new Vector3(-ang, 0, 0)));
+
+		// closed front end; the back is left as a torn, open flap (no end cap)
+		_k.Mat(canvasShade);
+		_k.Tri(new Vector3(-length * 0.5f, eaveH, halfWidth), new Vector3(-length * 0.5f, eaveH, -halfWidth), new Vector3(-length * 0.5f, ridgeH, 0),
+			Vector3.Left, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 1));
+
+		_k.Mat(pole);
+		_k.Cylinder(new Vector3(-length * 0.5f, ridgeH, 0), new Vector3(length * 0.5f + 0.12f, ridgeH * 0.96f, 0), 0.025f, 0.02f, 6);
+		_k.Cylinder(new Vector3(-length * 0.5f, 0, 0), new Vector3(-length * 0.5f, ridgeH, 0), 0.03f, 0.025f, 6);
+		_k.Cylinder(new Vector3(length * 0.5f, 0.04f, 0), new Vector3(length * 0.5f, ridgeH * 0.94f, 0), 0.028f, 0.02f, 6);
+		_k.Xf = Transform3D.Identity;
 	}
 }

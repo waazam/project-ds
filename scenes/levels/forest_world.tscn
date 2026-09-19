@@ -375,6 +375,32 @@ Offset = 2.2
 YawDegrees = 0.0
 HeightOffset = 0.0
 
+[node name="TornMap" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 11
+ClearRadius = 0.4
+ClearFoliage = true
+
+[node name="TrailAnchor" type="Node" parent="Props/TornMap"]
+script = ExtResource("6_anchor")
+Distance = 131.0
+Offset = 1.6
+YawDegrees = -20.0
+HeightOffset = 0.0
+
+[node name="ForgottenTent" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 12
+ClearRadius = 1.4
+ClearFoliage = true
+
+[node name="TrailAnchor" type="Node" parent="Props/ForgottenTent"]
+script = ExtResource("6_anchor")
+Distance = 340.0
+Offset = -5.5
+YawDegrees = 15.0
+HeightOffset = 0.0
+
 [node name="SnappedStick" type="Node3D" parent="Props"]
 script = ExtResource("5_prop")
 Kind = 8

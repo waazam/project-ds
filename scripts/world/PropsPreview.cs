@@ -60,6 +60,8 @@ public partial class PropsPreview : Node3D
 		var bridgeSign = root.FindChild("BridgeSign", true, false) as Node3D;
 		var m1 = root.FindChild("Marker_00_1", true, false) as Node3D;
 		var gag = root.FindChild("Marker_05_4", true, false) as Node3D;
+		var tornMap = root.FindChild("TornMap", true, false) as Node3D;
+		var tent = root.FindChild("ForgottenTent", true, false) as Node3D;
 		_terrain.TryGetStreamCrossing(out var cross, out _, out float crossS);
 		Log($"sign {sign?.GlobalPosition} dir {dirSign?.GlobalPosition} bridge {bridge?.GlobalPosition} bridgeSign {bridgeSign?.GlobalPosition} crossS {crossS:0.0}");
 		Vector3 TP(float s) => _terrain.TrailPoint(s, out _);
@@ -76,6 +78,13 @@ public partial class PropsPreview : Node3D
 		if (info != null) { var (a, b) = Front(info, 3.0f, -0.2f, 1.6f); views.Add(("05_info_board", a, b)); }
 		if (m1 != null) { var (a, b) = Front(m1, 2.2f, 0.2f, 0.8f); views.Add(("06_marker_1", a, b)); }
 		if (gag != null) { var (a, b) = Front(gag, 2.2f, 0.2f, 0.8f); views.Add(("07_marker_gag_4", a, b)); }
+		if (tornMap != null) { var (a, b) = Front(tornMap, 1.4f, 0f, 0.05f); views.Add(("07b_torn_map", a, b)); }
+		if (tent != null)
+		{
+			var (a, b) = Front(tent, 3.2f, 0.5f, 0.4f); views.Add(("07c_tent_front", a, b));
+			Vector3 r = tent.GlobalBasis.X;
+			views.Add(("07d_tent_side", EyeAt(tent.GlobalPosition + r * 2.6f), tent.GlobalPosition + new Vector3(0, 0.35f, 0)));
+		}
 		views.Add(("08_bridge_approach", EyeAt(TP(crossS - 12f)), TP(crossS) + new Vector3(0, 0.6f, 0)));
 		if (bridgeSign != null) { var (a, b) = Front(bridgeSign, 2.6f, 0.6f, 0.6f); views.Add(("09_bridge_sign", a, b)); }
 		views.Add(("10_bridge_near", EyeAt(TP(crossS - 6.5f)), TP(crossS + 2f) + new Vector3(0, 0.3f, 0)));
