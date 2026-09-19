@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/ForestTerrain.cs" id="1_terrain"]
 [ext_resource type="Script" path="res://scripts/world/ForestScatter.cs" id="2_scatter"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/world/ClearZone.cs" id="9_clear"]
 [ext_resource type="PackedScene" path="res://scenes/environment/staircase_interior.tscn" id="10_stairs"]
 [ext_resource type="PackedScene" path="res://scenes/environment/footbridge.tscn" id="12_bridge"]
+[ext_resource type="PackedScene" path="res://scenes/environment/cabin.tscn" id="14_cabin"]
 [ext_resource type="Shader" path="res://assets/shaders/sky_dusk.gdshader" id="13_sky"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
@@ -223,6 +224,18 @@ Offset = 0.02
 [node name="SpawnClear" type="Node3D" parent="PlayerSpawn"]
 script = ExtResource("9_clear")
 Radius = 2.0
+
+[node name="Cabin" parent="." instance=ExtResource("14_cabin")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 6, 0, 8)
+
+[node name="GroundSnap" type="Node" parent="Cabin"]
+script = ExtResource("4_snap")
+Offset = -0.05
+FootprintRadius = 2.5
+
+[node name="CabinClear" type="Node3D" parent="Cabin"]
+script = ExtResource("9_clear")
+Radius = 5.5
 
 [node name="Trailhead" type="Node3D" parent="."]
 

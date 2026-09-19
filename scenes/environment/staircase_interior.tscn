@@ -1,11 +1,15 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/StaircaseBuilder.cs" id="1_stairs"]
 [ext_resource type="Script" path="res://scripts/audio/SilenceZone.cs" id="2_silence"]
 [ext_resource type="Script" path="res://scripts/world/ClearZone.cs" id="3_clear"]
+[ext_resource type="Script" path="res://scripts/world/FirstClimbEvent.cs" id="4_climb"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_top"]
 size = Vector3(1.35, 1.8, 1.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_climb"]
+size = Vector3(1.7, 0.8, 0.7)
 
 [node name="StaircaseStone" type="Node3D"]
 script = ExtResource("1_stairs")
@@ -22,6 +26,16 @@ shape = SubResource("BoxShape3D_top")
 
 [node name="AutotestApproach" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.5)
+
+[node name="FirstClimbTrigger" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, -0.3)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("4_climb")
+
+[node name="Shape" type="CollisionShape3D" parent="FirstClimbTrigger"]
+shape = SubResource("BoxShape3D_climb")
 
 [node name="SilenceZone" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.06, -5.525)

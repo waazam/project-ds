@@ -6,6 +6,7 @@ using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Entities;
 using ProjectDS.Player;
+using ProjectDS.World;
 
 namespace ProjectDS.Systems;
 
@@ -137,17 +138,19 @@ public partial class AutoTest : Node
 		// Follow the trail.
 		var route = BuildRoute();
 		Check("trail route found", route.Count > 3, $"{route.Count} points");
+		var steps = _player.GetNode<PlayerFootsteps>("Footsteps");
 		float travelled = 0; var last = _player.GlobalPosition;
 		float nextShotAt = 30f;
 		bool lookedBack = false;
 		int birdsAtStart = (GetTree().Root.FindChild("BirdCalls", true, false) as OneShotEmitter)?.CallsPlayed ?? 0;
+		int stepsBeforeClimb = 0;
 		for (int i = 0; i < route.Count; i++)
 		{
 			// Line up tightly at the foot of the stairs so the climb starts square to the flight.
 			float radius = i == route.Count - 1 ? 0.35f : i == route.Count - 2 ? 0.25f : 2.0f;
 			bool ok = await GoTo(route[i], radius);
 			if (!ok) { Check($"reached waypoint {i}", false, $"stuck at {_player.GlobalPosition} going to {route[i]}"); break; }
-			if (i == route.Count - 2) await StillInSilenceTest();
+			if (i == route.Count - 2) { await StillInSilenceTest(); stepsBeforeClimb = steps.StepsPlayed; }
 			travelled += last.DistanceTo(_player.GlobalPosition); last = _player.GlobalPosition;
 			if (travelled >= nextShotAt) { Screenshot($"trail_{(int)travelled}m"); nextShotAt += 45f; }
 			if (!lookedBack && travelled > 160f) { lookedBack = true; await LookBackTest(); }
@@ -158,22 +161,47 @@ public partial class AutoTest : Node
 		int birdCalls = ((GetTree().Root.FindChild("BirdCalls", true, false) as OneShotEmitter)?.CallsPlayed ?? 0) - birdsAtStart;
 		Check("bird calls happened on the way", birdCalls > 5, $"{birdCalls} calls");
 
-		// On the stairs: the silence should be near total.
+		// Act 2: the first staircase should have taken control away and carried the player to the top.
+		await Wait(1.0);
 		Screenshot("stairs_top");
-		await Drive(Vector2.Zero, false, 0.5);
-		var steps = _player.GetNode<PlayerFootsteps>("Footsteps");
-		Check("footsteps played", steps.StepsPlayed > 50, $"{steps.StepsPlayed}");
-		Check("stone footsteps on stairs", steps.LastSurface == "stone", steps.LastSurface);
+		var topNode = GetTree().GetFirstNodeInGroup("stairs_top_trigger") as Node3D;
+		Check("forced climb reached the top landing", topNode != null && _player.GlobalPosition.DistanceTo(topNode.GlobalPosition) < 1.5f,
+			$"{_player.GlobalPosition}");
+		Check("no footsteps during the forced climb", steps.StepsPlayed - stepsBeforeClimb <= 2, $"{steps.StepsPlayed - stepsBeforeClimb} steps");
 		Check("near-total silence at stairs", (_amb?.Silence ?? 0) > 0.9f, $"silence {_amb?.Silence:0.00}");
 		Check("birds + insects gone", Db("Birds") < -60f && Db("Insects") < -60f, $"{Db("Birds"):0} / {Db("Insects"):0} dB");
 		Check("wind almost gone", Db("Wind") < -25f, $"{Db("Wind"):0.0} dB");
+		Check("checkpoint 2 (stairs climbed) reached", StoryManager.Instance.Current >= Checkpoint.Act2StairsClimbed && StoryManager.Instance.StairsClimbed,
+			$"{StoryManager.Instance.Current}");
+		var save2 = SaveSystem.Load();
+		Check("checkpoint 2 saved to disk", save2 != null && save2.Checkpoint >= Checkpoint.Act2StairsClimbed, $"{save2?.Checkpoint}");
+		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
+		Check("cabin door boarded on the climb", cabin != null && cabin.DoorBoarded, $"cabin found: {cabin != null}");
 
-		// The slice should end after standing on top.
-		double wait = 0;
-		while (!_flow.EndReached && wait < 8) { await Wait(0.25); wait += 0.25; }
-		Check("slice ends on the top step", _flow.EndReached, $"after {wait:0.0}s");
-		await Wait(6.0);
-		Screenshot("end_card");
+		// Control should be back: a scripted nudge should actually move the player now.
+		var beforeNudge = _player.GlobalPosition;
+		await Drive(new Vector2(0, -1), false, 0.6);
+		Check("player control restored after the climb", _player.GlobalPosition.DistanceTo(beforeNudge) > 0.2f,
+			$"{_player.GlobalPosition.DistanceTo(beforeNudge):0.00} m");
+
+		// Act 3: walk all the way back to the cabin and find the door boarded.
+		var back = BuildReturnRoute();
+		Check("return route found", back.Count > 3, $"{back.Count} points");
+		float returned = 0; var lastBack = _player.GlobalPosition;
+		for (int i = 0; i < back.Count; i++)
+		{
+			float radius = i == back.Count - 1 ? 1.2f : 2.0f;
+			bool ok = await GoTo(back[i], radius);
+			if (!ok) { Check($"return waypoint {i}", false, $"stuck at {_player.GlobalPosition} going to {back[i]}"); break; }
+			returned += lastBack.DistanceTo(_player.GlobalPosition); lastBack = _player.GlobalPosition;
+		}
+		Check("walked back toward the cabin", returned > 50f, $"{returned:0} m");
+		double doorWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act3DoorBoarded && doorWait < 10) { await Wait(0.25); doorWait += 0.25; }
+		Screenshot("cabin_boarded");
+		Check("checkpoint 3 (door boarded) reached", StoryManager.Instance.Current >= Checkpoint.Act3DoorBoarded, $"after {doorWait:0.0}s");
+		var save3 = SaveSystem.Load();
+		Check("checkpoint 3 saved to disk", save3 != null && save3.Checkpoint >= Checkpoint.Act3DoorBoarded, $"{save3?.Checkpoint}");
 
 		if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
 		Finish();
@@ -323,6 +351,25 @@ public partial class AutoTest : Node
 			if (stairsBase != null) route.Add(stairsBase.GlobalPosition);
 			route.Add(top.GlobalPosition);
 		}
+		return route;
+	}
+
+	/// <summary>The same hidden test route, walked back toward the trailhead, ending at the cabin door.</summary>
+	private List<Vector3> BuildReturnRoute()
+	{
+		var route = new List<Vector3>();
+		var path = (GetTree().GetFirstNodeInGroup("autotest_route") ?? GetTree().GetFirstNodeInGroup("trail")) as Path3D;
+		if (path is { Curve: not null } trail)
+		{
+			var pts = trail.Curve.GetBakedPoints();
+			float acc = 0; Vector3 prev = pts.Length > 0 ? pts[0] : Vector3.Zero;
+			var all = new List<Vector3>();
+			foreach (var p in pts) { acc += p.DistanceTo(prev); prev = p; if (acc >= 6f || all.Count == 0) { all.Add(trail.GlobalTransform * p); acc = 0; } }
+			all.Add(trail.GlobalTransform * pts[^1]);
+			for (int i = all.Count - 1; i >= 0; i--) route.Add(all[i]);
+		}
+		if (GetTree().GetFirstNodeInGroup("cabin") is Cabin cabin)
+			route.Add(cabin.ApproachPoint);
 		return route;
 	}
 

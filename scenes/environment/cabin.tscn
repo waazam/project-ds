@@ -1,0 +1,20 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/Cabin.cs" id="1_cabin"]
+[ext_resource type="Script" path="res://scripts/world/CabinReturnEvent.cs" id="2_return"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_door"]
+size = Vector3(12, 3, 12)
+
+[node name="Cabin" type="Node3D" groups=["cabin"]]
+script = ExtResource("1_cabin")
+
+[node name="ReturnTrigger" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("2_return")
+
+[node name="Shape" type="CollisionShape3D" parent="ReturnTrigger"]
+shape = SubResource("BoxShape3D_door")

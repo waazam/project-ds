@@ -1,4 +1,4 @@
-[gd_resource type="AudioBusLayout" format=3]
+[gd_resource type="AudioBusLayout" format=3 uid="uid://7gb3bg6km7v1"]
 
 [sub_resource type="AudioEffectHardLimiter" id="MasterLimiter"]
 resource_name = "HardLimiter"
@@ -13,7 +13,6 @@ resource_name = "Reverb"
 room_size = 0.35
 damping = 0.6
 spread = 0.6
-dry = 1.0
 wet = 0.02
 
 [resource]
