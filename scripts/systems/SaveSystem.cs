@@ -10,6 +10,8 @@ public enum Checkpoint
 	Act2StairsClimbed = 2,
 	Act3DoorBoarded = 3,
 	Act5CabinEntered = 4,
+	Act6BridgeCrossed = 5,
+	Act7CabinBurning = 6,
 }
 
 public class SaveData

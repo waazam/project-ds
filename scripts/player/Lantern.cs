@@ -6,7 +6,7 @@ namespace ProjectDS.Player;
 /// A hand lantern the player equips from the cabin porch in Act 3. Rides the
 /// camera. Holding Focus (right mouse — the same button that zooms the
 /// camera) narrows the beam and throws it further, like a real hand tightening
-/// around the glass.
+/// around the glass. [F] toggles the beam itself on and off.
 /// </summary>
 public partial class Lantern : Node3D
 {
@@ -21,6 +21,8 @@ public partial class Lantern : Node3D
 	private SpotLight3D _light;
 	private PlayerController _player;
 	private PlayerInventory _inv;
+	private bool _lit = true;
+	private bool _wasTogglePressed;
 
 	public override void _Ready()
 	{
@@ -45,7 +47,11 @@ public partial class Lantern : Node3D
 		var cam = _player.CameraRig?.Camera;
 		if (cam == null) return;
 		GlobalTransform = cam.GlobalTransform;
-		bool on = _inv.HasLantern;
+		bool toggle = Input.IsActionPressed("flashlight_toggle");
+		if (toggle && !_wasTogglePressed && _inv.HasLantern) _lit = !_lit;
+		_wasTogglePressed = toggle;
+
+		bool on = _inv.HasLantern && _lit;
 		_light.Visible = on;
 		if (!on) return;
 

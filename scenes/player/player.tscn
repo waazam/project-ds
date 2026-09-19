@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/player/PlayerBreathing.cs" id="5_breath"]
 [ext_resource type="Script" path="res://scripts/player/PlayerInventory.cs" id="6_inventory"]
 [ext_resource type="Script" path="res://scripts/player/Lantern.cs" id="7_lantern"]
+[ext_resource type="Script" path="res://scripts/player/CameraTool.cs" id="8_camtool"]
 
 [sub_resource type="CapsuleShape3D" id="Body"]
 radius = 0.3
@@ -112,3 +113,13 @@ script = ExtResource("6_inventory")
 
 [node name="Lantern" type="Node3D" parent="."]
 script = ExtResource("7_lantern")
+
+[node name="CameraTool" type="Node" parent="."]
+script = ExtResource("8_camtool")
+
+[node name="NavAgent" type="NavigationAgent3D" parent="."]
+radius = 0.35
+height = 1.75
+path_desired_distance = 0.8
+target_desired_distance = 0.6
+avoidance_enabled = false

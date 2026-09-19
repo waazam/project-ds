@@ -250,6 +250,43 @@ public static class Ambient
 		return o;
 	}
 
+	/// <summary>Act 7's burning cabin: a low, breathy roar bed with sparse, sharp popping embers on top.</summary>
+	public static double[] FireCrackle(Rng r, int sr, double sec)
+	{
+		int n = (int)(sec * sr), xf = 2 * sr, pre = sr, tot = pre + n + xf;
+		double T = (double)tot / sr;
+		var swell = new Smooth(r, T, 1.4);
+		var pk = new Pink();
+		var roarLp = Biquad.Lp(sr, 900);
+		var roarHp = Biquad.Hp(sr, 90);
+		var x = new double[tot];
+		for (int i = 0; i < tot; i++)
+		{
+			double t = (double)i / sr;
+			double s = 0.7 + 0.3 * swell.At(t);
+			x[i] = roarHp.P(roarLp.P(pk.P(r.W()))) * 1.6 * s;
+		}
+		// Sparse pops: short, sharp, randomly spaced, wrapped so the loop stays seamless.
+		int nPops = (int)(sec * 3.4);
+		for (int p = 0; p < nPops; p++)
+		{
+			double at = r.R(0, sec);
+			double dur = r.R(0.01, 0.045);
+			double amp = r.R(0.4, 1.0);
+			var pf = Biquad.Bp(sr, r.R(1200, 3600), r.R(2.5, 5.0));
+			int len = (int)(dur * sr);
+			for (int i = 0; i < len; i++)
+			{
+				double tt = (double)i / sr;
+				int idx = pre + ((int)(at * sr) + i) % n;
+				x[idx] += pf.P(r.W()) * Perc(tt, 0.0004, dur * 0.6) * amp * 2.2;
+			}
+		}
+		var o = MakeLoop(x, pre, n, xf);
+		NormRms(o, -20);
+		return o;
+	}
+
 	/// <summary>"Silence ringing": thin ~8.2 kHz sine, a 0.25 Hz beating partner for the wobble, all periodic.</summary>
 	public static double[] Ringing(int sr, int sec)
 	{

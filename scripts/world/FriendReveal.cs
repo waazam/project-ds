@@ -7,9 +7,10 @@ using ProjectDS.UI;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Act 5's payoff, inside the cabin: the player finds their friend, who
-/// admits to boarding the door. Fires once the player is close, marks the
-/// final checkpoint of this slice.
+/// Act 5's payoff, inside the cabin: the player finds their friend at the
+/// table, dead — the one who boarded the door, long before help could ever
+/// have come from outside. Fires once the player is close, marks the
+/// checkpoint, and leaves the newel post on the table for the player to find.
 /// </summary>
 public partial class FriendReveal : Area3D
 {
@@ -29,8 +30,9 @@ public partial class FriendReveal : Area3D
 		player.PlayerInput.SetEnabled(false);
 		if (GetTree().Root.FindChild("ScreenFader", true, false) is ScreenFader fader)
 		{
-			await fader.ShowCaption("", "\"...You're okay. Thank god.\"", 1.0f, 3.0f, 1.0f);
-			await fader.ShowCaption("", "\"I boarded it up. I saw something out there and I panicked.\"", 1.0f, 3.5f, 1.0f);
+			await fader.ShowCaption("", "He's in the chair. He's not moving.", 1.0f, 3.0f, 1.0f);
+			await fader.ShowCaption("", "His hand — bandaged, cut clean off. He bled out before he ever boarded that door shut.", 1.2f, 4.0f, 1.2f);
+			await fader.ShowCaption("", "Something sits on the table in front of him.", 1.0f, 2.8f, 1.0f);
 		}
 		player.PlayerInput.SetEnabled(true);
 		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act5CabinEntered, player.GlobalPosition, player.CameraRig.Yaw);

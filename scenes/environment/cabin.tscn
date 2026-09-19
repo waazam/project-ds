@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://scripts/world/SafeZoneWatcher.cs" id="4_safezone"]
 [ext_resource type="Script" path="res://scripts/world/DoorBreakEvent.cs" id="5_break"]
 [ext_resource type="PackedScene" path="res://scenes/entities/friend.tscn" id="6_friend"]
+[ext_resource type="Script" path="res://scripts/world/CabinExitLine.cs" id="7_exitline"]
+[ext_resource type="Script" path="res://scripts/world/CabinFireEvent.cs" id="8_fire"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_door"]
 size = Vector3(12, 3, 12)
@@ -56,3 +58,16 @@ shape = SubResource("BoxShape3D_breakin")
 
 [node name="Friend" parent="." instance=ExtResource("6_friend")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0, -1.6)
+
+[node name="ExitLineTrigger" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 3.0)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("7_exitline")
+
+[node name="Shape" type="CollisionShape3D" parent="ExitLineTrigger"]
+shape = SubResource("BoxShape3D_breakin")
+
+[node name="FireEvent" type="Node" parent="."]
+script = ExtResource("8_fire")

@@ -163,6 +163,14 @@ public partial class Footbridge : Node3D
 			if (Rocks) BuildRocks(gen, tilt, L, pitch);
 			if (Sign) BuildSign(gen, L);
 		}
+
+		var crossing = new BridgeCrossEvent { CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
+		gen.AddChild(crossing);
+		crossing.AddChild(new CollisionShape3D
+		{
+			Transform = tilt * new Transform3D(Basis.Identity, new Vector3(0, deckTop + 1.0f, 0)),
+			Shape = new BoxShape3D { Size = new Vector3(Width + 0.6f, 2.4f, L * 0.92f) },
+		});
 	}
 
 	/// <summary>Rocks piled at both abutments and scattered through the stream bed.</summary>

@@ -30,8 +30,11 @@ var jobs = new List<(string name, string dir, bool loop, int sr, Func<Rng, int, 
 	("undertone_loop", ambient, true, Lo, (r, sr) => Ambient.Undertone(r, sr, 40)),
 	("ringing_loop", ambient, true, Hi, (r, sr) => Ambient.Ringing(sr, 20)),
 	("rain_loop", ambient, true, Lo, (r, sr) => Ambient.Rain(r, sr, 26)),
+	("fire_crackle_loop", ambient, true, Lo, (r, sr) => Ambient.FireCrackle(r, sr, 22)),
 };
 for (int i = 1; i <= 3; i++) jobs.Add(($"thunder_{i:00}", sfx, false, Lo, (r, sr) => Sfx.ThunderCrack(r, sr)));
+jobs.Add(("camera_shutter", sfx, false, Lo, (r, sr) => Sfx.CameraShutter(r, sr)));
+jobs.Add(("distant_scream", sfx, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
 for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"bird_{k:00}", sfx, false, Lo, (r, sr) => Sfx.Bird(k, r, sr))); }
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_dirt_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepDirt(r, sr)));
 for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"step_wood_{k:00}", sfx, false, Lo, (r, sr) => Sfx.StepWood(r, sr, k % 2 == 0))); }

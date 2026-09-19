@@ -26,6 +26,10 @@ public partial class GameSettings : Node
 
 	// Command-line flags (after "--" on the godot command line)
 	public bool AutoTest { get; private set; }
+	/// <summary>Dev-only fast path: the autotest skips straight to the Act 5 → 7 handoff instead
+	/// of replaying the whole game first. Cuts a ~20-minute run down to a couple of minutes while
+	/// iterating on that stretch specifically.</summary>
+	public bool AutoTestSkipToAct5 { get; private set; }
 
 	private const string SavePath = "user://settings.cfg";
 
@@ -34,6 +38,7 @@ public partial class GameSettings : Node
 		Instance = this;
 		var args = OS.GetCmdlineUserArgs();
 		AutoTest = args.Contains("--autotest");
+		AutoTestSkipToAct5 = args.Contains("--skip-to-act5");
 		RegisterInputActions();
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
@@ -85,6 +90,8 @@ public partial class GameSettings : Node
 		AddKeys("pause", Key.Escape);
 		AddKeys("interact", Key.E);
 		AddMouse("focus", MouseButton.Right);
+		AddKeys("flashlight_toggle", Key.F);
+		AddMouse("photo", MouseButton.Left);
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);
@@ -99,6 +106,8 @@ public partial class GameSettings : Node
 		AddButton("pause", JoyButton.Start);
 		AddButton("interact", JoyButton.A);
 		AddAxis("focus", JoyAxis.TriggerRight, 1);
+		AddButton("flashlight_toggle", JoyButton.Y);
+		AddButton("photo", JoyButton.X);
 	}
 
 	private static void Ensure(string action)

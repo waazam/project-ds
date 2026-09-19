@@ -492,6 +492,60 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 40);
 	}
 
+	/// <summary>A camera's mechanical shutter: a sharp mirror-slap click, then a softer closing click ~90 ms later.</summary>
+	public static double[] CameraShutter(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.22);
+		void Click(double at, double amp, double toneHz, double q, double dur)
+		{
+			var bp = Biquad.Bp(sr, toneHz, q);
+			var hp = Biquad.Hp(sr, 1800);
+			int s0 = (int)(at * sr);
+			for (int i = 0; i + s0 < x.Length && i < dur * sr; i++)
+			{
+				double tt = (double)i / sr;
+				double v = bp.P(r.W()) * Perc(tt, 0.0003, dur * 0.35) * 2.4 + hp.P(r.W()) * Perc(tt, 0.0001, dur * 0.2) * 1.2;
+				x[s0 + i] += v * amp;
+			}
+		}
+		Click(0.0, 1.0, 2600, 3.0, 0.02);
+		Click(0.09 + r.R(-0.005, 0.01), 0.55, 1900, 2.4, 0.018);
+		return FinishOneShot(x, sr, -3, 40);
+	}
+
+	/// <summary>
+	/// The fourth bird's answer: a harsh scream, far off and wrong, breaking upward then choking off.
+	/// Heavy distortion and reverb keep it distant rather than a jump-scare stinger.
+	/// </summary>
+	public static double[] DistantScream(Rng r, int sr)
+	{
+		double dur = 1.7;
+		var src = Buf(sr, dur);
+		double f0 = r.R(340, 420);
+		double ph = 0;
+		for (int i = 0; i < src.Length; i++)
+		{
+			double t = (double)i / sr, u = t / dur;
+			double rise = Math.Pow(Math.Min(1, u * 1.8), 0.6);
+			double f = f0 * (1 + 1.3 * rise) * (1 - 0.25 * Math.Max(0, u - 0.75) / 0.25);
+			ph += TwoPi * f / sr;
+			double v = 0;
+			for (int h = 1; h <= 10; h++) if (f * h < sr * 0.45) v += Math.Sin(ph * h) / Math.Pow(h, 0.65);
+			double rough = 0.6 + 0.4 * Math.Sin(TwoPi * 37 * t);
+			double env = Env(u, 0.1, 0.55) * (u > 0.82 ? Math.Max(0, 1 - (u - 0.82) / 0.18) : 1.0);
+			src[i] = Math.Tanh(v * 1.6) * rough * env;
+		}
+		var bp1 = Biquad.Bp(sr, 900, 1.1); var bp2 = Biquad.Bp(sr, 2200, 1.3);
+		var x = new double[src.Length];
+		for (int i = 0; i < src.Length; i++) x[i] = bp1.P(src[i]) * 0.8 + bp2.P(src[i]) * 0.5;
+		// Distance: mostly reverb, dry signal well underneath.
+		var rv = new Reverb(sr, 0.95, 0.6);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) o[i] = x[i] * 0.35 + rv.P(x[i]) * 1.1;
+		LowPass(o, sr, 3400);
+		return FinishOneShot(o, sr, -3, 300);
+	}
+
 	/// <summary>
 	/// The sting when you look straight at it: not a jump scare, just a wrongness
 	/// in the ears. A thin, detuned high cluster swells in, pressure drops away

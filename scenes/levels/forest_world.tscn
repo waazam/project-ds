@@ -14,6 +14,10 @@
 [ext_resource type="Shader" path="res://assets/shaders/sky_dusk.gdshader" id="13_sky"]
 [ext_resource type="PackedScene" path="res://scenes/environment/shed.tscn" id="15_shed"]
 [ext_resource type="Script" path="res://scripts/world/Pickup.cs" id="16_pickup"]
+[ext_resource type="Script" path="res://scripts/world/Bird.cs" id="17_bird"]
+[ext_resource type="Script" path="res://scripts/world/DeepZoneDressing.cs" id="18_dressing"]
+[ext_resource type="Script" path="res://scripts/world/Act6ClearingEvent.cs" id="19_act6"]
+[ext_resource type="Script" path="res://scripts/world/NavMeshBaker.cs" id="20_navbaker"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -89,6 +93,11 @@ _data = {
 point_count = 4
 
 [node name="ForestWorld" type="Node3D"]
+
+[node name="NavRegion" type="NavigationRegion3D" parent="."]
+
+[node name="NavMeshBaker" type="Node" parent="."]
+script = ExtResource("20_navbaker")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Env")
@@ -287,6 +296,62 @@ Offset = -16.0
 YawDegrees = 40.0
 HeightOffset = 0.0
 
+[node name="CameraPickup" type="Area3D" parent="."]
+script = ExtResource("16_pickup")
+Kind = 6
+Label = "Camera"
+
+[node name="TrailAnchor" type="Node" parent="CameraPickup"]
+script = ExtResource("6_anchor")
+Distance = 10.0
+Offset = -2.0
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="Bird1" type="Node3D" parent="."]
+script = ExtResource("17_bird")
+Color = 0
+
+[node name="TrailAnchor" type="Node" parent="Bird1"]
+script = ExtResource("6_anchor")
+Distance = 40.0
+Offset = 3.2
+YawDegrees = 0.0
+HeightOffset = 0.7
+
+[node name="Bird2" type="Node3D" parent="."]
+script = ExtResource("17_bird")
+Color = 1
+
+[node name="TrailAnchor" type="Node" parent="Bird2"]
+script = ExtResource("6_anchor")
+Distance = 95.0
+Offset = -4.5
+YawDegrees = 0.0
+HeightOffset = 0.5
+
+[node name="Bird3" type="Node3D" parent="."]
+script = ExtResource("17_bird")
+Color = 2
+
+[node name="TrailAnchor" type="Node" parent="Bird3"]
+script = ExtResource("6_anchor")
+Distance = 150.0
+Offset = 5.0
+YawDegrees = 0.0
+HeightOffset = 0.6
+
+[node name="Bird4Omen" type="Node3D" parent="."]
+script = ExtResource("17_bird")
+Color = 3
+
+[node name="TrailAnchor" type="Node" parent="Bird4Omen"]
+script = ExtResource("6_anchor")
+Distance = 220.0
+Offset = -7.5
+YawDegrees = 0.0
+HeightOffset = 0.5
+
 [node name="Trailhead" type="Node3D" parent="."]
 
 [node name="TrailheadSign" type="Node3D" parent="Trailhead"]
@@ -394,7 +459,7 @@ script = ExtResource("7_markers")
 Distances = PackedFloat32Array(18, 58, 98, 138, 205, 268, 330, 395, 455)
 Labels = PackedStringArray("1", "2", "3", "4", "5", "4", "6", "7", "8")
 
-[node name="Footbridge" parent="." instance=ExtResource("12_bridge")]
+[node name="Footbridge" parent="." instance=ExtResource("12_bridge") groups=["bridge_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.27, -160)
 
 [node name="Props" type="Node3D" parent="."]
@@ -539,7 +604,7 @@ Offset = -1.5
 YawDegrees = 0.0
 HeightOffset = 0.0
 
-[node name="Clearing" type="Node3D" parent="."]
+[node name="Clearing" type="Node3D" parent="." groups=["stairs_clearing_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 9.5, -605)
 
 [node name="Stairs" parent="Clearing" instance=ExtResource("10_stairs")]
@@ -549,6 +614,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.6)
 script = ExtResource("4_snap")
 Offset = -0.02
 FootprintRadius = 1.2
+
+[node name="Dressing" type="Node3D" parent="Clearing/Stairs"]
+script = ExtResource("18_dressing")
+
+[node name="Act6Clearing" type="Node3D" parent="Clearing/Stairs"]
+script = ExtResource("19_act6")
 
 [node name="StairsClear" type="Node3D" parent="Clearing"]
 script = ExtResource("9_clear")

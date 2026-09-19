@@ -78,6 +78,7 @@ public partial class Pickup : Area3D
 			inv.Consume();
 		}
 		if (!inv.TryPickup(Kind)) return;
+		if (Kind == ToolKind.NewelPost) StoryManager.Instance?.MarkNewelPostTaken();
 		InteractPrompt.Instance?.HidePrompt();
 		QueueFree();
 	}
@@ -117,6 +118,8 @@ public partial class Pickup : Area3D
 			case ToolKind.Axe: BuildAxe(k); break;
 			case ToolKind.Key: BuildKey(k); break;
 			case ToolKind.Hammer: BuildHammer(k); break;
+			case ToolKind.Camera: BuildCamera(k); break;
+			case ToolKind.NewelPost: BuildNewelPost(k); break;
 		}
 		k.CommitTo(gen, "Mesh");
 	}
@@ -174,5 +177,29 @@ public partial class Pickup : Area3D
 		k.Mat(wood).Cylinder(new Vector3(0, 0.02f, 0), new Vector3(0, 0.42f, 0), 0.018f, 0.022f, 6);
 		k.Color = new Color(0.32f, 0.33f, 0.34f);
 		k.Mat(metal).Box(new Vector3(0, 0.42f, 0), new Vector3(0.2f, 0.06f, 0.06f));
+	}
+
+	private static void BuildCamera(MeshKit k)
+	{
+		var body = ProcTextures.Flat("camera_body", new Color(0.12f, 0.12f, 0.13f), 0.75f);
+		var lens = ProcTextures.Flat("camera_lens", new Color(0.08f, 0.09f, 0.1f), 0.15f);
+		var metal = ProcTextures.MetalMat;
+		k.Color = Colors.White;
+		k.Mat(body).Box(new Vector3(0, 0.05f, 0), new Vector3(0.14f, 0.09f, 0.06f));
+		k.Mat(body).Box(new Vector3(0, 0.105f, -0.005f), new Vector3(0.06f, 0.02f, 0.03f));
+		k.Mat(lens).Cylinder(new Vector3(0, 0.05f, 0.035f), new Vector3(0, 0.05f, 0.065f), 0.032f, 0.026f, 8);
+		k.Color = new Color(0.7f, 0.68f, 0.6f);
+		k.Mat(metal).Cylinder(new Vector3(0.04f, 0.1f, 0), new Vector3(0.04f, 0.1f, 0.002f), 0.014f, 0.014f, 6);
+	}
+
+	private static void BuildNewelPost(MeshKit k)
+	{
+		var wood = ProcTextures.WoodMat;
+		k.Color = new Color(0.42f, 0.33f, 0.22f);
+		k.Mat(wood);
+		k.Cylinder(new Vector3(0, 0f, 0), new Vector3(0, 0.05f, 0), 0.045f, 0.05f, 8);
+		k.Cylinder(new Vector3(0, 0.05f, 0), new Vector3(0, 0.16f, 0), 0.038f, 0.038f, 8);
+		k.Color = new Color(0.48f, 0.38f, 0.26f);
+		k.Blob(new Vector3(0, 0.2f, 0), new Vector3(0.05f, 0.055f, 0.05f), 41, 0.12f, false, 0.9f);
 	}
 }

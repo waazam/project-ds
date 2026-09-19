@@ -7,7 +7,8 @@ namespace ProjectDS.Audio;
 /// Act 3's storm: once the player leaves the cabin's safe zone with the
 /// lantern and compass in hand, the forest goes dead silent (the same signal
 /// as the stairs), rain fades in, and lightning flashes with a rolling thunder
-/// crack at random intervals. One-way: it never turns back off once triggered.
+/// crack at random intervals. It runs until <see cref="Deactivate"/> is called
+/// (Act 6's dawn breaks it), which is otherwise never automatic.
 /// </summary>
 public partial class StormController : Node
 {
@@ -55,6 +56,17 @@ public partial class StormController : Node
 		ForestAmbienceManager.Instance.SilenceOverride = 1f;
 		if (_rainLoop != null)
 			CreateTween().TweenProperty(_rainLoop, "Gain", 1f, RainFadeSeconds);
+	}
+
+	/// <summary>Act 6's dawn: the storm breaks. Rain fades out, the forced silence lifts, no more lightning.</summary>
+	public void Deactivate(float fadeSeconds = 6f)
+	{
+		if (!Active) return;
+		Active = false;
+		ForestAmbienceManager.Instance.SilenceOverride = -1f;
+		if (_rainLoop != null)
+			CreateTween().TweenProperty(_rainLoop, "Gain", 0f, fadeSeconds);
+		var c = _flash.Color; c.A = 0f; _flash.Color = c;
 	}
 
 	public override void _Process(double delta)

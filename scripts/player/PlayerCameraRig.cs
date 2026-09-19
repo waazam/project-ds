@@ -82,6 +82,15 @@ public partial class PlayerCameraRig : Node3D
 		ApplyRotation();
 	}
 
+	/// <summary>Forces the pitch directly (clamped to the current mode's limits), for scripted
+	/// camera moments (the top-of-the-stairs look-down) rather than player input.</summary>
+	public void SetPitch(float radians)
+	{
+		float minPitch = IsFirstPerson ? FirstPersonMinPitch : MinPitch;
+		float maxPitch = IsFirstPerson ? FirstPersonMaxPitch : MaxPitch;
+		Pitch = Mathf.Clamp(radians, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
+	}
+
 	private void ApplyMode(CameraMode mode)
 	{
 		if (mode == _mode) return;

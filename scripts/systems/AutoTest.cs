@@ -90,6 +90,15 @@ public partial class AutoTest : Node
 
 		while (!_flow.Started) await Frame();
 		await Wait(1.5);
+
+		if (GameSettings.Instance.AutoTestSkipToAct5)
+		{
+			await SkipToAct5();
+			if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
+			Finish();
+			return;
+		}
+
 		Check("player spawned on ground", _player.IsOnFloor(), $"pos {_player.GlobalPosition}");
 		Screenshot("spawn");
 		if (GameSettings.Instance.Camera == CameraMode.FirstPerson)
@@ -165,8 +174,10 @@ public partial class AutoTest : Node
 		// Act 2: the first staircase should have taken control away and carried the player to the top.
 		// The climb tween eases out at the very end, so GoTo can call the position "arrived" well
 		// before the tween actually fires Finished (and the checkpoint) — poll instead of a fixed wait.
+		// The tween's own tail accounts for a couple of seconds here, plus the forced look-down
+		// off the top step (pan + hold, ~10 s) that now runs before the checkpoint fires.
 		double climbFinishWait = 0;
-		while (StoryManager.Instance.Current < Checkpoint.Act2StairsClimbed && climbFinishWait < 10) { await Wait(0.25); climbFinishWait += 0.25; }
+		while (StoryManager.Instance.Current < Checkpoint.Act2StairsClimbed && climbFinishWait < 16) { await Wait(0.25); climbFinishWait += 0.25; }
 		Screenshot("stairs_top");
 		var topNode = GetTree().GetFirstNodeInGroup("stairs_top_trigger") as Node3D;
 		Check("forced climb reached the top landing", topNode != null && _player.GlobalPosition.DistanceTo(topNode.GlobalPosition) < 1.5f,
@@ -274,14 +285,137 @@ public partial class AutoTest : Node
 		if (atDoor) await GoTo(insideTarget, 1.0f);
 		else { insideTarget.Y = _player.GlobalPosition.Y; _player.GlobalPosition = insideTarget; await Frame(); }
 		double revealWait = 0;
-		while (StoryManager.Instance.Current < Checkpoint.Act5CabinEntered && revealWait < 12) { await Wait(0.25); revealWait += 0.25; }
+		while (StoryManager.Instance.Current < Checkpoint.Act5CabinEntered && revealWait < 24) { await Wait(0.25); revealWait += 0.25; }
 		Screenshot("friend_found");
 		Check("checkpoint 4 (found the friend) reached", StoryManager.Instance.Current >= Checkpoint.Act5CabinEntered, $"after {revealWait:0.1}s");
 		var save4 = SaveSystem.Load();
 		Check("checkpoint 4 saved to disk", save4 != null && save4.Checkpoint >= Checkpoint.Act5CabinEntered, $"{save4?.Checkpoint}");
 
+		await Act6And7(inv, cabin);
+
 		if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
 		Finish();
+	}
+
+	/// <summary>
+	/// Dev-only fast path (--skip-to-act5): fakes Acts 1-5 as already complete — door open,
+	/// lantern/compass in hand, player just inside the cabin — and jumps straight to the Act 5 → 7
+	/// handoff, for fast iteration on that stretch without replaying the whole game first.
+	/// </summary>
+	private async Task SkipToAct5()
+	{
+		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
+		Check("cabin found for skip-to-act5", cabin != null, "");
+		if (cabin == null) return;
+		var inv = _player.GetNode<PlayerInventory>("Inventory");
+		cabin.OpenDoor();
+		inv.TryPickup(ToolKind.Lantern);
+		inv.TryPickup(ToolKind.Compass);
+		_player.GlobalPosition = cabin.ToGlobal(new Vector3(0.3f, 0f, -0.8f));
+		await Frame();
+		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act5CabinEntered, _player.GlobalPosition, _player.CameraRig.Yaw);
+		// Let checkpoint-gated Pickups (the newel post) notice the new checkpoint and reveal
+		// themselves before we go looking for them — their own _Process only runs on real frames.
+		await Wait(0.3);
+		await Act6And7(inv, cabin);
+	}
+
+	/// <summary>Act 5's handoff into Act 6 (newel post, the bridge, the clearing) and Act 7 (the cabin on fire).</summary>
+	private async Task Act6And7(PlayerInventory inv, Cabin cabin)
+	{
+		var newelNode = GetTree().Root.FindChild("NewelPostPickup", true, false) as Node3D;
+		Check("newel post placed on the table", newelNode != null, $"{newelNode?.GlobalPosition}");
+		if (newelNode != null)
+		{
+			await GoTo(newelNode.GlobalPosition, 0.8f);
+			await Tap("interact", 0.15);
+		}
+		Check("newel post taken", inv.HasNewelPost, "");
+		var bridgeMarker = GetTree().GetFirstNodeInGroup("bridge_marker") as Node3D;
+		var objAfterNewel = StoryManager.Instance.ObjectivePosition;
+		Check("compass now points at the bridge", objAfterNewel != null && bridgeMarker != null && objAfterNewel.Value.DistanceTo(bridgeMarker.GlobalPosition) < 3f,
+			$"{objAfterNewel}");
+
+		// Step back outside: the storm should break and dawn should come up. The shed sits
+		// almost dead ahead along the cabin's own local +Z (its front wall is barely 0.4 m
+		// past the shed's near wall — the two structures are placed very close together), so
+		// any straight walk further out along that axis (ApproachPoint, WideApproachPoint)
+		// drives straight into it. Sidestep well clear laterally instead of following that line.
+		await GoTo(cabin.DoorCenter, 0.6f);
+		await GoTo(cabin.GlobalTransform * new Vector3(-6f, 0f, 3f), 1.0f);
+		double dawnWait = 0;
+		while (StormController.Instance is { Active: true } && dawnWait < 8) { await Wait(0.25); dawnWait += 0.25; }
+		Check("storm breaks once the newel post is carried outside", StormController.Instance is { Active: false }, $"after {dawnWait:0.1}s");
+		Screenshot("dawn");
+
+		// Act 6: cross the bridge — some 130 m of open forest away. The cabin and shed sit
+		// tight enough against each other that the bot's blind steering can get boxed in
+		// trying to path around both from right behind the cabin (a real player just looks
+		// and walks around them); the storm/dawn trigger above already proves the actual exit
+		// mechanic works, so snap onto the open trail itself before following it to the bridge.
+		var trailNearCabin = AllTrailWaypoints();
+		if (trailNearCabin.Count > 0)
+		{
+			Vector3 nearest = trailNearCabin[0]; float best = float.MaxValue;
+			foreach (var p in trailNearCabin)
+			{
+				float d = Flat(p).DistanceTo(Flat(cabin.GlobalPosition));
+				if (d < best) { best = d; nearest = p; }
+			}
+			_player.GlobalPosition = nearest;
+			await Frame();
+		}
+		Check("bridge placed in the world", bridgeMarker != null, $"{bridgeMarker?.GlobalPosition}");
+		if (bridgeMarker != null)
+		{
+			var toBridge = BuildTrailRouteTo(bridgeMarker.GlobalPosition);
+			for (int i = 0; i < toBridge.Count; i++)
+				await GoTo(toBridge[i], i == toBridge.Count - 1 ? 1.0f : 3.0f);
+		}
+		Screenshot("bridge_area");
+		double bridgeWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act6BridgeCrossed && bridgeWait < 10) { await Wait(0.25); bridgeWait += 0.25; }
+		Check("checkpoint 5 (bridge crossed) reached", StoryManager.Instance.Current >= Checkpoint.Act6BridgeCrossed, $"after {bridgeWait:0.1}s");
+		var save5 = SaveSystem.Load();
+		Check("checkpoint 5 saved to disk", save5 != null && save5.Checkpoint >= Checkpoint.Act6BridgeCrossed, $"{save5?.Checkpoint}");
+
+		var clearingMarker = GetTree().GetFirstNodeInGroup("stairs_clearing_marker") as Node3D;
+		var objAfterBridge = StoryManager.Instance.ObjectivePosition;
+		Check("compass now points at the clearing", objAfterBridge != null && clearingMarker != null && objAfterBridge.Value.DistanceTo(clearingMarker.GlobalPosition) < 3f,
+			$"{objAfterBridge}");
+
+		// Walk to the clearing (the same one from Act 2, ~450 m further on) — reuse the exact
+		// trail-following route the first climb used, which already proves out this whole
+		// corridor, rather than trusting a long blind hop across the forest again.
+		var clearingRoute = BuildRoute();
+		Check("clearing route found", clearingRoute.Count > 1, $"{clearingRoute.Count} points");
+		for (int i = 0; i < clearingRoute.Count; i++)
+			await GoTo(clearingRoute[i], i == clearingRoute.Count - 1 ? 10f : 2.0f);
+		double voiceWait = 0;
+		while (StoryManager.Instance is { ClearingVoiceHeard: false } && voiceWait < 15) { await Wait(0.5); voiceWait += 0.5; }
+		Screenshot("clearing");
+		Check("the clearing's voice fires and the post fuses", StoryManager.Instance.ClearingVoiceHeard, $"after {voiceWait:0.1}s");
+		Check("newel post consumed by the fusion", !inv.HasNewelPost, "");
+		int miniCount = GetTree().GetNodesInGroup("act6_mini_stairs").Count;
+		Check("fifteen mini staircases appeared", miniCount == 15, $"{miniCount}");
+
+		// Leave the fifteen stairs alone: night should still fall on its own after the fallback delay.
+		var atmosphere = GetTree().Root.FindChild("Atmosphere", true, false) as ForestAtmosphere;
+		double nightWait = 0;
+		while (atmosphere?.CurrentMood != ForestAtmosphere.Mood.Night && nightWait < 12) { await Wait(0.5); nightWait += 0.5; }
+		Check("night falls on its own when the optional stairs are skipped", atmosphere?.CurrentMood == ForestAtmosphere.Mood.Night, $"after {nightWait:0.1}s, mood {atmosphere?.CurrentMood}");
+
+		// Act 7: back to the cabin, now on fire.
+		var backToCabin = BuildReturnRoute();
+		Check("return-to-cabin route found (Act 7)", backToCabin.Count > 3, $"{backToCabin.Count} points");
+		for (int i = 0; i < backToCabin.Count; i++)
+			await GoTo(backToCabin[i], i == backToCabin.Count - 1 ? 1.2f : 2.0f);
+		double fireWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act7CabinBurning && fireWait < 15) { await Wait(0.5); fireWait += 0.5; }
+		Screenshot("cabin_burning");
+		Check("checkpoint 6 (cabin burning) reached", StoryManager.Instance.Current >= Checkpoint.Act7CabinBurning, $"after {fireWait:0.1}s");
+		var save6 = SaveSystem.Load();
+		Check("checkpoint 6 saved to disk", save6 != null && save6.Checkpoint >= Checkpoint.Act7CabinBurning, $"{save6?.Checkpoint}");
 	}
 
 	/// <summary>Presses and releases an input action, as a real key tap would (for interact-driven pickups/puzzles).</summary>
@@ -412,20 +546,26 @@ public partial class AutoTest : Node
 		}
 	}
 
+	/// <summary>The hidden test route (or the trail, if there is no hidden route) baked into ~6 m waypoints.</summary>
+	private List<Vector3> AllTrailWaypoints()
+	{
+		var all = new List<Vector3>();
+		var path = (GetTree().GetFirstNodeInGroup("autotest_route") ?? GetTree().GetFirstNodeInGroup("trail")) as Path3D;
+		if (path is not { Curve: not null } trail) return all;
+		var pts = trail.Curve.GetBakedPoints();
+		float acc = 0; Vector3 prev = pts.Length > 0 ? pts[0] : Vector3.Zero;
+		foreach (var p in pts) { acc += p.DistanceTo(prev); prev = p; if (acc >= 6f || all.Count == 0) { all.Add(trail.GlobalTransform * p); acc = 0; } }
+		all.Add(trail.GlobalTransform * pts[^1]);
+		return all;
+	}
+
 	private List<Vector3> BuildRoute()
 	{
+		var all = AllTrailWaypoints();
 		var route = new List<Vector3>();
-		// The trail no longer leads to the stairs: prefer the level's hidden test route,
-		// which follows the trail and then cuts through the woods.
-		var path = (GetTree().GetFirstNodeInGroup("autotest_route") ?? GetTree().GetFirstNodeInGroup("trail")) as Path3D;
-		if (path is { Curve: not null } trail)
+		if (all.Count > 0)
 		{
-			var pts = trail.Curve.GetBakedPoints();
-			float acc = 0; Vector3 prev = pts.Length > 0 ? pts[0] : Vector3.Zero;
 			// Waypoints every ~6 m, starting from the nearest point ahead of the player.
-			var all = new List<Vector3>();
-			foreach (var p in pts) { acc += p.DistanceTo(prev); prev = p; if (acc >= 6f || all.Count == 0) { all.Add(trail.GlobalTransform * p); acc = 0; } }
-			all.Add(trail.GlobalTransform * pts[^1]);
 			int nearest = 0; float best = float.MaxValue;
 			for (int i = 0; i < all.Count; i++)
 			{
@@ -447,23 +587,46 @@ public partial class AutoTest : Node
 	/// <summary>The same hidden test route, walked back toward the trailhead, ending at the cabin door.</summary>
 	private List<Vector3> BuildReturnRoute()
 	{
+		var all = AllTrailWaypoints();
 		var route = new List<Vector3>();
-		var path = (GetTree().GetFirstNodeInGroup("autotest_route") ?? GetTree().GetFirstNodeInGroup("trail")) as Path3D;
-		if (path is { Curve: not null } trail)
-		{
-			var pts = trail.Curve.GetBakedPoints();
-			float acc = 0; Vector3 prev = pts.Length > 0 ? pts[0] : Vector3.Zero;
-			var all = new List<Vector3>();
-			foreach (var p in pts) { acc += p.DistanceTo(prev); prev = p; if (acc >= 6f || all.Count == 0) { all.Add(trail.GlobalTransform * p); acc = 0; } }
-			all.Add(trail.GlobalTransform * pts[^1]);
-			for (int i = all.Count - 1; i >= 0; i--) route.Add(all[i]);
-		}
+		for (int i = all.Count - 1; i >= 0; i--) route.Add(all[i]);
 		if (GetTree().GetFirstNodeInGroup("cabin") is Cabin cabin)
 		{
 			// Straight in from well out front, so a straight-line walk never clips a side wall.
 			route.Add(cabin.WideApproachPoint);
 			route.Add(cabin.ApproachPoint);
 		}
+		return route;
+	}
+
+	/// <summary>
+	/// Follows the trail from wherever the player currently stands toward <paramref name="target"/>
+	/// (which should sit at or near the trail itself, like the bridge), rather than trusting a
+	/// single blind straight-line walk across open forest to get there.
+	/// </summary>
+	private List<Vector3> BuildTrailRouteTo(Vector3 target)
+	{
+		var all = AllTrailWaypoints();
+		var route = new List<Vector3>();
+		if (all.Count > 0)
+		{
+			int nearest = 0; float best = float.MaxValue;
+			for (int i = 0; i < all.Count; i++)
+			{
+				float d = Flat(all[i]).DistanceTo(Flat(_player.GlobalPosition));
+				if (d < best) { best = d; nearest = i; }
+			}
+			// Walk forward (toward the far end of the trail) if the target is that way, otherwise
+			// backward toward the trailhead — whichever direction actually closes the distance.
+			int step = Flat(all[Mathf.Min(nearest + 1, all.Count - 1)]).DistanceTo(Flat(target))
+				< Flat(all[Mathf.Max(nearest - 1, 0)]).DistanceTo(Flat(target)) ? 1 : -1;
+			for (int i = nearest; i >= 0 && i < all.Count; i += step)
+			{
+				route.Add(all[i]);
+				if (Flat(all[i]).DistanceTo(Flat(target)) < 15f) break;
+			}
+		}
+		route.Add(target);
 		return route;
 	}
 

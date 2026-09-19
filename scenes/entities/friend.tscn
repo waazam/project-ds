@@ -1,6 +1,7 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=27 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/FriendReveal.cs" id="1_reveal"]
+[ext_resource type="Script" path="res://scripts/world/Pickup.cs" id="2_pickup"]
 
 [sub_resource type="StandardMaterial3D" id="Shirt"]
 albedo_color = Color(0.25, 0.32, 0.36, 1)
@@ -11,22 +12,52 @@ albedo_color = Color(0.18, 0.18, 0.2, 1)
 roughness = 1.0
 
 [sub_resource type="StandardMaterial3D" id="Skin"]
-albedo_color = Color(0.7, 0.58, 0.5, 1)
+albedo_color = Color(0.62, 0.52, 0.48, 1)
 roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Bandage"]
+albedo_color = Color(0.82, 0.78, 0.74, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Stain"]
+albedo_color = Color(0.24, 0.03, 0.03, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Wood"]
+albedo_color = Color(0.42, 0.32, 0.22, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="WoodDark"]
+albedo_color = Color(0.3, 0.23, 0.16, 1)
+roughness = 0.95
 
 [sub_resource type="CapsuleMesh" id="Torso"]
 material = SubResource("Shirt")
 radius = 0.22
-height = 0.8
+height = 0.62
 radial_segments = 8
 rings = 2
 
-[sub_resource type="CapsuleMesh" id="Legs"]
+[sub_resource type="CapsuleMesh" id="Thigh"]
 material = SubResource("Pants")
-radius = 0.17
-height = 0.9
-radial_segments = 8
-rings = 2
+radius = 0.14
+height = 0.5
+radial_segments = 6
+rings = 1
+
+[sub_resource type="CapsuleMesh" id="Shin"]
+material = SubResource("Pants")
+radius = 0.12
+height = 0.46
+radial_segments = 6
+rings = 1
+
+[sub_resource type="CapsuleMesh" id="Arm"]
+material = SubResource("Skin")
+radius = 0.075
+height = 0.42
+radial_segments = 6
+rings = 1
 
 [sub_resource type="SphereMesh" id="Head"]
 material = SubResource("Skin")
@@ -35,25 +66,143 @@ height = 0.26
 radial_segments = 8
 rings = 5
 
+[sub_resource type="CapsuleMesh" id="Stump"]
+material = SubResource("Bandage")
+radius = 0.08
+height = 0.16
+radial_segments = 6
+rings = 1
+
+[sub_resource type="BoxMesh" id="ChairSeat"]
+material = SubResource("WoodDark")
+size = Vector3(0.42, 0.06, 0.42)
+
+[sub_resource type="BoxMesh" id="ChairBack"]
+material = SubResource("WoodDark")
+size = Vector3(0.42, 0.5, 0.05)
+
+[sub_resource type="BoxMesh" id="ChairLeg"]
+material = SubResource("WoodDark")
+size = Vector3(0.05, 0.46, 0.05)
+
+[sub_resource type="BoxMesh" id="TableTop"]
+material = SubResource("Wood")
+size = Vector3(1.1, 0.06, 0.7)
+
+[sub_resource type="BoxMesh" id="TableStain"]
+material = SubResource("Stain")
+size = Vector3(0.22, 0.01, 0.18)
+
+[sub_resource type="BoxMesh" id="TableLeg"]
+material = SubResource("WoodDark")
+size = Vector3(0.06, 0.6, 0.06)
+
 [sub_resource type="SphereShape3D" id="RevealShape"]
 radius = 3.2
 
 [node name="Friend" type="Node3D"]
 
-[node name="Legs" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
-mesh = SubResource("Legs")
+[node name="Chair" type="Node3D" parent="."]
 
-[node name="Torso" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, 0)
+[node name="Seat" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.46, 0)
+mesh = SubResource("ChairSeat")
+
+[node name="Back" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.82, -0.24)
+mesh = SubResource("ChairBack")
+
+[node name="LegFL" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.19, 0.23, 0.19)
+mesh = SubResource("ChairLeg")
+
+[node name="LegFR" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.19, 0.23, 0.19)
+mesh = SubResource("ChairLeg")
+
+[node name="LegBL" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.19, 0.23, -0.19)
+mesh = SubResource("ChairLeg")
+
+[node name="LegBR" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.19, 0.23, -0.19)
+mesh = SubResource("ChairLeg")
+
+[node name="Body" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.03)
+
+[node name="ThighL" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0.12, 0.52, 0.16)
+mesh = SubResource("Thigh")
+
+[node name="ThighR" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, -0.12, 0.52, 0.16)
+mesh = SubResource("Thigh")
+
+[node name="ShinL" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0.27, 0.36)
+mesh = SubResource("Shin")
+
+[node name="ShinR" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.27, 0.36)
+mesh = SubResource("Shin")
+
+[node name="Torso" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(0.9925, -0.1219, 0, 0.1219, 0.9925, 0, 0, 0, 1, 0, 0.92, 0.05)
 mesh = SubResource("Torso")
 
-[node name="Head" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.68, -0.02)
+[node name="Head" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(0.9962, -0.0872, 0, 0.0872, 0.9962, 0, 0, 0, 1, 0.01, 1.28, 0.16)
 mesh = SubResource("Head")
 
+[node name="ArmL" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(0.766, 0.643, 0, -0.643, 0.766, 0, 0, 0, 1, 0.24, 0.75, 0.28)
+mesh = SubResource("Arm")
+
+[node name="StumpWrist" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 0.5, 0.42)
+mesh = SubResource("Stump")
+
+[node name="ArmR" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(0.766, -0.643, 0, 0.643, 0.766, 0, 0, 0, 1, -0.24, 0.75, 0.28)
+mesh = SubResource("Arm")
+
+[node name="Table" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.85)
+
+[node name="Top" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+mesh = SubResource("TableTop")
+
+[node name="Stain" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.646, -0.28)
+mesh = SubResource("TableStain")
+
+[node name="LegFL" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.3, 0.22)
+mesh = SubResource("TableLeg")
+
+[node name="LegFR" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.3, 0.22)
+mesh = SubResource("TableLeg")
+
+[node name="LegBL" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.3, -0.22)
+mesh = SubResource("TableLeg")
+
+[node name="LegBR" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.3, -0.22)
+mesh = SubResource("TableLeg")
+
+[node name="NewelPostPickup" type="Area3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 0.65, 0)
+script = ExtResource("2_pickup")
+Kind = 7
+Label = "Newel Post"
+RequiredCheckpoint = 4
+
 [node name="Reveal" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0.4)
 collision_layer = 0
 collision_mask = 2
 monitorable = false

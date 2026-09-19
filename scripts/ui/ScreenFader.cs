@@ -46,6 +46,14 @@ public partial class ScreenFader : CanvasLayer
 
 	public void SetBlack(bool black) => _black.Color = new Color(0, 0, 0, black ? 1 : 0);
 
+	/// <summary>Direct, per-frame control of the black overlay's alpha (0 = clear, 1 = fully black),
+	/// for effects driven frame-by-frame elsewhere (a blink, a strobe) rather than a one-shot tween.</summary>
+	public float BlackAlpha
+	{
+		get => _black.Color.A;
+		set { var c = _black.Color; c.A = Mathf.Clamp(value, 0f, 1f); _black.Color = c; }
+	}
+
 	public async Task Fade(float toAlpha, float seconds)
 	{
 		var tween = CreateTween();

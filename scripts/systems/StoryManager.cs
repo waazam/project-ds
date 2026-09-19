@@ -20,20 +20,40 @@ public partial class StoryManager : Node
 	public bool StairsClimbed { get; private set; }
 	/// <summary>Runtime only, never saved: the Act 4 set-piece fires once per attempt, then the compass repoints home.</summary>
 	public bool GiantEventDone { get; private set; }
+	/// <summary>Runtime only: the newel post found on the friend's table has been taken (Act 5 → 6 handoff).</summary>
+	public bool NewelPostTaken { get; private set; }
+	/// <summary>Runtime only: the clearing's voice line has played and the post has fused onto a staircase.</summary>
+	public bool ClearingVoiceHeard { get; private set; }
 
-	/// <summary>Where the compass points: the stairs while still searching, the cabin once the giant has been seen.</summary>
+	/// <summary>
+	/// Where the compass points: the stairs while still searching for them, the cabin once the giant
+	/// has been seen, the bridge once the newel post is in hand, the Act 6 clearing once the bridge is
+	/// crossed, and back to the cabin once the clearing's voice has spoken.
+	/// </summary>
 	public Vector3? ObjectivePosition
 	{
 		get
 		{
 			if (Current < Checkpoint.Act3DoorBoarded) return null;
-			if (!GiantEventDone)
-				return GetTree().GetFirstNodeInGroup("stairs_top_trigger") is Node3D top ? top.GlobalPosition : null;
-			return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabin ? cabin.GlobalPosition : null;
+			if (Current < Checkpoint.Act5CabinEntered)
+			{
+				if (!GiantEventDone)
+					return GetTree().GetFirstNodeInGroup("stairs_top_trigger") is Node3D top ? top.GlobalPosition : null;
+				return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabin ? cabin.GlobalPosition : null;
+			}
+			if (!NewelPostTaken)
+				return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabinFriend ? cabinFriend.GlobalPosition : null;
+			if (Current < Checkpoint.Act6BridgeCrossed)
+				return GetTree().GetFirstNodeInGroup("bridge_marker") is Node3D bridge ? bridge.GlobalPosition : null;
+			if (!ClearingVoiceHeard)
+				return GetTree().GetFirstNodeInGroup("stairs_clearing_marker") is Node3D clearing ? clearing.GlobalPosition : null;
+			return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabinReturn ? cabinReturn.GlobalPosition : null;
 		}
 	}
 
 	public void MarkGiantEventDone() => GiantEventDone = true;
+	public void MarkNewelPostTaken() => NewelPostTaken = true;
+	public void MarkClearingVoiceHeard() => ClearingVoiceHeard = true;
 
 	/// <summary>True for one scene load: GameFlow should place the player from the saved data, not the spawn marker.</summary>
 	public bool HasPendingContinue { get; private set; }
@@ -48,6 +68,8 @@ public partial class StoryManager : Node
 		Current = Checkpoint.None;
 		StairsClimbed = false;
 		GiantEventDone = false;
+		NewelPostTaken = false;
+		ClearingVoiceHeard = false;
 		HasPendingContinue = false;
 		_continueData = null;
 		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller.
@@ -64,6 +86,8 @@ public partial class StoryManager : Node
 		Current = data.Checkpoint;
 		StairsClimbed = data.StairsClimbed;
 		GiantEventDone = false;
+		NewelPostTaken = false;
+		ClearingVoiceHeard = false;
 		GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, LevelScene);
 		return true;
 	}
