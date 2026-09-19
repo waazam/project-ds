@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/ForestTerrain.cs" id="1_terrain"]
 [ext_resource type="Script" path="res://scripts/world/ForestScatter.cs" id="2_scatter"]
@@ -12,6 +12,8 @@
 [ext_resource type="PackedScene" path="res://scenes/environment/footbridge.tscn" id="12_bridge"]
 [ext_resource type="PackedScene" path="res://scenes/environment/cabin.tscn" id="14_cabin"]
 [ext_resource type="Shader" path="res://assets/shaders/sky_dusk.gdshader" id="13_sky"]
+[ext_resource type="PackedScene" path="res://scenes/environment/shed.tscn" id="15_shed"]
+[ext_resource type="Script" path="res://scripts/world/Pickup.cs" id="16_pickup"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -226,7 +228,13 @@ script = ExtResource("9_clear")
 Radius = 2.0
 
 [node name="Cabin" parent="." instance=ExtResource("14_cabin")]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 6, 0, 8)
+
+[node name="TrailAnchor" type="Node" parent="Cabin"]
+script = ExtResource("6_anchor")
+Distance = 45.0
+Offset = 7.0
+YawDegrees = 90.0
+HeightOffset = 0.0
 
 [node name="GroundSnap" type="Node" parent="Cabin"]
 script = ExtResource("4_snap")
@@ -236,6 +244,48 @@ FootprintRadius = 2.5
 [node name="CabinClear" type="Node3D" parent="Cabin"]
 script = ExtResource("9_clear")
 Radius = 5.5
+
+[node name="Shed" parent="." instance=ExtResource("15_shed")]
+
+[node name="TrailAnchor" type="Node" parent="Shed"]
+script = ExtResource("6_anchor")
+Distance = 45.0
+Offset = 11.0
+YawDegrees = 90.0
+HeightOffset = 0.0
+
+[node name="GroundSnap" type="Node" parent="Shed"]
+script = ExtResource("4_snap")
+Offset = -0.04
+FootprintRadius = 1.4
+
+[node name="ShedClear" type="Node3D" parent="Shed"]
+script = ExtResource("9_clear")
+Radius = 3.0
+
+[node name="KeyPickup" type="Area3D" parent="."]
+script = ExtResource("16_pickup")
+Kind = 4
+Label = "Key"
+
+[node name="TrailAnchor" type="Node" parent="KeyPickup"]
+script = ExtResource("6_anchor")
+Distance = 402.0
+Offset = 1.8
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="AxePickup" type="Area3D" parent="."]
+script = ExtResource("16_pickup")
+Kind = 3
+Label = "Axe"
+
+[node name="TrailAnchor" type="Node" parent="AxePickup"]
+script = ExtResource("6_anchor")
+Distance = 158.0
+Offset = -16.0
+YawDegrees = 40.0
+HeightOffset = 0.0
 
 [node name="Trailhead" type="Node3D" parent="."]
 

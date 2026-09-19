@@ -437,6 +437,32 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 400);
 	}
 
+	/// <summary>A lightning strike: a sharp crack, then a long rolling rumble that dies away unevenly.</summary>
+	public static double[] ThunderCrack(Rng r, int sr)
+	{
+		double dur = r.R(4.5, 7.5);
+		var x = Buf(sr, dur);
+		var crackHp = Biquad.Hp(sr, 700); var crackLp = Biquad.Lp(sr, r.R(3000, 4500));
+		for (int i = 0; i < (int)(0.15 * sr) && i < x.Length; i++)
+			x[i] += crackHp.P(crackLp.P(r.W())) * Perc((double)i / sr, 0.0008, 0.02) * 4.0;
+
+		var rl1 = Biquad.Lp(sr, r.R(55, 90)); var rl2 = Biquad.Lp(sr, r.R(120, 200));
+		var swellA = new Smooth(r, dur, r.R(0.5, 1.1));
+		var swellB = new Smooth(r, dur, r.R(1.5, 3.0));
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			double env = Perc(Math.Max(t - 0.05, 0), 0.35, r.R(1.4, 2.6)) * (0.55 + 0.45 * swellB.At(t));
+			double v = rl2.P(rl1.P(r.W()));
+			x[i] += v * env * 7.0 * (0.6 + 0.4 * swellA.At(t));
+		}
+		HighPass(x, sr, 22);
+		double pk2 = 0; foreach (var v in x) pk2 = Math.Max(pk2, Math.Abs(v));
+		double drive2 = 4.5 / Math.Max(pk2, 1e-9);
+		for (int i = 0; i < x.Length; i++) x[i] = Math.Tanh(x[i] * drive2);
+		return FinishOneShot(x, sr, -3, 600);
+	}
+
 	/// <summary>
 	/// One soft breath, in or out, mostly through the nose: warm, pre-softened
 	/// noise through one broad low resonance, with the top rolled off hard. No

@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/Shed.cs" id="1_shed"]
+[ext_resource type="Script" path="res://scripts/world/Pickup.cs" id="2_pickup"]
+
+[node name="Shed" type="Node3D"]
+script = ExtResource("1_shed")
+
+[node name="HammerPickup" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5)
+script = ExtResource("2_pickup")
+Kind = 5
+Label = "Hammer"
+RequiredKey = 4

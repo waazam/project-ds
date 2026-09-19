@@ -16,19 +16,26 @@ public partial class Cabin : Node3D
 	[Export] public float Width = 4.2f;
 	[Export] public float Depth = 5.2f;
 	[Export] public float WallHeight = 2.3f;
-	[Export] public float DoorWidth = 0.95f;
+	[Export] public float DoorWidth = 1.3f;
 	[Export] public float DoorHeight = 2.0f;
 	[Export] public int Seed = 3;
 	[Export] public bool BuildCollision = true;
 
 	public bool DoorBoarded { get; private set; }
+	public bool IsOpen { get; private set; }
 	/// <summary>World-space centre of the door, for triggers to line up against.</summary>
 	public Vector3 DoorCenter => GlobalTransform * new Vector3(0, DoorHeight * 0.5f, Depth * 0.5f);
 	/// <summary>A walkable point a few metres out from the door, clear of the walls.</summary>
 	public Vector3 ApproachPoint => GlobalTransform * new Vector3(0, 0, Depth * 0.5f + 2.5f);
+	/// <summary>Well out in front of the door, clear of the building from any direction, for routing around it.</summary>
+	public Vector3 WideApproachPoint => GlobalTransform * new Vector3(0, 0, Depth * 0.5f + 12f);
+	/// <summary>A point just inside the doorway, for the player to be guided or teleported to.</summary>
+	public Vector3 InsidePoint => GlobalTransform * new Vector3(0, 0, Depth * 0.5f - 1.2f);
 
 	private Node3D _gen;
 	private Node3D _planks;
+	private MeshInstance3D _doorMesh;
+	private CollisionShape3D _doorCollision;
 
 	public override void _Ready() => Build();
 
@@ -96,13 +103,17 @@ public partial class Cabin : Node3D
 		k.Box(new Vector3(chX, (WallHeight + 1.6f) * 0.5f, chZ), new Vector3(0.55f, WallHeight + 1.6f, 0.55f), 1.5f);
 		k.Color = Colors.White;
 
-		// closed door filling the opening: always solid, so the cabin is never actually enterable in this slice
-		k.Color = new Color(0.22f, 0.16f, 0.11f);
-		k.Mat(doorMat);
-		k.Box(new Vector3(0, DoorHeight * 0.5f, hd), new Vector3(DoorWidth - 0.02f, DoorHeight - 0.02f, 0.06f), 1.3f);
-		k.Color = Colors.White;
-
 		k.CommitTo(_gen, "CabinMesh");
+
+		// The closed door: its own mesh (separate from the walls) so OpenDoor() can remove just this.
+		if (!IsOpen)
+		{
+			var dk = new MeshKit();
+			dk.Color = new Color(0.22f, 0.16f, 0.11f);
+			dk.Mat(doorMat);
+			dk.Box(new Vector3(0, DoorHeight * 0.5f, hd), new Vector3(DoorWidth - 0.02f, DoorHeight - 0.02f, 0.06f), 1.3f);
+			_doorMesh = dk.CommitTo(_gen, "DoorMesh");
+		}
 
 		if (BuildCollision && !Engine.IsEditorHint())
 		{
@@ -117,11 +128,17 @@ public partial class Cabin : Node3D
 				body.AddChild(new CollisionShape3D { Position = new Vector3(-(dw + sideW * 0.5f), WallHeight * 0.5f, hd), Shape = new BoxShape3D { Size = new Vector3(sideW, WallHeight, wallT + 0.1f) } });
 				body.AddChild(new CollisionShape3D { Position = new Vector3(dw + sideW * 0.5f, WallHeight * 0.5f, hd), Shape = new BoxShape3D { Size = new Vector3(sideW, WallHeight, wallT + 0.1f) } });
 			}
-			body.AddChild(new CollisionShape3D { Position = new Vector3(0, DoorHeight * 0.5f, hd), Shape = new BoxShape3D { Size = new Vector3(DoorWidth, DoorHeight, wallT + 0.1f) } });
+			_doorCollision = new CollisionShape3D
+			{
+				Position = new Vector3(0, DoorHeight * 0.5f, hd),
+				Shape = new BoxShape3D { Size = new Vector3(DoorWidth, DoorHeight, wallT + 0.1f) },
+				Disabled = IsOpen,
+			};
+			body.AddChild(_doorCollision);
 			body.AddChild(new CollisionShape3D { Position = new Vector3(chX, (WallHeight + 1.6f) * 0.5f, chZ), Shape = new BoxShape3D { Size = new Vector3(0.55f, WallHeight + 1.6f, 0.55f) } });
 		}
 
-		if (DoorBoarded) BuildPlanks();
+		if (DoorBoarded && !IsOpen) BuildPlanks();
 	}
 
 	/// <summary>Nails 3 rough planks across the doorway. Purely visual: the door underneath was already solid.</summary>
@@ -131,6 +148,16 @@ public partial class Cabin : Node3D
 		DoorBoarded = boarded;
 		if (_planks != null) { _planks.QueueFree(); _planks = null; }
 		if (boarded) BuildPlanks();
+	}
+
+	/// <summary>Chopped or pried open: the door and any planks come off for good, and the doorway is walkable.</summary>
+	public void OpenDoor()
+	{
+		if (IsOpen) return;
+		IsOpen = true;
+		SetBoarded(false);
+		if (_doorMesh != null) { _doorMesh.QueueFree(); _doorMesh = null; }
+		if (_doorCollision != null) _doorCollision.Disabled = true;
 	}
 
 	private void BuildPlanks()

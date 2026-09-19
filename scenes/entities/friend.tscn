@@ -1,0 +1,63 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/FriendReveal.cs" id="1_reveal"]
+
+[sub_resource type="StandardMaterial3D" id="Shirt"]
+albedo_color = Color(0.25, 0.32, 0.36, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Pants"]
+albedo_color = Color(0.18, 0.18, 0.2, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Skin"]
+albedo_color = Color(0.7, 0.58, 0.5, 1)
+roughness = 1.0
+
+[sub_resource type="CapsuleMesh" id="Torso"]
+material = SubResource("Shirt")
+radius = 0.22
+height = 0.8
+radial_segments = 8
+rings = 2
+
+[sub_resource type="CapsuleMesh" id="Legs"]
+material = SubResource("Pants")
+radius = 0.17
+height = 0.9
+radial_segments = 8
+rings = 2
+
+[sub_resource type="SphereMesh" id="Head"]
+material = SubResource("Skin")
+radius = 0.12
+height = 0.26
+radial_segments = 8
+rings = 5
+
+[sub_resource type="SphereShape3D" id="RevealShape"]
+radius = 3.2
+
+[node name="Friend" type="Node3D"]
+
+[node name="Legs" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("Legs")
+
+[node name="Torso" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, 0)
+mesh = SubResource("Torso")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.68, -0.02)
+mesh = SubResource("Head")
+
+[node name="Reveal" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("1_reveal")
+
+[node name="Shape" type="CollisionShape3D" parent="Reveal"]
+shape = SubResource("RevealShape")

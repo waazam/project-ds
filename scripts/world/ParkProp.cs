@@ -136,7 +136,7 @@ public partial class ParkProp : Node3D
 
 		float face = z + pt * 0.5f;
 		var fb = Basis.Identity;
-		SignKit.Text(_gen, "HARROW CREEK", new Vector3(0, centers[0] - 0.005f, face), fb, 0.23f);
+		SignKit.Text(_gen, "CULLEN CREEK", new Vector3(0, centers[0] - 0.005f, face), fb, 0.23f);
 		SignKit.Text(_gen, "NATIONAL PARK", new Vector3(0, centers[1] + 0.02f, face), fb, 0.17f);
 		SignKit.Text(_gen, "Blackfern Trail   2.1 mi", new Vector3(0, centers[2] + 0.055f, face), fb, 0.12f);
 		SignKit.Text(_gen, "Clearwater Loop   CLOSED", new Vector3(0, centers[2] - 0.065f, face), fb, 0.1f, SignKit.Carve * 0.8f);

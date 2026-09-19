@@ -23,7 +23,7 @@ public partial class Footbridge : Node3D
 	[Export] public float PostSpacing = 1.9f;
 	[Export] public bool Rocks = true;
 	[Export] public bool Sign = true;
-	[Export] public string[] SignBoards = { "Blackfern Trail >", "Harrow Creek" };
+	[Export] public string[] SignBoards = { "Blackfern Trail >", "Cullen Creek" };
 	[Export] public int Seed = 7;
 
 	private ForestTerrain _terrain;

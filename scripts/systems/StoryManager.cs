@@ -18,6 +18,22 @@ public partial class StoryManager : Node
 
 	public Checkpoint Current { get; private set; } = Checkpoint.None;
 	public bool StairsClimbed { get; private set; }
+	/// <summary>Runtime only, never saved: the Act 4 set-piece fires once per attempt, then the compass repoints home.</summary>
+	public bool GiantEventDone { get; private set; }
+
+	/// <summary>Where the compass points: the stairs while still searching, the cabin once the giant has been seen.</summary>
+	public Vector3? ObjectivePosition
+	{
+		get
+		{
+			if (Current < Checkpoint.Act3DoorBoarded) return null;
+			if (!GiantEventDone)
+				return GetTree().GetFirstNodeInGroup("stairs_top_trigger") is Node3D top ? top.GlobalPosition : null;
+			return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabin ? cabin.GlobalPosition : null;
+		}
+	}
+
+	public void MarkGiantEventDone() => GiantEventDone = true;
 
 	/// <summary>True for one scene load: GameFlow should place the player from the saved data, not the spawn marker.</summary>
 	public bool HasPendingContinue { get; private set; }
@@ -31,6 +47,7 @@ public partial class StoryManager : Node
 	{
 		Current = Checkpoint.None;
 		StairsClimbed = false;
+		GiantEventDone = false;
 		HasPendingContinue = false;
 		_continueData = null;
 		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller.
@@ -46,6 +63,7 @@ public partial class StoryManager : Node
 		HasPendingContinue = true;
 		Current = data.Checkpoint;
 		StairsClimbed = data.StairsClimbed;
+		GiantEventDone = false;
 		GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, LevelScene);
 		return true;
 	}

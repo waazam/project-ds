@@ -225,6 +225,31 @@ public static class Ambient
 		return o;
 	}
 
+	/// <summary>Steady drizzle: filtered noise hiss with a higher patter band, duller and busier than wind.</summary>
+	public static double[] Rain(Rng r, int sr, double sec)
+	{
+		int n = (int)(sec * sr), xf = 2 * sr, pre = sr, tot = pre + n + xf;
+		double T = (double)tot / sr;
+		var swell = new Smooth(r, T, 0.6);
+		var pk = new Pink();
+		var hp = Biquad.Hp(sr, 650);
+		var lp = Biquad.Lp(sr, 5400);
+		var patter = Biquad.Bp(sr, 3400, 0.8);
+		var x = new double[tot];
+		for (int i = 0; i < tot; i++)
+		{
+			double t = (double)i / sr;
+			double s = 0.75 + 0.25 * swell.At(t);
+			double w = r.W();
+			double body = lp.P(hp.P(pk.P(w)));
+			double crackle = patter.P(w) * 0.4;
+			x[i] = (body * 0.8 + crackle) * s;
+		}
+		var o = MakeLoop(x, pre, n, xf);
+		NormRms(o, -19);
+		return o;
+	}
+
 	/// <summary>"Silence ringing": thin ~8.2 kHz sine, a 0.25 Hz beating partner for the wobble, all periodic.</summary>
 	public static double[] Ringing(int sr, int sec)
 	{

@@ -4,6 +4,8 @@
 [ext_resource type="Script" path="res://scripts/ui/ScreenFader.cs" id="2_fader"]
 [ext_resource type="Script" path="res://scripts/ui/PauseMenu.cs" id="3_pause"]
 [ext_resource type="Script" path="res://scripts/ui/DebugOverlay.cs" id="4_debug"]
+[ext_resource type="Script" path="res://scripts/ui/InteractPrompt.cs" id="5_prompt"]
+[ext_resource type="Script" path="res://scripts/ui/Compass.cs" id="6_compass"]
 
 [sub_resource type="ShaderMaterial" id="PostMat"]
 shader = ExtResource("1_post")
@@ -30,3 +32,9 @@ script = ExtResource("3_pause")
 
 [node name="DebugOverlay" type="CanvasLayer" parent="."]
 script = ExtResource("4_debug")
+
+[node name="InteractPrompt" type="CanvasLayer" parent="."]
+script = ExtResource("5_prompt")
+
+[node name="Compass" type="CanvasLayer" parent="."]
+script = ExtResource("6_compass")

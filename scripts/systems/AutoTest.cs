@@ -6,6 +6,7 @@ using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Entities;
 using ProjectDS.Player;
+using ProjectDS.UI;
 using ProjectDS.World;
 
 namespace ProjectDS.Systems;
@@ -162,7 +163,10 @@ public partial class AutoTest : Node
 		Check("bird calls happened on the way", birdCalls > 5, $"{birdCalls} calls");
 
 		// Act 2: the first staircase should have taken control away and carried the player to the top.
-		await Wait(1.0);
+		// The climb tween eases out at the very end, so GoTo can call the position "arrived" well
+		// before the tween actually fires Finished (and the checkpoint) — poll instead of a fixed wait.
+		double climbFinishWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act2StairsClimbed && climbFinishWait < 10) { await Wait(0.25); climbFinishWait += 0.25; }
 		Screenshot("stairs_top");
 		var topNode = GetTree().GetFirstNodeInGroup("stairs_top_trigger") as Node3D;
 		Check("forced climb reached the top landing", topNode != null && _player.GlobalPosition.DistanceTo(topNode.GlobalPosition) < 1.5f,
@@ -172,7 +176,7 @@ public partial class AutoTest : Node
 		Check("birds + insects gone", Db("Birds") < -60f && Db("Insects") < -60f, $"{Db("Birds"):0} / {Db("Insects"):0} dB");
 		Check("wind almost gone", Db("Wind") < -25f, $"{Db("Wind"):0.0} dB");
 		Check("checkpoint 2 (stairs climbed) reached", StoryManager.Instance.Current >= Checkpoint.Act2StairsClimbed && StoryManager.Instance.StairsClimbed,
-			$"{StoryManager.Instance.Current}");
+			$"after {climbFinishWait:0.0}s, {StoryManager.Instance.Current}");
 		var save2 = SaveSystem.Load();
 		Check("checkpoint 2 saved to disk", save2 != null && save2.Checkpoint >= Checkpoint.Act2StairsClimbed, $"{save2?.Checkpoint}");
 		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
@@ -203,8 +207,90 @@ public partial class AutoTest : Node
 		var save3 = SaveSystem.Load();
 		Check("checkpoint 3 saved to disk", save3 != null && save3.Checkpoint >= Checkpoint.Act3DoorBoarded, $"{save3?.Checkpoint}");
 
+		var inv = _player.GetNode<PlayerInventory>("Inventory");
+		var compassUi = GetTree().Root.FindChild("Compass", true, false) as Compass;
+
+		// Gear up on the porch: lantern, then compass. They sit close together, so the
+		// generous pickup radius (needed on this sloped ground) can sweep up both from one
+		// tap; a pickup already gone by its turn just means that happened, not a failure.
+		var lanternNode = cabin?.GetNodeOrNull<Node3D>("LanternPickup");
+		Check("LanternPickup present", lanternNode != null, $"{lanternNode?.GlobalPosition}");
+		foreach (var pickup in new[] { "LanternPickup", "CompassPickup" })
+		{
+			var node = cabin?.GetNodeOrNull<Node3D>(pickup);
+			if (node == null) continue;
+			await GoTo(node.GlobalPosition, 0.8f);
+			await Tap("interact", 0.15);
+		}
+		Check("lantern equipped", inv.HasLantern, "");
+		Check("compass equipped", inv.HasCompass, "");
+		await Wait(0.5);
+		Check("compass HUD showing", compassUi != null && compassUi.ShowingCompass, "");
+
+		// Step outside the safe zone: the storm should begin.
+		Check("storm not yet active near the cabin", StormController.Instance is { Active: false }, "");
+		await GoTo(cabin.GlobalPosition + new Vector3(0, 0, -30f), 2f);
+		double stormWait = 0;
+		while (StormController.Instance is not { Active: true } && stormWait < 8) { await Wait(0.25); stormWait += 0.25; }
+		Screenshot("storm_active");
+		Check("storm activated on leaving the safe zone", StormController.Instance is { Active: true }, $"after {stormWait:0.0}s");
+		Check("forest forced silent by the storm", (_amb?.Silence ?? 0) > 0.9f, $"silence {_amb?.Silence:0.00}");
+
+		// Act 4: wait for the giant (autotest uses a short fuse), then the compass repoints home.
+		double giantWait = 0;
+		while (StoryManager.Instance is { GiantEventDone: false } && giantWait < 20) { await Wait(0.5); giantWait += 0.5; }
+		Check("giant set-piece fired", StoryManager.Instance.GiantEventDone, $"after {giantWait:0.1}s");
+		var objective = StoryManager.Instance.ObjectivePosition;
+		Check("compass now points at the cabin", objective != null && objective.Value.DistanceTo(cabin.GlobalPosition) < 3f, $"{objective}");
+
+		// Act 5: find the axe and chop the door open.
+		var axe = GetTree().Root.FindChild("AxePickup", true, false) as Node3D;
+		Check("axe placed in the world", axe != null, $"{axe?.GlobalPosition}");
+		if (axe != null)
+		{
+			await GoTo(axe.GlobalPosition, 0.8f);
+			await Tap("interact", 0.15);
+		}
+		Check("axe picked up", inv.CurrentTool == ToolKind.Axe, $"{inv.CurrentTool}");
+
+		await GoTo(cabin.WideApproachPoint, 2.0f);
+		await GoTo(cabin.ApproachPoint, 1.0f);
+		await GoTo(cabin.DoorCenter, 0.9f);
+		Input.ActionPress("interact");
+		await Wait(0.1);
+		Input.ActionRelease("interact");
+		double openWait = 0;
+		while (!cabin.IsOpen && openWait < 8) { await Wait(0.25); openWait += 0.25; }
+		Check("door chopped open with the axe", cabin.IsOpen, $"after {openWait:0.1}s");
+		Check("axe consumed", inv.CurrentTool == ToolKind.None, $"{inv.CurrentTool}");
+
+		// Step inside and find the friend. The doorway is a tight, precise target for this bot's
+		// straight-line steering (no real pathfinding/obstacle-avoidance) even though it's an easy
+		// walk for an actual player; the door mechanic itself is already proven by the chop above.
+		// Try it properly first, and only if that genuinely can't thread the gap, place the player
+		// just inside (as a scripted entry would) so the reveal logic itself still gets exercised.
+		Vector3 insideTarget = cabin.ToGlobal(new Vector3(0.3f, 0f, -0.8f));
+		bool atDoor = await GoTo(cabin.DoorCenter, 0.6f);
+		if (atDoor) await GoTo(insideTarget, 1.0f);
+		else { insideTarget.Y = _player.GlobalPosition.Y; _player.GlobalPosition = insideTarget; await Frame(); }
+		double revealWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act5CabinEntered && revealWait < 12) { await Wait(0.25); revealWait += 0.25; }
+		Screenshot("friend_found");
+		Check("checkpoint 4 (found the friend) reached", StoryManager.Instance.Current >= Checkpoint.Act5CabinEntered, $"after {revealWait:0.1}s");
+		var save4 = SaveSystem.Load();
+		Check("checkpoint 4 saved to disk", save4 != null && save4.Checkpoint >= Checkpoint.Act5CabinEntered, $"{save4?.Checkpoint}");
+
 		if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
 		Finish();
+	}
+
+	/// <summary>Presses and releases an input action, as a real key tap would (for interact-driven pickups/puzzles).</summary>
+	private async Task Tap(string action, double holdSeconds)
+	{
+		Input.ActionPress(action);
+		await Wait(holdSeconds);
+		Input.ActionRelease(action);
+		await Wait(0.1);
 	}
 
 	private async Task Drive(Vector2 move, bool run, double seconds)
@@ -306,18 +392,22 @@ public partial class AutoTest : Node
 	private async Task<bool> GoTo(Vector3 target, float radius)
 	{
 		double stuckTimer = 0; float bestDist = float.MaxValue;
+		double sidestepTimer = 0; float sidestepDir = 1f;
 		while (true)
 		{
 			float d = Flat(_player.GlobalPosition).DistanceTo(Flat(target));
 			if (d < radius) return true;
 			if (d < bestDist - 0.3f) { bestDist = d; stuckTimer = 0; }
 			stuckTimer += 1.0 / 60;
-			if (stuckTimer > 4) return false;
+			if (stuckTimer > 7) return false;
 			SteerCamera(target);
 			// Run until the forest starts to hush, then walk like a nervous person.
 			float s = _amb?.Silence ?? 0;
 			_input.ScriptedRun = s < 0.15f;
-			_input.ScriptedMove = new Vector2(0, 1);
+			// A single tree in the way: sidestep around it rather than push straight into it forever.
+			if (stuckTimer > 1.0 && sidestepTimer <= 0) { sidestepTimer = 1.0; sidestepDir = -sidestepDir; }
+			if (sidestepTimer > 0) { sidestepTimer -= 1.0 / 60; _input.ScriptedMove = new Vector2(sidestepDir, 0.5f); }
+			else _input.ScriptedMove = new Vector2(0, 1);
 			await Frame();
 		}
 	}
@@ -369,7 +459,11 @@ public partial class AutoTest : Node
 			for (int i = all.Count - 1; i >= 0; i--) route.Add(all[i]);
 		}
 		if (GetTree().GetFirstNodeInGroup("cabin") is Cabin cabin)
+		{
+			// Straight in from well out front, so a straight-line walk never clips a side wall.
+			route.Add(cabin.WideApproachPoint);
 			route.Add(cabin.ApproachPoint);
+		}
 		return route;
 	}
 

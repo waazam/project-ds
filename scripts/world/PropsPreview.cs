@@ -62,6 +62,8 @@ public partial class PropsPreview : Node3D
 		var gag = root.FindChild("Marker_05_4", true, false) as Node3D;
 		var tornMap = root.FindChild("TornMap", true, false) as Node3D;
 		var tent = root.FindChild("ForgottenTent", true, false) as Node3D;
+		var cabin = root.FindChild("Cabin", true, false) as Node3D;
+		var shed = root.FindChild("Shed", true, false) as Node3D;
 		_terrain.TryGetStreamCrossing(out var cross, out _, out float crossS);
 		Log($"sign {sign?.GlobalPosition} dir {dirSign?.GlobalPosition} bridge {bridge?.GlobalPosition} bridgeSign {bridgeSign?.GlobalPosition} crossS {crossS:0.0}");
 		Vector3 TP(float s) => _terrain.TrailPoint(s, out _);
@@ -76,6 +78,13 @@ public partial class PropsPreview : Node3D
 			views.Add(("04_direction_approach", EyeAt(TP(0f)), dirSign.GlobalPosition + new Vector3(1.5f, 1.2f, 0)));
 		}
 		if (info != null) { var (a, b) = Front(info, 3.0f, -0.2f, 1.6f); views.Add(("05_info_board", a, b)); }
+		if (cabin != null)
+		{
+			Log($"cabin {cabin.GlobalPosition}");
+			var (a, b) = Front(cabin, 8f, 0f, 1.2f); views.Add(("05b_cabin_front", a, b));
+			views.Add(("05c_cabin_overview", cabin.GlobalPosition + new Vector3(6, 4, 10), cabin.GlobalPosition + new Vector3(0, 1.5f, 0)));
+		}
+		if (shed != null) { Log($"shed {shed.GlobalPosition}"); var (a, b) = Front(shed, 4f, 0f, 1.0f); views.Add(("05d_shed", a, b)); }
 		if (m1 != null) { var (a, b) = Front(m1, 2.2f, 0.2f, 0.8f); views.Add(("06_marker_1", a, b)); }
 		if (gag != null) { var (a, b) = Front(gag, 2.2f, 0.2f, 0.8f); views.Add(("07_marker_gag_4", a, b)); }
 		if (tornMap != null) { var (a, b) = Front(tornMap, 1.4f, 0f, 0.05f); views.Add(("07b_torn_map", a, b)); }

@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scripts/audio/OneShotEmitter.cs" id="3_emit"]
 [ext_resource type="Script" path="res://scripts/audio/PointSourceSpawner.cs" id="4_points"]
 [ext_resource type="Script" path="res://scripts/audio/ForestDirector.cs" id="5_director"]
+[ext_resource type="Script" path="res://scripts/audio/StormController.cs" id="6_storm"]
 
 [node name="ForestAmbience" type="Node"]
 script = ExtResource("1_mgr")
@@ -110,9 +111,25 @@ VolumeDb = -2.0
 UnitSize = 8.0
 Voices = 2
 
+[node name="Rain" type="AudioStreamPlayer" parent="."]
+bus = &"Weather"
+
+[node name="Loop" type="Node" parent="Rain"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/rain_loop.wav"
+BaseVolumeDb = -6.0
+Gain = 0.0
+
+[node name="Thunder" type="AudioStreamPlayer" parent="."]
+bus = &"Weather"
+volume_db = -3.0
+
 [node name="StreamSources" type="Node" parent="."]
 script = ExtResource("4_points")
 
 [node name="Director" type="Node" parent="."]
 script = ExtResource("5_director")
+
+[node name="StormController" type="Node" parent="."]
+script = ExtResource("6_storm")
 

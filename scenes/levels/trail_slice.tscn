@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/entities/stalker.tscn" id="6_stalker"]
 [ext_resource type="Script" path="res://scripts/audio/SoundEvent.cs" id="7_event"]
 [ext_resource type="PackedScene" path="res://scenes/audio/score.tscn" id="8_score"]
+[ext_resource type="Script" path="res://scripts/entities/GiantStalkerEvent.cs" id="9_giant"]
 
 [node name="TrailSlice" type="Node3D"]
 
@@ -27,6 +28,9 @@ FaderPath = NodePath("../Hud/ScreenFader")
 PauseMenuPath = NodePath("../Hud/PauseMenu")
 
 [node name="Stalker" parent="." instance=ExtResource("6_stalker")]
+
+[node name="GiantStalkerEvent" type="Node" parent="."]
+script = ExtResource("9_giant")
 
 [node name="BridgeGunshot" type="Node" parent="."]
 script = ExtResource("7_event")

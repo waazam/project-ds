@@ -5,6 +5,8 @@
 [ext_resource type="Script" path="res://scripts/player/PlayerCameraRig.cs" id="3_rig"]
 [ext_resource type="Script" path="res://scripts/player/PlayerFootsteps.cs" id="4_steps"]
 [ext_resource type="Script" path="res://scripts/player/PlayerBreathing.cs" id="5_breath"]
+[ext_resource type="Script" path="res://scripts/player/PlayerInventory.cs" id="6_inventory"]
+[ext_resource type="Script" path="res://scripts/player/Lantern.cs" id="7_lantern"]
 
 [sub_resource type="CapsuleShape3D" id="Body"]
 radius = 0.3
@@ -104,3 +106,9 @@ script = ExtResource("4_steps")
 
 [node name="Breathing" type="Node" parent="."]
 script = ExtResource("5_breath")
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("6_inventory")
+
+[node name="Lantern" type="Node3D" parent="."]
+script = ExtResource("7_lantern")

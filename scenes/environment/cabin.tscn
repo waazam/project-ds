@@ -2,9 +2,16 @@
 
 [ext_resource type="Script" path="res://scripts/world/Cabin.cs" id="1_cabin"]
 [ext_resource type="Script" path="res://scripts/world/CabinReturnEvent.cs" id="2_return"]
+[ext_resource type="Script" path="res://scripts/world/Pickup.cs" id="3_pickup"]
+[ext_resource type="Script" path="res://scripts/world/SafeZoneWatcher.cs" id="4_safezone"]
+[ext_resource type="Script" path="res://scripts/world/DoorBreakEvent.cs" id="5_break"]
+[ext_resource type="PackedScene" path="res://scenes/entities/friend.tscn" id="6_friend"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_door"]
 size = Vector3(12, 3, 12)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_breakin"]
+size = Vector3(3.0, 5.0, 3.0)
 
 [node name="Cabin" type="Node3D" groups=["cabin"]]
 script = ExtResource("1_cabin")
@@ -18,3 +25,34 @@ script = ExtResource("2_return")
 
 [node name="Shape" type="CollisionShape3D" parent="ReturnTrigger"]
 shape = SubResource("BoxShape3D_door")
+
+[node name="LanternPickup" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2.9)
+script = ExtResource("3_pickup")
+Kind = 1
+Label = "Lantern"
+RequiredCheckpoint = 3
+
+[node name="CompassPickup" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 2.9)
+script = ExtResource("3_pickup")
+Kind = 2
+Label = "Compass"
+RequiredCheckpoint = 3
+
+[node name="SafeZoneWatcher" type="Node" parent="."]
+script = ExtResource("4_safezone")
+Radius = 16.0
+
+[node name="DoorBreakTrigger" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 3.0)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("5_break")
+
+[node name="Shape" type="CollisionShape3D" parent="DoorBreakTrigger"]
+shape = SubResource("BoxShape3D_breakin")
+
+[node name="Friend" parent="." instance=ExtResource("6_friend")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0, -1.6)
