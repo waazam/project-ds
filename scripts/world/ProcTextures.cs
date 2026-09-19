@@ -115,47 +115,135 @@ public static class ProcTextures
 
 	public static Texture2D Bark() => Make("bark", 32, 64, (x, y) =>
 	{
+		// deep vertical furrows, reddish-brown plates with grey weathering
 		float streak = Fbm(x, y * 0.12f, 32, 64, 8, 3, 11);
-		float crack = Mathf.SmoothStep(0.55f, 0.75f, Fbm(x, y * 0.25f, 32, 64, 6, 2, 12));
+		float crack = Mathf.SmoothStep(0.52f, 0.72f, Fbm(x, y * 0.22f, 32, 64, 6, 2, 12));
 		float n = Fbm(x, y, 32, 64, 8, 3, 13);
-		var c = Mix(new Color(0.20f, 0.16f, 0.12f), new Color(0.33f, 0.29f, 0.24f), streak * 0.9f + n * 0.3f);
-		return Mix(c, new Color(0.08f, 0.07f, 0.06f), crack * 0.8f);
+		float grey = Mathf.SmoothStep(0.45f, 0.75f, Fbm(x, y * 0.5f, 32, 64, 4, 2, 14));
+		var c = Mix(new Color(0.17f, 0.10f, 0.07f), new Color(0.31f, 0.20f, 0.14f), streak * 0.9f + n * 0.3f);
+		c = Mix(c, new Color(0.27f, 0.25f, 0.23f), grey * 0.55f);
+		return Mix(c, new Color(0.05f, 0.035f, 0.03f), crack * 0.85f);
 	});
 
 	public static Texture2D Needles() => Make("needles", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 64, 8, 4, 21);
 		float s = Fbm(x * 2, y * 0.6f, 64, 64, 16, 2, 22);
-		var c = Mix(new Color(0.05f, 0.09f, 0.06f), new Color(0.17f, 0.24f, 0.15f), n);
-		return Mix(c, new Color(0.24f, 0.30f, 0.18f), Mathf.SmoothStep(0.6f, 0.85f, s) * 0.6f);
+		var c = Mix(new Color(0.035f, 0.06f, 0.05f), new Color(0.11f, 0.16f, 0.12f), n);
+		return Mix(c, new Color(0.16f, 0.21f, 0.15f), Mathf.SmoothStep(0.6f, 0.85f, s) * 0.5f);
 	});
+
+	/// <summary>
+	/// A fir bough seen from above, for alpha-scissor branch cards. v=1 is the
+	/// trunk end, v=0 the tip; the main stem runs down the middle with side
+	/// sprays angled toward the tip and a ragged needle fringe.
+	/// </summary>
+	public static Texture2D FirBranch() => Make("firbranch", 64, 64, (x, y) =>
+	{
+		float u = (x + 0.5f) / 64f, v = (y + 0.5f) / 64f;   // v: 0 tip .. 1 trunk
+		float t = 1f - v;                                     // 0 trunk .. 1 tip
+		float dx = Mathf.Abs(u - 0.5f);
+		// envelope: widest a little past the middle, pointed at the tip
+		float env = 0.47f * Mathf.Sin(Mathf.Clamp(t * 1.05f, 0f, 1f) * Mathf.Pi * 0.92f + 0.12f) * (0.55f + 0.45f * t);
+		env *= 0.8f + 0.35f * Fbm(x, y, 64, 64, 8, 2, 23);
+		// side sprays: lines leaving the stem, sweeping toward the tip
+		float best = 9f;
+		for (int b = 0; b < 9; b++)
+		{
+			float t0 = 0.04f + b * 0.105f + (Hash(b, 0, 24) - 0.5f) * 0.04f;
+			float ty = t0 + dx * 0.9f;
+			best = Mathf.Min(best, Mathf.Abs(t - ty) * 0.8f);
+		}
+		float needle = Fbm(x, y, 64, 64, 16, 2, 25);
+		float thick = 0.04f + 0.04f * needle;
+		bool stem = dx < 0.022f && t < 0.97f;
+		bool spray = best < thick && dx < env;
+		bool fill = dx < env * 0.72f && needle > 0.34f;
+		bool core = t < 0.09f;                                // solid dark inner foliage (used by the tier cores)
+		if (!(stem || spray || fill || core)) return new Color(0, 0, 0, 0);
+		if (core) return new Color(0.03f, 0.045f, 0.035f, 1);
+		float lit = 0.35f + 0.65f * Mathf.Clamp(dx / Mathf.Max(env, 0.01f), 0, 1);   // tips lighter
+		lit *= 0.75f + 0.5f * needle;
+		var c = Mix(new Color(0.03f, 0.05f, 0.04f), new Color(0.13f, 0.18f, 0.12f), lit);
+		if (stem) c = new Color(0.10f, 0.07f, 0.05f);
+		return new Color(c.R, c.G, c.B, 1);
+	}, alpha: true);
 
 	public static Texture2D Leaves() => Make("leaves", 64, 64, (x, y) =>
 	{
+		// late-October foliage: dull green going to rust and ochre
 		float n = Fbm(x, y, 64, 64, 10, 4, 31);
-		float blot = Mathf.SmoothStep(0.55f, 0.7f, Fbm(x, y, 64, 64, 6, 2, 32));
-		var c = Mix(new Color(0.10f, 0.13f, 0.06f), new Color(0.26f, 0.30f, 0.12f), n);
-		return Mix(c, new Color(0.36f, 0.32f, 0.13f), blot * 0.5f);
+		float blot = Mathf.SmoothStep(0.45f, 0.65f, Fbm(x, y, 64, 64, 6, 2, 32));
+		var c = Mix(new Color(0.09f, 0.10f, 0.05f), new Color(0.22f, 0.22f, 0.10f), n);
+		c = Mix(c, Mix(new Color(0.36f, 0.17f, 0.06f), new Color(0.42f, 0.30f, 0.10f), Hash(x / 3, y / 3, 33)), blot * 0.75f);
+		return c;
+	});
+
+	/// <summary>Fallen leaves over dark soil (tileable). Rust, ochre, brown and a few faded yellows.</summary>
+	public static Texture2D LeafLitter() => Make("leaflitter", 64, 64, (x, y) =>
+	{
+		float soil = Fbm(x, y, 64, 64, 6, 3, 301);
+		Color c = Mix(new Color(0.09f, 0.065f, 0.045f), new Color(0.17f, 0.12f, 0.08f), soil);
+		Color[] pal =
+		{
+			new(0.36f, 0.19f, 0.08f), new(0.40f, 0.28f, 0.12f), new(0.26f, 0.15f, 0.08f),
+			new(0.31f, 0.14f, 0.07f), new(0.43f, 0.34f, 0.19f), new(0.20f, 0.13f, 0.07f),
+			new(0.33f, 0.23f, 0.11f), new(0.24f, 0.18f, 0.10f), new(0.29f, 0.20f, 0.10f),
+			new(0.17f, 0.11f, 0.06f),
+		};
+		// later leaves lie on top; each pixel keeps the colour of the topmost leaf
+		for (int i = 0; i < 320; i++)
+		{
+			float lx = Hash(i, 1, 302) * 64f, ly = Hash(i, 2, 302) * 64f;
+			float ddx = x + 0.5f - lx, ddy = y + 0.5f - ly;
+			ddx -= Mathf.Round(ddx / 64f) * 64f; ddy -= Mathf.Round(ddy / 64f) * 64f;   // wrap: tileable
+			float a = Hash(i, 3, 302) * Mathf.Tau;
+			float ca = Mathf.Cos(a), sa = Mathf.Sin(a);
+			float pu = ddx * ca + ddy * sa, pv = -ddx * sa + ddy * ca;
+			float len = 2.2f + Hash(i, 4, 302) * 2.8f, wid = len * (0.45f + Hash(i, 5, 302) * 0.25f);
+			float e = (pu * pu) / (len * len) + (pv * pv) / (wid * wid);
+			if (e > 1f) continue;
+			Color lc = pal[(int)(Hash(i, 6, 302) * pal.Length) % pal.Length];
+			float shade = 0.75f + 0.35f * (1f - e);
+			if (Mathf.Abs(pv) < 0.45f) shade *= 0.8f;       // midrib
+			c = lc * shade;                                  // later leaves lie on top
+		}
+		if (Hash(x, y, 303) > 0.965f) c = c * 0.55f;          // specks / grit
+		c.A = 1f;
+		return c;
+	});
+
+	/// <summary>Dark forest-floor moss (tileable).</summary>
+	public static Texture2D Moss() => Make("moss", 64, 64, (x, y) =>
+	{
+		float n = Fbm(x, y, 64, 64, 8, 4, 311);
+		float fine = Hash(x, y, 312);
+		var c = Mix(new Color(0.06f, 0.09f, 0.04f), new Color(0.17f, 0.22f, 0.09f), n);
+		if (fine > 0.9f) c = Mix(c, new Color(0.26f, 0.29f, 0.12f), 0.5f);
+		else if (fine < 0.08f) c = c * 0.6f;
+		return c;
 	});
 
 	public static Texture2D ForestFloor() => Make("floor", 64, 64, (x, y) =>
 	{
+		// darker needle duff with the odd leaf, for under the conifers
 		float n = Fbm(x, y, 64, 64, 6, 4, 41);
 		float fine = Hash(x, y, 42);
-		float moss = Mathf.SmoothStep(0.5f, 0.7f, Fbm(x, y, 64, 64, 4, 3, 43));
-		var c = Mix(new Color(0.13f, 0.10f, 0.07f), new Color(0.25f, 0.20f, 0.13f), n);
-		c = Mix(c, new Color(0.17f, 0.21f, 0.10f), moss * 0.7f);
-		if (fine > 0.93f) c = Mix(c, new Color(0.38f, 0.28f, 0.16f), 0.6f); // needle litter
-		else if (fine < 0.05f) c = c * 0.6f;
+		var c = Mix(new Color(0.09f, 0.065f, 0.045f), new Color(0.20f, 0.14f, 0.09f), n);
+		if (fine > 0.9f) c = Mix(c, new Color(0.36f, 0.20f, 0.09f), 0.6f); // needle litter
+		else if (fine < 0.06f) c = c * 0.6f;
 		return c;
 	});
 
 	public static Texture2D GrassGround() => Make("grassground", 64, 64, (x, y) =>
 	{
+		// autumn meadow: olive, straw and dead brown
 		float n = Fbm(x, y, 64, 64, 6, 4, 51);
+		float straw = Mathf.SmoothStep(0.45f, 0.7f, Fbm(x, y, 64, 64, 4, 3, 53));
 		float fine = Hash(x, y, 52);
-		var c = Mix(new Color(0.14f, 0.17f, 0.08f), new Color(0.27f, 0.29f, 0.15f), n);
-		if (fine > 0.9f) c = Mix(c, new Color(0.42f, 0.40f, 0.22f), 0.5f);
+		var c = Mix(new Color(0.10f, 0.11f, 0.06f), new Color(0.22f, 0.22f, 0.11f), n);
+		c = Mix(c, new Color(0.27f, 0.21f, 0.12f), straw * 0.6f);
+		if (fine > 0.9f) c = Mix(c, new Color(0.38f, 0.32f, 0.18f), 0.5f);
 		return c;
 	});
 
@@ -163,8 +251,8 @@ public static class ProcTextures
 	{
 		float n = Fbm(x, y, 64, 64, 5, 4, 61);
 		float peb = Hash(x / 2, y / 2, 62);
-		var c = Mix(new Color(0.29f, 0.23f, 0.16f), new Color(0.45f, 0.37f, 0.27f), n);
-		if (peb > 0.975f) c = Mix(c, new Color(0.40f, 0.37f, 0.32f), 0.45f);
+		var c = Mix(new Color(0.17f, 0.12f, 0.08f), new Color(0.31f, 0.23f, 0.15f), n);
+		if (peb > 0.975f) c = Mix(c, new Color(0.34f, 0.31f, 0.27f), 0.45f);
 		return c;
 	});
 
@@ -179,9 +267,11 @@ public static class ProcTextures
 	public static Texture2D Rock() => Make("rock", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 64, 6, 4, 81);
-		float moss = Mathf.SmoothStep(0.52f, 0.68f, Fbm(x, y, 64, 64, 4, 3, 82));
-		var c = Mix(new Color(0.24f, 0.24f, 0.23f), new Color(0.42f, 0.41f, 0.38f), n);
-		return Mix(c, new Color(0.18f, 0.23f, 0.12f), moss * 0.8f);
+		float moss = Mathf.SmoothStep(0.5f, 0.66f, Fbm(x, y, 64, 64, 4, 3, 82));
+		float lich = Hash(x / 2, y / 2, 83);
+		var c = Mix(new Color(0.13f, 0.13f, 0.13f), new Color(0.30f, 0.29f, 0.27f), n);
+		if (lich > 0.97f) c = Mix(c, new Color(0.42f, 0.42f, 0.36f), 0.5f);
+		return Mix(c, new Color(0.10f, 0.14f, 0.06f), moss * 0.8f);
 	});
 
 	public static Texture2D WeatheredWood() => Make("wwood", 64, 64, (x, y) =>
@@ -274,7 +364,7 @@ public static class ProcTextures
 			if (d < wdt) { best = 1; shade = Mathf.Max(shade, 0.5f + 0.5f * t); }
 		}
 		if (best < 0.5f) return new Color(0, 0, 0, 0);
-		var c = Mix(new Color(0.14f, 0.17f, 0.07f), new Color(0.40f, 0.42f, 0.20f), shade);
+		var c = Mix(new Color(0.11f, 0.12f, 0.06f), new Color(0.36f, 0.33f, 0.17f), shade);
 		return new Color(c.R, c.G, c.B, 1);
 	}, alpha: true);
 
@@ -291,7 +381,9 @@ public static class ProcTextures
 		bool leaf = dx < halfW && band < 3.0f && t < 0.95f;
 		if (!stem && !leaf) return new Color(0, 0, 0, 0);
 		float s = 0.55f + 0.45f * (1f - dx / 15f) - t * 0.25f;
-		var c = Mix(new Color(0.07f, 0.12f, 0.05f), new Color(0.22f, 0.32f, 0.12f), s);
+		var c = Mix(new Color(0.06f, 0.08f, 0.04f), new Color(0.20f, 0.24f, 0.10f), s);
+		// leaflet tips browning off
+		c = Mix(c, new Color(0.30f, 0.20f, 0.08f), Mathf.SmoothStep(0.6f, 1f, dx / Mathf.Max(halfW, 1f)) * 0.5f);
 		return new Color(c.R, c.G, c.B, 1);
 	}, alpha: true);
 
@@ -373,4 +465,29 @@ public static class ProcTextures
 	public static StandardMaterial3D EndGrainMat => Std("endgrain", EndGrain());
 	public static StandardMaterial3D PaperMat => Std("paper", Paper(), vertexColor: true);
 	public static StandardMaterial3D MapMat => Std("trailmap", TrailMap());
+
+	/// <summary>Alpha-scissor fir bough cards (foliage shader, slight sway, darker undersides).</summary>
+	public static ShaderMaterial FirBranchMat => (ShaderMaterial)Cached("firbranch", () =>
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+		m.SetShaderParameter("albedo_tex", FirBranch());
+		m.SetShaderParameter("tint", new Color(1f, 1f, 1f));
+		m.SetShaderParameter("sway", 0.06f);
+		m.SetShaderParameter("sway_speed", 0.7f);
+		m.SetShaderParameter("normal_up", 0.45f);
+		m.SetShaderParameter("alpha_cut", 0.5f);
+		m.SetShaderParameter("mip_boost", 0.45f);
+		m.SetShaderParameter("back_shade", 0.35f);
+		return m;
+	});
+
+	/// <summary>Dark stone with moss on its upward faces (world-normal blend). Vertex colour tints.</summary>
+	public static ShaderMaterial MossRockMat => (ShaderMaterial)Cached("mossrock", () =>
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/rock_moss.gdshader") };
+		m.SetShaderParameter("rock_tex", Rock());
+		m.SetShaderParameter("moss_tex", Moss());
+		m.SetShaderParameter("noise_tex", WaterNoise());
+		return m;
+	});
 }

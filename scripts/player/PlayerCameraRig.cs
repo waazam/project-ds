@@ -6,8 +6,8 @@ namespace ProjectDS.Player;
 /// <summary>
 /// The player's camera, in one of two modes (GameSettings.Camera):
 ///
-/// FirstPerson (current design): the camera sits at eye height. The body is
-/// hidden but still casts its shadow, and a small head bob follows the stride.
+/// FirstPerson (current design): the camera sits at eye height. The body
+/// (and its shadow) is hidden, and a small head bob follows the stride.
 ///
 /// ThirdPerson (kept for later): an over-the-shoulder orbit. A SpringArm3D
 /// probes for walls, and the camera pulls in instantly on a hit and eases back
@@ -21,6 +21,11 @@ public partial class PlayerCameraRig : Node3D
 	[Export] public NodePath TargetPath = "..";
 	[Export] public NodePath SpringArmPath = "SpringArm";
 	[Export] public NodePath CameraPath = "Camera";
+
+	[ExportGroup("Focus")]
+	/// <summary>Field of view while focusing (right mouse), as a fraction of normal.</summary>
+	[Export] public float FocusFovScale = 0.72f;
+	[Export] public float FocusSharpness = 7f;
 
 	[ExportGroup("First person")]
 	[Export] public float EyeHeight = 1.62f;
@@ -55,6 +60,7 @@ public partial class PlayerCameraRig : Node3D
 	private CameraMode _mode = (CameraMode)(-1);
 	private float _bobPhase;
 	private float _bobAmount;
+	private float _baseFov = 70f;
 
 	public override void _Ready()
 	{
@@ -64,7 +70,7 @@ public partial class PlayerCameraRig : Node3D
 		Camera = GetNode<Camera3D>(CameraPath);
 		_arm.AddExcludedObject(_target.GetRid());
 		_currentLength = GameSettings.Instance.CameraDistance;
-		// Mode (and body shadow setup) is applied on the first frame: the body isn't ready yet.
+		// Mode (and body visibility) is applied on the first frame: the body isn't ready yet.
 		GlobalPosition = PivotPosition();
 		ApplyRotation();
 	}
@@ -81,21 +87,19 @@ public partial class PlayerCameraRig : Node3D
 		if (mode == _mode) return;
 		_mode = mode;
 		bool fp = mode == CameraMode.FirstPerson;
-		Camera.Fov = fp ? FirstPersonFov : ThirdPersonFov;
+		_baseFov = fp ? FirstPersonFov : ThirdPersonFov;
+		Camera.Fov = _baseFov;
 		Camera.Position = Vector3.Zero;
 		Pitch = fp ? 0f : Mathf.DegToRad(-12f);
-		// First person: you never see your own body, but its shadow stays in the world.
-		foreach (var node in _target.Visual.FindChildren("*", "GeometryInstance3D", true, false))
-			((GeometryInstance3D)node).CastShadow = fp
-				? GeometryInstance3D.ShadowCastingSetting.ShadowsOnly
-				: GeometryInstance3D.ShadowCastingSetting.On;
+		// First person: the placeholder body is hidden entirely, shadow included.
+		_target.Visual.Visible = !fp;
 		_arm.ProcessMode = fp ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
 	}
 
 	public override void _UnhandledInput(InputEvent e)
 	{
 		// F5: dev toggle for the dormant third-person camera.
-		if (e is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F5 })
+		if (OS.IsDebugBuild() && e is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F5 })   // dev builds only
 		{
 			var s = GameSettings.Instance;
 			s.Camera = s.Camera == CameraMode.FirstPerson ? CameraMode.ThirdPerson : CameraMode.FirstPerson;
@@ -115,7 +119,11 @@ public partial class PlayerCameraRig : Node3D
 		float dt = (float)delta;
 		ApplyMode(GameSettings.Instance.Camera);
 
-		Vector2 look = _target.PlayerInput.ConsumeLook();
+		// Focus: ease the field of view in, and slow the aim to match so it stays steady.
+		float fovGoal = _baseFov * (_target.PlayerInput.Focus ? FocusFovScale : 1f);
+		Camera.Fov = Mathf.Lerp(Camera.Fov, fovGoal, 1f - Mathf.Exp(-FocusSharpness * dt));
+
+		Vector2 look = _target.PlayerInput.ConsumeLook() * (Camera.Fov / _baseFov);
 		float minPitch = IsFirstPerson ? FirstPersonMinPitch : MinPitch;
 		float maxPitch = IsFirstPerson ? FirstPersonMaxPitch : MaxPitch;
 		Yaw = Mathf.Wrap(Yaw + look.X, -Mathf.Pi, Mathf.Pi);

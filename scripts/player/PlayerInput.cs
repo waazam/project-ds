@@ -13,11 +13,14 @@ public partial class PlayerInput : Node
 	/// <summary>Movement intent, x = right, y = forward, length &lt;= 1.</summary>
 	public Vector2 Move { get; private set; }
 	public bool Run { get; private set; }
+	/// <summary>Held to focus on something (right mouse / right trigger): a slight zoom.</summary>
+	public bool Focus { get; private set; }
 
 	/// <summary>When true, the fields below replace real input.</summary>
 	public bool Scripted;
 	public Vector2 ScriptedMove;
 	public bool ScriptedRun;
+	public bool ScriptedFocus;
 
 	private Vector2 _pendingLook;   // radians, consumed once per frame
 	private bool _enabled = true;
@@ -25,7 +28,7 @@ public partial class PlayerInput : Node
 	public void SetEnabled(bool enabled)
 	{
 		_enabled = enabled;
-		if (!enabled) { Move = Vector2.Zero; Run = false; _pendingLook = Vector2.Zero; }
+		if (!enabled) { Move = Vector2.Zero; Run = false; Focus = false; _pendingLook = Vector2.Zero; }
 	}
 
 	/// <summary>Look delta in radians (x = yaw, y = pitch) since last call.</summary>
@@ -57,6 +60,7 @@ public partial class PlayerInput : Node
 		{
 			Move = ScriptedMove.LimitLength(1f);
 			Run = ScriptedRun;
+			Focus = ScriptedFocus;
 			return;
 		}
 
@@ -64,6 +68,7 @@ public partial class PlayerInput : Node
 			Input.GetAxis("move_left", "move_right"),
 			Input.GetAxis("move_back", "move_forward")).LimitLength(1f);
 		Run = Input.IsActionPressed("run");
+		Focus = Input.IsActionPressed("focus");
 
 		var s = GameSettings.Instance;
 		var stick = new Vector2(

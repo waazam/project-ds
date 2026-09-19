@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/audio/MusicDirector.cs" id="1_music"]
+[ext_resource type="Script" path="res://scripts/audio/AmbienceLoop.cs" id="2_loop"]
+
+[node name="Score" type="Node"]
+script = ExtResource("1_music")
+
+[node name="Pad" type="AudioStreamPlayer" parent="."]
+bus = &"Music"
+
+[node name="Loop" type="Node" parent="Pad"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/music/score_pad_loop.wav"
+BaseVolumeDb = 0.0
+Gain = 0.0
+DriftDb = 1.5
+DriftPeriod = Vector2(40, 90)
+
+[node name="Shimmer" type="AudioStreamPlayer" parent="."]
+bus = &"Music"
+
+[node name="Loop" type="Node" parent="Shimmer"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/music/score_shimmer_loop.wav"
+BaseVolumeDb = -10.0
+Gain = 0.0
+DriftDb = 2.0
+DriftPeriod = Vector2(20, 60)
+

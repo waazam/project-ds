@@ -6,10 +6,14 @@
 [node name="StaircaseFragment" type="Node3D"]
 script = ExtResource("1_stairs")
 Steps = 7
-IncludeLanding = false
+PlinthSteps = 1
+Ruined = true
+CrumbleSide = -1
+CrumbleAfterStep = 3
+Seed = 23
 
 [node name="SilenceZone" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, -0.6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, -1)
 script = ExtResource("2_silence")
 InnerRadius = 3.0
 OuterRadius = 30.0

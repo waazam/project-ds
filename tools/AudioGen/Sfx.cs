@@ -234,7 +234,7 @@ public static class Sfx
 			{
 				double tt = (double)i / sr, f = thumpF * (0.55 + 0.45 * Math.Exp(-tt / 0.02));
 				ph += TwoPi * f / sr;
-				x[s0 + i] += a * (Math.Sin(ph) * Perc(tt, 0.002, 0.03) * 0.9 + lpn.P(r.W()) * Perc(tt, 0.001, 0.022) * 1.6);
+				x[s0 + i] += a * (Math.Sin(ph) * Perc(tt, 0.002, 0.025) * 0.2 + lpn.P(r.W()) * Perc(tt, 0.001, 0.018) * 0.7);
 			}
 		}
 		// Crunch: short bright grains, dense at first then thinning.
@@ -261,6 +261,7 @@ public static class Sfx
 		var sw = Biquad.Bp(sr, r.R(2000, 3200), 0.8);
 		double swDur = r.R(0.08, 0.16);
 		for (int i = 0; i < swDur * sr; i++) x[i] += sw.P(r.W()) * 0.12 * Env((double)i / (swDur * sr), 0.2, 0.7);
+		HighPass(x, sr, 110);   // a footstep, not a kick drum
 		return FinishOneShot(x, sr, -3, 40, r.R(0.24, 0.3));
 	}
 
@@ -314,6 +315,50 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 30, 0.24);
 	}
 
+	// A boot on old concrete/stone steps: a hard, dry heel tap with almost no
+	// body (stone doesn't resonate like planks), a softer toe tap, and sandy
+	// grit ground under the sole. Occasionally a small crumb skitters off.
+	public static double[] StepStone(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.4);
+		double tapF = r.R(700, 1150), weight0 = r.R(0.7, 1.0);
+		double[] contacts = { 0.0, r.R(0.05, 0.09) };
+		double[] gains = { 1.0, r.R(0.3, 0.45) };
+		for (int c = 0; c < contacts.Length; c++)
+		{
+			var weight = Biquad.Lp(sr, 140);
+			var tap = Biquad.Bp(sr, tapF * r.R(0.9, 1.1), 0.8);
+			var tick = Biquad.Hp(sr, 3000);
+			int s0 = (int)(contacts[c] * sr);
+			for (int i = 0; i + s0 < x.Length && i < 0.06 * sr; i++)
+			{
+				double tt = (double)i / sr;
+				double v = weight.P(r.W()) * Perc(tt, 0.001, 0.016) * 3.4 * weight0
+					+ tap.P(r.W()) * Perc(tt, 0.0003, 0.007) * 2.2
+					+ tick.P(r.W()) * Perc(tt, 0.0001, 0.0025) * 1.0;
+				x[s0 + i] += gains[c] * v;
+			}
+		}
+		// Grit: sand between sole and stone, a short scrape of bright grains.
+		var grit = Biquad.Bp(sr, r.R(3000, 4500), 0.7);
+		int g0 = (int)(r.R(0.005, 0.02) * sr), gLen = (int)(r.R(0.07, 0.13) * sr);
+		for (int i = 0; i < gLen && g0 + i < x.Length; i++)
+			x[g0 + i] += grit.P(r.W()) * 0.09 * Env((double)i / gLen, 0.2, 0.6) * (r.Chance(0.08) ? 3.0 : 1.0);
+		if (r.Chance(0.35))
+		{
+			// A crumb kicked loose: two or three tiny ticks trailing off.
+			double t0 = r.R(0.12, 0.2);
+			for (int k = 0; k < r.I(2, 4); k++, t0 += r.R(0.03, 0.07))
+			{
+				var hp = Biquad.Hp(sr, 4000);
+				int s0 = (int)(t0 * sr);
+				for (int i = 0; i < 0.01 * sr && s0 + i < x.Length; i++)
+					x[s0 + i] += hp.P(r.W()) * Perc((double)i / sr, 0.0001, 0.0015) * 0.35 / (k + 1);
+			}
+		}
+		return FinishOneShot(x, sr, -3, 30, 0.24);
+	}
+
 	// ---------------------------------------------------------------- cloth
 
 	/// <summary>Jacket rustle: soft band noise in 2-3 overlapping swells, with a little fabric friction grain.</summary>
@@ -340,5 +385,112 @@ public static class Sfx
 			x[i] = v * e * (0.7 + 0.3 * tex.At((double)i / sr)) * Env(u, 0.05, 0.1);
 		}
 		return FinishOneShot(x, sr, -3, 40, dur);
+	}
+
+	/// <summary>
+	/// A hunting rifle, far off but unmistakable: a hard crack, a punchy boom
+	/// with enough mid-range to carry on any speaker, then the report rolling
+	/// back off the ridges for seconds. The mix is compressed so the whole event
+	/// is loud, not just its first millisecond.
+	/// </summary>
+	public static double[] RifleDistant(Rng r, int sr)
+	{
+		var x = Buf(sr, 6.5);
+		var shot = new double[(int)(0.6 * sr)];
+		var crackLp = Biquad.Lp(sr, 4200); var crackHp = Biquad.Hp(sr, 500);
+		var boomBp = Biquad.Bp(sr, 260, 0.7); var boomLp = Biquad.Lp(sr, 1100);
+		var body = Biquad.Lp(sr, 160);
+		for (int i = 0; i < shot.Length; i++)
+		{
+			double t = (double)i / sr;
+			double crack = crackHp.P(crackLp.P(r.W())) * Perc(t, 0.0002, 0.005) * 3.0;
+			double tb = t - 0.012;
+			double boom = boomLp.P(boomBp.P(r.W())) * Perc(tb, 0.0015, 0.09) * 9.0
+				+ body.P(r.W()) * Perc(tb, 0.002, 0.14) * 5.0;
+			shot[i] = crack + boom;
+		}
+		void Stamp(double at, double gain, double cutoff)
+		{
+			var lp = Biquad.Lp(sr, cutoff); var lp2 = Biquad.Lp(sr, cutoff * 1.2);
+			int s0 = (int)(at * sr);
+			for (int i = 0; i < shot.Length && s0 + i < x.Length; i++) x[s0 + i] += lp2.P(lp.P(shot[i])) * gain;
+		}
+		Stamp(0.02, 1.0, 7000);
+		// One shot only: a single soft, smeared reflection off the far ridge. Distinct
+		// slap-backs sounded like more shots, so the rest of the echo is the diffuse roll.
+		Stamp(0.55 + r.R(-0.05, 0.05), 0.22, 900);
+		// The diffuse roll between them.
+		var roll = Biquad.Lp(sr, 420); var roll2 = Biquad.Lp(sr, 500);
+		double swellPh = r.R(0, TwoPi);
+		for (int i = (int)(0.2 * sr); i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			double env = (1 - Math.Exp(-(t - 0.2) / 0.12)) * Math.Exp(-(t - 0.2) / 1.3);
+			double swell = 0.85 + 0.15 * Math.Sin(TwoPi * 0.4 * t + swellPh);   // gentle, so it never pulses like more shots
+			x[i] += roll2.P(roll.P(r.W())) * env * swell * 2.4;
+		}
+		HighPass(x, sr, 45);
+		// Compress: soft-clip so the body and echoes sit close to the peak.
+		double pk = 0; foreach (var v in x) pk = Math.Max(pk, Math.Abs(v));
+		double drive = 5.0 / Math.Max(pk, 1e-9);
+		for (int i = 0; i < x.Length; i++) x[i] = Math.Tanh(x[i] * drive);
+		return FinishOneShot(x, sr, -3, 400);
+	}
+
+	/// <summary>
+	/// One soft breath, in or out, mostly through the nose: warm, pre-softened
+	/// noise through one broad low resonance, with the top rolled off hard. No
+	/// throat buzz, no hiss. Inhales are a touch brighter and shorter; exhales
+	/// are longer and lower. <paramref name="effort"/> 0..1 = resting .. winded
+	/// (shorter, fuller). PlayerBreathing strings these together at a rate set
+	/// by exertion, so no two breaths line up.
+	/// </summary>
+	public static double[] BreathOne(Rng r, int sr, bool inhale, double effort)
+	{
+		double dur = (inhale ? r.R(0.6, 0.95) : r.R(0.8, 1.3)) * (1 - 0.3 * effort);
+		var x = Buf(sr, dur + 0.05);
+		var warm = Biquad.Lp(sr, 900);   // pink-ish source: no fizz to begin with
+		var body = Biquad.Bp(sr, inhale ? r.R(650, 900) : r.R(380, 560), 0.7);
+		var soft1 = Biquad.Lp(sr, inhale ? 1700 : 1150);
+		var soft2 = Biquad.Lp(sr, inhale ? 1900 : 1300);
+		var hp = Biquad.Hp(sr, inhale ? 220 : 120);
+		for (int i = 0; i < dur * sr; i++)
+		{
+			double u = i / (dur * sr);
+			double n = warm.P(r.W()) * 0.7 + r.W() * 0.3;
+			double v = soft2.P(soft1.P(hp.P(body.P(n))));
+			// Smooth, unhurried shapes: an inhale swells in, an exhale lets go.
+			double shape = inhale ? Math.Pow(Env(u, 0.45, 0.35), 1.2) : Math.Pow(Env(u, 0.15, 0.7), 1.1);
+			x[i] = v * shape * (0.8 + 0.2 * effort);
+		}
+		return FinishOneShot(x, sr, -3, 40);
+	}
+
+	/// <summary>
+	/// The sting when you look straight at it: not a jump scare, just a wrongness
+	/// in the ears. A thin, detuned high cluster swells in, pressure drops away
+	/// underneath, and it all drains out.
+	/// </summary>
+	public static double[] StalkerSeen(Rng r, int sr)
+	{
+		double dur = 2.2;
+		var x = Buf(sr, dur);
+		double[] hi = { 3150, 3171, 4420, 4447 };   // close pairs: slow, sick beating
+		double[] ph = new double[hi.Length];
+		var noise = Biquad.Bp(sr, 5200, 3);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr, u = t / dur;
+			double swell = Env(u, 0.18, 0.7);
+			double v = 0;
+			for (int k = 0; k < hi.Length; k++)
+			{
+				ph[k] += TwoPi * hi[k] * (1 - 0.03 * u) / sr;   // sags very slightly
+				v += Math.Sin(ph[k]) * (k < 2 ? 0.5 : 0.3);
+			}
+			double sub = Math.Sin(TwoPi * (46 - 18 * u) * t) * Env(u, 0.05, 0.8) * 0.45;
+			x[i] = (v * 0.9 + noise.P(r.W()) * 0.5) * swell + sub;
+		}
+		return FinishOneShot(x, sr, -3, 200);
 	}
 }

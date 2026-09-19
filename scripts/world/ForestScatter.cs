@@ -62,6 +62,7 @@ public partial class ForestScatter : Node3D
 		BuildMeshes();
 		ScatterTrees();
 		ScatterRocksAndLogs();
+		ScatterBoulders();
 		ScatterFoliage();
 		Commit();
 	}
@@ -70,67 +71,148 @@ public partial class ForestScatter : Node3D
 
 	private void BuildMeshes()
 	{
-		_meshes["conifer_a"] = ConiferMesh(1, 7, 13.5f, 2.5f);
-		_meshes["conifer_b"] = ConiferMesh(2, 6, 10f, 2.2f);
-		_meshes["conifer_c"] = ConiferMesh(3, 8, 17f, 2.8f);
+		// tall straight firs: bare lower trunk, drooping bough tiers (alpha cards)
+		_meshes["fir_giant"] = FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f);
+		_meshes["fir_tall"] = FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f);
+		_meshes["fir_mid"] = FirMesh(13, 18f, 0.31f, 0.26f, 11, 3.0f, 0.15f);
+		_meshes["fir_spire"] = FirMesh(14, 22f, 0.34f, 0.30f, 15, 2.4f, 0.08f);
+		_meshes["fir_young"] = FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f);
 		_meshes["decid_a"] = DeciduousMesh(4);
 		_meshes["decid_b"] = DeciduousMesh(5);
-		_meshes["snag"] = SnagMesh(6);
+		_meshes["snag"] = SnagMesh(6, 9.5f);
+		_meshes["snag_tall"] = SnagMesh(16, 19f);
 		_meshes["stump"] = StumpMesh();
 		_meshes["rock_a"] = RockMesh(7);
 		_meshes["rock_b"] = RockMesh(8);
+		_meshes["boulder_a"] = BoulderMesh(21);
+		_meshes["boulder_b"] = BoulderMesh(22);
 		_meshes["log"] = LogMesh();
 		_meshes["branch"] = BranchMesh();
 		_meshes["fern"] = FernMesh();
 		_meshes["grass"] = GrassMesh();
 	}
 
-	private static Mesh ConiferMesh(int seed, int tiers, float height, float radius)
+	/// <summary>
+	/// PS2-style fir: a tall trunk cylinder (flared, slightly bent) with dead
+	/// stubs on the bare lower part, then tiers of drooping bough cards that
+	/// use an alpha-scissor needle texture, plus a crossed-card leader on top.
+	/// crownStart = fraction of the height where live branches begin; ragged =
+	/// chance a bough is missing (irregular silhouette).
+	/// </summary>
+	private static Mesh FirMesh(int seed, float height, float trunkR, float crownStart, int tiers, float maxR, float ragged)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7919) };
 		var k = new MeshKit();
-		k.Color = new Color(0.9f, 0.88f, 0.85f);
-		k.Mat(ProcTextures.BarkMat).Cylinder(new Vector3(0, -0.4f, 0), new Vector3(0, height * 0.85f, 0), 0.26f, 0.05f, 6, false, 1f);
-		k.Mat(ProcTextures.NeedleMat);
-		float firstY = 1.6f + rng.RandfRange(0, 0.8f);
-		float span = height - firstY;
+		// ---- trunk: three segments with a slight wander
+		Vector3 Axis(float y)
+		{
+			float f = y / height;
+			return new Vector3(Mathf.Sin(f * 2.1f + seed) * 0.18f * f, y, Mathf.Cos(f * 1.7f + seed * 2) * 0.14f * f);
+		}
+		float topY = height * 0.93f;
+		k.Mat(ProcTextures.BarkMat);
+		k.Color = new Color(0.62f, 0.6f, 0.58f);
+		k.Cylinder(new Vector3(0, -0.5f, 0), new Vector3(0, 0.6f, 0), trunkR * 1.45f, trunkR * 1.02f, 7, false, 1f);   // root flare
+		float[] ys = { 0.6f, height * 0.3f, height * 0.62f, topY };
+		for (int s = 0; s < ys.Length - 1; s++)
+		{
+			float r0 = trunkR * Mathf.Lerp(1.02f, 0.08f, ys[s] / topY), r1 = trunkR * Mathf.Lerp(1.02f, 0.08f, ys[s + 1] / topY);
+			k.Color = new Color(0.62f, 0.6f, 0.58f).Lerp(new Color(0.8f, 0.78f, 0.74f), (float)s / 2f);
+			k.Cylinder(Axis(ys[s]), Axis(ys[s + 1]), r0, r1, s == 0 ? 7 : 6, false, 1f);
+		}
+		// dead stubs on the bare trunk
+		int stubs = Mathf.RoundToInt(crownStart * height * 0.55f);
+		k.Color = new Color(0.5f, 0.48f, 0.46f);
+		for (int i = 0; i < stubs; i++)
+		{
+			float y = rng.RandfRange(Mathf.Min(2.4f, crownStart * height * 0.5f), crownStart * height);
+			float a = rng.RandfRange(0, Mathf.Tau);
+			Vector3 dir = new(Mathf.Cos(a), rng.RandfRange(-0.5f, 0.05f), Mathf.Sin(a));
+			float len = rng.RandfRange(0.35f, 1.1f) * Mathf.Clamp(trunkR * 2.5f, 0.5f, 1.3f);
+			Vector3 from = Axis(y);
+			k.Cylinder(from, from + dir.Normalized() * len, 0.045f, 0.01f, 3, false, 2f);
+		}
+
+		// ---- bough tiers
+		k.Mat(ProcTextures.FirBranchMat);
+		float y0 = crownStart * height;
 		for (int t = 0; t < tiers; t++)
 		{
 			float f = (float)t / (tiers - 1);
-			float y0 = firstY + span * f * 0.86f;
-			float th = Mathf.Lerp(2.7f, 1.4f, f) * (height / 13f);
-			float r = Mathf.Lerp(radius, 0.45f, Mathf.Pow(f, 0.9f)) * rng.RandfRange(0.9f, 1.1f);
-			Vector3 apex = new(rng.RandfRange(-0.08f, 0.08f), y0 + th, rng.RandfRange(-0.08f, 0.08f));
-			Vector3 under = new(0, y0 + th * 0.28f, 0);
-			int sides = 9;
+			float y = Mathf.Lerp(y0, height * 0.9f, Mathf.Pow(f, 0.92f)) + rng.RandfRange(-0.25f, 0.25f);
+			float profile = Mathf.Lerp(1f, 0.16f, Mathf.Pow(f, 1.1f));
+			// lower tiers of tall trees are a bit shorter than the widest ones (crown shape)
+			profile *= Mathf.Lerp(0.82f, 1f, Mathf.SmoothStep(0f, 0.25f, f)) * rng.RandfRange(0.82f, 1.15f);
+			float R = maxR * profile;
+			int n = Mathf.Max(4, Mathf.RoundToInt(Mathf.Lerp(11f, 5f, f)));
+			float droop = Mathf.Lerp(0.7f, 0.35f, f);           // radians down at the tip
 			float rot = rng.RandfRange(0, Mathf.Tau);
-			var ring = new Vector3[sides];
-			for (int s = 0; s < sides; s++)
+			float ao = Mathf.Lerp(0.55f, 1f, f);                  // lower tiers sit in shade
+			Vector3 c = Axis(y);
+			// dense dark core: a low cone skirt so the tier reads as a solid mass, not loose fronds
 			{
-				float a = rot + Mathf.Tau * s / sides;
-				float rr = r * (s % 2 == 0 ? 1f : 0.74f) * rng.RandfRange(0.9f, 1.1f);
-				float droop = (s % 2 == 0 ? -0.35f : -0.1f) * (height / 13f);
-				ring[s] = new Vector3(Mathf.Cos(a) * rr, y0 + droop, Mathf.Sin(a) * rr);
+				float cr = R * 0.55f, drop = cr * Mathf.Tan(droop * 0.7f);
+				int cs = 7;
+				k.Color = new Color(ao * 0.8f, ao * 0.8f, ao * 0.8f);
+				Vector3 apex = c + Vector3.Up * 0.35f;
+				for (int s = 0; s < cs; s++)
+				{
+					float a0 = rot + Mathf.Tau * s / cs, a1 = rot + Mathf.Tau * (s + 1) / cs;
+					Vector3 p0 = c + new Vector3(Mathf.Cos(a0) * cr, -drop, Mathf.Sin(a0) * cr);
+					Vector3 p1 = c + new Vector3(Mathf.Cos(a1) * cr, -drop, Mathf.Sin(a1) * cr);
+					Vector3 nn = (p0 + p1 - 2f * c).Normalized() + Vector3.Up;
+					k.Tri(apex, p0, p1, nn.Normalized(), new Vector2(0.5f, 0.99f), new Vector2(0.1f, 0.93f), new Vector2(0.9f, 0.93f));
+				}
 			}
-			float lo = Mathf.Lerp(0.42f, 0.7f, f), hi = Mathf.Lerp(0.85f, 1.05f, f);
-			for (int s = 0; s < sides; s++)
+			for (int i = 0; i < n; i++)
 			{
-				Vector3 a = ring[s], b = ring[(s + 1) % sides];
-				Vector3 na = new Vector3(a.X, r * 0.9f, a.Z).Normalized(), nb = new Vector3(b.X, r * 0.9f, b.Z).Normalized();
-				Vector3 nApex = Vector3.Up;
-				float circ = Mathf.Tau * r;
-				Vector2 ua = new((float)s / sides * circ * 0.5f, th * 0.5f), ub = new((float)(s + 1) / sides * circ * 0.5f, th * 0.5f);
-				Vector2 uApex = new((s + 0.5f) / sides * circ * 0.5f, 0);
-				// outer skirt: dark at the ring, lighter toward the apex (baked occlusion)
-				k.Color = new Color(lo, lo, lo);
-				k.Tri(a, b, apex, na, nb, nApex, ua, ub, uApex);
-				// underside: very dark, faces down/in
-				k.Color = new Color(lo * 0.45f, lo * 0.45f, lo * 0.45f);
-				Vector3 nd = new Vector3(0, -1, 0);
-				k.Tri(a, b, under, nd, nd, nd, ua, ub, uApex);
+				if (rng.Randf() < ragged && t < tiers - 2) continue;
+				float a = rot + Mathf.Tau * i / n + rng.RandfRange(-0.25f, 0.25f);
+				float L = R * rng.RandfRange(0.78f, 1.12f);
+				Vector3 dir = new(Mathf.Cos(a), 0, Mathf.Sin(a));
+				Vector3 side = new(-dir.Z, 0, dir.X);
+				float dr = droop * rng.RandfRange(0.75f, 1.3f);
+				float pitch = rng.RandfRange(-0.12f, 0.1f);            // some boughs lift, some sag
+				Vector3 root = c + dir * trunkR * 0.3f + Vector3.Up * rng.RandfRange(-0.35f, 0.45f);
+				// out fairly level, then the outer half hangs down
+				Vector3 mid = root + dir * L * 0.5f + Vector3.Down * (L * 0.5f * Mathf.Tan(dr * 0.35f + pitch));
+				Vector3 tip = mid + dir * L * 0.47f + Vector3.Down * (L * 0.5f * Mathf.Tan(Mathf.Min(dr * 1.15f + pitch, 0.95f)));
+				float hw = L * 0.44f;
+				Vector3 nrm1 = (mid - root).Cross(side).Normalized(); if (nrm1.Y < 0) nrm1 = -nrm1;
+				Vector3 nrm2 = (tip - mid).Cross(side).Normalized(); if (nrm2.Y < 0) nrm2 = -nrm2;
+				float lum = ao * rng.RandfRange(0.85f, 1.1f);
+				k.Color = new Color(lum * 0.7f, lum * 0.7f, lum * 0.7f);
+				k.Quad(root - side * hw * 0.5f, root + side * hw * 0.5f, mid + side * hw, mid - side * hw, nrm1,
+					new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0.5f), new Vector2(0, 0.5f));
+				k.Color = new Color(lum, lum, lum);
+				k.Quad(mid - side * hw, mid + side * hw, tip + side * hw * 0.8f, tip - side * hw * 0.8f, nrm2,
+					new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0), new Vector2(0, 0));
 			}
-			k.Color = new Color(hi, hi, hi);
 		}
+		// leader: two crossed vertical cards at the very top
+		{
+			float lh = Mathf.Max(1.4f, height * 0.09f), lw = lh * 0.35f;
+			Vector3 b = Axis(height * 0.86f), top = Axis(height * 0.86f) + Vector3.Up * lh;
+			k.Color = new Color(0.9f, 0.9f, 0.9f);
+			for (int i = 0; i < 2; i++)
+			{
+				float a = i * Mathf.Pi * 0.5f + seed;
+				Vector3 sd = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * lw;
+				Vector3 nn = new Vector3(-sd.Z, 0, sd.X).Normalized();
+				k.Quad(b - sd, b + sd, top + sd * 0.2f, top - sd * 0.2f, nn,
+					new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+			}
+		}
+		return k.Commit();
+	}
+
+	private static Mesh BoulderMesh(int seed)
+	{
+		var k = new MeshKit();
+		k.Color = new Color(0.8f, 0.8f, 0.78f);
+		k.Mat(ProcTextures.MossRockMat);
+		k.Blob(Vector3.Zero, new Vector3(1.25f, 0.8f, 1.0f), seed, 0.24f, true, 0.6f);
+		k.Blob(new Vector3(0.75f, -0.1f, 0.35f), new Vector3(0.7f, 0.55f, 0.65f), seed + 100, 0.22f, true, 0.6f);
 		return k.Commit();
 	}
 
@@ -164,19 +246,27 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh SnagMesh(int seed)
+	private static Mesh SnagMesh(int seed, float h)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 31337) };
 		var k = new MeshKit();
-		k.Color = new Color(0.62f, 0.62f, 0.6f);
-		k.Mat(ProcTextures.BarkMat).Cylinder(new Vector3(0, -0.4f, 0), new Vector3(0.2f, 9.5f, 0.1f), 0.24f, 0.04f, 6, false, 1f);
-		for (int b = 0; b < 6; b++)
+		float r = 0.2f + h * 0.012f;
+		Vector3 top = new(0.02f * h, h, 0.01f * h);
+		k.Color = new Color(0.72f, 0.72f, 0.72f);
+		k.Mat(ProcTextures.BarkMat).Cylinder(new Vector3(0, -0.4f, 0), top * 0.5f, r * 1.1f, r * 0.7f, 6, false, 1f);
+		k.Color = new Color(0.9f, 0.9f, 0.88f);          // bleached, bark sloughing off higher up
+		k.Cylinder(top * 0.5f, top, r * 0.7f, r * 0.25f, 6, false, 1f);
+		k.Color = new Color(0.62f, 0.6f, 0.56f);
+		k.Mat(ProcTextures.EndGrainMat).Cylinder(top, top + new Vector3(0.05f, 0.08f, 0), r * 0.25f, 0.02f, 6, false, 1f);   // broken top
+		k.Mat(ProcTextures.BarkMat);
+		int nb = Mathf.RoundToInt(h * 0.7f);
+		for (int b = 0; b < nb; b++)
 		{
-			float y = rng.RandfRange(3f, 8.5f);
+			float y = rng.RandfRange(h * 0.3f, h * 0.92f);
 			float a = rng.RandfRange(0, Mathf.Tau);
-			float len = rng.RandfRange(0.5f, 1.6f) * (1.2f - y / 10f);
-			Vector3 from = new(0.2f * y / 9.5f, y, 0.1f * y / 9.5f);
-			k.Cylinder(from, from + new Vector3(Mathf.Cos(a) * len, rng.RandfRange(-0.3f, 0.3f), Mathf.Sin(a) * len), 0.05f, 0.012f, 4, false);
+			float len = rng.RandfRange(0.5f, 1.8f) * (1.25f - y / h);
+			Vector3 from = top * (y / h);
+			k.Cylinder(from, from + new Vector3(Mathf.Cos(a) * len, rng.RandfRange(-0.5f, 0.2f) * len, Mathf.Sin(a) * len), 0.055f, 0.01f, 4, false);
 		}
 		return k.Commit();
 	}
@@ -195,7 +285,7 @@ public partial class ForestScatter : Node3D
 	{
 		var k = new MeshKit();
 		k.Color = new Color(0.85f, 0.85f, 0.82f);
-		k.Mat(ProcTextures.RockMat).Blob(Vector3.Zero, new Vector3(1f, 0.62f, 0.85f), seed, 0.26f, true, 0.7f);
+		k.Mat(ProcTextures.MossRockMat).Blob(Vector3.Zero, new Vector3(1f, 0.62f, 0.85f), seed, 0.26f, true, 0.7f);
 		return k.Commit();
 	}
 
@@ -367,32 +457,50 @@ public partial class ForestScatter : Node3D
 				float cd = ClearingDist(p2);
 				if (cd < 0f) continue;
 				if (Cleared(p2, 1.0f, false)) continue;
+				float dB = _terrain.SampleBranch(px, pz, out float bHalf);
+				if (bHalf > 0.08f && dB < bHalf + 1.9f) continue;
+				float dA = _terrain.RouteDistance(px, pz);
+				if (dA < 1.6f) continue;
 
 				float deep = Deep(sT);
 				float clump = _clump.GetNoise2D(px, pz) * 0.5f + 0.5f;
-				float near = Mathf.SmoothStep(2.7f, 8f, dT);
+				float dP = Mathf.Min(dT, bHalf > 0.08f ? dB + 0.9f - bHalf : 999f);
+				float near = Mathf.SmoothStep(2.7f, 8f, dP);
 				float p = (0.5f + 0.4f * deep) * (0.45f + 0.9f * clump) * (0.35f + 0.65f * near);
 				p *= Mathf.SmoothStep(0f, 7f, cd) * 0.85f + 0.15f;
 				p = Mathf.Max(p, Mathf.SmoothStep(25f, 45f, dT) * 0.9f);   // walls of the valley are solid forest
 				if (roll > p) continue;
 
 				float h = Mathf.Min(_terrain.HeightAt(px, pz), Mathf.Min(_terrain.HeightAt(px + 0.3f, pz), _terrain.HeightAt(px - 0.3f, pz)));
-				float scale = _rng.RandfRange(0.75f, 1.25f) * (1f + 0.15f * deep);
+				float scale = _rng.RandfRange(0.8f, 1.15f) * (1f + 0.1f * deep);
 				float yaw = _rng.RandfRange(0, Mathf.Tau);
-				var tilt = new Vector3(_rng.RandfRange(-0.04f, 0.04f), yaw, _rng.RandfRange(-0.04f, 0.04f));
-				var basis = Basis.FromEuler(tilt).Scaled(Vector3.One * scale);
+				var tilt = new Vector3(_rng.RandfRange(-0.025f, 0.025f), yaw, _rng.RandfRange(-0.025f, 0.025f));
 				var pos = new Vector3(px, h - 0.05f, pz);
-				float tint = _rng.RandfRange(0.82f, 1.08f);
+				float tint = _rng.RandfRange(0.8f, 1.08f);
 
-				float decidChance = Mathf.Lerp(0.34f, 0.08f, Mathf.SmoothStep(60f, 190f, sT));
-				float snagChance = 0.03f + 0.07f * deep;
+				// mostly tall firs; a few autumn broadleaves early on, more dead snags deeper in
+				float decidChance = 0f;   // the reference is all conifer; broadleaves kept only as an option
+				float snagChance = 0.035f + 0.06f * deep;
+				bool nearPath = dT < 9f;
 				string mesh;
 				float trunkR;
-				if (roll2 < snagChance) { mesh = "snag"; trunkR = 0.22f; }
-				else if (roll2 < snagChance + decidChance) { mesh = roll3 < 0.5f ? "decid_a" : "decid_b"; trunkR = 0.2f; }
-				else { mesh = roll3 < 0.4f ? "conifer_a" : (roll3 < 0.75f ? "conifer_b" : "conifer_c"); trunkR = 0.24f; }
+				if (roll2 < snagChance) { mesh = roll3 < 0.55f ? "snag_tall" : "snag"; trunkR = mesh == "snag" ? 0.31f : 0.43f; }
+				else if (roll2 < snagChance + decidChance && dT > 4.5f) { mesh = roll3 < 0.5f ? "decid_a" : "decid_b"; trunkR = 0.2f; }
+				else
+				{
+					// big-trunked giants line the trail so the first-person view is framed by trunks
+					float r3 = nearPath ? roll3 * 0.8f : roll3;
+					if (r3 < 0.24f) { mesh = "fir_giant"; trunkR = 0.52f; }
+					else if (r3 < 0.52f) { mesh = "fir_tall"; trunkR = 0.42f; }
+					else if (r3 < 0.72f) { mesh = "fir_spire"; trunkR = 0.34f; }
+					else if (r3 < 0.9f || dT < 7f || Cleared(p2, 2.6f, false)) { mesh = "fir_mid"; trunkR = 0.31f; }
+					else { mesh = "fir_young"; trunkR = 0.17f; }
+				}
+				// the hidden test route keeps a thin lane: trunk surface >= 1.2 m from its centre
+				if (dA < 1.25f + trunkR * scale * 1.45f) continue;
+				var basis = Basis.FromEuler(tilt).Scaled(Vector3.One * scale);
 
-				Color col = mesh.StartsWith("decid") ? new Color(tint, tint * _rng.RandfRange(0.95f, 1.05f), tint * 0.9f) : new Color(tint, tint, tint);
+				Color col = mesh.StartsWith("decid") ? new Color(tint, tint * _rng.RandfRange(0.9f, 1.05f), tint * 0.85f) : new Color(tint, tint * 0.98f, tint * 0.97f);
 				Add(mesh, TreeChunk, pos, basis, col);
 				TreeCount++;
 				if (TreeCollision)
@@ -403,7 +511,7 @@ public partial class ForestScatter : Node3D
 				{
 					Vector3 sp = pos + new Vector3(_rng.RandfRange(-1.8f, 1.8f), 0, _rng.RandfRange(-1.8f, 1.8f));
 					_terrain.SampleFields(sp.X, sp.Z, out float sdT, out _, out float sdS, out _);
-					if (sdT > 2.2f && sdS > 3f)
+					if (sdT > 2.2f && sdS > 3f && _terrain.RouteDistance(sp.X, sp.Z) > 2f && _terrain.SampleBranch(sp.X, sp.Z, out float sbh) > sbh + 1.2f)
 					{
 						sp.Y = _terrain.HeightAt(sp.X, sp.Z);
 						Add("stump", TreeChunk, sp, Basis.FromEuler(new Vector3(0, _rng.RandfRange(0, 6.28f), 0)), Colors.White);
@@ -427,6 +535,9 @@ public partial class ForestScatter : Node3D
 				if (dT < 1.6f || dR < 3.5f || ParkDist(p2) < 2f || ClearingDist(p2) < -3f) continue;
 				if (Cleared(p2, 1.2f, false)) continue;
 				float yaw = _rng.RandfRange(0, Mathf.Tau);
+				if (_terrain.RouteDistance(px, pz) < 3.6f) continue;
+				float rdB = _terrain.SampleBranch(px, pz, out float rbHalf);
+				if (rbHalf > 0.08f && rdB < rbHalf + (kind < 0.8f && kind >= 0.55f ? 3f : 1.2f)) continue;
 
 				if (kind < 0.55f)
 				{
@@ -463,6 +574,41 @@ public partial class ForestScatter : Node3D
 			}
 	}
 
+	/// <summary>Big dark mossy boulders: along the trail, around the clearing and on the valley walls.</summary>
+	private void ScatterBoulders()
+	{
+		Vector2 min = _terrain.MinXZ, max = _terrain.MaxXZ;
+		float c = 8.5f;
+		for (float z = min.Y + c * 0.5f; z < max.Y; z += c)
+			for (float x = min.X + c * 0.5f; x < max.X; x += c)
+			{
+				float px = x + _rng.RandfRange(-0.5f, 0.5f) * c, pz = z + _rng.RandfRange(-0.5f, 0.5f) * c;
+				float roll = _rng.Randf(), kind = _rng.Randf();
+				float s = _rng.RandfRange(0.7f, 1.6f);
+				var p2 = new Vector2(px, pz);
+				_terrain.SampleFields(px, pz, out float dT, out float sT, out float dS, out float dR);
+				float reach = 1.45f * s;
+				if (dT < reach + 1.4f || dR < reach + 2f || ParkDist(p2) < reach + 2f) continue;
+				if (Cleared(p2, reach + 0.5f, false)) continue;
+				if (_terrain.RouteDistance(px, pz) < reach + 1.4f) continue;
+				float bdB = _terrain.SampleBranch(px, pz, out float bbHalf);
+				if (bbHalf > 0.08f && bdB < bbHalf + reach + 0.8f) continue;
+				float cd = ClearingDist(p2);
+				if (cd < -6f) continue;
+				float p = 0.1f + 0.3f * (1f - Mathf.SmoothStep(4f, 14f, dT)) + 0.3f * (1f - Mathf.SmoothStep(0f, 8f, Mathf.Abs(cd + 2f)))
+					+ 0.15f * (1f - Mathf.SmoothStep(3f, 10f, dS));
+				if (roll > p) continue;
+				if (_terrain.NormalAt(px, pz).Y < 0.7f) s *= 0.7f;
+				float h = _terrain.HeightAt(px, pz);
+				var basis = Basis.FromEuler(new Vector3(_rng.RandfRange(-0.15f, 0.15f), _rng.RandfRange(0, Mathf.Tau), _rng.RandfRange(-0.15f, 0.15f)))
+					.Scaled(new Vector3(s, s * _rng.RandfRange(0.75f, 1.1f), s));
+				var pos = new Vector3(px, h - 0.25f * s, pz);
+				float t = _rng.RandfRange(0.75f, 1.0f);
+				Add(kind < 0.5f ? "boulder_a" : "boulder_b", TreeChunk, pos, basis, new Color(t, t, t));
+				AddCollider(pos, Sphere(0.95f * s), new Transform3D(Basis.Identity, pos + new Vector3(0, 0.1f * s, 0)));
+			}
+	}
+
 	private void ScatterFoliage()
 	{
 		Vector2 min = _terrain.MinXZ, max = _terrain.MaxXZ;
@@ -477,19 +623,26 @@ public partial class ForestScatter : Node3D
 				float half = 0.9f;
 				if (dT < half + 0.35f || dR < 2.6f || ParkDist(p2) < 0.3f) continue;
 				if (Cleared(p2, 0.2f, true)) continue;
+				float fdB = _terrain.SampleBranch(px, pz, out float fbHalf);
+				if (fbHalf > 0.08f && fdB < fbHalf + 0.15f) continue;
 				float cd = ClearingDist(p2);
 				float clump = _clump.GetNoise2D(px * 2.3f, pz * 2.3f) * 0.5f + 0.5f;
 				string mesh = null; float p = 0;
-				if (cd < -1.5f)
+				if (cd < -1.5f && _terrain.ClearingGrass)
 				{
 					mesh = "grass"; p = 0.55f + 0.35f * clump;
+				}
+				else if (cd < -1.5f)
+				{
+					// the stairs' gap: bare forest floor with the odd fern and tuft
+					mesh = _rng.Randf() < 0.6f ? "fern" : "grass"; p = 0.1f + 0.2f * clump;
 				}
 				else if (dS < 2.8f) continue;
 				else
 				{
 					// grass verges early on, ferns under the trees
 					float verge = (1f - Mathf.SmoothStep(3f, 5f, dT)) * (1f - Mathf.SmoothStep(50f, 110f, sT));
-					float edgeOfClearing = 1f - Mathf.SmoothStep(-1.5f, 4f, cd);
+					float edgeOfClearing = _terrain.ClearingGrass ? 1f - Mathf.SmoothStep(-1.5f, 4f, cd) : 0f;
 					if (_rng.Randf() < Mathf.Max(verge * 0.8f, edgeOfClearing)) { mesh = "grass"; p = 0.5f * clump + 0.15f; }
 					else
 					{
@@ -505,7 +658,10 @@ public partial class ForestScatter : Node3D
 				float s = mesh == "fern" ? _rng.RandfRange(0.7f, 1.35f) : _rng.RandfRange(0.7f, 1.2f);
 				var basis = Basis.FromEuler(new Vector3(0, _rng.RandfRange(0, Mathf.Tau), 0)).Scaled(new Vector3(s, s * _rng.RandfRange(0.85f, 1.15f), s));
 				float t = _rng.RandfRange(0.75f, 1.05f);
-				Add(mesh, FoliageChunk, new Vector3(px, h - 0.03f, pz), basis, new Color(t, t, t * 0.95f));
+				// late October: a good share of the bracken has gone rust-brown
+				float brown = mesh == "fern" ? Mathf.Clamp(_rng.Randf() * 1.6f - 0.5f + 0.4f * clump, 0f, 1f) : _rng.Randf() * 0.5f;
+				var tc = new Color(t, t, t * 0.95f).Lerp(new Color(t * 1.55f, t * 0.95f, t * 0.55f), brown);
+				Add(mesh, FoliageChunk, new Vector3(px, h - 0.03f, pz), basis, tc);
 			}
 	}
 

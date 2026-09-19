@@ -13,8 +13,8 @@ public partial class PlayerFootsteps : Node
 {
 	[Export] public float WalkStride = 0.72f;   // metres per step while walking
 	[Export] public float RunStride = 1.15f;
-	[Export] public float StepVolumeDb = -6f;
-	[Export] public float ClothVolumeDb = -20f;
+	[Export] public float StepVolumeDb = -26f;
+	[Export] public float ClothVolumeDb = -32f;
 	[Export] public int Voices = 4;
 
 	private PlayerController _player;
@@ -25,6 +25,10 @@ public partial class PlayerFootsteps : Node
 	private float _distance;
 	private string _lastSurface = "";
 	private readonly RandomNumberGenerator _rng = new();
+	private Audio.SamplePicker _stepPicker, _clothPicker;
+
+	/// <summary>Fired on every player footstep (the stalker shadows these).</summary>
+	[Signal] public delegate void SteppedEventHandler();
 
 	public int StepsPlayed { get; private set; }
 	public string LastSurface => _lastSurface;
@@ -34,6 +38,7 @@ public partial class PlayerFootsteps : Node
 		_player = GetParent<PlayerController>();
 		_sets["dirt"] = LoadSet("res://assets/audio/sfx/step_dirt_{0:00}.wav", 6);
 		_sets["wood"] = LoadSet("res://assets/audio/sfx/step_wood_{0:00}.wav", 4);
+		_sets["stone"] = LoadSet("res://assets/audio/sfx/step_stone_{0:00}.wav", 6);
 		_cloth = LoadSet("res://assets/audio/sfx/cloth_{0:00}.wav", 4);
 		for (int i = 0; i < Voices; i++)
 		{
@@ -74,10 +79,11 @@ public partial class PlayerFootsteps : Node
 		if (set.Length == 0) return;
 
 		float loudness = Mathf.Remap(Mathf.Clamp(speed, 1f, 5f), 1f, 5f, -2f, 3f);
-		Play(set[_rng.RandiRange(0, set.Length - 1)], StepVolumeDb + loudness, _rng.RandfRange(0.92f, 1.08f));
+		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.92f, 1.08f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
-			Play(_cloth[_rng.RandiRange(0, _cloth.Length - 1)], ClothVolumeDb + loudness, _rng.RandfRange(0.9f, 1.1f));
+			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.9f, 1.1f));
 		StepsPlayed++;
+		EmitSignal(SignalName.Stepped);
 	}
 
 	private void Play(AudioStream stream, float db, float pitch)

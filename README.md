@@ -1,8 +1,14 @@
 # Project DS
 
-Working title. An original third-person psychological horror game. It looks like a lost PS2-era title but plays with modern third-person controls. The setting is a fictional American national park, where impossible staircases stand alone in the woods and the forest goes silent around them.
+*Working title.*
 
-**Status:** first vertical slice. You walk from a trailhead into the woods and find a staircase in a clearing, and the forest falls silent as you approach.
+A first-person horror game about a walk in the woods that goes quiet.
+
+You follow a park trail in the last light of an October evening. Birds, insects, wind and water fill the forest, and the forest sounds right. Then, somewhere off the path, it stops. The quiet is the first sign that something is near: a flight of stairs standing on its own among the trees, with no house around it. Something you only ever glimpse keeps pace behind you through the trees.
+
+It is built to look and feel like a game you half remember from a PS2 demo disc: low-poly, fog, dithered edges, 640x360. It controls like a game made now.
+
+**Where it is now:** one playable stretch. You start at a trailhead and walk into the woods until the trail thins out and disappears, then search the forest for the stairs. The forest falls silent as you get close, and on the way something follows you.
 
 ## Requirements
 - Godot **4.7.2 .NET** (the mono build). On this machine it lives at `C:\Users\Dan\tools\Godot_v4.7.2-stable_mono_win64\`.
@@ -21,9 +27,12 @@ Godot_v4.7.2-stable_mono_win64_console.exe --path . -- --autotest   # scripted w
 | Move | WASD / arrows | Left stick |
 | Look | Mouse | Right stick |
 | Run | Shift | LT / L3 |
-| Camera distance | Mouse wheel | Pause menu |
+| Focus (slight zoom) | Right mouse (hold) | RT |
+| Fullscreen / window | F11 or Alt+Enter | |
 | Pause / settings | Esc | Start |
 | Debug readout | F3 | |
+| Dev: third-person camera | F5 | |
+| Dev: stalker behind you / far ahead | F6 / F7 | |
 
 ## Layout
 See [docs/CONVENTIONS.md](docs/CONVENTIONS.md). Research and story proposals live in `docs/research` and `docs/design`.

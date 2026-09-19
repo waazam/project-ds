@@ -39,6 +39,18 @@ public partial class GameSettings : Node
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
 	}
 
+	public override void _UnhandledInput(InputEvent e)
+	{
+		// F11 or Alt+Enter: switch between borderless fullscreen (the default) and a window.
+		if (e is InputEventKey { Pressed: true, Echo: false } k && (k.Keycode == Key.F11 || (k.Keycode == Key.Enter && k.AltPressed)))
+		{
+			var mode = DisplayServer.WindowGetMode();
+			DisplayServer.WindowSetMode(mode == DisplayServer.WindowMode.Fullscreen
+				? DisplayServer.WindowMode.Windowed : DisplayServer.WindowMode.Fullscreen);
+			GetViewport().SetInputAsHandled();
+		}
+	}
+
 	public void Save()
 	{
 		var cfg = new ConfigFile();
@@ -72,6 +84,7 @@ public partial class GameSettings : Node
 		AddKeys("run", Key.Shift);
 		AddKeys("pause", Key.Escape);
 		AddKeys("interact", Key.E);
+		AddMouse("focus", MouseButton.Right);
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);
@@ -85,6 +98,7 @@ public partial class GameSettings : Node
 		AddButton("run", JoyButton.LeftStick);
 		AddButton("pause", JoyButton.Start);
 		AddButton("interact", JoyButton.A);
+		AddAxis("focus", JoyAxis.TriggerRight, 1);
 	}
 
 	private static void Ensure(string action)
@@ -103,6 +117,12 @@ public partial class GameSettings : Node
 	{
 		Ensure(action);
 		InputMap.ActionAddEvent(action, new InputEventJoypadMotion { Axis = axis, AxisValue = sign });
+	}
+
+	private static void AddMouse(string action, MouseButton button)
+	{
+		Ensure(action);
+		InputMap.ActionAddEvent(action, new InputEventMouseButton { ButtonIndex = button });
 	}
 
 	private static void AddButton(string action, JoyButton button)

@@ -96,16 +96,61 @@ public partial class ForestPreview : Node3D
 			views.Add(("06_bridge_side", Eye(side), cross + new Vector3(0, 0.3f, 0)));
 			views.Add(("07_deep_woods", Eye(TP(215f)), Eye(TP(228f))));
 			views.Add(("08_cut_log", Eye(TP(224f)), TP(232f) + new Vector3(0, 0.4f, 0)));
+			// branches: the overlook fork, the overlook itself, the split and each faded end
+			var branches = new List<(string name, Path3D path)>();
+			foreach (var n in GetTree().GetNodesInGroup("trail_branch"))
+				if (n is Path3D bp && bp.Curve != null && bp.Curve.PointCount > 1) branches.Add((bp.Name, bp));
+			Vector3 BP(Path3D p, int i) => p.GlobalTransform * p.Curve.GetPointPosition(i < 0 ? p.Curve.PointCount + i : i);
+			foreach (var (name, bp) in branches)
+			{
+				Log($"branch {name}: start {BP(bp, 0)} end {BP(bp, -1)} length {bp.Curve.GetBakedLength():0} m");
+				if (name == "Overlook")
+				{
+					views.Add(("16_fork_overlook", Eye(BP(bp, 0)) + new Vector3(-2f, 0, 9f), Eye(BP(bp, 3))));
+					Vector3 o = BP(bp, -1);
+					var prof = new System.Text.StringBuilder("overlook view profile (ground - eye, every 10 m NW):");
+					for (int d = 0; d <= 120; d += 10) { var q = o + new Vector3(-0.6f, 0, -0.8f) * d; prof.Append($" {_terrain.HeightAt(q.X, q.Z) - o.Y - 1.6f:0}"); }
+					Log(prof.ToString());
+					var ray = PhysicsRayQueryParameters3D.Create(Eye(o), Eye(o) + new Vector3(-0.6f, 0.02f, -0.8f) * 150f, 1);
+					var hit = GetWorld3D().DirectSpaceState.IntersectRay(ray);
+					Log($"overlook eye {Eye(o)}; level view ray hits {(hit.Count > 0 ? ((Vector3)hit["position"]).ToString() + " " + ((hit["collider"].AsGodotObject() as Node)?.Name ?? "tree/rock") : "nothing (open view)")}");
+					views.Add(("17_overlook_view", Eye(o), Eye(o) + new Vector3(-0.6f, 0.02f, -0.8f) * 20f));
+					views.Add(("17b_overlook_north", Eye(o), Eye(o) + new Vector3(-0.15f, 0.02f, -1f) * 20f));
+				}
+			}
+			views.Add(("18_split", Eye(TP(_terrain.TrailLength - 25f)), Eye(TP(_terrain.TrailLength))));
 			if (stairs != null)
 			{
-				views.Add(("09_clearing_entry", Eye(TP(_terrain.TrailLength - 14f)), stairs.GlobalPosition + new Vector3(0, 1.4f, -2f)));
 				Vector3 sp = stairs.GlobalPosition;
+				foreach (var (name, bp) in branches)
+				{
+					if (name == "Overlook") continue;
+					Vector3 end = BP(bp, -1), prev = BP(bp, -3);
+					views.Add(($"19_{name}_end_ahead", Eye(end), Eye(end) + (end - prev).Normalized() * 10f));
+					views.Add(($"19_{name}_end_to_stairs", Eye(end), sp + new Vector3(0, 2f, -5f)));
+				}
 				Vector3 Near(Vector3 off) { var q = sp + off; q.Y = _terrain.HeightAt(q.X, q.Z); return q; }
+				views.Add(("09_clearing_entry", Eye(Near(new Vector3(3f, 0, 16f))), sp + new Vector3(0, 1.4f, -2f)));
 				views.Add(("10_stairs_front", Eye(Near(new Vector3(0.8f, 0, 5.5f))), sp + new Vector3(0, 1.3f, -2f)));
-				views.Add(("11_stairs_side", Eye(Near(new Vector3(5.5f, 0, -1.5f))), sp + new Vector3(0, 1.2f, -2.2f)));
+				views.Add(("11_stairs_side", Eye(Near(new Vector3(6.5f, 0, -4.5f))), sp + new Vector3(0, 2.2f, -5.5f)));
 				views.Add(("12_stairs_close", Eye(Near(new Vector3(-1.4f, 0, 1.6f))) + new Vector3(0, -0.3f, 0), sp + new Vector3(0, 0.5f, -1.2f)));
-				views.Add(("13_stairs_landing", sp + new Vector3(0, 2.66f + 1.6f, -3.4f), sp + new Vector3(0, 2.66f, -4.5f)));
+				{
+					var shp = new SphereShape3D { Radius = 0.7f };
+					var qp = new PhysicsShapeQueryParameters3D { Shape = shp, CollisionMask = 1 };
+					for (int zi = 0; zi < 12; zi++)
+					{
+						qp.Transform = new Transform3D(Basis.Identity, stairs.GlobalTransform * new Vector3(0, 1.2f + zi * 0.55f, 1.0f - zi));
+						foreach (var r in GetWorld3D().DirectSpaceState.IntersectShape(qp, 8))
+						{
+							var nd = r["collider"].AsGodotObject() as Node;
+							if (nd == null || !stairs.IsAncestorOf(nd)) Log($"  stair-path blocker near z{zi}: {nd?.GetPath().ToString() ?? "scatter (tree/rock/log)"}");
+						}
+					}
+				}
+				Vector3 top = stairsTrig.GlobalPosition;
+				views.Add(("13_stairs_landing", top + new Vector3(0, 1.6f, 1.2f), top + new Vector3(0, 1.0f, -4f)));
 				views.Add(("14_stairs_far", Eye(Near(new Vector3(-9f, 0, 16f))), sp + new Vector3(0, 1.5f, -2f)));
+				LineOfSightReport(branches.FindAll(b => b.name != "Overlook").ConvertAll(b => (b.name.ToString(), BP(b.path, -1))), stairs);
 			}
 			views.Add(("15_overview", new Vector3(40, 45, 30), new Vector3(0, 0, -60)));
 
@@ -129,9 +174,37 @@ public partial class ForestPreview : Node3D
 		if (QuitWhenDone) GetTree().Quit(_fails == 0 ? 0 : 1);
 	}
 
+	/// <summary>
+	/// From each faded path end, cast rays at eye height to points up the flight and
+	/// report how many are unobstructed by terrain or trunks (fog is on top of that).
+	/// </summary>
+	private void LineOfSightReport(List<(string name, Vector3 end)> ends, Node3D stairs)
+	{
+		var space = GetWorld3D().DirectSpaceState;
+		Vector3 sp = stairs.GlobalPosition;
+		foreach (var (name, end) in ends)
+		{
+			Vector3 eye = end + new Vector3(0, 1.6f, 0);
+			int clear = 0, total = 0;
+			for (int i = 0; i <= 6; i++)
+				for (int side = -1; side <= 1; side++)
+				{
+					Vector3 target = stairs.GlobalTransform * new Vector3(side * 0.9f, 0.4f + i * 0.95f, -i * 1.8f);
+					var q = PhysicsRayQueryParameters3D.Create(eye, target, 1);
+					total++;
+					var hit = space.IntersectRay(q);
+					if (hit.Count == 0 || (hit["collider"].AsGodotObject() is Node hn && stairs.IsAncestorOf(hn))) clear++;
+					else if (i == 3 && side == 0) Log($"  mid ray blocked by {(hit["collider"].AsGodotObject() as Node)?.Name} at {(Vector3)hit["position"]}");
+				}
+			float dist = new Vector2(end.X - sp.X, end.Z - sp.Z).Length();
+			float fog = 1f - Mathf.Exp(-0.03f * dist);
+			Log($"line of sight {name} end {end} -> stairs: {dist:0} m, {clear}/{total} rays unobstructed, deep-fog cover ~{fog:P0}");
+		}
+	}
+
 	private async Task Walk(Node3D spawn, Node3D approach, Area3D trigger, VanishingProp vanish)
 	{
-		var path = GetTree().GetFirstNodeInGroup("trail") as Path3D;
+		var path = (GetTree().GetFirstNodeInGroup("autotest_route") ?? GetTree().GetFirstNodeInGroup("trail")) as Path3D;
 		if (path == null || spawn == null) { Check(false, "trail path + spawn exist"); return; }
 
 		var body = new CharacterBody3D { Name = "TestWalker", CollisionLayer = 2, CollisionMask = 1 };
@@ -182,7 +255,7 @@ public partial class ForestPreview : Node3D
 			}
 			else
 			{
-				dir = stairsDir; speed = 1.9f; climbT += dt;
+				{ var to = trigger != null ? new Vector3(trigger.GlobalPosition.X - pos.X, 0, trigger.GlobalPosition.Z - pos.Z) : Vector3.Zero; dir = to.Length() > 0.3f ? to.Normalized() : stairsDir; } speed = 1.9f; climbT += dt;
 				maxY = Mathf.Max(maxY, pos.Y);
 				if (reachedTop || climbT > 8f) break;
 			}

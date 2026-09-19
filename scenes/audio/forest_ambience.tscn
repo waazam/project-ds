@@ -2,27 +2,12 @@
 
 [ext_resource type="Script" path="res://scripts/audio/ForestAmbienceManager.cs" id="1_mgr"]
 [ext_resource type="Script" path="res://scripts/audio/AmbienceLoop.cs" id="2_loop"]
-[ext_resource type="Script" path="res://scripts/audio/BirdCallEmitter.cs" id="3_birds"]
+[ext_resource type="Script" path="res://scripts/audio/OneShotEmitter.cs" id="3_emit"]
 [ext_resource type="Script" path="res://scripts/audio/PointSourceSpawner.cs" id="4_points"]
+[ext_resource type="Script" path="res://scripts/audio/ForestDirector.cs" id="5_director"]
 
 [node name="ForestAmbience" type="Node"]
 script = ExtResource("1_mgr")
-
-[node name="Wind" type="AudioStreamPlayer" parent="."]
-bus = &"Wind"
-
-[node name="Loop" type="Node" parent="Wind"]
-script = ExtResource("2_loop")
-StreamPath = "res://assets/audio/ambient/wind_loop.wav"
-BaseVolumeDb = -8.0
-
-[node name="Leaves" type="AudioStreamPlayer" parent="."]
-bus = &"Wind"
-
-[node name="Loop" type="Node" parent="Leaves"]
-script = ExtResource("2_loop")
-StreamPath = "res://assets/audio/ambient/leaves_loop.wav"
-BaseVolumeDb = -14.0
 
 [node name="Insects" type="AudioStreamPlayer" parent="."]
 bus = &"Insects"
@@ -30,24 +15,34 @@ bus = &"Insects"
 [node name="Loop" type="Node" parent="Insects"]
 script = ExtResource("2_loop")
 StreamPath = "res://assets/audio/ambient/insects_loop.wav"
-BaseVolumeDb = -15.0
+BaseVolumeDb = -18.0
+DriftDb = 2.0
+DriftPitch = 0.015
+DriftPeriod = Vector2(30, 80)
 
-[node name="Distant" type="AudioStreamPlayer" parent="."]
-bus = &"Distant"
-
-[node name="Loop" type="Node" parent="Distant"]
-script = ExtResource("2_loop")
-StreamPath = "res://assets/audio/ambient/distant_loop.wav"
-BaseVolumeDb = -10.0
-
-[node name="Drone" type="AudioStreamPlayer" parent="."]
+[node name="Undertone" type="AudioStreamPlayer" parent="."]
 bus = &"Unnatural"
 
-[node name="Loop" type="Node" parent="Drone"]
+[node name="Loop" type="Node" parent="Undertone"]
 script = ExtResource("2_loop")
-StreamPath = "res://assets/audio/ambient/drone_loop.wav"
-BaseVolumeDb = -14.0
-SilenceFade = Vector2(0.7, 1)
+StreamPath = "res://assets/audio/ambient/undertone_loop.wav"
+BaseVolumeDb = -29.0
+SilenceFade = Vector2(0.5, 0.95)
+RisesWithSilence = false
+DriftDb = 3.0
+DriftPitch = 0.006
+DriftPeriod = Vector2(25, 70)
+
+[node name="Pressure" type="AudioStreamPlayer" parent="."]
+bus = &"Unnatural"
+
+[node name="Loop" type="Node" parent="Pressure"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/pressure_loop.wav"
+BaseVolumeDb = -9.0
+SilenceFade = Vector2(0.55, 1)
+DriftDb = 2.0
+DriftPeriod = Vector2(30, 80)
 
 [node name="Ringing" type="AudioStreamPlayer" parent="."]
 bus = &"Unnatural"
@@ -55,11 +50,69 @@ bus = &"Unnatural"
 [node name="Loop" type="Node" parent="Ringing"]
 script = ExtResource("2_loop")
 StreamPath = "res://assets/audio/ambient/ringing_loop.wav"
-BaseVolumeDb = -34.0
-SilenceFade = Vector2(0.88, 1)
+BaseVolumeDb = -38.0
+SilenceFade = Vector2(0.9, 1)
+DriftDb = 3.0
+DriftPitch = 0.004
+DriftPeriod = Vector2(15, 45)
+
+[node name="Heartbeat" type="AudioStreamPlayer" parent="."]
+bus = &"Player"
+
+[node name="Loop" type="Node" parent="Heartbeat"]
+script = ExtResource("2_loop")
+StreamPath = "res://assets/audio/ambient/heartbeat_loop.wav"
+BaseVolumeDb = -9.0
+Gain = 0.0
 
 [node name="BirdCalls" type="Node3D" parent="."]
-script = ExtResource("3_birds")
+script = ExtResource("3_emit")
+VolumeDb = -19.0
+SkipSamples = PackedInt32Array(2, 4, 5, 6)
+IntervalSeconds = Vector2(10, 25)
+
+[node name="Crickets" type="Node3D" parent="."]
+script = ExtResource("3_emit")
+SamplePattern = "res://assets/audio/sfx/cricket_chirp_{0:00}.wav"
+SampleCount = 3
+Bus = "Insects"
+LifeCategory = 2
+IntervalSeconds = Vector2(6, 16)
+DistanceRange = Vector2(3, 11)
+HeightRange = Vector2(0, 0.4)
+VolumeDb = -10.0
+UnitSize = 4.0
+Voices = 3
+
+[node name="Critters" type="Node3D" parent="."]
+script = ExtResource("3_emit")
+SamplePattern = "res://assets/audio/sfx/rustle_{0:00}.wav"
+SampleCount = 3
+Bus = "Distant"
+LifeCategory = 4
+IntervalSeconds = Vector2(25, 60)
+DistanceRange = Vector2(5, 16)
+HeightRange = Vector2(0, 0.3)
+VolumeDb = -8.0
+UnitSize = 5.0
+Voices = 2
+
+[node name="TwigSnaps" type="Node3D" parent="."]
+script = ExtResource("3_emit")
+SamplePattern = "res://assets/audio/sfx/twig_snap_{0:00}.wav"
+SampleCount = 4
+Bus = "Distant"
+LifeCategory = 4
+IntervalSeconds = Vector2(70, 150)
+DistanceRange = Vector2(10, 30)
+HeightRange = Vector2(0, 0.3)
+VolumeDb = -2.0
+UnitSize = 8.0
+Voices = 2
 
 [node name="StreamSources" type="Node" parent="."]
 script = ExtResource("4_points")
+
+[node name="Director" type="Node" parent="."]
+script = ExtResource("5_director")
+

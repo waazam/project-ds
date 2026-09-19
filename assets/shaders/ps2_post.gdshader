@@ -8,9 +8,9 @@ uniform float levels = 40.0;            // colour steps per channel after dither
 uniform float dither_strength = 1.0;
 uniform float grain = 0.035;
 uniform float vignette = 0.38;
-uniform float saturation = 0.82;
-uniform vec3 shadow_tint = vec3(0.012, 0.018, 0.014);
-uniform float contrast = 1.06;
+uniform float saturation = 0.95;
+uniform vec3 shadow_tint = vec3(0.009, 0.010, 0.019);
+uniform float contrast = 1.08;
 
 const float BAYER[16] = float[16](
 	0.0, 8.0, 2.0, 10.0,
@@ -25,7 +25,7 @@ float hash(vec2 p) {
 void fragment() {
 	vec3 c = texture(screen_tex, SCREEN_UV).rgb;
 
-	// Grade: pull saturation, add a touch of contrast, and lift blacks toward murky green.
+	// Grade: pull saturation, add contrast, and lift blacks toward a cool blue-violet.
 	float luma = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(vec3(luma), c, saturation);
 	c = (c - 0.5) * contrast + 0.5;

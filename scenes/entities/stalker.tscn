@@ -1,0 +1,20 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/entities/Stalker.cs" id="1_stalker"]
+[ext_resource type="Shader" path="res://assets/shaders/stalker_skin.gdshader" id="2_skin"]
+[ext_resource type="Script" path="res://scripts/entities/StalkerBody.cs" id="3_body"]
+
+[sub_resource type="ShaderMaterial" id="Skin"]
+shader = ExtResource("2_skin")
+shader_parameter/albedo = Color(0.026, 0.028, 0.034, 1)
+shader_parameter/face_tint = Color(0.21, 0.215, 0.22, 1)
+shader_parameter/visibility = 1.0
+shader_parameter/wetness = 0.6
+
+[node name="Stalker" type="Node3D"]
+script = ExtResource("1_stalker")
+SamplePoints = PackedVector3Array(0.022, 2.112, 0.484, 0, 2.277, 0.022, -0.44, 2.332, 0.066, 0.451, 2.365, 0.066, 0, 1.892, 0.066, 0, 1.452, 0.011, 0, 1.21, 0, -0.165, 0.704, 0.088, 0.176, 0.671, 0.132, -0.484, 0.858, 0.187)
+
+[node name="Body" type="Node3D" parent="."]
+script = ExtResource("3_body")
+Skin = SubResource("Skin")

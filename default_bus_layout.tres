@@ -1,5 +1,9 @@
 [gd_resource type="AudioBusLayout" format=3]
 
+[sub_resource type="AudioEffectHardLimiter" id="MasterLimiter"]
+resource_name = "HardLimiter"
+ceiling_db = -0.5
+
 [sub_resource type="AudioEffectLowPassFilter" id="NatureLowPass"]
 resource_name = "LowPassFilter"
 cutoff_hz = 20000.0
@@ -13,11 +17,13 @@ dry = 1.0
 wet = 0.02
 
 [resource]
+bus/0/effect/0/effect = SubResource("MasterLimiter")
+bus/0/effect/0/enabled = true
 bus/1/name = &"Nature"
 bus/1/solo = false
 bus/1/mute = false
 bus/1/bypass_fx = false
-bus/1/volume_db = 0.0
+bus/1/volume_db = -6.0
 bus/1/send = &"Master"
 bus/1/effect/0/effect = SubResource("NatureLowPass")
 bus/1/effect/0/enabled = true
@@ -71,3 +77,15 @@ bus/9/mute = false
 bus/9/bypass_fx = false
 bus/9/volume_db = 0.0
 bus/9/send = &"Master"
+bus/10/name = &"Events"
+bus/10/solo = false
+bus/10/mute = false
+bus/10/bypass_fx = false
+bus/10/volume_db = 0.0
+bus/10/send = &"Master"
+bus/11/name = &"Music"
+bus/11/solo = false
+bus/11/mute = false
+bus/11/bypass_fx = false
+bus/11/volume_db = -24.0
+bus/11/send = &"Master"

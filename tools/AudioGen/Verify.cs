@@ -74,6 +74,12 @@ public static class Verify
 		_ when name.StartsWith("step_dirt") => (0.2, 0.36),
 		_ when name.StartsWith("step_wood") => (0.2, 0.6),
 		_ when name.StartsWith("cloth") => (0.25, 0.55),
+		_ when name.StartsWith("twig_snap") => (0.25, 0.6),
+		_ when name.StartsWith("branch_drop") => (1.2, 2.2),
+		_ when name.StartsWith("trunk_creak") => (1.0, 2.5),
+		_ when name.StartsWith("cricket_chirp") => (0.3, 0.8),
+		_ when name.StartsWith("raven") => (0.8, 1.8),
+		_ when name.StartsWith("rustle") => (0.4, 1.2),
 		_ => (0, 1e9),
 	};
 
@@ -81,11 +87,17 @@ public static class Verify
 	static IEnumerable<string> ContentChecks(string name, double[] b, double centroid)
 	{
 		if (name == "insects_loop" && b[3] + b[4] < 0.85) yield return "insects not mostly >3k";
-		if (name == "drone_loop" && b[0] < 0.85) yield return "drone not mostly <100";
+		if (name == "pressure_loop" && b[0] < 0.9) yield return "pressure not mostly <100";
 		if (name == "ringing_loop" && b[3] + b[4] < 0.95) yield return "ringing not high";
 		if (name == "distant_loop" && b[0] + b[1] < 0.9) yield return "distant not low";
 		if (name == "wind_loop" && b[0] + b[1] < 0.8) yield return "wind not low/mid";
 		if (name == "leaves_loop" && b[2] + b[3] + b[4] < 0.6) yield return "leaves not high-band";
+		if (name == "heartbeat_loop" && b[0] < 0.85) yield return "heartbeat not mostly <100";
+		if (name.StartsWith("cricket_chirp") && b[3] + b[4] < 0.85) yield return "cricket not mostly >3k";
+		if (name.StartsWith("trunk_creak") && (b[1] < 0.6 || centroid > 800)) yield return "creak not low/woody";
+		if (name.StartsWith("raven") && (centroid > 1500 || b[4] > 0.01)) yield return "raven not dull/distant";
+		if (name.StartsWith("twig_snap") && b[2] + b[3] < 0.4) yield return "twig not broadband";
+		if (name.StartsWith("rustle") && b[2] + b[3] + b[4] < 0.5) yield return "rustle not crunchy";
 	}
 
 	/// <summary>Spread (p90 - p10, dB) of 250 ms RMS windows: how much the level moves (gusts, swells).</summary>

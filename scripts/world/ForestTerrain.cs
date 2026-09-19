@@ -40,16 +40,44 @@ public partial class ForestTerrain : Node3D
 	/// <summary>Spacing of the rewritten runtime Path3D points.</summary>
 	[Export] public float PathPointSpacing = 4f;
 
+	[ExportGroup("Branches")]
+	/// <summary>
+	/// Side paths (Path3D, group "trail_branch"), local to this node. A branch whose first
+	/// point lies within 12 m of the main trail is snapped onto it. Each branch is drawn as
+	/// a narrower trail cut into the natural slope (it doesn't carve a valley).
+	/// </summary>
+	[Export] public NodePath[] BranchPaths = System.Array.Empty<NodePath>();
+	/// <summary>Full width at the start of each branch (m).</summary>
+	[Export] public float[] BranchWidths = System.Array.Empty<float>();
+	/// <summary>Fraction of each branch's length where it starts to fade into the forest floor (>= 1: a real dead end, no fade).</summary>
+	[Export] public float[] BranchFadeFrom = System.Array.Empty<float>();
+	/// <summary>
+	/// Hidden test route (Path3D, group "autotest_route"). Its authored points are the
+	/// cross-country leg only; at runtime it is rewritten as trail → branch AutotestBranch →
+	/// those points, at ground height. Trees/rocks keep clear of the cross-country leg.
+	/// </summary>
+	[Export] public NodePath AutotestRoutePath = "AutotestRoute";
+	[Export] public int AutotestBranch = -1;
+
 	[ExportGroup("Areas")]
+	/// <summary>The gap where the staircase stands (flattened; trees kept out of it).</summary>
 	[Export] public Vector2 ClearingCenter = new(0, -302);
 	[Export] public float ClearingRadius = 20f;
+	/// <summary>Paint the clearing as meadow grass (the old mown clearing). Off = natural forest floor.</summary>
+	[Export] public bool ClearingGrass = true;
 	[Export] public Rect2 ParkingRect = new(-11, 23, 22, 13);
+	/// <summary>Broad, gently rolling low forest floor (x, z, radius) where the trail breaks up. Radius 0 = none.</summary>
+	[Export] public Vector3 Basin = Vector3.Zero;
+	/// <summary>Round hills added on top of everything else: (x, z, height, radius).</summary>
+	[Export] public Vector4[] Hills = System.Array.Empty<Vector4>();
 
 	[ExportGroup("Shape")]
 	[Export] public float ValleyDepth = 17f;
 	[Export] public float ValleyWidth = 34f;
 	[Export] public float NorthRise = 0.016f;
 	[Export] public float StreamDepth = 1.35f;
+	/// <summary>World Z range over which the canopy shade on the ground deepens.</summary>
+	[Export] public Vector2 DeepShadeZ = new(-160f, -240f);
 
 	[ExportGroup("Build")]
 	[Export] public bool BuildBoundaryWalls = true;
@@ -65,8 +93,15 @@ public partial class ForestTerrain : Node3D
 	private float[] _bed;            // stream bed per metre of stream arc length
 	private FastNoiseLite _nBig, _nMid, _nFine, _nEdge;
 	private float _parkH, _clearH;
+	private readonly List<Polyline2> _branches = new();
+	private float[] _brHalf0 = System.Array.Empty<float>(), _brFade = System.Array.Empty<float>();
+	private float[] _dB, _sB, _iB, _dA;   // nearest-branch distance / arc / index, route distance
+	private Polyline2 _route;              // cross-country leg of the test route (incl. its lead-in)
+	private const float BranchR = 14f, RouteR = 8f;
 
 	public Polyline2 Trail { get { EnsureData(); return _trail; } }
+	public int BranchCount { get { EnsureData(); return _branches.Count; } }
+	public Polyline2 Branch(int i) { EnsureData(); return _branches[i]; }
 	public Polyline2 Stream { get { EnsureData(); return _stream; } }
 	public float TrailLength { get { EnsureData(); return _trail.Length; } }
 
@@ -130,6 +165,54 @@ public partial class ForestTerrain : Node3D
 		int j = Mathf.Clamp(Mathf.RoundToInt((l.Y - MinXZ.Y) / CellSize), 0, _nz);
 		int k = j * (_nx + 1) + i;
 		dTrail = _dT[k]; sTrail = _sT[k]; dStream = _dS[k]; dRoad = _dR[k];
+	}
+
+	/// <summary>
+	/// Coarse distance to the nearest side branch, and that branch's current half-width
+	/// there (shrinks to ~0 where a faint path has faded away). Far away: 999 / 0.
+	/// </summary>
+	public float SampleBranch(float x, float z, out float halfWidth)
+	{
+		EnsureData();
+		halfWidth = 0f;
+		if (_branches.Count == 0) return 999f;
+		int k = GridIndex(x, z);
+		if (_dB[k] >= BranchR) return 999f;
+		halfWidth = BranchHalf((int)_iB[k], _sB[k]);
+		return _dB[k];
+	}
+
+	/// <summary>Coarse distance to the cross-country leg of the hidden test route (999 far away / none).</summary>
+	public float RouteDistance(float x, float z)
+	{
+		EnsureData();
+		if (_dA == null) return 999f;
+		float d = _dA[GridIndex(x, z)];
+		return d >= RouteR ? 999f : d;
+	}
+
+	/// <summary>0..1: how much of a path a branch still is at arc length s (1 = full trail, 0 = faded into the forest).</summary>
+	public float BranchStrength(int i, float s)
+	{
+		var b = _branches[i];
+		float f = i < _brFade.Length ? _brFade[i] : 1f;
+		if (f >= 1f) return 1f - Mathf.SmoothStep(b.Length - 3f, b.Length + 1f, s);
+		return 1f - Mathf.SmoothStep(b.Length * f, b.Length, s);
+	}
+
+	public float BranchHalf(int i, float s)
+	{
+		float h0 = 0.5f * (i < _brHalf0.Length ? _brHalf0[i] : 1.2f);
+		float st = BranchStrength(i, s);
+		return h0 * (0.3f + 0.7f * st) * Mathf.SmoothStep(0f, 0.25f, st + 0.05f);
+	}
+
+	private int GridIndex(float x, float z)
+	{
+		Vector2 l = ToLocal2(x, z);
+		int i = Mathf.Clamp(Mathf.RoundToInt((l.X - MinXZ.X) / CellSize), 0, _nx);
+		int j = Mathf.Clamp(Mathf.RoundToInt((l.Y - MinXZ.Y) / CellSize), 0, _nz);
+		return j * (_nx + 1) + i;
 	}
 
 	/// <summary>World-space point on the trail at arc length s (ground height), plus horizontal tangent.</summary>
@@ -222,6 +305,8 @@ public partial class ForestTerrain : Node3D
 		float dPark = RectDist(p, ParkingRect);
 		float dClear = Mathf.Max(0, p.DistanceTo(ClearingCenter) - ClearingRadius * 0.8f);
 		float d = Mathf.Min(Mathf.Min(Mathf.Min(dT, dRoadEff), Mathf.Min(dPark + 1f, dClear + 1f)), dV + 1.5f);
+		// the deep woods open out into a broad, gently rolling floor where the trail breaks up
+		if (Basin.Z > 0f) d = Mathf.Min(d, 6.5f + Mathf.Max(0f, p.DistanceTo(new Vector2(Basin.X, Basin.Y)) - Basin.Z));
 
 		float dd = Mathf.Max(0, d - 2.5f);
 		float rise = ValleyDepth * (1f - Mathf.Exp(-(dd / ValleyWidth) * (dd / ValleyWidth))) + 0.07f * dd;
@@ -230,6 +315,11 @@ public partial class ForestTerrain : Node3D
 		float mid = _nMid.GetNoise2D(x, z) * 1.4f * w;
 		float fine = _nFine.GetNoise2D(x, z) * 0.22f * Mathf.SmoothStep(1.2f, 3.5f, d);
 		float h = FloorAt(z) + rise + big + mid + fine;
+		foreach (var hill in Hills)
+		{
+			float r2 = (x - hill.X) * (x - hill.X) + (z - hill.Y) * (z - hill.Y);
+			h += hill.Z * Mathf.Exp(-r2 / (2f * hill.W * hill.W));
+		}
 
 		// worn trail bed
 		h -= 0.09f * (1f - Mathf.SmoothStep(half * 0.5f, half + 0.5f, dT));
@@ -328,6 +418,100 @@ public partial class ForestTerrain : Node3D
 				float y = H0(x, z, _dT[k], _sT[k], _dR[k], _dV[k]);
 				_h[k] = Carve(y, _dS[k], _sS[k]);
 			}
+
+		BuildBranches(w, h);
+	}
+
+	/// <summary>Read the side branches and the test route, raster their fields, and bench the branches into the slope.</summary>
+	private void BuildBranches(int w, int h)
+	{
+		int n = w * h;
+		_dB = new float[n]; _sB = new float[n]; _iB = new float[n];
+		System.Array.Fill(_dB, BranchR);
+		_brHalf0 = new float[BranchPaths.Length];
+		_brFade = new float[BranchPaths.Length];
+		var tmpD = new float[n]; var tmpS = new float[n];
+		for (int bi = 0; bi < BranchPaths.Length; bi++)
+		{
+			var pts = ReadPathPoints(BranchPaths[bi]);
+			if (pts.Count < 2) { _branches.Add(new Polyline2()); continue; }
+			// snap the first point onto the main trail so the fork joins cleanly
+			float dj = _trail.Closest(pts[0], out float sj);
+			if (dj < 12f) pts[0] = _trail.At(sj, out _);
+			var pl = Polyline2.CatmullRom(pts, 0.5f);
+			_branches.Add(pl);
+			_brHalf0[bi] = bi < BranchWidths.Length ? BranchWidths[bi] : 1.2f;
+			_brFade[bi] = bi < BranchFadeFrom.Length ? BranchFadeFrom[bi] : 1f;
+
+			System.Array.Fill(tmpD, BranchR);
+			var dec = pl.Decimate(2);
+			dec.Raster(MinXZ, CellSize, w, h, BranchR, tmpD, tmpS);
+			// smoothed centreline profile of the natural ground, 1 m steps
+			int m = Mathf.CeilToInt(pl.Length) + 1;
+			var prof = new float[m];
+			for (int s = 0; s < m; s++) { Vector2 p = pl.At(s, out _); prof[s] = HeightLocal(p.X, p.Y); }
+			for (int pass = 0; pass < 3; pass++)
+			{
+				var cp = (float[])prof.Clone();
+				for (int s = 0; s < m; s++)
+				{
+					float acc = 0; int cnt = 0;
+					for (int o = -5; o <= 5; o++) { int q = Mathf.Clamp(s + o, 0, m - 1); acc += cp[q]; cnt++; }
+					prof[s] = acc / cnt;
+				}
+			}
+			// bench: pull the ground toward the smoothed profile across the path (a cut into the slope)
+			for (int k = 0; k < n; k++)
+			{
+				float d = tmpD[k];
+				if (d >= BranchR) continue;
+				if (d < _dB[k]) { _dB[k] = d; _sB[k] = tmpS[k]; _iB[k] = bi; }
+				float s = tmpS[k];
+				float half = BranchHalf(bi, s), st = BranchStrength(bi, s);
+				float hw = Mathf.Max(half, 0.5f * _brHalf0[bi] * 0.6f);
+				float t = 1f - Mathf.SmoothStep(hw * 0.8f, hw + 2.6f, d);
+				if (t <= 0f) continue;
+				// don't fight the main trail right at the junction
+				t *= Mathf.SmoothStep(1.5f, 4f, _dT[k]);
+				// let the path run out onto natural ground at its end (no notch cut into a hilltop)
+				t *= _brFade[bi] >= 1f ? 1f - Mathf.SmoothStep(pl.Length - 14f, pl.Length - 2f, s) : 0.3f + 0.7f * st;
+				float target = SampleProfile(prof, s) - 0.07f * st * (1f - Mathf.SmoothStep(half * 0.5f, half + 0.5f, d));
+				_h[k] = Mathf.Lerp(_h[k], target, t);
+			}
+		}
+
+		// hidden test route: only its cross-country leg matters here
+		if (GetNodeOrNull<Path3D>(AutotestRoutePath) != null)
+		{
+			var rp = ReadPathPoints(AutotestRoutePath);
+			Polyline2 lead = AutotestBranch >= 0 && AutotestBranch < _branches.Count && _branches[AutotestBranch].Points.Count > 1 ? _branches[AutotestBranch] : null;
+			if (lead != null) rp.Insert(0, lead.Points[^1]);
+			if (rp.Count > 1)
+			{
+				_route = Polyline2.CatmullRom(rp, 0.5f);
+				_dA = new float[n];
+				System.Array.Fill(_dA, RouteR);
+				_route.Decimate(2).Raster(MinXZ, CellSize, w, h, RouteR, _dA, null);
+				// the branch it follows fades out, so keep its lane open too (from where it starts to fade)
+				if (lead != null) lead.Decimate(2).Raster(MinXZ, CellSize, w, h, RouteR, _dA, null);
+			}
+		}
+	}
+
+	private static float SampleProfile(float[] prof, float s)
+	{
+		float f = Mathf.Clamp(s, 0, prof.Length - 1.001f);
+		int i = (int)f;
+		return Mathf.Lerp(prof[i], prof[i + 1], f - i);
+	}
+
+	/// <summary>Bilinear height from the grid at local x,z (for generation passes).</summary>
+	private float HeightLocal(float x, float z)
+	{
+		float gx = Mathf.Clamp((x - MinXZ.X) / CellSize, 0, _nx - 0.0001f), gz = Mathf.Clamp((z - MinXZ.Y) / CellSize, 0, _nz - 0.0001f);
+		int i = (int)gx, j = (int)gz;
+		float fx = gx - i, fz = gz - j;
+		return Mathf.Lerp(Mathf.Lerp(H(i, j), H(i + 1, j), fx), Mathf.Lerp(H(i, j + 1), H(i + 1, j + 1), fx), fz);
 	}
 
 	// =====================================================================
@@ -346,8 +530,9 @@ public partial class ForestTerrain : Node3D
 		int k = j * (_nx + 1) + i;
 		float x = MinXZ.X + i * CellSize, z = MinXZ.Y + j * CellSize;
 		float dT = Mathf.Min(_dT[k], _dR[k]);
+		if (_dB != null && _dB[k] < BranchR) dT = Mathf.Min(dT, _dB[k] + 2.5f * (1f - BranchStrength((int)_iB[k], _sB[k])));
 		float n = _nMid.GetNoise2D(x * 1.7f + 50f, z * 1.7f) * 0.5f + 0.5f;
-		float deep = Mathf.SmoothStep(160f, 240f, -z);
+		float deep = Mathf.SmoothStep(-DeepShadeZ.X, -DeepShadeZ.Y, -z);
 		float shade = 1f - 0.38f * Mathf.SmoothStep(3f, 22f, dT) * (0.6f + 0.4f * n) - 0.12f * deep;
 		float wet = 1f - Mathf.SmoothStep(1.5f, 5f, _dS[k]);
 		shade *= 1f - 0.25f * wet;
@@ -357,7 +542,10 @@ public partial class ForestTerrain : Node3D
 	private void BuildMesh()
 	{
 		var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/terrain.gdshader") };
+		mat.SetShaderParameter("tex_litter", ProcTextures.LeafLitter());
 		mat.SetShaderParameter("tex_floor", ProcTextures.ForestFloor());
+		mat.SetShaderParameter("tex_moss", ProcTextures.Moss());
+		mat.SetShaderParameter("tex_noise", ProcTextures.WaterNoise());
 		mat.SetShaderParameter("tex_grass", ProcTextures.GrassGround());
 		mat.SetShaderParameter("tex_dirt", ProcTextures.Dirt());
 		mat.SetShaderParameter("tex_gravel", ProcTextures.Gravel());
@@ -419,6 +607,28 @@ public partial class ForestTerrain : Node3D
 		_trail.Raster(origin, step, w, h, 8f, dT, sT);
 		if (_road.Points.Count > 1) _road.Raster(origin, step, w, h, 8f, dR, null);
 		if (_stream.Points.Count > 1) _stream.Raster(origin, step, w, h, 8f, dS, null);
+		// side branches: dirt that narrows, breaks up and fades out where a faint path dies away
+		var bDirt = new float[w * h];
+		{
+			var bd = new float[w * h]; var bs = new float[w * h];
+			for (int bi = 0; bi < _branches.Count; bi++)
+			{
+				if (_branches[bi].Points.Count < 2) continue;
+				System.Array.Fill(bd, 4f);
+				_branches[bi].Raster(origin, step, w, h, 4f, bd, bs);
+				for (int k = 0; k < bd.Length; k++)
+				{
+					if (bd[k] >= 4f) continue;
+					float x = origin.X + (k % w) * step, z = origin.Y + (k / w) * step;
+					float e = _nEdge.GetNoise2D(x, z);
+					float st = BranchStrength(bi, bs[k]), half = BranchHalf(bi, bs[k]);
+					float v = 1f - Mathf.SmoothStep(half - 0.2f, half + 0.4f, bd[k] + e * 0.3f);
+					// the fading stretch goes patchy before it disappears
+					v *= Mathf.Clamp(st * 1.7f - 0.35f + e * 0.6f, 0f, 1f);
+					bDirt[k] = Mathf.Max(bDirt[k], v);
+				}
+			}
+		}
 
 		var data = new byte[w * h * 4];
 		for (int j = 0; j < h; j++)
@@ -430,12 +640,13 @@ public partial class ForestTerrain : Node3D
 				float e = _nEdge.GetNoise2D(x, z);
 				float half = TrailHalfWidth(sT[k]);
 				float dirt = 1f - Mathf.SmoothStep(half - 0.2f, half + 0.45f, dT[k] + e * 0.35f);
+				dirt = Mathf.Max(dirt, bDirt[k]);
 				// dirt apron around the trailhead
 				float park = RectDist(p, ParkingRect);
 				float gravel = 1f - Mathf.SmoothStep(-0.3f, 0.9f, park + e * 0.6f);
 				gravel = Mathf.Max(gravel, 1f - Mathf.SmoothStep(RoadWidth * 0.5f - 0.4f, RoadWidth * 0.5f + 0.5f, dR[k] + e * 0.4f));
 				float rc = p.DistanceTo(ClearingCenter);
-				float grass = 1f - Mathf.SmoothStep(ClearingRadius * 0.8f, ClearingRadius * 1.1f, rc + e * 3f);
+				float grass = ClearingGrass ? 1f - Mathf.SmoothStep(ClearingRadius * 0.8f, ClearingRadius * 1.1f, rc + e * 3f) : 0f;
 				// ragged grass verges along the first stretch of trail and the road
 				float verge = 0.6f * Mathf.SmoothStep(0.3f, 0.7f, _nMid.GetNoise2D(x * 3f, z * 3f) * 0.5f + 0.5f);
 				grass = Mathf.Max(grass, verge * (1f - Mathf.SmoothStep(3f, 5.5f, Mathf.Min(dT[k], dR[k]))) * (1f - Mathf.SmoothStep(40f, 90f, sT[k])) * 0.8f);
@@ -565,19 +776,35 @@ public partial class ForestTerrain : Node3D
 				}
 
 		if (GetNodeOrNull<Path3D>(TrailPath) is Path3D path)
+			path.Curve = GroundCurve(path, _trail);
+		for (int bi = 0; bi < BranchPaths.Length && bi < _branches.Count; bi++)
+			if (_branches[bi].Points.Count > 1 && GetNodeOrNull<Path3D>(BranchPaths[bi]) is Path3D bp)
+				bp.Curve = GroundCurve(bp, _branches[bi]);
+
+		// the test route: main trail → its branch → the cross-country leg
+		if (_route != null && GetNodeOrNull<Path3D>(AutotestRoutePath) is Path3D rpath)
 		{
-			var curve = new Curve3D();
-			int n = Mathf.Max(2, Mathf.CeilToInt(_trail.Length / PathPointSpacing));
-			Transform3D inv = path.GlobalTransform.AffineInverse();
-			Vector3 o = GlobalPosition;
-			for (int i = 0; i <= n; i++)
-			{
-				float s = _trail.Length * i / n;
-				Vector2 p = _trail.At(s, out _);
-				Vector3 world = GroundPoint(p.X + o.X, p.Y + o.Z);
-				curve.AddPoint(inv * world);
-			}
-			path.Curve = curve;
+			var all = new Polyline2();
+			foreach (var p in _trail.Points) all.Add(p);
+			if (AutotestBranch >= 0 && AutotestBranch < _branches.Count)
+				foreach (var p in _branches[AutotestBranch].Points) all.Add(p);
+			foreach (var p in _route.Points) all.Add(p);
+			rpath.Curve = GroundCurve(rpath, all);
 		}
+	}
+
+	/// <summary>A polyline (local x,z) as a Curve3D at ground height, in the given path's space.</summary>
+	private Curve3D GroundCurve(Path3D path, Polyline2 pl)
+	{
+		var curve = new Curve3D();
+		int n = Mathf.Max(2, Mathf.CeilToInt(pl.Length / PathPointSpacing));
+		Transform3D inv = path.GlobalTransform.AffineInverse();
+		Vector3 o = GlobalPosition;
+		for (int i = 0; i <= n; i++)
+		{
+			Vector2 p = pl.At(pl.Length * i / n, out _);
+			curve.AddPoint(inv * GroundPoint(p.X + o.X, p.Y + o.Z));
+		}
+		return curve;
 	}
 }

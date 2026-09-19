@@ -1,0 +1,23 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
+[ext_resource type="PackedScene" path="res://scenes/entities/stalker.tscn" id="3_stalker"]
+[ext_resource type="Script" path="res://scripts/entities/StalkerPreview.cs" id="4_preview"]
+
+[node name="StalkerPreview" type="Node3D"]
+
+[node name="ForestWorld" parent="." instance=ExtResource("1_world")]
+
+[node name="Hud" parent="." instance=ExtResource("2_hud")]
+
+[node name="Stalker" parent="." instance=ExtResource("3_stalker")]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+fov = 70.0
+near = 0.05
+far = 400.0
+current = true
+
+[node name="Preview" type="Node3D" parent="."]
+script = ExtResource("4_preview")

@@ -63,7 +63,7 @@ public partial class GameFlow : Node
 			await _fader.ShowCaption(OpeningTitle, OpeningSubtitle, 1.5f, 2.5f, 1.2f);
 		_player.PlayerInput.SetEnabled(true);
 		Started = true;
-		await _fader.Fade(0f, quick ? 0.2f : 3f);
+		await _fader.Fade(0f, quick ? 0.2f : 1.2f);
 	}
 
 	public override void _Process(double delta)

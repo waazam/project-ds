@@ -27,7 +27,7 @@ public partial class ForestAmbienceManager : Node
 	[Export] public Vector2 WaterFade = new(0.30f, 0.85f);
 	[Export] public Vector2 WindFade = new(0.40f, 0.95f);
 	/// <summary>Level a category rests at when fully faded. Wind never quite dies.</summary>
-	[Export] public float WindFloorDb = -34f;
+	[Export] public float WindFloorDb = -46f;
 	[Export] public float NatureCutoffLiving = 20000f;
 	[Export] public float NatureCutoffSilent = 1400f;
 	/// <summary>Seconds for the smoothed silence to cover ~63% of a change.</summary>
@@ -37,11 +37,15 @@ public partial class ForestAmbienceManager : Node
 	public float SilenceOverride = -1f;
 
 	public float Silence { get; private set; }
+	/// <summary>Current startle level (a gunshot, a crash): a temporary hush on top of the zones.</summary>
+	public float StartleLevel { get; private set; }
 	public float TargetSilence { get; private set; }
 
 	private Node3D _listener;
 	private AudioEffectLowPassFilter _natureLowPass;
 	private readonly float[] _gains = new float[5];
+	private float _startleHold;
+	private float _startleFall;
 
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
@@ -56,10 +60,23 @@ public partial class ForestAmbienceManager : Node
 
 	public float CategoryGain(Category c) => _gains[(int)c];
 
+	/// <summary>
+	/// Something loud just happened: hush the forest to at least <paramref name="strength"/>,
+	/// hold it for a while, then let life creep back over the rest of <paramref name="seconds"/>.
+	/// </summary>
+	public void Startle(float strength, float seconds)
+	{
+		StartleLevel = Mathf.Max(StartleLevel, strength);
+		_startleHold = seconds * 0.4f;
+		_startleFall = StartleLevel / Mathf.Max(seconds * 0.6f, 0.1f);
+	}
+
 	public override void _Process(double delta)
 	{
 		_listener ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
-		TargetSilence = SilenceOverride >= 0f ? SilenceOverride : SampleZones();
+		if (_startleHold > 0f) _startleHold -= (float)delta;
+		else StartleLevel = Mathf.Max(0f, StartleLevel - _startleFall * (float)delta);
+		TargetSilence = SilenceOverride >= 0f ? SilenceOverride : Mathf.Max(SampleZones(), StartleLevel);
 		float k = 1f - Mathf.Exp(-(float)delta / Mathf.Max(SmoothingTime, 0.01f));
 		Silence = Mathf.Lerp(Silence, TargetSilence, k);
 		Apply();

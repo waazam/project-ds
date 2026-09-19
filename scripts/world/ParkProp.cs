@@ -27,6 +27,8 @@ public partial class ParkProp : Node3D
 	[Export] public float ClearRadius = 0f;
 	[Export] public bool ClearFoliage = true;
 	[Export] public int Seed = 1;
+	/// <summary>TrailheadSign only: trail distance of the directional signpost it places (&lt; 0 = none).</summary>
+	[Export] public float DirectionSignDistance = 9f;
 
 	private MeshKit _k;
 	private StaticBody3D _body;
@@ -100,68 +102,117 @@ public partial class ParkProp : Node3D
 
 	private void TrailheadSign()
 	{
-		var wood = ProcTextures.SignWoodMat;
-		var post = ProcTextures.WoodMat;
-		_k.Color = new Color(0.8f, 0.75f, 0.7f);
-		foreach (float x in new[] { -0.9f, 0.9f })
+		// Park entrance sign: three routed planks between two heavy square posts.
+		var post = PropTextures.PostMat;
+		var plank = PropTextures.SignPlankMat;
+		const float postW = 0.2f, postH = 2.35f, bw = 2.2f, pt = 0.06f;
+		_k.Color = new Color(0.9f, 0.88f, 0.85f);
+		foreach (float x in new[] { -1.02f, 1.02f })
 		{
-			_k.Mat(post).Box(new Vector3(x, 1.15f, 0), new Vector3(0.11f, 2.3f, 0.11f), 2f);
-			Col(new Vector3(x, 1.15f, 0), new Vector3(0.12f, 2.3f, 0.12f));
+			_k.Mat(post);
+			SignKit.Post(_k, new Vector3(x, -0.4f, 0), postH + 0.4f, postW, 1.5f);
+			Col(new Vector3(x, postH * 0.5f, 0), new Vector3(postW + 0.02f, postH, postW + 0.02f));
 		}
+		// planks, top to bottom
+		float[] ph = { 0.36f, 0.3f, 0.3f };
+		float y = 2.1f, z = postW * 0.5f + pt * 0.5f + 0.002f;
+		var centers = new float[3];
+		for (int i = 0; i < 3; i++)
+		{
+			float cy = y - ph[i] * 0.5f;
+			centers[i] = cy;
+			float shade = 0.86f + 0.1f * Mathf.Abs(Mathf.Sin(i * 7.1f + Seed));
+			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
+			_k.Mat(plank).Box(new Vector3(0, cy, z), new Vector3(bw, ph[i] - 0.014f, pt), 1.1f);
+			y -= ph[i];
+		}
+		Col(new Vector3(0, 2.1f - 0.48f, z), new Vector3(bw, 0.96f, pt + 0.02f));
+		// cap board keeping the rain off
+		_k.Color = new Color(0.8f, 0.78f, 0.75f);
+		_k.Mat(post).Box(new Vector3(0, 2.14f, z - 0.01f), new Vector3(bw + 0.36f, 0.07f, 0.2f), 1.5f);
 		_k.Color = Colors.White;
-		_k.Mat(wood).Box(new Vector3(0, 1.72f, 0.075f), new Vector3(2.1f, 0.95f, 0.05f), 1.2f);
-		_k.Mat(post).Box(new Vector3(0, 2.22f, 0.07f), new Vector3(2.25f, 0.05f, 0.16f), 2f);
-		Col(new Vector3(0, 1.72f, 0.075f), new Vector3(2.1f, 0.95f, 0.06f));
-		var cream = new Color(0.80f, 0.72f, 0.50f);
-		Text("HARROW CREEK", new Vector3(0, 1.98f, 0.102f), 40, 0.0052f, cream);
-		Text("NATIONAL PARK", new Vector3(0, 1.79f, 0.102f), 26, 0.0052f, cream);
-		_k.Mat(Tint("routed", new Color(0.62f, 0.55f, 0.38f))).Box(new Vector3(0, 1.66f, 0.1f), new Vector3(1.5f, 0.012f, 0.005f));
-		Text("BLACKFERN TRAIL   2.1 mi", new Vector3(0, 1.49f, 0.102f), 24, 0.0048f, cream);
-		Text("CLEARWATER LOOP   CLOSED", new Vector3(0, 1.36f, 0.102f), 18, 0.0048f, cream * 0.85f);
+
+		float face = z + pt * 0.5f;
+		var fb = Basis.Identity;
+		SignKit.Text(_gen, "HARROW CREEK", new Vector3(0, centers[0] - 0.005f, face), fb, 0.23f);
+		SignKit.Text(_gen, "NATIONAL PARK", new Vector3(0, centers[1] + 0.02f, face), fb, 0.17f);
+		SignKit.Text(_gen, "Blackfern Trail   2.1 mi", new Vector3(0, centers[2] + 0.055f, face), fb, 0.12f);
+		SignKit.Text(_gen, "Clearwater Loop   CLOSED", new Vector3(0, centers[2] - 0.065f, face), fb, 0.1f, SignKit.Carve * 0.8f);
+
+		// The directional post where the trail leaves the lot. Placed by trail
+		// distance so it follows edits to the trail curve.
+		if (!Engine.IsEditorHint() && DirectionSignDistance >= 0f)
+		{
+			var dirSign = new SignPost
+			{
+				Name = "DirectionSign",
+				Style = SignPost.SignStyle.Directional,
+				Boards = new[] { "Blackfern Trail >", "Cabins >", "Ranger Station <" },
+				LeanDegrees = new Vector2(1.5f, -1.2f),
+				Seed = Seed + 5,
+			};
+			dirSign.AddChild(new TrailAnchor { Distance = DirectionSignDistance, Offset = -1.75f, YawDegrees = 28f, HeightOffset = -0.03f });
+			_gen.AddChild(dirSign);
+		}
 	}
 
 	private void InfoBoard()
 	{
-		var post = ProcTextures.WoodMat;
-		var wood = ProcTextures.SignWoodMat;
-		var roof = Tint("kiosk_roof", new Color(0.13f, 0.11f, 0.09f));
-		_k.Color = new Color(0.85f, 0.8f, 0.75f);
-		foreach (float x in new[] { -0.8f, 0.8f })
+		var post = PropTextures.PostMat;
+		var plank = PropTextures.SignPlankMat;
+		var roof = Tint("kiosk_roof", new Color(0.10f, 0.09f, 0.08f));
+		_k.Color = new Color(0.9f, 0.88f, 0.85f);
+		foreach (float x in new[] { -0.84f, 0.84f })
 		{
-			_k.Mat(post).Box(new Vector3(x, 1.25f, 0), new Vector3(0.12f, 2.5f, 0.12f), 2f);
-			Col(new Vector3(x, 1.25f, 0), new Vector3(0.13f, 2.5f, 0.13f));
+			_k.Mat(post).Box(new Vector3(x, 1.05f, 0), new Vector3(0.16f, 2.9f, 0.16f), 1.5f);
+			Col(new Vector3(x, 1.25f, 0), new Vector3(0.17f, 2.5f, 0.17f));
 		}
-		_k.Color = Colors.White;
-		_k.Mat(wood).Box(new Vector3(0, 1.5f, 0.02f), new Vector3(1.5f, 1.1f, 0.04f), 1.3f);
-		Col(new Vector3(0, 1.5f, 0.02f), new Vector3(1.5f, 1.1f, 0.05f));
+		// backboard: horizontal planks
+		for (int i = 0; i < 5; i++)
+		{
+			float shade = 0.82f + 0.14f * Mathf.Abs(Mathf.Sin(i * 3.7f + 1f));
+			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
+			_k.Mat(plank).Box(new Vector3(0, 1.06f + i * 0.22f, 0f), new Vector3(1.52f, 0.21f, 0.04f), 1.1f);
+		}
+		Col(new Vector3(0, 1.5f, 0f), new Vector3(1.5f, 1.1f, 0.05f));
 		// frame
+		_k.Color = new Color(0.8f, 0.78f, 0.75f);
 		_k.Mat(post);
-		_k.Box(new Vector3(0, 2.07f, 0.05f), new Vector3(1.6f, 0.06f, 0.05f), 2f);
-		_k.Box(new Vector3(0, 0.93f, 0.05f), new Vector3(1.6f, 0.06f, 0.05f), 2f);
+		_k.Box(new Vector3(0, 2.07f, 0.035f), new Vector3(1.6f, 0.07f, 0.05f), 1.5f);
+		_k.Box(new Vector3(0, 0.93f, 0.035f), new Vector3(1.6f, 0.07f, 0.05f), 1.5f);
+		// routed header board under the roof
+		_k.Color = new Color(0.92f, 0.9f, 0.87f);
+		_k.Mat(plank).Box(new Vector3(0, 2.25f, 0.06f), new Vector3(1.6f, 0.24f, 0.05f), 1.1f);
+		_k.Color = Colors.White;
+		SignKit.Text(_gen, "BLACKFERN TRAIL", new Vector3(0, 2.245f, 0.085f), Basis.Identity, 0.15f);
 		// gable roof
-		float peak = 2.72f, eave = 2.42f;
+		float peak = 2.8f, eave = 2.48f;
 		var tilt = new Vector3(0, peak - eave, 0.55f);
 		float ang = Mathf.Atan2(tilt.Y, tilt.Z);
 		_k.Mat(roof);
 		_k.Box(new Vector3(0, (peak + eave) * 0.5f, 0.28f), new Vector3(2.0f, 0.05f, tilt.Length() + 0.05f), 1f, Basis.FromEuler(new Vector3(ang, 0, 0)));
 		_k.Box(new Vector3(0, (peak + eave) * 0.5f, -0.28f), new Vector3(2.0f, 0.05f, tilt.Length() + 0.05f), 1f, Basis.FromEuler(new Vector3(-ang, 0, 0)));
-		_k.Mat(post).Box(new Vector3(0, 2.4f, 0), new Vector3(1.75f, 0.1f, 0.1f), 2f);
-		// map + notices
+		_k.Color = new Color(0.8f, 0.78f, 0.75f);
+		_k.Mat(post).Box(new Vector3(0, 2.44f, 0), new Vector3(1.84f, 0.1f, 0.12f), 1.5f);
+		_k.Color = Colors.White;
+		// map + notices, pinned to the planks
+		float fz = 0.021f;
 		var paper = ProcTextures.PaperMat;
-		_k.Mat(ProcTextures.MapMat).Quad(new Vector3(-0.68f, 1.02f, 0.045f), new Vector3(-0.02f, 1.02f, 0.045f),
-			new Vector3(-0.02f, 1.98f, 0.045f), new Vector3(-0.68f, 1.98f, 0.045f), Vector3.Back);
-		_k.Color = new Color(0.95f, 0.93f, 0.85f);
-		_k.Mat(paper).Quad(new Vector3(0.1f, 1.62f, 0.045f), new Vector3(0.6f, 1.62f, 0.045f),
-			new Vector3(0.6f, 1.95f, 0.045f), new Vector3(0.1f, 1.95f, 0.045f), Vector3.Back);
-		_k.Color = new Color(0.8f, 0.78f, 0.62f);
-		_k.Quad(new Vector3(0.14f, 1.12f, 0.045f), new Vector3(0.62f, 1.1f, 0.045f),
-			new Vector3(0.63f, 1.5f, 0.045f), new Vector3(0.15f, 1.52f, 0.045f), Vector3.Back);
+		_k.Mat(ProcTextures.MapMat).Quad(new Vector3(-0.68f, 1.04f, fz), new Vector3(-0.02f, 1.04f, fz),
+			new Vector3(-0.02f, 1.96f, fz), new Vector3(-0.68f, 1.96f, fz), Vector3.Back);
+		_k.Color = new Color(0.82f, 0.8f, 0.72f);
+		_k.Mat(paper).Quad(new Vector3(0.1f, 1.62f, fz), new Vector3(0.6f, 1.62f, fz),
+			new Vector3(0.6f, 1.95f, fz), new Vector3(0.1f, 1.95f, fz), Vector3.Back);
+		_k.Color = new Color(0.68f, 0.66f, 0.52f);
+		_k.Quad(new Vector3(0.14f, 1.12f, fz), new Vector3(0.62f, 1.1f, fz),
+			new Vector3(0.63f, 1.5f, fz), new Vector3(0.15f, 1.52f, fz), Vector3.Back);
 		_k.Color = Colors.White;
 		var ink = new Color(0.12f, 0.12f, 0.12f);
-		Text("TRAIL CLOSES\nAT DUSK", new Vector3(0.35f, 1.79f, 0.047f), 18, 0.0032f, ink);
-		Text("PLEASE STAY ON\nMARKED TRAILS", new Vector3(0.385f, 1.31f, 0.047f), 16, 0.0028f, ink * 1.5f);
-		Text("BLACKFERN TRAIL", new Vector3(-0.35f, 1.9f, 0.047f), 14, 0.0032f, ink);
+		Text("TRAIL CLOSES\nAT DUSK", new Vector3(0.35f, 1.79f, fz + 0.002f), 18, 0.0032f, ink);
+		Text("PLEASE STAY ON\nMARKED TRAILS", new Vector3(0.385f, 1.31f, fz + 0.002f), 16, 0.0028f, ink * 1.5f);
+		Text("BLACKFERN TRAIL", new Vector3(-0.35f, 1.9f, fz + 0.002f), 14, 0.0032f, ink);
 	}
+
 
 	private void TrashCan()
 	{
@@ -208,21 +259,24 @@ public partial class ParkProp : Node3D
 
 	private void TrailMarker()
 	{
-		var post = ProcTextures.WoodMat;
-		_k.Color = new Color(0.75f, 0.68f, 0.6f);
-		_k.Mat(post).Box(new Vector3(0, 0.6f, 0), new Vector3(0.1f, 1.2f, 0.1f), 2f);
-		// pyramid-ish cap
-		_k.Cylinder(new Vector3(0, 1.2f, 0), new Vector3(0, 1.27f, 0), 0.075f, 0.0f, 4, true, 2f, Mathf.Pi / 4f);
+		// Thick square post: a faded paint blaze and the number routed into the front and back faces.
+		const float w = 0.15f, h = 1.15f;
+		_k.Color = new Color(0.9f, 0.88f, 0.85f);
+		_k.Mat(PropTextures.PostMat);
+		SignKit.Post(_k, new Vector3(0, -0.3f, 0), h + 0.3f, w, 1.8f);
 		_k.Color = Colors.White;
-		// faded blaze + plate
-		_k.Mat(Tint("blaze", new Color(0.20f, 0.30f, 0.38f))).Box(new Vector3(0, 1.08f, 0), new Vector3(0.104f, 0.05f, 0.104f));
-		_k.Mat(Tint("plate", new Color(0.68f, 0.66f, 0.60f), 0.6f)).Box(new Vector3(0, 0.9f, 0.052f), new Vector3(0.075f, 0.1f, 0.006f));
-		_k.Box(new Vector3(0, 0.9f, -0.052f), new Vector3(0.075f, 0.1f, 0.006f));
-		var ink = new Color(0.1f, 0.1f, 0.1f);
-		Text(Label, new Vector3(0, 0.9f, 0.056f), 48, 0.0016f, ink);
-		var back = Text(Label, new Vector3(0, 0.9f, -0.056f), 48, 0.0016f, ink);
-		back.RotationDegrees = new Vector3(0, 180, 0);
-		Col(new Vector3(0, 0.6f, 0), new Vector3(0.12f, 1.2f, 0.12f));
+		// weathered paint blaze, mostly gone
+		_k.Mat(Tint("blaze_faded", new Color(0.11f, 0.14f, 0.15f))).Box(new Vector3(0, h - 0.1f, 0), new Vector3(w + 0.004f, 0.06f, w + 0.004f));
+		foreach (int side in new[] { 1, -1 })
+		{
+			var b = side > 0 ? Basis.Identity : Basis.FromEuler(new Vector3(0, Mathf.Pi, 0));
+			float fz = side * w * 0.5f;
+			SignKit.Text(_gen, Label, new Vector3(0, 0.8f, fz), b, 0.16f);
+			// small routed arrow under the number, pointing up
+			_k.Mat(PropTextures.RoutedMat);
+			SignKit.RoutedArrow(_k, new Vector3(0, 0.6f, fz + side * 0.002f), b * Basis.FromEuler(new Vector3(0, 0, Mathf.Pi / 2f)), 0.1f, 0.05f, 1);
+		}
+		Col(new Vector3(0, h * 0.5f, 0), new Vector3(w + 0.02f, h, w + 0.02f));
 	}
 
 	private void Backpack()

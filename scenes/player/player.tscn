@@ -102,6 +102,5 @@ far = 400.0
 [node name="Footsteps" type="Node" parent="."]
 script = ExtResource("4_steps")
 
-[node name="Breathing" type="AudioStreamPlayer" parent="."]
-bus = &"Player"
+[node name="Breathing" type="Node" parent="."]
 script = ExtResource("5_breath")

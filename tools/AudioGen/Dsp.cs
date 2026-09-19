@@ -255,7 +255,7 @@ public static class Dsp
 	/// One-shot finishing: DC removal, trim trailing near-silence, short fade in/out so both ends sit at zero,
 	/// and peak-normalise.
 	/// </summary>
-	public static double[] FinishOneShot(double[] x, int sr, double peakDb = -3, double fadeOutMs = 25, double minSec = 0)
+	public static double[] FinishOneShot(double[] x, int sr, double peakDb = -3, double fadeOutMs = 25, double minSec = 0, double maxSec = 0)
 	{
 		HighPass(x, sr, 25);
 		double pk = Peak(x), thr = pk * FromDb(-62);
@@ -263,6 +263,7 @@ public static class Dsp
 		int minEnd = Math.Max(sr / 20, Math.Min(x.Length, (int)(minSec * sr)));
 		while (end > minEnd && Math.Abs(x[end - 1]) < thr) end--;
 		end = Math.Min(x.Length, end + sr / 100);
+		if (maxSec > 0) end = Math.Min(end, (int)(maxSec * sr));
 		var o = x.Take(end).ToArray();
 		int fi = Math.Max(1, sr / 2000), fo = Math.Min(o.Length / 3, (int)(fadeOutMs * sr / 1000));
 		for (int i = 0; i < fi; i++) o[i] *= (double)i / fi;

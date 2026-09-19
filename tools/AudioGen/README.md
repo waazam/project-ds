@@ -6,13 +6,13 @@ The output is deterministic because it uses a fixed seed, so regenerating gives 
 ```
 dotnet run --project tools/AudioGen                 # regenerate everything, then verify
 dotnet run --project tools/AudioGen -- --verify     # only verify the existing files
-dotnet run --project tools/AudioGen -- --only bird  # regenerate the files whose name contains "bird"
+dotnet run --project tools/AudioGen -- --only bird,raven  # regenerate files whose name contains any listed fragment
 ```
 
 It can run from any directory. It walks up to `project.godot` to find the repo root, then writes to:
 
-- `assets/audio/ambient/*_loop.wav`: seamless 20-40 s beds (wind, leaves, insects, distant, stream, drone, ringing, breath)
-- `assets/audio/sfx/`: `bird_01..08`, `step_dirt_01..06`, `step_wood_01..04`, `cloth_01..04`
+- `assets/audio/ambient/*_loop.wav`: seamless 20-40 s beds (wind, leaves, insects, distant, stream, drone, ringing, breath, heartbeat)
+- `assets/audio/sfx/`: `bird_01..08`, `step_dirt_01..06`, `step_wood_01..04`, `cloth_01..04`, `step_stone_*`, `stalker_*`, `twig_snap_01..04`, `branch_drop_01..02`, `trunk_creak_01..03`, `cricket_chirp_01..03`, `raven_01..02`, `rustle_01..03`
 
 Format: 16-bit PCM mono at 22050 Hz. `insects_loop` and `ringing_loop` use 44100 Hz so that their 4-8 kHz content stays clean.
 
