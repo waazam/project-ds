@@ -1,15 +1,5 @@
 # Project DS
 
-*Working title.*
-
-A first-person horror game about a walk in the woods that goes quiet.
-
-You follow a park trail in the last light of an October evening. Birds, insects, wind and water fill the forest, and the forest sounds right. Then, somewhere off the path, it stops. The quiet is the first sign that something is near: a flight of stairs standing on its own among the trees, with no house around it. Something you only ever glimpse keeps pace behind you through the trees.
-
-It is built to look and feel like a game you half remember from a PS2 demo disc: low-poly, fog, dithered edges, 640x360. It controls like a game made now.
-
-**Where it is now:** one playable stretch. You start at a trailhead and walk into the woods until the trail thins out and disappears, then search the forest for the stairs. The forest falls silent as you get close, and on the way something follows you.
-
 ## Requirements
 - Godot **4.7.2 .NET** (the mono build). On this machine it lives at `C:\Users\Dan\tools\Godot_v4.7.2-stable_mono_win64\`.
 - .NET 8 SDK
@@ -19,6 +9,7 @@ It is built to look and feel like a game you half remember from a PS2 demo disc:
 dotnet build
 Godot_v4.7.2-stable_mono_win64.exe --path .                     # play
 Godot_v4.7.2-stable_mono_win64_console.exe --path . -- --autotest   # scripted walkthrough, report in test-output/
+Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --export-release "Windows Desktop" build/windows/ProjectDS.exe   # release build
 ```
 
 ## Controls
