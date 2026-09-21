@@ -24,6 +24,10 @@ public partial class GameSettings : Node
 	/// <summary>First person is the current design. Third person is kept working for later.</summary>
 	public CameraMode Camera = CameraMode.FirstPerson;
 
+	// Accessibility
+	/// <summary>Tones down lightning, the camera flash and other full-screen flashes.</summary>
+	public bool ReduceFlashing = false;
+
 	// Audio: linear 0..1, applied to the Master bus. Defaults below full — playtesting found the
 	// mix considerably louder than expected at 100%.
 	private float _masterVolume = 0.6f;
@@ -54,6 +58,9 @@ public partial class GameSettings : Node
 	/// bunker, for fast iteration on Act 11 (the radio, the tall stairs, the giant) without replaying
 	/// the bunker's hallway/CRT room/maze first.</summary>
 	public bool AutoTestSkipToAct11 { get; private set; }
+	/// <summary>`--continue-test`: instead of the walkthrough, write a save for every checkpoint in
+	/// turn, Continue from it, and check the restored world (see ContinueRoundTripTest).</summary>
+	public bool ContinueTest { get; private set; }
 
 	private const string SavePath = "user://settings.cfg";
 
@@ -65,6 +72,8 @@ public partial class GameSettings : Node
 		AutoTestSkipToAct5 = args.Contains("--skip-to-act5");
 		AutoTestSkipToAct7 = args.Contains("--skip-to-act7");
 		AutoTestSkipToAct11 = args.Contains("--skip-to-act11");
+		ContinueTest = args.Contains("--continue-test");
+		if (ContinueTest) AutoTest = true;   // same test save slots and defaults
 		RegisterInputActions();
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
@@ -92,6 +101,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("camera", "distance", CameraDistance);
 		cfg.SetValue("camera", "mode", (int)Camera);
 		cfg.SetValue("audio", "master_volume", MasterVolume);
+		cfg.SetValue("accessibility", "reduce_flashing", ReduceFlashing);
 		cfg.Save(SavePath);
 		EmitSignal(SignalName.Changed);
 	}
@@ -107,6 +117,7 @@ public partial class GameSettings : Node
 		CameraDistance = (float)cfg.GetValue("camera", "distance", CameraDistance);
 		Camera = (CameraMode)(int)cfg.GetValue("camera", "mode", (int)Camera);
 		_masterVolume = (float)cfg.GetValue("audio", "master_volume", _masterVolume);
+		ReduceFlashing = (bool)cfg.GetValue("accessibility", "reduce_flashing", ReduceFlashing);
 	}
 
 	private static void RegisterInputActions()

@@ -7,11 +7,12 @@ namespace ProjectDS.Player;
 /// refills faster at rest than on the move, and — once fully spent — locks
 /// running out again until it has climbed back to <see cref="MinToResumeRun"/>,
 /// so sprint can't be feathered on and off one frame at a time at empty.
+/// Applies to scripted input too: the autotest manages stamina like a player would.
 /// </summary>
 public partial class PlayerStamina : Node
 {
-	[Export] public float DrainPerSecond = 0.22f;
-	[Export] public float RegenPerSecondMoving = 0.10f;
+	[Export] public float DrainPerSecond = 0.11f;
+	[Export] public float RegenPerSecondMoving = 0.16f;
 	[Export] public float RegenPerSecondResting = 0.22f;
 	[Export] public float MinToResumeRun = 0.16f;
 
@@ -24,12 +25,15 @@ public partial class PlayerStamina : Node
 
 	public override void _PhysicsProcess(double delta)
 	{
-		// The autotest bot runs almost continuously for hundreds of metres at a stretch; every wait
-		// budget throughout AutoTest.cs was tuned against an unlimited sprint, long before this system
-		// existed. Gate the drain on real input rather than retune a long chain of unrelated timeouts.
-		if (_player.PlayerInput.Scripted) { Value = 1f; CanRun = true; return; }
-
 		float dt = (float)delta;
+		// Debug builds (running from the editor/project): unlimited stamina for playtesting.
+		// Not during the autotest, which checks that running drains it.
+		if (OS.IsDebugBuild() && !(Systems.GameSettings.Instance?.AutoTest ?? false))
+		{
+			Value = 1f;
+			CanRun = true;
+			return;
+		}
 		if (_player.IsRunning)
 		{
 			Value = Mathf.Max(0f, Value - DrainPerSecond * dt);

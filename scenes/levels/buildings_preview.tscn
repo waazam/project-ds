@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="Script" path="res://scripts/world/BuildingsPreview.cs" id="2_preview"]
+[ext_resource type="Shader" path="res://assets/shaders/ps2_post.gdshader" id="3_post"]
+
+[sub_resource type="ShaderMaterial" id="PostMat"]
+shader = ExtResource("3_post")
+
+[node name="BuildingsPreview" type="Node3D"]
+
+[node name="ForestWorld" parent="." instance=ExtResource("1_world")]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 20)
+fov = 70.0
+near = 0.05
+far = 400.0
+current = true
+
+[node name="Post" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Screen" type="ColorRect" parent="Post"]
+material = SubResource("PostMat")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Preview" type="Node3D" parent="."]
+script = ExtResource("2_preview")
+CameraPath = NodePath("../Camera3D")

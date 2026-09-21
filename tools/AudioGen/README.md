@@ -44,3 +44,22 @@ One-shots peak at -3 dBFS. Bed RMS targets:
 - ringing -26 peak
 
 These are only sensible starting levels. The real mix belongs to the buses and `ForestAmbienceManager`.
+
+## Story sounds (2026-09-21 rework)
+The owner rejected every synthetic continuous noise bed (wind read as an airplane, leaves as fire or surf, the distant bed as a helicopter), pitched knocks (drums, "bamboo"), repetitive breathing, and anything busy. So these sounds are built from events, not noise beds:
+
+- `rain_loop` (180 s): a drizzle of individual drops at three distances (near ~0.8/s, mid ~7/s, far ~60/s), plus a very soft under-layer below 300 Hz at -26 dB. Density swells over 36-90 s.
+- `thunder_01..03`: distant rolling rumble built from hundreds of low-passed pressure pulses grouped into rolls. No crack, no overdrive, natural decay. Variant 1 is far, variant 2 is nearer with a dull clap, variant 3 is very far.
+- `fire_crackle_loop` (30 s): clustered pops (power-law sizes), fine crackle, snaps every ~5 s and a soft roar below 300 Hz. No hiss.
+- `choir_chant_loop` (72 s): "come and see" chanted in unison by 4 men and 4 women, using the formant voice in `Voice.cs`, far off in an FDN hall (`Dsp.Hall`).
+- `stairs_hum_loop` (40 s): a D1 harmonic hum that stays clean when turned up a lot.
+- `giant_step_01..03`: low noise-only thuds for the giant's stride.
+
+Event loops are written circularly, and their filters and reverb run through `Dsp.Circular`, so they loop exactly. `--verify` prints extra taste measurements for these files and fails them on:
+- a sustained floor
+- clipping or overdrive
+- continuous hiss
+- a choir that never stops
+- a hum or thud that small speakers can't carry
+
+`--voice-test` writes dry chant renders to `test-output/audio/` and prints band energy for each phone.

@@ -73,17 +73,7 @@ public partial class DeepZoneDressing : Node3D
 		}
 	}
 
+	/// <summary>Terrain-conforming, fogged overlay that goes from worms at the edge to veins at the centre.</summary>
 	private void BuildVeinyGround(ForestTerrain terrain, Vector3 center, float radius)
-	{
-		var shader = GD.Load<Shader>("res://assets/shaders/veiny_ground.gdshader");
-		var mat = new ShaderMaterial { Shader = shader };
-		var mesh = new PlaneMesh { Size = new Vector2(radius * 2.4f, radius * 2.4f), Material = mat };
-		float y = (terrain?.HeightAt(center.X, center.Z) ?? center.Y) + 0.035f;
-		AddChild(new MeshInstance3D
-		{
-			Mesh = mesh,
-			Position = new Vector3(center.X, y, center.Z),
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-		});
-	}
+		=> AddChild(VeinyGround.Create(terrain, center, radius));
 }

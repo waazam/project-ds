@@ -8,18 +8,22 @@
 [ext_resource type="PackedScene" path="res://scenes/entities/friend.tscn" id="6_friend"]
 [ext_resource type="Script" path="res://scripts/world/CabinExitLine.cs" id="7_exitline"]
 [ext_resource type="Script" path="res://scripts/world/CabinFireEvent.cs" id="8_fire"]
+[ext_resource type="Script" path="res://scripts/audio/IndoorZone.cs" id="9_indoor"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_door"]
-size = Vector3(12, 3, 12)
+size = Vector3(12, 6, 12)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_breakin"]
 size = Vector3(3.0, 5.0, 3.0)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_indoor"]
+size = Vector3(3.95, 2.3, 4.95)
 
 [node name="Cabin" type="Node3D" groups=["cabin"]]
 script = ExtResource("1_cabin")
 
 [node name="ReturnTrigger" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 collision_layer = 0
 collision_mask = 2
 monitorable = false
@@ -28,15 +32,21 @@ script = ExtResource("2_return")
 [node name="Shape" type="CollisionShape3D" parent="ReturnTrigger"]
 shape = SubResource("BoxShape3D_door")
 
+[node name="LanternSpot" type="Marker3D" parent="." groups=["spot_lantern"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 3.21)
+
+[node name="CompassSpot" type="Marker3D" parent="." groups=["spot_compass"]]
+transform = Transform3D(0.9553, 0, -0.2955, 0, 1, 0, 0.2955, 0, 0.9553, 1.25, 0.45, 2.97)
+
 [node name="LanternPickup" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2.9)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 3.21)
 script = ExtResource("3_pickup")
 Kind = 1
 Label = "Lantern"
 RequiredCheckpoint = 3
 
 [node name="CompassPickup" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 2.9)
+transform = Transform3D(0.9553, 0, -0.2955, 0, 1, 0, 0.2955, 0, 0.9553, 1.25, 0.45, 2.97)
 script = ExtResource("3_pickup")
 Kind = 2
 Label = "Compass"
@@ -71,3 +81,10 @@ shape = SubResource("BoxShape3D_breakin")
 
 [node name="FireEvent" type="Node" parent="."]
 script = ExtResource("8_fire")
+
+[node name="IndoorZone" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
+script = ExtResource("9_indoor")
+
+[node name="Shape" type="CollisionShape3D" parent="IndoorZone"]
+shape = SubResource("BoxShape3D_indoor")

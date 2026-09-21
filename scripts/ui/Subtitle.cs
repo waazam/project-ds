@@ -7,7 +7,9 @@ namespace ProjectDS.UI;
 /// A single dialogue line, low on screen, that fades in and out on its own —
 /// unlike <see cref="ScreenFader"/>'s caption, it never blacks out the world
 /// underneath. For voices that speak while play continues, such as the Act 11
-/// radio exchange.
+/// radio exchange. Pausable: a line freezes with the game under the pause menu.
+/// Its band is the bottom of the screen, growing upward, clear of the
+/// ScreenFader caption band and the interaction prompt.
 /// </summary>
 public partial class Subtitle : CanvasLayer
 {
@@ -24,15 +26,19 @@ public partial class Subtitle : CanvasLayer
 	public override void _Ready()
 	{
 		Layer = 16;
-		ProcessMode = ProcessModeEnum.Always;
-		_label = new Label { HorizontalAlignment = HorizontalAlignment.Center, Modulate = new Color(1, 1, 1, 0) };
-		_label.AddThemeFontSizeOverride("font_size", 14);
-		_label.AddThemeColorOverride("font_color", new Color(0.85f, 0.83f, 0.78f));
-		_label.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
-		_label.AddThemeConstantOverride("shadow_offset_x", 1);
-		_label.AddThemeConstantOverride("shadow_offset_y", 1);
-		_label.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
-		_label.OffsetLeft = -260; _label.OffsetRight = 260; _label.OffsetTop = -110; _label.OffsetBottom = -80;
+		_label = new Label
+		{
+			Theme = UiKit.Theme,
+			ThemeTypeVariation = UiKit.CaptionLabel,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Bottom,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			Modulate = new Color(1, 1, 1, 0),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		_label.AnchorLeft = 0.5f; _label.AnchorRight = 0.5f; _label.AnchorTop = 1f; _label.AnchorBottom = 1f;
+		_label.OffsetLeft = -240; _label.OffsetRight = 240; _label.OffsetTop = -36 - 2 * 16; _label.OffsetBottom = -36;
+		_label.GrowVertical = Control.GrowDirection.Begin;
 		AddChild(_label);
 	}
 
@@ -42,7 +48,7 @@ public partial class Subtitle : CanvasLayer
 		var tween = CreateTween();
 		tween.TweenProperty(_label, "modulate:a", 1f, fadeIn);
 		await ToSignal(tween, Tween.SignalName.Finished);
-		await ToSignal(GetTree().CreateTimer(hold), SceneTreeTimer.SignalName.Timeout);
+		await ToSignal(GetTree().CreateTimer(hold, false), SceneTreeTimer.SignalName.Timeout);
 		tween = CreateTween();
 		tween.TweenProperty(_label, "modulate:a", 0f, fadeOut);
 		await ToSignal(tween, Tween.SignalName.Finished);

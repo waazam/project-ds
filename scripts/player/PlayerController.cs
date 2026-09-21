@@ -9,8 +9,8 @@ namespace ProjectDS.Player;
 /// </summary>
 public partial class PlayerController : CharacterBody3D
 {
-	[Export] public float WalkSpeed = 1.9f;
-	[Export] public float RunSpeed = 4.6f;
+	[Export] public float WalkSpeed = 2.7f;
+	[Export] public float RunSpeed = 5.4f;
 	[Export] public float Acceleration = 9f;
 	[Export] public float Deceleration = 12f;
 	[Export] public float TurnSpeed = 10f;          // how fast the visual faces travel direction

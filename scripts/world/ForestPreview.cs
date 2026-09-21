@@ -96,6 +96,14 @@ public partial class ForestPreview : Node3D
 			views.Add(("06_bridge_side", Eye(side), cross + new Vector3(0, 0.3f, 0)));
 			views.Add(("07_deep_woods", Eye(TP(215f)), Eye(TP(228f))));
 			views.Add(("08_cut_log", Eye(TP(224f)), TP(232f) + new Vector3(0, 0.4f, 0)));
+			// the fallen tree at the trail's end, and the way round it past the root plate
+			float tl = _terrain.TrailLength;
+			views.Add(("09a_fallen_tree_approach", Eye(TP(tl - 22f)), TP(tl) + new Vector3(0, 0.9f, 0)));
+			views.Add(("09b_fallen_tree_close", Eye(TP(tl - 6f)), TP(tl) + new Vector3(3f, 0.8f, -2f)));
+			Vector3 G(float x, float z) => new(x, _terrain.HeightAt(x, z), z);
+			views.Add(("09c_fallen_tree_side", Eye(G(16f, -458f)), G(0f, -469f) + new Vector3(0, 0.6f, 0)));
+			views.Add(("09d_round_the_roots", Eye(G(12f, -463f)), G(15f, -477f) + new Vector3(0, 1.2f, 0)));
+			views.Add(("09e_crown_from_beyond", Eye(G(-4f, -482f)), G(-6f, -470f) + new Vector3(0, 0.8f, 0)));
 			// branches: the overlook fork, the overlook itself, the split and each faded end
 			var branches = new List<(string name, Path3D path)>();
 			foreach (var n in GetTree().GetNodesInGroup("trail_branch"))

@@ -48,7 +48,7 @@ After 3-5 minutes out in the woods, a set-piece moment triggers at random. A GIA
 
 This is the breaking-into-the-cabin puzzle. The compass points directly at the cabin from every angle as the player walks around it.
 
-**Tools.** Tools lie around for the player to pick up. They can only hold 1 tool at a time, and a tool is "used up" when it's used correctly in the puzzle.
+**Tools.** Tools lie around for the player to pick up. The player can carry any number of tools, and every item they carry works at any time without selecting it. A tool is "used up" when it's used correctly in the puzzle.
 - **Axe:** very hard to find. With it, the player can cut the wood planks barricading the front door to get in.
 - **Key:** found on the main path if the player travels far enough, and it opens a shed by the house. Inside the shed is a hammer.
 - **Hammer:** you can pry the nails out of the front door. It's a little minigame, so it takes longer to get in than the axe.

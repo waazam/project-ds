@@ -1,13 +1,38 @@
 using Godot;
+using ProjectDS.Player;
 
 namespace ProjectDS.UI;
 
-/// <summary>Autoload-free singleton label for "Press E to ..." prompts. One line, bottom-centre.</summary>
+/// <summary>
+/// The centre-screen crosshair dot and the interaction prompt under it.
+///
+/// Its single source of truth is the player's <see cref="PlayerInteraction"/>
+/// (child "Interaction"): whatever is focused there shows its PromptText here,
+/// and a hold-to-use interactable draws its HoldProgress as a thin ring around
+/// the dot. The dot is tiny, low-alpha bone, and brightens a little when
+/// something is focused; it fades out while the player has no control
+/// (cutscenes) or the screen is blacked out.
+///
+/// <see cref="ShowPrompt"/>/<see cref="HidePrompt"/> remain for older callers
+/// that haven't moved to Interactable yet; that text only shows when nothing is
+/// focused, so the two never fight.
+/// </summary>
 public partial class InteractPrompt : CanvasLayer
 {
 	public static InteractPrompt Instance { get; private set; }
 
-	private Label _label;
+	/// <summary>Prompt band, below centre and clear of the ScreenFader caption band.</summary>
+	public const float PromptTop = 64f;   // px below screen centre
+
+	private Control _root;
+	private Control _dot;
+	private RichTextLabel _label;
+	private string _shownText;
+	private PlayerController _player;
+	private PlayerInteraction _interaction;
+	private ScreenFader _fader;
+	private string _legacyText;
+	private float _dotAlpha, _focusLit, _labelAlpha, _hold;
 
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
@@ -15,17 +40,100 @@ public partial class InteractPrompt : CanvasLayer
 	public override void _Ready()
 	{
 		Layer = 15;
-		_label = new Label { HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
-		_label.AddThemeFontSizeOverride("font_size", 11);
-		_label.AddThemeColorOverride("font_color", new Color(0.9f, 0.9f, 0.85f));
-		_label.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.8f));
+		_root = UiKit.Apply(new Control { MouseFilter = Control.MouseFilterEnum.Ignore });
+		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		AddChild(_root);
+
+		_dot = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
+		_dot.SetAnchorsPreset(Control.LayoutPreset.Center);
+		_dot.OffsetLeft = -10; _dot.OffsetRight = 10; _dot.OffsetTop = -10; _dot.OffsetBottom = 10;
+		_dot.Draw += DrawDot;
+		_root.AddChild(_dot);
+
+		_label = new RichTextLabel
+		{
+			BbcodeEnabled = true,
+			FitContent = true,
+			ScrollActive = false,
+			AutowrapMode = TextServer.AutowrapMode.Off,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			Modulate = new Color(1, 1, 1, 0),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		_label.AddThemeFontOverride("normal_font", UiKit.Serif);
+		_label.AddThemeFontSizeOverride("normal_font_size", UiKit.BodySize);
+		_label.AddThemeFontSizeOverride("mono_font_size", UiKit.SmallSize + 1);
+		_label.AddThemeFontOverride("mono_font", UiKit.Mono);
+		_label.AddThemeColorOverride("default_color", UiKit.Bone);
+		_label.AddThemeColorOverride("font_shadow_color", UiKit.Shadow);
 		_label.AddThemeConstantOverride("shadow_offset_x", 1);
 		_label.AddThemeConstantOverride("shadow_offset_y", 1);
-		_label.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
-		_label.OffsetLeft = -150; _label.OffsetRight = 150; _label.OffsetTop = -60; _label.OffsetBottom = -40;
-		AddChild(_label);
+		_label.AddThemeConstantOverride("shadow_outline_size", 1);
+		_label.AnchorLeft = 0.5f; _label.AnchorRight = 0.5f; _label.AnchorTop = 0.5f; _label.AnchorBottom = 0.5f;
+		_label.OffsetLeft = -180; _label.OffsetRight = 180; _label.OffsetTop = PromptTop; _label.OffsetBottom = PromptTop + 16;
+		_root.AddChild(_label);
 	}
 
-	public void ShowPrompt(string text) { _label.Text = text; _label.Visible = true; }
-	public void HidePrompt() => _label.Visible = false;
+	public void ShowPrompt(string text) => _legacyText = text;
+	public void HidePrompt() => _legacyText = null;
+
+	public override void _Process(double delta)
+	{
+		float dt = (float)delta;
+		if (_player == null || !IsInstanceValid(_player))
+		{
+			_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
+			_interaction = _player?.GetNodeOrNull<PlayerInteraction>("Interaction");
+		}
+
+		var focused = _interaction?.Focused;
+		if (focused != null && !IsInstanceValid(focused)) focused = null;
+		string text = focused != null ? _interaction.PromptText : _legacyText;
+		// Usable interactables get the key hint; blocked ones ("Hands full…") read as plain text.
+		if (focused != null && !string.IsNullOrEmpty(text) && !text.StartsWith("[") && focused.CanInteract(_player))
+			text = (focused.HoldSeconds > 0f ? "[Hold E] " : "[E] ") + text;
+		bool hasControl = _player != null && _player.PlayerInput != null && _player.PlayerInput.Enabled;
+		_fader ??= GetNodeOrNull<ScreenFader>("../ScreenFader");
+		bool dotVisible = _player != null && hasControl && !GetTree().Paused && (_fader == null || _fader.BlackAlpha < 0.5f);
+
+		_dotAlpha = Mathf.MoveToward(_dotAlpha, dotVisible ? 1f : 0f, dt * 3f);
+		_focusLit = Mathf.MoveToward(_focusLit, focused != null ? 1f : 0f, dt * 8f);
+		float hold = focused != null && focused.HoldSeconds > 0f ? focused.HoldProgress : 0f;
+		_hold = hold < _hold ? Mathf.MoveToward(_hold, hold, dt * 4f) : hold;   // snap up, ease back down
+		_dot.QueueRedraw();
+
+		bool showLabel = !string.IsNullOrEmpty(text) && (focused != null ? hasControl : true);
+		if (showLabel && text != _shownText) { _shownText = text; _label.Text = Format(text); }
+		_labelAlpha = Mathf.MoveToward(_labelAlpha, showLabel ? 1f : 0f, dt * (showLabel ? 10f : 6f));
+		_label.Modulate = new Color(1, 1, 1, _labelAlpha);
+	}
+
+	/// <summary>The prompt as BBCode: a leading key hint such as "[E]" or "[Hold E]" in quiet
+	/// eye-yellow monospace, the rest in bone serif. The text itself is unchanged.</summary>
+	private static string Format(string text)
+	{
+		static string Esc(string s) => s.Replace("[", "[lb]");
+		if (text.StartsWith("[") && text.IndexOf(']') is int close and > 1)
+		{
+			string key = text.Substring(0, close + 1), rest = text.Substring(close + 1);
+			return $"[code][color=#{UiKit.Eye.ToHtml(false)}c0]{Esc(key)}[/color][/code]{Esc(rest)}";
+		}
+		return Esc(text);
+	}
+
+	private void DrawDot()
+	{
+		if (_dotAlpha <= 0.01f) return;
+		var c = _dot.Size * 0.5f;
+		float a = _dotAlpha * Mathf.Lerp(0.28f, 0.6f, _focusLit);
+		// A 2x2 dot on the pixel grid (the screen centre sits between pixels at 640x360).
+		_dot.DrawRect(new Rect2(c - new Vector2(1, 1), new Vector2(2, 2)), new Color(UiKit.Bone, a));
+		_dot.DrawRect(new Rect2(c - new Vector2(2, 2), new Vector2(4, 4)), new Color(0, 0, 0, a * 0.25f), false, 1f);
+		if (_hold > 0.005f)
+		{
+			float r = 5.5f;
+			_dot.DrawArc(c, r, 0f, Mathf.Tau, 24, new Color(UiKit.Bone, 0.12f * _dotAlpha), 1f);
+			_dot.DrawArc(c, r, -Mathf.Pi * 0.5f, -Mathf.Pi * 0.5f + Mathf.Tau * _hold, 24, new Color(UiKit.Eye, 0.7f * _dotAlpha), 1f);
+		}
+	}
 }

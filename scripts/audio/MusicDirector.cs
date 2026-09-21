@@ -33,6 +33,7 @@ public partial class MusicDirector : Node
 	private AmbienceLoop _pad, _hum, _shimmer;
 	private Node3D _player, _spawn;
 	private Stalker _stalker;
+	private bool _stalkerSearched;   // looked up once: a scene without a stalker must not search every frame
 
 	public override void _Ready()
 	{
@@ -46,7 +47,7 @@ public partial class MusicDirector : Node
 		float dt = (float)delta;
 		_player ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
 		_spawn ??= GetTree().GetFirstNodeInGroup("player_spawn") as Node3D;
-		_stalker ??= GetTree().Root.FindChild("Stalker", true, false) as Stalker;
+		if (!_stalkerSearched) { _stalkerSearched = true; _stalker = GetTree().CurrentScene?.FindChild("Stalker", true, false) as Stalker; }
 		if (_player == null) return;
 
 		// How deep, how hunted.

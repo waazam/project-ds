@@ -6,16 +6,23 @@ namespace ProjectDS.UI;
 /// <summary>
 /// First thing the player sees. New Game / Continue / Settings / Quit.
 /// There is no manual save: Continue loads whatever checkpoint the story last
-/// reached. Placeholder-grade UI built in code, like PauseMenu.
+/// reached. An old TV in the dark plays a worn tape of the stairs, the title in the
+/// VCR's on-screen text (see <see cref="TitleTv"/>), with plain-text items
+/// bottom-left; styled by <see cref="UiKit"/>.
 /// </summary>
 public partial class MainMenu : Node
 {
 	private Control _menuBox;
 	private Control _settingsBox;
+	private Control _settingsShade;
+	private Control _firstItem;
+	private Control _firstSetting;
 
 	public override void _Ready()
 	{
 		if (GameSettings.Instance.AutoTest) { StoryManager.Instance.StartNewGame(); return; }
+		// Coming back from "Quit to Menu": StoryManager unpauses on scene change; make sure regardless.
+		GetTree().Paused = false;
 		Input.MouseMode = Input.MouseModeEnum.Visible;
 		Build();
 	}
@@ -24,33 +31,37 @@ public partial class MainMenu : Node
 	{
 		var layer = new CanvasLayer();
 		AddChild(layer);
+		var root = UiKit.Apply(new Control());
+		root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		layer.AddChild(root);
 
-		var bg = new ColorRect { Color = new Color(0.035f, 0.04f, 0.035f) };
-		bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		layer.AddChild(bg);
+		// The title screen: an old TV in the dark playing a tape of the stairs (the title is on the tape).
+		var tv = new TitleTv();
+		root.AddChild(tv);
+		root.AddChild(new MenuBackdrop { Source = tv.Texture });
+		root.AddChild(MenuBackdrop.MakeVignette(0.55f));
+
 
 		_menuBox = BuildMenu();
-		layer.AddChild(_menuBox);
+		root.AddChild(_menuBox);
+
+		_settingsShade = new ColorRect { Color = new Color(UiKit.Night, 0.62f), Visible = false };
+		_settingsShade.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		root.AddChild(_settingsShade);
 		_settingsBox = BuildSettings();
 		_settingsBox.Visible = false;
-		layer.AddChild(_settingsBox);
+		root.AddChild(_settingsBox);
+
+		_firstItem.CallDeferred(Control.MethodName.GrabFocus);
 	}
 
 	private Control BuildMenu()
 	{
 		var box = new VBoxContainer();
-		box.SetAnchorsPreset(Control.LayoutPreset.Center);
-		box.OffsetLeft = -130; box.OffsetRight = 130; box.OffsetTop = -100; box.OffsetBottom = 100;
-		box.AddThemeConstantOverride("separation", 8);
-
-		var title = new Label { Text = "PROJECT DS", HorizontalAlignment = HorizontalAlignment.Center };
-		title.AddThemeFontSizeOverride("font_size", 24);
-		box.AddChild(title);
-		var subtitle = new Label { Text = "working title", HorizontalAlignment = HorizontalAlignment.Center };
-		subtitle.AddThemeFontSizeOverride("font_size", 9);
-		subtitle.AddThemeColorOverride("font_color", new Color(0.55f, 0.55f, 0.5f));
-		box.AddChild(subtitle);
-		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 16) });
+		box.SetAnchorsPreset(Control.LayoutPreset.BottomLeft);
+		box.OffsetLeft = 44; box.OffsetRight = 250; box.OffsetTop = -126; box.OffsetBottom = -40;
+		box.GrowVertical = Control.GrowDirection.Begin;
+		box.AddThemeConstantOverride("separation", 2);
 
 		var newGame = UiKit.MakeButton("New Game", () => StoryManager.Instance.StartNewGame());
 		box.AddChild(newGame);
@@ -60,40 +71,61 @@ public partial class MainMenu : Node
 		cont.Disabled = !hasSave;
 		box.AddChild(cont);
 
-		box.AddChild(UiKit.MakeButton("Settings", () => { _menuBox.Visible = false; _settingsBox.Visible = true; }));
+		box.AddChild(UiKit.MakeButton("Settings", () => ShowSettings(true)));
 		box.AddChild(UiKit.MakeButton("Quit", () => GetTree().Quit()));
 
-		(hasSave ? cont : newGame).CallDeferred(Control.MethodName.GrabFocus);
+		_firstItem = hasSave ? cont : newGame;
 		return box;
 	}
 
 	private Control BuildSettings()
 	{
-		var box = new VBoxContainer();
+		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.SetAnchorsPreset(Control.LayoutPreset.Center);
-		box.OffsetLeft = -130; box.OffsetRight = 130; box.OffsetTop = -90; box.OffsetBottom = 90;
-		box.AddThemeConstantOverride("separation", 6);
+		box.OffsetLeft = -135; box.OffsetRight = 135; box.OffsetTop = -110; box.OffsetBottom = 110;
+		box.GrowHorizontal = Control.GrowDirection.Both; box.GrowVertical = Control.GrowDirection.Both;
+		box.AddThemeConstantOverride("separation", 5);
 
-		var title = new Label { Text = "SETTINGS", HorizontalAlignment = HorizontalAlignment.Center };
-		title.AddThemeFontSizeOverride("font_size", 14);
-		box.AddChild(title);
+		box.AddChild(UiKit.MakeLabel("SETTINGS", UiKit.HeadingLabel, HorizontalAlignment.Center));
+		box.AddChild(UiKit.Rule(150));
+		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
+		int before = box.GetChildCount();
+		UiKit.AddSettingsRows(box);
+		_firstSetting = FirstFocusable(box.GetChild(before));
 
-		var s = GameSettings.Instance;
-		UiKit.AddSlider(box, "Master volume", 0.0, 1.0, s.MasterVolume, v => s.MasterVolume = (float)v);
-		UiKit.AddSlider(box, "Mouse sensitivity", 0.0005, 0.008, s.MouseSensitivity, v => s.MouseSensitivity = (float)v);
-		UiKit.AddSlider(box, "Stick sensitivity", 0.8, 5.0, s.StickSensitivity, v => s.StickSensitivity = (float)v);
-
-		var invert = new CheckBox { Text = "Invert Y", ButtonPressed = s.InvertY };
-		invert.AddThemeFontSizeOverride("font_size", 9);
-		invert.Toggled += on => s.InvertY = on;
-		box.AddChild(invert);
-
+		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
 		box.AddChild(UiKit.MakeButton("Back", () =>
 		{
 			GameSettings.Instance.Save();
-			_settingsBox.Visible = false;
-			_menuBox.Visible = true;
-		}));
+			ShowSettings(false);
+		}, true));
 		return box;
+	}
+
+	private void ShowSettings(bool on)
+	{
+		_settingsBox.Visible = on;
+		_settingsShade.Visible = on;
+		_menuBox.Visible = !on;
+		(on ? _firstSetting : _firstItem)?.CallDeferred(Control.MethodName.GrabFocus);
+	}
+
+	public override void _UnhandledInput(InputEvent e)
+	{
+		// Esc / B backs out of settings.
+		if (_settingsBox != null && _settingsBox.Visible && e.IsActionPressed("ui_cancel"))
+		{
+			GameSettings.Instance.Save();
+			ShowSettings(false);
+			GetViewport().SetInputAsHandled();
+		}
+	}
+
+	private static Control FirstFocusable(Node n)
+	{
+		if (n is Control { FocusMode: Control.FocusModeEnum.All } c) return c;
+		foreach (var child in n.GetChildren())
+			if (FirstFocusable(child) is { } f) return f;
+		return null;
 	}
 }

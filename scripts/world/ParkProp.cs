@@ -386,37 +386,108 @@ public partial class ParkProp : Node3D
 		_k.Xf = Transform3D.Identity;
 	}
 
+	/// <summary>
+	/// A forgotten two-person ridge tent: olive-grey canvas that sags between its poles (a
+	/// subdivided cloth sheet pushed in by a sine sag, deepest mid-panel), the rear pole leaning
+	/// so the back half droops, one front door flap rolled back onto a dark interior, a ground
+	/// sheet, guy lines out to stakes. The eaves and stakes follow the terrain under them.
+	/// Front (door) is the -X end.
+	/// </summary>
 	private void Tent()
 	{
-		// A small ridge tent, settled and leaning: same two-slope roof technique as InfoBoard's gable,
-		// just low and narrow, tilted a few degrees as if one guy-line let go.
-		var canvas = Tint("tent_canvas", new Color(0.30f, 0.34f, 0.22f));
-		var canvasShade = Tint("tent_canvas_shade", new Color(0.19f, 0.23f, 0.14f));
+		var canvas = BuildingTextures.CanvasMat;
 		var pole = Tint("tent_pole", new Color(0.35f, 0.33f, 0.30f));
+		var rope = Tint("tent_rope", new Color(0.52f, 0.5f, 0.42f));
+		var stake = Tint("tent_stake", new Color(0.3f, 0.28f, 0.25f));
+		var terrain = Engine.IsEditorHint() ? null : GroundSnap.FindTerrain(this);
+		float Gnd(float x, float z)
+		{
+			if (terrain == null || !IsInsideTree()) return 0f;
+			Vector3 w = GlobalTransform * new Vector3(x, 0, z);
+			return terrain.HeightAt(w.X, w.Z) - GlobalPosition.Y;
+		}
 
-		float length = 1.3f, halfWidth = 0.55f, ridgeH = 0.62f, eaveH = 0.05f;
-		var tilt = new Vector3(0, ridgeH - eaveH, halfWidth);
-		float ang = Mathf.Atan2(tilt.Y, tilt.Z);
-		float slopeLen = tilt.Length();
-
-		// The whole tent leans, as if it's settling unevenly into the ground.
-		_k.Xf = new Transform3D(Basis.FromEuler(new Vector3(0.05f, 0.15f, 0.1f)), Vector3.Zero);
-
-		_k.Color = Colors.White;
+		const float L = 2.0f, hw = 0.72f, ridgeH = 1.0f;
+		const int nu = 8, nv = 4;
+		float x0 = -L * 0.5f, x1 = L * 0.5f;
+		// ridge height along the tent: the rear pole has slipped, so the back sags down
+		float Ridge(float u) => ridgeH - 0.32f * Mathf.SmoothStep(0.55f, 1f, u) - 0.05f * Mathf.Sin(Mathf.Pi * u);
+		Vector3 Cloth(int side, float u, float v)
+		{
+			float x = Mathf.Lerp(x0, x1, u);
+			float z = side * hw * v * (1f - 0.08f * Mathf.SmoothStep(0.6f, 1f, u));
+			float eave = Gnd(x, side * hw) + 0.03f;
+			float y = Mathf.Lerp(Ridge(u), eave, v);
+			// sag: inward along the panel normal, strongest mid-panel, worse on the loose rear half
+			float sag = (0.07f + 0.08f * u) * Mathf.Sin(Mathf.Pi * u) * Mathf.Sin(Mathf.Pi * Mathf.Clamp(v * 1.05f, 0, 1));
+			Vector3 nOut = new Vector3(0, hw, side * (Ridge(u) - eave)).Normalized();
+			return new Vector3(x, y, z) - nOut * sag;
+		}
 		_k.Mat(canvas);
-		_k.Box(new Vector3(0, (ridgeH + eaveH) * 0.5f, halfWidth * 0.5f), new Vector3(length, 0.04f, slopeLen), 1f, Basis.FromEuler(new Vector3(ang, 0, 0)));
-		_k.Mat(canvasShade);
-		_k.Box(new Vector3(0, (ridgeH + eaveH) * 0.5f, -halfWidth * 0.5f), new Vector3(length, 0.04f, slopeLen), 1f, Basis.FromEuler(new Vector3(-ang, 0, 0)));
+		foreach (int side in new[] { -1, 1 })
+		{
+			var pts = new Vector3[nu + 1, nv + 1];
+			for (int i = 0; i <= nu; i++)
+				for (int j = 0; j <= nv; j++)
+					pts[i, j] = Cloth(side, i / (float)nu, j / (float)nv);
+			for (int i = 0; i < nu; i++)
+				for (int j = 0; j < nv; j++)
+				{
+					Vector3 a = pts[i, j], b = pts[i + 1, j], c = pts[i + 1, j + 1], d = pts[i, j + 1];
+					Vector3 n = (b - a).Cross(d - a).Normalized();
+					if (n.Y < 0) n = -n;
+					// weathering: darker, damper toward the ground and on the shaded side
+					float shade = (side > 0 ? 1f : 0.8f) * (1f - 0.25f * (j + 0.5f) / nv);
+					_k.Color = new Color(shade, shade, shade * 0.97f);
+					float u0 = i / (float)nu * L, u1 = (i + 1) / (float)nu * L, v0 = j / (float)nv * 0.9f, v1 = (j + 1) / (float)nv * 0.9f;
+					_k.Quad(a, b, c, d, n, new Vector2(u0, v0), new Vector2(u1, v0), new Vector2(u1, v1), new Vector2(u0, v1));
+				}
+		}
+		// rear end panel (closed), following the drooped ridge
+		_k.Color = new Color(0.72f, 0.72f, 0.7f);
+		Vector3 rTop = Cloth(1, 1f, 0f), rL = Cloth(-1, 1f, 1f), rR = Cloth(1, 1f, 1f);
+		_k.Tri(rL, rR, rTop + new Vector3(0.05f, 0, 0), Vector3.Right, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 0));
+		// front: the left door flap hangs closed, the right one is rolled back (dark inside shows)
+		Vector3 fTop = Cloth(1, 0f, 0f), fL = Cloth(-1, 0f, 1f), fR = Cloth(1, 0f, 1f);
+		Vector3 fMid = new(x0 - 0.02f, Gnd(x0, 0) + 0.03f, -0.05f);
+		_k.Color = new Color(0.78f, 0.78f, 0.76f);
+		_k.Tri(fL, fMid, fTop, Vector3.Left, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 0));
+		_k.Tri(fL, fMid + new Vector3(0.12f, 0.35f, 0), fTop, Vector3.Left, new Vector2(0, 1), new Vector2(0.5f, 0.6f), new Vector2(0.5f, 0));
+		_k.Color = new Color(0.7f, 0.7f, 0.68f);
+		_k.Cylinder(fTop + new Vector3(-0.01f, -0.05f, 0.05f), fR + new Vector3(-0.01f, 0.08f, -0.08f), 0.045f, 0.06f, 5, true, 1f);
+		// ground sheet sticking out at the door, and the dark floor inside
+		_k.Color = new Color(0.35f, 0.36f, 0.3f);
+		float gy = Gnd(x0, 0) + 0.015f;
+		_k.Quad(new Vector3(x0 - 0.18f, gy, -hw * 0.8f), new Vector3(x1 - 0.05f, Gnd(x1, 0) + 0.015f, -hw * 0.8f), new Vector3(x1 - 0.05f, Gnd(x1, 0) + 0.015f, hw * 0.8f), new Vector3(x0 - 0.18f, gy, hw * 0.8f), Vector3.Up);
 
-		// closed front end; the back is left as a torn, open flap (no end cap)
-		_k.Mat(canvasShade);
-		_k.Tri(new Vector3(-length * 0.5f, eaveH, halfWidth), new Vector3(-length * 0.5f, eaveH, -halfWidth), new Vector3(-length * 0.5f, ridgeH, 0),
-			Vector3.Left, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 1));
-
+		// poles: the front one upright, the rear one leaning out
+		_k.Color = Colors.White;
 		_k.Mat(pole);
-		_k.Cylinder(new Vector3(-length * 0.5f, ridgeH, 0), new Vector3(length * 0.5f + 0.12f, ridgeH * 0.96f, 0), 0.025f, 0.02f, 6);
-		_k.Cylinder(new Vector3(-length * 0.5f, 0, 0), new Vector3(-length * 0.5f, ridgeH, 0), 0.03f, 0.025f, 6);
-		_k.Cylinder(new Vector3(length * 0.5f, 0.04f, 0), new Vector3(length * 0.5f, ridgeH * 0.94f, 0), 0.028f, 0.02f, 6);
-		_k.Xf = Transform3D.Identity;
+		_k.Cylinder(new Vector3(x0, Gnd(x0, 0), 0), new Vector3(x0, Ridge(0) + 0.06f, 0), 0.016f, 0.014f, 5, true);
+		_k.Cylinder(new Vector3(x1 - 0.1f, Gnd(x1, 0), 0.02f), new Vector3(x1 + 0.05f, Ridge(1f) + 0.04f, 0.1f), 0.016f, 0.014f, 5, true);
+
+		// guy lines to stakes: fore and aft off the ridge, and one off each eave corner (one has let go)
+		void Guy(Vector3 from, Vector3 stakeXZ, bool slack)
+		{
+			var s = new Vector3(stakeXZ.X, Gnd(stakeXZ.X, stakeXZ.Z), stakeXZ.Z);
+			_k.Mat(rope);
+			_k.Color = Colors.White;
+			if (slack)
+			{
+				Vector3 mid = (from + s) * 0.5f; mid.Y = Mathf.Max(s.Y, (from.Y + s.Y) * 0.5f - 0.35f);
+				_k.Cylinder(from, mid, 0.005f, 0.005f, 3, false);
+				_k.Cylinder(mid, s + new Vector3(0, 0.02f, 0), 0.005f, 0.005f, 3, false);
+			}
+			else _k.Cylinder(from, s + new Vector3(0, 0.08f, 0), 0.005f, 0.005f, 3, false);
+			_k.Mat(stake);
+			_k.Box(s + new Vector3(0, 0.05f, 0), new Vector3(0.025f, 0.12f, 0.025f), 3f, Basis.FromEuler(new Vector3(0, 0, 0.3f)));
+		}
+		Guy(new Vector3(x0, Ridge(0) + 0.04f, 0), new Vector3(x0 - 0.95f, 0, 0.05f), false);
+		Guy(new Vector3(x1 + 0.05f, Ridge(1f) + 0.02f, 0.1f), new Vector3(x1 + 0.9f, 0, 0.2f), true);
+		Guy(Cloth(-1, 0.02f, 0.95f), new Vector3(x0 - 0.35f, 0, -hw - 0.55f), false);
+		Guy(Cloth(1, 0.02f, 0.95f), new Vector3(x0 - 0.35f, 0, hw + 0.55f), false);
+		Guy(Cloth(-1, 0.98f, 0.95f), new Vector3(x1 + 0.35f, 0, -hw - 0.55f), false);
+		Guy(Cloth(1, 0.98f, 0.95f), new Vector3(x1 + 0.4f, 0, hw + 0.5f), true);
+		_k.Color = Colors.White;
 	}
 }

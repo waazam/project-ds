@@ -1,9 +1,9 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using ProjectDS.Player;
 using ProjectDS.Systems;
-using ProjectDS.UI;
 
 namespace ProjectDS.World;
 
@@ -16,6 +16,14 @@ namespace ProjectDS.World;
 /// optional) triggers a longer, stranger climb on the original staircase and
 /// a jump straight to night; skipping them lets night fall gradually instead
 /// while the player heads back on their own.
+///
+/// Restore: the reveal is derived from the checkpoint + newel post flag, the
+/// voice from <see cref="StoryManager.Flag.ClearingVoiceHeard"/>, the optional
+/// climb from <see cref="StoryManager.Flag.Act6ExtendedClimb"/> (no mini stairs,
+/// the original taller) and nightfall from <see cref="StoryManager.Flag.Act6NightFell"/>
+/// (a still-pending fallback restarts its timer). The overhead red spotlight
+/// belongs to the voice beat only: it follows the player through the clearing
+/// and is freed once they leave it (or the climb starts, or Act 7 begins).
 /// </summary>
 public partial class Act6ClearingEvent : Node3D
 {
@@ -24,6 +32,8 @@ public partial class Act6ClearingEvent : Node3D
 	[Export] public float VoiceRadius = 15f;
 	[Export] public float SkipNightDelaySeconds = 90f;
 	[Export] public float SkipNightDelayAutoTest = 6f;
+	/// <summary>The spotlight lets go of the player once they are this far from the clearing.</summary>
+	[Export] public float SpotlightReleaseRadius = 60f;
 
 	private const float StairsMaxReach = 30f;   // outer edge of the mini-stairs placement band
 
@@ -33,55 +43,99 @@ public partial class Act6ClearingEvent : Node3D
 	private bool _revealed;
 	private bool _voiceFired;
 	private bool _climbFired;
+	private bool _fallbackRunning;
 	/// <summary>For the autotest: true once the optional extended climb has fired (a scripted
 	/// teleport that a still-running approach/return walk needs to know to stop steering through).</summary>
 	public bool ExtendedClimbFired => _climbFired;
+	/// <summary>For tests: how many mini stairs currently stand.</summary>
+	public int MiniStairCount => _minis.Count;
+	/// <summary>For tests: whether the voice beat's spotlight is still following the player.</summary>
+	public bool SpotlightActive => _playerSpot != null;
+
 	private PlayerController _player;
 	private SpotLight3D _playerSpot;
+	private Area3D _voiceZone;
 
 	public override void _Ready()
 	{
 		_original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
 		_dressing = GetNodeOrNull<DeepZoneDressing>(DressingPath);
+		SetProcess(false);   // only while the spotlight rides
+		Callable.From(Restore).CallDeferred();
+		if (StoryManager.Instance is { } s)
+		{
+			s.CheckpointReached += OnCheckpoint;
+			s.FlagSet += OnFlag;
+		}
 	}
 
-	public override void _Process(double delta)
+	public override void _ExitTree()
 	{
-		if (StoryManager.Instance == null) return;
-		_player ??= GetTree().GetFirstNodeInGroup("player") as PlayerController;
-		if (_player == null) return;
-
-		if (!_revealed)
+		if (StoryManager.Instance is { } s)
 		{
-			if (StoryManager.Instance is not { NewelPostTaken: true } || StoryManager.Instance.Current < Checkpoint.Act6BridgeCrossed) return;
-			_revealed = true;
-			Reveal();
-			return;
+			s.CheckpointReached -= OnCheckpoint;
+			s.FlagSet -= OnFlag;
 		}
-		if (_playerSpot != null)
-		{
-			// A giant spotlight rides directly overhead, always aimed straight down at the player.
-			_playerSpot.GlobalPosition = _player.GlobalPosition + Vector3.Up * 22f;
-			_playerSpot.LookAt(_player.GlobalPosition, Vector3.Forward);
-		}
-		if (_voiceFired) return;
-		float d = new Vector2(_player.GlobalPosition.X - GlobalPosition.X, _player.GlobalPosition.Z - GlobalPosition.Z).Length();
-		if (d > VoiceRadius) return;
-		_voiceFired = true;
-		_ = VoiceAndFuse();
 	}
 
-	private void Reveal()
+	private void OnCheckpoint(Checkpoint cp)
 	{
-		if (GetTree().Root.FindChild("Atmosphere", true, false) is ForestAtmosphere atmo)
-			atmo.SetMood(ForestAtmosphere.Mood.Menacing, 14f);
+		TryReveal();
+		if (cp >= Checkpoint.Act7CabinBurning) ReleaseSpotlight(1.5f);
+	}
+
+	private void OnFlag(string _) => TryReveal();
+
+	private void TryReveal()
+	{
+		if (_revealed || !StoryBeat.Act6Revealed(StoryManager.Instance)) return;
+		Reveal(restoring: false);
+	}
+
+	/// <summary>Continue: rebuild whatever the clearing had become.</summary>
+	private void Restore()
+	{
+		var s = StoryManager.Instance;
+		if (!StoryBeat.Act6Revealed(s)) return;
+		_voiceFired = s.ClearingVoiceHeard;
+		_climbFired = s.HasFlag(StoryManager.Flag.Act6ExtendedClimb);
+		Reveal(restoring: true);
+		if (_climbFired && _original != null)
+		{
+			_original.Steps += Mathf.Max(20, _original.Steps);
+			_original.Build();
+		}
+		if (_voiceFired && !_climbFired && !s.HasFlag(StoryManager.Flag.Act6NightFell)) StartNightFallback();
+	}
+
+	private void Reveal(bool restoring)
+	{
+		_revealed = true;
+		_player ??= StoryBeat.Player(this);
+		// Continue applies the saved mood itself (GameFlow); only a live reveal fades to it.
+		if (!restoring) StoryBeat.SetMood(this, ForestAtmosphere.Mood.Menacing, 14f);
 		// Giants stay well outside the mini-stairs band (StairsMaxReach + one stair's own footprint)
 		// so their thick trunks never clip through a staircase.
 		_dressing?.Reveal(GlobalPosition, 55f);
-		BuildMiniStairs();
+		if (!_climbFired) BuildMiniStairs();
 		BuildClearingLights();
-		NavMeshBaker.Instance?.Bake();
-		GD.Print("[story] Act 6: the woods around the clearing turn");
+		if (!_voiceFired)
+		{
+			_voiceZone = StoryBeat.MakeTrigger(this, new CylinderShape3D { Radius = VoiceRadius, Height = 80f }, Vector3.Zero, OnVoiceZoneEntered, "VoiceZone");
+			_voiceZone.TopLevel = true;
+			_voiceZone.GlobalPosition = GlobalPosition;
+		}
+		if (!restoring) GD.Print("[story] Act 6: the woods around the clearing turn");
+	}
+
+	private void OnVoiceZoneEntered(PlayerController player)
+	{
+		if (_voiceFired) return;
+		_voiceFired = true;
+		_player = player;
+		_voiceZone?.QueueFree();
+		_voiceZone = null;
+		Cutscene.Run(this, VoiceAndFuse);
 	}
 
 	/// <summary>A ring of cold, even fill light so the whole stand of fifteen stairs actually reads
@@ -92,14 +146,14 @@ public partial class Act6ClearingEvent : Node3D
 		for (int i = 0; i < count; i++)
 		{
 			float ang = Mathf.Tau / count * i;
-			var light = new OmniLight3D
+			AddChild(new OmniLight3D
 			{
+				Name = $"ClearingFill{i}",
 				LightColor = new Color(0.75f, 0.78f, 0.85f),
 				LightEnergy = 3.2f,
 				OmniRange = StairsMaxReach + 8f,
 				Position = new Vector3(Mathf.Cos(ang) * StairsMaxReach * 0.5f, 11f, Mathf.Sin(ang) * StairsMaxReach * 0.5f),
-			};
-			AddChild(light);
+			});
 		}
 	}
 
@@ -157,26 +211,26 @@ public partial class Act6ClearingEvent : Node3D
 
 			float footLen = stair.Steps * stair.Run * stair.Scale.Z + 1f;
 			float footH = stair.TotalHeight * stair.Scale.Y + 1.5f;
-			var trigger = new Area3D { CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
-			trigger.Position = new Vector3(0, footH * 0.5f, -footLen * 0.5f + 0.4f);
-			trigger.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(stair.Width * stair.Scale.X + 1f, footH, footLen) } });
-			stair.AddChild(trigger);
-			trigger.BodyEntered += OnMiniStepped;
+			StoryBeat.MakeTrigger(stair,
+				new BoxShape3D { Size = new Vector3(stair.Width * stair.Scale.X + 1f, footH, footLen) },
+				new Vector3(0, footH * 0.5f, -footLen * 0.5f + 0.4f), OnMiniStepped, "StepTrigger");
 		}
 	}
 
-	private void OnMiniStepped(Node3D body)
+	private void OnMiniStepped(PlayerController player)
 	{
-		if (_climbFired || !_voiceFired || body is not PlayerController player) return;
+		if (_climbFired || !_voiceFired) return;
 		_climbFired = true;
-		_ = ExtendedClimb(player);
+		StoryManager.Instance?.SetFlag(StoryManager.Flag.Act6ExtendedClimb);
+		Cutscene.Run(this, ct => ExtendedClimb(player, ct), lockInput: true, freezeBody: true);
 	}
 
-	private async Task VoiceAndFuse()
+	private async Task VoiceAndFuse(CancellationToken ct)
 	{
 		BuildPlayerSpotlight();
-		if (GetTree().Root.FindChild("ScreenFader", true, false) is ScreenFader fader)
-			await fader.ShowCaption("", "\"Come up and see.\"", 1.6f, 3.2f, 1.6f);
+		PlayVoice();
+		await StoryBeat.Caption(this, "\"Come up and see.\"", 1.6f, 3.2f, 1.6f);
+		ct.ThrowIfCancellationRequested();
 
 		var inv = _player.GetNodeOrNull<PlayerInventory>("Inventory");
 		if (inv is { HasNewelPost: true } && _minis.Count > 0)
@@ -186,16 +240,30 @@ public partial class Act6ClearingEvent : Node3D
 			inv.ConsumeNewelPost();
 		}
 		StoryManager.Instance.MarkClearingVoiceHeard();
-		_ = SkipNightFallback();
+		StartNightFallback();
+	}
+
+	/// <summary>The clearing's line, heard once: clear but dreamlike-distant, so it plays
+	/// unpositioned (inside the head rather than from a spot in the trees), slightly slowed.</summary>
+	private void PlayVoice()
+	{
+		const string path = "res://assets/audio/voice/come_and_see_distant.mp3";
+		if (!ResourceLoader.Exists(path)) return;
+		var voice = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(path), Bus = "Voice", VolumeDb = -4f, PitchScale = 0.92f };
+		AddChild(voice);
+		voice.Finished += voice.QueueFree;
+		voice.Play();
 	}
 
 	/// <summary>A giant spotlight snaps on directly overhead the instant the voice speaks, catching
-	/// the player in a harsh red glare — the clearing's payoff beat. It rides with them from here on.</summary>
+	/// the player in a harsh red glare — the clearing's payoff beat. It rides with them while they
+	/// remain in the clearing.</summary>
 	private void BuildPlayerSpotlight()
 	{
-		if (_playerSpot != null) return;
+		if (_playerSpot != null || _player == null) return;
 		_playerSpot = new SpotLight3D
 		{
+			Name = "Act6PlayerSpot",
 			LightColor = new Color(1f, 0.05f, 0.02f),
 			LightEnergy = 12f,
 			SpotRange = 30f,
@@ -203,9 +271,37 @@ public partial class Act6ClearingEvent : Node3D
 			SpotAngleAttenuation = 2f,
 			ShadowEnabled = true,
 		};
-		GetTree().Root.AddChild(_playerSpot);
+		Cutscene.SceneRoot(this).AddChild(_playerSpot);
+		FollowPlayer();
+		SetProcess(true);
+	}
+
+	public override void _Process(double delta)
+	{
+		if (_playerSpot == null || _player == null || !IsInstanceValid(_player)) { SetProcess(false); return; }
+		FollowPlayer();
+		float d = new Vector2(_player.GlobalPosition.X - GlobalPosition.X, _player.GlobalPosition.Z - GlobalPosition.Z).Length();
+		if (d > SpotlightReleaseRadius) ReleaseSpotlight(2.5f);
+	}
+
+	private void FollowPlayer()
+	{
+		// A giant spotlight rides directly overhead, always aimed straight down at the player.
 		_playerSpot.GlobalPosition = _player.GlobalPosition + Vector3.Up * 22f;
 		_playerSpot.LookAt(_player.GlobalPosition, Vector3.Forward);
+	}
+
+	/// <summary>The voice beat is over: fade the spotlight out and free it.</summary>
+	private void ReleaseSpotlight(float fadeSeconds)
+	{
+		if (_playerSpot == null) return;
+		var spot = _playerSpot;
+		_playerSpot = null;
+		SetProcess(false);
+		if (!IsInstanceValid(spot)) return;
+		var t = spot.CreateTween();
+		t.TweenProperty(spot, "light_energy", 0f, fadeSeconds);
+		t.TweenCallback(Callable.From(spot.QueueFree));
 	}
 
 	/// <summary>A wooden creak and a burst of purple light where the post has fused on.</summary>
@@ -213,42 +309,40 @@ public partial class Act6ClearingEvent : Node3D
 	{
 		var light = new OmniLight3D { LightColor = new Color(0.7f, 0.25f, 0.95f), LightEnergy = 6f, OmniRange = 6f, Position = Vector3.Up * 0.4f };
 		at.AddChild(light);
-		var tween = CreateTween();
+		var tween = light.CreateTween();
 		tween.TweenProperty(light, "light_energy", 0f, 2.2f).SetDelay(0.15f);
 		tween.TweenCallback(Callable.From(light.QueueFree));
 
 		string path = $"res://assets/audio/sfx/trunk_creak_{new RandomNumberGenerator().RandiRange(1, 3):00}.wav";
-		if (ResourceLoader.Exists(path))
-		{
-			var voice = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(path), UnitSize = 3f, MaxDistance = 60f, VolumeDb = 2f };
-			at.AddChild(voice);
-			voice.Finished += voice.QueueFree;
-			voice.Play();
-		}
+		StoryBeat.PlayAt(at, path, "Unnatural", Vector3.Zero, volumeDb: 2f, unitSize: 3f, maxDistance: 60f);
 	}
 
 	/// <summary>If the player never takes the optional stairs, night still falls — just gradually, on the walk back.</summary>
-	private async Task SkipNightFallback()
+	private void StartNightFallback()
 	{
-		float delay = GameSettings.Instance.AutoTest ? SkipNightDelayAutoTest : SkipNightDelaySeconds;
-		await ToSignal(GetTree().CreateTimer(delay), SceneTreeTimer.SignalName.Timeout);
-		if (_climbFired) return;
-		if (GetTree().Root.FindChild("Atmosphere", true, false) is ForestAtmosphere atmo)
-			atmo.SetMood(ForestAtmosphere.Mood.Night, 20f);
+		if (_fallbackRunning) return;
+		_fallbackRunning = true;
+		Cutscene.Run(this, async ct =>
+		{
+			float delay = GameSettings.Instance.AutoTest ? SkipNightDelayAutoTest : SkipNightDelaySeconds;
+			await Cutscene.Wait(this, delay, ct);
+			if (_climbFired) return;
+			StoryBeat.SetMood(this, ForestAtmosphere.Mood.Night, 20f);
+			StoryManager.Instance?.SetFlag(StoryManager.Flag.Act6NightFell);
+		});
 	}
 
-	private async Task ExtendedClimb(PlayerController player)
+	private async Task ExtendedClimb(PlayerController player, CancellationToken ct)
 	{
-		player.PlayerInput.SetEnabled(false);
-		player.SetPhysicsProcess(false);
 		player.Velocity = Vector3.Zero;
+		ReleaseSpotlight(1.2f);
 
 		foreach (var m in _minis) m.QueueFree();
 		_minis.Clear();
 
-		var fader = GetTree().Root.FindChild("ScreenFader", true, false) as ScreenFader;
+		var fader = StoryBeat.Fader(this);
 		if (fader != null) await fader.Fade(1f, 1.6f);
-		await ToSignal(GetTree().CreateTimer(5.0), SceneTreeTimer.SignalName.Timeout);
+		await Cutscene.Wait(this, 5.0, ct);
 
 		SpotLight3D spot = null;
 		if (_original != null)
@@ -258,33 +352,29 @@ public partial class Act6ClearingEvent : Node3D
 			var top = _original.GetNodeOrNull<Node3D>("TopTrigger");
 			Vector3 dest = top?.GlobalPosition ?? _original.GlobalPosition;
 			player.GlobalPosition = dest + new Vector3(0, 0.1f, 1.0f);
-			spot = new SpotLight3D
-			{
-				LightColor = Colors.White, LightEnergy = 0f, SpotRange = 14f, SpotAngle = 45f,
-				GlobalPosition = dest + Vector3.Up * 8f,
-			};
+			spot = new SpotLight3D { LightColor = Colors.White, LightEnergy = 0f, SpotRange = 14f, SpotAngle = 45f };
+			Cutscene.SceneRoot(this).AddChild(spot);
+			spot.GlobalPosition = dest + Vector3.Up * 8f;
 			spot.LookAt(dest, Vector3.Forward);
-			GetTree().Root.AddChild(spot);
 		}
 
 		if (fader != null) await fader.Fade(0f, 1.8f);
-		if (spot != null) CreateTween().TweenProperty(spot, "light_energy", 3.5f, 1.2f);
+		if (spot != null) spot.CreateTween().TweenProperty(spot, "light_energy", 3.5f, 1.2f);
 
-		if (GetTree().Root.FindChild("Atmosphere", true, false) is ForestAtmosphere atmo2)
-			atmo2.SetMood(ForestAtmosphere.Mood.Night, 3f);
+		StoryBeat.SetMood(this, ForestAtmosphere.Mood.Night, 3f);
+		StoryManager.Instance?.SetFlag(StoryManager.Flag.Act6NightFell);
 
-		player.SetPhysicsProcess(true);
-		player.PlayerInput.SetEnabled(true);
-
-		if (fader != null)
-			await fader.ShowCaption("", "Hours must have passed. It's night now.", 1.2f, 3.0f, 1.2f);
-
-		if (spot != null)
+		// Control comes back here (the rest plays while the player can move).
+		Cutscene.Run(this, async ct2 =>
 		{
-			var t2 = CreateTween();
-			t2.TweenProperty(spot, "light_energy", 0f, 2.5f).SetDelay(2.5f);
-			t2.TweenCallback(Callable.From(spot.QueueFree));
-		}
+			await StoryBeat.Caption(this, "Hours must have passed. It's night now.", 1.2f, 3.0f, 1.2f);
+			if (spot != null && IsInstanceValid(spot))
+			{
+				var t2 = spot.CreateTween();
+				t2.TweenProperty(spot, "light_energy", 0f, 2.5f).SetDelay(2.5f);
+				t2.TweenCallback(Callable.From(spot.QueueFree));
+			}
+		});
 		GD.Print("[story] Act 6: the extended climb");
 	}
 }

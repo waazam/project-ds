@@ -18,11 +18,13 @@
 [ext_resource type="Script" path="res://scripts/world/DeepZoneDressing.cs" id="18_dressing"]
 [ext_resource type="Script" path="res://scripts/world/Act6ClearingEvent.cs" id="19_act6"]
 [ext_resource type="Script" path="res://scripts/world/Act11Ending.cs" id="25_act11"]
-[ext_resource type="Script" path="res://scripts/world/NavMeshBaker.cs" id="20_navbaker"]
 [ext_resource type="Script" path="res://scripts/world/Bunker.cs" id="21_bunker"]
 [ext_resource type="Script" path="res://scripts/world/BunkerInterior.cs" id="22_bunkerint"]
 [ext_resource type="Script" path="res://scripts/world/Act7Whispers.cs" id="23_whispers"]
 [ext_resource type="Script" path="res://scripts/world/ForestVoiceCues.cs" id="24_voicecues"]
+[ext_resource type="Script" path="res://scripts/world/RainVfx.cs" id="26_rainvfx"]
+[ext_resource type="Script" path="res://scripts/world/FriendTrail.cs" id="27_friendtrail"]
+[ext_resource type="Script" path="res://scripts/world/FallenTree.cs" id="28_fallentree"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -50,10 +52,10 @@ fog_sky_affect = 0.0
 
 [sub_resource type="Curve3D" id="Curve_trail"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 1, 0, 5, 0, 0, 0, 0, 0, 0, -3, 0, -20, 0, 0, 0, 0, 0, 0, -11, 0, -45, 0, 0, 0, 0, 0, 0, -18, 0, -68, 0, 0, 0, 0, 0, 0, -6, 0, -90, 0, 0, 0, 0, 0, 0, 6, 0, -110, 0, 0, 0, 0, 0, 0, 8, 0, -135, 0, 0, 0, 0, 0, 0, 6, 0, -160, 0, 0, 0, 0, 0, 0, 2, 0, -182, 0, 0, 0, 0, 0, 0, -8, 0, -204, 0, 0, 0, 0, 0, 0, -14, 0, -228, 0, 0, 0, 0, 0, 0, -9, 0, -252, 0, 0, 0, 0, 0, 0, -2, 0, -272, 0, 0, 0, 0, 0, 0, 3, 0, -296, 0, 0, 0, 0, 0, 0, 1, 0, -322, 0, 0, 0, 0, 0, 0, -8, 0, -346, 0, 0, 0, 0, 0, 0, -5, 0, -372, 0, 0, 0, 0, 0, 0, 4, 0, -396, 0, 0, 0, 0, 0, 0, 3, 0, -422, 0, 0, 0, 0, 0, 0, -5, 0, -446, 0, 0, 0, 0, 0, 0, -4, 0, -470, 0, 0, 0, 0, 0, 0, 0, 0, -492),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 1, 0, 5, 0, 0, 0, 0, 0, 0, -3, 0, -20, 0, 0, 0, 0, 0, 0, -11, 0, -45, 0, 0, 0, 0, 0, 0, -18, 0, -68, 0, 0, 0, 0, 0, 0, -6, 0, -90, 0, 0, 0, 0, 0, 0, 6, 0, -110, 0, 0, 0, 0, 0, 0, 8, 0, -135, 0, 0, 0, 0, 0, 0, 6, 0, -160, 0, 0, 0, 0, 0, 0, 2, 0, -182, 0, 0, 0, 0, 0, 0, -8, 0, -204, 0, 0, 0, 0, 0, 0, -14, 0, -228, 0, 0, 0, 0, 0, 0, -9, 0, -252, 0, 0, 0, 0, 0, 0, -2, 0, -272, 0, 0, 0, 0, 0, 0, 3, 0, -296, 0, 0, 0, 0, 0, 0, 1, 0, -322, 0, 0, 0, 0, 0, 0, -8, 0, -346, 0, 0, 0, 0, 0, 0, -5, 0, -372, 0, 0, 0, 0, 0, 0, 4, 0, -396, 0, 0, 0, 0, 0, 0, 3, 0, -422, 0, 0, 0, 0, 0, 0, -5, 0, -446, 0, 0, 0, 0, 0, 0, -4.5, 0, -463),
 "tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
-point_count = 23
+point_count = 22
 
 [sub_resource type="Curve3D" id="Curve_road"]
 _data = {
@@ -69,40 +71,14 @@ _data = {
 }
 point_count = 9
 
-[sub_resource type="Curve3D" id="Curve_faint_w"]
-_data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, -492, 0, 0, 0, 0, 0, 0, -14, 0, -504, 0, 0, 0, 0, 0, 0, -30, 0, -512, 0, 0, 0, 0, 0, 0, -46, 0, -524, 0, 0, 0, 0, 0, 0, -58, 0, -538),
-"tilts": PackedFloat32Array(0, 0, 0, 0, 0)
-}
-point_count = 5
-
-[sub_resource type="Curve3D" id="Curve_faint_n"]
-_data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, -492, 0, 0, 0, 0, 0, 0, -3, 0, -512, 0, 0, 0, 0, 0, 0, 2, 0, -532, 0, 0, 0, 0, 0, 0, -2, 0, -552),
-"tilts": PackedFloat32Array(0, 0, 0, 0)
-}
-point_count = 4
-
-[sub_resource type="Curve3D" id="Curve_faint_e"]
-_data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, -492, 0, 0, 0, 0, 0, 0, 15, 0, -505, 0, 0, 0, 0, 0, 0, 30, 0, -512, 0, 0, 0, 0, 0, 0, 44, 0, -524, 0, 0, 0, 0, 0, 0, 54, 0, -538),
-"tilts": PackedFloat32Array(0, 0, 0, 0, 0)
-}
-point_count = 5
-
 [sub_resource type="Curve3D" id="Curve_route"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 62, 0, -551, 0, 0, 0, 0, 0, 0, 62, 0, -567, 0, 0, 0, 0, 0, 0, 51, 0, -582, 0, 0, 0, 0, 0, 0, 41, 0, -591),
-"tilts": PackedFloat32Array(0, 0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 3, 0, -461.5, 0, 0, 0, 0, 0, 0, 12, 0, -462.5, 0, 0, 0, 0, 0, 0, 13.5, 0, -471, 0, 0, 0, 0, 0, 0, 20, 0, -490, 0, 0, 0, 0, 0, 0, 30, 0, -512, 0, 0, 0, 0, 0, 0, 40, 0, -534, 0, 0, 0, 0, 0, 0, 48, 0, -554, 0, 0, 0, 0, 0, 0, 49, 0, -568, 0, 0, 0, 0, 0, 0, 46, 0, -581, 0, 0, 0, 0, 0, 0, 41, 0, -591),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
-point_count = 4
+point_count = 10
 
 [node name="ForestWorld" type="Node3D"]
-
-[node name="NavRegion" type="NavigationRegion3D" parent="."]
-
-[node name="NavMeshBaker" type="Node" parent="."]
-script = ExtResource("20_navbaker")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Env")
@@ -117,7 +93,7 @@ shadow_blur = 1.5
 directional_shadow_mode = 1
 directional_shadow_max_distance = 60.0
 
-[node name="Atmosphere" type="Node" parent="."]
+[node name="Atmosphere" type="Node" parent="." groups=["atmosphere"]]
 script = ExtResource("3_atmo")
 DeepStartZ = -260.0
 DeepFullZ = -440.0
@@ -125,17 +101,20 @@ ClearingCenter = Vector3(40, 0, -605)
 ClearingRadius = 20.0
 ClearingRelief = 0.15
 
+[node name="RainVfx" type="Node3D" parent="." groups=["rain_vfx"]]
+script = ExtResource("26_rainvfx")
+
 [node name="Terrain" type="Node3D" parent="."]
 script = ExtResource("1_terrain")
 MinXZ = Vector2(-160, -650)
 MaxXZ = Vector2(180, 60)
 NarrowStart = 380.0
 NarrowEnd = 500.0
-BranchPaths = Array[NodePath]([NodePath("Branches/Overlook"), NodePath("Branches/FaintWest"), NodePath("Branches/FaintNorth"), NodePath("Branches/FaintEast")])
-BranchWidths = PackedFloat32Array(1.3, 1.1, 1.0, 1.1)
-BranchFadeFrom = PackedFloat32Array(1.0, 0.25, 0.2, 0.3)
+BranchPaths = Array[NodePath]([NodePath("Branches/Overlook")])
+BranchWidths = PackedFloat32Array(0.8)
+BranchFadeFrom = PackedFloat32Array(0.3)
 AutotestRoutePath = NodePath("AutotestRoute")
-AutotestBranch = 3
+AutotestBranch = -1
 ClearingCenter = Vector2(40, -605)
 ClearingRadius = 10.0
 ClearingGrass = false
@@ -153,15 +132,6 @@ curve = SubResource("Curve_road")
 
 [node name="Overlook" type="Path3D" parent="Terrain/Branches" groups=["trail_branch"]]
 curve = SubResource("Curve_overlook")
-
-[node name="FaintWest" type="Path3D" parent="Terrain/Branches" groups=["trail_branch"]]
-curve = SubResource("Curve_faint_w")
-
-[node name="FaintNorth" type="Path3D" parent="Terrain/Branches" groups=["trail_branch"]]
-curve = SubResource("Curve_faint_n")
-
-[node name="FaintEast" type="Path3D" parent="Terrain/Branches" groups=["trail_branch"]]
-curve = SubResource("Curve_faint_e")
 
 [node name="AutotestRoute" type="Path3D" parent="Terrain" groups=["autotest_route"]]
 curve = SubResource("Curve_route")
@@ -250,14 +220,9 @@ Offset = 7.0
 YawDegrees = 90.0
 HeightOffset = 0.0
 
-[node name="GroundSnap" type="Node" parent="Cabin"]
-script = ExtResource("4_snap")
-Offset = -0.05
-FootprintRadius = 2.5
-
 [node name="CabinClear" type="Node3D" parent="Cabin"]
 script = ExtResource("9_clear")
-Radius = 5.5
+Radius = 7.0
 
 [node name="Shed" parent="." instance=ExtResource("15_shed")]
 
@@ -268,14 +233,9 @@ Offset = 26.0
 YawDegrees = 90.0
 HeightOffset = 0.0
 
-[node name="GroundSnap" type="Node" parent="Shed"]
-script = ExtResource("4_snap")
-Offset = -0.04
-FootprintRadius = 1.4
-
 [node name="ShedClear" type="Node3D" parent="Shed"]
 script = ExtResource("9_clear")
-Radius = 3.0
+Radius = 3.5
 
 [node name="KeyPickup" type="Area3D" parent="."]
 script = ExtResource("16_pickup")
@@ -309,7 +269,7 @@ Label = "Camera"
 [node name="TrailAnchor" type="Node" parent="CameraPickup"]
 script = ExtResource("6_anchor")
 Distance = 10.0
-Offset = -2.0
+Offset = -2.8
 YawDegrees = 0.0
 HeightOffset = 0.0
 
@@ -319,7 +279,7 @@ Color = 0
 
 [node name="TrailAnchor" type="Node" parent="Bird1"]
 script = ExtResource("6_anchor")
-Distance = 40.0
+Distance = 55.0
 Offset = 3.2
 YawDegrees = 0.0
 HeightOffset = 0.7
@@ -330,7 +290,7 @@ Color = 1
 
 [node name="TrailAnchor" type="Node" parent="Bird2"]
 script = ExtResource("6_anchor")
-Distance = 95.0
+Distance = 170.0
 Offset = -4.5
 YawDegrees = 0.0
 HeightOffset = 0.5
@@ -341,7 +301,7 @@ Color = 2
 
 [node name="TrailAnchor" type="Node" parent="Bird3"]
 script = ExtResource("6_anchor")
-Distance = 150.0
+Distance = 290.0
 Offset = 5.0
 YawDegrees = 0.0
 HeightOffset = 0.6
@@ -352,7 +312,7 @@ Color = 3
 
 [node name="TrailAnchor" type="Node" parent="Bird4Omen"]
 script = ExtResource("6_anchor")
-Distance = 220.0
+Distance = 415.0
 Offset = -7.5
 YawDegrees = 0.0
 HeightOffset = 0.5
@@ -511,7 +471,7 @@ HeightOffset = 0.0
 [node name="ForgottenTent" type="Node3D" parent="Props"]
 script = ExtResource("5_prop")
 Kind = 12
-ClearRadius = 1.4
+ClearRadius = 2.4
 ClearFoliage = true
 
 [node name="TrailAnchor" type="Node" parent="Props/ForgottenTent"]
@@ -546,6 +506,20 @@ Distance = 232.0
 Offset = 0
 YawDegrees = 0.0
 HeightOffset = -0.06
+
+[node name="MossBoulder" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 10
+ClearRadius = 1.8
+ClearFoliage = true
+Seed = 7
+
+[node name="TrailAnchor" type="Node" parent="Props/MossBoulder"]
+script = ExtResource("6_anchor")
+Distance = 372.0
+Offset = 3.4
+YawDegrees = 40.0
+HeightOffset = 0.0
 
 [node name="Overlook" type="Node3D" parent="."]
 
@@ -609,6 +583,18 @@ Offset = -1.5
 YawDegrees = 0.0
 HeightOffset = 0.0
 
+[node name="FallenTree" type="Node3D" parent="."]
+script = ExtResource("28_fallentree")
+Root = Vector2(-10, -464)
+Tip = Vector2(8, -470.5)
+CrownFrom = 0.55
+
+[node name="FriendTrail" type="Node3D" parent="."]
+script = ExtResource("27_friendtrail")
+Waypoints = PackedVector2Array(12, -470, 20, -490, 30, -512, 40, -534, 48, -554, 49, -568, 46, -581, 41, -591)
+ItemAt = PackedFloat32Array()
+AvoidPath = NodePath("../Terrain/AutotestRoute")
+
 [node name="Clearing" type="Node3D" parent="." groups=["stairs_clearing_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 9.5, -605)
 
@@ -640,7 +626,7 @@ script = ExtResource("21_bunker")
 script = ExtResource("6_anchor")
 Distance = 460.0
 Offset = -14.0
-YawDegrees = -90.0
+YawDegrees = 90.0
 HeightOffset = 0.0
 
 [node name="GroundSnap" type="Node" parent="Bunker"]

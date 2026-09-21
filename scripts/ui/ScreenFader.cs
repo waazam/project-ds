@@ -5,7 +5,13 @@ namespace ProjectDS.UI;
 
 /// <summary>
 /// Black overlay with centred caption lines for title cards and endings.
-/// Sits above the post-process layer so text stays clean.
+/// Sits above the post-process layer so text stays clean. Styled by UiKit;
+/// its waits are pausable, so a caption holds under the pause menu.
+///
+/// Caption bands at 640x360: the title sits just above centre, the caption line
+/// starts just below it and wraps downward (three lines still end above the
+/// InteractPrompt band). <see cref="Subtitle"/> has its own band at the bottom,
+/// so the two never collide.
 /// </summary>
 public partial class ScreenFader : CanvasLayer
 {
@@ -20,23 +26,26 @@ public partial class ScreenFader : CanvasLayer
 		_black.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_black);
 
-		_title = MakeLabel(16, new Color(0.78f, 0.76f, 0.7f));
-		_title.OffsetTop = -22; _title.OffsetBottom = 0;
-		_subtitle = MakeLabel(9, new Color(0.55f, 0.55f, 0.5f));
-		_subtitle.OffsetTop = 6; _subtitle.OffsetBottom = 26;
+		_title = MakeLabel(UiKit.HeadingLabel, 18, VerticalAlignment.Bottom);
+		_title.OffsetLeft = -250; _title.OffsetRight = 250; _title.OffsetTop = -34; _title.OffsetBottom = -4;
+		_subtitle = MakeLabel(UiKit.CaptionLabel, UiKit.CaptionSize, VerticalAlignment.Top);
+		_subtitle.OffsetLeft = -230; _subtitle.OffsetRight = 230; _subtitle.OffsetTop = 6; _subtitle.OffsetBottom = 6 + 3 * 16;
 	}
 
-	private Label MakeLabel(int size, Color color)
+	private Label MakeLabel(string variation, int size, VerticalAlignment valign)
 	{
 		var label = new Label
 		{
+			Theme = UiKit.Theme,
+			ThemeTypeVariation = variation,
 			HorizontalAlignment = HorizontalAlignment.Center,
-			VerticalAlignment = VerticalAlignment.Center,
+			VerticalAlignment = valign,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
 			Modulate = new Color(1, 1, 1, 0),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
 		};
 		label.AddThemeFontSizeOverride("font_size", size);
-		label.AddThemeColorOverride("font_color", color);
-		label.AnchorLeft = 0f; label.AnchorRight = 1f;
+		label.AnchorLeft = 0.5f; label.AnchorRight = 0.5f;
 		label.AnchorTop = 0.5f; label.AnchorBottom = 0.5f;
 		AddChild(label);
 		return label;
@@ -70,7 +79,7 @@ public partial class ScreenFader : CanvasLayer
 		tween.TweenProperty(_subtitle, "modulate:a", 1f, fadeIn).SetDelay(fadeIn * 0.6f);
 		await ToSignal(tween, Tween.SignalName.Finished);
 		if (hold < 0) return;   // stay up
-		await ToSignal(GetTree().CreateTimer(hold), SceneTreeTimer.SignalName.Timeout);
+		await ToSignal(GetTree().CreateTimer(hold, false), SceneTreeTimer.SignalName.Timeout);
 		tween = CreateTween().SetParallel();
 		tween.TweenProperty(_title, "modulate:a", 0f, fadeOut);
 		tween.TweenProperty(_subtitle, "modulate:a", 0f, fadeOut);

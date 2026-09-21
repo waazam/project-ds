@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Player;
@@ -10,6 +11,10 @@ namespace ProjectDS.UI;
 /// yaw; a diamond marks the bearing to <see cref="ProjectDS.Systems.StoryManager"/>'s
 /// current objective. Near-total forest silence (the stairs' own signal) makes
 /// it glitch: the marker jitters and occasionally jumps to a false bearing.
+///
+/// Lookups are cached: the player and inventory once (re-acquired only if
+/// freed), the silence zones refreshed once a second, and the distortion is
+/// computed once per frame in _Process rather than in the draw.
 /// </summary>
 public partial class Compass : CanvasLayer
 {
@@ -23,11 +28,18 @@ public partial class Compass : CanvasLayer
 		("N", 0), ("NE", 45), ("E", 90), ("SE", 135), ("S", 180), ("SW", 225), ("W", 270), ("NW", 315),
 	};
 
+	private static readonly Color LineColor = new(UiKit.Bone, 0.3f);
+	private static readonly Color NorthColor = new(UiKit.Bone, 0.9f);
+
 	/// <summary>For the autotest: whether the compass ribbon is currently drawn.</summary>
 	public bool ShowingCompass => _draw?.Visible ?? false;
 
 	private Control _draw;
 	private PlayerController _player;
+	private PlayerInventory _inv;
+	private readonly List<SilenceZone> _zones = new();
+	private double _nextZoneRefresh;
+	private float _jitter;
 	private readonly RandomNumberGenerator _rng = new();
 	private float _glitchPhase;
 	private float _falseBearing;
@@ -49,28 +61,50 @@ public partial class Compass : CanvasLayer
 	public override void _Process(double delta)
 	{
 		_clock += delta;
-		_player ??= GetTree().GetFirstNodeInGroup("player") as PlayerController;
-		var inv = _player?.GetNodeOrNull<PlayerInventory>("Inventory");
-		bool show = inv is { HasCompass: true };
+		if (_player == null || !IsInstanceValid(_player))
+		{
+			_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
+			_inv = _player?.GetNodeOrNull<PlayerInventory>("Inventory");
+		}
+		bool show = _inv != null && IsInstanceValid(_inv) && _inv.HasCompass;
 		_draw.Visible = show;
 		if (!show) return;
+
+		if (_clock >= _nextZoneRefresh)
+		{
+			_nextZoneRefresh = _clock + 1.0;
+			_zones.Clear();
+			foreach (var node in GetTree().GetNodesInGroup("silence_zones"))
+				if (node is SilenceZone zone) _zones.Add(zone);
+		}
+		// Distance to the stairs specifically (not the storm's forced silence, which would peg this at max).
+		float distortion = 0f;
+		foreach (var zone in _zones)
+			if (IsInstanceValid(zone)) distortion = Mathf.Max(distortion, zone.SilenceAt(_player.GlobalPosition));
+		_jitter = distortion > 0.15f ? (distortion - 0.15f) / 0.85f : 0f;
+
 		_glitchPhase += (float)delta;
 		_draw.QueueRedraw();
 	}
 
 	private void OnDraw()
 	{
+		if (_player == null || !IsInstanceValid(_player) || _player.CameraRig == null) return;
 		var size = _draw.Size;
 		float cx = size.X * 0.5f, cy = size.Y * 0.5f;
 		float yawDeg = Mathf.RadToDeg(_player.CameraRig.Yaw);
-		// Distance to the stairs specifically (not the storm's forced silence, which would peg this at max).
-		float distortion = 0f;
-		foreach (var node in GetTree().GetNodesInGroup("silence_zones"))
-			if (node is SilenceZone zone) distortion = Mathf.Max(distortion, zone.SilenceAt(_player.GlobalPosition));
-		float jitter = distortion > 0.15f ? (distortion - 0.15f) / 0.85f : 0f;
+		float jitter = _jitter;
 
-		// A thin baseline, Skyrim-style — no solid backing bar, just the line and its ticks.
-		_draw.DrawLine(new Vector2(0, cy), new Vector2(size.X, cy), new Color(0.85f, 0.85f, 0.8f, 0.4f), 1f);
+		// A thin baseline, Skyrim-style but fainter — no backing bar, just the line and its ticks,
+		// fading out at both ends.
+		const int segments = 8;
+		for (int i = 0; i < segments; i++)
+		{
+			float x0 = size.X * i / segments, x1 = size.X * (i + 1) / segments;
+			float mid = (i + 0.5f) / segments;
+			float fade = 1f - Mathf.Pow(Mathf.Abs(mid - 0.5f) * 2f, 2f);
+			_draw.DrawLine(new Vector2(x0, cy), new Vector2(x1, cy), new Color(LineColor, LineColor.A * fade), 1f);
+		}
 
 		float PxFor(float deg)
 		{
@@ -78,6 +112,7 @@ public partial class Compass : CanvasLayer
 			return cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f);
 		}
 
+		var font = UiKit.Serif;
 		foreach (var (label, deg) in Ticks)
 		{
 			float shown = deg;
@@ -87,14 +122,20 @@ public partial class Compass : CanvasLayer
 			float x = cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f) + JitterPx(jitter, 2f);
 			if (x < 0 || x > size.X) continue;
 			bool major = label is "N" or "S" or "E" or "W";
-			var col = label == "N" ? new Color(0.85f, 0.8f, 0.6f, 0.95f) : new Color(0.8f, 0.8f, 0.76f, major ? 0.75f : 0.45f);
-			float half = major ? 4f : 2.5f;
-			_draw.DrawLine(new Vector2(x, cy - half), new Vector2(x, cy + half), col, 1f);
+			float edge = 1f - Mathf.Pow(Mathf.Abs(x - cx) / cx, 3f);   // fade toward the ends
+			var col = label == "N" ? NorthColor : new Color(UiKit.Bone, major ? 0.7f : 0.38f);
+			col.A *= edge;
+			float half = major ? 3.5f : 2f;
+			_draw.DrawLine(new Vector2(Mathf.Round(x) + 0.5f, cy - half), new Vector2(Mathf.Round(x) + 0.5f, cy + half), col, 1f);
 			if (major)
-				_draw.DrawString(ThemeDB.FallbackFont, new Vector2(x - 4, cy - half - 2), label, HorizontalAlignment.Center, -1, 7, col);
+			{
+				var p = new Vector2(Mathf.Round(x) - 10f, cy - half - 1.5f);
+				_draw.DrawString(font, p + new Vector2(1, 1), label, HorizontalAlignment.Center, 21, 8, new Color(0, 0, 0, 0.5f * edge));
+				_draw.DrawString(font, p, label, HorizontalAlignment.Center, 21, 8, col);
+			}
 		}
 
-		// Objective marker: a small diamond riding the line, or an arrow pinned to the edge if it's behind us.
+		// Objective marker: a small eye-yellow diamond riding the line, or an arrow pinned to the edge if it's behind us.
 		float bearing = ObjectiveBearingDeg();
 		if (jitter > 0.05f)
 		{
@@ -103,14 +144,14 @@ public partial class Compass : CanvasLayer
 			bearing = Mathf.RadToDeg(bearing);
 		}
 		float bx = PxFor(bearing) + JitterPx(jitter, 6f);
-		var markColor = new Color(0.9f, 0.75f, 0.3f, Mathf.Lerp(0.95f, 0.4f, jitter));
+		var markColor = new Color(UiKit.Eye, Mathf.Lerp(0.9f, 0.4f, jitter));
 		if (bx >= 4 && bx <= size.X - 4)
-			_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 4.5f), new Vector2(bx + 3.5f, cy), new Vector2(bx, cy + 4.5f), new Vector2(bx - 3.5f, cy) }, markColor);
+			_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 4f), new Vector2(bx + 3f, cy), new Vector2(bx, cy + 4f), new Vector2(bx - 3f, cy) }, markColor);
 		else
 		{
 			float ex = Mathf.Clamp(bx, 4, size.X - 4);
 			float dir = bx < 4 ? -1f : 1f;
-			_draw.DrawColoredPolygon(new[] { new Vector2(ex, cy - 4f), new Vector2(ex + dir * 5f, cy), new Vector2(ex, cy + 4f) }, markColor);
+			_draw.DrawColoredPolygon(new[] { new Vector2(ex, cy - 3.5f), new Vector2(ex + dir * 4.5f, cy), new Vector2(ex, cy + 3.5f) }, markColor);
 		}
 	}
 

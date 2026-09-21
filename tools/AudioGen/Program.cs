@@ -29,12 +29,14 @@ var jobs = new List<(string name, string dir, bool loop, int sr, Func<Rng, int, 
 	("pressure_loop", ambient, true, Lo, (r, sr) => Ambient.Pressure(r, sr, 40)),
 	("undertone_loop", ambient, true, Lo, (r, sr) => Ambient.Undertone(r, sr, 40)),
 	("ringing_loop", ambient, true, Hi, (r, sr) => Ambient.Ringing(sr, 20)),
-	("rain_loop", ambient, true, Lo, (r, sr) => Ambient.Rain(r, sr, 26)),
-	("fire_crackle_loop", ambient, true, Lo, (r, sr) => Ambient.FireCrackle(r, sr, 22)),
-	("choir_chant_loop", ambient, true, Lo, (r, sr) => Ambient.ChoirChant(r, sr, 26)),
+	("rain_loop", ambient, true, Lo, (r, sr) => Ambient.Rain(r, sr, 180)),
+	("fire_crackle_loop", ambient, true, Lo, (r, sr) => Ambient.FireCrackle(r, sr, 30)),
+	("choir_chant_loop", ambient, true, Lo, (r, sr) => Ambient.ChoirChant(r, sr, 72)),
+	("stairs_hum_loop", ambient, true, Lo, (r, sr) => Ambient.StairsHum(r, sr, 40)),
 	("radio_static_loop", ambient, true, Lo, (r, sr) => Ambient.RadioStatic(r, sr, 22)),
 };
-for (int i = 1; i <= 3; i++) jobs.Add(($"thunder_{i:00}", sfx, false, Lo, (r, sr) => Sfx.ThunderCrack(r, sr)));
+for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"thunder_{k:00}", sfx, false, Lo, (r, sr) => Sfx.Thunder(r, sr, k))); }
+for (int i = 1; i <= 3; i++) jobs.Add(($"giant_step_{i:00}", sfx, false, Lo, (r, sr) => Sfx.GiantStep(r, sr)));
 jobs.Add(("camera_shutter", sfx, false, Lo, (r, sr) => Sfx.CameraShutter(r, sr)));
 jobs.Add(("distant_scream", sfx, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"whisper_voice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WhisperVoice(r, sr)));
@@ -73,6 +75,37 @@ if (args.Contains("--music-samples"))
 		string path = Path.Combine(outDir, name + ".wav");
 		Wav.Write(path, x, Hi);
 		Console.WriteLine($"  wrote {Path.GetRelativePath(root, path)}  ({x.Length / (double)Hi:0.0} s)");
+	}
+	return 0;
+}
+
+if (args.Contains("--voice-test"))
+{
+	// Intelligibility checks for the chant (not game assets): one dry singer, the dry unison, and
+	// the finished distant choir, each as a few spaced phrases. Feed them to a speech recogniser.
+	string outDir = Path.Combine(root, "test-output", "audio");
+	Directory.CreateDirectory(outDir);
+	int sr = Lo, n = 16 * sr;
+	var plan = new List<Ambient.ChantPhrase> { new(0.5, 62, 1, 1), new(5.5, 62, 1, 1), new(10.5, 62, 1, 1) };
+	foreach (var (name, men, women, spaced) in new[] { ("chant_solo_dry", 1, 0, false), ("chant_unison_dry", 4, 4, false), ("chant_unison_hall", 4, 4, true) })
+	{
+		var x = Ambient.ChantDry(new Rng(Seed ^ Fnv(name)), sr, n, plan, men, women, 1.0);
+		if (spaced) x = Ambient.ChoirSpace(x, sr); else Dsp.NormPeak(x, -3);
+		string path = Path.Combine(outDir, name + ".wav");
+		Wav.Write(path, x, sr);
+		Console.WriteLine($"  wrote {Path.GetRelativePath(root, path)}");
+		if (name != "chant_solo_dry") continue;
+		// Phone centres in the first phrase (starts 0.5 s, tempo 1), and where each should put its energy.
+		Console.WriteLine($"    {"phone",-6} {"<400",6} {"-1.3k",6} {"-2k",6} {"-3.5k",6} {">3.5k",6}  expected");
+		foreach (var (ph, at, exp) in new[]
+		{
+			("uh", 0.75, "400-1.3k (F1 640, F2 1190)"), ("m", 1.05, "<400 (murmur)"), ("schwa", 1.24, "400-2k"),
+			("n", 1.41, "<400 (murmur)"), ("s", 1.56, ">3.5k (frication)"), ("ee", 2.2, "<400 (F1 270) + 2-3.5k (F2 2290, F3 3010)"),
+		})
+		{
+			var b = PhoneCheck.Bands(x, sr, at);
+			Console.WriteLine($"    {ph,-6} " + string.Join(" ", b.Select(v => $"{v * 100,6:0.0}")) + $"  {exp}");
+		}
 	}
 	return 0;
 }

@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="Script" path="res://scripts/ui/MenuBackdropCapture.cs" id="2_cap"]
+
+[node name="MenuBackdropCapture" type="Node3D"]
+script = ExtResource("2_cap")
+
+[node name="ForestWorld" parent="." instance=ExtResource("1_world")]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+fov = 70.0
+near = 0.1
+far = 400.0
+current = true

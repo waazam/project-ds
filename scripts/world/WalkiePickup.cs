@@ -2,73 +2,103 @@ using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.Systems;
-using ProjectDS.UI;
 
 namespace ProjectDS.World;
 
 /// <summary>
 /// Act 10's ending beat: a walkie-talkie hissing with static, dropped just
 /// past the maze's exit. The player follows the sound to find it; picking it
-/// up with [E] is checkpoint 8 — the end of the story so far.
+/// up with [E] is checkpoint 8, the end of the story so far.
+///
+/// It lies on the floor (snapped down onto whatever is under it) with a slow
+/// pulsing red LED, and is used through an <see cref="Interactable"/> child:
+/// highlight and prompt only while it's under the crosshair.
 /// </summary>
 public partial class WalkiePickup : Area3D
 {
-	private bool _playerInRange;
-	private bool _wasPressed;
-	private PlayerController _player;
+	public const string PromptText = "Pick up the walkie-talkie";
+
 	private AudioStreamPlayer3D _staticPlayer;
+	private Interactable _use;
+	private Node3D _item;
+	private ItemMeshes.Built _built;
+	private int _settleFrame;
+	private bool _settled, _taken;
+	private double _t;
 
 	public override void _Ready()
 	{
 		CollisionLayer = 0;
-		CollisionMask = 2;
+		CollisionMask = 0;
+		Monitoring = false;
 		Monitorable = false;
-		Monitoring = true;
-		AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 2.2f } });
-		BuildVisual();
-		BodyEntered += OnEntered;
-		BodyExited += OnExited;
+		// Restore: already found on a previous run.
+		if (StoryManager.Instance != null && StoryManager.Instance.Current >= Checkpoint.Act10WalkieFound)
+		{
+			QueueFree();
+			return;
+		}
+		_item = new Node3D { Name = "Item" };
+		AddChild(_item);
+		_built = ItemMeshes.Build(ToolKind.Radio, _item);
+
+		_use = new Interactable
+		{
+			Name = "Interactable",
+			Prompt = PromptText,
+			PickRadius = _built.PickRadius,
+			PickOffset = _built.PickCenter,
+			HighlightRoot = new NodePath("../Item"),
+		};
+		_use.Interacted += OnInteract;
+		AddChild(_use);
 
 		string path = "res://assets/audio/ambient/radio_static_loop.wav";
 		if (ResourceLoader.Exists(path))
 		{
-			_staticPlayer = new AudioStreamPlayer3D { UnitSize = 3f, MaxDistance = 28f };
+			_staticPlayer = new AudioStreamPlayer3D { UnitSize = 3f, MaxDistance = 28f, Bus = "Events" };
 			AddChild(_staticPlayer);
 			_staticPlayer.AddChild(new AmbienceLoop { StreamPath = path, BaseVolumeDb = -2f });
 		}
 	}
 
-	private void BuildVisual()
+	private void OnInteract(PlayerController player)
 	{
-		var k = new MeshKit();
-		var body = ProcTextures.Flat("walkie_body", new Color(0.14f, 0.15f, 0.14f), 0.75f);
-		var metal = ProcTextures.MetalMat;
-		k.Color = Colors.White;
-		k.Mat(body).Box(new Vector3(0, 0.09f, 0), new Vector3(0.08f, 0.17f, 0.045f));
-		k.Mat(metal).Cylinder(new Vector3(0, 0.17f, 0), new Vector3(0, 0.32f, 0), 0.007f, 0.007f, 5);
-		k.CommitTo(this, "Mesh");
-	}
-
-	public override void _Process(double delta)
-	{
-		bool pressed = Input.IsActionPressed("interact");
-		bool justPressed = pressed && !_wasPressed;
-		_wasPressed = pressed;
-		if (_playerInRange) InteractPrompt.Instance?.ShowPrompt("[E] Pick up the walkie-talkie");
-		if (!_playerInRange || _player == null || !justPressed) return;
-		StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act10WalkieFound, _player.GlobalPosition, _player.CameraRig.Yaw);
-		_player.GetNodeOrNull<PlayerInventory>("Inventory")?.TryPickup(ToolKind.Radio);
-		InteractPrompt.Instance?.HidePrompt();
+		if (_taken) return;
+		_taken = true;
+		StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act10WalkieFound, player.GlobalPosition, player.CameraRig.Yaw);
+		player.GetNodeOrNull<PlayerInventory>("Inventory")?.TryPickup(ToolKind.Radio);
 		_staticPlayer?.QueueFree();
 		QueueFree();
 	}
 
-	private void OnEntered(Node3D body) { if (body is PlayerController p) { _player = p; _playerInRange = true; } }
-
-	private void OnExited(Node3D body)
+	public override void _Process(double delta)
 	{
-		if (body != (Node3D)_player) return;
-		_playerInRange = false;
-		InteractPrompt.Instance?.HidePrompt();
+		if (_built.Led == null) return;
+		// Slow heartbeat blink: mostly dim, a soft rise and fall every ~1.6 s.
+		_t += delta;
+		float ph = (float)(_t % 1.6) / 1.6f;
+		float pulse = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(ph * Mathf.Pi)), 3f);
+		_built.Led.EmissionEnergyMultiplier = 0.4f + 3.2f * pulse;
+		if (_built.Glow != null) _built.Glow.LightEnergy = 0.05f + 0.4f * pulse;
+	}
+
+	public override void _PhysicsProcess(double delta)
+	{
+		if (_settled || _item == null) return;
+		if (++_settleFrame < 3) return;
+		var space = GetWorld3D()?.DirectSpaceState;
+		if (space != null)
+		{
+			Vector3 p = GlobalPosition;
+			var q = PhysicsRayQueryParameters3D.Create(p + Vector3.Up * 0.5f, p + Vector3.Down * 3f, 1u);
+			var hit = space.IntersectRay(q);
+			if (hit.Count > 0)
+			{
+				GlobalPosition = new Vector3(p.X, ((Vector3)hit["position"]).Y + 0.003f, p.Z);
+				_settled = true;
+			}
+		}
+		if (_settleFrame > 40) _settled = true;
 	}
 }

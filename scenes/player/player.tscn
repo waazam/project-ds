@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scripts/player/PlayerCameraRig.cs" id="3_rig"]
 [ext_resource type="Script" path="res://scripts/player/PlayerFootsteps.cs" id="4_steps"]
 [ext_resource type="Script" path="res://scripts/player/PlayerBreathing.cs" id="5_breath"]
+[ext_resource type="Script" path="res://scripts/player/PlayerInteraction.cs" id="20_interact"]
 [ext_resource type="Script" path="res://scripts/player/PlayerInventory.cs" id="6_inventory"]
 [ext_resource type="Script" path="res://scripts/player/Lantern.cs" id="7_lantern"]
 [ext_resource type="Script" path="res://scripts/player/CameraTool.cs" id="8_camtool"]
@@ -121,9 +122,5 @@ script = ExtResource("8_camtool")
 [node name="Stamina" type="Node" parent="."]
 script = ExtResource("9_stamina")
 
-[node name="NavAgent" type="NavigationAgent3D" parent="."]
-radius = 0.35
-height = 1.75
-path_desired_distance = 0.8
-target_desired_distance = 0.6
-avoidance_enabled = false
+[node name="Interaction" type="Node" parent="."]
+script = ExtResource("20_interact")

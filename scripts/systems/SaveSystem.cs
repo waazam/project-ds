@@ -21,7 +21,8 @@ public class SaveData
 {
 	public Checkpoint Checkpoint;
 	public float PosX, PosY, PosZ, Yaw;
-	public bool StairsClimbed;
+	public string[] Flags = System.Array.Empty<string>();
+	public string Inventory = "";
 }
 
 /// <summary>
@@ -31,8 +32,10 @@ public class SaveData
 /// </summary>
 public static class SaveSystem
 {
-	private const string PathA = "user://save_a.cfg";
-	private const string PathB = "user://save_b.cfg";
+	// Test runs write their own slots so they never overwrite a real save.
+	private static string Prefix => GameSettings.Instance?.AutoTest == true ? "user://test_save_" : "user://save_";
+	private static string PathA => Prefix + "a.cfg";
+	private static string PathB => Prefix + "b.cfg";
 
 	public static bool HasSave() => Load() != null;
 
@@ -45,7 +48,8 @@ public static class SaveSystem
 		cfg.SetValue("save", "pos_y", data.PosY);
 		cfg.SetValue("save", "pos_z", data.PosZ);
 		cfg.SetValue("save", "yaw", data.Yaw);
-		cfg.SetValue("save", "stairs_climbed", data.StairsClimbed);
+		cfg.SetValue("save", "flags", string.Join(",", data.Flags));
+		cfg.SetValue("save", "inventory", data.Inventory ?? "");
 		cfg.SetValue("save", "saved_at", Time.GetUnixTimeFromSystem());
 		var err = cfg.Save(target);
 		if (err != Error.Ok) GD.PushError($"SaveSystem: failed to write {target}: {err}");
@@ -83,7 +87,8 @@ public static class SaveSystem
 			PosY = (float)cfg.GetValue("save", "pos_y", 0f),
 			PosZ = (float)cfg.GetValue("save", "pos_z", 0f),
 			Yaw = (float)cfg.GetValue("save", "yaw", 0f),
-			StairsClimbed = (bool)cfg.GetValue("save", "stairs_climbed", false),
+			Flags = ((string)cfg.GetValue("save", "flags", "")).Split(',', System.StringSplitOptions.RemoveEmptyEntries),
+			Inventory = (string)cfg.GetValue("save", "inventory", ""),
 		};
 	}
 }

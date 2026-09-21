@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using ProjectDS.Audio;
@@ -12,6 +13,10 @@ namespace ProjectDS.Entities;
 /// version of the stalker crosses the far horizon in the fog for about ten
 /// seconds, never to be seen again, and the compass repoints to the cabin.
 /// Never interactive, never close: this is scale and dread, not a fight.
+///
+/// Restore: done for good once <see cref="StoryManager.Flag.GiantEventDone"/> is saved;
+/// otherwise the fuse starts over whenever the (restored) storm is raging.
+/// The fuse counts only unpaused storm time; the thuds are on the Unnatural bus.
 /// </summary>
 public partial class GiantStalkerEvent : Node
 {
@@ -27,11 +32,17 @@ public partial class GiantStalkerEvent : Node
 	private double _clock;
 	private double _fireAt = -1;
 	private bool _done;
-	private Node3D _player;
+
+	public override void _Ready() => Callable.From(Restore).CallDeferred();
+
+	private void Restore()
+	{
+		if (StoryManager.Instance is { GiantEventDone: true }) { _done = true; SetProcess(false); }
+	}
 
 	public override void _Process(double delta)
 	{
-		if (_done) return;
+		if (_done) { SetProcess(false); return; }
 		if (StormController.Instance is not { Active: true }) return;
 		_clock += delta;
 		if (_fireAt < 0)
@@ -42,19 +53,20 @@ public partial class GiantStalkerEvent : Node
 		}
 		if (_clock < _fireAt) return;
 		_done = true;
-		_ = Run();
+		SetProcess(false);
+		Cutscene.Run(this, Cross);
 	}
 
-	private async Task Run()
+	private async Task Cross(CancellationToken ct)
 	{
-		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
-		if (_player == null) { StoryManager.Instance?.MarkGiantEventDone(); return; }
+		var player = StoryBeat.Player(this);
+		if (player == null) { StoryManager.Instance?.MarkGiantEventDone(); return; }
 		var terrain = GroundSnap.FindTerrain(this);
 
 		Vector3 fwd = -(GetViewport().GetCamera3D()?.GlobalBasis.Z ?? Vector3.Forward); fwd.Y = 0; fwd = fwd.Normalized();
 		if (fwd.LengthSquared() < 0.01f) fwd = Vector3.Forward;
 		Vector3 right = fwd.Cross(Vector3.Up).Normalized();
-		Vector3 centre = _player.GlobalPosition + fwd * Distance;
+		Vector3 centre = player.GlobalPosition + fwd * Distance;
 		Vector3 start = centre - right * SweepWidth * 0.5f;
 		Vector3 end = centre + right * SweepWidth * 0.5f;
 		float Ground(Vector3 p) => terrain?.HeightAt(p.X, p.Z) ?? p.Y;
@@ -65,43 +77,49 @@ public partial class GiantStalkerEvent : Node
 		skin.SetShaderParameter("face_tint", new Color(0.14f, 0.14f, 0.15f));
 		skin.SetShaderParameter("visibility", 1f);
 		skin.SetShaderParameter("wetness", 0.4f);
-		var body = new StalkerBody { Skin = skin, Size = BodyScale, SwaySeconds = 22f, SwayDegrees = 0.8f, HeadDriftDegrees = 1.5f };
+		var body = new StalkerBody { Name = "Act4Giant", Skin = skin, Size = BodyScale, SwaySeconds = 22f, SwayDegrees = 0.8f, HeadDriftDegrees = 1.5f };
 		// Must be in the tree before GlobalPosition/LookAt: Godot can't resolve a global transform
 		// for an orphan node, and silently no-ops (with a console warning) instead.
-		GetTree().Root.AddChild(body);
-		body.GlobalPosition = start;
-		body.LookAt(body.GlobalPosition + right, Vector3.Up);
-
-		var steps = new List<AudioStream>();
-		foreach (var name in new[] { "branch_drop_01", "branch_drop_02" })
+		Cutscene.SceneRoot(this).AddChild(body);
+		try
 		{
-			string p = $"res://assets/audio/sfx/{name}.wav";
-			if (ResourceLoader.Exists(p)) steps.Add(GD.Load<AudioStream>(p));
-		}
-		var voice = new AudioStreamPlayer3D { Bus = "Unnatural", UnitSize = 40f, MaxDistance = 400f, TopLevel = true };
-		body.AddChild(voice);
+			body.GlobalPosition = start;
+			body.LookAt(body.GlobalPosition + right, Vector3.Up);
 
-		GD.Print("[story] Act 4: the giant crosses the horizon");
-		double t = 0, nextThud = 0;
-		while (t < DurationSeconds)
-		{
-			double dt = GetProcessDeltaTime();
-			t += dt;
-			float u = (float)(t / DurationSeconds);
-			Vector3 p = start.Lerp(end, u);
-			p.Y = Ground(p);
-			body.GlobalPosition = p;
-			if (t >= nextThud && steps.Count > 0)
+			var steps = new List<AudioStream>();
+			foreach (var name in new[] { "giant_step_01", "giant_step_02", "giant_step_03" })
 			{
-				nextThud = t + _rng.RandfRange(ThudInterval.X, ThudInterval.Y);
-				voice.Stream = steps[_rng.RandiRange(0, steps.Count - 1)];
-				voice.VolumeDb = _rng.RandfRange(6f, 10f);
-				voice.PitchScale = _rng.RandfRange(0.45f, 0.55f);
-				voice.Play();
+				string p = $"res://assets/audio/sfx/{name}.wav";
+				if (ResourceLoader.Exists(p)) steps.Add(GD.Load<AudioStream>(p));
 			}
-			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			var voice = new AudioStreamPlayer3D { Bus = "Unnatural", UnitSize = 40f, MaxDistance = 400f, TopLevel = true };
+			body.AddChild(voice);
+
+			GD.Print("[story] Act 4: the giant crosses the horizon");
+			double t = 0, nextThud = 0;
+			while (t < DurationSeconds)
+			{
+				t += GetProcessDeltaTime();
+				float u = (float)(t / DurationSeconds);
+				Vector3 p = start.Lerp(end, u);
+				p.Y = Ground(p);
+				body.GlobalPosition = p;
+				voice.GlobalPosition = p;
+				if (t >= nextThud && steps.Count > 0)
+				{
+					nextThud = t + _rng.RandfRange(ThudInterval.X, ThudInterval.Y);
+					voice.Stream = steps[_rng.RandiRange(0, steps.Count - 1)];
+					voice.VolumeDb = _rng.RandfRange(4f, 8f);
+					voice.PitchScale = _rng.RandfRange(0.9f, 1.1f);
+					voice.Play();
+				}
+				await Cutscene.Frame(this, ct);
+			}
 		}
-		body.QueueFree();
+		finally
+		{
+			if (IsInstanceValid(body)) body.QueueFree();
+		}
 		StoryManager.Instance?.MarkGiantEventDone();
 	}
 }

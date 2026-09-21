@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using ProjectDS.Audio;
@@ -19,6 +20,11 @@ namespace ProjectDS.World;
 /// the distance and reaches out. The touch cuts to black and wakes the player,
 /// at dawn, back in the Act 6 clearing among the small stairs — this is the
 /// end of the story as written so far.
+///
+/// Restore: once the radio exchange is done (<see cref="StoryManager.Flag.Act11DialogueDone"/>)
+/// the stairs are tall on load, and until the giant's checkpoint the climb trigger
+/// and the fog-ramp zone are waiting. At checkpoint 8 without the exchange, the
+/// radio sequence plays again. The radio's static runs on its own "Radio" bus.
 /// </summary>
 public partial class Act11Ending : Node3D
 {
@@ -30,156 +36,196 @@ public partial class Act11Ending : Node3D
 	[Export] public float ApproachSecondsReal = 7f;
 	[Export] public float ApproachSecondsAutoTest = 1.5f;
 	[Export] public float FogRampRadius = 70f;
+	/// <summary>Silence priority: above the storm's, so the climb is silent whatever else is going on.</summary>
+	[Export] public int SilencePriority = 100;
+	[ExportGroup("Stairs hum")]
+	[Export] public float ClimbHumStartDb = -14f;
+	[Export] public float ClimbHumTopDb = 0f;
+	[Export] public float EncounterHumDb = 4f;
 
 	/// <summary>For the autotest: the base-of-the-stairs trigger it should walk into to start the climb.</summary>
 	public Vector3? ClimbTriggerWorld => _climbTrigger?.GlobalPosition;
 	/// <summary>For the autotest: a point square in front of the stairs' base, to approach from before
 	/// aiming at the trigger itself (mirrors the original climb's own AutotestApproach → top route).</summary>
 	public Vector3? ApproachWorld => _original?.GetNodeOrNull<Node3D>("AutotestApproach")?.GlobalPosition;
+	/// <summary>For tests: whether the stairs have been rebuilt impossibly tall.</summary>
+	public bool StairsTall => _original != null && _original.Steps == ClimbStepCount;
 
 	private StaircaseBuilder _original;
-	private Node3D _bunker;
-	private Node3D _clearing;
-	private PlayerController _player;
 	private Area3D _climbTrigger;
+	private Area3D _fogZone;
 	private bool _stageAStarted;
-	private bool _fogRamped;
 	private bool _climbFired;
 
-	public override void _Ready() => _original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
+	public override void _Ready()
+	{
+		_original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
+		Callable.From(Restore).CallDeferred();
+		if (StoryManager.Instance is { } s)
+		{
+			s.CheckpointReached += OnStoryChanged;
+			s.FlagSet += OnStoryChanged;
+		}
+	}
 
-	public override void _Process(double delta)
+	public override void _ExitTree()
+	{
+		if (StoryManager.Instance is { } s)
+		{
+			s.CheckpointReached -= OnStoryChanged;
+			s.FlagSet -= OnStoryChanged;
+		}
+		ForestAmbienceManager.Instance?.ReleaseSilence(this);
+	}
+
+	private void Restore()
 	{
 		var s = StoryManager.Instance;
 		if (s == null || _original == null) return;
-		_player ??= GetTree().GetFirstNodeInGroup("player") as PlayerController;
-		if (_player == null) return;
-		_bunker ??= GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
-		_clearing ??= GetTree().GetFirstNodeInGroup("stairs_clearing_marker") as Node3D;
+		if (s.Act11DialogueDone) MakeStairsTall();
+		_climbFired = s.Current >= Checkpoint.Act11GiantEncounter;
+		OnStoryChanged(0);
+	}
 
+	private void OnStoryChanged<T>(T _)
+	{
+		var s = StoryManager.Instance;
+		if (s == null || _original == null) return;
 		if (s.Current == Checkpoint.Act10WalkieFound && !s.Act11DialogueDone && !_stageAStarted)
 		{
 			_stageAStarted = true;
-			_ = StageA(_player);
+			if (StoryBeat.Player(this) is { } p) Cutscene.Run(this, ct => StageA(p, ct));
 			return;
 		}
-		if (!s.Act11DialogueDone || s.Current >= Checkpoint.Act11GiantEncounter) return;
+		if (s.Act11DialogueDone && s.Current < Checkpoint.Act11GiantEncounter) EnsureClimbTriggers();
+	}
 
-		EnsureClimbTrigger();
-		MaybeRampFog();
+	private void MakeStairsTall()
+	{
+		if (_original.Steps == ClimbStepCount) return;
+		_original.Steps = ClimbStepCount;
+		_original.Build();
 	}
 
 	// ================================================================== the radio, outside again
 
-	private async Task StageA(PlayerController player)
+	private async Task StageA(PlayerController player, CancellationToken ct)
 	{
+		// On Continue this is restored at level load: let the opening fade hand control over first.
+		while (GameFlow.Instance is { Started: false }) await Cutscene.Frame(this, ct);
 		player.GetNodeOrNull<PlayerInventory>("Inventory")?.TryPickup(ToolKind.Radio);
+		var bunker = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
+		var fader = StoryBeat.Fader(this);
 
-		player.PlayerInput.SetEnabled(false);
-		player.SetPhysicsProcess(false);
-		var fader = GetTree().Root.FindChild("ScreenFader", true, false) as ScreenFader;
-		if (fader != null) await fader.Fade(1f, 1.0f);
+		Cutscene.Lock(player, true, true);
+		try
+		{
+			if (fader != null) await fader.Fade(1f, 1.0f);
+			// 16 m out in front of the bunker door (its local +Z), clear of the mound.
+			Vector3 spot = bunker != null ? bunker.GlobalTransform * new Vector3(0, 0, 16f) : player.GlobalPosition;
+			var terrain = GroundSnap.FindTerrain(this);
+			if (terrain != null) spot.Y = terrain.HeightAt(spot.X, spot.Z) + 0.2f;
+			Vector3 away = bunker != null ? spot - bunker.GlobalPosition : Vector3.Forward;
+			float yawHome = Mathf.Atan2(-away.X, -away.Z);
+			player.Teleport(spot, yawHome);
+			await Cutscene.Frame(this, ct);
+			if (fader != null) await fader.Fade(0f, 1.2f);
+		}
+		finally
+		{
+			if (IsInstanceValid(player) && player.IsInsideTree()) Cutscene.Unlock(player, true, true);
+		}
 
-		Vector3 spot = (_bunker?.GlobalPosition ?? player.GlobalPosition) + new Vector3(0, 0, 16f);
-		var terrain = GroundSnap.FindTerrain(this);
-		if (terrain != null) spot.Y = terrain.HeightAt(spot.X, spot.Z) + 0.2f;
-		Vector3 away = _bunker != null ? spot - _bunker.GlobalPosition : Vector3.Forward;
-		float yawHome = Mathf.Atan2(-away.X, -away.Z);
-		player.Teleport(spot, yawHome);
-		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		await Cutscene.Wait(this, GameSettings.Instance.AutoTest ? 0.5 : 2.0, ct);
 
-		if (fader != null) await fader.Fade(0f, 1.2f);
-		player.SetPhysicsProcess(true);
-		player.PlayerInput.SetEnabled(true);
-
-		await Wait(GameSettings.Instance.AutoTest ? 0.5 : 2.0);
-
-		int voiceIdx = AudioServer.GetBusIndex("Voice");
 		PlayStatic(0.3f);
-		if (voiceIdx >= 0) AudioServer.SetBusEffectEnabled(voiceIdx, 1, true);
 		if (Subtitle.Instance != null) await Subtitle.Instance.Show("\"Did you see them?\"", 0.8f, 3.0f, 0.8f);
-		if (voiceIdx >= 0) AudioServer.SetBusEffectEnabled(voiceIdx, 1, false);
 
-		await Wait(0.7);
+		await Cutscene.Wait(this, 0.7, ct);
 		if (Subtitle.Instance != null) await Subtitle.Instance.Show("\"Who are you!\"", 0.6f, 2.2f, 0.8f);
 
 		PlayStatic(0.6f);
-		await Wait(1.0);
+		await Cutscene.Wait(this, 1.0, ct);
 
 		// Already impossibly tall by the time the compass leads there — not growing at the last second.
-		_original.Steps = ClimbStepCount;
-		_original.Build();
+		MakeStairsTall();
 
 		StoryManager.Instance.MarkAct11DialogueDone();
 		GD.Print("[story] Act 11: the radio speaks");
 	}
 
+	/// <summary>A burst of walkie-talkie static on the Radio bus (band-limited and distorted), faded out after 1.4 s.</summary>
 	private void PlayStatic(float extraGain)
 	{
 		string path = "res://assets/audio/ambient/radio_static_loop.wav";
 		if (!ResourceLoader.Exists(path)) return;
-		var p = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(path), Bus = "Voice", VolumeDb = -6f + extraGain * 10f };
-		GetTree().Root.AddChild(p);
+		var p = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(path), Bus = "Radio", VolumeDb = -6f + extraGain * 10f };
+		Cutscene.SceneRoot(this).AddChild(p);
 		p.Play();
-		_ = StopAfter(p, 1.4);
-	}
-
-	private async Task StopAfter(AudioStreamPlayer p, double seconds)
-	{
-		await Wait(seconds);
-		var tween = CreateTween();
-		tween.TweenProperty(p, "volume_db", -60f, 0.4f);
-		await ToSignal(tween, Tween.SignalName.Finished);
-		p.QueueFree();
+		Cutscene.Run(this, async ct =>
+		{
+			try
+			{
+				await Cutscene.Wait(this, 1.4, ct);
+				var tween = p.CreateTween();
+				tween.TweenProperty(p, "volume_db", -60f, 0.4f);
+				await Cutscene.Tween(this, tween, ct);
+			}
+			finally
+			{
+				if (IsInstanceValid(p)) p.QueueFree();
+			}
+		});
 	}
 
 	// ================================================================== the walk back to the stairs
 
-	private void EnsureClimbTrigger()
+	private void EnsureClimbTriggers()
 	{
-		if (_climbTrigger != null || _original == null) return;
-		_climbTrigger = new Area3D { CollisionLayer = 0, CollisionMask = 2, Monitorable = false, Monitoring = true, Position = new Vector3(0, 0.4f, -0.3f) };
-		_climbTrigger.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(1.7f, 0.8f, 0.7f) } });
-		_original.AddChild(_climbTrigger);
-		_climbTrigger.BodyEntered += OnClimbTriggerEntered;
+		if (_climbTrigger != null || _original == null || _climbFired) return;
+		_climbTrigger = StoryBeat.MakeTrigger(_original, new BoxShape3D { Size = new Vector3(1.7f, 0.8f, 0.7f) },
+			new Vector3(0, 0.4f, -0.3f), OnClimbTriggerEntered, "Act11ClimbTrigger");
+		// The closer the player gets, the more the fog swallows everything above roughly the
+		// stairs' midpoint — from the ground you can never quite see where they end.
+		_fogZone = StoryBeat.MakeTrigger(_original, new CylinderShape3D { Radius = FogRampRadius, Height = 200f },
+			Vector3.Zero, _ => RampFog(), "Act11FogZone");
 	}
 
-	/// <summary>The closer the player gets, the more the fog swallows everything above roughly the
-	/// stairs' midpoint — from the ground you can never quite see where they end.</summary>
-	private void MaybeRampFog()
+	private void RampFog()
 	{
-		if (_fogRamped) return;
-		float d = new Vector2(_player.GlobalPosition.X - _original.GlobalPosition.X, _player.GlobalPosition.Z - _original.GlobalPosition.Z).Length();
-		if (d > FogRampRadius) return;
-		_fogRamped = true;
-		if (GetTree().Root.FindChild("Atmosphere", true, false) is ForestAtmosphere atmo)
-			atmo.SetHeightFog(_original.GlobalPosition.Y + _original.TotalHeight * 0.4f, 0.1f, 9f);
+		if (_fogZone == null) return;
+		_fogZone.QueueFree();
+		_fogZone = null;
+		StoryBeat.Atmosphere(this)?.SetHeightFog(_original.GlobalPosition.Y + _original.TotalHeight * 0.4f, 0.1f, 9f);
 	}
 
-	private void OnClimbTriggerEntered(Node3D body)
+	private void OnClimbTriggerEntered(PlayerController player)
 	{
-		if (_climbFired || body is not PlayerController player) return;
-		if (StoryManager.Instance is not { Act11DialogueDone: true }) return;
+		if (_climbFired || StoryManager.Instance is not { Act11DialogueDone: true }) return;
 		_climbFired = true;
-		_ = ClimbAndEncounter(player);
+		RampFog();   // in case the player came from inside the fog radius on load
+		Cutscene.Run(this, ct => ClimbAndEncounter(player, ct), lockInput: true, freezeBody: true);
 	}
 
 	// ================================================================== the climb, the giant, the touch
 
-	private async Task ClimbAndEncounter(PlayerController player)
+	private async Task ClimbAndEncounter(PlayerController player, CancellationToken ct)
 	{
-		player.PlayerInput.SetEnabled(false);
-		player.SetPhysicsProcess(false);
 		player.Velocity = Vector3.Zero;
-		if (ForestAmbienceManager.Instance != null) ForestAmbienceManager.Instance.SilenceOverride = 1f;
+		ForestAmbienceManager.Instance?.RequestSilence(this, 1f, SilencePriority);
 
 		var top = _original.GetNodeOrNull<Node3D>("TopTrigger");
 		Vector3 dest = (top?.GlobalPosition ?? _original.GlobalPosition) + new Vector3(0, 0.1f, 1.0f);
 		float climbSeconds = GameSettings.Instance.AutoTest ? ClimbSecondsAutoTest : ClimbSecondsReal;
 
+		// "The hum is very loud" on the way up, and "so loud now" at the top (STORY.md Act 11).
+		var hum = StairsHum.Instance;
+		var humTween = CreateTween();
+		humTween.TweenMethod(Callable.From<float>(db => hum?.SetOverrideDb(db)), ClimbHumStartDb, ClimbHumTopDb, climbSeconds);
+
 		var tween = player.CreateTween();
 		tween.TweenProperty(player, "global_position", dest, climbSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-		await player.ToSignal(tween, Tween.SignalName.Finished);
+		await Cutscene.Tween(this, tween, ct);
 
 		Vector3 fwd = -_original.GlobalTransform.Basis.Z; fwd.Y = 0;
 		if (fwd.LengthSquared() < 0.01f) fwd = Vector3.Forward; else fwd = fwd.Normalized();
@@ -192,34 +238,45 @@ public partial class Act11Ending : Node3D
 		skin.SetShaderParameter("wetness", 0.4f);
 		skin.SetShaderParameter("eye_color", new Color(1f, 0.04f, 0.02f));
 		skin.SetShaderParameter("eye_glow", 0f);
-		var body = new StalkerBody { Skin = skin, Size = BodyScale, SwaySeconds = 26f, SwayDegrees = 0.5f, HeadDriftDegrees = 0.8f };
+		var body = new StalkerBody { Name = "Act11Giant", Skin = skin, Size = BodyScale, SwaySeconds = 26f, SwayDegrees = 0.5f, HeadDriftDegrees = 0.8f };
 		// Must be in the tree before GlobalPosition/LookAt, or Godot can't resolve the transform.
-		GetTree().Root.AddChild(body);
-		body.GlobalPosition = giantStart;
-		body.LookAt(player.GlobalPosition, Vector3.Up);
+		Cutscene.SceneRoot(this).AddChild(body);
+		Tween louder = null;
+		try
+		{
+			body.GlobalPosition = giantStart;
+			body.LookAt(player.GlobalPosition, Vector3.Up);
 
-		await PanTowards(player, body.GlobalPosition, 2.2f);
-		await Wait(1.2);
+			await StoryBeat.PanTowards(this, player, body.GlobalPosition, 2.2f, ct);
+			await Cutscene.Wait(this, 1.2, ct);
 
-		var eyeTween = CreateTween();
-		eyeTween.TweenMethod(Callable.From<float>(v => skin.SetShaderParameter("eye_glow", v)), 0f, 7.5f, 2.4f);
-		await ToSignal(eyeTween, Tween.SignalName.Finished);
-		await Wait(1.6);
+			var eyeTween = body.CreateTween();
+			eyeTween.TweenMethod(Callable.From<float>(v => skin.SetShaderParameter("eye_glow", v)), 0f, 7.5f, 2.4f);
+			louder = CreateTween();
+			louder.TweenMethod(Callable.From<float>(db => hum?.SetOverrideDb(db)), ClimbHumTopDb, EncounterHumDb, 4f);
+			await Cutscene.Tween(this, eyeTween, ct);
+			await Cutscene.Wait(this, 1.6, ct);
 
-		Vector3 toPlayer = player.GlobalPosition - body.GlobalPosition; toPlayer.Y = 0;
-		Vector3 closeSpot = body.GlobalPosition + toPlayer.Normalized() * Mathf.Max(0f, toPlayer.Length() - 2.4f);
-		float approachSeconds = GameSettings.Instance.AutoTest ? ApproachSecondsAutoTest : ApproachSecondsReal;
-		var approach = CreateTween();
-		approach.TweenProperty(body, "global_position", closeSpot, approachSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-		await ToSignal(approach, Tween.SignalName.Finished);
+			Vector3 toPlayer = player.GlobalPosition - body.GlobalPosition; toPlayer.Y = 0;
+			Vector3 closeSpot = body.GlobalPosition + toPlayer.Normalized() * Mathf.Max(0f, toPlayer.Length() - 2.4f);
+			float approachSeconds = GameSettings.Instance.AutoTest ? ApproachSecondsAutoTest : ApproachSecondsReal;
+			var approach = body.CreateTween();
+			approach.TweenProperty(body, "global_position", closeSpot, approachSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+			await Cutscene.Tween(this, approach, ct);
 
-		var fader = GetTree().Root.FindChild("ScreenFader", true, false) as ScreenFader;
-		if (fader != null) await fader.Fade(1f, 0.25f);
-		body.QueueFree();
-		await Wait(1.0);
+			var fader = StoryBeat.Fader(this);
+			if (fader != null) await fader.Fade(1f, 0.25f);
+		}
+		finally
+		{
+			if (IsInstanceValid(body)) body.QueueFree();
+		}
+		louder?.Kill();
+		hum?.SetOverrideDb(null);   // cut with the blackout; proximity takes over again in the clearing
+		await Cutscene.Wait(this, 1.0, ct);
 
-		if (ForestAmbienceManager.Instance != null) ForestAmbienceManager.Instance.SilenceOverride = -1f;
-		if (GetTree().Root.FindChild("Atmosphere", true, false) is ForestAtmosphere atmo)
+		ForestAmbienceManager.Instance?.ReleaseSilence(this);
+		if (StoryBeat.Atmosphere(this) is { } atmo)
 		{
 			atmo.ClearHeightFog(0.1f);
 			atmo.SetMood(ForestAtmosphere.Mood.Dawn, 0.1f);
@@ -230,12 +287,10 @@ public partial class Act11Ending : Node3D
 		if (terrain != null) wake.Y = terrain.HeightAt(wake.X, wake.Z);
 		player.Teleport(wake + new Vector3(0, 0.15f, 0), 0f);
 
-		if (fader != null) await fader.Fade(0f, 1.4f);
-		player.SetPhysicsProcess(true);
-		player.PlayerInput.SetEnabled(true);
+		if (StoryBeat.Fader(this) is { } f2) await f2.Fade(0f, 1.4f);
 
-		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act11GiantEncounter, player.GlobalPosition, player.CameraRig.Yaw);
-		if (fader != null) await fader.ShowCaption("", "Morning. You don't remember how you got here.", 1.4f, 3.6f, 1.4f);
+		StoryBeat.ReachCheckpoint(player, Checkpoint.Act11GiantEncounter);
+		Cutscene.Run(this, _ => StoryBeat.Caption(this, "Morning. You don't remember how you got here.", 1.4f, 3.6f, 1.4f));
 		GD.Print("[story] Act 11: the giant touches the player");
 	}
 
@@ -248,10 +303,11 @@ public partial class Act11Ending : Node3D
 	/// </summary>
 	private Vector3 FindSafeWakeSpot()
 	{
-		Vector3 center = _clearing?.GlobalPosition ?? _original.GlobalPosition;
+		var clearing = GetTree().GetFirstNodeInGroup("stairs_clearing_marker") as Node3D;
+		Vector3 center = clearing?.GlobalPosition ?? _original.GlobalPosition;
 		var hazards = new System.Collections.Generic.List<Vector3>();
 		foreach (var n in GetTree().GetNodesInGroup("act6_mini_stairs"))
-			if (n is Node3D n3) hazards.Add(n3.GlobalPosition);
+			if (n is Node3D n3 && !n3.IsQueuedForDeletion()) hazards.Add(n3.GlobalPosition);
 		if (_original != null) hazards.Add(_original.GlobalPosition);
 
 		bool Clear(Vector3 p)
@@ -274,25 +330,4 @@ public partial class Act11Ending : Node3D
 		}
 		return center;   // every ring failed (implausible) — a rare overlap beats an unbounded search
 	}
-
-	/// <summary>Turns the player's own view toward a point over time — a scripted look, not input,
-	/// so it works the same with PlayerInput disabled (mirrors AutoTest's own camera steering).</summary>
-	private async Task PanTowards(PlayerController player, Vector3 target, float seconds)
-	{
-		double t = 0;
-		while (t < seconds)
-		{
-			Vector3 to = target - player.GlobalPosition; to.Y = 0;
-			if (to.LengthSquared() > 0.01f)
-			{
-				float want = Mathf.Atan2(-to.X, -to.Z);
-				float diff = Mathf.AngleDifference(player.CameraRig.Yaw, want);
-				player.PlayerInput.AddScriptedLook(new Vector2(Mathf.Clamp(diff, -0.06f, 0.06f), 0));
-			}
-			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-			t += GetProcessDeltaTime();
-		}
-	}
-
-	private async Task Wait(double seconds) => await ToSignal(GetTree().CreateTimer(seconds, true, true), SceneTreeTimer.SignalName.Timeout);
 }

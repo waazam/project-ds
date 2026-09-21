@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
+[ext_resource type="Script" path="res://scripts/world/bunkerparts/BunkerPreview.cs" id="3_preview"]
+
+[node name="BunkerPreview" type="Node3D"]
+
+[node name="ForestWorld" parent="." instance=ExtResource("1_world")]
+
+[node name="Hud" parent="." instance=ExtResource("2_hud")]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+fov = 70.0
+near = 0.05
+far = 400.0
+current = true
+
+[node name="Preview" type="Node3D" parent="."]
+script = ExtResource("3_preview")
+CameraPath = NodePath("../Camera3D")

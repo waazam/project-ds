@@ -1,0 +1,17 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/world/ItemsPreview.cs" id="4_preview"]
+
+[node name="ItemsPreview" type="Node3D"]
+
+[node name="ForestWorld" parent="." instance=ExtResource("1_world")]
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+
+[node name="Hud" parent="." instance=ExtResource("3_hud")]
+
+[node name="Preview" type="Node3D" parent="."]
+script = ExtResource("4_preview")

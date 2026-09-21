@@ -145,9 +145,81 @@ public sealed class Reverb
 	}
 }
 
+/// <summary>
+/// Soft hall: a short pre-delay, three diffusing allpasses, then an 8-line feedback delay network
+/// (Householder mixing, one-pole damping per line) with its decay set as an RT60 in seconds.
+/// Much larger and smoother than <see cref="Reverb"/>; used for the choir and the weather.
+/// </summary>
+public sealed class Hall
+{
+	readonly double[][] _d; readonly int[] _i; readonly double[] _g, _lp;
+	readonly double[][] _ap; readonly int[] _ai;
+	readonly double[] _pre; int _pi;
+	readonly double _damp;
+	public Hall(int sr, double rt60, double damp = 0.4, double preDelayMs = 30, double size = 1.0)
+	{
+		double[] ms = { 43.1, 51.7, 61.3, 68.9, 77.5, 86.3, 97.1, 107.9 };
+		_d = ms.Select(m => new double[Math.Max(1, (int)(m * size * sr / 1000))]).ToArray();
+		_i = new int[ms.Length]; _lp = new double[ms.Length];
+		_g = _d.Select(b => Math.Pow(10, -3.0 * b.Length / sr / rt60)).ToArray();
+		double[] apMs = { 4.7, 7.3, 11.3 };
+		_ap = apMs.Select(m => new double[Math.Max(1, (int)(m * sr / 1000))]).ToArray();
+		_ai = new int[apMs.Length];
+		_pre = new double[Math.Max(1, (int)(preDelayMs * sr / 1000))];
+		_damp = damp;
+	}
+	public double P(double x)
+	{
+		double v = _pre[_pi]; _pre[_pi] = x; _pi = (_pi + 1) % _pre.Length;
+		for (int k = 0; k < _ap.Length; k++)
+		{
+			var b = _ap[k]; int i = _ai[k];
+			double bo = b[i], w = v + bo * 0.6;
+			b[i] = w; v = bo - 0.6 * w;
+			_ai[k] = (i + 1) % b.Length;
+		}
+		int n = _d.Length;
+		double sum = 0, o = 0;
+		for (int k = 0; k < n; k++)
+		{
+			double y = _d[k][_i[k]];
+			_lp[k] = y * (1 - _damp) + _lp[k] * _damp;
+			sum += _lp[k];
+			o += (k % 2 == 0 ? 1 : -1) * _lp[k];
+		}
+		double h = 2.0 / n * sum;
+		for (int k = 0; k < n; k++)
+		{
+			_d[k][_i[k]] = v * 0.35 + _g[k] * (_lp[k] - h);
+			_i[k] = (_i[k] + 1) % _d[k].Length;
+		}
+		return o * 0.5;
+	}
+}
+
 public static class Dsp
 {
 	public const double TwoPi = Math.PI * 2;
+
+	/// <summary>
+	/// Runs a periodic signal through a stateful chain (filters, reverb) as if it had always been
+	/// looping: <paramref name="laps"/>-1 warm-up laps, then the output of the last lap. The result
+	/// loops seamlessly, reverb tails from the end included, as long as the tail is shorter than a lap.
+	/// </summary>
+	public static double[] Circular(double[] x, Func<double, double> chain, int laps = 2)
+	{
+		for (int l = 0; l < laps - 1; l++) foreach (var v in x) chain(v);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) o[i] = chain(x[i]);
+		return o;
+	}
+
+	/// <summary>Adds <paramref name="len"/> samples of <paramref name="gen"/>(i) at <paramref name="start"/>, wrapping around the buffer.</summary>
+	public static void AddEvent(double[] buf, int start, int len, Func<int, double> gen)
+	{
+		int n = buf.Length;
+		for (int i = 0; i < len; i++) buf[(((start + i) % n) + n) % n] += gen(i);
+	}
 
 	public static double Db(double lin) => 20 * Math.Log10(Math.Max(lin, 1e-12));
 	public static double FromDb(double db) => Math.Pow(10, db / 20);

@@ -1,4 +1,6 @@
 using Godot;
+using ProjectDS.Player;
+using ProjectDS.Systems;
 
 namespace ProjectDS.Audio;
 
@@ -7,7 +9,8 @@ namespace ProjectDS.Audio;
 /// gunshot while crossing the bridge). The sound comes from a fixed compass
 /// direction far away. Distance attenuation is off, so it arrives at full
 /// weight but still pans to where it came from. It can startle the forest into
-/// a temporary hush.
+/// a temporary hush. The place is a trigger volume (radius <see cref="Radius"/>
+/// around the target), not a per-frame distance check; the delay is pausable.
 /// </summary>
 public partial class SoundEvent : Node
 {
@@ -26,16 +29,13 @@ public partial class SoundEvent : Node
 
 	public bool Fired { get; private set; }
 
-	private Node3D _target;
-	private Node3D _player;
 	private AudioStreamPlayer3D _voice;
-	private double _fireAt = -1;
-	private double _clock;
+	private Area3D _trigger;
 
 	public override void _Ready()
 	{
-		_target = GetNodeOrNull<Node3D>(TargetPath);
-		if (_target == null) GD.PushWarning($"SoundEvent {Name}: no target at {TargetPath}");
+		var target = GetNodeOrNull<Node3D>(TargetPath);
+		if (target == null) GD.PushWarning($"SoundEvent {Name}: no target at {TargetPath}");
 		_voice = new AudioStreamPlayer3D
 		{
 			Bus = Bus,
@@ -47,28 +47,24 @@ public partial class SoundEvent : Node
 		if (ResourceLoader.Exists(SoundPath)) _voice.Stream = GD.Load<AudioStream>(SoundPath);
 		else GD.PushWarning($"SoundEvent {Name}: missing {SoundPath}");
 		AddChild(_voice);
+		// Deferred: the level is still readying when this runs.
+		if (target != null)
+			Callable.From(() => _trigger = StoryBeat.MakeTrigger(target, new CylinderShape3D { Radius = Radius, Height = 40f }, Vector3.Zero, OnEntered, $"{Name}Trigger")).CallDeferred();
 	}
 
-	public override void _Process(double delta)
+	private void OnEntered(PlayerController player)
 	{
-		_clock += delta;
-		if (Fired || _target == null) return;
-		_player ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
-		if (_player == null) return;
-
-		if (_fireAt < 0)
-		{
-			var d = new Vector2(_player.GlobalPosition.X - _target.GlobalPosition.X, _player.GlobalPosition.Z - _target.GlobalPosition.Z);
-			if (d.Length() <= Radius) _fireAt = _clock + GD.RandRange(DelaySeconds.X, DelaySeconds.Y);
-			return;
-		}
-		if (_clock < _fireAt) return;
-
+		if (Fired) return;
 		Fired = true;
-		GD.Print($"[event] {Name} fired");
-		var dir = new Vector3(FromDirection.X, 0f, FromDirection.Z).Normalized();
-		_voice.GlobalPosition = _player.GlobalPosition + dir * 60f + Vector3.Up * 4f;
-		_voice.Play();
-		if (StartleStrength > 0f) ForestAmbienceManager.Instance?.Startle(StartleStrength, StartleSeconds);
+		_trigger?.QueueFree();
+		Cutscene.Run(this, async ct =>
+		{
+			await Cutscene.Wait(this, GD.RandRange(DelaySeconds.X, DelaySeconds.Y), ct);
+			GD.Print($"[event] {Name} fired");
+			var dir = new Vector3(FromDirection.X, 0f, FromDirection.Z).Normalized();
+			_voice.GlobalPosition = player.GlobalPosition + dir * 60f + Vector3.Up * 4f;
+			_voice.Play();
+			if (StartleStrength > 0f) ForestAmbienceManager.Instance?.Startle(StartleStrength, StartleSeconds);
+		});
 	}
 }

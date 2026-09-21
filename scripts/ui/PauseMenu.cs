@@ -4,12 +4,14 @@ using ProjectDS.Systems;
 namespace ProjectDS.UI;
 
 /// <summary>
-/// Esc / Start: pauses the game and shows camera settings. Placeholder-grade
-/// UI built in code, to be replaced by the final menu later.
+/// Esc / Start: pauses the game and shows the settings. The world stays visible
+/// under a near-black fog wash; a serif heading, the shared settings rows and
+/// plain-text actions, all in the UiKit theme.
 /// </summary>
 public partial class PauseMenu : CanvasLayer
 {
 	private Control _root;
+	private MenuItem _resume;
 	public bool Locked;   // e.g. during the ending
 
 	public override void _Ready()
@@ -44,37 +46,34 @@ public partial class PauseMenu : CanvasLayer
 
 	private void Build()
 	{
-		_root = new ColorRect { Color = new Color(0, 0, 0, 0.72f) };
+		_root = UiKit.Apply(new Control { MouseFilter = Control.MouseFilterEnum.Stop });
 		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_root);
 
-		var box = new VBoxContainer();
+		// Fog wash: darker at the edges, a little of the world still showing through the middle.
+		var wash = new ColorRect { Color = new Color(UiKit.Night, 0.86f), MouseFilter = Control.MouseFilterEnum.Ignore };
+		wash.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_root.AddChild(wash);
+		_root.AddChild(MenuBackdrop.MakeVignette(0.6f));
+
+		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
 		box.SetAnchorsPreset(Control.LayoutPreset.Center);
-		box.OffsetLeft = -120; box.OffsetRight = 120; box.OffsetTop = -95; box.OffsetBottom = 95;
+		box.OffsetLeft = -135; box.OffsetRight = 135; box.OffsetTop = -120; box.OffsetBottom = 120;
+		box.GrowHorizontal = Control.GrowDirection.Both; box.GrowVertical = Control.GrowDirection.Both;
 		box.AddThemeConstantOverride("separation", 5);
 		_root.AddChild(box);
 
-		var title = new Label { Text = "PAUSED", HorizontalAlignment = HorizontalAlignment.Center };
-		title.AddThemeFontSizeOverride("font_size", 14);
-		box.AddChild(title);
+		box.AddChild(UiKit.MakeLabel("PAUSED", UiKit.HeadingLabel, HorizontalAlignment.Center));
+		box.AddChild(UiKit.Rule(150));
+		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
 
-		var s = GameSettings.Instance;
-		UiKit.AddSlider(box, "Master volume", 0.0, 1.0, s.MasterVolume, v => s.MasterVolume = (float)v);
-		UiKit.AddSlider(box, "Mouse sensitivity", 0.0005, 0.008, s.MouseSensitivity, v => s.MouseSensitivity = (float)v);
-		UiKit.AddSlider(box, "Stick sensitivity", 0.8, 5.0, s.StickSensitivity, v => s.StickSensitivity = (float)v);
-		if (s.Camera == CameraMode.ThirdPerson)
-			UiKit.AddSlider(box, "Camera distance", 1.6, 5.5, s.CameraDistance, v => s.CameraDistance = (float)v);
+		UiKit.AddSettingsRows(box);
 
-		var invert = new CheckBox { Text = "Invert Y", ButtonPressed = s.InvertY };
-		invert.AddThemeFontSizeOverride("font_size", 9);
-		invert.Toggled += on => s.InvertY = on;
-		box.AddChild(invert);
-
-		var resume = UiKit.MakeButton("Resume", () => SetOpen(false));
-		box.AddChild(resume);
-		box.AddChild(UiKit.MakeButton("Quit to Menu", () => { GameSettings.Instance.Save(); StoryManager.Instance.ReturnToMenu(); }));
-		box.AddChild(UiKit.MakeButton("Quit", () => GetTree().Quit()));
-		resume.CallDeferred(Control.MethodName.GrabFocus);
-		_root.VisibilityChanged += () => { if (_root.Visible) resume.GrabFocus(); };
+		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
+		_resume = UiKit.MakeButton("Resume", () => SetOpen(false), true);
+		box.AddChild(_resume);
+		box.AddChild(UiKit.MakeButton("Quit to Menu", () => { GameSettings.Instance.Save(); StoryManager.Instance.ReturnToMenu(); }, true));
+		box.AddChild(UiKit.MakeButton("Quit", () => GetTree().Quit(), true));
+		_root.VisibilityChanged += () => { if (_root.Visible) _resume.CallDeferred(Control.MethodName.GrabFocus); };
 	}
 }

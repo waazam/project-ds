@@ -11,18 +11,14 @@ namespace ProjectDS.World;
 /// reacts during that specific window, so the bridge stays a normal part of
 /// the trail the rest of the time.
 /// </summary>
-public partial class BridgeCrossEvent : Area3D
+public partial class BridgeCrossEvent : StoryTrigger
 {
-	private bool _fired;
+	protected override bool AlreadyHappened(StoryManager s) => s.Current >= Checkpoint.Act6BridgeCrossed;
+	protected override bool CanFire(StoryManager s, PlayerController p) => s is { NewelPostTaken: true, Current: Checkpoint.Act5CabinEntered };
 
-	public override void _Ready() => BodyEntered += OnEntered;
-
-	private void OnEntered(Node3D body)
+	protected override void Fire(PlayerController player)
 	{
-		if (_fired || body is not PlayerController player) return;
-		if (StoryManager.Instance is not { NewelPostTaken: true, Current: Checkpoint.Act5CabinEntered }) return;
-		_fired = true;
-		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act6BridgeCrossed, player.GlobalPosition, player.CameraRig.Yaw);
+		StoryBeat.ReachCheckpoint(player, Checkpoint.Act6BridgeCrossed);
 		GD.Print("[story] Act 6: the bridge is crossed");
 	}
 }

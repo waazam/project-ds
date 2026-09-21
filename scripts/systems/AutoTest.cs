@@ -24,7 +24,15 @@ namespace ProjectDS.Systems;
 /// </summary>
 public partial class AutoTest : Node
 {
-	private const string OutDir = "res://test-output";
+	/// <summary>test-output/, or test-output/NAME with `--test-out=NAME` on the command line.</summary>
+	private static readonly string OutDir = OutputDir();
+
+	internal static string OutputDir()
+	{
+		foreach (var a in OS.GetCmdlineUserArgs())
+			if (a.StartsWith("--test-out=")) return "res://test-output/" + a["--test-out=".Length..];
+		return "res://test-output";
+	}
 	private PlayerController _player;
 	private PlayerInput _input;
 	private GameFlow _flow;
@@ -42,7 +50,16 @@ public partial class AutoTest : Node
 		DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(OutDir));
 		// Keep the editor from importing screenshots as project assets.
 		using (FileAccess.Open($"{OutDir}/.gdignore", FileAccess.ModeFlags.Write)) { }
-		_ = Run();
+		Cutscene.Run(this, async _ =>
+		{
+			try { await Run(); }
+			catch (System.Exception e) when (e is not System.OperationCanceledException)
+			{
+				// A crash in the walkthrough is a failure, never a silent hang.
+				Check("walkthrough ran without an exception", false, e.ToString());
+				Finish();
+			}
+		});
 	}
 
 	public override void _Process(double delta)
@@ -160,8 +177,10 @@ public partial class AutoTest : Node
 		float walk = _player.GroundSpeed;
 		await Drive(new Vector2(0, 1), true, 2.5);
 		float run = _player.GroundSpeed;
-		Check("walks", walk > 1.5f && walk < 2.3f, $"{walk:0.00} m/s");
-		Check("runs", run > 4.0f && run < 5.2f, $"{run:0.00} m/s");
+		Check("walks", Mathf.Abs(walk - _player.WalkSpeed) < 0.4f, $"{walk:0.00} m/s");
+		Check("runs", Mathf.Abs(run - _player.RunSpeed) < 0.6f, $"{run:0.00} m/s");
+		if (_player.GetNodeOrNull<PlayerStamina>("Stamina") is { } stamina)
+			Check("running drains stamina (scripted input too)", stamina.Value < 0.9f, $"stamina {stamina.Value:0.00}");
 		Check("moved from spawn", start.DistanceTo(_player.GlobalPosition) > 8f, $"{start.DistanceTo(_player.GlobalPosition):0.0} m");
 		await Drive(new Vector2(-1, 0), false, 1.0);   // strafe
 		await Drive(new Vector2(0, -1), false, 1.0);   // back toward camera
@@ -260,8 +279,8 @@ public partial class AutoTest : Node
 		{
 			var node = cabin?.GetNodeOrNull<Node3D>(pickup);
 			if (node == null) continue;
-			await GoTo(node.GlobalPosition, 0.8f);
-			await Tap("interact", 0.15);
+			await GoTo(node.GlobalPosition, 1.2f);
+			await InteractAt(AimPoint(node));
 		}
 		Check("lantern equipped", inv.HasLantern, "");
 		Check("compass equipped", inv.HasCompass, "");
@@ -297,21 +316,22 @@ public partial class AutoTest : Node
 		Check("axe placed in the world", axe != null, $"{axe?.GlobalPosition}");
 		if (axe != null)
 		{
-			await GoTo(axe.GlobalPosition, 0.8f);
-			await Tap("interact", 0.15);
+			await GoTo(axe.GlobalPosition, 1.2f);
+			await InteractAt(AimPoint(axe));
 		}
-		Check("axe picked up", inv.CurrentTool == ToolKind.Axe, $"{inv.CurrentTool}");
+		Check("axe picked up", inv.HasTool(ToolKind.Axe), inv.Serialize());
 
 		await GoTo(cabin.WideApproachPoint, 2.0f);
 		await GoTo(cabin.ApproachPoint, 1.0f);
-		await GoTo(cabin.DoorCenter, 0.9f);
-		Input.ActionPress("interact");
-		await Wait(0.1);
-		Input.ActionRelease("interact");
+		// Stand a pace out from the door and look at the boards: the break-in is an Interactable
+		// under the crosshair now (a press with the axe; a hammer would need the full hold).
+		await GoTo(cabin.DoorCenter, 1.6f);
+		_input.ScriptedMove = Vector2.Zero;
+		await InteractAt(cabin.DoorCenter, 0.2);
 		double openWait = 0;
 		while (!cabin.IsOpen && openWait < 8) { await Wait(0.25); openWait += 0.25; }
 		Check("door chopped open with the axe", cabin.IsOpen, $"after {openWait:0.1}s");
-		Check("axe consumed", inv.CurrentTool == ToolKind.None, $"{inv.CurrentTool}");
+		Check("axe consumed", !inv.HasTool(ToolKind.Axe), inv.Serialize());
 		_input.ScriptedMove = Vector2.Zero;
 		await GoTo(cabin.ApproachPoint, 1.0f);
 		_input.ScriptedMove = Vector2.Zero;
@@ -325,8 +345,9 @@ public partial class AutoTest : Node
 		// just inside (as a scripted entry would) so the reveal logic itself still gets exercised.
 		Vector3 insideTarget = cabin.ToGlobal(new Vector3(0.3f, 0f, -0.8f));
 		bool atDoor = await GoTo(cabin.DoorCenter, 0.6f);
-		if (atDoor) await GoTo(insideTarget, 1.0f);
-		else { insideTarget.Y = _player.GlobalPosition.Y; _player.GlobalPosition = insideTarget; await Frame(); }
+		bool walkedIn = atDoor && await GoTo(insideTarget, 1.0f);
+		Check("walked in through the doorway", walkedIn, walkedIn ? "" : $"stuck at {_player.GlobalPosition}; placing inside");
+		if (!walkedIn) { insideTarget.Y = _player.GlobalPosition.Y; _player.GlobalPosition = insideTarget; await Frame(); }
 		double revealWait = 0;
 		while (StoryManager.Instance.Current < Checkpoint.Act5CabinEntered && revealWait < 24) { await Wait(0.25); revealWait += 0.25; }
 		Screenshot("friend_found");
@@ -389,7 +410,7 @@ public partial class AutoTest : Node
 		// The bunker's own Y doesn't carry over to a point 18 m away on uneven ground — sample the
 		// terrain there directly (as any real placement in this game does) rather than teleporting
 		// blind and hoping gravity sorts it out.
-		Vector3 spot = bunkerNode.GlobalPosition + new Vector3(0, 0, 18f);
+		Vector3 spot = bunkerNode.GlobalTransform * new Vector3(0, 0, 18f);
 		if (GetTree().GetFirstNodeInGroup("terrain") is ForestTerrain terrain)
 			spot.Y = terrain.HeightAt(spot.X, spot.Z) + 0.2f;
 		_player.GlobalPosition = spot;
@@ -420,7 +441,7 @@ public partial class AutoTest : Node
 		var bunkerNode = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
 		Check("bunker found for skip-to-act11", bunkerNode != null, $"{bunkerNode?.GlobalPosition}");
 		if (bunkerNode == null) return;
-		Vector3 spot = bunkerNode.GlobalPosition + new Vector3(0, 0, 16f);
+		Vector3 spot = bunkerNode.GlobalTransform * new Vector3(0, 0, 16f);
 		if (GetTree().GetFirstNodeInGroup("terrain") is ForestTerrain terrain)
 			spot.Y = terrain.HeightAt(spot.X, spot.Z) + 0.2f;
 		_player.GlobalPosition = spot;
@@ -450,22 +471,17 @@ public partial class AutoTest : Node
 			if (cabinNode != null)
 			{
 				await GoTo(cabinNode.WideApproachPoint, 2.0f);
-				var trailNearCabin = AllTrailWaypoints();
-				if (trailNearCabin.Count > 0)
-				{
-					Vector3 nearest = trailNearCabin[0]; float best = float.MaxValue;
-					foreach (var p in trailNearCabin)
-					{
-						float d = Flat(p).DistanceTo(Flat(cabinNode.GlobalPosition));
-						if (d < best) { best = d; nearest = p; }
-					}
-					_player.GlobalPosition = nearest;
-					await Frame();
-				}
+				await ReachTrailNear(cabinNode);
 			}
 			var toBunker = BuildTrailRouteTo(bunkerNode.GlobalPosition);
-			for (int i = 0; i < toBunker.Count && !BunkerEntered(); i++)
-				await GoTo(toBunker[i], i == toBunker.Count - 1 ? 1.0f : 3.0f, BunkerEntered);
+			for (int i = 0; i < toBunker.Count - 1 && !BunkerEntered(); i++)
+				await GoTo(toBunker[i], 3.0f, BunkerEntered);
+			// In through the door: the apron in front of it, then the doorway trigger just inside the hatch.
+			if (bunkerNode is Bunker bunker)
+			{
+				if (!BunkerEntered()) await GoTo(bunker.ApproachPointWorld, 0.8f, BunkerEntered);
+				if (!BunkerEntered()) await GoTo(bunker.EntryPointWorld, 0.3f, BunkerEntered);
+			}
 		}
 		Screenshot("bunker_found");
 		double bunkerWait = 0;
@@ -491,7 +507,7 @@ public partial class AutoTest : Node
 		Check("walked the length of the hallway", reachedDoor, $"{_player.GlobalPosition}");
 		Check("hallway lights commit to red by the far end", bunkerInt.RedTriggered, "");
 		Check("player standing in the vine door's trigger zone", bunkerInt.PlayerAtVineDoor, $"{_player.GlobalPosition}");
-		await Tap("interact", 0.15);
+		await InteractAt(bunkerInt.VineDoorInteractWorld);
 		Check("vine door pushed open", bunkerInt.VineDoorOpenState, "");
 		bool reachedCrtRoom = await GoTo(bunkerInt.CrtRoomInteriorWorld, 1.2f);
 		Check("walked into the CRT room", reachedCrtRoom, $"{_player.GlobalPosition}");
@@ -500,7 +516,7 @@ public partial class AutoTest : Node
 		bool reachedCrtTarget = await GoTo(bunkerInt.CrtTargetApproachWorld, 1.0f);
 		Check("reached the target screen", reachedCrtTarget, $"{_player.GlobalPosition} vs {bunkerInt.CrtTargetApproachWorld}");
 		Check("in range to interact with the target screen", bunkerInt.PlayerAtCrtTarget, "");
-		await Tap("interact", 0.15);
+		await InteractAt(bunkerInt.CrtSwitchWorld);
 		await Wait(0.3);
 		Check("all the screens go dark", bunkerInt.ScreensOff, "");
 		double crtWait = 0;
@@ -533,8 +549,8 @@ public partial class AutoTest : Node
 		Check("walkie-talkie dropped at the maze exit", walkie != null, $"{walkie?.GlobalPosition}");
 		if (walkie != null)
 		{
-			await GoTo(walkie.GlobalPosition, 0.8f);
-			await Tap("interact", 0.15);
+			await GoTo(walkie.GlobalPosition, 1.2f);
+			await InteractAt(AimPoint(walkie));
 		}
 		double walkieWait = 0;
 		while (StoryManager.Instance.Current < Checkpoint.Act10WalkieFound && walkieWait < 5) { await Wait(0.25); walkieWait += 0.25; }
@@ -591,8 +607,8 @@ public partial class AutoTest : Node
 		Check("newel post placed on the table", newelNode != null, $"{newelNode?.GlobalPosition}");
 		if (newelNode != null)
 		{
-			await GoTo(newelNode.GlobalPosition, 0.8f);
-			await Tap("interact", 0.15);
+			await GoTo(newelNode.GlobalPosition, 1.2f);
+			await InteractAt(AimPoint(newelNode));
 		}
 		Check("newel post taken", inv.HasNewelPost, "");
 		var bridgeMarker = GetTree().GetFirstNodeInGroup("bridge_marker") as Node3D;
@@ -616,19 +632,8 @@ public partial class AutoTest : Node
 		// tight enough against each other that the bot's blind steering can get boxed in
 		// trying to path around both from right behind the cabin (a real player just looks
 		// and walks around them); the storm/dawn trigger above already proves the actual exit
-		// mechanic works, so snap onto the open trail itself before following it to the bridge.
-		var trailNearCabin = AllTrailWaypoints();
-		if (trailNearCabin.Count > 0)
-		{
-			Vector3 nearest = trailNearCabin[0]; float best = float.MaxValue;
-			foreach (var p in trailNearCabin)
-			{
-				float d = Flat(p).DistanceTo(Flat(cabin.GlobalPosition));
-				if (d < best) { best = d; nearest = p; }
-			}
-			_player.GlobalPosition = nearest;
-			await Frame();
-		}
+		// mechanic works, so get onto the open trail itself before following it to the bridge.
+		await ReachTrailNear(cabin);
 		Check("bridge placed in the world", bridgeMarker != null, $"{bridgeMarker?.GlobalPosition}");
 		if (bridgeMarker != null)
 		{
@@ -707,13 +712,53 @@ public partial class AutoTest : Node
 		Check("checkpoint 6 saved to disk", save6 != null && save6.Checkpoint >= Checkpoint.Act7CabinBurning, $"{save6?.Checkpoint}");
 	}
 
-	/// <summary>Presses and releases an input action, as a real key tap would (for interact-driven pickups/puzzles).</summary>
-	private async Task Tap(string action, double holdSeconds)
+	/// <summary>
+	/// Looks at <paramref name="target"/> (interaction is decided by the centre-screen crosshair) and
+	/// holds E through PlayerInput's scripted button for <paramref name="holdSeconds"/> (at least a
+	/// few frames; the Pressed edge fires on the first). Hold-to-use interactables need their full
+	/// HoldSeconds here.
+	/// </summary>
+	private async Task InteractAt(Vector3 target, double holdSeconds = 0.08)
 	{
-		Input.ActionPress(action);
+		_input.ScriptedMove = Vector2.Zero;
+		await SnapLookAt(target);
+		await Frame();
+		var interaction = _player.GetNodeOrNull<PlayerInteraction>("Interaction");
+		GD.Print($"[autotest] INFO interact at {target}: focused '{interaction?.Focused?.GetParent()?.Name}' prompt '{interaction?.PromptText}', " +
+			$"eye {_player.CameraRig.Camera.GlobalPosition}, input enabled {_input.Enabled}");
+		_input.ScriptedInteract = true;
+		for (int i = 0; i < 3; i++) await Frame();
 		await Wait(holdSeconds);
-		Input.ActionRelease(action);
+		_input.ScriptedInteract = false;
 		await Wait(0.1);
+	}
+
+	/// <summary>Where to look to focus an object's Interactable: the centre of its pick volume.</summary>
+	private static Vector3 AimPoint(Node3D node)
+	{
+		var use = node.GetNodeOrNull<Interactable>("Interactable") ?? node as Interactable;
+		return use != null ? use.ToGlobal(use.PickOffset) : node.GlobalPosition + Vector3.Up * 0.15f;
+	}
+
+	/// <summary>
+	/// Walks onto the trail waypoint nearest <paramref name="cabin"/> (the cabin and shed sit close
+	/// together, which can box in the bot's straight-line steering). Only if the walk genuinely fails
+	/// does it place the player there, and it says so in the log.
+	/// </summary>
+	private async Task ReachTrailNear(Node3D cabin)
+	{
+		var trail = AllTrailWaypoints();
+		if (trail.Count == 0) return;
+		Vector3 nearest = trail[0]; float best = float.MaxValue;
+		foreach (var p in trail)
+		{
+			float d = Flat(p).DistanceTo(Flat(cabin.GlobalPosition));
+			if (d < best) { best = d; nearest = p; }
+		}
+		if (await GoTo(nearest, 2.0f)) return;
+		GD.Print($"[autotest] INFO could not walk from {_player.GlobalPosition} to the trail at {nearest}; placing the player there");
+		_player.GlobalPosition = nearest;
+		await Frame();
 	}
 
 	private async Task Drive(Vector2 move, bool run, double seconds)
@@ -824,9 +869,9 @@ public partial class AutoTest : Node
 		float wantYaw = Mathf.Atan2(-to.X, -to.Z);
 		float horiz = new Vector2(to.X, to.Z).Length();
 		float wantPitch = Mathf.Atan2(to.Y, horiz);
-		float yawDiff = Mathf.AngleDifference(_player.CameraRig.Yaw, wantYaw);
-		float pitchDiff = wantPitch - _player.CameraRig.Pitch;
-		_input.AddScriptedLook(new Vector2(yawDiff, pitchDiff));
+		// Straight through the rig, so it works whether or not input is currently enabled.
+		_player.CameraRig.SnapBehind(wantYaw);
+		_player.CameraRig.SetPitch(wantPitch);
 		await Frame();
 		await Frame();
 	}
@@ -862,7 +907,8 @@ public partial class AutoTest : Node
 			stuckTimer += 1.0 / 60;
 			if (stuckTimer > 7) return false;
 			SteerCamera(target);
-			// Run until the forest starts to hush, then walk like a nervous person.
+			// Run until the forest starts to hush, then walk like a nervous person. Holding run is all
+			// the bot does about stamina, like a player: an empty tank drops it to a walk until it refills.
 			float s = _amb?.Silence ?? 0;
 			_input.ScriptedRun = s < 0.15f;
 			// A single tree in the way: sidestep around it rather than push straight into it forever.

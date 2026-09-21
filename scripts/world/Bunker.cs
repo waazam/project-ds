@@ -1,36 +1,57 @@
 using Godot;
 using ProjectDS.Player;
 using ProjectDS.Systems;
-using ProjectDS.UI;
+using ProjectDS.World.BunkerParts;
 
 namespace ProjectDS.World;
 
 /// <summary>
-/// A concrete bunker door set into a mound, deep in the woods. Locked and
-/// solid until the cabin has been seen burning (Act 7); the first time the
-/// player then gets close, the door stands open for good. Walking through the
-/// open doorway carries them into the bunker's interior (Act 8) and marks
-/// checkpoint 7. Group "bunker_marker" so the compass can find it.
+/// The bunker's outside: a round vault door in a stepped concrete face, set
+/// into an earth mound deep in the woods. Locked until the cabin has been seen
+/// burning (Act 7); the first time the player then gets close, the door swings
+/// open for good. Walking in through the doorway (a trigger just inside the
+/// hatch) carries them into the bunker's interior (Act 8) and marks checkpoint 7.
+/// Group "bunker_marker" so the compass can find it.
+///
+/// Restore: in _Ready the door is open (silently) if the story is at Act 8 or
+/// later. Entry works every time the open doorway is walked into (a Continue
+/// respawns the player outside), until the walkie has been found.
+/// Geometry lives in <see cref="BunkerExterior"/>.
 /// </summary>
 [Tool]
 [GlobalClass]
 public partial class Bunker : Node3D
 {
 	[Export] public float OpenRadius = 14f;
-	private const float DoorRadius = 0.95f;
 
 	public bool IsOpen { get; private set; }
 
+	/// <summary>A spot on the apron in front of the door, on the ground (the Act 8 checkpoint's respawn point).</summary>
+	public Vector3 ApproachPointWorld
+	{
+		get
+		{
+			var p = ToGlobal(new Vector3(0, 0.3f, 3.2f));
+			if (GetTree()?.GetFirstNodeInGroup("terrain") is ForestTerrain t) p.Y = Mathf.Max(p.Y, t.HeightAt(p.X, p.Z) + 0.1f);
+			return p;
+		}
+	}
+	/// <summary>Camera yaw that faces the door from the apron.</summary>
+	public float ApproachYaw => Mathf.Atan2(GlobalBasis.Z.X, GlobalBasis.Z.Z);
+	/// <summary>A point just inside the doorway, in the entry trigger (walk here to enter).</summary>
+	public Vector3 EntryPointWorld => ToGlobal(new Vector3(0, BunkerExterior.FloorY, -1.05f));
+
 	private Node3D _gen;
-	private MeshInstance3D _doorMesh;
-	private CollisionShape3D _doorCollision;
+	private Node3D _doorNode;
+	private CollisionShape3D _closedCollision, _openCollision;
 	private PlayerController _player;
-	private bool _entered;
 
 	public override void _Ready()
 	{
 		AddToGroup("bunker_marker");
 		Build();
+		if (!Engine.IsEditorHint())
+			SetOpen(StoryManager.Instance is { Current: >= Checkpoint.Act8BunkerEntered });
 	}
 
 	public override void _Process(double delta)
@@ -44,190 +65,155 @@ public partial class Bunker : Node3D
 		Open();
 	}
 
+	/// <summary>Instantly and silently open or shut the door (restore, previews).</summary>
+	public void SetOpen(bool open)
+	{
+		if (_gen == null) return;
+		IsOpen = open;
+		if (_doorNode != null) { _doorNode.QueueFree(); _doorNode = null; }
+		_doorNode = open ? BuildOpenDoor() : BuildClosedDoor();
+		if (_closedCollision != null) _closedCollision.Disabled = open;
+		if (_openCollision != null) _openCollision.Disabled = !open;
+	}
+
+	/// <summary>The story beat: the door grinds open (with its groan) and stays open.</summary>
+	private void Open()
+	{
+		SetOpen(true);
+		BunkerKit.OneShot(_gen, "res://assets/audio/sfx/trunk_creak_02.wav", new Vector3(0, 1f, 0.3f), "Events", 3f, 0.6f, 4f, 40f);
+		GD.Print("[story] the bunker door stands open");
+	}
+
 	public void Build()
 	{
 		var old = GetNodeOrNull("Generated");
 		if (old != null) { RemoveChild(old); old.QueueFree(); }
 		_gen = new Node3D { Name = "Generated" };
 		AddChild(_gen);
+		_doorNode = null;
 
-		var k = new MeshKit();
-		var dirt = ProcTextures.Flat("bunker_dirt", new Color(0.22f, 0.19f, 0.14f), 1f);
-		var concrete = ProcTextures.ConcreteMat;
-		var metal = ProcTextures.MetalMat;
-		var rng = new RandomNumberGenerator { Seed = 55 };
-
-		// Earthen mound the door is set into.
-		k.Color = new Color(0.3f, 0.27f, 0.2f);
-		k.Mat(dirt);
-		k.Blob(new Vector3(0, 1.6f, -1.2f), new Vector3(4.2f, 2.0f, 3.6f), 71, 0.22f, true, 0.5f, 0.3f);
-
-		// Roots and dead vines draping down over the lintel from the mound above, like the reference photo.
-		var root = ProcTextures.Flat("bunker_root", new Color(0.18f, 0.15f, 0.1f), 1f);
-		k.Mat(root);
-		for (int i = 0; i < 9; i++)
+		var terrain = Engine.IsEditorHint() ? null : GetTree()?.GetFirstNodeInGroup("terrain") as ForestTerrain;
+		if (terrain != null)
 		{
-			float x = rng.RandfRange(-1.5f, 1.5f);
-			float shade = rng.RandfRange(0.7f, 1.1f);
-			k.Color = new Color(0.2f * shade, 0.16f * shade, 0.1f * shade);
-			Vector3 top = new(x, 2.55f + rng.RandfRange(-0.1f, 0.15f), rng.RandfRange(-0.15f, 0.15f));
-			Vector3 bot = top + new Vector3(rng.RandfRange(-0.15f, 0.15f), -rng.RandfRange(0.3f, 0.85f), rng.RandfRange(0f, 0.15f));
-			k.Beam(top, bot, rng.RandfRange(0.02f, 0.045f), rng.RandfRange(0.02f, 0.045f));
+			// Sit the door at the level of the ground just in front of it. (GroundSnap uses the lowest point
+			// under the footprint, which on a slope left the door half buried by the ground before it.)
+			// The mound follows the terrain and the concrete reaches well below grade, so nothing floats.
+			var front = ToGlobal(new Vector3(0, 0, 1.2f));
+			var p = GlobalPosition;
+			p.Y = Mathf.Max(p.Y, terrain.HeightAt(front.X, front.Z) - 0.05f);
+			GlobalPosition = p;
 		}
-
-		// Concrete face set into the mound, weathered with moss and rust streaks, plus a small vent window off to one side.
-		k.Mat(concrete);
-		float faceHalf = 1.45f;
-		k.Color = new Color(0.5f, 0.5f, 0.47f);
-		k.Box(new Vector3(0, 1.15f, 0.15f), new Vector3(faceHalf * 2f, 2.3f, 0.3f), 1f);
-		for (int i = 0; i < 10; i++)
+		float TerrainY(float x, float z)
 		{
-			bool moss = rng.Randf() < 0.6f;
-			var stainCol = moss ? new Color(0.28f, 0.34f, 0.2f) : new Color(0.22f, 0.2f, 0.17f);
-			k.Color = stainCol;
-			float sx = rng.RandfRange(-faceHalf + 0.2f, faceHalf - 0.2f);
-			float sy = rng.RandfRange(0.2f, 2.3f);
-			k.Box(new Vector3(sx, sy, 0.301f), new Vector3(rng.RandfRange(0.15f, 0.4f), rng.RandfRange(0.3f, 1.1f), 0.006f), 1f);
+			if (terrain == null) return 0f;
+			var w = ToGlobal(new Vector3(x, 0, z));
+			return terrain.HeightAt(w.X, w.Z) - GlobalPosition.Y;
 		}
-		k.Color = new Color(0.55f, 0.68f, 0.68f);
-		k.Box(new Vector3(-1.0f, 1.75f, 0.31f), new Vector3(0.34f, 0.34f, 0.05f), 1f);
-		k.Color = new Color(0.05f, 0.07f, 0.06f);
-		k.Box(new Vector3(-1.0f, 1.75f, 0.335f), new Vector3(0.24f, 0.24f, 0.03f), 1f);
+		var moundTris = BunkerExterior.BuildMound(_gen, TerrainY, true);
+		BunkerExterior.BuildConcrete(_gen, _gen);
 
-		// A round, dark recess set into the face — the vault door sits inside this like a hatch.
-		k.Color = new Color(0.15f, 0.14f, 0.13f);
-		k.Mat(metal);
-		k.Cylinder(new Vector3(0, 1.05f, 0.28f), new Vector3(0, 1.05f, 0.34f), DoorRadius + 0.12f, DoorRadius + 0.12f, 20, false);
-
-		// Two wall lamps flanking the door, like the reference photo.
-		var lampMetal = ProcTextures.Flat("bunker_lamp", new Color(0.2f, 0.19f, 0.17f), 0.6f);
-		foreach (float x in new[] { -1.55f, 1.55f })
+		if (Engine.IsEditorHint()) return;
+		var body = new StaticBody3D { Name = "BunkerBody", CollisionLayer = 1, CollisionMask = 0 };
+		body.SetMeta("surface", "stone");
+		_gen.AddChild(body);
+		void Box(Vector3 c, Vector3 s) => body.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
+		void BeamBox(Vector3 from, Vector3 to, float width, float height)
 		{
-			k.Color = new Color(0.55f, 0.53f, 0.5f);
-			k.Mat(lampMetal);
-			k.Cylinder(new Vector3(x, 2.05f, 0.3f), new Vector3(x, 2.05f, 0.55f), 0.03f, 0.03f, 6);
-			k.Cylinder(new Vector3(x, 1.95f, 0.55f), new Vector3(x, 1.95f, 0.72f), 0.1f, 0.14f, 8, true);
-			var lamp = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.5f), LightEnergy = 1.6f, OmniRange = 6f, Position = new Vector3(x, 1.9f, 0.75f) };
-			_gen.AddChild(lamp);
+			Vector3 z = (to - from).Normalized();
+			Vector3 x = Vector3.Up.Cross(z).Normalized();
+			Vector3 y = z.Cross(x).Normalized();
+			body.AddChild(new CollisionShape3D
+			{
+				Transform = new Transform3D(new Basis(x, y, z), (from + to) * 0.5f),
+				Shape = new BoxShape3D { Size = new Vector3(width, height, from.DistanceTo(to)) },
+			});
 		}
-
-		k.Color = Colors.White;
-		k.CommitTo(_gen, "BunkerMesh");
-
-		BuildClosedDoor(metal);
-
-		if (!Engine.IsEditorHint())
+		const float gap = 0.55f, fy = BunkerExterior.FloorY, back = BunkerExterior.VestibuleBackZ;
+		// The face, solid either side of and above the doorway.
+		Box(new Vector3(-(gap + 2.75f) * 0.5f, (3.05f + BunkerExterior.Base) * 0.5f, 0.05f), new Vector3(2.75f - gap, 3.05f - BunkerExterior.Base, 0.7f));
+		Box(new Vector3((gap + 2.75f) * 0.5f, (3.05f + BunkerExterior.Base) * 0.5f, 0.05f), new Vector3(2.75f - gap, 3.05f - BunkerExterior.Base, 0.7f));
+		Box(new Vector3(0, 2.6f, 0.05f), new Vector3(gap * 2f, 0.9f, 0.7f));
+		// The vestibule: floor, walls, ceiling and back, a corridor just wider than a person.
+		Box(new Vector3(0, fy - 0.26f, (0.5f + back) * 0.5f), new Vector3(1.2f, 0.52f, 0.5f - back));
+		Box(new Vector3(-0.65f, 1.2f, (-0.3f + back) * 0.5f), new Vector3(0.3f, 2.0f, -0.3f - back));
+		Box(new Vector3(0.65f, 1.2f, (-0.3f + back) * 0.5f), new Vector3(0.3f, 2.0f, -0.3f - back));
+		Box(new Vector3(0, 2.3f, (-0.3f + back) * 0.5f), new Vector3(1.6f, 0.3f, -0.3f - back));
+		Box(new Vector3(0, 1.2f, back - 0.1f), new Vector3(1.6f, 2.4f, 0.2f));
+		// Apron and wing walls.
+		BeamBox(BunkerExterior.ApronFrom, BunkerExterior.ApronTo, 4.8f, 1.0f);
+		foreach (float s in new[] { -1f, 1f })
 		{
-			var body = new StaticBody3D { Name = "BunkerBody", CollisionLayer = 1, CollisionMask = 0 };
-			body.SetMeta("surface", "stone");
-			_gen.AddChild(body);
-			// The mound's own collision must not reach past the concrete face (Z=0.15±0.15) or it
-			// blocks the doorway outright, regardless of the door's own open/closed state.
-			body.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.6f, -1.55f), Shape = new BoxShape3D { Size = new Vector3(4.2f, 3.2f, 2.9f) } });
-			// The concrete face itself is solid either side of the round door opening.
-			body.AddChild(new CollisionShape3D { Position = new Vector3(-1.2f, 1.1f, 0.15f), Shape = new BoxShape3D { Size = new Vector3(0.5f, 2.2f, 0.3f) } });
-			body.AddChild(new CollisionShape3D { Position = new Vector3(1.2f, 1.1f, 0.15f), Shape = new BoxShape3D { Size = new Vector3(0.5f, 2.2f, 0.3f) } });
-			_doorCollision = new CollisionShape3D { Position = new Vector3(0, 1.05f, 0.15f), Shape = new BoxShape3D { Size = new Vector3(DoorRadius * 2f, DoorRadius * 2f, 0.35f) } };
-			body.AddChild(_doorCollision);
-
-			// Generous and omnidirectional on purpose: a real player can walk straight to the modelled
-			// doorway, but this trail-side structure's facing doesn't line up with the direction the
-			// autotest bot's blind steering happens to approach from, and the story beat only needs
-			// "got to the now-open bunker," not a precise walk through a ~1 m gap from one exact side.
-			var trigger = new Area3D { Name = "EntryTrigger", CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
-			trigger.Position = new Vector3(0, 1.6f, -1.2f);
-			trigger.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 5f } });
-			_gen.AddChild(trigger);
-			trigger.BodyEntered += OnEntered;
+			Vector3 a = BunkerExterior.WingPoint(s, false), b = BunkerExterior.WingPoint(s, true), m = a.Lerp(b, 0.5f);
+			BeamBox(a + Vector3.Up * BunkerExterior.WingMidA, m + Vector3.Up * BunkerExterior.WingMidA, 0.3f, BunkerExterior.WingTopA - BunkerExterior.Base);
+			BeamBox(m + Vector3.Up * BunkerExterior.WingMidB, b + Vector3.Up * BunkerExterior.WingMidB, 0.3f, BunkerExterior.WingTopB - BunkerExterior.Base);
 		}
+		// The mound itself, walkable.
+		var mound = new ConcavePolygonShape3D { BackfaceCollision = true };
+		mound.SetFaces(moundTris);
+		body.AddChild(new CollisionShape3D { Name = "Mound", Shape = mound });
+		// The door: closed it fills the gap; open, the swung leaf is solid where it stands.
+		_closedCollision = new CollisionShape3D { Position = new Vector3(0, 1.2f, 0.2f), Shape = new BoxShape3D { Size = new Vector3(1.2f, 2.0f, 0.2f) } };
+		body.AddChild(_closedCollision);
+		Vector3 hinge = new(-BunkerExterior.DoorRadius, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ);
+		Vector3 leafDir = Basis.FromEuler(new Vector3(0, Mathf.DegToRad(-100f), 0)) * Vector3.Right;
+		_openCollision = new CollisionShape3D
+		{
+			Transform = new Transform3D(Basis.LookingAt(leafDir, Vector3.Up), hinge + leafDir * BunkerExterior.DoorRadius),
+			Shape = new BoxShape3D { Size = new Vector3(0.2f, 2.0f, BunkerExterior.DoorRadius * 2f) },
+			Disabled = true,
+		};
+		body.AddChild(_openCollision);
+
+		// A proper doorway trigger: just inside the hatch, so only walking in through the door counts.
+		var trigger = new Area3D { Name = "EntryTrigger", CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
+		trigger.Position = new Vector3(0, fy + 0.95f, -1.05f);
+		trigger.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.9f, 1.7f, 1.1f) } });
+		_gen.AddChild(trigger);
+		trigger.BodyEntered += OnEntered;
+
+		_doorNode = BuildClosedDoor();
 	}
 
-	/// <summary>A round riveted vault door with a spoked wheel-lock at its centre, built at
-	/// <paramref name="diskCenter"/> in the MeshKit's own (pre-Xf) space — the caller's Xf then
-	/// places and, for the open state, swings it about its hinge edge.</summary>
-	private static void BuildVaultDoorAt(MeshKit dk, Vector3 diskCenter, Material metal)
-	{
-		float thickness = 0.16f;
-		Vector3 front = diskCenter + new Vector3(0, 0, thickness * 0.5f);
-		Vector3 back = diskCenter - new Vector3(0, 0, thickness * 0.5f);
-
-		dk.Color = new Color(0.34f, 0.32f, 0.29f);
-		dk.Mat(metal);
-		dk.Cylinder(back, front, DoorRadius, DoorRadius, 20, true, 1.2f);
-
-		// Rivets ringing the rim.
-		dk.Color = new Color(0.42f, 0.4f, 0.36f);
-		const int rivets = 16;
-		for (int i = 0; i < rivets; i++)
-		{
-			float a = Mathf.Tau / rivets * i;
-			Vector3 p = front + new Vector3(Mathf.Cos(a) * DoorRadius * 0.86f, Mathf.Sin(a) * DoorRadius * 0.86f, 0f);
-			dk.Cylinder(p, p + new Vector3(0, 0, 0.025f), 0.035f, 0.03f, 6);
-		}
-
-		// A recessed inner ring groove, like the reference photo's stepped face.
-		dk.Color = new Color(0.24f, 0.23f, 0.2f);
-		dk.Cylinder(front + new Vector3(0, 0, 0.002f), front + new Vector3(0, 0, 0.02f), DoorRadius * 0.62f, DoorRadius * 0.62f, 18, false);
-
-		// Central hub and spoked wheel-lock.
-		dk.Color = new Color(0.3f, 0.29f, 0.26f);
-		Vector3 hubFront = front + new Vector3(0, 0, 0.1f);
-		dk.Cylinder(front, hubFront, 0.16f, 0.13f, 10, true);
-		dk.Cylinder(hubFront - new Vector3(0, 0, 0.03f), hubFront + new Vector3(0, 0, 0.03f), 0.34f, 0.34f, 14, false);
-		for (int i = 0; i < 4; i++)
-		{
-			float a = Mathf.Pi * 0.5f * i + Mathf.Pi * 0.25f;
-			Vector3 dir = new(Mathf.Cos(a), Mathf.Sin(a), 0);
-			var rot = Basis.FromEuler(new Vector3(0, 0, a));
-			dk.Box(hubFront + dir * 0.22f, new Vector3(0.32f, 0.045f, 0.045f), 1f, rot);
-		}
-	}
-
-	private void BuildClosedDoor(Material metal)
+	private Node3D BuildClosedDoor()
 	{
 		var dk = new MeshKit();
-		BuildVaultDoorAt(dk, new Vector3(0, 1.05f, 0.15f), metal);
-		_doorMesh = dk.CommitTo(_gen, "DoorMesh");
+		BunkerExterior.VaultDoor(dk, new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ), ProcTextures.MetalMat);
+		var mesh = dk.CommitTo(_gen, "DoorMesh");
+		if (!Engine.IsEditorHint())
+		{
+			// Story: found before the fire, it is locked. Focusable so the prompt can say so.
+			mesh.AddChild(new BunkerLockedHatch
+			{
+				Name = "Hatch", Prompt = "Locked", MaxDistance = 3f, PickRadius = 1.0f,
+				Position = new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ), PickOffset = new Vector3(0, 0, -0.4f),
+			});
+		}
+		return mesh;
 	}
 
-	private void BuildOpenDoor()
+	private Node3D BuildOpenDoor()
 	{
-		var metal = ProcTextures.MetalMat;
 		// Swings open about its left edge (the hinge). Building the disc relative to that hinge and
 		// letting Xf place and rotate it keeps the hinge edge itself fixed between the two states.
-		var leaf = new MeshKit { Xf = new Transform3D(Basis.FromEuler(new Vector3(0, Mathf.DegToRad(-100f), 0)), new Vector3(-DoorRadius, 0f, 0.15f)) };
-		BuildVaultDoorAt(leaf, new Vector3(DoorRadius, 1.05f, 0f), metal);
-		leaf.CommitTo(_gen, "DoorOpenMesh");
-	}
-
-	private void Open()
-	{
-		IsOpen = true;
-		if (_doorMesh != null) { _doorMesh.QueueFree(); _doorMesh = null; }
-		if (_doorCollision != null) _doorCollision.Disabled = true;
-		BuildOpenDoor();
-		string path = "res://assets/audio/sfx/trunk_creak_02.wav";
-		if (ResourceLoader.Exists(path))
+		var leaf = new MeshKit
 		{
-			var groan = new AudioStreamPlayer3D
-			{
-				Stream = GD.Load<AudioStream>(path), UnitSize = 4f, MaxDistance = 40f,
-				PitchScale = 0.6f, VolumeDb = 3f, Position = new Vector3(0, 1f, 0.3f),
-			};
-			_gen.AddChild(groan);
-			groan.Finished += groan.QueueFree;
-			groan.Play();
-		}
-		GD.Print("[story] the bunker door stands open");
+			Xf = new Transform3D(Basis.FromEuler(new Vector3(0, Mathf.DegToRad(-100f), 0)),
+				new Vector3(-BunkerExterior.DoorRadius, 0f, BunkerExterior.DoorZ)),
+		};
+		BunkerExterior.VaultDoor(leaf, new Vector3(BunkerExterior.DoorRadius, BunkerExterior.DoorCenterY, 0f), ProcTextures.MetalMat);
+		return leaf.CommitTo(_gen, "DoorOpenMesh");
 	}
 
 	private void OnEntered(Node3D body)
 	{
-		if (_entered || !IsOpen || body is not PlayerController player) return;
-		_entered = true;
-		InteractPrompt.Instance?.HidePrompt();
-		BunkerInterior.Instance?.AdmitPlayer(player);
-		StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act8BunkerEntered, player.GlobalPosition, player.CameraRig.Yaw);
+		if (!IsOpen || body is not PlayerController player) return;
+		var story = StoryManager.Instance;
+		// After the walkie the interior has nothing left and no way back out: the doorway stays dark.
+		if (story is { Current: >= Checkpoint.Act10WalkieFound }) return;
+		var interior = BunkerInterior.Instance;
+		if (interior == null || interior.IsAdmitting) return;
+		interior.AdmitPlayer(player);
+		story?.ReachCheckpoint(Checkpoint.Act8BunkerEntered, ApproachPointWorld, ApproachYaw);
 		GD.Print("[story] Act 8: into the bunker");
 	}
 }

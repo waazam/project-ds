@@ -1,8 +1,8 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using ProjectDS.Player;
 using ProjectDS.Systems;
-using ProjectDS.UI;
 
 namespace ProjectDS.World;
 
@@ -11,6 +11,10 @@ namespace ProjectDS.World;
 /// "come up and see" out of the forest at random intervals, in different
 /// speeds and sometimes doubled like an overlapping echo, until the player
 /// finds the bunker. Purely atmospheric — it never blocks or redirects.
+///
+/// Stateless beyond the checkpoint, so Continue restores it for free. Waits are
+/// pausable; the harsh takes play on the always-distorted "VoiceHarsh" bus
+/// (no shared effect is toggled).
 /// </summary>
 public partial class Act7Whispers : Node
 {
@@ -23,40 +27,40 @@ public partial class Act7Whispers : Node
 	private PlayerController _player;
 	private readonly RandomNumberGenerator _rng = new();
 
-	public override void _Ready() => _ = Loop();
+	public override void _Ready() => Cutscene.Run(this, Loop);
 
-	private bool Active(StoryManager s) => s != null && s.Current >= Checkpoint.Act7CabinBurning && s.Current < Checkpoint.Act8BunkerEntered;
+	private static bool Active(StoryManager s) => s != null && s.Current >= Checkpoint.Act7CabinBurning && s.Current < Checkpoint.Act8BunkerEntered;
 
-	private async Task Loop()
+	private async Task Loop(CancellationToken ct)
 	{
 		while (true)
 		{
-			if (!Active(StoryManager.Instance)) { await Wait(1.0); continue; }
+			if (!Active(StoryManager.Instance)) { await Cutscene.Wait(this, 1.0, ct); continue; }
 			var interval = GameSettings.Instance.AutoTest ? IntervalSecondsAutoTest : IntervalSeconds;
-			await Wait(_rng.RandfRange(interval.X, interval.Y));
+			await Cutscene.Wait(this, _rng.RandfRange(interval.X, interval.Y), ct);
 			if (!Active(StoryManager.Instance)) continue;
-			await FireWhisper();
+			await FireWhisper(ct);
 		}
 	}
 
-	private async Task FireWhisper()
+	private async Task FireWhisper(CancellationToken ct)
 	{
 		WhisperCount++;
-		_player ??= GetTree().GetFirstNodeInGroup("player") as PlayerController;
+		if (_player == null || !IsInstanceValid(_player)) _player = StoryBeat.Player(this);
 		PlaySting();
 		bool echo = _rng.Randf() < 0.3f;
 		float fadeIn = _rng.RandfRange(0.8f, 2.2f), hold = _rng.RandfRange(1.6f, 3.4f), fadeOut = _rng.RandfRange(0.8f, 2.0f);
-		if (GetTree().Root.FindChild("ScreenFader", true, false) is not ScreenFader fader) return;
+		if (StoryBeat.Fader(this) == null) return;
 		if (!echo)
 		{
-			await fader.ShowCaption("", "\"Come up and see.\"", fadeIn, hold, fadeOut);
+			await StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut);
 			return;
 		}
 		// A second, overlapping voice a beat behind the first: the "multiplicity" the outline asks for.
-		_ = fader.ShowCaption("", "\"Come up and see.\"", fadeIn, hold, fadeOut);
-		await Wait(_rng.RandfRange(0.3f, 0.7f));
+		Cutscene.Run(this, _ => StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut));
+		await Cutscene.Wait(this, _rng.RandfRange(0.3f, 0.7f), ct);
 		PlaySting();
-		await fader.ShowCaption("", "\"...come up and see...\"", fadeIn * 0.6f, hold * 0.7f, fadeOut);
+		await StoryBeat.Caption(this, "\"...come up and see...\"", fadeIn * 0.6f, hold * 0.7f, fadeOut);
 	}
 
 	// The four recorded takes read "close/quiet" to "far/harsh"; each gets its own baseline
@@ -80,30 +84,21 @@ public partial class Act7Whispers : Node
 			"medium" => (3f, 4f, 55f, false),
 			_ => (8f, 3f, 50f, true),   // "loud"
 		};
+		bool distorted = recorded && harsh && _rng.Randf() < 0.6f;
 		float ang = _rng.RandfRange(0f, Mathf.Tau);
 		float dist = _rng.RandfRange(9f, 24f);
 		Vector3 pos = _player.GlobalPosition + new Vector3(Mathf.Cos(ang), 0.5f, Mathf.Sin(ang)) * dist;
 		var voice = new AudioStreamPlayer3D
 		{
-			Stream = GD.Load<AudioStream>(path), Bus = "Voice",
+			Stream = GD.Load<AudioStream>(path), Bus = distorted ? "VoiceHarsh" : "Voice",
 			UnitSize = unitSize, MaxDistance = maxDist,
 			VolumeDb = baseDb + _rng.RandfRange(-2f, 2f),
 			PitchScale = _rng.RandfRange(0.82f, 1.18f),
 		};
 		// Must be parented before GlobalPosition is set, or Godot can't resolve the transform.
-		GetTree().Root.AddChild(voice);
+		Cutscene.SceneRoot(this).AddChild(voice);
 		voice.GlobalPosition = pos;
-
-		int distortionIdx = AudioServer.GetBusIndex("Voice");
-		bool wantDistortion = recorded && harsh && _rng.Randf() < 0.6f;
-		if (distortionIdx >= 0) AudioServer.SetBusEffectEnabled(distortionIdx, 1, wantDistortion);
-		voice.Finished += () =>
-		{
-			if (distortionIdx >= 0) AudioServer.SetBusEffectEnabled(distortionIdx, 1, false);
-			voice.QueueFree();
-		};
+		voice.Finished += voice.QueueFree;
 		voice.Play();
 	}
-
-	private async Task Wait(double seconds) => await ToSignal(GetTree().CreateTimer(seconds, true, true), SceneTreeTimer.SignalName.Timeout);
 }

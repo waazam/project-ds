@@ -1,57 +1,66 @@
+using System.Linq;
 using Godot;
 using ProjectDS.Player;
 
 namespace ProjectDS.UI;
 
 /// <summary>
-/// Small translucent bottom-right readout of whichever carried item the mouse
-/// wheel has landed on, styled like the compass: a thin outline, no solid
-/// backing, muted text. Purely informational — cycling never changes what F
-/// or E do, only which name this shows.
+/// Small translucent bottom-right list of everything the player carries, styled
+/// like the compass: a thin rule, no solid backing, muted serif text, one item
+/// per line. There is no selecting: every item works at any time (the camera
+/// raises on right mouse, the lantern toggles on F, tools are used by walking up
+/// to what they're for), so this only shows what's in the pack.
 /// </summary>
 public partial class EquippedItemHud : CanvasLayer
 {
 	[Export] public float BoxWidth = 132f;
-	[Export] public float BoxHeight = 22f;
+	[Export] public float LineHeight = 13f;
 
 	private Control _draw;
 	private PlayerController _player;
 	private PlayerInventory _inv;
+	private string[] _shown = System.Array.Empty<string>();
 
 	public override void _Ready()
 	{
 		Layer = 13;
-		ProcessMode = ProcessModeEnum.Always;
-		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, CustomMinimumSize = new Vector2(BoxWidth, BoxHeight) };
+		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
-		_draw.OffsetLeft = -BoxWidth - 16; _draw.OffsetRight = -16;
-		_draw.OffsetTop = -BoxHeight - 14; _draw.OffsetBottom = -14;
 		_draw.Draw += OnDraw;
 		AddChild(_draw);
 	}
 
 	public override void _Process(double delta)
 	{
-		_player ??= GetTree().GetFirstNodeInGroup("player") as PlayerController;
-		if (_player == null) return;
-		_inv ??= _player.GetNodeOrNull<PlayerInventory>("Inventory");
-		if (_inv == null) return;
+		if (_player == null || !IsInstanceValid(_player))
+		{
+			_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
+			_inv = _player?.GetNodeOrNull<PlayerInventory>("Inventory");
+		}
+		if (_inv == null || !IsInstanceValid(_inv)) { _draw.Visible = false; return; }
 
-		if (Input.IsActionJustPressed("item_next")) _inv.CycleSelected(1);
-		if (Input.IsActionJustPressed("item_prev")) _inv.CycleSelected(-1);
-
-		bool show = _inv.OwnedItems().Count > 0;
-		_draw.Visible = show;
-		if (show) _draw.QueueRedraw();
+		var labels = _inv.OwnedItems().Select(i => i.Label).ToArray();
+		_draw.Visible = labels.Length > 0;
+		if (labels.SequenceEqual(_shown)) return;
+		_shown = labels;
+		// Grow upward from the bottom-right corner, one line per item.
+		float h = 6f + LineHeight * labels.Length;
+		_draw.OffsetLeft = -BoxWidth - 16; _draw.OffsetRight = -16;
+		_draw.OffsetTop = -h - 12; _draw.OffsetBottom = -12;
+		_draw.QueueRedraw();
 	}
 
 	private void OnDraw()
 	{
 		var size = _draw.Size;
-		string label = _inv.SelectedItem?.Label ?? "";
-		var line = new Color(0.85f, 0.85f, 0.8f, 0.35f);
-		_draw.DrawRect(new Rect2(0, 0, size.X, 1f), line);
-		_draw.DrawString(ThemeDB.FallbackFont, new Vector2(0, size.Y * 0.5f + 3f), label,
-			HorizontalAlignment.Right, size.X, 10, new Color(0.82f, 0.8f, 0.74f, 0.75f));
+		_draw.DrawRect(new Rect2(size.X * 0.35f, 0, size.X * 0.65f, 1f), new Color(UiKit.Fog, 0.45f));
+		var font = UiKit.Serif;
+		const int fontSize = 10;
+		for (int i = 0; i < _shown.Length; i++)
+		{
+			var pos = new Vector2(0, 6f + LineHeight * i + 8f);
+			_draw.DrawString(font, pos + new Vector2(1, 1), _shown[i], HorizontalAlignment.Right, size.X, fontSize, new Color(0, 0, 0, 0.55f));
+			_draw.DrawString(font, pos, _shown[i], HorizontalAlignment.Right, size.X, fontSize, new Color(UiKit.Bone, 0.72f));
+		}
 	}
 }

@@ -1,13 +1,24 @@
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
+using ProjectDS.Player;
 
 namespace ProjectDS.Systems;
 
 /// <summary>
-/// Autoload. Owns which checkpoint the story has reached and drives the
-/// New Game / Continue flow. Gameplay scripts call <see cref="ReachCheckpoint"/>
-/// when the player passes a story beat (finding the stairs, reaching the
-/// boarded cabin); GameFlow reads <see cref="ConsumeContinueData"/> once, on
-/// scene load, to know where to place the player when continuing a save.
+/// Autoload. Owns the story state and drives the New Game / Continue flow.
+///
+/// Story state = the checkpoint reached plus a set of named flags (see
+/// <see cref="Flag"/>) plus the carried inventory. All of it is saved, so a
+/// Continue restores exactly what had happened, not just where the player stood.
+///
+/// Restore contract: every stateful system (door, fire, storm, bunker, mood,
+/// clearing, pickups...) must, in its own _Ready (or deferred from it), read
+/// <see cref="Current"/> and <see cref="HasFlag"/> and put itself into the state
+/// the story has reached. A fresh game simply reads checkpoint None and no flags.
+///
+/// Gameplay scripts call <see cref="ReachCheckpoint"/> at story beats and
+/// <see cref="SetFlag"/> for finer state; both save immediately.
 /// </summary>
 public partial class StoryManager : Node
 {
@@ -16,18 +27,68 @@ public partial class StoryManager : Node
 	public const string LevelScene = "res://scenes/levels/trail_slice.tscn";
 	public const string MenuScene = "res://scenes/ui/main_menu.tscn";
 
+	/// <summary>Well-known flag names. Add new ones here; never rename one once saves exist.</summary>
+	public static class Flag
+	{
+		public const string StairsClimbed = "stairs_climbed";
+		public const string GiantEventDone = "giant_event_done";
+		public const string NewelPostTaken = "newel_post_taken";
+		public const string ClearingVoiceHeard = "clearing_voice_heard";
+		public const string CrtPuzzleDone = "crt_puzzle_done";
+		public const string Act11DialogueDone = "act11_dialogue_done";
+		/// <summary>Act 3: the player left the cabin's safe zone with lantern + compass and the storm began.</summary>
+		public const string StormStarted = "storm_started";
+		/// <summary>Act 5: the newel post was carried outside: the storm broke and dawn came up.</summary>
+		public const string DawnBroke = "dawn_broke";
+		/// <summary>Act 5: the boarded door was chopped or pried open.</summary>
+		public const string CabinDoorOpen = "cabin_door_open";
+		/// <summary>Act 6: night has fallen (the optional extended climb, or the gradual fallback).</summary>
+		public const string Act6NightFell = "act6_night_fell";
+		/// <summary>Act 6: the optional extended climb happened (the mini stairs are gone, the original is taller).</summary>
+		public const string Act6ExtendedClimb = "act6_extended_climb";
+		/// <summary>Act 10: the hallway has turned into the maze (re-entering the bunker lands in the maze).</summary>
+		public const string BunkerMazeEntered = "bunker_maze_entered";
+		/// <summary>Act 10: the maze's end was reached and the walkie-talkie dropped there.</summary>
+		public const string BunkerMazeExited = "bunker_maze_exited";
+		// World pickups already taken (Pickup.TakenFlag = "pickup_taken_" + kind, lower case):
+		// a taken item never reappears on Continue. The newel post uses NewelPostTaken instead.
+		public const string PickupTakenLantern = "pickup_taken_lantern";
+		public const string PickupTakenCompass = "pickup_taken_compass";
+		public const string PickupTakenCamera = "pickup_taken_camera";
+		public const string PickupTakenAxe = "pickup_taken_axe";
+		public const string PickupTakenKey = "pickup_taken_key";
+		public const string PickupTakenHammer = "pickup_taken_hammer";
+	}
+
+	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>
+	public event System.Action<Checkpoint> CheckpointReached;
+	/// <summary>Raised after a new flag is set (and saved).</summary>
+	public event System.Action<string> FlagSet;
+
 	public Checkpoint Current { get; private set; } = Checkpoint.None;
-	public bool StairsClimbed { get; private set; }
-	/// <summary>Runtime only, never saved: the Act 4 set-piece fires once per attempt, then the compass repoints home.</summary>
-	public bool GiantEventDone { get; private set; }
-	/// <summary>Runtime only: the newel post found on the friend's table has been taken (Act 5 → 6 handoff).</summary>
-	public bool NewelPostTaken { get; private set; }
-	/// <summary>Runtime only: the clearing's voice line has played and the post has fused onto a staircase.</summary>
-	public bool ClearingVoiceHeard { get; private set; }
-	/// <summary>Runtime only: the bunker's CRT room has been shut off and shown the stairs (Act 9 → 10 handoff).</summary>
-	public bool CrtPuzzleDone { get; private set; }
-	/// <summary>Runtime only: the radio's one exchange ("Did you see them?" / "Who are you!") has played and the compass now points at the main stairs (Act 10 → 11 handoff).</summary>
-	public bool Act11DialogueDone { get; private set; }
+
+	private readonly HashSet<string> _flags = new();
+	public bool HasFlag(string flag) => _flags.Contains(flag);
+	public IEnumerable<string> Flags => _flags;
+
+	public bool StairsClimbed => HasFlag(Flag.StairsClimbed);
+	public bool GiantEventDone => HasFlag(Flag.GiantEventDone);
+	public bool NewelPostTaken => HasFlag(Flag.NewelPostTaken);
+	public bool ClearingVoiceHeard => HasFlag(Flag.ClearingVoiceHeard);
+	public bool CrtPuzzleDone => HasFlag(Flag.CrtPuzzleDone);
+	public bool Act11DialogueDone => HasFlag(Flag.Act11DialogueDone);
+
+	public void MarkGiantEventDone() => SetFlag(Flag.GiantEventDone);
+	public void MarkNewelPostTaken() => SetFlag(Flag.NewelPostTaken);
+	public void MarkClearingVoiceHeard() => SetFlag(Flag.ClearingVoiceHeard);
+	public void MarkCrtPuzzleDone() => SetFlag(Flag.CrtPuzzleDone);
+	public void MarkAct11DialogueDone() => SetFlag(Flag.Act11DialogueDone);
+
+	/// <summary>True for the level loaded by Continue (systems may use it to skip intro-only effects).</summary>
+	public bool LoadedFromSave { get; private set; }
+
+	/// <summary>Inventory to restore into the player's PlayerInventory on level load (null on a fresh game).</summary>
+	public string PendingInventory { get; private set; }
 
 	/// <summary>
 	/// Where the compass points: the stairs while still searching for them, the cabin once the giant
@@ -42,44 +103,32 @@ public partial class StoryManager : Node
 		{
 			if (Current < Checkpoint.Act3DoorBoarded) return null;
 			if (Current < Checkpoint.Act5CabinEntered)
-			{
-				if (!GiantEventDone)
-					return GetTree().GetFirstNodeInGroup("stairs_top_trigger") is Node3D top ? top.GlobalPosition : null;
-				return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabin ? cabin.GlobalPosition : null;
-			}
-			if (!NewelPostTaken)
-				return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabinFriend ? cabinFriend.GlobalPosition : null;
-			if (Current < Checkpoint.Act6BridgeCrossed)
-				return GetTree().GetFirstNodeInGroup("bridge_marker") is Node3D bridge ? bridge.GlobalPosition : null;
-			if (!ClearingVoiceHeard)
-				return GetTree().GetFirstNodeInGroup("stairs_clearing_marker") is Node3D clearing ? clearing.GlobalPosition : null;
-			if (Current < Checkpoint.Act7CabinBurning)
-				return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabinReturn ? cabinReturn.GlobalPosition : null;
-			if (Current < Checkpoint.Act8BunkerEntered)
-				return GetTree().GetFirstNodeInGroup("bunker_marker") is Node3D bunker ? bunker.GlobalPosition : null;
-			if (!CrtPuzzleDone)
-				return GetTree().GetFirstNodeInGroup("crt_target_marker") is Node3D crt ? crt.GlobalPosition : null;
-			if (Current < Checkpoint.Act10WalkieFound)
-				return GetTree().GetFirstNodeInGroup("bunker_entrance_marker") is Node3D entrance ? entrance.GlobalPosition : null;
+				return MarkerPos(GiantEventDone ? "cabin" : "stairs_top_trigger");
+			if (!NewelPostTaken) return MarkerPos("cabin");
+			if (Current < Checkpoint.Act6BridgeCrossed) return MarkerPos("bridge_marker");
+			if (!ClearingVoiceHeard) return MarkerPos("stairs_clearing_marker");
+			if (Current < Checkpoint.Act7CabinBurning) return MarkerPos("cabin");
+			if (Current < Checkpoint.Act8BunkerEntered) return MarkerPos("bunker_marker");
+			if (!CrtPuzzleDone) return MarkerPos("crt_target_marker");
+			if (Current < Checkpoint.Act10WalkieFound) return MarkerPos("bunker_entrance_marker");
 			if (Current < Checkpoint.Act11GiantEncounter)
-			{
-				if (!Act11DialogueDone) return null;   // mid-exchange, still standing outside the bunker
-				return GetTree().GetFirstNodeInGroup("stairs_clearing_marker") is Node3D stairs ? stairs.GlobalPosition : null;
-			}
+				return Act11DialogueDone ? MarkerPos("stairs_clearing_marker") : null;   // mid-exchange outside the bunker
 			return null;
 		}
 	}
 
-	public void MarkGiantEventDone() => GiantEventDone = true;
-	public void MarkNewelPostTaken() => NewelPostTaken = true;
-	public void MarkClearingVoiceHeard() => ClearingVoiceHeard = true;
-	public void MarkCrtPuzzleDone() => CrtPuzzleDone = true;
-	public void MarkAct11DialogueDone() => Act11DialogueDone = true;
-
-	/// <summary>True for one scene load: GameFlow should place the player from the saved data, not the spawn marker.</summary>
-	public bool HasPendingContinue { get; private set; }
+	// Marker lookups are cached per group; the cache is dropped whenever the scene changes.
+	private readonly Dictionary<string, Node3D> _markers = new();
+	private Vector3? MarkerPos(string group)
+	{
+		if (!_markers.TryGetValue(group, out var n) || !IsInstanceValid(n) || !n.IsInsideTree())
+			_markers[group] = n = GetTree().GetFirstNodeInGroup(group) as Node3D;
+		return n?.GlobalPosition;
+	}
 
 	private SaveData _continueData;
+	private Vector3 _lastPos;
+	private float _lastYaw;
 
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
@@ -87,16 +136,11 @@ public partial class StoryManager : Node
 	public void StartNewGame()
 	{
 		Current = Checkpoint.None;
-		StairsClimbed = false;
-		GiantEventDone = false;
-		NewelPostTaken = false;
-		ClearingVoiceHeard = false;
-		CrtPuzzleDone = false;
-		Act11DialogueDone = false;
-		HasPendingContinue = false;
+		_flags.Clear();
+		LoadedFromSave = false;
+		PendingInventory = null;
 		_continueData = null;
-		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller.
-		GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, LevelScene);
+		ChangeScene(LevelScene);
 	}
 
 	/// <summary>False if there was no valid save to continue from.</summary>
@@ -105,41 +149,76 @@ public partial class StoryManager : Node
 		var data = SaveSystem.Load();
 		if (data == null) return false;
 		_continueData = data;
-		HasPendingContinue = true;
 		Current = data.Checkpoint;
-		StairsClimbed = data.StairsClimbed;
-		GiantEventDone = false;
-		NewelPostTaken = false;
-		ClearingVoiceHeard = false;
-		CrtPuzzleDone = false;
-		Act11DialogueDone = false;
-		GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, LevelScene);
+		_flags.Clear();
+		foreach (var f in data.Flags) _flags.Add(f);
+		if (data.Checkpoint >= Checkpoint.Act2StairsClimbed) _flags.Add(Flag.StairsClimbed);
+		PendingInventory = data.Inventory;
+		LoadedFromSave = true;
+		_lastPos = new Vector3(data.PosX, data.PosY, data.PosZ);
+		_lastYaw = data.Yaw;
+		ChangeScene(LevelScene);
 		return true;
 	}
+
+	/// <summary>True for one scene load: GameFlow should place the player from the saved data, not the spawn marker.</summary>
+	public bool HasPendingContinue => _continueData != null;
 
 	/// <summary>GameFlow calls this once at level start; returns null if this is a fresh run.</summary>
 	public SaveData ConsumeContinueData()
 	{
-		HasPendingContinue = false;
 		var d = _continueData;
 		_continueData = null;
 		return d;
 	}
 
-	public void ReturnToMenu() => GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, MenuScene);
+	/// <summary>PlayerInventory calls this once after restoring from <see cref="PendingInventory"/>.</summary>
+	public void ClearPendingInventory() => PendingInventory = null;
+
+	public void ReturnToMenu() => ChangeScene(MenuScene);
+
+	/// <summary>Every scene change goes through here: the pause menu's pause must never survive it.</summary>
+	private void ChangeScene(string path)
+	{
+		GetTree().Paused = false;
+		_markers.Clear();
+		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller.
+		GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, path);
+	}
 
 	/// <summary>Advances the story and checkpoint-saves. Never moves the checkpoint backwards.</summary>
 	public void ReachCheckpoint(Checkpoint cp, Vector3 pos, float yaw)
 	{
 		if (cp <= Current) return;
 		Current = cp;
-		if (cp >= Checkpoint.Act2StairsClimbed) StairsClimbed = true;
+		if (cp >= Checkpoint.Act2StairsClimbed) _flags.Add(Flag.StairsClimbed);
+		_lastPos = pos;
+		_lastYaw = yaw;
+		Save();
+		GD.Print($"[story] checkpoint reached: {cp}");
+		CheckpointReached?.Invoke(cp);
+	}
+
+	/// <summary>Records a story flag and saves (keeping the last checkpoint's position).</summary>
+	public void SetFlag(string flag)
+	{
+		if (!_flags.Add(flag)) return;
+		if (Current > Checkpoint.None) Save();
+		GD.Print($"[story] flag set: {flag}");
+		FlagSet?.Invoke(flag);
+	}
+
+	/// <summary>Writes the current story state (checkpoint, flags, inventory) to the save slots.</summary>
+	public void Save()
+	{
+		if (Current == Checkpoint.None) return;
+		var inv = (GetTree().GetFirstNodeInGroup("player") as Node)?.GetNodeOrNull<PlayerInventory>("Inventory");
 		SaveSystem.Save(new SaveData
 		{
-			Checkpoint = cp,
-			PosX = pos.X, PosY = pos.Y, PosZ = pos.Z, Yaw = yaw,
-			StairsClimbed = StairsClimbed,
+			Checkpoint = Current,
+			PosX = _lastPos.X, PosY = _lastPos.Y, PosZ = _lastPos.Z, Yaw = _lastYaw,
+			Flags = _flags.ToArray(),
+			Inventory = inv?.Serialize() ?? PendingInventory ?? "",
 		});
-		GD.Print($"[story] checkpoint reached: {cp}");
 	}
 }

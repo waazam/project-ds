@@ -17,8 +17,8 @@ namespace ProjectDS.Entities;
 /// - It only ever moves while outside the camera's view, so it never visibly
 ///   teleports.
 /// - Seen, it holds for a moment, then is gone in a blink. Glimpsed and looked
-///   away from, it is simply gone when you look back. Focusing on it (right
-///   mouse) while looking straight at it brings an uneasy sting.
+///   away from, it is simply gone when you look back. Catching it in a photo
+///   (Act 1's camera) brings an uneasy sting.
 /// - It tails you tree to tree. Walk on past its tree and it is gone, then a
 ///   few seconds later it is behind another one. Linger and it moves trees.
 /// - Unseen, it creeps closer over time; being seen pushes it back.
@@ -73,8 +73,6 @@ public partial class Stalker : Node3D
 	[Export(PropertyHint.Range, "0.1,1")] public float MaxVisibility = 1f;
 	/// <summary>Walk closer than this to an ahead sighting and it goes.</summary>
 	[Export] public float AheadBreakDistance = 18f;
-	/// <summary>Degrees from screen centre that count as looking straight at it.</summary>
-	[Export] public float StareDegrees = 14f;
 	[Export] public float StingVolumeDb = -4f;
 
 	[ExportGroup("Silence")]
@@ -147,6 +145,7 @@ public partial class Stalker : Node3D
 
 	public override void _Ready()
 	{
+		ProjectDS.Player.CameraTool.PhotoTaken += OnPhotoTaken;
 		_body = GetNode<Node3D>("Body");
 		// Every visible part dissolves together: collect each distinct shader material under Body.
 		foreach (var node in _body.FindChildren("*", "GeometryInstance3D", true, false))
@@ -169,6 +168,8 @@ public partial class Stalker : Node3D
 		_nextTwig = _rng.RandfRange(TwigInterval.X, TwigInterval.Y);
 		_nextShadow = _rng.RandfRange(ShadowInterval.X, ShadowInterval.Y);
 	}
+
+	public override void _ExitTree() => ProjectDS.Player.CameraTool.PhotoTaken -= OnPhotoTaken;
 
 	private static void TryLoad(string path, List<AudioStream> into)
 	{
@@ -263,7 +264,6 @@ public partial class Stalker : Node3D
 			if (!_seenThisPeek) { _seenThisPeek = true; SeenCount++; Tension = 0.1f; }
 			LastSeenFraction = seen;
 			_seenTime += dt;
-			MaybeSting(cam);
 			bool tooClose = _ahead && dist < AheadBreakDistance;
 			if (_seenTime >= _linger || tooClose || withdraw) { LastSeenDuration = _seenTime; Current = State.Vanishing; }
 			return;
@@ -294,19 +294,25 @@ public partial class Stalker : Node3D
 		FacePlayer();
 	}
 
-	/// <summary>Focusing on it while looking straight at it brings a sting, once per appearance.</summary>
-	private void MaybeSting(Camera3D cam)
+	/// <summary>
+	/// A photo taken with it in frame (visible in the camera's view, not behind cover)
+	/// brings the sting, once per appearance, and it is gone as if seen.
+	/// </summary>
+	private void OnPhotoTaken(Camera3D cam)
 	{
-		// Only when the player is deliberately focusing (right mouse) on it.
-		if (_stungThisPeek || _sting == null || _player is not PlayerController { PlayerInput.Focus: true }) return;
-		Vector3 chest = _body.GlobalTransform * new Vector3(0, 1.8f, 0);
-		float angle = Mathf.RadToDeg((-cam.GlobalBasis.Z).AngleTo((chest - cam.GlobalPosition).Normalized()));
-		if (angle > StareDegrees) return;
+		if (!IsPresent || _stungThisPeek || _sting == null || cam == null || !IsInstanceValid(cam)) return;
+		if (VisibleFraction(cam) <= 0f) return;
 		_stungThisPeek = true;
 		StingCount++;
 		_stingVoice.Stream = _sting;
 		_stingVoice.VolumeDb = StingVolumeDb;
 		_stingVoice.Play();
+		if (Current == State.Peeking)
+		{
+			if (!_seenThisPeek) { _seenThisPeek = true; SeenCount++; Tension = 0.1f; }
+			LastSeenDuration = _seenTime;
+			Current = State.Vanishing;
+		}
 	}
 
 	private void Hide(float cooldown)

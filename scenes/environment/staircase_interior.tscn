@@ -41,7 +41,7 @@ shape = SubResource("BoxShape3D_climb")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.06, -5.525)
 script = ExtResource("2_silence")
 InnerRadius = 9.5
-OuterRadius = 90.0
+OuterRadius = 120.0
 
 [node name="TreeClear0" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.5)

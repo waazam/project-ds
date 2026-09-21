@@ -1,8 +1,6 @@
-using System.Threading.Tasks;
 using Godot;
 using ProjectDS.Player;
 using ProjectDS.Systems;
-using ProjectDS.UI;
 
 namespace ProjectDS.World;
 
@@ -10,91 +8,102 @@ namespace ProjectDS.World;
 /// Act 5's break-in: at the boarded cabin door, an axe chops through quickly;
 /// a hammer takes a slower, hold-to-pry mini-game. Either way the door opens,
 /// the tool is used up, and the player can finally step inside.
+///
+/// An <see cref="Interactable"/> on the door: look at the boards and press E
+/// (axe) or hold E (hammer, <see cref="HammerSeconds"/>). Also owns restoring
+/// the door on Continue: boarded from Act 2 until it was broken open.
 /// </summary>
-public partial class DoorBreakEvent : Area3D
+public partial class DoorBreakEvent : Interactable
 {
 	[Export] public NodePath CabinPath = "..";
 	[Export] public float AxeSeconds = 2.2f;
 	[Export] public float HammerSeconds = 9f;
 
 	private Cabin _cabin;
-	private PlayerController _player;
-	private bool _playerInRange;
 	private bool _busy;
-	private float _hammerProgress;
-	private bool _wasPressed;
 
 	public override void _Ready()
 	{
 		_cabin = GetNode<Cabin>(CabinPath);
-		BodyEntered += OnEntered;
-		BodyExited += OnExited;
+		// The pick volume sits over the door itself, a little proud of its collider.
+		PickOffset = _cabin.ToLocal(_cabin.DoorCenter) - Position;
+		PickRadius = 0.9f;
+		MaxDistance = 3f;
+		// Highlight the planks nailed over the door (resolved when focused, since they are rebuilt).
+		HighlightRoot = new NodePath(GetPathTo(_cabin) + "/Generated/Planks");
+		base._Ready();
+		Callable.From(Restore).CallDeferred();
+		if (StoryManager.Instance is { } s) s.CheckpointReached += OnCheckpoint;
 	}
 
-	private void OnEntered(Node3D body) { if (body is PlayerController p) { _player = p; _playerInRange = true; } }
-
-	private void OnExited(Node3D body)
+	public override void _ExitTree()
 	{
-		if (body != (Node3D)_player) return;
-		_playerInRange = false;
-		_hammerProgress = 0f;
-		if (!_busy) InteractPrompt.Instance?.HidePrompt();
+		base._ExitTree();
+		if (StoryManager.Instance is { } s) s.CheckpointReached -= OnCheckpoint;
 	}
 
-	public override void _Process(double delta)
+	/// <summary>Continue: put the door back the way the story left it.</summary>
+	private void Restore()
 	{
-		if (!_playerInRange || _player == null || _busy || _cabin.IsOpen) return;
-		if (!_cabin.DoorBoarded) { InteractPrompt.Instance?.HidePrompt(); return; }
+		var s = StoryManager.Instance;
+		if (StoryBeat.CabinDoorOpen(s)) _cabin.SetOpen(true);   // no sound or animation
+		else if (s is { StairsClimbed: true }) _cabin.SetBoarded(true);
+		UpdateEnabled();
+	}
 
-		bool pressed = Input.IsActionPressed("interact");
-		bool justPressed = pressed && !_wasPressed;
-		_wasPressed = pressed;
+	private void OnCheckpoint(Checkpoint _) => UpdateEnabled();
 
-		var inv = _player.GetNodeOrNull<PlayerInventory>("Inventory");
-		switch (inv?.CurrentTool)
+	private void UpdateEnabled() => Enabled = _cabin.DoorBoarded && !_cabin.IsOpen;
+
+	public override bool CanInteract(PlayerController player)
+	{
+		if (!base.CanInteract(player) || _busy) return false;
+		return ToolFor(player) != ToolKind.None;
+	}
+
+	public override string GetPrompt(PlayerController player)
+	{
+		if (_busy) return "Chopping through the boards...";
+		switch (ToolFor(player))
 		{
 			case ToolKind.Axe:
-				InteractPrompt.Instance?.ShowPrompt("[E] Chop the boards with the axe");
-				if (justPressed) { _busy = true; _ = ChopWithAxe(inv); }
-				break;
+				HoldSeconds = 0f;
+				return "[E] Chop the boards with the axe";
 			case ToolKind.Hammer:
-				if (Input.IsActionPressed("interact"))
-				{
-					_hammerProgress = Mathf.Min(1f, _hammerProgress + (float)delta / HammerSeconds);
-					InteractPrompt.Instance?.ShowPrompt($"Prying the boards loose... {_hammerProgress * 100f:0}%");
-					if (_hammerProgress >= 1f) { _busy = true; _ = FinishWithHammer(inv); }
-				}
-				else
-				{
-					_hammerProgress = Mathf.Max(0f, _hammerProgress - (float)delta * 0.4f);
-					InteractPrompt.Instance?.ShowPrompt("[Hold E] Pry the boards loose");
-				}
-				break;
+				HoldSeconds = HammerSeconds;
+				return HoldProgress > 0f ? $"Prying the boards loose... {HoldProgress * 100f:0}%" : "[Hold E] Pry the boards loose";
 			default:
-				InteractPrompt.Instance?.ShowPrompt("The door is boarded shut.");
-				break;
+				HoldSeconds = 0f;
+				return "The door is boarded shut.";
 		}
 	}
 
-	private async Task ChopWithAxe(PlayerInventory inv)
+	public override void Interact(PlayerController player)
 	{
-		InteractPrompt.Instance?.ShowPrompt("Chopping through the boards...");
-		await ToSignal(GetTree().CreateTimer(AxeSeconds), SceneTreeTimer.SignalName.Timeout);
-		inv.Consume();
-		await FinishOpening();
+		var inv = Inventory(player);
+		if (inv == null || _busy) return;
+		_busy = true;
+		var tool = ToolFor(player);
+		if (tool == ToolKind.None) return;
+		bool axe = tool == ToolKind.Axe;
+		Cutscene.Run(this, async ct =>
+		{
+			if (axe) await Cutscene.Wait(this, AxeSeconds, ct);
+			inv.Consume(tool);
+			_cabin.OpenDoor();
+			Enabled = false;
+			StoryManager.Instance?.SetFlag(StoryManager.Flag.CabinDoorOpen);
+			base.Interact(player);
+			await StoryBeat.Caption(this, "The door gives way.", 1.0f, 1.8f, 1.0f);
+		});
 	}
 
-	private async Task FinishWithHammer(PlayerInventory inv)
+	/// <summary>The axe if carried (quick), else the hammer (the slow pry), else nothing.</summary>
+	private static ToolKind ToolFor(PlayerController p)
 	{
-		inv.Consume();
-		await FinishOpening();
+		var inv = Inventory(p);
+		return inv == null ? ToolKind.None : inv.HasTool(ToolKind.Axe) ? ToolKind.Axe : inv.HasTool(ToolKind.Hammer) ? ToolKind.Hammer : ToolKind.None;
 	}
 
-	private async Task FinishOpening()
-	{
-		InteractPrompt.Instance?.HidePrompt();
-		_cabin.OpenDoor();
-		if (GetTree().Root.FindChild("ScreenFader", true, false) is ScreenFader fader)
-			await fader.ShowCaption("", "The door gives way.", 1.0f, 1.8f, 1.0f);
-	}
+	private static PlayerInventory Inventory(PlayerController p) => p.GetNodeOrNull<PlayerInventory>("Inventory");
 }

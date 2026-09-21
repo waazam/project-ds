@@ -57,11 +57,20 @@ public static class Verify
 
 			var (bands, centroid) = Spectrum(x, w.SampleRate);
 			problems.AddRange(ContentChecks(name, bands, centroid));
+			string detail = null;
+			if (Detailed(name))
+			{
+				var m = Measure(x, w.SampleRate);
+				problems.AddRange(TasteChecks(name, m, bands, centroid));
+				detail = $"    crest {m.Crest:0.0} dB | 10ms floor(p10) {m.Floor:+0.0;-0.0} dB re RMS | 10ms power CV {m.Cv:0.00} | 50ms windows at >=0.9 pk {m.NearPeak:0} "
+					+ $"| hiss gate (>1k p50 re p99) {m.HissGate:+0.0;-0.0} dB | 1s gaps (<-12 dB re RMS) {m.Gaps * 100:0}% | top-bin {m.TopBin * 100:0.0}% | tail {m.Tail:+0.0;-0.0} dB";
+			}
 
 			bool fileOk = problems.Count == 0;
 			allOk &= fileOk;
 			Console.WriteLine($"{name,-20} {w.SampleRate,6} {dur,7:0.000} {pk,7:0.0} {rms,7:0.0}  {seam,-22} "
 				+ string.Join(" ", bands.Select(v => $"{v * 100,5:0.0}")) + $" {centroid,8:0} {ModRange(x, w.SampleRate),6:0.0}  {(fileOk ? "ok" : "FAIL: " + string.Join(", ", problems))}");
+			if (detail != null) Console.WriteLine(detail);
 		}
 		Console.WriteLine(allOk ? "\nAll checks passed." : "\nSome checks FAILED.");
 		return allOk;
@@ -69,7 +78,11 @@ public static class Verify
 
 	static (double, double) ExpectedDuration(string name) => name switch
 	{
+		"rain_loop" => (150, 240),
+		"choir_chant_loop" => (50, 90),
 		_ when name.EndsWith("_loop") => (20, 40),
+		_ when name.StartsWith("thunder") => (6, 18),
+		_ when name.StartsWith("giant_step") => (1.5, 4),
 		_ when name.StartsWith("bird") => (0.3, 2.5),
 		_ when name.StartsWith("step_dirt") => (0.2, 0.36),
 		_ when name.StartsWith("step_wood") => (0.2, 0.6),
@@ -98,6 +111,91 @@ public static class Verify
 		if (name.StartsWith("raven") && (centroid > 1500 || b[4] > 0.01)) yield return "raven not dull/distant";
 		if (name.StartsWith("twig_snap") && b[2] + b[3] < 0.4) yield return "twig not broadband";
 		if (name.StartsWith("rustle") && b[2] + b[3] + b[4] < 0.5) yield return "rustle not crunchy";
+	}
+
+	/// <summary>Files that get the extra taste measurements (the reworked sounds and the new ones).</summary>
+	static bool Detailed(string name) => name is "rain_loop" or "fire_crackle_loop" or "choir_chant_loop" or "stairs_hum_loop"
+		|| name.StartsWith("thunder") || name.StartsWith("giant_step");
+
+	public record Metrics(double Crest, double Floor, double Cv, double NearPeak, double HissGate, double Gaps, double TopBin, double Tail, double MaxAbs);
+
+	/// <summary>
+	/// Crest factor; the 10 ms level floor (p10 of 10 ms RMS windows re the overall RMS: a noise bed
+	/// sits near 0 dB, sparse drops far below); the coefficient of variation of 10 ms power; the share
+	/// of samples within 1 dB of the peak (overdrive and clipping pile samples up there); the "hiss
+	/// gate" (median vs p99 of the >1 kHz band in 10 ms windows: a continuous hiss keeps the median
+	/// close); the share of 1 s windows 12 dB under the RMS (silence between phrases); the largest
+	/// single FFT bin's share of all energy (a steady drone concentrates there); and the level of the
+	/// last quarter against the loudest second (natural decay).
+	/// </summary>
+	public static Metrics Measure(double[] x, int sr)
+	{
+		double rms = Db(Rms(x)), pk = Peak(x);
+		int w10 = sr / 100;
+		var lv = new List<double>(); var pw = new List<double>();
+		for (int s = 0; s + w10 <= x.Length; s += w10) { double p = 0; for (int i = s; i < s + w10; i++) p += x[i] * x[i]; p /= w10; pw.Add(p); lv.Add(Db(Math.Sqrt(p))); }
+		double floor = Pct(lv.ToArray(), 0.1) - rms;
+		double mean = pw.Average(), sd = Math.Sqrt(pw.Sum(p => (p - mean) * (p - mean)) / pw.Count);
+		int w50 = sr / 20; double near = 0;
+		for (int s = 0; s + w50 <= x.Length; s += w50) { double lp = 0; for (int i = s; i < s + w50; i++) lp = Math.Max(lp, Math.Abs(x[i])); if (lp >= 0.9 * pk) near++; }
+		var h1 = Biquad.Hp(sr, 1000); var h2 = Biquad.Hp(sr, 1000);
+		var hx = x.Select(v => h2.P(h1.P(v))).ToArray();
+		var hl = new List<double>();
+		for (int s = 0; s + w10 <= hx.Length; s += w10) hl.Add(Db(Rms(hx[s..(s + w10)])));
+		var ha = hl.ToArray();
+		double gate = Pct(ha, 0.5) - Pct(ha, 0.99);
+		int w1 = sr, gaps = 0, wins = 0; double loud = -200;
+		for (int s = 0; s + w1 <= x.Length; s += w1 / 2) { double l = Db(Rms(x[s..(s + w1)])); wins++; if (l < rms - 12) gaps++; loud = Math.Max(loud, l); }
+		double tail = Db(Rms(x[(x.Length * 3 / 4)..])) - loud;
+		return new Metrics(Db(pk) - rms, floor, sd / Math.Max(mean, 1e-30), near, gate, wins > 0 ? (double)gaps / wins : 0, TopBin(x), tail, pk);
+	}
+
+	static double TopBin(double[] x)
+	{
+		int N = 4096;
+		var pow = new double[N / 2]; var re = new double[N]; var im = new double[N];
+		for (int s = 0; s + N <= x.Length; s += N / 2)
+		{
+			for (int i = 0; i < N; i++) { re[i] = x[s + i] * (0.5 - 0.5 * Math.Cos(TwoPi * i / (N - 1))); im[i] = 0; }
+			Fft(re, im);
+			for (int k = 1; k < N / 2; k++) pow[k] += re[k] * re[k] + im[k] * im[k];
+		}
+		double tot = pow.Sum();
+		return tot > 0 ? pow.Max() / tot : 0;
+	}
+
+	/// <summary>The owner's taste, as numbers: no noise beds, no overdrive, no hiss, no drones.</summary>
+	static IEnumerable<string> TasteChecks(string name, Metrics m, double[] b, double centroid)
+	{
+		if (name == "rain_loop")
+		{
+			if (m.Floor > -10) yield return "rain has a sustained floor";
+			if (m.Cv < 2) yield return "rain level too steady";
+			if (b[0] > 0.05 || b[4] > 0.1) yield return "rain rumble/fizz";
+		}
+		if (name.StartsWith("thunder"))
+		{
+			if (m.NearPeak > 4 || m.Crest < 12 || m.MaxAbs >= 0.999) yield return "thunder clipped/overdriven";
+			if (b[0] + b[1] < 0.97 || centroid > 250) yield return "thunder not low";
+			if (m.Tail > -15) yield return "thunder doesn't decay";
+		}
+		if (name == "fire_crackle_loop")
+		{
+			if (m.HissGate > -25) yield return "fire has a continuous hiss";
+			if (m.Crest < 18) yield return "fire not poppy";
+		}
+		if (name == "choir_chant_loop")
+		{
+			if (b[2] < 0.03) yield return "choir has no vocal formants 1-3k";
+			if (m.Gaps < 0.2) yield return "choir never stops (a drone)";
+		}
+		if (name == "stairs_hum_loop")
+		{
+			if (b[0] + b[1] < 0.99) yield return "hum not low";
+			if (b[1] < 0.2) yield return "hum inaudible on small speakers";
+			if (m.Crest > 12) yield return "hum not steady";
+		}
+		if (name.StartsWith("giant_step") && (b[0] < 0.6 || centroid > 150 || b[1] < 0.1 || b[2] + b[3] + b[4] > 0.02)) yield return "giant step not a low (but audible) thud";
 	}
 
 	/// <summary>Spread (p90 - p10, dB) of 250 ms RMS windows: how much the level moves (gusts, swells).</summary>
@@ -162,6 +260,61 @@ public static class Verify
 		for (int len = 2; len <= n; len <<= 1)
 		{
 			double ang = -TwoPi / len, wr = Math.Cos(ang), wi = Math.Sin(ang);
+			for (int i = 0; i < n; i += len)
+			{
+				double cr = 1, ci = 0;
+				for (int k = 0; k < len / 2; k++)
+				{
+					int a = i + k, b = a + len / 2;
+					double tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+					re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+					double ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr;
+				}
+			}
+		}
+	}
+}
+
+/// <summary>Per-phone spectral check of a dry chant take (used by --voice-test).</summary>
+public static class PhoneCheck
+{
+	static readonly double[] Edges = { 0, 400, 1300, 2000, 3500, 1e9 };
+
+	/// <summary>Energy share per band (&lt;400 / 400-1.3k / 1.3-2k / 2-3.5k / &gt;3.5k) in a 60 ms window centred at <paramref name="t"/>.</summary>
+	public static double[] Bands(double[] x, int sr, double t)
+	{
+		int N = 2048, w = (int)(0.06 * sr), c = (int)(t * sr);
+		var re = new double[N]; var im = new double[N];
+		for (int i = 0; i < w; i++)
+		{
+			int k = c - w / 2 + i;
+			re[i] = (k >= 0 && k < x.Length ? x[k] : 0) * (0.5 - 0.5 * Math.Cos(Dsp.TwoPi * i / (w - 1)));
+		}
+		Fft(re, im);
+		var b = new double[Edges.Length - 1]; double tot = 0;
+		for (int k = 1; k < N / 2; k++)
+		{
+			double f = (double)k * sr / N, p = re[k] * re[k] + im[k] * im[k];
+			tot += p;
+			for (int j = 0; j < b.Length; j++) if (f >= Edges[j] && f < Edges[j + 1]) b[j] += p;
+		}
+		for (int j = 0; j < b.Length; j++) b[j] /= Math.Max(tot, 1e-30);
+		return b;
+	}
+
+	static void Fft(double[] re, double[] im)
+	{
+		int n = re.Length;
+		for (int i = 1, j = 0; i < n; i++)
+		{
+			int bit = n >> 1;
+			for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+			j ^= bit;
+			if (i < j) { (re[i], re[j]) = (re[j], re[i]); (im[i], im[j]) = (im[j], im[i]); }
+		}
+		for (int len = 2; len <= n; len <<= 1)
+		{
+			double ang = -Dsp.TwoPi / len, wr = Math.Cos(ang), wi = Math.Sin(ang);
 			for (int i = 0; i < n; i += len)
 			{
 				double cr = 1, ci = 0;

@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/audio/PointSourceSpawner.cs" id="4_points"]
 [ext_resource type="Script" path="res://scripts/audio/ForestDirector.cs" id="5_director"]
 [ext_resource type="Script" path="res://scripts/audio/StormController.cs" id="6_storm"]
+[ext_resource type="Script" path="res://scripts/audio/StairsHum.cs" id="7_hum"]
 
 [node name="ForestAmbience" type="Node"]
 script = ExtResource("1_mgr")
@@ -133,3 +134,6 @@ script = ExtResource("5_director")
 [node name="StormController" type="Node" parent="."]
 script = ExtResource("6_storm")
 
+
+[node name="StairsHum" type="Node" parent="."]
+script = ExtResource("7_hum")

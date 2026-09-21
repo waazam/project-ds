@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace ProjectDS.Audio;
@@ -5,7 +6,8 @@ namespace ProjectDS.Audio;
 /// <summary>
 /// Marks a place where the forest stops making sound. Drop one under anything
 /// that should hush the woods (a staircase, a scripted event). The
-/// ForestAmbienceManager reads every zone in the "silence_zones" group; zones
+/// ForestAmbienceManager reads every zone (the "silence_zones" group, mirrored
+/// in <see cref="All"/> so it needn't query the group every frame); zones
 /// never touch audio themselves.
 ///
 /// Silence is 0 at OuterRadius and beyond, 1 at InnerRadius and within,
@@ -21,7 +23,17 @@ public partial class SilenceZone : Node3D
 	[Export(PropertyHint.Range, "0,1")] public float Strength = 1f;
 	[Export] public bool Active = true;
 
-	public override void _EnterTree() => AddToGroup("silence_zones");
+	private static readonly List<SilenceZone> _all = new();
+	/// <summary>Every zone currently in the tree.</summary>
+	public static IReadOnlyList<SilenceZone> All => _all;
+
+	public override void _EnterTree()
+	{
+		AddToGroup("silence_zones");
+		_all.Add(this);
+	}
+
+	public override void _ExitTree() => _all.Remove(this);
 
 	/// <summary>0..1 silence this zone applies at a world position (horizontal distance).</summary>
 	public float SilenceAt(Vector3 worldPos)

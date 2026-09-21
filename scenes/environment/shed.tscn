@@ -6,8 +6,11 @@
 [node name="Shed" type="Node3D"]
 script = ExtResource("1_shed")
 
+[node name="HammerSpot" type="Marker3D" parent="." groups=["spot_hammer"]]
+transform = Transform3D(0.8776, 0, 0.4794, 0, 1, 0, -0.4794, 0, 0.8776, 0.15, 0.88, -0.71)
+
 [node name="HammerPickup" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5)
+transform = Transform3D(0.8776, 0, 0.4794, 0, 1, 0, -0.4794, 0, 0.8776, 0.15, 0.88, -0.71)
 script = ExtResource("2_pickup")
 Kind = 5
 Label = "Hammer"

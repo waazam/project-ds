@@ -8,6 +8,14 @@ namespace ProjectDS.World;
 /// WorldEnvironment/sun it is pointed at; no post effects. From Act 6 onward,
 /// <see cref="SetMood"/> can override this distance-based blend entirely with
 /// a scripted lighting transition (dawn, the menacing deep-forest tone, night).
+///
+/// On top of whichever base is active, every frame it layers:
+/// - a fog-coloured ambient floor, so night, the storm and the menacing tone
+///   stay dark and scary but never crush the trail and tree silhouettes to pure black;
+/// - moonlight at night (the sun becomes a faint cold key light, so shapes keep a lit side);
+/// - <see cref="Storm"/> (overcast: thicker, greyer fog, weaker sun) and
+///   <see cref="Wetness"/> (set by <see cref="RainVfx"/>);
+/// - <see cref="Flash"/>: a lightning flash's sky and ambient boost (RainVfx drives it).
 /// </summary>
 [GlobalClass]
 public partial class ForestAtmosphere : Node
@@ -46,19 +54,36 @@ public partial class ForestAtmosphere : Node
 	[Export] public float SunEnergyDawn = 0.95f;
 	[Export] public Color SunColorDawn = new(1f, 0.72f, 0.5f);
 
-	[Export] public Color FogColorMenacing = new(0.1f, 0.07f, 0.09f);
+	[Export] public Color FogColorMenacing = new(0.13f, 0.085f, 0.1f);
 	[Export] public float FogDensityMenacing = 0.05f;
 	[Export] public float AmbientMenacing = 0.32f;
 	[Export] public float SunEnergyMenacing = 0.22f;
 
-	[Export] public Color FogColorNight = new(0.045f, 0.05f, 0.075f);
+	/// <summary>Night fog is a deep blue-grey, not black: trees read as dark shapes against it.</summary>
+	[Export] public Color FogColorNight = new(0.06f, 0.07f, 0.1f);
 	[Export] public float FogDensityNight = 0.032f;
 	[Export] public float AmbientNight = 0.2f;
-	[Export] public float SunEnergyNight = 0.04f;
+	[Export] public float SunEnergyNight = 0.1f;
+	/// <summary>At night the sun becomes a weak, cold moon.</summary>
+	[Export] public Color MoonColor = new(0.55f, 0.64f, 0.9f);
+
+	/// <summary>
+	/// The ambient floor: the ambient light never drops below this luminance (ambient colour x energy),
+	/// and is tinted toward the current fog colour, so dark moods stay readable. 0 disables it.
+	/// </summary>
+	[Export] public float AmbientFloorLuminance = 0.28f;
+	/// <summary>How much of the ambient light's hue comes from the fog colour (0 = keep the scene's ambient colour).</summary>
+	[Export] public float AmbientFogTint = 0.55f;
+
+	/// <summary>0..1 overcast storm weight (RainVfx sets this from its intensity).</summary>
+	public float Storm { get; set; }
+	/// <summary>0..1 how wet everything is (RainVfx raises it with the rain; it dries slowly afterwards).</summary>
+	public float Wetness { get; set; }
+	/// <summary>0..~1.5 current lightning flash (RainVfx drives this for a fraction of a second).</summary>
+	public float Flash { get; set; }
 
 	private Environment _env;
 	private DirectionalLight3D _sun;
-	private float _t = -1;
 	private Tween _heightFogTween;
 
 	private Mood _mood = Mood.Auto;
@@ -67,24 +92,43 @@ public partial class ForestAtmosphere : Node
 	private Color _fromFog, _fromSunColor;
 	private float _fromDensity, _fromSkyFog, _fromAmbient, _fromSunEnergy;
 	private Color _sunBaseColor;
+	private Color _ambientBaseColor;
+	private float _bgEnergyBase = 1f;
+
+	// The last "base" values (before the per-frame layers), so SetMood blends from what the mood system
+	// had, not from a value that already includes a lightning flash or the ambient floor.
+	private Color _baseFog, _baseSunColor;
+	private float _baseDensity, _baseSkyFog, _baseAmbient, _baseSunEnergy;
 
 	public override void _Ready()
 	{
+		AddToGroup("atmosphere");
 		_env = GetNodeOrNull<WorldEnvironment>(EnvironmentPath)?.Environment;
 		_sun = GetNodeOrNull<DirectionalLight3D>(SunPath);
 		if (_sun != null) _sunBaseColor = _sun.LightColor;
+		if (_env != null)
+		{
+			_ambientBaseColor = _env.AmbientLightColor;
+			_bgEnergyBase = _env.BackgroundEnergyMultiplier;
+			_baseFog = _env.FogLightColor;
+			_baseDensity = _env.FogDensity;
+			_baseSkyFog = _env.FogSkyAffect;
+			_baseAmbient = _env.AmbientLightEnergy;
+		}
+		_baseSunEnergy = _sun?.LightEnergy ?? 0f;
+		_baseSunColor = _sun?.LightColor ?? Colors.White;
 	}
 
 	/// <summary>Cross-fades from the current lighting to a fixed mood over <paramref name="seconds"/>, then holds it (no more auto distance blend).</summary>
 	public void SetMood(Mood mood, float seconds = 6f)
 	{
 		if (_env == null) return;
-		_fromFog = _env.FogLightColor;
-		_fromDensity = _env.FogDensity;
-		_fromSkyFog = _env.FogSkyAffect;
-		_fromAmbient = _env.AmbientLightEnergy;
-		_fromSunEnergy = _sun?.LightEnergy ?? 0f;
-		_fromSunColor = _sun?.LightColor ?? Colors.White;
+		_fromFog = _baseFog;
+		_fromDensity = _baseDensity;
+		_fromSkyFog = _baseSkyFog;
+		_fromAmbient = _baseAmbient;
+		_fromSunEnergy = _baseSunEnergy;
+		_fromSunColor = _baseSunColor;
 		_mood = mood;
 		_moodBlend = 0f;
 		_moodBlendSpeed = 1f / Mathf.Max(seconds, 0.05f);
@@ -92,7 +136,7 @@ public partial class ForestAtmosphere : Node
 
 	/// <summary>
 	/// A vertical fog band that has nothing to do with the distance-based mood blend above (this
-	/// touches only fog_height/fog_height_density, which ProcessMoodBlend never sets): cross-fades
+	/// touches only fog_height/fog_height_density, which the per-frame blend never sets): cross-fades
 	/// toward thickening above <paramref name="height"/>, at <paramref name="density"/>, so anything
 	/// tall enough gets visually swallowed the higher up it goes. Used for Act 11's stairs, which need
 	/// to look like they vanish into the canopy rather than simply being a very tall, fully visible model.
@@ -117,7 +161,13 @@ public partial class ForestAtmosphere : Node
 	public override void _Process(double delta)
 	{
 		if (_env == null) return;
-		if (_mood != Mood.Auto) { ProcessMoodBlend(delta); return; }
+		if (_mood != Mood.Auto) ProcessMoodBlend(delta);
+		else ProcessAuto();
+		ApplyLayers();
+	}
+
+	private void ProcessAuto()
+	{
 		var cam = GetViewport().GetCamera3D();
 		if (cam == null) return;
 		Vector3 p = cam.GlobalPosition;
@@ -125,13 +175,12 @@ public partial class ForestAtmosphere : Node
 		deep = deep * deep * (3 - 2 * deep);
 		float inClearing = 1f - Mathf.Clamp((new Vector2(p.X - ClearingCenter.X, p.Z - ClearingCenter.Z).Length() - ClearingRadius * 0.5f) / (ClearingRadius * 0.5f), 0, 1);
 		float t = deep * (1f - ClearingRelief * inClearing);
-		if (Mathf.Abs(t - _t) < 0.002f) return;
-		_t = t;
-		_env.FogDensity = Mathf.Lerp(FogDensityOpen, FogDensityDeep, t) * (1f - 0.35f * ClearingRelief * inClearing);
-		_env.FogLightColor = FogColorOpen.Lerp(FogColorDeep, t);
-		_env.FogSkyAffect = Mathf.Lerp(SkyFogOpen, SkyFogDeep, t);
-		_env.AmbientLightEnergy = Mathf.Lerp(AmbientOpen, AmbientDeep, t);
-		if (_sun != null) _sun.LightEnergy = Mathf.Lerp(SunOpen, SunDeep, t);
+		_baseDensity = Mathf.Lerp(FogDensityOpen, FogDensityDeep, t) * (1f - 0.35f * ClearingRelief * inClearing);
+		_baseFog = FogColorOpen.Lerp(FogColorDeep, t);
+		_baseSkyFog = Mathf.Lerp(SkyFogOpen, SkyFogDeep, t);
+		_baseAmbient = Mathf.Lerp(AmbientOpen, AmbientDeep, t);
+		_baseSunEnergy = Mathf.Lerp(SunOpen, SunDeep, t);
+		_baseSunColor = _sunBaseColor;
 	}
 
 	private void ProcessMoodBlend(double delta)
@@ -142,15 +191,51 @@ public partial class ForestAtmosphere : Node
 		{
 			Mood.Dawn => (FogColorDawn, FogDensityDawn, 0.1f, AmbientDawn, SunEnergyDawn, SunColorDawn),
 			Mood.Menacing => (FogColorMenacing, FogDensityMenacing, 0.6f, AmbientMenacing, SunEnergyMenacing, _sunBaseColor),
-			Mood.Night => (FogColorNight, FogDensityNight, 0.35f, AmbientNight, SunEnergyNight, _sunBaseColor),
+			Mood.Night => (FogColorNight, FogDensityNight, 0.35f, AmbientNight, SunEnergyNight, MoonColor),
 			_ => (_fromFog, _fromDensity, _fromSkyFog, _fromAmbient, _fromSunEnergy, _fromSunColor),
 		};
-		_env.FogLightColor = _fromFog.Lerp(target.fog, u);
-		_env.FogDensity = Mathf.Lerp(_fromDensity, target.density, u);
-		_env.FogSkyAffect = Mathf.Lerp(_fromSkyFog, target.skyFog, u);
-		_env.AmbientLightEnergy = Mathf.Lerp(_fromAmbient, target.ambient, u);
+		_baseFog = _fromFog.Lerp(target.fog, u);
+		_baseDensity = Mathf.Lerp(_fromDensity, target.density, u);
+		_baseSkyFog = Mathf.Lerp(_fromSkyFog, target.skyFog, u);
+		_baseAmbient = Mathf.Lerp(_fromAmbient, target.ambient, u);
+		_baseSunEnergy = Mathf.Lerp(_fromSunEnergy, target.sunEnergy, u);
+		_baseSunColor = _fromSunColor.Lerp(target.sunColor, u);
+	}
+
+	private static float Lum(Color c) => c.R * 0.2126f + c.G * 0.7152f + c.B * 0.0722f;
+
+	/// <summary>Storm, wetness, ambient floor and lightning, layered over the base every frame.</summary>
+	private void ApplyLayers()
+	{
+		float storm = Mathf.Clamp(Storm, 0f, 1f);
+		float flash = Mathf.Max(0f, Flash);
+
+		Color fog = _baseFog.Lerp(new Color(0.2f, 0.215f, 0.24f) * Mathf.Min(1f, Lum(_baseFog) / 0.2f + 0.3f), storm * 0.35f);
+		float density = _baseDensity * (1f + 0.22f * storm);
+		float sunEnergy = _baseSunEnergy * (1f - 0.45f * storm);
+
+		// Ambient floor: tint toward the fog's hue (at the ambient colour's brightness), then lift the
+		// energy until colour x energy reaches the floor luminance. Dark moods keep their colour and
+		// most of their gloom, but the ground and trunks never go fully black.
+		Color fogHue = Lum(fog) > 0.001f ? fog * (Lum(_ambientBaseColor) / Lum(fog)) : _ambientBaseColor;
+		Color ambColor = _ambientBaseColor.Lerp(fogHue, AmbientFogTint);
+		float ambient = _baseAmbient;
+		float lum = Lum(ambColor);
+		if (AmbientFloorLuminance > 0f && lum > 0.001f)
+			ambient = Mathf.Max(ambient, AmbientFloorLuminance / lum);
+
+		// Lightning: the whole sky and the fog light up for an instant (the directional light is RainVfx's).
+		ambient += flash * 1.4f;
+		fog += new Color(0.35f, 0.37f, 0.42f) * flash * 0.6f;
+
+		_env.FogLightColor = fog;
+		_env.FogDensity = density;
+		_env.FogSkyAffect = _baseSkyFog;
+		_env.AmbientLightColor = ambColor;
+		_env.AmbientLightEnergy = ambient;
+		_env.BackgroundEnergyMultiplier = _bgEnergyBase * (1f - 0.35f * storm) + flash * 2.5f;
 		if (_sun == null) return;
-		_sun.LightEnergy = Mathf.Lerp(_fromSunEnergy, target.sunEnergy, u);
-		_sun.LightColor = _fromSunColor.Lerp(target.sunColor, u);
+		_sun.LightEnergy = sunEnergy;
+		_sun.LightColor = _baseSunColor;
 	}
 }

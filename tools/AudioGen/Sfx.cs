@@ -437,30 +437,118 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 400);
 	}
 
-	/// <summary>A lightning strike: a sharp crack, then a long rolling rumble that dies away unevenly.</summary>
-	public static double[] ThunderCrack(Rng r, int sr)
+	/// <summary>
+	/// Low, distant thunder (Act 3: "low thunder rumbles"). No crack and no overdrive: at a few
+	/// kilometres the air has taken the top off, and what's left is a rolling rumble. Built the way
+	/// thunder is heard: hundreds of low pressure pulses arriving from different parts of a long,
+	/// crooked channel, grouped into 2-3 rolls that swell and die away unevenly, then a long soft
+	/// tail, all under a gentle outdoor reverb.
+	/// Variants: 1 = far, three rolls; 2 = nearer, with a dull opening clap; 3 = very far, a slow low grumble.
+	/// </summary>
+	public static double[] Thunder(Rng r, int sr, int variant)
 	{
-		double dur = r.R(4.5, 7.5);
-		var x = Buf(sr, dur);
-		var crackHp = Biquad.Hp(sr, 700); var crackLp = Biquad.Lp(sr, r.R(3000, 4500));
-		for (int i = 0; i < (int)(0.15 * sr) && i < x.Length; i++)
-			x[i] += crackHp.P(crackLp.P(r.W())) * Perc((double)i / sr, 0.0008, 0.02) * 4.0;
-
-		var rl1 = Biquad.Lp(sr, r.R(55, 90)); var rl2 = Biquad.Lp(sr, r.R(120, 200));
-		var swellA = new Smooth(r, dur, r.R(0.5, 1.1));
-		var swellB = new Smooth(r, dur, r.R(1.5, 3.0));
-		for (int i = 0; i < x.Length; i++)
+		(double cut, int rolls, double clap, double rate) = variant switch
 		{
-			double t = (double)i / sr;
-			double env = Perc(Math.Max(t - 0.05, 0), 0.35, r.R(1.4, 2.6)) * (0.55 + 0.45 * swellB.At(t));
-			double v = rl2.P(rl1.P(r.W()));
-			x[i] += v * env * 7.0 * (0.6 + 0.4 * swellA.At(t));
+			1 => (190.0, 3, 0.0, 70.0),
+			2 => (300.0, 3, 0.8, 90.0),
+			_ => (125.0, 2, 0.0, 55.0),
+		};
+		// Roll envelopes: onset, rise, decay, level. Each roll is a little weaker than the last, but
+		// not always by much: a later roll can nearly match the first.
+		var rl = new List<(double at, double rise, double decay, double amp)>();
+		double at = r.R(0.15, 0.5) + (variant == 3 ? 0.6 : 0), lvl = 1.0;
+		for (int k = 0; k < rolls; k++)
+		{
+			rl.Add((at, r.R(0.25, 0.7) * (variant == 3 ? 1.8 : 1), r.R(0.8, 1.6) * (variant == 3 ? 1.4 : 1), lvl));
+			at += r.R(1.1, 2.4);
+			lvl *= r.R(0.5, 0.9);
+		}
+		double tailAt = rl[0].at, tailTau = 1.6;
+		// Long enough for everything to die away on its own (the finish trims the silent end).
+		double dur = rl[^1].at + rl[^1].rise + 5 * rl[^1].decay + 3;
+		var x = Buf(sr, dur);
+		double Density(double t)
+		{
+			double d = 0;
+			foreach (var (a, rise, decay, amp) in rl)
+			{
+				double u = t - a;
+				if (u > 0) d += amp * (1 - Math.Exp(-u / rise)) * Math.Exp(-u / decay);
+			}
+			if (t > tailAt) d += 0.12 * Math.Exp(-(t - tailAt) / tailTau);
+			return d;
+		}
+		double dMax = 0;
+		for (double t = 0; t < dur; t += 0.01) dMax = Math.Max(dMax, Density(t));
+
+		// Arrivals: short low-passed pressure pulses, each from a different stretch of the channel.
+		double tt0 = 0;
+		while (true)
+		{
+			tt0 += -Math.Log(1 - r.U()) / rate;
+			if (tt0 >= dur) break;
+			double d = Density(tt0) / dMax;
+			if (r.U() > d) continue;
+			double a = r.LogR(0.2, 1.0), tau = r.LogR(0.03, 0.16), att = r.R(0.006, 0.03);
+			var lp1 = Biquad.Lp(sr, cut * r.R(0.7, 1.5)); var lp2 = Biquad.Lp(sr, cut * r.R(0.8, 1.6));
+			int s0 = (int)(tt0 * sr), len = (int)((att + tau * 6) * sr);
+			for (int i = 0; i < len && s0 + i < x.Length; i++)
+				x[s0 + i] += lp2.P(lp1.P(r.W())) * Perc((double)i / sr, att, tau) * a;
+		}
+		if (clap > 0)
+		{
+			// The first return, still soft-edged: a dull low-mid clap, nothing above ~700 Hz.
+			var c1 = Biquad.Lp(sr, 650); var c2 = Biquad.Lp(sr, 750); var ch = Biquad.Hp(sr, 60);
+			int s0 = (int)(rl[0].at * sr);
+			for (int i = 0; i < 0.6 * sr && s0 + i < x.Length; i++)
+				x[s0 + i] += ch.P(c2.P(c1.P(r.W()))) * Perc((double)i / sr, 0.008, 0.07) * clap * 1.6;
+		}
+		var g1 = Biquad.Lp(sr, cut * 1.6); var g2 = Biquad.Lp(sr, cut * 2.2);
+		for (int i = 0; i < x.Length; i++) x[i] = g2.P(g1.P(x[i]));
+		HighPass(x, sr, 24);
+		var hall = new Hall(sr, 2.2, 0.6, 25, 1.2);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) o[i] = x[i] + hall.P(x[i]) * 0.5;
+		return FinishOneShot(o, sr, -3, 900);
+	}
+
+	/// <summary>
+	/// The giant's stride far off in the fog (Act 4: "the low thuds of the giant landing its stride").
+	/// A huge soft mass landing on soil a few hundred metres away: a slow-edged (20-40 ms) impact
+	/// that is almost all below 120 Hz, a little 100-250 Hz ground body so small speakers still hear
+	/// it, the forest floor settling (dull debris, no high end) and a long low rumble through the
+	/// ground. All noise: no swept sine (a pitched thump reads as a kick drum) and no ringing mode.
+	/// </summary>
+	public static double[] GiantStep(Rng r, int sr)
+	{
+		var x = Buf(sr, 3.4);
+		double t0 = 0.02;
+		var l1 = Biquad.Lp(sr, r.R(55, 75)); var l2 = Biquad.Lp(sr, r.R(70, 95));
+		var b1 = Biquad.Lp(sr, r.R(260, 320)); var b2 = Biquad.Hp(sr, 90);
+		var t1 = Biquad.Lp(sr, 45); var t2 = Biquad.Lp(sr, 60);
+		double att = r.R(0.02, 0.04), tau = r.R(0.18, 0.3), tail = r.R(0.7, 1.1);
+		for (int i = (int)(t0 * sr); i < x.Length; i++)
+		{
+			double t = (double)i / sr - t0;
+			double impact = l2.P(l1.P(r.W())) * Perc(t, att, tau) * 14;
+			double body = b2.P(b1.P(r.W())) * Perc(t, att * 0.7, 0.11) * 6.5;
+			double rumble = t2.P(t1.P(r.W())) * Perc(t, 0.12, tail) * 9 * (1 - Math.Exp(-t / 0.05));
+			x[i] += impact + body + rumble;
+		}
+		// The floor settling: soft, dull debris a moment after the impact.
+		var dl = Biquad.Lp(sr, 900); var dh = Biquad.Hp(sr, 250);
+		double ds = t0 + r.R(0.06, 0.14), dd = r.R(0.35, 0.6);
+		var tex = new Smooth(r, 4, 0.03);
+		for (int i = (int)(ds * sr); i < (ds + dd) * sr && i < x.Length; i++)
+		{
+			double u = (i / (double)sr - ds) / dd;
+			x[i] += dh.P(dl.P(r.W())) * Env(u, 0.1, 0.8) * Math.Pow(tex.At(i / (double)sr), 2) * 0.35;
 		}
 		HighPass(x, sr, 22);
-		double pk2 = 0; foreach (var v in x) pk2 = Math.Max(pk2, Math.Abs(v));
-		double drive2 = 4.5 / Math.Max(pk2, 1e-9);
-		for (int i = 0; i < x.Length; i++) x[i] = Math.Tanh(x[i] * drive2);
-		return FinishOneShot(x, sr, -3, 600);
+		var hall = new Hall(sr, 2.4, 0.6, 30, 1.2);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) o[i] = x[i] + hall.P(x[i]) * 0.45;
+		return FinishOneShot(o, sr, -3, 500);
 	}
 
 	/// <summary>
