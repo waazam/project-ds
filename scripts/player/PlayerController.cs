@@ -30,6 +30,7 @@ public partial class PlayerController : CharacterBody3D
 	private float _gravity;
 	private float _bobTime;
 	private Vector3 _visualBase;
+	private PlayerStamina _stamina;
 
 	public override void _Ready()
 	{
@@ -37,6 +38,7 @@ public partial class PlayerController : CharacterBody3D
 		PlayerInput = GetNode<PlayerInput>(InputPath);
 		CameraRig = GetNode<PlayerCameraRig>(CameraRigPath);
 		Visual = GetNode<Node3D>(VisualPath);
+		_stamina = GetNodeOrNull<PlayerStamina>("Stamina");
 		_visualBase = Visual.Position;
 		_gravity = (float)ProjectSettings.GetSetting("physics/3d/default_gravity") * GravityScale;
 		FloorSnapLength = 0.45f;
@@ -58,7 +60,7 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 right = cam.X; right.Y = 0; right = right.Normalized();
 		Vector3 wish = right * move.X + forward * move.Y;
 
-		IsRunning = PlayerInput.Run && move.LengthSquared() > 0.04f;
+		IsRunning = PlayerInput.Run && move.LengthSquared() > 0.04f && (_stamina?.CanRun ?? true);
 		float targetSpeed = (IsRunning ? RunSpeed : WalkSpeed) * move.Length();
 		Vector3 targetVel = wish.LengthSquared() > 0.0001f ? wish.Normalized() * targetSpeed : Vector3.Zero;
 

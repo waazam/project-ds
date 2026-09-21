@@ -547,6 +547,40 @@ public static class Sfx
 	}
 
 	/// <summary>
+	/// A murmured, breathy voice out in the trees — never intelligible words,
+	/// just a handful of syllable-like pulses sweeping downward through heavy
+	/// reverb, so it reads as "something spoke" from a dreamlike distance.
+	/// </summary>
+	public static double[] WhisperVoice(Rng r, int sr)
+	{
+		double dur = r.R(1.8, 2.6);
+		var x = Buf(sr, dur);
+		int syl = r.I(3, 5);
+		double t = r.R(0.03, 0.08);
+		for (int s = 0; s < syl; s++)
+		{
+			double d = r.R(0.14, 0.26);
+			double f0 = r.R(220, 340) * (1 - 0.08 * s);
+			int s0 = (int)(t * sr), len = (int)(d * sr);
+			var bp1 = Biquad.Bp(sr, f0, 5.0);
+			var bp2 = Biquad.Bp(sr, f0 * r.R(2.6, 3.2), 4.0);
+			for (int i = 0; i < len && s0 + i < x.Length; i++)
+			{
+				double tt = (double)i / sr, u = tt / d;
+				double n = r.W();
+				double v = bp1.P(n) * 1.4 + bp2.P(n) * 0.6;
+				x[s0 + i] += v * Env(u, 0.25, 0.4) * r.R(0.7, 1.0);
+			}
+			t += d + r.R(0.05, 0.13);
+		}
+		HighPass(x, sr, 150); LowPass(x, sr, 2600);
+		var rv = new Reverb(sr, 0.92, 0.6);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) o[i] = x[i] * 0.4 + rv.P(x[i]) * 1.0;
+		return FinishOneShot(o, sr, -3, 200);
+	}
+
+	/// <summary>
 	/// The sting when you look straight at it: not a jump scare, just a wrongness
 	/// in the ears. A thin, detuned high cluster swells in, pressure drops away
 	/// underneath, and it all drains out.

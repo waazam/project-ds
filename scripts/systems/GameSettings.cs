@@ -24,12 +24,36 @@ public partial class GameSettings : Node
 	/// <summary>First person is the current design. Third person is kept working for later.</summary>
 	public CameraMode Camera = CameraMode.FirstPerson;
 
+	// Audio: linear 0..1, applied to the Master bus. Defaults below full — playtesting found the
+	// mix considerably louder than expected at 100%.
+	private float _masterVolume = 0.6f;
+	public float MasterVolume
+	{
+		get => _masterVolume;
+		set { _masterVolume = Mathf.Clamp(value, 0f, 1f); ApplyMasterVolume(); }
+	}
+
+	private static void ApplyMasterVolume()
+	{
+		int bus = AudioServer.GetBusIndex("Master");
+		if (bus < 0) return;
+		float v = Instance?._masterVolume ?? 0.6f;
+		AudioServer.SetBusVolumeDb(bus, v <= 0.0001f ? -80f : Mathf.LinearToDb(v));
+	}
+
 	// Command-line flags (after "--" on the godot command line)
 	public bool AutoTest { get; private set; }
 	/// <summary>Dev-only fast path: the autotest skips straight to the Act 5 → 7 handoff instead
 	/// of replaying the whole game first. Cuts a ~20-minute run down to a couple of minutes while
 	/// iterating on that stretch specifically.</summary>
 	public bool AutoTestSkipToAct5 { get; private set; }
+	/// <summary>Dev-only fast path: skips straight to just after the cabin fire, near the bunker, for
+	/// fast iteration on Acts 8-10 (the bunker interior) without replaying Acts 1-7 first.</summary>
+	public bool AutoTestSkipToAct7 { get; private set; }
+	/// <summary>Dev-only fast path: skips straight to just after the walkie-talkie is found, near the
+	/// bunker, for fast iteration on Act 11 (the radio, the tall stairs, the giant) without replaying
+	/// the bunker's hallway/CRT room/maze first.</summary>
+	public bool AutoTestSkipToAct11 { get; private set; }
 
 	private const string SavePath = "user://settings.cfg";
 
@@ -39,9 +63,12 @@ public partial class GameSettings : Node
 		var args = OS.GetCmdlineUserArgs();
 		AutoTest = args.Contains("--autotest");
 		AutoTestSkipToAct5 = args.Contains("--skip-to-act5");
+		AutoTestSkipToAct7 = args.Contains("--skip-to-act7");
+		AutoTestSkipToAct11 = args.Contains("--skip-to-act11");
 		RegisterInputActions();
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
+		ApplyMasterVolume();
 	}
 
 	public override void _UnhandledInput(InputEvent e)
@@ -64,6 +91,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("camera", "invert_y", InvertY);
 		cfg.SetValue("camera", "distance", CameraDistance);
 		cfg.SetValue("camera", "mode", (int)Camera);
+		cfg.SetValue("audio", "master_volume", MasterVolume);
 		cfg.Save(SavePath);
 		EmitSignal(SignalName.Changed);
 	}
@@ -78,6 +106,7 @@ public partial class GameSettings : Node
 		InvertY = (bool)cfg.GetValue("camera", "invert_y", InvertY);
 		CameraDistance = (float)cfg.GetValue("camera", "distance", CameraDistance);
 		Camera = (CameraMode)(int)cfg.GetValue("camera", "mode", (int)Camera);
+		_masterVolume = (float)cfg.GetValue("audio", "master_volume", _masterVolume);
 	}
 
 	private static void RegisterInputActions()
@@ -92,6 +121,8 @@ public partial class GameSettings : Node
 		AddMouse("focus", MouseButton.Right);
 		AddKeys("flashlight_toggle", Key.F);
 		AddMouse("photo", MouseButton.Left);
+		AddMouse("item_next", MouseButton.WheelDown);
+		AddMouse("item_prev", MouseButton.WheelUp);
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);

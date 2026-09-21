@@ -59,6 +59,7 @@ public partial class ForestAtmosphere : Node
 	private Environment _env;
 	private DirectionalLight3D _sun;
 	private float _t = -1;
+	private Tween _heightFogTween;
 
 	private Mood _mood = Mood.Auto;
 	private float _moodBlend;
@@ -87,6 +88,30 @@ public partial class ForestAtmosphere : Node
 		_mood = mood;
 		_moodBlend = 0f;
 		_moodBlendSpeed = 1f / Mathf.Max(seconds, 0.05f);
+	}
+
+	/// <summary>
+	/// A vertical fog band that has nothing to do with the distance-based mood blend above (this
+	/// touches only fog_height/fog_height_density, which ProcessMoodBlend never sets): cross-fades
+	/// toward thickening above <paramref name="height"/>, at <paramref name="density"/>, so anything
+	/// tall enough gets visually swallowed the higher up it goes. Used for Act 11's stairs, which need
+	/// to look like they vanish into the canopy rather than simply being a very tall, fully visible model.
+	/// </summary>
+	public void SetHeightFog(float height, float density, float seconds)
+	{
+		if (_env == null) return;
+		_heightFogTween?.Kill();
+		_heightFogTween = CreateTween().SetParallel();
+		_heightFogTween.TweenProperty(_env, "fog_height", height, seconds);
+		_heightFogTween.TweenProperty(_env, "fog_height_density", -Mathf.Abs(density), seconds);
+	}
+
+	public void ClearHeightFog(float seconds)
+	{
+		if (_env == null) return;
+		_heightFogTween?.Kill();
+		_heightFogTween = CreateTween().SetParallel();
+		_heightFogTween.TweenProperty(_env, "fog_height_density", 0f, seconds);
 	}
 
 	public override void _Process(double delta)

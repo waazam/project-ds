@@ -92,8 +92,12 @@ public partial class Cabin : Node3D
 		k.Mat(wood);
 		foreach (float z in new[] { -hd - wallT * 0.5f, hd + wallT * 0.5f })
 		{
+			// Double-sided: a single-facing normal here backface-culled the inward side, leaving the
+			// gable invisible (and the sky showing straight through it) from inside the cabin.
 			k.Tri(new Vector3(-hw, WallHeight, z), new Vector3(hw, WallHeight, z), new Vector3(0, peak - 0.06f, z),
 				new Vector3(0, 0, Mathf.Sign(z)), new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 1));
+			k.Tri(new Vector3(-hw, WallHeight, z), new Vector3(hw, WallHeight, z), new Vector3(0, peak - 0.06f, z),
+				new Vector3(0, 0, -Mathf.Sign(z)), new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 1));
 		}
 
 		// chimney, stone, on the back-left corner

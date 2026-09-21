@@ -15,6 +15,18 @@ damping = 0.6
 spread = 0.6
 wet = 0.02
 
+[sub_resource type="AudioEffectDistortion" id="VoiceDistortion"]
+resource_name = "Distortion"
+mode = 0
+drive = 0.35
+
+[sub_resource type="AudioEffectReverb" id="VoiceReverb"]
+resource_name = "Reverb"
+room_size = 0.85
+damping = 0.5
+spread = 0.8
+wet = 0.35
+
 [resource]
 bus/0/effect/0/effect = SubResource("MasterLimiter")
 bus/0/effect/0/enabled = true
@@ -76,6 +88,10 @@ bus/9/mute = false
 bus/9/bypass_fx = false
 bus/9/volume_db = 0.0
 bus/9/send = &"Master"
+bus/9/effect/0/effect = SubResource("VoiceReverb")
+bus/9/effect/0/enabled = true
+bus/9/effect/1/effect = SubResource("VoiceDistortion")
+bus/9/effect/1/enabled = false
 bus/10/name = &"Events"
 bus/10/solo = false
 bus/10/mute = false

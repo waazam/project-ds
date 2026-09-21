@@ -6,6 +6,9 @@
 [ext_resource type="Script" path="res://scripts/ui/DebugOverlay.cs" id="4_debug"]
 [ext_resource type="Script" path="res://scripts/ui/InteractPrompt.cs" id="5_prompt"]
 [ext_resource type="Script" path="res://scripts/ui/Compass.cs" id="6_compass"]
+[ext_resource type="Script" path="res://scripts/ui/StaminaBar.cs" id="7_stamina"]
+[ext_resource type="Script" path="res://scripts/ui/EquippedItemHud.cs" id="8_equip"]
+[ext_resource type="Script" path="res://scripts/ui/Subtitle.cs" id="9_subtitle"]
 
 [sub_resource type="ShaderMaterial" id="PostMat"]
 shader = ExtResource("1_post")
@@ -38,3 +41,12 @@ script = ExtResource("5_prompt")
 
 [node name="Compass" type="CanvasLayer" parent="."]
 script = ExtResource("6_compass")
+
+[node name="StaminaBar" type="CanvasLayer" parent="."]
+script = ExtResource("7_stamina")
+
+[node name="EquippedItemHud" type="CanvasLayer" parent="."]
+script = ExtResource("8_equip")
+
+[node name="Subtitle" type="CanvasLayer" parent="."]
+script = ExtResource("9_subtitle")

@@ -24,11 +24,17 @@ public partial class StoryManager : Node
 	public bool NewelPostTaken { get; private set; }
 	/// <summary>Runtime only: the clearing's voice line has played and the post has fused onto a staircase.</summary>
 	public bool ClearingVoiceHeard { get; private set; }
+	/// <summary>Runtime only: the bunker's CRT room has been shut off and shown the stairs (Act 9 → 10 handoff).</summary>
+	public bool CrtPuzzleDone { get; private set; }
+	/// <summary>Runtime only: the radio's one exchange ("Did you see them?" / "Who are you!") has played and the compass now points at the main stairs (Act 10 → 11 handoff).</summary>
+	public bool Act11DialogueDone { get; private set; }
 
 	/// <summary>
 	/// Where the compass points: the stairs while still searching for them, the cabin once the giant
 	/// has been seen, the bridge once the newel post is in hand, the Act 6 clearing once the bridge is
-	/// crossed, and back to the cabin once the clearing's voice has spoken.
+	/// crossed, back to the cabin once the clearing's voice has spoken, the bunker once the cabin is
+	/// seen burning, the CRT room's marked screen once inside the bunker, and back toward the bunker's
+	/// own entrance once the screens have shown the stairs.
 	/// </summary>
 	public Vector3? ObjectivePosition
 	{
@@ -47,13 +53,28 @@ public partial class StoryManager : Node
 				return GetTree().GetFirstNodeInGroup("bridge_marker") is Node3D bridge ? bridge.GlobalPosition : null;
 			if (!ClearingVoiceHeard)
 				return GetTree().GetFirstNodeInGroup("stairs_clearing_marker") is Node3D clearing ? clearing.GlobalPosition : null;
-			return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabinReturn ? cabinReturn.GlobalPosition : null;
+			if (Current < Checkpoint.Act7CabinBurning)
+				return GetTree().GetFirstNodeInGroup("cabin") is Node3D cabinReturn ? cabinReturn.GlobalPosition : null;
+			if (Current < Checkpoint.Act8BunkerEntered)
+				return GetTree().GetFirstNodeInGroup("bunker_marker") is Node3D bunker ? bunker.GlobalPosition : null;
+			if (!CrtPuzzleDone)
+				return GetTree().GetFirstNodeInGroup("crt_target_marker") is Node3D crt ? crt.GlobalPosition : null;
+			if (Current < Checkpoint.Act10WalkieFound)
+				return GetTree().GetFirstNodeInGroup("bunker_entrance_marker") is Node3D entrance ? entrance.GlobalPosition : null;
+			if (Current < Checkpoint.Act11GiantEncounter)
+			{
+				if (!Act11DialogueDone) return null;   // mid-exchange, still standing outside the bunker
+				return GetTree().GetFirstNodeInGroup("stairs_clearing_marker") is Node3D stairs ? stairs.GlobalPosition : null;
+			}
+			return null;
 		}
 	}
 
 	public void MarkGiantEventDone() => GiantEventDone = true;
 	public void MarkNewelPostTaken() => NewelPostTaken = true;
 	public void MarkClearingVoiceHeard() => ClearingVoiceHeard = true;
+	public void MarkCrtPuzzleDone() => CrtPuzzleDone = true;
+	public void MarkAct11DialogueDone() => Act11DialogueDone = true;
 
 	/// <summary>True for one scene load: GameFlow should place the player from the saved data, not the spawn marker.</summary>
 	public bool HasPendingContinue { get; private set; }
@@ -70,6 +91,8 @@ public partial class StoryManager : Node
 		GiantEventDone = false;
 		NewelPostTaken = false;
 		ClearingVoiceHeard = false;
+		CrtPuzzleDone = false;
+		Act11DialogueDone = false;
 		HasPendingContinue = false;
 		_continueData = null;
 		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller.
@@ -88,6 +111,8 @@ public partial class StoryManager : Node
 		GiantEventDone = false;
 		NewelPostTaken = false;
 		ClearingVoiceHeard = false;
+		CrtPuzzleDone = false;
+		Act11DialogueDone = false;
 		GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, LevelScene);
 		return true;
 	}

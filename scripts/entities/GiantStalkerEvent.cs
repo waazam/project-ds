@@ -66,9 +66,11 @@ public partial class GiantStalkerEvent : Node
 		skin.SetShaderParameter("visibility", 1f);
 		skin.SetShaderParameter("wetness", 0.4f);
 		var body = new StalkerBody { Skin = skin, Size = BodyScale, SwaySeconds = 22f, SwayDegrees = 0.8f, HeadDriftDegrees = 1.5f };
+		// Must be in the tree before GlobalPosition/LookAt: Godot can't resolve a global transform
+		// for an orphan node, and silently no-ops (with a console warning) instead.
+		GetTree().Root.AddChild(body);
 		body.GlobalPosition = start;
 		body.LookAt(body.GlobalPosition + right, Vector3.Up);
-		GetTree().Root.AddChild(body);
 
 		var steps = new List<AudioStream>();
 		foreach (var name in new[] { "branch_drop_01", "branch_drop_02" })

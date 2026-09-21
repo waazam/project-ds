@@ -59,6 +59,7 @@ public partial class PauseMenu : CanvasLayer
 		box.AddChild(title);
 
 		var s = GameSettings.Instance;
+		UiKit.AddSlider(box, "Master volume", 0.0, 1.0, s.MasterVolume, v => s.MasterVolume = (float)v);
 		UiKit.AddSlider(box, "Mouse sensitivity", 0.0005, 0.008, s.MouseSensitivity, v => s.MouseSensitivity = (float)v);
 		UiKit.AddSlider(box, "Stick sensitivity", 0.8, 5.0, s.StickSensitivity, v => s.StickSensitivity = (float)v);
 		if (s.Camera == CameraMode.ThirdPerson)

@@ -74,8 +74,18 @@ public partial class AutoTest : Node
 
 	private void Screenshot(string label)
 	{
-		var img = GetViewport().GetTexture().GetImage();
-		img.SavePng(ProjectSettings.GlobalizePath($"{OutDir}/{_shot++:00}_{label}.png"));
+		// A screenshot is diagnostic sugar, never a test assertion: an occasional null frame from the
+		// headless/dummy renderer (seen right after an expensive synchronous rebuild, e.g. Act 11's
+		// stairs) must not take the whole scripted run down with it.
+		try
+		{
+			var img = GetViewport()?.GetTexture()?.GetImage();
+			img?.SavePng(ProjectSettings.GlobalizePath($"{OutDir}/{_shot++:00}_{label}.png"));
+		}
+		catch (System.Exception e)
+		{
+			GD.PushWarning($"[autotest] screenshot '{label}' failed: {e.Message}");
+		}
 	}
 
 	private async Task Run()
@@ -94,6 +104,22 @@ public partial class AutoTest : Node
 		if (GameSettings.Instance.AutoTestSkipToAct5)
 		{
 			await SkipToAct5();
+			if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
+			Finish();
+			return;
+		}
+
+		if (GameSettings.Instance.AutoTestSkipToAct7)
+		{
+			await SkipToAct7();
+			if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
+			Finish();
+			return;
+		}
+
+		if (GameSettings.Instance.AutoTestSkipToAct11)
+		{
+			await SkipToAct11();
 			if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
 			Finish();
 			return;
@@ -213,6 +239,10 @@ public partial class AutoTest : Node
 		Check("walked back toward the cabin", returned > 50f, $"{returned:0} m");
 		double doorWait = 0;
 		while (StoryManager.Instance.Current < Checkpoint.Act3DoorBoarded && doorWait < 10) { await Wait(0.25); doorWait += 0.25; }
+		_input.ScriptedMove = Vector2.Zero;
+		await GoTo(cabin.ApproachPoint, 1.0f);
+		_input.ScriptedMove = Vector2.Zero;
+		await SnapLookAt(cabin.DoorCenter);
 		Screenshot("cabin_boarded");
 		Check("checkpoint 3 (door boarded) reached", StoryManager.Instance.Current >= Checkpoint.Act3DoorBoarded, $"after {doorWait:0.0}s");
 		var save3 = SaveSystem.Load();
@@ -237,6 +267,14 @@ public partial class AutoTest : Node
 		Check("compass equipped", inv.HasCompass, "");
 		await Wait(0.5);
 		Check("compass HUD showing", compassUi != null && compassUi.ShowingCompass, "");
+
+		// A wide shot with both buildings in frame, to catch the cabin and shed ever overlapping again.
+		if (GetTree().Root.FindChild("Shed", true, false) is Node3D shed)
+		{
+			_input.ScriptedMove = Vector2.Zero;
+			await SnapLookAt(shed.GlobalPosition + Vector3.Up * 1.2f);
+			Screenshot("cabin_and_shed");
+		}
 
 		// Step outside the safe zone: the storm should begin.
 		Check("storm not yet active near the cabin", StormController.Instance is { Active: false }, "");
@@ -274,6 +312,11 @@ public partial class AutoTest : Node
 		while (!cabin.IsOpen && openWait < 8) { await Wait(0.25); openWait += 0.25; }
 		Check("door chopped open with the axe", cabin.IsOpen, $"after {openWait:0.1}s");
 		Check("axe consumed", inv.CurrentTool == ToolKind.None, $"{inv.CurrentTool}");
+		_input.ScriptedMove = Vector2.Zero;
+		await GoTo(cabin.ApproachPoint, 1.0f);
+		_input.ScriptedMove = Vector2.Zero;
+		await SnapLookAt(cabin.DoorCenter);
+		Screenshot("cabin_door_open");
 
 		// Step inside and find the friend. The doorway is a tight, precise target for this bot's
 		// straight-line steering (no real pathfinding/obstacle-avoidance) even though it's an easy
@@ -292,6 +335,8 @@ public partial class AutoTest : Node
 		Check("checkpoint 4 saved to disk", save4 != null && save4.Checkpoint >= Checkpoint.Act5CabinEntered, $"{save4?.Checkpoint}");
 
 		await Act6And7(inv, cabin);
+		await Act8Through10();
+		await Act11();
 
 		if (_fpsCount > 0) Check("performance", _fpsSum / _fpsCount > 55f, $"avg {_fpsSum / _fpsCount:0} min {_fpsMin:0} fps");
 		Finish();
@@ -318,6 +363,225 @@ public partial class AutoTest : Node
 		// themselves before we go looking for them — their own _Process only runs on real frames.
 		await Wait(0.3);
 		await Act6And7(inv, cabin);
+		await Act8Through10();
+	}
+
+	/// <summary>Dev-only fast path (--skip-to-act7): fakes Acts 1-7 as already complete — cabin open,
+	/// lantern/compass/newel post handled, the cabin already seen burning — and places the player
+	/// just outside the bunker's open radius, for fast iteration on Acts 8-10 (the bunker interior).</summary>
+	private async Task SkipToAct7()
+	{
+		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
+		Check("cabin found for skip-to-act7", cabin != null, "");
+		if (cabin == null) return;
+		var inv = _player.GetNode<PlayerInventory>("Inventory");
+		cabin.OpenDoor();
+		inv.TryPickup(ToolKind.Lantern);
+		inv.TryPickup(ToolKind.Compass);
+		StoryManager.Instance.MarkGiantEventDone();
+		StoryManager.Instance.MarkNewelPostTaken();
+		StoryManager.Instance.MarkClearingVoiceHeard();
+		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act6BridgeCrossed, cabin.GlobalPosition, 0f);
+
+		var bunkerNode = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
+		Check("bunker found for skip-to-act7", bunkerNode != null, $"{bunkerNode?.GlobalPosition}");
+		if (bunkerNode == null) return;
+		// The bunker's own Y doesn't carry over to a point 18 m away on uneven ground — sample the
+		// terrain there directly (as any real placement in this game does) rather than teleporting
+		// blind and hoping gravity sorts it out.
+		Vector3 spot = bunkerNode.GlobalPosition + new Vector3(0, 0, 18f);
+		if (GetTree().GetFirstNodeInGroup("terrain") is ForestTerrain terrain)
+			spot.Y = terrain.HeightAt(spot.X, spot.Z) + 0.2f;
+		_player.GlobalPosition = spot;
+		await Frame();
+		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act7CabinBurning, _player.GlobalPosition, _player.CameraRig.Yaw);
+		await Wait(0.3);
+		await Act8Through10();
+	}
+
+	/// <summary>Dev-only fast path (--skip-to-act11): fakes Acts 1-10 as already complete — cabin,
+	/// newel post, clearing voice, and the whole bunker (hallway/CRT room/maze) all handled — and
+	/// places the player just outside the bunker with the walkie-talkie already found, for fast
+	/// iteration on Act 11 (the radio, the tall stairs, the giant) without replaying the bunker first.</summary>
+	private async Task SkipToAct11()
+	{
+		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
+		Check("cabin found for skip-to-act11", cabin != null, "");
+		if (cabin == null) return;
+		var inv = _player.GetNode<PlayerInventory>("Inventory");
+		cabin.OpenDoor();
+		inv.TryPickup(ToolKind.Lantern);
+		inv.TryPickup(ToolKind.Compass);
+		StoryManager.Instance.MarkGiantEventDone();
+		StoryManager.Instance.MarkNewelPostTaken();
+		StoryManager.Instance.MarkClearingVoiceHeard();
+		StoryManager.Instance.MarkCrtPuzzleDone();
+
+		var bunkerNode = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
+		Check("bunker found for skip-to-act11", bunkerNode != null, $"{bunkerNode?.GlobalPosition}");
+		if (bunkerNode == null) return;
+		Vector3 spot = bunkerNode.GlobalPosition + new Vector3(0, 0, 16f);
+		if (GetTree().GetFirstNodeInGroup("terrain") is ForestTerrain terrain)
+			spot.Y = terrain.HeightAt(spot.X, spot.Z) + 0.2f;
+		_player.GlobalPosition = spot;
+		await Frame();
+		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act10WalkieFound, _player.GlobalPosition, _player.CameraRig.Yaw);
+		inv.TryPickup(ToolKind.Radio);
+		await Wait(0.3);
+		await Act11();
+	}
+
+	/// <summary>Act 7's handoff into the bunker (Act 8's hallway, Act 9's CRT room, Act 10's maze escape).</summary>
+	private async Task Act8Through10()
+	{
+		var bunkerNode = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
+		Check("bunker exists in the world", bunkerNode != null, $"{bunkerNode?.GlobalPosition}");
+		var objAfterFire = StoryManager.Instance.ObjectivePosition;
+		Check("compass now points at the bunker", bunkerNode != null && objAfterFire != null && objAfterFire.Value.DistanceTo(bunkerNode.GlobalPosition) < 3f, $"{objAfterFire}");
+
+		bool BunkerEntered() => StoryManager.Instance.Current >= Checkpoint.Act8BunkerEntered;
+		if (bunkerNode != null)
+		{
+			// Wherever the fire checkpoint left the player standing near the cabin (a normal walk-up,
+			// or a recovery from the accidental extended climb above), the same cabin/shed tightness
+			// that required a sidestep-and-snap for the bridge leg applies here too — a blind
+			// BuildTrailRouteTo from an arbitrary point right next to the building can box the bot in.
+			var cabinNode = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
+			if (cabinNode != null)
+			{
+				await GoTo(cabinNode.WideApproachPoint, 2.0f);
+				var trailNearCabin = AllTrailWaypoints();
+				if (trailNearCabin.Count > 0)
+				{
+					Vector3 nearest = trailNearCabin[0]; float best = float.MaxValue;
+					foreach (var p in trailNearCabin)
+					{
+						float d = Flat(p).DistanceTo(Flat(cabinNode.GlobalPosition));
+						if (d < best) { best = d; nearest = p; }
+					}
+					_player.GlobalPosition = nearest;
+					await Frame();
+				}
+			}
+			var toBunker = BuildTrailRouteTo(bunkerNode.GlobalPosition);
+			for (int i = 0; i < toBunker.Count && !BunkerEntered(); i++)
+				await GoTo(toBunker[i], i == toBunker.Count - 1 ? 1.0f : 3.0f, BunkerEntered);
+		}
+		Screenshot("bunker_found");
+		double bunkerWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act8BunkerEntered && bunkerWait < 12) { await Wait(0.25); bunkerWait += 0.25; }
+		Check("checkpoint 7 (entered the bunker) reached", StoryManager.Instance.Current >= Checkpoint.Act8BunkerEntered, $"after {bunkerWait:0.1}s");
+		var save7 = SaveSystem.Load();
+		Check("checkpoint 7 saved to disk", save7 != null && save7.Checkpoint >= Checkpoint.Act8BunkerEntered, $"{save7?.Checkpoint}");
+
+		var bunkerInt = BunkerInterior.Instance;
+		Check("bunker interior wired up", bunkerInt != null, "");
+		if (bunkerInt == null) return;
+
+		// The checkpoint fires the instant the trigger is crossed, but AdmitPlayer's own fade/teleport
+		// sequence takes a couple of seconds to actually land the player — give it room to finish.
+		double admitWait = 0;
+		while (_player.GlobalPosition.DistanceTo(bunkerInt.GlobalPosition) > 500f && admitWait < 5) { await Wait(0.25); admitWait += 0.25; }
+		Check("teleported into the bunker interior", _player.GlobalPosition.DistanceTo(bunkerInt.GlobalPosition) < 500f,
+			$"player {_player.GlobalPosition}, interior {bunkerInt.GlobalPosition}, after {admitWait:0.0}s");
+
+		// Act 8: the hallway. Walking its length should trip the light-reddening mechanic.
+		bool reachedDoor = await GoTo(bunkerInt.VineDoorApproachWorld + new Vector3(0, 0, -4f), 0.6f);
+		Screenshot("hallway_red");
+		Check("walked the length of the hallway", reachedDoor, $"{_player.GlobalPosition}");
+		Check("hallway lights commit to red by the far end", bunkerInt.RedTriggered, "");
+		Check("player standing in the vine door's trigger zone", bunkerInt.PlayerAtVineDoor, $"{_player.GlobalPosition}");
+		await Tap("interact", 0.15);
+		Check("vine door pushed open", bunkerInt.VineDoorOpenState, "");
+		bool reachedCrtRoom = await GoTo(bunkerInt.CrtRoomInteriorWorld, 1.2f);
+		Check("walked into the CRT room", reachedCrtRoom, $"{_player.GlobalPosition}");
+
+		// Act 9: the CRT room.
+		bool reachedCrtTarget = await GoTo(bunkerInt.CrtTargetApproachWorld, 1.0f);
+		Check("reached the target screen", reachedCrtTarget, $"{_player.GlobalPosition} vs {bunkerInt.CrtTargetApproachWorld}");
+		Check("in range to interact with the target screen", bunkerInt.PlayerAtCrtTarget, "");
+		await Tap("interact", 0.15);
+		await Wait(0.3);
+		Check("all the screens go dark", bunkerInt.ScreensOff, "");
+		double crtWait = 0;
+		while (StoryManager.Instance is { CrtPuzzleDone: false } && crtWait < 8) { await Wait(0.25); crtWait += 0.25; }
+		Screenshot("crt_room");
+		Check("the screens turn back on showing the stairs", StoryManager.Instance.CrtPuzzleDone, $"after {crtWait:0.1}s");
+
+		// Act 10: leaving back through the door turns the hallway into a maze mid-walk — a plain
+		// GoTo would keep chasing the old (now irrelevant) target through the teleport that follows,
+		// so steer by hand and stop the moment the maze actually appears.
+		var vineApproach = bunkerInt.VineDoorApproachWorld;
+		double backTimer = 0;
+		while (!bunkerInt.MazeActive && backTimer < 15)
+		{
+			SteerCamera(vineApproach);
+			_input.ScriptedMove = new Vector2(0, 1);
+			_input.ScriptedRun = true;
+			await Frame();
+			backTimer += 1.0 / 60;
+		}
+		Check("leaving back through the door turns the hallway into a maze", bunkerInt.MazeActive, $"after {backTimer:0.0}s");
+
+		if (bunkerInt.MazeSolutionWaypointsWorld is { Count: > 0 } maze)
+		{
+			for (int i = 0; i < maze.Count; i++)
+				await GoTo(maze[i], i == maze.Count - 1 ? 1.2f : 1.5f);
+		}
+		Screenshot("maze_exit");
+		var walkie = GetTree().Root.FindChild("WalkiePickup", true, false) as Node3D;
+		Check("walkie-talkie dropped at the maze exit", walkie != null, $"{walkie?.GlobalPosition}");
+		if (walkie != null)
+		{
+			await GoTo(walkie.GlobalPosition, 0.8f);
+			await Tap("interact", 0.15);
+		}
+		double walkieWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act10WalkieFound && walkieWait < 5) { await Wait(0.25); walkieWait += 0.25; }
+		Check("checkpoint 8 (walkie-talkie found) reached", StoryManager.Instance.Current >= Checkpoint.Act10WalkieFound, $"after {walkieWait:0.1}s");
+		var save8 = SaveSystem.Load();
+		Check("checkpoint 8 saved to disk", save8 != null && save8.Checkpoint >= Checkpoint.Act10WalkieFound, $"{save8?.Checkpoint}");
+	}
+
+	/// <summary>Act 11, "The Third Man": the radio's one exchange, the walk back to the now-impossibly-tall
+	/// original stairs, the climb, and the giant's touch.</summary>
+	private async Task Act11()
+	{
+		// The radio wakes up: a fade-teleport carries the player back outside near the bunker, then the
+		// exchange plays as a subtitle (never a full black screen — this is meant to happen mid-stride).
+		double dialogueWait = 0;
+		while (StoryManager.Instance is { Act11DialogueDone: false } && dialogueWait < 20) { await Wait(0.25); dialogueWait += 0.25; }
+		Screenshot("radio_outside");
+		Check("radio exchange finished, compass ready to point at the stairs", StoryManager.Instance.Act11DialogueDone, $"after {dialogueWait:0.1}s");
+		var bunkerNode = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
+		Check("player carried back outside near the bunker", bunkerNode != null && _player.GlobalPosition.DistanceTo(bunkerNode.GlobalPosition) < 60f,
+			$"{_player.GlobalPosition}");
+
+		var stairsMarker = GetTree().GetFirstNodeInGroup("stairs_clearing_marker") as Node3D;
+		var objToStairs = StoryManager.Instance.ObjectivePosition;
+		Check("compass now points at the main stairs", stairsMarker != null && objToStairs != null && objToStairs.Value.DistanceTo(stairsMarker.GlobalPosition) < 3f,
+			$"{objToStairs}");
+
+		var act11 = GetTree().Root.FindChild("Act11Ending", true, false) as Act11Ending;
+		Check("Act11Ending wired up", act11 != null, "");
+		if (act11 == null || stairsMarker == null) return;
+
+		var toStairs = BuildTrailRouteTo(stairsMarker.GlobalPosition);
+		for (int i = 0; i < toStairs.Count; i++) await GoTo(toStairs[i], i == toStairs.Count - 1 ? 3.0f : 3.0f);
+		Screenshot("stairs_reveal");
+
+		var approach = act11.ApproachWorld;
+		if (approach != null) await GoTo(approach.Value, 1.0f);
+		var trigger = act11.ClimbTriggerWorld;
+		Check("climb trigger exists at the base of the (now huge) stairs", trigger != null, $"{trigger}");
+		if (trigger != null) await GoTo(trigger.Value, 0.8f);
+
+		double climbWait = 0;
+		while (StoryManager.Instance.Current < Checkpoint.Act11GiantEncounter && climbWait < 90) { await Wait(0.5); climbWait += 0.5; }
+		Screenshot("giant_touch");
+		Check("checkpoint 9 (the giant's touch) reached", StoryManager.Instance.Current >= Checkpoint.Act11GiantEncounter, $"after {climbWait:0.1}s");
+		var save9 = SaveSystem.Load();
+		Check("checkpoint 9 saved to disk", save9 != null && save9.Checkpoint >= Checkpoint.Act11GiantEncounter, $"{save9?.Checkpoint}");
 	}
 
 	/// <summary>Act 5's handoff into Act 6 (newel post, the bridge, the clearing) and Act 7 (the cabin on fire).</summary>
@@ -387,10 +651,24 @@ public partial class AutoTest : Node
 		// Walk to the clearing (the same one from Act 2, ~450 m further on) — reuse the exact
 		// trail-following route the first climb used, which already proves out this whole
 		// corridor, rather than trusting a long blind hop across the forest again.
+		// The now-larger mini staircases can be close enough to this path that the bot brushes one
+		// by accident and fires the (entirely optional, player-only) extended climb — if that
+		// happens, stop steering toward the old waypoint immediately rather than fighting the
+		// scripted teleport that follows.
+		var act6Event = GetTree().Root.FindChild("Act6Clearing", true, false) as Act6ClearingEvent;
+		bool ExtendedClimbFired() => act6Event?.ExtendedClimbFired ?? false;
 		var clearingRoute = BuildRoute();
 		Check("clearing route found", clearingRoute.Count > 1, $"{clearingRoute.Count} points");
-		for (int i = 0; i < clearingRoute.Count; i++)
-			await GoTo(clearingRoute[i], i == clearingRoute.Count - 1 ? 10f : 2.0f);
+		for (int i = 0; i < clearingRoute.Count && !ExtendedClimbFired(); i++)
+			await GoTo(clearingRoute[i], i == clearingRoute.Count - 1 ? 10f : 2.0f, ExtendedClimbFired);
+		if (ExtendedClimbFired())
+		{
+			// The mini staircases free themselves almost the instant the climb starts, so that's not
+			// a useful "it's finished" signal — just wait out the whole scripted sequence (fade, 5 s
+			// hold, rebuild, teleport, fade back, captions) before touching player state again.
+			GD.Print("[autotest] brushed an optional mini staircase on the way in — waiting out the extended climb before continuing");
+			await Wait(15.0);
+		}
 		double voiceWait = 0;
 		while (StoryManager.Instance is { ClearingVoiceHeard: false } && voiceWait < 15) { await Wait(0.5); voiceWait += 0.5; }
 		Screenshot("clearing");
@@ -405,11 +683,22 @@ public partial class AutoTest : Node
 		while (atmosphere?.CurrentMood != ForestAtmosphere.Mood.Night && nightWait < 12) { await Wait(0.5); nightWait += 0.5; }
 		Check("night falls on its own when the optional stairs are skipped", atmosphere?.CurrentMood == ForestAtmosphere.Mood.Night, $"after {nightWait:0.1}s, mood {atmosphere?.CurrentMood}");
 
-		// Act 7: back to the cabin, now on fire.
+		// Act 7: back to the cabin, now on fire. Same accidental-mini-staircase protection as the
+		// walk in (BuildReturnRoute leaves from wherever the player actually is, so it recovers
+		// cleanly on its own once the extended climb — if it fires here instead — hands control back).
+		bool climbFiredBefore = ExtendedClimbFired();
 		var backToCabin = BuildReturnRoute();
 		Check("return-to-cabin route found (Act 7)", backToCabin.Count > 3, $"{backToCabin.Count} points");
-		for (int i = 0; i < backToCabin.Count; i++)
-			await GoTo(backToCabin[i], i == backToCabin.Count - 1 ? 1.2f : 2.0f);
+		for (int i = 0; i < backToCabin.Count && !ExtendedClimbFired(); i++)
+			await GoTo(backToCabin[i], i == backToCabin.Count - 1 ? 1.2f : 2.0f, ExtendedClimbFired);
+		if (ExtendedClimbFired() && !climbFiredBefore)
+		{
+			GD.Print("[autotest] brushed an optional mini staircase on the way out — waiting out the extended climb before continuing");
+			await Wait(12.0);
+			backToCabin = BuildReturnRoute();
+			for (int i = 0; i < backToCabin.Count; i++)
+				await GoTo(backToCabin[i], i == backToCabin.Count - 1 ? 1.2f : 2.0f);
+		}
 		double fireWait = 0;
 		while (StoryManager.Instance.Current < Checkpoint.Act7CabinBurning && fireWait < 15) { await Wait(0.5); fireWait += 0.5; }
 		Screenshot("cabin_burning");
@@ -472,7 +761,18 @@ public partial class AutoTest : Node
 		if (GetTree().Root.FindChild("Stalker", true, false) is not Stalker st) return;
 		_input.ScriptedMove = Vector2.Zero; _input.ScriptedRun = false;
 		await Wait(0.6);
+		// DebugForcePeek can fail for two different, both entirely legitimate reasons: it correctly
+		// refuses to interrupt an in-progress Vanishing dissolve, and its own tree search is a randomised,
+		// player-position-dependent raycast sweep that can simply come up empty if nothing suitable is
+		// behind the player at this exact spot on the trail. Neither is a bug — retry a few times so one
+		// unlucky roll (or a stalker still finishing a peek from the very active walk in) doesn't fail
+		// the check outright when the stalker plainly is capable of taking cover here.
 		bool placed = st.DebugForcePeek();
+		for (int i = 0; i < 10 && !placed; i++)
+		{
+			await Wait(0.3);
+			placed = st.DebugForcePeek();
+		}
 		int seenBefore = st.SeenCount;
 		for (int i = 0; i < 45; i++) { _input.AddScriptedLook(new Vector2(Mathf.Pi / 45f, 0)); await Frame(); }
 		Screenshot("look_back");
@@ -512,6 +812,25 @@ public partial class AutoTest : Node
 		for (int i = 0; i < 30; i++) { SteerCamera(target); await Frame(); }
 	}
 
+	/// <summary>Snaps yaw AND pitch to look exactly at a point in one shot, from the camera's actual eye
+	/// position — unlike FaceTarget/SteerCamera (yaw only, and rate-limited, so it can leave a residual
+	/// pitch from whatever the player was last looking at, or not fully turn in 30 frames), this is for
+	/// establishing shots that need to reliably frame a specific target regardless of where the camera
+	/// happened to be pointed beforehand.</summary>
+	private async Task SnapLookAt(Vector3 target)
+	{
+		Vector3 eye = _player.CameraRig.Camera.GlobalPosition;
+		Vector3 to = target - eye;
+		float wantYaw = Mathf.Atan2(-to.X, -to.Z);
+		float horiz = new Vector2(to.X, to.Z).Length();
+		float wantPitch = Mathf.Atan2(to.Y, horiz);
+		float yawDiff = Mathf.AngleDifference(_player.CameraRig.Yaw, wantYaw);
+		float pitchDiff = wantPitch - _player.CameraRig.Pitch;
+		_input.AddScriptedLook(new Vector2(yawDiff, pitchDiff));
+		await Frame();
+		await Frame();
+	}
+
 	private static Vector2 Flat(Vector3 v) => new(v.X, v.Z);
 
 	/// <summary>Turns the camera toward a point; forward input then walks there, like a player would.</summary>
@@ -523,12 +842,20 @@ public partial class AutoTest : Node
 		_input.AddScriptedLook(new Vector2(Mathf.Clamp(diff, -0.08f, 0.08f), 0));
 	}
 
-	private async Task<bool> GoTo(Vector3 target, float radius)
+	/// <summary>
+	/// Steers toward target until within radius (true), stuck for 7s (false), or — if given —
+	/// giveUpIf() turns true first (true): a scripted story transition (a teleport into another
+	/// space entirely) can fire mid-walk from a trigger the bot just crossed, and blindly continuing
+	/// to steer toward the now-irrelevant old-world target once input re-enables there would just
+	/// drag the player sideways off whatever they landed on.
+	/// </summary>
+	private async Task<bool> GoTo(Vector3 target, float radius, System.Func<bool> giveUpIf = null)
 	{
 		double stuckTimer = 0; float bestDist = float.MaxValue;
 		double sidestepTimer = 0; float sidestepDir = 1f;
 		while (true)
 		{
+			if (giveUpIf != null && giveUpIf()) { _input.ScriptedMove = Vector2.Zero; return true; }
 			float d = Flat(_player.GlobalPosition).DistanceTo(Flat(target));
 			if (d < radius) return true;
 			if (d < bestDist - 0.3f) { bestDist = d; stuckTimer = 0; }

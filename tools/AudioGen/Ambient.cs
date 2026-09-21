@@ -287,6 +287,76 @@ public static class Ambient
 		return o;
 	}
 
+	/// <summary>
+	/// Act 10's maze: a handful of overlapping, slowly wavering vocal-like
+	/// drones — a wordless "choir" chanting somewhere in the dark, unsteady
+	/// and never quite in tune with itself.
+	/// </summary>
+	public static double[] ChoirChant(Rng r, int sr, double sec)
+	{
+		int n = (int)(sec * sr), xf = 2 * sr, pre = sr, tot = pre + n + xf;
+		double T = (double)tot / sr;
+		var x = new double[tot];
+		int voices = 5;
+		for (int v = 0; v < voices; v++)
+		{
+			double f0 = r.R(160, 260);
+			var wobble = new Smooth(r, T, r.R(2.2, 4.5));
+			var bp1 = Biquad.Bp(sr, f0, 6);
+			var bp2 = Biquad.Bp(sr, f0 * r.R(2.4, 3.1), 5);
+			double phase = r.R(0, TwoPi);
+			for (int i = 0; i < tot; i++)
+			{
+				double t = (double)i / sr;
+				double f = f0 * (1 + 0.02 * (wobble.At(t) - 0.5));
+				phase += TwoPi * f / sr;
+				double tone = Math.Sin(phase) * 0.5 + Math.Sin(phase * 1.5) * 0.2;
+				double w = r.W();
+				x[i] += (bp1.P(w) * 1.1 + bp2.P(w) * 0.5 + tone * 0.25) / voices;
+			}
+		}
+		HighPass(x, sr, 90); LowPass(x, sr, 2200);
+		var rv = new Reverb(sr, 0.9, 0.55);
+		var o2 = new double[tot];
+		for (int i = 0; i < tot; i++) o2[i] = x[i] * 0.6 + rv.P(x[i]) * 0.8;
+		var loop = MakeLoop(o2, pre, n, xf);
+		NormRms(loop, -22);
+		return loop;
+	}
+
+	/// <summary>Act 10's ending beat: a walkie-talkie's hiss, with sparse crackly pops — the sound the player follows to find it.</summary>
+	public static double[] RadioStatic(Rng r, int sr, double sec)
+	{
+		int n = (int)(sec * sr), xf = (int)(0.3 * sr), pre = (int)(0.2 * sr), tot = pre + n + xf;
+		double T = (double)tot / sr;
+		var x = new double[tot];
+		var hiss = Biquad.Bp(sr, 3200, 0.7);
+		var swell = new Smooth(r, T, 0.6);
+		for (int i = 0; i < tot; i++)
+		{
+			double t = (double)i / sr;
+			x[i] = hiss.P(r.W()) * (0.5 + 0.5 * swell.At(t));
+		}
+		int pops = (int)(sec * 2.2);
+		for (int p = 0; p < pops; p++)
+		{
+			double at = r.R(0, sec);
+			var pf = Biquad.Bp(sr, r.R(800, 2200), 3.5);
+			double dur = r.R(0.01, 0.03);
+			int len = (int)(dur * sr);
+			for (int i = 0; i < len; i++)
+			{
+				double tt = (double)i / sr;
+				int idx = pre + ((int)(at * sr) + i) % n;
+				x[idx] += pf.P(r.W()) * Perc(tt, 0.0003, dur * 0.5) * r.R(0.5, 1.0) * 1.8;
+			}
+		}
+		HighPass(x, sr, 400);
+		var loop = MakeLoop(x, pre, n, xf);
+		NormRms(loop, -18);
+		return loop;
+	}
+
 	/// <summary>"Silence ringing": thin ~8.2 kHz sine, a 0.25 Hz beating partner for the wobble, all periodic.</summary>
 	public static double[] Ringing(int sr, int sec)
 	{

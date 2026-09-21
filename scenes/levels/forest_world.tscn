@@ -17,7 +17,12 @@
 [ext_resource type="Script" path="res://scripts/world/Bird.cs" id="17_bird"]
 [ext_resource type="Script" path="res://scripts/world/DeepZoneDressing.cs" id="18_dressing"]
 [ext_resource type="Script" path="res://scripts/world/Act6ClearingEvent.cs" id="19_act6"]
+[ext_resource type="Script" path="res://scripts/world/Act11Ending.cs" id="25_act11"]
 [ext_resource type="Script" path="res://scripts/world/NavMeshBaker.cs" id="20_navbaker"]
+[ext_resource type="Script" path="res://scripts/world/Bunker.cs" id="21_bunker"]
+[ext_resource type="Script" path="res://scripts/world/BunkerInterior.cs" id="22_bunkerint"]
+[ext_resource type="Script" path="res://scripts/world/Act7Whispers.cs" id="23_whispers"]
+[ext_resource type="Script" path="res://scripts/world/ForestVoiceCues.cs" id="24_voicecues"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -259,7 +264,7 @@ Radius = 5.5
 [node name="TrailAnchor" type="Node" parent="Shed"]
 script = ExtResource("6_anchor")
 Distance = 45.0
-Offset = 11.0
+Offset = 26.0
 YawDegrees = 90.0
 HeightOffset = 0.0
 
@@ -621,7 +626,39 @@ script = ExtResource("18_dressing")
 [node name="Act6Clearing" type="Node3D" parent="Clearing/Stairs"]
 script = ExtResource("19_act6")
 
+[node name="Act11Ending" type="Node3D" parent="Clearing/Stairs"]
+script = ExtResource("25_act11")
+
 [node name="StairsClear" type="Node3D" parent="Clearing"]
 script = ExtResource("9_clear")
 Radius = 2.7
+
+[node name="Bunker" type="Node3D" parent="."]
+script = ExtResource("21_bunker")
+
+[node name="TrailAnchor" type="Node" parent="Bunker"]
+script = ExtResource("6_anchor")
+Distance = 460.0
+Offset = -14.0
+YawDegrees = -90.0
+HeightOffset = 0.0
+
+[node name="GroundSnap" type="Node" parent="Bunker"]
+script = ExtResource("4_snap")
+Offset = -0.05
+FootprintRadius = 2.5
+
+[node name="BunkerClear" type="Node3D" parent="Bunker"]
+script = ExtResource("9_clear")
+Radius = 9.0
+
+[node name="BunkerInterior" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1500, -80, -3000)
+script = ExtResource("22_bunkerint")
+
+[node name="Act7Whispers" type="Node" parent="."]
+script = ExtResource("23_whispers")
+
+[node name="ForestVoiceCues" type="Node" parent="."]
+script = ExtResource("24_voicecues")
 

@@ -13,8 +13,8 @@ namespace ProjectDS.UI;
 /// </summary>
 public partial class Compass : CanvasLayer
 {
-	[Export] public float StripWidth = 340f;
-	[Export] public float StripHeight = 20f;
+	[Export] public float StripWidth = 220f;
+	[Export] public float StripHeight = 13f;
 	/// <summary>Total degrees of heading shown across the strip.</summary>
 	[Export] public float VisibleDegrees = 140f;
 
@@ -38,9 +38,10 @@ public partial class Compass : CanvasLayer
 	{
 		Layer = 12;
 		ProcessMode = ProcessModeEnum.Always;
-		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
-		_draw.SetAnchorsPreset(Control.LayoutPreset.TopWide);
-		_draw.OffsetTop = 14; _draw.OffsetBottom = 14 + StripHeight;
+		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, CustomMinimumSize = new Vector2(StripWidth, StripHeight) };
+		_draw.SetAnchorsPreset(Control.LayoutPreset.CenterTop);
+		_draw.OffsetLeft = -StripWidth * 0.5f; _draw.OffsetRight = StripWidth * 0.5f;
+		_draw.OffsetTop = 8; _draw.OffsetBottom = 8 + StripHeight;
 		_draw.Draw += OnDraw;
 		AddChild(_draw);
 	}
@@ -68,7 +69,8 @@ public partial class Compass : CanvasLayer
 			if (node is SilenceZone zone) distortion = Mathf.Max(distortion, zone.SilenceAt(_player.GlobalPosition));
 		float jitter = distortion > 0.15f ? (distortion - 0.15f) / 0.85f : 0f;
 
-		_draw.DrawRect(new Rect2(0, 0, size.X, size.Y), new Color(0, 0, 0, 0.35f));
+		// A thin baseline, Skyrim-style — no solid backing bar, just the line and its ticks.
+		_draw.DrawLine(new Vector2(0, cy), new Vector2(size.X, cy), new Color(0.85f, 0.85f, 0.8f, 0.4f), 1f);
 
 		float PxFor(float deg)
 		{
@@ -82,14 +84,17 @@ public partial class Compass : CanvasLayer
 			if (jitter > 0.5f && _rng.Randf() < 0.02f) shown += _rng.RandfRange(-40f, 40f);   // a tick briefly lies
 			float delta = Mathf.Wrap(shown - yawDeg, -180f, 180f);
 			if (Mathf.Abs(delta) > VisibleDegrees * 0.5f) continue;
-			float x = cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f) + JitterPx(jitter, 3f);
+			float x = cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f) + JitterPx(jitter, 2f);
 			if (x < 0 || x > size.X) continue;
-			var col = label == "N" ? new Color(0.85f, 0.8f, 0.6f) : new Color(0.75f, 0.75f, 0.72f, 0.8f);
-			_draw.DrawLine(new Vector2(x, cy - 6), new Vector2(x, cy + 6), col, 1.2f);
-			_draw.DrawString(ThemeDB.FallbackFont, new Vector2(x - 6, cy - 8), label, HorizontalAlignment.Center, -1, 9, col);
+			bool major = label is "N" or "S" or "E" or "W";
+			var col = label == "N" ? new Color(0.85f, 0.8f, 0.6f, 0.95f) : new Color(0.8f, 0.8f, 0.76f, major ? 0.75f : 0.45f);
+			float half = major ? 4f : 2.5f;
+			_draw.DrawLine(new Vector2(x, cy - half), new Vector2(x, cy + half), col, 1f);
+			if (major)
+				_draw.DrawString(ThemeDB.FallbackFont, new Vector2(x - 4, cy - half - 2), label, HorizontalAlignment.Center, -1, 7, col);
 		}
 
-		// Objective marker: a diamond on the strip, or an arrow pinned to the edge if it's behind us.
+		// Objective marker: a small diamond riding the line, or an arrow pinned to the edge if it's behind us.
 		float bearing = ObjectiveBearingDeg();
 		if (jitter > 0.05f)
 		{
@@ -97,15 +102,15 @@ public partial class Compass : CanvasLayer
 			bearing = Mathf.LerpAngle(Mathf.DegToRad(bearing), Mathf.DegToRad(_falseBearing), jitter);
 			bearing = Mathf.RadToDeg(bearing);
 		}
-		float bx = PxFor(bearing) + JitterPx(jitter, 8f);
+		float bx = PxFor(bearing) + JitterPx(jitter, 6f);
 		var markColor = new Color(0.9f, 0.75f, 0.3f, Mathf.Lerp(0.95f, 0.4f, jitter));
-		if (bx >= 6 && bx <= size.X - 6)
-			_draw.DrawColoredPolygon(new[] { new Vector2(bx, 2), new Vector2(bx + 5, cy), new Vector2(bx, size.Y - 2), new Vector2(bx - 5, cy) }, markColor);
+		if (bx >= 4 && bx <= size.X - 4)
+			_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 4.5f), new Vector2(bx + 3.5f, cy), new Vector2(bx, cy + 4.5f), new Vector2(bx - 3.5f, cy) }, markColor);
 		else
 		{
-			float ex = Mathf.Clamp(bx, 6, size.X - 6);
-			float dir = bx < 6 ? -1f : 1f;
-			_draw.DrawColoredPolygon(new[] { new Vector2(ex, cy - 6), new Vector2(ex + dir * 7f, cy), new Vector2(ex, cy + 6) }, markColor);
+			float ex = Mathf.Clamp(bx, 4, size.X - 4);
+			float dir = bx < 4 ? -1f : 1f;
+			_draw.DrawColoredPolygon(new[] { new Vector2(ex, cy - 4f), new Vector2(ex + dir * 5f, cy), new Vector2(ex, cy + 4f) }, markColor);
 		}
 	}
 

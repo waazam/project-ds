@@ -40,8 +40,9 @@ public partial class DeepZoneDressing : Node3D
 			float height = rng.RandfRange(38f, 58f);
 			float trunkR = height * 0.028f;
 			var tree = new Node3D { Name = $"Giant{i}" };
-			tree.GlobalPosition = pos;
+			// Must be parented before GlobalPosition is set, or Godot can't resolve the transform.
 			AddChild(tree);
+			tree.GlobalPosition = pos;
 
 			var k = new MeshKit();
 			k.Color = new Color(0.32f, 0.26f, 0.2f);
