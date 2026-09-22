@@ -24,7 +24,20 @@ public partial class StoryManager : Node
 {
 	public static StoryManager Instance { get; private set; }
 
-	public const string LevelScene = "res://scenes/levels/trail_slice.tscn";
+	/// <summary>Act 1: the trailhead, the Blackfern trail and the first staircase.</summary>
+	public const string TrailheadScene = "res://scenes/levels/trail_slice.tscn";
+	/// <summary>Acts 2-11: the hollow the stairs leave the player in, one forward route from the camp to the last staircase.</summary>
+	public const string HollowScene = "res://scenes/levels/hollow.tscn";
+	/// <summary>Kept for older callers: the level a new game starts in.</summary>
+	public const string LevelScene = TrailheadScene;
+
+	/// <summary>The level a checkpoint belongs to: everything from the first climb on happens in the hollow.</summary>
+	public static string LevelFor(Checkpoint cp) => cp >= Checkpoint.Act2StairsClimbed ? HollowScene : TrailheadScene;
+
+	/// <summary>True for one level load: the player got here by the stairs letting go of them (Act 2),
+	/// not by Continue. GameFlow plays the slow wake instead of the usual fade-in.</summary>
+	public bool ArrivedByTravel { get; private set; }
+	public void ConsumeArrival() => ArrivedByTravel = false;
 	public const string MenuScene = "res://scenes/ui/main_menu.tscn";
 
 	/// <summary>Well-known flag names. Add new ones here; never rename one once saves exist.</summary>
@@ -94,28 +107,27 @@ public partial class StoryManager : Node
 	public string PendingInventory { get; private set; }
 
 	/// <summary>
-	/// Where the compass points: the stairs while still searching for them, the cabin once the giant
-	/// has been seen, the bridge once the newel post is in hand, the Act 6 clearing once the bridge is
-	/// crossed, back to the cabin once the clearing's voice has spoken, the bunker once the cabin is
-	/// seen burning, the CRT room's marked screen once inside the bunker, and back toward the bunker's
-	/// own entrance once the screens have shown the stairs.
+	/// Where the compass points, along the hollow's one forward route (Acts 3-11): the cabin from the
+	/// camp on (through the storm and the giant), the footbridge once the newel post is in hand, the
+	/// clearing once the bridge is crossed, the lookout over the cabin once the clearing's voice has
+	/// spoken, the bunker once the cabin has been seen burning, the CRT room's marked screen once inside,
+	/// back toward the way out once the screens have shown the stairs, and the last staircase once the
+	/// radio has spoken. Nothing before the compass is picked up (Acts 1-2) and nothing after the ending.
 	/// </summary>
 	public Vector3? ObjectivePosition
 	{
 		get
 		{
 			if (Current < Checkpoint.Act3DoorBoarded) return null;
-			if (Current < Checkpoint.Act5CabinEntered)
-				return MarkerPos(GiantEventDone ? "cabin" : "stairs_top_trigger");
-			if (!NewelPostTaken) return MarkerPos("cabin");
+			if (Current < Checkpoint.Act5CabinEntered || !NewelPostTaken) return MarkerPos("cabin");
 			if (Current < Checkpoint.Act6BridgeCrossed) return MarkerPos("bridge_marker");
 			if (!ClearingVoiceHeard) return MarkerPos("stairs_clearing_marker");
-			if (Current < Checkpoint.Act7CabinBurning) return MarkerPos("cabin");
+			if (Current < Checkpoint.Act7CabinBurning) return MarkerPos("fire_lookout_marker");
 			if (Current < Checkpoint.Act8BunkerEntered) return MarkerPos("bunker_marker");
 			if (!CrtPuzzleDone) return MarkerPos("crt_target_marker");
 			if (Current < Checkpoint.Act10WalkieFound) return MarkerPos("bunker_entrance_marker");
 			if (Current < Checkpoint.Act11GiantEncounter)
-				return Act11DialogueDone ? MarkerPos("stairs_clearing_marker") : null;   // mid-exchange outside the bunker
+				return Act11DialogueDone ? MarkerPos("final_stairs_marker") : null;   // mid-exchange outside the bunker
 			return null;
 		}
 	}
@@ -143,7 +155,8 @@ public partial class StoryManager : Node
 		LoadedFromSave = false;
 		PendingInventory = null;
 		_continueData = null;
-		ChangeScene(LevelScene);
+		ArrivedByTravel = false;
+		ChangeScene(TrailheadScene);
 	}
 
 	/// <summary>False if there was no valid save to continue from.</summary>
@@ -158,9 +171,10 @@ public partial class StoryManager : Node
 		if (data.Checkpoint >= Checkpoint.Act2StairsClimbed) _flags.Add(Flag.StairsClimbed);
 		PendingInventory = data.Inventory;
 		LoadedFromSave = true;
+		ArrivedByTravel = false;
 		_lastPos = new Vector3(data.PosX, data.PosY, data.PosZ);
 		_lastYaw = data.Yaw;
-		ChangeScene(LevelScene);
+		ChangeScene(LevelFor(data.Checkpoint));
 		return true;
 	}
 
@@ -179,6 +193,29 @@ public partial class StoryManager : Node
 	public void ClearPendingInventory() => PendingInventory = null;
 
 	public void ReturnToMenu() => ChangeScene(MenuScene);
+
+	/// <summary>
+	/// Moves the player on to the level the current checkpoint belongs to (Act 2: the stairs let go of
+	/// them and they come to in the hollow). The story is already saved at the checkpoint; the new level
+	/// is booted exactly like a Continue (GameFlow places the player at the checkpoint's respawn marker,
+	/// every system restores from the story state, the carried gear comes along) with
+	/// <see cref="ArrivedByTravel"/> set so GameFlow plays the wake-up instead of the usual fade-in.
+	/// </summary>
+	public void TravelToCheckpointLevel()
+	{
+		var inv = (GetTree().GetFirstNodeInGroup("player") as PlayerController)?.Inventory;
+		PendingInventory = inv?.Serialize() ?? PendingInventory ?? "";
+		_continueData = new SaveData
+		{
+			Version = SaveData.CurrentVersion,
+			Checkpoint = Current,
+			PosX = _lastPos.X, PosY = _lastPos.Y, PosZ = _lastPos.Z, Yaw = _lastYaw,
+			Flags = _flags.ToArray(),
+			Inventory = PendingInventory,
+		};
+		ArrivedByTravel = true;
+		ChangeScene(LevelFor(Current));
+	}
 
 	/// <summary>Every scene change goes through here: the pause menu's pause must never survive it.</summary>
 	private void ChangeScene(string path)

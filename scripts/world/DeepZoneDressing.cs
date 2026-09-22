@@ -56,10 +56,25 @@ public partial class DeepZoneDressing : Node3D
 			float ang = (Mathf.Tau / count) * i + rng.RandfRange(-0.25f, 0.25f);
 			float dist = radius * rng.RandfRange(0.7f, 1.15f);
 			Vector3 pos = center + new Vector3(Mathf.Cos(ang) * dist, 0, Mathf.Sin(ang) * dist);
+			// Never on the path: step round the ring (then outward) until the trunk stands clear of it.
+			for (int tries = 0; tries < 24 && terrain != null && terrain.TrailDistance(pos.X, pos.Z, out _) < 6f; tries++)
+			{
+				ang += 0.09f;
+				if (tries % 6 == 5) dist += 6f;
+				pos = center + new Vector3(Mathf.Cos(ang) * dist, 0, Mathf.Sin(ang) * dist);
+			}
 			pos.Y = terrain?.HeightAt(pos.X, pos.Z) ?? center.Y;
 
 			float height = rng.RandfRange(38f, 58f);
 			float trunkR = height * 0.028f;
+			// Stand on the lowest ground under the trunk (these are 1-1.6 m thick, often on a slope): the
+			// uphill side runs into the bank as a real trunk would, the downhill side never shows daylight.
+			if (terrain != null)
+				for (int s = 0; s < 8; s++)
+				{
+					float a = Mathf.Tau * s / 8f;
+					pos.Y = Mathf.Min(pos.Y, terrain.HeightAt(pos.X + Mathf.Cos(a) * trunkR * 1.05f, pos.Z + Mathf.Sin(a) * trunkR * 1.05f));
+				}
 			var tree = new Node3D { Name = $"Giant{i}" };
 			// Must be parented before GlobalPosition is set, or Godot can't resolve the transform.
 			parent.AddChild(tree);
@@ -67,7 +82,7 @@ public partial class DeepZoneDressing : Node3D
 
 			var k = new MeshKit();
 			k.Color = new Color(0.32f, 0.26f, 0.2f);
-			k.Mat(trunk).Cylinder(new Vector3(0, 0, 0), new Vector3(0, height * 0.42f, 0), trunkR, trunkR * 0.6f, 7);
+			k.Mat(trunk).Cylinder(new Vector3(0, -0.3f, 0), new Vector3(0, height * 0.42f, 0), trunkR, trunkR * 0.6f, 7);
 			k.Color = new Color(0.07f, 0.11f, 0.075f);
 			k.Mat(needle);
 			int tiers = 8;

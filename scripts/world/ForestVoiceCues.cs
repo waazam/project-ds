@@ -65,7 +65,7 @@ public partial class ForestVoiceCues : Node
 			Stream = _stream, Bus = "Voice",
 			UnitSize = _rng.RandfRange(5f, 9f), MaxDistance = 70f,
 			VolumeDb = _rng.RandfRange(-3f, 5f),
-			PitchScale = _rng.RandfRange(0.8f, 1.2f),
+			PitchScale = _rng.RandfRange(0.8f, 0.97f),
 		};
 		// Must be parented before GlobalPosition is set, or Godot can't resolve the transform.
 		Cutscene.SceneRoot(this).AddChild(voice);

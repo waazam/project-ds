@@ -5,10 +5,10 @@ using ProjectDS.Systems;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Act 5's payoff, inside the cabin: the player finds their friend at the
-/// table, dead — the one who boarded the door, long before help could ever
-/// have come from outside. Fires once the player is close, marks the
-/// checkpoint, and leaves the newel post on the table for the player to find.
+/// Act 5's payoff, inside the cabin: the friend is not there. What he left is
+/// (his chair pushed back, the bandage, the stains, his page, the newel post on
+/// the table). Fires once the player is inside, says the one line, marks the
+/// checkpoint (the newel post and his page show from it).
 ///
 /// Gated so it can only happen as the story intends: after the boarded-door
 /// checkpoint (Act 3) and before this one, with the door actually broken open,
@@ -28,6 +28,8 @@ public partial class FriendReveal : StoryTrigger
 		_cabin ??= StoryBeat.Cabin(this);
 	}
 
+	public const string Line = "He's not here.";
+
 	protected override bool RecheckWhileInside => true;
 
 	protected override bool AlreadyHappened(StoryManager s) => s.Current >= Checkpoint.Act5CabinEntered;
@@ -46,10 +48,8 @@ public partial class FriendReveal : StoryTrigger
 	{
 		Cutscene.Run(this, async ct =>
 		{
-			await StoryBeat.Caption(this, "He's in the chair. He's not moving.", 1.0f, 3.0f, 1.0f);
-			await StoryBeat.Caption(this, "His hand — bandaged, cut clean off. He bled out before he ever boarded that door shut.", 1.2f, 4.0f, 1.2f);
-			await StoryBeat.Caption(this, "Something sits on the table in front of him.", 1.0f, 2.8f, 1.0f);
 			StoryBeat.ReachCheckpoint(player, Checkpoint.Act5CabinEntered);
-		}, lockInput: true);
+			await StoryBeat.Caption(this, Line, 1.0f, 3.0f, 1.2f);
+		});
 	}
 }

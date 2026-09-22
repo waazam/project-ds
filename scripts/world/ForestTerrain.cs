@@ -66,6 +66,8 @@ public partial class ForestTerrain : Node3D
 	/// <summary>Paint the clearing as meadow grass (the old mown clearing). Off = natural forest floor.</summary>
 	[Export] public bool ClearingGrass = true;
 	[Export] public Rect2 ParkingRect = new(-11, 23, 22, 13);
+	/// <summary>Flatten and gravel the <see cref="ParkingRect"/> (the trailhead's lot). Off: no pad anywhere (the rect is moved out of the world, so the scatter ignores it too).</summary>
+	[Export] public bool ParkingPad = true;
 	/// <summary>Broad, gently rolling low forest floor (x, z, radius) where the trail breaks up. Radius 0 = none.</summary>
 	[Export] public Vector3 Basin = Vector3.Zero;
 	/// <summary>Round hills added on top of everything else: (x, z, height, radius).</summary>
@@ -76,6 +78,11 @@ public partial class ForestTerrain : Node3D
 	[Export] public float ValleyWidth = 34f;
 	[Export] public float NorthRise = 0.016f;
 	[Export] public float StreamDepth = 1.35f;
+	/// <summary>The trail dips gently toward its stream crossing and climbs out of it: world Z of the dip's centre
+	/// (the trailhead's crossing by default), its depth (m) and its half width along Z (m). Depth 0 = no dip.</summary>
+	[Export] public float StreamDipZ = -160f;
+	[Export] public float StreamDipDepth = 1.2f;
+	[Export] public float StreamDipWidth = 30f;
 	/// <summary>World Z range over which the canopy shade on the ground deepens.</summary>
 	[Export] public Vector2 DeepShadeZ = new(-160f, -240f);
 
@@ -287,7 +294,7 @@ public partial class ForestTerrain : Node3D
 
 	private float FloorAt(float z) => -z * NorthRise
 		// the trail dips gently toward the stream and climbs out of it
-		- 1.2f * Mathf.Exp(-Mathf.Pow((z + 160f) / 30f, 2f));
+		- StreamDipDepth * Mathf.Exp(-Mathf.Pow((z - StreamDipZ) / Mathf.Max(StreamDipWidth, 0.01f), 2f));
 
 	private float RectDist(Vector2 p, Rect2 r)
 	{
@@ -361,6 +368,8 @@ public partial class ForestTerrain : Node3D
 	{
 		if (_ready) return;
 		_ready = true;
+		// No pad: park the rect far outside any world, so nothing (terrain, gravel, scatter) sees it.
+		if (!ParkingPad) ParkingRect = new Rect2(1e6f, 1e6f, 0f, 0f);
 
 		_nBig = new FastNoiseLite { Seed = Seed, Frequency = 0.011f, FractalOctaves = 3, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth };
 		_nMid = new FastNoiseLite { Seed = Seed + 1, Frequency = 0.035f, FractalOctaves = 2, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth };

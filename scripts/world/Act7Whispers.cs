@@ -96,7 +96,7 @@ public partial class Act7Whispers : Node
 			Stream = GD.Load<AudioStream>(path), Bus = distorted ? "VoiceHarsh" : "Voice",
 			UnitSize = unitSize, MaxDistance = maxDist,
 			VolumeDb = baseDb + _rng.RandfRange(-2f, 2f),
-			PitchScale = _rng.RandfRange(0.82f, 1.18f),
+			PitchScale = _rng.RandfRange(0.8f, 0.97f),   // never above the take: every voice stays low (the Voice bus deepens them further)
 		};
 		// Must be parented before GlobalPosition is set, or Godot can't resolve the transform.
 		Cutscene.SceneRoot(this).AddChild(voice);

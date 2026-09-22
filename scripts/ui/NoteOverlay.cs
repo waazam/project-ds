@@ -24,7 +24,10 @@ public partial class NoteOverlay : CanvasLayer
 	public Readable Current { get; private set; }
 
 	private const float CardWidth = 300f;
-	private const float MaxCardHeight = 300f;
+	/// <summary>Typed logs and registers are wider (monospace lines wrap badly at the note width).</summary>
+	private const float TypedWidth = 380f;
+	/// <summary>Space kept clear above and below the card.</summary>
+	private const float ScreenMargin = 18f;
 	private const float Pad = 18f;
 
 	private Control _root;
@@ -82,8 +85,9 @@ public partial class NoteOverlay : CanvasLayer
 		_body = new RichTextLabel
 		{
 			BbcodeEnabled = false,
-			FitContent = true,
+			FitContent = false,
 			ScrollActive = true,
+			ScrollFollowing = false,
 			AutowrapMode = TextServer.AutowrapMode.WordSmart,
 			MouseFilter = Control.MouseFilterEnum.Ignore,
 			CustomMinimumSize = new Vector2(CardWidth - Pad * 2, 0),
@@ -106,7 +110,8 @@ public partial class NoteOverlay : CanvasLayer
 	public void Open(Readable note, PlayerController player)
 	{
 		if (note == null) return;
-		if (IsOpen) Close();
+		if (IsOpen && Current != null) Close();
+		_closing = false;
 		Current = note;
 		_player = player;
 
@@ -127,10 +132,12 @@ public partial class NoteOverlay : CanvasLayer
 		_body.ScrollToLine(0);
 
 		// A handwritten sheet is held a little askew; cards and logs sit square.
-		_card.RotationDegrees = note.Style == Readable.NoteStyle.Handwritten ? -1.4f : 0f;
-		_card.PivotOffset = _card.Size * 0.5f;
-		_card.CustomMinimumSize = new Vector2(CardWidth, 0);
-		_card.ResetSize();
+		_card.RotationDegrees = note.Style == Readable.NoteStyle.Handwritten ? -1.2f : 0f;
+		var vis = GetViewport().GetVisibleRect().Size;
+		_width = Mathf.Min(note.Style == Readable.NoteStyle.Typed ? TypedWidth : CardWidth, vis.X - 32f);
+		_body.CustomMinimumSize = new Vector2(_width - Pad * 2, 40f);
+		Place(_width, 120f);
+		_layoutTries = 0;
 		Callable.From(FitCard).CallDeferred();
 
 		_player?.PlayerInput.BeginModal();
@@ -141,14 +148,39 @@ public partial class NoteOverlay : CanvasLayer
 		_tween.TweenProperty(_root, "modulate:a", 1f, 0.15f);
 	}
 
+	private float _width = CardWidth;
+	private int _layoutTries;
+
+	/// <summary>
+	/// Sizes the card to its text once the text has been laid out at the card's width: as tall as the
+	/// text needs, but never taller than the screen allows. Longer texts keep the card at that height
+	/// and scroll (wheel), and the hint says so. The card is centred through its offsets (it is
+	/// anchored to the screen's centre), so it stays centred whatever the window's aspect.
+	/// </summary>
 	private void FitCard()
 	{
-		if (!IsOpen) return;
-		float h = Mathf.Min(_card.Size.Y, MaxCardHeight);
-		_card.CustomMinimumSize = new Vector2(CardWidth, h);
-		_card.Size = new Vector2(CardWidth, h);
-		_card.Position = -_card.Size * 0.5f;
-		_card.PivotOffset = _card.Size * 0.5f;
+		if (!IsOpen || Current == null) return;
+		float content = _body.GetContentHeight();
+		if (content <= 1f && _layoutTries++ < 6) { Callable.From(FitCard).CallDeferred(); return; }
+		var vis = GetViewport().GetVisibleRect().Size;
+		float titleH = _title.Visible ? _title.GetMinimumSize().Y + 6f : 0f;
+		float hintH = _hint.GetMinimumSize().Y + 6f;
+		float chrome = (Pad - 4f) * 2f + titleH + hintH;
+		float maxBody = Mathf.Max(60f, vis.Y - ScreenMargin * 2f - chrome);
+		float bodyH = Mathf.Min(content + 4f, maxBody);
+		bool scrolls = content + 4f > maxBody;
+		_hint.Text = scrolls ? "wheel  more      E  put it down" : "E   put it down";
+		_body.CustomMinimumSize = new Vector2(_width - Pad * 2f, bodyH);
+		Place(_width, chrome + bodyH);
+	}
+
+	private void Place(float w, float h)
+	{
+		_card.CustomMinimumSize = new Vector2(w, h);
+		_card.OffsetLeft = -w * 0.5f; _card.OffsetRight = w * 0.5f;
+		_card.OffsetTop = -h * 0.5f; _card.OffsetBottom = h * 0.5f;
+		_card.Size = new Vector2(w, h);
+		_card.PivotOffset = new Vector2(w, h) * 0.5f;
 	}
 
 	public void Close()
@@ -172,7 +204,7 @@ public partial class NoteOverlay : CanvasLayer
 		if (_closing && _root.Modulate.A <= 0.01f) { _root.Visible = false; _closing = false; }
 		if (!IsOpen || _closing) return;
 		// A cutscene taking control, or the camera going, puts the page down.
-		if (_player == null || !IsInstanceValid(_player) || !_player.PlayerInput.Enabled) Close();
+		if (_player != null && (!IsInstanceValid(_player) || !_player.PlayerInput.Enabled)) Close();
 	}
 
 	public override void _Input(InputEvent e)

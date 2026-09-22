@@ -5,13 +5,13 @@ using ProjectDS.Systems;
 namespace ProjectDS.UI;
 
 /// <summary>
-/// The print: right after a shot that got something on the list, a small card
-/// slides in from the bottom-left edge, sits for two seconds and slides back
-/// out. A white border like a print, the frame inside, a tiny exposure stamp
-/// on the bottom border (it reads wrong on the stairs' print) and the pencil
-/// caption under the card. No sound of its own, no pulsing: the shutter already
-/// happened. Blank shots get no print. Off entirely with <see cref="ShowPrints"/>
-/// (then the page's ticks are the only feedback).
+/// The print: right after every shot, a small card slides in from the bottom-left
+/// edge, sits for two seconds and slides back out. A white border like a print,
+/// the frame inside, a tiny exposure stamp on the bottom border (it reads wrong
+/// on the stairs' print) and, when the camera recognised something, a short
+/// pencil caption under the card. No sound of its own, no pulsing: the shutter
+/// already happened. Off entirely with <see cref="ShowPrints"/> (the album still
+/// gets every picture).
 ///
 /// Sized for 640x360: a 74x58 card, 16 px in from the left, above the stamina
 /// line. Pauses with the tree like the viewfinder.
@@ -34,9 +34,8 @@ public partial class PhotoThumb : CanvasLayer
 
 	private enum Phase { Idle, Delay, In, Hold, Out }
 
-	private readonly Queue<(PhotoLog.Entry entry, ImageTexture tex)> _queue = new();
-	private PhotoLog.Entry _entry;
-	private ImageTexture _tex;
+	private readonly Queue<PhotoLog.Photo> _queue = new();
+	private PhotoLog.Photo _photo;
 	private Phase _phase = Phase.Idle;
 	private float _t;
 	private float _x;   // card left edge in viewport px
@@ -45,7 +44,9 @@ public partial class PhotoThumb : CanvasLayer
 
 	/// <summary>A print is on screen (for tests).</summary>
 	public bool Showing => _phase is Phase.In or Phase.Hold or Phase.Out;
-	public string ShowingId => Showing ? _entry?.Id : null;
+	public string ShowingId => Showing ? _photo?.SubjectId : null;
+	/// <summary>The number of the print on screen (for tests), 0 for none.</summary>
+	public int ShowingNumber => Showing ? _photo?.Number ?? 0 : 0;
 
 	public override void _Ready()
 	{
@@ -58,13 +59,13 @@ public partial class PhotoThumb : CanvasLayer
 
 	public override void _ExitTree()
 	{
-		if (_log != null && IsInstanceValid(_log)) _log.Recorded -= OnRecorded;
+		if (_log != null && IsInstanceValid(_log)) _log.Taken -= OnTaken;
 	}
 
-	private void OnRecorded(PhotoLog.Entry entry, ImageTexture tex)
+	private void OnTaken(PhotoLog.Photo photo)
 	{
 		if (!ShowPrints) return;
-		_queue.Enqueue((entry, tex));
+		_queue.Enqueue(photo);
 	}
 
 	public override void _Process(double delta)
@@ -72,7 +73,7 @@ public partial class PhotoThumb : CanvasLayer
 		if (_log == null || !IsInstanceValid(_log))
 		{
 			_log = PhotoLog.Instance;
-			if (_log != null) _log.Recorded += OnRecorded;
+			if (_log != null) _log.Taken += OnTaken;
 		}
 		float dt = (float)delta;
 		_t += dt;
@@ -80,7 +81,7 @@ public partial class PhotoThumb : CanvasLayer
 		switch (_phase)
 		{
 			case Phase.Idle:
-				if (_queue.Count > 0) { (_entry, _tex) = _queue.Dequeue(); _phase = Phase.Delay; _t = 0f; }
+				if (_queue.Count > 0) { _photo = _queue.Dequeue(); _phase = Phase.Delay; _t = 0f; }
 				_x = hidden;
 				break;
 			case Phase.Delay:
@@ -102,7 +103,7 @@ public partial class PhotoThumb : CanvasLayer
 			{
 				float k = Mathf.Clamp(_t / Mathf.Max(SlideOutSeconds, 0.01f), 0f, 1f);
 				_x = Mathf.Lerp(Margin, hidden, 1f - Mathf.Cos(k * Mathf.Pi * 0.5f));
-				if (k >= 1f) { _phase = Phase.Idle; _t = 0f; _entry = null; _tex = null; }
+				if (k >= 1f) { _phase = Phase.Idle; _t = 0f; _photo = null; }
 				break;
 			}
 		}
@@ -112,7 +113,7 @@ public partial class PhotoThumb : CanvasLayer
 
 	private void OnDraw()
 	{
-		if (_entry == null) return;
+		if (_photo == null) return;
 		var size = _draw.Size;
 		float x = Mathf.Round(_x);
 		// Above the stamina line's corner (bottom-left, 16 px in), the caption clear of the viewfinder's readout line.
@@ -122,18 +123,19 @@ public partial class PhotoThumb : CanvasLayer
 		_draw.DrawRect(new Rect2(card.Position + new Vector2(1, 2), card.Size), new Color(0, 0, 0, 0.4f));
 		_draw.DrawRect(card, Paper);
 		var img = new Rect2(x + Border, y + Border, ImageW, ImageH);
-		if (_tex != null) _draw.DrawTextureRect(_tex, img, false);
+		if (_photo.Texture != null) _draw.DrawTextureRect(_photo.Texture, img, false);
 		else _draw.DrawRect(img, new Color(0.42f, 0.44f, 0.46f));
 
 		// Exposure stamp on the bottom border: a lab's frame print, wrong on the stairs.
-		bool wrong = _log != null && _log.IsWrong(_entry.Id);
+		bool wrong = _photo.Wrong;
 		string stamp = wrong ? "F--  1/--" : "F2.8  1/60";
 		_draw.DrawString(UiKit.Mono, new Vector2(x + Border, y + CardH - 3f), stamp, HorizontalAlignment.Right, ImageW, 7, new Color(Graphite, 0.7f));
 
 		// The pencil caption under the print, bone over the forest with the HUD's soft shadow.
 		var font = UiKit.SerifItalic;
 		var pos = new Vector2(x + 1f, y + CardH + 10f);
-		string caption = _entry.ShortCaption;
+		string caption = _photo.Caption;
+		if (caption.Length == 0) return;
 		_draw.DrawString(font, pos + new Vector2(1, 1), caption, HorizontalAlignment.Left, -1, 9, new Color(0, 0, 0, 0.6f));
 		_draw.DrawString(font, pos, caption, HorizontalAlignment.Left, -1, 9, new Color(UiKit.Bone, 0.85f));
 	}

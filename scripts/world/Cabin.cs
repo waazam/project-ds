@@ -6,18 +6,16 @@ using ProjectDS.Systems;
 namespace ProjectDS.World;
 
 /// <summary>
-/// The rental cabin: a small round-log cabin with crossed log ends at the corners,
+/// The old cabin up the hollow: a small round-log cabin with crossed log ends at the corners,
 /// a shingled gable roof (ridge parallel to the front) with fascia, rake boards and
 /// a ridge cap, a mortared fieldstone chimney on the left gable, and a covered front
 /// porch (posts, rails, a bench, steps down to a stone landing). Two front windows
-/// (boarded over once the friend boards the cabin up); the left one glows faintly from the lamp inside. Inside: plank
+/// (boarded over while the door is boarded); the left one glows faintly from the lamp inside. Inside: plank
 /// floor, open rafters under the roof boards, a cast-iron stove, a cot, a shelf and a
-/// hanging lamp (warm light). The friend's own chair and table (friend.tscn) sit on
-/// the floor at his existing spot. Papers (PaperKit readables and props): his note tucked
-/// into the top corner of the door (<see cref="DoorNote"/>), the tongue-twister sheet over
-/// the cot (<see cref="TwisterSheet"/>) and his four prints over his chair; the page on the
-/// table is the friend's own (FriendBody). All of them join <see cref="PapersGroup"/> and
-/// burn away with the cabin.
+/// hanging lamp (warm light). What the friend left at his table (friend.tscn: his chair pushed
+/// back, the bandage, the stains, his page, the newel post) sits on the floor at his spot.
+/// Papers: R.H.'s four prints over his chair; the page on the table is
+/// FriendBody's. All of them join <see cref="PapersGroup"/> and burn away with the cabin.
 ///
 /// Local frame: front (the door) faces +Z, same convention as ParkProp. y = 0 is the
 /// INTERIOR FLOOR TOP. At runtime the cabin grounds itself: floor at sill height above
@@ -109,11 +107,9 @@ public partial class Cabin : Node3D
 	private const float WinW = 0.7f, StepW = 1.4f, StepRun = 0.3f;
 
 	private Node3D _gen, _planks, _door, _windowBoards, _debris, _fire, _sashes, _panes, _papers;
-	private Readable _doorNote, _sheet;
+	private Readable _sheet;
 	private CollisionShape3D _doorCollision;
 
-	/// <summary>The friend's note on the door (P1), for tests and previews. Null in the editor and once burnt.</summary>
-	public Readable DoorNote => _doorNote;
 	/// <summary>The tongue-twister sheet over the cot (P3), for tests and previews.</summary>
 	public Readable TwisterSheet => _sheet;
 	/// <summary>Every paper prop in the cabin joins this group (the friend's page too); they all burn away with it.</summary>
@@ -187,7 +183,7 @@ public partial class Cabin : Node3D
 		_gen = new Node3D { Name = "Generated" };
 		AddChild(_gen);
 		_planks = _door = _windowBoards = _debris = _sashes = _panes = _papers = null;
-		_doorNote = _sheet = null;
+		_sheet = null;
 		_doorCollision = null;
 
 		var shell = new MeshKit();
@@ -900,8 +896,8 @@ public partial class Cabin : Node3D
 			Position = new Vector3(-WinCx, (_winBot + _winTop) * 0.5f, FrontFace + 0.35f),
 		};
 		_gen.AddChild(spill);
-		// and a faint warm fill just inside the door, so with the door open the room (and whoever sits at
-		// the table) reads as a silhouette from the porch and beyond
+		// and a faint warm fill just inside the door, so with the door open the room (the empty chair at
+		// the table) reads from the porch and beyond
 		var doorFill = new OmniLight3D
 		{
 			Name = "DoorFill",
@@ -958,54 +954,13 @@ public partial class Cabin : Node3D
 		foreach (float y in new[] { 0.3f, h - 0.3f })
 			BuildKit.Box(k, new Vector3(0.14f, y, 0.058f), new Vector3(0.28f, 0.04f, 0.01f), 3f);
 		k.CommitTo(_door, "DoorMesh");
-		BuildDoorNote();
 	}
 
-	// ---- the papers: the note on the door (P1), the tongue-twister over the cot (P3), the prints (P5)
-
-	private const string DoorNoteText =
-		"Couldn't sleep. Gone back up to the old steps past the end of the trail. Take the camera, get the red one for me. Back by dark. — C.";
-
-	private const string TwisterText =
-		"He thrusts his fists against the posts and still insists he sees the ghosts.\n" +
-		"He thrusts his fists against the posts and still insists he sees the ghosts.\n" +
-		"He thrusts his fists against the posts and still insists he sees the ghosts.\n" +
-		"he thrusts his fists against the posts\n" +
-		"still insists";
+	// ---- the prints (P5)
 
 	/// <summary>
-	/// A folded note tucked into the latch-side top corner of the door frame. It sits that high
-	/// because the door's own pick sphere (0.9 m around the door centre; the first thing the
-	/// crosshair ray touches wins) swallows anything at eye height on the leaf, disabled or not;
-	/// up here, with its own pick sphere pushed proud of the leaf, a look from anywhere on the
-	/// porch reaches the note first. It rides the leaf (door space: the leaf runs +X from the
-	/// hinge, its face hardware reaches z 0.075), so it swings inside with the door. Its top
-	/// edge is tucked under the head casing; while the door is boarded the ends of the two
-	/// cross braces cover its lower half.
-	/// </summary>
-	private void BuildDoorNote()
-	{
-		_doorNote = null;
-		if (Engine.IsEditorHint() || _door == null) return;
-		float w = DoorWidth - 0.04f;
-		// Eye height, toward the latch side: the door trigger's pick sphere no longer swallows it (the probe re-casts past disabled interactables).
-		// Built detached so the Readable reads the pick radius/offset below when it enters the tree.
-		var root = new Node3D { Name = "DoorNote" };
-		_doorNote = PaperKit.Pinned(root, new Vector3(w * 0.62f, 1.50f, 0.076f), Vector3.Back, new Vector2(0.14f, 0.18f), PaperKit.Look.Note,
-			"", DoorNoteText, Readable.NoteStyle.Handwritten, tiltDeg: -7f, prompt: "Read the note", seed: 3);
-		_doorNote.ReadFlag = "read_door_note";
-		_doorNote.PickRadius = 0.28f;
-		_doorNote.PickOffset = new Vector3(0, 0, 0.15f);
-		_doorNote.MaxDistance = 2.8f;
-		root.AddToGroup(PapersGroup);
-		_door.AddChild(root);
-	}
-
-	/// <summary>
-	/// The sheet of lined paper pinned to the right wall above the middle of the cot (only
-	/// reachable from inside: the wall blocks the pick), and the friend's four prints in a row
-	/// on the back wall over his chair: the three birds he came for and the first staircase at
-	/// night. Props only, no text on them.
+	/// R.H.'s four prints in a row on the back wall over his chair: the three birds he came for
+	/// and the first staircase at night. Props only, no text on them.
 	/// </summary>
 	private void BuildPapers()
 	{
@@ -1013,19 +968,13 @@ public partial class Cabin : Node3D
 		_papers = null;
 		_sheet = null;
 		if (Engine.IsEditorHint()) return;
-		float ix = Hw - LogT * 0.5f, iz = Hd - LogT * 0.5f;
+		float iz = Hd - LogT * 0.5f;
 		var root = new Node3D { Name = "Papers" };
 		root.AddToGroup(PapersGroup);
 
-		_sheet = PaperKit.Pinned(root, new Vector3(ix - 0.006f, 1.38f, -1.44f), Vector3.Left, new Vector2(0.16f, 0.21f), PaperKit.Look.Lined,
-			"", TwisterText, Readable.NoteStyle.Handwritten, tiltDeg: 3f, seed: 5);
-		_sheet.ReadFlag = "read_twister_sheet";
-
-		// tacks: one over the sheet, one per print (the prints' are red pushpins, the stairs' a plain one)
+		// tacks: one per print (the prints' are red pushpins, the stairs' a plain one)
 		var tacks = new MeshKit();
 		tacks.Mat(BuildingTextures.IronMat);
-		tacks.Color = new Color(0.45f, 0.42f, 0.4f);
-		BuildKit.Box(tacks, new Vector3(ix - 0.014f, 1.38f + 0.095f, -1.44f), new Vector3(0.012f, 0.012f, 0.012f), 1f);
 
 		float pz = -iz + 0.012f, py = 1.64f;
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 17 + 29) };
@@ -1067,7 +1016,7 @@ public partial class Cabin : Node3D
 			if (n is Node3D p && IsInstanceValid(p)) p.Visible = on;
 	}
 
-	/// <summary>Planks nailed across the doorway (Act 3: "completely boarded up"). Visual; the door behind is solid.</summary>
+	/// <summary>Planks nailed across the doorway ("boarded up, from the outside"). Visual; the door behind is solid.</summary>
 	public void SetBoarded(bool boarded)
 	{
 		if (DoorBoarded == boarded) return;
@@ -1154,8 +1103,7 @@ public partial class Cabin : Node3D
 	}
 
 	/// <summary>Boards nailed over both windows, with gaps (the left window's glow shows through).
-	/// Only once the friend has boarded the cabin up (Act 3 on: boarded, or broken open after);
-	/// in Act 1 the windows are bare glass. While burning / burnt they are gone, so smoke can pour out.</summary>
+	/// Whenever the door is boarded, or broken open after; otherwise the windows are bare glass. While burning / burnt they are gone, so smoke can pour out.</summary>
 	private void RefreshWindowBoards()
 	{
 		if (_windowBoards != null && IsInstanceValid(_windowBoards)) _windowBoards.QueueFree();

@@ -545,7 +545,8 @@ public partial class ForestScatter : Node3D
 					float p = 0.22f + 0.4f * (1f - Mathf.SmoothStep(2f, 9f, dS)) + 0.15f * Mathf.SmoothStep(10f, 30f, dT);
 					if (roll > p) continue;
 					float s = _rng.RandfRange(0.25f, 0.8f) * (1f + 0.9f * Mathf.SmoothStep(4f, 20f, dT));
-					float h = _terrain.HeightAt(px, pz);
+					// on a slope, settle toward the low side of its footprint so the downhill flank isn't undercut
+					float h = Mathf.Lerp(_terrain.HeightAt(px, pz), RingLow(px, pz, 0.9f * s), 0.7f);
 					var basis = Basis.FromEuler(new Vector3(_rng.RandfRange(-0.2f, 0.2f), yaw, _rng.RandfRange(-0.2f, 0.2f)))
 						.Scaled(new Vector3(s, s * _rng.RandfRange(0.7f, 1.2f), s));
 					var pos = new Vector3(px, h - 0.12f * s, pz);
@@ -555,23 +556,66 @@ public partial class ForestScatter : Node3D
 				else if (kind < 0.8f)
 				{
 					if (dT < 3.2f || dS < 3f || roll > 0.28f) continue;
-					var basis = Basis.FromEuler(new Vector3(0, yaw, 0));
-					Vector3 axis = basis.X;
-					// sit on the lower of the two ends so it doesn't float
-					float h = Mathf.Min(_terrain.HeightAt(px + axis.X * 2.2f, pz + axis.Z * 2.2f), _terrain.HeightAt(px - axis.X * 2.2f, pz - axis.Z * 2.2f));
-					h = Mathf.Min(h, _terrain.HeightAt(px, pz));
+					var yb = Basis.FromEuler(new Vector3(0, yaw, 0));
+					Vector3 axis = yb.X;
 					float s = _rng.RandfRange(0.8f, 1.3f);
-					var pos = new Vector3(px, h + 0.12f * s, pz);
+					// lying along the ground: pitched to the line between the ground at its two ends (a level
+					// 5 m log on a slope leaves its downhill end in the air), lowered where the ground dips mid-way
+					float half = 2.6f * s;
+					float hA = _terrain.HeightAt(px + axis.X * half, pz + axis.Z * half), hB = _terrain.HeightAt(px - axis.X * half, pz - axis.Z * half);
+					float dip = 0f;
+					foreach (float t in new[] { -0.5f, 0f, 0.5f })
+						dip = Mathf.Min(dip, _terrain.HeightAt(px + axis.X * half * t, pz + axis.Z * half * t) - Mathf.Lerp(hB, hA, t * 0.5f + 0.5f));
+					var basis = LieAlong(axis * (2f * half) + Vector3.Up * (hA - hB), yb.Z);
+					// across a steep side slope (or a crest) a round log is undercut where the ground falls away beside it: bed it deeper
+					float across = 0f;
+					foreach (float t in new[] { -0.9f, 0f, 0.9f })
+					{
+						float cx = px + axis.X * half * t, cz = pz + axis.Z * half * t;
+						float hc = _terrain.HeightAt(cx, cz);
+						across = Mathf.Max(across, (hc - Mathf.Min(_terrain.HeightAt(cx + yb.Z.X * 0.35f * s, cz + yb.Z.Z * 0.35f * s), _terrain.HeightAt(cx - yb.Z.X * 0.35f * s, cz - yb.Z.Z * 0.35f * s))) / (0.35f * s));
+					}
+					float bed = Mathf.Clamp(0.165f * across - 0.07f, 0f, 0.2f) * s;
+					var pos = new Vector3(px, (hA + hB) * 0.5f + dip + 0.12f * s - bed, pz);
 					Add("log", TreeChunk, pos, basis.Scaled(Vector3.One * s), Colors.White);
 					AddCollider(pos, BoxShape(new Vector3(2.5f * s, 0.22f * s, 0.22f * s)), new Transform3D(basis, pos));
 				}
 				else
 				{
 					if (roll > 0.7f) continue;
-					float h = _terrain.HeightAt(px, pz);
-					Add("branch", TreeChunk, new Vector3(px, h, pz), Basis.FromEuler(new Vector3(0, yaw, 0)).Scaled(Vector3.One * _rng.RandfRange(0.7f, 1.4f)), Colors.White);
+					var yb = Basis.FromEuler(new Vector3(0, yaw, 0));
+					float s = _rng.RandfRange(0.7f, 1.4f);
+					// lying along the ground: pitched to the ground under its ends and rolled to the ground across it
+					float half = 0.9f * s;
+					float hA = _terrain.HeightAt(px + yb.X.X * half, pz + yb.X.Z * half), hB = _terrain.HeightAt(px - yb.X.X * half, pz - yb.X.Z * half);
+					float hL = _terrain.HeightAt(px + yb.Z.X * 0.5f, pz + yb.Z.Z * 0.5f), hR = _terrain.HeightAt(px - yb.Z.X * 0.5f, pz - yb.Z.Z * 0.5f);
+					float h = Mathf.Min(_terrain.HeightAt(px, pz), (hA + hB) * 0.5f);
+					var basis = LieAlong(yb.X * (2f * half) + Vector3.Up * (hA - hB), yb.Z + Vector3.Up * (hL - hR));
+					Add("branch", TreeChunk, new Vector3(px, h - 0.01f, pz), basis.Scaled(Vector3.One * s), Colors.White);
 				}
 			}
+	}
+
+	/// <summary>Lowest ground on a ring of radius r round (x, z).</summary>
+	private float RingLow(float x, float z, float r)
+	{
+		float lo = _terrain.HeightAt(x, z);
+		for (int i = 0; i < 6; i++)
+		{
+			float a = Mathf.Tau * i / 6f;
+			lo = Mathf.Min(lo, _terrain.HeightAt(x + Mathf.Cos(a) * r, z + Mathf.Sin(a) * r));
+		}
+		return lo;
+	}
+
+	/// <summary>An orthonormal basis whose X runs along <paramref name="along"/>, with Z as close to <paramref name="across"/> as it allows (Y is up-ish).</summary>
+	private static Basis LieAlong(Vector3 along, Vector3 across)
+	{
+		Vector3 x = along.Normalized();
+		Vector3 y = across.Cross(x).Normalized();
+		if (y.Y < 0f) y = -y;
+		Vector3 z = x.Cross(y);
+		return new Basis(x, y, z);
 	}
 
 	/// <summary>Big dark mossy boulders: along the trail, around the clearing and on the valley walls.</summary>
@@ -599,7 +643,8 @@ public partial class ForestScatter : Node3D
 					+ 0.15f * (1f - Mathf.SmoothStep(3f, 10f, dS));
 				if (roll > p) continue;
 				if (_terrain.NormalAt(px, pz).Y < 0.7f) s *= 0.7f;
-				float h = _terrain.HeightAt(px, pz);
+				// half sunk, and settled toward the low side of its footprint on a slope
+				float h = Mathf.Lerp(_terrain.HeightAt(px, pz), RingLow(px, pz, 1.0f * s), 0.5f);
 				var basis = Basis.FromEuler(new Vector3(_rng.RandfRange(-0.15f, 0.15f), _rng.RandfRange(0, Mathf.Tau), _rng.RandfRange(-0.15f, 0.15f)))
 					.Scaled(new Vector3(s, s * _rng.RandfRange(0.75f, 1.1f), s));
 				var pos = new Vector3(px, h - 0.25f * s, pz);

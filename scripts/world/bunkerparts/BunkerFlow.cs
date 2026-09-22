@@ -229,7 +229,7 @@ public partial class BunkerFlow : Node
 		_choirStarted = true;
 		const string path = "res://assets/audio/ambient/choir_chant_loop.wav";
 		if (!ResourceLoader.Exists(path)) return;
-		var choir = new AudioStreamPlayer { Name = "Choir", Bus = "Unnatural" };
+		var choir = new AudioStreamPlayer { Name = "Choir", Bus = "Unnatural", PitchScale = 0.78f };   // voices stay deep
 		_maze.AddChild(choir);
 		choir.AddChild(new AmbienceLoop { StreamPath = path, BaseVolumeDb = -8f });
 	}

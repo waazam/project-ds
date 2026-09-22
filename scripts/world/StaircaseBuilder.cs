@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Systems;
 
 namespace ProjectDS.World;
 
@@ -18,6 +19,23 @@ namespace ProjectDS.World;
 ///
 /// Ruined = a short broken fragment: no landing, one cheek wall crumbled away
 /// part way up with rubble at its foot, the flight simply stopping.
+///
+/// The newel post (not when Ruined): at the top of the right-hand cheek wall
+/// (+X), in place of that side's landing pier, a squat square pier of the same
+/// coursed stone with a two-step cast-stone cap, carrying a round stone cap: a
+/// short round spigot, a small square plinth, a neck and a ball (~0.3 m). With
+/// <see cref="NewelCapped"/> false only the spigot's broken stump stands there,
+/// a jagged top of pale fresh break. The cap is its own child node
+/// ("Generated/Newel/Cap"), shown or hidden without rebuilding the flight; the
+/// stump stays under it, and its break matches the cap's underside exactly, so
+/// the same mesh is the item on R.H.'s table (<see cref="BuildNewelCap"/>).
+/// The pier stands outside the clear width, behind the wall's collider line;
+/// its own collider only covers its outer side.
+///
+/// Restore: <see cref="NewelCapRestore"/> = AfterClearingVoice caps the post
+/// from <see cref="StoryManager.Flag.ClearingVoiceHeard"/> (the last staircase:
+/// the stairs are whole again once the cap has been fused on in the clearing).
+/// The clearing's own staircase is capped by <see cref="Act6ClearingEvent"/>.
 ///
 /// Runtime only: a child Area3D "TopTrigger" is moved onto the top landing,
 /// Marker3D "AutotestApproach" 1.5 m in front of the first step, and (when not
@@ -46,14 +64,36 @@ public partial class StaircaseBuilder : Node3D
 	[Export] public int CrumbleAfterStep = 3;
 	[Export] public int Seed = 7;
 	[Export] public bool BuildCollision = true;
+	/// <summary>How far the walls, plinth and front riser go below the local ground (covers terrain dips
+	/// under the footprint; a flight set on a slope needs more).</summary>
+	[Export] public float FoundationDepth = 0.7f;
+
+	public enum CapRestore { Never, AfterClearingVoice }
+
+	/// <summary>Whether the newel post's round stone cap sits on its pier. Setting it only shows/hides
+	/// the cap's node; the flight is not rebuilt.</summary>
+	[Export]
+	public bool NewelCapped
+	{
+		get => _newelCapped;
+		set
+		{
+			_newelCapped = value;
+			if (_capNode != null && IsInstanceValid(_capNode)) _capNode.Visible = value;
+		}
+	}
+	private bool _newelCapped = true;
+
+	/// <summary>How this flight puts its cap back from the story on load (and live when the flag is set).</summary>
+	[Export] public CapRestore NewelCapRestore = CapRestore.Never;
 
 	/// <summary>The flight's length as authored in the scene, captured when it enters the tree (before
-	/// any story code lengthens it). <see cref="StairsState.StepsFor"/> takes it as the base.</summary>
+	/// any story code lengthens it). <see cref="StairsState.ClearingStepsFor"/> takes it as the base.</summary>
 	public int BaseSteps { get; private set; } = -1;
 	/// <summary>For tests: how many times <see cref="Build"/> has run.</summary>
 	public int BuildCount { get; private set; }
 
-	private const float Found = 0.7f;      // how far walls/plinth go below local ground (covers terrain dips)
+	private float Found => FoundationDepth;   // how far walls/plinth go below local ground (covers terrain dips)
 	private const float CopingH = 0.075f, CopingOver = 0.035f, PierD = 0.42f, PierExtra = 0.05f, Nose = 0.015f;
 
 	public float TotalHeight => Steps * Rise;
@@ -73,9 +113,36 @@ public partial class StaircaseBuilder : Node3D
 	private FastNoiseLite _noise;
 	private RandomNumberGenerator _rng;
 
-	public override void _EnterTree() { if (BaseSteps < 0) BaseSteps = Steps; }
+	private bool _capListening;
 
-	public override void _Ready() => Build();
+	public override void _EnterTree()
+	{
+		if (BaseSteps < 0) BaseSteps = Steps;
+		if (!Engine.IsEditorHint() && NewelCapRestore == CapRestore.AfterClearingVoice && StoryManager.Instance is { } s && !_capListening)
+		{
+			s.FlagSet += OnStoryFlag;
+			_capListening = true;
+		}
+	}
+
+	public override void _ExitTree()
+	{
+		if (_capListening && StoryManager.Instance is { } s) s.FlagSet -= OnStoryFlag;
+		_capListening = false;
+	}
+
+	public override void _Ready()
+	{
+		// Restore: the cap back on from the saved story (before the first build, so it builds that way).
+		if (!Engine.IsEditorHint() && NewelCapRestore == CapRestore.AfterClearingVoice && StoryManager.Instance is { } s)
+			_newelCapped = s.ClearingVoiceHeard;
+		Build();
+	}
+
+	private void OnStoryFlag(string flag)
+	{
+		if (flag == StoryManager.Flag.ClearingVoiceHeard) NewelCapped = true;
+	}
 
 	// ------------------------------------------------------------------ mesh helper
 
@@ -225,6 +292,8 @@ public partial class StaircaseBuilder : Node3D
 		BuildCount++;
 		var old = GetNodeOrNull("Generated");
 		if (old != null) { RemoveChild(old); old.QueueFree(); }
+		_newel = null;
+		_capNode = null;
 		var gen = new Node3D { Name = "Generated" };
 		AddChild(gen);
 
@@ -284,7 +353,7 @@ public partial class StaircaseBuilder : Node3D
 					Quad(grid[c, r], grid[c + 1, r], grid[c + 1, r + 1], grid[c, r + 1], Vector3.Up, Kind.Tread);
 
 			// riser: nose lip, then the recessed face down into the step below
-			float yBot = i == 0 ? -Found * 0.4f : i * Rise - 0.03f;
+			float yBot = i == 0 ? -Found : i * Rise - 0.03f;
 			for (int c = 0; c < cols; c++)
 			{
 				Vector3 a = grid[c, 0], b = grid[c + 1, 0];
@@ -354,6 +423,7 @@ public partial class StaircaseBuilder : Node3D
 		gen.AddChild(mi);
 
 		if (Ruined) BuildRubble(gen);
+		else BuildNewel(gen);
 
 		if (BuildCollision && !Engine.IsEditorHint()) BuildColliders(gen);
 
@@ -465,7 +535,19 @@ public partial class StaircaseBuilder : Node3D
 		OBox(new Vector3(xc, (footTop - Found) * 0.5f, z0 - PierD * 0.5f), Basis.Identity, new Vector3(pw, footTop + Found, PierD), Kind.Wall);
 		_m.Mat(concrete);
 		OBox(new Vector3(xc, footTop + 0.04f, z0 - PierD * 0.5f), Basis.Identity, new Vector3(pw + 0.07f, 0.08f, PierD + 0.07f), Kind.Coping, true);
-		if (!Ruined)
+		if (!Ruined && s == NewelSide)
+		{
+			// the newel post: a squat square pier, taller and broader than the other, with a two-step
+			// cast-stone cap; the round cap (or its stump) sits on top as its own node (BuildNewel)
+			var c = NewelPierCentre;
+			float pierTop = NewelPierTop;
+			_m.Mat(blocks);
+			OBox(new Vector3(c.X, (pierTop - Found) * 0.5f, c.Z), Basis.Identity, new Vector3(NewelW, pierTop + Found, PierD), Kind.Wall);
+			_m.Mat(concrete);
+			OBox(new Vector3(c.X, pierTop + NewelSlab * 0.5f, c.Z), Basis.Identity, new Vector3(NewelW + 0.07f, NewelSlab, PierD + 0.07f), Kind.Coping, true);
+			OBox(new Vector3(c.X, pierTop + NewelSlab + NewelSlab2 * 0.5f, c.Z), Basis.Identity, new Vector3(NewelW - 0.08f, NewelSlab2, PierD - 0.08f), Kind.Coping, true);
+		}
+		else if (!Ruined)
 		{
 			float zb = BackZ;
 			float topTop = TotalHeight + WallHeight + 0.08f;
@@ -618,11 +700,166 @@ public partial class StaircaseBuilder : Node3D
 		}
 	}
 
+	// ------------------------------------------------------------------ newel post
+
+	/// <summary>The newel post stands at the top of this cheek wall (+1 = right, looking up the flight).</summary>
+	private const int NewelSide = 1;
+	/// <summary>Pier width across the flight (it grows outward from the wall's inner face), how much taller
+	/// it stands than the other landing pier, and its two cast-stone cap slabs.</summary>
+	private const float NewelW = 0.38f, NewelRaise = 0.2f, NewelSlab = 0.08f, NewelSlab2 = 0.04f;
+	private float NewelPierTop => TotalHeight + WallHeight + NewelRaise;
+	private Vector3 NewelPierCentre => new(NewelSide * (Hw + NewelW * 0.5f), 0f, BackZ + PierD * 0.5f);
+	/// <summary>Where the round cap seats (local): the top of the upper slab, centred on the pier.</summary>
+	public Vector3 NewelSeatLocal => NewelPierCentre + new Vector3(0f, NewelPierTop + NewelSlab + NewelSlab2, 0f);
+	/// <summary>The cap's seat in world space: the cap mesh (<see cref="NewelCapMesh"/>) placed with this transform sits exactly where the pier's own cap does.</summary>
+	public Transform3D NewelSeatGlobal => GlobalTransform * new Transform3D(Basis.Identity, NewelSeatLocal);
+	public bool HasNewel => !Ruined;
+
+	private Node3D _newel;
+	private MeshInstance3D _capNode;
+
+	private void BuildNewel(Node3D gen)
+	{
+		_newel = new Node3D { Name = "Newel", Position = NewelSeatLocal };
+		gen.AddChild(_newel);
+		var k = new MeshKit();
+		BuildNewelStump(k);
+		k.CommitTo(_newel, "Stump");
+		_capNode = new MeshInstance3D { Name = "Cap", Mesh = NewelCapMesh, Visible = _newelCapped };
+		_newel.AddChild(_capNode);
+	}
+
+	// The cap, in "cap space": y = 0 on the seat (the top of the pier's upper slab). A round spigot
+	// rises from the seat and snapped part way up; above the break: the rest of the spigot, a small
+	// square plinth, a neck, and the ball. The break height wanders around the spigot, and the stump's
+	// top and the cap's underside are the same surface, so the cap sits back on exactly.
+	private const int CapSides = 12;
+	private const float SpigotR = 0.07f, SpigotTop = 0.065f, BreakCentreY = 0.04f;
+	private const float CapPlinthW = 0.19f, CapPlinthTop = 0.1f, CapStepW = 0.16f, CapStepTop = 0.109f;
+	private const float BallR = 0.1f, BallY = 0.223f;
+
+	/// <summary>Height of the break (cap space) at angle <paramref name="a"/> around the spigot.</summary>
+	private static float BreakY(float a) => 0.036f + 0.013f * Mathf.Sin(3f * a + 1.3f) + 0.007f * Mathf.Sin(7f * a + 0.4f) + 0.004f * Mathf.Sin(11f * a + 2.1f);
+	private static Vector3 BreakPt(int i) { float a = Mathf.Tau * i / CapSides; return new Vector3(Mathf.Cos(a) * SpigotR, BreakY(a), Mathf.Sin(a) * SpigotR); }
+	/// <summary>The lowest point of the cap's broken underside (cap space): where it rests when set down on a table.</summary>
+	public static float NewelBreakLowY
+	{
+		get { float lo = BreakCentreY; for (int i = 0; i < CapSides; i++) lo = Mathf.Min(lo, BreakPt(i).Y); return lo; }
+	}
+	/// <summary>Full height of the cap above its lowest break point.</summary>
+	public static float NewelCapHeight => BallY + BallR - NewelBreakLowY;
+
+	// Weathered cast stone, painted like the coping: pale above, damp and dark underneath, a little lichen on top.
+	private static readonly Color CapStone = new(0.93f, 0.92f, 0.88f);
+	private static readonly Color CapUnder = new(0.6f, 0.6f, 0.57f);
+	private static readonly Color CapLichen = new(0.7f, 0.74f, 0.58f);
+	private static readonly Color FreshBreak = new(0.92f, 0.9f, 0.85f);
+
+	private static ArrayMesh _capMesh;
+	/// <summary>The cap as one mesh (cap space), shared by every staircase and by the flying cap in Act 6.</summary>
+	public static ArrayMesh NewelCapMesh
+	{
+		get
+		{
+			if (_capMesh != null) return _capMesh;
+			var k = new MeshKit();
+			BuildNewelCap(k);
+			_capMesh = k.Commit();
+			return _capMesh;
+		}
+	}
+
+	/// <summary>The round stone cap, broken off its spigot, in cap space (see above); honours <see cref="MeshKit.Xf"/>.
+	/// The item on R.H.'s table is this, set down on its break.</summary>
+	public static void BuildNewelCap(MeshKit k)
+	{
+		// the upper part of the spigot, from the break up into the plinth
+		k.Mat(StairTextures.ConcreteMat);
+		k.Color = CapUnder;
+		for (int i = 0; i < CapSides; i++)
+		{
+			Vector3 a = BreakPt(i), b = BreakPt(i + 1);
+			Vector3 na = new Vector3(a.X, 0, a.Z).Normalized(), nb = new Vector3(b.X, 0, b.Z).Normalized();
+			Vector3 a1 = new(a.X, SpigotTop, a.Z), b1 = new(b.X, SpigotTop, b.Z);
+			float u0 = (float)i / CapSides * 0.43f, u1 = (float)(i + 1) / CapSides * 0.43f;
+			k.Tri(a, b, b1, na, nb, nb, new Vector2(u0, a.Y), new Vector2(u1, b.Y), new Vector2(u1, SpigotTop));
+			k.Tri(a, b1, a1, na, nb, na, new Vector2(u0, a.Y), new Vector2(u1, SpigotTop), new Vector2(u0, SpigotTop));
+		}
+		// the square plinth and a small step above it
+		k.Color = CapStone * 0.9f;
+		k.Box(new Vector3(0, (SpigotTop + CapPlinthTop) * 0.5f, 0), new Vector3(CapPlinthW, CapPlinthTop - SpigotTop, CapPlinthW), 1f);
+		k.Color = CapStone * 0.95f;
+		k.Box(new Vector3(0, (CapPlinthTop + CapStepTop) * 0.5f, 0), new Vector3(CapStepW, CapStepTop - CapPlinthTop, CapStepW), 1f);
+		// the neck, a ring, and the ball
+		var prof = new List<Vector2> { new(0.052f, CapStepTop), new(0.042f, 0.118f), new(0.036f, 0.126f), new(0.047f, 0.133f), new(0.047f, 0.138f) };
+		foreach (float deg in new[] { -58f, -40f, -20f, 0f, 20f, 40f, 58f, 74f, 84f })
+		{
+			float t = Mathf.DegToRad(deg);
+			prof.Add(new Vector2(BallR * Mathf.Cos(t), BallY + BallR * Mathf.Sin(t)));
+		}
+		Color Tone(int r, float ang)
+		{
+			if (ang < 0f) return CapStone;                           // the little flat top
+			float y = prof[Mathf.Min(r + 1, prof.Count - 1)].Y;
+			float up = Mathf.Clamp((y - BallY) / BallR, -1f, 1f);    // -1 under the ball .. 1 on top
+			var c = CapUnder.Lerp(CapStone, Mathf.SmoothStep(-0.9f, 0.1f, up));
+			float lichen = Mathf.Max(0f, up - 0.35f) * (0.6f + 0.4f * Mathf.Sin(ang * 3f + 0.7f));
+			return c.Lerp(CapLichen, Mathf.Clamp(lichen, 0f, 0.55f)) * (0.96f + 0.04f * Mathf.Sin(ang * 5f + r));
+		}
+		ItemMeshes.Lathe(k, prof, CapSides, false, true, 1f, 1f, 1.5f, Tone);
+		// the break: pale fresh stone, facing down
+		k.Mat(StairTextures.BreakMat);
+		k.Color = FreshBreak;
+		BreakFan(k, Vector3.Down);
+		k.Color = Colors.White;
+	}
+
+	/// <summary>What is left on the pier when the cap is gone: the spigot's stump with a jagged, pale top.</summary>
+	public static void BuildNewelStump(MeshKit k)
+	{
+		k.Mat(StairTextures.ConcreteMat);
+		k.Color = CapUnder * 1.1f;
+		for (int i = 0; i < CapSides; i++)
+		{
+			Vector3 a = BreakPt(i), b = BreakPt(i + 1);
+			Vector3 na = new Vector3(a.X, 0, a.Z).Normalized(), nb = new Vector3(b.X, 0, b.Z).Normalized();
+			Vector3 a0 = new(a.X, -0.01f, a.Z), b0 = new(b.X, -0.01f, b.Z);
+			float u0 = (float)i / CapSides * 0.43f, u1 = (float)(i + 1) / CapSides * 0.43f;
+			k.Tri(a0, b0, b, na, nb, nb, new Vector2(u0, 0), new Vector2(u1, 0), new Vector2(u1, b.Y));
+			k.Tri(a0, b, a, na, nb, na, new Vector2(u0, 0), new Vector2(u1, b.Y), new Vector2(u0, a.Y));
+		}
+		k.Mat(StairTextures.BreakMat);
+		k.Color = FreshBreak;
+		BreakFan(k, Vector3.Up);
+		k.Color = Colors.White;
+	}
+
+	private static void BreakFan(MeshKit k, Vector3 facing)
+	{
+		var c = new Vector3(0, BreakCentreY, 0);
+		for (int i = 0; i < CapSides; i++)
+		{
+			Vector3 a = BreakPt(i), b = BreakPt(i + 1);
+			Vector3 n = (a - c).Cross(b - c).Normalized();
+			if (n.Dot(facing) < 0f) n = -n;
+			Vector2 U(Vector3 p) => new(0.5f + p.X / (SpigotR * 2.2f), 0.5f + p.Z / (SpigotR * 2.2f));
+			k.Tri(c, a, b, n, U(c), U(a), U(b));
+		}
+	}
+
 	private void BuildRubble(Node3D gen)
 	{
 		var k = new MeshKit();
-		k.Mat(StairTextures.ConcreteMat);
 		int s = CrumbleSide;
+		// each block lies on the ground where it fell (the flight's foot is level, the ground beside it may not be)
+		var terrain = !Engine.IsEditorHint() && IsInsideTree() ? GroundSnap.FindTerrain(this) : null;
+		float Gnd(float x, float z)
+		{
+			if (terrain == null) return 0f;
+			Vector3 w = GlobalTransform * new Vector3(x, 0, z);
+			return ToLocal(new Vector3(w.X, terrain.HeightAt(w.X, w.Z), w.Z)).Y;
+		}
+		k.Mat(StairTextures.ConcreteMat);
 		for (int r = 0; r < 7; r++)
 		{
 			float z = CrumbleZ - _rng.RandfRange(0.1f, 1.6f);
@@ -630,7 +867,7 @@ public partial class StaircaseBuilder : Node3D
 			float sz = _rng.RandfRange(0.1f, 0.24f);
 			float g = _rng.RandfRange(0.55f, 0.8f);
 			k.Color = new Color(g, g * 0.99f, g * 0.93f);
-			k.Blob(new Vector3(x, sz * 0.3f, z), new Vector3(sz * 1.3f, sz * 0.8f, sz), Seed * 13 + r, 0.25f, true, 1f, 0.35f);
+			k.Blob(new Vector3(x, Gnd(x, z) + sz * 0.3f, z), new Vector3(sz * 1.3f, sz * 0.8f, sz), Seed * 13 + r, 0.25f, true, 1f, 0.35f);
 		}
 		k.CommitTo(gen, "Rubble");
 	}
@@ -679,6 +916,18 @@ public partial class StaircaseBuilder : Node3D
 				pts.Add(new Vector3(x, -Found, top[^1].X));
 			}
 			body.AddChild(new CollisionShape3D { Name = s < 0 ? "WallL" : "WallR", Shape = new ConvexPolygonShape3D { Points = pts.ToArray() } });
+		}
+
+		// the newel pier's outer part (the wall's collider already covers its inner part)
+		if (!Ruined)
+		{
+			var c = NewelPierCentre;
+			float top = NewelPierTop + NewelSlab;
+			body.AddChild(new CollisionShape3D
+			{
+				Name = "NewelPier", Position = new Vector3(c.X, (top - Found) * 0.5f, c.Z),
+				Shape = new BoxShape3D { Size = new Vector3(NewelW, top + Found, PierD) },
+			});
 		}
 
 		// invisible guard at the top edge: the stairs end, the player doesn't fall off them

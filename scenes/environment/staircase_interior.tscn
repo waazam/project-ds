@@ -14,6 +14,7 @@ size = Vector3(1.7, 0.8, 0.7)
 
 [node name="StaircaseStone" type="Node3D"]
 script = ExtResource("1_stairs")
+NewelCapped = false
 
 [node name="TopTrigger" type="Area3D" parent="." groups=["stairs_top_trigger"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.12, -10.425)

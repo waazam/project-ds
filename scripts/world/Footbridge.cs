@@ -23,7 +23,7 @@ public partial class Footbridge : Node3D
 	[Export] public float PostSpacing = 1.9f;
 	[Export] public bool Rocks = true;
 	[Export] public bool Sign = true;
-	[Export] public string[] SignBoards = { "Blackfern Trail >", "Cullen Creek" };
+	[Export] public string[] SignBoards = { "Blackfern Trail >", "Overlook Creek" };
 	[Export] public int Seed = 7;
 
 	private ForestTerrain _terrain;
@@ -163,7 +163,6 @@ public partial class Footbridge : Node3D
 			if (Rocks) BuildRocks(gen, tilt, L, pitch);
 			if (Sign) BuildSign(gen, L);
 		}
-		BuildPhotoSubject(gen);
 
 		var crossing = new BridgeCrossEvent { CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
 		gen.AddChild(crossing);
@@ -202,10 +201,22 @@ public partial class Footbridge : Node3D
 				Seed * 31 + id, 0.22f, true, 0.9f, 0.45f);
 			id++;
 			if (collide && r > 0.3f)
-				body.AddChild(new CollisionShape3D { Position = lp, Shape = new SphereShape3D { Radius = r * squash * 0.95f } });
+				body.AddChild(new CollisionShape3D { Position = lp, Shape = new SphereShape3D { Radius = Mathf.Min(r, r * squash) * 0.95f } });
 		}
-		Vector3 OnGround(Vector3 w, float r, float squash, float sink) { w.Y = _terrain.HeightAt(w.X, w.Z) - r * squash * sink; return w; }
+		// settled toward the low side of its footprint, so a rock on the bank slope does not overhang it
+		Vector3 OnGround(Vector3 w, float r, float squash, float sink) { w.Y = Mathf.Lerp(_terrain.HeightAt(w.X, w.Z), LowestUnder(w, r), 0.6f) - r * squash * sink; return w; }
 		Vector3 W(float x, float z) => GlobalTransform * new Vector3(x, 0, z);
+		// lowest ground under a rock of radius r (out to 90 %: the jittered flanks may overhang)
+		float LowestUnder(Vector3 w, float r)
+		{
+			float lo = _terrain.HeightAt(w.X, w.Z);
+			for (int i = 0; i < 6; i++)
+			{
+				float a = Mathf.Tau * i / 6f;
+				lo = Mathf.Min(lo, _terrain.HeightAt(w.X + Mathf.Cos(a) * r * 0.9f, w.Z + Mathf.Sin(a) * r * 0.9f));
+			}
+			return lo;
+		}
 
 		// abutments: a heap either side of each end, outside the rails
 		int a = 0;
@@ -253,51 +264,19 @@ public partial class Footbridge : Node3D
 				float squash = bank ? 0.65f : 0.6f;
 				// break the surface: the top sits 30-70 % of the rock's height above the water
 				w.Y = Mathf.Max(ground - r * squash * 0.3f, water - r * squash * Rand(4300 + i, 0.3f, 0.6f));
+				// in deeper water the rock still stands on the bed: same top, reaching down to the ground
+				float bottom = w.Y - r * squash, bed = LowestUnder(w, r) - 0.04f;
+				if (bottom > bed)
+				{
+					float top = w.Y + r * squash;
+					w.Y = (top + bed) * 0.5f;
+					squash = (top - bed) * 0.5f / r;
+				}
 				Rock(w, r, squash, bank, bank ? 0.4f : 1f);
 			}
 		}
 		if (!k.IsEmpty) k.CommitTo(gen, "RockMesh");
 		if (body.GetChildCount() == 0) body.QueueFree();
-	}
-
-	/// <summary>Act 1 shot list: the creek from the bridge. Built here because the bridge places itself
-	/// onto the crossing; the look points are the water up- and downstream (the stream runs across local X).</summary>
-	private void BuildPhotoSubject(Node3D gen)
-	{
-		// Each point sits just above the water (or the bank, where the bed rises out of it), so
-		// the line-of-sight ray is not stopped by the stream bed itself.
-		var points = new Vector3[4];
-		float[] offsets = { 6f, -6f, 12f, -12f };
-		var toLocal = GlobalTransform.AffineInverse();
-		for (int i = 0; i < 4; i++)
-		{
-			Vector3 w = GlobalTransform * new Vector3(offsets[i], 0, 0);
-			float y = w.Y - 0.9f;
-			if (_terrain != null)
-			{
-				float ground = _terrain.HeightAt(w.X, w.Z);
-				float water = ground;
-				var stream = _terrain.Stream;
-				if (stream != null && stream.Points.Count > 1)
-				{
-					Vector3 o = _terrain.GlobalPosition;
-					stream.Closest(new Vector2(w.X - o.X, w.Z - o.Z), out float s);
-					water = _terrain.WaterLevel(s);
-				}
-				y = Mathf.Max(ground, water) + 0.2f;
-			}
-			points[i] = toLocal * new Vector3(w.X, y, w.Z);
-		}
-		gen.AddChild(new PhotoSubject
-		{
-			Name = "CreekPhotoSubject",
-			Id = "creek",
-			LookPoints = points,
-			MinDistance = 3f,
-			MaxDistance = 28f,
-			ConeDegrees = 22f,
-			OwnerPath = "../..",
-		});
 	}
 
 	/// <summary>Low routed sign at the near (+Z) end, on the left as you arrive, pointing at the bridge.</summary>

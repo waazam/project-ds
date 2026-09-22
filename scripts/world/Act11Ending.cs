@@ -101,7 +101,7 @@ public partial class Act11Ending : Node3D
 		var s = StoryManager.Instance;
 		if (s == null || _original == null) return;
 		// One rule for the flight's length, whatever restored before or after this node; rebuilt only if it differs.
-		if (s.Act11DialogueDone) SetStairs(StairsState.StepsFor(s, _original.BaseSteps));
+		if (s.Act11DialogueDone) SetStairs(StairsState.FinalStepsFor(s, _original.BaseSteps));
 		_climbFired = s.Current >= Checkpoint.Act11GiantEncounter;
 		OnStoryChanged(0);
 		if (s.Act11DialogueDone && !_climbFired) _ = Cutscene.Run(this, RestoreFog);
@@ -281,7 +281,7 @@ public partial class Act11Ending : Node3D
 
 		// Two questions on the way up: 10 s and 30 s into a 46 s climb (the same fractions of a shorter one).
 		_ = Cutscene.Run(this, async c => { await Cutscene.Wait(this, climbSeconds * (10f / 46f), c); await Ask("\"Who's that with you?\"", c); });
-		_ = Cutscene.Run(this, async c => { await Cutscene.Wait(this, climbSeconds * (30f / 46f), c); await Ask("\"Is he still in the chair?\"", c); });
+		_ = Cutscene.Run(this, async c => { await Cutscene.Wait(this, climbSeconds * (30f / 46f), c); await Ask("\"Did you find his hand?\"", c); });
 
 		var tween = player.CreateTween();
 		tween.TweenProperty(player, "global_position", dest, climbSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
@@ -418,6 +418,15 @@ public partial class Act11Ending : Node3D
 		foreach (var n in GetTree().GetNodesInGroup("act6_mini_stairs"))
 			if (n is Node3D n3 && !n3.IsQueuedForDeletion()) hazards.Add(n3.GlobalPosition);
 		if (_original != null) hazards.Add(_original.GlobalPosition);
+		// The clearing's own staircase (the Hollow's first one) stands there too, flight and all.
+		if (clearing != null)
+			foreach (var st in clearing.FindChildren("*", "", true, false))
+				if (st is StaircaseBuilder sb && sb != _original && !sb.IsInGroup("act6_mini_stairs"))
+				{
+					hazards.Add(sb.GlobalPosition);
+					hazards.Add(sb.GlobalTransform * new Vector3(0, 0, -sb.Steps * sb.Run * 0.5f));
+					hazards.Add(sb.GlobalTransform * new Vector3(0, 0, -sb.Steps * sb.Run));
+				}
 
 		bool Clear(Vector3 p)
 		{

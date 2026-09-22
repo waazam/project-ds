@@ -1,0 +1,598 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/ForestTerrain.cs" id="1_terrain"]
+[ext_resource type="Script" path="res://scripts/world/ForestScatter.cs" id="2_scatter"]
+[ext_resource type="Script" path="res://scripts/world/ForestAtmosphere.cs" id="3_atmo"]
+[ext_resource type="Script" path="res://scripts/world/GroundSnap.cs" id="4_snap"]
+[ext_resource type="Script" path="res://scripts/world/ParkProp.cs" id="5_prop"]
+[ext_resource type="Script" path="res://scripts/world/TrailAnchor.cs" id="6_anchor"]
+[ext_resource type="Script" path="res://scripts/world/ClearZone.cs" id="9_clear"]
+[ext_resource type="PackedScene" path="res://scenes/environment/staircase_interior.tscn" id="10_stairs"]
+[ext_resource type="PackedScene" path="res://scenes/environment/footbridge.tscn" id="12_bridge"]
+[ext_resource type="Shader" path="res://assets/shaders/sky_dusk.gdshader" id="13_sky"]
+[ext_resource type="PackedScene" path="res://scenes/environment/cabin.tscn" id="14_cabin"]
+[ext_resource type="PackedScene" path="res://scenes/environment/shed.tscn" id="15_shed"]
+[ext_resource type="Script" path="res://scripts/world/Pickup.cs" id="16_pickup"]
+[ext_resource type="Script" path="res://scripts/world/DeepZoneDressing.cs" id="18_dressing"]
+[ext_resource type="Script" path="res://scripts/world/Act6ClearingEvent.cs" id="19_act6"]
+[ext_resource type="Script" path="res://scripts/world/Bunker.cs" id="21_bunker"]
+[ext_resource type="Script" path="res://scripts/world/BunkerInterior.cs" id="22_bunkerint"]
+[ext_resource type="Script" path="res://scripts/world/Act7Whispers.cs" id="23_whispers"]
+[ext_resource type="Script" path="res://scripts/world/Act11Ending.cs" id="25_act11"]
+[ext_resource type="Script" path="res://scripts/world/RainVfx.cs" id="26_rainvfx"]
+[ext_resource type="Script" path="res://scripts/world/Camp.cs" id="30_camp"]
+[ext_resource type="Script" path="res://scripts/world/CampArrivalEvent.cs" id="31_arrival"]
+[ext_resource type="Script" path="res://scripts/world/SafeZoneWatcher.cs" id="32_safezone"]
+[ext_resource type="Script" path="res://scripts/world/Woodpile.cs" id="33_woodpile"]
+
+[sub_resource type="ShaderMaterial" id="SkyMat"]
+shader = ExtResource("13_sky")
+shader_parameter/peak_dir = Vector2(-0.95, -0.3)
+shader_parameter/zenith_color = Color(0.075, 0.08, 0.125, 1)
+shader_parameter/horizon_color = Color(0.36, 0.29, 0.3, 1)
+shader_parameter/glow_color = Color(0.78, 0.43, 0.26, 1)
+shader_parameter/glow_strength = 0.75
+shader_parameter/cloud_dark = Color(0.1, 0.095, 0.12, 1)
+shader_parameter/cloud_light = Color(0.42, 0.33, 0.33, 1)
+shader_parameter/ridge_far = Color(0.2, 0.19, 0.23, 1)
+shader_parameter/ridge_mid = Color(0.15, 0.145, 0.18, 1)
+shader_parameter/ridge_near = Color(0.1, 0.1, 0.13, 1)
+shader_parameter/haze_color = Color(0.3, 0.26, 0.29, 1)
+shader_parameter/below_color = Color(0.22, 0.2, 0.24, 1)
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 2
+ambient_light_color = Color(0.4, 0.38, 0.46, 1)
+ambient_light_energy = 0.7
+reflected_light_source = 1
+tonemap_mode = 2
+tonemap_exposure = 1.1
+fog_enabled = true
+fog_mode = 0
+fog_light_color = Color(0.25, 0.23, 0.27, 1)
+fog_light_energy = 1.0
+fog_sun_scatter = 0.08
+fog_density = 0.02
+fog_sky_affect = 0.4
+
+[sub_resource type="Curve3D" id="Curve_trail"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, -1, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, -20, 0, 0, 0, 0, 0, 0, 5, 0, -48, 0, 0, 0, 0, 0, 0, 12, 0, -75, 0, 0, 0, 0, 0, 0, 9, 0, -104, 0, 0, 0, 0, 0, 0, -2, 0, -130, 0, 0, 0, 0, 0, 0, -10, 0, -158, 0, 0, 0, 0, 0, 0, -8, 0, -188, 0, 0, 0, 0, 0, 0, 2, 0, -215, 0, 0, 0, 0, 0, 0, 10, 0, -242, 0, 0, 0, 0, 0, 0, 9, 0, -270, 0, 0, 0, 0, 0, 0, 2, 0, -298, 0, 0, 0, 0, 0, 0, 0, 0, -325, 0, 0, 0, 0, 0, 0, 5, 0, -350, 0, 0, 0, 0, 0, 0, 11, 0, -372, 0, 0, 0, 0, 0, 0, 12, 0, -392, 0, 0, 0, 0, 0, 0, 10, 0, -415, 0, 0, 0, 0, 0, 0, 7, 0, -440, 0, 0, 0, 0, 0, 0, 6, 0, -463, 0, 0, 0, 0, 0, 0, 8, 0, -487, 0, 0, 0, 0, 0, 0, 8, 0, -510, 0, 0, 0, 0, 0, 0, 4, 0, -535, 0, 0, 0, 0, 0, 0, 0, 0, -560, 0, 0, 0, 0, 0, 0, -1, 0, -580, 0, 0, 0, 0, 0, 0, 3, 0, -598, 0, 0, 0, 0, 0, 0, 16, 0, -604, 0, 0, 0, 0, 0, 0, 32, 0, -594, 0, 0, 0, 0, 0, 0, 44, 0, -574, 0, 0, 0, 0, 0, 0, 54, 0, -550, 0, 0, 0, 0, 0, 0, 62, 0, -526, 0, 0, 0, 0, 0, 0, 65, 0, -504, 0, 0, 0, 0, 0, 0, 63, 0, -484, 0, 0, 0, 0, 0, 0, 61, 0, -468, 0, 0, 0, 0, 0, 0, 68, 0, -462, 0, 0, 0, 0, 0, 0, 84, 0, -470, 0, 0, 0, 0, 0, 0, 101, 0, -490, 0, 0, 0, 0, 0, 0, 118, 0, -514, 0, 0, 0, 0, 0, 0, 134, 0, -534, 0, 0, 0, 0, 0, 0, 148, 0, -552, 0, 0, 0, 0, 0, 0, 152, 0, -572, 0, 0, 0, 0, 0, 0, 146, 0, -596, 0, 0, 0, 0, 0, 0, 133, 0, -616, 0, 0, 0, 0, 0, 0, 121, 0, -634, 0, 0, 0, 0, 0, 0, 113, 0, -649, 0, 0, 0, 0, 0, 0, 110, 0, -659),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 47
+
+[sub_resource type="Curve3D" id="Curve_sight"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 58, 0, -462, 0, 0, 0, 0, 0, 0, 42.5, 0, -428.5, 0, 0, 0, 0, 0, 0, 28, 0, -396),
+"tilts": PackedFloat32Array(0, 0, 0)
+}
+point_count = 3
+
+[sub_resource type="Curve3D" id="Curve_flight"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 110, 0, -662, 0, 0, 0, 0, 0, 0, 110, 0, -700, 0, 0, 0, 0, 0, 0, 110, 0, -735),
+"tilts": PackedFloat32Array(0, 0, 0)
+}
+point_count = 3
+
+[node name="HollowWorld" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.307, 0.1908, -0.9324, 0, 0.9797, 0.2005, 0.9517, 0.0616, -0.3008, 0, 40, 0)
+light_color = Color(0.95, 0.6, 0.4, 1)
+light_energy = 0.55
+shadow_enabled = true
+shadow_opacity = 0.8
+shadow_blur = 1.5
+directional_shadow_mode = 1
+directional_shadow_max_distance = 60.0
+
+[node name="Atmosphere" type="Node" parent="." groups=["atmosphere"]]
+script = ExtResource("3_atmo")
+DeepStartZ = 400.0
+DeepFullZ = 300.0
+FogDensityDeep = 0.02
+FogColorDeep = Color(0.25, 0.23, 0.27, 1)
+SkyFogDeep = 0.45
+AmbientDeep = 0.62
+SunDeep = 0.55
+ClearingCenter = Vector3(-4, 0, -592)
+ClearingRadius = 24.0
+ClearingRelief = 0.2
+OpenTrailGrade = false
+FogDensityNight = 0.016
+
+[node name="RainVfx" type="Node3D" parent="." groups=["rain_vfx"]]
+script = ExtResource("26_rainvfx")
+
+[node name="Terrain" type="Node3D" parent="."]
+script = ExtResource("1_terrain")
+Seed = 9311
+MinXZ = Vector2(-180, -800)
+MaxXZ = Vector2(220, 60)
+TrailWidth = 1.2
+TrailWidthDeep = 1.1
+NarrowStart = 0.0
+NarrowEnd = 1.0
+ValleyPaths = Array[NodePath]([NodePath("Valleys/SightLine"), NodePath("Valleys/FinalFlight")])
+ClearingCenter = Vector2(-4, -592)
+ClearingRadius = 22.0
+ClearingGrass = false
+ParkingPad = false
+Hills = Array[Vector4]([Vector4(62, -467, 11, 20), Vector4(-45, -300, 9, 30), Vector4(58, -160, 10, 30), Vector4(-42, -62, 7, 25)])
+DeepShadeZ = Vector2(200, 100)
+StreamDipZ = -487.0
+StreamDipDepth = 1.2
+StreamDipWidth = 30.0
+
+[node name="Trail" type="Path3D" parent="Terrain" groups=["trail"]]
+curve = SubResource("Curve_trail")
+
+[node name="Valleys" type="Node3D" parent="Terrain"]
+
+[node name="SightLine" type="Path3D" parent="Terrain/Valleys"]
+curve = SubResource("Curve_sight")
+
+[node name="FinalFlight" type="Path3D" parent="Terrain/Valleys"]
+curve = SubResource("Curve_flight")
+
+[node name="Stream" type="Node3D" parent="Terrain"]
+
+[node name="S00" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -178, 0, -548)
+
+[node name="S01" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 0, -540)
+
+[node name="S02" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -120, 0, -530)
+
+[node name="S03" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90, 0, -520)
+
+[node name="S04" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0, -508)
+
+[node name="S05" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -35, 0, -498)
+
+[node name="S06" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -491)
+
+[node name="S07" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -487)
+
+[node name="S08" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, -479)
+
+[node name="S09" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, 0, -462)
+
+[node name="S10" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, 0, -444)
+
+[node name="S11" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 0, -428)
+
+[node name="S12" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, -414)
+
+[node name="S13" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, -400)
+
+[node name="S14" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 104, 0, -388)
+
+[node name="S15" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 130, 0, -378)
+
+[node name="S16" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 160, 0, -370)
+
+[node name="S17" type="Marker3D" parent="Terrain/Stream" groups=["stream_audio_points"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 218, 0, -362)
+
+[node name="Forest" type="Node3D" parent="."]
+script = ExtResource("2_scatter")
+Seed = 313
+DeepStart = 0.0
+DeepEnd = 1.0
+
+[node name="PlayerSpawn" type="Marker3D" parent="." groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
+
+[node name="GroundSnap" type="Node" parent="PlayerSpawn"]
+script = ExtResource("4_snap")
+Offset = 0.02
+FootprintRadius = 0
+
+[node name="SpawnClear" type="Node3D" parent="PlayerSpawn"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("9_clear")
+Radius = 2.5
+ClearFoliage = true
+
+[node name="Camp" type="Node3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -7, 0, -21)
+script = ExtResource("30_camp")
+
+[node name="LanternPickup" type="Area3D" parent="Camp"]
+script = ExtResource("16_pickup")
+Kind = 1
+Label = "Lantern"
+RequiredCheckpoint = 2
+
+[node name="CompassPickup" type="Area3D" parent="Camp"]
+script = ExtResource("16_pickup")
+Kind = 2
+Label = "Compass"
+RequiredCheckpoint = 2
+
+[node name="Arrival" type="Area3D" parent="Camp"]
+script = ExtResource("31_arrival")
+Radius = 8.5
+
+[node name="SafeZoneWatcher" type="Node" parent="Camp"]
+script = ExtResource("32_safezone")
+Radius = 16.0
+
+[node name="CampClear" type="Node3D" parent="Camp"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.5)
+script = ExtResource("9_clear")
+Radius = 5.5
+ClearFoliage = false
+
+[node name="CampFoliage" type="Node3D" parent="Camp"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0, 1.6)
+script = ExtResource("9_clear")
+Radius = 2.2
+ClearFoliage = true
+
+[node name="Tent" type="Node3D" parent="Camp"]
+transform = Transform3D(0.9903, 0, -0.1392, 0, 1, 0, 0.1392, 0, 0.9903, 0.4, 0, -2.6)
+script = ExtResource("5_prop")
+Kind = 12
+ClearRadius = 2.4
+ClearFoliage = true
+
+[node name="GroundSnap" type="Node" parent="Camp/Tent"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 1
+
+[node name="Pack" type="Node3D" parent="Camp"]
+transform = Transform3D(-0.866, 0, 0.5, 0, 1, 0, -0.5, 0, -0.866, 1.7, 0, 0.8)
+script = ExtResource("5_prop")
+Kind = 6
+ClearRadius = 0.8
+ClearFoliage = true
+
+[node name="GroundSnap" type="Node" parent="Camp/Pack"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0.3
+
+[node name="respawn_Act3DoorBoarded" type="Marker3D" parent="." groups=["respawn_Act3DoorBoarded"]]
+transform = Transform3D(0.995, 0, -0.0995, 0, 1, 0, 0.0995, 0, 0.995, 0.5, 0, -27)
+
+[node name="GroundSnap" type="Node" parent="respawn_Act3DoorBoarded"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="KeyPickup" type="Area3D" parent="."]
+script = ExtResource("16_pickup")
+Kind = 4
+Label = "Key"
+RequiredCheckpoint = 3
+
+[node name="TrailAnchor" type="Node" parent="KeyPickup"]
+script = ExtResource("6_anchor")
+Distance = 330
+Offset = 0.45
+YawDegrees = 20
+HeightOffset = 0
+
+[node name="Cabin" parent="." instance=ExtResource("14_cabin")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 24, 0, -392)
+
+[node name="CabinClear" type="Node3D" parent="Cabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.5)
+script = ExtResource("9_clear")
+Radius = 8
+ClearFoliage = true
+
+[node name="FrontClear" type="Node3D" parent="Cabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 10)
+script = ExtResource("9_clear")
+Radius = 4.5
+ClearFoliage = true
+
+[node name="WideClear" type="Node3D" parent="Cabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 14.6)
+script = ExtResource("9_clear")
+Radius = 3
+ClearFoliage = true
+
+[node name="respawn_Act5CabinEntered" type="Marker3D" parent="." groups=["respawn_Act5CabinEntered"]]
+transform = Transform3D(0.995, 0, 0.0995, 0, 1, 0, -0.0995, 0, 0.995, 12.5, 0, -400)
+
+[node name="GroundSnap" type="Node" parent="respawn_Act5CabinEntered"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="Shed" parent="." instance=ExtResource("15_shed")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 27, 0, -372)
+
+[node name="ShedClear" type="Node3D" parent="Shed"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
+script = ExtResource("9_clear")
+Radius = 4
+ClearFoliage = true
+
+[node name="ShedFrontClear" type="Node3D" parent="Shed"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.5)
+script = ExtResource("9_clear")
+Radius = 3.5
+ClearFoliage = true
+
+[node name="Woodpile" type="Node3D" parent="."]
+transform = Transform3D(0.5, 0, 0.866, 0, 1, 0, -0.866, 0, 0.5, -13.5, 0, -404)
+script = ExtResource("33_woodpile")
+
+[node name="AxePickup" type="Area3D" parent="."]
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -11.8, 0, -402.2)
+script = ExtResource("16_pickup")
+Kind = 3
+Label = "Axe"
+RequiredCheckpoint = 3
+
+[node name="GroundSnap" type="Node" parent="AxePickup"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="AxeClear" type="Node3D" parent="AxePickup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("9_clear")
+Radius = 1.6
+ClearFoliage = true
+
+[node name="Footbridge" parent="." instance=ExtResource("12_bridge") groups=["bridge_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -487)
+Sign = false
+
+[node name="respawn_Act6BridgeCrossed" type="Marker3D" parent="." groups=["respawn_Act6BridgeCrossed"]]
+transform = Transform3D(0.995, 0, 0.0995, 0, 1, 0, -0.0995, 0, 0.995, 7.5, 0, -502)
+
+[node name="GroundSnap" type="Node" parent="respawn_Act6BridgeCrossed"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="Clearing" type="Node3D" parent="." groups=["stairs_clearing_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -590)
+
+[node name="Stairs" parent="Clearing" instance=ExtResource("10_stairs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, 2)
+
+[node name="GroundSnap" type="Node" parent="Clearing/Stairs"]
+script = ExtResource("4_snap")
+Offset = -0.02
+FootprintRadius = 1.2
+
+[node name="Dressing" type="Node3D" parent="Clearing/Stairs"]
+script = ExtResource("18_dressing")
+
+[node name="Act6Clearing" type="Node3D" parent="Clearing/Stairs"]
+script = ExtResource("19_act6")
+SkipNightDelaySeconds = 15.0
+
+[node name="StairsClear" type="Node3D" parent="Clearing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -3)
+script = ExtResource("9_clear")
+Radius = 3
+ClearFoliage = true
+
+[node name="respawn_Act11GiantEncounter" type="Marker3D" parent="." groups=["respawn_Act11GiantEncounter"]]
+transform = Transform3D(0.9578, 0, -0.2873, 0, 1, 0, 0.2873, 0, 0.9578, 6, 0, -578)
+
+[node name="GroundSnap" type="Node" parent="respawn_Act11GiantEncounter"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="Lookout" type="Marker3D" parent="." groups=["fire_lookout_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61, 0, -465)
+
+[node name="GroundSnap" type="Node" parent="Lookout"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="respawn_Act7CabinBurning" type="Marker3D" parent="." groups=["respawn_Act7CabinBurning"]]
+transform = Transform3D(-0.892, 0, 0.4521, 0, 1, 0, -0.4521, 0, -0.892, 61, 0, -465)
+
+[node name="GroundSnap" type="Node" parent="respawn_Act7CabinBurning"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="ViewClear0" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.04, 0, -459.16)
+script = ExtResource("9_clear")
+Radius = 5
+ClearFoliage = false
+
+[node name="ViewClear1" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53.23, 0, -449.67)
+script = ExtResource("9_clear")
+Radius = 6.6
+ClearFoliage = false
+
+[node name="ViewClear2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.42, 0, -440.18)
+script = ExtResource("9_clear")
+Radius = 8.2
+ClearFoliage = false
+
+[node name="ViewClear3" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.61, 0, -430.69)
+script = ExtResource("9_clear")
+Radius = 9.8
+ClearFoliage = false
+
+[node name="ViewClear4" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.8, 0, -421.2)
+script = ExtResource("9_clear")
+Radius = 11.4
+ClearFoliage = false
+
+[node name="ViewClear5" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.99, 0, -411.71)
+script = ExtResource("9_clear")
+Radius = 13
+ClearFoliage = false
+
+[node name="ViewClear6" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.18, 0, -402.22)
+script = ExtResource("9_clear")
+Radius = 14.6
+ClearFoliage = false
+
+[node name="Bunker" type="Node3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 166, 0, -566)
+script = ExtResource("21_bunker")
+
+[node name="GroundSnap" type="Node" parent="Bunker"]
+script = ExtResource("4_snap")
+Offset = -0.05
+FootprintRadius = 2.5
+
+[node name="BunkerClear" type="Node3D" parent="Bunker"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("9_clear")
+Radius = 9
+ClearFoliage = true
+
+[node name="respawn_Act8BunkerEntered" type="Marker3D" parent="Bunker" groups=["respawn_Act8BunkerEntered"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.5)
+
+[node name="respawn_Act10WalkieFound" type="Marker3D" parent="Bunker" groups=["respawn_Act10WalkieFound"]]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 16)
+
+[node name="BunkerInterior" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1500, -80, -3000)
+script = ExtResource("22_bunkerint")
+
+[node name="FinalStairs" type="Node3D" parent="." groups=["final_stairs_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 110, 0, -662)
+
+[node name="Stairs" parent="FinalStairs" instance=ExtResource("10_stairs")]
+NewelCapRestore = 1
+
+[node name="GroundSnap" type="Node" parent="FinalStairs/Stairs"]
+script = ExtResource("4_snap")
+Offset = -0.02
+FootprintRadius = 1.2
+
+[node name="Act11Ending" type="Node3D" parent="FinalStairs/Stairs"]
+script = ExtResource("25_act11")
+
+[node name="FlightClear0" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear1" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear2" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -13)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear3" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -18)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear4" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -23)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear5" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -28)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear6" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -33)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear7" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -38)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear8" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -43)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear9" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -48)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear10" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -53)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear11" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -58)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear12" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -63)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="FlightClear13" type="Node3D" parent="FinalStairs"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -68)
+script = ExtResource("9_clear")
+Radius = 3.2
+ClearFoliage = false
+
+[node name="Act7Whispers" type="Node" parent="."]
+script = ExtResource("23_whispers")
+

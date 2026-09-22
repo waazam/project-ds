@@ -14,11 +14,12 @@ namespace ProjectDS.Player;
 /// stairs take over. The shutter is on the Player bus, the scream on Unnatural;
 /// Reduce Flashing softens the white flash.
 ///
-/// Besides the birds (judged first, by the unchanged rule) any <see cref="PhotoSubject"/>
-/// in group "photo_subjects" can be the shot; whatever it was is recorded in
-/// <see cref="PhotoLog"/> with a small print of the frame. The frame is read back
-/// one render frame after the press, with the viewfinder's marks hidden for that
-/// frame, so the print holds only what the camera saw.
+/// Every shot goes into the album (<see cref="PhotoLog"/>) as a small print of the frame,
+/// whatever it shows. Besides the birds (judged first, by the unchanged rule) any
+/// <see cref="PhotoSubject"/> in group "photo_subjects" can be recognised: that only drives
+/// the viewfinder's focus square, the print's caption and the subject's story flag. The
+/// frame is read back one render frame after the press, with the viewfinder's marks hidden
+/// for that frame, so the print holds only what the camera saw.
 /// </summary>
 public partial class CameraTool : Node
 {
@@ -58,7 +59,7 @@ public partial class CameraTool : Node
 		_viewfinder = new UI.CameraViewfinder();
 		AddChild(_viewfinder);
 		_framesLeft = FilmFrames;
-		// Continue: misses are forgiven, every recorded shot cost a frame.
+		// Continue: every picture in the album cost a frame.
 		Callable.From(() => _framesLeft = Mathf.Max(0, FilmFrames - (PhotoLog.Instance?.RecordedCount ?? 0))).CallDeferred();
 	}
 

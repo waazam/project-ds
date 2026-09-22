@@ -28,9 +28,8 @@ namespace ProjectDS.Entities;
 /// - It is heard more than seen, but only from where it actually is: while it
 ///   waits, its steps sometimes shadow yours a beat late and stop when you
 ///   stop, or a twig snaps at its tree.
-/// - It does not start following until the player has crossed the first
-///   footbridge (group "bridge_marker"; the trail runs north, -Z), or at once
-///   on a Continue from Act 2 on. It never enters the silence around a
+/// - It does not follow at all on the Blackfern Trail: it starts in the Hollow,
+///   once the first climb has happened (checkpoint 2 on). It never enters the silence around a
 ///   staircase, and it withdraws entirely while the player is indoors (the
 ///   cabin, the bunker), where there are no trees to hide behind.
 /// </summary>
@@ -39,8 +38,6 @@ public partial class Stalker : Node3D
 	public enum State { Dormant, Hidden, Peeking, Vanishing }
 
 	[ExportGroup("Pacing")]
-	/// <summary>It wakes once the player is this far past the footbridge (north of it, along -Z).</summary>
-	[Export] public float PastBridgeMeters = 6f;
 	[Export] public Vector2 CooldownSeconds = new(20f, 50f);   // after being seen, it keeps its distance a while
 	/// <summary>How long it waits at one tree, unseen, before moving to another while you linger nearby.</summary>
 	[Export] public Vector2 RelocateSeconds = new(18f, 35f);
@@ -107,7 +104,7 @@ public partial class Stalker : Node3D
 	public double LastSeenDuration { get; private set; }
 	/// <summary>0 = just seen, keeping back .. 1 = long unseen, as close as it gets.</summary>
 	public float Tension { get; private set; }
-	/// <summary>True once it has started following (past the bridge, a Continue from Act 2, or a dev key).</summary>
+	/// <summary>True once it has started following (from the first climb on, or a dev key).</summary>
 	public bool Awake => _awake;
 
 	/// <summary>Points on the body (local to Body) used to decide whether the player can see it.</summary>
@@ -119,8 +116,6 @@ public partial class Stalker : Node3D
 
 	private PlayerController _player;
 	private Node3D _body;
-	private Node3D _bridge;
-	private bool _bridgeSearched;
 	private bool _awake;
 	private readonly List<ShaderMaterial> _skins = new();
 	private readonly RandomNumberGenerator _rng = new();
@@ -241,18 +236,8 @@ public partial class Stalker : Node3D
 
 	private static bool Indoors => ForestAmbienceManager.Instance is { IsIndoor: true };
 
-	/// <summary>Whether the story lets it follow yet: past the footbridge, or a Continue from Act 2 on.</summary>
-	private bool ShouldWake()
-	{
-		if (StoryManager.Instance is { Current: >= Checkpoint.Act2StairsClimbed }) return true;
-		if (!_bridgeSearched)
-		{
-			_bridgeSearched = true;
-			_bridge = GetTree().GetFirstNodeInGroup("bridge_marker") as Node3D;
-		}
-		if (_bridge == null || !IsInstanceValid(_bridge)) return true;   // no bridge in this scene (previews): nothing to wait for
-		return _player.GlobalPosition.Z < _bridge.GlobalPosition.Z - PastBridgeMeters;
-	}
+	/// <summary>Whether the story lets it follow yet: only in the Hollow, from the first climb on.</summary>
+	private static bool ShouldWake() => StoryManager.Instance is not { } s || s.Current >= Checkpoint.Act2StairsClimbed;
 
 	public override void _Process(double delta)
 	{

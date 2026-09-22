@@ -26,6 +26,7 @@ public partial class StairsHum : Node
 
 	private AmbienceLoop _loop;
 	private SilenceZone _zone;
+	private double _zonePick;
 	private Node3D _listener;
 	private float? _override;
 
@@ -47,8 +48,21 @@ public partial class StairsHum : Node
 	{
 		if (_listener == null || !IsInstanceValid(_listener))
 			_listener = GetTree().GetFirstNodeInGroup("player") as Node3D;
-		if (_zone == null || !IsInstanceValid(_zone))
-			_zone = (GetTree().GetFirstNodeInGroup("stairs_top_trigger") as Node)?.GetParent()?.GetNodeOrNull<SilenceZone>("SilenceZone");
+		// Follow the nearest staircase (the Hollow has two: the clearing's and the last one), re-picked once a second.
+		_zonePick -= delta;
+		if ((_zone == null || !IsInstanceValid(_zone) || _zonePick <= 0) && _listener != null)
+		{
+			_zonePick = 1.0;
+			SilenceZone best = null; float bestD = float.MaxValue;
+			foreach (var n in GetTree().GetNodesInGroup("stairs_top_trigger"))
+			{
+				var z = (n as Node)?.GetParent()?.GetNodeOrNull<SilenceZone>("SilenceZone");
+				if (z == null) continue;
+				float d = z.GlobalPosition.DistanceSquaredTo(_listener.GlobalPosition);
+				if (d < bestD) { bestD = d; best = z; }
+			}
+			if (best != null) _zone = best;
+		}
 
 		float target = -80f;
 		if (_override.HasValue) target = _override.Value;

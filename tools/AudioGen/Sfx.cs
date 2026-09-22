@@ -315,6 +315,59 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 30, 0.24);
 	}
 
+	/// <summary>
+	/// Stone settling onto stone (Act 6: the newel post's cap seating back onto its broken neck): a
+	/// short, low, dry grind of grains catching and slipping under the weight, a heavy dull seat, and
+	/// one last small shift. Built from individual contacts, everything under ~1.4 kHz: no hiss, no
+	/// bed, no ring, no reverb.
+	/// </summary>
+	public static double[] NewelSeat(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.1);
+		const double grindLen = 0.42, seat = 0.44;
+		var catches = new Smooth(r, 1.2, 0.045);
+		// the grind: stick-slip grain contacts, ~100 a second, swelling where it catches
+		for (double t = 0.0; t < grindLen; t += r.R(0.004, 0.016))
+		{
+			double u = t / grindLen;
+			double level = Env(u, 0.25, 0.3) * (0.35 + 0.65 * Math.Pow(catches.At(t), 1.5));
+			var bp = Biquad.Bp(sr, r.R(180, 520), 1.1);
+			var lp = Biquad.Lp(sr, 900);
+			double tau = r.R(0.003, 0.009), g = level * r.R(0.4, 1.0);
+			int s0 = (int)(t * sr);
+			for (int i = 0; i < 0.04 * sr && s0 + i < x.Length; i++)
+				x[s0 + i] += lp.P(bp.P(r.W())) * Perc((double)i / sr, 0.0008, tau) * g * 5.0;
+		}
+		// the weight under it: a very low rumble riding the grind
+		var w1 = Biquad.Lp(sr, 90); var w2 = Biquad.Lp(sr, 110);
+		int wn = (int)((grindLen + 0.05) * sr);
+		for (int i = 0; i < wn; i++)
+		{
+			double tt = (double)i / sr;
+			x[i] += w2.P(w1.P(r.W())) * Env((double)i / wn, 0.3, 0.4) * (0.5 + 0.5 * catches.At(tt)) * 4.0;
+		}
+		// the seat: a heavy, dull knock, noise only
+		{
+			var l1 = Biquad.Lp(sr, 140); var l2 = Biquad.Lp(sr, 170); var b = Biquad.Bp(sr, 380, 0.9);
+			int s0 = (int)(seat * sr);
+			for (int i = 0; i < 0.35 * sr && s0 + i < x.Length; i++)
+			{
+				double tt = (double)i / sr;
+				x[s0 + i] += l2.P(l1.P(r.W())) * Perc(tt, 0.002, 0.05) * 16 + b.P(r.W()) * Perc(tt, 0.001, 0.014) * 2.5;
+			}
+		}
+		// one last small shift as it settles
+		{
+			var bp = Biquad.Bp(sr, r.R(250, 400), 1.0);
+			int s0 = (int)((seat + r.R(0.13, 0.19)) * sr);
+			for (int i = 0; i < 0.05 * sr && s0 + i < x.Length; i++)
+				x[s0 + i] += bp.P(r.W()) * Perc((double)i / sr, 0.001, 0.01) * 1.2;
+		}
+		LowPass(x, sr, 1400);
+		HighPass(x, sr, 30);
+		return FinishOneShot(x, sr, -3, 60);
+	}
+
 	// A boot on old concrete/stone steps: a hard, dry heel tap with almost no
 	// body (stone doesn't resonate like planks), a softer toe tap, and sandy
 	// grit ground under the sole. Occasionally a small crumb skitters off.

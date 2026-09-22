@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/world/ForestTerrain.cs" id="1_terrain"]
 [ext_resource type="Script" path="res://scripts/world/ForestScatter.cs" id="2_scatter"]
@@ -10,22 +10,18 @@
 [ext_resource type="Script" path="res://scripts/world/ClearZone.cs" id="9_clear"]
 [ext_resource type="PackedScene" path="res://scenes/environment/staircase_interior.tscn" id="10_stairs"]
 [ext_resource type="PackedScene" path="res://scenes/environment/footbridge.tscn" id="12_bridge"]
-[ext_resource type="PackedScene" path="res://scenes/environment/cabin.tscn" id="14_cabin"]
 [ext_resource type="Shader" path="res://assets/shaders/sky_dusk.gdshader" id="13_sky"]
-[ext_resource type="PackedScene" path="res://scenes/environment/shed.tscn" id="15_shed"]
 [ext_resource type="Script" path="res://scripts/world/Pickup.cs" id="16_pickup"]
 [ext_resource type="Script" path="res://scripts/world/Bird.cs" id="17_bird"]
-[ext_resource type="Script" path="res://scripts/world/DeepZoneDressing.cs" id="18_dressing"]
-[ext_resource type="Script" path="res://scripts/world/Act6ClearingEvent.cs" id="19_act6"]
-[ext_resource type="Script" path="res://scripts/world/Act11Ending.cs" id="25_act11"]
-[ext_resource type="Script" path="res://scripts/world/Bunker.cs" id="21_bunker"]
-[ext_resource type="Script" path="res://scripts/world/BunkerInterior.cs" id="22_bunkerint"]
-[ext_resource type="Script" path="res://scripts/world/Act7Whispers.cs" id="23_whispers"]
-[ext_resource type="Script" path="res://scripts/world/ForestVoiceCues.cs" id="24_voicecues"]
 [ext_resource type="Script" path="res://scripts/world/RainVfx.cs" id="26_rainvfx"]
 [ext_resource type="Script" path="res://scripts/world/FriendTrail.cs" id="27_friendtrail"]
 [ext_resource type="Script" path="res://scripts/world/FallenTree.cs" id="28_fallentree"]
 [ext_resource type="Script" path="res://scripts/world/PhotoSubject.cs" id="29_photo"]
+[ext_resource type="Script" path="res://scripts/world/SignPost.cs" id="30_signpost"]
+[ext_resource type="Script" path="res://scripts/entities/Deer.cs" id="31_deer"]
+[ext_resource type="Script" path="res://scripts/entities/Frog.cs" id="32_frog"]
+[ext_resource type="Script" path="res://scripts/world/Waterfall.cs" id="33_waterfall"]
+[ext_resource type="Script" path="res://scripts/world/OpeningAtCar.cs" id="34_opening"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -212,70 +208,6 @@ Offset = 0.02
 script = ExtResource("9_clear")
 Radius = 2.0
 
-[node name="Cabin" parent="." instance=ExtResource("14_cabin")]
-
-[node name="TrailAnchor" type="Node" parent="Cabin"]
-script = ExtResource("6_anchor")
-Distance = 45.0
-Offset = 7.0
-YawDegrees = 90.0
-HeightOffset = 0.0
-
-[node name="CabinClear" type="Node3D" parent="Cabin"]
-script = ExtResource("9_clear")
-Radius = 7.0
-
-[node name="Shed" parent="." instance=ExtResource("15_shed")]
-
-[node name="TrailAnchor" type="Node" parent="Shed"]
-script = ExtResource("6_anchor")
-Distance = 45.0
-Offset = 26.0
-YawDegrees = 90.0
-HeightOffset = 0.0
-
-[node name="ShedClear" type="Node3D" parent="Shed"]
-script = ExtResource("9_clear")
-Radius = 3.5
-
-[node name="KeyPickup" type="Area3D" parent="."]
-script = ExtResource("16_pickup")
-Kind = 4
-Label = "Key"
-RequiredCheckpoint = 3
-
-[node name="TrailAnchor" type="Node" parent="KeyPickup"]
-script = ExtResource("6_anchor")
-Distance = 402.0
-Offset = 1.8
-YawDegrees = 0.0
-HeightOffset = 0.0
-
-[node name="AxePickup" type="Area3D" parent="."]
-script = ExtResource("16_pickup")
-Kind = 3
-Label = "Axe"
-RequiredCheckpoint = 3
-
-[node name="TrailAnchor" type="Node" parent="AxePickup"]
-script = ExtResource("6_anchor")
-Distance = 158.0
-Offset = -16.0
-YawDegrees = 40.0
-HeightOffset = 0.0
-
-[node name="CameraPickup" type="Area3D" parent="."]
-script = ExtResource("16_pickup")
-Kind = 6
-Label = "Camera"
-
-[node name="TrailAnchor" type="Node" parent="CameraPickup"]
-script = ExtResource("6_anchor")
-Distance = 10.0
-Offset = -2.8
-YawDegrees = 0.0
-HeightOffset = 0.0
-
 [node name="Bird1" type="Node3D" parent="."]
 script = ExtResource("17_bird")
 Color = 0
@@ -320,6 +252,39 @@ Offset = -7.5
 YawDegrees = 0.0
 HeightOffset = 0.5
 
+[node name="Deer" type="Node3D" parent="."]
+script = ExtResource("31_deer")
+
+[node name="TrailAnchor" type="Node" parent="Deer"]
+script = ExtResource("6_anchor")
+Distance = 128.0
+Offset = 15.5
+YawDegrees = 180.0
+HeightOffset = 0.0
+
+[node name="Glade" type="Node3D" parent="Deer"]
+script = ExtResource("9_clear")
+Radius = 6.0
+ClearFoliage = false
+
+[node name="Sightline" type="Node3D" parent="Deer"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 0)
+script = ExtResource("9_clear")
+Radius = 3.0
+ClearFoliage = false
+
+[node name="Sightline2" type="Node3D" parent="Deer"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 0, 0)
+script = ExtResource("9_clear")
+Radius = 3.0
+ClearFoliage = false
+
+[node name="Frog" type="Node3D" parent="."]
+script = ExtResource("32_frog")
+
+[node name="Waterfall" type="Node3D" parent="."]
+script = ExtResource("33_waterfall")
+
 [node name="Trailhead" type="Node3D" parent="."]
 
 [node name="TrailheadSign" type="Node3D" parent="Trailhead"]
@@ -332,14 +297,6 @@ ClearRadius = 2.5
 script = ExtResource("4_snap")
 Offset = -0.04
 FootprintRadius = 0.3
-
-[node name="PhotoSubject" type="Node3D" parent="Trailhead/TrailheadSign"]
-script = ExtResource("29_photo")
-Id = "trailhead_sign"
-LookPoints = PackedVector3Array(0, 1.62, 0.13)
-MinDistance = 2.0
-MaxDistance = 14.0
-ConeDegrees = 14.0
 
 [node name="InfoBoard" type="Node3D" parent="Trailhead"]
 transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 3.4, 0, 19.8)
@@ -362,6 +319,43 @@ ClearRadius = 1.5
 script = ExtResource("4_snap")
 Offset = -0.04
 FootprintRadius = 0.3
+
+[node name="TrailRegister" type="Node3D" parent="Trailhead"]
+transform = Transform3D(0.5, 0, 0.866, 0, 1, 0, -0.866, 0, 0.5, -1.7, 0, 13.6)
+script = ExtResource("5_prop")
+Kind = 16
+ClearRadius = 1.0
+Seed = 3
+
+[node name="GroundSnap" type="Node" parent="Trailhead/TrailRegister"]
+script = ExtResource("4_snap")
+Offset = -0.03
+
+[node name="Car" type="Node3D" parent="Trailhead"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -5, 0, 25.95)
+script = ExtResource("5_prop")
+Kind = 17
+ClearRadius = 3.2
+Seed = 2
+
+[node name="GroundSnap" type="Node" parent="Trailhead/Car"]
+script = ExtResource("4_snap")
+Offset = -0.02
+FootprintRadius = 1.6
+Mode = 1
+
+[node name="OpeningAtCar" type="Node3D" parent="Trailhead/Car"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.3)
+script = ExtResource("34_opening")
+LookAfterPath = NodePath("../../TrailheadSign")
+
+[node name="Stand" type="Marker3D" parent="Trailhead/Car/OpeningAtCar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.9)
+
+[node name="TrunkCamera" type="Node3D" parent="Trailhead/Car/OpeningAtCar"]
+transform = Transform3D(0.94, 0, 0.342, 0, 1, 0, -0.342, 0, 0.94, 0.12, 0.61, -0.28)
+script = ExtResource("5_prop")
+Kind = 18
 
 [node name="VaultToilet" type="Node3D" parent="Trailhead"]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -9.8, 0, 18.6)
@@ -492,14 +486,6 @@ Offset = -5.5
 YawDegrees = 15.0
 HeightOffset = 0.0
 
-[node name="PhotoSubject" type="Node3D" parent="Props/ForgottenTent"]
-script = ExtResource("29_photo")
-Id = "tent"
-LookPoints = PackedVector3Array(-1, 0.9, 0, 0.9, 0.7, 0)
-MinDistance = 3.0
-MaxDistance = 16.0
-ConeDegrees = 16.0
-
 [node name="SnappedStick" type="Node3D" parent="Props"]
 script = ExtResource("5_prop")
 Kind = 8
@@ -562,6 +548,69 @@ MinDistance = 0.8
 MaxDistance = 5.0
 ConeDegrees = 12.0
 
+[node name="Wildflowers" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 14
+ClearRadius = 2.2
+ClearFoliage = true
+Seed = 6
+
+[node name="TrailAnchor" type="Node" parent="Props/Wildflowers"]
+script = ExtResource("6_anchor")
+Distance = 38.0
+Offset = 4.2
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Wildflowers"]
+script = ExtResource("29_photo")
+Id = "wildflowers"
+LookPoints = PackedVector3Array(-0.8, 0.25, 0.1, 0.5, 0.25, -0.35, 0.9, 0.25, 0.55)
+MinDistance = 1.0
+MaxDistance = 12.0
+ConeDegrees = 16.0
+RequireLineOfSight = false
+
+[node name="WeirdStone" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 15
+ClearRadius = 5.0
+ClearFoliage = false
+Seed = 9
+
+[node name="TrailAnchor" type="Node" parent="Props/WeirdStone"]
+script = ExtResource("6_anchor")
+Distance = 283.0
+Offset = -11.5
+YawDegrees = 90.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/WeirdStone"]
+script = ExtResource("29_photo")
+Id = "weird_stone"
+LookPoints = PackedVector3Array(0, 1.55, 0, 0, 0.8, 0, 0.15, 2.1, 0)
+MinDistance = 2.0
+MaxDistance = 30.0
+ConeDegrees = 14.0
+
+[node name="Sightline" type="Node3D" parent="Props/WeirdStone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
+script = ExtResource("9_clear")
+Radius = 3.0
+ClearFoliage = false
+
+[node name="Sightline2" type="Node3D" parent="Props/WeirdStone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 9.5)
+script = ExtResource("9_clear")
+Radius = 3.0
+ClearFoliage = false
+
+[node name="Sightline3" type="Node3D" parent="Props/WeirdStone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 12.5)
+script = ExtResource("9_clear")
+Radius = 2.5
+ClearFoliage = false
+
 [node name="Overlook" type="Node3D" parent="."]
 
 [node name="Landing" type="Node3D" parent="Overlook"]
@@ -569,15 +618,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, 0, -270)
 script = ExtResource("9_clear")
 Radius = 4.0
 ClearFoliage = false
-
-[node name="PhotoSubject" type="Node3D" parent="Overlook/Landing"]
-script = ExtResource("29_photo")
-Id = "overlook"
-Vista = true
-StandRadius = 6.0
-BearingDegrees = 37.0
-YawToleranceDegrees = 30.0
-MinPitchDegrees = -15.0
 
 [node name="ViewClear0" type="Node3D" parent="Overlook"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70.2, 0, -276.4)
@@ -616,20 +656,15 @@ Radius = 14.0
 ClearFoliage = false
 
 [node name="ForkSign_A" type="Node3D" parent="."]
+script = ExtResource("30_signpost")
+Boards = PackedStringArray("Overlook  0.2 mi >", "Blackfern Trail <")
+LeanDegrees = Vector2(1.2, -0.8)
+Seed = 11
 
 [node name="TrailAnchor" type="Node" parent="ForkSign_A"]
 script = ExtResource("6_anchor")
 Distance = 219.0
-Offset = 1.7
-YawDegrees = 0.0
-HeightOffset = 0.0
-
-[node name="ForkSign_B" type="Node3D" parent="."]
-
-[node name="TrailAnchor" type="Node" parent="ForkSign_B"]
-script = ExtResource("6_anchor")
-Distance = 529.0
-Offset = -1.5
+Offset = 3.1
 YawDegrees = 0.0
 HeightOffset = 0.0
 
@@ -641,11 +676,11 @@ CrownFrom = 0.55
 
 [node name="FriendTrail" type="Node3D" parent="."]
 script = ExtResource("27_friendtrail")
-Waypoints = PackedVector2Array(12, -470, 20, -490, 30, -512, 40, -534, 48, -554, 49, -568, 46, -581, 41, -591)
+Waypoints = PackedVector2Array(-1.5, -462.2, 4, -461.8, 9.5, -462.6, 12.8, -465.5, 13.5, -471, 20, -490, 30, -512, 40, -534, 48, -554, 49, -568, 46, -581, 41, -591)
 ItemAt = PackedFloat32Array()
 AvoidPath = NodePath("../Terrain/AutotestRoute")
 
-[node name="Clearing" type="Node3D" parent="." groups=["stairs_clearing_marker"]]
+[node name="Clearing" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 9.5, -605)
 
 [node name="Stairs" parent="Clearing" instance=ExtResource("10_stairs")]
@@ -656,45 +691,6 @@ script = ExtResource("4_snap")
 Offset = -0.02
 FootprintRadius = 1.2
 
-[node name="Dressing" type="Node3D" parent="Clearing/Stairs"]
-script = ExtResource("18_dressing")
-
-[node name="Act6Clearing" type="Node3D" parent="Clearing/Stairs"]
-script = ExtResource("19_act6")
-
-[node name="Act11Ending" type="Node3D" parent="Clearing/Stairs"]
-script = ExtResource("25_act11")
-
 [node name="StairsClear" type="Node3D" parent="Clearing"]
 script = ExtResource("9_clear")
 Radius = 2.7
-
-[node name="Bunker" type="Node3D" parent="."]
-script = ExtResource("21_bunker")
-
-[node name="TrailAnchor" type="Node" parent="Bunker"]
-script = ExtResource("6_anchor")
-Distance = 460.0
-Offset = -14.0
-YawDegrees = 90.0
-HeightOffset = 0.0
-
-[node name="GroundSnap" type="Node" parent="Bunker"]
-script = ExtResource("4_snap")
-Offset = -0.05
-FootprintRadius = 2.5
-
-[node name="BunkerClear" type="Node3D" parent="Bunker"]
-script = ExtResource("9_clear")
-Radius = 9.0
-
-[node name="BunkerInterior" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1500, -80, -3000)
-script = ExtResource("22_bunkerint")
-
-[node name="Act7Whispers" type="Node" parent="."]
-script = ExtResource("23_whispers")
-
-[node name="ForestVoiceCues" type="Node" parent="."]
-script = ExtResource("24_voicecues")
-

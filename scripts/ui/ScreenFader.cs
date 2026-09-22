@@ -144,7 +144,10 @@ public partial class ScreenFader : CanvasLayer
 	{
 		while (IsInstanceValid(tween) && tween.IsValid())
 		{
+			// A level change mid-caption frees this layer: stop quietly rather than touch a dead tree.
+			if (!IsInsideTree()) return false;
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			if (!IsInstanceValid(this) || !IsInsideTree()) return false;
 			if (!Owns(slot, gen, ct)) return false;
 		}
 		return Owns(slot, gen, ct);

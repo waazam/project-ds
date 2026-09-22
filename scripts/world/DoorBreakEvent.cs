@@ -14,8 +14,8 @@ namespace ProjectDS.World;
 /// the door on Continue: boarded from Act 2 until it was broken open.
 ///
 /// Act 5 begins after the giant (Act 4): until <see cref="StoryManager.Flag.GiantEventDone"/>
-/// the boards cannot be broken even with a tool in hand, and the prompt says why
-/// in the plainest terms. Prompts never carry the key hint; the HUD adds it.
+/// the boards cannot be broken even with a tool in hand (in the Hollow the giant
+/// always crosses before the player gets near the cabin, see GiantStalkerEvent). Prompts never carry the key hint; the HUD adds it.
 /// </summary>
 public partial class DoorBreakEvent : Interactable
 {
@@ -80,7 +80,7 @@ public partial class DoorBreakEvent : Interactable
 		if (_busy) return "Chopping through the boards...";
 		var tool = ToolFor(player.Inventory);
 		if (tool == ToolKind.None) return "The door is boarded shut.";
-		if (!GiantSeen) return "Boarded shut. Find him first.";
+		if (!GiantSeen) return "Boarded shut.";
 		return tool == ToolKind.Axe
 			? "Chop the boards with the axe"
 			: HoldProgress > 0f ? $"Prying the boards loose... {HoldProgress * 100f:0}%" : "Pry the boards loose";

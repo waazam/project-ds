@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/levels/hollow_world.tscn" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
 [ext_resource type="Script" path="res://scripts/world/bunkerparts/BunkerPreview.cs" id="3_preview"]
 

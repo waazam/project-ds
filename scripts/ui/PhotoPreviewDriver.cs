@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Linq;
 using Godot;
 using ProjectDS.Player;
 using ProjectDS.Systems;
@@ -8,18 +9,27 @@ using ProjectDS.World;
 namespace ProjectDS.UI;
 
 /// <summary>
-/// Drives photo_preview.tscn; see <see cref="PhotoPreview"/>. Everything goes through
-/// PlayerInput.Scripted*. In trail order it stands the player in front of each subject,
-/// raises the camera, checks the focus lock, shoots, checks the log and screenshots the
-/// viewfinder and the print. Negative checks (too far, behind a trunk, wrong bearing,
-/// bird over cabin), the black bird beat, the page, the take-away, and finally a real
-/// Continue from a save with three photo flags (the real save slots are backed up and put
-/// back). Shots: test-output/photo/ at 640x360 plus the nearest-scaled 1600x900 view.
+/// Drives photo_preview.tscn; see <see cref="PhotoPreview"/>. The Act 1 (trailhead level) harness,
+/// everything through PlayerInput.Scripted*:
+/// 1. the level holds Act 1 only (nothing of the cabin, shed, bunker or later acts);
+/// 2. the open-trail grade, before (the old values) and after, at the lot, the trailhead, 100 m
+///    and past the bridge (test-output/trailhead/atmo_*);
+/// 3. look shots of the new dressing (signs, papers, pavers, the barrier left of the fallen fir,
+///    deer, frog, flowers, waterfall, stone) into test-output/trailhead/;
+/// 4. every readable: reachable, highlighted, opens the note overlay with the right text;
+/// 5. the fallen fir: walking left of the root plate is stopped; the pavers lead round the crown
+///    to the stairs' foot;
+/// 6. the photo trip in trail order: each subject locks, shoots, records, prints; the deer bolts
+///    at the shutter and is gone; the black bird beat; the stairs; the page;
+///    the take-away (test-output/photo/);
+/// 7. a real Continue from a save with three photo flags (the real save slots are backed up and put
+///    back): restore checks, the deer bolting when walked up to, and the first climb (the log line
+///    "[story] checkpoint reached: Act2StairsClimbed" and the travel to the Hollow).
 /// Quits non-zero on any failed check.
 /// </summary>
 public partial class PhotoPreviewDriver : Node
 {
-	private string _out;
+	private string _out, _outTh;
 	private int _fails;
 	private PlayerController _player;
 	private PlayerInput _pin;
@@ -36,22 +46,31 @@ public partial class PhotoPreviewDriver : Node
 	{
 		ProcessMode = ProcessModeEnum.Always;
 		_out = ProjectSettings.GlobalizePath("res://test-output/photo");
+		_outTh = ProjectSettings.GlobalizePath("res://test-output/trailhead");
 		DirAccess.MakeDirRecursiveAbsolute(_out);
+		DirAccess.MakeDirRecursiveAbsolute(_outTh);
 		Run();
 	}
 
 	private async Task Frames(int n) { for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }
+	private async Task Physics(int n) { for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame); }
 	private async Task Seconds(double s) => await ToSignal(GetTree().CreateTimer(s, true), SceneTreeTimer.SignalName.Timeout);
 	private void Check(bool ok, string what) { GD.Print($"[photo-preview] {(ok ? "PASS" : "FAIL")} {what}"); if (!ok) _fails++; }
 	private static void Note(string what) => GD.Print($"[photo-preview] note: {what}");
 
-	private void Shot(string name)
+	private void Shot(string name) => Save(_out, name, true);
+	private void ShotTh(string name) => Save(_outTh, name, false);
+
+	private void Save(string dir, string name, bool big)
 	{
 		var img = GetViewport().GetTexture().GetImage();
-		img.SavePng($"{_out}/{name}_640x360.png");
-		var big = (Image)img.Duplicate();
-		big.Resize(1600, 900, Image.Interpolation.Nearest);
-		big.SavePng($"{_out}/{name}_1600x900.png");
+		img.SavePng($"{dir}/{name}_640x360.png");
+		if (big)
+		{
+			var b = (Image)img.Duplicate();
+			b.Resize(1600, 900, Image.Interpolation.Nearest);
+			b.SavePng($"{dir}/{name}_1600x900.png");
+		}
 		GD.Print($"[photo-preview] shot {name}");
 	}
 
@@ -73,6 +92,7 @@ public partial class PhotoPreviewDriver : Node
 	}
 
 	private Vector3 Ground(Vector3 p) => new(p.X, _terrain.HeightAt(p.X, p.Z) + 0.1f, p.Z);
+	private Vector3 TrailNear(Vector3 p) { _terrain.TrailDistance(p.X, p.Z, out float s); return Ground(_terrain.TrailPoint(s, out _)); }
 
 	private static float YawToward(Vector3 from, Vector3 to)
 	{
@@ -85,12 +105,17 @@ public partial class PhotoPreviewDriver : Node
 	{
 		_player.Teleport(at, YawToward(at, lookAt));
 		await Frames(4);
+		Aim(lookAt);
+		await Frames(2);
+	}
+
+	private void Aim(Vector3 lookAt)
+	{
 		var eye = _player.CameraRig.Camera.GlobalPosition;
 		Vector3 d = lookAt - eye;
 		float flat = new Vector2(d.X, d.Z).Length();
 		_player.CameraRig.SnapBehind(Mathf.Atan2(-d.X, -d.Z));
 		_player.CameraRig.SetPitch(Mathf.Atan2(d.Y, flat));
-		await Frames(2);
 	}
 
 	private async Task StandFacing(Vector3 at, float yawDeg, float pitchDeg)
@@ -118,21 +143,28 @@ public partial class PhotoPreviewDriver : Node
 	}
 
 	/// <summary>Raise, check the lock, shoot, check the record, screenshot both.</summary>
-	private async Task Shoot(string tag, string expectId, bool? expectLock, bool expectRecord)
+	private async Task Shoot(string tag, string expectId, bool? expectLock, bool expectRecord, double settle = 2.2)
 	{
 		await Raise(true);
 		if (expectLock is bool lockOn) Check(_viewfinder.FocusLocked == lockOn, $"{tag}: focus lock {(lockOn ? "on" : "off")}");
 		Shot($"viewfinder_{tag}");
 		int film = _camera.FramesLeft;
+		int before = PhotoLog.Instance.RecordedCount;
 		await Press(v => _pin.ScriptedPhoto = v);
 		await Seconds(0.9);
 		Check(_camera.FramesLeft == film - 1, $"{tag}: one frame of film spent");
-		bool has = expectId != null && PhotoLog.Instance.Has(expectId);
-		Check(has == expectRecord, $"{tag}: {(expectRecord ? "recorded" : "not recorded")} {expectId}");
-		if (expectRecord) Check(_thumb.ShowingId == expectId, $"{tag}: print showing ({_thumb.ShowingId ?? "none"})");
+		Check(PhotoLog.Instance.RecordedCount == before + 1, $"{tag}: the picture is in the album (#{PhotoLog.Instance.RecordedCount})");
+		// (quick runs of shots queue their prints; only a lone shot is checked for its own print)
+		if (settle >= 1.0) Check(_thumb.ShowingNumber == before + 1, $"{tag}: its print slides in (#{_thumb.ShowingNumber})");
+		if (expectId != null)
+		{
+			bool has = PhotoLog.Instance.Has(expectId);
+			Check(has == expectRecord, $"{tag}: {(expectRecord ? "recognised" : "not recognised")} {expectId}");
+			if (expectRecord) Check(_thumb.ShowingId == expectId, $"{tag}: the print is captioned '{PhotoLog.CaptionFor(expectId)}' ({_thumb.ShowingId})");
+		}
 		Shot($"print_{tag}");
 		await Raise(false);
-		await Seconds(2.2);
+		await Seconds(settle);
 	}
 
 	private async Task PulseTab()
@@ -149,183 +181,33 @@ public partial class PhotoPreviewDriver : Node
 			if (!Bind()) { GD.PushError("[photo-preview] scene is missing something (player, hud page/thumb, terrain, world)"); GetTree().Quit(2); return; }
 			(GetTree().CurrentScene.FindChild("ScreenFader", true, false) as ScreenFader)?.SetBlack(false);
 			Input.MouseMode = Input.MouseModeEnum.Visible;
-			_inv.TryPickup(ToolKind.Camera);
 			_pin.Scripted = true;
 			await Frames(20);
 			var log = PhotoLog.Instance;
 			Check(log != null && log.RecordedCount == 0, "fresh log is empty");
+			CheckAct1Only();
+
+			await Atmosphere();
+			var only = System.Array.Find(OS.GetCmdlineUserArgs(), a => a.StartsWith("--only="))?.Substring(7);
+			if (only == "atmo")
+			{
+				var env = _world.GetNode<WorldEnvironment>("WorldEnvironment").Environment;
+				await Stand(Ground(_terrain.TrailPoint(4f, out _)), _terrain.TrailPoint(40f, out _) + Vector3.Up * 1.4f);
+				await Seconds(6.0);
+				env.FogEnabled = false; await Frames(3); ShotTh("diag_nofog");
+				env.FogEnabled = true; env.ReflectedLightSource = Environment.ReflectionSource.Disabled; await Frames(3); ShotTh("diag_noreflect");
+				GetTree().Quit(_fails == 0 ? 0 : 1); return;
+			}
+			if (only == "look") { await LookShots(); GetTree().Quit(_fails == 0 ? 0 : 1); return; }
+			await LookShots();
+			await Readables();
+			await FallenFir();
+
+			_inv.TryPickup(ToolKind.Camera);
+			await Frames(10);
 			Check(_camera.FramesLeft == 36, $"fresh roll has 36 frames ({_camera.FramesLeft})");
-			CheckAct5ToolsHidden();
+			await PhotoTrip(log);
 
-			// ---- the sign: too far first, then from 6 m
-			var sign = _world.GetNode<Node3D>("Trailhead/TrailheadSign");
-			Vector3 plank = sign.GlobalTransform * new Vector3(0, 1.62f, 0.13f);
-			await Stand(Ground(sign.GlobalTransform * new Vector3(0, 0, 30)), plank);
-			await Raise(true);
-			Check(!_viewfinder.FocusLocked, "sign from 30 m does not lock");
-			await Raise(false);
-			await Stand(Ground(sign.GlobalTransform * new Vector3(0, 0, 6)), plank);
-			await Shoot("sign", "trailhead_sign", true, true);
-
-			// ---- the red bird with the cabin right behind it: the bird wins
-			var bird1 = _world.GetNode<Bird>("Bird1");
-			var cabin = _world.GetNode<Cabin>("Cabin");
-			Vector3 b = bird1.GlobalPosition;
-			Vector3 away = b - cabin.DoorCenter; away.Y = 0; away = away.Normalized();
-			// Aim a little above the bird so the door behind it sits near the centre too (the bird's cone is 22 deg).
-			await Stand(Ground(b + away * 6f), b + Vector3.Up * 0.8f);
-			var cabinSubject = cabin.GetNode<PhotoSubject>("PhotoSubject");
-			bool cabinInFrame = cabinSubject.TryScore(_player.CameraRig.Camera, _player, out _);
-			{
-				var cam = _player.CameraRig.Camera;
-				Vector3 door = cabin.DoorCenter;
-				Vector3 to = door - cam.GlobalPosition;
-				float ang = Mathf.RadToDeg(Mathf.Acos(Mathf.Clamp((-cam.GlobalBasis.Z).Dot(to.Normalized()), -1f, 1f)));
-				var q = PhysicsRayQueryParameters3D.Create(cam.GlobalPosition, door, 1u);
-				q.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
-				var hit = _player.GetWorld3D().DirectSpaceState.IntersectRay(q);
-				string blocker = hit.Count == 0 ? "clear" : (hit["collider"].AsGodotObject() as Node)?.GetPath().ToString();
-				Note($"cabin in frame behind the red bird: {cabinInFrame} (door {to.Length():0.0} m, {ang:0.0} deg, ray {blocker})");
-			}
-			await Shoot("bird_red", "bird_red", true, true);
-			Check(!log.Has("cabin"), "bird over cabin: the cabin was not recorded");
-			Check(bird1.Photographed, "red bird captured");
-
-			// ---- the cabin from its front
-			await Stand(Ground(cabin.GlobalTransform * new Vector3(0, 0, 12)), cabin.GlobalTransform * new Vector3(0, 1.0f, 2.6f));
-			await Shoot("cabin", "cabin", true, true);
-
-			// ---- the creek from the deck
-			var bridge = _world.GetNode<Node3D>("Footbridge");
-			await Stand(bridge.GlobalTransform * new Vector3(0, 0.35f, 0), bridge.GlobalTransform * new Vector3(6, -0.9f, 0));
-			await Shoot("creek", "creek", true, true);
-
-			// ---- the overlook: south first (nothing), then the view
-			var landing = _world.GetNode<Node3D>("Overlook/Landing");
-			await StandFacing(Ground(landing.GlobalPosition), 180f, 0f);
-			await Shoot("overlook_south", "overlook", false, false);
-			await StandFacing(Ground(landing.GlobalPosition), 37f, 2f);
-			await Shoot("overlook", "overlook", true, true);
-
-			// ---- the tent: behind a trunk first (if one can be found), then from the door side
-			var tent = _world.GetNode<Node3D>("Props/ForgottenTent");
-			Vector3 tentLook = tent.GlobalTransform * new Vector3(-1f, 0.9f, 0);
-			Vector3? hidden = FindHiddenSpot(tent, tentLook);
-			if (hidden is Vector3 hs)
-			{
-				await Stand(hs, tentLook);
-				await Raise(true);
-				Check(!_viewfinder.FocusLocked, "tent behind a trunk does not lock");
-				Shot("viewfinder_tent_hidden");
-				await Raise(false);
-			}
-			else Note("no trunk between a stand point and the tent: hidden-tent check skipped");
-			await Stand(Ground(tent.GlobalTransform * new Vector3(-4.5f, 0, 3f)), tentLook);
-			await Shoot("tent", "tent", true, true);
-
-			// ---- the mushrooms, close and looking down
-			var mush = _world.GetNode<Node3D>("Props/Mushrooms");
-			await Stand(Ground(mush.GlobalTransform * new Vector3(0, 0, 1.8f)), mush.GlobalTransform * new Vector3(0, 0.12f, 0));
-			await Shoot("mushrooms", "mushrooms", true, true);
-
-			// ---- the black bird: the scream, the flock gone, the listed blue and purple never ticked
-			var omen = _world.GetNode<Bird>("Bird4Omen");
-			Vector3 o = omen.GlobalPosition;
-			Vector3 tp = _terrain.TrailPoint(415f, out _);
-			Vector3 toward = tp - o; toward.Y = 0; toward = toward.Normalized();
-			await Stand(Ground(o + toward * 6f), o + Vector3.Up * 0.1f);
-			await Shoot("bird_black", "bird_black", true, true);
-			bool allGone = true;
-			foreach (var n in new[] { "Bird1", "Bird2", "Bird3", "Bird4Omen" })
-				if (_world.GetNodeOrNull<Bird>(n) is { } bd && !bd.Photographed) allGone = false;
-			Check(allGone, "after the black bird every bird is Photographed");
-			Check(!log.Has("bird_blue") && !log.Has("bird_purple"), "unshot listed birds stay unticked");
-			Check(GetTree().GetNodesInGroup("photo_birds").Count == 0, "photo_birds group is empty");
-
-			// ---- the stalker's sting writes "(nothing there)"
-			var stalker = GetTree().GetFirstNodeInGroup("stalker") as Entities.Stalker;
-			if (stalker != null)
-			{
-				// Facing up the trail (every bird is gone by now, every prop here is already on the roll), at
-				// whichever of a few spots offers it a trunk behind us. Camera already up, then it takes
-				// cover; a fast turn and the shutter inside its linger (it vanishes a third of a second
-				// after being seen, and the sting needs it in frame).
-				bool placed = false;
-				foreach (float s in new[] { 330f, 250f, 360f, 300f, 200f })
-				{
-					Vector3 sp = _terrain.TrailPoint(s, out Vector3 st);
-					await StandFacing(Ground(sp), Mathf.RadToDeg(Mathf.Atan2(-st.X, -st.Z)), 0f);
-					await Raise(true);
-					placed = stalker.DebugForcePeek();
-					await Seconds(0.3);
-					if (placed) { Note($"stalker took cover at s = {s}"); break; }
-					await Raise(false);
-				}
-				if (placed)
-				{
-					Vector3 centre = Vector3.Zero; int k = 0;
-					foreach (var p in stalker.WorldSamplePoints()) { centre += p; k++; }
-					if (k > 0) centre /= k;
-					var eye = _player.CameraRig.Camera.GlobalPosition;
-					Vector3 d = centre - eye;
-					_player.CameraRig.SnapBehind(Mathf.Atan2(-d.X, -d.Z));
-					_player.CameraRig.SetPitch(Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length()));
-					await Frames(1);
-					int film = _camera.FramesLeft;
-					await Press(v => _pin.ScriptedPhoto = v);
-					await Seconds(0.9);
-					Check(_camera.FramesLeft == film - 1, "stalker: one frame of film spent");
-					Check(log.Has("stalker"), $"stalker: recorded (stings {stalker.StingCount}, state {stalker.Current})");
-					Check(_thumb.ShowingId == "stalker", $"stalker: print showing ({_thumb.ShowingId ?? "none"})");
-					Shot("print_stalker");
-					await Raise(false);
-					await Seconds(2.2);
-				}
-				else Note("stalker found no cover at any spot: stalker check skipped");
-			}
-			else Note("no stalker in the scene");
-
-			// ---- the stairs from the clearing (never stepping on)
-			var stairs = _world.GetNode<Node3D>("Clearing/Stairs");
-			await Stand(Ground(stairs.GlobalTransform * new Vector3(0, 0, 9f)), stairs.GlobalTransform * new Vector3(0, 3.0f, -5.5f));
-			await Shoot("stairs", "stairs", true, true);
-
-			// ---- the page
-			await PulseTab();
-			Check(_page.IsOpen, "Tab opens the page");
-			Shot("page_open");
-			await PulseTab();
-			Check(!_page.IsOpen, "Tab again closes the page");
-			_thumb.ShowPrints = false;
-			log.Record("bird_blue");
-			log.Record("bird_purple");
-			Check(log.ListComplete, "list complete after the last two records");
-			await PulseTab();
-			await Seconds(0.2);
-			Shot("page_complete");
-			await PulseTab();
-			await Raise(true);
-			await PulseTab();
-			Check(!_page.IsOpen, "Tab is ignored with the camera raised");
-			await Raise(false);
-			await PulseTab();
-			Check(_page.IsOpen, "page opens again once the camera is down");
-			await Raise(true);
-			Check(!_page.IsOpen, "raising the camera puts the page away");
-			await Raise(false);
-
-			// ---- the stairs take the camera
-			_inv.TakeAwayCamera();
-			await Frames(5);
-			Check(!_page.IsOpen, "take-away: page hidden");
-			await Raise(true);
-			Check(!_camera.IsRaised, "take-away: focus never raises");
-			await Raise(false);
-			await PulseTab();
-			Check(!_page.IsOpen, "take-away: Tab does nothing");
-			Shot("after_stairs");
-
-			// ---- Continue from a save with three photos
 			await ContinueCheck();
 		}
 		catch (System.Exception e)
@@ -340,38 +222,387 @@ public partial class PhotoPreviewDriver : Node
 		GetTree().Quit(_fails == 0 ? 0 : 1);
 	}
 
-	/// <summary>Fix 1.9: the Act 5 tools (axe, key, hammer) stay hidden until the door is boarded (Act 3).</summary>
-	private void CheckAct5ToolsHidden()
+	// ------------------------------------------------------------------ 1. Act 1 only
+
+	private void CheckAct1Only()
 	{
-		foreach (var path in new[] { "AxePickup", "KeyPickup", "Shed/HammerPickup" })
-		{
-			var p = _world.GetNodeOrNull<Pickup>(path);
-			Check(p != null && !p.Visible && p.RequiredCheckpoint == Checkpoint.Act3DoorBoarded, $"before Act 3: {path} hidden (required checkpoint {p?.RequiredCheckpoint})");
-		}
+		Check(_world.GetNodeOrNull("ForkSign_B") == null, "no sign at the fallen fir");
+		Check(_world.GetNodeOrNull("CameraPickup") == null, "no camera on the ground: it comes from the car");
+		Check(_world.GetNodeOrNull("Trailhead/Car/OpeningAtCar/Stand") != null && _world.GetNodeOrNull("Trailhead/Car/OpeningAtCar/TrunkCamera") != null, "the car, its opening, the stand and the trunk camera");
+		foreach (var path in new[] { "Cabin", "Shed", "KeyPickup", "AxePickup", "Bunker", "BunkerInterior", "Act7Whispers", "ForestVoiceCues",
+			"Clearing/Stairs/Dressing", "Clearing/Stairs/Act6Clearing", "Clearing/Stairs/Act11Ending" })
+			Check(_world.GetNodeOrNull(path) == null, $"act 1 only: no {path}");
+		Check(!_world.GetNode("Clearing").IsInGroup("stairs_clearing_marker"), "act 1 only: the clearing is not a compass marker");
+		Check(_world.GetNodeOrNull("Clearing/Stairs/FirstClimbTrigger") != null, "act 1 only: the first climb trigger is there");
+		Check(GetTree().CurrentScene.GetNodeOrNull("GiantStalkerEvent") == null, "act 1 only: no giant event");
+		Check(GetTree().GetFirstNodeInGroup("stalker") == null, "act 1 only: no stalker");
+		Check(PhotoLog.CaptionFor("stalker") == "", "no stalker picture caption");
 	}
 
-	/// <summary>A stand point 7-9 m from the tent whose line to the look point is blocked by something that is not the tent.</summary>
-	private Vector3? FindHiddenSpot(Node3D tent, Vector3 look)
+	// ------------------------------------------------------------------ 2. atmosphere
+
+	private async Task Atmosphere()
 	{
-		var space = _player.GetWorld3D().DirectSpaceState;
-		foreach (float r in new[] { 7f, 9f, 11f })
-			for (int i = 0; i < 24; i++)
+		var atmo = _world.GetNode<ForestAtmosphere>("Atmosphere");
+		atmo.OpenSmoothing = 0.1f;
+		var spawn = GetTree().GetFirstNodeInGroup("player_spawn") as Node3D;
+		float bridgeS = 189f;
+		if (_terrain.TryGetStreamCrossing(out _, out _, out float cs)) bridgeS = cs;
+		var views = new List<(string name, Vector3 at, Vector3 look)>
+		{
+			("01_lot", Ground(spawn.GlobalPosition + new Vector3(2f, 0, 12f)), _terrain.TrailPoint(8f, out _) + Vector3.Up * 1.5f),
+			("02_trailhead", Ground(_terrain.TrailPoint(4f, out _)), _terrain.TrailPoint(40f, out _) + Vector3.Up * 1.4f),
+			("03_100m", Ground(_terrain.TrailPoint(100f, out _)), _terrain.TrailPoint(135f, out _) + Vector3.Up * 1.4f),
+			("04_past_bridge", Ground(_terrain.TrailPoint(bridgeS + 25f, out _)), _terrain.TrailPoint(bridgeS + 60f, out _) + Vector3.Up * 1.4f),
+		};
+		// "before": the old, subtle grade values
+		var after = (atmo.OpenSunScale, atmo.OpenSunColor, atmo.OpenFogDensityScale, atmo.OpenFogColor, atmo.OpenAmbientScale, atmo.OpenSkyBoost, atmo.OpenExposureBoost, atmo.OpenHoldMeters);
+		foreach (bool now in new[] { false, true })
+		{
+			if (!now)
 			{
-				float a = Mathf.Tau * i / 24f;
-				Vector3 at = Ground(tent.GlobalPosition + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r));
-				Vector3 eye = at + Vector3.Up * 1.55f;
-				var q = PhysicsRayQueryParameters3D.Create(eye, look, 1u);
-				var hit = space.IntersectRay(q);
-				if (hit.Count == 0) continue;
-				// Scattered trunks are PhysicsServer bodies with no node (collider null): exactly the cover wanted.
-				var col = hit["collider"].AsGodotObject() as Node;
-				if (col != null && (col == tent || tent.IsAncestorOf(col))) continue;
-				// something else is in the way, and the spot itself must be clear of it (a metre off the trunk)
-				if (((Vector3)hit["position"]).DistanceTo(eye) < 1.0f) continue;
-				return at;
+				atmo.OpenSunScale = 1.5f; atmo.OpenSunColor = new Color(1f, 0.92f, 0.72f); atmo.OpenFogDensityScale = 0.4f;
+				atmo.OpenFogColor = new Color(0.47f, 0.48f, 0.5f); atmo.OpenAmbientScale = 1.2f; atmo.OpenSkyBoost = 0.3f;
+				atmo.OpenExposureBoost = 0f; atmo.OpenHoldMeters = 40f; atmo.OpenWarmAmbientAndSky = false;
 			}
-		return null;
+			else
+			{
+				(atmo.OpenSunScale, atmo.OpenSunColor, atmo.OpenFogDensityScale, atmo.OpenFogColor, atmo.OpenAmbientScale, atmo.OpenSkyBoost, atmo.OpenExposureBoost, atmo.OpenHoldMeters) = after;
+				atmo.OpenWarmAmbientAndSky = true;
+			}
+			foreach (var (name, at, look) in views)
+			{
+				await Stand(at, look);
+				await Seconds(1.2);
+				ShotTh($"atmo_{name}_{(now ? "after" : "before")}");
+				var env = _world.GetNode<WorldEnvironment>("WorldEnvironment").Environment;
+				var sun = _world.GetNode<DirectionalLight3D>("Sun");
+				Note($"atmo {name} {(now ? "after" : "before")}: open {atmo.OpenAmount:0.00} fog {env.FogDensity:0.0000} {env.FogLightColor} amb {env.AmbientLightEnergy:0.00} {env.AmbientLightColor} sun {sun.LightEnergy:0.00} dir {-sun.GlobalBasis.Z} exp {env.TonemapExposure:0.00}");
+				if (now && name == "02_trailhead") Check(atmo.OpenAmount > 0.95f, $"trailhead fully open ({atmo.OpenAmount:0.00})");
+				if (now && name == "04_past_bridge") Check(atmo.OpenAmount < 0.05f, $"past the bridge the grade is gone ({atmo.OpenAmount:0.00})");
+			}
+		}
+		atmo.OpenSmoothing = 2f;
 	}
+
+	// ------------------------------------------------------------------ 3. look shots
+
+	private async Task LookShots()
+	{
+		Node3D N(string p) => _world.GetNodeOrNull<Node3D>(p);
+		Vector3 Front(Node3D n, float dist, float side = 0f)
+		{
+			Vector3 f = n.GlobalBasis.Z; f.Y = 0; f = f.Normalized();
+			Vector3 r = n.GlobalBasis.X; r.Y = 0; r = r.Normalized();
+			return Ground(n.GlobalPosition + f * dist + r * side);
+		}
+		async Task Look(string name, Vector3 at, Vector3 look) { await Stand(at, look); await Seconds(0.6); ShotTh(name); }
+
+		var atmo = _world.GetNode<ForestAtmosphere>("Atmosphere");
+		atmo.OpenSmoothing = 0.1f;   // the harness teleports: let the grade settle at once
+		var sign = N("Trailhead/TrailheadSign");
+		await Look("10_trailhead_sign", Front(sign, 5f, 0.4f), sign.GlobalPosition + Vector3.Up * 1.6f);
+		var board = N("Trailhead/InfoBoard");
+		await Look("11_info_board", Front(board, 2.6f), board.GlobalPosition + Vector3.Up * 1.45f);
+		var reg = N("Trailhead/TrailRegister");
+		await Look("12_register", Front(reg, 1.5f, 0.2f), reg.GlobalPosition + Vector3.Up * 1.05f);
+		var can = N("Trailhead/TrashCan");
+		Vector3 broch = can.GlobalTransform * new Vector3(0.62f, 0, 0.42f);
+		await Look("13_brochure", Ground(broch + (can.GlobalBasis.Z + can.GlobalBasis.X).Normalized() * 1.4f), broch);
+		var forkA = N("ForkSign_A");
+		await Look("14_fork_a", Front(forkA, 4f, -0.5f), forkA.GlobalPosition + Vector3.Up * 1.7f);
+		_terrain.TrailDistance(forkA.GlobalPosition.X, forkA.GlobalPosition.Z, out float forkS);
+		await Look("15_fork_a_approach", Ground(_terrain.TrailPoint(forkS - 14f, out _)), _terrain.TrailPoint(forkS + 4f, out _) + Vector3.Up * 1.2f);
+
+		var flowers = N("Props/Wildflowers");
+		await Look("16_wildflowers_from_trail", TrailNear(flowers.GlobalPosition), flowers.GlobalPosition + Vector3.Up * 0.2f);
+		await Look("16b_wildflowers_close", Ground(flowers.GlobalPosition + (TrailNear(flowers.GlobalPosition) - flowers.GlobalPosition).Normalized() * 2.2f), flowers.GlobalPosition);
+
+		var deer = N("Deer");
+		await Look("17_deer_from_trail", TrailNear(deer.GlobalPosition), deer.GlobalPosition + Vector3.Up * 0.8f);
+
+		var frog = N("Frog");
+		Vector3 fp = frog.GlobalPosition + Vector3.Up * 0.1f;
+		await Look("18_frog_bank", Ground(frog.GlobalPosition + frog.GlobalBasis.Z * 1.4f), fp);
+		var fall = N("Waterfall") as Waterfall;
+		var bridge = N("Footbridge");
+		await Look("19_waterfall_from_deck", bridge.GlobalPosition + Vector3.Up * 0.35f, fall.CurtainCenter);
+		Vector3 bank = fall.CurtainCenter + (bridge.GlobalPosition - fall.CurtainCenter).Normalized() * 9f;
+		await Look("19b_waterfall_bank", Ground(bank), fall.CurtainCenter);
+
+		var stone = N("Props/WeirdStone");
+		await Look("20_stone_from_trail", TrailNear(stone.GlobalPosition), stone.GlobalPosition + Vector3.Up * 1.3f);
+		await Look("20b_stone_close", Ground(stone.GlobalPosition + stone.GlobalBasis.Z * 4.5f), stone.GlobalPosition + Vector3.Up * 1.4f);
+
+		// the end of the trail, the fir, the sign, the barrier and the stones
+		var fir = N("FallenTree") as FallenTree;
+		Vector3 root = new(fir.Root.X, 0, fir.Root.Y), tip = new(fir.Tip.X, 0, fir.Tip.Y);
+		float len = _terrain.TrailLength;
+		Vector3 end = Ground(_terrain.TrailPoint(len - 9f, out _));
+		await Look("21_trail_end_fir", end, Ground((root + tip) * 0.5f) + Vector3.Up * 1.0f);
+		await Look("23_left_of_root_plate", Ground(_terrain.TrailPoint(len - 3f, out _)), Ground(root + new Vector3(-12f, 0, 2f)) + Vector3.Up * 1.0f);
+		await Look("23b_barrier_from_the_side", Ground(root + new Vector3(-14f, 0, 9f)), Ground(root + new Vector3(-14f, 0, 0f)) + Vector3.Up * 1.0f);
+		var trail = N("FriendTrail") as FriendTrail;
+		Vector3 P(float s) => Ground(new Vector3(trail.At(s, out _).X, 0, trail.At(s, out _).Y));
+		await Look("24_round_the_crown", Ground(_terrain.TrailPoint(len - 2f, out _)) + new Vector3(1.5f, 0, 0), P(12f) + Vector3.Up * 0.5f);
+		await Look("25_pavers_past_tree", P(16f), P(30f));
+		await Look("26_pavers_midway", P(60f), P(75f));
+		atmo.OpenSmoothing = 2f;
+		await Look("27_pavers_to_stairs", P(trail.Length - 16f), _world.GetNode<Node3D>("Clearing/Stairs").GlobalPosition + Vector3.Up * 1.5f);
+	}
+
+	// ------------------------------------------------------------------ 4. readables
+
+	private async Task Readables()
+	{
+		var readables = new List<Readable>();
+		foreach (var n in GetTree().GetNodesInGroup("interactables"))
+			if (n is Readable r && _world.IsAncestorOf(r)) readables.Add(r);
+		Check(readables.Count == 4, $"four readables in the level ({readables.Count})");
+		int i = 0;
+		foreach (var r in readables)
+		{
+			var paper = r.GetParent<Node3D>();
+			Vector3 c = paper.GlobalPosition;
+			Vector3 nrm = paper.GlobalBasis.Z.Normalized();
+			Vector3 at;
+			if (Mathf.Abs(nrm.Y) > 0.7f)
+			{
+				// lying flat: stand a metre off it, toward the trail
+				Vector3 toward = TrailNear(c) - c; toward.Y = 0;
+				if (toward.LengthSquared() < 0.25f) toward = Vector3.Back;
+				at = Ground(c + toward.Normalized() * 1.1f);
+			}
+			else
+			{
+				Vector3 f = new Vector3(nrm.X, 0, nrm.Z).Normalized();
+				at = Ground(c + f * 1.3f);
+			}
+			await Stand(at, c);
+			await Physics(4);
+			var focused = _player.Interaction?.Focused;
+			Check(focused == r, $"readable '{r.Prompt}' ({r.Title}{Short(r.Text)}): focused from {at.DistanceTo(c):0.0} m ({focused?.Name ?? "nothing"})");
+			ShotTh($"30_readable_{i}_focus");
+			await Press(v => _pin.ScriptedInteract = v);
+			await Seconds(0.4);
+			var overlay = NoteOverlay.Instance;
+			Check(overlay != null && overlay.IsOpen && overlay.Current == r, $"readable {i}: overlay open");
+			ShotTh($"30_readable_{i}_open");
+			// E puts it down (the overlay reads the real input event, not the scripted flag)
+			Input.ParseInputEvent(new InputEventAction { Action = "interact", Pressed = true });
+			await Frames(2);
+			Input.ParseInputEvent(new InputEventAction { Action = "interact", Pressed = false });
+			await Seconds(0.4);
+			Check(overlay != null && !overlay.IsOpen, $"readable {i}: overlay closed again");
+			i++;
+		}
+		Check(!readables.Any(r => r.ReadFlag == "read_friends_note"), "no friend's note at the trailhead (R.H. is a stranger)");
+		Check(readables.Any(r => r.Text.Contains("R.H.  the steps")), "the trail register carries R.H.'s last entry");
+		Check(!readables.Any(r => r.Text.Contains("Cullen")), "nothing names the park's old name");
+	}
+
+	private static string Short(string t) { t = t.Replace("\n", " "); return t.Length > 28 ? " " + t[..28] + "..." : " " + t; }
+
+	// ------------------------------------------------------------------ 5. the fallen fir
+
+	private async Task FallenFir()
+	{
+		var fir = _world.GetNode<FallenTree>("FallenTree");
+		Vector3 root = new(fir.Root.X, 0, fir.Root.Y);
+		float len = _terrain.TrailLength;
+		// Try to go round the left (root-plate) side three ways; none may get past the tree's line.
+		var tries = new (string name, Vector3 from, Vector3 toward)[]
+		{
+			("north-west from the trail end", _terrain.TrailPoint(len - 2f, out _), root + new Vector3(-6f, 0, -8f)),
+			("north, just left of the plate", root + new Vector3(-4f, 0, 6f), root + new Vector3(-4f, 0, -12f)),
+			("north, 15 m left", root + new Vector3(-15f, 0, 7f), root + new Vector3(-15f, 0, -12f)),
+		};
+		foreach (var (name, from, toward) in tries)
+		{
+			Vector3 start = Ground(from);
+			await Stand(start, toward + Vector3.Up * 1.5f);
+			float minZ = float.MaxValue;
+			for (int f = 0; f < 60 * 8; f++)
+			{
+				Aim(new Vector3(toward.X, _player.GlobalPosition.Y + 1.5f, toward.Z));
+				_pin.ScriptedMove = new Vector2(0, 1);
+				await Physics(1);
+				minZ = Mathf.Min(minZ, _player.GlobalPosition.Z);
+			}
+			_pin.ScriptedMove = Vector2.Zero;
+			// the fir's line on the left runs at about z = root.z - 1; past it would be z < root.z - 4
+			Check(minZ > root.Z - 4f, $"left of the fir, {name}: stopped (furthest z {minZ:0.0}, the tree at {root.Z:0.0})");
+			ShotTh($"40_blocked_{name.Replace(' ', '_').Replace(",", "")}");
+		}
+
+		// Round the crown and along the stones to the stairs' foot.
+		var trail = _world.GetNode<FriendTrail>("FriendTrail");
+		Vector3 Pt(float s) { var p = trail.At(s, out _); return new Vector3(p.X, 0, p.Y); }
+		await Stand(Ground(_terrain.TrailPoint(len - 3f, out _)), Pt(4f) + Vector3.Up * 1.5f);
+		float target = trail.Length - 1f;
+		float best = 0f;
+		int stuck = 0;
+		Vector3 last = _player.GlobalPosition;
+		for (int f = 0; f < 60 * 120; f++)
+		{
+			Vector3 pos = _player.GlobalPosition;
+			// steer to the point 3 m ahead of the nearest point on the line
+			float sNear = NearestS(trail, pos);
+			best = Mathf.Max(best, sNear);
+			if (sNear >= target - 0.5f) break;
+			Vector3 aim = Pt(Mathf.Min(sNear + 3f, target));
+			Aim(new Vector3(aim.X, pos.Y + 1.5f, aim.Z));
+			_pin.ScriptedMove = new Vector2(0, 1);
+			await Physics(1);
+			if (f % 60 == 59)
+			{
+				if (_player.GlobalPosition.DistanceTo(last) < 0.3f) stuck++; else stuck = 0;
+				last = _player.GlobalPosition;
+				if (stuck > 5) break;
+			}
+		}
+		_pin.ScriptedMove = Vector2.Zero;
+		Check(best >= target - 1f, $"the stones lead round the crown to the stairs' foot (reached {best:0.0} of {trail.Length:0.0} m)");
+		ShotTh("41_reached_stairs_foot");
+	}
+
+	private static float NearestS(FriendTrail t, Vector3 p)
+	{
+		float best = 0f, bd = float.MaxValue;
+		for (float s = 0; s <= t.Length; s += 0.5f)
+		{
+			var q = t.At(s, out _);
+			float d = new Vector2(p.X - q.X, p.Z - q.Y).LengthSquared();
+			if (d < bd) { bd = d; best = s; }
+		}
+		return best;
+	}
+
+	// ------------------------------------------------------------------ 6. the photo trip
+
+	private async Task PhotoTrip(PhotoLog log)
+	{
+		Node3D N(string p) => _world.GetNode<Node3D>(p);
+
+		// ---- the empty album
+		await PulseTab();
+		Check(_page.IsOpen && log.RecordedCount == 0, "Tab opens the album, empty");
+		Shot("album_empty");
+		await PulseTab();
+		Check(!_page.IsOpen, "Tab again puts it away");
+
+		// ---- a picture of nothing in particular still goes in the album, uncaptioned
+		await StandFacing(Ground(_terrain.TrailPoint(30f, out _)), 200f, 8f);
+		await Shoot("trees", null, false, false);
+		Check(_thumb.ShowingNumber == 0 || _thumb.ShowingId == "", "trees: no caption");
+
+		// ---- wildflowers from the trail
+		var flowers = N("Props/Wildflowers");
+		await Stand(TrailNear(flowers.GlobalPosition), flowers.GlobalPosition + Vector3.Up * 0.2f);
+		await Shoot("wildflowers", "wildflowers", true, true);
+
+		// ---- the red bird
+		var bird1 = _world.GetNode<Bird>("Bird1");
+		Vector3 b = bird1.GlobalPosition;
+		Vector3 tb = TrailNear(b);
+		Vector3 fromTrail = b - tb; fromTrail.Y = 0;
+		await Stand(Ground(b - fromTrail.Normalized() * 6f), b + Vector3.Up * 0.2f);
+		await Shoot("bird_red", "bird_red", true, true);
+		Check(bird1.Photographed, "red bird captured");
+
+		// ---- the deer: grazing when seen from the trail, it bolts at the shutter and is gone
+		var deer = _world.GetNode<Entities.Deer>("Deer");
+		Vector3 dstand = TrailNear(deer.GlobalPosition);
+		Note($"deer {deer.GlobalPosition.DistanceTo(dstand):0.0} m from the trail");
+		await Stand(dstand, deer.GlobalPosition + Vector3.Up * 0.8f);
+		await Seconds(0.5);
+		Check(deer.Current == Entities.Deer.State.Grazing, $"deer still grazing with the player on the trail ({deer.Current})");
+		await Raise(true);
+		Check(_viewfinder.FocusLocked, "deer: focus lock on");
+		Shot("viewfinder_deer");
+		await Press(v => _pin.ScriptedPhoto = v);
+		await Seconds(0.9);
+		Check(log.Has("deer"), "deer: recorded");
+		Check(deer.Current is Entities.Deer.State.Alert or Entities.Deer.State.Fleeing, $"deer: the shutter spooks it ({deer.Current})");
+		Shot("print_deer");
+		await Raise(false);
+		await Seconds(0.4);
+		ShotTh("50_deer_bolting");
+		await Seconds(6.5);
+		Check(deer.Current == Entities.Deer.State.Gone && !deer.Visible, $"deer: gone for good ({deer.Current})");
+		Check(StoryManager.Instance.HasFlag(Entities.Deer.FledFlag), "deer: deer_fled set");
+
+		// ---- the frog, close, from the bank
+		var frog = N("Frog");
+		await Stand(Ground(frog.GlobalPosition + frog.GlobalBasis.Z * 1.4f), frog.GlobalPosition + Vector3.Up * 0.1f);
+		await Shoot("frog", "frog", true, true);
+
+		// ---- the waterfall from the bridge deck
+		var fall = N("Waterfall") as Waterfall;
+		var bridge = N("Footbridge");
+		await Stand(bridge.GlobalPosition + Vector3.Up * 0.35f, fall.CurtainCenter);
+		await Shoot("waterfall", "waterfall", true, true);
+
+		// ---- the weird stone from the trail
+		var stone = N("Props/WeirdStone");
+		await Stand(TrailNear(stone.GlobalPosition), stone.GlobalPosition + Vector3.Up * 1.4f);
+		await Shoot("weird_stone", "weird_stone", true, true);
+
+		// ---- the mushrooms, close and looking down
+		var mush = N("Props/Mushrooms");
+		await Stand(Ground(mush.GlobalTransform * new Vector3(0, 0, 1.8f)), mush.GlobalTransform * new Vector3(0, 0.12f, 0));
+		await Shoot("mushrooms", "mushrooms", true, true);
+
+		// ---- the black bird: the scream, the flock gone, the listed blue and purple never ticked
+		var omen = _world.GetNode<Bird>("Bird4Omen");
+		Vector3 o = omen.GlobalPosition;
+		Vector3 tp = _terrain.TrailPoint(415f, out _);
+		Vector3 toward = tp - o; toward.Y = 0; toward = toward.Normalized();
+		await Stand(Ground(o + toward * 6f), o + Vector3.Up * 0.1f);
+		await Shoot("bird_black", "bird_black", true, true);
+		bool allGone = true;
+		foreach (var n in new[] { "Bird1", "Bird2", "Bird3", "Bird4Omen" })
+			if (_world.GetNodeOrNull<Bird>(n) is { } bd && !bd.Photographed) allGone = false;
+		Check(allGone, "after the black bird every bird is Photographed");
+		Check(!log.Has("bird_blue") && !log.Has("bird_purple"), "unshot listed birds stay unticked");
+
+		// ---- the stairs from the clearing (never stepping on)
+		var stairs = N("Clearing/Stairs");
+		await Stand(Ground(stairs.GlobalTransform * new Vector3(0, 0, 9f)), stairs.GlobalTransform * new Vector3(0, 3.0f, -5.5f));
+		await Shoot("stairs", "stairs", true, true);
+
+		// ---- the album: a few more pictures of the clearing to run onto a second page, then the pages
+		for (int i = 0; log.RecordedCount < PhotoLogPage.PerPage + 2 && i < 8; i++)
+		{
+			await StandFacing(Ground(stairs.GlobalTransform * new Vector3(4f, 0, 12f + i)), 20f * i, 5f);
+			await Shoot($"extra_{i}", null, null, false, 0.3);
+		}
+		await Seconds(2.5);
+		await PulseTab();
+		Check(_page.IsOpen, "Tab opens the album");
+		Check(_page.PageCount == 2 && _page.Page == 1, $"the album opens on its last page ({_page.Page + 1} / {_page.PageCount})");
+		Shot("album_last_page");
+		await Press(v => _pin.ScriptedItemPrev = v);
+		await Seconds(0.2);
+		Check(_page.Page == 0, "the wheel turns back a page");
+		Shot("album_first_page");
+		await Raise(true);
+		Check(!_page.IsOpen, "raising the camera puts the album away");
+		await Raise(false);
+		Check(log.Photos[log.RecordedCount - 1].Number == log.RecordedCount, "newest last");
+		_lastAlbumCount = log.RecordedCount;
+
+		// ---- the stairs take the camera
+		_inv.TakeAwayCamera();
+		await Frames(5);
+		Check(!_page.IsOpen, "take-away: page hidden");
+		await Raise(true);
+		Check(!_camera.IsRaised, "take-away: focus never raises");
+		await Raise(false);
+		_thumb.ShowPrints = true;
+	}
+
+	// ------------------------------------------------------------------ 7. continue, the deer, the climb
 
 	private async Task ContinueCheck()
 	{
@@ -383,8 +614,8 @@ public partial class PhotoPreviewDriver : Node
 		{
 			Checkpoint = Checkpoint.Act1Start,
 			PosX = sp.X, PosY = sp.Y, PosZ = sp.Z, Yaw = 0f,
-			// The red bird shot, the stalker caught; the black bird NOT shot, so the other three birds must still be there.
-			Flags = new[] { StoryManager.Flag.PickupTakenCamera, StoryManager.Flag.Photo("trailhead_sign"), StoryManager.Flag.Photo("bird_red"), StoryManager.Flag.Photo("stalker") },
+			// Flowers and the red bird shot, the stairs photographed from the clearing; the black bird and the deer NOT.
+			Flags = new[] { StoryManager.Flag.PickupTakenCamera, StoryManager.Flag.Photo("wildflowers"), StoryManager.Flag.Photo("bird_red"), StoryManager.Flag.Photo("stairs") },
 			Inventory = "camera;tools=",
 		});
 		var before = GetTree().CurrentScene;
@@ -395,35 +626,59 @@ public partial class PhotoPreviewDriver : Node
 		Input.MouseMode = Input.MouseModeEnum.Visible;
 		_pin.Scripted = true;
 		var log = PhotoLog.Instance;
-		Check(log != null && log.RecordedCount == 3, $"continue: 3 photos restored ({log?.RecordedCount})");
+		Check(log != null && log.RecordedCount == _lastAlbumCount, $"continue: the album comes back ({log?.RecordedCount} of {_lastAlbumCount})");
 		Check(_inv.HasCamera, "continue: camera in hand");
-		Check(_camera.FramesLeft == 33, $"continue: film is 33 ({_camera.FramesLeft})");
-		CheckAct5ToolsHidden();
+		Check(_camera.FramesLeft == 36 - _lastAlbumCount, $"continue: film is {36 - _lastAlbumCount} ({_camera.FramesLeft})");
+		Check(log.Has("bird_red") && log.Has("wildflowers") && !log.Has("deer"), "continue: the photographed subjects come back from the flags");
 		foreach (var (name, gone) in new[] { ("Bird1", true), ("Bird2", false), ("Bird3", false), ("Bird4Omen", false) })
 		{
 			var bd = _world.GetNodeOrNull<Bird>(name);
 			bool hasModel = bd != null && bd.GetNodeOrNull("Model") != null;
-			bool inGroup = bd != null && bd.IsInGroup("photo_birds");
-			Check(bd != null && hasModel == !gone && inGroup == !gone, $"continue: {name} {(gone ? "gone (no model, out of the group)" : "present")}");
-			if (gone) Check(bd != null && bd.GetNodeOrNull("Perch") != null, $"continue: {name}'s perch stays");
+			Check(bd != null && hasModel == !gone, $"continue: {name} {(gone ? "gone" : "present")}");
 		}
-		var stairsClimbedLater = _world.GetNodeOrNull<Bird>("Bird2");
-		Check(stairsClimbedLater != null && !stairsClimbedLater.Gone, "continue at Act 1: birds are not hidden by the Act 2 rule");
 		await PulseTab();
-		Check(_page.IsOpen, "continue: page opens");
-		Check(log.ListedRecorded == 2 && log.RecordedCount - log.ListedRecorded == 1, "continue: two ticks and one unlisted line");
-		Shot("continue_page");
+		Check(_page.IsOpen, "continue: the album opens");
+		Shot("continue_album");
 		await PulseTab();
 
-		// Fresh play of the Act 2 rule: reaching the checkpoint hides the remaining birds (the slots are restored afterwards).
-		StoryManager.Instance.ReachCheckpoint(Checkpoint.Act2StairsClimbed, _player.GlobalPosition, 0f);
-		await Frames(3);
-		foreach (var name in new[] { "Bird2", "Bird3", "Bird4Omen" })
+		// The deer is back (it never fled in this save); walking up to it sends it off for good.
+		var deer = _world.GetNode<Entities.Deer>("Deer");
+		Check(deer.Visible && deer.Current == Entities.Deer.State.Grazing, $"continue: the deer is there ({deer.Current})");
+		Vector3 dp = deer.GlobalPosition;
+		Vector3 tr = TrailNear(dp);
+		await Stand(Ground(dp + (tr - dp).Normalized() * 14f), dp + Vector3.Up * 0.8f);
+		await Seconds(0.3);
+		Check(deer.Current == Entities.Deer.State.Grazing, $"deer: at 14 m, walking, it keeps grazing ({deer.Current})");
+		ShotTh("51_deer_grazing_14m");
+		for (int f = 0; f < 60 * 3 && deer.Current == Entities.Deer.State.Grazing; f++)
 		{
-			var bd = _world.GetNodeOrNull<Bird>(name);
-			Check(bd != null && bd.Gone && bd.GetNodeOrNull("Model") == null && !bd.IsInGroup("photo_birds"), $"act 2 reached: {name} hidden");
-			Check(bd != null && bd.GetNodeOrNull("Perch") != null, $"act 2 reached: {name}'s perch stays");
+			_pin.ScriptedMove = new Vector2(0, 1);
+			await Physics(1);
 		}
+		_pin.ScriptedMove = Vector2.Zero;
+		float at = _player.GlobalPosition.DistanceTo(dp);
+		Check(deer.Current != Entities.Deer.State.Grazing && at < 12.5f, $"deer: walked up to, it bolts at {at:0.0} m ({deer.Current})");
+		await Seconds(0.9);
+		ShotTh("52_deer_bounding");
+		await Seconds(6f);
+		Check(deer.Current == Entities.Deer.State.Gone && StoryManager.Instance.HasFlag(Entities.Deer.FledFlag), "deer: gone, deer_fled set");
+
+		// The first climb: walk onto the first step. The climb ends in the travel to the Hollow.
+		var stairs = _world.GetNode<Node3D>("Clearing/Stairs");
+		await Stand(Ground(stairs.GlobalTransform * new Vector3(0, 0, 3f)), stairs.GlobalTransform * new Vector3(0, 1.2f, -3f));
+		ShotTh("60_stairs_foot");
+		bool reached = false;
+		void OnCp(Checkpoint cp) { if (cp == Checkpoint.Act2StairsClimbed) reached = true; }
+		StoryManager.Instance.CheckpointReached += OnCp;
+		var scene = GetTree().CurrentScene;
+		for (int f = 0; f < 60 * 4; f++) { _pin.ScriptedMove = new Vector2(0, 1); await Physics(1); }
+		_pin.ScriptedMove = Vector2.Zero;
+		Check(!_inv.HasCamera, "the first step takes the camera");
+		for (int i = 0; i < 120 && !reached; i++) await Seconds(0.5);
+		StoryManager.Instance.CheckpointReached -= OnCp;
+		Check(reached, "the climb reaches checkpoint Act2StairsClimbed");
+		for (int i = 0; i < 20 && GetTree().CurrentScene == scene; i++) await Seconds(0.5);
+		Note($"after the climb the current scene is {GetTree().CurrentScene?.SceneFilePath ?? "(none: the Hollow failed to load)"}");
 	}
 
 	private static string UserFile(string name) => ProjectSettings.GlobalizePath("user://" + name);
@@ -458,4 +713,5 @@ public partial class PhotoPreviewDriver : Node
 	}
 
 	private bool _continueStarted;
+	private int _lastAlbumCount;
 }

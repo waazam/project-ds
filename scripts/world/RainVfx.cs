@@ -24,7 +24,11 @@ public partial class RainVfx : Node3D
 	public static RainVfx Instance { get; private set; }
 
 	[Export] public NodePath AtmospherePath = "../Atmosphere";
-	[Export] public int MaxDrops = 5000;
+	[Export] public int MaxDrops = 1400;
+	/// <summary>Streaks in the thin layer right around the eye (it sells the rain against the fog; keep it sparse).</summary>
+	[Export] public int NearDrops = 90;
+	/// <summary>Streak opacity. Low: the rain should be seen through, never a curtain.</summary>
+	[Export] public float StreakAlpha = 0.11f;
 	[Export] public float Radius = 11f;
 	[Export] public float FallSpeed = 15f;
 	[Export] public Vector2 Wind = new(0.9f, 0.4f);
@@ -114,7 +118,7 @@ public partial class RainVfx : Node3D
 		{
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			AlbedoColor = new Color(0.8f, 0.83f, 0.9f, 0.42f),
+			AlbedoColor = new Color(0.58f, 0.61f, 0.68f, StreakAlpha),
 			AlbedoTexture = StreakTexture(),
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 			BillboardMode = BaseMaterial3D.BillboardModeEnum.FixedY,
@@ -129,7 +133,7 @@ public partial class RainVfx : Node3D
 			Lifetime = 1.15f,
 			Preprocess = 1.2f,
 			ProcessMaterial = pm,
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.026f, 0.75f), Material = mat },
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.018f, 0.6f), Material = mat },
 			LocalCoords = false,
 			VisibilityAabb = new Aabb(new Vector3(-Radius - 2, -20, -Radius - 2), new Vector3(Radius * 2 + 4, 32, Radius * 2 + 4)),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
@@ -137,17 +141,17 @@ public partial class RainVfx : Node3D
 			AmountRatio = 0f,
 		};
 		AddChild(_rain);
-		// a dense near layer right around the eye, so the rain reads against the fog
+		// a sparse near layer right around the eye, so the rain reads against the fog
 		var npm = (ParticleProcessMaterial)pm.Duplicate();
 		npm.EmissionBoxExtents = new Vector3(3.5f, 0.3f, 3.5f);
 		_rainNear = new GpuParticles3D
 		{
 			Name = "RainNear",
-			Amount = 1400,
+			Amount = NearDrops,
 			Lifetime = 0.55f,
 			Preprocess = 0.6f,
 			ProcessMaterial = npm,
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.012f, 0.5f), Material = mat },
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.01f, 0.38f), Material = mat },
 			LocalCoords = false,
 			VisibilityAabb = new Aabb(new Vector3(-6, -10, -6), new Vector3(12, 14, 12)),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,

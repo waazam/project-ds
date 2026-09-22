@@ -1,5 +1,16 @@
 # Photo trip: Act 1 as a picture-taking walk
 
+> **Current design (2026-09-22): the album, not a list.** Dan: *"i do not like the checklist of things to take pictures of, instead just have a collection of the pictures taken. its not a requirement."* There is no shot list anywhere: nothing asks the player to photograph anything. The camera comes out of the player's own car at the start (the opening, `OpeningAtCar`), and **Tab opens the album**: every picture taken, in the order taken. Sections 3.1-3.10 below describe the earlier checklist design and are kept only as history; where they disagree with this box, this box wins.
+>
+> - **Every shot is a photo.** `CameraTool` grabs the frame (cropped to the viewfinder, 96x64) and `PhotoLog.EndShot` puts it in the album, recognised subject or not. The print still slides in after every shot (`PhotoThumb`); a recognised subject gives it a small pencil caption ("a deer", "the waterfall", "stairs?"), anything else has none.
+> - **Recognition only where it matters:** the viewfinder's focus square; the black bird (the scream, the flock gone, its near-black print with two red eyes); the stairs (the dark print, the misprinted stamp); and the subjects' story flags (`photo_<id>`), which keep the birds and the deer gone on Continue. Recognised subjects: the three birds and the black one, the deer, the frog, the wildflowers, the mushrooms, the waterfall, the strange stone, the stairs. They are simply nice things to photograph.
+> - **The album page** (`PhotoLogPage`): a dark album page centred on screen, 4 x 3 prints to a page (the slide-in print look, each a little askew), newest last, opening on the last page; the mouse wheel turns the pages; "NN exp. left" and "page / pages" in the footer; empty: "No pictures yet." It goes away with the camera at the first step onto the stairs.
+> - **The film:** 36 frames. Every picture costs one; on Continue the film is 36 minus the pictures in the album.
+> - **Survives Continue:** each picture is written as `photo_NNN.png` under `user://photos/` (`user://test_photos/` when `GameSettings.AutoTest`) with a line in `index.txt` (`number|subject|wrong`), and read back in `PhotoLog._Ready` when the level was loaded from a save. A new game (checkpoint None or Act1Start, not loaded from a save) empties the folder. The preview harnesses use `user://preview_photos/` (`PhotoLog.FolderOverride`).
+> - **The friend's note** on the info board no longer mentions a list: "Couldn't wait. Gone on ahead up the Blackfern to the old stone steps past the end of the trail. / Get the red one for me if you see it. / Back before dark. — C."
+>
+> Tests: `scenes/levels/photo_preview.tscn` (`PhotoPreviewDriver`): every subject recognised and captioned, a picture of nothing still in the album, the empty album, the album's two pages and the wheel, the black bird, the stairs, the take-away, and a real Continue that brings the album back. `scenes/levels/props_preview.tscn` plays the opening at the car.
+
 Design + implementation plan, 2026-09-21. Read-only analysis; nothing in the project was changed to write this.
 
 The owner's ask: *"I want the beginning to be like a minigame where you're taking pictures of things on your way to the stairs, like we're doing with the birds."*
@@ -65,7 +76,7 @@ Positions are from `scenes/levels/forest_world.tscn` and the trail curve (`Curve
 | Landmark | Node (`forest_world.tscn` line) | Placement | World ≈ (x, z) | Built by |
 |---|---|---|---|---|
 | Player spawn | `PlayerSpawn` :203-212 | (0, -0.28, 19) | (0, 19) | in the parking lot |
-| Trailhead sign "CULLEN CREEK NATIONAL PARK" | `Trailhead/TrailheadSign` :322-331 | fixed, yawed 25° | (-2.6, 15.5) | `ParkProp.TrailheadSign` `scripts/world/ParkProp.cs:105-159` (also spawns the directional post at `s = 9`, lines 146-158) |
+| Trailhead sign "OVERLOOK PARK" | `Trailhead/TrailheadSign` :322-331 | fixed, yawed 25° | (-2.6, 15.5) | `ParkProp.TrailheadSign` `scripts/world/ParkProp.cs:105-159` (also spawns the directional post at `s = 9`, lines 146-158) |
 | Info board "BLACKFERN TRAIL" | `Trailhead/InfoBoard` :333-342 | fixed | (3.4, 19.8) | `ParkProp.InfoBoard` 161-216 |
 | Trash can, vault toilet, 4 bumpers, boulder | :344-415 | fixed | the lot | `ParkProp` 219-261, 360-370 |
 | Camera pickup | `CameraPickup` :264-274 | `s = 10`, off -2.8 | (-2, 10) | `Pickup` + `ItemMeshes.Camera` |
@@ -77,8 +88,8 @@ Positions are from `scenes/levels/forest_world.tscn` and the trail curve (`Curve
 | Torn map | `Props/TornMap` :458-469 | `s = 131`, off +1.6 | (3, -103) | `ParkProp.TornMap` 373-387 |
 | Axe (an Act 5 tool, but visible from Act 1: no `RequiredCheckpoint`) | `AxePickup` :252-262 | `s = 158`, off -16 | (-9, -129) | `Pickup` |
 | Blue bird | `Bird2` :287-296 | `s = 170`, off -4.5, h +0.5 | (3, -141) | `Bird.cs` |
-| Stream (Cullen Creek) | `Terrain/Stream/S00..S18` :141-196 | markers along z -145..-172 from x -126 to +126; water at y ≈ 0 east of the trail, climbing to +27 up the west valley | crossing at the bridge | `ForestTerrain` (`Stream`, `WaterLevel`, `TryGetStreamCrossing`: `scripts/world/ForestTerrain.cs:105, 233, 240`) |
-| Footbridge + "Blackfern Trail > / Cullen Creek" sign + rocks | `Footbridge` :427-428 (group `bridge_marker`) | `AutoPlace` onto the crossing, `s ≈ 189` | (6, -160) | `scripts/world/Footbridge.cs:31-51` (placement), `263-278` (sign), `177-260` (rocks); `BridgeGunshot` at the bridge, `scenes/levels/trail_slice.tscn:35-41` |
+| Stream (Overlook Creek) | `Terrain/Stream/S00..S18` :141-196 | markers along z -145..-172 from x -126 to +126; water at y ≈ 0 east of the trail, climbing to +27 up the west valley | crossing at the bridge | `ForestTerrain` (`Stream`, `WaterLevel`, `TryGetStreamCrossing`: `scripts/world/ForestTerrain.cs:105, 233, 240`) |
+| Footbridge + "Blackfern Trail > / Overlook Creek" sign + rocks | `Footbridge` :427-428 (group `bridge_marker`) | `AutoPlace` onto the crossing, `s ≈ 189` | (6, -160) | `scripts/world/Footbridge.cs:31-51` (placement), `263-278` (sign), `177-260` (rocks); `BridgeGunshot` at the bridge, `scenes/levels/trail_slice.tscn:35-41` |
 | Lost boot | `Props/LostBoot` :445-456 | `s = 212`, off +2.2 | (4, -182) | `ParkProp.Boot` |
 | Overlook fork | `Terrain/Branches/Overlook` :133-134 (group `trail_branch`) | leaves the trail at (-2, -191), 9 points, ends (75, -270), ~115 m | | `ForestTerrain` branch |
 | Fork signs | `ForkSign_A` :568-575 (`s = 219`), `ForkSign_B` :577-584 (`s = 529`, past the trail's end) | empty `Node3D`s with only a `TrailAnchor`, no script | | leftovers, nothing is built |
@@ -110,26 +121,27 @@ Whose list? Two options, both story-safe:
 - **A. The player's own list.** Plain, no strings attached. Header: *"Blackfern Trail — shots"*.
 - **B. The friend's list**, in his hand. Adds one line of texture to the friend before Act 5 without adding a beat: he is the one who wanted the pictures. Header: *"shots for the album — get these!!"*. Nothing later references it, so the story is untouched. Recommended, but it is a taste call for Dan.
 
-### 3.2 The subjects (12: 9 listed, 3 unlisted)
+### 3.2 The subjects (superseded by the album; kept for where things are)
 
-Listed entries are on the page from the start with an empty pencil box. Unlisted ones are not on the page at all; when photographed, a new line is written under a pencil rule at the bottom, in a heavier hand. "Recognition" is how `CameraTool` decides the subject is in the shot (rules in 3.3).
+**Revised 2026-09-22 (linear story).** Dan: *"the act 1 minigame of taking photos should include different plants and possibly animals in the wild... it makes more sense to take pictures of wildlife, waterfall, animals, flowers, plants, weird stones"*. The park sign, cabin, creek, overlook and tent subjects are gone (the props stay); the list is now what someone photographs on a day in the woods. The friend's list, in his order, is below; the unlisted lines write themselves in as before. The stalker's "(nothing there)" line is gone: the stalker does not appear before the Hollow. Ids are save-file flag names (`photo_<id>`).
 
-| # | Id | Where (trail order) | Recognition | Log line (pencil) | Notes / hook |
+Listed entries are on the page from the start with an empty pencil box. Unlisted ones are not on the page at all; when photographed, a new line is written under a pencil rule at the bottom, in a heavier hand. "Recognition" is how `CameraTool` decides the subject is in the shot (rules in 3.3; a hidden subject never scores).
+
+| # | Id | Log line (pencil) | Where | Recognition | Notes |
 |---|---|---|---|---|---|
-| 1 | `trailhead_sign` | `Trailhead/TrailheadSign`, (-2.6, 15.5), 5 m behind the camera pickup | `PhotoSubject` child of the sign: one look point at the plank centre (local (0, 1.75, 0.13)); 2-14 m; ≤ 14°; line of sight | `the park sign` | The first thing the player can shoot, and it is behind them when they pick the camera up: turning round to get it teaches the loop (RMB to raise, LMB to shoot) with zero text. |
-| 2 | `cabin` | `Cabin`, (2, -26), 7 m right of the trail at `s = 45` | `PhotoSubject` in `scenes/environment/cabin.tscn`: look points door centre (0, 1.0, 2.6) and ridge (0, 3.6, 0); 4-22 m; ≤ 16°; LOS to at least one point | `the cabin` | The player will see this building burn in Act 7. Nothing is added; the photo just exists. |
-| 3 | `bird_red` | `Bird1`, `s = 55` | **unchanged bird rule** (`CameraTool.FindSubject`) | `the red bird` | |
-| 4 | `bird_blue` | `Bird2`, `s = 170` | unchanged bird rule | `the blue one` | |
-| 5 | `creek` | Cullen Creek from the footbridge, `s ≈ 189` | `PhotoSubject` built in code by `Footbridge` (it auto-places): node at the bridge centre, look points 6 m up- and downstream at water level (local (±6, -0.9, 0)) and 12 m out (local (±12, -1.0, 0)); 3-28 m; ≤ 22°; LOS | `the creek from the bridge` | The bridge sign already says "Cullen Creek". Photographable from the deck or either bank. |
-| 6 | `overlook` | `Overlook/Landing`, (75, -270), end of the branch | **vista rule**: player within 6 m (flat) of the landing, camera yaw within ±30° of NW (yaw ≈ +37°, i.e. forward (-0.6, 0, -0.8)), pitch ≥ -15°; no look point, no LOS | `the view from the overlook` | The only reason to take the branch today; this gives it one. Uses the existing cleared view cone (`ViewClear0..5`). |
-| 7 | `bird_purple` | `Bird3`, `s = 290` | unchanged bird rule | `the purple one (he swears it's real)` under option B; `the purple one` under A | |
-| 8 | `tent` | `Props/ForgottenTent`, `s = 340` | `PhotoSubject` child: look points ridge front (-1.0, 0.9, 0) and ridge rear (0.9, 0.7, 0); 3-16 m; ≤ 16°; LOS | `that tent` | The list makes the player stop at the one prop that is already slightly wrong. No change to the prop. |
-| 9 | `mushrooms` | **new prop**, at the foot of `Props/MossBoulder`, `s = 372` (see 3.7) | `PhotoSubject` child: one look point at the cluster centre (0, 0.12, 0); 0.8-5 m; ≤ 12°; LOS | `mushrooms (don't touch)` | Close-up subject: the only one that makes the player point the camera down and get near. |
-| 10 | `bird_black` | `Bird4Omen`, `s = 415` | unchanged bird rule; the scream and flock-vanish stay exactly as they are (`CameraTool.cs:105-116`) | new line: `a black bird` | Unlisted. Its thumbnail is nearly black with two red pixels where the eyes were (see 3.5, hook H2). |
-| 11 | `stalker` | wherever it is | **unchanged stalker rule** (`Stalker.OnPhotoTaken`, `Stalker.cs:301-316`): when the sting fires, the log records it | new line: `(nothing there)` | Unlisted and deniable, as Act 1 demands (`STORY.md` line 10). The thumbnail is whatever the frame held: fog and a trunk. |
-| 12 | `stairs` | `Clearing/Stairs`, from inside the clearing before stepping on | `PhotoSubject` in `scenes/environment/staircase_interior.tscn`: look points first riser (0, 0.4, 0), mid flight (0, 3.0, -5.5), top landing (0, 6.1, -10.4); 3-30 m; ≤ 18°; LOS to any point | new line: `stairs?` | Unlisted. The camera goes the moment they step on the first step (`FirstClimbEvent.cs:53`), so this can only happen from the clearing. Hook H2 makes the thumbnail come out wrong. |
+| 1 | `bird_red` | `the red bird` | `Bird1`, trail 55 m | unchanged bird rule | |
+| 2 | `bird_blue` | `the blue one` | `Bird2`, 170 m | unchanged bird rule | |
+| 3 | `bird_purple` | `the purple one (he swears it's real)` | `Bird3`, 290 m | unchanged bird rule | |
+| 4 | `deer` | `a deer` | `Deer` (`scripts/entities/Deer.cs`), a doe grazing in a small glade 17 m right of the trail at 128 m, seen from the trail through a cleared sightline | `PhotoSubject` riding on the deer: body and head; 3-45 m; 12 deg; LOS | Shy: within 12 m walking, 20 m running, or a shutter within 30 m, it throws its head up, then bounds away and is gone for good (flag `deer_fled`; gone on Continue once fled or photographed). One shot, from the trail. |
+| 5 | `frog` | `a frog by the creek` | `Frog` (`scripts/entities/Frog.cs`), on a wet rock at the creek's edge 3 m upstream of the footbridge (places itself) | one look point on the frog; 0.6-5 m; 12 deg; LOS | 8 cm, green-brown, throat pulse. Close-up from the bank. |
+| 6 | `wildflowers` | `wildflowers` | `Props/Wildflowers` (`ParkProp` kind 14), 4 m right of the trail at 38 m, in the sunny first stretch | three look points over the patch; 1-12 m; 16 deg | Small purple and white flowers in three loose clumps. |
+| 7 | `mushrooms` | `mushrooms (don't touch)` | `Props/Mushrooms`, at the moss boulder, 372 m | unchanged: 0.8-5 m; 12 deg; LOS | |
+| 8 | `waterfall` | `the waterfall` | `Waterfall` (`scripts/world/Waterfall.cs`), where the creek drops fastest 12-45 m above the footbridge (it finds the spot: ~29 m up, a 2.3 m drop) | curtain, lip and foot; 3-45 m; 16 deg; LOS | Rock ledge, scrolling water curtain, foam, mist, a quiet loop on the Water bus. Trees cleared down the creek so it shows from the bridge deck. |
+| 9 | `weird_stone` | `that weird stone` | `Props/WeirdStone` (`ParkProp` kind 15), 15 m left of the trail at 305 m, alone in a small opening | hole, middle and top; 2-30 m; 14 deg; LOS | A tall thin standing stone, leaning, with a hole worn through it. No text. |
+| 10 | `bird_black` | `a black bird` (unlisted) | `Bird4Omen`, 415 m | unchanged; the scream and the flock vanishing stay as they are | |
+| 11 | `stairs` | `stairs?` (unlisted) | `Clearing/Stairs`, from the clearing before stepping on | unchanged | |
 
-Why these and not others: the backpack, boot, torn map and snapped stick are the "small wrong things" and should stay unlisted noise the player walks past, not checklist items. The cut log and bunker mound are visually flat at 640x360. The fallen fir is a good subject but sits where the atmosphere should already be pulling the player forward; if Dan wants it, swap it for the cabin (`fallen_fir`: look points root plate and mid trunk, 4-20 m, ≤ 18°).
+The film stays at 36 frames.
 
 ### 3.3 Recognition rules
 

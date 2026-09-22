@@ -27,7 +27,7 @@ public partial class Bunker : Node3D
 
 	/// <summary>The station card beside the hatch (story-gaps P10).</summary>
 	public const string StationCardText =
-		"CULLEN CREEK N.P.\n" +
+		"OVERLOOK PARK\n" +
 		"REMOTE MONITORING STATION 3\n" +
 		"AUTHORISED PERSONNEL ONLY\n" +
 		"Unstaffed since 09/98.";

@@ -6,8 +6,8 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// Procedural textures + materials for the stone park staircase: poured
-/// concrete treads, coursed block cheek walls, a moss decal and a dead-leaf
-/// atlas. Low-res (32-64 px), linear + mipmaps, tileable, fixed seeds.
+/// concrete treads, coursed block cheek walls, a fresh stone break (the newel
+/// post's snapped neck), a moss decal and a dead-leaf atlas. Low-res (32-64 px), linear + mipmaps, tileable, fixed seeds.
 /// Materials use vertex colour as albedo so the builder can paint damp edges,
 /// moss tint and wear per vertex.
 /// </summary>
@@ -148,6 +148,21 @@ public static class StairTextures
 		return new Color(g, g * 0.985f, g * 0.94f);
 	});
 
+	/// <summary>
+	/// A fresh break through cast stone (the newel post's snapped neck): pale, unweathered, warm grey,
+	/// the aggregate showing as darker and lighter grains, no lichen, no cracks. 32 px, mapped once
+	/// across the break.
+	/// </summary>
+	public static Texture2D Break() => Make("stair_break", 32, 32, (x, y) =>
+	{
+		float n = Fbm(x, y, 32, 32, 4, 3, 981);
+		float s = Hash(x, y, 983);
+		float g = 0.80f + (n - 0.5f) * 0.14f;
+		if (s > 0.9f) g -= 0.16f;            // dark aggregate grains
+		else if (s < 0.08f) g += 0.06f;      // bright grains
+		return new Color(g, g * 0.975f, g * 0.93f);
+	});
+
 	/// <summary>Moss patch decal (alpha). Irregular clumps, dark olive to yellow-green.</summary>
 	public static Texture2D Moss() => Make("stair_moss", 64, 64, (x, y) =>
 	{
@@ -221,6 +236,7 @@ public static class StairTextures
 
 	public static StandardMaterial3D ConcreteMat => Mat("stair_concrete", Concrete(), 0.95f, 0.3f, false);
 	public static StandardMaterial3D BlockMat => Mat("stair_blocks", Blocks(), 0.97f, 0.25f, false);
+	public static StandardMaterial3D BreakMat => Mat("stair_break", Break(), 0.98f, 0.2f, false);
 	public static StandardMaterial3D MossMat => Mat("stair_moss", Moss(), 1f, 0.1f, true);
 	public static StandardMaterial3D LeafMat => Mat("stair_leaves", Leaves(), 1f, 0.15f, true);
 }

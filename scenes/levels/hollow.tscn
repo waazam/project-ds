@@ -1,0 +1,36 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/levels/hollow_world.tscn" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/audio/forest_ambience.tscn" id="3_amb"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
+[ext_resource type="Script" path="res://scripts/systems/GameFlow.cs" id="5_flow"]
+[ext_resource type="PackedScene" path="res://scenes/entities/stalker.tscn" id="6_stalker"]
+[ext_resource type="PackedScene" path="res://scenes/audio/score.tscn" id="8_score"]
+[ext_resource type="Script" path="res://scripts/entities/GiantStalkerEvent.cs" id="9_giant"]
+
+[node name="Hollow" type="Node3D"]
+
+[node name="HollowWorld" parent="." instance=ExtResource("1_world")]
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+
+[node name="ForestAmbience" parent="." instance=ExtResource("3_amb")]
+
+[node name="Score" parent="." instance=ExtResource("8_score")]
+
+[node name="Hud" parent="." instance=ExtResource("4_hud")]
+
+[node name="GameFlow" type="Node" parent="."]
+script = ExtResource("5_flow")
+FaderPath = NodePath("../Hud/ScreenFader")
+PauseMenuPath = NodePath("../Hud/PauseMenu")
+AtmospherePath = NodePath("../HollowWorld/Atmosphere")
+
+[node name="Stalker" parent="." instance=ExtResource("6_stalker")]
+
+[node name="GiantStalkerEvent" type="Node" parent="."]
+script = ExtResource("9_giant")
+Distance = 70.0
+GuaranteeRadius = 60.0
+BeyondCabin = 15.0

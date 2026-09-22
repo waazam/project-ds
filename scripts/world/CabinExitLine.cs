@@ -55,6 +55,13 @@ public partial class CabinExitLine : StoryTrigger
 		StormController.Instance?.Deactivate();
 		StoryBeat.SetMood(this, ForestAtmosphere.Mood.Dawn, 10f);
 		StoryManager.Instance.SetFlag(StoryManager.Flag.DawnBroke);
-		_ = Cutscene.Run(this, ct => StoryBeat.Caption(this, "\"He thrusts his fists against the posts...\"", 1.2f, 3.2f, 1.2f, ct));
+		// The player's one thought as the storm breaks the moment they carry the post out.
+		_ = Cutscene.Run(this, async ct =>
+		{
+			await Cutscene.Wait(this, 1.5f, ct);
+			await StoryBeat.Caption(this, Line, 1.2f, 3.4f, 1.2f, ct);
+		});
 	}
+
+	public const string Line = "The rain stopped. Like it wanted me to take it.";
 }

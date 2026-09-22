@@ -6,92 +6,65 @@ using ProjectDS.World;
 namespace ProjectDS.UI;
 
 /// <summary>
-/// The shot list: a torn spiral-notebook page in the friend's hand, tucked into
-/// the camera strap. Tab (Back on a pad) holds it up on the left of the screen
-/// and puts it away again; the game keeps running and the player can walk with
-/// it open. Nine listed lines with pencil boxes that get ticked, a pencil rule,
-/// and under it the lines that write themselves in when something unlisted is
-/// photographed. "NN exp. left" in the corner is the only number.
+/// The album: the pictures the player has taken, in the order taken, as small prints on a dark
+/// album page. Tab (Back on a pad) holds it up and puts it away again; the game keeps running
+/// and the player can walk with it open. Twelve prints to a page (four across, three down), each
+/// the same white-bordered print that slides in after a shot, a little askew as if tucked into
+/// photo corners, with its pencil caption when the camera recognised something. The newest is
+/// last; the album opens on the last page and the wheel turns the pages. "NN exp. left" and the
+/// page number are the only figures. Empty: one quiet line.
 ///
-/// It goes away with the camera: shown only while the inventory has it, so the
-/// moment the first stairs take the camera the page and the key go dead for
-/// good. Closed by a cutscene taking control, by a note being read, and by the
-/// camera coming up to the eye (you cannot read with the camera at your eye;
-/// the toggle is ignored then).
+/// It goes away with the camera: shown only while the inventory has it, so the moment the first
+/// stairs take the camera the album and the key go dead for good. Closed by a cutscene taking
+/// control, by a note being read, and by the camera coming up to the eye.
 ///
-/// Drawn in code at 640x360 (184x236 px, 16 px in from the left, vertically
-/// centred) on the existing procedural paper texture. Layer 14: over the
-/// compass and item list, under the prompt, the viewfinder and the pause menu.
+/// Drawn in code at 640x360 (352x252 px, centred). Layer 14: over the compass and item list,
+/// under the prompt, the viewfinder and the pause menu.
 /// </summary>
 public partial class PhotoLogPage : CanvasLayer
 {
-	[Export] public float PageWidth = 184f;
-	[Export] public float PageHeight = 236f;
-	[Export] public float LineStep = 13f;
 	[Export] public string OpenSound = "res://assets/audio/sfx/cloth_02.wav";
 	[Export] public float OpenSoundDb = -16f;
+	[Export] public string EmptyLine = "No pictures yet.";
+
+	public const int Columns = 4, Rows = 3, PerPage = Columns * Rows;
+	private const float CardW = 74f, CardH = 58f, Border = 4f, BottomBorder = 10f;
+	private const float CellW = 82f, CellH = 72f;
+	private const float PageW = Columns * CellW + 24f, PageH = Rows * CellH + 36f;
 
 	public bool IsOpen { get; private set; }
+	/// <summary>The page on show (0-based), for tests.</summary>
+	public int Page { get; private set; }
+	public int PageCount => Mathf.Max(1, (int)Mathf.Ceil((_log?.RecordedCount ?? 0) / (float)PerPage));
 
-	private static readonly Color Graphite = new(0.22f, 0.22f, 0.24f, 0.9f);
-	private static readonly Color Pencil = new(0.28f, 0.27f, 0.29f, 0.8f);
-	private static readonly Color Rule = new(0.5f, 0.56f, 0.68f, 0.32f);
-	private static readonly Color MarginLine = new(0.72f, 0.42f, 0.4f, 0.32f);
+	private static readonly Color PageColor = new(0.1f, 0.095f, 0.09f, 0.94f);
+	private static readonly Color PrintPaper = new(0.94f, 0.93f, 0.89f);
+	private static readonly Color Graphite = new(0.3f, 0.3f, 0.32f, 0.85f);
 
 	private Control _draw;
 	private PlayerController _player;
 	private PlayerInventory _inv;
 	private CameraTool _camera;
 	private PhotoLog _log;
-	private Texture2D _paper;
-	private Vector2[] _outline;
-	private Vector2[] _uvs;
 	private float _alpha;
 
 	public override void _Ready()
 	{
 		Layer = 14;
-		_draw = new Control
-		{
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-			Visible = false,
-			TextureRepeat = CanvasItem.TextureRepeatEnum.Enabled,
-			TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-		};
-		_draw.SetAnchorsPreset(Control.LayoutPreset.CenterLeft);
-		_draw.OffsetLeft = 16; _draw.OffsetRight = 16 + PageWidth;
-		_draw.OffsetTop = -PageHeight * 0.5f; _draw.OffsetBottom = PageHeight * 0.5f;
+		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, TextureFilter = CanvasItem.TextureFilterEnum.Nearest };
+		_draw.SetAnchorsPreset(Control.LayoutPreset.Center);
+		_draw.OffsetLeft = -PageW * 0.5f; _draw.OffsetRight = PageW * 0.5f;
+		_draw.OffsetTop = -PageH * 0.5f; _draw.OffsetBottom = PageH * 0.5f;
 		_draw.Draw += OnDraw;
 		AddChild(_draw);
-		_paper = ProcTextures.Paper();
-		BuildOutline();
 	}
 
 	public override void _ExitTree()
 	{
-		if (_log != null && IsInstanceValid(_log)) _log.Recorded -= OnRecorded;
+		if (_log != null && IsInstanceValid(_log)) _log.Taken -= OnTaken;
 	}
 
-	private void OnRecorded(PhotoLog.Entry e, ImageTexture t) { if (IsOpen) _draw.QueueRedraw(); }
-
-	/// <summary>The torn top edge and the page body, with UVs in paper-texture tiles.</summary>
-	private void BuildOutline()
-	{
-		var pts = new System.Collections.Generic.List<Vector2>();
-		var rng = new RandomNumberGenerator { Seed = 1937 };
-		int tears = 9;
-		for (int i = 0; i <= tears; i++)
-		{
-			float x = PageWidth * i / tears;
-			float y = i == 0 || i == tears ? 3f : 3f + rng.RandfRange(-2.5f, 2.5f);
-			pts.Add(new Vector2(x, y));
-		}
-		pts.Add(new Vector2(PageWidth, PageHeight));
-		pts.Add(new Vector2(0, PageHeight));
-		_outline = pts.ToArray();
-		_uvs = new Vector2[_outline.Length];
-		for (int i = 0; i < _outline.Length; i++) _uvs[i] = _outline[i] / 16f;
-	}
+	private void OnTaken(PhotoLog.Photo p) { if (IsOpen) { Page = PageCount - 1; _draw.QueueRedraw(); } }
 
 	public override void _Process(double delta)
 	{
@@ -104,7 +77,7 @@ public partial class PhotoLogPage : CanvasLayer
 		if (_log == null || !IsInstanceValid(_log))
 		{
 			_log = PhotoLog.Instance;
-			if (_log != null) _log.Recorded += OnRecorded;
+			if (_log != null) _log.Taken += OnTaken;
 		}
 
 		bool has = _inv != null && IsInstanceValid(_inv) && _inv.HasCamera;
@@ -121,6 +94,8 @@ public partial class PhotoLogPage : CanvasLayer
 			{
 				if (IsOpen) Close(true); else Open();
 			}
+			else if (IsOpen && pin.ItemNextPressed) Turn(1);
+			else if (IsOpen && pin.ItemPrevPressed) Turn(-1);
 		}
 
 		float target = IsOpen ? 1f : 0f;
@@ -132,6 +107,7 @@ public partial class PhotoLogPage : CanvasLayer
 	private void Open()
 	{
 		IsOpen = true;
+		Page = PageCount - 1;   // the newest pictures
 		Rustle();
 	}
 
@@ -139,6 +115,14 @@ public partial class PhotoLogPage : CanvasLayer
 	{
 		IsOpen = false;
 		if (byHand) Rustle();
+	}
+
+	private void Turn(int by)
+	{
+		int p = Mathf.Clamp(Page + by, 0, PageCount - 1);
+		if (p == Page) return;
+		Page = p;
+		Rustle();
 	}
 
 	private void Rustle()
@@ -150,93 +134,55 @@ public partial class PhotoLogPage : CanvasLayer
 		v.Play();
 	}
 
-	private static float Jitter(int line) => ((line * 7919 + 13) % 3) - 1f;   // -1, 0 or +1 px per line, fixed
+	/// <summary>A fixed small tilt per print (degrees), as if each was tucked in by hand.</summary>
+	private static float Tilt(int n) => (((n * 7919 + 17) % 7) - 3) * 0.45f;
 
 	private void OnDraw()
 	{
-		float w = PageWidth, h = PageHeight;
-		// Shadow, then the paper (a warm bone tint over the grey paper texture).
-		var shadow = new Vector2[_outline.Length];
-		for (int i = 0; i < _outline.Length; i++) shadow[i] = _outline[i] + new Vector2(1.5f, 2f);
-		_draw.DrawColoredPolygon(shadow, new Color(0, 0, 0, 0.4f));
-		var tint = new Color(1.2f, 1.17f, 1.05f, 0.94f);
-		var cols = new Color[_outline.Length];
-		for (int i = 0; i < cols.Length; i++) cols[i] = tint;
-		_draw.DrawPolygon(_outline, cols, _uvs, _paper);
+		var rect = new Rect2(Vector2.Zero, new Vector2(PageW, PageH));
+		_draw.DrawRect(new Rect2(rect.Position + new Vector2(2, 3), rect.Size), new Color(0, 0, 0, 0.45f));
+		_draw.DrawRect(rect, PageColor);
+		_draw.DrawRect(rect.Grow(-3f), new Color(0.3f, 0.28f, 0.26f, 0.35f), false, 1f);
 
-		// Ruled lines, the red margin, the spiral holes.
-		for (float y = 32f; y < h - 10f; y += LineStep)
-			_draw.DrawLine(new Vector2(14, y + 0.5f), new Vector2(w - 8, y + 0.5f), Rule, 1f);
-		_draw.DrawLine(new Vector2(22.5f, 8), new Vector2(22.5f, h - 6), MarginLine, 1f);
-		for (int i = 0; i < 6; i++)
-		{
-			float y = 22f + i * (h - 44f) / 5f;
-			_draw.DrawCircle(new Vector2(7f, y), 2.2f, new Color(0.16f, 0.14f, 0.12f, 0.75f));
-		}
-
-		var log = _log;
+		var photos = _log?.Photos;
+		int count = photos?.Count ?? 0;
 		var italic = UiKit.SerifItalic;
-		float x0 = 27f;
-
-		// Header.
-		Heavy(italic, new Vector2(x0, 20f), PhotoLog.Header);
-
-		// Listed lines with their boxes.
-		float y0 = 32f + LineStep - 3f;
-		float yy = y0;
-		int line = 0;
-		foreach (var e in PhotoLog.Entries)
+		var footer = new Color(0.62f, 0.6f, 0.56f, 0.8f);
+		if (count == 0)
+			_draw.DrawString(italic, new Vector2(0, PageH * 0.5f + 4f), EmptyLine, HorizontalAlignment.Center, PageW, 11, footer);
+		else
 		{
-			if (!e.Listed) continue;
-			bool done = log != null && log.Has(e.Id);
-			float jy = yy + Jitter(line);
-			var box = new Rect2(x0, jy - 7f, 7f, 7f);
-			_draw.DrawRect(box, new Color(Pencil, 0.7f), false, 1f);
-			if (done) Tick(box);
-			string[] parts = e.Caption.Split('\n');
-			_draw.DrawString(italic, new Vector2(x0 + 12f, jy), parts[0], HorizontalAlignment.Left, -1, 10, Graphite);
-			for (int i = 1; i < parts.Length; i++)
+			int first = Mathf.Clamp(Page, 0, PageCount - 1) * PerPage;
+			for (int i = first; i < Mathf.Min(count, first + PerPage); i++)
 			{
-				yy += LineStep - 2f;
-				_draw.DrawString(italic, new Vector2(x0 + 18f, yy + Jitter(line)), parts[i], HorizontalAlignment.Left, -1, 10, Graphite);
+				int slot = i - first;
+				int col = slot % Columns, row = slot / Columns;
+				var centre = new Vector2(12f + col * CellW + CellW * 0.5f, 12f + row * CellH + CardH * 0.5f + 2f);
+				DrawPrint(photos[i], centre);
 			}
-			yy += LineStep;
-			line++;
 		}
-
-		// A pencil rule, then the lines that wrote themselves in (a heavier hand).
-		float ry = yy - 8f;
-		_draw.DrawLine(new Vector2(x0, ry), new Vector2(w - 12f, ry - 1f), new Color(Pencil, 0.6f), 1f);
-		yy += 2f;
-		foreach (var e in PhotoLog.Entries)
-		{
-			if (e.Listed || log == null || !log.Has(e.Id)) continue;
-			float jy = yy + Jitter(line);
-			Heavy(italic, new Vector2(x0, jy), e.Caption);
-			yy += LineStep;
-			line++;
-		}
-		if (log != null && log.ListComplete)
-			_draw.DrawString(italic, new Vector2(x0, yy + Jitter(line)), PhotoLog.RewardLine, HorizontalAlignment.Left, -1, 10, Graphite);
-
-		// Footer: frames left.
+		// Footer: the film left, and the page when there is more than one.
 		int left = _camera != null && IsInstanceValid(_camera) ? _camera.FramesLeft : 0;
-		_draw.DrawString(UiKit.Mono, new Vector2(x0, h - 7f), $"{left} exp. left", HorizontalAlignment.Right, w - x0 - 10f, 9, new Color(0.3f, 0.3f, 0.32f, 0.8f));
+		_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{left} exp. left", HorizontalAlignment.Left, -1, 9, footer);
+		if (PageCount > 1)
+			_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{Page + 1} / {PageCount}", HorizontalAlignment.Right, PageW - 24f, 9, footer);
 	}
 
-	private void Tick(Rect2 box)
+	private void DrawPrint(PhotoLog.Photo p, Vector2 centre)
 	{
-		var c = new Color(Pencil, 0.95f);
-		var a = box.Position + new Vector2(1f, 3.5f);
-		var b = box.Position + new Vector2(3f, 6.5f);
-		var d = box.Position + new Vector2(8.5f, -1.5f);
-		_draw.DrawLine(a, b, c, 1.5f);
-		_draw.DrawLine(b, d, c, 1.5f);
-	}
-
-	private void Heavy(Font font, Vector2 pos, string text)
-	{
-		_draw.DrawString(font, pos + new Vector2(0.7f, 0), text, HorizontalAlignment.Left, -1, 10, new Color(Graphite, 0.7f));
-		_draw.DrawString(font, pos, text, HorizontalAlignment.Left, -1, 10, Graphite);
+		_draw.DrawSetTransform(centre, Mathf.DegToRad(Tilt(p.Number)), Vector2.One);
+		var card = new Rect2(-CardW * 0.5f, -CardH * 0.5f, CardW, CardH);
+		_draw.DrawRect(new Rect2(card.Position + new Vector2(1, 2), card.Size), new Color(0, 0, 0, 0.5f));
+		_draw.DrawRect(card, PrintPaper);
+		var img = new Rect2(card.Position + new Vector2(Border, Border), new Vector2(CardW - Border * 2, CardH - Border - BottomBorder));
+		if (p.Texture != null) _draw.DrawTextureRect(p.Texture, img, false);
+		string stamp = p.Wrong ? "F--  1/--" : "F2.8  1/60";
+		_draw.DrawString(UiKit.Mono, new Vector2(card.Position.X + Border, card.End.Y - 3f), stamp, HorizontalAlignment.Right, CardW - Border * 2, 7, new Color(Graphite, 0.7f));
+		_draw.DrawString(UiKit.Mono, new Vector2(card.Position.X + Border, card.End.Y - 3f), p.Number.ToString(), HorizontalAlignment.Left, -1, 7, new Color(Graphite, 0.55f));
+		_draw.DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+		string caption = p.Caption;
+		if (caption.Length > 0)
+			_draw.DrawString(UiKit.SerifItalic, new Vector2(centre.X - CardW * 0.5f + 1f, centre.Y + CardH * 0.5f + 10f), caption,
+				HorizontalAlignment.Left, CardW + 6f, 9, new Color(UiKit.Bone, 0.85f));
 	}
 }

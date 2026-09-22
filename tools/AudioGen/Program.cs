@@ -46,6 +46,7 @@ for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"step_wood_{k:00}", sfx, fa
 for (int i = 1; i <= 4; i++) jobs.Add(($"cloth_{i:00}", sfx, false, Lo, (r, sr) => Sfx.Cloth(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_stone_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepStone(r, sr)));
 jobs.Add(("rifle_distant_01", sfx, false, Lo, (r, sr) => Sfx.RifleDistant(r, sr)));
+jobs.Add(("newel_seat", sfx, false, Lo, (r, sr) => Sfx.NewelSeat(r, sr)));
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_in_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, true, (k - 1) / 4.0))); }
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_out_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, false, (k - 1) / 4.0))); }
 jobs.Add(("stalker_seen_01", sfx, false, Lo, (r, sr) => Sfx.StalkerSeen(r, sr)));

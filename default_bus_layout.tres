@@ -22,6 +22,12 @@ damping = 0.5
 spread = 0.8
 wet = 0.35
 
+[sub_resource type="AudioEffectPitchShift" id="VoiceDeep"]
+resource_name = "PitchShift"
+pitch_scale = 0.72
+oversampling = 8
+fft_size = 3
+
 [sub_resource type="AudioEffectLowPassFilter" id="WeatherLowPass"]
 resource_name = "LowPassFilter"
 cutoff_hz = 20000.0
@@ -102,8 +108,10 @@ bus/9/mute = false
 bus/9/bypass_fx = false
 bus/9/volume_db = 0.0
 bus/9/send = &"Master"
-bus/9/effect/0/effect = SubResource("VoiceReverb")
+bus/9/effect/0/effect = SubResource("VoiceDeep")
 bus/9/effect/0/enabled = true
+bus/9/effect/1/effect = SubResource("VoiceReverb")
+bus/9/effect/1/enabled = true
 bus/10/name = &"Events"
 bus/10/solo = false
 bus/10/mute = false

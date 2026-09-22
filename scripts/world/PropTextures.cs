@@ -139,4 +139,43 @@ public static class PropTextures
 	public static StandardMaterial3D DeckMat => Std("p_deck", DeckWood(), 0.62f, 0.38f);
 	public static StandardMaterial3D WetPostMat => Std("p_wetpost", PostWood(), 0.7f, 0.33f);
 	public static StandardMaterial3D RoutedMat => Std("p_routed", Routed(), 0.95f, 0.2f);
+
+	/// <summary>Short-hair hide: near-white with soft darker flecks, so vertex colour does the markings.</summary>
+	public static Texture2D Fur() => Make("p_fur", 32, 32, (x, y) =>
+	{
+		float n = Fbm(x, y, 32, 32, 8, 3, 2, 351) * 0.18f + Hash(x, y, 352) * 0.1f;
+		float v = 0.82f + n;
+		return new Color(v, v * 0.98f, v * 0.95f);
+	});
+
+	/// <summary>Deer, frog: vertex-coloured, matte, the hide texture over it.</summary>
+	public static StandardMaterial3D FurMat => Std("p_fur", Fur(), 1f, 0.15f);
+	/// <summary>Frog skin, eyes and wet rock: same hide texture, glossier.</summary>
+	public static StandardMaterial3D WetSkinMat => Std("p_wetskin", Fur(), 0.4f, 0.5f);
+
+	/// <summary>Falling water: bright vertical streaks (grain along V) with gaps, alpha in the streaks.</summary>
+	public static Texture2D FallStreaks() => Make("p_fall", 32, 64, (x, y) =>
+	{
+		float streak = Fbm(x, y, 32, 64, 12, 2, 3, 361);
+		float broken = Fbm(x, y, 32, 64, 6, 6, 2, 362);
+		float a = Mathf.Clamp((streak - 0.32f) * 2.2f, 0f, 1f) * (0.55f + 0.45f * broken);
+		float v = 0.8f + 0.2f * streak;
+		return new Color(v, v, v, Mathf.Clamp(0.35f + a * 0.65f, 0f, 1f));
+	});
+
+	/// <summary>Foam: white blotches with holes, alpha from the blotches.</summary>
+	public static Texture2D Foam() => Make("p_foam", 32, 32, (x, y) =>
+	{
+		float f = Fbm(x, y, 32, 32, 5, 5, 3, 371);
+		float a = Mathf.SmoothStep(0.38f, 0.62f, f);
+		return new Color(0.95f, 0.96f, 0.95f, a);
+	});
+
+	/// <summary>A soft round puff for mist sprites.</summary>
+	public static Texture2D Puff() => Make("p_puff", 16, 16, (x, y) =>
+	{
+		float d = new Vector2(x - 7.5f, y - 7.5f).Length() / 7.5f;
+		float a = Mathf.Clamp(1f - d, 0f, 1f);
+		return new Color(1f, 1f, 1f, a * a);
+	});
 }

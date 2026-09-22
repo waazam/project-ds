@@ -22,6 +22,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 0.65, -0.15)
 script = ExtResource("2_pickup")
 Kind = 7
 Label = "Newel Post"
+TakenLine = "It's warm."
 RequiredCheckpoint = 4
 
 [node name="Reveal" type="Area3D" parent="."]

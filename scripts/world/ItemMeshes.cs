@@ -567,25 +567,13 @@ public static class ItemMeshes
 
 	private static void NewelPost(MeshKit k, ref Built b)
 	{
-		// The newel post bulb (STORY.md, Act 5): the turned top of a staircase newel post,
-		// wrenched off. Stands upright on the table: a square base block showing a pale
-		// splintered break, a turned collar and neck, the big bulb, and a small cap. ~0.28 m.
-		var xf = new Transform3D(new Basis(Vector3.Up, 0.3f), Vector3.Zero);
-		k.Xf = xf;
-		k.Color = new Color(0.56f, 0.38f, 0.23f);
-		k.Mat(ItemTextures.TurnedWoodMat);
-		k.Box(new Vector3(0, 0.035f, 0), new Vector3(0.085f, 0.07f, 0.085f), 6f);
-		k.Box(new Vector3(0, 0.075f, 0), new Vector3(0.095f, 0.012f, 0.095f), 6f);
-		Lathe(k, new[]
-		{
-			V(0.036f, 0.081f), V(0.042f, 0.09f), V(0.032f, 0.102f), V(0.022f, 0.118f), V(0.028f, 0.13f),
-			V(0.05f, 0.148f), V(0.066f, 0.178f), V(0.066f, 0.2f), V(0.052f, 0.228f), V(0.03f, 0.245f),
-			V(0.022f, 0.252f), V(0.03f, 0.262f), V(0.024f, 0.275f), V(0.008f, 0.283f),
-		}, 10, false, true, 1f, 1f, 5f);
-		// splintered break down one face of the base block, where it was torn from the post
-		k.Color = new Color(0.95f, 0.85f, 0.66f);
-		k.Mat(ProcTextures.EndGrainMat);
-		k.Box(new Vector3(0.012f, 0.02f, 0.0435f), new Vector3(0.05f, 0.03f, 0.002f), 20f, new Basis(Vector3.Back, 0.25f));
+		// The newel post bulb (STORY.md, Act 5): the round stone cap missing from the newel post at
+		// the top of the first staircase, exactly as the stairs build it (StaircaseBuilder.BuildNewelCap):
+		// a ball on a neck on a small square plinth, snapped through the spigot under it, the break
+		// pale and fresh. Set down on its break, leaning a little, turned a little. ~0.29 m.
+		var basis = new Basis(Vector3.Up, 0.3f) * new Basis(Vector3.Right, 0.07f);
+		k.Xf = new Transform3D(basis, basis * new Vector3(0, -StaircaseBuilder.NewelBreakLowY, 0) + new Vector3(0, 0.004f, 0));
+		StaircaseBuilder.BuildNewelCap(k);
 		k.Xf = Transform3D.Identity;
 		b.PickCenter = new Vector3(0, 0.15f, 0);
 		b.PickRadius = 0.3f;

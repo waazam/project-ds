@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/levels/hollow_world.tscn" id="1_world"]
 [ext_resource type="Script" path="res://scripts/world/BuildingsPreview.cs" id="2_preview"]
 [ext_resource type="Shader" path="res://assets/shaders/ps2_post.gdshader" id="3_post"]
 

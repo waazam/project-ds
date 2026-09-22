@@ -11,15 +11,20 @@ namespace ProjectDS.World;
 /// Act 6's clearing. Once the player has crossed the bridge with the newel
 /// post in hand, the woods around the original staircase turn menacing and
 /// fifteen small stair variations appear around it. Getting close enough
-/// plays the clearing's voice line and fuses the post onto one of them,
-/// repointing the compass home. Stepping onto any of the fifteen (entirely
+/// plays the clearing's voice line, repoints the compass onward, and the post
+/// (the stone cap missing from the first staircase's newel post) flies from
+/// the player's view to this clearing's own copy of that staircase and grinds
+/// down onto its broken newel stump, stone on stone, with a purple flash at
+/// the joint: the staircase is whole again (<see cref="StaircaseBuilder.NewelCapped"/>). Stepping onto any of the fifteen (entirely
 /// optional, and only while Act 6 lasts: after the voice, before the cabin is
 /// seen burning) triggers a longer, stranger climb on the original staircase
 /// and a jump straight to night; skipping them lets night fall gradually
 /// instead while the player heads back on their own.
 ///
 /// Restore: the reveal is derived from the checkpoint + newel post flag, the
-/// voice from <see cref="StoryManager.Flag.ClearingVoiceHeard"/>, the optional
+/// voice and the cap back on the newel post from
+/// <see cref="StoryManager.Flag.ClearingVoiceHeard"/> (set as the cap leaves the
+/// player's hands, before it lands), the optional
 /// climb from <see cref="StoryManager.Flag.Act6ExtendedClimb"/> (no mini stairs,
 /// the original taller) and nightfall from <see cref="StoryManager.Flag.Act6NightFell"/>
 /// (a still-pending fallback restarts its timer). The overhead red spotlight
@@ -27,7 +32,7 @@ namespace ProjectDS.World;
 /// and is freed once they leave it (or the climb starts, or Act 7 begins).
 ///
 /// The original flight's length is never accumulated: it is always
-/// <see cref="StairsState.StepsFor"/> of the saved story, applied here before the
+/// <see cref="StairsState.ClearingStepsFor"/> of the saved story, applied here before the
 /// staircase's own first build (this node is its child, so it readies first),
 /// so a Continue builds the flight exactly once.
 ///
@@ -84,8 +89,10 @@ public partial class Act6ClearingEvent : Node3D
 		_original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
 		_dressing = GetNodeOrNull<DeepZoneDressing>(DressingPath);
 		SetProcess(false);   // only while the spotlight rides
-		// Before the parent flight builds itself (children ready first): its first build is already the right length.
+		// Before the parent flight builds itself (children ready first): its first build is already the right
+		// length, and its newel post already capped or broken.
 		ApplyStairsLength();
+		if (_original != null) _original.NewelCapped = StoryManager.Instance?.ClearingVoiceHeard == true;
 		Callable.From(() => { PrepareDressing(); Restore(); }).CallDeferred();
 		if (StoryManager.Instance is { } s)
 		{
@@ -117,7 +124,7 @@ public partial class Act6ClearingEvent : Node3D
 	private void ApplyStairsLength()
 	{
 		if (_original == null) return;
-		int want = StairsState.StepsFor(StoryManager.Instance, _original.BaseSteps);
+		int want = StairsState.ClearingStepsFor(StoryManager.Instance, _original.BaseSteps);
 		if (_original.Steps == want) return;
 		_original.Steps = want;
 		if (_original.IsNodeReady()) _original.Build();
@@ -221,6 +228,14 @@ public partial class Act6ClearingEvent : Node3D
 		var terrain = GroundSnap.FindTerrain(this);
 		const int count = 15;
 		var placed = new List<(Vector2 xz, float clearance)>();
+		// The path runs through the clearing: no staircase may stand on it (or so close that its step
+		// trigger would catch someone just walking by).
+		bool OnPath(Vector2 localXz, float reach)
+		{
+			if (terrain == null) return false;
+			Vector3 w = GlobalPosition + new Vector3(localXz.X, 0, localXz.Y);
+			return terrain.TrailDistance(w.X, w.Z, out _) < reach + 2.2f;
+		}
 		for (int i = 0; i < count; i++)
 		{
 			// Reject placements that would crowd or overlap an already-placed staircase: with
@@ -237,6 +252,7 @@ public partial class Act6ClearingEvent : Node3D
 				bool clear = true;
 				foreach (var p in placed)
 					if (tryXz.DistanceTo(p.xz) < tryFootprint + p.clearance + 1.2f) { clear = false; break; }
+				if (clear && OnPath(tryXz, tryFootprint)) clear = false;
 				if (clear || attempt == 39) { xz = tryXz; footprint = tryFootprint; break; }
 			}
 			placed.Add((xz, footprint));
@@ -263,6 +279,9 @@ public partial class Act6ClearingEvent : Node3D
 				Position = new Vector3(local.X, groundY - GlobalPosition.Y, local.Z),
 				RotationDegrees = new Vector3(0, rng.RandfRange(0f, 360f), 0),
 			};
+			// Set on the ground at its foot; on a slope the walls and plinth reach down to the lowest ground
+			// under the whole flight, so no edge of it stands in the air.
+			stair.FoundationDepth = FootingFor(stair, new Vector3(world.X, groundY, world.Z), terrain);
 			parent.AddChild(stair);
 			stair.AddToGroup("act6_mini_stairs");
 			_minis.Add(stair);
@@ -273,6 +292,23 @@ public partial class Act6ClearingEvent : Node3D
 				new BoxShape3D { Size = new Vector3(stair.Width * stair.Scale.X + 1f, footH, footLen) },
 				new Vector3(0, footH * 0.5f, -footLen * 0.5f + 0.4f), OnMiniStepped, "StepTrigger");
 		}
+	}
+
+	/// <summary>Foundation depth (in the flight's own units) that reaches the lowest ground under its footprint.</summary>
+	private static float FootingFor(StaircaseBuilder s, Vector3 origin, ForestTerrain terrain)
+	{
+		if (terrain == null) return s.FoundationDepth;
+		float half = s.Width * 0.5f + s.WallThickness + s.PlinthFlare + 0.15f;
+		float z0 = 0.3f, z1 = s.BackZ - 0.5f;
+		var basis = Basis.FromEuler(s.RotationDegrees * (Mathf.Pi / 180f)).Scaled(s.Scale);
+		float lo = origin.Y;
+		for (int j = 0; j <= 12; j++)
+			for (int i = 0; i <= 6; i++)
+			{
+				Vector3 w = origin + basis * new Vector3(Mathf.Lerp(-half, half, i / 6f), 0, Mathf.Lerp(z0, z1, j / 12f));
+				lo = Mathf.Min(lo, terrain.HeightAt(w.X, w.Z));
+			}
+		return Mathf.Max(s.FoundationDepth, (origin.Y - lo) / s.Scale.Y + 0.25f);
 	}
 
 	private void OnMiniStepped(PlayerController player)
@@ -295,14 +331,84 @@ public partial class Act6ClearingEvent : Node3D
 		ct.ThrowIfCancellationRequested();
 
 		var inv = _player.Inventory;
-		if (inv is { HasNewelPost: true } && _minis.Count > 0)
-		{
-			var target = _minis[new RandomNumberGenerator().RandiRange(0, _minis.Count - 1)];
-			FlashFusion(target);
-			inv.ConsumeNewelPost();
-		}
+		bool fly = inv is { HasNewelPost: true } && _original is { HasNewel: true };
+		if (fly) inv.ConsumeNewelPost();
 		StoryManager.Instance.MarkClearingVoiceHeard();
 		StartNightFallback();
+		if (fly) await FlyCapHome(ct);
+		if (_original != null) _original.NewelCapped = true;
+	}
+
+	/// <summary>
+	/// The post leaves the player's hands: the stone cap flies from in front of their view in an arc to
+	/// the clearing staircase's broken newel post, arriving turned a little, then grinds round and down
+	/// onto the stump (stone on stone), where the pier's own cap takes its place in a purple flash. The
+	/// view drifts after it (a gentle scripted look the player can overrule).
+	/// </summary>
+	private async Task FlyCapHome(CancellationToken ct)
+	{
+		var stairs = _original;
+		var cam = GetViewport().GetCamera3D();
+		Transform3D seat = stairs.NewelSeatGlobal;
+		Vector3 scale = seat.Basis.Scale;
+		Quaternion qSeat = seat.Basis.Orthonormalized().GetRotationQuaternion();
+		Quaternion qArrive = qSeat * new Quaternion(Vector3.Up, -0.6f);
+		Vector3 start = cam != null ? cam.GlobalTransform * new Vector3(0.1f, -0.22f, -0.6f) : _player.GlobalPosition + Vector3.Up * 1.3f;
+		Quaternion qStart = new Quaternion(Vector3.Up, cam?.GlobalRotation.Y ?? 0f);
+		Vector3 hover = seat.Origin + seat.Basis.Y.Normalized() * 0.14f * scale.Y;
+		float dist = start.DistanceTo(hover);
+		Vector3 ctrl = (start + hover) * 0.5f + Vector3.Up * (1.2f + dist * 0.12f);
+		float flight = Mathf.Clamp(dist / 9f, 1.4f, 2.8f);
+
+		var cap = new MeshInstance3D { Name = "FlyingNewelCap", Mesh = StaircaseBuilder.NewelCapMesh };
+		Cutscene.SceneRoot(this).AddChild(cap);
+		void Place(Vector3 p, Quaternion q) => cap.GlobalTransform = new Transform3D(new Basis(q).Scaled(scale), p);
+		Place(start, qStart);
+		try
+		{
+			double t = 0;
+			while (t < flight)
+			{
+				await Cutscene.Frame(this, ct);
+				t += GetProcessDeltaTime();
+				float u = Mathf.Clamp((float)(t / flight), 0f, 1f);
+				float e = u * u * (3f - 2f * u);
+				Vector3 p = (1 - e) * (1 - e) * start + 2 * (1 - e) * e * ctrl + e * e * hover;
+				Place(p, qStart.Slerp(qArrive, e));
+				FollowWithView(p);
+			}
+			// grinding round and down onto the stump: the sound's grind runs the length of the drop and its seat lands on contact
+			StoryBeat.PlayAt(stairs, "res://assets/audio/sfx/newel_seat.wav", "Unnatural", stairs.NewelSeatLocal, volumeDb: 4f, unitSize: 5f, maxDistance: 60f);
+			const float drop = 0.44f;
+			t = 0;
+			while (t < drop)
+			{
+				await Cutscene.Frame(this, ct);
+				t += GetProcessDeltaTime();
+				float u = Mathf.Clamp((float)(t / drop), 0f, 1f);
+				Place(hover.Lerp(seat.Origin, u * u), qArrive.Slerp(qSeat, u));
+			}
+			stairs.NewelCapped = true;
+			FlashFusion(seat.Origin);
+		}
+		finally
+		{
+			if (IsInstanceValid(cap)) cap.QueueFree();
+		}
+	}
+
+	/// <summary>Turns the player's view a little each frame toward the flying cap.</summary>
+	private void FollowWithView(Vector3 target)
+	{
+		if (_player == null || !IsInstanceValid(_player)) return;
+		var rig = _player.CameraRig;
+		Vector3 eye = rig.Camera?.GlobalPosition ?? _player.GlobalPosition + Vector3.Up * 1.6f;
+		Vector3 d = target - eye;
+		float yaw = Mathf.Atan2(-d.X, -d.Z);
+		float pitch = Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length());
+		float dy = Mathf.Clamp(Mathf.AngleDifference(rig.Yaw, yaw), -0.03f, 0.03f);
+		float dp = Mathf.Clamp(pitch - rig.Pitch, -0.02f, 0.02f);
+		_player.PlayerInput.AddCutsceneLook(new Vector2(dy, dp));
 	}
 
 	/// <summary>The clearing's line, heard once: clear but dreamlike-distant, so it plays
@@ -366,17 +472,15 @@ public partial class Act6ClearingEvent : Node3D
 		t.TweenCallback(Callable.From(spot.QueueFree));
 	}
 
-	/// <summary>A wooden creak and a burst of purple light where the post has fused on.</summary>
-	private void FlashFusion(Node3D at)
+	/// <summary>A burst of purple light at the joint where the cap has fused back on (the stone sound is played by the drop).</summary>
+	private void FlashFusion(Vector3 joint)
 	{
-		var light = new OmniLight3D { LightColor = new Color(0.7f, 0.25f, 0.95f), LightEnergy = 6f, OmniRange = 6f, Position = Vector3.Up * 0.4f };
-		at.AddChild(light);
+		var light = new OmniLight3D { LightColor = new Color(0.7f, 0.25f, 0.95f), LightEnergy = 6f, OmniRange = 6f };
+		Cutscene.SceneRoot(this).AddChild(light);
+		light.GlobalPosition = joint + Vector3.Up * 0.1f;
 		var tween = light.CreateTween();
 		tween.TweenProperty(light, "light_energy", 0f, 2.2f).SetDelay(0.15f);
 		tween.TweenCallback(Callable.From(light.QueueFree));
-
-		string path = $"res://assets/audio/sfx/trunk_creak_{new RandomNumberGenerator().RandiRange(1, 3):00}.wav";
-		StoryBeat.PlayAt(at, path, "Unnatural", Vector3.Zero, volumeDb: 2f, unitSize: 3f, maxDistance: 60f);
 	}
 
 	/// <summary>If the player never takes the optional stairs, night still falls — just gradually, on the walk back.</summary>

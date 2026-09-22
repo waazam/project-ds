@@ -99,7 +99,7 @@ public partial class SystemsPreview : Node3D
 		var stairs = OriginalStairs();
 		Check(stairs != null, "original staircase found");
 		if (stairs == null) return;
-		int want = StairsState.StepsFor(StoryManager.Instance, stairs.BaseSteps);
+		int want = StairsState.ClearingStepsFor(StoryManager.Instance, stairs.BaseSteps);
 		Log($"stairs: base {stairs.BaseSteps}, steps {stairs.Steps}, wanted {want}, builds {stairs.BuildCount}");
 		Check(stairs.Steps == want, $"flight loads at StairsState length ({stairs.Steps} == {want})");
 		Check(stairs.BuildCount == 1, $"flight built exactly once on load (builds {stairs.BuildCount})");

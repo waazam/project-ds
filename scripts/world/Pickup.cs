@@ -29,6 +29,8 @@ namespace ProjectDS.World;
 /// If <see cref="RequiredCheckpoint"/> is set, the item stays hidden and
 /// unusable until the story reaches it. Restore: a taken pickup records a flag
 /// (the newel post uses StoryManager's own flag) and doesn't come back on Continue.
+/// An optional <see cref="TakenLine"/> is captioned when the player takes it in
+/// play (the newel post: "It's warm."), never on a restore.
 /// </summary>
 [Tool]
 [GlobalClass]
@@ -45,6 +47,8 @@ public partial class Pickup : Area3D
 	[Export] public bool SnapToSurface = true;
 	/// <summary>Move onto the building marker for this kind (LanternSpot etc.) if there is one.</summary>
 	[Export] public bool UseSpot = true;
+	/// <summary>A thought captioned a moment after the player takes it (never on a restore), e.g. the newel post's "It's warm."</summary>
+	[Export] public string TakenLine = "";
 
 	public const string TakenFlagPrefix = "pickup_taken_";
 	public string TakenFlag => TakenFlagPrefix + Kind.ToString().ToLowerInvariant();
@@ -171,7 +175,21 @@ public partial class Pickup : Area3D
 		if (!inv.TryPickup(Kind)) return;
 		if (Kind == ToolKind.NewelPost) StoryManager.Instance?.MarkNewelPostTaken();
 		else StoryManager.Instance?.SetFlag(TakenFlag);
+		SayTakenLine();
 		MarkTaken();
+	}
+
+	/// <summary>The taken line, a beat after the pickup feedback. Runs on the level (this pickup is freed as it's taken).</summary>
+	private void SayTakenLine()
+	{
+		if (string.IsNullOrEmpty(TakenLine)) return;
+		string line = TakenLine;
+		var root = Cutscene.SceneRoot(this);
+		_ = Cutscene.Run(root, async ct =>
+		{
+			await Cutscene.Wait(root, 0.6, ct);
+			await StoryBeat.Caption(root, line, 1.0f, 2.6f, 1.2f, ct);
+		});
 	}
 
 	private bool AlreadyTaken()

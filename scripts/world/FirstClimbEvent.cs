@@ -37,13 +37,10 @@ public partial class FirstClimbEvent : StoryTrigger
 	[Export] public float LookDownHoldSeconds = 5f;
 	[Export] public float LookDownPitchDegrees = -78f;
 
-	[ExportGroup("Blackout and wake")]
+	[ExportGroup("Blackout")]
 	[Export] public float BlackoutSeconds = 2.5f;
-	[Export] public float BlackHoldSeconds = 3f;
-	/// <summary>Seconds for sight to come back and the head to lift at the bridge.</summary>
-	[Export] public float WakeSeconds = 6f;
-	/// <summary>Camera pitch at the moment of waking: face toward the ground.</summary>
-	[Export] public float WakePitchDegrees = -55f;
+	/// <summary>Seconds of black before the level changes (the wake-up in the hollow is GameFlow's).</summary>
+	[Export] public float BlackHoldSeconds = 2f;
 
 	protected override bool AlreadyHappened(StoryManager s) => s.Current >= Checkpoint.Act2StairsClimbed;
 	protected override bool CanFire(StoryManager s, PlayerController p) => s.Current < Checkpoint.Act2StairsClimbed;
@@ -59,20 +56,26 @@ public partial class FirstClimbEvent : StoryTrigger
 		_ = Cutscene.Run(this, async ct =>
 		{
 			feet?.SetPhysicsProcess(false);
+			bool travelling = false;
 			try
 			{
 				await Climb(player, postMat, baseVignette, fader, ct);
+				// Black, and gone: the checkpoint is saved here and the player comes to in the hollow
+				// (GameFlow plays the wake-up there). The screen stays black through the level change.
+				StoryBeat.ReachCheckpoint(player, Checkpoint.Act2StairsClimbed);
+				travelling = true;
+				StoryManager.Instance?.TravelToCheckpointLevel();
 			}
 			finally
 			{
-				// Whatever happens, vision comes back and the feet work again.
-				postMat?.SetShaderParameter("vignette", baseVignette);
-				if (fader != null && IsInstanceValid(fader)) fader.BlackAlpha = 0f;
+				// If anything went wrong before the level change, vision comes back and the feet work again.
+				if (!travelling)
+				{
+					postMat?.SetShaderParameter("vignette", baseVignette);
+					if (fader != null && IsInstanceValid(fader)) fader.BlackAlpha = 0f;
+				}
 				if (feet != null && IsInstanceValid(feet)) feet.SetPhysicsProcess(true);
 			}
-			StoryBeat.ReachCheckpoint(player, Checkpoint.Act2StairsClimbed);
-			// The caption plays with control already back.
-			_ = Cutscene.Run(this, _ => StoryBeat.Caption(this, "It's getting late. Get back to the cabin.", 1.2f, 3.5f, 1.2f));
 		}, lockInput: true, freezeBody: true);
 	}
 
@@ -128,38 +131,7 @@ public partial class FirstClimbEvent : StoryTrigger
 			fader.BlackAlpha = 1f;
 		}
 		await Cutscene.Wait(this, BlackHoldSeconds, ct);
-
-		var (wakePos, wakeYaw) = WakeSpot(this);
-		player.Teleport(wakePos, wakeYaw);
-		rig.SetPitch(Mathf.DegToRad(WakePitchDegrees));
-		postMat?.SetShaderParameter("vignette", BlinkVignette);
-
-		float wakePitch = rig.Pitch;
-		var wake = player.CreateTween();
-		wake.TweenMethod(Callable.From<float>(p =>
-		{
-			if (fader != null) fader.BlackAlpha = 1f - p;
-			postMat?.SetShaderParameter("vignette", Mathf.Lerp(BlinkVignette, baseVignette, p));
-			rig.SetPitch(Mathf.LerpAngle(wakePitch, levelPitch, Mathf.SmoothStep(0f, 1f, p)));
-		}), 0f, 1f, WakeSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-		await Cutscene.Tween(this, wake, ct);
-		GD.Print("[story] Act 2: woke at the bridge");
+		rig.SetPitch(levelPitch);
+		GD.Print("[story] Act 2: blacked out at the top of the stairs");
 	}
-
-	/// <summary>
-	/// Where the stairs leave the player after the first climb, and where Continue puts them at
-	/// this checkpoint: on the ground a few metres off the cabin-side end of the footbridge,
-	/// facing back down the trail toward the cabin.
-	/// </summary>
-	public static (Vector3 pos, float yaw) WakeSpot(Node n)
-	{
-		var bridge = n.GetTree().GetFirstNodeInGroup("bridge_marker") as Node3D;
-		Vector3 p = bridge != null ? bridge.GlobalPosition + new Vector3(0, 0, WakeOffsetFromBridge) : Vector3.Zero;
-		var terrain = GroundSnap.FindTerrain(n);
-		if (terrain != null) p.Y = terrain.HeightAt(p.X, p.Z);
-		return (p + Vector3.Up * 0.15f, Mathf.Pi);   // yaw π = facing +Z, back toward the cabin
-	}
-
-	/// <summary>Metres along +Z from the bridge's centre to the wake spot (the bridge is 9 m long).</summary>
-	public const float WakeOffsetFromBridge = 7.5f;
 }

@@ -8,8 +8,8 @@ namespace ProjectDS.World;
 /// Dev harness for buildings_preview.tscn: first-person (1.62 m eye, FOV 70, the
 /// game's PS2 post) screenshots of the cabin, shed, tent/map, storm, night fire and
 /// the Act 6 veins into test-output/buildings/, plus a triangle count per building.
-/// "papers" shoots the cabin's readables (door note from the porch, bare and boarded; the
-/// sheet over the cot; the friend's page; the prints) with each one focused, logs what the
+/// "papers" shoots the cabin's readables (the sheet over the cot; the friend's page; the
+/// prints) with each one focused, logs what the
 /// crosshair ray would pick from each spot, and checks that ignition frees the glazing and
 /// papers without rebuilding the cabin.
 /// Pass "-- --only=cabin,papers,shed,storm,night,fire,burnt,clutter,veins" to limit. Not used by the game.
@@ -138,10 +138,6 @@ public partial class BuildingsPreview : Node3D
 		await ShotTo(dir, "cabin_02_threequarter_9m", W(7.5729885f, 4.82671f, -34.11965f), C(2.5340867f, 1.9819313f, -26.398935f));
 		await ShotTo(dir, "cabin_03_back_chimney", W(-3.464775f, 1.8047285f, -18.398083f), C(2.5340867f, 2.6819315f, -26.398935f));
 		await ShotTo(dir, "cabin_04_boarded_door_3m", W(7.7978086f, 4.3171396f, -28.351685f), C(5.0299826f, 1.4819313f, -27.12729f));
-		foreach (var n in new[] { "LanternPickup", "CompassPickup" })
-			if (cabin.GetNodeOrNull(n) is Pickup p) p.Reveal();
-		Vector3 spots = (cabin.GetNode<Node3D>("LanternSpot").GlobalPosition + cabin.GetNode<Node3D>("CompassSpot").GlobalPosition) * 0.5f;
-		await ShotTo(dir, "cabin_05_porch_pickups", W(6.893876f, 4.00518f, -27.879555f), spots);
 		cabin.OpenDoor();
 		await ShotTo(dir, "cabin_06_open_door_6m", W(10.789745f, 5.374615f, -28.80811f), C(2.5340867f, 1.5819314f, -26.398935f));
 		await ShotTo(dir, "cabin_07_friend_15m", W(17.357443f, 8.87206f, -30.933044f), C(1.1061016f, 1.5819314f, -26.294733f));
@@ -239,8 +235,6 @@ public partial class BuildingsPreview : Node3D
 		Log($"cabin at {cabin.GlobalPosition} (terrain at centre {_terrain.HeightAt(cabin.GlobalPosition.X, cabin.GlobalPosition.Z):0.00})");
 		Log($"cabin tris shell {Tris(cabin.GetNode("Generated/CabinMesh"))}, interior {Tris(cabin.GetNode("Generated/InteriorMesh"))}, total generated {Tris(cabin.GetNode("Generated"))}");
 		Log($"shed at {shed.GlobalPosition}, tris {Tris(shed.GetNode("Generated"))}");
-		foreach (var m in new[] { "LanternSpot", "CompassSpot" })
-			Log($"{m} {cabin.GetNode<Node3D>(m).GlobalPosition}  ground there {_terrain.HeightAt(cabin.GetNode<Node3D>(m).GlobalPosition.X, cabin.GetNode<Node3D>(m).GlobalPosition.Z):0.00}");
 		Log($"HammerSpot {shed.GetNode<Node3D>("HammerSpot").GlobalPosition}");
 		float hd = cabin.Depth * 0.5f;
 
@@ -319,7 +313,7 @@ public partial class BuildingsPreview : Node3D
 			await Local("cabin_05b_boarded_4m", cabin, new Vector2(-0.8f, hd + 5f), new Vector3(0, 1.1f, hd));
 			cabin.OpenDoor();
 			await Local("cabin_06_open_door_6m", cabin, new Vector2(1.5f, hd + 6f), new Vector3(0, 1.1f, hd));
-			await Local("cabin_08_interior_friend_3m", cabin, new Vector2(0.1f, hd - 0.5f), new Vector3(0.3f, 0.7f, -1.6f), 0f);
+			await Local("cabin_08_interior_table_3m", cabin, new Vector2(0.1f, hd - 0.5f), new Vector3(0.3f, 0.7f, -1.6f), 0f);
 			await Local("cabin_10_interior_corner_up", cabin, new Vector2(1.3f, 1.8f), new Vector3(-1.2f, 2.6f, -1.8f), 0f);
 			await Local("cabin_11_interior_lookback_door", cabin, new Vector2(0.6f, -1.9f), new Vector3(-0.2f, 1.1f, hd), 0f);
 			await Local("cabin_12_interior_stove_cot", cabin, new Vector2(0.2f, 1.2f), new Vector3(-1.2f, 0.6f, -1.8f), 0f);
@@ -336,35 +330,26 @@ public partial class BuildingsPreview : Node3D
 			friend?.RevealPage();
 			var post = cabin.FindChild("NewelPostPickup", true, false) as Pickup;
 			post?.Reveal();
-			Log($"door note {Pos(cabin.DoorNote)} sheet {Pos(cabin.TwisterSheet)} page {Pos(friend?.Page)}");
-			// Act 1: the note from the porch, bare door; then from the far left and right of the porch
-			// (hard angles for the door's own 0.9 m pick sphere, which is disabled but still in the ray's way)
-			await Paper("papers_01_note_porch_act1", cabin, new Vector2(0.2f, hd + 1.7f), cabin.DoorNote);
-			await Paper("papers_01b_note_porch_left", cabin, new Vector2(-1.3f, hd + 0.9f), cabin.DoorNote);
-			await Paper("papers_01c_note_porch_right", cabin, new Vector2(1.5f, hd + 1.0f), cabin.DoorNote);
-			// Act 2 on: boarded; the note stays readable, and the planks still take the look for the chop
+			Log($"page {Pos(friend?.Page)}");
+			// Boarded: the planks take the look for the chop
 			cabin.SetBoarded(true);
 			await Frames(2);
-			await Paper("papers_02_note_boarded", cabin, new Vector2(0.2f, hd + 1.7f), cabin.DoorNote);
-			await Paper("papers_02b_note_boarded_close", cabin, new Vector2(0.45f, hd + 0.75f), cabin.DoorNote);
 			Log("planks pick (want DoorBreakTrigger): " + Pick(cabin.GlobalTransform * new Vector3(0, Eye, hd + 1.0f), cabin.GlobalTransform * new Vector3(0, 1.0f, hd + 0.15f)));
 			// Act 5: inside
 			cabin.OpenDoor();
 			await Frames(2);
-			await Paper("papers_03_sheet_over_cot", cabin, new Vector2(0.75f, -1.3f), cabin.TwisterSheet);
 			await Paper("papers_04_page_on_table", cabin, new Vector2(0.9f, 0.25f), friend?.Page);
 			if (post != null)
 				Log("post pick (want NewelPostPickup): " + Pick(cabin.GlobalTransform * new Vector3(0.9f, Eye, 0.25f), post.GlobalPosition + Vector3.Up * 0.15f));
 			await Local("papers_05_prints_1_5m", cabin, new Vector2(1.0f, -1.2f), new Vector3(0.3f, 1.64f, -hd + 0.11f), 0f);
 			await Local("papers_05b_prints_close", cabin, new Vector2(0.3f, -hd + 0.75f), new Vector3(0.3f, 1.64f, -hd + 0.11f), 0f);
 			await Local("papers_06_prints_from_door", cabin, new Vector2(0.0f, 2.2f), new Vector3(0.3f, 1.45f, -hd + 0.11f), 0f);
-			await Paper("papers_07_note_door_open_inside", cabin, new Vector2(-0.1f, 1.0f), cabin.DoorNote);
 			// Act 7: ignition must not rebuild the cabin; sashes, glass, boards and every paper go
 			_atmo?.SetMood(ForestAtmosphere.Mood.Night, 0.1f);
 			ulong genBefore = cabin.GetNode("Generated").GetInstanceId();
 			cabin.SetBurning(1f);
 			await Frames(3);
-			Log($"burning: Generated same instance {cabin.GetNode("Generated").GetInstanceId() == genBefore}, sashes {cabin.GetNodeOrNull("Generated/WindowSashes") != null}, panes {cabin.GetNodeOrNull("Generated/Panes") != null}, boards {cabin.GetNodeOrNull("Generated/WindowBoards") != null}, papers visible {cabin.GetNode<Node3D>("Generated/Papers").Visible}, note visible {cabin.DoorNote?.IsVisibleInTree()}, page visible {friend?.Page?.IsVisibleInTree()}");
+			Log($"burning: Generated same instance {cabin.GetNode("Generated").GetInstanceId() == genBefore}, sashes {cabin.GetNodeOrNull("Generated/WindowSashes") != null}, panes {cabin.GetNodeOrNull("Generated/Panes") != null}, boards {cabin.GetNodeOrNull("Generated/WindowBoards") != null}, papers visible {cabin.GetNode<Node3D>("Generated/Papers").Visible}, page visible {friend?.Page?.IsVisibleInTree()}");
 			await Secs(3.0);
 			await Local("papers_08_burning_porch", cabin, new Vector2(0.3f, hd + 2.2f), new Vector3(0, 1.3f, hd), 0f);
 			await Local("papers_09_burning_window", cabin, new Vector2(-1.3f, hd + 1.4f), new Vector3(-1.4f, 1.3f, hd), 0f);

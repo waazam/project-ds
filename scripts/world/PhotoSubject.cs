@@ -5,9 +5,10 @@ using ProjectDS.Systems;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Something on the Act 1 shot list that is not a bird: a child of the thing it
-/// describes (sign, cabin, tent, mushrooms, stairs) or built in code by the thing
-/// itself (the creek, under the footbridge). CameraTool asks every subject in
+/// Something the Act 1 camera recognises that is not a bird: a child of the thing it
+/// describes (mushrooms, flowers, the stone, the stairs) or built in code by the
+/// thing itself (the deer, the frog, the waterfall). Moving subjects carry it with
+/// them; a hidden one never scores. CameraTool asks every subject in
 /// group "photo_subjects" to score itself for the shot; birds are judged first
 /// and by their own unchanged rule.
 ///
@@ -15,13 +16,13 @@ namespace ProjectDS.World;
 /// is within the distance band, inside the cone around the camera's axis and,
 /// if required, not hidden behind world geometry (a hit on the subject's own
 /// collider, i.e. anything under <see cref="OwnerPath"/>, counts as clear).
-/// Vista subjects (the overlook): the player stands within <see cref="StandRadius"/>
+/// Vista subjects (none on the list today): the player stands within <see cref="StandRadius"/>
 /// of this node and looks roughly along <see cref="BearingDegrees"/>, not down.
 /// </summary>
 [GlobalClass]
 public partial class PhotoSubject : Node3D
 {
-	/// <summary>Id in PhotoLog.Entries (also the save flag "photo_" + id).</summary>
+	/// <summary>The subject's id (its caption in PhotoLog and the save flag "photo_" + id).</summary>
 	[Export] public string Id = "";
 	[Export] public bool Vista;
 	/// <summary>Local points the camera must have in the frame (point subjects).</summary>
@@ -49,7 +50,8 @@ public partial class PhotoSubject : Node3D
 	public bool TryScore(Camera3D cam, PlayerController player, out float score)
 	{
 		score = float.MaxValue;
-		if (cam == null || string.IsNullOrEmpty(Id)) return false;
+		// A hidden subject (the deer once it has bolted) is not there to be photographed.
+		if (cam == null || string.IsNullOrEmpty(Id) || !IsVisibleInTree()) return false;
 		Vector3 origin = cam.GlobalPosition;
 		Vector3 fwd = -cam.GlobalBasis.Z;
 

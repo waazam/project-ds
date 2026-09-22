@@ -131,6 +131,9 @@ public partial class ContinueRoundTripTest : Node
 		input.Scripted = true;
 
 		Check("checkpoint restored", story.Current == sc.Cp, $"{story.Current}");
+		string level = GetTree().CurrentScene?.SceneFilePath ?? "";
+		bool hollow = level == StoryManager.HollowScene;
+		Check("Continue loads the checkpoint's level", level == StoryManager.LevelFor(sc.Cp), level);
 		var missing = sc.Flags.Where(f => !story.HasFlag(f)).ToArray();
 		Check("flags restored", missing.Length == 0, missing.Length == 0 ? $"{sc.Flags.Length} flags" : $"missing {string.Join(",", missing)}");
 
@@ -179,6 +182,14 @@ public partial class ContinueRoundTripTest : Node
 		var atmo = StoryBeat.Atmosphere(this);
 		var wantMood = StoryBeat.ExpectedMood(story);
 		Check("lighting mood", atmo?.CurrentMood == wantMood, $"{atmo?.CurrentMood} (want {wantMood})");
+		if (!hollow)
+		{
+			// The trailhead holds Act 1 only: none of the Hollow's beats exist here.
+			Check("no compass on the trail", story.ObjectivePosition == null, $"{story.ObjectivePosition}");
+			input.ScriptedMove = Vector2.Zero;
+			Screenshot(sc.Name);
+			return;
+		}
 		var fire = FindFirst<CabinFireEvent>();
 		bool wantFire = story.Current >= Checkpoint.Act7CabinBurning;
 		Check("cabin fire state", fire != null && fire.Burning == wantFire, $"burning {fire?.Burning} (want {wantFire})");
@@ -195,7 +206,8 @@ public partial class ContinueRoundTripTest : Node
 
 		// One-shot beats know they already happened.
 		CheckFired<FirstClimbEvent>(story.Current >= Checkpoint.Act2StairsClimbed);
-		CheckFired<CabinReturnEvent>(story.Current >= Checkpoint.Act3DoorBoarded);
+		// The boarded-door caption is a once-only line now (no checkpoint): done once seen, or once the door is open.
+		CheckFired<CabinReturnEvent>(story.HasFlag(CabinReturnEvent.SeenFlag) || StoryBeat.CabinDoorOpen(story));
 		CheckFired<FriendReveal>(story.Current >= Checkpoint.Act5CabinEntered);
 		CheckFired<CabinExitLine>(story.HasFlag(StoryManager.Flag.DawnBroke));
 		CheckFired<BridgeCrossEvent>(story.Current >= Checkpoint.Act6BridgeCrossed);

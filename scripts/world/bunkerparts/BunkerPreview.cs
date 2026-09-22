@@ -132,9 +132,6 @@ public partial class BunkerPreview : Node3D
 		Log($"check station log on the console: {LookHit(ledgerEye, ledger - ledgerEye)}");
 		Vector3 ledgerEye2 = o + new Vector3(0.1f, 1.62f, back + 2.6f);
 		Log($"check station log from in front of the screen: {LookHit(ledgerEye2, ledger - ledgerEye2)}");
-		Vector3 slip = o + new Vector3(-5.65f + 0.51f, 0.915f, BunkerLayout.CrtRoomFrontZ - 2.52f);
-		Vector3 slipEye = o + new Vector3(-4.35f, 1.62f, BunkerLayout.CrtRoomFrontZ - 2.3f);
-		Log($"check condemnation slip in the drawer: {LookHit(slipEye, slip - slipEye)}");
 
 		// The compass marker after the screens: the way out, then the maze's end; one node, moved.
 		var marker = GetTree().GetFirstNodeInGroup("bunker_entrance_marker") as Node3D;
@@ -242,12 +239,12 @@ public partial class BunkerPreview : Node3D
 		await Take(new Shot("int_10_crt_target_close", new(1500.4f, -78.38f, -3119f), new(1500f, -79.1f, -3121.7f)));
 		await Take(new Shot("crt_room_nolantern", new(1500f, -78.38f, -3094f), new(1500f, -78.6f, -3122f), "bunker", false));
 		await Take(new Shot("crt_target_nolantern", new(1500.3f, -78.38f, -3118.8f), new(1500f, -78.9f, -3121.6f), "bunker", false));
-		// The papers in the CRT room: the station log on the console, the condemnation slip in the open drawer.
+		// The papers in the CRT room: the station log on the console; the open filing drawer (no papers in it).
 		var o2 = interior.GlobalPosition;
 		float backZ = BunkerLayout.CrtRoomBackZ;
 		await Take(new Shot("paper_console_log", o2 + new Vector3(-0.3f, 1.62f, backZ + 2.85f), o2 + new Vector3(-0.57f, 0.95f, backZ + 1.72f), "bunker"));
 		await Take(new Shot("paper_console_log_context", o2 + new Vector3(0.1f, 1.62f, backZ + 3.2f), o2 + new Vector3(-0.2f, 1.0f, backZ + 1.5f), "bunker"));
-		await Take(new Shot("paper_drawer_slip", o2 + new Vector3(-4.35f, 1.62f, BunkerLayout.CrtRoomFrontZ - 2.3f), o2 + new Vector3(-5.14f, 0.915f, BunkerLayout.CrtRoomFrontZ - 2.52f), "bunker"));
+		await Take(new Shot("drawer_open",o2 + new Vector3(-4.35f, 1.62f, BunkerLayout.CrtRoomFrontZ - 2.3f), o2 + new Vector3(-5.14f, 0.915f, BunkerLayout.CrtRoomFrontZ - 2.52f), "bunker"));
 		await Take(new Shot("paper_drawer_context", o2 + new Vector3(-3.6f, 1.62f, BunkerLayout.CrtRoomFrontZ - 1.6f), o2 + new Vector3(-5.4f, 0.9f, BunkerLayout.CrtRoomFrontZ - 2.5f), "bunker"));
 		interior.Crt.TurnAllOff();
 		await Seconds(0.8);

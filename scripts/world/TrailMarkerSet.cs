@@ -13,7 +13,7 @@ public partial class TrailMarkerSet : Node3D
 	[Export] public float[] Distances = { 18f, 58f, 98f, 138f, 205f, 268f };
 	[Export] public string[] Labels = { "1", "2", "3", "4", "5", "4" };
 	/// <summary>Metres from the trail centre (+ = right-hand side walking in).</summary>
-	[Export] public float SideOffset = 1.35f;
+	[Export] public float SideOffset = 1.75f;
 
 	public override void _Ready()
 	{

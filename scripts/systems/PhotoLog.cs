@@ -4,57 +4,48 @@ using Godot;
 namespace ProjectDS.Systems;
 
 /// <summary>
-/// Act 1's photo trip: the shot list and the record of what the camera got.
+/// Act 1's camera album: every picture the player takes, in the order taken. Nothing asks for
+/// any particular picture; there is no list. Tab opens the album (<see cref="UI.PhotoLogPage"/>),
+/// and a small print slides in after every shot (<see cref="UI.PhotoThumb"/>).
 ///
-/// The list is the friend's (a notebook page tucked into the camera strap): nine
-/// listed subjects, ticked off as they are photographed, and three unlisted ones
-/// that write themselves in when they happen (the black bird, the stalker's
-/// sting, the stairs). One story flag per subject (<see cref="StoryManager.Flag.Photo"/>),
-/// so the record survives Continue; the thumbnails do not (they only ever show
-/// on the print that slides in right after the shot).
+/// A shot is framed by <see cref="BeginShot"/> / <see cref="EndShot"/> from CameraTool: the frame
+/// grabbed at the press (already cropped to the viewfinder and downsampled to 96x64) becomes the
+/// photo at EndShot. If a subject was recognised during the shot (<see cref="Record"/>: a bird, the
+/// deer, the stairs...), the photo carries a small caption and the subject's story flag is set
+/// (<see cref="StoryManager.Flag.Photo"/>): the flags are what the story reads (the birds and the
+/// deer stay gone on Continue). Two prints come out wrong when <see cref="WrongPhotos"/> is on: the
+/// black bird's (near black, two red eyes) and the stairs' (dark, the stamp misprinted).
 ///
-/// A shot is framed by <see cref="BeginShot"/> / <see cref="EndShot"/> from
-/// CameraTool: anything recording during that window (birds, other subjects, the
-/// stalker through its Photographed event) gets the frame that was just grabbed.
-/// Two photos come out wrong (the black bird, the stairs) when <see cref="WrongPhotos"/>
-/// is on: cheap, deniable, no new beat.
+/// The album survives Continue: each photo is written as a PNG under <see cref="Folder"/> with a
+/// line in an index file as it is taken, and read back in _Ready when the level was loaded from a
+/// save. A new game (checkpoint None or Act1Start, not loaded from a save) empties the folder.
 /// </summary>
 public partial class PhotoLog : Node
 {
 	public static PhotoLog Instance { get; private set; }
 
-	public sealed class Entry
+	/// <summary>Tests point the album somewhere else (set before the level loads; it survives scene changes).</summary>
+	public static string FolderOverride;
+
+	public sealed class Photo
 	{
-		public readonly string Id;
-		/// <summary>The pencil line on the page ('\n' breaks it over two lines).</summary>
-		public readonly string Caption;
-		/// <summary>On the page from the start (with a box), or written in when earned.</summary>
-		public readonly bool Listed;
-		public Entry(string id, string caption, bool listed) { Id = id; Caption = caption; Listed = listed; }
-		/// <summary>The caption's first line: what the print shows.</summary>
-		public string ShortCaption { get { int i = Caption.IndexOf('\n'); return i < 0 ? Caption : Caption[..i]; } }
+		public int Number;
+		/// <summary>The recognised subject ("" for none).</summary>
+		public string SubjectId = "";
+		public ImageTexture Texture;
+		public bool Wrong;
+		public string Caption => CaptionFor(SubjectId);
 	}
 
-	/// <summary>In trail order. Ids are save-file names: never rename one.</summary>
-	public static readonly Entry[] Entries =
+	/// <summary>Small captions for recognised subjects (a print's pencil note). Anything else has none.</summary>
+	private static readonly Dictionary<string, string> Captions = new()
 	{
-		new("trailhead_sign", "the park sign", true),
-		new("cabin", "the cabin", true),
-		new("bird_red", "the red bird", true),
-		new("bird_blue", "the blue one", true),
-		new("creek", "the creek from the bridge", true),
-		new("overlook", "the view from the overlook", true),
-		new("bird_purple", "the purple one\n(he swears it's real)", true),
-		new("tent", "that tent", true),
-		new("mushrooms", "mushrooms (don't touch)", true),
-		new("bird_black", "a black bird", false),
-		new("stalker", "(nothing there)", false),
-		new("stairs", "stairs?", false),
+		["bird_red"] = "a red bird", ["bird_blue"] = "a blue bird", ["bird_purple"] = "a purple bird",
+		["bird_black"] = "a black bird", ["deer"] = "a deer", ["frog"] = "a frog", ["wildflowers"] = "wildflowers",
+		["mushrooms"] = "mushrooms", ["waterfall"] = "the waterfall", ["weird_stone"] = "a strange stone", ["stairs"] = "stairs?",
 	};
 
-	public const string Header = "shots for the album — get these!!";
-	/// <summary>Written under the list once every listed box is ticked. Nothing else happens.</summary>
-	public const string RewardLine = "that's the lot";
+	public static string CaptionFor(string id) => id != null && Captions.TryGetValue(id, out var c) ? c : "";
 
 	/// <summary>Thumbnail size (a 3:2 frame).</summary>
 	public const int ThumbWidth = 96, ThumbHeight = 64;
@@ -62,63 +53,46 @@ public partial class PhotoLog : Node
 	/// <summary>H2: the black bird's print comes out near black with red eyes; the stairs' print comes out dark and misexposed.</summary>
 	[Export] public bool WrongPhotos = true;
 
-	/// <summary>A subject was just recorded, with its print (null when nothing was grabbed, e.g. a scripted record).</summary>
-	public event System.Action<Entry, ImageTexture> Recorded;
+	/// <summary>A photo was just taken (every shot, recognised or not).</summary>
+	public event System.Action<Photo> Taken;
 
+	public IReadOnlyList<Photo> Photos => _photos;
+	/// <summary>Pictures on the roll so far (each one cost a frame of film).</summary>
+	public int RecordedCount => _photos.Count;
+
+	public static string Folder => FolderOverride
+		?? (GameSettings.Instance?.AutoTest == true ? "user://test_photos/" : "user://photos/");
+	private const string IndexFile = "index.txt";
+
+	private readonly List<Photo> _photos = new();
 	private readonly HashSet<string> _has = new();
 	private Image _frame;
 	private Camera3D _frameCam;
 	private Rect2 _frameRect;
 	private bool _inShot;
-	private Entities.Stalker _stalker;
+	private string _shotSubject;
+	private Vector3? _shotEyes;
 
-	public static Entry Find(string id)
-	{
-		foreach (var e in Entries) if (e.Id == id) return e;
-		return null;
-	}
-
+	/// <summary>Whether this subject has ever been photographed (its story flag).</summary>
 	public bool Has(string id) => _has.Contains(id);
-	public int RecordedCount => _has.Count;
-	public int ListedRecorded
-	{
-		get { int n = 0; foreach (var e in Entries) if (e.Listed && _has.Contains(e.Id)) n++; return n; }
-	}
-	public static int ListedTotal
-	{
-		get { int n = 0; foreach (var e in Entries) if (e.Listed) n++; return n; }
-	}
-	public bool ListComplete => ListedRecorded >= ListedTotal;
 	/// <summary>The print's exposure stamp reads wrong for the stairs.</summary>
 	public bool IsWrong(string id) => WrongPhotos && id == "stairs";
 
 	public override void _EnterTree() => Instance = this;
-	public override void _ExitTree()
-	{
-		if (Instance == this) Instance = null;
-		if (_stalker != null && IsInstanceValid(_stalker)) _stalker.Photographed -= OnStalkerPhotographed;
-	}
+	public override void _ExitTree() { if (Instance == this) Instance = null; }
 
 	public override void _Ready()
 	{
-		// Restore: the flags are already in the autoload when the level loads.
 		var story = StoryManager.Instance;
 		if (story != null)
-			foreach (var e in Entries)
-				if (story.HasFlag(StoryManager.Flag.Photo(e.Id))) _has.Add(e.Id);
+			foreach (var f in story.Flags)
+				if (f.StartsWith(StoryManager.Flag.PhotoPrefix)) _has.Add(f[StoryManager.Flag.PhotoPrefix.Length..]);
+		bool fresh = story == null || (!story.LoadedFromSave && story.Current <= Checkpoint.Act1Start);
+		if (fresh) ClearFolder();
+		else LoadFolder();
 	}
 
-	public override void _Process(double delta)
-	{
-		// The stalker comes and goes with the level; subscribe to whichever one is out there.
-		if (_stalker == null || !IsInstanceValid(_stalker))
-		{
-			_stalker = GetTree().GetFirstNodeInGroup("stalker") as Entities.Stalker;
-			if (_stalker != null) _stalker.Photographed += OnStalkerPhotographed;
-		}
-	}
-
-	private void OnStalkerPhotographed() => Record("stalker");
+	// ------------------------------------------------------------------ shots
 
 	/// <summary>CameraTool: the frame just grabbed (already cropped to the viewfinder and downsampled), and how it was taken.</summary>
 	public void BeginShot(Image frame, Camera3D cam, Rect2 frameRect)
@@ -127,39 +101,85 @@ public partial class PhotoLog : Node
 		_frameCam = cam;
 		_frameRect = frameRect;
 		_inShot = true;
-	}
-
-	public void EndShot()
-	{
-		_frame = null;
-		_frameCam = null;
-		_inShot = false;
+		_shotSubject = null;
+		_shotEyes = null;
 	}
 
 	/// <summary>
-	/// Records the subject: sets its flag (saved at once) and raises <see cref="Recorded"/> with the
-	/// print. Unknown or already-recorded ids do nothing. <paramref name="worldPoint"/> is where the
-	/// subject's eyes were, for the black bird's wrong print.
+	/// A subject recognised in the shot being taken (or, outside a shot, just marked as photographed):
+	/// sets its story flag (saved at once). <paramref name="worldPoint"/> is where the subject's eyes
+	/// were, for the black bird's wrong print.
 	/// </summary>
 	public void Record(string id, Vector3? worldPoint = null)
 	{
-		var entry = Find(id);
-		if (entry == null || _has.Contains(id)) return;
-		_has.Add(id);
-		StoryManager.Instance?.SetFlag(StoryManager.Flag.Photo(id));
-		var tex = MakePrint(id, worldPoint);
-		GD.Print($"[photo] {id} recorded ({RecordedCount}/{Entries.Length})");
-		Recorded?.Invoke(entry, tex);
+		if (string.IsNullOrEmpty(id)) return;
+		if (_has.Add(id)) StoryManager.Instance?.SetFlag(StoryManager.Flag.Photo(id));
+		if (_inShot) { _shotSubject = id; _shotEyes = worldPoint; }
 	}
 
-	private ImageTexture MakePrint(string id, Vector3? worldPoint)
+	/// <summary>CameraTool, after the shot: the picture goes into the album (and to disk), whatever it shows.</summary>
+	public void EndShot()
 	{
-		if (!_inShot || _frame == null) return null;
-		var img = (Image)_frame.Duplicate();
-		if (WrongPhotos && id == "bird_black") DarkenWithEyes(img, worldPoint);
-		else if (WrongPhotos && id == "stairs") Multiply(img, 0.3f);
-		return ImageTexture.CreateFromImage(img);
+		if (_inShot)
+		{
+			var img = _frame != null ? (Image)_frame.Duplicate() : Image.CreateEmpty(ThumbWidth, ThumbHeight, false, Image.Format.Rgb8);
+			string id = _shotSubject ?? "";
+			if (WrongPhotos && id == "bird_black") DarkenWithEyes(img, _shotEyes);
+			else if (WrongPhotos && id == "stairs") Multiply(img, 0.3f);
+			var photo = new Photo { Number = _photos.Count + 1, SubjectId = id, Texture = ImageTexture.CreateFromImage(img), Wrong = IsWrong(id) };
+			_photos.Add(photo);
+			SavePhoto(photo, img);
+			GD.Print($"[photo] #{photo.Number} taken{(id.Length > 0 ? " (" + id + ")" : "")}");
+			Taken?.Invoke(photo);
+		}
+		_frame = null;
+		_frameCam = null;
+		_inShot = false;
+		_shotSubject = null;
+		_shotEyes = null;
 	}
+
+	// ------------------------------------------------------------------ disk
+
+	private static string FileName(int n) => $"photo_{n:000}.png";
+
+	private static void SavePhoto(Photo p, Image img)
+	{
+		DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(Folder));
+		var err = img.SavePng(Folder + FileName(p.Number));
+		if (err != Error.Ok) { GD.PushWarning($"[photo] could not save {FileName(p.Number)}: {err}"); return; }
+		bool exists = FileAccess.FileExists(Folder + IndexFile);
+		using var f = FileAccess.Open(Folder + IndexFile, exists ? FileAccess.ModeFlags.ReadWrite : FileAccess.ModeFlags.Write);
+		if (f == null) return;
+		f.SeekEnd();
+		f.StoreLine($"{p.Number}|{p.SubjectId}|{(p.Wrong ? 1 : 0)}");
+	}
+
+	private void LoadFolder()
+	{
+		if (!FileAccess.FileExists(Folder + IndexFile)) return;
+		using var f = FileAccess.Open(Folder + IndexFile, FileAccess.ModeFlags.Read);
+		if (f == null) return;
+		while (!f.EofReached())
+		{
+			var parts = f.GetLine().Split('|');
+			if (parts.Length < 3 || !int.TryParse(parts[0], out int n)) continue;
+			var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(Folder + FileName(n)));
+			if (img == null || img.IsEmpty()) continue;
+			_photos.Add(new Photo { Number = _photos.Count + 1, SubjectId = parts[1], Texture = ImageTexture.CreateFromImage(img), Wrong = parts[2] == "1" });
+		}
+		GD.Print($"[photo] album restored: {_photos.Count} picture(s)");
+	}
+
+	private static void ClearFolder()
+	{
+		using var dir = DirAccess.Open(Folder);
+		if (dir == null) return;
+		foreach (var file in dir.GetFiles())
+			if (file == IndexFile || (file.StartsWith("photo_") && file.EndsWith(".png"))) dir.Remove(file);
+	}
+
+	// ------------------------------------------------------------------ wrong prints
 
 	private static void Multiply(Image img, float k)
 	{

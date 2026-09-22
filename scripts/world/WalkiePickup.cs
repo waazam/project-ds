@@ -30,8 +30,9 @@ public partial class WalkiePickup : Area3D
 	{
 		CollisionLayer = 0;
 		CollisionMask = 0;
-		Monitoring = false;
-		Monitorable = false;
+		// Deferred: the walkie is spawned from the maze-exit trigger's signal, when area flags are locked.
+		SetDeferred(Area3D.PropertyName.Monitoring, false);
+		SetDeferred(Area3D.PropertyName.Monitorable, false);
 		// Restore: already found on a previous run.
 		if (StoryManager.Instance != null && StoryManager.Instance.Current >= Checkpoint.Act10WalkieFound)
 		{

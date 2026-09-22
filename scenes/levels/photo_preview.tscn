@@ -1,12 +1,10 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/levels/forest_world.tscn" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3_hud"]
 [ext_resource type="Script" path="res://scripts/ui/PhotoPreview.cs" id="4_preview"]
 [ext_resource type="Script" path="res://scripts/systems/PhotoLog.cs" id="5_photolog"]
-[ext_resource type="PackedScene" path="res://scenes/entities/stalker.tscn" id="6_stalker"]
-
 [node name="PhotoPreview" type="Node3D"]
 script = ExtResource("4_preview")
 
@@ -18,5 +16,3 @@ script = ExtResource("5_photolog")
 [node name="Player" parent="." instance=ExtResource("2_player")]
 
 [node name="Hud" parent="." instance=ExtResource("3_hud")]
-
-[node name="Stalker" parent="." instance=ExtResource("6_stalker")]

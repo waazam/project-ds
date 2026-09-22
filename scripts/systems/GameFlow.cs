@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Godot;
 using ProjectDS.Player;
 using ProjectDS.UI;
@@ -50,7 +52,7 @@ public partial class GameFlow : Node
 		// (they sit earlier in the tree), then the player is placed into that restored world.
 		Callable.From(Begin).CallDeferred();
 		if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
-		else if (GameSettings.Instance.AutoTest) AddChild(new AutoTest());
+		else if (GameSettings.Instance.AutoTest) AddChild(new StoryTest());
 	}
 
 	private void Begin()
@@ -73,12 +75,99 @@ public partial class GameFlow : Node
 
 		bool quick = GameSettings.Instance.AutoTest;
 		if (!quick) Input.MouseMode = Input.MouseModeEnum.Captured;
+		if (StoryManager.Instance is { ArrivedByTravel: true } story)
+		{
+			story.ConsumeArrival();
+			_ = Cutscene.Run(this, ct => WakeUp(quick, ct));
+			return;
+		}
+		// A new game opens at the car: the intro cards, the fade-in at the trunk, the camera in hand.
+		if (save == null && GetTree().GetFirstNodeInGroup("opening") is OpeningAtCar opening)
+		{
+			var (pos, yaw) = opening.StandPose();
+			_player.Teleport(pos, yaw);
+			_ = Cutscene.Run(this, async ct =>
+			{
+				Started = true;
+				try { await opening.Run(_player, _fader, quick, ct); }
+				finally
+				{
+					if (IsInstanceValid(_fader)) _fader.BlackAlpha = 0f;
+					if (IsInstanceValid(_player)) Cutscene.Unlock(_player, input: true);
+				}
+				if (!IsInstanceValid(_player) || !_player.IsInsideTree()) return;
+				StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act1Start, _player.GlobalPosition, _player.CameraRig.Yaw);
+				await opening.ShowHowTo(ct);
+			});
+			return;
+		}
 		_ = Cutscene.Run(this, async ct =>
 		{
 			Cutscene.Unlock(_player, input: true);
 			Started = true;
 			await _fader.Fade(0f, quick ? 0.2f : 1.2f, ct);
+			if (!IsInstanceValid(_player) || !_player.IsInsideTree()) return;   // the level is already being left
 			StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act1Start, _player.GlobalPosition, _player.CameraRig.Yaw);
 		});
+	}
+
+	[ExportGroup("Wake-up (arriving from the stairs)")]
+	[Export] public float WakeBlackSeconds = 2.5f;
+	[Export] public float WakeSeconds = 7f;
+	[Export] public float WakePitchDegrees = -60f;
+	[Export] public float WakeVignette = 2.4f;
+	[Export] public string WakeLine = "This isn't the trail.";
+
+	/// <summary>
+	/// Act 2's end, in the hollow: the stairs have let go of the player somewhere they have never been.
+	/// They come to face down in the dark; their eyes open and fall shut twice, then their sight clears
+	/// slowly while their head lifts. Input stays locked throughout (the reference GameFlow took in
+	/// _Ready is released only once they are up), then the one line plays.
+	/// </summary>
+	private async Task WakeUp(bool quick, CancellationToken ct)
+	{
+		var rig = _player.CameraRig;
+		var post = StoryBeat.PostMaterial(this);
+		float baseVignette = post != null ? (float)post.GetShaderParameter("vignette") : 0f;
+		float levelPitch = rig.Pitch;
+		float downPitch = Mathf.DegToRad(WakePitchDegrees);
+		rig.SetPitch(downPitch);
+		post?.SetShaderParameter("vignette", WakeVignette);
+		_fader.SetBlack(true);
+		Started = true;
+		try
+		{
+			await Cutscene.Wait(this, quick ? 0.2f : WakeBlackSeconds, ct);
+			if (!quick)
+			{
+				await _fader.Fade(0.55f, 1.4f, ct);
+				await _fader.Fade(1f, 1.1f, ct);
+				await Cutscene.Wait(this, 0.8f, ct);
+				await _fader.Fade(0.35f, 1.6f, ct);
+				await _fader.Fade(0.8f, 0.9f, ct);
+			}
+			float seconds = quick ? 0.4f : WakeSeconds;
+			float startAlpha = _fader.BlackAlpha;
+			var tween = CreateTween();
+			tween.TweenMethod(Callable.From<float>(p =>
+			{
+				_fader.BlackAlpha = Mathf.Lerp(startAlpha, 0f, p);
+				post?.SetShaderParameter("vignette", Mathf.Lerp(WakeVignette, baseVignette, p));
+				rig.SetPitch(Mathf.Lerp(downPitch, levelPitch, Mathf.SmoothStep(0.25f, 1f, p)));
+			}), 0f, 1f, seconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+			await Cutscene.Tween(this, tween, ct);
+		}
+		finally
+		{
+			if (IsInstanceValid(_fader)) _fader.BlackAlpha = 0f;
+			post?.SetShaderParameter("vignette", baseVignette);
+			if (IsInstanceValid(_player))
+			{
+				rig.SetPitch(levelPitch);
+				Cutscene.Unlock(_player, input: true);
+			}
+		}
+		GD.Print("[story] Act 2: woke in the hollow");
+		if (!string.IsNullOrEmpty(WakeLine)) await StoryBeat.Caption(this, WakeLine, 1.2f, 3f, 1.2f, ct);
 	}
 }

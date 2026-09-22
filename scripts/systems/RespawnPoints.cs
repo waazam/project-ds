@@ -20,10 +20,17 @@ public static class RespawnPoints
 		var cp = save.Checkpoint;
 		Vector3 saved = new(save.PosX, save.PosY, save.PosZ);
 
-		if (tree.GetFirstNodeInGroup($"respawn_{cp}") is Node3D marker)
-			return (marker.GlobalPosition + Vector3.Up * 0.1f, YawOf(-marker.GlobalBasis.Z));
-
 		var cabin = tree.GetFirstNodeInGroup("cabin") as Cabin;
+		// Post in hand but not yet carried out: just inside the (open) doorway, facing out, so stepping
+		// outside plays the dawn beat exactly as it would have. Before any level marker: an outdoor
+		// respawn would skip the doorway, and with it the dawn.
+		if (cp == Checkpoint.Act5CabinEntered && cabin != null
+			&& StoryManager.Instance is { NewelPostTaken: true } s5 && !s5.HasFlag(StoryManager.Flag.DawnBroke))
+			return (cabin.InsidePoint + Vector3.Up * 0.1f, YawToward(cabin.InsidePoint, cabin.ApproachPoint));
+
+		if (tree.GetFirstNodeInGroup($"respawn_{cp}") is Node3D marker)
+			return OnGround(n, marker.GlobalPosition, YawOf(-marker.GlobalBasis.Z));
+
 		var top = tree.GetFirstNodeInGroup("stairs_top_trigger") as Node3D;
 		var bridge = tree.GetFirstNodeInGroup("bridge_marker") as Node3D;
 		var bunker = tree.GetFirstNodeInGroup("bunker_marker") as Node3D;
@@ -33,14 +40,9 @@ public static class RespawnPoints
 		{
 			case Checkpoint.Act1Start when spawn != null:
 				return (spawn.GlobalPosition + Vector3.Up * 0.1f, YawOf(-spawn.GlobalBasis.Z));
-			case Checkpoint.Act2StairsClimbed when bridge != null:
-				// Where the climb's blackout left them: the cabin-side end of the footbridge, facing home.
-				return FirstClimbEvent.WakeSpot(n);
-			case Checkpoint.Act5CabinEntered when cabin != null
-				&& StoryManager.Instance is { NewelPostTaken: true } s5 && !s5.HasFlag(StoryManager.Flag.DawnBroke):
-				// Post in hand but not yet carried out: just inside the (open) doorway, facing out, so
-				// stepping outside plays the dawn beat exactly as it would have.
-				return (cabin.InsidePoint + Vector3.Up * 0.1f, YawToward(cabin.InsidePoint, cabin.ApproachPoint));
+			case Checkpoint.Act2StairsClimbed when spawn != null:
+				// Where the stairs let go of them: the hollow's own spawn point (its wake spot).
+				return OnGround(n, spawn.GlobalPosition, YawOf(-spawn.GlobalBasis.Z));
 			case Checkpoint.Act3DoorBoarded when cabin != null:
 			case Checkpoint.Act5CabinEntered when cabin != null:
 				// Outside the door, facing it: never inside the cabin, whatever state the door is in.
