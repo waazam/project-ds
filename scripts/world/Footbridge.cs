@@ -163,6 +163,7 @@ public partial class Footbridge : Node3D
 			if (Rocks) BuildRocks(gen, tilt, L, pitch);
 			if (Sign) BuildSign(gen, L);
 		}
+		BuildPhotoSubject(gen);
 
 		var crossing = new BridgeCrossEvent { CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
 		gen.AddChild(crossing);
@@ -257,6 +258,46 @@ public partial class Footbridge : Node3D
 		}
 		if (!k.IsEmpty) k.CommitTo(gen, "RockMesh");
 		if (body.GetChildCount() == 0) body.QueueFree();
+	}
+
+	/// <summary>Act 1 shot list: the creek from the bridge. Built here because the bridge places itself
+	/// onto the crossing; the look points are the water up- and downstream (the stream runs across local X).</summary>
+	private void BuildPhotoSubject(Node3D gen)
+	{
+		// Each point sits just above the water (or the bank, where the bed rises out of it), so
+		// the line-of-sight ray is not stopped by the stream bed itself.
+		var points = new Vector3[4];
+		float[] offsets = { 6f, -6f, 12f, -12f };
+		var toLocal = GlobalTransform.AffineInverse();
+		for (int i = 0; i < 4; i++)
+		{
+			Vector3 w = GlobalTransform * new Vector3(offsets[i], 0, 0);
+			float y = w.Y - 0.9f;
+			if (_terrain != null)
+			{
+				float ground = _terrain.HeightAt(w.X, w.Z);
+				float water = ground;
+				var stream = _terrain.Stream;
+				if (stream != null && stream.Points.Count > 1)
+				{
+					Vector3 o = _terrain.GlobalPosition;
+					stream.Closest(new Vector2(w.X - o.X, w.Z - o.Z), out float s);
+					water = _terrain.WaterLevel(s);
+				}
+				y = Mathf.Max(ground, water) + 0.2f;
+			}
+			points[i] = toLocal * new Vector3(w.X, y, w.Z);
+		}
+		gen.AddChild(new PhotoSubject
+		{
+			Name = "CreekPhotoSubject",
+			Id = "creek",
+			LookPoints = points,
+			MinDistance = 3f,
+			MaxDistance = 28f,
+			ConeDegrees = 22f,
+			OwnerPath = "../..",
+		});
 	}
 
 	/// <summary>Low routed sign at the near (+Z) end, on the left as you arrive, pointing at the bridge.</summary>

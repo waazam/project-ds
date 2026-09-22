@@ -55,6 +55,7 @@ public partial class Pickup : Area3D
 	private PickupInteractable _use;
 	private ItemMeshes.Built _built;
 	private bool _revealed;
+	private bool _waitingForCheckpoint;
 	private int _settleFrame;
 	private bool _settled;
 	private float _glowBase;
@@ -78,6 +79,12 @@ public partial class Pickup : Area3D
 		_revealed = RequiredCheckpoint == Checkpoint.None
 			|| (StoryManager.Instance != null && StoryManager.Instance.Current >= RequiredCheckpoint);
 		Visible = _revealed;
+		// Not yet in the story: the checkpoint event reveals it (no per-frame poll).
+		if (!_revealed && StoryManager.Instance is { } story)
+		{
+			_waitingForCheckpoint = true;
+			story.CheckpointReached += OnCheckpoint;
+		}
 
 		_use = new PickupInteractable
 		{
@@ -100,7 +107,22 @@ public partial class Pickup : Area3D
 		_revealed = true;
 		Visible = true;
 		if (_use != null) _use.Enabled = true;
+		StopWaiting();
 	}
+
+	private void OnCheckpoint(Checkpoint cp)
+	{
+		if (!Taken && cp >= RequiredCheckpoint) Reveal();
+	}
+
+	private void StopWaiting()
+	{
+		if (!_waitingForCheckpoint) return;
+		_waitingForCheckpoint = false;
+		if (StoryManager.Instance is { } story) story.CheckpointReached -= OnCheckpoint;
+	}
+
+	public override void _ExitTree() => StopWaiting();
 
 	public static string HumanName(ToolKind kind) => kind switch
 	{
@@ -119,7 +141,7 @@ public partial class Pickup : Area3D
 	private static bool IsGear(ToolKind kind)
 		=> kind is ToolKind.Lantern or ToolKind.Compass or ToolKind.Camera or ToolKind.NewelPost or ToolKind.Radio;
 
-	private static PlayerInventory Inv(PlayerController p) => p?.GetNodeOrNull<PlayerInventory>("Inventory");
+	private static PlayerInventory Inv(PlayerController p) => p?.Inventory;
 
 	private bool CanTake(PlayerController p)
 	{
@@ -179,8 +201,13 @@ public partial class Pickup : Area3D
 		if (_settleFrame == 3)
 		{
 			MoveToSpot();
-			// Old saves have no taken-flag: equipped gear already carried counts as taken.
-			if (!Taken && IsGear(Kind) && Kind != ToolKind.NewelPost && PlayerHas(Kind)) { StoryManager.Instance?.SetFlag(TakenFlag); MarkTaken(); }
+			// Old saves have no taken-flag: on a Continue, equipped gear already carried counts as taken.
+			// (Only on a Continue: a fresh run that grants gear directly, e.g. a test skip, keeps its world pickups.)
+			if (!Taken && IsGear(Kind) && Kind != ToolKind.NewelPost && StoryManager.Instance is { LoadedFromSave: true } && PlayerHas(Kind))
+			{
+				StoryManager.Instance.SetFlag(TakenFlag);
+				MarkTaken();
+			}
 		}
 		if (!SnapToSurface || TrySnap() || _settleFrame > 40)
 		{
@@ -192,7 +219,7 @@ public partial class Pickup : Area3D
 
 	private bool PlayerHas(ToolKind kind)
 	{
-		var inv = (GetTree().GetFirstNodeInGroup("player") as Node)?.GetNodeOrNull<PlayerInventory>("Inventory");
+		var inv = (GetTree().GetFirstNodeInGroup("player") as PlayerController)?.Inventory;
 		if (inv == null) return false;
 		return kind switch
 		{
@@ -293,15 +320,11 @@ public partial class Pickup : Area3D
 	public override void _Process(double delta)
 	{
 		if (Engine.IsEditorHint() || Taken) return;
-		if (!_revealed && StoryManager.Instance != null && StoryManager.Instance.Current >= RequiredCheckpoint)
-			Reveal();
-		if (_built.Glow != null && IsInstanceValid(_built.Glow))
-		{
-			// A lit wick: slow breathing plus a faint quick flutter.
-			_t += delta;
-			float f = 0.88f + 0.08f * Mathf.Sin((float)_t * 1.7f) + 0.04f * Mathf.Sin((float)_t * 11.3f + 1.2f);
-			_built.Glow.LightEnergy = _glowBase * f;
-		}
+		if (_built.Glow == null || !IsInstanceValid(_built.Glow)) { SetProcess(false); return; }   // only a lit wick needs a frame
+		// A lit wick: slow breathing plus a faint quick flutter.
+		_t += delta;
+		float f = 0.88f + 0.08f * Mathf.Sin((float)_t * 1.7f) + 0.04f * Mathf.Sin((float)_t * 11.3f + 1.2f);
+		_built.Glow.LightEnergy = _glowBase * f;
 	}
 
 	private void BuildVisual()

@@ -2,14 +2,17 @@ using Godot;
 
 namespace ProjectDS.Systems;
 
-/// <summary>Story checkpoints, in order reached. Never renumber existing values once a save exists.</summary>
+/// <summary>
+/// Story checkpoints, in order reached. Never renumber existing values once a save exists: the
+/// numbers are what the save files and the test logs carry ("checkpoint 4" = Act 5, the friend found).
+/// </summary>
 public enum Checkpoint
 {
 	None = 0,
 	Act1Start = 1,
 	Act2StairsClimbed = 2,
 	Act3DoorBoarded = 3,
-	Act5CabinEntered = 4,
+	Act5CabinEntered = 4,      // the cabin entered, the friend found
 	Act6BridgeCrossed = 5,
 	Act7CabinBurning = 6,
 	Act8BunkerEntered = 7,
@@ -19,6 +22,9 @@ public enum Checkpoint
 
 public class SaveData
 {
+	/// <summary>Bump when the layout changes and a loader needs to migrate; saves without the key read as 0.</summary>
+	public const int CurrentVersion = 1;
+	public int Version = CurrentVersion;
 	public Checkpoint Checkpoint;
 	public float PosX, PosY, PosZ, Yaw;
 	public string[] Flags = System.Array.Empty<string>();
@@ -43,6 +49,7 @@ public static class SaveSystem
 	{
 		string target = NewestSlot() == PathA ? PathB : PathA;
 		var cfg = new ConfigFile();
+		cfg.SetValue("save", "version", data.Version);
 		cfg.SetValue("save", "checkpoint", (int)data.Checkpoint);
 		cfg.SetValue("save", "pos_x", data.PosX);
 		cfg.SetValue("save", "pos_y", data.PosY);
@@ -82,6 +89,7 @@ public static class SaveSystem
 		savedAt = (double)cfg.GetValue("save", "saved_at", -1.0);
 		return new SaveData
 		{
+			Version = (int)cfg.GetValue("save", "version", 0),
 			Checkpoint = (Checkpoint)(int)cfg.GetValue("save", "checkpoint", 0),
 			PosX = (float)cfg.GetValue("save", "pos_x", 0f),
 			PosY = (float)cfg.GetValue("save", "pos_y", 0f),

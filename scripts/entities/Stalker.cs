@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Player;
+using ProjectDS.Systems;
 
 namespace ProjectDS.Entities;
 
@@ -27,15 +28,19 @@ namespace ProjectDS.Entities;
 /// - It is heard more than seen, but only from where it actually is: while it
 ///   waits, its steps sometimes shadow yours a beat late and stop when you
 ///   stop, or a twig snaps at its tree.
-/// - It is dormant for the first stretch of the walk and will not enter the
-///   silence around a staircase.
+/// - It does not start following until the player has crossed the first
+///   footbridge (group "bridge_marker"; the trail runs north, -Z), or at once
+///   on a Continue from Act 2 on. It never enters the silence around a
+///   staircase, and it withdraws entirely while the player is indoors (the
+///   cabin, the bunker), where there are no trees to hide behind.
 /// </summary>
 public partial class Stalker : Node3D
 {
 	public enum State { Dormant, Hidden, Peeking, Vanishing }
 
 	[ExportGroup("Pacing")]
-	[Export] public float ActivateAfterMeters = 30f;
+	/// <summary>It wakes once the player is this far past the footbridge (north of it, along -Z).</summary>
+	[Export] public float PastBridgeMeters = 6f;
 	[Export] public Vector2 CooldownSeconds = new(20f, 50f);   // after being seen, it keeps its distance a while
 	/// <summary>How long it waits at one tree, unseen, before moving to another while you linger nearby.</summary>
 	[Export] public Vector2 RelocateSeconds = new(18f, 35f);
@@ -102,6 +107,8 @@ public partial class Stalker : Node3D
 	public double LastSeenDuration { get; private set; }
 	/// <summary>0 = just seen, keeping back .. 1 = long unseen, as close as it gets.</summary>
 	public float Tension { get; private set; }
+	/// <summary>True once it has started following (past the bridge, a Continue from Act 2, or a dev key).</summary>
+	public bool Awake => _awake;
 
 	/// <summary>Points on the body (local to Body) used to decide whether the player can see it.</summary>
 	[Export] public Vector3[] SamplePoints =
@@ -110,13 +117,15 @@ public partial class Stalker : Node3D
 		new(0, 1.4f, 0), new(0, 1.0f, 0), new(-0.1f, 0.5f, 0), new(0.1f, 0.5f, 0),
 	};
 
-	private Node3D _player;
+	private PlayerController _player;
 	private Node3D _body;
+	private Node3D _bridge;
+	private bool _bridgeSearched;
+	private bool _awake;
 	private readonly List<ShaderMaterial> _skins = new();
 	private readonly RandomNumberGenerator _rng = new();
 	private Vector3 _lastPlayerPos;
 	private bool _hasLastPos;
-	private float _progress;
 	private float _cooldown = 4f;
 	private float _stayTimer;
 	private float _linger;
@@ -126,6 +135,11 @@ public partial class Stalker : Node3D
 	private float _visibility;
 	private Vector3 _hideDir;
 	private bool _ahead;
+
+	// Reused query objects: the sweeps run many rays a frame while it peeks, so nothing is allocated per ray.
+	private Godot.Collections.Array<Rid> _exclude;
+	private PhysicsRayQueryParameters3D _ray;
+	private PhysicsShapeQueryParameters3D _overlap;
 
 	private readonly List<AudioStream> _steps = new();
 	private readonly List<AudioStream> _twigs = new();
@@ -145,6 +159,7 @@ public partial class Stalker : Node3D
 
 	public override void _Ready()
 	{
+		AddToGroup("stalker");
 		ProjectDS.Player.CameraTool.PhotoTaken += OnPhotoTaken;
 		_body = GetNode<Node3D>("Body");
 		// Every visible part dissolves together: collect each distinct shader material under Body.
@@ -167,6 +182,11 @@ public partial class Stalker : Node3D
 		AddChild(_stingVoice);
 		_nextTwig = _rng.RandfRange(TwigInterval.X, TwigInterval.Y);
 		_nextShadow = _rng.RandfRange(ShadowInterval.X, ShadowInterval.Y);
+		_overlap = new PhysicsShapeQueryParameters3D
+		{
+			Shape = new CapsuleShape3D { Radius = 0.3f, Height = 1.9f },
+			CollisionMask = 1,
+		};
 	}
 
 	public override void _ExitTree() => ProjectDS.Player.CameraTool.PhotoTaken -= OnPhotoTaken;
@@ -197,7 +217,7 @@ public partial class Stalker : Node3D
 	/// <summary>Test hook: take cover far ahead now if a trunk is available.</summary>
 	public bool DebugForceDistant()
 	{
-		if (Current == State.Dormant) _progress = ActivateAfterMeters;
+		if (!DebugWake()) return false;
 		if (Current != State.Hidden && Current != State.Dormant) Hide(0f);
 		return TryPlace(GetViewport().GetCamera3D(), ahead: true);
 	}
@@ -205,28 +225,69 @@ public partial class Stalker : Node3D
 	/// <summary>Test hook: take cover behind the player now if a trunk is available.</summary>
 	public bool DebugForcePeek()
 	{
-		if (Current == State.Dormant) _progress = ActivateAfterMeters;
+		if (!DebugWake()) return false;
 		if (Current is State.Peeking or State.Vanishing) return Current == State.Peeking;
 		_cooldown = 0f;
 		return TryPlace(GetViewport().GetCamera3D(), ahead: false);
+	}
+
+	/// <summary>Dev keys skip the dormant stretch (but not the indoors rule: there is nowhere to hide).</summary>
+	private bool DebugWake()
+	{
+		_awake = true;
+		if (Current == State.Dormant) Current = State.Hidden;
+		return _player != null && _body != null && !Indoors;
+	}
+
+	private static bool Indoors => ForestAmbienceManager.Instance is { IsIndoor: true };
+
+	/// <summary>Whether the story lets it follow yet: past the footbridge, or a Continue from Act 2 on.</summary>
+	private bool ShouldWake()
+	{
+		if (StoryManager.Instance is { Current: >= Checkpoint.Act2StairsClimbed }) return true;
+		if (!_bridgeSearched)
+		{
+			_bridgeSearched = true;
+			_bridge = GetTree().GetFirstNodeInGroup("bridge_marker") as Node3D;
+		}
+		if (_bridge == null || !IsInstanceValid(_bridge)) return true;   // no bridge in this scene (previews): nothing to wait for
+		return _player.GlobalPosition.Z < _bridge.GlobalPosition.Z - PastBridgeMeters;
 	}
 
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
 		_clock += delta;
-		_player ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
+		if (_player == null || !IsInstanceValid(_player))
+		{
+			_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
+			if (_player == null) return;
+			_exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+			_ray = new PhysicsRayQueryParameters3D { CollisionMask = 1, Exclude = _exclude };
+			_listening = false;
+		}
 		var cam = GetViewport().GetCamera3D();
-		if (_player == null || cam == null) return;
-		if (!_listening && _player.GetNodeOrNull<PlayerFootsteps>("Footsteps") is PlayerFootsteps feet)
+		if (cam == null) return;
+		if (!_listening && _player.Footsteps is PlayerFootsteps feet)
 		{
 			feet.Stepped += OnPlayerStepped;
 			_listening = true;
 		}
 
-		float speed = TrackProgress(dt);
+		float speed = TrackSpeed(dt);
 		PlayPendingSteps();
-		if (_progress < ActivateAfterMeters) { Current = State.Dormant; return; }
+
+		// Indoors there is nothing to hide behind: it is simply not there until you come back out.
+		if (Indoors)
+		{
+			if (Current != State.Dormant) { Hide(0f); Current = State.Dormant; _shadowLeft = 0; }
+			return;
+		}
+		if (!_awake)
+		{
+			if (!ShouldWake()) { Current = State.Dormant; return; }
+			_awake = true;
+		}
 		if (Current == State.Dormant) Current = State.Hidden;
 		// Unseen, it grows bolder: its trees creep closer over time.
 		Tension = Mathf.Min(1f, Tension + dt / CloseInSeconds);
@@ -294,6 +355,9 @@ public partial class Stalker : Node3D
 		FacePlayer();
 	}
 
+	/// <summary>Raised when a photo catches it (the sting has just played). The photo log records the frame.</summary>
+	public event System.Action Photographed;
+
 	/// <summary>
 	/// A photo taken with it in frame (visible in the camera's view, not behind cover)
 	/// brings the sting, once per appearance, and it is gone as if seen.
@@ -307,6 +371,7 @@ public partial class Stalker : Node3D
 		_stingVoice.Stream = _sting;
 		_stingVoice.VolumeDb = StingVolumeDb;
 		_stingVoice.Play();
+		Photographed?.Invoke();
 		if (Current == State.Peeking)
 		{
 			if (!_seenThisPeek) { _seenThisPeek = true; SeenCount++; Tension = 0.1f; }
@@ -328,11 +393,11 @@ public partial class Stalker : Node3D
 	/// </summary>
 	private bool TryPlace(Camera3D cam, bool ahead)
 	{
+		if (_player == null || cam == null || _ray == null) return false;
 		var space = GetWorld3D().DirectSpaceState;
 		Vector3 eye = _player.GlobalPosition + Vector3.Up * 1.5f;
 		Vector3 look = -cam.GlobalBasis.Z; look.Y = 0; look = look.Normalized();
 		Vector2 range = ahead ? AheadDistance : BehindDistanceFar.Lerp(BehindDistanceNear, Tension);
-		var exclude = new Godot.Collections.Array<Rid> { ((CollisionObject3D)_player).GetRid() };
 
 		for (int attempt = 0; attempt < 16; attempt++)
 		{
@@ -344,9 +409,7 @@ public partial class Stalker : Node3D
 			}
 			else dir = (-look).Rotated(Vector3.Up, _rng.RandfRange(-0.9f, 0.9f));
 
-			var q = PhysicsRayQueryParameters3D.Create(eye, eye + dir * (range.Y + 4f), 1);
-			q.Exclude = exclude;
-			var hit = space.IntersectRay(q);
+			var hit = Ray(eye, eye + dir * (range.Y + 4f));
 			if (hit.Count == 0) continue;
 
 			Vector3 at = (Vector3)hit["position"], normal = (Vector3)hit["normal"];
@@ -355,8 +418,7 @@ public partial class Stalker : Node3D
 
 			// Find the trunk's far side (big trees are over a metre thick): cast back toward us from beyond it.
 			Vector3 flatDir = new Vector3(dir.X, 0, dir.Z).Normalized();
-			var back = PhysicsRayQueryParameters3D.Create(at + flatDir * 3f, at + flatDir * 0.05f, 1);
-			var farHit = space.IntersectRay(back);
+			var farHit = Ray(at + flatDir * 3f, at + flatDir * 0.05f);
 			Vector3 farSide = farHit.Count > 0 ? (Vector3)farHit["position"] : at + flatDir * 0.6f;
 
 			float lean = _rng.Randf() < 0.5f ? -1f : 1f;
@@ -393,6 +455,14 @@ public partial class Stalker : Node3D
 		return false;
 	}
 
+	/// <summary>One world-layer ray (excluding the player) through the shared query object.</summary>
+	private Godot.Collections.Dictionary Ray(Vector3 from, Vector3 to)
+	{
+		_ray.From = from;
+		_ray.To = to;
+		return GetWorld3D().DirectSpaceState.IntersectRay(_ray);
+	}
+
 	/// <summary>True while it is out there (peeking or dissolving), for debug display.</summary>
 	public bool IsPresent => Current is State.Peeking or State.Vanishing;
 
@@ -402,56 +472,46 @@ public partial class Stalker : Node3D
 		foreach (var local in SamplePoints) yield return _body.GlobalTransform * local;
 	}
 
-
 	/// <summary>True if a body standing at <paramref name="feet"/> would be inside a trunk, rock or log.</summary>
 	private bool Overlaps(Vector3 feet)
 	{
-		var shape = new CapsuleShape3D { Radius = 0.3f, Height = 1.9f };
-		var q = new PhysicsShapeQueryParameters3D
-		{
-			Shape = shape,
-			// Lifted clear of the ground so the terrain itself doesn't count.
-			Transform = new Transform3D(Basis.Identity, feet + Vector3.Up * 1.3f),
-			CollisionMask = 1,
-		};
-		return GetWorld3D().DirectSpaceState.IntersectShape(q, 1).Count > 0;
+		// Lifted clear of the ground so the terrain itself doesn't count.
+		_overlap.Transform = new Transform3D(Basis.Identity, feet + Vector3.Up * 1.3f);
+		return GetWorld3D().DirectSpaceState.IntersectShape(_overlap, 1).Count > 0;
 	}
 
 	/// <summary>How many of its sample points have a clear line of sight from <paramref name="from"/> (ignoring where you look).</summary>
 	private int ExposedPoints(Vector3 from)
 	{
-		var space = GetWorld3D().DirectSpaceState;
-		var exclude = new Godot.Collections.Array<Rid> { ((CollisionObject3D)_player).GetRid() };
+		if (_ray == null) return 0;
 		int n = 0;
+		var xf = _body.GlobalTransform;
 		foreach (var local in SamplePoints)
-		{
-			var q = PhysicsRayQueryParameters3D.Create(from, _body.GlobalTransform * local, 1);
-			q.Exclude = exclude;
-			if (space.IntersectRay(q).Count == 0) n++;
-		}
+			if (Ray(from, xf * local).Count == 0) n++;
 		return n;
 	}
+
 	private float VisibleFraction(Camera3D cam)
 	{
-		var space = GetWorld3D().DirectSpaceState;
+		if (_ray == null) return 0f;
 		Vector3 from = cam.GlobalPosition;
 		if (from.DistanceTo(GlobalPosition) > 60f) return 0f;
 		int visible = 0;
+		var xf = _body.GlobalTransform;
 		foreach (var local in SamplePoints)
 		{
-			Vector3 p = _body.GlobalTransform * local;
+			Vector3 p = xf * local;
 			if (!cam.IsPositionInFrustum(p)) continue;
-			var q = PhysicsRayQueryParameters3D.Create(from, p, 1);
-			q.Exclude = new Godot.Collections.Array<Rid> { ((CollisionObject3D)_player).GetRid() };
-			if (space.IntersectRay(q).Count == 0) visible++;
+			if (Ray(from, p).Count == 0) visible++;
 		}
 		return visible / (float)SamplePoints.Length;
 	}
 
 	private bool AnyPointInFrustum(Camera3D cam)
 	{
+		var xf = _body.GlobalTransform;
 		foreach (var local in SamplePoints)
-			if (cam.IsPositionInFrustum(_body.GlobalTransform * local)) return true;
+			if (cam.IsPositionInFrustum(xf * local)) return true;
 		return false;
 	}
 
@@ -468,13 +528,13 @@ public partial class Stalker : Node3D
 		Visible = _visibility > 0f;
 	}
 
-	/// <summary>Accumulates distance walked; returns the player's current speed.</summary>
-	private float TrackProgress(float dt)
+	/// <summary>The player's current ground speed (from their position, so scripted moves count too).</summary>
+	private float TrackSpeed(float dt)
 	{
 		Vector3 p = _player.GlobalPosition;
 		float moved = _hasLastPos ? Flat(p).DistanceTo(Flat(_lastPlayerPos)) : 0f;
-		if (moved < 5f) _progress += moved;   // ignore teleports
 		_lastPlayerPos = p; _hasLastPos = true;
+		if (moved > 5f) return 0f;   // a teleport, not a step
 		return moved / Mathf.Max(dt, 0.0001f);
 	}
 
@@ -554,20 +614,28 @@ public partial class Stalker : Node3D
 		SoundCount++;
 	}
 
+	private ForestTerrainRef _terrain;
+	private sealed class ForestTerrainRef { public Node Node; public bool Searched; }
+
 	private float GroundAt(Vector3 p)
 	{
-		if (GetTree().GetFirstNodeInGroup("terrain") is Node terrain && terrain.HasMethod("HeightAt"))
-			return terrain.Call("HeightAt", p.X, p.Z).AsSingle();
-		var space = GetWorld3D().DirectSpaceState;
-		var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(p + Vector3.Up * 30f, p + Vector3.Down * 30f, 1));
+		_terrain ??= new ForestTerrainRef();
+		if (!_terrain.Searched)
+		{
+			_terrain.Searched = true;
+			if (GetTree().GetFirstNodeInGroup("terrain") is Node t && t.HasMethod("HeightAt")) _terrain.Node = t;
+		}
+		if (_terrain.Node != null && IsInstanceValid(_terrain.Node))
+			return _terrain.Node.Call("HeightAt", p.X, p.Z).AsSingle();
+		var hit = Ray(p + Vector3.Up * 30f, p + Vector3.Down * 30f);
 		return hit.Count > 0 ? ((Vector3)hit["position"]).Y : float.NaN;
 	}
 
-	private float SilenceAt(Vector3 p)
+	private static float SilenceAt(Vector3 p)
 	{
 		float s = 0f;
-		foreach (var node in GetTree().GetNodesInGroup("silence_zones"))
-			if (node is SilenceZone zone) s = Mathf.Max(s, zone.SilenceAt(p));
+		var zones = SilenceZone.All;
+		for (int i = 0; i < zones.Count; i++) s = Mathf.Max(s, zones[i].SilenceAt(p));
 		return s;
 	}
 

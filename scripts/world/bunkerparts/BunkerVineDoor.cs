@@ -36,11 +36,8 @@ public partial class BunkerVineDoor : Node3D
 		BuildLeaf();
 		BuildOvergrowth();
 
-		var area = new Area3D { Name = "VineDoorArea", CollisionLayer = 0, CollisionMask = 2, Monitorable = false, Monitoring = true };
-		area.Position = new Vector3(0, HallHeight * 0.5f, -HallLength);
-		area.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(HallHalfWidth * 1.8f, HallHeight, 1.4f) } });
-		AddChild(area);
-		area.BodyEntered += b => { if (b is PlayerController) PlayerNear = true; };
+		var area = StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(HallHalfWidth * 1.8f, HallHeight, 1.4f) },
+			new Vector3(0, HallHeight * 0.5f, -HallLength), _ => PlayerNear = true, "VineDoorArea");
 		area.BodyExited += b => { if (b is PlayerController) PlayerNear = false; };
 	}
 

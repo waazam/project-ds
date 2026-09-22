@@ -43,6 +43,9 @@ public partial class BunkerHallway : Node3D
 
 	// ------------------------------------------------------------------ light sequence (story: unchanged)
 
+	/// <summary>Only the lamps within this many metres of the player cast light (the glass glows regardless).</summary>
+	public const float LampLightRange = 22f;
+
 	/// <summary>Called every frame with the player's position local to the interior (null when absent).</summary>
 	public void Animate(Vector3? playerLocal, double clock)
 	{
@@ -54,6 +57,9 @@ public partial class BunkerHallway : Node3D
 		foreach (var l in _lamps)
 		{
 			float depthHere = -l.Z;
+			// Eighteen omnis overlap three deep along the tunnel; only the few near the player need to be lit
+			// (a preview with no player leaves them all on).
+			if (playerLocal is { } pl) l.Light.Visible = Mathf.Abs(pl.Z - l.Z) < LampLightRange;
 			bool aheadFlicker = !RedTriggered && frac >= RedFlickerFrac && depthHere <= _maxDepth + 15f && depthHere >= _maxDepth - 2f;
 			bool permRed = l.Red || (RedTriggered && depthHere <= _maxDepth + 0.5f);
 			if (permRed) l.Red = true;
@@ -81,6 +87,26 @@ public partial class BunkerHallway : Node3D
 	public void ForceDepth(float depth)
 	{
 		_maxDepth = Mathf.Max(_maxDepth, depth);
+		Animate(null, 0);
+	}
+
+	/// <summary>Restore: the lights committed to red on an earlier run; every lamp is red at once, no sequence.</summary>
+	public void SetRedInstant() => ForceDepth(HallLength);
+
+	/// <summary>For the preview's restore check: how many lamps are red, out of how many.</summary>
+	public (int red, int total) LampTally()
+	{
+		int red = 0;
+		foreach (var l in _lamps) if (l.Red) red++;
+		return (red, _lamps.Count);
+	}
+
+	/// <summary>Previews only: back to the untouched white state, as at level load.</summary>
+	public void ResetLightsForPreview()
+	{
+		_maxDepth = 0f;
+		RedTriggered = false;
+		foreach (var l in _lamps) { l.Red = false; l.Light.Visible = true; }
 		Animate(null, 0);
 	}
 

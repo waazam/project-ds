@@ -18,10 +18,20 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public NodePath VisualPath = "Visual";
 	[Export] public NodePath InputPath = "Input";
 	[Export] public NodePath CameraRigPath = "CameraRig";
+	[Export] public NodePath InventoryPath = "Inventory";
+	[Export] public NodePath FootstepsPath = "Footsteps";
+	[Export] public NodePath InteractionPath = "Interaction";
+	[Export] public NodePath StaminaPath = "Stamina";
 
 	public PlayerInput PlayerInput { get; private set; }
 	public PlayerCameraRig CameraRig { get; private set; }
 	public Node3D Visual { get; private set; }
+	// The optional components, resolved from their exported paths on first use (so a reader in
+	// another node's _Ready never depends on ready order). Null if the scene has none.
+	public PlayerInventory Inventory => _inventory ??= GetNodeOrNull<PlayerInventory>(InventoryPath);
+	public PlayerFootsteps Footsteps => _footsteps ??= GetNodeOrNull<PlayerFootsteps>(FootstepsPath);
+	public PlayerInteraction Interaction => _interaction ??= GetNodeOrNull<PlayerInteraction>(InteractionPath);
+	public PlayerStamina Stamina => _stamina ??= GetNodeOrNull<PlayerStamina>(StaminaPath);
 
 	/// <summary>Horizontal speed in m/s.</summary>
 	public float GroundSpeed => new Vector2(Velocity.X, Velocity.Z).Length();
@@ -30,6 +40,9 @@ public partial class PlayerController : CharacterBody3D
 	private float _gravity;
 	private float _bobTime;
 	private Vector3 _visualBase;
+	private PlayerInventory _inventory;
+	private PlayerFootsteps _footsteps;
+	private PlayerInteraction _interaction;
 	private PlayerStamina _stamina;
 
 	public override void _Ready()
@@ -38,7 +51,6 @@ public partial class PlayerController : CharacterBody3D
 		PlayerInput = GetNode<PlayerInput>(InputPath);
 		CameraRig = GetNode<PlayerCameraRig>(CameraRigPath);
 		Visual = GetNode<Node3D>(VisualPath);
-		_stamina = GetNodeOrNull<PlayerStamina>("Stamina");
 		_visualBase = Visual.Position;
 		_gravity = (float)ProjectSettings.GetSetting("physics/3d/default_gravity") * GravityScale;
 		FloorSnapLength = 0.45f;
@@ -60,7 +72,7 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 right = cam.X; right.Y = 0; right = right.Normalized();
 		Vector3 wish = right * move.X + forward * move.Y;
 
-		IsRunning = PlayerInput.Run && move.LengthSquared() > 0.04f && (_stamina?.CanRun ?? true);
+		IsRunning = PlayerInput.Run && move.LengthSquared() > 0.04f && (Stamina?.CanRun ?? true);
 		float targetSpeed = (IsRunning ? RunSpeed : WalkSpeed) * move.Length();
 		Vector3 targetVel = wish.LengthSquared() > 0.0001f ? wish.Normalized() * targetSpeed : Vector3.Zero;
 

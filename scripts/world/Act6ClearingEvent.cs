@@ -13,9 +13,10 @@ namespace ProjectDS.World;
 /// fifteen small stair variations appear around it. Getting close enough
 /// plays the clearing's voice line and fuses the post onto one of them,
 /// repointing the compass home. Stepping onto any of the fifteen (entirely
-/// optional) triggers a longer, stranger climb on the original staircase and
-/// a jump straight to night; skipping them lets night fall gradually instead
-/// while the player heads back on their own.
+/// optional, and only while Act 6 lasts: after the voice, before the cabin is
+/// seen burning) triggers a longer, stranger climb on the original staircase
+/// and a jump straight to night; skipping them lets night fall gradually
+/// instead while the player heads back on their own.
 ///
 /// Restore: the reveal is derived from the checkpoint + newel post flag, the
 /// voice from <see cref="StoryManager.Flag.ClearingVoiceHeard"/>, the optional
@@ -24,6 +25,15 @@ namespace ProjectDS.World;
 /// (a still-pending fallback restarts its timer). The overhead red spotlight
 /// belongs to the voice beat only: it follows the player through the clearing
 /// and is freed once they leave it (or the climb starts, or Act 7 begins).
+///
+/// The original flight's length is never accumulated: it is always
+/// <see cref="StairsState.StepsFor"/> of the saved story, applied here before the
+/// staircase's own first build (this node is its child, so it readies first),
+/// so a Continue builds the flight exactly once.
+///
+/// The clearing's dressing (the fifteen stairs, the giant firs, the veiny
+/// ground) is deterministic, so it is built at load and kept out of the tree
+/// until the bridge checkpoint, when it is simply attached.
 /// </summary>
 public partial class Act6ClearingEvent : Node3D
 {
@@ -40,6 +50,8 @@ public partial class Act6ClearingEvent : Node3D
 	private StaircaseBuilder _original;
 	private DeepZoneDressing _dressing;
 	private readonly List<Node3D> _minis = new();
+	private Node3D _stand;    // the fifteen mini stairs, pre-built, attached on reveal
+	private Node3D _lights;   // the clearing's fill lights, pre-built, attached on reveal
 	private bool _revealed;
 	private bool _voiceFired;
 	private bool _climbFired;
@@ -47,10 +59,21 @@ public partial class Act6ClearingEvent : Node3D
 	/// <summary>For the autotest: true once the optional extended climb has fired (a scripted
 	/// teleport that a still-running approach/return walk needs to know to stop steering through).</summary>
 	public bool ExtendedClimbFired => _climbFired;
-	/// <summary>For tests: how many mini stairs currently stand.</summary>
-	public int MiniStairCount => _minis.Count;
+	/// <summary>For tests: how many mini stairs currently stand in the world.</summary>
+	public int MiniStairCount => _stand != null && _stand.IsInsideTree() ? _minis.Count : 0;
 	/// <summary>For tests: whether the voice beat's spotlight is still following the player.</summary>
 	public bool SpotlightActive => _playerSpot != null;
+	/// <summary>For tests: the original flight this clearing surrounds.</summary>
+	public StaircaseBuilder OriginalStairs => _original;
+	/// <summary>For tests: whether the pre-built dressing is standing in the world.</summary>
+	public bool Revealed => _revealed;
+
+	/// <summary>Dev previews only (debug builds): shows the clearing now, without the story reaching it.</summary>
+	public void DebugReveal()
+	{
+		if (!OS.IsDebugBuild() || _revealed) return;
+		Reveal(restoring: false);
+	}
 
 	private PlayerController _player;
 	private SpotLight3D _playerSpot;
@@ -61,7 +84,9 @@ public partial class Act6ClearingEvent : Node3D
 		_original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
 		_dressing = GetNodeOrNull<DeepZoneDressing>(DressingPath);
 		SetProcess(false);   // only while the spotlight rides
-		Callable.From(Restore).CallDeferred();
+		// Before the parent flight builds itself (children ready first): its first build is already the right length.
+		ApplyStairsLength();
+		Callable.From(() => { PrepareDressing(); Restore(); }).CallDeferred();
 		if (StoryManager.Instance is { } s)
 		{
 			s.CheckpointReached += OnCheckpoint;
@@ -76,6 +101,26 @@ public partial class Act6ClearingEvent : Node3D
 			s.CheckpointReached -= OnCheckpoint;
 			s.FlagSet -= OnFlag;
 		}
+		// Dressing that was never attached would otherwise outlive the level.
+		FreeIfDetached(ref _stand);
+		FreeIfDetached(ref _lights);
+	}
+
+	private static void FreeIfDetached(ref Node3D n)
+	{
+		if (n != null && IsInstanceValid(n) && n.GetParent() == null) n.Free();
+		n = null;
+	}
+
+	/// <summary>Sets the original flight's length to what the saved story says (StairsState), rebuilding
+	/// only if it already stands at another length.</summary>
+	private void ApplyStairsLength()
+	{
+		if (_original == null) return;
+		int want = StairsState.StepsFor(StoryManager.Instance, _original.BaseSteps);
+		if (_original.Steps == want) return;
+		_original.Steps = want;
+		if (_original.IsNodeReady()) _original.Build();
 	}
 
 	private void OnCheckpoint(Checkpoint cp)
@@ -92,7 +137,7 @@ public partial class Act6ClearingEvent : Node3D
 		Reveal(restoring: false);
 	}
 
-	/// <summary>Continue: rebuild whatever the clearing had become.</summary>
+	/// <summary>Continue: put the clearing back the way the story left it.</summary>
 	private void Restore()
 	{
 		var s = StoryManager.Instance;
@@ -100,25 +145,38 @@ public partial class Act6ClearingEvent : Node3D
 		_voiceFired = s.ClearingVoiceHeard;
 		_climbFired = s.HasFlag(StoryManager.Flag.Act6ExtendedClimb);
 		Reveal(restoring: true);
-		if (_climbFired && _original != null)
-		{
-			_original.Steps += Mathf.Max(20, _original.Steps);
-			_original.Build();
-		}
+		ApplyStairsLength();   // normally a no-op: the flight was built at the right length
 		if (_voiceFired && !_climbFired && !s.HasFlag(StoryManager.Flag.Act6NightFell)) StartNightFallback();
+	}
+
+	/// <summary>Builds everything the reveal will need, then keeps it out of the tree (no rendering,
+	/// no physics) until the story gets there. Deterministic seeds, so nothing depends on when it runs.</summary>
+	private void PrepareDressing()
+	{
+		if (_stand != null) return;
+		_stand = new Node3D { Name = "MiniStairs" };
+		AddChild(_stand);
+		BuildMiniStairs(_stand);
+		RemoveChild(_stand);
+		_lights = new Node3D { Name = "ClearingLights" };
+		AddChild(_lights);
+		BuildClearingLights(_lights);
+		RemoveChild(_lights);
+		// Giants stay well outside the mini-stairs band (StairsMaxReach + one stair's own footprint)
+		// so their thick trunks never clip through a staircase.
+		_dressing?.Prepare(GlobalPosition, 55f);
 	}
 
 	private void Reveal(bool restoring)
 	{
 		_revealed = true;
 		_player ??= StoryBeat.Player(this);
+		PrepareDressing();
 		// Continue applies the saved mood itself (GameFlow); only a live reveal fades to it.
 		if (!restoring) StoryBeat.SetMood(this, ForestAtmosphere.Mood.Menacing, 14f);
-		// Giants stay well outside the mini-stairs band (StairsMaxReach + one stair's own footprint)
-		// so their thick trunks never clip through a staircase.
 		_dressing?.Reveal(GlobalPosition, 55f);
-		if (!_climbFired) BuildMiniStairs();
-		BuildClearingLights();
+		if (!_climbFired && _stand.GetParent() == null) AddChild(_stand);
+		if (_lights.GetParent() == null) AddChild(_lights);
 		if (!_voiceFired)
 		{
 			_voiceZone = StoryBeat.MakeTrigger(this, new CylinderShape3D { Radius = VoiceRadius, Height = 80f }, Vector3.Zero, OnVoiceZoneEntered, "VoiceZone");
@@ -135,18 +193,18 @@ public partial class Act6ClearingEvent : Node3D
 		_player = player;
 		_voiceZone?.QueueFree();
 		_voiceZone = null;
-		Cutscene.Run(this, VoiceAndFuse);
+		_ = Cutscene.Run(this, VoiceAndFuse);
 	}
 
 	/// <summary>A ring of cold, even fill light so the whole stand of fifteen stairs actually reads
 	/// clearly, rather than being lost in the Menacing mood's low ambient.</summary>
-	private void BuildClearingLights()
+	private static void BuildClearingLights(Node3D parent)
 	{
 		const int count = 6;
 		for (int i = 0; i < count; i++)
 		{
 			float ang = Mathf.Tau / count * i;
-			AddChild(new OmniLight3D
+			parent.AddChild(new OmniLight3D
 			{
 				Name = $"ClearingFill{i}",
 				LightColor = new Color(0.75f, 0.78f, 0.85f),
@@ -157,7 +215,7 @@ public partial class Act6ClearingEvent : Node3D
 		}
 	}
 
-	private void BuildMiniStairs()
+	private void BuildMiniStairs(Node3D parent)
 	{
 		var rng = new RandomNumberGenerator { Seed = 9001 };
 		var terrain = GroundSnap.FindTerrain(this);
@@ -205,7 +263,7 @@ public partial class Act6ClearingEvent : Node3D
 				Position = new Vector3(local.X, groundY - GlobalPosition.Y, local.Z),
 				RotationDegrees = new Vector3(0, rng.RandfRange(0f, 360f), 0),
 			};
-			AddChild(stair);
+			parent.AddChild(stair);
 			stair.AddToGroup("act6_mini_stairs");
 			_minis.Add(stair);
 
@@ -219,20 +277,24 @@ public partial class Act6ClearingEvent : Node3D
 
 	private void OnMiniStepped(PlayerController player)
 	{
-		if (_climbFired || !_voiceFired) return;
+		// The optional climb belongs to Act 6: after the clearing's voice, before the cabin is seen
+		// burning. Never after (Act 11 wakes the player among these very stairs).
+		var s = StoryManager.Instance;
+		if (_climbFired || !_voiceFired || s == null) return;
+		if (!s.ClearingVoiceHeard || s.Current >= Checkpoint.Act7CabinBurning) return;
 		_climbFired = true;
-		StoryManager.Instance?.SetFlag(StoryManager.Flag.Act6ExtendedClimb);
-		Cutscene.Run(this, ct => ExtendedClimb(player, ct), lockInput: true, freezeBody: true);
+		s.SetFlag(StoryManager.Flag.Act6ExtendedClimb);
+		_ = Cutscene.Run(this, ct => ExtendedClimb(player, ct), lockInput: true, freezeBody: true);
 	}
 
 	private async Task VoiceAndFuse(CancellationToken ct)
 	{
 		BuildPlayerSpotlight();
 		PlayVoice();
-		await StoryBeat.Caption(this, "\"Come up and see.\"", 1.6f, 3.2f, 1.6f);
+		await StoryBeat.Caption(this, "\"Come up and see.\"", 1.6f, 3.2f, 1.6f, ct);
 		ct.ThrowIfCancellationRequested();
 
-		var inv = _player.GetNodeOrNull<PlayerInventory>("Inventory");
+		var inv = _player.Inventory;
 		if (inv is { HasNewelPost: true } && _minis.Count > 0)
 		{
 			var target = _minis[new RandomNumberGenerator().RandiRange(0, _minis.Count - 1)];
@@ -322,7 +384,7 @@ public partial class Act6ClearingEvent : Node3D
 	{
 		if (_fallbackRunning) return;
 		_fallbackRunning = true;
-		Cutscene.Run(this, async ct =>
+		_ = Cutscene.Run(this, async ct =>
 		{
 			float delay = GameSettings.Instance.AutoTest ? SkipNightDelayAutoTest : SkipNightDelaySeconds;
 			await Cutscene.Wait(this, delay, ct);
@@ -341,14 +403,13 @@ public partial class Act6ClearingEvent : Node3D
 		_minis.Clear();
 
 		var fader = StoryBeat.Fader(this);
-		if (fader != null) await fader.Fade(1f, 1.6f);
+		if (fader != null) await fader.Fade(1f, 1.6f, ct);
 		await Cutscene.Wait(this, 5.0, ct);
 
 		SpotLight3D spot = null;
 		if (_original != null)
 		{
-			_original.Steps += Mathf.Max(20, _original.Steps);
-			_original.Build();
+			ApplyStairsLength();   // Act6ExtendedClimb is set: twice the scene's flight
 			var top = _original.GetNodeOrNull<Node3D>("TopTrigger");
 			Vector3 dest = top?.GlobalPosition ?? _original.GlobalPosition;
 			player.GlobalPosition = dest + new Vector3(0, 0.1f, 1.0f);
@@ -358,16 +419,16 @@ public partial class Act6ClearingEvent : Node3D
 			spot.LookAt(dest, Vector3.Forward);
 		}
 
-		if (fader != null) await fader.Fade(0f, 1.8f);
+		if (fader != null) await fader.Fade(0f, 1.8f, ct);
 		if (spot != null) spot.CreateTween().TweenProperty(spot, "light_energy", 3.5f, 1.2f);
 
 		StoryBeat.SetMood(this, ForestAtmosphere.Mood.Night, 3f);
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.Act6NightFell);
 
 		// Control comes back here (the rest plays while the player can move).
-		Cutscene.Run(this, async ct2 =>
+		_ = Cutscene.Run(this, async ct2 =>
 		{
-			await StoryBeat.Caption(this, "Hours must have passed. It's night now.", 1.2f, 3.0f, 1.2f);
+			await StoryBeat.Caption(this, "Hours must have passed. It's night now.", 1.2f, 3.0f, 1.2f, ct2);
 			if (spot != null && IsInstanceValid(spot))
 			{
 				var t2 = spot.CreateTween();

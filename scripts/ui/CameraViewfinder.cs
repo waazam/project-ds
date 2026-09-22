@@ -13,7 +13,20 @@ public partial class CameraViewfinder : CanvasLayer
 {
 	public float Raise { get; set; }          // 0 = lowered, 1 = fully raised (eased by CameraTool)
 	public bool FocusLocked { get; set; }
-	public int FramesLeft { get; set; } = 24;
+	public int FramesLeft { get; set; } = 36;
+	/// <summary>CameraTool sets this for the one frame it reads back for the print: no brackets, no focus square, no readouts.</summary>
+	public bool HideMarks { get; set; }
+
+	/// <summary>The 3:2 frame rectangle in viewport pixels (valid whether or not the overlay is drawing).</summary>
+	public Rect2 FrameRect => FrameFor(_draw?.Size ?? new Vector2(640, 360));
+
+	private static Rect2 FrameFor(Vector2 size)
+	{
+		// The 3:2 frame, centred, as large as fits with a margin.
+		float fh = size.Y * 0.78f, fw = fh * 1.5f;
+		if (fw > size.X * 0.86f) { fw = size.X * 0.86f; fh = fw / 1.5f; }
+		return new Rect2((size - new Vector2(fw, fh)) * 0.5f, new Vector2(fw, fh));
+	}
 
 	private static readonly Color Bone = new(0.81f, 0.80f, 0.75f);
 	private static readonly Color Eye = new(0.90f, 0.76f, 0.35f);
@@ -41,10 +54,8 @@ public partial class CameraViewfinder : CanvasLayer
 		float a = Mathf.SmoothStep(0f, 1f, Raise);
 		var size = _draw.Size;
 
-		// The 3:2 frame, centred, as large as fits with a margin.
-		float fh = size.Y * 0.78f, fw = fh * 1.5f;
-		if (fw > size.X * 0.86f) { fw = size.X * 0.86f; fh = fw / 1.5f; }
-		var frame = new Rect2((size - new Vector2(fw, fh)) * 0.5f, new Vector2(fw, fh));
+		var frame = FrameFor(size);
+		float fh = frame.Size.Y;
 
 		// Dim everything outside the frame (the camera body around the eyepiece).
 		var dim = new Color(0.03f, 0.035f, 0.045f, 0.72f * a);
@@ -52,6 +63,7 @@ public partial class CameraViewfinder : CanvasLayer
 		_draw.DrawRect(new Rect2(0, frame.End.Y, size.X, size.Y - frame.End.Y), dim);
 		_draw.DrawRect(new Rect2(0, frame.Position.Y, frame.Position.X, fh), dim);
 		_draw.DrawRect(new Rect2(frame.End.X, frame.Position.Y, size.X - frame.End.X, fh), dim);
+		if (HideMarks) return;
 
 		// Corner brackets.
 		var line = new Color(Bone, 0.55f * a);

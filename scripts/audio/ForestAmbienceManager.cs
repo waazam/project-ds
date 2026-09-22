@@ -18,10 +18,13 @@ namespace ProjectDS.Audio;
 /// Scripted silence: <see cref="RequestSilence"/> / <see cref="ReleaseSilence"/>. Each
 /// request has an owner and a priority; the highest-priority request wins (ties: the
 /// deepest silence), so the storm and a set piece can overlap without clobbering
-/// each other: when one releases, the other's request still stands.
+/// each other: when one releases, the other's request still stands. An owner that
+/// is a Godot object and has been freed is dropped automatically, so a set piece
+/// that forgets to release can't pin the forest silent for the rest of the level.
 ///
 /// Indoors: <see cref="SetIndoor"/> (or an <see cref="IndoorZone"/>) muffles and ducks
-/// the Nature bed and the Weather bus, as heard through walls. Also owner-based.
+/// the Nature bed and the Weather bus, as heard through walls. Also owner-based,
+/// with the same dead-owner rule.
 /// </summary>
 public partial class ForestAmbienceManager : Node
 {
@@ -50,28 +53,19 @@ public partial class ForestAmbienceManager : Node
 	/// <summary>Seconds for the indoor muffling to cover ~63% of a change.</summary>
 	[Export] public float IndoorSmoothingTime = 0.35f;
 
-	/// <summary>
-	/// Legacy single-slot override (negative = off). Kept for older callers: it is a
-	/// lowest-priority request owned by the manager itself. New code uses <see cref="RequestSilence"/>.
-	/// </summary>
-	public float SilenceOverride
-	{
-		get => EffectiveOverride(out float v) ? v : -1f;
-		set { if (value >= 0f) RequestSilence(_legacyOwner, value, int.MinValue); else ReleaseSilence(_legacyOwner); }
-	}
-
 	public float Silence { get; private set; }
 	/// <summary>Current startle level (a gunshot, a crash): a temporary hush on top of the zones.</summary>
 	public float StartleLevel { get; private set; }
 	public float TargetSilence { get; private set; }
 	/// <summary>0 = outdoors .. 1 = fully indoors (smoothed).</summary>
 	public float Indoor { get; private set; }
-	public bool IsIndoor => _indoorOwners.Count > 0;
+	/// <summary>True while any live owner says the listener is inside.</summary>
+	public bool IsIndoor { get { PurgeDead(); return _indoorOwners.Count > 0; } }
 
-	private readonly object _legacyOwner = new();
 	private readonly object _defaultIndoorOwner = new();
 	private readonly Dictionary<object, (float level, int priority)> _silenceRequests = new();
 	private readonly HashSet<object> _indoorOwners = new();
+	private readonly List<object> _dead = new();
 
 	private Node3D _listener;
 	private AudioEffectLowPassFilter _natureLowPass;
@@ -133,8 +127,21 @@ public partial class ForestAmbienceManager : Node
 	/// <summary>Single-owner convenience for scripts that only ever toggle one interior.</summary>
 	public void SetIndoor(bool indoor) => SetIndoor(_defaultIndoorOwner, indoor);
 
+	private static bool Dead(object owner) => owner is GodotObject o && !IsInstanceValid(o);
+
+	/// <summary>Drops requests whose owner node has been freed without releasing.</summary>
+	private void PurgeDead()
+	{
+		foreach (var owner in _silenceRequests.Keys) if (Dead(owner)) _dead.Add(owner);
+		foreach (var owner in _indoorOwners) if (Dead(owner)) _dead.Add(owner);
+		if (_dead.Count == 0) return;
+		foreach (var owner in _dead) { _silenceRequests.Remove(owner); _indoorOwners.Remove(owner); }
+		_dead.Clear();
+	}
+
 	private bool EffectiveOverride(out float level)
 	{
+		PurgeDead();
 		level = -1f;
 		int best = int.MinValue; bool any = false;
 		foreach (var (lvl, prio) in _silenceRequests.Values)
@@ -166,7 +173,7 @@ public partial class ForestAmbienceManager : Node
 		float k = 1f - Mathf.Exp(-dt / Mathf.Max(SmoothingTime, 0.01f));
 		Silence = Mathf.Lerp(Silence, TargetSilence, k);
 		float ki = 1f - Mathf.Exp(-dt / Mathf.Max(IndoorSmoothingTime, 0.01f));
-		Indoor = Mathf.Lerp(Indoor, IsIndoor ? 1f : 0f, ki);
+		Indoor = Mathf.Lerp(Indoor, _indoorOwners.Count > 0 ? 1f : 0f, ki);
 		Apply();
 	}
 

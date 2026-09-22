@@ -41,10 +41,14 @@ public static class UiKit
 	public const string CaptionLabel = "CaptionLabel";
 
 	private static Theme _theme;
-	private static Font _serif, _serifTitle, _serifHeading, _mono, _monoSpaced;
+	private static Font _serif, _serifItalic, _serifTitle, _serifHeading, _mono, _monoSpaced;
+
+	private static readonly string[] SerifNames = { "Georgia", "Constantia", "Cambria", "Times New Roman", "Liberation Serif", "DejaVu Serif", "serif" };
 
 	/// <summary>Georgia-style serif for body text, prompts and captions.</summary>
-	public static Font Serif => _serif ??= MakeSystemFont(new[] { "Georgia", "Constantia", "Cambria", "Times New Roman", "Liberation Serif", "DejaVu Serif", "serif" }, false);
+	public static Font Serif => _serif ??= MakeSystemFont(SerifNames, false);
+	/// <summary>The same serif in italic: handwritten notes and pages.</summary>
+	public static Font SerifItalic => _serifItalic ??= MakeSystemFont(SerifNames, false, italic: true);
 	/// <summary>The title face: the same serif with wide letter-spacing (website h2: 0.3em).</summary>
 	public static Font SerifTitle => _serifTitle ??= Spaced(Serif, 7);
 	public static Font SerifHeading => _serifHeading ??= Spaced(Serif, 2);
@@ -52,11 +56,12 @@ public static class UiKit
 	public static Font Mono => _mono ??= MakeSystemFont(new[] { "Consolas", "Courier New", "DejaVu Sans Mono", "Liberation Mono", "monospace" }, true);
 	public static Font MonoSpaced => _monoSpaced ??= Spaced(Mono, 1);
 
-	private static Font MakeSystemFont(string[] names, bool mono)
+	private static Font MakeSystemFont(string[] names, bool mono, bool italic = false)
 	{
 		return new SystemFont
 		{
 			FontNames = names,
+			FontItalic = italic,
 			Antialiasing = TextServer.FontAntialiasing.Gray,
 			Hinting = mono ? TextServer.Hinting.Normal : TextServer.Hinting.Light,
 			SubpixelPositioning = TextServer.SubpixelPositioning.Disabled,

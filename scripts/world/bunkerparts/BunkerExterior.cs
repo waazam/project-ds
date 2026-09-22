@@ -226,8 +226,33 @@ public static class BunkerExterior
 
 	// ------------------------------------------------------------------ concrete
 
-	/// <summary>The stepped face with its round hole, coping, wing walls, apron and the vestibule.</summary>
-	public static void BuildConcrete(Node3D parent, Node3D lampParent)
+	/// <summary>A flat-ended concrete ramp 1 m thick whose top surface runs from <paramref name="fromTop"/>
+	/// to <paramref name="toTop"/> (both on the centre line), <paramref name="halfW"/> to each side.</summary>
+	public static void Ramp(MeshKit k, Vector3 fromTop, Vector3 toTop, float halfW)
+	{
+		Vector3 d = toTop - fromTop;
+		Vector3 nTop = new Vector3(0, d.Z, -d.Y).Normalized();
+		Vector3 L = Vector3.Left * halfW, R = Vector3.Right * halfW, D = Vector3.Down;
+		k.Quad(fromTop + L, toTop + L, toTop + R, fromTop + R, nTop);
+		k.Quad(fromTop + L, fromTop + L + D, toTop + L + D, toTop + L, Vector3.Left);
+		k.Quad(fromTop + R, toTop + R, toTop + R + D, fromTop + R + D, Vector3.Right);
+		k.Quad(toTop + L, toTop + L + D, toTop + R + D, toTop + R, d.Normalized());
+	}
+
+	/// <summary>The collider matching <see cref="Ramp"/>.</summary>
+	public static ConvexPolygonShape3D RampShape(Vector3 fromTop, Vector3 toTop, float halfW)
+	{
+		Vector3 L = Vector3.Left * halfW, R = Vector3.Right * halfW, D = Vector3.Down;
+		return new ConvexPolygonShape3D
+		{
+			Points = new[] { fromTop + L, fromTop + R, fromTop + L + D, fromTop + R + D, toTop + L, toTop + R, toTop + L + D, toTop + R + D },
+		};
+	}
+
+	/// <summary>The stepped face with its round hole, coping, wing walls, apron and the vestibule.
+	/// <paramref name="rampEndTop"/> (a point on the ground in front, below the sill) replaces the flat
+	/// apron with one that ramps down to it.</summary>
+	public static void BuildConcrete(Node3D parent, Node3D lampParent, Vector3? rampEndTop = null)
 	{
 		var k = new MeshKit();
 		k.Mat(BunkerTextures.ExteriorConcreteMat);
@@ -293,7 +318,17 @@ public static class BunkerExterior
 		}
 		// Sloped apron in front of the door.
 		k.Color = new Color(0.85f, 0.85f, 0.82f);
-		k.Beam(ApronFrom, ApronTo, 4.8f, 1.0f);
+		if (rampEndTop is { } end)
+		{
+			// Lower ground in front: the apron, then a narrower ramp down to meet it (flat-ended prisms whose
+			// top edge is exactly the sill, so the surface runs on from the vestibule floor without a lip).
+			Vector3 sill = new(0, FloorY, FaceZ);
+			Vector3 mid = sill.Lerp(end, (ApronTo.Z - sill.Z) / (end.Z - sill.Z));
+			Ramp(k, sill, mid, 2.4f);
+			k.Color = new Color(0.8f, 0.8f, 0.77f);
+			Ramp(k, mid, end, 1.4f);
+		}
+		else k.Beam(ApronFrom, ApronTo, 4.8f, 1.0f);
 		// The vestibule: a round concrete tube behind the doorway (inward-facing), its floor, and the dark.
 		k.Color = new Color(0.55f, 0.55f, 0.53f);
 		const int ts = 20;

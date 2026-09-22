@@ -6,16 +6,16 @@ namespace ProjectDS.UI;
 /// <summary>
 /// The centre-screen crosshair dot and the interaction prompt under it.
 ///
-/// Its single source of truth is the player's <see cref="PlayerInteraction"/>
-/// (child "Interaction"): whatever is focused there shows its PromptText here,
-/// and a hold-to-use interactable draws its HoldProgress as a thin ring around
-/// the dot. The dot is tiny, low-alpha bone, and brightens a little when
-/// something is focused; it fades out while the player has no control
-/// (cutscenes) or the screen is blacked out.
+/// Its single source of truth is the player's <see cref="PlayerInteraction"/>:
+/// whatever is focused there shows its PromptText here, and a hold-to-use
+/// interactable draws its HoldProgress as a thin ring around the dot. The dot
+/// is tiny, low-alpha bone, and brightens a little when something is focused;
+/// it fades out while the player has no control (cutscenes) or the screen is
+/// blacked out.
 ///
-/// <see cref="ShowPrompt"/>/<see cref="HidePrompt"/> remain for older callers
-/// that haven't moved to Interactable yet; that text only shows when nothing is
-/// focused, so the two never fight.
+/// Prompts never carry the key hint themselves: this layer prepends "[E]" or
+/// "[Hold E]" to a usable interactable's text, and shows a blocked one's text
+/// ("Hands full...") plain.
 /// </summary>
 public partial class InteractPrompt : CanvasLayer
 {
@@ -27,11 +27,10 @@ public partial class InteractPrompt : CanvasLayer
 	private Control _root;
 	private Control _dot;
 	private RichTextLabel _label;
-	private string _shownText;
+	private string _shownKey, _shownText;
 	private PlayerController _player;
 	private PlayerInteraction _interaction;
 	private ScreenFader _fader;
-	private string _legacyText;
 	private float _dotAlpha, _focusLit, _labelAlpha, _hold;
 
 	public override void _EnterTree() => Instance = this;
@@ -74,24 +73,22 @@ public partial class InteractPrompt : CanvasLayer
 		_root.AddChild(_label);
 	}
 
-	public void ShowPrompt(string text) => _legacyText = text;
-	public void HidePrompt() => _legacyText = null;
-
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
 		if (_player == null || !IsInstanceValid(_player))
 		{
 			_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
-			_interaction = _player?.GetNodeOrNull<PlayerInteraction>("Interaction");
+			_interaction = _player?.Interaction;
 		}
 
 		var focused = _interaction?.Focused;
 		if (focused != null && !IsInstanceValid(focused)) focused = null;
-		string text = focused != null ? _interaction.PromptText : _legacyText;
-		// Usable interactables get the key hint; blocked ones ("Hands full…") read as plain text.
-		if (focused != null && !string.IsNullOrEmpty(text) && !text.StartsWith("[") && focused.CanInteract(_player))
-			text = (focused.HoldSeconds > 0f ? "[Hold E] " : "[E] ") + text;
+		string text = focused != null ? _interaction.PromptText : null;
+		// Usable interactables get the key hint; blocked ones ("Hands full...") read as plain text.
+		string key = focused != null && !string.IsNullOrEmpty(text) && focused.CanInteract(_player)
+			? (focused.HoldSeconds > 0f ? "[Hold E]" : "[E]")
+			: null;
 		bool hasControl = _player != null && _player.PlayerInput != null && _player.PlayerInput.Enabled;
 		_fader ??= GetNodeOrNull<ScreenFader>("../ScreenFader");
 		bool dotVisible = _player != null && hasControl && !GetTree().Paused && (_fader == null || _fader.BlackAlpha < 0.5f);
@@ -102,23 +99,19 @@ public partial class InteractPrompt : CanvasLayer
 		_hold = hold < _hold ? Mathf.MoveToward(_hold, hold, dt * 4f) : hold;   // snap up, ease back down
 		_dot.QueueRedraw();
 
-		bool showLabel = !string.IsNullOrEmpty(text) && (focused != null ? hasControl : true);
-		if (showLabel && text != _shownText) { _shownText = text; _label.Text = Format(text); }
+		bool showLabel = !string.IsNullOrEmpty(text) && hasControl;
+		if (showLabel && (text != _shownText || key != _shownKey)) { _shownText = text; _shownKey = key; _label.Text = Format(key, text); }
 		_labelAlpha = Mathf.MoveToward(_labelAlpha, showLabel ? 1f : 0f, dt * (showLabel ? 10f : 6f));
 		_label.Modulate = new Color(1, 1, 1, _labelAlpha);
 	}
 
-	/// <summary>The prompt as BBCode: a leading key hint such as "[E]" or "[Hold E]" in quiet
-	/// eye-yellow monospace, the rest in bone serif. The text itself is unchanged.</summary>
-	private static string Format(string text)
+	/// <summary>The prompt as BBCode: the key hint ("[E]" / "[Hold E]", if any) in quiet eye-yellow
+	/// monospace, the text in bone serif. The text itself is shown verbatim.</summary>
+	private static string Format(string key, string text)
 	{
 		static string Esc(string s) => s.Replace("[", "[lb]");
-		if (text.StartsWith("[") && text.IndexOf(']') is int close and > 1)
-		{
-			string key = text.Substring(0, close + 1), rest = text.Substring(close + 1);
-			return $"[code][color=#{UiKit.Eye.ToHtml(false)}c0]{Esc(key)}[/color][/code]{Esc(rest)}";
-		}
-		return Esc(text);
+		if (string.IsNullOrEmpty(key)) return Esc(text);
+		return $"[code][color=#{UiKit.Eye.ToHtml(false)}c0]{Esc(key)}[/color][/code] {Esc(text)}";
 	}
 
 	private void DrawDot()

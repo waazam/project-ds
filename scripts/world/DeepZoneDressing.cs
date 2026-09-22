@@ -5,26 +5,47 @@ namespace ProjectDS.World;
 /// <summary>
 /// Act 6's "the woods turn menacing" set dressing: a handful of oversized firs
 /// looming around the clearing, and a faint pulsing vein pattern laid over the
-/// ground. Built once, on demand, rather than at scene load, since the effect
-/// should only appear once the story reaches it.
+/// ground. Deterministically seeded, so it can be built at load
+/// (<see cref="Prepare"/>) and kept out of the tree (no rendering, no physics)
+/// until the story reaches it, when <see cref="Reveal"/> simply attaches it.
+/// Calling Reveal without Prepare still works (it builds on the spot).
 /// </summary>
 [GlobalClass]
 public partial class DeepZoneDressing : Node3D
 {
-	private bool _built;
+	private Node3D _root;
+	private bool _shown;
 
-	/// <summary>Spawns the giants and the ground overlay centred on <paramref name="center"/> (world space).</summary>
-	public void Reveal(Vector3 center, float radius = 34f)
+	/// <summary>Builds the giants and the ground overlay centred on <paramref name="center"/> (world
+	/// space) and detaches them, ready to be shown. No-op once built.</summary>
+	public void Prepare(Vector3 center, float radius = 34f)
 	{
-		if (_built) return;
-		_built = true;
+		if (_root != null) return;
 		var terrain = GroundSnap.FindTerrain(this);
-
-		BuildGiantTrees(terrain, center, radius);
-		BuildVeinyGround(terrain, center, radius);
+		_root = new Node3D { Name = "Generated" };
+		AddChild(_root);   // in the tree while building: the giants need a resolvable global transform
+		BuildGiantTrees(_root, terrain, center, radius);
+		BuildVeinyGround(_root, terrain, center, radius);
+		RemoveChild(_root);
 	}
 
-	private void BuildGiantTrees(ForestTerrain terrain, Vector3 center, float radius)
+	/// <summary>Shows the dressing (building it first if <see cref="Prepare"/> never ran).</summary>
+	public void Reveal(Vector3 center, float radius = 34f)
+	{
+		if (_shown) return;
+		_shown = true;
+		Prepare(center, radius);
+		if (_root.GetParent() == null) AddChild(_root);
+	}
+
+	public override void _ExitTree()
+	{
+		// Built but never shown: nothing else owns it, so free it with the level.
+		if (_root != null && IsInstanceValid(_root) && _root.GetParent() == null) _root.Free();
+		_root = null;
+	}
+
+	private static void BuildGiantTrees(Node3D parent, ForestTerrain terrain, Vector3 center, float radius)
 	{
 		var trunk = ProcTextures.WoodMat;
 		var needle = ProcTextures.Flat("giant_fir_needle", new Color(0.06f, 0.1f, 0.07f), 0.95f);
@@ -41,7 +62,7 @@ public partial class DeepZoneDressing : Node3D
 			float trunkR = height * 0.028f;
 			var tree = new Node3D { Name = $"Giant{i}" };
 			// Must be parented before GlobalPosition is set, or Godot can't resolve the transform.
-			AddChild(tree);
+			parent.AddChild(tree);
 			tree.GlobalPosition = pos;
 
 			var k = new MeshKit();
@@ -74,6 +95,6 @@ public partial class DeepZoneDressing : Node3D
 	}
 
 	/// <summary>Terrain-conforming, fogged overlay that goes from worms at the edge to veins at the centre.</summary>
-	private void BuildVeinyGround(ForestTerrain terrain, Vector3 center, float radius)
-		=> AddChild(VeinyGround.Create(terrain, center, radius));
+	private static void BuildVeinyGround(Node3D parent, ForestTerrain terrain, Vector3 center, float radius)
+		=> parent.AddChild(VeinyGround.Create(terrain, center, radius));
 }

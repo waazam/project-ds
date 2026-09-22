@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Systems;
 using ProjectDS.World;
 using Ring = ProjectDS.World.ItemMeshes.Ring;
 
@@ -36,7 +37,70 @@ public partial class FriendBody : Node3D
 	/// <summary>Table top height (friend space), for anything placed on it.</summary>
 	public const float TableTop = 0.65f;
 
-	public override void _Ready() => Build();
+	/// <summary>The friend's last page (P4) lies on the table from Act 5's reveal on, like the newel post.</summary>
+	[Export] public Checkpoint PageCheckpoint = Checkpoint.Act5CabinEntered;
+	/// <summary>The page's Readable (null in the editor), for tests and previews.</summary>
+	public Readable Page { get; private set; }
+
+	private const string PageText =
+		"It came away in my hand at the top like it wanted to. The cap off the post.\n" +
+		"The hand hasn't been mine since. I kept the rest of me.\n" +
+		"The door won't open from in here. I didn't do that.\n" +
+		"Don't take it back up. Don't take it anywhere.";
+
+	private Node3D _page;
+	private bool _pageShown;
+
+	public override void _Ready()
+	{
+		Build();
+		if (!Engine.IsEditorHint() && StoryManager.Instance is { } s) s.CheckpointReached += OnCheckpoint;
+	}
+
+	public override void _ExitTree()
+	{
+		if (StoryManager.Instance is { } s) s.CheckpointReached -= OnCheckpoint;
+	}
+
+	private void OnCheckpoint(Checkpoint _) => UpdatePage();
+
+	/// <summary>Shows the page now regardless of checkpoint (dev previews only; the story reveals it normally).</summary>
+	public void RevealPage() { _pageShown = true; UpdatePage(); }
+
+	private void UpdatePage()
+	{
+		if (_page == null || !IsInstanceValid(_page)) return;
+		bool on = _pageShown || PageCheckpoint == Checkpoint.None
+			|| (StoryManager.Instance != null && StoryManager.Instance.Current >= PageCheckpoint);
+		_page.Visible = on;
+		if (Page != null) Page.Enabled = on;
+	}
+
+	/// <summary>
+	/// The page lies at the table's corner on his left, its near edge in the dried pool (friend
+	/// space about (0.7, top, 0.9)). Its pick sphere is small (0.2 m, just above the sheet) and
+	/// well clear of the newel post's (0.3 m at (-0.1, 0.8, 0.55)), so the post is what the
+	/// crosshair finds whenever both are under it.
+	/// </summary>
+	private void BuildPage(Node3D table)
+	{
+		Page = null;
+		_page = null;
+		var old = table.GetNodeOrNull("Page");
+		if (old != null) { table.RemoveChild(old); old.QueueFree(); }
+		if (Engine.IsEditorHint()) return;
+		// Built detached so the Readable reads the pick radius/offset below when it enters the tree.
+		var root = new Node3D { Name = "Page" };
+		root.AddToGroup(Cabin.PapersGroup);
+		Page = PaperKit.Flat(root, new Vector3(0.40f, TableTop, 0.21f), 18f, new Vector2(0.14f, 0.18f), PaperKit.Look.Note,
+			"", PageText, Readable.NoteStyle.Handwritten, prompt: "Read the page", seed: 9);
+		Page.ReadFlag = "read_friend_page";
+		Page.PickRadius = 0.2f;
+		Page.PickOffset = new Vector3(0, 0, 0.05f);   // the sheet's +Z is up: the sphere sits just above the table
+		table.AddChild(root);
+		_page = root;
+		UpdatePage();
+	}
 
 	// ───────────────────────────── materials ─────────────────────────────
 
@@ -122,7 +186,11 @@ public partial class FriendBody : Node3D
 		TriangleCount += ItemMeshes.CountTriangles(man.Mesh);
 
 		if (GetNodeOrNull<Node3D>(ChairPath) is Node3D chair) TriangleCount += BuildChair(chair);
-		if (GetNodeOrNull<Node3D>(TablePath) is Node3D table) TriangleCount += BuildTable(table);
+		if (GetNodeOrNull<Node3D>(TablePath) is Node3D table)
+		{
+			TriangleCount += BuildTable(table);
+			BuildPage(table);
+		}
 
 		if (BuildCollision && !Engine.IsEditorHint())
 		{

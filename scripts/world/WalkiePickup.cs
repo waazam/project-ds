@@ -56,7 +56,8 @@ public partial class WalkiePickup : Area3D
 		string path = "res://assets/audio/ambient/radio_static_loop.wav";
 		if (ResourceLoader.Exists(path))
 		{
-			_staticPlayer = new AudioStreamPlayer3D { UnitSize = 3f, MaxDistance = 28f, Bus = "Events" };
+			// The same object as Act 11's radio: its hiss runs on the band-limited Radio bus too.
+			_staticPlayer = new AudioStreamPlayer3D { UnitSize = 3f, MaxDistance = 28f, Bus = "Radio" };
 			AddChild(_staticPlayer);
 			_staticPlayer.AddChild(new AmbienceLoop { StreamPath = path, BaseVolumeDb = -2f });
 		}
@@ -66,8 +67,9 @@ public partial class WalkiePickup : Area3D
 	{
 		if (_taken) return;
 		_taken = true;
-		StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act10WalkieFound, player.GlobalPosition, player.CameraRig.Yaw);
+		// The radio goes into the inventory first, so the checkpoint's save already carries it.
 		player.GetNodeOrNull<PlayerInventory>("Inventory")?.TryPickup(ToolKind.Radio);
+		StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act10WalkieFound, player.GlobalPosition, player.CameraRig.Yaw);
 		_staticPlayer?.QueueFree();
 		QueueFree();
 	}

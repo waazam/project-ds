@@ -35,8 +35,15 @@ public partial class FirstClimbEvent : StoryTrigger
 	[ExportGroup("Look down at the top")]
 	[Export] public float LookDownPanSeconds = 3f;
 	[Export] public float LookDownHoldSeconds = 5f;
-	[Export] public float LookUpSeconds = 2f;
 	[Export] public float LookDownPitchDegrees = -78f;
+
+	[ExportGroup("Blackout and wake")]
+	[Export] public float BlackoutSeconds = 2.5f;
+	[Export] public float BlackHoldSeconds = 3f;
+	/// <summary>Seconds for sight to come back and the head to lift at the bridge.</summary>
+	[Export] public float WakeSeconds = 6f;
+	/// <summary>Camera pitch at the moment of waking: face toward the ground.</summary>
+	[Export] public float WakePitchDegrees = -55f;
 
 	protected override bool AlreadyHappened(StoryManager s) => s.Current >= Checkpoint.Act2StairsClimbed;
 	protected override bool CanFire(StoryManager s, PlayerController p) => s.Current < Checkpoint.Act2StairsClimbed;
@@ -49,7 +56,7 @@ public partial class FirstClimbEvent : StoryTrigger
 		float baseVignette = postMat != null ? (float)postMat.GetShaderParameter("vignette") : 0f;
 		var fader = StoryBeat.Fader(this);
 
-		Cutscene.Run(this, async ct =>
+		_ = Cutscene.Run(this, async ct =>
 		{
 			feet?.SetPhysicsProcess(false);
 			try
@@ -65,7 +72,7 @@ public partial class FirstClimbEvent : StoryTrigger
 			}
 			StoryBeat.ReachCheckpoint(player, Checkpoint.Act2StairsClimbed);
 			// The caption plays with control already back.
-			Cutscene.Run(this, _ => StoryBeat.Caption(this, "It's getting late. Get back to the cabin.", 1.2f, 3.5f, 1.2f));
+			_ = Cutscene.Run(this, _ => StoryBeat.Caption(this, "It's getting late. Get back to the cabin.", 1.2f, 3.5f, 1.2f));
 		}, lockInput: true, freezeBody: true);
 	}
 
@@ -100,9 +107,7 @@ public partial class FirstClimbEvent : StoryTrigger
 
 		StoryBeat.Cabin(this)?.SetBoarded(true);
 
-		// Still no control: the camera tips down on its own to stare off the top step, holds,
-		// then lifts back to a normal forward view — control returns with the player already
-		// looking where they're walking, not stuck staring at their feet.
+		// Still no control: the camera tips down on its own to stare off the top step and holds there.
 		var rig = player.CameraRig;
 		float levelPitch = rig.Pitch;
 		var pan = player.CreateTween();
@@ -111,9 +116,50 @@ public partial class FirstClimbEvent : StoryTrigger
 		await Cutscene.Tween(this, pan, ct);
 		if (LookDownHoldSeconds > 0f) await Cutscene.Wait(this, LookDownHoldSeconds, ct);
 
-		var rise = player.CreateTween();
-		rise.TweenMethod(Callable.From<float>(rig.SetPitch), rig.Pitch, levelPitch, LookUpSeconds)
-			.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-		await Cutscene.Tween(this, rise, ct);
+		// Then everything goes black. The stairs let go of them: they come to on the near bank of
+		// the footbridge, face down in the dirt, and lift their head slowly as their sight clears —
+		// the first taste of lost time.
+		if (fader != null)
+		{
+			var toBlack = player.CreateTween();
+			toBlack.TweenProperty(fader, nameof(ScreenFader.BlackAlpha), 1f, BlackoutSeconds)
+				.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+			await Cutscene.Tween(this, toBlack, ct);
+			fader.BlackAlpha = 1f;
+		}
+		await Cutscene.Wait(this, BlackHoldSeconds, ct);
+
+		var (wakePos, wakeYaw) = WakeSpot(this);
+		player.Teleport(wakePos, wakeYaw);
+		rig.SetPitch(Mathf.DegToRad(WakePitchDegrees));
+		postMat?.SetShaderParameter("vignette", BlinkVignette);
+
+		float wakePitch = rig.Pitch;
+		var wake = player.CreateTween();
+		wake.TweenMethod(Callable.From<float>(p =>
+		{
+			if (fader != null) fader.BlackAlpha = 1f - p;
+			postMat?.SetShaderParameter("vignette", Mathf.Lerp(BlinkVignette, baseVignette, p));
+			rig.SetPitch(Mathf.LerpAngle(wakePitch, levelPitch, Mathf.SmoothStep(0f, 1f, p)));
+		}), 0f, 1f, WakeSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		await Cutscene.Tween(this, wake, ct);
+		GD.Print("[story] Act 2: woke at the bridge");
 	}
+
+	/// <summary>
+	/// Where the stairs leave the player after the first climb, and where Continue puts them at
+	/// this checkpoint: on the ground a few metres off the cabin-side end of the footbridge,
+	/// facing back down the trail toward the cabin.
+	/// </summary>
+	public static (Vector3 pos, float yaw) WakeSpot(Node n)
+	{
+		var bridge = n.GetTree().GetFirstNodeInGroup("bridge_marker") as Node3D;
+		Vector3 p = bridge != null ? bridge.GlobalPosition + new Vector3(0, 0, WakeOffsetFromBridge) : Vector3.Zero;
+		var terrain = GroundSnap.FindTerrain(n);
+		if (terrain != null) p.Y = terrain.HeightAt(p.X, p.Z);
+		return (p + Vector3.Up * 0.15f, Mathf.Pi);   // yaw π = facing +Z, back toward the cabin
+	}
+
+	/// <summary>Metres along +Z from the bridge's centre to the wake spot (the bridge is 9 m long).</summary>
+	public const float WakeOffsetFromBridge = 7.5f;
 }

@@ -14,4 +14,5 @@ transform = Transform3D(0.8776, 0, 0.4794, 0, 1, 0, -0.4794, 0, 0.8776, 0.15, 0.
 script = ExtResource("2_pickup")
 Kind = 5
 Label = "Hammer"
+RequiredCheckpoint = 3
 RequiredKey = 4

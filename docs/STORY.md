@@ -24,21 +24,22 @@ When the player steps on the first step:
 - They lose control of their movement and ascend the stairs to the top in an unnatural, levitating way that feels very off and odd, then get control back at the top.
 - Their view darkens completely by the middle of the ascent and only opens back up fully at the top, making the climb feel dreamlike.
 - At the top they still can't move for 10 more seconds while the camera pans down, revealing they are looking straight down off the stairs.
+- Then the screen goes all the way black. The player is teleported back to the footbridge (the cabin side) and wakes up slowly, face down, sight clearing as they lift their head. Their first taste of lost time.
 
 After that the player can move freely again, which starts the quest: **get back to the cabin, it's getting too late.**
 
 ## Act 3: Homebase
 **Checkpoint 3**
 
-The player gets back to the cabin. The door has been completely boarded up (this is triggered when the player steps on the stairs). In a panic they notice a lantern and a compass on the front porch.
+The player gets back to the cabin and walks onto the deck. The door has been completely boarded up (this is triggered when the player steps on the stairs). In a panic they notice a lantern and a compass on the front porch.
 
-**Compass.** Equipping it points to the player's current objective, but it gradually goes haywire the closer you get to the stairs. It is an unobtrusive little UI element at the very top of the screen, similar to Skyrim's compass but a bit more translucent, with N, S, E, W shown accurately. It reads N, S, E, W normally until quests mess with it or the stairs get too near.
+**Compass.** Equipping it points to the player's current objective, but it gradually goes haywire the closer you get to the stairs. It is an unobtrusive little UI element at the very top of the screen, similar to Skyrim's compass but a bit more translucent, with N, S, E, W shown accurately. It reads N, S, E, W normally until quests mess with it or the stairs get too near. When the objective changes, the marker must never snap or swing quickly; it sweeps to the new heading over a few seconds. Fast direction changes are disorienting and not fun.
 
 **Leaving the safe zone.** After picking these up, the moment you step outside the cabin's adequately sized radius (the "safe zone"), the game goes dead silent, as if you were by the stairs. Rain starts to drizzle and low thunder rumbles, with lightning crackling across the sky, distant but bright.
 
 **Lantern.** A radial light source. Its beam can be focused by holding right-click, like the other focus mechanic.
 
-All we hear is the patter of the rain while we still search for our friend, guided by the compass.
+All we hear is the patter of the rain while we still search for our friend, guided by the compass. All of this is to get the player into place for the Act 4 set-piece.
 
 ## Act 4: Der Riese
 After 3-5 minutes out in the woods, a set-piece moment triggers at random. A GIANT version of the stalker walks through the fog in the distance, to add scale and dread. You can hear the low thuds of the giant landing its stride. It walks through the map for 10 seconds in the distance, then never appears again. When the event ends, the compass points back to the house.

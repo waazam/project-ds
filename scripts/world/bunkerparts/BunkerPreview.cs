@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Godot;
 using ProjectDS.Systems;
+using ProjectDS.UI;
 
 namespace ProjectDS.World.BunkerParts;
 
@@ -118,6 +119,34 @@ public partial class BunkerPreview : Node3D
 		float back = BunkerLayout.CrtRoomBackZ;
 		Log($"check CRT switch, against the desk, level eye: {LookHit(o + new Vector3(0, 1.62f, back + 2.16f), Vector3.Forward)}");
 		Log($"check CRT switch, from 1.2 m, looking at the screen: {LookHit(o + new Vector3(0.2f, 1.62f, back + 2.9f), interior.CrtSwitchWorld - (o + new Vector3(0.2f, 1.62f, back + 2.9f)))}");
+
+		// The papers: each must be the first thing the look ray meets from where a player would stand.
+		bunker.SetOpen(false);
+		await Frames(3);
+		Vector3 card = bunker.ToGlobal(Bunker.StationCardLocal);
+		Vector3 cardEye = bunker.ToGlobal(new Vector3(1.3f, 1.62f + 0.22f, 2.0f));
+		Log($"check station card from 1.8 m with the hatch locked: {LookHit(cardEye, card - cardEye)}");
+		Log($"check the hatch is still 'Locked' beside it: {LookHit(B(0, 1.62f + 0.22f, 2.2f), fwd)}");
+		Vector3 ledger = o + new Vector3(-0.57f, 0.95f, BunkerLayout.CrtRoomBackZ + 1.45f + 0.27f);
+		Vector3 ledgerEye = o + new Vector3(-0.3f, 1.62f, back + 2.85f);
+		Log($"check station log on the console: {LookHit(ledgerEye, ledger - ledgerEye)}");
+		Vector3 ledgerEye2 = o + new Vector3(0.1f, 1.62f, back + 2.6f);
+		Log($"check station log from in front of the screen: {LookHit(ledgerEye2, ledger - ledgerEye2)}");
+		Vector3 slip = o + new Vector3(-5.65f + 0.51f, 0.915f, BunkerLayout.CrtRoomFrontZ - 2.52f);
+		Vector3 slipEye = o + new Vector3(-4.35f, 1.62f, BunkerLayout.CrtRoomFrontZ - 2.3f);
+		Log($"check condemnation slip in the drawer: {LookHit(slipEye, slip - slipEye)}");
+
+		// The compass marker after the screens: the way out, then the maze's end; one node, moved.
+		var marker = GetTree().GetFirstNodeInGroup("bunker_entrance_marker") as Node3D;
+		bool atHall = marker != null && marker.GlobalPosition.DistanceTo(interior.ToGlobal(BunkerInterior.HallwayEntranceLocal)) < 0.01f;
+		Log($"check compass marker starts at the hallway entrance: {(atHall ? "PASS" : "FAIL")} ({marker?.GlobalPosition})");
+		interior.PointCompass(BunkerInterior.CompassSpot.MazeExit);
+		bool atExit = marker != null && marker.GlobalPosition.DistanceTo(interior.ToGlobal(BunkerMaze.ExitLocal)) < 0.01f;
+		Log($"check the same node moves to the maze exit: {(atExit ? "PASS" : "FAIL")} ({marker?.GlobalPosition})");
+		interior.PointCompass(BunkerInterior.CompassSpot.Outside);
+		bool atHatch = marker != null && marker.GlobalPosition.DistanceTo(bunker.GlobalPosition) < 0.01f;
+		Log($"check outdoors it stands at the hatch: {(atHatch ? "PASS" : "FAIL")} ({marker?.GlobalPosition})");
+		interior.PointCompass(BunkerInterior.CompassSpot.HallwayEntrance);
 	}
 
 	private async void Run()
@@ -134,7 +163,7 @@ public partial class BunkerPreview : Node3D
 		if (terrain != null)
 		{
 			var sb = new System.Text.StringBuilder("terrain - bunker base, local (x,z):");
-			foreach (var (x, z) in new[] { (0f, 3f), (0f, 1.5f), (-3f, 1f), (3f, 1f), (0f, -3f), (0f, -7f), (-6f, -2f), (6f, -2f), (-4f, 3f), (4f, 3f) })
+			foreach (var (x, z) in new[] { (0f, 3f), (0f, 1.5f), (0f, 0.5f), (0f, -1f), (0f, -2f), (-3f, 1f), (3f, 1f), (0f, -3f), (0f, -7f), (-6f, -2f), (6f, -2f), (-4f, 3f), (4f, 3f) })
 			{
 				var w = bunker.ToGlobal(new Vector3(x, 0, z));
 				sb.Append($" ({x},{z})={terrain.HeightAt(w.X, w.Z) - bunker.GlobalPosition.Y:0.00}");
@@ -162,6 +191,9 @@ public partial class BunkerPreview : Node3D
 		// Extra, bunker-relative: the door at eye level from the apron, and the locked hatch up close.
 		await Take(new Shot("ext_front_8m", Ground(0.3f, 8f), B(0, 1.4f, 0), "bunker"));
 		await Take(new Shot("ext_front_4m", Ground(0.6f, 4f), B(0, 1.3f, 0), "bunker"));
+		// The station card beside the locked hatch: from where a player reads it, and in context.
+		await Take(new Shot("paper_ext_card_1m", B(1.35f, 1.62f + 0.22f, 1.5f), B(1.62f, 1.42f, 0.3f), "bunker"));
+		await Take(new Shot("paper_ext_card_context", Ground(1.4f, 3.2f), B(1.0f, 1.35f, 0.3f), "bunker"));
 		await Take(new Shot("ext_threequarter", Ground(5.5f, 6f), B(0, 1.2f, -1f), "bunker"));
 		await Take(new Shot("ext_top_mound", Ground(-4f, -9f), B(0, 2.5f, -2f), "bunker"));
 		// the mound's crest from behind and from the flanks, where the earth meets the coping
@@ -210,6 +242,13 @@ public partial class BunkerPreview : Node3D
 		await Take(new Shot("int_10_crt_target_close", new(1500.4f, -78.38f, -3119f), new(1500f, -79.1f, -3121.7f)));
 		await Take(new Shot("crt_room_nolantern", new(1500f, -78.38f, -3094f), new(1500f, -78.6f, -3122f), "bunker", false));
 		await Take(new Shot("crt_target_nolantern", new(1500.3f, -78.38f, -3118.8f), new(1500f, -78.9f, -3121.6f), "bunker", false));
+		// The papers in the CRT room: the station log on the console, the condemnation slip in the open drawer.
+		var o2 = interior.GlobalPosition;
+		float backZ = BunkerLayout.CrtRoomBackZ;
+		await Take(new Shot("paper_console_log", o2 + new Vector3(-0.3f, 1.62f, backZ + 2.85f), o2 + new Vector3(-0.57f, 0.95f, backZ + 1.72f), "bunker"));
+		await Take(new Shot("paper_console_log_context", o2 + new Vector3(0.1f, 1.62f, backZ + 3.2f), o2 + new Vector3(-0.2f, 1.0f, backZ + 1.5f), "bunker"));
+		await Take(new Shot("paper_drawer_slip", o2 + new Vector3(-4.35f, 1.62f, BunkerLayout.CrtRoomFrontZ - 2.3f), o2 + new Vector3(-5.14f, 0.915f, BunkerLayout.CrtRoomFrontZ - 2.52f), "bunker"));
+		await Take(new Shot("paper_drawer_context", o2 + new Vector3(-3.6f, 1.62f, BunkerLayout.CrtRoomFrontZ - 1.6f), o2 + new Vector3(-5.4f, 0.9f, BunkerLayout.CrtRoomFrontZ - 2.5f), "bunker"));
 		interior.Crt.TurnAllOff();
 		await Seconds(0.8);
 		await Take(new Shot("crt_screens_off", new(1500f, -78.38f, -3100f), new(1500f, -78.4f, -3122f), "bunker", false));
@@ -255,6 +294,34 @@ public partial class BunkerPreview : Node3D
 		await Take(new Shot("maze_08_walkie_side_level", new(1820f, -79.65f, -3037.5f), wp + new Vector3(0, 0.05f, 0)));
 		await Take(new Shot("maze_exit_door_nolantern", new(1820f, -78.38f, -3033f), new(1820f, -78.8f, -3038f), "bunker", false));
 		await Take(new Shot("maze_walkie_dark", new(1818.5f, -78.38f, -3035f), wp, "bunker", false));
+
+		// ---------------------------------------------------------------- restore: Continue at checkpoint 7 after the screens
+		// The real path (Flow.Restore with the CRT flag) must leave every hallway lamp red at once.
+		atmo?.SetMood(ForestAtmosphere.Mood.Night, 0.05f);
+		interior.Hallway.ResetLightsForPreview();
+		await Frames(2);
+		var before = interior.Hallway.LampTally();
+		if (StoryManager.Instance is { } story)
+		{
+			story.SetFlag(StoryManager.Flag.CrtPuzzleDone);   // checkpoint None: nothing is saved
+			interior.Flow.Restore();
+		}
+		await Frames(10);
+		var after = interior.Hallway.LampTally();
+		Log($"check hallway red on restore with crt_puzzle_done: {(before.red == 0 && after.red == after.total && interior.RedTriggered ? "PASS" : "FAIL")} (before {before.red}/{before.total}, after {after.red}/{after.total})");
+		await Take(new Shot("hall_red_on_restore", new(1500f, -78.38f, -3000.8f), new(1500f, -78.38f, -3020f), "bunker"));
+		await Take(new Shot("hall_red_on_restore_mid", new(1498.8f, -78.38f, -3040f), new(1500f, -78.1f, -3060f), "bunker"));
+
+		// ---------------------------------------------------------------- the end card
+		if (GetTree().Root.FindChild("ScreenFader", true, false) is ScreenFader fader)
+		{
+			fader.Visible = true;
+			fader.SetBlack(true);
+			_ = Act11Ending.ShowEndCard(fader, -1f);
+			await Seconds(2.0);
+			await Take(new Shot("end_card", _cam.GlobalPosition, _cam.GlobalPosition + Vector3.Forward, "bunker", false));
+			fader.Visible = false;
+		}
 
 		Log("done");
 		GetTree().Quit(0);

@@ -9,10 +9,14 @@
 [ext_resource type="Script" path="res://scripts/audio/SoundEvent.cs" id="7_event"]
 [ext_resource type="PackedScene" path="res://scenes/audio/score.tscn" id="8_score"]
 [ext_resource type="Script" path="res://scripts/entities/GiantStalkerEvent.cs" id="9_giant"]
+[ext_resource type="Script" path="res://scripts/systems/PhotoLog.cs" id="10_photolog"]
 
 [node name="TrailSlice" type="Node3D"]
 
 [node name="ForestWorld" parent="." instance=ExtResource("1_world")]
+
+[node name="PhotoLog" type="Node" parent="."]
+script = ExtResource("10_photolog")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 

@@ -16,6 +16,12 @@ namespace ProjectDS.World;
 /// - <see cref="Storm"/> (overcast: thicker, greyer fog, weaker sun) and
 ///   <see cref="Wetness"/> (set by <see cref="RainVfx"/>);
 /// - <see cref="Flash"/>: a lightning flash's sky and ambient boost (RainVfx drives it).
+///
+/// The Act 1 day look also carries an "open trail" grade: at the parking lot,
+/// the cabin and the trailhead the sun is a little brighter and warmer, the fog
+/// thinner and lighter, the sky clearer; it fades out along the trail and is
+/// gone by the footbridge, from where the usual look stands. It is a grade on
+/// the auto blend only: never during a storm or a scripted mood.
 /// </summary>
 [GlobalClass]
 public partial class ForestAtmosphere : Node
@@ -45,6 +51,24 @@ public partial class ForestAtmosphere : Node
 	[Export] public float ClearingRadius = 26f;
 	/// <summary>How much of the deep-woods effect the clearing takes back (0 = none).</summary>
 	[Export] public float ClearingRelief = 0.5f;
+
+	[ExportGroup("Open trail (Act 1 day)")]
+	[Export] public bool OpenTrailGrade = true;
+	/// <summary>Fully open until this far along the trail; fades out from here to the footbridge.</summary>
+	[Export] public float OpenHoldMeters = 40f;
+	/// <summary>Where the grade is gone, in metres along the trail (the "bridge_marker" node overrides it).</summary>
+	[Export] public float OpenFadeEndMeters = 180f;
+	[Export] public float OpenSunScale = 1.5f;
+	[Export] public Color OpenSunColor = new(1f, 0.92f, 0.72f);
+	[Export] public float OpenFogDensityScale = 0.4f;
+	[Export] public Color OpenFogColor = new(0.47f, 0.48f, 0.5f);
+	[Export] public float OpenAmbientScale = 1.2f;
+	/// <summary>Extra sky (background) energy when fully open.</summary>
+	[Export] public float OpenSkyBoost = 0.3f;
+	/// <summary>Seconds for the grade to cover ~63% of a change (so a teleport never snaps it).</summary>
+	[Export] public float OpenSmoothing = 2f;
+	/// <summary>0..1 how much of the open-trail grade is applied right now (for tests and the HUD).</summary>
+	public float OpenAmount => _open;
 
 	// Scripted mood targets (Act 6 onward). Fog colour/density, sky-fog, ambient and sun energy
 	// all cross-fade from whatever the auto system last set toward these over SetMood's duration.
@@ -85,6 +109,14 @@ public partial class ForestAtmosphere : Node
 	private Environment _env;
 	private DirectionalLight3D _sun;
 	private Tween _heightFogTween;
+
+	private float _open;
+	private float _openTarget;
+	private float _openSampleTimer;
+	private ForestTerrain _terrain;
+	private Node3D _spawn;
+	private bool _trailSearched;
+	private float _openFadeEnd = -1f;
 
 	private Mood _mood = Mood.Auto;
 	private float _moodBlend;
@@ -161,9 +193,57 @@ public partial class ForestAtmosphere : Node
 	public override void _Process(double delta)
 	{
 		if (_env == null) return;
+		UpdateOpen((float)delta);
 		if (_mood != Mood.Auto) ProcessMoodBlend(delta);
 		else ProcessAuto();
 		ApplyLayers();
+	}
+
+	/// <summary>Smoothly tracks how "open" the trail is where the camera stands: 1 at the trailhead,
+	/// 0 from the footbridge on, and 0 whenever a storm or a scripted mood is on.</summary>
+	private void UpdateOpen(float dt)
+	{
+		_openSampleTimer -= dt;
+		if (_openSampleTimer <= 0f)
+		{
+			_openSampleTimer = 0.2f;   // the trail lookup needn't run every frame
+			var cam = GetViewport().GetCamera3D();
+			_openTarget = cam == null ? 0f : OpenTarget(cam.GlobalPosition);
+		}
+		_open = Mathf.Lerp(_open, _openTarget, 1f - Mathf.Exp(-dt / Mathf.Max(OpenSmoothing, 0.01f)));
+	}
+
+	private float OpenTarget(Vector3 p)
+	{
+		if (!OpenTrailGrade || _mood != Mood.Auto) return 0f;
+		float along = TrailAlong(p);
+		float end = _openFadeEnd > 0f ? _openFadeEnd : OpenFadeEndMeters;
+		float open = 1f - Mathf.SmoothStep(OpenHoldMeters, Mathf.Max(end, OpenHoldMeters + 1f), along);
+		return open * (1f - Mathf.Clamp(Storm, 0f, 1f));
+	}
+
+	/// <summary>Metres along the trail of the point nearest <paramref name="p"/> (the terrain's trail
+	/// helpers; without a terrain, distance north of the spawn). The bridge sets the fade's end.</summary>
+	private float TrailAlong(Vector3 p)
+	{
+		if (!_trailSearched)
+		{
+			_trailSearched = true;
+			_terrain = GetTree().GetFirstNodeInGroup("terrain") as ForestTerrain;
+			_spawn = GetTree().GetFirstNodeInGroup("player_spawn") as Node3D;
+			if (GetTree().GetFirstNodeInGroup("bridge_marker") is Node3D bridge)
+			{
+				if (_terrain != null) { _terrain.TrailDistance(bridge.GlobalPosition.X, bridge.GlobalPosition.Z, out _openFadeEnd); }
+				else if (_spawn != null) _openFadeEnd = _spawn.GlobalPosition.Z - bridge.GlobalPosition.Z;
+			}
+		}
+		if (_terrain != null && IsInstanceValid(_terrain))
+		{
+			_terrain.TrailDistance(p.X, p.Z, out float along);
+			return along;
+		}
+		float z0 = _spawn != null && IsInstanceValid(_spawn) ? _spawn.GlobalPosition.Z : 0f;
+		return Mathf.Max(0f, z0 - p.Z);
 	}
 
 	private void ProcessAuto()
@@ -181,6 +261,16 @@ public partial class ForestAtmosphere : Node
 		_baseAmbient = Mathf.Lerp(AmbientOpen, AmbientDeep, t);
 		_baseSunEnergy = Mathf.Lerp(SunOpen, SunDeep, t);
 		_baseSunColor = _sunBaseColor;
+
+		// The open-trail grade: sunnier, warmer, thinner and lighter fog near the start of the walk.
+		float open = _open;
+		if (open <= 0.001f) return;
+		_baseDensity *= Mathf.Lerp(1f, OpenFogDensityScale, open);
+		_baseFog = _baseFog.Lerp(OpenFogColor, open);
+		_baseSkyFog *= 1f - open;
+		_baseAmbient *= Mathf.Lerp(1f, OpenAmbientScale, open);
+		_baseSunEnergy *= Mathf.Lerp(1f, OpenSunScale, open);
+		_baseSunColor = _sunBaseColor.Lerp(OpenSunColor, open);
 	}
 
 	private void ProcessMoodBlend(double delta)
@@ -233,7 +323,7 @@ public partial class ForestAtmosphere : Node
 		_env.FogSkyAffect = _baseSkyFog;
 		_env.AmbientLightColor = ambColor;
 		_env.AmbientLightEnergy = ambient;
-		_env.BackgroundEnergyMultiplier = _bgEnergyBase * (1f - 0.35f * storm) + flash * 2.5f;
+		_env.BackgroundEnergyMultiplier = _bgEnergyBase * (1f + OpenSkyBoost * _open) * (1f - 0.35f * storm) + flash * 2.5f;
 		if (_sun == null) return;
 		_sun.LightEnergy = sunEnergy;
 		_sun.LightColor = _baseSunColor;

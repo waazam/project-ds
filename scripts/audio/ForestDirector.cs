@@ -244,10 +244,15 @@ public partial class ForestDirector : Node
 		}
 	}
 
+	private Stalker _stalker;
+	private bool _stalkerSearched;
+
 	private void NudgeStalker(float silence)
 	{
 		if (_nudgedThisStill || StillSeconds < StalkerNudgeAfter || silence > 0.3f) return;
+		if (ForestAmbienceManager.Instance is { IsIndoor: true }) return;   // nothing follows you indoors
 		_nudgedThisStill = true;
-		(GetTree().Root.FindChild("Stalker", true, false) as Stalker)?.NudgeNoise();
+		if (!_stalkerSearched) { _stalkerSearched = true; _stalker = GetTree().GetFirstNodeInGroup("stalker") as Stalker; }
+		if (_stalker != null && IsInstanceValid(_stalker)) _stalker.NudgeNoise();
 	}
 }

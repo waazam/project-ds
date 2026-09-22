@@ -9,7 +9,7 @@ namespace ProjectDS.Systems;
 /// Boots a level: places the player (at the checkpoint's safe respawn point if
 /// continuing, otherwise the scene's "player_spawn" marker), restores the
 /// story-wide lighting mood, plays the opening fade, then hands control to the
-/// player. Story beats (the stairs, the cabin) advance <see cref="StoryManager"/>
+/// player (through the reference-counted <see cref="Cutscene"/> lock). Story beats (the stairs, the cabin) advance <see cref="StoryManager"/>
 /// directly; this node only gets the game started.
 ///
 /// It also registers the shared story nodes into their groups ("screen_fader",
@@ -22,8 +22,6 @@ public partial class GameFlow : Node
 	[Export] public NodePath PauseMenuPath = "../PauseMenu";
 	[Export] public NodePath AtmospherePath = "../ForestWorld/Atmosphere";
 	[Export] public NodePath PostScreenPath = "../Hud/PostProcess/Screen";
-	[Export] public string OpeningTitle = "";
-	[Export] public string OpeningSubtitle = "";
 
 	public bool Started { get; private set; }
 	/// <summary>The current level's GameFlow (null between levels).</summary>
@@ -45,7 +43,9 @@ public partial class GameFlow : Node
 		GetNodeOrNull(AtmospherePath)?.AddToGroup("atmosphere");
 		GetNodeOrNull(PostScreenPath)?.AddToGroup("post_screen");
 		_fader.SetBlack(true);
-		_player.PlayerInput.SetEnabled(false);
+		// One reference on the cutscene lock until the opening fade hands control over (Begin), so
+		// any beat that locks during the fade-in still counts correctly.
+		Cutscene.Lock(_player, input: true);
 		// Deferred: every stateful system restores itself deferred from its own _Ready first
 		// (they sit earlier in the tree), then the player is placed into that restored world.
 		Callable.From(Begin).CallDeferred();
@@ -73,13 +73,11 @@ public partial class GameFlow : Node
 
 		bool quick = GameSettings.Instance.AutoTest;
 		if (!quick) Input.MouseMode = Input.MouseModeEnum.Captured;
-		Cutscene.Run(this, async ct =>
+		_ = Cutscene.Run(this, async ct =>
 		{
-			if (!quick && OpeningTitle != "")
-				await _fader.ShowCaption(OpeningTitle, OpeningSubtitle, 1.5f, 2.5f, 1.2f);
-			_player.PlayerInput.SetEnabled(true);
+			Cutscene.Unlock(_player, input: true);
 			Started = true;
-			await _fader.Fade(0f, quick ? 0.2f : 1.2f);
+			await _fader.Fade(0f, quick ? 0.2f : 1.2f, ct);
 			StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act1Start, _player.GlobalPosition, _player.CameraRig.Yaw);
 		});
 	}

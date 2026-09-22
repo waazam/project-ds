@@ -10,7 +10,8 @@ namespace ProjectDS.Audio;
 ///
 /// If LifeCategory is set, calls get rarer as that category's gain drops and
 /// stop entirely before its bus is fully faded, so the last one you hear is a
-/// whole call, not one that faded out mid-song. ForestDirector drives
+/// whole call, not one that faded out mid-song. Indoors (ForestAmbienceManager)
+/// the forest's calls stop altogether: no birds in a bunker. ForestDirector drives
 /// RateScale / DistanceScale (stillness, activity waves) and can Trigger()
 /// calls directly (gust creaks).
 /// </summary>
@@ -77,7 +78,7 @@ public partial class OneShotEmitter : Node3D
 	{
 		var m = ForestAmbienceManager.Instance;
 		if (m == null) return 1f;
-		return LifeCategory switch
+		float life = LifeCategory switch
 		{
 			Life.Birds => m.CategoryGain(ForestAmbienceManager.Category.Birds),
 			Life.Insects => m.CategoryGain(ForestAmbienceManager.Category.Insects),
@@ -85,6 +86,8 @@ public partial class OneShotEmitter : Node3D
 			Life.Distant => m.CategoryGain(ForestAmbienceManager.Category.Distant),
 			_ => 1f,
 		};
+		// Through walls the forest is a murmur, not a source of new calls around the listener.
+		return life * (1f - m.Indoor);
 	}
 
 	public override void _Process(double delta)

@@ -11,6 +11,10 @@ namespace ProjectDS.Audio;
 /// weight but still pans to where it came from. It can startle the forest into
 /// a temporary hush. The place is a trigger volume (radius <see cref="Radius"/>
 /// around the target), not a per-frame distance check; the delay is pausable.
+///
+/// Restore-aware: it belongs to one stretch of the story. Once the checkpoint
+/// <see cref="OnlyBefore"/> has been reached (on Continue, or during play) it
+/// counts as already heard and never fires; the default suits an Act 1 sound.
 /// </summary>
 public partial class SoundEvent : Node
 {
@@ -26,6 +30,8 @@ public partial class SoundEvent : Node
 	[Export] public Vector2 DelaySeconds = new(0.3f, 0.9f);
 	[Export] public float StartleStrength = 0.5f;
 	[Export] public float StartleSeconds = 12f;
+	/// <summary>The sound only plays while the story is before this checkpoint (None = always).</summary>
+	[Export] public Checkpoint OnlyBefore = Checkpoint.Act2StairsClimbed;
 
 	public bool Fired { get; private set; }
 
@@ -47,9 +53,16 @@ public partial class SoundEvent : Node
 		if (ResourceLoader.Exists(SoundPath)) _voice.Stream = GD.Load<AudioStream>(SoundPath);
 		else GD.PushWarning($"SoundEvent {Name}: missing {SoundPath}");
 		AddChild(_voice);
-		// Deferred: the level is still readying when this runs.
-		if (target != null)
-			Callable.From(() => _trigger = StoryBeat.MakeTrigger(target, new CylinderShape3D { Radius = Radius, Height = 40f }, Vector3.Zero, OnEntered, $"{Name}Trigger")).CallDeferred();
+		// Deferred: the level is still readying when this runs (and the story is settled by then).
+		if (target != null) Callable.From(() => Restore(target)).CallDeferred();
+	}
+
+	private bool TooLate => OnlyBefore != Checkpoint.None && StoryManager.Instance is { } s && s.Current >= OnlyBefore;
+
+	private void Restore(Node3D target)
+	{
+		if (TooLate) { Fired = true; return; }   // a Continue from later on: it already happened
+		_trigger = StoryBeat.MakeTrigger(target, new CylinderShape3D { Radius = Radius, Height = 40f }, Vector3.Zero, OnEntered, $"{Name}Trigger");
 	}
 
 	private void OnEntered(PlayerController player)
@@ -57,7 +70,9 @@ public partial class SoundEvent : Node
 		if (Fired) return;
 		Fired = true;
 		_trigger?.QueueFree();
-		Cutscene.Run(this, async ct =>
+		_trigger = null;
+		if (TooLate) return;   // the story moved on while the trigger stood
+		_ = Cutscene.Run(this, async ct =>
 		{
 			await Cutscene.Wait(this, GD.RandRange(DelaySeconds.X, DelaySeconds.Y), ct);
 			GD.Print($"[event] {Name} fired");

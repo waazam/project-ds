@@ -8,7 +8,11 @@ namespace ProjectDS.World;
 /// Dev harness for buildings_preview.tscn: first-person (1.62 m eye, FOV 70, the
 /// game's PS2 post) screenshots of the cabin, shed, tent/map, storm, night fire and
 /// the Act 6 veins into test-output/buildings/, plus a triangle count per building.
-/// Pass "-- --only=cabin,shed,storm,night,fire,burnt,clutter,veins" to limit. Not used by the game.
+/// "papers" shoots the cabin's readables (door note from the porch, bare and boarded; the
+/// sheet over the cot; the friend's page; the prints) with each one focused, logs what the
+/// crosshair ray would pick from each spot, and checks that ignition frees the glazing and
+/// papers without rebuilding the cabin.
+/// Pass "-- --only=cabin,papers,shed,storm,night,fire,burnt,clutter,veins" to limit. Not used by the game.
 /// </summary>
 public partial class BuildingsPreview : Node3D
 {
@@ -43,8 +47,43 @@ public partial class BuildingsPreview : Node3D
 		_cam.LookAt(at, Vector3.Up);
 		await Frames(settle);
 		GetViewport().GetTexture().GetImage().SavePng($"{_out}/{name}.png");
-		Log($"shot {name}");
+		// A trunk or wall right in front of the eye makes a black frame: say so in the log.
+		var q = PhysicsRayQueryParameters3D.Create(eye, eye + (at - eye).Normalized() * 1.2f, 1u);
+		var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+		string blocked = hit.Count > 0 ? $"  (view blocked at {eye.DistanceTo((Vector3)hit["position"]):0.00} m by {(hit["collider"].AsGodotObject() as Node)?.Name})" : "";
+		Log($"shot {name}{blocked}");
 	}
+
+	/// <summary>
+	/// Stand at a local (x, z) spot on the building's floor, look at the paper, report what the
+	/// crosshair ray would pick there (same query as PlayerInteraction.Probe), and shoot it focused
+	/// (the highlight on).
+	/// </summary>
+	private async Task Paper(string name, Node3D b, Vector2 standXZ, Systems.Readable r, float floorLocalY = 0f)
+	{
+		if (r == null || !GodotObject.IsInstanceValid(r)) { Log($"{name}: no readable"); return; }
+		Vector3 eye = b.GlobalTransform * new Vector3(standXZ.X, floorLocalY + Eye, standXZ.Y);
+		Vector3 at = r.GetParent<Node3D>().GlobalPosition;
+		Log($"{name}: pick {Pick(eye, at)}; want '{r.Prompt}'; eye to paper {eye.DistanceTo(at):0.00} m");
+		r.SetFocused(true);
+		await Shot(name, eye, at);
+		r.SetFocused(false);
+	}
+
+	private string Pick(Vector3 from, Vector3 at)
+	{
+		var q = PhysicsRayQueryParameters3D.Create(from, from + (at - from).Normalized() * 4f, 1u | Systems.Interactable.PickLayer);
+		q.CollideWithAreas = true;
+		var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+		if (hit.Count == 0) return "nothing";
+		var col = hit["collider"].AsGodotObject() as Node;
+		float d = from.DistanceTo((Vector3)hit["position"]);
+		if (col is Area3D a && a.GetParent() is Systems.Interactable i)
+			return $"{i.GetParent()?.Name}/{i.Name} '{i.Prompt}' enabled {i.Enabled} visible {i.IsVisibleInTree()} at {d:0.00} m (max {i.MaxDistance})";
+		return $"{col?.Name} (not an interactable) at {d:0.00} m";
+	}
+
+	private static string Pos(Systems.Readable r) => r == null ? "null" : r.GetParent<Node3D>().GlobalPosition.ToString();
 
 	/// <summary>Eye standing at local (x,z) of a building (on terrain, or on the given floor height), looking at local point.</summary>
 	private async Task Local(string name, Node3D b, Vector2 standXZ, Vector3 lookLocal, float? floorLocalY = null)
@@ -287,6 +326,55 @@ public partial class BuildingsPreview : Node3D
 			await Local("cabin_13_interior_cot_shelf", cabin, new Vector2(-1.2f, 0.9f), new Vector3(1.5f, 0.8f, -0.4f), 0f);
 		}
 
+		if (Want("papers"))
+		{
+			await Frames(20);
+			cabin.SetOpen(false);
+			cabin.SetBoarded(false);
+			await Frames(2);
+			var friend = cabin.FindChild("Body", true, false) as Entities.FriendBody;
+			friend?.RevealPage();
+			var post = cabin.FindChild("NewelPostPickup", true, false) as Pickup;
+			post?.Reveal();
+			Log($"door note {Pos(cabin.DoorNote)} sheet {Pos(cabin.TwisterSheet)} page {Pos(friend?.Page)}");
+			// Act 1: the note from the porch, bare door; then from the far left and right of the porch
+			// (hard angles for the door's own 0.9 m pick sphere, which is disabled but still in the ray's way)
+			await Paper("papers_01_note_porch_act1", cabin, new Vector2(0.2f, hd + 1.7f), cabin.DoorNote);
+			await Paper("papers_01b_note_porch_left", cabin, new Vector2(-1.3f, hd + 0.9f), cabin.DoorNote);
+			await Paper("papers_01c_note_porch_right", cabin, new Vector2(1.5f, hd + 1.0f), cabin.DoorNote);
+			// Act 2 on: boarded; the note stays readable, and the planks still take the look for the chop
+			cabin.SetBoarded(true);
+			await Frames(2);
+			await Paper("papers_02_note_boarded", cabin, new Vector2(0.2f, hd + 1.7f), cabin.DoorNote);
+			await Paper("papers_02b_note_boarded_close", cabin, new Vector2(0.45f, hd + 0.75f), cabin.DoorNote);
+			Log("planks pick (want DoorBreakTrigger): " + Pick(cabin.GlobalTransform * new Vector3(0, Eye, hd + 1.0f), cabin.GlobalTransform * new Vector3(0, 1.0f, hd + 0.15f)));
+			// Act 5: inside
+			cabin.OpenDoor();
+			await Frames(2);
+			await Paper("papers_03_sheet_over_cot", cabin, new Vector2(0.75f, -1.3f), cabin.TwisterSheet);
+			await Paper("papers_04_page_on_table", cabin, new Vector2(0.9f, 0.25f), friend?.Page);
+			if (post != null)
+				Log("post pick (want NewelPostPickup): " + Pick(cabin.GlobalTransform * new Vector3(0.9f, Eye, 0.25f), post.GlobalPosition + Vector3.Up * 0.15f));
+			await Local("papers_05_prints_1_5m", cabin, new Vector2(1.0f, -1.2f), new Vector3(0.3f, 1.64f, -hd + 0.11f), 0f);
+			await Local("papers_05b_prints_close", cabin, new Vector2(0.3f, -hd + 0.75f), new Vector3(0.3f, 1.64f, -hd + 0.11f), 0f);
+			await Local("papers_06_prints_from_door", cabin, new Vector2(0.0f, 2.2f), new Vector3(0.3f, 1.45f, -hd + 0.11f), 0f);
+			await Paper("papers_07_note_door_open_inside", cabin, new Vector2(-0.1f, 1.0f), cabin.DoorNote);
+			// Act 7: ignition must not rebuild the cabin; sashes, glass, boards and every paper go
+			_atmo?.SetMood(ForestAtmosphere.Mood.Night, 0.1f);
+			ulong genBefore = cabin.GetNode("Generated").GetInstanceId();
+			cabin.SetBurning(1f);
+			await Frames(3);
+			Log($"burning: Generated same instance {cabin.GetNode("Generated").GetInstanceId() == genBefore}, sashes {cabin.GetNodeOrNull("Generated/WindowSashes") != null}, panes {cabin.GetNodeOrNull("Generated/Panes") != null}, boards {cabin.GetNodeOrNull("Generated/WindowBoards") != null}, papers visible {cabin.GetNode<Node3D>("Generated/Papers").Visible}, note visible {cabin.DoorNote?.IsVisibleInTree()}, page visible {friend?.Page?.IsVisibleInTree()}");
+			await Secs(3.0);
+			await Local("papers_08_burning_porch", cabin, new Vector2(0.3f, hd + 2.2f), new Vector3(0, 1.3f, hd), 0f);
+			await Local("papers_09_burning_window", cabin, new Vector2(-1.3f, hd + 1.4f), new Vector3(-1.4f, 1.3f, hd), 0f);
+			cabin.SetBurning(0f);
+			await Frames(3);
+			Log($"out: Generated same instance {cabin.GetNode("Generated").GetInstanceId() == genBefore}, sashes {cabin.GetNodeOrNull("Generated/WindowSashes") != null}, panes {cabin.GetNodeOrNull("Generated/Panes") != null}, boards {cabin.GetNodeOrNull("Generated/WindowBoards") != null}, papers visible {cabin.GetNode<Node3D>("Generated/Papers").Visible}");
+			_atmo?.SetMood(ForestAtmosphere.Mood.Auto, 0.1f);
+			await Frames(10);
+		}
+
 		if (Want("shed"))
 		{
 			await Local("shed_01_front_8m", shed, new Vector2(0.5f, 8f), new Vector3(0, 1.1f, 0));
@@ -353,7 +441,7 @@ public partial class BuildingsPreview : Node3D
 				cabin.SetBurning(1f);
 			await Secs(5.0);
 				await Local("fire_01_25m", cabin, new Vector2(8f, 23f), new Vector3(0, 2f, 0));
-				await Local("fire_02_10m", cabin, new Vector2(3f, 10f), new Vector3(0, 2f, 0));
+				await Local("fire_02_10m", cabin, new Vector2(1.5f, 10.5f), new Vector3(0, 2f, 0));
 				await Local("fire_03_side_14m", cabin, new Vector2(13f, 3f), new Vector3(0, 2.2f, 0));
 				cabin.SetBurning(0f);
 			}
@@ -366,7 +454,7 @@ public partial class BuildingsPreview : Node3D
 			cabin.SetBurnt(true);
 			cabin.SetBurning(0.25f);
 			await Frames(60);
-			await Local("burnt_01_front_10m", cabin, new Vector2(3f, 10f), new Vector3(0, 1.8f, 0));
+			await Local("burnt_01_front_10m", cabin, new Vector2(1.5f, 10.5f), new Vector3(0, 1.8f, 0));
 			await Local("burnt_02_threequarter", cabin, new Vector2(-7f, 7f), new Vector3(0, 1.8f, 0));
 		}
 

@@ -27,7 +27,7 @@ public partial class Act7Whispers : Node
 	private PlayerController _player;
 	private readonly RandomNumberGenerator _rng = new();
 
-	public override void _Ready() => Cutscene.Run(this, Loop);
+	public override void _Ready() => _ = Cutscene.Run(this, Loop);
 
 	private static bool Active(StoryManager s) => s != null && s.Current >= Checkpoint.Act7CabinBurning && s.Current < Checkpoint.Act8BunkerEntered;
 
@@ -53,14 +53,17 @@ public partial class Act7Whispers : Node
 		if (StoryBeat.Fader(this) == null) return;
 		if (!echo)
 		{
-			await StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut);
+			await StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut, ct);
 			return;
 		}
 		// A second, overlapping voice a beat behind the first: the "multiplicity" the outline asks for.
-		Cutscene.Run(this, _ => StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut));
+		// It goes on the fader's echo line, so the two captions stand as two lines and neither cuts
+		// the other short. Both come down with this sequence if it is cancelled.
+		var first = StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut, ct);
 		await Cutscene.Wait(this, _rng.RandfRange(0.3f, 0.7f), ct);
 		PlaySting();
-		await StoryBeat.Caption(this, "\"...come up and see...\"", fadeIn * 0.6f, hold * 0.7f, fadeOut);
+		await StoryBeat.Echo(this, "\"...come up and see...\"", fadeIn * 0.6f, hold * 0.7f, fadeOut, ct);
+		await first;
 	}
 
 	// The four recorded takes read "close/quiet" to "far/harsh"; each gets its own baseline

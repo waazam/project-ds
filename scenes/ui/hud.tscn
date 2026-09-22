@@ -9,6 +9,9 @@
 [ext_resource type="Script" path="res://scripts/ui/StaminaBar.cs" id="7_stamina"]
 [ext_resource type="Script" path="res://scripts/ui/EquippedItemHud.cs" id="8_equip"]
 [ext_resource type="Script" path="res://scripts/ui/Subtitle.cs" id="9_subtitle"]
+[ext_resource type="Script" path="res://scripts/ui/NoteOverlay.cs" id="10_note"]
+[ext_resource type="Script" path="res://scripts/ui/PhotoThumb.cs" id="11_thumb"]
+[ext_resource type="Script" path="res://scripts/ui/PhotoLogPage.cs" id="12_page"]
 
 [sub_resource type="ShaderMaterial" id="PostMat"]
 shader = ExtResource("1_post")
@@ -50,3 +53,12 @@ script = ExtResource("8_equip")
 
 [node name="Subtitle" type="CanvasLayer" parent="."]
 script = ExtResource("9_subtitle")
+
+[node name="NoteOverlay" type="CanvasLayer" parent="."]
+script = ExtResource("10_note")
+
+[node name="PhotoThumb" type="CanvasLayer" parent="."]
+script = ExtResource("11_thumb")
+
+[node name="PhotoLogPage" type="CanvasLayer" parent="."]
+script = ExtResource("12_page")

@@ -13,24 +13,28 @@ namespace ProjectDS.World;
 /// Act 11, "The Third Man": the walkie-talkie the player just picked up in the
 /// bunker's maze starts speaking. They're carried back outside into the woods,
 /// a radio voice asks "Did you see them?", they shout "Who are you!" back, and
-/// the radio goes to silence — the compass then points at the very first
+/// the radio goes to static — the compass then points at the very first
 /// staircase, now rebuilt impossibly tall and already half-swallowed by fog
-/// from a distance. Touching its base starts a long, silent climb; at the top,
-/// Act 4's giant is waiting, its eyes opening on the last step before it closes
-/// the distance and reaches out. The touch cuts to black and wakes the player,
-/// at dawn, back in the Act 6 clearing among the small stairs — this is the
-/// end of the story as written so far.
+/// from a distance. The radio keeps asking on the way (six short questions, on
+/// the walk, at the fog, twice on the climb, at the top, and once more after
+/// waking; never answered). Touching the stairs' base starts a long, silent
+/// climb; at the top, Act 4's giant is waiting, its eyes opening on the last
+/// step before it closes the distance and reaches out. The touch cuts to black
+/// and wakes the player, at dawn, back in the Act 6 clearing among the small
+/// stairs. A last "Did you see them?", a short while to look around, then the
+/// screen goes to black, the title card, and the main menu.
 ///
 /// Restore: once the radio exchange is done (<see cref="StoryManager.Flag.Act11DialogueDone"/>)
-/// the stairs are tall on load, and until the giant's checkpoint the climb trigger
-/// and the fog-ramp zone are waiting. At checkpoint 8 without the exchange, the
-/// radio sequence plays again. The radio's static runs on its own "Radio" bus.
+/// the stairs are tall on load (the one length rule is <see cref="StairsState"/>), and until the
+/// giant's checkpoint the climb trigger and the fog-ramp zone are waiting (a Continue inside the
+/// fog radius ramps the fog at once). At checkpoint 8 without the exchange, the radio sequence
+/// plays again; after it, the walk-line is simply skipped. The radio's static runs on its own
+/// "Radio" bus. Continue at checkpoint 9 lands in the clearing at dawn with nothing pending.
 /// </summary>
 public partial class Act11Ending : Node3D
 {
 	[Export] public NodePath OriginalStairsPath = "..";
 	[Export] public float BodyScale = 28f;
-	[Export] public int ClimbStepCount = 220;
 	[Export] public float ClimbSecondsReal = 46f;
 	[Export] public float ClimbSecondsAutoTest = 6f;
 	[Export] public float ApproachSecondsReal = 7f;
@@ -42,6 +46,16 @@ public partial class Act11Ending : Node3D
 	[Export] public float ClimbHumStartDb = -14f;
 	[Export] public float ClimbHumTopDb = 0f;
 	[Export] public float EncounterHumDb = 4f;
+	[ExportGroup("Ending")]
+	/// <summary>Free roam in the dawn clearing after the last question, before the screen goes to black.</summary>
+	[Export] public float RoamSecondsReal = 12f;
+	[Export] public float RoamSecondsAutoTest = 2f;
+	[Export] public float EndFadeSeconds = 4f;
+	[Export] public float EndCardHoldSeconds = 5f;
+
+	/// <summary>The end card: what the title screen's tape calls the game.</summary>
+	public const string EndCardTitle = "PROJECT DS";
+	public const string ClosingLine = "\"Did you see them?\"";
 
 	/// <summary>For the autotest: the base-of-the-stairs trigger it should walk into to start the climb.</summary>
 	public Vector3? ClimbTriggerWorld => _climbTrigger?.GlobalPosition;
@@ -49,13 +63,17 @@ public partial class Act11Ending : Node3D
 	/// aiming at the trigger itself (mirrors the original climb's own AutotestApproach → top route).</summary>
 	public Vector3? ApproachWorld => _original?.GetNodeOrNull<Node3D>("AutotestApproach")?.GlobalPosition;
 	/// <summary>For tests: whether the stairs have been rebuilt impossibly tall.</summary>
-	public bool StairsTall => _original != null && _original.Steps == ClimbStepCount;
+	public bool StairsTall => _original != null && _original.Steps == StairsState.TallSteps;
+	/// <summary>For tests: the ending (fade, card, menu) is running.</summary>
+	public bool EndingStarted { get; private set; }
 
 	private StaircaseBuilder _original;
 	private Area3D _climbTrigger;
 	private Area3D _fogZone;
 	private bool _stageAStarted;
 	private bool _climbFired;
+	private bool _fogLineArmed;
+	private Task _lineChain = Task.CompletedTask;
 
 	public override void _Ready()
 	{
@@ -82,29 +100,43 @@ public partial class Act11Ending : Node3D
 	{
 		var s = StoryManager.Instance;
 		if (s == null || _original == null) return;
-		if (s.Act11DialogueDone) MakeStairsTall();
+		// One rule for the flight's length, whatever restored before or after this node; rebuilt only if it differs.
+		if (s.Act11DialogueDone) SetStairs(StairsState.StepsFor(s, _original.BaseSteps));
 		_climbFired = s.Current >= Checkpoint.Act11GiantEncounter;
 		OnStoryChanged(0);
+		if (s.Act11DialogueDone && !_climbFired) _ = Cutscene.Run(this, RestoreFog);
 	}
 
-	private void OnStoryChanged<T>(T _)
+	private void OnStoryChanged<T>(T unused)
 	{
 		var s = StoryManager.Instance;
 		if (s == null || _original == null) return;
 		if (s.Current == Checkpoint.Act10WalkieFound && !s.Act11DialogueDone && !_stageAStarted)
 		{
 			_stageAStarted = true;
-			if (StoryBeat.Player(this) is { } p) Cutscene.Run(this, ct => StageA(p, ct));
+			if (StoryBeat.Player(this) is { } p) _ = Cutscene.Run(this, ct => StageA(p, ct));
 			return;
 		}
 		if (s.Act11DialogueDone && s.Current < Checkpoint.Act11GiantEncounter) EnsureClimbTriggers();
 	}
 
-	private void MakeStairsTall()
+	private void SetStairs(int steps)
 	{
-		if (_original.Steps == ClimbStepCount) return;
-		_original.Steps = ClimbStepCount;
+		if (_original.Steps == steps) return;
+		_original.Steps = steps;
 		_original.Build();
+	}
+
+	/// <summary>A Continue that lands inside the fog radius gets the height fog at once (no line: the
+	/// player never "arrived"); one that lands outside arms the fog-zone question for when they do.</summary>
+	private async Task RestoreFog(CancellationToken ct)
+	{
+		while (GameFlow.Instance is { Started: false }) await Cutscene.Frame(this, ct);
+		if (_fogZone == null || _climbFired) return;
+		var p = StoryBeat.Player(this);
+		if (p != null && new Vector2(p.GlobalPosition.X - _original.GlobalPosition.X, p.GlobalPosition.Z - _original.GlobalPosition.Z).Length() < FogRampRadius)
+			RampFog(false);
+		else _fogLineArmed = true;
 	}
 
 	// ================================================================== the radio, outside again
@@ -128,6 +160,9 @@ public partial class Act11Ending : Node3D
 			Vector3 away = bunker != null ? spot - bunker.GlobalPosition : Vector3.Forward;
 			float yawHome = Mathf.Atan2(-away.X, -away.Z);
 			player.Teleport(spot, yawHome);
+			// The stairs are rebuilt behind the black: already impossibly tall by the time the compass
+			// leads there, and the rebuild never hitches the dialogue.
+			SetStairs(StairsState.TallSteps);
 			await Cutscene.Frame(this, ct);
 			if (fader != null) await fader.Fade(0f, 1.2f);
 		}
@@ -147,11 +182,13 @@ public partial class Act11Ending : Node3D
 		PlayStatic(0.6f);
 		await Cutscene.Wait(this, 1.0, ct);
 
-		// Already impossibly tall by the time the compass leads there — not growing at the last second.
-		MakeStairsTall();
-
+		_fogLineArmed = true;
 		StoryManager.Instance.MarkAct11DialogueDone();
 		GD.Print("[story] Act 11: the radio speaks");
+
+		// The radio keeps asking: the first question comes on the walk, unless they're already climbing.
+		await Cutscene.Wait(this, GameSettings.Instance.AutoTest ? 3.0 : 25.0, ct);
+		if (!_climbFired) await Ask("\"Are you alone out there?\"", ct);
 	}
 
 	/// <summary>A burst of walkie-talkie static on the Radio bus (band-limited and distorted), faded out after 1.4 s.</summary>
@@ -162,7 +199,7 @@ public partial class Act11Ending : Node3D
 		var p = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(path), Bus = "Radio", VolumeDb = -6f + extraGain * 10f };
 		Cutscene.SceneRoot(this).AddChild(p);
 		p.Play();
-		Cutscene.Run(this, async ct =>
+		_ = Cutscene.Run(this, async ct =>
 		{
 			try
 			{
@@ -178,6 +215,24 @@ public partial class Act11Ending : Node3D
 		});
 	}
 
+	/// <summary>One of the radio's questions: a short static burst, then the line on the subtitle band.
+	/// Questions queue behind each other so two never fight over the band.</summary>
+	private Task Ask(string line, CancellationToken ct)
+	{
+		var prev = _lineChain;
+		async Task Go()
+		{
+			try { await prev; } catch (System.OperationCanceledException) { }
+			ct.ThrowIfCancellationRequested();
+			if (Subtitle.Instance == null) return;
+			PlayStatic(0.3f);
+			await Cutscene.Wait(this, 0.35, ct);
+			await Subtitle.Instance.Show(line, 0.6f, 2.6f, 0.8f);
+		}
+		_lineChain = Go();
+		return _lineChain;
+	}
+
 	// ================================================================== the walk back to the stairs
 
 	private void EnsureClimbTriggers()
@@ -188,23 +243,24 @@ public partial class Act11Ending : Node3D
 		// The closer the player gets, the more the fog swallows everything above roughly the
 		// stairs' midpoint — from the ground you can never quite see where they end.
 		_fogZone = StoryBeat.MakeTrigger(_original, new CylinderShape3D { Radius = FogRampRadius, Height = 200f },
-			Vector3.Zero, _ => RampFog(), "Act11FogZone");
+			Vector3.Zero, _ => RampFog(_fogLineArmed), "Act11FogZone");
 	}
 
-	private void RampFog()
+	private void RampFog(bool ask)
 	{
 		if (_fogZone == null) return;
 		_fogZone.QueueFree();
 		_fogZone = null;
 		StoryBeat.Atmosphere(this)?.SetHeightFog(_original.GlobalPosition.Y + _original.TotalHeight * 0.4f, 0.1f, 9f);
+		if (ask) _ = Cutscene.Run(this, ct => Ask("\"Did you count them?\"", ct));
 	}
 
 	private void OnClimbTriggerEntered(PlayerController player)
 	{
 		if (_climbFired || StoryManager.Instance is not { Act11DialogueDone: true }) return;
 		_climbFired = true;
-		RampFog();   // in case the player came from inside the fog radius on load
-		Cutscene.Run(this, ct => ClimbAndEncounter(player, ct), lockInput: true, freezeBody: true);
+		RampFog(false);   // in case the player came from inside the fog radius on load
+		_ = Cutscene.Run(this, ct => ClimbAndEncounter(player, ct), lockInput: true, freezeBody: true);
 	}
 
 	// ================================================================== the climb, the giant, the touch
@@ -222,6 +278,10 @@ public partial class Act11Ending : Node3D
 		var hum = StairsHum.Instance;
 		var humTween = CreateTween();
 		humTween.TweenMethod(Callable.From<float>(db => hum?.SetOverrideDb(db)), ClimbHumStartDb, ClimbHumTopDb, climbSeconds);
+
+		// Two questions on the way up: 10 s and 30 s into a 46 s climb (the same fractions of a shorter one).
+		_ = Cutscene.Run(this, async c => { await Cutscene.Wait(this, climbSeconds * (10f / 46f), c); await Ask("\"Who's that with you?\"", c); });
+		_ = Cutscene.Run(this, async c => { await Cutscene.Wait(this, climbSeconds * (30f / 46f), c); await Ask("\"Is he still in the chair?\"", c); });
 
 		var tween = player.CreateTween();
 		tween.TweenProperty(player, "global_position", dest, climbSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
@@ -249,6 +309,10 @@ public partial class Act11Ending : Node3D
 
 			await StoryBeat.PanTowards(this, player, body.GlobalPosition, 2.2f, ct);
 			await Cutscene.Wait(this, 1.2, ct);
+
+			// Just before the eyes open, the radio asks one more.
+			_ = Ask("\"Do you see him now?\"", ct);
+			await Cutscene.Wait(this, 1.0, ct);
 
 			var eyeTween = body.CreateTween();
 			eyeTween.TweenMethod(Callable.From<float>(v => skin.SetShaderParameter("eye_glow", v)), 0f, 7.5f, 2.4f);
@@ -290,8 +354,53 @@ public partial class Act11Ending : Node3D
 		if (StoryBeat.Fader(this) is { } f2) await f2.Fade(0f, 1.4f);
 
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act11GiantEncounter);
-		Cutscene.Run(this, _ => StoryBeat.Caption(this, "Morning. You don't remember how you got here.", 1.4f, 3.6f, 1.4f));
+		// The wake-up, the last question and the ending run unlocked: the player has the clearing meanwhile.
+		_ = Cutscene.Run(this, Ending);
 		GD.Print("[story] Act 11: the giant touches the player");
+	}
+
+	// ================================================================== the end
+
+	/// <summary>The waking caption, the closing question, a while in the dawn clearing, then black, the card, the menu.</summary>
+	private async Task Ending(CancellationToken ct)
+	{
+		await StoryBeat.Caption(this, "Morning. You don't remember how you got here.", 1.4f, 3.6f, 1.4f);
+		ct.ThrowIfCancellationRequested();
+		await Ask(ClosingLine, ct);
+		await Cutscene.Wait(this, GameSettings.Instance.AutoTest ? RoamSecondsAutoTest : RoamSecondsReal, ct);
+		EndingStarted = true;
+		_ = Cutscene.Run(this, async c =>
+		{
+			var pause = FindPauseMenu();
+			if (pause != null) pause.Locked = true;
+			try
+			{
+				var fader = StoryBeat.Fader(this);
+				if (fader != null) await fader.Fade(1f, EndFadeSeconds);
+				c.ThrowIfCancellationRequested();
+				if (fader != null) await ShowEndCard(fader, EndCardHoldSeconds);
+				c.ThrowIfCancellationRequested();
+				GD.Print("[story] the end: back to the menu");
+				StoryManager.Instance?.ReturnToMenu();
+			}
+			finally
+			{
+				if (pause != null && IsInstanceValid(pause)) pause.Locked = false;
+			}
+		}, lockInput: true, freezeBody: true);
+	}
+
+	/// <summary>The single end card in the fader's caption style (hold &lt; 0 keeps it up, for previews).</summary>
+	public static Task ShowEndCard(ScreenFader fader, float hold) => fader.ShowCaption(EndCardTitle, "", 1.5f, hold, 1.5f);
+
+	private PauseMenu FindPauseMenu()
+	{
+		var tree = GetTree();
+		if (tree.GetFirstNodeInGroup("pause_menu") is PauseMenu grouped) return grouped;
+		// Nothing registers the pause menu in a group yet: look once under the level, then register it.
+		if (tree.CurrentScene?.FindChild("PauseMenu", true, false) is not PauseMenu found) return null;
+		found.AddToGroup("pause_menu");
+		return found;
 	}
 
 	/// <summary>

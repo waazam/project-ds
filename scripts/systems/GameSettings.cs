@@ -134,6 +134,7 @@ public partial class GameSettings : Node
 		AddMouse("photo", MouseButton.Left);
 		AddMouse("item_next", MouseButton.WheelDown);
 		AddMouse("item_prev", MouseButton.WheelUp);
+		AddKeys("photo_log", Key.Tab);
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);
@@ -150,6 +151,7 @@ public partial class GameSettings : Node
 		AddAxis("focus", JoyAxis.TriggerRight, 1);
 		AddButton("flashlight_toggle", JoyButton.Y);
 		AddButton("photo", JoyButton.X);
+		AddButton("photo_log", JoyButton.Back);
 	}
 
 	private static void Ensure(string action)

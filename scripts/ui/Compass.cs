@@ -22,6 +22,11 @@ public partial class Compass : CanvasLayer
 	[Export] public float StripHeight = 13f;
 	/// <summary>Total degrees of heading shown across the strip.</summary>
 	[Export] public float VisibleDegrees = 140f;
+	/// <summary>Fastest the objective marker may sweep around the ribbon, in degrees per second.</summary>
+	[Export] public float MaxSweepDegPerSec = 40f;
+
+	private float _shownBearing;
+	private bool _hasBearing;
 
 	private static readonly (string Label, float Deg)[] Ticks =
 	{
@@ -84,6 +89,7 @@ public partial class Compass : CanvasLayer
 		_jitter = distortion > 0.15f ? (distortion - 0.15f) / 0.85f : 0f;
 
 		_glitchPhase += (float)delta;
+		UpdateShownBearing((float)delta);
 		_draw.QueueRedraw();
 	}
 
@@ -136,7 +142,8 @@ public partial class Compass : CanvasLayer
 		}
 
 		// Objective marker: a small eye-yellow diamond riding the line, or an arrow pinned to the edge if it's behind us.
-		float bearing = ObjectiveBearingDeg();
+		if (!_hasBearing) return;
+		float bearing = _shownBearing;
 		if (jitter > 0.05f)
 		{
 			if (_clock >= _nextFalseBearing) { _falseBearing = _rng.RandfRange(0f, 360f); _nextFalseBearing = _clock + Mathf.Lerp(3.0, 0.4, jitter); }
@@ -157,12 +164,22 @@ public partial class Compass : CanvasLayer
 
 	private float JitterPx(float jitter, float amount) => jitter <= 0f ? 0f : Mathf.Sin(_glitchPhase * 41f + amount) * amount * jitter;
 
-	private float ObjectiveBearingDeg()
+	/// <summary>
+	/// The marker never snaps. When the objective changes (or the player moves), the shown bearing
+	/// sweeps toward the true one at no more than <see cref="MaxSweepDegPerSec"/>: a full about-face
+	/// takes a few seconds to read, which is calm rather than disorienting. It snaps only when an
+	/// objective first appears after there was none.
+	/// </summary>
+	private void UpdateShownBearing(float delta)
 	{
 		var target = Systems.StoryManager.Instance?.ObjectivePosition;
-		if (target == null || _player == null) return 0f;
+		if (target == null || _player == null) { _hasBearing = false; return; }
 		Vector3 d = target.Value - _player.GlobalPosition; d.Y = 0;
-		if (d.LengthSquared() < 0.01f) return 0f;
-		return Mathf.RadToDeg(Mathf.Atan2(-d.X, -d.Z));
+		if (d.LengthSquared() < 0.01f) return;   // standing on it: keep the last heading
+		float trueDeg = Mathf.RadToDeg(Mathf.Atan2(-d.X, -d.Z));
+		if (!_hasBearing) { _shownBearing = trueDeg; _hasBearing = true; return; }
+		float diff = Mathf.Wrap(trueDeg - _shownBearing, -180f, 180f);
+		float step = MaxSweepDegPerSec * delta;
+		_shownBearing = Mathf.Wrap(_shownBearing + Mathf.Clamp(diff, -step, step), 0f, 360f);
 	}
 }

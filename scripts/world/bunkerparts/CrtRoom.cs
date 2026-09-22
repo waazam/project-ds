@@ -24,6 +24,18 @@ public partial class CrtRoom : Node3D
 
 	private static readonly Color GlowCold = new(0.55f, 0.62f, 0.7f);
 
+	/// <summary>The station log's three entries, the last unfinished (story-gaps P11).</summary>
+	public const string LogText =
+		"09/19  0300  Steps on 3 lit again. Two went up. Recorded.\n" +
+		"09/20  0310  One came down. Did not answer. Recorded.\n" +
+		"09/21  0314  I am going up to see";
+	/// <summary>The condemnation slip in the open drawer (story-gaps P12).</summary>
+	public const string SlipText =
+		"TRACT 41  CULLEN, M.  dwelling and barn burned per order 4/1937.  Steps left standing.\n" +
+		"Note 1961: steps rebuilt. No work order. Removed.\n" +
+		"Note 1974: steps rebuilt. Removed.\n" +
+		"Note 1998: see Station 3.";
+
 	private ShaderMaterial _normalMat, _targetMat;
 	private Node3D _target;
 	private Vector3 _targetTubeLocal;
@@ -305,6 +317,10 @@ public partial class CrtRoom : Node3D
 		k.CommitTo(this, "Console");
 		AddBox(new Vector3(0, ConsoleTop * 0.5f, ConsoleZ), new Vector3(1.6f, ConsoleTop, 0.8f));
 
+		// The station log, open on the desk left of the keyboard, readable before or after the switch.
+		PaperKit.Flat(this, new Vector3(-0.57f, ConsoleTop, ConsoleZ + 0.27f), -7f, new Vector2(0.32f, 0.22f), PaperKit.Look.Ledger,
+			"", LogText, Readable.NoteStyle.Typed, "Read the log", 3);
+
 		// The marked set: on the console, facing the room.
 		_target = new Node3D { Name = "CrtTarget", Position = new Vector3(0, ConsoleTop, ConsoleZ - 0.1f) };
 		AddChild(_target);
@@ -333,11 +349,7 @@ public partial class CrtRoom : Node3D
 			SwitchUsed?.Invoke();
 		};
 
-		var near = new Area3D { Name = "TargetReach", CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
-		near.Position = new Vector3(0, 0, 1.6f);
-		near.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 2.2f } });
-		_target.AddChild(near);
-		near.BodyEntered += b => { if (b is PlayerController) PlayerAtTarget = true; };
+		var near = StoryBeat.MakeTrigger(_target, new SphereShape3D { Radius = 2.2f }, new Vector3(0, 0, 1.6f), _ => PlayerAtTarget = true, "TargetReach");
 		near.BodyExited += b => { if (b is PlayerController) PlayerAtTarget = false; };
 	}
 
@@ -374,7 +386,20 @@ public partial class CrtRoom : Node3D
 				float y = 0.18f + d * 0.32f;
 				bool open = i == 1 && d == 2;
 				k.Color = new Color(0.7f, 0.72f, 0.68f);
-				k.Box(new Vector3(c.X + 0.3f + (open ? 0.2f : 0.005f), y, c.Z), new Vector3(open ? 0.4f : 0.01f, 0.26f, 0.44f));
+				if (!open) { k.Box(new Vector3(c.X + 0.305f, y, c.Z), new Vector3(0.01f, 0.26f, 0.44f)); continue; }
+				// The open drawer: a tray pulled 0.4 m out, hanging files inside, one card lying across their tops.
+				float x0 = c.X + 0.3f, x1 = c.X + 0.7f, floor = y - 0.12f;
+				k.Box(new Vector3(x1 - 0.01f, y, c.Z), new Vector3(0.02f, 0.26f, 0.44f));                        // front
+				k.Box(new Vector3((x0 + x1) * 0.5f, floor + 0.01f, c.Z), new Vector3(x1 - x0, 0.02f, 0.44f));   // bottom
+				foreach (float sz in new[] { -0.21f, 0.21f })
+					k.Box(new Vector3((x0 + x1) * 0.5f, floor + 0.1f, c.Z + sz), new Vector3(x1 - x0, 0.2f, 0.02f));   // sides
+				k.Color = new Color(0.64f, 0.55f, 0.38f);
+				for (int f = 0; f < 5; f++)
+					k.Box(new Vector3(x0 + 0.06f + f * 0.065f, floor + 0.11f, c.Z + rng.RandfRange(-0.01f, 0.01f)),
+						new Vector3(0.012f, 0.2f, 0.4f), 1f, Basis.FromEuler(new Vector3(0, 0, rng.RandfRange(-0.06f, 0.06f))));
+				k.Color = new Color(0.7f, 0.72f, 0.68f);
+				PaperKit.Flat(this, new Vector3(x0 + 0.21f, floor + 0.215f, c.Z + 0.02f), 14f, new Vector2(0.13f, 0.09f), PaperKit.Look.Card,
+					"", SlipText, Readable.NoteStyle.Typed, "Read the card", 5);
 			}
 			AddBox(c, new Vector3(0.6f, 1.32f, 0.5f));
 		}

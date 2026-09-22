@@ -58,11 +58,40 @@ public partial class Bird : Node3D
 		}
 		_rng.Seed = (ulong)(Seed() * 7919 + 13);
 		if (!Engine.IsEditorHint()) BuildPerchOrGround();
+		if (!Engine.IsEditorHint() && Systems.StoryManager.Instance is { } story)
+		{
+			// Restore: a bird already on the roll (or the whole flock, once the black one was shot) stays gone;
+			// from Act 2 on the birds are gone and silent either way. The perch stays in both cases.
+			bool shot = story.HasFlag(Systems.StoryManager.Flag.Photo("bird_" + FlagName)) || story.HasFlag(Systems.StoryManager.Flag.Photo("bird_black"));
+			if (shot) { Photographed = true; RemoveFromGroup("photo_birds"); return; }
+			if (story.Current >= Systems.Checkpoint.Act2StairsClimbed) { Gone = true; RemoveFromGroup("photo_birds"); return; }
+			story.CheckpointReached += OnCheckpoint;
+		}
 		_model = new Node3D { Name = "Model", Scale = Vector3.One * ModelScale };
 		AddChild(_model);
 		Build();
 		_headTimer = _rng.RandfRange(0.2f, 1f);
 		_bodyTimer = _rng.RandfRange(1f, 4f);
+	}
+
+	/// <summary>The bird's name in the photo log ("photo_bird_" + this).</summary>
+	public string FlagName => Color switch { BirdColor.Red => "red", BirdColor.Blue => "blue", BirdColor.Purple => "purple", _ => "black" };
+
+	/// <summary>Hidden and silent from Act 2 on (a cardinal beside the burning cabin at night is wrong); the perch stays.</summary>
+	public bool Gone { get; private set; }
+
+	public override void _ExitTree()
+	{
+		if (!Engine.IsEditorHint() && Systems.StoryManager.Instance is { } story) story.CheckpointReached -= OnCheckpoint;
+	}
+
+	private void OnCheckpoint(Systems.Checkpoint cp)
+	{
+		if (cp < Systems.Checkpoint.Act2StairsClimbed || Gone) return;
+		Gone = true;
+		if (IsInGroup("photo_birds")) RemoveFromGroup("photo_birds");
+		if (_model != null && IsInstanceValid(_model)) _model.QueueFree();
+		_model = null;
 	}
 
 	private int Seed() => (int)Color * 191 + (int)(GlobalPosition.X * 13f) + (int)(GlobalPosition.Z * 7f);

@@ -15,7 +15,10 @@ namespace ProjectDS.Audio;
 /// tension. It adds weight and brings in the shimmer, but the bed is present
 /// from the first step. When the silence around a staircase takes hold, the
 /// score cuts out almost instantly, and it only creeps back slowly once you
-/// leave. Everything runs on the Music bus, set well under the forest.
+/// leave. Indoors (the bunker, kilometres from the trailhead) the depth holds
+/// at its last outdoor value, so the score doesn't swell to full just because
+/// the interior sits far away. Everything runs on the Music bus, set well
+/// under the forest.
 /// </summary>
 public partial class MusicDirector : Node
 {
@@ -34,6 +37,7 @@ public partial class MusicDirector : Node
 	private Node3D _player, _spawn;
 	private Stalker _stalker;
 	private bool _stalkerSearched;   // looked up once: a scene without a stalker must not search every frame
+	private float _outdoorDepth;
 
 	public override void _Ready()
 	{
@@ -47,17 +51,23 @@ public partial class MusicDirector : Node
 		float dt = (float)delta;
 		_player ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
 		_spawn ??= GetTree().GetFirstNodeInGroup("player_spawn") as Node3D;
-		if (!_stalkerSearched) { _stalkerSearched = true; _stalker = GetTree().CurrentScene?.FindChild("Stalker", true, false) as Stalker; }
+		if (!_stalkerSearched) { _stalkerSearched = true; _stalker = GetTree().GetFirstNodeInGroup("stalker") as Stalker; }
 		if (_player == null) return;
 
-		// How deep, how hunted.
-		float depth = _spawn == null ? 0f
-			: Mathf.Clamp(new Vector2(_player.GlobalPosition.X - _spawn.GlobalPosition.X, _player.GlobalPosition.Z - _spawn.GlobalPosition.Z).Length() / DepthMeters, 0f, 1f);
+		// How deep, how hunted. Indoors, depth stays where it was when the player went in.
+		var amb = ForestAmbienceManager.Instance;
+		float depth = _outdoorDepth;
+		if (amb is not { IsIndoor: true })
+		{
+			depth = _spawn == null ? 0f
+				: Mathf.Clamp(new Vector2(_player.GlobalPosition.X - _spawn.GlobalPosition.X, _player.GlobalPosition.Z - _spawn.GlobalPosition.Z).Length() / DepthMeters, 0f, 1f);
+			_outdoorDepth = depth;
+		}
 		float target = Mathf.Clamp(0.1f + 0.65f * depth + TensionWeight * (_stalker?.Tension ?? 0f), 0f, 1f);
 		Intensity = Mathf.Lerp(Intensity, target, 1f - Mathf.Exp(-dt / IntensitySmoothing));
 
 		// The silence takes it away at once; it only creeps back.
-		float silence = ForestAmbienceManager.Instance?.Silence ?? 0f;
+		float silence = amb?.Silence ?? 0f;
 		Cut = silence > CutAtSilence
 			? Mathf.Max(0f, Cut - dt / CutSeconds)
 			: Mathf.Min(1f, Cut + dt / ReturnSeconds);

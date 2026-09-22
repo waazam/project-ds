@@ -33,9 +33,9 @@ public static class RespawnPoints
 		{
 			case Checkpoint.Act1Start when spawn != null:
 				return (spawn.GlobalPosition + Vector3.Up * 0.1f, YawOf(-spawn.GlobalBasis.Z));
-			case Checkpoint.Act2StairsClimbed when top != null:
-				// The top landing, where the forced climb left them (not on the ground: the landing is the floor).
-				return (top.GlobalPosition + Vector3.Up * 0.1f, save.Yaw);
+			case Checkpoint.Act2StairsClimbed when bridge != null:
+				// Where the climb's blackout left them: the cabin-side end of the footbridge, facing home.
+				return FirstClimbEvent.WakeSpot(n);
 			case Checkpoint.Act5CabinEntered when cabin != null
 				&& StoryManager.Instance is { NewelPostTaken: true } s5 && !s5.HasFlag(StoryManager.Flag.DawnBroke):
 				// Post in hand but not yet carried out: just inside the (open) doorway, facing out, so

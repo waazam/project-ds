@@ -41,9 +41,15 @@ public static class StoryBeat
 		return byName;
 	}
 
-	/// <summary>A narration caption on the fader (no title). Completes immediately if there is no fader.</summary>
-	public static Task Caption(Node owner, string text, float fadeIn, float hold, float fadeOut)
-		=> Fader(owner)?.ShowCaption("", text, fadeIn, hold, fadeOut) ?? Task.CompletedTask;
+	/// <summary>A narration caption on the fader (no title). Completes immediately if there is no fader.
+	/// Pass the cutscene's token so a cancelled sequence takes its caption down with it.</summary>
+	public static Task Caption(Node owner, string text, float fadeIn, float hold, float fadeOut, CancellationToken ct = default)
+		=> Fader(owner)?.ShowCaption("", text, fadeIn, hold, fadeOut, ct) ?? Task.CompletedTask;
+
+	/// <summary>A second line under the caption band (a voice echoing the first), so two overlapping
+	/// captions render as two lines instead of one overwriting the other.</summary>
+	public static Task Echo(Node owner, string text, float fadeIn, float hold, float fadeOut, CancellationToken ct = default)
+		=> Fader(owner)?.ShowEcho(text, fadeIn, hold, fadeOut, ct) ?? Task.CompletedTask;
 
 	/// <summary>Reaches a checkpoint at the player's current position and view.</summary>
 	public static void ReachCheckpoint(PlayerController p, Checkpoint cp)
@@ -108,7 +114,7 @@ public static class StoryBeat
 			{
 				float want = Mathf.Atan2(-to.X, -to.Z);
 				float diff = Mathf.AngleDifference(player.CameraRig.Yaw, want);
-				player.PlayerInput.AddScriptedLook(new Vector2(Mathf.Clamp(diff, -0.06f, 0.06f), 0));
+				player.PlayerInput.AddCutsceneLook(new Vector2(Mathf.Clamp(diff, -0.06f, 0.06f), 0));
 			}
 			await Cutscene.Frame(owner, ct);
 			t += owner.GetProcessDeltaTime();

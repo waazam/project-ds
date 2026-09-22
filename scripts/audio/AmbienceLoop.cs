@@ -14,6 +14,9 @@ namespace ProjectDS.Audio;
 /// Drift keeps a bed from sounding static: volume (and optionally pitch)
 /// wander slowly on their own random curve, so no two minutes sound the same.
 /// ForestDirector adds its own push on top through Gain and ExtraDb.
+///
+/// The parent player is resolved once to its concrete type and written only
+/// when the value actually moves (some thirty of these run every frame).
 /// </summary>
 public partial class AmbienceLoop : Node
 {
@@ -38,15 +41,28 @@ public partial class AmbienceLoop : Node
 	/// <summary>dB offset set by ForestDirector (gusts, activity).</summary>
 	public float ExtraDb = 0f;
 
-	private Node _source;
+	private const float WriteThresholdDb = 0.05f;
+	private const float WriteThresholdPitch = 0.0005f;
+
+	private AudioStreamPlayer _player2D;
+	private AudioStreamPlayer3D _player3D;
 	private bool _useFade;
 	private double _time;
 	private readonly float[] _freq = new float[4];
 	private readonly float[] _phase = new float[4];
+	private float _lastDb = float.NaN, _lastPitch = float.NaN;
+
+	private AudioStream Stream
+	{
+		get => _player2D != null ? _player2D.Stream : _player3D?.Stream;
+		set { if (_player2D != null) _player2D.Stream = value; else if (_player3D != null) _player3D.Stream = value; }
+	}
 
 	public override void _Ready()
 	{
-		_source = GetParent();
+		_player2D = GetParent() as AudioStreamPlayer;
+		_player3D = GetParent() as AudioStreamPlayer3D;
+		if (_player2D == null && _player3D == null) { GD.PushWarning($"AmbienceLoop: parent of {Name} is not an audio player"); return; }
 		_useFade = SilenceFade.Y > SilenceFade.X;
 		var rng = new RandomNumberGenerator();
 		for (int i = 0; i < 4; i++)
@@ -55,22 +71,22 @@ public partial class AmbienceLoop : Node
 			_phase[i] = rng.RandfRange(0f, Mathf.Tau);
 		}
 
-		// An empty stream slot reads as a null Object, not Nil, so test the object itself.
-		if (_source.Get("stream").AsGodotObject() == null && StreamPath != "" && ResourceLoader.Exists(StreamPath))
-			_source.Set("stream", GD.Load<AudioStream>(StreamPath));
-		if (_source.Get("stream").AsGodotObject() == null) { GD.PushWarning($"AmbienceLoop: no stream for {_source.Name}"); return; }
-		if (_source.Get("stream").AsGodotObject() is AudioStreamWav wav)
+		if (Stream == null && StreamPath != "" && ResourceLoader.Exists(StreamPath))
+			Stream = GD.Load<AudioStream>(StreamPath);
+		if (Stream == null) { GD.PushWarning($"AmbienceLoop: no stream for {GetParent().Name}"); return; }
+		if (Stream is AudioStreamWav wav)
 		{
 			wav = (AudioStreamWav)wav.Duplicate();
 			wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
 			wav.LoopBegin = 0;
 			// In frames, from the duration: imported WAVs are compressed (QOA), so the byte size says nothing.
 			wav.LoopEnd = Mathf.RoundToInt(wav.GetLength() * wav.MixRate);
-			_source.Set("stream", wav);
+			Stream = wav;
 		}
 		Apply();
-		var length = (_source.Get("stream").AsGodotObject() as AudioStream)?.GetLength() ?? 0;
-		_source.Call("play", (float)GD.RandRange(0.0, Mathf.Max(length - 0.1, 0.0)));
+		double length = Stream.GetLength();
+		float from = (float)GD.RandRange(0.0, Mathf.Max(length - 0.1, 0.0));
+		if (_player2D != null) _player2D.Play(from); else _player3D.Play(from);
 	}
 
 	public override void _Process(double delta)
@@ -94,7 +110,16 @@ public partial class AmbienceLoop : Node
 			db += Mathf.LinearToDb(Mathf.Max(t, 0.0001f));
 		}
 		db += Mathf.LinearToDb(Mathf.Max(Gain, 0.0001f));
-		_source.Set("volume_db", Mathf.Max(db, -80f));
-		if (DriftPitch > 0f) _source.Set("pitch_scale", 1f + DriftPitch * Wander(2, 3));
+		db = Mathf.Max(db, -80f);
+		if (float.IsNaN(_lastDb) || Mathf.Abs(db - _lastDb) > WriteThresholdDb)
+		{
+			_lastDb = db;
+			if (_player2D != null) _player2D.VolumeDb = db; else _player3D.VolumeDb = db;
+		}
+		if (DriftPitch <= 0f) return;
+		float pitch = 1f + DriftPitch * Wander(2, 3);
+		if (!float.IsNaN(_lastPitch) && Mathf.Abs(pitch - _lastPitch) <= WriteThresholdPitch) return;
+		_lastPitch = pitch;
+		if (_player2D != null) _player2D.PitchScale = pitch; else _player3D.PitchScale = pitch;
 	}
 }

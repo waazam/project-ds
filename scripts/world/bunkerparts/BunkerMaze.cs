@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using ProjectDS.Entities;
 using ProjectDS.Player;
+using ProjectDS.Systems;
 using static ProjectDS.World.BunkerParts.BunkerLayout;
 
 namespace ProjectDS.World.BunkerParts;
@@ -71,17 +72,13 @@ public partial class BunkerMaze : Node3D
 		AddChild(_creature);
 		_glimpseRng = new RandomNumberGenerator { Seed = 1010 };
 
-		_exitTrigger = new Area3D { Name = "ExitTrigger", CollisionLayer = 0, CollisionMask = 2, Monitorable = false, Monitoring = true };
-		_exitTrigger.Position = ExitLocal - MazeOffset;
-		_exitTrigger.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(MazeCell * 0.8f, 2f, MazeCell * 0.8f) } });
-		AddChild(_exitTrigger);
-		_exitTrigger.BodyEntered += b =>
+		_exitTrigger = StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(MazeCell * 0.8f, 2f, MazeCell * 0.8f) }, ExitLocal - MazeOffset, _ =>
 		{
-			if (Exited || !Active || b is not PlayerController) return;
+			if (Exited || !Active) return;
 			Exited = true;
 			Active = false;
 			ExitReached?.Invoke();
-		};
+		}, "ExitTrigger");
 	}
 
 	/// <summary>Restore: the exit has already been reached.</summary>
@@ -165,7 +162,7 @@ public partial class BunkerMaze : Node3D
 		_creature.Rotation = new Vector3(0, Mathf.Atan2(to.X, to.Z), 0);
 		_creature.Visible = true;
 		BunkerKit.OneShot(this, "res://assets/audio/sfx/stalker_seen_01.wav", mazeLocal + Vector3.Up * 1.6f, "Unnatural", -6f, 1f, 4f, 30f);
-		Systems.Cutscene.Run(this, async ct =>
+		_ = Systems.Cutscene.Run(this, async ct =>
 		{
 			await Systems.Cutscene.Wait(this, 0.6, ct);
 			_creature.Visible = false;

@@ -86,7 +86,7 @@ public partial class UiPreviewDriver : Node
 		prop.GlobalPosition = cam.GlobalPosition - cam.GlobalBasis.Z * 1.9f + Vector3.Down * 0.45f;
 		var mat = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.24f, 0.16f) };
 		prop.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.45f, 0.32f, 0.32f), Material = mat } });
-		var it = new Interactable { Prompt = "[E] Take Axe", PickRadius = 0.6f, PickOffset = new Vector3(0, 0.35f, 0) };
+		var it = new Interactable { Prompt = "Take Axe", PickRadius = 0.6f, PickOffset = new Vector3(0, 0.35f, 0) };
 		prop.AddChild(it);
 		_ = Subtitle.Instance?.Show("\"...are you still out there? Say something.\"", 0.2f, 2.5f, 0.2f);
 		await Seconds(0.6);
@@ -95,7 +95,7 @@ public partial class UiPreviewDriver : Node
 		Shot("hud_01_prompt", "hud_01_all_elements.png");
 		await Seconds(2.5);
 
-		it.Prompt = "[Hold E] Pry the boards loose";
+		it.Prompt = "Pry the boards loose";
 		it.HoldSeconds = 3f;
 		pin.Scripted = true;
 		pin.ScriptedInteract = true;
@@ -104,7 +104,7 @@ public partial class UiPreviewDriver : Node
 		Shot("hud_02_hold");
 		pin.ScriptedInteract = false;
 		pin.Scripted = false;
-		it.Prompt = "[E] Take Axe"; it.HoldSeconds = 0f;
+		it.Prompt = "Take Axe"; it.HoldSeconds = 0f;
 		await Frames(10);
 
 		// Both caption bands and the prompt together (worst case): they must not overlap.

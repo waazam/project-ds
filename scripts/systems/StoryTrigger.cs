@@ -8,7 +8,9 @@ namespace ProjectDS.Systems;
 ///
 /// Subclasses answer three questions:
 /// - <see cref="AlreadyHappened"/>: has the saved story already passed this beat? Checked once,
-///   deferred from _Ready, so a Continue never replays it (the restore contract).
+///   the first time it matters (the first entry, or the deferred restore, whichever comes first),
+///   so a Continue never replays it (the restore contract), even if the player's body is already
+///   overlapping the volume on the first physics tick.
 /// - <see cref="CanFire"/>: is the story in the right state for it right now?
 /// - <see cref="Fire"/>: play it (usually <c>Cutscene.Run</c>).
 ///
@@ -25,6 +27,7 @@ public partial class StoryTrigger : Area3D
 	protected virtual bool RecheckWhileInside => false;
 
 	private PlayerController _inside;
+	private bool _restoreChecked;
 
 	public override void _Ready()
 	{
@@ -68,8 +71,17 @@ public partial class StoryTrigger : Area3D
 	{
 		var s = StoryManager.Instance;
 		if (s == null) return;
-		if (AlreadyHappened(s)) Fired = true;
+		CheckRestored(s);
 		OnRestored(s);
+	}
+
+	/// <summary>Evaluates <see cref="AlreadyHappened"/> exactly once, on whichever comes first: the
+	/// deferred restore or the first attempt to fire.</summary>
+	private void CheckRestored(StoryManager s)
+	{
+		if (_restoreChecked) return;
+		_restoreChecked = true;
+		if (AlreadyHappened(s)) Fired = true;
 	}
 
 	private void OnBodyEntered(Node3D body)
@@ -91,7 +103,9 @@ public partial class StoryTrigger : Area3D
 
 	protected void TryFire(PlayerController player)
 	{
-		if (Fired || StoryManager.Instance is not { } s || !CanFire(s, player)) return;
+		if (Fired || StoryManager.Instance is not { } s) return;
+		CheckRestored(s);
+		if (Fired || !CanFire(s, player)) return;
 		Fired = true;
 		Fire(player);
 	}

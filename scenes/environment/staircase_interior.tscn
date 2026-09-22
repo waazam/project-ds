@@ -1,6 +1,7 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/StaircaseBuilder.cs" id="1_stairs"]
+[ext_resource type="Script" path="res://scripts/world/PhotoSubject.cs" id="5_photo"]
 [ext_resource type="Script" path="res://scripts/audio/SilenceZone.cs" id="2_silence"]
 [ext_resource type="Script" path="res://scripts/world/ClearZone.cs" id="3_clear"]
 [ext_resource type="Script" path="res://scripts/world/FirstClimbEvent.cs" id="4_climb"]
@@ -91,3 +92,11 @@ Radius = 1.2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10.6)
 script = ExtResource("3_clear")
 Radius = 1.2
+
+[node name="PhotoSubject" type="Node3D" parent="."]
+script = ExtResource("5_photo")
+Id = "stairs"
+LookPoints = PackedVector3Array(0, 0.4, 0, 0, 3, -5.5, 0, 6.1, -10.4)
+MinDistance = 3.0
+MaxDistance = 30.0
+ConeDegrees = 18.0

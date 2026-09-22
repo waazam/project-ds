@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://scripts/world/CabinExitLine.cs" id="7_exitline"]
 [ext_resource type="Script" path="res://scripts/world/CabinFireEvent.cs" id="8_fire"]
 [ext_resource type="Script" path="res://scripts/audio/IndoorZone.cs" id="9_indoor"]
+[ext_resource type="Script" path="res://scripts/world/PhotoSubject.cs" id="10_photo"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_door"]
 size = Vector3(12, 6, 12)
@@ -88,3 +89,11 @@ script = ExtResource("9_indoor")
 
 [node name="Shape" type="CollisionShape3D" parent="IndoorZone"]
 shape = SubResource("BoxShape3D_indoor")
+
+[node name="PhotoSubject" type="Node3D" parent="."]
+script = ExtResource("10_photo")
+Id = "cabin"
+LookPoints = PackedVector3Array(0, 1, 2.6, 0, 3.6, 0)
+MinDistance = 4.0
+MaxDistance = 22.0
+ConeDegrees = 16.0

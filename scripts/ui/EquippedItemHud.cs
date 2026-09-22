@@ -9,7 +9,8 @@ namespace ProjectDS.UI;
 /// like the compass: a thin rule, no solid backing, muted serif text, one item
 /// per line. There is no selecting: every item works at any time (the camera
 /// raises on right mouse, the lantern toggles on F, tools are used by walking up
-/// to what they're for), so this only shows what's in the pack.
+/// to what they're for), so this only shows what's in the pack. It redraws on
+/// the inventory's ToolChanged signal, never per frame.
 /// </summary>
 public partial class EquippedItemHud : CanvasLayer
 {
@@ -30,15 +31,25 @@ public partial class EquippedItemHud : CanvasLayer
 		AddChild(_draw);
 	}
 
+	/// <summary>Only until the player's inventory is found; then the signal does the work.</summary>
 	public override void _Process(double delta)
 	{
-		if (_player == null || !IsInstanceValid(_player))
-		{
-			_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
-			_inv = _player?.GetNodeOrNull<PlayerInventory>("Inventory");
-		}
-		if (_inv == null || !IsInstanceValid(_inv)) { _draw.Visible = false; return; }
+		_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
+		_inv = _player?.Inventory;
+		if (_inv == null) return;
+		_inv.ToolChanged += Refresh;
+		SetProcess(false);
+		Refresh();
+	}
 
+	public override void _ExitTree()
+	{
+		if (_inv != null && IsInstanceValid(_inv)) _inv.ToolChanged -= Refresh;
+	}
+
+	private void Refresh()
+	{
+		if (_inv == null || !IsInstanceValid(_inv)) { _draw.Visible = false; return; }
 		var labels = _inv.OwnedItems().Select(i => i.Label).ToArray();
 		_draw.Visible = labels.Length > 0;
 		if (labels.SequenceEqual(_shown)) return;

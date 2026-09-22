@@ -25,6 +25,7 @@
 [ext_resource type="Script" path="res://scripts/world/RainVfx.cs" id="26_rainvfx"]
 [ext_resource type="Script" path="res://scripts/world/FriendTrail.cs" id="27_friendtrail"]
 [ext_resource type="Script" path="res://scripts/world/FallenTree.cs" id="28_fallentree"]
+[ext_resource type="Script" path="res://scripts/world/PhotoSubject.cs" id="29_photo"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -241,6 +242,7 @@ Radius = 3.5
 script = ExtResource("16_pickup")
 Kind = 4
 Label = "Key"
+RequiredCheckpoint = 3
 
 [node name="TrailAnchor" type="Node" parent="KeyPickup"]
 script = ExtResource("6_anchor")
@@ -253,6 +255,7 @@ HeightOffset = 0.0
 script = ExtResource("16_pickup")
 Kind = 3
 Label = "Axe"
+RequiredCheckpoint = 3
 
 [node name="TrailAnchor" type="Node" parent="AxePickup"]
 script = ExtResource("6_anchor")
@@ -329,6 +332,14 @@ ClearRadius = 2.5
 script = ExtResource("4_snap")
 Offset = -0.04
 FootprintRadius = 0.3
+
+[node name="PhotoSubject" type="Node3D" parent="Trailhead/TrailheadSign"]
+script = ExtResource("29_photo")
+Id = "trailhead_sign"
+LookPoints = PackedVector3Array(0, 1.62, 0.13)
+MinDistance = 2.0
+MaxDistance = 14.0
+ConeDegrees = 14.0
 
 [node name="InfoBoard" type="Node3D" parent="Trailhead"]
 transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 3.4, 0, 19.8)
@@ -481,6 +492,14 @@ Offset = -5.5
 YawDegrees = 15.0
 HeightOffset = 0.0
 
+[node name="PhotoSubject" type="Node3D" parent="Props/ForgottenTent"]
+script = ExtResource("29_photo")
+Id = "tent"
+LookPoints = PackedVector3Array(-1, 0.9, 0, 0.9, 0.7, 0)
+MinDistance = 3.0
+MaxDistance = 16.0
+ConeDegrees = 16.0
+
 [node name="SnappedStick" type="Node3D" parent="Props"]
 script = ExtResource("5_prop")
 Kind = 8
@@ -521,6 +540,28 @@ Offset = 3.4
 YawDegrees = 40.0
 HeightOffset = 0.0
 
+[node name="Mushrooms" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 13
+ClearRadius = 0.7
+ClearFoliage = true
+Seed = 4
+
+[node name="TrailAnchor" type="Node" parent="Props/Mushrooms"]
+script = ExtResource("6_anchor")
+Distance = 372.0
+Offset = 4.6
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Mushrooms"]
+script = ExtResource("29_photo")
+Id = "mushrooms"
+LookPoints = PackedVector3Array(0, 0.12, 0)
+MinDistance = 0.8
+MaxDistance = 5.0
+ConeDegrees = 12.0
+
 [node name="Overlook" type="Node3D" parent="."]
 
 [node name="Landing" type="Node3D" parent="Overlook"]
@@ -528,6 +569,15 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, 0, -270)
 script = ExtResource("9_clear")
 Radius = 4.0
 ClearFoliage = false
+
+[node name="PhotoSubject" type="Node3D" parent="Overlook/Landing"]
+script = ExtResource("29_photo")
+Id = "overlook"
+Vista = true
+StandRadius = 6.0
+BearingDegrees = 37.0
+YawToleranceDegrees = 30.0
+MinPitchDegrees = -15.0
 
 [node name="ViewClear0" type="Node3D" parent="Overlook"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70.2, 0, -276.4)

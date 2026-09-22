@@ -17,7 +17,7 @@ public partial class ParkProp : Node3D
 	public enum PropKind
 	{
 		TrailheadSign, InfoBoard, TrashCan, VaultToilet, ParkingBumper, TrailMarker,
-		Backpack, Boot, WalkingStick, CutLog, Boulder, TornMap, Tent,
+		Backpack, Boot, WalkingStick, CutLog, Boulder, TornMap, Tent, Mushrooms,
 	}
 
 	[Export] public PropKind Kind = PropKind.TrailMarker;
@@ -60,6 +60,7 @@ public partial class ParkProp : Node3D
 			case PropKind.Boulder: Boulder(); break;
 			case PropKind.TornMap: TornMap(); break;
 			case PropKind.Tent: Tent(); break;
+			case PropKind.Mushrooms: Mushrooms(); break;
 		}
 		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");
 		if (ClearRadius > 0f && !Engine.IsEditorHint())
@@ -366,6 +367,42 @@ public partial class ParkProp : Node3D
 			_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 			_gen.AddChild(_body);
 			_body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.85f } });
+		}
+	}
+
+	/// <summary>A clump of small tan and rust caps at the foot of a boulder: the shot list's one close-up. No collision.</summary>
+	private void Mushrooms()
+	{
+		var stem = Tint("mush_stem", new Color(0.74f, 0.68f, 0.56f));
+		var capTan = Tint("mush_cap_tan", new Color(0.66f, 0.5f, 0.3f));
+		var capRust = Tint("mush_cap_rust", new Color(0.55f, 0.27f, 0.14f));
+		var capBruised = Tint("mush_cap_bruised", new Color(0.24f, 0.17f, 0.13f));
+		var gill = Tint("mush_gill", new Color(0.5f, 0.42f, 0.3f));
+		float R(int i, float lo, float hi)
+		{
+			unchecked
+			{
+				uint h = (uint)(Seed * 7919 + i * 104729 + 31);
+				h = (h ^ (h >> 13)) * 1274126177u; h ^= h >> 16;
+				return lo + (hi - lo) * ((h & 0xFFFF) / 65535f);
+			}
+		}
+		const int n = 7;
+		for (int i = 0; i < n; i++)
+		{
+			float a = Mathf.Tau * i / n + R(i * 5, -0.3f, 0.3f);
+			float d = i == 0 ? 0f : R(i * 5 + 1, 0.07f, 0.2f);
+			var foot = new Vector3(Mathf.Cos(a) * d, -0.01f, Mathf.Sin(a) * d);
+			float h = R(i * 5 + 2, 0.05f, 0.12f) * (i == 0 ? 1.25f : 1f);
+			float cr = R(i * 5 + 3, 0.035f, 0.07f) * (i == 0 ? 1.3f : 1f);
+			// stems lean a little, every one its own way
+			var top = foot + new Vector3(R(i * 5 + 4, -0.2f, 0.2f) * h, h, R(i * 7 + 9, -0.2f, 0.2f) * h);
+			_k.Color = Colors.White;
+			_k.Mat(stem).Cylinder(foot, top, cr * 0.3f, cr * 0.22f, 5, false);
+			// a small gill disc under the cap, then the cap: a squashed blob, one of them bruised dark
+			_k.Mat(gill).Cylinder(top - new Vector3(0, 0.004f, 0), top + new Vector3(0, 0.004f, 0), cr * 0.85f, cr * 0.85f, 7, true);
+			_k.Mat(i == 3 ? capBruised : i % 2 == 0 ? capRust : capTan);
+			_k.Blob(top + new Vector3(0, cr * 0.28f, 0), new Vector3(cr, cr * 0.5f, cr * 0.95f), Seed * 13 + i, 0.08f, true, 1f);
 		}
 	}
 

@@ -58,6 +58,9 @@ public partial class StoryManager : Node
 		public const string PickupTakenAxe = "pickup_taken_axe";
 		public const string PickupTakenKey = "pickup_taken_key";
 		public const string PickupTakenHammer = "pickup_taken_hammer";
+		// Act 1 photo log: one flag per photographed subject ("photo_" + subject id). See PhotoLog.
+		public const string PhotoPrefix = "photo_";
+		public static string Photo(string subjectId) => PhotoPrefix + subjectId;
 	}
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>
@@ -212,9 +215,10 @@ public partial class StoryManager : Node
 	public void Save()
 	{
 		if (Current == Checkpoint.None) return;
-		var inv = (GetTree().GetFirstNodeInGroup("player") as Node)?.GetNodeOrNull<PlayerInventory>("Inventory");
+		var inv = (GetTree().GetFirstNodeInGroup("player") as PlayerController)?.Inventory;
 		SaveSystem.Save(new SaveData
 		{
+			Version = SaveData.CurrentVersion,
 			Checkpoint = Current,
 			PosX = _lastPos.X, PosY = _lastPos.Y, PosZ = _lastPos.Z, Yaw = _lastYaw,
 			Flags = _flags.ToArray(),

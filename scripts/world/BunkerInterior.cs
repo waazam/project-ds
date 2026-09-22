@@ -16,7 +16,8 @@ namespace ProjectDS.World;
 /// - "Maze" (<see cref="BunkerMaze"/>): Act 10's maze, off at its own offset;
 /// - "Flow" (<see cref="BunkerFlow"/>): the sequences that tie them to the story, and restore.
 /// This node keeps the public surface other code (the entrance, the autotest) uses.
-/// Groups provided: "crt_target_marker" (the marked set), "bunker_entrance_marker" (the maze's end).
+/// Groups provided: "crt_target_marker" (the marked set), "bunker_entrance_marker" (the way out:
+/// the hallway's entrance until the maze wakes, then the maze's end; the hatch itself while outdoors).
 /// </summary>
 [GlobalClass]
 public partial class BunkerInterior : Node3D
@@ -71,9 +72,10 @@ public partial class BunkerInterior : Node3D
 		Maze = new BunkerMaze { Name = "Maze" };
 		AddChild(Maze);
 
-		var entrance = new Node3D { Name = "BunkerEntranceMarker", Position = BunkerMaze.ExitLocal };
-		AddChild(entrance);
-		entrance.AddToGroup("bunker_entrance_marker");
+		// One marker node, moved (never swapped: StoryManager caches the node and reads its position).
+		_entranceMarker = new Node3D { Name = "BunkerEntranceMarker", Position = HallwayEntranceLocal };
+		AddChild(_entranceMarker);
+		_entranceMarker.AddToGroup("bunker_entrance_marker");
 
 		Flow = new BunkerFlow { Name = "Flow" };
 		Flow.Setup(this, Hallway, VineDoor, Crt, Maze);
@@ -83,6 +85,48 @@ public partial class BunkerInterior : Node3D
 	}
 
 	public override void _Process(double delta) => Flow?.Tick(delta);
+
+	// ------------------------------------------------------------------ the compass after the screens
+
+	/// <summary>Where the "bunker_entrance_marker" objective stands.</summary>
+	public enum CompassSpot
+	{
+		/// <summary>The real hatch outside (the player is outdoors: the way back in).</summary>
+		Outside,
+		/// <summary>The hallway's entrance end: from the CRT room, straight back out through the vine door.</summary>
+		HallwayEntrance,
+		/// <summary>The maze's exit cell, once the hallway has become the maze.</summary>
+		MazeExit,
+	}
+
+	/// <summary>Interior-local point the compass leads to from the CRT room: the hallway's open end.</summary>
+	public static Vector3 HallwayEntranceLocal => new(0, 1f, -1f);
+
+	public CompassSpot CompassAt { get; private set; } = CompassSpot.HallwayEntrance;
+	/// <summary>For tests: the marker's current world position.</summary>
+	public Vector3? EntranceMarkerWorld => _entranceMarker?.GlobalPosition;
+
+	private Node3D _entranceMarker;
+
+	/// <summary>Moves the objective marker; see <see cref="CompassSpot"/>.</summary>
+	public void PointCompass(CompassSpot spot)
+	{
+		if (_entranceMarker == null) return;
+		CompassAt = spot;
+		switch (spot)
+		{
+			case CompassSpot.Outside:
+				if (GetTree().GetFirstNodeInGroup("bunker_marker") is Node3D hatch) _entranceMarker.GlobalPosition = hatch.GlobalPosition;
+				else _entranceMarker.Position = HallwayEntranceLocal;
+				break;
+			case CompassSpot.MazeExit:
+				_entranceMarker.Position = BunkerMaze.ExitLocal;
+				break;
+			default:
+				_entranceMarker.Position = HallwayEntranceLocal;
+				break;
+		}
+	}
 
 	/// <summary>The entrance calls this when the player walks in through the open hatch.</summary>
 	public void AdmitPlayer(PlayerController player) => Flow?.Admit(player);

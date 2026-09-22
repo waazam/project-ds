@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using ProjectDS.Audio;
+using ProjectDS.Systems;
 
 namespace ProjectDS.World;
 
@@ -12,7 +13,11 @@ namespace ProjectDS.World;
 /// (boarded over once the friend boards the cabin up); the left one glows faintly from the lamp inside. Inside: plank
 /// floor, open rafters under the roof boards, a cast-iron stove, a cot, a shelf and a
 /// hanging lamp (warm light). The friend's own chair and table (friend.tscn) sit on
-/// the floor at his existing spot.
+/// the floor at his existing spot. Papers (PaperKit readables and props): his note tucked
+/// into the top corner of the door (<see cref="DoorNote"/>), the tongue-twister sheet over
+/// the cot (<see cref="TwisterSheet"/>) and his four prints over his chair; the page on the
+/// table is the friend's own (FriendBody). All of them join <see cref="PapersGroup"/> and
+/// burn away with the cabin.
 ///
 /// Local frame: front (the door) faces +Z, same convention as ParkProp. y = 0 is the
 /// INTERIOR FLOOR TOP. At runtime the cabin grounds itself: floor at sill height above
@@ -103,8 +108,16 @@ public partial class Cabin : Node3D
 	private float WinCx => (Dw + Hw) * 0.5f + 0.02f;
 	private const float WinW = 0.7f, StepW = 1.4f, StepRun = 0.3f;
 
-	private Node3D _gen, _planks, _door, _windowBoards, _debris, _fire;
+	private Node3D _gen, _planks, _door, _windowBoards, _debris, _fire, _sashes, _panes, _papers;
+	private Readable _doorNote, _sheet;
 	private CollisionShape3D _doorCollision;
+
+	/// <summary>The friend's note on the door (P1), for tests and previews. Null in the editor and once burnt.</summary>
+	public Readable DoorNote => _doorNote;
+	/// <summary>The tongue-twister sheet over the cot (P3), for tests and previews.</summary>
+	public Readable TwisterSheet => _sheet;
+	/// <summary>Every paper prop in the cabin joins this group (the friend's page too); they all burn away with it.</summary>
+	public const string PapersGroup = "cabin_papers";
 	private OmniLight3D _lamp;
 	private MeshInstance3D _lampGlass, _litPane;
 	private ShaderMaterial _char;
@@ -173,7 +186,8 @@ public partial class Cabin : Node3D
 		if (old != null) { RemoveChild(old); old.QueueFree(); }
 		_gen = new Node3D { Name = "Generated" };
 		AddChild(_gen);
-		_planks = _door = _windowBoards = _debris = null;
+		_planks = _door = _windowBoards = _debris = _sashes = _panes = _papers = null;
+		_doorNote = _sheet = null;
 		_doorCollision = null;
 
 		var shell = new MeshKit();
@@ -188,7 +202,7 @@ public partial class Cabin : Node3D
 		BuildInterior(inner, cols);
 		shell.CommitTo(_gen, "CabinMesh");
 		inner.CommitTo(_gen, "InteriorMesh");
-		BuildPanes();
+		BuildGlazing();
 		BuildLamp();
 
 		if (BuildCollision && !Engine.IsEditorHint())
@@ -211,8 +225,10 @@ public partial class Cabin : Node3D
 		if (DoorBoarded && !IsOpen) BuildPlanks();
 		if (IsOpen) BuildDebris();
 		RefreshWindowBoards();
+		BuildPapers();
 		ApplyChar();
 		UpdateLamp();
+		UpdatePapers();
 	}
 
 	// ---- walls: 9 courses of logs, crossed ends alternating at the corners
@@ -643,13 +659,6 @@ public partial class Cabin : Node3D
 			BuildKit.Box(k, new Vector3(cx, _winBot + 0.01f, Hd), new Vector3(WinW, 0.02f, LogT), 1.4f);
 			foreach (float x in new[] { x0 + 0.01f, x1 - 0.01f })
 				BuildKit.Box(k, new Vector3(x, (_winBot + _winTop) * 0.5f, Hd), new Vector3(0.02f, _winTop - _winBot, LogT), 1.4f);
-			if (Burning > 0f || IsBurnt) continue;   // sash burned/blown out
-			// sash frame and muntins, set a little back from the outer face
-			float zs = Hd + 0.02f;
-			k.Color = new Color(0.42f, 0.38f, 0.34f);
-			BuildKit.Box(k, new Vector3(cx, (_winBot + _winTop) * 0.5f, zs), new Vector3(0.035f, _winTop - _winBot - 0.04f, 0.04f), 2f);
-			BuildKit.Box(k, new Vector3(cx, (_winBot + _winTop) * 0.5f, zs), new Vector3(WinW - 0.04f, 0.035f, 0.04f), 2f);
-			k.Color = new Color(0.6f, 0.55f, 0.5f);
 		}
 		// door casing: jambs and head on the outside, lining in the opening
 		k.Color = new Color(0.62f, 0.57f, 0.52f);
@@ -666,10 +675,32 @@ public partial class Cabin : Node3D
 		k.Color = Colors.White;
 	}
 
-	private void BuildPanes()
+	// ---- glazing: the sashes with their muntins and the panes, small nodes of their own so
+	// ignition frees just these (and the window boards) instead of rebuilding the building
+
+	private void BuildGlazing()
 	{
+		if (_sashes != null && IsInstanceValid(_sashes)) _sashes.QueueFree();
+		if (_panes != null && IsInstanceValid(_panes)) _panes.QueueFree();
+		_sashes = _panes = null;
 		_litPane = null;
-		if (Burning > 0f || IsBurnt) return;
+		if (Burning > 0f || IsBurnt) return;   // sash burned/blown out, glass gone, so smoke can pour out
+		var ks = new MeshKit();
+		ks.Mat(PropTextures.PostMat);
+		ks.Color = new Color(0.42f, 0.38f, 0.34f);
+		float zs = Hd + 0.02f;
+		foreach (float cx in new[] { -WinCx, WinCx })
+		{
+			// sash frame and muntins, set a little back from the outer face
+			BuildKit.Box(ks, new Vector3(cx, (_winBot + _winTop) * 0.5f, zs), new Vector3(0.035f, _winTop - _winBot - 0.04f, 0.04f), 2f);
+			BuildKit.Box(ks, new Vector3(cx, (_winBot + _winTop) * 0.5f, zs), new Vector3(WinW - 0.04f, 0.035f, 0.04f), 2f);
+		}
+		_sashes = new Node3D { Name = "WindowSashes" };
+		_gen.AddChild(_sashes);
+		ks.CommitTo(_sashes, "SashMesh");
+
+		_panes = new Node3D { Name = "Panes" };
+		_gen.AddChild(_panes);
 		foreach (float cx in new[] { -WinCx, WinCx })
 		{
 			bool lit = cx < 0;
@@ -678,12 +709,12 @@ public partial class Cabin : Node3D
 			float x0 = cx - WinW * 0.5f + 0.02f, x1 = cx + WinW * 0.5f - 0.02f, y0 = _winBot + 0.02f, y1 = _winTop - 0.02f, z = Hd + 0.005f;
 			// outside face: lamplit (seen through the boards) or dark; the inside face is always dark glass
 			k.Quad(new Vector3(x0, y0, z), new Vector3(x1, y0, z), new Vector3(x1, y1, z), new Vector3(x0, y1, z), Vector3.Back);
-			var mi = k.CommitTo(_gen, lit ? "LitPane" : "Pane", false);
+			var mi = k.CommitTo(_panes, lit ? "LitPane" : "Pane", false);
 			if (lit) _litPane = mi;
 			var ki = new MeshKit();
 			ki.Mat(BuildingTextures.GlassMat);
 			ki.Quad(new Vector3(x0, y0, z - 0.004f), new Vector3(x1, y0, z - 0.004f), new Vector3(x1, y1, z - 0.004f), new Vector3(x0, y1, z - 0.004f), Vector3.Forward);
-			ki.CommitTo(_gen, "PaneInside", false);
+			ki.CommitTo(_panes, "PaneInside", false);
 		}
 	}
 
@@ -927,6 +958,113 @@ public partial class Cabin : Node3D
 		foreach (float y in new[] { 0.3f, h - 0.3f })
 			BuildKit.Box(k, new Vector3(0.14f, y, 0.058f), new Vector3(0.28f, 0.04f, 0.01f), 3f);
 		k.CommitTo(_door, "DoorMesh");
+		BuildDoorNote();
+	}
+
+	// ---- the papers: the note on the door (P1), the tongue-twister over the cot (P3), the prints (P5)
+
+	private const string DoorNoteText =
+		"Couldn't sleep. Gone back up to the old steps past the end of the trail. Take the camera, get the red one for me. Back by dark. — C.";
+
+	private const string TwisterText =
+		"He thrusts his fists against the posts and still insists he sees the ghosts.\n" +
+		"He thrusts his fists against the posts and still insists he sees the ghosts.\n" +
+		"He thrusts his fists against the posts and still insists he sees the ghosts.\n" +
+		"he thrusts his fists against the posts\n" +
+		"still insists";
+
+	/// <summary>
+	/// A folded note tucked into the latch-side top corner of the door frame. It sits that high
+	/// because the door's own pick sphere (0.9 m around the door centre; the first thing the
+	/// crosshair ray touches wins) swallows anything at eye height on the leaf, disabled or not;
+	/// up here, with its own pick sphere pushed proud of the leaf, a look from anywhere on the
+	/// porch reaches the note first. It rides the leaf (door space: the leaf runs +X from the
+	/// hinge, its face hardware reaches z 0.075), so it swings inside with the door. Its top
+	/// edge is tucked under the head casing; while the door is boarded the ends of the two
+	/// cross braces cover its lower half.
+	/// </summary>
+	private void BuildDoorNote()
+	{
+		_doorNote = null;
+		if (Engine.IsEditorHint() || _door == null) return;
+		float w = DoorWidth - 0.04f;
+		// Eye height, toward the latch side: the door trigger's pick sphere no longer swallows it (the probe re-casts past disabled interactables).
+		// Built detached so the Readable reads the pick radius/offset below when it enters the tree.
+		var root = new Node3D { Name = "DoorNote" };
+		_doorNote = PaperKit.Pinned(root, new Vector3(w * 0.62f, 1.50f, 0.076f), Vector3.Back, new Vector2(0.14f, 0.18f), PaperKit.Look.Note,
+			"", DoorNoteText, Readable.NoteStyle.Handwritten, tiltDeg: -7f, prompt: "Read the note", seed: 3);
+		_doorNote.ReadFlag = "read_door_note";
+		_doorNote.PickRadius = 0.28f;
+		_doorNote.PickOffset = new Vector3(0, 0, 0.15f);
+		_doorNote.MaxDistance = 2.8f;
+		root.AddToGroup(PapersGroup);
+		_door.AddChild(root);
+	}
+
+	/// <summary>
+	/// The sheet of lined paper pinned to the right wall above the middle of the cot (only
+	/// reachable from inside: the wall blocks the pick), and the friend's four prints in a row
+	/// on the back wall over his chair: the three birds he came for and the first staircase at
+	/// night. Props only, no text on them.
+	/// </summary>
+	private void BuildPapers()
+	{
+		if (_papers != null && IsInstanceValid(_papers)) _papers.QueueFree();
+		_papers = null;
+		_sheet = null;
+		if (Engine.IsEditorHint()) return;
+		float ix = Hw - LogT * 0.5f, iz = Hd - LogT * 0.5f;
+		var root = new Node3D { Name = "Papers" };
+		root.AddToGroup(PapersGroup);
+
+		_sheet = PaperKit.Pinned(root, new Vector3(ix - 0.006f, 1.38f, -1.44f), Vector3.Left, new Vector2(0.16f, 0.21f), PaperKit.Look.Lined,
+			"", TwisterText, Readable.NoteStyle.Handwritten, tiltDeg: 3f, seed: 5);
+		_sheet.ReadFlag = "read_twister_sheet";
+
+		// tacks: one over the sheet, one per print (the prints' are red pushpins, the stairs' a plain one)
+		var tacks = new MeshKit();
+		tacks.Mat(BuildingTextures.IronMat);
+		tacks.Color = new Color(0.45f, 0.42f, 0.4f);
+		BuildKit.Box(tacks, new Vector3(ix - 0.014f, 1.38f + 0.095f, -1.44f), new Vector3(0.012f, 0.012f, 0.012f), 1f);
+
+		float pz = -iz + 0.012f, py = 1.64f;
+		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 17 + 29) };
+		for (int i = 0; i < 4; i++)
+		{
+			Vector3 at = new(0.3f + (i - 1.5f) * 0.19f, py + rng.RandfRange(-0.012f, 0.012f), pz);
+			Print(root, at, Vector3.Back, i, rng.RandfRange(-4f, 4f));
+			tacks.Color = i == 3 ? new Color(0.4f, 0.38f, 0.35f) : new Color(0.6f, 0.12f, 0.1f);
+			BuildKit.Box(tacks, at + new Vector3(0, 0.045f, 0.009f), new Vector3(0.011f, 0.011f, 0.011f), 1f);
+		}
+		tacks.CommitTo(root, "Tacks", false);
+		_gen.AddChild(root);
+		_papers = root;
+	}
+
+	/// <summary>One pinned photographic print (3:2 like the viewfinder), image side out.</summary>
+	private static void Print(Node3D parent, Vector3 at, Vector3 outward, int kind, float tiltDeg)
+	{
+		Vector3 z = outward.Normalized();
+		Vector3 x = Vector3.Up.Cross(z).Normalized();
+		var b = new Basis(x, Vector3.Up, z);
+		if (tiltDeg != 0f) b = b.Rotated(z, Mathf.DegToRad(tiltDeg));
+		parent.AddChild(new MeshInstance3D
+		{
+			Name = $"Print{kind}",
+			Mesh = new QuadMesh { Size = new Vector2(0.15f, 0.10f) },
+			MaterialOverride = BuildingTextures.PrintMat(kind),
+			Transform = new Transform3D(b, at + z * 0.006f),
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		});
+	}
+
+	/// <summary>Paper burns first: every note and print in the cabin (group <see cref="PapersGroup"/>) is gone while it burns or once burnt.</summary>
+	private void UpdatePapers()
+	{
+		if (!IsInsideTree()) return;
+		bool on = Burning <= 0f && !IsBurnt;
+		foreach (var n in GetTree().GetNodesInGroup(PapersGroup))
+			if (n is Node3D p && IsInstanceValid(p)) p.Visible = on;
 	}
 
 	/// <summary>Planks nailed across the doorway (Act 3: "completely boarded up"). Visual; the door behind is solid.</summary>
@@ -1079,10 +1217,14 @@ public partial class Cabin : Node3D
 			_fires.Clear();
 			if (_fire != null && IsInstanceValid(_fire)) _fire.QueueFree();
 			_fire = null;
-			if (wasBurning && _gen != null) Build();
+			if (wasBurning && _gen != null) { BuildGlazing(); RefreshWindowBoards(); }
+			ApplyChar();
+			UpdateLamp();
+			UpdatePapers();
 			return;
 		}
-		if (!wasBurning && _gen != null) Build();   // windows lose their boards/glass
+		// Ignition frees just the sashes, glass and window boards (smoke pours out); nothing is rebuilt.
+		if (!wasBurning && _gen != null) { BuildGlazing(); RefreshWindowBoards(); }
 		if (_fires.Count == 0)
 		{
 			_fire = new Node3D { Name = "Fire" };
@@ -1113,6 +1255,7 @@ public partial class Cabin : Node3D
 		foreach (var f in _fires) f.Intensity = intensity;
 		ApplyChar();
 		UpdateLamp();
+		UpdatePapers();
 	}
 
 	/// <summary>The burnt-out shell (black, faint embers, part of the roof and the porch roof fallen in). Unused by the story so far.</summary>

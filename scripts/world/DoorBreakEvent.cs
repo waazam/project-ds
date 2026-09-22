@@ -12,6 +12,10 @@ namespace ProjectDS.World;
 /// An <see cref="Interactable"/> on the door: look at the boards and press E
 /// (axe) or hold E (hammer, <see cref="HammerSeconds"/>). Also owns restoring
 /// the door on Continue: boarded from Act 2 until it was broken open.
+///
+/// Act 5 begins after the giant (Act 4): until <see cref="StoryManager.Flag.GiantEventDone"/>
+/// the boards cannot be broken even with a tool in hand, and the prompt says why
+/// in the plainest terms. Prompts never carry the key hint; the HUD adds it.
 /// </summary>
 public partial class DoorBreakEvent : Interactable
 {
@@ -20,6 +24,7 @@ public partial class DoorBreakEvent : Interactable
 	[Export] public float HammerSeconds = 9f;
 
 	private Cabin _cabin;
+	private PlayerInventory _inventory;
 	private bool _busy;
 
 	public override void _Ready()
@@ -40,6 +45,7 @@ public partial class DoorBreakEvent : Interactable
 	{
 		base._ExitTree();
 		if (StoryManager.Instance is { } s) s.CheckpointReached -= OnCheckpoint;
+		if (_inventory != null && IsInstanceValid(_inventory)) _inventory.ToolChanged -= UpdateHold;
 	}
 
 	/// <summary>Continue: put the door back the way the story left it.</summary>
@@ -49,44 +55,46 @@ public partial class DoorBreakEvent : Interactable
 		if (StoryBeat.CabinDoorOpen(s)) _cabin.SetOpen(true);   // no sound or animation
 		else if (s is { StairsClimbed: true }) _cabin.SetBoarded(true);
 		UpdateEnabled();
+		// The hold time depends only on what is carried, so it follows the inventory, not the prompt.
+		_inventory = StoryBeat.Player(this)?.Inventory;
+		if (_inventory != null) _inventory.ToolChanged += UpdateHold;
+		UpdateHold();
 	}
 
 	private void OnCheckpoint(Checkpoint _) => UpdateEnabled();
 
 	private void UpdateEnabled() => Enabled = _cabin.DoorBoarded && !_cabin.IsOpen;
 
+	private void UpdateHold() => HoldSeconds = ToolFor(_inventory) == ToolKind.Hammer ? HammerSeconds : 0f;
+
+	private static bool GiantSeen => StoryManager.Instance is { GiantEventDone: true };
+
 	public override bool CanInteract(PlayerController player)
 	{
-		if (!base.CanInteract(player) || _busy) return false;
-		return ToolFor(player) != ToolKind.None;
+		if (!base.CanInteract(player) || _busy || !GiantSeen) return false;
+		return ToolFor(player.Inventory) != ToolKind.None;
 	}
 
 	public override string GetPrompt(PlayerController player)
 	{
 		if (_busy) return "Chopping through the boards...";
-		switch (ToolFor(player))
-		{
-			case ToolKind.Axe:
-				HoldSeconds = 0f;
-				return "[E] Chop the boards with the axe";
-			case ToolKind.Hammer:
-				HoldSeconds = HammerSeconds;
-				return HoldProgress > 0f ? $"Prying the boards loose... {HoldProgress * 100f:0}%" : "[Hold E] Pry the boards loose";
-			default:
-				HoldSeconds = 0f;
-				return "The door is boarded shut.";
-		}
+		var tool = ToolFor(player.Inventory);
+		if (tool == ToolKind.None) return "The door is boarded shut.";
+		if (!GiantSeen) return "Boarded shut. Find him first.";
+		return tool == ToolKind.Axe
+			? "Chop the boards with the axe"
+			: HoldProgress > 0f ? $"Prying the boards loose... {HoldProgress * 100f:0}%" : "Pry the boards loose";
 	}
 
 	public override void Interact(PlayerController player)
 	{
-		var inv = Inventory(player);
-		if (inv == null || _busy) return;
-		_busy = true;
-		var tool = ToolFor(player);
+		var inv = player.Inventory;
+		if (inv == null || _busy || !GiantSeen) return;
+		var tool = ToolFor(inv);
 		if (tool == ToolKind.None) return;
+		_busy = true;
 		bool axe = tool == ToolKind.Axe;
-		Cutscene.Run(this, async ct =>
+		_ = Cutscene.Run(this, async ct =>
 		{
 			if (axe) await Cutscene.Wait(this, AxeSeconds, ct);
 			inv.Consume(tool);
@@ -94,16 +102,11 @@ public partial class DoorBreakEvent : Interactable
 			Enabled = false;
 			StoryManager.Instance?.SetFlag(StoryManager.Flag.CabinDoorOpen);
 			base.Interact(player);
-			await StoryBeat.Caption(this, "The door gives way.", 1.0f, 1.8f, 1.0f);
+			await StoryBeat.Caption(this, "The door gives way.", 1.0f, 1.8f, 1.0f, ct);
 		});
 	}
 
 	/// <summary>The axe if carried (quick), else the hammer (the slow pry), else nothing.</summary>
-	private static ToolKind ToolFor(PlayerController p)
-	{
-		var inv = Inventory(p);
-		return inv == null ? ToolKind.None : inv.HasTool(ToolKind.Axe) ? ToolKind.Axe : inv.HasTool(ToolKind.Hammer) ? ToolKind.Hammer : ToolKind.None;
-	}
-
-	private static PlayerInventory Inventory(PlayerController p) => p.GetNodeOrNull<PlayerInventory>("Inventory");
+	private static ToolKind ToolFor(PlayerInventory inv)
+		=> inv == null ? ToolKind.None : inv.HasTool(ToolKind.Axe) ? ToolKind.Axe : inv.HasTool(ToolKind.Hammer) ? ToolKind.Hammer : ToolKind.None;
 }

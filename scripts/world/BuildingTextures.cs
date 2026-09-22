@@ -302,6 +302,115 @@ public static class BuildingTextures
 		return s;
 	}
 
+	// ---------- the friend's prints (Cabin.BuildPapers): 48 x 32, a 3:2 photo with a paper border ----------
+
+	/// <summary>
+	/// 0..2: a red, blue and purple bird on a branch, composed like the viewfinder (subject in the
+	/// centre, dim edges); 3: the first staircase at night from its foot, the top step lit from above.
+	/// Low-res and a little faded, like a drugstore print. No text anywhere on them.
+	/// </summary>
+	public static Texture2D Print(int kind) => Make($"b_print{kind}", 48, 32, (x, y) => PrintPixel(kind, x, y));
+
+	public static StandardMaterial3D PrintMat(int kind)
+	{
+		string key = $"b_print{kind}";
+		if (_mat.TryGetValue(key, out var m)) return (StandardMaterial3D)m;
+		var s = new StandardMaterial3D
+		{
+			AlbedoTexture = Print(kind),
+			Roughness = 0.55f,
+			MetallicSpecular = 0.4f,
+			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+		};
+		_mat[key] = s;
+		return s;
+	}
+
+	private static Color PrintPixel(int kind, int x, int y)
+	{
+		const int w = 48, h = 32, border = 2;
+		const int iw = w - 2 * border, ih = h - 2 * border;   // 44 x 28
+		int px = x - border, py = y - border;
+		if (px < 0 || py < 0 || px >= iw || py >= ih)
+		{
+			float g = 0.86f + (Hash(x, y, 701) - 0.5f) * 0.05f;
+			return new Color(g, g * 0.97f, g * 0.9f);
+		}
+		float u = (px + 0.5f) / iw, v = (py + 0.5f) / ih;
+		Color c = kind == 3 ? StairsPrint(px, py, u, v) : BirdPrint(kind, px, py, u, v);
+		// the viewfinder's dim edges, and the flat warm fade of an old print
+		float r = new Vector2((u - 0.5f) * 1.5f, v - 0.5f).Length() / 0.9f;
+		c *= 1f - 0.35f * Mathf.SmoothStep(0.62f, 1.02f, r);
+		return Mix(c, new Color(0.62f, 0.56f, 0.46f), 0.15f);
+	}
+
+	private static Color BirdPrint(int kind, int px, int py, float u, float v)
+	{
+		// blurred daylit woods behind, paler toward a sky gap top left
+		float n = Fbm(px, py, 44, 28, 3, 2, 3, 711 + kind * 7);
+		var c = Mix(new Color(0.16f, 0.22f, 0.10f), new Color(0.46f, 0.54f, 0.30f), n);
+		float sky = Mathf.SmoothStep(0.5f, 0.85f, Fbm(px, py, 44, 28, 2, 2, 2, 719 + kind)) * (1f - v) * (1f - u * 0.6f);
+		c = Mix(c, new Color(0.78f, 0.82f, 0.74f), sky * 0.85f);
+		// the branch it sits on, drooping a little to the right
+		float yb = 0.70f + 0.10f * (u - 0.5f);
+		if (Mathf.Abs(v - yb) < 0.04f + 0.012f * (1f - u))
+			c = Mix(new Color(0.11f, 0.08f, 0.05f), new Color(0.2f, 0.15f, 0.1f), Hash(px, py, 723));
+		// the bird, filling the middle of the frame, in pixel-space ellipses: tail, body, folded wing, head, crest, beak, eye, feet
+		Color body = kind switch
+		{
+			0 => new Color(0.82f, 0.12f, 0.09f),
+			1 => new Color(0.15f, 0.34f, 0.86f),
+			_ => new Color(0.52f, 0.2f, 0.62f),
+		};
+		Color dark = body * 0.55f;
+		bool In(float cx, float cy, float rx, float ry) { float dx = (px + 0.5f - cx) / rx, dy = (py + 0.5f - cy) / ry; return dx * dx + dy * dy <= 1f; }
+		if (In(14f, 16.2f, 4.2f, 1.6f)) c = dark;
+		if (In(22f, 15f, 7f, 4.2f)) c = body * (1.05f - 0.35f * Mathf.Clamp((py + 0.5f - 12f) / 7f, 0f, 1f));
+		if (In(20.5f, 14.5f, 4.2f, 2f)) c = dark;
+		if (In(27.5f, 9.6f, 3.2f, 2.9f)) c = body * 1.02f;
+		if (kind == 0 && In(28.3f, 6.8f, 1.3f, 1.6f)) c = body * 0.9f;
+		if (px >= 30 && px <= 31 && (py == 9 || py == 10)) c = kind == 0 ? new Color(0.85f, 0.5f, 0.2f) : new Color(0.35f, 0.33f, 0.3f);
+		if (px == 28 && py == 9) c = new Color(0.03f, 0.02f, 0.02f);
+		if ((px == 19 || px == 23) && py == 19) c = new Color(0.1f, 0.08f, 0.05f);
+		return c;
+	}
+
+	private static Color StairsPrint(int px, int py, float u, float v)
+	{
+		// night: near-black blue with faint trunks
+		float trunk = Noise(px * 0.55f, py * 0.08f, 24, 3, 731);
+		var c = Mix(new Color(0.02f, 0.03f, 0.05f), new Color(0.09f, 0.1f, 0.14f), Mathf.SmoothStep(0.6f, 0.9f, trunk));
+		// the flight as a trapezoid from a wide foot (bottom) up to the narrow top landing
+		const float top = 0.16f;
+		float t = Mathf.Clamp((v - top) / (1f - top), 0f, 1f);   // 0 at the top step, 1 at the foot
+		float half = Mathf.Lerp(0.12f, 0.42f, t);
+		float du = Mathf.Abs(u - 0.5f);
+		float lightFall = Mathf.Exp(-t * 3.2f);                    // the light from above reaches a few steps down
+		if (v >= top && du < half)
+		{
+			// pale concrete treads, dark risers; the courses tighten toward the top
+			bool riser = Mathf.PosMod(Mathf.Sqrt(t) * 10f, 1f) < 0.25f;
+			c = new Color(0.72f, 0.72f, 0.7f) * (0.12f + 0.88f * lightFall);
+			if (riser) c *= 0.45f;
+			if (t < 0.05f) c = new Color(0.92f, 0.94f, 1.0f);     // the top step, lit white
+		}
+		else if (v >= top && du < half + 0.07f)
+		{
+			// the stone cheek walls, catching a little of it
+			var stone = Mix(new Color(0.18f, 0.16f, 0.13f), new Color(0.34f, 0.3f, 0.25f), Hash(px, py, 737));
+			c = stone * (0.3f + 0.7f * lightFall);
+		}
+		// the beam: a pale wedge widening down from the top edge onto the landing, and a haze around it
+		if (v < top + 0.02f)
+		{
+			float bh = Mathf.Lerp(0.03f, 0.14f, v / top);
+			float inBeam = 1f - Mathf.SmoothStep(bh * 0.6f, bh, du);
+			c = Mix(c, new Color(0.6f, 0.65f, 0.78f), inBeam * 0.65f);
+		}
+		float haze = Mathf.Exp(-((u - 0.5f) * (u - 0.5f) * 40f + (v - top) * (v - top) * 60f));
+		return Mix(c, new Color(0.45f, 0.5f, 0.6f), haze * 0.5f);
+	}
+
 	/// <summary>
 	/// A fresh (not shared) char overlay: blackens the surface it is laid over as
 	/// "amount" rises (0 = untouched, 1 = fully charred), with glowing ember cracks

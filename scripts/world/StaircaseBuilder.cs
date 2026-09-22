@@ -47,6 +47,12 @@ public partial class StaircaseBuilder : Node3D
 	[Export] public int Seed = 7;
 	[Export] public bool BuildCollision = true;
 
+	/// <summary>The flight's length as authored in the scene, captured when it enters the tree (before
+	/// any story code lengthens it). <see cref="StairsState.StepsFor"/> takes it as the base.</summary>
+	public int BaseSteps { get; private set; } = -1;
+	/// <summary>For tests: how many times <see cref="Build"/> has run.</summary>
+	public int BuildCount { get; private set; }
+
 	private const float Found = 0.7f;      // how far walls/plinth go below local ground (covers terrain dips)
 	private const float CopingH = 0.075f, CopingOver = 0.035f, PierD = 0.42f, PierExtra = 0.05f, Nose = 0.015f;
 
@@ -66,6 +72,8 @@ public partial class StaircaseBuilder : Node3D
 
 	private FastNoiseLite _noise;
 	private RandomNumberGenerator _rng;
+
+	public override void _EnterTree() { if (BaseSteps < 0) BaseSteps = Steps; }
 
 	public override void _Ready() => Build();
 
@@ -214,6 +222,7 @@ public partial class StaircaseBuilder : Node3D
 
 	public void Build()
 	{
+		BuildCount++;
 		var old = GetNodeOrNull("Generated");
 		if (old != null) { RemoveChild(old); old.QueueFree(); }
 		var gen = new Node3D { Name = "Generated" };
