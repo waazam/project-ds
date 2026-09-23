@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-23b — Act 13: the forester station](2026-09-23b-act13-forester-station.md)
 - [2026-09-23 — Act 12: the lake crossing](2026-09-23-act12-lake-crossing.md)
 - [2026-09-22e — Restore the automatic float up the first stairs](2026-09-22e-first-stairs-float.md)
 - [2026-09-22d — Sound pass: footsteps, rain, omen bird](2026-09-22d-sound-pass.md)
