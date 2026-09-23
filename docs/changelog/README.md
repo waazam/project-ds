@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-22e — Restore the automatic float up the first stairs](2026-09-22e-first-stairs-float.md)
 - [2026-09-22d — Sound pass: footsteps, rain, omen bird](2026-09-22d-sound-pass.md)
 - [2026-09-22c — Story pass: one night in the Hollow, Act 6 stair loop, bunker rework](2026-09-22c-story-pass-hollow.md)
 - [2026-09-22b — Linear story rework: two levels, the Hollow, R.H.](2026-09-22b-linear-story-rework.md)
