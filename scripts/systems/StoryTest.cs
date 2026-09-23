@@ -184,7 +184,8 @@ public partial class StoryTest : Node
 
 	public override void _Process(double delta)
 	{
-		if (_player == null || !IsInstanceValid(_player)) return;
+		// Quit() only schedules the exit; a frame or two can still land after Finish() nulls the session.
+		if (_s == null || _player == null || !IsInstanceValid(_player)) return;
 		// Walked distance (teleports are counted separately by Teleport()).
 		float moved = Flat(_player.GlobalPosition).DistanceTo(Flat(_lastPos));
 		if (moved < 3f) _s.Walked += moved;
@@ -342,12 +343,17 @@ public partial class StoryTest : Node
 			await WaitUntil(() => climb.OnTheStairs, 5, ct);
 			await Frames(2, ct);
 			Check("stepping on the stairs is noticed", climb.OnTheStairs);
-			Check("the body stays the player's: they climb it themselves", _input.Enabled && _player.IsPhysicsProcessing());
 			cameraGone = !_inv.HasCamera;
-			// Up the flight on foot, to the top landing.
+			// The first step lifts them off their feet: movement is taken away, but the mouse can still look.
+			Check("movement is taken away for the float", climb.Floating && !_player.IsPhysicsProcessing());
+			Check("input stays live so the mouse can still look around", _input.Enabled);
 			var top = stairs?.GetNodeOrNull<Node3D>("TopTrigger");
-			bool climbed = top != null && await WalkTo(top.GlobalPosition, 1.2f, ct, giveUp: 30f);
-			Check("the player can walk up the flight to the top", climbed, $"{_player.GlobalPosition} vs {top?.GlobalPosition}");
+			Engine.TimeScale = 3.0;
+			await WaitUntil(() => !climb.Floating, 20, ct);
+			Engine.TimeScale = 1.0;
+			Check("the float hands movement back once it lands", !climb.Floating && _player.IsPhysicsProcessing());
+			bool landed = top != null && Flat(_player.GlobalPosition).DistanceTo(Flat(top.GlobalPosition)) < 1.5f;
+			Check("the float carried the player to the top of the flight", landed, $"{_player.GlobalPosition} vs {top?.GlobalPosition}");
 			Screenshot("climb");
 			// There is no going back down: the one-way wall is up and a walk toward the foot goes nowhere.
 			Check("the flight has turned one-way", climb.OneWay is { Armed: true }, $"progress {climb.OneWay?.MaxProgress:0.0} m");
@@ -452,7 +458,10 @@ public partial class StoryTest : Node
 			// Walk on toward the cabin so the spells and the relocations have something to follow.
 			await WalkAlongTrail(cabin.GlobalPosition, 40f, ct, stopWhen: () => st.ShadowSpells >= 1 && st.DirectionsUsed >= 3 && st.ShadowStepsHeard >= 6);
 			Check("its steps follow", st.ShadowSpells >= 1, $"spells {st.ShadowSpells}");
-			Check("its steps match the player's, a beat behind", st.ShadowStepsHeard == 0 || Mathf.Abs(st.ShadowStepsHeard / 2 - st.ShadowStepsAnswered) <= 3,   // one answer per two strides (Dan: every step read as hooves)
+			// ShadowStepsHeard already only counts every second real stride (the parity check in
+			// OnPlayerStepped is the "one answer per two strides" rule); every one of those gets an
+			// answer queued a beat later, so the two counts should track each other closely, not by half.
+			Check("its steps match the player's, a beat behind", st.ShadowStepsHeard == 0 || Mathf.Abs(st.ShadowStepsHeard - st.ShadowStepsAnswered) <= 3,
 				$"heard {st.ShadowStepsHeard}, answered {st.ShadowStepsAnswered}");
 			Check("it comes from at least three directions", st.DirectionsUsed >= 3, $"{st.DirectionsUsed} sectors, peeks {st.PeekCount}");
 			Check("no snarl ever", st.SnarlCount == 0);

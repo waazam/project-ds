@@ -9,11 +9,12 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// The first staircase's story (Act 1 into Act 2). Stepping onto the flight takes the camera
-/// away and turns the stairs one-way (<see cref="OneWayFlight"/>): the player climbs it
-/// themselves, at their own pace, and cannot go back down. At the top landing stands the stone
-/// newel post with its cap broken off. Inspecting the stump (E) is the trigger: the vignette
-/// closes like heavy eyelids, everything goes black, the checkpoint is saved and the player
-/// comes to in the Hollow (GameFlow plays the wake-up there).
+/// away, turns the stairs one-way (<see cref="OneWayFlight"/>), and lifts the player off their
+/// feet: a straight, silent glide to the top landing with no say in it (movement is taken away,
+/// but the mouse is still free to look around on the way up). Landing hands control back. At the
+/// top stands the stone newel post with its cap broken off. Inspecting the stump (E) is the
+/// trigger: the vignette closes like heavy eyelids, everything goes black, the checkpoint is
+/// saved and the player comes to in the Hollow (GameFlow plays the wake-up there).
 ///
 /// Only before Act 2 has happened, so it can never collide with Act 11's staircase.
 /// </summary>
@@ -25,6 +26,8 @@ public partial class FirstClimbEvent : StoryTrigger
 	[Export] public float FlightInset = 0.05f;
 	/// <summary>Head room the flight box keeps above the top landing.</summary>
 	[Export] public float FlightHeadroom = 1.4f;
+	/// <summary>Seconds for the automatic glide from wherever the player stepped on to the top landing.</summary>
+	[Export] public float FloatSeconds = 6.5f;
 
 	[ExportGroup("The collapse")]
 	/// <summary>Seconds for the vignette to close, blinking, into black after the post is inspected.</summary>
@@ -38,6 +41,8 @@ public partial class FirstClimbEvent : StoryTrigger
 
 	/// <summary>For tests: the player has stepped onto the stairs (the camera is gone, the flight is one-way).</summary>
 	public bool OnTheStairs { get; private set; }
+	/// <summary>For tests: the automatic glide to the top landing is running (movement is taken away, look is not).</summary>
+	public bool Floating { get; private set; }
 	/// <summary>For tests: the collapse is running (from E on the post to the level change).</summary>
 	public bool Collapsing { get; private set; }
 	/// <summary>For tests: the E-point on the broken newel post at the top (built when the stairs are stepped on).</summary>
@@ -78,7 +83,9 @@ public partial class FirstClimbEvent : StoryTrigger
 		AddChild(box);
 	}
 
-	/// <summary>The first step: the camera is gone, the flight is one-way, and the post at the top can be inspected.</summary>
+	/// <summary>The first step: the camera is gone, the flight is one-way, and the player is lifted
+	/// off their feet for the glide to the top (<see cref="FloatUp"/>). The post at the top can be
+	/// inspected only once they land there.</summary>
 	protected override void Fire(PlayerController player)
 	{
 		OnTheStairs = true;
@@ -86,21 +93,57 @@ public partial class FirstClimbEvent : StoryTrigger
 		if (GetParent() is StaircaseBuilder stairs)
 		{
 			OneWay = OneWayFlight.Attach(stairs);
-			if (stairs.HasNewel)
-			{
-				InspectPost = new Interactable
-				{
-					Name = "InspectPost",
-					Prompt = InspectPrompt,
-					PickRadius = 0.6f,
-					MaxDistance = 2.6f,
-					Position = stairs.NewelSeatLocal,
-				};
-				InspectPost.Interacted += OnInspected;
-				stairs.AddChild(InspectPost);
-			}
+			_ = Cutscene.Run(this, ct => FloatUp(player, stairs, ct), freezeBody: true);
 		}
 		GD.Print("[story] Act 1: on the stairs; there is no going back down");
+	}
+
+	/// <summary>
+	/// Straight up to the top landing on its own, at a fixed pace, with no footsteps: the body's
+	/// physics is frozen so no key moves it, but <see cref="PlayerInput"/> and the camera rig are
+	/// left running, so the mouse (or stick) can still look around for the whole ride. Landing
+	/// hands movement back and reveals the broken post's E-point, exactly where an ordinary climb
+	/// would leave the player.
+	/// </summary>
+	private async Task FloatUp(PlayerController player, StaircaseBuilder stairs, CancellationToken ct)
+	{
+		Floating = true;
+		var feet = player.GetNodeOrNull<PlayerFootsteps>("Footsteps");
+		feet?.SetPhysicsProcess(false);
+		player.Velocity = Vector3.Zero;
+		try
+		{
+			var top = GetNodeOrNull<Node3D>(TopMarkerPath);
+			Vector3 dest = top?.GlobalPosition ?? player.GlobalPosition;
+			var tween = player.CreateTween();
+			tween.TweenProperty(player, "global_position", dest, FloatSeconds)
+				.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+			await Cutscene.Tween(this, tween, ct);
+		}
+		finally
+		{
+			Floating = false;
+			if (feet != null && IsInstanceValid(feet)) feet.SetPhysicsProcess(true);
+		}
+		GD.Print("[story] Act 2: the climb set them down at the top landing");
+		if (GodotObject.IsInstanceValid(player) && player.IsInsideTree()) AttachInspectPost(stairs);
+	}
+
+	/// <summary>The E-point on the broken newel post, built once the glide actually sets the player down
+	/// at the top.</summary>
+	private void AttachInspectPost(StaircaseBuilder stairs)
+	{
+		if (!stairs.HasNewel || InspectPost != null) return;
+		InspectPost = new Interactable
+		{
+			Name = "InspectPost",
+			Prompt = InspectPrompt,
+			PickRadius = 0.6f,
+			MaxDistance = 2.6f,
+			Position = stairs.NewelSeatLocal,
+		};
+		InspectPost.Interacted += OnInspected;
+		stairs.AddChild(InspectPost);
 	}
 
 	private bool _inspected;
