@@ -323,6 +323,10 @@ public partial class LakeCrossingEvent : Node3D
 	/// <summary>Control is back once <see cref="Landed"/>; the player walks the last stretch to the
 	/// station themselves. Stepping up to its doorway is the act's real end: checkpoint 10, then
 	/// the credits <see cref="Act11Ending"/> already knows how to roll.</summary>
+	/// <summary>Reaching the station's door doesn't roll credits any more (Act 13 happens inside
+	/// it): checkpoint 10 marks Act 12 done, then a fade carries the player into the lobby, the
+	/// same way the bunker's vault door admits them (<see cref="StationInterior"/>). The real
+	/// ending now waits on Act 13's own last puzzle.</summary>
 	private void OnArrival(PlayerController player)
 	{
 		if (_arrived || !Landed) return;
@@ -332,8 +336,12 @@ public partial class LakeCrossingEvent : Node3D
 		{
 			GD.Print("[story] Act 12: reached the rescue station");
 			StoryBeat.ReachCheckpoint(player, Checkpoint.Act12LakeCrossed);
-			if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending)
-				await ending.Credits(StoryBeat.Fader(this), ct);
-		}, lockInput: true);
+			var fader = StoryBeat.Fader(this);
+			if (fader != null) await fader.Fade(1f, 0.8f, ct);
+			var station = StationInterior.Instance;
+			if (station != null) player.Teleport(station.EntranceMarkerWorld, station.EntranceYaw);
+			if (fader != null) await fader.Fade(0f, 0.9f, ct);
+			GD.Print("[story] Act 13: into the forester station");
+		}, lockInput: true, freezeBody: true);
 	}
 }

@@ -3,13 +3,14 @@ using Godot;
 
 namespace ProjectDS.Player;
 
-public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio }
+public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio, Knife }
 
 /// <summary>
 /// One inventory, all of it usable at any time, with no selecting and no hands-full
 /// limit. Lantern, Compass, Camera, NewelPost and Radio are gear (picking them up
-/// turns systems on); Axe, Key and Hammer are puzzle tools, any number carried at
-/// once, each gone once <see cref="Consume"/> is called by the puzzle that used it.
+/// turns systems on); Axe, Key, Hammer and Knife are puzzle tools, any number carried
+/// at once. Axe/Key/Hammer are gone once <see cref="Consume"/> is called by the
+/// puzzle that used it; the Knife is never consumed (Act 13 reuses it for every cut).
 /// </summary>
 public partial class PlayerInventory : Node
 {

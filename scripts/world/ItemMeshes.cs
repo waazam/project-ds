@@ -215,6 +215,7 @@ public static class ItemMeshes
 			case ToolKind.Lantern: Lantern(k, parent, ref b); break;
 			case ToolKind.NewelPost: NewelPost(k, ref b); break;
 			case ToolKind.Radio: Walkie(k, parent, ref b); break;
+			case ToolKind.Knife: Knife(k, ref b); break;
 		}
 		if (!k.IsEmpty)
 		{
@@ -413,6 +414,30 @@ public static class ItemMeshes
 		k.Xf = Transform3D.Identity;
 		b.PickCenter = new Vector3(0, 0.1f, 0);
 		b.PickRadius = 0.3f;
+	}
+
+	/// <summary>Lies flat, blade along +X from a small brass bolster, dark grip along -X.</summary>
+	private static void Knife(MeshKit k, ref Built b)
+	{
+		var xf = new Transform3D(new Basis(Vector3.Up, 0.4f), new Vector3(0, 0.035f, 0));
+		k.Xf = xf;
+		k.Color = new Color(0.14f, 0.13f, 0.12f);
+		k.Mat(ItemTextures.AshMat);
+		k.Cylinder(new Vector3(-0.1f, 0, 0), new Vector3(0.01f, 0, 0), 0.014f, 0.011f, 6, true);
+		k.Color = new Color(0.5f, 0.46f, 0.36f);
+		k.Mat(ItemTextures.BrassMat);
+		k.Cylinder(new Vector3(0.012f, 0, 0), new Vector3(0.026f, 0, 0), 0.017f, 0.013f, 6, true);
+		k.Color = new Color(0.8f, 0.82f, 0.84f);
+		k.Mat(ItemTextures.ChromeMat);
+		k.Box(new Vector3(0.115f, 0, 0), new Vector3(0.18f, 0.004f, 0.026f), 8f);
+		Vector3 tl = new(0.205f, 0.002f, 0.013f), bl = new(0.205f, -0.002f, 0.013f);
+		Vector3 tr = new(0.205f, 0.002f, -0.013f), br = new(0.205f, -0.002f, -0.013f);
+		Vector3 tip = new(0.26f, 0f, -0.002f);
+		k.Tri(tl, tip, tr, Vector3.Up, V(0, 0), V(1, 0.5f), V(0, 1));
+		k.Tri(bl, br, tip, Vector3.Down, V(0, 0), V(0, 1), V(1, 0.5f));
+		k.Xf = Transform3D.Identity;
+		b.PickCenter = new Vector3(0, 0.06f, 0);
+		b.PickRadius = 0.28f;
 	}
 
 	private static void Camera(MeshKit k, ref Built b)

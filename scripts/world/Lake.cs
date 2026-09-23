@@ -152,10 +152,11 @@ public partial class Lake : Node3D
 
 	// ------------------------------------------------------------------ the rescue station
 
-	/// <summary>A large, dilapidated forest rescue/ranger station: board-and-batten walls gone grey,
-	/// a sagging gable roof missing shingles on one slope, boarded and broken windows, a lopsided
-	/// porch, and a hand-painted sign gone illegible. Built the same way as <see cref="Shed"/>, just
-	/// bigger and rougher — nobody has touched this place in years.</summary>
+	/// <summary>A large, dilapidated forest rescue/ranger station: a proper round-log cabin (the
+	/// same course-by-course construction as <see cref="Cabin"/>) gone grey and weathered, a
+	/// sagging gable roof missing shingles on one slope, boarded and broken windows, a lopsided
+	/// porch, and a hand-painted sign gone illegible — nobody has touched this place in years.
+	/// Its front door is the way into Act 13's interior (<see cref="StationInterior"/>).</summary>
 	private void BuildStation(float farZ, RandomNumberGenerator rng)
 	{
 		float cz = farZ - ShoreDepth - 4.5f;
@@ -180,18 +181,50 @@ public partial class Lake : Node3D
 		BuildKit.Box(k, new Vector3(0, -0.02f, 0), new Vector3(w, 0.1f, d), 1f / 0.6f, BuildKit.Face.NY);
 		cols.Add((new Vector3(0, -0.2f, 0), new Vector3(w, 0.5f, d)));
 
-		// Walls: grey, weathered boards, a few missing/broken slats for neglect.
-		k.Mat(boards);
-		k.Color = new Color(0.38f, 0.37f, 0.36f);
-		const float doorW = 1.5f, doorH = 2.3f;
-		BuildKit.Box(k, new Vector3(0, wallH * 0.5f, -hd), new Vector3(w, wallH, 0.08f), 1.1f);
-		foreach (int s in new[] { -1, 1 })
-			BuildKit.Box(k, new Vector3(s * hw, wallH * 0.5f, 0), new Vector3(0.08f, wallH, d), 1.1f);
+		// Walls: round-log, weathered and grey, the same course-by-course technique as the cabin
+		// (BuildKit.Log; alternating which pair of walls runs long past the corner each course, so
+		// the joints read as interlocking without any actual notch geometry) - a proper log cabin,
+		// not board-and-batten, just bigger and left to rot.
+		// doorW matches the interior doorway widening elsewhere in the station (1.4 -> 2.2 m): a
+		// narrower gap here left the test bot (and, more importantly, the player under an autowalk
+		// or a tight camera angle) prone to clipping the door-frame collision on the approach.
+		const float doorW = 2.2f, doorH = 2.3f, logT = 0.24f, ext = 0.22f;
+		const int courses = 12;
+		float logH = wallH / courses;
+		float uLen = logH * 4f;
+		var logMat = BuildingTextures.LogMat;
+		var logEnd = BuildingTextures.LogEndMat;
 		float sideW = hw - doorW * 0.5f;
-		foreach (int s in new[] { -1, 1 })
-			BuildKit.Box(k, new Vector3(s * (doorW * 0.5f + sideW * 0.5f), wallH * 0.5f, hd), new Vector3(sideW, wallH, 0.08f), 1.1f);
-		BuildKit.Box(k, new Vector3(0, (doorH + wallH) * 0.5f, hd), new Vector3(doorW, wallH - doorH, 0.08f), 1.1f);
+		for (int c = 0; c < courses; c++)
+		{
+			float y0 = c * logH, y1 = y0 + logH;
+			bool frontLong = c % 2 == 0;
+			float shade = rng.RandfRange(0.62f, 0.82f);   // grey and weathered, darker than a fresh cabin
+			float jit = rng.RandfRange(-0.012f, 0.012f);
+			k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
+
+			// front (the door) and back, along X
+			float xa = frontLong ? -hw - ext : -hw + logT * 0.5f, xb = -xa;
+			bool doorHere = y1 > 0.05f && y0 < doorH - 0.05f;
+			if (doorHere)
+			{
+				float dw = doorW * 0.5f;
+				if (xa < -dw) BuildKit.Log(k, logMat, logEnd, false, xa, -dw, hd, y0, y1, logT, uLen, true, true);
+				if (dw < xb) BuildKit.Log(k, logMat, logEnd, false, dw, xb, hd, y0, y1, logT, uLen, true, true);
+			}
+			else BuildKit.Log(k, logMat, logEnd, false, xa, xb, hd, y0, y1, logT, uLen, true, true);
+			BuildKit.Log(k, logMat, logEnd, false, xa, xb, -hd, y0, y1, logT, uLen, true, true);
+			// the two sides, along Z
+			float za = frontLong ? -hd + logT * 0.5f : -hd - ext, zb = -za;
+			foreach (int s in new[] { -1, 1 })
+			{
+				float s2 = rng.RandfRange(0.64f, 0.8f);
+				k.Color = new Color(s2, s2 * 0.98f, s2 * 0.95f);
+				BuildKit.Log(k, logMat, logEnd, true, za, zb, s * hw + jit * 0.5f, y0, y1, logT, uLen);
+			}
+		}
 		// A few boards knocked loose, hanging askew.
+		k.Mat(boards);
 		k.Color = new Color(0.34f, 0.33f, 0.32f);
 		for (int i = 0; i < 5; i++)
 		{

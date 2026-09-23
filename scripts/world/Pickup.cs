@@ -138,10 +138,11 @@ public partial class Pickup : Area3D
 		ToolKind.Camera => "camera",
 		ToolKind.NewelPost => "newel post",
 		ToolKind.Radio => "walkie-talkie",
+		ToolKind.Knife => "knife",
 		_ => "item",
 	};
 
-	/// <summary>Gear (as opposed to the single-use puzzle tools: axe, key, hammer).</summary>
+	/// <summary>Gear (as opposed to the puzzle tools: axe, key, hammer, knife).</summary>
 	private static bool IsGear(ToolKind kind)
 		=> kind is ToolKind.Lantern or ToolKind.Compass or ToolKind.Camera or ToolKind.NewelPost or ToolKind.Radio;
 

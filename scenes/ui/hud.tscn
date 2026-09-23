@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://scripts/ui/PhotoThumb.cs" id="11_thumb"]
 [ext_resource type="Script" path="res://scripts/ui/PhotoLogPage.cs" id="12_page"]
 [ext_resource type="Script" path="res://scripts/ui/CodeLockOverlay.cs" id="13_codelock"]
+[ext_resource type="Script" path="res://scripts/ui/TapeCutOverlay.cs" id="14_tapecut"]
 
 [sub_resource type="ShaderMaterial" id="PostMat"]
 shader = ExtResource("1_post")
@@ -60,6 +61,9 @@ script = ExtResource("10_note")
 
 [node name="CodeLockOverlay" type="CanvasLayer" parent="."]
 script = ExtResource("13_codelock")
+
+[node name="TapeCutOverlay" type="CanvasLayer" parent="."]
+script = ExtResource("14_tapecut")
 
 [node name="PhotoThumb" type="CanvasLayer" parent="."]
 script = ExtResource("11_thumb")

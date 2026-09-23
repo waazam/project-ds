@@ -60,6 +60,23 @@ public partial class MainMenu : Node
 			Callable.From(() => StoryManager.Instance.ContinueGame()).CallDeferred();
 			return;
 		}
+		if (GameSettings.Instance.StartAct == 13)
+		{
+			// Dev launch inside the forester station (Act 13): everything through the lake crossing
+			// done; Continue's respawn for this checkpoint is the station's own entrance marker.
+			string[] flags =
+			{
+				StoryManager.Flag.StairsClimbed, StoryManager.Flag.StormStarted, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, "read_camp_note",
+				StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke,
+				StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2), StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4),
+				StoryManager.Flag.ClearingVoiceHeard, StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone,
+				StoryManager.Flag.BunkerUnlocked, StoryManager.Flag.CrtPuzzleDone, StoryManager.Flag.WalkieTaken, StoryManager.Flag.BunkerMazeEntered,
+				StoryManager.Flag.BunkerMazeExited, StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated,
+			};
+			SaveSystem.Save(new SaveData { Checkpoint = Checkpoint.Act12LakeCrossed, Flags = flags, Inventory = "lantern,compass,radio;tool=None" });
+			Callable.From(() => StoryManager.Instance.ContinueGame()).CallDeferred();
+			return;
+		}
 		// Coming back from "Quit to Menu": StoryManager unpauses on scene change; make sure regardless.
 		GetTree().Paused = false;
 		Input.MouseMode = Input.MouseModeEnum.Visible;

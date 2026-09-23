@@ -53,6 +53,10 @@ for (int i = 1; i <= 4; i++) jobs.Add(($"cloth_{i:00}", sfx, false, Lo, (r, sr) 
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_stone_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepStone(r, sr)));
 jobs.Add(("rifle_distant_01", sfx, false, Lo, (r, sr) => Sfx.RifleDistant(r, sr)));
 jobs.Add(("newel_seat", sfx, false, Lo, (r, sr) => Sfx.NewelSeat(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"knife_slice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.KnifeSlice(r, sr)));
+jobs.Add(("wheel_turn_01", sfx, false, Lo, (r, sr) => Sfx.WheelTurn(r, sr)));
+jobs.Add(("clock_chime_drowned", sfx, false, Lo, (r, sr) => Sfx.ClockChimeDrowned(r, sr)));
+jobs.Add(("clock_break", sfx, false, Lo, (r, sr) => Sfx.ClockBreak(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"wall_knock_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WallKnock(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"door_slam_{i:00}", sfx, false, Lo, (r, sr) => Sfx.DoorSlam(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"wall_pound_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WallPound(r, sr)));

@@ -587,6 +587,98 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 40, dur);
 	}
 
+	/// <summary>A knife dragged through duct tape: a fast, textured rip - brighter and more
+	/// plasticky than cloth, with a stickier crinkle riding on top as the tape gives.</summary>
+	public static double[] KnifeSlice(Rng r, int sr)
+	{
+		double dur = r.R(0.3, 0.44);
+		var x = Buf(sr, dur + 0.05);
+		var bp = Biquad.Bp(sr, r.R(2200, 3200), 1.1);
+		var hp = Biquad.Hp(sr, 1100);
+		var crinkle = Biquad.Bp(sr, r.R(4500, 6500), 2.2);
+		var tex = new Smooth(r, dur + 0.1, 0.01);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double u = (double)i / (dur * sr);
+			double t = tex.At((double)i / sr);
+			double slice = hp.P(bp.P(r.W())) * Env(u, 0.015, 0.3);
+			double crink = crinkle.P(r.W()) * Math.Pow(Math.Max(0, t - 0.25), 1.4) * 0.55 * Env(u, 0.02, 0.32);
+			x[i] = (slice + crink) * (0.75 + 0.25 * t);
+		}
+		return FinishOneShot(x, sr, -3, 35, dur);
+	}
+
+	/// <summary>A heavy iron valve wheel, straining round: a filtered-noise creak whose pitch rises
+	/// and falls with the effort of the turn, ending in a hard clank as it reaches its stop.</summary>
+	public static double[] WheelTurn(Rng r, int sr)
+	{
+		double dur = r.R(1.1, 1.5);
+		var x = Buf(sr, dur + 0.2);
+		var creak = new Biquad(sr);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double u = (double)i / (dur * sr);
+			if ((i & 15) == 0) creak.SetBp(300 + 260 * Math.Sin(Math.PI * Math.Min(1, u)), 3.2);
+			x[i] = creak.P(r.W()) * Env(Math.Min(1, u), 0.05, 0.5) * 0.85;
+		}
+		var clank = Biquad.Bp(sr, r.R(900, 1400), 4);
+		int endIdx = (int)(dur * 0.9 * sr);
+		for (int i = 0; i < (int)(0.18 * sr) && endIdx + i < x.Length; i++)
+		{
+			double u = i / (0.18 * sr);
+			x[endIdx + i] += clank.P(r.W()) * Math.Exp(-u * 8) * 1.1;
+		}
+		return FinishOneShot(x, sr, -3, 80, dur);
+	}
+
+	/// <summary>The grandfather clock's noon chime, drowned: real bell partials (inharmonic, decaying
+	/// each at its own rate) pushed through a heavy underwater lowpass with a slow amplitude wobble,
+	/// so it reads as the same chime but choked and warped by the flooded room around it.</summary>
+	public static double[] ClockChimeDrowned(Rng r, int sr)
+	{
+		const double dur = 4.2;
+		var x = Buf(sr, dur + 0.4);
+		double f0 = r.R(170, 190);
+		var partials = new[] { (1.0, 0.55), (2.0, 0.35), (2.4, 0.25), (3.01, 0.18), (4.12, 0.1) };
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = i / (double)sr, v = 0;
+			foreach (var (mul, amp) in partials) v += Math.Sin(TwoPi * f0 * mul * t) * amp * Math.Exp(-t * (0.5 + mul * 0.35));
+			x[i] = v;
+		}
+		var lp1 = Biquad.Lp(sr, 850); var lp2 = Biquad.Lp(sr, 650);
+		for (int i = 0; i < x.Length; i++) x[i] = lp2.P(lp1.P(x[i]));
+		var wobble = new Smooth(r, dur + 0.4, 0.22);
+		for (int i = 0; i < x.Length; i++) { double t = i / (double)sr; x[i] *= 0.65 + 0.35 * wobble.At(t); }
+		return FinishOneShot(x, sr, -3, 250, dur);
+	}
+
+	/// <summary>The clock breaking apart right after its chime: a sharp wood crack, a scatter of
+	/// glass, and a low body-thud as the case comes apart.</summary>
+	public static double[] ClockBreak(Rng r, int sr)
+	{
+		const double dur = 1.1;
+		var x = Buf(sr, dur + 0.3);
+		var crackHp = Biquad.Hp(sr, 900);
+		var thudLp = Biquad.Lp(sr, 150);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double u = (double)i / (dur * sr);
+			x[i] = crackHp.P(r.W()) * Env(Math.Min(1, u), 0.002, 0.12) * 1.2
+				+ thudLp.P(r.W()) * Env(Math.Min(1, u), 0.01, 0.3) * 0.9;
+		}
+		int n = r.I(5, 9);
+		for (int g = 0; g < n; g++)
+		{
+			double at = r.R(0.03, 0.55);
+			var glass = Biquad.Bp(sr, r.R(2500, 5500), r.R(10, 20));
+			int s0 = (int)(at * sr), len = (int)(0.12 * sr);
+			for (int i = 0; i < len && s0 + i < x.Length; i++)
+				x[s0 + i] += glass.P(i == 0 ? 1.0 : 0.0) * Math.Exp(-i / (double)sr * 22) * r.R(0.15, 0.3);
+		}
+		return FinishOneShot(x, sr, -3, 350, dur);
+	}
+
 	/// <summary>
 	/// A hunting rifle, far off but unmistakable: a hard crack, a punchy boom
 	/// with enough mid-range to carry on any speaker, then the report rolling

@@ -221,6 +221,7 @@ public partial class StoryTest : Node
 			new("Acts 8-10: the bunker", hollow, Act8To10Bunker),
 			new("Act 11: the last climb", hollow, Act11),
 			new("Act 12: the lake crossing", hollow, Act12Lake),
+			new("Act 13: the forester station", hollow, Act13Station),
 		};
 	}
 
@@ -1222,19 +1223,14 @@ public partial class StoryTest : Node
 		Check("crossed the current and landed", crossing.Landed, $"progress {crossing.Progress:0.00}");
 		Screenshot("landed");
 
-		// Checkpoint 10 fires the real credits in the same synchronous call (LakeCrossingEvent.OnArrival),
-		// and under AutoTest they run to "back to the menu" fast enough to race a polled WaitUntil (the
-		// main menu then starts a fresh game, confusing this session's loop). Subscribing to the event
-		// itself — exactly Act2Climb's fix for the same class of race — lets Finish() win: it runs
-		// synchronously inside ReachCheckpoint, before OnArrival's next line even starts the credits.
+		// Subscribed rather than polled for the same reason Act2Climb's checkpoint watch is: the
+		// handler runs synchronously inside ReachCheckpoint, so it can never miss the frame it fires.
 		bool reached = false;
 		void OnCheckpoint(Checkpoint cp)
 		{
 			if (cp != Checkpoint.Act12LakeCrossed) return;
 			reached = true;
 			Check("checkpoint 10: reached the rescue station", true);
-			Engine.TimeScale = 1.0;
-			Finish();
 		}
 		StoryManager.Instance.CheckpointReached += OnCheckpoint;
 		try
@@ -1243,6 +1239,125 @@ public partial class StoryTest : Node
 			await WalkTo(lake.StationDoorWorld, 1.0f, ct, giveUp: 15f);
 			await WaitUntil(() => reached, 10, ct);
 			if (!reached) Check("checkpoint 10: reached the rescue station", false, "trigger never fired");
+		}
+		finally { StoryManager.Instance.CheckpointReached -= OnCheckpoint; }
+		Engine.TimeScale = 1.0;
+		// Act 13 happens inside the station now (no credits here any more): wait for the entry
+		// fade to hand control back before the next step starts driving the player around.
+		await WaitUntil(() => _input.Enabled, 5, ct);
+	}
+
+	private async Task Act13Station(CancellationToken ct)
+	{
+		var station = StationInterior.Instance;
+		Check("the station interior exists", station != null);
+		if (station == null) return;
+		Screenshot("station_lobby");
+
+		var knife = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Knife);
+		Check("the knife is on the desk", knife != null);
+		if (knife != null) await UseIt(knife, ct);
+		Check("the knife is in hand", _inv.HasTool(ToolKind.Knife));
+
+		// The basement: cut the tape, turn the wheel three times, wait for the drain and the clock.
+		var basement = station.Basement;
+		Check("the basement exists", basement != null);
+		var basementDoorUse = basement?.GetNodeOrNull<Interactable>("Door/Use");
+		Check("the basement door can be interacted with", basementDoorUse != null);
+		if (basementDoorUse != null) await UseIt(basementDoorUse, ct);
+		await WaitUntil(() => TapeCutOverlay.Instance is { IsOpen: true }, 5, ct);
+		Check("the tape-cut view opens", TapeCutOverlay.Instance is { IsOpen: true });
+		Screenshot("basement_tape_cut");
+		TapeCutOverlay.Instance?.TestCompleteCut();
+		await WaitUntil(() => basement != null && basement.TapeCut, 5, ct);
+		Check("the basement tape is cut", basement is { TapeCut: true });
+
+		var wheelUse = basement?.GetNodeOrNull<Interactable>("Wheel/Use");
+		Check("the wheel can be turned", wheelUse != null);
+		for (int i = 0; i < 3 && wheelUse != null; i++) await UseIt(wheelUse, ct);
+		Check("the wheel was turned three times", basement is { Turns: >= 3 }, $"{basement?.Turns}");
+		Engine.TimeScale = 3.0;
+		await WaitUntil(() => basement != null && basement.Drained, 15, ct);
+		Check("the basement drains", basement is { Drained: true });
+		await WaitUntil(() => basement != null && basement.ClockBroken, 15, ct);
+		Check("the clock chimes, drowned, and breaks apart, dropping the key", basement is { ClockBroken: true });
+		Engine.TimeScale = 1.0;
+		Screenshot("clock_broken");
+
+		// The key opens room 1.
+		var key = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Key && !p.Taken);
+		Check("the clock's key can be taken", key != null);
+		if (key != null) await UseIt(key, ct);
+		Check("the key is in hand", _inv.HasTool(ToolKind.Key));
+		var room1Door = station.GetNodeOrNull<StationDoor>("Room1Door");
+		Check("room 1's door exists", room1Door != null);
+		if (room1Door != null) await UseIt(room1Door, ct);
+		Check("the key opens room 1", room1Door is { Locked: false, IsOpen: true });
+
+		// Room 1: cut the box's three sides, press the button, the writing melts.
+		var room1 = station.Room1;
+		var boxUse = room1?.GetNodeOrNull<Interactable>("CigarBox/Use");
+		Check("the cigar box can be interacted with", boxUse != null);
+		if (boxUse != null) await UseIt(boxUse, ct);
+		for (int i = 0; i < 3; i++)
+		{
+			await WaitUntil(() => TapeCutOverlay.Instance is { IsOpen: true }, 5, ct);
+			TapeCutOverlay.Instance?.TestCompleteCut();
+			await Frames(3, ct);
+		}
+		await WaitUntil(() => room1 != null && room1.BoxOpen, 5, ct);
+		Check("all three sides are cut and the box opens on a button", room1 is { BoxCutsDone: 3, BoxOpen: true }, $"{room1?.BoxCutsDone} cuts");
+		var buttonUse = room1?.GetNodeOrNull<Interactable>("CigarBox/Button/Press");
+		Check("the button can be pressed", buttonUse != null);
+		if (buttonUse != null) await UseIt(buttonUse, ct);
+		Check("room 1 is solved", room1 is { Solved: true });
+		Screenshot("room1_solved");
+
+		// Room 2: read the code off the wall, use the keypad.
+		await WaitUntil(() => station.GetNodeOrNull<StationDoor>("Room2Door") is { Locked: false }, 5, ct);
+		Check("solving room 1 unlocks room 2's door", station.GetNodeOrNull<StationDoor>("Room2Door") is { Locked: false });
+		var room2Door = station.GetNodeOrNull<StationDoor>("Room2Door");
+		if (room2Door != null) await UseIt(room2Door, ct);
+		var room2 = station.Room2;
+		var padUse = room2?.GetNodeOrNull<Interactable>("Keypad/Use");
+		Check("the keypad can be interacted with", padUse != null);
+		if (padUse != null) await UseIt(padUse, ct);
+		await WaitUntil(() => CodeLockOverlay.Instance is { IsOpen: true }, 5, ct);
+		Check("the keypad view opens", CodeLockOverlay.Instance is { IsOpen: true });
+		if (room2 != null) CodeLockOverlay.Instance?.EnterAndSubmit(room2.Code);
+		await WaitUntil(() => room2 != null && room2.Solved, 5, ct);
+		Check("room 2 takes the code", room2 is { Solved: true });
+
+		// Room 3: collect the three coins, use the pedestal - the act's real end.
+		await WaitUntil(() => station.GetNodeOrNull<StationDoor>("Room3Door") is { Locked: false }, 5, ct);
+		Check("solving room 2 unlocks room 3's door", station.GetNodeOrNull<StationDoor>("Room3Door") is { Locked: false });
+		var room3Door = station.GetNodeOrNull<StationDoor>("Room3Door");
+		if (room3Door != null) await UseIt(room3Door, ct);
+		var room3 = station.Room3;
+		for (int i = 0; i < 3; i++)
+		{
+			var coin = room3?.GetNodeOrNull<Node3D>($"Coin{i}");
+			if (coin != null) await UseIt(coin, ct);
+		}
+		Check("all three coins collected", room3?.CoinsCollected == 3, $"{room3?.CoinsCollected}");
+		var pedestalUse = room3?.GetNodeOrNull<Interactable>("Pedestal/Use");
+		Check("the pedestal can be used", pedestalUse != null);
+		Screenshot("room3_coins");
+
+		bool reached = false;
+		void OnCheckpoint(Checkpoint cp)
+		{
+			if (cp != Checkpoint.Act13StationSolved) return;
+			reached = true;
+			Check("checkpoint 11: the station is solved", true);
+			Finish();
+		}
+		StoryManager.Instance.CheckpointReached += OnCheckpoint;
+		try
+		{
+			if (pedestalUse != null) await UseIt(pedestalUse, ct);
+			await WaitUntil(() => reached, 5, ct);
+			if (!reached) Check("checkpoint 11: the station is solved", false, "trigger never fired");
 		}
 		finally { StoryManager.Instance.CheckpointReached -= OnCheckpoint; }
 	}

@@ -84,9 +84,21 @@ public partial class StoryManager : Node
 		public const string PickupTakenAxe = "pickup_taken_axe";
 		public const string PickupTakenKey = "pickup_taken_key";
 		public const string PickupTakenHammer = "pickup_taken_hammer";
+		public const string PickupTakenKnife = "pickup_taken_knife";
 		// Act 1 photo log: one flag per photographed subject ("photo_" + subject id). See PhotoLog.
 		public const string PhotoPrefix = "photo_";
 		public static string Photo(string subjectId) => PhotoPrefix + subjectId;
+
+		/// <summary>Act 13, the forester station: the basement's taped-shut door has been cut open.</summary>
+		public const string StationBasementTapeCut = "station_basement_tape_cut";
+		/// <summary>Act 13: the flooded basement has been pumped dry (the wheel turned 3 times).</summary>
+		public const string StationBasementDrained = "station_basement_drained";
+		/// <summary>Act 13: the grandfather clock has chimed, spat out its key and broken apart.</summary>
+		public const string StationClockBroken = "station_clock_broken";
+		/// <summary>Act 13, room 1: the cut-open cigar box's button has been pressed (the wall writing melts).</summary>
+		public const string StationRoom1Solved = "station_room1_solved";
+		/// <summary>Act 13, room 2: the keypad has taken its code.</summary>
+		public const string StationRoom2Solved = "station_room2_solved";
 	}
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>
