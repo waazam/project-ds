@@ -6,7 +6,7 @@ using static ProjectDS.World.BunkerParts.BunkerLayout;
 namespace ProjectDS.World.BunkerParts;
 
 /// <summary>
-/// Act 9's room: a grimy concrete hall (Z -90 .. -122) whose back and side
+/// Act 9's room: a grimy concrete hall (Z -90 .. -108) whose back and side
 /// walls are steel shelving stacked unevenly with old CRTs, Matrix-style, all
 /// showing grainy night surveillance of the woods. One marked set on the
 /// console at the back shows the cabin smouldering; "Turn off the screen"
@@ -279,7 +279,8 @@ public partial class CrtRoom : Node3D
 		float backZ = CrtRoomBackZ + 0.35f;
 		foreach (float x in new[] { -4.2f, -2.1f, 0f, 2.1f, 4.2f })
 			Unit(new Transform3D(Basis.Identity, new Vector3(x, 0, backZ)));
-		foreach (float z in new[] { -102.5f, -106.5f, -110.5f, -114.5f })
+		// Three per side in the 18 m room, clear of the front clutter (z -92..-95) and the back wall units.
+		foreach (float z in new[] { -98f, -101.5f, -105f })
 		{
 			Unit(new Transform3D(Basis.FromEuler(new Vector3(0, Mathf.Pi * 0.5f, 0)), new Vector3(-CrtRoomHalfWidth + 0.58f, 0, z)));
 			Unit(new Transform3D(Basis.FromEuler(new Vector3(0, -Mathf.Pi * 0.5f, 0)), new Vector3(CrtRoomHalfWidth - 0.58f, 0, z)));
@@ -311,6 +312,8 @@ public partial class CrtRoom : Node3D
 		k.CommitTo(this, "Console");
 		AddBox(new Vector3(0, ConsoleTop * 0.5f, ConsoleZ), new Vector3(1.6f, ConsoleTop, 0.8f));
 
+		// The walkie-talkie, dead, right of the keyboard: taken here, it only wakes outside (WalkiePickup).
+		AddChild(new WalkiePickup { Name = "WalkiePickup", Dead = true, Position = new Vector3(0.3f, ConsoleTop + 0.06f, ConsoleZ + 0.2f), Rotation = new Vector3(0, -0.7f, 0) });
 		// The station log, open on the desk left of the keyboard, readable before or after the switch.
 		PaperKit.Flat(this, new Vector3(-0.57f, ConsoleTop, ConsoleZ + 0.27f), -7f, new Vector2(0.32f, 0.22f), PaperKit.Look.Ledger,
 			"", LogText, Readable.NoteStyle.Typed, "Read the log", 3);
@@ -423,7 +426,7 @@ public partial class CrtRoom : Node3D
 		cords.Mat(BunkerTextures.RubberMat);
 		cords.Color = Colors.White;
 		int n = 0;
-		foreach (float z in new[] { -96.5f, -106.5f, -116.5f })
+		foreach (float z in new[] { -96f, -100f, -104f })   // between the ceiling beams (every 4 m from the front)
 		{
 			var xf = new Transform3D(Basis.FromEuler(new Vector3(0, 0.4f * n, 0)), new Vector3(0, CrtRoomHeight - 0.9f, z));
 			cords.Cylinder(new Vector3(0, CrtRoomHeight, z), new Vector3(0, CrtRoomHeight - 0.9f, z), 0.008f, 0.008f, 4, false);
@@ -443,8 +446,8 @@ public partial class CrtRoom : Node3D
 		_glow = new[]
 		{
 			new OmniLight3D { Name = "GlowBack", Position = new Vector3(0, 1.7f, CrtRoomBackZ + 2.6f), OmniRange = 8f, LightEnergy = 1.3f },
-			new OmniLight3D { Name = "GlowLeft", Position = new Vector3(-CrtRoomHalfWidth + 2.2f, 1.7f, -108.5f), OmniRange = 8f, LightEnergy = 1.1f },
-			new OmniLight3D { Name = "GlowRight", Position = new Vector3(CrtRoomHalfWidth - 2.2f, 1.7f, -108.5f), OmniRange = 8f, LightEnergy = 1.1f },
+			new OmniLight3D { Name = "GlowLeft", Position = new Vector3(-CrtRoomHalfWidth + 2.2f, 1.7f, MidZ - 2f), OmniRange = 8f, LightEnergy = 1.1f },
+			new OmniLight3D { Name = "GlowRight", Position = new Vector3(CrtRoomHalfWidth - 2.2f, 1.7f, MidZ - 2f), OmniRange = 8f, LightEnergy = 1.1f },
 		};
 		_glowEnergy = new float[_glow.Length];
 		for (int i = 0; i < _glow.Length; i++)

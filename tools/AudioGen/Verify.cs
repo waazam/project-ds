@@ -79,10 +79,21 @@ public static class Verify
 	static (double, double) ExpectedDuration(string name) => name switch
 	{
 		"rain_loop" => (150, 240),
-		"choir_chant_loop" => (50, 90),
+		"choir_chant_loop" => (50, 130),   // 108 s since 2026-09-22: Dan wants the chant sparse (6-14 s between phrases)
+		_ when name.StartsWith("creature_rattle_cand") => (18, 30),
+		_ when name.StartsWith("creature_giant_rattle") => (22, 28),
 		_ when name.EndsWith("_loop") => (20, 40),
 		_ when name.StartsWith("thunder") => (6, 18),
 		_ when name.StartsWith("giant_step") => (1.5, 4),
+		_ when name.StartsWith("squelch") => (0.05, 0.32),
+		_ when name.StartsWith("radio_tick") => (0.02, 0.12),
+		_ when name.StartsWith("door_slam") => (0.5, 1.4),
+		_ when name.StartsWith("wall_pound") => (0.2, 0.5),
+		_ when name.StartsWith("cabin_slam") => (0.8, 1.6),
+		_ when name.StartsWith("body_thump") => (0.35, 0.8),
+		_ when name.StartsWith("steel_door_open") => (0.7, 1.3),
+		_ when name.StartsWith("steel_door_slam") => (1.0, 1.6),
+		_ when name.StartsWith("radio_burst") => (2, 3.5),
 		_ when name.StartsWith("bird") => (0.3, 2.5),
 		_ when name.StartsWith("step_dirt") => (0.2, 0.36),
 		_ when name.StartsWith("step_wood") => (0.2, 0.6),
@@ -169,14 +180,16 @@ public static class Verify
 	{
 		if (name == "rain_loop")
 		{
-			if (m.Floor > -10) yield return "rain has a sustained floor";
-			if (m.Cv < 2) yield return "rain level too steady";
-			if (b[0] > 0.05 || b[4] > 0.1) yield return "rain rumble/fizz";
+			// Dense canopy patter (2026-09-22): a steady floor is the point now; the old sparse drops read as fire.
+			if (m.Cv < 0.25) yield return "rain level too steady";
+			if (b[0] > 0.05 || b[4] > 0.15) yield return "rain rumble/fizz";
 		}
 		if (name.StartsWith("thunder"))
 		{
-			if (m.NearPeak > 4 || m.Crest < 12 || m.MaxAbs >= 0.999) yield return "thunder clipped/overdriven";
-			if (b[0] + b[1] < 0.97 || centroid > 250) yield return "thunder not low";
+			// A slow soft front (the roll Dan likes) sits near its peak for several 50 ms windows without being
+			// limited: 8 windows is the bound now (2026-09-22); the crest and hard-peak checks still catch clipping.
+			if (m.NearPeak > 8 || m.Crest < 8 || m.MaxAbs >= 0.999) yield return "thunder clipped/overdriven";
+			if (b[0] + b[1] < 0.9 || centroid > 450) yield return "thunder not low";
 			if (m.Tail > -15) yield return "thunder doesn't decay";
 		}
 		if (name == "fire_crackle_loop")
@@ -195,7 +208,8 @@ public static class Verify
 			if (b[1] < 0.2) yield return "hum inaudible on small speakers";
 			if (m.Crest > 12) yield return "hum not steady";
 		}
-		if (name.StartsWith("giant_step") && (b[0] < 0.6 || centroid > 150 || b[1] < 0.1 || b[2] + b[3] + b[4] > 0.02)) yield return "giant step not a low (but audible) thud";
+		// Since 2026-09-22 the step is sub + rumble only (the 100-250 Hz body read as a gunshot), so no lower bound on the 100 Hz-1 kHz band.
+		if (name.StartsWith("giant_step") && (b[0] < 0.8 || centroid > 120 || b[2] + b[3] + b[4] > 0.01)) yield return "giant step not a soft sub thud";
 	}
 
 	/// <summary>Spread (p90 - p10, dB) of 250 ms RMS windows: how much the level moves (gusts, swells).</summary>

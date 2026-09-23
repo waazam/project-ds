@@ -24,7 +24,7 @@ public partial class SafeZoneWatcher : Node
 	/// <summary>The safe zone's centre (the camp).</summary>
 	[Export] public NodePath CenterPath = "..";
 	[Export] public float Radius = 16f;
-	[Export] public string ThingsLine = "Someone's camp.";
+	[Export] public string ThingsLine = "";   // was "Someone's camp." (self-talk removed, Dan 2026-09-22)
 	/// <summary>Seconds after the second piece of gear is taken before the line shows.</summary>
 	[Export] public float ThingsLineDelay = 1.6f;
 
@@ -93,7 +93,7 @@ public partial class SafeZoneWatcher : Node
 		Cutscene.Run(this, async ct =>
 		{
 			await Cutscene.Wait(this, ThingsLineDelay, ct);
-			await StoryBeat.Caption(this, ThingsLine, 0.8f, 3.0f, 1.0f);
+			if (!string.IsNullOrEmpty(ThingsLine)) await StoryBeat.Caption(this, ThingsLine, 0.8f, 3.0f, 1.0f);
 		});
 	}
 }

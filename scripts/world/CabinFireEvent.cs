@@ -21,7 +21,7 @@ namespace ProjectDS.World;
 /// (<c>Cabin.SetBurning</c>). This adds the fire's sound (a crackle bed and the odd structural
 /// groan, on the Events bus), a tall glow over the roof so the fire lights the smoke and the
 /// trees around it from afar, warms the screen's shadow tint the closer the player stands, and
-/// says the one line the sight gets (<see cref="SightLine"/>, <see cref="LineDelay"/> after
+/// keeps a beat of quiet after the checkpoint (<see cref="LineDelay"/>; the old line is gone, no self-talk).
 /// the checkpoint; never on Continue).
 ///
 /// The per-frame work (groans, heat tint) only runs while the player is within
@@ -44,14 +44,15 @@ public partial class CabinFireEvent : Node
 	[Export] public float Radius = 30f;
 	/// <summary>Multiple of <see cref="Radius"/> beyond which the heat tint is zero and processing stops.</summary>
 	[Export] public float HeatReach = 3f;
-	[Export] public string SightLine = "Everything he wrote is in there.";
+	/// <summary>Unused since 2026-09-22 (no self-talk); kept so scene overrides still load.</summary>
+	[Export] public string SightLine = "";
 	[Export] public float LineDelay = 2f;
 	/// <summary>Seconds for night to fall at the lookout if it has not yet.</summary>
 	[Export] public float NightFallSeconds = 6f;
 	[ExportGroup("Glow seen from afar")]
 	[Export] public Color GlowColor = new(1f, 0.45f, 0.16f);
 	[Export] public float GlowEnergy = 9f;
-	[Export] public float GlowRange = 32f;
+	[Export] public float GlowRange = 60f;   // reaches the far bank: the trail now runs past the fire across the creek
 	[Export] public float GlowHeight = 5.5f;
 
 	private Cabin _cabin;
@@ -99,7 +100,9 @@ public partial class CabinFireEvent : Node
 			_preZone = MakeWorldTrigger(_lookout.GlobalPosition, PreIgniteRadius, _ => TryPreIgnite(), "FirePreIgniteZone");
 		}
 		else _zone = StoryBeat.MakeTrigger(_cabin, new CylinderShape3D { Radius = Radius, Height = 80f }, Vector3.Zero, OnZoneEntered, "FireSightZone");
-		if (StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning }) Ignite();
+		if (StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning }) { Ignite(); Struck = true; GD.Print($"[story] Act 7: fire restored as already seen (checkpoint {StoryManager.Instance.Current})"); }
+		// A Continue after the fall but before the strike: armed from the start.
+		else if (StoryManager.Instance is { } sm && sm.HasFlag(StoryManager.Flag.ClearingLoopDone)) Callable.From(ArmAtWake).CallDeferred();
 	}
 
 	/// <summary>A tall player trigger at a world point, parented to this beat (top level, so the cabin's transform doesn't matter).</summary>
@@ -111,39 +114,100 @@ public partial class CabinFireEvent : Node
 		return area;
 	}
 
-	private static bool CanFire(StoryManager s) => s is { ClearingVoiceHeard: true } && s.Current < Checkpoint.Act7CabinBurning;
+	/// <summary>Only after the clearing's loop (the Act 7 wake): the cabin stands dark until lightning takes it.</summary>
+	// Past the footbridge and not yet struck. (The loop's end arms the strike; it is not a gate any more: in live play
+	// nothing must be able to leave the cabin dark for good.)
+	private static bool CanFire(StoryManager s) => s != null && s.Current >= Checkpoint.Act6BridgeCrossed && s.Current < Checkpoint.Act7CabinBurning;
 
-	// The voice can be heard while already standing in range only in theory; re-check anyway.
-	private void OnFlag(string _)
+	/// <summary>Seconds after the wake (the loop's end) by which the strike happens whatever the player looks at.</summary>
+	[Export] public float FallbackSeconds = 40f;
+	[Export] public float FallbackSecondsAutoTest = 6f;
+	private double _fallbackAt = -1;
+
+	private void OnFlag(string flag)
 	{
+		// The wake after the fall arms the strike outright (Dan, 2026-09-22: it was never firing in live play when the
+		// player walked the ridge without looking across, and the 7 m lookout zone could be passed by).
+		if (flag == StoryManager.Flag.ClearingLoopDone) ArmAtWake();
 		if (StoryBeat.PlayerInside(_preZone) != null) TryPreIgnite();
 		if (StoryBeat.PlayerInside(_zone) is { } p) OnZoneEntered(p);
 	}
 
+	private void ArmAtWake()
+	{
+		if (_burning || Struck || !CanFire(StoryManager.Instance)) return;
+		_player = StoryBeat.Player(this);
+		_armed = true;
+		_fallbackAt = _clock + (GameSettings.Instance.AutoTest ? FallbackSecondsAutoTest : FallbackSeconds);
+		// No strike any more: the cabin is already burning when they wake (Dan, 2026-09-22); seeing it is checkpoint 6.
+		EnsureNight();
+		Ignite(instant: true);
+		SetProcess(true);
+		GD.Print($"[story] Act 7: the cabin burns from the wake (checkpoint on sight, fallback in {_fallbackAt - _clock:0} s)");
+	}
+
+	/// <summary>For tests: lightning has struck the cabin (the fire's start; checkpoint 6 goes with it).</summary>
+	public bool Struck { get; private set; }
+	/// <summary>For tests: the cabin has come into view on the walk and the strike is counting down.</summary>
+	public bool Sighted { get; private set; }
+	/// <summary>How far the player may be for the cabin to count as "in view" (the sight lane from the ridge).</summary>
+	[Export] public float SightRange = 160f;
+	/// <summary>Seconds between the cabin coming into view and the strike (random in this range).</summary>
+	[Export] public Vector2 StrikeDelay = new(2f, 6f);
+	private double _strikeAt = -1;
+	private bool _armed;
+
+	/// <summary>Within 45 m of the lookout: the cabin is in the sight lane; from here on, the moment the player looks at
+	/// it the countdown to the strike begins (Dan, 2026-09-22: lightning takes it as you walk up and see it).</summary>
 	private void TryPreIgnite()
 	{
-		if (_burning || !CanFire(StoryManager.Instance)) return;
-		Ignite();
-		EnsureNight();
-		GD.Print("[story] Act 7: the cabin catches");
+		if (_burning || _armed || !CanFire(StoryManager.Instance)) return;
+		_armed = true;
+		_player = StoryBeat.Player(this);
+		SetProcess(true);
 	}
 
+	/// <summary>The lookout itself: if they never looked at it on the way, it is struck now anyway.</summary>
 	private void OnZoneEntered(PlayerController player)
 	{
-		if (!CanFire(StoryManager.Instance)) return;
-		Ignite();
-		EnsureNight();
-		StoryBeat.ReachCheckpoint(player, Checkpoint.Act7CabinBurning);
-		GD.Print("[story] Act 7: the cabin is burning");
-		// A beat after the sight has landed, the one thing there is to say. Only here, never on a restore.
-		Cutscene.Run(this, async ct =>
-		{
-			await Cutscene.Wait(this, LineDelay, ct);
-			await StoryBeat.Caption(this, SightLine, 0.8f, 2.8f, 1.0f);
-		});
+		if (!CanFire(StoryManager.Instance) || Struck) return;
+		_player = player;
+		_armed = true;
+		if (!Sighted) { Sighted = true; _strikeAt = _clock + 1.0; }
+		SetProcess(true);
 	}
 
-	/// <summary>The fire is seen at night: if the Act 6 fallback has not brought night yet, it comes now.</summary>
+	/// <summary>The cabin is in front of the camera and not too far: the sight that starts the countdown.</summary>
+	private bool CabinInView()
+	{
+		var cam = _player?.CameraRig?.Camera;
+		if (cam == null) return false;
+		Vector3 to = _cabin.GlobalPosition + Vector3.Up * 2.5f - cam.GlobalPosition;
+		float d = to.Length();
+		if (d > SightRange) return false;
+		return (-cam.GlobalBasis.Z).Dot(to / Mathf.Max(d, 0.01f)) > 0.64f;   // within ~50 degrees of straight ahead (no ray: fog and trees never hide it)
+	}
+
+	/// <summary>
+	/// The strike (Dan, 2026-09-22): a flash over the cabin, a bolt down onto its roof for two frames, the thunder
+	/// right on it (it is close), and the cabin catches: embers, then flames, the glow ramping over three seconds,
+	/// then it burns as before (sealed door, the glow across the creek). Checkpoint 6 is set at the strike; the
+	/// player keeps control; the giant's crossing follows the checkpoint as before.
+	/// </summary>
+	private async System.Threading.Tasks.Task Strike(System.Threading.CancellationToken ct)
+	{
+		// The lightning strike is scrapped (Dan, 2026-09-22: it broke too much). The cabin has been burning since the
+		// wake; this beat is only the SIGHT of it: checkpoint 6, and the giant's crossing follows. The name stays for the tests.
+		Struck = true;
+		GD.Print($"[story] Act 7: sight beat (sighted {Sighted}, player {(_player != null)}, checkpoint {StoryManager.Instance?.Current})");
+		var player = _player ?? StoryBeat.Player(this);
+		if (!_burning) { EnsureNight(); Ignite(instant: true); }
+		if (player != null) StoryBeat.ReachCheckpoint(player, Checkpoint.Act7CabinBurning);
+		GD.Print("[story] Act 7: the burning cabin is in view");
+		await Cutscene.Frame(this, ct);
+	}
+
+	/// <summary>The Hollow is night throughout; this only records the flag older code keyed on (the mood is already Night).</summary>
 	private void EnsureNight()
 	{
 		var s = StoryManager.Instance;
@@ -152,12 +216,21 @@ public partial class CabinFireEvent : Node
 		s.SetFlag(StoryManager.Flag.Act6NightFell);
 	}
 
-	private void Ignite()
+	private void Ignite(bool instant = true)
 	{
 		if (_burning) return;
 		_burning = true;
+		// Not Struck here: the fire starts at the wake now, the SIGHT beat (Strike) is what sets Struck and checkpoint 6.
 		_player = StoryBeat.Player(this);
-		_cabin.SetBurning(1f);
+		if (instant) _cabin.SetBurning(1f);
+		else
+		{
+			// Embers first, then the flames take over three seconds.
+			_cabin.SetBurning(0.12f);
+			var ramp = CreateTween();
+			ramp.TweenMethod(Callable.From<float>(v => _cabin.SetBurning(v)), 0.12f, 1f, 3f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+		}
+		_cabin.SealShut();   // nobody goes into a burning house (Dan, 2026-09-22): the door is shut and solid for good
 
 		var crackleBed = new AudioStreamPlayer3D { Name = "FireCrackle", Bus = "Events", UnitSize = 7f, MaxDistance = 55f, Position = new Vector3(0, 1.4f, 0) };
 		_cabin.AddChild(crackleBed);
@@ -169,7 +242,7 @@ public partial class CabinFireEvent : Node
 		{
 			Name = "FireGlow",
 			LightColor = GlowColor,
-			LightEnergy = GlowEnergy,
+			LightEnergy = instant ? GlowEnergy : 0f,
 			OmniRange = GlowRange,
 			OmniAttenuation = 0.9f,
 			ShadowEnabled = false,
@@ -192,18 +265,47 @@ public partial class CabinFireEvent : Node
 		SetProcess(false);
 	}
 
+	private double _ignitedAt = -1;
+
 	public override void _Process(double delta)
 	{
+		_clock += delta;
+		// Armed on the walk up: the strike waits for the cabin to be seen, then a short beat.
+		if (_armed && !Struck)
+		{
+			if (_player == null || !IsInstanceValid(_player)) _player = StoryBeat.Player(this);
+			if (!Sighted && CabinInView())
+			{
+				Sighted = true;
+				var delay = GameSettings.Instance.AutoTest ? new Vector2(1f, 2f) : StrikeDelay;
+				_strikeAt = _clock + _rng.RandfRange(delay.X, delay.Y);
+				GD.Print("[story] Act 7: the cabin in view; the sky is about to break");
+			}
+			else if (!Sighted && _fallbackAt > 0 && _clock >= _fallbackAt)
+			{
+				// Never looked across: the sky breaks anyway.
+				Sighted = true;
+				_strikeAt = _clock + 0.5;
+				GD.Print("[story] Act 7: the strike's fallback timer ran out");
+			}
+			if (Sighted && _clock >= _strikeAt) { _ = Cutscene.Run(this, Strike); return; }
+			if (!_burning) return;
+		}
+
 		float d = -1f;
 		if (_player != null && IsInstanceValid(_player))
 		{
 			d = new Vector2(_player.GlobalPosition.X - _cabin.GlobalPosition.X, _player.GlobalPosition.Z - _cabin.GlobalPosition.Z).Length();
-			if (d > Radius * HeatReach + 1f) { Sleep(); return; }
+			// Far from the fire the heat effects sleep, but NEVER while the sight beat is still waiting: the cabin burns
+			// from the wake now, and sleeping here on the first frame killed the sight check and the fallback, so
+			// checkpoint 6 (and with it the giant and the door's dial) never came (Dan's playthrough, 2026-09-22).
+			if (d > Radius * HeatReach + 1f) { if (!(_armed && !Struck)) Sleep(); return; }
 		}
 
-		_clock += delta;
+		if (_ignitedAt < 0 && _burning) _ignitedAt = _clock;
+		float catching = _burning ? Mathf.Clamp((float)(_clock - _ignitedAt) / 3f, 0f, 1f) : 0f;   // the glow comes up with the flames
 		if (_glow != null && IsInstanceValid(_glow))
-			_glow.LightEnergy = GlowEnergy * (0.85f + 0.1f * Mathf.Sin((float)_clock * 2.3f) + 0.05f * Mathf.Sin((float)_clock * 9.1f));
+			_glow.LightEnergy = GlowEnergy * Mathf.Max(catching, _cabin.Burning >= 0.99f ? 1f : catching) * (0.85f + 0.1f * Mathf.Sin((float)_clock * 2.3f) + 0.05f * Mathf.Sin((float)_clock * 9.1f));
 		if (_clock >= _nextGroan)
 		{
 			_nextGroan = _clock + _rng.RandfRange(5.0f, 11.0f);

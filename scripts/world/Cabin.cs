@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using ProjectDS.Audio;
+using ProjectDS.Player;
 using ProjectDS.Systems;
 
 namespace ProjectDS.World;
@@ -1050,6 +1051,83 @@ public partial class Cabin : Node3D
 		if (_debris != null && IsInstanceValid(_debris)) _debris.QueueFree();
 		_debris = null;
 		if (DoorBoarded && _gen != null) BuildPlanks();
+	}
+
+	private Interactable _reopen;
+	/// <summary>Level of the door slam (hot: the scare of the room).</summary>
+	[Export] public float SlamDb = 10f;   // non-positional now (a 3D one-shot at +18 was still tame inside)
+
+	/// <summary>A one-shot flat at the ear on the Events bus (no 3D falloff), freed when done.</summary>
+	private void PlayFlat(string path, float db, float pitch = 1f)
+	{
+		if (!ResourceLoader.Exists(path)) return;
+		var s = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(path), Bus = "Events", VolumeDb = db, PitchScale = pitch };
+		GetTree().CurrentScene.AddChild(s);
+		s.Finished += s.QueueFree;
+		s.Play();
+	}
+	/// <summary>For tests: the door slammed shut behind the player (the cap in hand).</summary>
+	public bool SlammedShut { get; private set; }
+	/// <summary>For tests: the E-point that swings the slammed door open again (null until the slam, and after it is used).</summary>
+	public Interactable DoorReopen => _reopen;
+
+	/// <summary>
+	/// The cap is in hand and the door slams shut behind the player (Dan, 2026-09-22): the leaf whips
+	/// closed, the collider comes back and the slam sounds; from then on E on the door swings it open
+	/// again. Never saved (IsOpen stays true): a Continue restores the door open, the beat is live only.
+	/// </summary>
+	public void SlamShut()
+	{
+		if (!IsOpen || SlammedShut || _door == null || !IsInstanceValid(_door)) return;
+		SlammedShut = true;
+		var tw = _door.CreateTween();
+		tw.TweenProperty(_door, "rotation:y", 0f, 0.2f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+		tw.TweenCallback(Callable.From(() =>
+		{
+			if (_doorCollision != null && IsInstanceValid(_doorCollision)) _doorCollision.Disabled = false;
+			// The slam (Dan, 2026-09-22: louder and dramatic): the cabin_slam take with the wall's rattle, hot, a hard
+			// jolt of the view, and the lantern guttering for a moment.
+			// Way louder (Dan): flat at the ear, no 3D falloff, with a steel sub under it for weight.
+			int take = (int)(GD.Randi() % 2) + 1;
+			PlayFlat($"res://assets/audio/sfx/cabin_slam_{take:00}.wav", SlamDb, 0.97f);
+			PlayFlat("res://assets/audio/sfx/steel_door_slam_01.wav", SlamDb - 6f, 0.9f);
+			if (StoryBeat.Player(this) is { } p)
+			{
+				p.PlayerInput?.AddCutsceneLook(new Vector2((float)GD.RandRange(-0.05, 0.05), 0.14f));
+				p.GetNodeOrNull<Lantern>("Lantern")?.Jolt(0.4f);
+			}
+			if (_reopen == null)
+			{
+				_reopen = new Interactable { Name = "OpenDoor", Prompt = "Open the door", MaxDistance = 2.6f, PickRadius = 0.6f, Position = new Vector3(0, 1.0f, Hd), HighlightRoot = new NodePath("NoHighlight") };   // prompt only: with no root it lit the whole cabin (Dan, 2026-09-22)
+				AddChild(_reopen);
+				_reopen.Interacted += _ => Reopen();
+			}
+		}));
+	}
+
+	private void Reopen()
+	{
+		if (_door == null || !IsInstanceValid(_door)) return;
+		if (_doorCollision != null && IsInstanceValid(_doorCollision)) _doorCollision.Disabled = true;
+		_door.CreateTween().TweenProperty(_door, "rotation:y", Mathf.DegToRad(96f), 0.6f).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+		StoryBeat.PlayAt(this, "res://assets/audio/sfx/trunk_creak_01.wav", "Events", new Vector3(0, 1.0f, Hd), volumeDb: -2f, unitSize: 3f, maxDistance: 25f, pitch: 0.8f);
+		if (_reopen != null) { _reopen.QueueFree(); _reopen = null; }
+	}
+
+	/// <summary>For tests: the doorway is sealed for good (the fire): shut, solid, no way in.</summary>
+	public bool Sealed { get; private set; }
+
+	/// <summary>
+	/// The cabin is burning (Act 7): nobody goes in. The leaf is shut, the door collider is back for
+	/// good and any reopen E-point is gone. Not saved on its own: the fire's restore calls it again.
+	/// </summary>
+	public void SealShut()
+	{
+		if (Sealed) return;
+		Sealed = true;
+		if (_door != null && IsInstanceValid(_door)) { _door.Rotation = Vector3.Zero; }
+		if (_doorCollision != null && IsInstanceValid(_doorCollision)) _doorCollision.Disabled = false;
+		if (_reopen != null && IsInstanceValid(_reopen)) { _reopen.QueueFree(); _reopen = null; }
 	}
 
 	private void BuildPlanks()

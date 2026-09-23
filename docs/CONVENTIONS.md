@@ -37,4 +37,5 @@ One architecture for everyone (human or agent) working on this repo.
 - Never commit `.godot/`, `bin/`, `obj/`, or build output.
 
 ## Testing
-- `-- --autotest` runs a scripted walkthrough that logs checks and screenshots to `test-output/`, then exits non-zero if a check fails. Run it after every change that touches gameplay.
+- `-- --autotest` runs the full-story test (`StoryTest.cs`, Acts 1-11 across both levels); report and screenshots go to `test-output/story/`, exit code 1 on any failed check. Run it after every change that touches gameplay.
+- `-- --continue-test` runs the Continue round trip for every checkpoint (`ContinueRoundTripTest.cs`); report in `test-output/systems/`.

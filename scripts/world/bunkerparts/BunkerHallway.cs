@@ -32,6 +32,20 @@ public partial class BunkerHallway : Node3D
 	/// <summary>The lamps have committed to red for good.</summary>
 	public bool RedTriggered { get; private set; }
 
+	private double _joltUntil = -1;
+	/// <summary>Every lamp stutters wildly (mostly red, mostly dark) until the given clock: the jumpscare's light.</summary>
+	public void Jolt(double untilClock) => _joltUntil = untilClock;
+
+	/// <summary>Every fixture dead at once (the hallway scare): lights and their glass, until it is lifted.</summary>
+	public bool BlackedOut { get; private set; }
+	/// <summary>For the autotest: how many times the lamps have died for the scare.</summary>
+	public int BlackoutCount { get; private set; }
+	public void Blackout(bool on)
+	{
+		if (on && !BlackedOut) BlackoutCount++;
+		BlackedOut = on;
+	}
+
 	public override void _Ready()
 	{
 		BuildShell();
@@ -75,6 +89,12 @@ public partial class BunkerHallway : Node3D
 				energy = flick;
 				target = flick < 0.5f ? RedDim : target;
 			}
+			if (clock < _joltUntil)
+			{
+				energy = GD.Randf() < 0.55f ? 0.05f : 2.2f;
+				target = GD.Randf() < 0.7f ? Red : White;
+			}
+			if (BlackedOut) { energy = 0f; target = Colors.Black; }
 			l.Mat.Emission = target;
 			l.Mat.AlbedoColor = target;
 			l.Mat.EmissionEnergyMultiplier = energy;

@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://scripts/ui/NoteOverlay.cs" id="10_note"]
 [ext_resource type="Script" path="res://scripts/ui/PhotoThumb.cs" id="11_thumb"]
 [ext_resource type="Script" path="res://scripts/ui/PhotoLogPage.cs" id="12_page"]
+[ext_resource type="Script" path="res://scripts/ui/CodeLockOverlay.cs" id="13_codelock"]
 
 [sub_resource type="ShaderMaterial" id="PostMat"]
 shader = ExtResource("1_post")
@@ -56,6 +57,9 @@ script = ExtResource("9_subtitle")
 
 [node name="NoteOverlay" type="CanvasLayer" parent="."]
 script = ExtResource("10_note")
+
+[node name="CodeLockOverlay" type="CanvasLayer" parent="."]
+script = ExtResource("13_codelock")
 
 [node name="PhotoThumb" type="CanvasLayer" parent="."]
 script = ExtResource("11_thumb")

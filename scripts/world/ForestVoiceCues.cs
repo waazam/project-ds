@@ -64,7 +64,7 @@ public partial class ForestVoiceCues : Node
 		{
 			Stream = _stream, Bus = "Voice",
 			UnitSize = _rng.RandfRange(5f, 9f), MaxDistance = 70f,
-			VolumeDb = _rng.RandfRange(-3f, 5f),
+			VolumeDb = _rng.RandfRange(-9f, -2f),
 			PitchScale = _rng.RandfRange(0.8f, 0.97f),
 		};
 		// Must be parented before GlobalPosition is set, or Godot can't resolve the transform.
@@ -72,5 +72,6 @@ public partial class ForestVoiceCues : Node
 		voice.GlobalPosition = pos;
 		voice.Finished += voice.QueueFree;
 		voice.Play();
+		StoryBeat.FadeIn(voice, voice.VolumeDb, 0.5f);
 	}
 }

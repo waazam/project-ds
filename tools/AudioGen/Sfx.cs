@@ -269,6 +269,153 @@ public static class Sfx
 	// modes read as hand drums). Heel strike = dull weight + a low-Q board knock
 	// + a dry click; the toe lands softer 60-110 ms later; a little grit scuffs
 	// between them. Even-numbered variants add a faint board creak.
+	/// <summary>
+	/// A body landing hard on earth (Act 6, the fall off the last landing; Dan, 2026-09-22: a proper thump).
+	/// A soft-fronted sub thud under 80 Hz, a dull 150-300 Hz body of the fall, a short crunch of ground
+	/// under it (noise, 400-900 Hz, dead in 40 ms) and a little settle after; nothing above 2 kHz. About
+	/// half a second. Played flat at the ear, hot, at the moment the screen is black.
+	/// </summary>
+	public static double[] BodyThump(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.55);
+		var sub1 = Biquad.Lp(sr, r.R(40, 80)); var sub2 = Biquad.Lp(sr, 120);
+		var body = Biquad.Bp(sr, r.R(150, 300), 0.8);
+		var crunch = Biquad.Bp(sr, r.R(400, 900), 1.2);
+		var settle = Biquad.Lp(sr, r.R(90, 140));
+		double settleAt = r.R(0.14, 0.2);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			x[i] = sub2.P(sub1.P(r.W())) * Perc(t, 0.012, 0.09) * 4.0
+				+ body.P(r.W()) * Perc(t, 0.004, 0.035) * 2.0
+				+ crunch.P(r.W()) * Perc(t, 0.002, 0.012) * 0.9
+				+ settle.P(r.W()) * Perc(t - settleAt, 0.01, 0.05) * 1.2;
+		}
+		LowPass(x, sr, 2000);
+		return FinishOneShot(x, sr, -3, 60);
+	}
+
+	/// <summary>
+	/// A heavy pound on the outside of a log wall (Act 5, the cabin; Dan, 2026-09-22: dramatic and
+	/// scary, not a knuckle): a fist or a heel on the logs. A sub thump under 90 Hz with a hard
+	/// 250-450 Hz body, the whole wall answering with a short low shudder, nothing above 1.5 kHz,
+	/// 0.25 s. Hot (peak -1 dB): the beat plays three of these in a row.
+	/// </summary>
+	public static double[] WallPound(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.34);
+		var sub1 = Biquad.Lp(sr, r.R(50, 90)); var sub2 = Biquad.Lp(sr, 140);
+		var body = Biquad.Bp(sr, r.R(250, 450), 0.9);
+		var shudder = Biquad.Lp(sr, r.R(160, 220));
+		var knock = Biquad.Bp(sr, r.R(600, 900), 1.4);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			x[i] = sub2.P(sub1.P(r.W())) * Perc(t, 0.004, 0.06) * 4.2
+				+ body.P(r.W()) * Perc(t, 0.001, 0.02) * 2.4
+				+ shudder.P(r.W()) * Perc(t - 0.02, 0.01, 0.09) * 1.1
+				+ knock.P(r.W()) * Perc(t, 0.0004, 0.005) * 0.5;
+		}
+		LowPass(x, sr, 1500);
+		return FinishOneShot(x, sr, -3, 50);   // Verify holds every one-shot at -3 dB; the beat plays it hot
+	}
+
+	/// <summary>
+	/// The cabin's plank door slammed shut by nothing (Act 5; Dan, 2026-09-22: louder and dramatic):
+	/// <see cref="DoorSlam"/>'s plank slab and frame chatter with a far heavier slab under it, and the
+	/// whole log wall rattling for a moment after (damped low knocks thinning out over 0.6 s), plus a
+	/// short low rumble tail. About a second. Hot (peak -1 dB).
+	/// </summary>
+	public static double[] CabinSlam(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.05);
+		var slab1 = Biquad.Lp(sr, r.R(60, 90)); var slab2 = Biquad.Lp(sr, 150);
+		var plank1 = Biquad.Lp(sr, r.R(100, 130)); var plank2 = Biquad.Lp(sr, 200);
+		var body = Biquad.Bp(sr, r.R(260, 380), 0.8);
+		var chatter = Biquad.Bp(sr, r.R(500, 760), 1.3);
+		var wall = Biquad.Bp(sr, r.R(170, 260), 1.1);
+		var latch = Biquad.Bp(sr, r.R(1400, 2000), 2.0);
+		var rumble = Biquad.Lp(sr, 110);
+		double[] chatterAt = { 0.035, 0.07, 0.115, 0.17, 0.24 };
+		double[] chatterGain = { 0.7, 0.55, 0.4, 0.28, 0.16 };
+		// The wall's rattle: eight damped knocks, thinning, a little irregular.
+		int rattles = 8;
+		var rattleAt = new double[rattles]; var rattleGain = new double[rattles];
+		double ra = 0.05;
+		for (int k = 0; k < rattles; k++) { rattleAt[k] = ra; rattleGain[k] = 0.9 * Math.Pow(0.72, k); ra += r.R(0.05, 0.09); }
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			double v = slab2.P(slab1.P(r.W())) * Perc(t, 0.008, 0.16) * 4.5
+				+ plank2.P(plank1.P(r.W())) * Perc(t, 0.005, 0.09) * 2.6
+				+ body.P(r.W()) * Perc(t, 0.002, 0.03) * 1.8
+				+ rumble.P(r.W()) * Perc(t - 0.05, 0.05, 0.35) * 1.2;
+			double ch = chatter.P(r.W());
+			for (int c = 0; c < chatterAt.Length; c++)
+				if (t >= chatterAt[c]) v += ch * Perc(t - chatterAt[c], 0.0008, 0.012) * chatterGain[c];
+			double w = wall.P(r.W());
+			for (int k = 0; k < rattles; k++)
+				if (t >= rattleAt[k]) v += w * Perc(t - rattleAt[k], 0.001, 0.02) * rattleGain[k];
+			v += latch.P(r.W()) * Perc(t - 0.012, 0.0003, 0.003) * 0.3;
+			x[i] = v;
+		}
+		LowPass(x, sr, 2500);
+		return FinishOneShot(Space(x, sr, 0.3), sr, -3, 80);   // same: -3 in the file, +18 dB in the room
+	}
+
+	/// <summary>
+	/// A heavy plank door slammed into its frame (the bunker's rooms, Act 10): a soft-fronted
+	/// slab thump under 130 Hz, the plank body knocking around 300 Hz, the frame chattering
+	/// for a quarter second after, and one small latch click. Nothing above 2.5 kHz and no
+	/// sharp transient body in the 100 Hz-1 kHz band, so it never reads as a gunshot.
+	/// </summary>
+	public static double[] DoorSlam(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.8);
+		var slab1 = Biquad.Lp(sr, r.R(95, 130)); var slab2 = Biquad.Lp(sr, 180);
+		var body = Biquad.Bp(sr, r.R(260, 360), 0.8);
+		var chatter = Biquad.Bp(sr, r.R(520, 760), 1.3);
+		var latch = Biquad.Bp(sr, r.R(1500, 2200), 2.0);
+		double[] chatterAt = { 0.035, 0.07, 0.115, 0.17, 0.24 };
+		double[] chatterGain = { 0.7, 0.55, 0.4, 0.28, 0.16 };
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			double v = slab2.P(slab1.P(r.W())) * Perc(t, 0.006, 0.09) * 3.2
+				+ body.P(r.W()) * Perc(t, 0.002, 0.03) * 1.5;
+			double ch = chatter.P(r.W());
+			for (int c = 0; c < chatterAt.Length; c++)
+				if (t >= chatterAt[c]) v += ch * Perc(t - chatterAt[c], 0.0008, 0.012) * chatterGain[c];
+			v += latch.P(r.W()) * Perc(t - 0.012, 0.0003, 0.003) * 0.35;
+			x[i] = v;
+		}
+		LowPass(x, sr, 2500);
+		return FinishOneShot(Space(x, sr, 0.25), sr, -3, 60);
+	}
+
+	/// <summary>
+	/// A knuckle on the outside of a log wall, heard from inside (Act 5, the cabin): one dull, dead
+	/// knock, no ring and no pitch (a ringing knock reads as a drum): the wood's thud under 200 Hz,
+	/// a short 300-500 Hz body that dies in 15 ms, and the faint tick of the knuckle itself.
+	/// Wall-muffled: nothing above 1.2 kHz. The beat plays these in a pattern, so each is one knock.
+	/// </summary>
+	public static double[] WallKnock(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.3);
+		var thud1 = Biquad.Lp(sr, r.R(140, 190)); var thud2 = Biquad.Lp(sr, 260);
+		var body = Biquad.Bp(sr, r.R(320, 480), 0.9);
+		var tick = Biquad.Bp(sr, r.R(800, 1100), 1.6);
+		for (int i = 0; i < 0.16 * sr; i++)
+		{
+			double t = (double)i / sr;
+			x[i] = thud2.P(thud1.P(r.W())) * Perc(t, 0.003, 0.03) * 3.0
+				+ body.P(r.W()) * Perc(t, 0.0008, 0.012) * 1.6
+				+ tick.P(r.W()) * Perc(t, 0.0003, 0.004) * 0.5;
+		}
+		LowPass(x, sr, 1200);
+		return FinishOneShot(x, sr, -3, 40);
+	}
+
 	public static double[] StepWood(Rng r, int sr, bool creak)
 	{
 		var x = Buf(sr, creak ? 0.5 : 0.38);
@@ -491,14 +638,70 @@ public static class Sfx
 	}
 
 	/// <summary>
+	/// Rolling thunder and nothing else (Dan, 2026-09-22: the continuous rumble bed after the first boom
+	/// read as a loud rushing wind; he likes the rolling peals). There is no noise floor any more: the
+	/// take is a first boom (the biggest peal: a 0.5-0.9 s soft front, a brief crest, a 1.2-2 s fall)
+	/// followed by two to four rolls, each a quieter, softer peal 1.8-3.4 s after the last with near
+	/// silence between them, the only tails being the hall's. Peals are noise through a 60-110 Hz band
+	/// with a 220 Hz low-pass on top, so nothing above 300 Hz is in there but the peals' own soft body.
+	/// Variants: 1 = a couple of kilometres off, boom + 2-3 rolls; 2 = nearer and fuller, boom + 3-4
+	/// rolls; 3 = very far, a slower boom + 2 rolls.
+	/// </summary>
+	public static double[] Thunder(Rng r, int sr, int variant)
+	{
+		(int rolls, double frontMin, double frontMax, double gain) = variant switch
+		{
+			1 => (r.I(2, 4), 0.5, 0.8, 1.0),
+			2 => (r.I(3, 5), 0.5, 0.9, 1.15),
+			_ => (2, 0.7, 1.0, 0.85),
+		};
+		var pl = new List<(double at, double rise, double hold, double fall, double amp)>();
+		double t0 = r.R(0.15, 0.4), amp = 1.0;
+		pl.Add((t0, r.R(frontMin, frontMax), r.R(0.1, 0.3), r.R(1.2, 2.0), amp));
+		for (int k = 0; k < rolls; k++)
+		{
+			t0 += pl[^1].rise + pl[^1].hold + r.R(1.6, 2.9);
+			amp *= r.R(0.45, 0.65);
+			pl.Add((t0, r.R(0.6, 1.0), r.R(0.05, 0.2), r.R(0.9, 1.6), amp));
+		}
+		var last = pl[^1];
+		double dur = Math.Min(16.5, last.at + last.rise + last.hold + last.fall * 2.8 + 1.2);
+		var x = Buf(sr, dur);
+		double Peal(double t)
+		{
+			double v = 0;
+			foreach (var (at, rise, hold, fall, a) in pl)
+			{
+				double u = t - at;
+				if (u < 0) continue;
+				double e = u < rise ? Math.Sin(0.5 * Math.PI * u / rise) : u < rise + hold ? 1 : Math.Exp(-(u - rise - hold) / fall);
+				v += a * e * e;
+			}
+			return v;
+		}
+		var bp = new Biquad(sr); var lpTop = Biquad.Lp(sr, 160); var hp = Biquad.Hp(sr, 30);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr, u = t / dur;
+			if ((i & 63) == 0) bp.SetBp(55 + 35 * Math.Max(0, 1 - u * 1.5), 0.8);   // the later rolls sit lower
+			x[i] = hp.P(lpTop.P(bp.P(r.W()))) * Peal(t) * 1.6 * gain;
+		}
+		var hallRv = new Hall(sr, 2.4, 0.5, 30, 1.2);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) o[i] = x[i] + hallRv.P(x[i]) * 0.4;
+		return FinishOneShot(o, sr, -3, 900);
+	}
+
+	/// <summary>
 	/// Low, distant thunder (Act 3: "low thunder rumbles"). No crack and no overdrive: at a few
 	/// kilometres the air has taken the top off, and what's left is a rolling rumble. Built the way
 	/// thunder is heard: hundreds of low pressure pulses arriving from different parts of a long,
 	/// crooked channel, grouped into 2-3 rolls that swell and die away unevenly, then a long soft
 	/// tail, all under a gentle outdoor reverb.
 	/// Variants: 1 = far, three rolls; 2 = nearer, with a dull opening clap; 3 = very far, a slow low grumble.
+	/// Superseded by <see cref="Thunder"/> (2026-09-22): a train of discrete thuds reads as a drum roll.
 	/// </summary>
-	public static double[] Thunder(Rng r, int sr, int variant)
+	public static double[] ThunderPulses(Rng r, int sr, int variant)
 	{
 		(double cut, int rolls, double clap, double rate) = variant switch
 		{
@@ -516,7 +719,7 @@ public static class Sfx
 			at += r.R(1.1, 2.4);
 			lvl *= r.R(0.5, 0.9);
 		}
-		double tailAt = rl[0].at, tailTau = 1.6;
+		double tailAt = rl[0].at, tailTau = 2.6;
 		// Long enough for everything to die away on its own (the finish trims the silent end).
 		double dur = rl[^1].at + rl[^1].rise + 5 * rl[^1].decay + 3;
 		var x = Buf(sr, dur);
@@ -558,6 +761,16 @@ public static class Sfx
 		}
 		var g1 = Biquad.Lp(sr, cut * 1.6); var g2 = Biquad.Lp(sr, cut * 2.2);
 		for (int i = 0; i < x.Length; i++) x[i] = g2.P(g1.P(x[i]));
+		if (variant != 3)
+		{
+			// The leading edge: a short tearing crack on the first roll (the part that says "lightning",
+			// not just "rumble"), rolled off above ~1 kHz so it still reads as a mile or two away.
+			var k1 = Biquad.Lp(sr, 950); var k2 = Biquad.Lp(sr, 1150); var kh = Biquad.Hp(sr, 140);
+			int s0 = (int)((rl[0].at + r.R(0.02, 0.08)) * sr);
+			double ka = variant == 2 ? 1.4 : 0.75;
+			for (int i = 0; i < 0.4 * sr && s0 + i < x.Length; i++)
+				x[s0 + i] += kh.P(k2.P(k1.P(r.W()))) * Perc((double)i / sr, 0.004, 0.06) * ka;
+		}
 		HighPass(x, sr, 24);
 		var hall = new Hall(sr, 2.2, 0.6, 25, 1.2);
 		var o = new double[x.Length];
@@ -567,41 +780,204 @@ public static class Sfx
 
 	/// <summary>
 	/// The giant's stride far off in the fog (Act 4: "the low thuds of the giant landing its stride").
-	/// A huge soft mass landing on soil a few hundred metres away: a slow-edged (20-40 ms) impact
-	/// that is almost all below 120 Hz, a little 100-250 Hz ground body so small speakers still hear
-	/// it, the forest floor settling (dull debris, no high end) and a long low rumble through the
-	/// ground. All noise: no swept sine (a pitched thump reads as a kick drum) and no ringing mode.
+	/// From a few hundred metres it is not a bang but a pressure: a slow-edged (60-120 ms) swell of
+	/// sub (under ~80 Hz) as the mass lands, a long low rumble through the ground behind it, and the
+	/// faintest dull settle of the forest floor a moment later. No sharp edge and no 100-250 Hz
+	/// "body" (that pair is what read as a gunshot), no pitched thump, no ringing mode. All noise.
 	/// </summary>
 	public static double[] GiantStep(Rng r, int sr)
 	{
-		var x = Buf(sr, 3.4);
+		var x = Buf(sr, 3.6);
 		double t0 = 0.02;
-		var l1 = Biquad.Lp(sr, r.R(55, 75)); var l2 = Biquad.Lp(sr, r.R(70, 95));
-		var b1 = Biquad.Lp(sr, r.R(260, 320)); var b2 = Biquad.Hp(sr, 90);
-		var t1 = Biquad.Lp(sr, 45); var t2 = Biquad.Lp(sr, 60);
-		double att = r.R(0.02, 0.04), tau = r.R(0.18, 0.3), tail = r.R(0.7, 1.1);
+		var l1 = Biquad.Lp(sr, r.R(48, 62)); var l2 = Biquad.Lp(sr, r.R(60, 80)); var l3 = Biquad.Lp(sr, 95);
+		var t1 = Biquad.Lp(sr, 40); var t2 = Biquad.Lp(sr, 55);
+		double att = r.R(0.06, 0.12), tau = r.R(0.22, 0.34), tail = r.R(0.9, 1.4);
 		for (int i = (int)(t0 * sr); i < x.Length; i++)
 		{
 			double t = (double)i / sr - t0;
-			double impact = l2.P(l1.P(r.W())) * Perc(t, att, tau) * 14;
-			double body = b2.P(b1.P(r.W())) * Perc(t, att * 0.7, 0.11) * 6.5;
-			double rumble = t2.P(t1.P(r.W())) * Perc(t, 0.12, tail) * 9 * (1 - Math.Exp(-t / 0.05));
-			x[i] += impact + body + rumble;
+			double impact = l3.P(l2.P(l1.P(r.W()))) * Perc(t, att, tau) * 16;
+			double rumble = t2.P(t1.P(r.W())) * Perc(t, 0.2, tail) * 10 * (1 - Math.Exp(-t / 0.08));
+			x[i] += impact + rumble;
 		}
-		// The floor settling: soft, dull debris a moment after the impact.
-		var dl = Biquad.Lp(sr, 900); var dh = Biquad.Hp(sr, 250);
-		double ds = t0 + r.R(0.06, 0.14), dd = r.R(0.35, 0.6);
-		var tex = new Smooth(r, 4, 0.03);
+		// The floor settling: very faint, dull and late, with a slow edge so it never ticks.
+		var dl = Biquad.Lp(sr, 500); var dh = Biquad.Hp(sr, 120);
+		double ds = t0 + r.R(0.12, 0.2), dd = r.R(0.5, 0.8);
+		var tex = new Smooth(r, 4, 0.05);
 		for (int i = (int)(ds * sr); i < (ds + dd) * sr && i < x.Length; i++)
 		{
 			double u = (i / (double)sr - ds) / dd;
-			x[i] += dh.P(dl.P(r.W())) * Env(u, 0.1, 0.8) * Math.Pow(tex.At(i / (double)sr), 2) * 0.35;
+			x[i] += dh.P(dl.P(r.W())) * Env(u, 0.3, 0.6) * Math.Pow(tex.At(i / (double)sr), 2) * 0.25;
 		}
-		HighPass(x, sr, 22);
-		var hall = new Hall(sr, 2.4, 0.6, 30, 1.2);
+		HighPass(x, sr, 20);
+		var hall = new Hall(sr, 2.8, 0.7, 40, 1.4);
 		var o = new double[x.Length];
-		for (int i = 0; i < x.Length; i++) o[i] = x[i] + hall.P(x[i]) * 0.45;
-		return FinishOneShot(o, sr, -3, 500);
+		for (int i = 0; i < x.Length; i++) o[i] = x[i] + hall.P(x[i]) * 0.4;
+		return FinishOneShot(o, sr, -3, 600);
+	}
+
+	/// <summary>
+	/// A handheld's squelch gate (the Act 10-11 walkie). Open: a small relay-like click, then the
+	/// receiver's floor hiss coming up over ~40 ms (the static loop takes over from there). Close:
+	/// the classic "pfft" squelch tail, 80-160 ms of the bare FM noise floor as the carrier drops,
+	/// cut dead by the gate with a tiny click. Both live in a small speaker's 300-3000 Hz: a real
+	/// radio's squelch is a tick and a breath, not a burst of static.
+	/// </summary>
+	public static double[] Squelch(Rng r, int sr, bool open)
+	{
+		// From the reference samples (Dan, 2026-09-22): the open is a relay click and a ~60 ms burst of
+		// the same bright static; the close is the classic "kshht": a 170-230 ms burst of full-band
+		// white noise through the speaker, cut dead by the gate with a tiny click.
+		double noiseDur = open ? r.R(0.05, 0.07) : r.R(0.17, 0.23);
+		var x = Buf(sr, noiseDur + 0.08);
+		var hp = Biquad.Hp(sr, 280); var lp = Biquad.Lp(sr, 3600);
+		var hump = Biquad.Bp(sr, 2100, 0.5);
+		var click = Biquad.Bp(sr, r.R(1200, 1900), 2.5);
+		double n0 = open ? 0.005 : 0.0, clickAt = open ? 0.003 : noiseDur;
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr, env;
+			if (open)
+			{
+				double u = (t - n0) / noiseDur;
+				env = u < 0 ? 0 : u < 1 ? Math.Pow(Math.Sin(0.5 * Math.PI * Math.Min(1, u * 3)), 2) * (1 - 0.35 * u) : Math.Max(0, 1 - (t - n0 - noiseDur) / 0.02);
+			}
+			else
+			{
+				double u = t / noiseDur;
+				env = u < 1 ? (0.7 + 0.3 * Math.Sin(0.5 * Math.PI * Math.Min(1, u * 4))) * (1 - 0.15 * u) : 0.8 * Math.Max(0, 1 - (t - noiseDur) / 0.003);
+			}
+			double w = r.W();
+			double hiss = (lp.P(hp.P(w)) + 0.7 * hump.P(w)) * env;
+			double tc = t - clickAt;
+			double k = tc >= 0 ? click.P(r.W()) * Perc(tc, 0.0004, 0.003) * 0.9 : 0;
+			x[i] = hiss + k;
+		}
+		return FinishOneShot(x, sr, -3, 6);
+	}
+
+	/// <summary>
+	/// One tiny crackle from the handheld while a line is up: the receiver catching the edge of
+	/// something for 30-90 ms. Band-limited to the little speaker (300-3000 Hz), a burst of grainy
+	/// ticks over a whisper of hiss, no click and no tone. Act 11 sprinkles two to four of these
+	/// under each radio line, never two within a quarter second.
+	/// </summary>
+	public static double[] RadioTick(Rng r, int sr)
+	{
+		double dur = r.R(0.03, 0.09);
+		var x = Buf(sr, dur + 0.02);
+		var hp = Biquad.Hp(sr, 320); var lp = Biquad.Lp(sr, 3000);
+		var grain = Biquad.Bp(sr, r.R(900, 2200), 2.0);
+		var gate = new Smooth(r, 1, 0.004);   // the crackle's own grain: fast random gating
+		double att = r.R(0.05, 0.2);
+		for (int i = 0; i < dur * sr; i++)
+		{
+			double t = (double)i / sr, u = t / dur;
+			double env = Env(u, att, 0.35);
+			double g = Math.Pow(gate.At(t), 3) * 1.6;
+			x[i] = (grain.P(r.W()) * g + 0.15 * lp.P(hp.P(r.W()))) * env;
+		}
+		return FinishOneShot(x, sr, -3, 6);
+	}
+
+	// ---------------------------------------------------------------- the bunker's steel doors
+
+	/// <summary>A dull, damped knock: noise through one bandpass, dead in <paramref name="tau"/>*3 or so. No ring.</summary>
+	static void DullKnock(double[] x, Rng r, int sr, double at, double fc, double q, double tau, double amp)
+	{
+		var bp = Biquad.Bp(sr, fc, q); var lp = Biquad.Lp(sr, 3800);
+		for (int i = (int)(at * sr); i < (at + tau * 5 + 0.01) * sr && i < x.Length; i++)
+		{
+			double t = (double)i / sr - at;
+			x[i] += lp.P(bp.P(r.W())) * Perc(t, 0.003, tau) * amp;
+		}
+	}
+
+	/// <summary>
+	/// A riveted steel slab opening (the bunker rooms), heavy and dead: a dull latch clunk (a damped
+	/// 300-500 Hz knock), a low groan of filtered noise sweeping 260 down to 120 Hz over ~0.5 s
+	/// (no sine, no pitch that rings), and a soft stop thud. Everything low-passed near 4 kHz and
+	/// nothing resonant longer than 100 ms: no pinball, no wood. ~0.9 s.
+	/// </summary>
+	public static double[] SteelDoorOpen(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.3);
+		double t0 = 0.02;
+		// Latch: two dull knocks a hair apart (the bolt, then the handle falling).
+		DullKnock(x, r, sr, t0, r.R(320, 480), 1.0, r.R(0.018, 0.026), 3.0);
+		DullKnock(x, r, sr, t0 + r.R(0.03, 0.06), r.R(300, 420), 1.0, r.R(0.02, 0.03), 1.6);
+		// Hinge: a groan of filtered noise, the band sliding down, the level wavering.
+		double g0 = t0 + r.R(0.1, 0.16), gd = r.R(0.45, 0.6), fa = r.R(230, 260), fb = r.R(120, 150);
+		var groan = new Biquad(sr); var wav = new Smooth(r, 2, 0.04); var rough = new Smooth(r, 2, 0.008);
+		var glp = Biquad.Lp(sr, 900);
+		for (int i = (int)(g0 * sr); i < (g0 + gd) * sr && i < x.Length; i++)
+		{
+			double t = (double)i / sr, u = (t - g0) / gd;
+			if (i % 32 == 0) groan.SetBp(fa * Math.Pow(fb / fa, u), 6);
+			double lvl = Env(u, 0.2, 0.3) * (0.5 + 0.5 * wav.At(t)) * (0.6 + 0.8 * Math.Pow(rough.At(t), 2));
+			x[i] += glp.P(groan.P(r.W())) * lvl * 2.2;
+		}
+		// Stop thud: the slab meeting its stop, soft and low.
+		double k0 = g0 + gd + r.R(0.01, 0.04);
+		var kl = Biquad.Lp(sr, 260);
+		for (int i = (int)(k0 * sr); i < (k0 + 0.3) * sr && i < x.Length; i++)
+		{
+			double t = (double)i / sr - k0;
+			x[i] += kl.P(r.W()) * Perc(t, 0.006, 0.05) * 3.0;
+		}
+		DullKnock(x, r, sr, k0 + 0.004, r.R(300, 420), 1.0, 0.02, 1.2);
+		HighPass(x, sr, 40);
+		var lpAll = Biquad.Lp(sr, 4000);
+		var room = new Hall(sr, 0.5, 0.7, 8, 0.5);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) { double v = lpAll.P(x[i]); o[i] = v + room.P(v) * 0.25; }
+		return FinishOneShot(o, sr, -3, 60, 0.7, 1.05);
+	}
+
+	/// <summary>
+	/// A steel slab slamming shut in a concrete room, heavy and dead: a soft-fronted sub boom
+	/// (60-110 Hz, 0.08 s front, ~0.5 s decay), a dull damped clunk (noise through a 250-500 Hz
+	/// bandpass, dead in 60-90 ms), a very short low-level broadband slap (2-6 kHz, dead in 15 ms),
+	/// a few dull frame knocks (200-400 Hz, ~40 ms each) and a low-passed rumble tail. No pitched
+	/// ring anywhere (a ringing partial reads as a pinball bumper), nothing resonant past 100 ms,
+	/// everything low-passed near 4 kHz. ~1.2 s.
+	/// </summary>
+	public static double[] SteelDoorSlam(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.6);
+		double t0 = 0.01;
+		var b1 = Biquad.Lp(sr, r.R(60, 80)); var b2 = Biquad.Lp(sr, r.R(90, 110)); var bh = Biquad.Hp(sr, 45);
+		var r1 = Biquad.Lp(sr, 140); var r2 = Biquad.Lp(sr, 200);
+		double boomTau = r.R(0.16, 0.2), rumTau = r.R(0.3, 0.4);
+		for (int i = (int)(t0 * sr); i < x.Length; i++)
+		{
+			double t = (double)i / sr - t0;
+			double boom = bh.P(b2.P(b1.P(r.W()))) * Perc(t, 0.08, boomTau) * 12;
+			double rumble = r2.P(r1.P(r.W())) * Perc(t, 0.12, rumTau) * 3.5;
+			x[i] += boom + rumble;
+		}
+		// The clunk: the slab's body meeting the frame, dull and dead.
+		DullKnock(x, r, sr, t0 + 0.005, r.R(250, 500), 1.0, r.R(0.02, 0.03), 4.0);
+		// The slap: the thinnest broadband edge, gone in 15 ms, low.
+		var sb = Biquad.Bp(sr, r.R(2500, 4500), 0.8); var sl = Biquad.Lp(sr, 5500);
+		for (int i = (int)(t0 * sr); i < (t0 + 0.05) * sr; i++)
+		{
+			double t = (double)i / sr - t0;
+			x[i] += sl.P(sb.P(r.W())) * Perc(t, 0.001, 0.004) * 0.7;
+		}
+		// The frame rattling: dull knocks thinning out.
+		int knocks = r.I(3, 5);
+		double kt = t0 + r.R(0.07, 0.12);
+		for (int k = 0; k < knocks; k++)
+		{
+			DullKnock(x, r, sr, kt, r.R(200, 400), 1.2, r.R(0.01, 0.014), r.R(0.9, 1.8) * (1 - 0.15 * k));
+			kt += r.R(0.05, 0.13) * (1 + 0.3 * k);
+		}
+		HighPass(x, sr, 28);
+		var lpAll = Biquad.Lp(sr, 4000);
+		var room = new Hall(sr, 0.8, 0.7, 10, 0.6);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) { double v = lpAll.P(x[i]); o[i] = v + room.P(v) * 0.3; }
+		return FinishOneShot(o, sr, -3, 80, 1.0, 1.3);
 	}
 
 	/// <summary>

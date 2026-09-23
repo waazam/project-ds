@@ -20,7 +20,7 @@ Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --export-release 
 | Run | Shift | LT / L3 |
 | Focus (slight zoom) | Right mouse (hold) | RT |
 | Camera (Act 1): raise / shoot | Right mouse (hold) / Left mouse | RT / X |
-| Shot list (Act 1) | Tab | Back |
+| Photo album (Act 1) | Tab | Back |
 | Use / read | E | A |
 | Fullscreen / window | F11 or Alt+Enter | |
 | Pause / settings | Esc | Start |

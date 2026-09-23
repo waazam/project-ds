@@ -13,7 +13,7 @@ namespace ProjectDS.World;
 /// - "Hallway" (<see cref="BunkerHallway"/>): Act 8's long vaulted tunnel and its failing lights;
 /// - "VineDoor" (<see cref="BunkerVineDoor"/>): the overgrown door at its end;
 /// - "CrtRoom" (<see cref="CrtRoom"/>): Act 9's wall of screens and the marked set;
-/// - "Maze" (<see cref="BunkerMaze"/>): Act 10's maze, off at its own offset;
+/// - "Rooms" (<see cref="BunkerRooms"/>): Act 10's repeating room and the run out, off at its own offset;
 /// - "Flow" (<see cref="BunkerFlow"/>): the sequences that tie them to the story, and restore.
 /// This node keeps the public surface other code (the entrance, the autotest) uses.
 /// Groups provided: "crt_target_marker" (the marked set), "bunker_entrance_marker" (the way out:
@@ -27,7 +27,7 @@ public partial class BunkerInterior : Node3D
 	public BunkerHallway Hallway { get; private set; }
 	public BunkerVineDoor VineDoor { get; private set; }
 	public CrtRoom Crt { get; private set; }
-	public BunkerMaze Maze { get; private set; }
+	public BunkerRooms Rooms { get; private set; }
 	public BunkerFlow Flow { get; private set; }
 
 	/// <summary>For the autotest: hallway lights have committed to red for good.</summary>
@@ -40,10 +40,11 @@ public partial class BunkerInterior : Node3D
 	public bool PlayerAtCrtTarget => Crt?.PlayerAtTarget ?? false;
 	/// <summary>For the autotest: the CRT room's screens are currently off (mid-sequence).</summary>
 	public bool ScreensOff => Crt?.ScreensOff ?? false;
-	/// <summary>For the autotest: the maze's solution, start to exit.</summary>
-	public List<Vector3> MazeSolutionWaypointsWorld => Maze?.SolutionWaypointsWorld;
+
 	/// <summary>For the autotest: true from the hallway turning into the maze until its exit is reached.</summary>
-	public bool MazeActive => Maze?.Active ?? false;
+	public bool MazeActive => Rooms?.Active ?? false;
+	/// <summary>For the autotest: the hallway jumpscare has happened.</summary>
+	public bool JumpscareFired => Flow?.JumpscareFired ?? false;
 	/// <summary>True while the admit fade/teleport is running (the entrance ignores re-entry meanwhile).</summary>
 	public bool IsAdmitting => Flow?.IsAdmitting ?? false;
 
@@ -69,8 +70,8 @@ public partial class BunkerInterior : Node3D
 		AddChild(VineDoor);
 		Crt = new CrtRoom { Name = "CrtRoom" };
 		AddChild(Crt);
-		Maze = new BunkerMaze { Name = "Maze" };
-		AddChild(Maze);
+		Rooms = new BunkerRooms { Name = "Rooms" };
+		AddChild(Rooms);
 
 		// One marker node, moved (never swapped: StoryManager caches the node and reads its position).
 		_entranceMarker = new Node3D { Name = "BunkerEntranceMarker", Position = HallwayEntranceLocal };
@@ -78,7 +79,7 @@ public partial class BunkerInterior : Node3D
 		_entranceMarker.AddToGroup("bunker_entrance_marker");
 
 		Flow = new BunkerFlow { Name = "Flow" };
-		Flow.Setup(this, Hallway, VineDoor, Crt, Maze);
+		Flow.Setup(this, Hallway, VineDoor, Crt, Rooms);
 		AddChild(Flow);
 		Flow.Restore();
 		GD.Print($"[bunker] interior built in {watch.ElapsedMilliseconds} ms");
@@ -120,7 +121,8 @@ public partial class BunkerInterior : Node3D
 				else _entranceMarker.Position = HallwayEntranceLocal;
 				break;
 			case CompassSpot.MazeExit:
-				_entranceMarker.Position = BunkerMaze.ExitLocal;
+				// The far door while the rooms repeat; the round door behind you once it has shown itself.
+				_entranceMarker.Position = Rooms is { JumpscareDone: true } ? BunkerRooms.ExitLocal : BunkerRooms.LoopLocal;
 				break;
 			default:
 				_entranceMarker.Position = HallwayEntranceLocal;

@@ -138,7 +138,7 @@ public partial class BunkerPreview : Node3D
 		bool atHall = marker != null && marker.GlobalPosition.DistanceTo(interior.ToGlobal(BunkerInterior.HallwayEntranceLocal)) < 0.01f;
 		Log($"check compass marker starts at the hallway entrance: {(atHall ? "PASS" : "FAIL")} ({marker?.GlobalPosition})");
 		interior.PointCompass(BunkerInterior.CompassSpot.MazeExit);
-		bool atExit = marker != null && marker.GlobalPosition.DistanceTo(interior.ToGlobal(BunkerMaze.ExitLocal)) < 0.01f;
+		bool atExit = marker != null && marker.GlobalPosition.DistanceTo(interior.ToGlobal(BunkerRooms.ExitLocal)) < 0.01f;
 		Log($"check the same node moves to the maze exit: {(atExit ? "PASS" : "FAIL")} ({marker?.GlobalPosition})");
 		interior.PointCompass(BunkerInterior.CompassSpot.Outside);
 		bool atHatch = marker != null && marker.GlobalPosition.DistanceTo(bunker.GlobalPosition) < 0.01f;
@@ -265,23 +265,21 @@ public partial class BunkerPreview : Node3D
 
 		// ---------------------------------------------------------------- the maze (menacing mood)
 		atmo?.SetMood(ForestAtmosphere.Mood.Menacing, 0.05f);
-		interior.Maze.Active = false;
+		interior.Rooms.Active = false;
 		await Frames(30);
 		await Take(new Shot("maze_01_start", new(1800f, -78.38f, -3000f), new(1804f, -78.38f, -3000f)));
-		interior.Maze.ShowGlimpse(new Vector3(8f, 0, 0), new Vector3(1800f, -78.38f, -3000f));
 		await Frames(3);
-		await Take(new Shot("maze_02_creature_glimpse", new(1800f, -78.38f, -3000f), new(1808f, -78.8f, -3000f)));
+		await Take(new Shot("rooms_02_doors", new(1800f, -78.38f, -3001f), new(1800f, -78.6f, -3007f)));
 		await Seconds(0.8);
-		interior.Maze.ShowGlimpse(new Vector3(4f, 0, 0), new Vector3(1800f, -78.38f, -3000f));
 		await Frames(3);
-		await Take(new Shot("maze_03_creature_4m", new(1800f, -78.38f, -3000f), new(1804f, -78.9f, -3000f)));
+		await Take(new Shot("rooms_03_left_door", new(1800f, -78.38f, -3003.5f), new(1795.5f, -78.9f, -3003.5f)));
 		await Seconds(0.8);
 		await Take(new Shot("maze_04_mid", new(1808f, -78.38f, -3020f), new(1812f, -78.38f, -3020f)));
 		await Take(new Shot("maze_05_mid_down", new(1808f, -78.38f, -3020f), new(1812f, -79.7f, -3020f)));
 		await Take(new Shot("maze_mid_nolantern", new(1808f, -78.38f, -3020f), new(1812f, -78.38f, -3020f), "bunker", false));
 		// The walkie, as dropped at the exit.
-		var walkie = new WalkiePickup { Name = "WalkiePickup", Position = BunkerMaze.WalkieLocal - BunkerLayout.MazeOffset, Rotation = new Vector3(0, 0.5f, 0) };
-		interior.Maze.AddChild(walkie);
+		var walkie = new WalkiePickup { Name = "WalkiePickup", Dead = false, Position = BunkerRooms.ExitLocal - BunkerLayout.MazeOffset + new Vector3(1.0f, -1f, -1.5f), Rotation = new Vector3(0, 0.5f, 0) };
+		interior.Rooms.AddChild(walkie);
 		walkie.AddChild(new WalkieBeacon { Name = "Beacon", Position = new Vector3(0.022f, 0.158f, 0.024f) });
 		await Frames(10);
 		var wp = walkie.GlobalPosition;

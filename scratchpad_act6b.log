@@ -1,0 +1,157 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 6950 XT
+
+[waterfall] at stream s 109.4 (29.0 m above the crossing), drop 2.28 m, curtain (-21.60702, 8.20504, -162.55476)
+[storytest] --story-from=6: continuing into 'Act 6: the bridge and the clearing' at Act5CabinEntered with 9 flags, gear 'lantern,compass,newel_post;tool=None'
+[bunker] CRT room: 127 screens
+[bunker] interior built in 96 ms
+[storytest] ---- Act 6: the bridge and the clearing
+[story] checkpoint reached: Act6BridgeCrossed
+[story] Act 6: the woods around the clearing turn
+[story] Act 6: the bridge is crossed
+[storytest] PASS checkpoint 5 on crossing the footbridge 
+[storytest] PASS the compass points at the clearing objective (2, 0, -590), stairs_clearing_marker (2, 0, -590)
+[storytest] PASS fifteen small stairs in the clearing 15
+[story] flag set: clearing_voice_heard
+[storytest] PASS the clearing's voice 
+[storytest] PASS the spotlight finds the player 
+[storytest] PASS the voice is the saved beat 
+[storytest] PASS the cap stays in hand (it belongs to the last staircase) 
+[storytest] PASS the clearing's staircase stays broken 
+[story] Act 6: the clearing has spoken
+[story] Act 6: the clearing is closed
+[story] Act 6: the loop is lit (4 climbs)
+[storytest] PASS a staircase is lit after the voice 
+[storytest] PASS the compass points at the lit staircase objective (-0.90361893, 9.4234915, -568.78546), clearing_loop_marker (-0.90361893, 9.4234915, -568.78546)
+[storytest] PASS the lit staircase stands on the trail MiniStair0, 0.0 m off the trail
+[storytest] PASS only the whole staircases carry the loop 10 loop stairs, ruined 0
+[storytest] PASS the clearing is closed until the loop ends 
+[storytest] PASS three or four climbs are asked for 4
+[storytest] climb 1: MiniStair0 at (-1.0234556, 9.350662, -570.82117) scale 1.46 steps 24 rise 0.117 run 0.192 foot (-0.90361893, 9.4234915, -568.78546) (ground 9.22) top (-1.4554062, 13.430662, -578.1588); player (-1.0475849, 9.160539, -567.8062) onFloor True ground 9.16
+[storytest]   climbing: (-1.0475849, 9.160539, -567.8062) onFloor True stage 0
+[storytest]   climbing: (0.8377362, 9.40067, -570.647) onFloor True stage 0
+[storytest]   climbing: (0.7754063, 9.471791, -573.13916) onFloor True stage 0
+[storytest]   climbing: (0.63014543, 9.530078, -575.6114) onFloor True stage 0
+[storytest]   climbing: (0.5183278, 9.540987, -577.5104) onFloor True stage 0
+[storytest]   climbing: (0.47438553, 9.535355, -578.25336) onFloor True stage 0
+[storytest]   climbing: (0.4714434, 9.53451, -578.30255) onFloor True stage 0
+[storytest]   climbing: (0.4714434, 9.53451, -578.30255) onFloor True stage 0
+[storytest]   climbing: (0.4714434, 9.53451, -578.30255) onFloor True stage 0
+[storytest]   climbing: (0.48837167, 9.5386915, -578.0148) onFloor True stage 0
+[storytest]   climbing: (0.59469366, 9.538011, -576.2087) onFloor True stage 0
+[storytest]   climbing: (0.64827067, 9.525717, -575.3032) onFloor True stage 0
+[storytest]   climbing: (0.678209, 9.519507, -574.8018) onFloor True stage 0
+[storytest]   climbing: (1.3710371, 9.530422, -575.924) onFloor True stage 0
+[storytest]   climbing: (1.146188, 9.533222, -578.5827) onFloor True stage 0
+[storytest]   climbing: (-1.0645262, 9.478205, -579.8767) onFloor True stage 0
+[storytest]   climbing: (-2.8582063, 9.465126, -579.28973) onFloor True stage 0
+[storytest]   climbing: (-1.6364367, 9.476234, -579.36206) onFloor True stage 0
+[storytest]   climbing: (-1.430113, 9.480436, -579.37427) onFloor True stage 0
+[storytest]   climbing: (-1.430113, 9.480436, -579.37427) onFloor True stage 0
+[storytest]   climbing: (-1.430113, 9.480436, -579.37427) onFloor True stage 0
+[storytest]   climbing: (-0.04720459, 9.508389, -579.4553) onFloor True stage 0
+[storytest]   climbing: (0.5664454, 9.53447, -578.29785) onFloor True stage 0
+[storytest]   climbing: (0.589811, 9.537973, -576.2917) onFloor True stage 0
+[storytest]   climbing: (0.8992774, 9.534996, -576.00354) onFloor True stage 0
+[storytest]   climbing: (0.7486388, 9.531681, -578.60315) onFloor True stage 0
+[storytest]   climbing: (-1.0406681, 9.478907, -579.9182) onFloor True stage 0
+[storytest]   climbing: (-2.9719348, 9.464602, -579.28326) onFloor True stage 0
+[storytest]   climbing: (-1.8895136, 9.463269, -579.75214) onFloor True stage 0
+[storytest]   climbing: (0.04317074, 9.509852, -579.4609) onFloor True stage 0
+[storytest]   climbing: (0.5086433, 9.5377035, -578.11597) onFloor True stage 0
+[storytest]   climbing: (0.6383123, 9.537698, -576.39484) onFloor True stage 0
+[storytest]   climbing: (0.6133735, 9.53059, -578.6158) onFloor True stage 0
+[storytest]   climbing: (-0.99627465, 9.479226, -579.9109) onFloor True stage 0
+[storytest]   climbing: (-2.9814563, 9.464552, -579.2825) onFloor True stage 0
+[storytest]   climbing: (-2.720627, 9.460697, -579.58887) onFloor True stage 0
+[storytest]   climbing: (-0.3723119, 9.501787, -579.4363) onFloor True stage 0
+[storytest]   climbing: (0.62279433, 9.5241585, -578.8882) onFloor True stage 0
+[storytest]   climbing: (0.57694584, 9.540161, -576.6627) onFloor True stage 0
+[storytest]   climbing: (0.59360397, 9.533398, -578.468) onFloor True stage 0
+[storytest]   climbing: (-0.64944476, 9.48646, -579.9099) onFloor True stage 0
+[storytest]   climbing: (-2.7863262, 9.465694, -579.2938) onFloor True stage 0
+[storytest]   climbing: (-2.8769066, 9.460334, -579.5146) onFloor True stage 0
+[storytest]   climbing: (-0.47764364, 9.499586, -579.4301) onFloor True stage 0
+[storytest]   climbing: (0.6152749, 9.52087, -579.061) onFloor True stage 0
+[storytest]   climbing: (0.56422406, 9.541959, -576.7263) onFloor True stage 0
+[storytest]   climbing: (0.5406106, 9.534176, -578.37695) onFloor True stage 0
+[storytest]   climbing: (-0.4144669, 9.492138, -579.8768) onFloor True stage 0
+[storytest]   climbing: (-2.6843293, 9.466432, -579.30005) onFloor True stage 0
+[storytest]   climbing: (-3.0672364, 9.462346, -579.40955) onFloor True stage 0
+[storytest]   climbing: (-0.6194947, 9.496595, -579.4216) onFloor True stage 0
+[storytest]   climbing: (0.5698387, 9.517867, -579.2444) onFloor True stage 0
+[storytest]   climbing: (0.5554687, 9.543812, -576.875) onFloor True stage 0
+[storytest]   climbing: (0.6746079, 9.540579, -578.0625) onFloor True stage 0
+[storytest]   climbing: (-0.13205412, 9.499577, -579.7988) onFloor True stage 0
+[storytest]   climbing: (-2.5070705, 9.467473, -579.3104) onFloor True stage 0
+[storytest]   climbing: (-3.2507484, 9.468071, -579.26935) onFloor True stage 0
+[storytest]   climbing: (-0.80559814, 9.492687, -579.4106) onFloor True stage 0
+[storytest]   climbing: (0.48242217, 9.514285, -579.38196) onFloor True stage 0
+[storytest]   climbing: (0.54460347, 9.544239, -577.0596) onFloor True stage 0
+[storytest]   climbing: (0.741658, 9.541991, -577.79944) onFloor True stage 0
+[storytest]   climbing: (0.11418091, 9.505265, -579.6971) onFloor True stage 0
+[storytest]   climbing: (-2.3421257, 9.468326, -579.3207) onFloor True stage 0
+[storytest]   climbing: (-3.3786192, 9.471546, -579.14014) onFloor True stage 0
+[storytest]   climbing: (-1.049548, 9.487439, -579.4146) onFloor True stage 0
+[storytest]   climbing: (0.36762917, 9.512283, -579.45355) onFloor True stage 0
+[storytest]   climbing: (0.5306636, 9.542181, -577.2963) onFloor True stage 0
+[storytest]   climbing: (0.754314, 9.542371, -577.6132) onFloor True stage 0
+[storytest]   climbing: (0.3312104, 9.509867, -579.577) onFloor True stage 0
+[storytest]   climbing: (-2.170251, 9.468924, -579.3302) onFloor True stage 0
+[storytest]   climbing: (-3.1129189, 9.463488, -579.41705) onFloor True stage 0
+[storytest]   climbing: (-0.6895065, 9.495122, -579.4175) onFloor True stage 0
+[storytest]   climbing: (0.53948075, 9.516437, -579.3085) onFloor True stage 0
+[storytest]   climbing: (0.5513813, 9.544664, -576.9444) onFloor True stage 0
+[storytest]   climbing: (0.7971807, 9.54339, -577.67474) onFloor True stage 0
+[storytest]   climbing: (0.13885178, 9.5056505, -579.68756) onFloor True stage 0
+[storytest]   climbing: (-2.3222253, 9.46845, -579.3213) onFloor True stage 0
+[storytest]   climbing: (-3.416667, 9.473899, -579.0724) onFloor True stage 0
+[storytest]   climbing: (-1.2403446, 9.48098, -579.5386) onFloor True stage 0
+[storytest]   climbing: (0.27754644, 9.511371, -579.4721) onFloor True stage 0
+[storytest]   climbing: (0.51802003, 9.540743, -577.51117) onFloor True stage 0
+[storytest]   climbing: (0.75020826, 9.542788, -577.4704) onFloor True stage 0
+[storytest]   climbing: (0.4674555, 9.512475, -579.44855) onFloor True stage 0
+[storytest]   climbing: (-2.0255487, 9.46644, -579.4679) onFloor True stage 0
+[storytest]   climbing: (-3.3782976, 9.471802, -579.15784) onFloor True stage 0
+[storytest]   climbing: (-1.343084, 9.477882, -579.58606) onFloor True stage 0
+[storytest]   climbing: (0.24945971, 9.511176, -579.4727) onFloor True stage 0
+[storytest]   climbing: (0.5136796, 9.540528, -577.58527) onFloor True stage 0
+[storytest]   climbing: (0.77414036, 9.545284, -577.08234) onFloor True stage 0
+[storytest]   climbing: (0.56186485, 9.516669, -579.2655) onFloor True stage 0
+[storytest]   climbing: (-1.8288465, 9.467447, -579.6172) onFloor True stage 0
+[storytest]   climbing: (-3.3323307, 9.470264, -579.1915) onFloor True stage 0
+[storytest]   climbing: (-1.6982313, 9.468381, -579.694) onFloor True stage 0
+[storytest]   climbing: (0.122775614, 9.510369, -579.4653) onFloor True stage 0
+[storytest]   climbing: (0.49561647, 9.539635, -577.8917) onFloor True stage 0
+[storytest]   climbing: (0.72022665, 9.542394, -576.80164) onFloor True stage 0
+[storytest]   climbing: (0.5894576, 9.522991, -579.0241) onFloor True stage 0
+[storytest]   climbing: (-1.5291333, 9.469792, -579.78253) onFloor True stage 0
+[storytest]   climbing: (-3.1855836, 9.467145, -579.26685) onFloor True stage 0
+[storytest]   climbing: (-1.9088877, 9.462448, -579.7217) onFloor True stage 0
+[storytest]   climbing: (0.034297578, 9.509804, -579.46014) onFloor True stage 0
+[storytest]   climbing: (0.50686026, 9.537961, -578.09814) onFloor True stage 0
+[storytest]   climbing: (0.6722756, 9.53952, -576.59753) onFloor True stage 0
+[storytest]   climbing: (0.6007267, 9.52675, -578.8327) onFloor True stage 0
+[storytest]   climbing: (-1.3048532, 9.474226, -579.8471) onFloor True stage 0
+[storytest]   climbing: (-3.1128762, 9.465944, -579.2748) onFloor True stage 0
+[storytest]   climbing: (-2.080055, 9.459803, -579.72473) onFloor True stage 0
+[storytest]   climbing: (-0.060486026, 9.508112, -579.4544) onFloor True stage 0
+[storytest]   climbing: (0.5834848, 9.533687, -578.3475) onFloor True stage 0
+[storytest]   climbing: (0.63841283, 9.541167, -576.66437) onFloor True stage 0
+[storytest]   climbing: (0.6061921, 9.528526, -578.73987) onFloor True stage 0
+[storytest]   climbing: (-1.1172642, 9.477893, -579.88904) onFloor True stage 0
+[storytest]   climbing: (-3.0371797, 9.464735, -579.27936) onFloor True stage 0
+[storytest]   climbing: (-2.2584448, 9.459793, -579.7088) onFloor True stage 0
+[storytest]   climbing: (-0.12375015, 9.506829, -579.4507) onFloor True stage 0
+[storytest]   climbing: (0.6035275, 9.53368, -578.4355) onFloor True stage 0
+[storytest]   climbing: (0.61570776, 9.538674, -576.5285) onFloor True stage 0
+[storytest]   climbing: (0.6130175, 9.530388, -578.62067) onFloor True stage 0
+[storytest]   climbing: (-0.9499179, 9.48124, -579.9039) onFloor True stage 0
+[storytest]   climbing: (-2.9586504, 9.46481, -579.2838) onFloor True stage 0
+[storytest]   climbing: (-2.6293654, 9.460298, -579.6172) onFloor True stage 0
+[storytest]   climbing: (-0.31844127, 9.502876, -579.4395) onFloor True stage 0
+[storytest]   climbing: (0.62058145, 9.525959, -578.8399) onFloor True stage 0
+[storytest]   climbing: (0.5772098, 9.540526, -576.6219) onFloor True stage 0
+[storytest]   climbing: (0.5886638, 9.5335865, -578.4559) onFloor True stage 0
+[storytest]   climbing: (-0.63713634, 9.487086, -579.9088) onFloor True stage 0
+[storytest]   climbing: (-2.0476522, 9.466651, -579.4471) onFloor True stage 0

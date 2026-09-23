@@ -1,0 +1,728 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 6950 XT
+
+[waterfall] at stream s 109.4 (29.0 m above the crossing), drop 2.28 m, curtain (-21.60702, 8.20504, -162.55476)
+[continue-test] --- continuing into act1_start (Act1Start)
+[waterfall] at stream s 109.4 (29.0 m above the crossing), drop 2.28 m, curtain (-21.60702, 8.20504, -162.55476)
+[continue-test] PASS act1_start: checkpoint restored Act1Start
+[continue-test] PASS act1_start: Continue loads the checkpoint's level res://scenes/levels/trail_slice.tscn
+[continue-test] PASS act1_start: flags restored 0 flags
+[continue-test] PASS act1_start: control handed back (no softlock) after 0.0s
+[continue-test] PASS act1_start: standing on something on floor True, y -0.3 vs ground -0.3
+[continue-test] PASS act1_start: player can move 1.52 m
+[continue-test] PASS act1_start: storm state active False (want False)
+[continue-test] PASS act1_start: lighting mood Auto (want Auto)
+[continue-test] PASS act1_start: no compass on the trail 
+[continue-test] --- continuing into act2_stairs_climbed (Act2StairsClimbed)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 89 ms
+[continue-test] PASS act2_stairs_climbed: checkpoint restored Act2StairsClimbed
+[continue-test] PASS act2_stairs_climbed: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act2_stairs_climbed: flags restored 1 flags
+[continue-test] PASS act2_stairs_climbed: control handed back (no softlock) after 0.0s
+[continue-test] PASS act2_stairs_climbed: not respawned inside a sealed cabin player (0, -0.6975265, 40), inside False, door open False
+[continue-test] PASS act2_stairs_climbed: standing on something on floor True, y -0.7 vs ground -0.7
+[continue-test] PASS act2_stairs_climbed: player can move 1.52 m
+[continue-test] PASS act2_stairs_climbed: cabin door state open False (want False), boarded True (want True)
+[continue-test] PASS act2_stairs_climbed: storm state active True (want True)
+[continue-test] PASS act2_stairs_climbed: lighting mood Auto (want Auto)
+[continue-test] PASS act2_stairs_climbed: cabin fire state burning False (want False)
+[continue-test] PASS act2_stairs_climbed: clearing mini stairs 0 (want 0)
+[continue-test] PASS act2_stairs_climbed: no leftover clearing spotlight 
+[continue-test] PASS act2_stairs_climbed: clearing loop lit target none, done False (want lit False)
+[continue-test] PASS act2_stairs_climbed: Act 11 stairs height tall False (want False)
+[continue-test] PASS act2_stairs_climbed: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act2_stairs_climbed: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act2_stairs_climbed: CabinReturnEvent guard fired False (want False)
+[continue-test] PASS act2_stairs_climbed: FriendReveal guard fired False (want False)
+[continue-test] PASS act2_stairs_climbed: CabinExitLine guard fired False (want False)
+[continue-test] PASS act2_stairs_climbed: BridgeCrossEvent guard fired False (want False)
+[continue-test] PASS act2_stairs_climbed: taken pickups stay taken 
+[continue-test] PASS act2_stairs_climbed: inventory restored ;tools= (saved ;tool=None)
+[continue-test] PASS act2_stairs_climbed: compass has an objective 
+[continue-test] --- continuing into act3_door_boarded (Act3DoorBoarded)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 56 ms
+[continue-test] PASS act3_door_boarded: checkpoint restored Act3DoorBoarded
+[continue-test] PASS act3_door_boarded: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act3_door_boarded: flags restored 1 flags
+[continue-test] PASS act3_door_boarded: control handed back (no softlock) after 0.0s
+[continue-test] PASS act3_door_boarded: not respawned inside a sealed cabin player (0.5, 0.87967986, -27), inside False, door open False
+[continue-test] PASS act3_door_boarded: standing on something on floor True, y 0.9 vs ground 0.9
+[continue-test] PASS act3_door_boarded: player can move 1.52 m
+[continue-test] PASS act3_door_boarded: cabin door state open False (want False), boarded True (want True)
+[continue-test] PASS act3_door_boarded: storm state active True (want True)
+[continue-test] PASS act3_door_boarded: lighting mood Auto (want Auto)
+[continue-test] PASS act3_door_boarded: cabin fire state burning False (want False)
+[continue-test] PASS act3_door_boarded: clearing mini stairs 0 (want 0)
+[continue-test] PASS act3_door_boarded: no leftover clearing spotlight 
+[continue-test] PASS act3_door_boarded: clearing loop lit target none, done False (want lit False)
+[continue-test] PASS act3_door_boarded: Act 11 stairs height tall False (want False)
+[continue-test] PASS act3_door_boarded: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act3_door_boarded: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act3_door_boarded: CabinReturnEvent guard fired False (want False)
+[continue-test] PASS act3_door_boarded: FriendReveal guard fired False (want False)
+[continue-test] PASS act3_door_boarded: CabinExitLine guard fired False (want False)
+[continue-test] PASS act3_door_boarded: BridgeCrossEvent guard fired False (want False)
+[continue-test] PASS act3_door_boarded: taken pickups stay taken 
+[continue-test] PASS act3_door_boarded: inventory restored ;tools= (saved ;tool=None)
+[continue-test] PASS act3_door_boarded: compass has an objective (24, 7.390401, -392)
+[continue-test] --- continuing into act3_storm (Act3DoorBoarded)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 59 ms
+[continue-test] PASS act3_storm: checkpoint restored Act3DoorBoarded
+[continue-test] PASS act3_storm: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act3_storm: flags restored 4 flags
+[continue-test] PASS act3_storm: control handed back (no softlock) after 0.0s
+[continue-test] PASS act3_storm: not respawned inside a sealed cabin player (0.5, 0.87967986, -27), inside False, door open False
+[continue-test] PASS act3_storm: standing on something on floor True, y 0.9 vs ground 0.9
+[continue-test] PASS act3_storm: player can move 1.52 m
+[continue-test] PASS act3_storm: cabin door state open False (want False), boarded True (want True)
+[continue-test] PASS act3_storm: storm state active True (want True)
+[continue-test] PASS act3_storm: lighting mood Auto (want Auto)
+[continue-test] PASS act3_storm: cabin fire state burning False (want False)
+[continue-test] PASS act3_storm: clearing mini stairs 0 (want 0)
+[continue-test] PASS act3_storm: no leftover clearing spotlight 
+[continue-test] PASS act3_storm: clearing loop lit target none, done False (want lit False)
+[continue-test] PASS act3_storm: Act 11 stairs height tall False (want False)
+[continue-test] PASS act3_storm: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act3_storm: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act3_storm: CabinReturnEvent guard fired False (want False)
+[continue-test] PASS act3_storm: FriendReveal guard fired False (want False)
+[continue-test] PASS act3_storm: CabinExitLine guard fired False (want False)
+[continue-test] PASS act3_storm: BridgeCrossEvent guard fired False (want False)
+[continue-test] PASS act3_storm: taken pickups stay taken 
+[continue-test] PASS act3_storm: inventory restored lantern,compass;tools= (saved lantern,compass;tool=None)
+[continue-test] PASS act3_storm: compass has an objective (24, 7.390401, -392)
+[continue-test] --- continuing into act5_cabin_entered (Act5CabinEntered)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 54 ms
+[continue-test] PASS act5_cabin_entered: checkpoint restored Act5CabinEntered
+[continue-test] PASS act5_cabin_entered: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act5_cabin_entered: flags restored 7 flags
+[continue-test] PASS act5_cabin_entered: control handed back (no softlock) after 0.0s
+[continue-test] PASS act5_cabin_entered: not respawned inside a sealed cabin player (12.5, 6.4547324, -400), inside False, door open True
+[continue-test] PASS act5_cabin_entered: standing on something on floor True, y 6.5 vs ground 6.5
+[continue-test] PASS act5_cabin_entered: player can move 1.52 m
+[continue-test] PASS act5_cabin_entered: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act5_cabin_entered: storm state active True (want True)
+[continue-test] PASS act5_cabin_entered: lighting mood Auto (want Auto)
+[continue-test] PASS act5_cabin_entered: cabin fire state burning False (want False)
+[continue-test] PASS act5_cabin_entered: clearing mini stairs 0 (want 0)
+[continue-test] PASS act5_cabin_entered: no leftover clearing spotlight 
+[continue-test] PASS act5_cabin_entered: clearing loop lit target none, done False (want lit False)
+[continue-test] PASS act5_cabin_entered: Act 11 stairs height tall False (want False)
+[continue-test] PASS act5_cabin_entered: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act5_cabin_entered: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act5_cabin_entered: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act5_cabin_entered: FriendReveal guard fired True (want True)
+[continue-test] PASS act5_cabin_entered: CabinExitLine guard fired False (want False)
+[continue-test] PASS act5_cabin_entered: BridgeCrossEvent guard fired False (want False)
+[continue-test] PASS act5_cabin_entered: taken pickups stay taken 
+[continue-test] PASS act5_cabin_entered: inventory restored lantern,compass;tools= (saved lantern,compass;tool=None)
+[continue-test] PASS act5_cabin_entered: compass has an objective (24, 7.390401, -392)
+[continue-test] --- continuing into act5_post_taken (Act5CabinEntered)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 55 ms
+[continue-test] PASS act5_post_taken: checkpoint restored Act5CabinEntered
+[continue-test] PASS act5_post_taken: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act5_post_taken: flags restored 8 flags
+[continue-test] PASS act5_post_taken: control handed back (no softlock) after 0.0s
+[continue-test] PASS act5_post_taken: not respawned inside a sealed cabin player (22.6, 7.3913116, -392), inside True, door open True
+[continue-test] PASS act5_post_taken: standing on something on floor True, y 7.4 vs ground 6.7
+[continue-test] PASS act5_post_taken: player can move 1.52 m
+[continue-test] PASS act5_post_taken: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act5_post_taken: storm state active True (want True)
+[continue-test] PASS act5_post_taken: lighting mood Auto (want Auto)
+[continue-test] PASS act5_post_taken: cabin fire state burning False (want False)
+[continue-test] PASS act5_post_taken: clearing mini stairs 0 (want 0)
+[continue-test] PASS act5_post_taken: no leftover clearing spotlight 
+[continue-test] PASS act5_post_taken: clearing loop lit target none, done False (want lit False)
+[continue-test] PASS act5_post_taken: Act 11 stairs height tall False (want False)
+[continue-test] PASS act5_post_taken: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act5_post_taken: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act5_post_taken: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act5_post_taken: FriendReveal guard fired True (want True)
+[continue-test] PASS act5_post_taken: CabinExitLine guard fired False (want False)
+[continue-test] PASS act5_post_taken: BridgeCrossEvent guard fired False (want False)
+[continue-test] PASS act5_post_taken: taken pickups stay taken 
+[continue-test] PASS act5_post_taken: inventory restored lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+[continue-test] PASS act5_post_taken: compass has an objective (7.9378033, 6.6031194, -486.8941)
+[continue-test] --- continuing into act6_bridge_crossed (Act6BridgeCrossed)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 54 ms
+[continue-test] PASS act6_bridge_crossed: checkpoint restored Act6BridgeCrossed
+[continue-test] PASS act6_bridge_crossed: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act6_bridge_crossed: flags restored 9 flags
+[continue-test] PASS act6_bridge_crossed: control handed back (no softlock) after 0.0s
+[continue-test] PASS act6_bridge_crossed: not respawned inside a sealed cabin player (7.5, 7.230775, -502), inside False, door open True
+[continue-test] PASS act6_bridge_crossed: standing on something on floor True, y 7.2 vs ground 7.2
+[continue-test] PASS act6_bridge_crossed: player can move 1.52 m
+[continue-test] PASS act6_bridge_crossed: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act6_bridge_crossed: storm state active False (want False)
+[continue-test] PASS act6_bridge_crossed: lighting mood Menacing (want Menacing)
+[continue-test] PASS act6_bridge_crossed: cabin fire state burning False (want False)
+[continue-test] PASS act6_bridge_crossed: clearing mini stairs 15 (want 15)
+[continue-test] PASS act6_bridge_crossed: no leftover clearing spotlight 
+[continue-test] PASS act6_bridge_crossed: clearing loop lit target none, done False (want lit False)
+[continue-test] PASS act6_bridge_crossed: Act 11 stairs height tall False (want False)
+[continue-test] PASS act6_bridge_crossed: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act6_bridge_crossed: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act6_bridge_crossed: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act6_bridge_crossed: FriendReveal guard fired True (want True)
+[continue-test] PASS act6_bridge_crossed: CabinExitLine guard fired True (want True)
+[continue-test] PASS act6_bridge_crossed: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act6_bridge_crossed: taken pickups stay taken 
+[continue-test] PASS act6_bridge_crossed: inventory restored lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+[continue-test] PASS act6_bridge_crossed: compass has an objective (2, 0, -590)
+[continue-test] --- continuing into act6_voice_heard (Act6BridgeCrossed)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 53 ms
+[story] Act 6: the loop is lit (3 climbs)
+[continue-test] PASS act6_voice_heard: checkpoint restored Act6BridgeCrossed
+[continue-test] PASS act6_voice_heard: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act6_voice_heard: flags restored 10 flags
+[continue-test] PASS act6_voice_heard: control handed back (no softlock) after 0.0s
+[continue-test] PASS act6_voice_heard: not respawned inside a sealed cabin player (7.5, 7.230775, -502), inside False, door open True
+[continue-test] PASS act6_voice_heard: standing on something on floor True, y 7.2 vs ground 7.2
+[continue-test] PASS act6_voice_heard: player can move 1.52 m
+[continue-test] PASS act6_voice_heard: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act6_voice_heard: storm state active False (want False)
+[continue-test] PASS act6_voice_heard: lighting mood Menacing (want Menacing)
+[continue-test] PASS act6_voice_heard: cabin fire state burning False (want False)
+[continue-test] PASS act6_voice_heard: clearing mini stairs 15 (want 15)
+[continue-test] PASS act6_voice_heard: no leftover clearing spotlight 
+[continue-test] PASS act6_voice_heard: clearing loop lit target MiniStair6, done False (want lit True)
+[continue-test] PASS act6_voice_heard: compass on the lit staircase (-28.622585, 10.075221, -579.32025)
+[continue-test] PASS act6_voice_heard: Act 11 stairs height tall False (want False)
+[continue-test] PASS act6_voice_heard: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act6_voice_heard: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act6_voice_heard: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act6_voice_heard: FriendReveal guard fired True (want True)
+[continue-test] PASS act6_voice_heard: CabinExitLine guard fired True (want True)
+[continue-test] PASS act6_voice_heard: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act6_voice_heard: taken pickups stay taken 
+[continue-test] PASS act6_voice_heard: inventory restored lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+[continue-test] PASS act6_voice_heard: compass has an objective (-28.622585, 10.075221, -579.32025)
+[continue-test] --- continuing into act6_loop_done (Act6BridgeCrossed)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 54 ms
+[continue-test] PASS act6_loop_done: checkpoint restored Act6BridgeCrossed
+[continue-test] PASS act6_loop_done: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act6_loop_done: flags restored 12 flags
+[continue-test] PASS act6_loop_done: control handed back (no softlock) after 0.0s
+[continue-test] PASS act6_loop_done: not respawned inside a sealed cabin player (7.5, 7.230775, -502), inside False, door open True
+[continue-test] PASS act6_loop_done: standing on something on floor True, y 7.2 vs ground 7.2
+[continue-test] PASS act6_loop_done: player can move 1.52 m
+[continue-test] PASS act6_loop_done: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act6_loop_done: storm state active False (want False)
+[continue-test] PASS act6_loop_done: lighting mood Night (want Night)
+[continue-test] PASS act6_loop_done: cabin fire state burning False (want False)
+[continue-test] PASS act6_loop_done: clearing mini stairs 15 (want 15)
+[continue-test] PASS act6_loop_done: no leftover clearing spotlight 
+[continue-test] PASS act6_loop_done: clearing loop lit target none, done True (want lit False)
+[continue-test] PASS act6_loop_done: Act 11 stairs height tall False (want False)
+[continue-test] PASS act6_loop_done: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act6_loop_done: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act6_loop_done: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act6_loop_done: FriendReveal guard fired True (want True)
+[continue-test] PASS act6_loop_done: CabinExitLine guard fired True (want True)
+[continue-test] PASS act6_loop_done: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act6_loop_done: taken pickups stay taken 
+[continue-test] PASS act6_loop_done: inventory restored lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+[continue-test] PASS act6_loop_done: compass has an objective (61, 17.757242, -465)
+[continue-test] --- continuing into act7_cabin_burning (Act7CabinBurning)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 58 ms
+[continue-test] PASS act7_cabin_burning: checkpoint restored Act7CabinBurning
+[continue-test] PASS act7_cabin_burning: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act7_cabin_burning: flags restored 12 flags
+[continue-test] PASS act7_cabin_burning: control handed back (no softlock) after 0.0s
+[continue-test] PASS act7_cabin_burning: not respawned inside a sealed cabin player (61, 17.757519, -465), inside False, door open True
+[continue-test] PASS act7_cabin_burning: standing on something on floor True, y 17.8 vs ground 17.8
+[continue-test] PASS act7_cabin_burning: player can move 1.52 m
+[continue-test] PASS act7_cabin_burning: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act7_cabin_burning: storm state active False (want False)
+[continue-test] PASS act7_cabin_burning: lighting mood Night (want Night)
+[continue-test] PASS act7_cabin_burning: cabin fire state burning True (want True)
+[continue-test] PASS act7_cabin_burning: clearing mini stairs 15 (want 15)
+[continue-test] PASS act7_cabin_burning: no leftover clearing spotlight 
+[continue-test] PASS act7_cabin_burning: clearing loop lit target none, done True (want lit False)
+[continue-test] PASS act7_cabin_burning: Act 11 stairs height tall False (want False)
+[continue-test] PASS act7_cabin_burning: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act7_cabin_burning: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act7_cabin_burning: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act7_cabin_burning: FriendReveal guard fired True (want True)
+[continue-test] PASS act7_cabin_burning: CabinExitLine guard fired True (want True)
+[continue-test] PASS act7_cabin_burning: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act7_cabin_burning: taken pickups stay taken 
+[continue-test] PASS act7_cabin_burning: inventory restored lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+[continue-test] PASS act7_cabin_burning: compass has an objective (166, 12.402138, -566)
+[continue-test] --- continuing into act8_bunker_entered (Act8BunkerEntered)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 55 ms
+[continue-test] PASS act8_bunker_entered: checkpoint restored Act8BunkerEntered
+[continue-test] PASS act8_bunker_entered: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act8_bunker_entered: flags restored 12 flags
+[continue-test] PASS act8_bunker_entered: control handed back (no softlock) after 0.0s
+[continue-test] PASS act8_bunker_entered: not respawned inside a sealed cabin player (160.5, 9.247927, -566), inside False, door open True
+[continue-test] PASS act8_bunker_entered: standing on something on floor True, y 9.2 vs ground 9.2
+[continue-test] PASS act8_bunker_entered: player can move 1.39 m
+[continue-test] PASS act8_bunker_entered: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act8_bunker_entered: storm state active False (want False)
+[continue-test] PASS act8_bunker_entered: lighting mood Night (want Night)
+[continue-test] PASS act8_bunker_entered: cabin fire state burning True (want True)
+[continue-test] PASS act8_bunker_entered: clearing mini stairs 15 (want 15)
+[continue-test] PASS act8_bunker_entered: no leftover clearing spotlight 
+[continue-test] PASS act8_bunker_entered: clearing loop lit target none, done True (want lit False)
+[continue-test] PASS act8_bunker_entered: Act 11 stairs height tall False (want False)
+[continue-test] PASS act8_bunker_entered: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act8_bunker_entered: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act8_bunker_entered: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act8_bunker_entered: FriendReveal guard fired True (want True)
+[continue-test] PASS act8_bunker_entered: CabinExitLine guard fired True (want True)
+[continue-test] PASS act8_bunker_entered: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act8_bunker_entered: taken pickups stay taken 
+[continue-test] PASS act8_bunker_entered: inventory restored lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+[continue-test] PASS act8_bunker_entered: compass has an objective (1500, -79.05, -3120.65)
+[continue-test] PASS act8_bunker_entered: bunker door open 
+[continue-test] --- continuing into act10_walkie_found (Act10WalkieFound)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 58 ms
+[continue-test] PASS act10_walkie_found: checkpoint restored Act10WalkieFound
+[continue-test] PASS act10_walkie_found: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act10_walkie_found: flags restored 15 flags
+[story] flag set: act11_dialogue_done
+[story] Act 11: the radio speaks
+[continue-test] PASS act10_walkie_found: radio exchange replays and completes after 12.0s
+[continue-test] PASS act10_walkie_found: control handed back (no softlock) after 0.0s
+[continue-test] PASS act10_walkie_found: not respawned inside a sealed cabin player (150, 8.958945, -566), inside False, door open True
+[continue-test] PASS act10_walkie_found: standing on something on floor True, y 9.0 vs ground 9.0
+[continue-test] PASS act10_walkie_found: player can move 1.51 m
+[continue-test] PASS act10_walkie_found: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act10_walkie_found: storm state active False (want False)
+[continue-test] PASS act10_walkie_found: lighting mood Night (want Night)
+[continue-test] PASS act10_walkie_found: cabin fire state burning True (want True)
+[continue-test] PASS act10_walkie_found: clearing mini stairs 15 (want 15)
+[continue-test] PASS act10_walkie_found: no leftover clearing spotlight 
+[continue-test] PASS act10_walkie_found: clearing loop lit target none, done True (want lit False)
+[continue-test] PASS act10_walkie_found: Act 11 stairs height tall True (want True)
+[continue-test] PASS act10_walkie_found: Act 11 climb trigger seat True (want True)
+[continue-test] PASS act10_walkie_found: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act10_walkie_found: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act10_walkie_found: FriendReveal guard fired True (want True)
+[continue-test] PASS act10_walkie_found: CabinExitLine guard fired True (want True)
+[continue-test] PASS act10_walkie_found: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act10_walkie_found: taken pickups stay taken 
+[continue-test] PASS act10_walkie_found: inventory restored lantern,compass,newel_post,radio;tools= (saved lantern,compass,newel_post;tool=None)
+[continue-test] PASS act10_walkie_found: compass has an objective (110, 0, -662)
+[continue-test] --- continuing into act10_after_radio (Act10WalkieFound)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 57 ms
+[continue-test] PASS act10_after_radio: checkpoint restored Act10WalkieFound
+[continue-test] PASS act10_after_radio: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act10_after_radio: flags restored 16 flags
+[continue-test] PASS act10_after_radio: control handed back (no softlock) after 0.0s
+[continue-test] PASS act10_after_radio: not respawned inside a sealed cabin player (150, 8.958956, -566), inside False, door open True
+[continue-test] PASS act10_after_radio: standing on something on floor True, y 9.0 vs ground 9.0
+[continue-test] PASS act10_after_radio: player can move 1.51 m
+[continue-test] PASS act10_after_radio: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act10_after_radio: storm state active False (want False)
+[continue-test] PASS act10_after_radio: lighting mood Night (want Night)
+[continue-test] PASS act10_after_radio: cabin fire state burning True (want True)
+[continue-test] PASS act10_after_radio: clearing mini stairs 15 (want 15)
+[continue-test] PASS act10_after_radio: no leftover clearing spotlight 
+[continue-test] PASS act10_after_radio: clearing loop lit target none, done True (want lit False)
+[continue-test] PASS act10_after_radio: Act 11 stairs height tall True (want True)
+[continue-test] PASS act10_after_radio: Act 11 climb trigger seat True (want True)
+[continue-test] PASS act10_after_radio: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act10_after_radio: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act10_after_radio: FriendReveal guard fired True (want True)
+[continue-test] PASS act10_after_radio: CabinExitLine guard fired True (want True)
+[continue-test] PASS act10_after_radio: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act10_after_radio: taken pickups stay taken 
+[continue-test] PASS act10_after_radio: inventory restored lantern,compass,newel_post,radio;tools= (saved lantern,compass,newel_post,radio;tool=None)
+[continue-test] PASS act10_after_radio: compass has an objective (110, 0, -662)
+[continue-test] --- continuing into act11_giant_encounter (Act11GiantEncounter)
+[bunker] CRT room: 152 screens
+[bunker] interior built in 60 ms
+[continue-test] PASS act11_giant_encounter: checkpoint restored Act11GiantEncounter
+[continue-test] PASS act11_giant_encounter: Continue loads the checkpoint's level res://scenes/levels/hollow.tscn
+[continue-test] PASS act11_giant_encounter: flags restored 17 flags
+[continue-test] PASS act11_giant_encounter: control handed back (no softlock) after 0.0s
+[continue-test] PASS act11_giant_encounter: not respawned inside a sealed cabin player (6, 9.555316, -578), inside False, door open True
+[continue-test] PASS act11_giant_encounter: standing on something on floor True, y 9.6 vs ground 9.6
+[continue-test] PASS act11_giant_encounter: player can move 1.52 m
+[continue-test] PASS act11_giant_encounter: cabin door state open True (want True), boarded False (want False)
+[continue-test] PASS act11_giant_encounter: storm state active False (want False)
+[continue-test] PASS act11_giant_encounter: lighting mood Dawn (want Dawn)
+[continue-test] PASS act11_giant_encounter: cabin fire state burning True (want True)
+[continue-test] PASS act11_giant_encounter: clearing mini stairs 15 (want 15)
+[continue-test] PASS act11_giant_encounter: no leftover clearing spotlight 
+[continue-test] PASS act11_giant_encounter: clearing loop lit target none, done True (want lit False)
+[continue-test] PASS act11_giant_encounter: Act 11 stairs height tall True (want True)
+[continue-test] PASS act11_giant_encounter: Act 11 climb trigger seat False (want False)
+[continue-test] PASS act11_giant_encounter: FirstClimbEvent guard fired True (want True)
+[continue-test] PASS act11_giant_encounter: CabinReturnEvent guard fired True (want True)
+[continue-test] PASS act11_giant_encounter: FriendReveal guard fired True (want True)
+[continue-test] PASS act11_giant_encounter: CabinExitLine guard fired True (want True)
+[continue-test] PASS act11_giant_encounter: BridgeCrossEvent guard fired True (want True)
+[continue-test] PASS act11_giant_encounter: taken pickups stay taken 
+[continue-test] PASS act11_giant_encounter: inventory restored lantern,compass,radio;tools= (saved lantern,compass,radio;tool=None)
+[continue-test] PASS act11_giant_encounter: compass has an objective 
+Project DS continue round-trip test  2026-09-22T13:55:02
+324/324 passed, 14 scenarios, 72 s
+
+
+[act1_start]
+PASS  checkpoint restored  Act1Start
+PASS  Continue loads the checkpoint's level  res://scenes/levels/trail_slice.tscn
+PASS  flags restored  0 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  standing on something  on floor True, y -0.3 vs ground -0.3
+PASS  player can move  1.52 m
+PASS  storm state  active False (want False)
+PASS  lighting mood  Auto (want Auto)
+PASS  no compass on the trail  
+
+[act2_stairs_climbed]
+PASS  checkpoint restored  Act2StairsClimbed
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  1 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (0, -0.6975265, 40), inside False, door open False
+PASS  standing on something  on floor True, y -0.7 vs ground -0.7
+PASS  player can move  1.52 m
+PASS  cabin door state  open False (want False), boarded True (want True)
+PASS  storm state  active True (want True)
+PASS  lighting mood  Auto (want Auto)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  0 (want 0)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done False (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired False (want False)
+PASS  FriendReveal guard  fired False (want False)
+PASS  CabinExitLine guard  fired False (want False)
+PASS  BridgeCrossEvent guard  fired False (want False)
+PASS  taken pickups stay taken  
+PASS  inventory restored  ;tools= (saved ;tool=None)
+PASS  compass has an objective  
+
+[act3_door_boarded]
+PASS  checkpoint restored  Act3DoorBoarded
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  1 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (0.5, 0.87967986, -27), inside False, door open False
+PASS  standing on something  on floor True, y 0.9 vs ground 0.9
+PASS  player can move  1.52 m
+PASS  cabin door state  open False (want False), boarded True (want True)
+PASS  storm state  active True (want True)
+PASS  lighting mood  Auto (want Auto)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  0 (want 0)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done False (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired False (want False)
+PASS  FriendReveal guard  fired False (want False)
+PASS  CabinExitLine guard  fired False (want False)
+PASS  BridgeCrossEvent guard  fired False (want False)
+PASS  taken pickups stay taken  
+PASS  inventory restored  ;tools= (saved ;tool=None)
+PASS  compass has an objective  (24, 7.390401, -392)
+
+[act3_storm]
+PASS  checkpoint restored  Act3DoorBoarded
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  4 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (0.5, 0.87967986, -27), inside False, door open False
+PASS  standing on something  on floor True, y 0.9 vs ground 0.9
+PASS  player can move  1.52 m
+PASS  cabin door state  open False (want False), boarded True (want True)
+PASS  storm state  active True (want True)
+PASS  lighting mood  Auto (want Auto)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  0 (want 0)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done False (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired False (want False)
+PASS  FriendReveal guard  fired False (want False)
+PASS  CabinExitLine guard  fired False (want False)
+PASS  BridgeCrossEvent guard  fired False (want False)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass;tools= (saved lantern,compass;tool=None)
+PASS  compass has an objective  (24, 7.390401, -392)
+
+[act5_cabin_entered]
+PASS  checkpoint restored  Act5CabinEntered
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  7 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (12.5, 6.4547324, -400), inside False, door open True
+PASS  standing on something  on floor True, y 6.5 vs ground 6.5
+PASS  player can move  1.52 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active True (want True)
+PASS  lighting mood  Auto (want Auto)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  0 (want 0)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done False (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired False (want False)
+PASS  BridgeCrossEvent guard  fired False (want False)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass;tools= (saved lantern,compass;tool=None)
+PASS  compass has an objective  (24, 7.390401, -392)
+
+[act5_post_taken]
+PASS  checkpoint restored  Act5CabinEntered
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  8 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (22.6, 7.3913116, -392), inside True, door open True
+PASS  standing on something  on floor True, y 7.4 vs ground 6.7
+PASS  player can move  1.52 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active True (want True)
+PASS  lighting mood  Auto (want Auto)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  0 (want 0)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done False (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired False (want False)
+PASS  BridgeCrossEvent guard  fired False (want False)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+PASS  compass has an objective  (7.9378033, 6.6031194, -486.8941)
+
+[act6_bridge_crossed]
+PASS  checkpoint restored  Act6BridgeCrossed
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  9 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (7.5, 7.230775, -502), inside False, door open True
+PASS  standing on something  on floor True, y 7.2 vs ground 7.2
+PASS  player can move  1.52 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Menacing (want Menacing)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done False (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+PASS  compass has an objective  (2, 0, -590)
+
+[act6_voice_heard]
+PASS  checkpoint restored  Act6BridgeCrossed
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  10 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (7.5, 7.230775, -502), inside False, door open True
+PASS  standing on something  on floor True, y 7.2 vs ground 7.2
+PASS  player can move  1.52 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Menacing (want Menacing)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target MiniStair6, done False (want lit True)
+PASS  compass on the lit staircase  (-28.622585, 10.075221, -579.32025)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+PASS  compass has an objective  (-28.622585, 10.075221, -579.32025)
+
+[act6_loop_done]
+PASS  checkpoint restored  Act6BridgeCrossed
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  12 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (7.5, 7.230775, -502), inside False, door open True
+PASS  standing on something  on floor True, y 7.2 vs ground 7.2
+PASS  player can move  1.52 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Night (want Night)
+PASS  cabin fire state  burning False (want False)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done True (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+PASS  compass has an objective  (61, 17.757242, -465)
+
+[act7_cabin_burning]
+PASS  checkpoint restored  Act7CabinBurning
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  12 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (61, 17.757519, -465), inside False, door open True
+PASS  standing on something  on floor True, y 17.8 vs ground 17.8
+PASS  player can move  1.52 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Night (want Night)
+PASS  cabin fire state  burning True (want True)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done True (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+PASS  compass has an objective  (166, 12.402138, -566)
+
+[act8_bunker_entered]
+PASS  checkpoint restored  Act8BunkerEntered
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  12 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (160.5, 9.247927, -566), inside False, door open True
+PASS  standing on something  on floor True, y 9.2 vs ground 9.2
+PASS  player can move  1.39 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Night (want Night)
+PASS  cabin fire state  burning True (want True)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done True (want lit False)
+PASS  Act 11 stairs height  tall False (want False)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post;tools= (saved lantern,compass,newel_post;tool=None)
+PASS  compass has an objective  (1500, -79.05, -3120.65)
+PASS  bunker door open  
+
+[act10_walkie_found]
+PASS  checkpoint restored  Act10WalkieFound
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  15 flags
+PASS  radio exchange replays and completes  after 12.0s
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (150, 8.958945, -566), inside False, door open True
+PASS  standing on something  on floor True, y 9.0 vs ground 9.0
+PASS  player can move  1.51 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Night (want Night)
+PASS  cabin fire state  burning True (want True)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done True (want lit False)
+PASS  Act 11 stairs height  tall True (want True)
+PASS  Act 11 climb trigger  seat True (want True)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post,radio;tools= (saved lantern,compass,newel_post;tool=None)
+PASS  compass has an objective  (110, 0, -662)
+
+[act10_after_radio]
+PASS  checkpoint restored  Act10WalkieFound
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  16 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (150, 8.958956, -566), inside False, door open True
+PASS  standing on something  on floor True, y 9.0 vs ground 9.0
+PASS  player can move  1.51 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Night (want Night)
+PASS  cabin fire state  burning True (want True)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done True (want lit False)
+PASS  Act 11 stairs height  tall True (want True)
+PASS  Act 11 climb trigger  seat True (want True)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,newel_post,radio;tools= (saved lantern,compass,newel_post,radio;tool=None)
+PASS  compass has an objective  (110, 0, -662)
+
+[act11_giant_encounter]
+PASS  checkpoint restored  Act11GiantEncounter
+PASS  Continue loads the checkpoint's level  res://scenes/levels/hollow.tscn
+PASS  flags restored  17 flags
+PASS  control handed back (no softlock)  after 0.0s
+PASS  not respawned inside a sealed cabin  player (6, 9.555316, -578), inside False, door open True
+PASS  standing on something  on floor True, y 9.6 vs ground 9.6
+PASS  player can move  1.52 m
+PASS  cabin door state  open True (want True), boarded False (want False)
+PASS  storm state  active False (want False)
+PASS  lighting mood  Dawn (want Dawn)
+PASS  cabin fire state  burning True (want True)
+PASS  clearing mini stairs  15 (want 15)
+PASS  no leftover clearing spotlight  
+PASS  clearing loop lit  target none, done True (want lit False)
+PASS  Act 11 stairs height  tall True (want True)
+PASS  Act 11 climb trigger  seat False (want False)
+PASS  FirstClimbEvent guard  fired True (want True)
+PASS  CabinReturnEvent guard  fired True (want True)
+PASS  FriendReveal guard  fired True (want True)
+PASS  CabinExitLine guard  fired True (want True)
+PASS  BridgeCrossEvent guard  fired True (want True)
+PASS  taken pickups stay taken  
+PASS  inventory restored  lantern,compass,radio;tools= (saved lantern,compass,radio;tool=None)
+PASS  compass has an objective  
+

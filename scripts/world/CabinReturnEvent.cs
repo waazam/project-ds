@@ -23,6 +23,6 @@ public partial class CabinReturnEvent : StoryTrigger
 	protected override void Fire(PlayerController player)
 	{
 		StoryManager.Instance.SetFlag(SeenFlag);
-		_ = Cutscene.Run(this, ct => StoryBeat.Caption(this, Line, 1.0f, 3.2f, 1.2f, ct));
+		// No line (Dan, 2026-09-22: no talking to himself); the boards say it.
 	}
 }

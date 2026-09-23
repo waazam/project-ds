@@ -51,17 +51,30 @@ public partial class StoryManager : Node
 		public const string Act11DialogueDone = "act11_dialogue_done";
 		/// <summary>Act 3: the player left the cabin's safe zone with lantern + compass and the storm began.</summary>
 		public const string StormStarted = "storm_started";
-		/// <summary>Act 5: the newel post was carried outside: the storm broke and dawn came up.</summary>
+		/// <summary>Act 5: the newel post was carried outside: the storm broke (the rain stopped). Old name kept for
+		/// saves; there is no dawn: the Hollow is one night (Dan, 2026-09-22).</summary>
 		public const string DawnBroke = "dawn_broke";
 		/// <summary>Act 5: the boarded door was chopped or pried open.</summary>
 		public const string CabinDoorOpen = "cabin_door_open";
-		/// <summary>Act 6: night has fallen (the optional extended climb, or the gradual fallback).</summary>
+		/// <summary>Act 6: the clearing loop's fall is behind them (legacy name: it was "night fell"; the Hollow is
+		/// night throughout now, so the lighting never depends on this).</summary>
 		public const string Act6NightFell = "act6_night_fell";
-		/// <summary>Act 6: the optional extended climb happened (the mini stairs are gone, the original is taller).</summary>
+		/// <summary>Act 6: the clearing's stair loop ended in the fall (the player woke at night on the trail past the clearing).</summary>
+		public const string ClearingLoopDone = "clearing_loop_done";
+		/// <summary>Legacy (never set since 2026-09-22): the old optional extended climb. Kept so old saves and the
+		/// systems preview still read; <see cref="World.StairsState"/> still honours it.</summary>
 		public const string Act6ExtendedClimb = "act6_extended_climb";
+		/// <summary>Act 7: the bunker door's dial was opened with the survey stakes' code (the door stays open).</summary>
+		public const string BunkerUnlocked = "bunker_unlocked";
+		/// <summary>Acts 3-7: the n-th (1-4) survey stake's digit has been read under the lantern (the HUD tracker and the dial pre-fill from these).</summary>
+		public static string CodeDigit(int n) => $"code_digit_{n}";
+		/// <summary>Act 11: the newel cap was put back at the foot of the last staircase (it is whole; the climb followed).</summary>
+		public const string NewelSeated = "newel_seated";
 		/// <summary>Act 10: the hallway has turned into the maze (re-entering the bunker lands in the maze).</summary>
 		public const string BunkerMazeEntered = "bunker_maze_entered";
-		/// <summary>Act 10: the maze's end was reached and the walkie-talkie dropped there.</summary>
+		/// <summary>Act 9: the dead walkie-talkie was taken off the CRT room's console (it wakes outside).</summary>
+		public const string WalkieTaken = "walkie_taken";
+		/// <summary>Act 10: the run out of the rooms ended at the round door (the radio woke outside).</summary>
 		public const string BunkerMazeExited = "bunker_maze_exited";
 		// World pickups already taken (Pickup.TakenFlag = "pickup_taken_" + kind, lower case):
 		// a taken item never reappears on Continue. The newel post uses NewelPostTaken instead.
@@ -109,8 +122,9 @@ public partial class StoryManager : Node
 	/// <summary>
 	/// Where the compass points, along the hollow's one forward route (Acts 3-11): the cabin from the
 	/// camp on (through the storm and the giant), the footbridge once the newel post is in hand, the
-	/// clearing once the bridge is crossed, the lookout over the cabin once the clearing's voice has
-	/// spoken, the bunker once the cabin has been seen burning, the CRT room's marked screen once inside,
+	/// clearing once the bridge is crossed, the lit staircase of the clearing's loop once the voice has
+	/// spoken (until the loop's fall, or until night falls on its own), then the lookout over the cabin,
+	/// the bunker once the cabin has been seen burning, the CRT room's marked screen once inside,
 	/// back toward the way out once the screens have shown the stairs, and the last staircase once the
 	/// radio has spoken. Nothing before the compass is picked up (Acts 1-2) and nothing after the ending.
 	/// </summary>
@@ -122,12 +136,15 @@ public partial class StoryManager : Node
 			if (Current < Checkpoint.Act5CabinEntered || !NewelPostTaken) return MarkerPos("cabin");
 			if (Current < Checkpoint.Act6BridgeCrossed) return MarkerPos("bridge_marker");
 			if (!ClearingVoiceHeard) return MarkerPos("stairs_clearing_marker");
+			if (Current < Checkpoint.Act7CabinBurning && !HasFlag(Flag.ClearingLoopDone) && !HasFlag(Flag.Act6NightFell))
+				return MarkerPos("clearing_loop_marker") ?? MarkerPos("fire_lookout_marker");   // the lit staircase (null only before it is lit)
 			if (Current < Checkpoint.Act7CabinBurning) return MarkerPos("fire_lookout_marker");
 			if (Current < Checkpoint.Act8BunkerEntered) return MarkerPos("bunker_marker");
 			if (!CrtPuzzleDone) return MarkerPos("crt_target_marker");
+			if (Current < Checkpoint.Act10WalkieFound && !HasFlag(Flag.WalkieTaken)) return MarkerPos("walkie_marker") ?? MarkerPos("bunker_entrance_marker");   // the dead walkie on the console first
 			if (Current < Checkpoint.Act10WalkieFound) return MarkerPos("bunker_entrance_marker");
 			if (Current < Checkpoint.Act11GiantEncounter)
-				return Act11DialogueDone ? MarkerPos("final_stairs_marker") : null;   // mid-exchange outside the bunker
+				return MarkerPos("final_stairs_marker");   // from the bunker on, the compass leads to the last staircase (Dan, 2026-09-22)
 			return null;
 		}
 	}

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using Godot;
 
@@ -17,6 +18,10 @@ public partial class ForestScatter : Node3D
 {
 	[Export] public int Seed = 77;
 	[Export] public float TreeCell = 3.1f;
+	/// <summary>The scatter (trees, rocks, logs, boulders) keeps this far from the terrain's clearing centre when it is
+	/// wider than the terrain's own ClearingRadius (Act 6's stand of stairs and its ring need the whole disc clear;
+	/// the boulders and the dense trees then ring it from outside).</summary>
+	[Export] public float TreeClearRadius = 0f;
 	[Export] public float TreeChunk = 40f;
 	[Export] public float FoliageChunk = 24f;
 	[Export] public float TreeViewDistance = 150f;
@@ -375,7 +380,32 @@ public partial class ForestScatter : Node3D
 
 	private float Deep(float sT) => Mathf.SmoothStep(DeepStart, DeepEnd, sT);
 
-	private float ClearingDist(Vector2 p) => p.DistanceTo(_terrain.ClearingCenter) - _terrain.ClearingRadius;
+	private float ClearingDist(Vector2 p) => p.DistanceTo(_terrain.ClearingCenter) - Mathf.Max(_terrain.ClearingRadius, TreeClearRadius);
+
+	/// <summary>For tests: how many placed instances of the meshes <paramref name="meshKey"/> accepts stand within
+	/// <paramref name="radius"/> of <paramref name="centre"/> (world xz).</summary>
+	public int CountInstancesWithin(Vector2 centre, float radius, System.Func<string, bool> meshKey)
+	{
+		int n = 0;
+		var roots = new List<Node3D>();
+		if (GetNodeOrNull<Node3D>("Instances") is { } a) roots.Add(a);
+		foreach (var child in roots.SelectMany(r => r.GetChildren()))
+		{
+			if (child is not MultiMeshInstance3D mmi || mmi.Multimesh == null) continue;
+			// Names are "{meshKey}_{chunkX}_{chunkY}"; the key itself may carry underscores.
+			string[] parts = mmi.Name.ToString().Split('_');
+			if (parts.Length < 3) continue;
+			string key = string.Join("_", parts[..^2]);
+			if (!meshKey(key)) continue;
+			var mm = mmi.Multimesh;
+			for (int i = 0; i < mm.InstanceCount; i++)
+			{
+				Vector3 o = mmi.GlobalTransform * mm.GetInstanceTransform(i).Origin;
+				if (new Vector2(o.X, o.Z).DistanceTo(centre) < radius) n++;
+			}
+		}
+		return n;
+	}
 
 	private float ParkDist(Vector2 p)
 	{
@@ -712,9 +742,29 @@ public partial class ForestScatter : Node3D
 
 	private void Commit()
 	{
-		var root = new Node3D { Name = "Instances" };
+		CommitInstances(_inst, _colliders, "Instances");
+	}
+
+	private static void AddTo(Dictionary<string, Dictionary<Vector2I, List<(Transform3D xf, Color c)>>> inst, string mesh, float chunk, Vector3 pos, Basis basis, Color tint)
+	{
+		if (!inst.TryGetValue(mesh, out var byChunk)) inst[mesh] = byChunk = new();
+		var key = new Vector2I(Mathf.FloorToInt(pos.X / chunk), Mathf.FloorToInt(pos.Z / chunk));
+		if (!byChunk.TryGetValue(key, out var list)) byChunk[key] = list = new();
+		list.Add((new Transform3D(basis, pos), tint));
+	}
+
+	private void AddColliderTo(Dictionary<Vector2I, List<(Rid shape, Transform3D xf)>> cols, Vector3 pos, Rid shape, Transform3D xf)
+	{
+		var key = new Vector2I(Mathf.FloorToInt(pos.X / TreeChunk), Mathf.FloorToInt(pos.Z / TreeChunk));
+		if (!cols.TryGetValue(key, out var list)) cols[key] = list = new();
+		list.Add((shape, xf));
+	}
+
+	private void CommitInstances(Dictionary<string, Dictionary<Vector2I, List<(Transform3D xf, Color c)>>> inst, Dictionary<Vector2I, List<(Rid shape, Transform3D xf)>> cols, string rootName)
+	{
+		var root = new Node3D { Name = rootName };
 		AddChild(root);
-		foreach (var (meshKey, byChunk) in _inst)
+		foreach (var (meshKey, byChunk) in inst)
 		{
 			bool foliage = meshKey is "fern" or "grass";
 			bool small = foliage || meshKey is "branch" or "stump";
@@ -746,7 +796,7 @@ public partial class ForestScatter : Node3D
 
 		if (!TreeCollision) return;
 		var space = GetWorld3D().Space;
-		foreach (var (key, list) in _colliders)
+		foreach (var (key, list) in cols)
 		{
 			var body = PhysicsServer3D.BodyCreate();
 			PhysicsServer3D.BodySetMode(body, PhysicsServer3D.BodyMode.Static);

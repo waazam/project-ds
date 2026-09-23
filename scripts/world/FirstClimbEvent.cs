@@ -8,58 +8,121 @@ using ProjectDS.UI;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Sits at the foot of the first staircase the player finds. Stepping into it
-/// takes movement away from the player entirely: they rise to the top landing
-/// in a slow, silent, unnaturally smooth line, their vision closing and
-/// opening like heavy eyelids the whole way up — each blink deeper than the
-/// last, until the last few go to total blackness — clearing fully the moment
-/// they arrive. Then, still without control, the camera tips down to stare
-/// off the top step for several seconds before they get to move again. This
-/// is the story's Act 2 trigger; it boards the cabin door and marks the
-/// checkpoint once the whole sequence finishes.
+/// The first staircase's story (Act 1 into Act 2). Stepping onto the flight takes the camera
+/// away and turns the stairs one-way (<see cref="OneWayFlight"/>): the player climbs it
+/// themselves, at their own pace, and cannot go back down. At the top landing stands the stone
+/// newel post with its cap broken off. Inspecting the stump (E) is the trigger: the vignette
+/// closes like heavy eyelids, everything goes black, the checkpoint is saved and the player
+/// comes to in the Hollow (GameFlow plays the wake-up there).
 ///
-/// Only fires before Act 2 has happened, so it can never collide with Act 11's
-/// climb of the same staircase.
+/// Only before Act 2 has happened, so it can never collide with Act 11's staircase.
 /// </summary>
 public partial class FirstClimbEvent : StoryTrigger
 {
 	[Export] public NodePath TopMarkerPath = "../TopTrigger";
-	[Export] public float ClimbSeconds = 13f;
-	/// <summary>Seconds for one full close-and-open cycle of the vignette while climbing.</summary>
-	[Export] public float BlinkSeconds = 4.5f;
-	/// <summary>How far the vignette closes in at its darkest, before blinks start going fully black.</summary>
+	/// <summary>How far inside each cheek wall the flight box stays, so a body brushing the outside of
+	/// a wall never counts as being on the stairs.</summary>
+	[Export] public float FlightInset = 0.05f;
+	/// <summary>Head room the flight box keeps above the top landing.</summary>
+	[Export] public float FlightHeadroom = 1.4f;
+
+	[ExportGroup("The collapse")]
+	/// <summary>Seconds for the vignette to close, blinking, into black after the post is inspected.</summary>
+	[Export] public float CollapseSeconds = 4.5f;
+	[Export] public float BlinkSeconds = 1.6f;
 	[Export] public float BlinkVignette = 2.4f;
-	/// <summary>Fraction of the climb (0..1) at which blinks start reaching total blackness, ramping up from there.</summary>
-	[Export] public float BlackoutStartFraction = 0.55f;
-
-	[ExportGroup("Look down at the top")]
-	[Export] public float LookDownPanSeconds = 3f;
-	[Export] public float LookDownHoldSeconds = 5f;
-	[Export] public float LookDownPitchDegrees = -78f;
-
-	[ExportGroup("Blackout")]
-	[Export] public float BlackoutSeconds = 2.5f;
 	/// <summary>Seconds of black before the level changes (the wake-up in the hollow is GameFlow's).</summary>
 	[Export] public float BlackHoldSeconds = 2f;
+	[Export] public string InspectPrompt = "Inspect the post";
+	[Export] public string InspectLine = "";   // was "The cap's gone. Broken off." (self-talk removed, Dan 2026-09-22)
+
+	/// <summary>For tests: the player has stepped onto the stairs (the camera is gone, the flight is one-way).</summary>
+	public bool OnTheStairs { get; private set; }
+	/// <summary>For tests: the collapse is running (from E on the post to the level change).</summary>
+	public bool Collapsing { get; private set; }
+	/// <summary>For tests: the E-point on the broken newel post at the top (built when the stairs are stepped on).</summary>
+	public Interactable InspectPost { get; private set; }
+	/// <summary>For tests: the one-way wall (null until the stairs are stepped on).</summary>
+	public OneWayFlight OneWay { get; private set; }
+	/// <summary>For tests: the box that covers the whole flight (null until built).</summary>
+	public BoxShape3D FlightBox => GetNodeOrNull<CollisionShape3D>("FlightShape")?.Shape as BoxShape3D;
 
 	protected override bool AlreadyHappened(StoryManager s) => s.Current >= Checkpoint.Act2StairsClimbed;
 	protected override bool CanFire(StoryManager s, PlayerController p) => s.Current < Checkpoint.Act2StairsClimbed;
 
+	public override void _Ready()
+	{
+		base._Ready();
+		// Deferred: a sibling (the Act 6 clearing event) may still be setting the flight's length.
+		Callable.From(CoverWholeFlight).CallDeferred();
+	}
+
+	/// <summary>
+	/// A second trigger box over the flight: from where the cheek walls begin (just past the plinth
+	/// the scene's box already covers) to the back of the top landing, from a little under the lowest
+	/// walled step to head height over the landing, and just inside the walls. Anyone on any step is
+	/// inside it, so however they get onto the flight, the camera goes and the flight turns one-way.
+	/// </summary>
+	private void CoverWholeFlight()
+	{
+		if (GetParent() is not StaircaseBuilder stairs || GetNodeOrNull("FlightShape") != null) return;
+		float zFront = -stairs.PlinthSteps * stairs.Run + 0.1f;
+		float zBack = stairs.BackZ;
+		float height = stairs.TotalHeight + FlightHeadroom;
+		var box = new CollisionShape3D
+		{
+			Name = "FlightShape",
+			Shape = new BoxShape3D { Size = new Vector3(Mathf.Max(0.3f, stairs.Width - FlightInset * 2f), height, zFront - zBack) },
+			Position = new Vector3(0, height * 0.5f - 0.2f, (zFront + zBack) * 0.5f) - Position,
+		};
+		AddChild(box);
+	}
+
+	/// <summary>The first step: the camera is gone, the flight is one-way, and the post at the top can be inspected.</summary>
 	protected override void Fire(PlayerController player)
 	{
+		OnTheStairs = true;
 		player.GetNodeOrNull<PlayerInventory>("Inventory")?.TakeAwayCamera();
+		if (GetParent() is StaircaseBuilder stairs)
+		{
+			OneWay = OneWayFlight.Attach(stairs);
+			if (stairs.HasNewel)
+			{
+				InspectPost = new Interactable
+				{
+					Name = "InspectPost",
+					Prompt = InspectPrompt,
+					PickRadius = 0.6f,
+					MaxDistance = 2.6f,
+					Position = stairs.NewelSeatLocal,
+				};
+				InspectPost.Interacted += OnInspected;
+				stairs.AddChild(InspectPost);
+			}
+		}
+		GD.Print("[story] Act 1: on the stairs; there is no going back down");
+	}
+
+	private bool _inspected;
+
+	/// <summary>E on the broken post: the collapse.</summary>
+	private void OnInspected(PlayerController player)
+	{
+		if (_inspected || StoryManager.Instance is not { Current: < Checkpoint.Act2StairsClimbed }) return;
+		_inspected = true;
+		if (InspectPost != null) InspectPost.Enabled = false;
 		var feet = player.GetNodeOrNull<PlayerFootsteps>("Footsteps");
 		var postMat = StoryBeat.PostMaterial(this);
 		float baseVignette = postMat != null ? (float)postMat.GetShaderParameter("vignette") : 0f;
 		var fader = StoryBeat.Fader(this);
-
 		_ = Cutscene.Run(this, async ct =>
 		{
+			Collapsing = true;
 			feet?.SetPhysicsProcess(false);
 			bool travelling = false;
 			try
 			{
-				await Climb(player, postMat, baseVignette, fader, ct);
+				await Collapse(player, postMat, baseVignette, fader, ct);
 				// Black, and gone: the checkpoint is saved here and the player comes to in the hollow
 				// (GameFlow plays the wake-up there). The screen stays black through the level change.
 				StoryBeat.ReachCheckpoint(player, Checkpoint.Act2StairsClimbed);
@@ -68,7 +131,7 @@ public partial class FirstClimbEvent : StoryTrigger
 			}
 			finally
 			{
-				// If anything went wrong before the level change, vision comes back and the feet work again.
+				Collapsing = false;
 				if (!travelling)
 				{
 					postMat?.SetShaderParameter("vignette", baseVignette);
@@ -79,59 +142,31 @@ public partial class FirstClimbEvent : StoryTrigger
 		}, lockInput: true, freezeBody: true);
 	}
 
-	private async Task Climb(PlayerController player, ShaderMaterial postMat, float baseVignette, ScreenFader fader, CancellationToken ct)
+	/// <summary>
+	/// The hand on the stump, one thought, and then vision falls shut and drifts open again, over and
+	/// over, each blink deeper than the last, until it is all black. The player passes out on the
+	/// landing. Their eyes are locked on the post the whole way down.
+	/// </summary>
+	private async Task Collapse(PlayerController player, ShaderMaterial postMat, float baseVignette, ScreenFader fader, CancellationToken ct)
 	{
-		Vector3 dest = GetNode<Node3D>(TopMarkerPath).GlobalPosition;
 		player.Velocity = Vector3.Zero;
-
-		var tween = player.CreateTween();
-		tween.TweenProperty(player, "global_position", dest, ClimbSeconds)
-			.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-
-		// Vision slowly falls shut and drifts open again, over and over, like heavy, involuntary
-		// blinking, deepening into full blackness by the end, frame by frame alongside the tween.
+		await Cutscene.Wait(this, 1.2, ct);   // the hand on the stump, no thought (self-talk removed, Dan 2026-09-22)
 		double t = 0;
-		while (tween.IsValid() && tween.IsRunning())
+		while (t < CollapseSeconds)
 		{
 			t += GetProcessDeltaTime();
+			float u = Mathf.Min(1f, (float)(t / CollapseSeconds));
 			float phase = (float)(t / Mathf.Max(BlinkSeconds, 0.1f)) * Mathf.Tau;
 			float closed = Mathf.Sin(phase - Mathf.Pi / 2f) * 0.5f + 0.5f;   // 0 = open .. 1 = closed
-			postMat?.SetShaderParameter("vignette", Mathf.Lerp(baseVignette, BlinkVignette, closed));
-			// Early blinks are just a heavy vignette; from BlackoutStartFraction on, the closed
-			// part of each blink ramps toward total, screen-covering blackness.
-			float blackout = Mathf.Clamp((float)(t / Mathf.Max(ClimbSeconds, 0.1f) - BlackoutStartFraction) / Mathf.Max(1f - BlackoutStartFraction, 0.05f), 0f, 1f);
-			if (fader != null) fader.BlackAlpha = closed * blackout;
-			try { await Cutscene.Frame(this, ct); }
-			catch (System.OperationCanceledException) { tween.Kill(); throw; }
+			// Each blink closes further than the last; the last ones never open.
+			float floor = Mathf.SmoothStep(0.3f, 1f, u);
+			float shut = Mathf.Max(closed, floor);
+			postMat?.SetShaderParameter("vignette", Mathf.Lerp(baseVignette, BlinkVignette, shut));
+			if (fader != null) fader.BlackAlpha = shut * Mathf.SmoothStep(0.15f, 0.9f, u);
+			await Cutscene.Frame(this, ct);
 		}
-		// Vision resolves fully open and clear the instant they arrive at the top.
-		postMat?.SetShaderParameter("vignette", baseVignette);
-		if (fader != null) fader.BlackAlpha = 0f;
-
-		StoryBeat.Cabin(this)?.SetBoarded(true);
-
-		// Still no control: the camera tips down on its own to stare off the top step and holds there.
-		var rig = player.CameraRig;
-		float levelPitch = rig.Pitch;
-		var pan = player.CreateTween();
-		pan.TweenMethod(Callable.From<float>(rig.SetPitch), rig.Pitch, Mathf.DegToRad(LookDownPitchDegrees), LookDownPanSeconds)
-			.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-		await Cutscene.Tween(this, pan, ct);
-		if (LookDownHoldSeconds > 0f) await Cutscene.Wait(this, LookDownHoldSeconds, ct);
-
-		// Then everything goes black. The stairs let go of them: they come to on the near bank of
-		// the footbridge, face down in the dirt, and lift their head slowly as their sight clears —
-		// the first taste of lost time.
-		if (fader != null)
-		{
-			var toBlack = player.CreateTween();
-			toBlack.TweenProperty(fader, nameof(ScreenFader.BlackAlpha), 1f, BlackoutSeconds)
-				.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-			await Cutscene.Tween(this, toBlack, ct);
-			fader.BlackAlpha = 1f;
-		}
+		if (fader != null) fader.BlackAlpha = 1f;
 		await Cutscene.Wait(this, BlackHoldSeconds, ct);
-		rig.SetPitch(levelPitch);
 		GD.Print("[story] Act 2: blacked out at the top of the stairs");
 	}
 }

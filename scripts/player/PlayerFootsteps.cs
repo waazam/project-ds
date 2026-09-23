@@ -72,6 +72,20 @@ public partial class PlayerFootsteps : Node
 		PlayStep(speed);
 	}
 
+	/// <summary>A footfall on demand, on a named surface, for scripted walks (the stairs pulling the
+	/// player up step by step) while the body's own physics is off. <paramref name="loudness"/> in dB.</summary>
+	public void StepNow(string surface, float loudness = 0f)
+	{
+		_lastSurface = surface;
+		if (!_sets.TryGetValue(surface, out var set) || set.Length == 0) set = _sets["dirt"];
+		if (set.Length == 0) return;
+		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.9f, 1.04f));
+		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
+			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.9f, 1.1f));
+		StepsPlayed++;
+		EmitSignal(SignalName.Stepped);
+	}
+
 	private void PlayStep(float speed)
 	{
 		_lastSurface = SurfaceUnderfoot();

@@ -183,16 +183,15 @@ public partial class HollowPreviewDriver : Node
 			{
 				new("wake", Checkpoint.Act2StairsClimbed, F2, ";tools=", null, Wake),
 				new("camp", Checkpoint.Act3DoorBoarded, F2, ";tools=", "cabin", Camp),
-				new("key", Checkpoint.Act3DoorBoarded, F3Storm, "lantern,compass;tools=", "cabin", Key),
-				new("giant", Checkpoint.Act3DoorBoarded, F3Storm, "lantern,compass;tools=Key", "cabin", Giant),
-				new("cabin", Checkpoint.Act3DoorBoarded, F3Giant, "lantern,compass;tools=Key", "cabin", CabinStop),
-				new("inside", Checkpoint.Act5CabinEntered, F5, "lantern,compass;tools=Key", "cabin", Inside),
-				new("bridge", Checkpoint.Act5CabinEntered, F5Post, "lantern,compass,newel_post;tools=Key", "bridge_marker", Bridge),
-				new("clearing", Checkpoint.Act6BridgeCrossed, F5Post, "lantern,compass,newel_post;tools=Key", "stairs_clearing_marker", Clearing),
-				new("lookout", Checkpoint.Act7CabinBurning, F7, "lantern,compass;tools=Key", "bunker_marker", Lookout),
-				new("bunker", Checkpoint.Act7CabinBurning, F7, "lantern,compass;tools=Key", "bunker_marker", BunkerStop),
-				new("laststairs", Checkpoint.Act10WalkieFound, F11, "lantern,compass,radio;tools=Key", "final_stairs_marker", LastStairs),
-				new("ending", Checkpoint.Act11GiantEncounter, F11, "lantern,compass,radio;tools=Key", null, Ending),
+				new("giant", Checkpoint.Act3DoorBoarded, F3Storm, "lantern,compass;tools=", "cabin", Giant),
+				new("cabin", Checkpoint.Act3DoorBoarded, F3Giant, "lantern,compass;tools=", "cabin", CabinStop),
+				new("inside", Checkpoint.Act5CabinEntered, F5, "lantern,compass;tools=", "cabin", Inside),
+				new("bridge", Checkpoint.Act5CabinEntered, F5Post, "lantern,compass,newel_post;tools=", "bridge_marker", Bridge),
+				new("clearing", Checkpoint.Act6BridgeCrossed, F5Post, "lantern,compass,newel_post;tools=", "stairs_clearing_marker", Clearing),
+				new("lookout", Checkpoint.Act7CabinBurning, F7, "lantern,compass;tools=", "bunker_marker", Lookout),
+				new("bunker", Checkpoint.Act7CabinBurning, F7, "lantern,compass;tools=", "bunker_marker", BunkerStop),
+				new("laststairs", Checkpoint.Act10WalkieFound, F11, "lantern,compass,radio;tools=", "final_stairs_marker", LastStairs),
+				new("ending", Checkpoint.Act11GiantEncounter, F11, "lantern,compass,radio;tools=", null, Ending),
 			};
 			bool routeDone = false;
 			foreach (var st in stops)
@@ -235,7 +234,7 @@ public partial class HollowPreviewDriver : Node
 		var lookout = First<Node3D>("fire_lookout_marker");
 		var bunker = First<Node3D>("bunker_marker");
 		var last = First<Node3D>("final_stairs_marker");
-		Where("wake spot", spawn); Where("camp", camp); Where("key", key); Where("cabin", cabin); Where("axe", axe); Where("shed", shed);
+		Where("wake spot", spawn); Where("camp", camp); Where("cabin", cabin); Where("axe", axe); Where("shed", shed);
 		Where("bridge", bridge); Where("clearing", clearing); Where("lookout", lookout); Where("bunker", bunker); Where("last staircase", last);
 		for (int cp = 3; cp <= 9; cp++)
 		{
@@ -259,7 +258,7 @@ public partial class HollowPreviewDriver : Node
 		if (lookout != null && cabin != null)
 			Check(Flat(lookout.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)) is >= 70f and <= 110f, $"route: lookout 70-110 m from the cabin ({Flat(lookout.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)):0.0} m)");
 		// order along the path
-		var order = new (string, Node3D)[] { ("camp", camp), ("key", key), ("cabin", cabin), ("bridge", bridge), ("clearing", clearing), ("lookout", lookout), ("bunker", bunker), ("last staircase", last) };
+		var order = new (string, Node3D)[] { ("camp", camp), ("cabin", cabin), ("bridge", bridge), ("clearing", clearing), ("lookout", lookout), ("bunker", bunker), ("last staircase", last) };
 		float prevS = -1f; string prevName = "start";
 		foreach (var (name, n) in order)
 		{
@@ -390,40 +389,21 @@ public partial class HollowPreviewDriver : Node
 
 	private async Task Giant()
 	{
+		// The giant left the storm walk (Dan, 2026-09-22): it is seen from the Act 7 lookout, beyond the burning
+		// cabin. Here the stalker has the stretch to itself: nothing big may cross on the way to the cabin.
 		var cabin = First<Cabin>("cabin");
 		var giant = AllOf<GiantStalkerEvent>().FirstOrDefault();
-		Check(giant != null && !StoryManager.Instance.GiantEventDone, "giant: not crossed yet (storm restored, fuse running)");
-		// walk up to 85 m short of the cabin, then step inside 80 m: it must cross now, beyond the cabin
+		Check(giant != null && !StoryManager.Instance.GiantEventDone, "giant: event present, not crossed (it waits for the lookout)");
 		float sCabin = TrailS(cabin.GlobalPosition);
 		await StandOnTrail(sCabin - 100f, cabin.GlobalPosition + Vector3.Up * 3f);
 		await Seconds(1.0);
-		Check(!StoryManager.Instance.GiantEventDone && FindGiant() == null, "giant: not yet at 100 m along the path");
-		Vector3 p = _terrain.TrailPoint(sCabin - 100f, out _);
-		for (float s = sCabin - 99f; s < sCabin; s += 1f)
-		{
-			p = _terrain.TrailPoint(s, out _);
-			if (Flat(p).DistanceTo(Flat(cabin.GlobalPosition)) < (giant?.GuaranteeRadius ?? 80f) - 2f) break;
-		}
-		await Stand(p, cabin.GlobalPosition + Vector3.Up * 6f);
-		Node3D body = null;
-		for (int i = 0; i < 60 && (body = FindGiant()) == null; i++) await Frames(2);
-		Check(body != null, $"giant: crosses as soon as the player is within {giant?.GuaranteeRadius:0} m of the cabin ({Flat(p).DistanceTo(Flat(cabin.GlobalPosition)):0} m)");
-		if (body == null) return;
-		await Seconds(2.5);
-		float dist = Flat(body.GlobalPosition).DistanceTo(Flat(_player.GlobalPosition));
-		float beyond = Flat(body.GlobalPosition).DistanceTo(Flat(_player.GlobalPosition)) - Flat(cabin.GlobalPosition).DistanceTo(Flat(_player.GlobalPosition));
-		Log($"giant: {dist:0} m from the player, {beyond:0} m further than the cabin");
-		await Stand(p, body.GlobalPosition + Vector3.Up * 18f);
-		Shot("04_giant_crossing");
-		await Seconds(2.5);
-		await Stand(p, FindGiant()?.GlobalPosition + Vector3.Up * 18f ?? body.GlobalPosition);
-		Shot("04b_giant_crossing_later");
-		double t0 = Time.GetTicksMsec();
-		while (!StoryManager.Instance.GiantEventDone && Time.GetTicksMsec() - t0 < 15000) await Frames(2);
-		Check(StoryManager.Instance.GiantEventDone, $"giant: done (flag saved) (waited {(Time.GetTicksMsec() - t0) / 1000.0:0.0} s, giant still there: {FindGiant() != null}, done {giant?.Done})");
+		await StandOnTrail(sCabin - 40f, cabin.GlobalPosition + Vector3.Up * 6f);
+		await Seconds(3.0);
+		Check(!StoryManager.Instance.GiantEventDone && FindGiant() == null, "giant: nothing crosses on the storm walk, even 40 m from the cabin");
+		Shot("04_storm_walk_no_giant");
 	}
 
-	private Node3D FindGiant() => All(GetTree().Root).OfType<Node3D>().FirstOrDefault(n => n.Name == "Act4Giant");
+	private Node3D FindGiant() => All(GetTree().Root).OfType<Node3D>().FirstOrDefault(n => n.Name == "Act7Giant");
 
 	private async Task CabinStop()
 	{
@@ -491,7 +471,7 @@ public partial class HollowPreviewDriver : Node
 	private async Task Bridge()
 	{
 		var bridge = First<Node3D>("bridge_marker");
-		Check(StoryManager.Instance.HasFlag(StoryManager.Flag.DawnBroke), "bridge: dawn (restored)");
+		Check(StoryManager.Instance.HasFlag(StoryManager.Flag.DawnBroke), "bridge: the rain has stopped (restored)");
 		float s = TrailS(bridge.GlobalPosition);
 		await StandOnTrail(s - 14f, bridge.GlobalPosition + Vector3.Up * 0.8f);
 		await Seconds(0.8);
@@ -576,7 +556,7 @@ public partial class HollowPreviewDriver : Node
 		var last = First<Node3D>("final_stairs_marker");
 		var act11 = AllOf<Act11Ending>().FirstOrDefault();
 		Check(act11 is { StairsTall: true }, $"last stairs: tall ({act11?.StairsTall})");
-		Check(act11?.ClimbTriggerWorld != null && act11.ApproachWorld != null, "last stairs: the climb trigger and the approach point are there");
+		Check(act11?.CapSeat != null && act11.ApproachWorld != null, "last stairs: the cap's E-point on the landing and the approach point are there");
 		var clearingStairs = AllOf<Act6ClearingEvent>().FirstOrDefault()?.OriginalStairs;
 		Check(clearingStairs != null && clearingStairs.Steps == clearingStairs.BaseSteps, $"last stairs: the clearing's staircase keeps its own length ({clearingStairs?.Steps})");
 		float s = TrailS(last.GlobalPosition);
@@ -591,7 +571,7 @@ public partial class HollowPreviewDriver : Node
 	{
 		var clearing = First<Node3D>("stairs_clearing_marker");
 		Check(Flat(_player.GlobalPosition).DistanceTo(Flat(clearing.GlobalPosition)) < 40f, "ending: Continue at checkpoint 9 wakes in the clearing");
-		Check(StoryBeat.Atmosphere(this)?.CurrentMood == ForestAtmosphere.Mood.Dawn, $"ending: dawn ({StoryBeat.Atmosphere(this)?.CurrentMood})");
+		Check(StoryBeat.Atmosphere(this)?.CurrentMood == ForestAtmosphere.Mood.Night, $"ending: still night ({StoryBeat.Atmosphere(this)?.CurrentMood})");
 		await Seconds(1.0);
 		_player.CameraRig.SetPitch(Mathf.DegToRad(-4f));
 		await Seconds(0.3);

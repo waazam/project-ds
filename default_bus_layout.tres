@@ -39,8 +39,8 @@ drive = 0.35
 
 [sub_resource type="AudioEffectBandPassFilter" id="RadioBand"]
 resource_name = "BandPassFilter"
-cutoff_hz = 1600.0
-resonance = 0.4
+cutoff_hz = 1700.0
+resonance = 0.15
 
 [sub_resource type="AudioEffectDistortion" id="RadioDistortion"]
 resource_name = "Distortion"

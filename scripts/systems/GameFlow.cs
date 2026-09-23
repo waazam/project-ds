@@ -116,7 +116,7 @@ public partial class GameFlow : Node
 	[Export] public float WakeSeconds = 7f;
 	[Export] public float WakePitchDegrees = -60f;
 	[Export] public float WakeVignette = 2.4f;
-	[Export] public string WakeLine = "This isn't the trail.";
+	[Export] public string WakeLine = "";   // was "This isn't the trail." (self-talk removed, Dan 2026-09-22)
 
 	/// <summary>
 	/// Act 2's end, in the hollow: the stairs have let go of the player somewhere they have never been.
@@ -168,6 +168,7 @@ public partial class GameFlow : Node
 			}
 		}
 		GD.Print("[story] Act 2: woke in the hollow");
-		if (!string.IsNullOrEmpty(WakeLine)) await StoryBeat.Caption(this, WakeLine, 1.2f, 3f, 1.2f, ct);
+		// No thought on waking (Dan, 2026-09-22: the player does not talk to himself); WakeLine is kept for previews only.
+		await Cutscene.Wait(this, 1.0, ct);
 	}
 }

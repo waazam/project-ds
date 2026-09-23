@@ -7,10 +7,11 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// Sits at the cabin doorway. The first time the player steps back outside
-/// carrying the newel post, the storm breaks, dawn comes up over the forest,
-/// and a single line of narration plays — Act 5's last beat before the
-/// compass leads them to the bridge. Records <see cref="StoryManager.Flag.DawnBroke"/>,
-/// which the storm and the lighting mood restore from on Continue.
+/// carrying the newel post, the storm breaks (the rain stops; it is still the
+/// same night, and stays so to the end) and a single line of narration plays,
+/// Act 5's last beat before the compass leads them to the bridge. Records
+/// <see cref="StoryManager.Flag.DawnBroke"/> (the flag keeps its old name for saves),
+/// which the storm restores from on Continue.
 ///
 /// The doorway volume reaches a little way into the room, so leaving it is only
 /// "going outside" when the player comes out on the porch side of the front
@@ -53,14 +54,9 @@ public partial class CabinExitLine : StoryTrigger
 	protected override void Fire(PlayerController player)
 	{
 		StormController.Instance?.Deactivate();
-		StoryBeat.SetMood(this, ForestAtmosphere.Mood.Dawn, 10f);
+		// No dawn (Dan, 2026-09-22: the Hollow is one night): the rain stops, the fog stays, the dark stays.
 		StoryManager.Instance.SetFlag(StoryManager.Flag.DawnBroke);
-		// The player's one thought as the storm breaks the moment they carry the post out.
-		_ = Cutscene.Run(this, async ct =>
-		{
-			await Cutscene.Wait(this, 1.5f, ct);
-			await StoryBeat.Caption(this, Line, 1.2f, 3.4f, 1.2f, ct);
-		});
+		// No line (Dan, 2026-09-22: no talking to himself): the rain simply stops.
 	}
 
 	public const string Line = "The rain stopped. Like it wanted me to take it.";

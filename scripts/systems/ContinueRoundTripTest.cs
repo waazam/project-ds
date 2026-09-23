@@ -6,6 +6,7 @@ using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.World;
+using ProjectDS.World.BunkerParts;
 
 namespace ProjectDS.Systems;
 
@@ -28,11 +29,14 @@ public partial class ContinueRoundTripTest : Node
 	private record Scenario(string Name, Checkpoint Cp, string[] Flags, string Inventory);
 
 	private static readonly string[] F2 = { StoryManager.Flag.StairsClimbed };
-	private static readonly string[] F5 = F2.Concat(new[] { StoryManager.Flag.StormStarted, StoryManager.Flag.GiantEventDone, StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, StoryManager.Flag.PickupTakenAxe }).ToArray();
+	private static readonly string[] F5 = F2.Concat(new[] { StoryManager.Flag.StormStarted, StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2) }).ToArray();
 	private static readonly string[] F6 = F5.Concat(new[] { StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke }).ToArray();
 	private static readonly string[] F6Voice = F6.Concat(new[] { StoryManager.Flag.ClearingVoiceHeard }).ToArray();
-	private static readonly string[] F7 = F6Voice.Concat(new[] { StoryManager.Flag.Act6NightFell }).ToArray();
-	private static readonly string[] F10 = F7.Concat(new[] { StoryManager.Flag.CrtPuzzleDone, StoryManager.Flag.BunkerMazeEntered, StoryManager.Flag.BunkerMazeExited }).ToArray();
+	// The giant is seen from the Act 7 lookout (after checkpoint 6): a save at the lookout carries it once it has crossed.
+	private static readonly string[] F7 = F6Voice.Concat(new[] { StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone, StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4) }).ToArray();
+	private static readonly string[] F9 = F7.Concat(new[] { StoryManager.Flag.CrtPuzzleDone, StoryManager.Flag.WalkieTaken }).ToArray();
+	private static readonly string[] F10Scared = F9.Concat(new[] { StoryManager.Flag.BunkerMazeEntered, BunkerRooms.ScaredFlag }).ToArray();
+	private static readonly string[] F10 = F10Scared.Concat(new[] { StoryManager.Flag.BunkerMazeExited }).ToArray();
 	private static readonly string[] F11 = F10.Concat(new[] { StoryManager.Flag.Act11DialogueDone }).ToArray();
 
 	private static readonly Scenario[] Scenarios =
@@ -44,13 +48,19 @@ public partial class ContinueRoundTripTest : Node
 		new("act5_cabin_entered", Checkpoint.Act5CabinEntered, F5, "lantern,compass;tool=None"),
 		new("act5_post_taken", Checkpoint.Act5CabinEntered, F5.Append(StoryManager.Flag.NewelPostTaken).ToArray(), "lantern,compass,newel_post;tool=None"),
 		new("act6_bridge_crossed", Checkpoint.Act6BridgeCrossed, F6, "lantern,compass,newel_post;tool=None"),
-		new("act6_voice_heard", Checkpoint.Act6BridgeCrossed, F6Voice, "lantern,compass;tool=None"),
-		new("act6_extended_climb", Checkpoint.Act6BridgeCrossed, F6Voice.Concat(new[] { StoryManager.Flag.Act6ExtendedClimb, StoryManager.Flag.Act6NightFell }).ToArray(), "lantern,compass;tool=None"),
-		new("act7_cabin_burning", Checkpoint.Act7CabinBurning, F7, "lantern,compass;tool=None"),
-		new("act8_bunker_entered", Checkpoint.Act8BunkerEntered, F7, "lantern,compass;tool=None"),
-		new("act10_walkie_found", Checkpoint.Act10WalkieFound, F10, "lantern,compass;tool=None"),
-		new("act10_after_radio", Checkpoint.Act10WalkieFound, F11, "lantern,compass,radio;tool=None"),
-		new("act11_giant_encounter", Checkpoint.Act11GiantEncounter, F11, "lantern,compass,radio;tool=None"),
+		// The cap ("newel_post") is carried from the cabin all the way to the foot of the last staircase (Act 11).
+		new("act6_voice_heard", Checkpoint.Act6BridgeCrossed, F6Voice, "lantern,compass,newel_post;tool=None"),
+		// The loop is never saved mid-way: a save after the voice reloads with the loop lit again; one after the fall is Act 7 in all but checkpoint.
+		new("act6_loop_done", Checkpoint.Act6BridgeCrossed, F7, "lantern,compass,newel_post;tool=None"),
+		new("act7_cabin_burning", Checkpoint.Act7CabinBurning, F7, "lantern,compass,newel_post;tool=None"),
+		new("act8_bunker_entered", Checkpoint.Act8BunkerEntered, F7, "lantern,compass,newel_post;tool=None"),
+		// The dead walkie-talkie is taken off the CRT console (Act 9) and wakes only outside; a save after the rooms' scare
+		// reloads with the room black, the eyes lit and the way back open.
+		new("act9_walkie_taken", Checkpoint.Act8BunkerEntered, F9, "lantern,compass,newel_post,radio;tool=None"),
+		new("act10_rooms_scared", Checkpoint.Act8BunkerEntered, F10Scared, "lantern,compass,newel_post,radio;tool=None"),
+		new("act10_walkie_found", Checkpoint.Act10WalkieFound, F10, "lantern,compass,newel_post,radio;tool=None"),
+		new("act10_after_radio", Checkpoint.Act10WalkieFound, F11, "lantern,compass,newel_post,radio;tool=None"),
+		new("act11_giant_encounter", Checkpoint.Act11GiantEncounter, F11.Append(StoryManager.Flag.NewelSeated).ToArray(), "lantern,compass,radio;tool=None"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -195,14 +205,20 @@ public partial class ContinueRoundTripTest : Node
 		Check("cabin fire state", fire != null && fire.Burning == wantFire, $"burning {fire?.Burning} (want {wantFire})");
 
 		var act6 = FindFirst<Act6ClearingEvent>();
-		int wantMinis = StoryBeat.Act6Revealed(story) && !story.HasFlag(StoryManager.Flag.Act6ExtendedClimb) ? 15 : 0;
+		int wantMinis = StoryBeat.Act6Revealed(story) && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) ? 15 : 0;   // gone for good after the fall (Act 7)
 		Check("clearing mini stairs", act6 != null && act6.MiniStairCount == wantMinis, $"{act6?.MiniStairCount} (want {wantMinis})");
 		Check("no leftover clearing spotlight", act6 is { SpotlightActive: false }, "");
+		// The loop is armed again (nothing lit until a flight is chosen) whenever the voice has spoken but the fall has not come.
+		bool wantLoop = story.ClearingVoiceHeard && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) && story.Current < Checkpoint.Act7CabinBurning;
+		Check("clearing loop armed", act6 != null && act6.LoopArmed == wantLoop && act6.LoopTarget == null && act6.LoopDone == story.HasFlag(StoryManager.Flag.ClearingLoopDone),
+			$"armed {act6?.LoopArmed}, target {act6?.LoopTarget?.Name ?? "none"}, done {act6?.LoopDone} (want armed {wantLoop})");
+		if (wantLoop) Check("compass has somewhere to point in the clearing", story.ObjectivePosition != null, $"{story.ObjectivePosition}");
 
 		var act11 = FindFirst<Act11Ending>();
 		Check("Act 11 stairs height", act11 != null && act11.StairsTall == story.Act11DialogueDone, $"tall {act11?.StairsTall} (want {story.Act11DialogueDone})");
 		bool wantClimbTrigger = story.Act11DialogueDone && story.Current < Checkpoint.Act11GiantEncounter;
-		Check("Act 11 climb trigger", (act11?.ClimbTriggerWorld != null) == wantClimbTrigger, $"present {act11?.ClimbTriggerWorld != null} (want {wantClimbTrigger})");
+		// The way up is open once the radio has spoken: the cap's E-point waits on the top landing until the ending.
+		Check("Act 11 climb trigger", (act11?.CapSeat != null) == wantClimbTrigger, $"seat {act11?.CapSeat != null} (want {wantClimbTrigger})");
 
 		// One-shot beats know they already happened.
 		CheckFired<FirstClimbEvent>(story.Current >= Checkpoint.Act2StairsClimbed);
@@ -227,6 +243,15 @@ public partial class ContinueRoundTripTest : Node
 
 		if (sc.Cp == Checkpoint.Act8BunkerEntered && GetTree().GetFirstNodeInGroup("bunker_marker") is Bunker bunker)
 			Check("bunker door open", bunker.IsOpen, "");
+		if (BunkerInterior.Instance is { Rooms: { } rooms })
+		{
+			bool wantScared = story.HasFlag(BunkerRooms.ScaredFlag);
+			// Scared = shoved out into the hall with the door shut behind (no eyes left in the room), the chase on.
+			Check("the rooms' scare state", rooms.JumpscareDone == wantScared && rooms.BlackedOut == wantScared && rooms.ShovedOut == wantScared && !rooms.EntryOpen && !rooms.EyesLit,
+				$"done {rooms.JumpscareDone} black {rooms.BlackedOut} shoved {rooms.ShovedOut} open {rooms.EntryOpen} eyes {rooms.EyesLit} (want {wantScared})");
+			bool walkieGone = story.HasFlag(StoryManager.Flag.WalkieTaken) || story.Current >= Checkpoint.Act10WalkieFound;
+			Check("the console walkie-talkie", (FindFirst<WalkiePickup>() == null) == walkieGone, $"present {FindFirst<WalkiePickup>() != null} (want gone {walkieGone})");
+		}
 
 		input.ScriptedMove = Vector2.Zero;
 		Screenshot(sc.Name);

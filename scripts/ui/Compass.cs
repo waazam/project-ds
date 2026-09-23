@@ -23,10 +23,11 @@ public partial class Compass : CanvasLayer
 	/// <summary>Total degrees of heading shown across the strip.</summary>
 	[Export] public float VisibleDegrees = 140f;
 	/// <summary>Fastest the objective marker may sweep around the ribbon, in degrees per second.</summary>
-	[Export] public float MaxSweepDegPerSec = 40f;
+	[Export] public float MaxSweepDegPerSec = 120f;   // 40 lagged for seconds after the loop's hand-offs (2026-09-22)
 
 	private float _shownBearing;
 	private bool _hasBearing;
+	private Vector3 _lastPlayerPos;
 
 	private static readonly (string Label, float Deg)[] Ticks =
 	{
@@ -112,18 +113,14 @@ public partial class Compass : CanvasLayer
 			_draw.DrawLine(new Vector2(x0, cy), new Vector2(x1, cy), new Color(LineColor, LineColor.A * fade), 1f);
 		}
 
-		float PxFor(float deg)
-		{
-			float delta = Mathf.Wrap(deg - yawDeg, -180f, 180f);
-			return cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f);
-		}
+		float PxFor(float deg) => cx + OffsetPx(deg, yawDeg);
 
 		var font = UiKit.Serif;
 		foreach (var (label, deg) in Ticks)
 		{
 			float shown = deg;
 			if (jitter > 0.5f && _rng.Randf() < 0.02f) shown += _rng.RandfRange(-40f, 40f);   // a tick briefly lies
-			float delta = Mathf.Wrap(shown - yawDeg, -180f, 180f);
+			float delta = Mathf.Wrap(yawDeg - shown, -180f, 180f);
 			if (Mathf.Abs(delta) > VisibleDegrees * 0.5f) continue;
 			float x = cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f) + JitterPx(jitter, 2f);
 			if (x < 0 || x > size.X) continue;
@@ -165,21 +162,54 @@ public partial class Compass : CanvasLayer
 	private float JitterPx(float jitter, float amount) => jitter <= 0f ? 0f : Mathf.Sin(_glitchPhase * 41f + amount) * amount * jitter;
 
 	/// <summary>
-	/// The marker never snaps. When the objective changes (or the player moves), the shown bearing
-	/// sweeps toward the true one at no more than <see cref="MaxSweepDegPerSec"/>: a full about-face
-	/// takes a few seconds to read, which is calm rather than disorienting. It snaps only when an
-	/// objective first appears after there was none.
+	/// Where a heading sits on the ribbon, in pixels from the centre. The camera's yaw grows turning LEFT
+	/// (Godot rotates counter-clockwise about +Y, and the bearing uses the same atan2(-x, -z) space), so a
+	/// heading greater than the yaw is on the player's left and must draw left of centre. Until 2026-09-22
+	/// this was the other way round: the marker sat on the right when the objective was to the left, and the
+	/// ticks slid the wrong way as you turned (the "broken compass").
+	/// </summary>
+	private float OffsetPx(float deg, float yawDeg)
+	{
+		float delta = Mathf.Wrap(yawDeg - deg, -180f, 180f);
+		return delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f);
+	}
+
+	/// <summary>For tests: the bearing (degrees, yaw space) the marker is drawn at right now, or null when there is none.</summary>
+	public float? ShownBearing => _hasBearing ? _shownBearing : null;
+	/// <summary>For tests: the marker's pixel offset from the ribbon's centre (negative = left of centre = to the player's left).</summary>
+	public float? MarkerOffsetPx => _hasBearing && _player != null && IsInstanceValid(_player) && _player.CameraRig != null
+		? OffsetPx(_shownBearing, Mathf.RadToDeg(_player.CameraRig.Yaw)) : null;
+	/// <summary>The bearing (degrees, yaw space) from one point to another, as the compass computes it.</summary>
+	public static float BearingDeg(Vector3 from, Vector3 to)
+	{
+		Vector3 d = to - from; d.Y = 0;
+		return Mathf.Wrap(Mathf.RadToDeg(Mathf.Atan2(-d.X, -d.Z)), 0f, 360f);
+	}
+
+	/// <summary>
+	/// The shown bearing sweeps toward the true one at no more than <see cref="MaxSweepDegPerSec"/> while
+	/// the player walks and turns (calm, never twitchy). It snaps when an objective first appears, after any
+	/// teleport (a 6 m jump in one frame), and when the objective moves to a different direction altogether:
+	/// the ribbon must never point at a place the story has already left (Dan, 2026-09-22).
 	/// </summary>
 	private void UpdateShownBearing(float delta)
 	{
 		var target = Systems.StoryManager.Instance?.ObjectivePosition;
 		if (target == null || _player == null) { _hasBearing = false; return; }
+		// A teleport (the loop's hand-offs, the fall's wake, the bunker's door) is not a walk: the marker snaps with it
+		// instead of sweeping round for seconds from a place the player no longer stands.
+		if (_hasBearing && _lastPlayerPos.DistanceTo(_player.GlobalPosition) > 2f) _hasBearing = false;   // any jump in one frame is a teleport
+		_lastPlayerPos = _player.GlobalPosition;
 		Vector3 d = target.Value - _player.GlobalPosition; d.Y = 0;
 		if (d.LengthSquared() < 0.01f) return;   // standing on it: keep the last heading
-		float trueDeg = Mathf.RadToDeg(Mathf.Atan2(-d.X, -d.Z));
+		float trueDeg = Mathf.Wrap(Mathf.RadToDeg(Mathf.Atan2(-d.X, -d.Z)), 0f, 360f);
 		if (!_hasBearing) { _shownBearing = trueDeg; _hasBearing = true; return; }
 		float diff = Mathf.Wrap(trueDeg - _shownBearing, -180f, 180f);
-		float step = MaxSweepDegPerSec * delta;
+		// A new objective in another direction altogether (the story moved it): snap rather than sweep a half-turn.
+		if (Mathf.Abs(diff) > 60f) { _shownBearing = trueDeg; return; }
+		// Otherwise close the gap fast when it is big and calmly when it is small (an exponential settle plus the
+		// linear sweep): within a third of a second of any change the marker is within a degree or two.
+		float step = MaxSweepDegPerSec * delta + Mathf.Abs(diff) * Mathf.Min(1f, 8f * delta);
 		_shownBearing = Mathf.Wrap(_shownBearing + Mathf.Clamp(diff, -step, step), 0f, 360f);
 	}
 }

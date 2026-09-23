@@ -61,6 +61,9 @@ public partial class GameSettings : Node
 	/// <summary>`--continue-test`: instead of the walkthrough, write a save for every checkpoint in
 	/// turn, Continue from it, and check the restored world (see ContinueRoundTripTest).</summary>
 	public bool ContinueTest { get; private set; }
+	/// <summary>Dev: `--start-act=2` writes a save at that act's checkpoint and Continues into it from the menu
+	/// (only 2 today: the Hollow wake). 0 = normal start. Overwrites the real save slot.</summary>
+	public int StartAct { get; private set; }
 
 	private const string SavePath = "user://settings.cfg";
 
@@ -73,6 +76,7 @@ public partial class GameSettings : Node
 		AutoTestSkipToAct7 = args.Contains("--skip-to-act7");
 		AutoTestSkipToAct11 = args.Contains("--skip-to-act11");
 		ContinueTest = args.Contains("--continue-test");
+		foreach (var a in args) if (a.StartsWith("--start-act=") && int.TryParse(a["--start-act=".Length..], out int sa)) StartAct = sa;
 		if (ContinueTest) AutoTest = true;   // same test save slots and defaults
 		RegisterInputActions();
 		Load();

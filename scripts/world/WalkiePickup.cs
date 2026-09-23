@@ -6,17 +6,23 @@ using ProjectDS.Systems;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Act 10's ending beat: a walkie-talkie hissing with static, dropped just
-/// past the maze's exit. The player follows the sound to find it; picking it
-/// up with [E] is checkpoint 8, the end of the story so far.
+/// The walkie-talkie. Since 2026-09-22 it lies dead on the CRT room's console (Act 9):
+/// no static, no LED. Taking it (E) puts it in the inventory and sets
+/// <see cref="StoryManager.Flag.WalkieTaken"/>; nothing else happens until the player is
+/// out of the bunker, where it crackles to life (checkpoint 8, <see cref="Act11Ending"/>).
+/// The rooms' way out will not open without it (see BunkerFlow).
 ///
-/// It lies on the floor (snapped down onto whatever is under it) with a slow
-/// pulsing red LED, and is used through an <see cref="Interactable"/> child:
-/// highlight and prompt only while it's under the crosshair.
+/// <see cref="Dead"/> = false is the old behaviour (hissing, LED pulsing, the checkpoint on
+/// pickup), kept for previews. It settles down onto whatever is under it and is used through
+/// an <see cref="Interactable"/> child: highlight and prompt only while it's under the crosshair.
 /// </summary>
 public partial class WalkiePickup : Area3D
 {
 	public const string PromptText = "Pick up the walkie-talkie";
+	/// <summary>Silent and dark: it only wakes outside the bunker (the story's walkie). Off = the old hissing pickup.</summary>
+	[Export] public bool Dead = true;
+	/// <summary>For tests: its static is running.</summary>
+	public bool Hissing => _staticPlayer != null && IsInstanceValid(_staticPlayer);
 
 	private AudioStreamPlayer3D _staticPlayer;
 	private Interactable _use;
@@ -34,7 +40,7 @@ public partial class WalkiePickup : Area3D
 		SetDeferred(Area3D.PropertyName.Monitoring, false);
 		SetDeferred(Area3D.PropertyName.Monitorable, false);
 		// Restore: already found on a previous run.
-		if (StoryManager.Instance != null && StoryManager.Instance.Current >= Checkpoint.Act10WalkieFound)
+		if (StoryManager.Instance != null && (StoryManager.Instance.Current >= Checkpoint.Act10WalkieFound || StoryManager.Instance.HasFlag(StoryManager.Flag.WalkieTaken)))
 		{
 			QueueFree();
 			return;
@@ -54,13 +60,14 @@ public partial class WalkiePickup : Area3D
 		_use.Interacted += OnInteract;
 		AddChild(_use);
 
+		AddToGroup("walkie_marker");   // the compass finds it after the screens
 		string path = "res://assets/audio/ambient/radio_static_loop.wav";
-		if (ResourceLoader.Exists(path))
+		if (!Dead && ResourceLoader.Exists(path))
 		{
 			// The same object as Act 11's radio: its hiss runs on the band-limited Radio bus too.
 			_staticPlayer = new AudioStreamPlayer3D { UnitSize = 3f, MaxDistance = 28f, Bus = "Radio" };
 			AddChild(_staticPlayer);
-			_staticPlayer.AddChild(new AmbienceLoop { StreamPath = path, BaseVolumeDb = -2f });
+			_staticPlayer.AddChild(new AmbienceLoop { StreamPath = path, BaseVolumeDb = -16f });   // a quiet open squelch, not a storm
 		}
 	}
 
@@ -70,6 +77,14 @@ public partial class WalkiePickup : Area3D
 		_taken = true;
 		// The radio goes into the inventory first, so the checkpoint's save already carries it.
 		player.GetNodeOrNull<PlayerInventory>("Inventory")?.TryPickup(ToolKind.Radio);
+		if (Dead)
+		{
+			// Dead in the hand. It wakes outside (BunkerFlow.OnMazeExit reaches the checkpoint there).
+			StoryManager.Instance?.SetFlag(StoryManager.Flag.WalkieTaken);
+			GD.Print("[story] Act 9: the walkie-talkie, dead, off the console");
+			QueueFree();
+			return;
+		}
 		StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act10WalkieFound, player.GlobalPosition, player.CameraRig.Yaw);
 		_staticPlayer?.QueueFree();
 		QueueFree();
@@ -78,6 +93,7 @@ public partial class WalkiePickup : Area3D
 	public override void _Process(double delta)
 	{
 		if (_built.Led == null) return;
+		if (Dead) { _built.Led.EmissionEnergyMultiplier = 0f; if (_built.Glow != null) _built.Glow.LightEnergy = 0f; return; }
 		// Slow heartbeat blink: mostly dim, a soft rise and fall every ~1.6 s.
 		_t += delta;
 		float ph = (float)(_t % 1.6) / 1.6f;

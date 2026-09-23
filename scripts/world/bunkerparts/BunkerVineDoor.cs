@@ -23,12 +23,17 @@ public partial class BunkerVineDoor : Node3D
 	private Node3D _tornStrands;
 
 	public bool IsOpen { get; private set; }
+	/// <summary>It swung shut behind the player once they were in the CRT room (Dan, 2026-09-22): from
+	/// then on it is used from the inside, and the way through it is the room of doors.</summary>
+	public bool ShutBehind { get; private set; }
 	/// <summary>The player is standing in the door's zone (the autotest reads this).</summary>
 	public bool PlayerNear { get; private set; }
 	/// <summary>Where the E pick volume sits (aim here to use the door).</summary>
 	public Vector3 InteractWorld => _interact != null ? _interact.ToGlobal(_interact.PickOffset) : ToGlobal(new Vector3(0, 1.25f, Z));
 
 	public event System.Action Opened;
+	/// <summary>E on the shut door from the CRT room side (the flow decides: stuck, or the way out).</summary>
+	public event System.Action UsedFromInside;
 
 	public override void _Ready()
 	{
@@ -58,6 +63,61 @@ public partial class BunkerVineDoor : Node3D
 		if (IsOpen) return;
 		SetOpenState();
 		_leaf.Rotation = new Vector3(0, Mathf.DegToRad(OpenDegrees), 0);
+	}
+
+	/// <summary>
+	/// The player is through into the CRT room: the door swings shut behind them (a creak, a soft
+	/// thud), the collider comes back, and the E-point turns round to the room side ("Push it open").
+	/// Once only. <see cref="SetShutBehindInstant"/> is the silent restore of the same state.
+	/// </summary>
+	public void Close()
+	{
+		if (!IsOpen || ShutBehind) return;
+		ShutBehind = true;
+		var tw = CreateTween();
+		tw.TweenProperty(_leaf, "rotation:y", 0f, 0.9f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+		tw.TweenCallback(Callable.From(() =>
+		{
+			BunkerKit.OneShot(this, "res://assets/audio/sfx/wall_knock_02.wav", new Vector3(0, 1.0f, Z), "Events", 2f, 0.7f, 3f, 25f);
+			SetShutState();
+		}));
+		BunkerKit.OneShot(this, "res://assets/audio/sfx/trunk_creak_01.wav", new Vector3(0, 1.2f, Z), "Events", -1f, 0.85f, 3f, 25f);
+		GD.Print("[story] Act 9: the vine door swings shut behind them");
+	}
+
+	/// <summary>Restore: shut behind the player, silently (a Continue inside the CRT room).</summary>
+	public void SetShutBehindInstant()
+	{
+		if (ShutBehind) return;
+		SetOpenInstant();
+		ShutBehind = true;
+		_leaf.Rotation = Vector3.Zero;
+		SetShutState();
+	}
+
+	/// <summary>Stuck: E from the inside before the screens are done only rattles it.</summary>
+	public void Rattle()
+	{
+		BunkerKit.OneShot(this, "res://assets/audio/sfx/trunk_creak_03.wav", new Vector3(0, 1.2f, Z), "Events", -3f, 1.05f, 3f, 20f);
+		if (_leaf == null) return;
+		var tw = CreateTween();
+		tw.TweenProperty(_leaf, "rotation:y", Mathf.DegToRad(1.5f), 0.08f);
+		tw.TweenProperty(_leaf, "rotation:y", 0f, 0.12f);
+	}
+
+	/// <summary>The flow relabels the inside E-point once the way through is open.</summary>
+	public void SetInsidePrompt(string prompt) { if (_interact != null) _interact.Prompt = prompt; }
+
+	private void SetShutState()
+	{
+		if (_leafCollision != null) _leafCollision.Disabled = false;
+		if (_interact != null)
+		{
+			// The pick disc now stands proud on the CRT-room side (local -Z of the leaf when shut).
+			_interact.PickOffset = new Vector3(0, 0, 0.45f);
+			_interact.Prompt = "It won't move.";   // locked until the screens are done and the walkie is in hand (the flow re-labels it)
+			_interact.Enabled = true;
+		}
 	}
 
 	private void SetOpenState()
@@ -160,7 +220,7 @@ public partial class BunkerVineDoor : Node3D
 			Position = new Vector3(w * 0.5f, 1.43f, 0),
 		};
 		_leaf.AddChild(_interact);
-		_interact.Interacted += _ => Open();
+		_interact.Interacted += _ => { if (ShutBehind) UsedFromInside?.Invoke(); else Open(); };
 	}
 
 	private void BuildOvergrowth()

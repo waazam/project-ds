@@ -182,14 +182,8 @@ public partial class Pickup : Area3D
 	/// <summary>The taken line, a beat after the pickup feedback. Runs on the level (this pickup is freed as it's taken).</summary>
 	private void SayTakenLine()
 	{
+		// Self-talk removed (Dan, 2026-09-22): the taken line ("It's warm.") is never shown; the property stays so scenes load.
 		if (string.IsNullOrEmpty(TakenLine)) return;
-		string line = TakenLine;
-		var root = Cutscene.SceneRoot(this);
-		_ = Cutscene.Run(root, async ct =>
-		{
-			await Cutscene.Wait(root, 0.6, ct);
-			await StoryBeat.Caption(root, line, 1.0f, 2.6f, 1.2f, ct);
-		});
 	}
 
 	private bool AlreadyTaken()
@@ -338,9 +332,9 @@ public partial class Pickup : Area3D
 	public override void _Process(double delta)
 	{
 		if (Engine.IsEditorHint() || Taken) return;
+		_t += delta;
 		if (_built.Glow == null || !IsInstanceValid(_built.Glow)) { SetProcess(false); return; }   // only a lit wick needs a frame
 		// A lit wick: slow breathing plus a faint quick flutter.
-		_t += delta;
 		float f = 0.88f + 0.08f * Mathf.Sin((float)_t * 1.7f) + 0.04f * Mathf.Sin((float)_t * 11.3f + 1.2f);
 		_built.Glow.LightEnergy = _glowBase * f;
 	}

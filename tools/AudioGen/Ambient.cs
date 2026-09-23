@@ -286,7 +286,7 @@ public static class Ambient
 	/// Density swells slowly (36-90 s), never fast enough to sound like waves. The loop is long (3 min)
 	/// because the storm lasts 10-15 minutes, and every event is written circularly so it loops exactly.
 	/// </summary>
-	public static double[] Rain(Rng r, int sr, int sec)
+	public static double[] RainSparse(Rng r, int sr, int sec)
 	{
 		int n = sec * sr;
 		var dens = PeriodicSmooth(r.Fork(), sec, 36);
@@ -348,6 +348,73 @@ public static class Ambient
 		var o = new double[n];
 		for (int i = 0; i < n; i++) o[i] = drops[i] + hush[i] * (0.8 + 0.2 * D((double)i / sr));
 		NormRms(o, -32, -6);
+		return o;
+	}
+
+	/// <summary>
+	/// Steady rain under the trees (the Act 3-5 storm), replacing <see cref="RainSparse"/>, whose
+	/// sixty drops a second read as a crackling fire. Real rain in a wood is thousands of tiny drops
+	/// a second on the canopy, blended by distance into a soft, grainy patter; this is built the same
+	/// way, from drops, so it never becomes a flat hiss:
+	///  * canopy patter: ~1100 drops a second, each a 1-2 ms tick in the 1.5-4.5 kHz band, dulled and
+	///    partly in the reverb, so the whole wood sounds wet;
+	///  * nearer drops (~50 a second): a little bigger and lower, some with a soft leaf "give";
+	///  * drops on the leaves right around the player (2-3 a second): a sharp tick, a body, sometimes
+	///    a short run of drips as the water runs off.
+	/// The density breathes by a quarter over 40-90 s, never fast enough to sound like waves, and
+	/// there is no low hush (a low bed reads as surf or an engine). Three minutes long because the
+	/// storm lasts a while; every event is written circularly so it loops exactly.
+	/// </summary>
+	public static double[] Rain(Rng r, int sr, int sec)
+	{
+		int n = sec * sr;
+		var dens = PeriodicSmooth(r.Fork(), sec, 40);
+		double D(double t) => 0.75 + 0.25 * dens(t);
+		var far = new double[n]; var mid = new double[n]; var near = new double[n];
+
+		var rf = r.Fork();
+		foreach (double t in Poisson(rf, sec, 935, D))
+			Tick(far, rf, sr, t, 0.12 * rf.LogR(0.3, 1), rf.LogR(1500, 4500), rf.R(1.5, 3.0), rf.LogR(0.0004, 0.0016));
+
+		var rm = r.Fork();
+		foreach (double t in Poisson(rm, sec, 42, D))
+		{
+			double a = 0.3 * rm.LogR(0.25, 1);
+			Tick(mid, rm, sr, t, a, rm.LogR(1200, 3500), rm.R(1.4, 2.8), rm.LogR(0.0006, 0.002));
+			if (rm.Chance(0.25)) Body(mid, rm, sr, t, a * 0.5, rm.R(350, 700), rm.R(0.003, 0.006));
+		}
+
+		var rn = r.Fork();
+		foreach (double t in Poisson(rn, sec, 2.1, D))
+		{
+			double a = 0.4 * rn.LogR(0.3, 1);
+			Tick(near, rn, sr, t, a, rn.LogR(1800, 4200), rn.R(1.2, 2.4), rn.LogR(0.0006, 0.002));
+			if (rn.Chance(0.5)) Body(near, rn, sr, t, a * 0.5, rn.R(400, 800), rn.R(0.003, 0.007));
+			if (rn.Chance(0.25))
+			{
+				double td = t, gap = rn.R(0.05, 0.12), ad = a;
+				for (int k = rn.I(1, 4); k > 0; k--)
+				{
+					td += gap; gap *= rn.R(1.3, 1.9); ad *= rn.R(0.35, 0.6);
+					Tick(near, rn, sr, td, ad, rn.LogR(1800, 4200), rn.R(1.2, 2.4), rn.LogR(0.0004, 0.0012));
+				}
+			}
+		}
+
+		// Distance and the trees between: the patter loses its top and its bottom and sits partly in the reverb.
+		var fl1 = Biquad.Lp(sr, 3600); var fl2 = Biquad.Lp(sr, 4200); var fh = Biquad.Hp(sr, 900);
+		var farD = Circular(far, v => fh.P(fl2.P(fl1.P(v))));
+		var ml = Biquad.Lp(sr, 5000);
+		var midD = Circular(mid, ml.P);
+		var send = new double[n];
+		for (int i = 0; i < n; i++) send[i] = farD[i] * 0.6 + midD[i] * 0.3 + near[i] * 0.08;
+		var hall = new Hall(sr, 1.2, 0.6, 12, 0.8);
+		var wet = Circular(send, hall.P);
+		var o = new double[n];
+		for (int i = 0; i < n; i++) o[i] = farD[i] * 0.8 + midD[i] + near[i] + wet[i] * 0.7;
+		var dh = Biquad.Hp(sr, 200);
+		o = Circular(o, dh.P);
+		NormRms(o, -30, -6);
 		return o;
 	}
 
@@ -428,55 +495,87 @@ public static class Ambient
 
 	// ---------------------------------------------------------------- choir
 
-	/// <summary>Plan for one chanted phrase: start time, unison note (female; the men sing an octave lower), level and tempo.</summary>
-	public sealed record ChantPhrase(double At, int Midi, double Level, double Tempo);
+	/// <summary>
+	/// Plan for one chanted phrase: start time, unison note (female; the men sing an octave lower),
+	/// level and tempo. <paramref name="Voices"/> caps how many singers take part (a phrase can be one
+	/// lone voice); <paramref name="Lead"/> lets one singer come in alone ahead of the rest.
+	/// </summary>
+	public sealed record ChantPhrase(double At, int Midi, double Level, double Tempo, int Voices = 99, bool Lead = false);
 
 	/// <summary>
-	/// Renders the chant: every singer sings every planned phrase they take part in, a little
-	/// early or late, slightly out of tune with the others, wavering.
+	/// Renders the chant: every singer sings the planned phrases they take part in, with their own
+	/// habit of coming in early or late, their own tuning, and wavering. Not every singer joins every
+	/// phrase (<paramref name="join"/>), a phrase can be cast small, and on a <see cref="ChantPhrase.Lead"/>
+	/// phrase one voice starts well ahead of the others, so the unison is never a block.
 	/// </summary>
-	public static double[] ChantDry(Rng r, int sr, int n, IList<ChantPhrase> plan, int men, int women, double join = 0.8)
+	public static double[] ChantDry(Rng r, int sr, int n, IList<ChantPhrase> plan, int men, int women, double join = 0.8, double wobble = 1.0)
 	{
 		var dry = new double[n];
+		int total = men + women;
 		static double Hz(int midi) => 440 * Math.Pow(2, (midi - 69) / 12.0);
-		for (int s = 0; s < men + women; s++)
+		// Casting: who sings each phrase, and who (if anyone) leads it in.
+		var rc = r.Fork();
+		var cast = new bool[plan.Count, total]; var lead = new int[plan.Count];
+		for (int p = 0; p < plan.Count; p++)
+		{
+			int want = Math.Min(total, plan[p].Voices);
+			var order = Enumerable.Range(0, total).OrderBy(_ => rc.U()).ToArray();
+			for (int k = 0; k < want; k++) cast[p, order[k]] = true;
+			lead[p] = plan[p].Lead ? order[0] : -1;
+		}
+		for (int s = 0; s < total; s++)
 		{
 			var rs = r.Fork();
 			bool female = s >= men;
-			double detune = Math.Pow(2, rs.R(-22, 22) / 1200);   // everyone a little off
+			double detune = Math.Pow(2, rs.R(-28, 28) * wobble / 1200);   // everyone a little off (a couple of percent at full wobble)
+			double habit = (rs.U() + rs.U() - 1) * 0.14 * wobble;   // this singer always comes in a touch early or late
+			double eager = rs.R(0.5, 1.0);   // and always a bit under or over the others
 			var takes = new List<Voice.Take>();
-			foreach (var p in plan)
+			for (int p = 0; p < plan.Count; p++)
 			{
-				if (!rs.Chance(join)) continue;
-				double late = (rs.U() + rs.U() + rs.U() - 1.5) * 0.09;
-				double f0 = Hz(p.Midi - (female ? 0 : 12)) * detune;
-				takes.Add(new Voice.Take(p.At + late, p.Tempo * rs.R(0.97, 1.03), f0,
-					p.Level * rs.R(0.6, 1.0) * (female ? 0.8 : 1.0), -rs.R(20, 90)));
+				var ph = plan[p];
+				bool isLead = lead[p] == s;
+				if (!cast[p, s] || (!isLead && !rs.Chance(join))) continue;
+				double late = isLead ? -rs.R(0.4, 1.0) : habit + (rs.U() + rs.U() + rs.U() - 1.5) * 0.13 * wobble;
+				double f0 = Hz(ph.Midi - (female ? 0 : 12)) * detune * Math.Pow(2, rs.R(-8, 8) * wobble / 1200);   // and lands a little differently each time
+				takes.Add(new Voice.Take(ph.At + late, ph.Tempo * rs.R(0.94, 1.06), f0,
+					ph.Level * eager * rs.R(0.7, 1.0) * (female ? 0.8 : 1.0) * (isLead ? 1.15 : 1.0), -rs.R(15, 110)));
 			}
-			Voice.Sing(dry, sr, rs, female, takes);
+			Voice.Sing(dry, sr, rs, female, takes, wobble);
 		}
 		return dry;
 	}
 
 	/// <summary>
-	/// Act 10's maze: "come and see" chanted in unison by a choir of unsteady, wavering voices,
-	/// somewhere far off in the dark. Formant-synthesised singers (four men, four women an octave
-	/// up), each joining most phrases but not all, each a little early or late, a little sharp or
-	/// flat, with their own irregular vibrato; the long "see" sags flat by a different amount in
-	/// every voice, so the unison comes apart at the end of each phrase. Mostly on D, twice a
-	/// semitone off. One phrase every ~7 s with silence between, swelling and receding over the
-	/// loop, heard through a big soft hall. 72 s, exactly periodic (phrases and reverb wrap).
+	/// Act 10's maze: "come and see" chanted, low and far off, by a choir of unsteady voices in the
+	/// dark. Formant-synthesised singers (five basses, five altos an octave up, all pitched deep and
+	/// played back deeper still), each with their own habit of coming in early or late, a couple of
+	/// percent sharp or flat, their own irregular vibrato setting in at their own moment, their own
+	/// throat and vowels; the long "see" sags flat by a different amount in every voice. Sparse: a
+	/// phrase every 6-14 s with real silence between (no grid: the spacings are drawn at random and
+	/// scaled to fit the loop), the phrases short, the level swelling and receding slowly over the
+	/// loop, some phrases cast to a few voices or a single one, some led in by one voice before the
+	/// rest follow. Mostly on G, twice a semitone off. 108 s, exactly periodic (phrases and reverb wrap).
 	/// </summary>
 	public static double[] ChoirChant(Rng r, int sr, int sec)
 	{
 		int n = sec * sr, phrases = 10;
-		double period = (double)sec / phrases;
-		int[] note = { 62, 62, 62, 63, 62, 62, 62, 61, 62, 62 };
-		double[] level = { 0.55, 0.7, 0.85, 1.0, 0.8, 0.6, 0.75, 0.95, 0.7, 0.5 };
+		// Spacings 6-14 s, scaled so the loop closes; phrases short (tempo 0.8-0.95).
+		var gap = new double[phrases]; double sum = 0;
+		for (int p = 0; p < phrases; p++) { gap[p] = r.R(6, 14); sum += gap[p]; }
+		double scale = sec / sum;
+		int[] note = { 55, 55, 55, 56, 55, 55, 54, 55, 55, 55 };   // G3 for the altos, G2 for the basses (x0.66 in game)
 		var plan = new List<ChantPhrase>();
+		double at = r.R(0, 2), level = r.R(0.5, 0.8);
 		for (int p = 0; p < phrases; p++)
-			plan.Add(new ChantPhrase(p * period + r.R(0.0, 0.8), note[p], level[p], r.R(0.95, 1.08)));
-		var dry = ChantDry(r, sr, n, plan, 4, 4);
+		{
+			level = 0.55 * level + 0.45 * r.R(0.35, 1.0);   // a slow swell, never a table
+			int voices = r.U() < 0.2 ? r.I(1, 3) : r.U() < 0.3 ? r.I(4, 6) : 99;
+			bool lead = voices > 3 && r.U() < 0.4;
+			plan.Add(new ChantPhrase(at, note[p], level, r.R(0.8, 0.95), voices, lead));
+			at += gap[p] * scale;
+		}
+		var dry = ChantDry(r, sr, n, plan, 5, 5, 0.7, 2.0);
 		return ChoirSpace(dry, sr);
 	}
 
@@ -484,13 +583,13 @@ public static class Ambient
 	public static double[] ChoirSpace(double[] dry, int sr)
 	{
 		int n = dry.Length;
-		var hp = Biquad.Hp(sr, 90); var lp = Biquad.Lp(sr, 6000);
+		var hp = Biquad.Hp(sr, 70); var lp = Biquad.Lp(sr, 4200);
 		dry = Circular(dry, v => lp.P(hp.P(v)));
-		var hall = new Hall(sr, 4.5, 0.5, 60, 1.5);
+		var hall = new Hall(sr, 5.0, 0.6, 80, 2.0);
 		var wet = Circular(dry, hall.P);
 		var o = new double[n];
-		for (int i = 0; i < n; i++) o[i] = dry[i] * 0.4 + wet[i] * 0.9;
-		var h2 = Biquad.Hp(sr, 70);
+		for (int i = 0; i < n; i++) o[i] = dry[i] * 0.3 + wet[i] * 1.0;
+		var h2 = Biquad.Hp(sr, 55);
 		o = Circular(o, h2.P);
 		NormRms(o, -25, -6);
 		return o;
@@ -534,37 +633,82 @@ public static class Ambient
 		return x;
 	}
 
-	/// <summary>Act 10's ending beat: a walkie-talkie's hiss, with sparse crackly pops — the sound the player follows to find it.</summary>
+	/// <summary>
+	/// Real FM inter-station static (Dan, 2026-09-22, from the reference samples): plain white noise
+	/// rushing through the handheld's little speaker, 280 Hz to 3.6 kHz with a broad bright hump
+	/// around 2 kHz, a slow swell, and sparse crackles. No dark "hiss": the old 1.4 kHz honk and the
+	/// 2.6 kHz roll-off made it nasal. Played under every radio line (Act 11) and gated with it.
+	/// </summary>
 	public static double[] RadioStatic(Rng r, int sr, double sec)
 	{
 		int n = (int)(sec * sr), xf = (int)(0.3 * sr), pre = (int)(0.2 * sr), tot = pre + n + xf;
 		double T = (double)tot / sr;
 		var x = new double[tot];
-		var hiss = Biquad.Bp(sr, 3200, 0.7);
-		var swell = new Smooth(r, T, 0.6);
+		var hp = Biquad.Hp(sr, 280); var lp = Biquad.Lp(sr, 3600);
+		var hump = Biquad.Bp(sr, 2100, 0.5);   // the bright presence of a small speaker on white noise
+		var swell = new Smooth(r, T, 0.5);
 		for (int i = 0; i < tot; i++)
 		{
-			double t = (double)i / sr;
-			x[i] = hiss.P(r.W()) * (0.5 + 0.5 * swell.At(t));
+			double t = (double)i / sr, w = r.W();
+			x[i] = (lp.P(hp.P(w)) + 0.7 * hump.P(w)) * (0.85 + 0.15 * swell.At(t));
 		}
-		int pops = (int)(sec * 2.2);
+		// Sparse crackles riding the rush: the receiver catching the edge of something.
+		int pops = (int)(sec * 1.5);
 		for (int p = 0; p < pops; p++)
 		{
 			double at = r.R(0, sec);
+			var pf = Biquad.Bp(sr, r.R(900, 2600), 2.0);
+			double dur = r.R(0.015, 0.05);
+			int len = (int)(dur * sr);
+			for (int i = 0; i < len; i++)
+			{
+				double tt = (double)i / sr;
+				int idx = pre + ((int)(at * sr) + i) % n;
+				x[idx] += pf.P(r.W()) * Perc(tt, 0.001, dur * 0.4) * r.R(0.5, 1.0) * 1.2;
+			}
+		}
+		HighPass(x, sr, 280);
+		var loop = MakeLoop(x, pre, n, xf);
+		NormRms(loop, -22);
+		return loop;
+	}
+
+	/// <summary>
+	/// The old walkie-talkie noise, kept as the stalker's jumpscare (Dan, 2026-09-22: the super
+	/// loud static burst the radio used to make was the scariest sound in the build). The hiss
+	/// and crackle of the old <see cref="RadioStatic"/>, denser, swelling hard, as a 2.6 s one-shot
+	/// normalised hot; the game plays it on the Radio bus right at the ear.
+	/// </summary>
+	public static double[] RadioBurst(Rng r, int sr)
+	{
+		double sec = 2.6;
+		int n = (int)(sec * sr);
+		var x = new double[n];
+		var hiss = Biquad.Bp(sr, 3200, 0.7);
+		var swell = new Smooth(r, sec, 0.25);
+		for (int i = 0; i < n; i++)
+		{
+			double t = (double)i / sr;
+			double env = Perc(t, 0.01, 1.4) * (0.55 + 0.45 * swell.At(t));
+			x[i] = hiss.P(r.W()) * env;
+		}
+		int pops = (int)(sec * 9);
+		for (int p = 0; p < pops; p++)
+		{
+			double at = r.R(0, sec - 0.05);
 			var pf = Biquad.Bp(sr, r.R(800, 2200), 3.5);
 			double dur = r.R(0.01, 0.03);
 			int len = (int)(dur * sr);
 			for (int i = 0; i < len; i++)
 			{
 				double tt = (double)i / sr;
-				int idx = pre + ((int)(at * sr) + i) % n;
-				x[idx] += pf.P(r.W()) * Perc(tt, 0.0003, dur * 0.5) * r.R(0.5, 1.0) * 1.8;
+				int idx = (int)(at * sr) + i;
+				if (idx >= n) break;
+				x[idx] += pf.P(r.W()) * Perc(tt, 0.0003, dur * 0.5) * r.R(0.5, 1.0) * 1.8 * Perc(at, 0.01, 1.6);
 			}
 		}
 		HighPass(x, sr, 400);
-		var loop = MakeLoop(x, pre, n, xf);
-		NormRms(loop, -18);
-		return loop;
+		return FinishOneShot(x, sr, -3, 120);
 	}
 
 	/// <summary>"Silence ringing": thin ~8.2 kHz sine, a 0.25 Hz beating partner for the wobble, all periodic.</summary>

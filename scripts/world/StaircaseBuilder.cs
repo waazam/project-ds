@@ -32,10 +32,10 @@ namespace ProjectDS.World;
 /// The pier stands outside the clear width, behind the wall's collider line;
 /// its own collider only covers its outer side.
 ///
-/// Restore: <see cref="NewelCapRestore"/> = AfterClearingVoice caps the post
-/// from <see cref="StoryManager.Flag.ClearingVoiceHeard"/> (the last staircase:
-/// the stairs are whole again once the cap has been fused on in the clearing).
-/// The clearing's own staircase is capped by <see cref="Act6ClearingEvent"/>.
+/// Restore: <see cref="NewelCapRestore"/> = AfterNewelSeated caps the post
+/// from <see cref="StoryManager.Flag.NewelSeated"/> (the last staircase only:
+/// it is whole again once the player has put the cap back at its top in Act 11;
+/// <see cref="Act11Ending"/> seats it live, this only restores a save).
 ///
 /// Runtime only: a child Area3D "TopTrigger" is moved onto the top landing,
 /// Marker3D "AutotestApproach" 1.5 m in front of the first step, and (when not
@@ -68,7 +68,7 @@ public partial class StaircaseBuilder : Node3D
 	/// under the footprint; a flight set on a slope needs more).</summary>
 	[Export] public float FoundationDepth = 0.7f;
 
-	public enum CapRestore { Never, AfterClearingVoice }
+	public enum CapRestore { Never, AfterNewelSeated }
 
 	/// <summary>Whether the newel post's round stone cap sits on its pier. Setting it only shows/hides
 	/// the cap's node; the flight is not rebuilt.</summary>
@@ -94,6 +94,10 @@ public partial class StaircaseBuilder : Node3D
 	public int BuildCount { get; private set; }
 
 	private float Found => FoundationDepth;   // how far walls/plinth go below local ground (covers terrain dips)
+	/// <summary>Metres of run per metre of foundation for the collider apron in front of the first step (the
+	/// stairs' own pitch), so a flight whose base stands proud of the ground in front is still walked onto:
+	/// a vertical lip of more than about 12 cm stops a walking character dead.</summary>
+	private float ApronRun => Run / Mathf.Max(Rise, 0.05f);
 	private const float CopingH = 0.075f, CopingOver = 0.035f, PierD = 0.42f, PierExtra = 0.05f, Nose = 0.015f;
 
 	public float TotalHeight => Steps * Rise;
@@ -118,7 +122,7 @@ public partial class StaircaseBuilder : Node3D
 	public override void _EnterTree()
 	{
 		if (BaseSteps < 0) BaseSteps = Steps;
-		if (!Engine.IsEditorHint() && NewelCapRestore == CapRestore.AfterClearingVoice && StoryManager.Instance is { } s && !_capListening)
+		if (!Engine.IsEditorHint() && NewelCapRestore == CapRestore.AfterNewelSeated && StoryManager.Instance is { } s && !_capListening)
 		{
 			s.FlagSet += OnStoryFlag;
 			_capListening = true;
@@ -134,14 +138,14 @@ public partial class StaircaseBuilder : Node3D
 	public override void _Ready()
 	{
 		// Restore: the cap back on from the saved story (before the first build, so it builds that way).
-		if (!Engine.IsEditorHint() && NewelCapRestore == CapRestore.AfterClearingVoice && StoryManager.Instance is { } s)
-			_newelCapped = s.ClearingVoiceHeard;
+		if (!Engine.IsEditorHint() && NewelCapRestore == CapRestore.AfterNewelSeated && StoryManager.Instance is { } s)
+			_newelCapped = s.HasFlag(StoryManager.Flag.NewelSeated);
 		Build();
 	}
 
 	private void OnStoryFlag(string flag)
 	{
-		if (flag == StoryManager.Flag.ClearingVoiceHeard) NewelCapped = true;
+		if (flag == StoryManager.Flag.NewelSeated) NewelCapped = true;
 	}
 
 	// ------------------------------------------------------------------ mesh helper
@@ -877,6 +881,7 @@ public partial class StaircaseBuilder : Node3D
 		float H = TotalHeight, zTop = TopFrontZ, zBack = BackZ;
 		var body = new StaticBody3D { Name = "StairBody", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "stone");
+		body.SetMeta("stair_owner", GetPath());   // the clearing reads which flight the player's feet are on (Act 6)
 		gen.AddChild(body);
 
 		// ramp through the step noses, over the whole clear width, down to the landing
@@ -887,7 +892,7 @@ public partial class StaircaseBuilder : Node3D
 			ramp.Add(new Vector3(x, H, zTop));
 			ramp.Add(new Vector3(x, H, zBack));
 			ramp.Add(new Vector3(x, -Found, zBack));
-			ramp.Add(new Vector3(x, -Found, Run));
+			ramp.Add(new Vector3(x, -Found, Run + Mathf.Min(Found, 0.6f) * ApronRun));   // an apron at the stairs' own pitch: no lip where the ground in front sits lower
 		}
 		body.AddChild(new CollisionShape3D { Name = "Ramp", Shape = new ConvexPolygonShape3D { Points = ramp.ToArray() } });
 
@@ -900,7 +905,7 @@ public partial class StaircaseBuilder : Node3D
 			pl.Add(new Vector3(x, pTop, zpf));
 			pl.Add(new Vector3(x, pTop, PlinthBackZ));
 			pl.Add(new Vector3(x, -Found, PlinthBackZ));
-			pl.Add(new Vector3(x, -Found, Run));
+			pl.Add(new Vector3(x, -Found, Run + Mathf.Min(Found, 0.6f) * ApronRun));
 		}
 		body.AddChild(new CollisionShape3D { Name = "Plinth", Shape = new ConvexPolygonShape3D { Points = pl.ToArray() } });
 

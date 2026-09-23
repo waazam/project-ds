@@ -105,10 +105,10 @@ SamplePattern = "res://assets/audio/sfx/twig_snap_{0:00}.wav"
 SampleCount = 4
 Bus = "Distant"
 LifeCategory = 4
-IntervalSeconds = Vector2(70, 150)
+IntervalSeconds = Vector2(120, 240)
 DistanceRange = Vector2(10, 30)
 HeightRange = Vector2(0, 0.3)
-VolumeDb = -2.0
+VolumeDb = -12.0
 UnitSize = 8.0
 Voices = 2
 

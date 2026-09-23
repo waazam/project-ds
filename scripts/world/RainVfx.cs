@@ -162,7 +162,8 @@ public partial class RainVfx : Node3D
 	}
 
 	/// <summary>Vertical streak, soft at both ends.</summary>
-	private static Texture2D StreakTexture()
+	/// <summary>A soft vertical streak (shared with Act 11's blood rain).</summary>
+	internal static Texture2D StreakTexture()
 	{
 		var img = Image.CreateEmpty(4, 32, false, Image.Format.Rgba8);
 		for (int y = 0; y < 32; y++)
@@ -316,9 +317,9 @@ public partial class RainVfx : Node3D
 
 		float shown = sheltered ? 0f : _intensity;
 		_rain.Emitting = shown > 0.01f;
-		_rain.AmountRatio = shown;
+		_rain.AmountRatio = shown * 0.85f;   // a touch fewer drops (Dan, 2026-09-22)
 		_rainNear.Emitting = shown > 0.01f;
-		_rainNear.AmountRatio = shown;
+		_rainNear.AmountRatio = shown * 0.85f;
 		_rainNear.GlobalPosition = cp + new Vector3(0, 4.5f, 0) + (cam.GlobalBasis * new Vector3(0, 0, -1.5f)) with { Y = 0 };
 		// lead the camera a little so walking forward doesn't outrun the rain
 		_rain.GlobalPosition = cp + new Vector3(0, 9.5f, 0) + (cam.GlobalBasis * new Vector3(0, 0, -3f)) with { Y = 0 };

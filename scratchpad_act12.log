@@ -1,0 +1,154 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 6950 XT
+
+[waterfall] at stream s 109.4 (29.0 m above the crossing), drop 2.28 m, curtain (-21.60702, 8.20504, -162.55476)
+[storytest] ---- Act 1: arrival
+[storytest] PASS the player spawned on the ground (-5, -0.4201949, 22.750002)
+[storytest] PASS first-person eye height 1.62 m
+[story] flag set: pickup_taken_camera
+[story] opening: camera in hand at the car
+[story] checkpoint reached: Act1Start
+[storytest] PASS checkpoint 1 reached 
+[storytest] PASS checkpoint 1 saved Act1Start
+[storytest] PASS the forest is alive at the lot silence 0.00
+[storytest] PASS no compass in Act 1 
+[storytest] PASS the player can walk 3.6 m
+[storytest] Act 1: arrival took 1.8s
+[storytest] ---- Act 1: the trail register
+[storytest] PASS no note from a friend at the trailhead 
+[storytest] PASS the trail register carries R.H.'s last entry 
+[storytest] PASS the note opens ('DATE   PARTY   NAME   DESTIN...') 
+[storytest] PASS the note closes and control returns 
+[storytest] Act 1: the trail register took 0.9s
+[storytest] ---- Act 1: the camera and the album
+[storytest] PASS the camera came out of the car 
+[storytest] PASS no camera left lying around 
+[storytest] PASS the opening ran at the car 
+[storytest] PASS Tab opens the album 
+[storytest] PASS Tab closes it again 
+[storytest] Act 1: the camera and the album took 0.2s
+[storytest] ---- Act 1: a photograph
+[storytest] PASS a bird to photograph 
+[storytest] PASS the viewfinder locks focus on the bird 
+[story] flag set: photo_bird_red
+[photo] #1 taken (bird_red)
+[storytest] PASS the photo is logged 0 -> 1
+[storytest] Act 1: a photograph took 2.4s
+[storytest] ---- Act 1: to the stairs
+[storytest] PASS the first staircase is in the trailhead level 
+[story] flag set: line_old_stones
+[storytest] PASS walked from the fallen fir to the stairs (30.610985, 8.7398615, -524.86694)
+[storytest] PASS the forest falls silent by the stairs silence 0.96
+[storytest] Act 1: to the stairs took 38.2s
+[storytest] ---- Act 2: the climb
+[storytest] PASS the stairs trigger covers the whole flight, not just the first step box (1.25, 7.52, 10.59) vs flight 6.1 m tall, 10.1 m long
+[story] Act 1: on the stairs; there is no going back down
+[storytest] PASS stepping on the stairs is noticed 
+[storytest] PASS the body stays the player's: they climb it themselves 
+[storytest] PASS the player can walk up the flight to the top (30.001745, 14.54057, -543.64014) vs (30, 14.828454, -544.825)
+[storytest] PASS the flight has turned one-way progress 9.2 m
+[storytest] PASS no going back down the stairs y 14.5 -> 14.8
+[storytest] PASS cannot back down the stairs backed 0.00 m
+[storytest] PASS the broken post can be inspected 
+[storytest] use InspectPost: focused 'Stairs' prompt 'Inspect the post'
+[storytest] PASS inspecting the post starts the collapse 
+[story] Act 2: blacked out at the top of the stairs
+[story] checkpoint reached: Act2StairsClimbed
+[storytest] PASS checkpoint 2 reached at the top 
+[storytest] PASS the camera is gone after the first step 
+[bunker] CRT room: 127 screens
+[bunker] interior built in 95 ms
+[story] Act 6 layout (name, xz, yaw deg, footprint w x l):
+  MiniStair0  (   9.7,  25.1) yaw    6 whole   4.2 x 19.0 m (trail)
+  MiniStair1  ( -15.7,   5.0) yaw  193 whole   4.2 x 19.0 m
+  MiniStair2  ( -12.5,  -9.5) yaw  177 ruined  4.6 x  4.4 m
+  MiniStair3  (  17.9,   2.3) yaw  234 whole   4.2 x 19.0 m
+  MiniStair4  ( -13.2, -13.7) yaw    9 whole   4.2 x 19.0 m
+  MiniStair5  (  -7.1,  15.7) yaw  306 ruined  3.9 x  5.2 m
+  MiniStair6  (  10.5, -21.9) yaw   91 whole   4.2 x 19.0 m
+  MiniStair7  ( -23.4,  -3.1) yaw  180 whole   4.2 x 19.0 m
+  MiniStair8  (  17.4,  -7.5) yaw  194 ruined  3.8 x  3.4 m
+  MiniStair9  (  15.0,   8.3) yaw  224 whole   4.2 x 19.0 m
+  MiniStair10 ( -25.4,  -9.0) yaw    6 whole   4.2 x 19.0 m
+  MiniStair11 ( -16.2,  -0.4) yaw  122 ruined  3.7 x  3.2 m
+  MiniStair12 (   1.5,  26.1) yaw  141 whole   4.2 x 19.0 m
+  MiniStair13 (  24.3,  -2.6) yaw  231 whole   4.2 x 19.0 m
+  MiniStair14 ( -24.0,  20.4) yaw  250 ruined  4.6 x  4.9 m
+[storytest] ---- Act 2: waking in the hollow
+[story] Act 2: woke in the hollow
+[storytest] PASS control comes back after the wake-up 
+[storytest] PASS checkpoint 2 on arrival Act2StairsClimbed
+[storytest] PASS woke at the Hollow's wake spot (0, -0.6975265, 40) vs (0, -0.67970145, 40)
+[storytest] PASS still no camera 
+[storytest] PASS no compass yet 
+[storytest] PASS the save says checkpoint 2 
+[storytest] PASS the rain is already falling when they wake 
+[storytest] Act 2: waking in the hollow took 0.5s
+Project DS story test  2026-09-22T15:53:07
+40/40 passed in 76 s  (walked 128 m, jumped 458 m)
+fps while walking: avg 234, min 1
+
+== Act 1: arrival
+PASS  the player spawned on the ground  (-5, -0.4201949, 22.750002)
+PASS  first-person eye height  1.62 m
+PASS  checkpoint 1 reached  
+PASS  checkpoint 1 saved  Act1Start
+PASS  the forest is alive at the lot  silence 0.00
+PASS  no compass in Act 1  
+PASS  the player can walk  3.6 m
+
+== Act 1: the trail register
+PASS  no note from a friend at the trailhead  
+PASS  the trail register carries R.H.'s last entry  
+PASS  the note opens ('DATE   PARTY   NAME   DESTIN...')  
+PASS  the note closes and control returns  
+
+== Act 1: the camera and the album
+PASS  the camera came out of the car  
+PASS  no camera left lying around  
+PASS  the opening ran at the car  
+PASS  Tab opens the album  
+PASS  Tab closes it again  
+
+== Act 1: a photograph
+PASS  a bird to photograph  
+PASS  the viewfinder locks focus on the bird  
+PASS  the photo is logged  0 -> 1
+
+== Act 1: to the stairs
+PASS  the first staircase is in the trailhead level  
+PASS  walked from the fallen fir to the stairs  (30.610985, 8.7398615, -524.86694)
+PASS  the forest falls silent by the stairs  silence 0.96
+
+== Act 2: the climb
+PASS  the stairs trigger covers the whole flight, not just the first step  box (1.25, 7.52, 10.59) vs flight 6.1 m tall, 10.1 m long
+PASS  stepping on the stairs is noticed  
+PASS  the body stays the player's: they climb it themselves  
+PASS  the player can walk up the flight to the top  (30.001745, 14.54057, -543.64014) vs (30, 14.828454, -544.825)
+PASS  the flight has turned one-way  progress 9.2 m
+PASS  no going back down the stairs  y 14.5 -> 14.8
+PASS  cannot back down the stairs  backed 0.00 m
+PASS  the broken post can be inspected  
+PASS  inspecting the post starts the collapse  
+PASS  checkpoint 2 reached at the top  
+PASS  the camera is gone after the first step  
+
+== Act 2: waking in the hollow
+PASS  control comes back after the wake-up  
+PASS  checkpoint 2 on arrival  Act2StairsClimbed
+PASS  woke at the Hollow's wake spot  (0, -0.6975265, 40) vs (0, -0.67970145, 40)
+PASS  still no camera  
+PASS  no compass yet  
+PASS  the save says checkpoint 2  
+PASS  the rain is already falling when they wake  
+
+ERROR: System.NullReferenceException: Object reference not set to an instance of an object.
+   at ProjectDS.Systems.StoryTest._Process(Double delta) in C:\Users\Dan\GLHFDD\Godot Projects\project-ds\scripts\systems\StoryTest.cs:line 190
+   at Godot.Node.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret) in /root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:line 2654
+   at ProjectDS.Systems.StoryTest.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret) in C:\Users\Dan\GLHFDD\Godot Projects\project-ds\Godot.SourceGenerators\Godot.SourceGenerators.ScriptMethodsGenerator\ProjectDS.Systems.StoryTest_ScriptMethods.generated.cs:line 186
+   at Godot.Bridge.CSharpInstanceBridge.Call(IntPtr godotObjectGCHandle, godot_string_name* method, godot_variant** args, Int32 argCount, godot_variant_call_error* refCallError, godot_variant* ret) in /root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:line 24
+   at: void Godot.NativeInterop.ExceptionUtils.LogException(System.Exception) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/NativeInterop/ExceptionUtils.cs:113)
+   C# backtrace (most recent call first):
+       [0] void Godot.GD.PushError(string) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/GD.cs:366)
+       [1] void Godot.NativeInterop.ExceptionUtils.LogException(System.Exception) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/NativeInterop/ExceptionUtils.cs:113)
+       [2] Godot.NativeInterop.godot_bool Godot.Bridge.CSharpInstanceBridge.Call(nint, Godot.NativeInterop.godot_string_name*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant_call_error*, Godot.NativeInterop.godot_variant*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:24)

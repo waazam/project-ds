@@ -19,11 +19,17 @@ public static class RespawnPoints
 		var tree = n.GetTree();
 		var cp = save.Checkpoint;
 		Vector3 saved = new(save.PosX, save.PosY, save.PosZ);
+		// Dev launch (--start-act=8): stand 14 m in front of the bunker's hatch, facing it.
+		if (System.Array.IndexOf(save.Flags, "dev_spawn_bunker") >= 0 && tree.GetFirstNodeInGroup("bunker_marker") is Node3D hatch)
+		{
+			Vector3 front = hatch.GlobalTransform * new Vector3(0, 0, 14f);
+			return OnGround(n, front, YawToward(front, hatch.GlobalPosition));
+		}
 
 		var cabin = tree.GetFirstNodeInGroup("cabin") as Cabin;
 		// Post in hand but not yet carried out: just inside the (open) doorway, facing out, so stepping
-		// outside plays the dawn beat exactly as it would have. Before any level marker: an outdoor
-		// respawn would skip the doorway, and with it the dawn.
+		// outside plays the rain-stops beat exactly as it would have. Before any level marker: an outdoor
+		// respawn would skip the doorway, and with it that beat.
 		if (cp == Checkpoint.Act5CabinEntered && cabin != null
 			&& StoryManager.Instance is { NewelPostTaken: true } s5 && !s5.HasFlag(StoryManager.Flag.DawnBroke))
 			return (cabin.InsidePoint + Vector3.Up * 0.1f, YawToward(cabin.InsidePoint, cabin.ApproachPoint));

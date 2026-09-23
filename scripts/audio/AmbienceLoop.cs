@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace ProjectDS.Audio;
@@ -86,6 +87,36 @@ public partial class AmbienceLoop : Node
 		Apply();
 		double length = Stream.GetLength();
 		float from = (float)GD.RandRange(0.0, Mathf.Max(length - 0.1, 0.0));
+		if (_player2D != null) _player2D.Play(from); else _player3D.Play(from);
+	}
+
+	/// <summary>Every take named {prefix}_01.wav, _02.wav, ... until one is missing (so new takes are picked up without a list).</summary>
+	public static List<AudioStream> LoadTakes(string prefix)
+	{
+		var list = new List<AudioStream>();
+		for (int i = 1; i < 100; i++)
+		{
+			string p = $"{prefix}_{i:00}.wav";
+			if (!ResourceLoader.Exists(p)) break;
+			list.Add(GD.Load<AudioStream>(p));
+		}
+		return list;
+	}
+
+	/// <summary>Switch to another loop take (prepared to loop, started at a random point), e.g. between bursts so the beat never repeats.</summary>
+	public void SwapStream(AudioStream stream)
+	{
+		if (stream == null || (_player2D == null && _player3D == null)) return;
+		if (stream is AudioStreamWav wav)
+		{
+			wav = (AudioStreamWav)wav.Duplicate();
+			wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
+			wav.LoopBegin = 0;
+			wav.LoopEnd = Mathf.RoundToInt(wav.GetLength() * wav.MixRate);
+			stream = wav;
+		}
+		Stream = stream;
+		float from = (float)GD.RandRange(0.0, Mathf.Max(stream.GetLength() - 0.1, 0.0));
 		if (_player2D != null) _player2D.Play(from); else _player3D.Play(from);
 	}
 

@@ -32,6 +32,10 @@ public partial class ForestAtmosphere : Node
 
 	/// <summary>For the autotest and other callers: which mood is currently active (or blending toward).</summary>
 	public Mood CurrentMood => _mood;
+	/// <summary>For tests: the environment's distance fog density right now.</summary>
+	public float FogDensity => _env?.FogDensity ?? 0f;
+	/// <summary>For tests: the height fog band's density (negative = thickening above fog_height; 0 = none).</summary>
+	public float HeightFogDensity => _env?.FogHeightDensity ?? 0f;
 	[Export] public NodePath EnvironmentPath = "../WorldEnvironment";
 	[Export] public NodePath SunPath = "../Sun";
 	/// <summary>World Z where "deep woods" begins / is fully reached (north is -Z).</summary>
@@ -43,11 +47,14 @@ public partial class ForestAtmosphere : Node
 	[Export] public Color FogColorDeep = new(0.25f, 0.26f, 0.29f);
 	/// <summary>How much the fog hides the sky (and its distant ridges); deep woods swallow them.</summary>
 	[Export] public float SkyFogOpen = 0.0f;
-	[Export] public float SkyFogDeep = 0.6f;
+	[Export] public float SkyFogDeep = 0.75f;
 	[Export] public float AmbientOpen = 0.85f;
-	[Export] public float AmbientDeep = 0.6f;
+	[Export] public float AmbientDeep = 0.7f;
 	[Export] public float SunOpen = 0.75f;
-	[Export] public float SunDeep = 0.4f;
+	[Export] public float SunDeep = 0.5f;
+	/// <summary>Sky (background) energy scale in the deep woods: the sky dims as the trees close in, so
+	/// it never sits as a bright cut-out behind dark trunks (Dan, 2026-09-22).</summary>
+	[Export] public float SkyEnergyDeep = 0.62f;
 	/// <summary>An area that opens up a little again (the stairs' gap).</summary>
 	[Export] public Vector3 ClearingCenter = new(0, 0, -302);
 	[Export] public float ClearingRadius = 26f;
@@ -69,13 +76,13 @@ public partial class ForestAtmosphere : Node
 	/// <summary>Ambient light colour when fully open (warmer than the scene's grey-blue).</summary>
 	[Export] public Color OpenAmbientColor = new(0.55f, 0.53f, 0.5f);
 	/// <summary>Extra sky (background) energy when fully open.</summary>
-	[Export] public float OpenSkyBoost = 0.35f;
+	[Export] public float OpenSkyBoost = 0.12f;
 	/// <summary>Warm the ambient light and the sky with the grade (off reproduces the old, subtler grade for comparisons).</summary>
 	[Export] public bool OpenWarmAmbientAndSky = true;
 	/// <summary>The sun stands this much higher when fully open, so its light reaches the ground between the trees.</summary>
 	[Export] public float OpenSunRaiseDegrees = 14f;
 	/// <summary>Added to the tonemap exposure when fully open.</summary>
-	[Export] public float OpenExposureBoost = 0.15f;
+	[Export] public float OpenExposureBoost = 0.1f;
 	/// <summary>Seconds for the grade to cover ~63% of a change (so a teleport never snaps it).</summary>
 	[Export] public float OpenSmoothing = 2f;
 	/// <summary>0..1 how much of the open-trail grade is applied right now (for tests and the HUD).</summary>
@@ -116,6 +123,8 @@ public partial class ForestAtmosphere : Node
 	public float Wetness { get; set; }
 	/// <summary>0..~1.5 current lightning flash (RainVfx drives this for a fraction of a second).</summary>
 	public float Flash { get; set; }
+	/// <summary>0..1: the fog light goes dark red (Act 11's blood rain). Blended in after the mood each frame.</summary>
+	public float BloodTint { get; set; }
 
 	private Environment _env;
 	private DirectionalLight3D _sun;
@@ -147,16 +156,17 @@ public partial class ForestAtmosphere : Node
 	/// <summary>The sky shader's colours for the open-trail grade: a clear, light, warm late afternoon.</summary>
 	private static readonly (string name, Vector3 open)[] OpenSky =
 	{
-		("zenith_color", new Vector3(0.36f, 0.5f, 0.72f)),
-		("horizon_color", new Vector3(0.74f, 0.76f, 0.74f)),
-		("glow_color", new Vector3(1.0f, 0.82f, 0.56f)),
-		("cloud_dark", new Vector3(0.6f, 0.6f, 0.64f)),
-		("cloud_light", new Vector3(0.97f, 0.92f, 0.84f)),
-		("ridge_far", new Vector3(0.6f, 0.64f, 0.7f)),
-		("ridge_mid", new Vector3(0.48f, 0.53f, 0.58f)),
-		("ridge_near", new Vector3(0.36f, 0.41f, 0.44f)),
-		("haze_color", new Vector3(0.78f, 0.74f, 0.66f)),
-		("below_color", new Vector3(0.66f, 0.62f, 0.54f)),
+		// Toned down a step (2026-09-22): the sky was a bright cut-out behind the dark trees.
+		("zenith_color", new Vector3(0.33f, 0.45f, 0.64f)),
+		("horizon_color", new Vector3(0.62f, 0.64f, 0.63f)),
+		("glow_color", new Vector3(0.92f, 0.76f, 0.52f)),
+		("cloud_dark", new Vector3(0.5f, 0.5f, 0.54f)),
+		("cloud_light", new Vector3(0.84f, 0.8f, 0.74f)),
+		("ridge_far", new Vector3(0.52f, 0.56f, 0.62f)),
+		("ridge_mid", new Vector3(0.42f, 0.46f, 0.51f)),
+		("ridge_near", new Vector3(0.32f, 0.36f, 0.39f)),
+		("haze_color", new Vector3(0.68f, 0.65f, 0.58f)),
+		("below_color", new Vector3(0.58f, 0.55f, 0.48f)),
 	};
 	private float _skyGlowBase = 0.55f, _skyCloudBase = 0.55f;
 
@@ -164,6 +174,18 @@ public partial class ForestAtmosphere : Node
 	// had, not from a value that already includes a lightning flash or the ambient floor.
 	private Color _baseFog, _baseSunColor;
 	private float _baseDensity, _baseSkyFog, _baseAmbient, _baseSunEnergy;
+	private float _baseSkyEnergy = 1f, _fromSkyEnergy = 1f;
+
+	// The light shafts (see LightShafts): owned here, driven by the mood every frame.
+	private LightShafts _shafts;
+	private Color _shaftTint = new(1f, 0.88f, 0.66f);
+	private float _shaftIntensity = 0.16f, _shaftStrength;
+	/// <summary>For tests: the shafts node this atmosphere drives.</summary>
+	public LightShafts Shafts => _shafts;
+	/// <summary>Sky (background) energy scale by mood: dim overcast at night, a little less in the menace.</summary>
+	[Export] public float SkyEnergyNight = 0.3f;
+	[Export] public float SkyEnergyMenacing = 0.45f;
+	[Export] public float SkyEnergyDawn = 0.8f;
 
 	public override void _Ready()
 	{
@@ -190,6 +212,11 @@ public partial class ForestAtmosphere : Node
 		}
 		_baseSunEnergy = _sun?.LightEnergy ?? 0f;
 		_baseSunColor = _sun?.LightColor ?? Colors.White;
+		if (!Engine.IsEditorHint() && _sun != null)
+		{
+			_shafts = new LightShafts { Name = "LightShafts", Strength = 0f };
+			AddChild(_shafts);
+		}
 	}
 
 	/// <summary>A sky uniform as set on the material, else the shader's default (colours as Vector3).</summary>
@@ -222,6 +249,7 @@ public partial class ForestAtmosphere : Node
 		_fromFog = _baseFog;
 		_fromDensity = _baseDensity;
 		_fromSkyFog = _baseSkyFog;
+		_fromSkyEnergy = _baseSkyEnergy;
 		_fromAmbient = _baseAmbient;
 		_fromSunEnergy = _baseSunEnergy;
 		_fromSunColor = _baseSunColor;
@@ -327,6 +355,7 @@ public partial class ForestAtmosphere : Node
 		_baseSkyFog = Mathf.Lerp(SkyFogOpen, SkyFogDeep, t);
 		_baseAmbient = Mathf.Lerp(AmbientOpen, AmbientDeep, t);
 		_baseSunEnergy = Mathf.Lerp(SunOpen, SunDeep, t);
+		_baseSkyEnergy = Mathf.Lerp(1f, SkyEnergyDeep, t);
 		_baseSunColor = _sunBaseColor;
 
 		// The open-trail grade: sunnier, warmer, thinner and lighter fog near the start of the walk.
@@ -344,22 +373,52 @@ public partial class ForestAtmosphere : Node
 	{
 		_moodBlend = Mathf.Min(1f, _moodBlend + (float)delta * _moodBlendSpeed);
 		float u = Mathf.SmoothStep(0f, 1f, _moodBlend);
-		(Color fog, float density, float skyFog, float ambient, float sunEnergy, Color sunColor) target = _mood switch
+		// Sky-fog: at night and in the menace the fog swallows most of the sky, so it reads as a dim
+		// overcast only just lighter than the trees, never a bright cut-out behind them.
+		(Color fog, float density, float skyFog, float ambient, float sunEnergy, Color sunColor, float skyEnergy) target = _mood switch
 		{
-			Mood.Dawn => (FogColorDawn, FogDensityDawn, 0.1f, AmbientDawn, SunEnergyDawn, SunColorDawn),
-			Mood.Menacing => (FogColorMenacing, FogDensityMenacing, 0.6f, AmbientMenacing, SunEnergyMenacing, _sunBaseColor),
-			Mood.Night => (FogColorNight, FogDensityNight, 0.35f, AmbientNight, SunEnergyNight, MoonColor),
-			_ => (_fromFog, _fromDensity, _fromSkyFog, _fromAmbient, _fromSunEnergy, _fromSunColor),
+			Mood.Dawn => (FogColorDawn, FogDensityDawn, 0.1f, AmbientDawn, SunEnergyDawn, SunColorDawn, SkyEnergyDawn),
+			Mood.Menacing => (FogColorMenacing, FogDensityMenacing, 0.78f, AmbientMenacing, SunEnergyMenacing, _sunBaseColor, SkyEnergyMenacing),
+			Mood.Night => (FogColorNight, FogDensityNight, 0.72f, AmbientNight, SunEnergyNight, MoonColor, SkyEnergyNight),
+			_ => (_fromFog, _fromDensity, _fromSkyFog, _fromAmbient, _fromSunEnergy, _fromSunColor, _fromSkyEnergy),
 		};
 		_baseFog = _fromFog.Lerp(target.fog, u);
 		_baseDensity = Mathf.Lerp(_fromDensity, target.density, u);
 		_baseSkyFog = Mathf.Lerp(_fromSkyFog, target.skyFog, u);
+		_baseSkyEnergy = Mathf.Lerp(_fromSkyEnergy, target.skyEnergy, u);
 		_baseAmbient = Mathf.Lerp(_fromAmbient, target.ambient, u);
 		_baseSunEnergy = Mathf.Lerp(_fromSunEnergy, target.sunEnergy, u);
 		_baseSunColor = _fromSunColor.Lerp(target.sunColor, u);
 	}
 
 	private static float Lum(Color c) => c.R * 0.2126f + c.G * 0.7152f + c.B * 0.0722f;
+
+	/// <summary>
+	/// The light shafts follow the mood: warm and strong on the open Act 1 trail, about half in the
+	/// deep woods, a faint cold moon at night, a red-tinged trace in the menace; gone indoors and in
+	/// heavy rain. Colour and level ease toward their targets so a mood change never pops them.
+	/// </summary>
+	private void DriveShafts(float storm)
+	{
+		if (_shafts == null || !IsInstanceValid(_shafts)) return;
+		(Color tint, float intensity, float strength) target = _mood switch
+		{
+			Mood.Night => (new Color(0.5f, 0.62f, 0.9f), 0.02f, 0.3f),
+			Mood.Menacing => (new Color(0.75f, 0.45f, 0.5f), 0.018f, 0.2f),
+			Mood.Dawn => (new Color(1f, 0.78f, 0.55f), 0.12f, 0.6f),
+			_ => (new Color(1f, 0.88f, 0.66f), 0.16f, Mathf.Lerp(0.55f, 1f, _open)),
+		};
+		bool indoors = Audio.ForestAmbienceManager.Instance is { IsIndoor: true };
+		float strength = indoors ? 0f : target.strength * (1f - 0.85f * storm);
+		float k = 1f - Mathf.Exp(-(float)GetProcessDeltaTime() * 1.2f);
+		_shaftTint = _shaftTint.Lerp(target.tint, k);
+		_shaftIntensity = Mathf.Lerp(_shaftIntensity, target.intensity, k);
+		_shaftStrength = Mathf.Lerp(_shaftStrength, strength, k);
+		_shafts.Tint = _shaftTint;
+		_shafts.Intensity = _shaftIntensity;
+		_shafts.Strength = _shaftStrength;
+		_shafts.LightDir = -_sun.GlobalBasis.Z;
+	}
 
 	/// <summary>Storm, wetness, ambient floor and lightning, layered over the base every frame.</summary>
 	private void ApplyLayers()
@@ -385,16 +444,18 @@ public partial class ForestAtmosphere : Node
 		ambient += flash * 1.4f;
 		fog += new Color(0.35f, 0.37f, 0.42f) * flash * 0.6f;
 
+		if (BloodTint > 0f) fog = fog.Lerp(new Color(0.30f, 0.04f, 0.03f), Mathf.Clamp(BloodTint, 0f, 1f));
 		_env.FogLightColor = fog;
 		_env.FogDensity = density;
 		_env.FogSkyAffect = _baseSkyFog;
 		_env.AmbientLightColor = ambColor;
 		_env.AmbientLightEnergy = ambient;
 		_env.TonemapExposure = _exposureBase + OpenExposureBoost * _open;
-		_env.BackgroundEnergyMultiplier = _bgEnergyBase * (1f + OpenSkyBoost * _open) * (1f - 0.35f * storm) + flash * 2.5f;
+		_env.BackgroundEnergyMultiplier = _bgEnergyBase * _baseSkyEnergy * (1f + OpenSkyBoost * _open) * (1f - 0.35f * storm) + flash * 2.5f;
 		if (_sun == null) return;
 		_sun.LightEnergy = sunEnergy;
 		_sun.LightColor = _baseSunColor;
+		DriveShafts(storm);
 		// Raise the sun with the grade (about its own horizontal axis), in small steps.
 		float raise = Mathf.Snapped(_open * (OpenWarmAmbientAndSky ? OpenSunRaiseDegrees : 0f), 0.25f);
 		if (!Mathf.IsEqualApprox(raise, _sunRaiseApplied))

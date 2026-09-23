@@ -26,10 +26,13 @@ namespace ProjectDS.Entities;
 /// - Seen, it ducks sideways behind its trunk as it dissolves: the movement is
 ///   the tell.
 /// - It is heard more than seen, but only from where it actually is: while it
-///   waits, its steps sometimes shadow yours a beat late and stop when you
-///   stop, or a twig snaps at its tree.
+///   waits, its steps answer yours a beat late (the player's own samples, from where it
+///   stands) and stop when you stop, and its rattle clicks from its tree, slower far off and
+///   quicker the closer or more urgent it is (one take, creature_rattle_loop_01). It has no other
+///   voice: no growl, snarl or screech, and it makes no sound when it goes.
 /// - It does not follow at all on the Blackfern Trail: it starts in the Hollow,
-///   once the first climb has happened (checkpoint 2 on). It never enters the silence around a
+///   once the lantern and the compass are in hand. Until the footbridge it stalks hardest
+///   (its introduction: see the Intro exports). It never enters the silence around a
 ///   staircase, and it withdraws entirely while the player is indoors (the
 ///   cabin, the bunker), where there are no trees to hide behind.
 /// </summary>
@@ -68,7 +71,7 @@ public partial class Stalker : Node3D
 	[Export] public Vector2 LingerSeconds = new(0.08f, 0.3f);
 	[Export] public float LongLingerChance = 0.1f;
 	[Export] public float LongLingerSeconds = 0.6f;
-	[Export] public float VanishSeconds = 0.22f;
+	[Export] public float VanishSeconds = 0.1f;   // gone the instant it is caught (Dan, 2026-09-22)
 	/// <summary>Seen, it ducks sideways into cover this fast while dissolving (m/s). The movement is the tell.</summary>
 	[Export] public float DuckSpeed = 3.2f;
 	/// <summary>Never fully solid: its peak opacity in the screen-door dither (1 = solid).</summary>
@@ -88,9 +91,31 @@ public partial class Stalker : Node3D
 	/// <summary>Seconds of walking between spells of its steps shadowing yours.</summary>
 	[Export] public Vector2 ShadowInterval = new(10f, 25f);
 	[Export] public Vector2I ShadowSteps = new(4, 10);
-	[Export] public Vector2 TwigInterval = new(15f, 40f);   // counted only while it is out there
 	[Export] public float StepVolumeDb = 3f;
-	[Export] public float TwigVolumeDb = 5f;
+
+	[ExportGroup("Intro (the Hollow path walk)")]
+	/// <summary>Until the footbridge (checkpoint 5) it stalks hard: this is its introduction as a character.
+	/// These replace the pacing exports above while <see cref="Intro"/> is true (Dan, 2026-09-22).</summary>
+	[Export] public Vector2 IntroCooldownSeconds = new(6f, 14f);
+	[Export] public Vector2 IntroRelocateSeconds = new(6f, 12f);   // a new tree, a new side, even while you keep walking
+	[Export] public Vector2 IntroUnseenCooldown = new(1f, 3f);
+	[Export] public float IntroCloseInSeconds = 45f;
+	[Export] public float IntroAheadChance = 0.3f;
+	[Export] public Vector2 IntroShadowInterval = new(2f, 5f);   // steps are most of what is heard on the path (Dan, 2026-09-22)
+	[Export] public Vector2I IntroShadowSteps = new(4, 10);
+	[Export] public float IntroEchoStepChance = 0.8f;
+	[Export] public float IntroEchoStepCooldown = 6f;
+	[Export] public float IntroRattleRange = 34f;
+	/// <summary>Seconds after waking before it first stands behind a tree.</summary>
+	[Export] public Vector2 IntroFirstAppearance = new(8f, 13f);
+
+	[ExportGroup("Voice")]
+	/// <summary>The rattle (a dry clicking croak from its tree) is inaudible beyond this and grows as you close in.</summary>
+	[Export] public float RattleRange = 26f;
+	/// <summary>Level of the rattle when it is right on you.</summary>
+	[Export] public float RattleMaxDb = 3f;
+	/// <summary>Unused since 2026-09-22 (the rate is lerp(0.55, 1, intensity) in UpdateRattle); kept so scene overrides still load.</summary>
+	[Export] public Vector2 RattlePitch = new(0.72f, 1f);
 
 	public State Current { get; private set; } = State.Dormant;
 	public int PeekCount { get; private set; }
@@ -100,6 +125,18 @@ public partial class Stalker : Node3D
 	public int StingCount { get; private set; }
 	public int ShadowSpells { get; private set; }
 	public int SoundCount { get; private set; }
+	/// <summary>Always 0 since 2026-09-22: it has no voice but the rattle (Dan: no snarl, screech or growl, it just disappears).</summary>
+	public int SnarlCount => 0;
+	/// <summary>The Hollow path walk, from the wake to the footbridge: its introduction, when it stalks hardest.</summary>
+	public bool Intro => StoryManager.Instance is { } s && s.Current < Checkpoint.Act6BridgeCrossed;
+	/// <summary>0..1 how loud the rattle is right now (for the debug readout and tests).</summary>
+	public float RattleLevel { get; private set; }
+	/// <summary>0..1, set by the story (the survey lot: a quarter per digit found): the rattle reaches
+	/// further, plays louder and quicker, and no longer needs it to be at a tree: it is somewhere behind
+	/// you, everywhere, closing. Hurry.</summary>
+	public float Urgency { get; set; }
+	/// <summary>Out of the bunker (checkpoint 8 on): the clicking is on you for the rest of the game, wherever you are.</summary>
+	public bool Hunted => StoryManager.Instance is { Current: >= Checkpoint.Act10WalkieFound };
 	public float LastSeenFraction { get; private set; }
 	public double LastSeenDuration { get; private set; }
 	/// <summary>0 = just seen, keeping back .. 1 = long unseen, as close as it gets.</summary>
@@ -136,18 +173,37 @@ public partial class Stalker : Node3D
 	private PhysicsRayQueryParameters3D _ray;
 	private PhysicsShapeQueryParameters3D _overlap;
 
-	private readonly List<AudioStream> _steps = new();
-	private readonly List<AudioStream> _twigs = new();
+	// Its footsteps are the player's own samples (Dan, 2026-09-22: they must SOUND like the player's), picked
+	// by the surface under IT, a touch heavier, a beat behind each of the player's steps.
+	private readonly Dictionary<string, AudioStream[]> _stepSets = new();
+	// Where it stands relative to you: the sectors it picks from (degrees off straight behind, + = to your right).
+	private static readonly float[] SectorDegrees = { 0f, -60f, 60f, -105f, 105f };
+	private const int AheadSector = 5;
+	private int _lastSector = -1, _trySector;
+	private readonly HashSet<int> _sectorsUsed = new();
+	private AudioStreamPlayer3D _rattle;
+	private AmbienceLoop _rattleLoop;
 	private AudioStream _sting;
 	private readonly List<AudioStreamPlayer3D> _voices = new();
 	private AudioStreamPlayer _stingVoice;
 	private int _nextVoice;
-	private SamplePicker _stepPicker, _twigPicker;
-	private readonly List<(double at, Vector3 pos)> _pendingSteps = new();
+	private SamplePicker _stepPicker;
+	private readonly List<(double at, Vector3 pos, AudioStream stream, bool shadow)> _pendingSteps = new();
 	private double _clock;
 	private double _nextEchoAllowed;
-	private double _nextTwig;
 	private double _nextShadow;
+
+	// The pacing in force: the intro's (the Hollow path walk, until the footbridge) or the exports'.
+	private Vector2 CooldownNow => Intro ? IntroCooldownSeconds : CooldownSeconds;
+	private Vector2 RelocateNow => Intro ? IntroRelocateSeconds : RelocateSeconds;
+	private Vector2 UnseenCooldownNow => Intro ? IntroUnseenCooldown : UnseenCooldown;
+	private float CloseInNow => Intro ? IntroCloseInSeconds : CloseInSeconds;
+	private float AheadChanceNow => Intro ? IntroAheadChance : AheadChance;
+	private Vector2 ShadowIntervalNow => Intro ? IntroShadowInterval : ShadowInterval;
+	private Vector2I ShadowStepsNow => Intro ? IntroShadowSteps : ShadowSteps;
+	private float EchoStepChanceNow => Intro ? IntroEchoStepChance : EchoStepChance;
+	private float EchoStepCooldownNow => Intro ? IntroEchoStepCooldown : EchoStepCooldown;
+	private float RattleRangeNow => Intro ? IntroRattleRange : RattleRange;
 	private int _shadowLeft;
 	private bool _listening;
 	private float _walkedFor;
@@ -163,8 +219,10 @@ public partial class Stalker : Node3D
 		TopLevel = true;
 		SetVisibility(0f);
 
-		for (int i = 1; i <= 6; i++) TryLoad($"res://assets/audio/sfx/step_dirt_{i:00}.wav", _steps);
-		for (int i = 1; i <= 4; i++) TryLoad($"res://assets/audio/sfx/twig_snap_{i:00}.wav", _twigs);
+		_stepSets["dirt"] = LoadSet("res://assets/audio/sfx/step_dirt_{0:00}.wav", 6);
+		_stepSets["wood"] = LoadSet("res://assets/audio/sfx/step_wood_{0:00}.wav", 4);
+		_stepSets["stone"] = LoadSet("res://assets/audio/sfx/step_stone_{0:00}.wav", 6);
+		// No twig snaps from it (Dan, 2026-09-22: a dry snap reads as a distant gunshot; the rattle is its sound now).
 		if (ResourceLoader.Exists("res://assets/audio/sfx/stalker_seen_01.wav"))
 			_sting = GD.Load<AudioStream>("res://assets/audio/sfx/stalker_seen_01.wav");
 		for (int i = 0; i < 4; i++)
@@ -175,7 +233,17 @@ public partial class Stalker : Node3D
 		}
 		_stingVoice = new AudioStreamPlayer { Bus = "Unnatural" };
 		AddChild(_stingVoice);
-		_nextTwig = _rng.RandfRange(TwigInterval.X, TwigInterval.Y);
+		// Its only voice is the rattle loop that rises as you close in (Dan, 2026-09-22: no growl, snarl or
+		// screech, ever; it makes no sound when it goes, it is just gone). Every rattle take there is, so you
+		// very rarely hear the same beat twice.
+		const string rattlePath = "res://assets/audio/sfx/creature_rattle_loop_01.wav";   // the one take (the others read as hooves)
+		if (ResourceLoader.Exists(rattlePath))
+		{
+			_rattle = new AudioStreamPlayer3D { Bus = "Unnatural", UnitSize = 8f, MaxDistance = 60f, TopLevel = true };
+			AddChild(_rattle);
+			_rattleLoop = new AmbienceLoop { Name = "Loop", StreamPath = rattlePath, BaseVolumeDb = RattleMaxDb, Gain = 0f };
+			_rattle.AddChild(_rattleLoop);
+		}
 		_nextShadow = _rng.RandfRange(ShadowInterval.X, ShadowInterval.Y);
 		_overlap = new PhysicsShapeQueryParameters3D
 		{
@@ -186,16 +254,36 @@ public partial class Stalker : Node3D
 
 	public override void _ExitTree() => ProjectDS.Player.CameraTool.PhotoTaken -= OnPhotoTaken;
 
-	private static void TryLoad(string path, List<AudioStream> into)
+	private static AudioStream[] LoadSet(string pattern, int count)
 	{
-		if (ResourceLoader.Exists(path)) into.Add(GD.Load<AudioStream>(path));
+		var list = new List<AudioStream>();
+		for (int i = 1; i <= count; i++)
+		{
+			string path = string.Format(pattern, i);
+			if (ResourceLoader.Exists(path)) list.Add(GD.Load<AudioStream>(path));
+		}
+		return list.ToArray();
 	}
 
-	/// <summary>The player has stood still a long time: appear soon, and let a twig snap.</summary>
+	/// <summary>The surface under its feet, from the collider's "surface" meta like the player's own steps (dirt by default).</summary>
+	private string SurfaceUnderIt()
+	{
+		if (_ray == null) return "dirt";
+		var hit = Ray(GlobalPosition + Vector3.Up * 0.5f, GlobalPosition + Vector3.Down * 1.5f);
+		if (hit.Count > 0 && hit["collider"].AsGodotObject() is Node n && n.HasMeta("surface")) return n.GetMeta("surface").AsString();
+		return "dirt";
+	}
+
+	private AudioStream PickStep()
+	{
+		if (!_stepSets.TryGetValue(SurfaceUnderIt(), out var set) || set.Length == 0) set = _stepSets["dirt"];
+		return set.Length == 0 ? null : set[_stepPicker.Next(_rng, set.Length)];
+	}
+
+	/// <summary>The player has stood still a long time: appear soon.</summary>
 	public void NudgeNoise()
 	{
 		_cooldown = Mathf.Min(_cooldown, _rng.RandfRange(1f, 4f));   // come and stand behind a tree soon
-		_nextTwig = Mathf.Min(_nextTwig, _clock + _rng.RandfRange(4f, 9f));
 	}
 
 	public override void _UnhandledInput(InputEvent e)
@@ -236,8 +324,20 @@ public partial class Stalker : Node3D
 
 	private static bool Indoors => ForestAmbienceManager.Instance is { IsIndoor: true };
 
-	/// <summary>Whether the story lets it follow yet: only in the Hollow, from the first climb on.</summary>
-	private static bool ShouldWake() => StoryManager.Instance is not { } s || s.Current >= Checkpoint.Act2StairsClimbed;
+	/// <summary>
+	/// The hard gate (Dan, 2026-09-22: "the mini stalker should not stalk you inside the bunker", "only the jumpscares"):
+	/// indoors, or anywhere in the bunker's story window (checkpoint 7 until the walkie wakes outside at checkpoint 8),
+	/// the free-roaming stalker is completely inert: no placements, no peeks, no rattle, no footsteps of any kind. The
+	/// story window covers the admit fade, when IsIndoor is briefly false while the player already stands in the
+	/// interior 300 m away. The bunker's own scripted scares (BunkerFlow / BunkerRooms) are the only stalker in there.
+	/// </summary>
+	public static bool Inert => Indoors
+		|| (StoryManager.Instance is { } s && s.Current >= Checkpoint.Act8BunkerEntered && s.Current < Checkpoint.Act10WalkieFound);
+
+	/// <summary>Whether the story lets it follow yet: only in the Hollow, and only once the lantern and the compass
+	/// are both in hand (Dan, 2026-09-22: it starts stalking soon after those pickups, not before).</summary>
+	private static bool ShouldWake() => StoryManager.Instance is not { } s
+		|| (s.HasFlag(StoryManager.Flag.PickupTakenLantern) && s.HasFlag(StoryManager.Flag.PickupTakenCompass));
 
 	public override void _Process(double delta)
 	{
@@ -260,22 +360,31 @@ public partial class Stalker : Node3D
 		}
 
 		float speed = TrackSpeed(dt);
-		PlayPendingSteps();
-
-		// Indoors there is nothing to hide behind: it is simply not there until you come back out.
-		if (Indoors)
+		// Indoors, or in the bunker, there is nothing of it at all: no sound, no body, until you come back out.
+		if (Inert)
 		{
-			if (Current != State.Dormant) { Hide(0f); Current = State.Dormant; _shadowLeft = 0; }
+			if (Current != State.Dormant) { Hide(0f); Current = State.Dormant; }
+			_shadowLeft = 0;
+			_pendingSteps.Clear();
+			_walkedFor = 0f;
+			if (_episodeOn) EndEpisode();
+			_burstOn = false;
+			RattleLevel = 0f;
+			if (_rattleLoop != null) _rattleLoop.Gain = 0f;
 			return;
 		}
+		PlayPendingSteps();
+		UpdateRattle(dt);
 		if (!_awake)
 		{
 			if (!ShouldWake()) { Current = State.Dormant; return; }
 			_awake = true;
+			// Its introduction: the first tree within seconds of the lantern and compass being taken.
+			_cooldown = _rng.RandfRange(IntroFirstAppearance.X, IntroFirstAppearance.Y);
 		}
 		if (Current == State.Dormant) Current = State.Hidden;
 		// Unseen, it grows bolder: its trees creep closer over time.
-		Tension = Mathf.Min(1f, Tension + dt / CloseInSeconds);
+		Tension = Mathf.Min(1f, Tension + dt / CloseInNow);
 
 		bool withdraw = SilenceAt(_player.GlobalPosition) > RetreatAtSilence;
 		switch (Current)
@@ -284,17 +393,18 @@ public partial class Stalker : Node3D
 				_cooldown -= dt;
 				if (!withdraw && _cooldown <= 0f)
 				{
-					bool placed = _rng.Randf() < AheadChance && TryPlace(cam, ahead: true);
-					if (!placed && !TryPlace(cam, ahead: false)) _cooldown = 3f;
+					bool placed = _rng.Randf() < AheadChanceNow && TryPlace(cam, ahead: true);
+					if (!placed && !TryPlace(cam, ahead: false)) _cooldown = Intro ? 1.5f : 3f;
 				}
 				break;
 			case State.Peeking:
 				UpdatePeeking(cam, dt, withdraw);
 				break;
 			case State.Vanishing:
+				// Gone the instant it is caught: a 0.1 s dissolve, no sound of any kind.
 				SetVisibility(_visibility - dt * MaxVisibility / VanishSeconds);
 				GlobalPosition += _hideDir * DuckSpeed * dt;
-				if (_visibility <= 0f) Hide(_rng.RandfRange(CooldownSeconds.X, CooldownSeconds.Y));
+				if (_visibility <= 0f) Hide(_rng.RandfRange(CooldownNow.X, CooldownNow.Y));
 				break;
 		}
 
@@ -311,7 +421,7 @@ public partial class Stalker : Node3D
 			LastSeenFraction = seen;
 			_seenTime += dt;
 			bool tooClose = _ahead && dist < AheadBreakDistance;
-			if (_seenTime >= _linger || tooClose || withdraw) { LastSeenDuration = _seenTime; Current = State.Vanishing; }
+			if (_seenTime >= _linger || tooClose || withdraw) { LastSeenDuration = _seenTime; StartVanishing(); }
 			return;
 		}
 
@@ -319,14 +429,14 @@ public partial class Stalker : Node3D
 		if (withdraw || _seenThisPeek)
 		{
 			if (_seenThisPeek) LastSeenDuration = _seenTime;
-			Hide(_rng.RandfRange(CooldownSeconds.X, CooldownSeconds.Y));
+			Hide(_rng.RandfRange(CooldownNow.X, CooldownNow.Y));
 			return;
 		}
 
 		// Unobserved. If you walked on without ever seeing it, it is simply gone.
 		if (dist > (_ahead ? MoveOnDistance + 18f : MoveOnDistance))
 		{
-			Hide(_rng.RandfRange(UnseenCooldown.X, UnseenCooldown.Y));
+			Hide(_rng.RandfRange(UnseenCooldownNow.X, UnseenCooldownNow.Y));
 			return;
 		}
 		// You are lingering near it: after a while it moves to another tree (only while nobody is looking).
@@ -361,9 +471,135 @@ public partial class Stalker : Node3D
 		{
 			if (!_seenThisPeek) { _seenThisPeek = true; SeenCount++; Tension = 0.1f; }
 			LastSeenDuration = _seenTime;
-			Current = State.Vanishing;
+			StartVanishing();
 		}
 	}
+
+	/// <summary>Caught looking: it ducks away and is gone. It makes no sound as it goes (Dan, 2026-09-22).</summary>
+	private void StartVanishing()
+	{
+		Current = State.Vanishing;
+		_episodeRequested = true;   // it ducked away from your eyes: a short rattle episode follows
+	}
+
+	/// <summary>
+	/// The rattle: a dry clicking croak that plays from its tree while it stands there unseen, silent
+	/// beyond <see cref="RattleRange"/> and rising (louder, quicker) the closer you come. Seen, or
+	/// gone, it drops away at once.
+	/// </summary>
+	private void UpdateRattle(float dt)
+	{
+		if (_rattleLoop == null || _player == null) return;
+		// Out of the bunker (Dan, 2026-09-22: the clicking must be far more present after that): full urgency,
+		// twice the reach, and it never lets go of your back.
+		bool hunted = Hunted;
+		float urg = hunted ? 1f : Mathf.Clamp(Urgency, 0f, 1f);
+		float target = 0f, intensity = 0f;
+		Vector3 at = GlobalPosition + Vector3.Up * 1.5f;
+		if (Present && !Indoors)
+		{
+			float dist = Flat(GlobalPosition).DistanceTo(Flat(_player.GlobalPosition));
+			float close = Mathf.Clamp(1f - dist / (Mathf.Max(RattleRangeNow, 1f) * (1f + 0.6f * urg) * (hunted ? 2f : 1f)), 0f, 1f);
+			target = Mathf.Max(close * close * (3f - 2f * close), (hunted ? 0.7f : 0.35f) * urg);
+			intensity = close * (0.5f + 0.5f * urg);
+		}
+		else if (_awake && !Indoors && urg > 0f)
+		{
+			// Not at a tree, but not gone either: the clicking comes from just behind you, wherever you turn.
+			target = (hunted ? 0.85f : 0.45f) * urg;
+			var cam = GetViewport().GetCamera3D();
+			Vector3 back = cam != null ? cam.GlobalBasis.Z : Vector3.Back; back.Y = 0;
+			at = _player.GlobalPosition + back.Normalized() * 5f + Vector3.Up * 1.5f;
+			intensity = 0.35f + 0.4f * urg;
+		}
+		// One take only, creature_rattle_loop_01 (Dan, 2026-09-22: the other beats read as hooves), and its speed is a
+		// clean function of intensity: slow far off and calm, quick close in or hunted, gliding over about a second.
+		if (hunted) intensity = Mathf.Max(intensity, 0.75f);
+		_intensity = Mathf.MoveToward(_intensity, intensity, dt * 1f);
+		_rattle.PitchScale = Mathf.Lerp(0.55f, 1f, _intensity);
+		// Sporadic (Dan, 2026-09-22): it clicks in bursts with silences between, and no two bursts sit at
+		// quite the same level. The burst gate scales the target; the level drift rides on the volume.
+		// Less of it, and never over its own footsteps (Dan, 2026-09-22: "too much rattling"): bursts are short
+		// (0.8-2.2 s) and rare (3-9 s apart on the path walk, 2-6 s later), a spell of steps holds the rattle off, and
+		// every burst sits at its own level, most of them quiet, the odd one loud.
+		// EPISODES (Dan, 2026-09-22: "it can rattle a lot at certain times but not all the dang time"): long quiet
+		// stretches with no rattle at all (25-60 s on the path walk, 20-45 s later; its steps may still come), then an
+		// episode of 10-20 s where it rattles a lot, bursts on 1-2.5 s and off 0.5-1.5 s, louder and quicker toward the
+		// end, then silence again. Being very close, or having just ducked away from your eyes, starts a short episode.
+		_episodeTimer -= dt;
+		bool closeNow = Present && !Indoors && intensity > 0.8f;
+		if (!_episodeOn && (closeNow || _episodeRequested) && _clock >= _episodeAllowedAt) StartEpisode(_rng.RandfRange(6f, 10f));
+		_episodeRequested = false;
+		if (_episodeTimer <= 0f)
+		{
+			if (_episodeOn) EndEpisode();
+			else StartEpisode(_rng.RandfRange(10f, 20f));
+		}
+		float episodeFrac = _episodeOn ? Mathf.Clamp(1f - _episodeTimer / Mathf.Max(_episodeLength, 0.1f), 0f, 1f) : 0f;
+		if (_episodeOn) _rattle.PitchScale = Mathf.Min(1f, _rattle.PitchScale * Mathf.Lerp(1f, 1.18f, episodeFrac));   // quicker toward the end
+		_burstTimer -= dt;
+		bool stepsRunning = _shadowLeft > 0;
+		if (!_episodeOn) { _burstOn = false; _burstTimer = 0f; }
+		else
+		{
+			if (_burstOn && stepsRunning) { _burstOn = false; _burstTimer = _rng.RandfRange(0.5f, 1.5f); }
+			if (_burstTimer <= 0f)
+			{
+				if (!_burstOn && stepsRunning) _burstTimer = 0.3f;   // wait for the steps to end
+				else
+				{
+					_burstOn = !_burstOn;
+					_burstTimer = _burstOn ? _rng.RandfRange(1f, 2.5f) : _rng.RandfRange(0.5f, 1.5f);
+					if (_burstOn)
+					{
+						RattleBursts++;
+						float u = _rng.Randf();
+						_burstDb = u < 0.15f ? _rng.RandfRange(1f, 3f) : u < 0.5f ? _rng.RandfRange(-4f, 0f) : _rng.RandfRange(-9f, -4f);
+						_burstDb += 5f * episodeFrac;   // louder toward the end of the episode
+					}
+				}
+			}
+		}
+		float gate = _burstOn ? 1f : 0f;
+		_rattleLoop.BaseVolumeDb = RattleMaxDb + 5f * urg + (hunted ? 3f : 0f) + _burstDb;
+		RattleLevel = Mathf.MoveToward(RattleLevel, target * gate, dt * (target * gate > RattleLevel ? 0.9f : 2.5f));
+		_rattleLoop.Gain = RattleLevel;
+		if (RattleLevel > 0.001f) _rattle.GlobalPosition = at;
+		// For the test: how much of the time the rattle is actually audible.
+		_rattleClock += dt;
+		if (RattleLevel > 0.05f) _rattleAudible += dt;
+	}
+
+	private void StartEpisode(float length)
+	{
+		if (Inert) return;
+		_episodeOn = true;
+		_episodeLength = length;
+		_episodeTimer = length;
+		_burstOn = false;
+		_burstTimer = 0f;
+		RattleEpisodes++;
+	}
+
+	private void EndEpisode()
+	{
+		_episodeOn = false;
+		_burstOn = false;
+		_episodeTimer = Intro ? _rng.RandfRange(25f, 60f) : _rng.RandfRange(20f, 45f);
+		_episodeAllowedAt = _clock + 8f;   // a close or a sighting cannot restart it at once
+	}
+
+	private bool _burstOn = false, _episodeOn = false, _episodeRequested = false;
+	private float _intensity;
+	private float _burstTimer = 0f, _burstDb;
+	private float _episodeTimer = 12f, _episodeLength = 1f;   // the first quiet stretch is short: it is heard early, then goes quiet
+	private double _episodeAllowedAt, _rattleClock, _rattleAudible;
+	/// <summary>For tests: how many rattle bursts have started.</summary>
+	public int RattleBursts { get; private set; }
+	/// <summary>For tests: how many rattle episodes (the stretches where it rattles a lot) have started.</summary>
+	public int RattleEpisodes { get; private set; }
+	/// <summary>For tests: 0..1, the share of its awake time with the rattle audible.</summary>
+	public float RattleAudibleFraction => _rattleClock > 1 ? (float)(_rattleAudible / _rattleClock) : 0f;
 
 	private void Hide(float cooldown)
 	{
@@ -392,7 +628,15 @@ public partial class Stalker : Node3D
 				float side = _rng.Randf() < 0.5f ? -1f : 1f;
 				dir = look.Rotated(Vector3.Up, side * Mathf.DegToRad(_rng.RandfRange(AheadAngleDegrees.X, AheadAngleDegrees.Y)));
 			}
-			else dir = (-look).Rotated(Vector3.Up, _rng.RandfRange(-0.9f, 0.9f));
+			else
+			{
+				// A different side each time (Dan, 2026-09-22: it moves around, so its sounds come from all round you):
+				// behind, behind-left, behind-right, off to the left, off to the right; never the same sector twice running.
+				int sector;
+				do sector = _rng.RandiRange(0, SectorDegrees.Length - 1); while (sector == _lastSector && SectorDegrees.Length > 1);
+				_trySector = sector;
+				dir = (-look).Rotated(Vector3.Up, Mathf.DegToRad(SectorDegrees[sector] + _rng.RandfRange(-22f, 22f)));
+			}
 
 			var hit = Ray(eye, eye + dir * (range.Y + 4f));
 			if (hit.Count == 0) continue;
@@ -423,16 +667,17 @@ public partial class Stalker : Node3D
 
 			_hideDir = -lateral;
 			_ahead = ahead;
+			_lastSector = ahead ? AheadSector : _trySector;
+			_sectorsUsed.Add(_lastSector);
 			Current = State.Peeking;
 			PeekCount++;
 			if (ahead) DistantCount++;
 			_seenThisPeek = false;
 			_stungThisPeek = false;
 			_seenTime = 0;
-			_stayTimer = ahead ? 25f : _rng.RandfRange(RelocateSeconds.X, RelocateSeconds.Y);
-			// Give it a moment at its new tree before it makes any sound.
-			_nextTwig = _clock + _rng.RandfRange(TwigInterval.X, TwigInterval.Y);
-			_nextShadow = _clock + _rng.RandfRange(3f, 10f);
+			_stayTimer = ahead ? 25f : _rng.RandfRange(RelocateNow.X, RelocateNow.Y);
+			// Give it a moment at its new tree before its steps start answering yours.
+			_nextShadow = _clock + (Intro ? _rng.RandfRange(0.8f, 3f) : _rng.RandfRange(3f, 10f));
 			_linger = _rng.Randf() < LongLingerChance ? LongLingerSeconds : _rng.RandfRange(LingerSeconds.X, LingerSeconds.Y);
 			SetVisibility(MaxVisibility);
 			return true;
@@ -530,65 +775,83 @@ public partial class Stalker : Node3D
 	{
 		if (Current == State.Dormant) return;
 
-		// Echo steps: you stop, and from behind its tree, one more step.
+		// Echo steps: you stop, and from behind its tree, one more step (two, when it was already following).
 		if (speed > 1.2f) _walkedFor += (float)GetProcessDeltaTime();
-		else if (speed < 0.2f && _walkedFor >= 1.5f)
+		else if (speed < 0.2f && _walkedFor >= (Intro ? 0.8f : 1.5f))
 		{
 			_walkedFor = 0f;
 			bool wasShadowing = _shadowLeft > 0;
 			_shadowLeft = 0;   // you stopped; so did it
-			if (Present && _clock >= _nextEchoAllowed && _rng.Randf() < (wasShadowing ? 0.6f : EchoStepChance))
+			if (Present && _clock >= _nextEchoAllowed && _rng.Randf() < (wasShadowing ? 0.85f : EchoStepChanceNow))
 			{
-				_nextEchoAllowed = _clock + EchoStepCooldown;
-				QueueSteps(1, _rng.RandfRange(0.35f, 0.8f));
+				_nextEchoAllowed = _clock + EchoStepCooldownNow;
+				QueueSteps(wasShadowing && _rng.Randf() < 0.5f ? 2 : 1, _rng.RandfRange(0.35f, 0.8f));
 			}
 		}
 		if (!Present) { _shadowLeft = 0; return; }
 
-		// Every so often while you walk, its steps start shadowing yours (see OnPlayerStepped).
+		// While you walk, its steps shadow yours a beat behind, from its tree (see OnPlayerStepped): on the
+		// Hollow path walk almost all the time, later now and then.
 		if (speed > 1.2f && _shadowLeft == 0 && _clock >= _nextShadow)
 		{
-			_nextShadow = _clock + _rng.RandfRange(ShadowInterval.X, ShadowInterval.Y);
-			_shadowLeft = _rng.RandiRange(ShadowSteps.X, ShadowSteps.Y);
+			_nextShadow = _clock + _rng.RandfRange(ShadowIntervalNow.X, ShadowIntervalNow.Y);
+			_shadowLeft = _rng.RandiRange(ShadowStepsNow.X, ShadowStepsNow.Y);
+			_spellDb = _rng.RandfRange(-4f, 2f);   // each spell at its own level
 			ShadowSpells++;
 		}
-
-		// A twig snaps where it stands.
-		if (_clock >= _nextTwig && _twigs.Count > 0)
-		{
-			_nextTwig = _clock + _rng.RandfRange(TwigInterval.X, TwigInterval.Y);
-			Play(_twigs[_twigPicker.Next(_rng, _twigs.Count)], GlobalPosition + Vector3.Up * 0.1f, TwigVolumeDb, _rng.RandfRange(0.9f, 1.05f));
-		}
 	}
 
-	/// <summary>While shadowing: each of your footsteps is answered a beat later from its tree.</summary>
+	/// <summary>For tests: the player's steps that fell inside a shadow spell, and its answers to them.</summary>
+	public int ShadowStepsHeard { get; private set; }
+	public int ShadowStepsAnswered { get; private set; }
+	/// <summary>For tests: how many different sides of the player it has stood on (up to 6: five sectors and ahead).</summary>
+	public int DirectionsUsed => _sectorsUsed.Count;
+
+	/// <summary>While shadowing: each of your footsteps is answered a beat (120-220 ms) later from its tree, with the
+	/// same sample the player would get on the ground under it, so the two sets of steps sound like one pair of feet.</summary>
 	private void OnPlayerStepped()
 	{
-		if (_shadowLeft <= 0 || !Present) return;
+		if (Inert || _shadowLeft <= 0 || !Present) return;
+		// Never while the player runs, and only every second step, 380-520 ms behind: a separate walker
+		// out of phase with you, not a clip-clop on your own stride (Dan, 2026-09-22: it sounded like hooves).
+		if (_player.IsRunning) return;
+		_stepParity = !_stepParity;
+		if (!_stepParity) return;
 		_shadowLeft--;
-		Vector3 p = GlobalPosition + new Vector3(_rng.RandfRange(-0.4f, 0.4f), 0.1f, _rng.RandfRange(-0.4f, 0.4f));
-		_pendingSteps.Add((_clock + _rng.RandfRange(0.2f, 0.3f), p));
+		ShadowStepsHeard++;
+		var stream = PickStep();
+		if (stream == null) return;
+		Vector3 p = GlobalPosition + new Vector3(_rng.RandfRange(-0.3f, 0.3f), 0.1f, _rng.RandfRange(-0.3f, 0.3f));
+		_pendingSteps.Add((_clock + _rng.RandfRange(0.38f, 0.52f), p, stream, true));
 	}
+	private bool _stepParity;
 
 	private void QueueSteps(int count, float firstDelay)
 	{
 		double at = _clock + firstDelay;
 		for (int i = 0; i < count; i++, at += _rng.RandfRange(0.55f, 0.7f))
-			_pendingSteps.Add((at, GlobalPosition + Vector3.Up * 0.1f));
+		{
+			var stream = PickStep();
+			if (stream != null) _pendingSteps.Add((at, GlobalPosition + Vector3.Up * 0.1f, stream, false));
+		}
 	}
 
 	private void PlayPendingSteps()
 	{
 		for (int i = _pendingSteps.Count - 1; i >= 0; i--)
 		{
-			if (_pendingSteps[i].at > _clock || _steps.Count == 0) continue;
-			Play(_steps[_stepPicker.Next(_rng, _steps.Count)], _pendingSteps[i].pos, StepVolumeDb, _rng.RandfRange(0.84f, 0.94f));
+			if (_pendingSteps[i].at > _clock) continue;
+			// The player's sample, a touch heavier: pitched 0.9-0.97 and +1 dB.
+			Play(_pendingSteps[i].stream, _pendingSteps[i].pos, StepVolumeDb - 1f + (_pendingSteps[i].shadow ? _spellDb : 0f), _rng.RandfRange(0.9f, 0.97f));
+			if (_pendingSteps[i].shadow) ShadowStepsAnswered++;
 			_pendingSteps.RemoveAt(i);
 		}
 	}
+	private float _spellDb;
 
 	private void Play(AudioStream stream, Vector3 at, float db, float pitch)
 	{
+		if (Inert) return;   // nothing of it sounds inside the bunker
 		var v = _voices[_nextVoice];
 		_nextVoice = (_nextVoice + 1) % _voices.Count;
 		v.GlobalPosition = at;

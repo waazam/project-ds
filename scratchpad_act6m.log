@@ -1,0 +1,412 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+D3D12 12_0 - Forward+ - Using Device #0: AMD - AMD Radeon RX 6950 XT
+
+[waterfall] at stream s 109.4 (29.0 m above the crossing), drop 2.28 m, curtain (-21.60702, 8.20504, -162.55476)
+[storytest] --story-from=6: continuing into 'Act 6: the bridge and the clearing' at Act5CabinEntered with 9 flags, gear 'lantern,compass,newel_post;tool=None'
+[bunker] CRT room: 127 screens
+[bunker] interior built in 96 ms
+[story] Act 6 layout (name, xz, yaw deg, footprint w x l):
+  MiniStair0  (   9.7,  25.1) yaw    6 whole   4.2 x 19.0 m (trail)
+  MiniStair1  ( -15.7,   5.0) yaw  193 whole   4.2 x 19.0 m
+  MiniStair2  ( -12.5,  -9.5) yaw  177 ruined  4.6 x  4.4 m
+  MiniStair3  (  17.9,   2.3) yaw  234 whole   4.2 x 19.0 m
+  MiniStair4  ( -13.2, -13.7) yaw    9 whole   4.2 x 19.0 m
+  MiniStair5  (  -7.1,  15.7) yaw  306 ruined  3.9 x  5.2 m
+  MiniStair6  (  10.5, -21.9) yaw   91 whole   4.2 x 19.0 m
+  MiniStair7  ( -23.4,  -3.1) yaw  180 whole   4.2 x 19.0 m
+  MiniStair8  (  17.4,  -7.5) yaw  194 ruined  3.8 x  3.4 m
+  MiniStair9  (  15.0,   8.3) yaw  224 whole   4.2 x 19.0 m
+  MiniStair10 ( -25.4,  -9.0) yaw    6 whole   4.2 x 19.0 m
+  MiniStair11 ( -16.2,  -0.4) yaw  122 ruined  3.7 x  3.2 m
+  MiniStair12 (   1.5,  26.1) yaw  141 whole   4.2 x 19.0 m
+  MiniStair13 (  24.3,  -2.6) yaw  231 whole   4.2 x 19.0 m
+  MiniStair14 ( -24.0,  20.4) yaw  250 ruined  4.6 x  4.9 m
+[storytest] ---- Act 6: the bridge and the clearing
+[story] checkpoint reached: Act6BridgeCrossed
+[story] Act 6: the clearing is closed but for the trail
+[story] Act 6: the woods around the clearing turn
+[story] Act 6: the bridge is crossed
+[storytest] PASS checkpoint 5 on crossing the footbridge 
+[storytest] PASS the compass points at the clearing objective (2, 0, -590), stairs_clearing_marker (2, 0, -590)
+[storytest] PASS fifteen small stairs in the clearing 15
+[story] Act 6: the voice starts calling out of the trees
+[story] flag set: clearing_voice_heard
+[story] Act 6: the clearing has spoken
+[story] Act 6: the clearing waits for a staircase to be chosen (6 flights)
+[storytest] PASS the clearing's voice 
+[storytest] PASS the spotlight finds the player 
+[storytest] PASS the voice is the saved beat 
+[storytest] PASS the cap stays in hand (it belongs to the last staircase) 
+[storytest] PASS the clearing's staircase stays broken 
+[storytest] PASS after the voice the clearing waits for a choice: nothing lit armed True, target 
+[storytest] PASS the voice started calling as they entered the clearing calling True, 23 calls so far
+[storytest] PASS the compass rests on the clearing until a flight is chosen objective (-10, 10.545584, -588), clearing_loop_marker (-10, 10.545584, -588)
+[storytest] PASS only the whole staircases carry the loop 10 loop stairs, ruined 0
+[storytest] PASS the whole staircases are all much the same size steps 48-48, scale 1.35, width 1.50
+[storytest] PASS no two clearing staircases overlap 16 flights
+[storytest] PASS all whole flights are the same length 48-48 steps
+[storytest] PASS no staircase sinks into the ground 
+[storytest] PASS one whole staircase stands in the trail's mouth MiniStair0, 0.0 m off the trail
+[storytest] PASS the clearing is thick with fog height fog -0.070
+[storytest] PASS no trees inside the clearing 0 trunks within 50 m
+[storytest] PASS the clearing is closed 
+[storytest] PASS the clearing is closed but for the way in entrance open True, onward blocked True, side blocked True
+[story] it is raining blood
+[story] Act 6: the loop starts on MiniStair9
+[storytest] PASS stepping onto a staircase starts the loop target MiniStair9, chosen MiniStair9
+[storytest] PASS the light and the compass follow the chosen flight objective (14.8015585, 17.8392, -569.6735), clearing_loop_marker (14.8015585, 17.8392, -569.6735)
+[storytest] PASS blood begins to rain as the loop starts 
+[storytest] PASS four to six flights are planned, all up 6 flights
+[storytest] PASS cannot back down on flight 1 wall armed True, backed 0.01 m
+[story] Act 6: the top of MiniStair9 reached (flight 1 of 6)
+[storytest] PASS flight 1 (MiniStair9): the top is reached on foot (14.101379, 17.796743, -570.3865) vs (14.8015585, 17.8392, -569.6735)
+[story]   after hand-off 0.0s: on MiniStair3 local (0.00, 3.02, -4.75) floor True vel 0.00 move (0, 0) yaw -126 target MiniStair3 stage 1 t 145973
+[story] Act 6: the loop, flight 2 of 6 (MiniStair3, 0.48 up it)
+[story]   after hand-off 0.3s: on MiniStair3 local (0.00, 3.04, -4.74) floor True vel 0.00 move (0, 0) yaw -126 target MiniStair3 stage 1 t 146276
+[storytest] PASS flight 1: the fog put them on another flight (0.48 up it), still walking, no cut MiniStair3 at (13.039951, 13.723799, -581.9469) vs (13.055805, 13.514375, -581.93524), input True, black 0.00
+[storytest] PASS the compass follows the flight objective (19.167488, 17.77982, -577.43604), clearing_loop_marker (19.167488, 17.77982, -577.43604)
+[story]   after hand-off 0.6s: on MiniStair3 local (-0.00, 3.18, -4.97) floor True vel 2.70 move (0, 1) yaw -126 target MiniStair3 stage 1 t 146572
+[story]   after hand-off 0.9s: on MiniStair3 local (-0.00, 3.45, -5.41) floor True vel 2.70 move (0, 1) yaw -126 target MiniStair3 stage 1 t 146876
+[storytest] PASS cannot back down on flight 2 wall armed True, backed 0.01 m
+[story] Act 6: the top of MiniStair3 reached (flight 2 of 6)
+[storytest] PASS flight 2 (MiniStair3): the top is reached on foot (18.356659, 17.73258, -578.0337) vs (19.167488, 17.77982, -577.43604)
+[story]   after hand-off 0.0s: on MiniStair1 local (-0.00, 3.97, -6.33) floor True vel 0.00 move (0, 0) yaw -167 target MiniStair1 stage 2 t 156735
+[story] Act 6: the loop, flight 3 of 6 (MiniStair1, 0.64 up it)
+[story]   after hand-off 0.3s: on MiniStair1 local (-0.00, 4.00, -6.31) floor True vel 0.00 move (0, 0) yaw -167 target MiniStair1 stage 2 t 157038
+[storytest] PASS flight 2: the fog put them on another flight (0.64 up it), still walking, no cut MiniStair1 at (-23.694746, 15.036629, -574.67755) vs (-23.690157, 14.827219, -574.6584), input True, black 0.00
+[storytest] PASS the compass follows the flight objective (-22.416216, 17.801876, -569.3458), clearing_loop_marker (-22.416216, 17.801876, -569.3458)
+[story]   after hand-off 0.6s: on MiniStair1 local (0.00, 4.14, -6.54) floor True vel 2.70 move (0, 1) yaw -167 target MiniStair1 stage 2 t 157343
+[story]   after hand-off 0.9s: on MiniStair1 local (0.00, 4.40, -6.98) floor True vel 2.70 move (0, 1) yaw -167 target MiniStair1 stage 2 t 157647
+[story] Act 6: the top of MiniStair1 reached (flight 3 of 6)
+[storytest] PASS flight 3 (MiniStair1): the top is reached on foot (-22.648132, 17.762674, -570.3123) vs (-22.416216, 17.801876, -569.3458)
+[story]   after hand-off 0.0s: on MiniStair13 local (0.00, 0.16, 1.40) floor True vel 0.00 move (0, 0) yaw -129 target MiniStair13 stage 3 t 160268
+[story] Act 6: the loop, flight 4 of 6 (MiniStair13, 0.00 up it)
+[story]   after hand-off 0.3s: on MiniStair13 local (0.00, -0.07, 1.40) floor True vel 0.00 move (0, 0) yaw -129 target MiniStair13 stage 3 t 160572
+[storytest] PASS flight 3: the fog put them on another flight (0.00 up it), still walking, no cut MiniStair13 at (12.805512, 9.600576, -591.8341) vs (12.805512, 9.766983, -591.8341), input True, black 0.00
+[storytest] PASS the compass follows the flight objective (25.159447, 17.859482, -581.83453), clearing_loop_marker (25.159447, 17.859482, -581.83453)
+[story]   after hand-off 0.6s: on MiniStair13 local (0.00, -0.06, 1.08) floor True vel 2.70 move (0, 1) yaw -129 target MiniStair13 stage 3 t 160876
+[story]   after hand-off 0.9s: on MiniStair13 local (0.00, 0.04, 0.21) floor True vel 5.40 move (0, 1) yaw -129 target MiniStair13 stage 3 t 161180
+[story] Act 6: the top of MiniStair13 reached (flight 4 of 6)
+[storytest] PASS flight 4 (MiniStair13): the top is reached on foot (24.384195, 17.818497, -582.4614) vs (25.159447, 17.859482, -581.83453)
+[story]   after hand-off 0.0s: on MiniStair7 local (-0.00, 3.21, -5.07) floor True vel 0.00 move (0, 0) yaw -180 target MiniStair7 stage 4 t 166968
+[story] Act 6: the loop, flight 5 of 6 (MiniStair7, 0.51 up it)
+[story]   after hand-off 0.3s: on MiniStair7 local (-0.00, 3.24, -5.06) floor True vel 0.00 move (0, 0) yaw -180 target MiniStair7 stage 4 t 167272
+[storytest] PASS flight 4: the fog put them on another flight (0.51 up it), still walking, no cut MiniStair7 at (-33.396732, 14.045148, -584.2368) vs (-33.396698, 13.835751, -584.2171), input True, black 0.00
+[storytest] PASS the compass follows the flight objective (-33.38393, 17.837566, -577.06213), clearing_loop_marker (-33.38393, 17.837566, -577.06213)
+[story]   after hand-off 0.6s: on MiniStair7 local (-0.00, 3.38, -5.29) floor True vel 2.70 move (0, 1) yaw -180 target MiniStair7 stage 4 t 167576
+[story]   after hand-off 0.9s: on MiniStair7 local (-0.00, 3.64, -5.73) floor True vel 2.70 move (0, 1) yaw -180 target MiniStair7 stage 4 t 167880
+[story] Act 6: the top of MiniStair7 reached (flight 5 of 6)
+[storytest] PASS flight 5 (MiniStair7): the top is reached on foot (-33.38563, 17.790543, -578.069) vs (-33.38393, 17.837566, -577.06213)
+[story]   after hand-off 0.0s: on MiniStair1 local (-0.00, 2.88, -4.53) floor True vel 0.00 move (0, 0) yaw -167 target MiniStair1 stage 5 t 171343
+[story] Act 6: the loop, flight 6 of 6 (MiniStair1, 0.45 up it)
+[story]   after hand-off 0.3s: on MiniStair1 local (0.00, 2.90, -4.51) floor True vel 0.00 move (0, 0) yaw -167 target MiniStair1 stage 5 t 171647
+[storytest] PASS flight 5: the fog put them on another flight (0.45 up it), still walking, no cut MiniStair1 at (-24.26136, 13.561355, -577.0404) vs (-24.256771, 13.351934, -577.0213), input True, black 0.00
+[storytest] PASS the compass follows the flight objective (-22.416216, 17.801876, -569.3458), clearing_loop_marker (-22.416216, 17.801876, -569.3458)
+[story]   after hand-off 0.6s: on MiniStair1 local (0.00, 3.04, -4.74) floor True vel 2.70 move (0, 1) yaw -167 target MiniStair1 stage 5 t 171951
+[story]   after hand-off 0.9s: on MiniStair1 local (0.00, 3.31, -5.18) floor True vel 2.70 move (0, 1) yaw -167 target MiniStair1 stage 5 t 172255
+[story] Act 6: the top of MiniStair1 reached (flight 6 of 6)
+[story] Act 6: the fall
+[storytest] PASS flight 6 (MiniStair1): the top is reached on foot (-22.654959, 17.744951, -570.3408) vs (-22.416216, 17.801876, -569.3458)
+[story] flag set: act6_night_fell
+[story] flag set: clearing_loop_done
+[story] Act 6: woke on the trail; night, fog
+[storytest] PASS the last landing ends in the fall 
+[storytest] PASS the fall is the saved beat 
+[storytest] PASS the voice kept calling during the loop 52 calls
+[storytest] PASS blood rained harder with every flight 
+[storytest] PASS at least one hand-off landed part way along a flight landed at 0.48, 0.64, 0.00, 0.51, 0.45
+[storytest] PASS the loop flights are long 48-48 steps
+[storytest] PASS the blood stops with the fall 
+[storytest] PASS the ring still stands after the fall 
+[storytest] PASS it is still the same night when they wake Night
+[storytest] PASS woke on the trail past the clearing, outside the ring trail 723 m vs clearing 655 m, 58 m from the centre
+[storytest] PASS woke in thick fog height fog -0.160
+[storytest] PASS control comes back on waking 
+[storytest] PASS nothing is said on waking caption alpha 0.00
+[storytest] PASS the compass points on to the lookout objective (61, 17.757242, -465), fire_lookout_marker (61, 17.757242, -465)
+[storytest] Act 6: the bridge and the clearing took 172.6s
+[storytest] ---- Act 7: the lookout
+[story] Act 7: the cabin catches
+[story] checkpoint reached: Act7CabinBurning
+[story] Act 7: the cabin is burning
+[story] Act 7: the giant crosses beyond the burning cabin
+[storytest] PASS checkpoint 6 at the lookout 
+[storytest] PASS the cabin is burning 1
+[storytest] PASS the giant appears beyond the burning cabin 
+[storytest] PASS it starts far beyond the cabin giant 226 m, cabin 82 m from the lookout
+[storytest] PASS it walks toward the cabin 226 m -> 201 m from the lookout
+[storytest] PASS it stays well behind the cabin's tree line giant 201 m, cabin 82 m
+[storytest] PASS it faces the cabin dot 0.98
+[storytest] PASS only its neck and head clear the trees size 22
+[storytest] FAIL its feet are on the ground feet -1.5 m off the terrain (body 22)
+[storytest] PASS it strides (the gait is running) phase 12.55
+[storytest] PASS it is a shadow in the murk haze 0.75
+[storytest] PASS the player keeps control while it passes 
+[story] Act 7: the giant is gone (8 footfalls)
+[story] flag set: giant_event_done
+[storytest] PASS the giant is gone and the sighting is saved 
+[storytest] PASS the compass points at the bunker objective (166, 12.402138, -566), bunker_marker (166, 12.402138, -566)
+[storytest] Act 7: the lookout took 28.0s
+[storytest] ---- Acts 8-10: the bunker
+[story] flag set: line_bunker_dial
+[storytest] PASS the hatch stays locked until the code is dialled 
+[storytest] PASS the station's survey lot stands round the bunker 4
+[storytest] PASS the lantern is in hand for the lot 
+[storytest] PASS stake 3-1 is unreadable in the plain glow glow 0.00
+[storytest] PASS stake 3-1 reads under the gathered beam glow 0.60
+[storytest] PASS stake 3-2 is unreadable in the plain glow glow 0.00
+[storytest] PASS stake 3-2 reads under the gathered beam glow 0.60
+[storytest] PASS stake 3-3 is unreadable in the plain glow glow 0.00
+[storytest] PASS stake 3-3 reads under the gathered beam glow 0.60
+[storytest] PASS stake 3-4 is unreadable in the plain glow glow 0.00
+[storytest] PASS stake 3-4 reads under the gathered beam glow 0.60
+[storytest] PASS the four stakes spell the door's code read 4729, code 4729
+[storytest] dial: focused '@MeshInstance3D@493' prompt 'Try the dial'
+[storytest] PASS E on the dial holds it up 
+[storytest] PASS a wrong code keeps the hatch shut 
+[story] flag set: bunker_unlocked
+[story] the bunker door stands open
+[storytest] PASS the stakes' code opens the bunker door 
+[storytest] PASS the code is saved (the door stays open on Continue) 
+[storytest] PASS the dial is put down and control is back 
+[story] checkpoint reached: Act8BunkerEntered
+[story] Act 8: into the bunker
+[storytest] PASS checkpoint 7 inside the bunker 
+[storytest] PASS carried into the interior 
+[storytest] PASS indoors (forest audio off) 
+[storytest] PASS the forest stalker stays outside Dormant
+[story] flag set: bunker_jumpscare_done
+[story] Act 8: it is in the hallway
+[storytest] PASS walked the hallway 
+[storytest] PASS the lights have gone red 
+[storytest] PASS the stalker stepped out in the flickering hallway 
+[storytest] PASS the lamps died for the scare, and came back 1
+[storytest] PASS the vine door opens 
+[storytest] PASS the screens go dark 
+[story] flag set: crt_puzzle_done
+[story] Act 9: the screens show the stairs
+[storytest] PASS the screens come back showing the stairs 
+[storytest] PASS the compass points at the dead walkie-talkie on the console objective (1500.3, -79.047005, -3106.35), walkie_marker (1500.3, -79.047005, -3106.35)
+[storytest] PASS the walkie-talkie lies dead on the console 
+[storytest] use WalkiePickup: focused 'WalkiePickup' prompt 'Pick up the walkie-talkie'
+[story] flag set: walkie_taken
+[story] Act 9: the walkie-talkie, dead, off the console
+[storytest] PASS the radio is in hand, and silent 
+[storytest] PASS the compass points at the way out objective (1500, -79, -3001), bunker_entrance_marker (1500, -79, -3001)
+[story] flag set: bunker_maze_entered
+[storytest] PASS the hallway is gone: a room with three doors 
+[storytest] PASS the room has three doors 3
+[storytest] PASS the compass points at the door ahead while the rooms repeat objective (1800, -79, -3006.6), bunker_entrance_marker (1800, -79, -3006.6)
+[story] Act 10: the hallway is gone; a room with three doors
+[storytest] use Open: focused 'DoorLeaf0' prompt 'Open the door'
+[storytest] use Open: focused 'DoorLeaf1' prompt 'Open the door'
+[story] flag set: bunker_rooms_scared
+[story] Act 10: it is in the room (room 2)
+[storytest] FAIL it hangs in the room room 2 of a random 2
+[storytest] PASS the rooms repeat until it shows itself opened 2
+[storytest] PASS the room went black, only its eyes 
+[storytest] PASS RUN! went up 
+[storytest] PASS the doors ahead are dead 
+[storytest] PASS shoved out into the hall and the door shut behind (0, 0, 3.1999512)
+[storytest] PASS the compass points back at the round door objective (1800, -79, -3006.6), bunker_entrance_marker (1800, -79, -3006.6)
+[story] Act 10: they looked back; nothing there
+[storytest] PASS nothing there when they look back 
+[story] flag set: bunker_rooms_flashed
+[story] Act 10: it is in front of them
+[storytest] PASS it flashes in front when they look forward again 
+[storytest] PASS and is gone again 
+[story] Act 10: out through the round door
+[story] flag set: bunker_maze_exited
+[story] checkpoint reached: Act10WalkieFound
+[story] Act 10: out of the bunker; the radio wakes
+[storytest] PASS the run ends at the round door 
+[storytest] PASS its clicking rose as they ran 0.12 -> 0.99
+[storytest] PASS checkpoint 8: the walkie-talkie wakes outside 
+[storytest] PASS carried out of the bunker 
+[storytest] PASS the radio is in the saved inventory lantern,compass,newel_post,radio;tools=
+[storytest] Acts 8-10: the bunker took 81.3s
+[storytest] ---- Act 11: the last climb
+[story] flag set: act11_dialogue_done
+[story] Act 11: the radio speaks
+[storytest] PASS the radio exchange plays 
+[storytest] PASS the compass points at the last staircase objective (110, 0, -662), final_stairs_marker (110, 0, -662)
+[storytest] PASS the last staircase exists, tall True
+[storytest] PASS the last staircase is still broken 
+[storytest] PASS the cap is still in hand at the last staircase 
+[storytest] PASS the top landing exists 
+[storytest] PASS walked up the tall flight to the top landing progress 0.99 at (110.0056, 47.415535, -722.7579)
+[storytest] PASS the hum rose with the climb progress 0.99
+[storytest] PASS the last staircase called once or twice on the way up 2 calls
+[storytest] PASS still in control at the top 
+[storytest] PASS the broken post's E-point waits on the landing 
+[storytest] use CapSeat: focused 'Stairs' prompt 'Put the cap back'
+[storytest] PASS the cap leaves the player's hands 
+[storytest] PASS the cap seats on the last staircase's post 
+[story] Act 11: the cap is back on the post
+[story] Act 11: looking up at it (pitch 47 deg)
+[story] Act 11: passed out looking it in the eyes
+[story] flag set: newel_seated
+[story] checkpoint reached: Act11GiantEncounter
+[storytest] PASS checkpoint 9: the giant's touch 
+[storytest] PASS the seated cap is saved with it 
+[storytest] PASS the ending is running 
+[storytest] PASS they looked up into its eyes 
+[storytest] PASS trembling, then passed out looking at it 
+[storytest] PASS the hum hummed out over black 
+[storytest] PASS the screen is black for the credits 
+[storytest] PASS control never comes back 
+[storytest] Act 11: the last climb took 47.1s
+Project DS story test  2026-09-22T15:51:47
+140/142 passed in 332 s  (walked 495 m, jumped 520 m)
+fps while walking: avg 239, min 70
+
+== Act 6: the bridge and the clearing
+PASS  checkpoint 5 on crossing the footbridge  
+PASS  the compass points at the clearing  objective (2, 0, -590), stairs_clearing_marker (2, 0, -590)
+PASS  fifteen small stairs in the clearing  15
+PASS  the clearing's voice  
+PASS  the spotlight finds the player  
+PASS  the voice is the saved beat  
+PASS  the cap stays in hand (it belongs to the last staircase)  
+PASS  the clearing's staircase stays broken  
+PASS  after the voice the clearing waits for a choice: nothing lit  armed True, target 
+PASS  the voice started calling as they entered the clearing  calling True, 23 calls so far
+PASS  the compass rests on the clearing until a flight is chosen  objective (-10, 10.545584, -588), clearing_loop_marker (-10, 10.545584, -588)
+PASS  only the whole staircases carry the loop  10 loop stairs, ruined 0
+PASS  the whole staircases are all much the same size  steps 48-48, scale 1.35, width 1.50
+PASS  no two clearing staircases overlap  16 flights
+PASS  all whole flights are the same length  48-48 steps
+PASS  no staircase sinks into the ground  
+PASS  one whole staircase stands in the trail's mouth  MiniStair0, 0.0 m off the trail
+PASS  the clearing is thick with fog  height fog -0.070
+PASS  no trees inside the clearing  0 trunks within 50 m
+PASS  the clearing is closed  
+PASS  the clearing is closed but for the way in  entrance open True, onward blocked True, side blocked True
+PASS  stepping onto a staircase starts the loop  target MiniStair9, chosen MiniStair9
+PASS  the light and the compass follow the chosen flight  objective (14.8015585, 17.8392, -569.6735), clearing_loop_marker (14.8015585, 17.8392, -569.6735)
+PASS  blood begins to rain as the loop starts  
+PASS  four to six flights are planned, all up  6 flights
+PASS  cannot back down on flight 1  wall armed True, backed 0.01 m
+PASS  flight 1 (MiniStair9): the top is reached on foot  (14.101379, 17.796743, -570.3865) vs (14.8015585, 17.8392, -569.6735)
+PASS  flight 1: the fog put them on another flight (0.48 up it), still walking, no cut  MiniStair3 at (13.039951, 13.723799, -581.9469) vs (13.055805, 13.514375, -581.93524), input True, black 0.00
+PASS  the compass follows the flight  objective (19.167488, 17.77982, -577.43604), clearing_loop_marker (19.167488, 17.77982, -577.43604)
+PASS  cannot back down on flight 2  wall armed True, backed 0.01 m
+PASS  flight 2 (MiniStair3): the top is reached on foot  (18.356659, 17.73258, -578.0337) vs (19.167488, 17.77982, -577.43604)
+PASS  flight 2: the fog put them on another flight (0.64 up it), still walking, no cut  MiniStair1 at (-23.694746, 15.036629, -574.67755) vs (-23.690157, 14.827219, -574.6584), input True, black 0.00
+PASS  the compass follows the flight  objective (-22.416216, 17.801876, -569.3458), clearing_loop_marker (-22.416216, 17.801876, -569.3458)
+PASS  flight 3 (MiniStair1): the top is reached on foot  (-22.648132, 17.762674, -570.3123) vs (-22.416216, 17.801876, -569.3458)
+PASS  flight 3: the fog put them on another flight (0.00 up it), still walking, no cut  MiniStair13 at (12.805512, 9.600576, -591.8341) vs (12.805512, 9.766983, -591.8341), input True, black 0.00
+PASS  the compass follows the flight  objective (25.159447, 17.859482, -581.83453), clearing_loop_marker (25.159447, 17.859482, -581.83453)
+PASS  flight 4 (MiniStair13): the top is reached on foot  (24.384195, 17.818497, -582.4614) vs (25.159447, 17.859482, -581.83453)
+PASS  flight 4: the fog put them on another flight (0.51 up it), still walking, no cut  MiniStair7 at (-33.396732, 14.045148, -584.2368) vs (-33.396698, 13.835751, -584.2171), input True, black 0.00
+PASS  the compass follows the flight  objective (-33.38393, 17.837566, -577.06213), clearing_loop_marker (-33.38393, 17.837566, -577.06213)
+PASS  flight 5 (MiniStair7): the top is reached on foot  (-33.38563, 17.790543, -578.069) vs (-33.38393, 17.837566, -577.06213)
+PASS  flight 5: the fog put them on another flight (0.45 up it), still walking, no cut  MiniStair1 at (-24.26136, 13.561355, -577.0404) vs (-24.256771, 13.351934, -577.0213), input True, black 0.00
+PASS  the compass follows the flight  objective (-22.416216, 17.801876, -569.3458), clearing_loop_marker (-22.416216, 17.801876, -569.3458)
+PASS  flight 6 (MiniStair1): the top is reached on foot  (-22.654959, 17.744951, -570.3408) vs (-22.416216, 17.801876, -569.3458)
+PASS  the last landing ends in the fall  
+PASS  the fall is the saved beat  
+PASS  the voice kept calling during the loop  52 calls
+PASS  blood rained harder with every flight  
+PASS  at least one hand-off landed part way along a flight  landed at 0.48, 0.64, 0.00, 0.51, 0.45
+PASS  the loop flights are long  48-48 steps
+PASS  the blood stops with the fall  
+PASS  the ring still stands after the fall  
+PASS  it is still the same night when they wake  Night
+PASS  woke on the trail past the clearing, outside the ring  trail 723 m vs clearing 655 m, 58 m from the centre
+PASS  woke in thick fog  height fog -0.160
+PASS  control comes back on waking  
+PASS  nothing is said on waking  caption alpha 0.00
+PASS  the compass points on to the lookout  objective (61, 17.757242, -465), fire_lookout_marker (61, 17.757242, -465)
+
+== Act 7: the lookout
+PASS  checkpoint 6 at the lookout  
+PASS  the cabin is burning  1
+PASS  the giant appears beyond the burning cabin  
+PASS  it starts far beyond the cabin  giant 226 m, cabin 82 m from the lookout
+PASS  it walks toward the cabin  226 m -> 201 m from the lookout
+PASS  it stays well behind the cabin's tree line  giant 201 m, cabin 82 m
+PASS  it faces the cabin  dot 0.98
+PASS  only its neck and head clear the trees  size 22
+FAIL  its feet are on the ground  feet -1.5 m off the terrain (body 22)
+PASS  it strides (the gait is running)  phase 12.55
+PASS  it is a shadow in the murk  haze 0.75
+PASS  the player keeps control while it passes  
+PASS  the giant is gone and the sighting is saved  
+PASS  the compass points at the bunker  objective (166, 12.402138, -566), bunker_marker (166, 12.402138, -566)
+
+== Acts 8-10: the bunker
+PASS  the hatch stays locked until the code is dialled  
+PASS  the station's survey lot stands round the bunker  4
+PASS  the lantern is in hand for the lot  
+PASS  stake 3-1 is unreadable in the plain glow  glow 0.00
+PASS  stake 3-1 reads under the gathered beam  glow 0.60
+PASS  stake 3-2 is unreadable in the plain glow  glow 0.00
+PASS  stake 3-2 reads under the gathered beam  glow 0.60
+PASS  stake 3-3 is unreadable in the plain glow  glow 0.00
+PASS  stake 3-3 reads under the gathered beam  glow 0.60
+PASS  stake 3-4 is unreadable in the plain glow  glow 0.00
+PASS  stake 3-4 reads under the gathered beam  glow 0.60
+PASS  the four stakes spell the door's code  read 4729, code 4729
+PASS  E on the dial holds it up  
+PASS  a wrong code keeps the hatch shut  
+PASS  the stakes' code opens the bunker door  
+PASS  the code is saved (the door stays open on Continue)  
+PASS  the dial is put down and control is back  
+PASS  checkpoint 7 inside the bunker  
+PASS  carried into the interior  
+PASS  indoors (forest audio off)  
+PASS  the forest stalker stays outside  Dormant
+PASS  walked the hallway  
+PASS  the lights have gone red  
+PASS  the stalker stepped out in the flickering hallway  
+PASS  the lamps died for the scare, and came back  1
+PASS  the vine door opens  
+PASS  the screens go dark  
+PASS  the screens come back showing the stairs  
+PASS  the compass points at the dead walkie-talkie on the console  objective (1500.3, -79.047005, -3106.35), walkie_marker (1500.3, -79.047005, -3106.35)
+PASS  the walkie-talkie lies dead on the console  
+PASS  the radio is in hand, and silent  
+PASS  the compass points at the way out  objective (1500, -79, -3001), bunker_entrance_marker (1500, -79, -3001)
+PASS  the hallway is gone: a room with three doors  
+PASS  the room has three doors  3
+PASS  the compass points at the door ahead while the rooms repeat  objective (1800, -79, -3006.6), bunker_entrance_marker (1800, -79, -3006.6)
+FAIL  it hangs in the room  room 2 of a random 2
+PASS  the rooms repeat until it shows itself  opened 2
+PASS  the room went black, only its eyes  
+PASS  RUN! went up  
+PASS  the doors ahead are dead  
+PASS  shoved out into the hall and the door shut behind  (0, 0, 3.1999512)
+PASS  the compass points back at the round door  objective (1800, -79, -3006.6), bunker_entrance_marker (1800, -79, -3006.6)
+PASS  nothing there when they look back  
+PASS  it flashes in front when they look forward again  
+PASS  and is gone again  
+PASS  the run ends at the round door  
+PASS  its clicking rose as they ran  0.12 -> 0.99
+PASS  checkpoint 8: the walkie-talkie wakes outside  
+PASS  carried out of the bunker  
+PASS  the radio is in the saved inventory  lantern,compass,newel_post,radio;tools=
+
+== Act 11: the last climb
+PASS  the radio exchange plays  
+PASS  the compass points at the last staircase  objective (110, 0, -662), final_stairs_marker (110, 0, -662)
+PASS  the last staircase exists, tall  True
+PASS  the last staircase is still broken  
+PASS  the cap is still in hand at the last staircase  
+PASS  the top landing exists  
+PASS  walked up the tall flight to the top landing  progress 0.99 at (110.0056, 47.415535, -722.7579)
+PASS  the hum rose with the climb  progress 0.99
+PASS  the last staircase called once or twice on the way up  2 calls
+PASS  still in control at the top  
+PASS  the broken post's E-point waits on the landing  
+PASS  the cap leaves the player's hands  
+PASS  the cap seats on the last staircase's post  
+PASS  checkpoint 9: the giant's touch  
+PASS  the seated cap is saved with it  
+PASS  the ending is running  
+PASS  they looked up into its eyes  
+PASS  trembling, then passed out looking at it  
+PASS  the hum hummed out over black  
+PASS  the screen is black for the credits  
+PASS  control never comes back  
+

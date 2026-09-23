@@ -35,7 +35,7 @@ public partial class FriendBody : Node3D
 	public const float TableTop = 0.65f;
 
 	/// <summary>The friend's last page (P4) lies on the table from Act 5's checkpoint on, like the newel post.</summary>
-	[Export] public Checkpoint PageCheckpoint = Checkpoint.Act5CabinEntered;
+	[Export] public Checkpoint PageCheckpoint = Checkpoint.None;   // on the table from load (Dan, 2026-09-22: nothing pops in on entry)
 	/// <summary>The page's Readable (null in the editor), for tests and previews.</summary>
 	public Readable Page { get; private set; }
 

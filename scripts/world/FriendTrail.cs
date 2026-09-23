@@ -73,7 +73,7 @@ public partial class FriendTrail : Node3D
 			var s = Systems.StoryManager.Instance;
 			if (s == null || s.HasFlag(StonesLineFlag) || s.Current >= Systems.Checkpoint.Act2StairsClimbed) return;
 			s.SetFlag(StonesLineFlag);
-			_ = Systems.Cutscene.Run(this, ct => Systems.StoryBeat.Caption(this, StonesLine, 1.0f, 3.0f, 1.2f, ct));
+			// The flag still marks the spot for saves; no line (self-talk removed, Dan 2026-09-22).
 		}, "StonesLine");
 	}
 

@@ -4,11 +4,16 @@ using ProjectDS.Systems;
 namespace ProjectDS.World.BunkerParts;
 
 /// <summary>
-/// The closed vault door before Act 7 (story: "if they find it earlier in the
-/// game, it is locked"). Focusable so the prompt can say so, never usable.
-/// Disabled once the door stands open.
+/// The closed vault door. Before Act 7 it is simply locked (focusable so the prompt can say so,
+/// never usable). From the cabin fire on, the dial on it can be tried: E opens the four-wheel
+/// code lock (<see cref="UI.CodeLockOverlay"/>); the bunker owns what the right code does.
+/// Gone with the closed door once it stands open.
 /// </summary>
 public partial class BunkerLockedHatch : Interactable
 {
-	public override bool CanInteract(PlayerController player) => false;
+	private static bool DialReady => StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning };
+
+	public override bool CanInteract(PlayerController player) => base.CanInteract(player) && DialReady;
+
+	public override string GetPrompt(PlayerController player) => DialReady ? "Try the dial" : "Locked";
 }

@@ -30,6 +30,10 @@ public partial class PlayerCameraRig : Node3D
 	[ExportGroup("First person")]
 	[Export] public float EyeHeight = 1.62f;
 	[Export] public float FirstPersonFov = 70f;
+	/// <summary>Degrees added to the field of view by a story beat (the clearing loop's swim); tweened by the beat, 0 at rest.</summary>
+	public float FovSwim;
+	/// <summary>A slow roll of the view in radians (Act 6's daze); 0 normally. Added on top of the pitch/yaw.</summary>
+	public float RollSwim;
 	[Export] public float FirstPersonMinPitch = -80f;
 	[Export] public float FirstPersonMaxPitch = 80f;
 	[Export] public float EyeVerticalSharpness = 18f;   // smooths stairs without feeling floaty
@@ -50,6 +54,9 @@ public partial class PlayerCameraRig : Node3D
 
 	public float Yaw { get; private set; }
 	public float Pitch { get; private set; }
+	/// <summary>A story beat that needs the view driven past the mode's pitch limit (Act 11: looking up the
+	/// giant to its eyes) sets this (degrees) for its duration and clears it after.</summary>
+	public float? MaxPitchOverride { get; set; }
 	public Basis YawBasis => new Basis(Vector3.Up, Yaw);
 	public Camera3D Camera { get; private set; }
 	public bool IsFirstPerson => _mode == CameraMode.FirstPerson;
@@ -87,7 +94,7 @@ public partial class PlayerCameraRig : Node3D
 	public void SetPitch(float radians)
 	{
 		float minPitch = IsFirstPerson ? FirstPersonMinPitch : MinPitch;
-		float maxPitch = IsFirstPerson ? FirstPersonMaxPitch : MaxPitch;
+		float maxPitch = MaxPitchOverride ?? (IsFirstPerson ? FirstPersonMaxPitch : MaxPitch);
 		Pitch = Mathf.Clamp(radians, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
 	}
 
@@ -129,12 +136,12 @@ public partial class PlayerCameraRig : Node3D
 		ApplyMode(GameSettings.Instance.Camera);
 
 		// Focus: ease the field of view in, and slow the aim to match so it stays steady.
-		float fovGoal = _baseFov * (_target.PlayerInput.Focus ? FocusFovScale : 1f);
+		float fovGoal = _baseFov * (_target.PlayerInput.Focus ? FocusFovScale : 1f) + FovSwim;
 		Camera.Fov = Mathf.Lerp(Camera.Fov, fovGoal, 1f - Mathf.Exp(-FocusSharpness * dt));
 
 		Vector2 look = _target.PlayerInput.ConsumeLook() * (Camera.Fov / _baseFov);
 		float minPitch = IsFirstPerson ? FirstPersonMinPitch : MinPitch;
-		float maxPitch = IsFirstPerson ? FirstPersonMaxPitch : MaxPitch;
+		float maxPitch = MaxPitchOverride ?? (IsFirstPerson ? FirstPersonMaxPitch : MaxPitch);
 		Yaw = Mathf.Wrap(Yaw + look.X, -Mathf.Pi, Mathf.Pi);
 		Pitch = Mathf.Clamp(Pitch + look.Y, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
 
@@ -191,7 +198,7 @@ public partial class PlayerCameraRig : Node3D
 
 	private void ApplyRotation()
 	{
-		Rotation = new Vector3(Pitch, Yaw, 0);
+		Rotation = new Vector3(Pitch, Yaw, RollSwim);
 		_arm.Position = new Vector3(IsFirstPerson ? 0f : ShoulderOffset, 0, 0);
 	}
 }

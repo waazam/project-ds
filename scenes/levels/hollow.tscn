@@ -31,6 +31,3 @@ AtmospherePath = NodePath("../HollowWorld/Atmosphere")
 
 [node name="GiantStalkerEvent" type="Node" parent="."]
 script = ExtResource("9_giant")
-Distance = 70.0
-GuaranteeRadius = 60.0
-BeyondCabin = 15.0

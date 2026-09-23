@@ -31,7 +31,7 @@ public static class BunkerLayout
 
 	// ---------------------------------------------------------------- CRT room
 	public const float CrtRoomFrontZ = -90f;
-	public const float CrtRoomBackZ = -122f;
+	public const float CrtRoomBackZ = -108f;   // 18 m deep (was 32: the walk from the door was too long, Dan 2026-09-22)
 	public const float CrtRoomHalfWidth = 6f;
 	public const float CrtRoomHeight = 4.0f;
 

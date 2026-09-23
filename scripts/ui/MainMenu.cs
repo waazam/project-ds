@@ -21,6 +21,28 @@ public partial class MainMenu : Node
 	public override void _Ready()
 	{
 		if (GameSettings.Instance.AutoTest) { StoryManager.Instance.StartNewGame(); return; }
+		if (GameSettings.Instance.StartAct == 2)
+		{
+			// Dev launch straight into the Hollow wake (Dan, 2026-09-22): a fresh save at checkpoint 2, then Continue.
+			SaveSystem.Save(new SaveData { Checkpoint = Checkpoint.Act2StairsClimbed, Flags = new[] { StoryManager.Flag.StairsClimbed }, Inventory = ";tool=None" });
+			Callable.From(() => StoryManager.Instance.ContinueGame()).CallDeferred();
+			return;
+		}
+		if (GameSettings.Instance.StartAct == 8)
+		{
+			// Dev launch at the bunker's door (Dan, 2026-09-22): everything up to the lookout done, the door unlocked, in front of the hatch.
+			string[] flags =
+			{
+				StoryManager.Flag.StairsClimbed, StoryManager.Flag.StormStarted, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, "read_camp_note",
+				StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke,
+				StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2), StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4),
+				StoryManager.Flag.ClearingVoiceHeard, StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone,
+				StoryManager.Flag.BunkerUnlocked, "dev_spawn_bunker",
+			};
+			SaveSystem.Save(new SaveData { Checkpoint = Checkpoint.Act7CabinBurning, Flags = flags, Inventory = "lantern,compass,newel_post;tool=None" });
+			Callable.From(() => StoryManager.Instance.ContinueGame()).CallDeferred();
+			return;
+		}
 		// Coming back from "Quit to Menu": StoryManager unpauses on scene change; make sure regardless.
 		GetTree().Paused = false;
 		Input.MouseMode = Input.MouseModeEnum.Visible;

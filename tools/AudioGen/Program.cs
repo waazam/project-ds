@@ -31,12 +31,17 @@ var jobs = new List<(string name, string dir, bool loop, int sr, Func<Rng, int, 
 	("ringing_loop", ambient, true, Hi, (r, sr) => Ambient.Ringing(sr, 20)),
 	("rain_loop", ambient, true, Lo, (r, sr) => Ambient.Rain(r, sr, 180)),
 	("fire_crackle_loop", ambient, true, Lo, (r, sr) => Ambient.FireCrackle(r, sr, 30)),
-	("choir_chant_loop", ambient, true, Lo, (r, sr) => Ambient.ChoirChant(r, sr, 72)),
+	("choir_chant_loop", ambient, true, Lo, (r, sr) => Ambient.ChoirChant(r, sr, 108)),
 	("stairs_hum_loop", ambient, true, Lo, (r, sr) => Ambient.StairsHum(r, sr, 40)),
 	("radio_static_loop", ambient, true, Lo, (r, sr) => Ambient.RadioStatic(r, sr, 22)),
+	("radio_burst_01", sfx, false, Lo, (r, sr) => Ambient.RadioBurst(r, sr)),
+	("radio_burst_02", sfx, false, Lo, (r, sr) => Ambient.RadioBurst(r, sr)),
 };
 for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"thunder_{k:00}", sfx, false, Lo, (r, sr) => Sfx.Thunder(r, sr, k))); }
 for (int i = 1; i <= 3; i++) jobs.Add(($"giant_step_{i:00}", sfx, false, Lo, (r, sr) => Sfx.GiantStep(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"squelch_open_{i:00}", sfx, false, Lo, (r, sr) => Sfx.Squelch(r, sr, true)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"squelch_close_{i:00}", sfx, false, Lo, (r, sr) => Sfx.Squelch(r, sr, false)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"radio_tick_{i:00}", sfx, false, Lo, (r, sr) => Sfx.RadioTick(r, sr)));
 jobs.Add(("camera_shutter", sfx, false, Lo, (r, sr) => Sfx.CameraShutter(r, sr)));
 jobs.Add(("distant_scream", sfx, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"whisper_voice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WhisperVoice(r, sr)));
@@ -47,9 +52,35 @@ for (int i = 1; i <= 4; i++) jobs.Add(($"cloth_{i:00}", sfx, false, Lo, (r, sr) 
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_stone_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepStone(r, sr)));
 jobs.Add(("rifle_distant_01", sfx, false, Lo, (r, sr) => Sfx.RifleDistant(r, sr)));
 jobs.Add(("newel_seat", sfx, false, Lo, (r, sr) => Sfx.NewelSeat(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"wall_knock_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WallKnock(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"door_slam_{i:00}", sfx, false, Lo, (r, sr) => Sfx.DoorSlam(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"wall_pound_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WallPound(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"cabin_slam_{i:00}", sfx, false, Lo, (r, sr) => Sfx.CabinSlam(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"body_thump_{i:00}", sfx, false, Lo, (r, sr) => Sfx.BodyThump(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"steel_door_open_{i:00}", sfx, false, Lo, (r, sr) => Sfx.SteelDoorOpen(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"steel_door_slam_{i:00}", sfx, false, Lo, (r, sr) => Sfx.SteelDoorSlam(r, sr)));
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_in_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, true, (k - 1) / 4.0))); }
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_out_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, false, (k - 1) / 4.0))); }
 jobs.Add(("stalker_seen_01", sfx, false, Lo, (r, sr) => Sfx.StalkerSeen(r, sr)));
+// Creature candidates (not wired into the game yet): growls, roars (near / far), screeches, snarls.
+for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_near_{i:00}", sfx, false, Lo, (r, sr) => Creature.Roar(r, sr, false)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_far_{i:00}", sfx, false, Lo, (r, sr) => Creature.Roar(r, sr, true)));
+for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"creature_screech_{k:00}", sfx, false, Lo, (r, sr) => Creature.Screech(r, sr, k))); }
+for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"creature_snarl_{k:00}", sfx, false, Lo, (r, sr) => Creature.Snarl(r, sr, k))); }
+// Eight beats of the one rattle voice, 21-30 s each: the game swaps takes between bursts so the rhythm never repeats.
+for (int i = 1; i <= 8; i++) { int k = i; int len = new[] { 24, 28, 22, 26, 30, 25, 21, 29 }[k - 1]; jobs.Add(($"creature_rattle_loop_{k:00}", sfx, true, Lo, (r, sr) => Creature.RattleLoop(r, sr, len, k))); }
+jobs.Add(("creature_giant_rattle_loop_01", sfx, true, Lo, (r, sr) => Creature.GiantRattle(r, sr, 26)));
+// Rattle candidates (Dan, 2026-09-22: the click reads as hooves): a..f, not wired in until he picks one.
+jobs.Add(("creature_rattle_cand_a", sfx, true, Lo, (r, sr) => Creature.RattleCroak(r, sr, 24, Creature.RattleVar.Base)));
+jobs.Add(("creature_rattle_cand_b", sfx, true, Lo, (r, sr) => Creature.RattleInsect(r, sr, 22, Creature.RattleVar.Base)));
+jobs.Add(("creature_rattle_cand_c", sfx, true, Lo, (r, sr) => Creature.RattleWetClicks(r, sr, 24, Creature.RattleVar.Base)));
+jobs.Add(("creature_rattle_cand_d", sfx, true, Lo, (r, sr) => Creature.RattleBone(r, sr, 26, Creature.RattleVar.Base)));
+jobs.Add(("creature_rattle_cand_e", sfx, true, Lo, (r, sr) => Creature.RattleRatchet(r, sr, 22, Creature.RattleVar.Base)));
+jobs.Add(("creature_rattle_cand_f", sfx, true, Lo, (r, sr) => Creature.RattleCroakClicks(r, sr, 24, Creature.RattleVar.Base)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_moan_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantMoan(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_bellow_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantBellow(r, sr)));
+for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"creature_jumpscream_{k:00}", sfx, false, Lo, (r, sr) => Creature.JumpScream(r, sr, k))); }
+for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"creature_jumpscare_{k:00}", sfx, false, Hi, (r, sr) => Creature.Jumpscare(r, sr, k))); }
 for (int i = 1; i <= 4; i++) jobs.Add(($"twig_snap_{i:00}", sfx, false, Lo, (r, sr) => Forest.TwigSnap(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"branch_drop_{i:00}", sfx, false, Lo, (r, sr) => Forest.BranchDrop(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"trunk_creak_{i:00}", sfx, false, Lo, (r, sr) => Forest.TrunkCreak(r, sr)));

@@ -11,7 +11,7 @@ namespace ProjectDS.World;
 /// move onto the "LanternSpot"/"CompassSpot" markers this builds on the stump top).
 ///
 /// While the lantern still stands on the stump, a warm light around it makes the camp a
-/// faint glow in the dusk, visible from the wake spot. It goes out when the lantern is
+/// faint glow in the dark, visible from the wake spot. It goes out when the lantern is
 /// taken (or was taken in the saved story).
 ///
 /// Local frame: origin on the ground at the camp's centre, +Z toward the path. Everything
@@ -32,6 +32,7 @@ public partial class Camp : Node3D
 	public const string NoteText =
 		"If you're reading this, it got you too.\n" +
 		"Don't stay out here after dark. There's an old cabin up the hollow. The needle knows the way.\n" +
+		"Past it there's a bunker. Steel door, four numbers.\n" +
 		"Leave the lantern lit. — R.H.";
 
 	public const string NoteReadFlag = "read_camp_note";

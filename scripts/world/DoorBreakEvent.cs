@@ -13,9 +13,7 @@ namespace ProjectDS.World;
 /// (axe) or hold E (hammer, <see cref="HammerSeconds"/>). Also owns restoring
 /// the door on Continue: boarded from Act 2 until it was broken open.
 ///
-/// Act 5 begins after the giant (Act 4): until <see cref="StoryManager.Flag.GiantEventDone"/>
-/// the boards cannot be broken even with a tool in hand (in the Hollow the giant
-/// always crosses before the player gets near the cabin, see GiantStalkerEvent). Prompts never carry the key hint; the HUD adds it.
+/// Prompts never carry the key hint; the HUD adds it. (The giant no longer gates the door: it is seen from the Act 7 lookout now.)
 /// </summary>
 public partial class DoorBreakEvent : Interactable
 {
@@ -35,7 +33,8 @@ public partial class DoorBreakEvent : Interactable
 		PickRadius = 0.9f;
 		MaxDistance = 3f;
 		// Highlight the planks nailed over the door (resolved when focused, since they are rebuilt).
-		HighlightRoot = new NodePath(GetPathTo(_cabin) + "/Generated/Planks");
+		// No highlight (Dan, 2026-09-22: the whole wall lit up): the prompt alone marks the door.
+		HighlightRoot = new NodePath("NoHighlight");
 		base._Ready();
 		Callable.From(Restore).CallDeferred();
 		if (StoryManager.Instance is { } s) s.CheckpointReached += OnCheckpoint;
@@ -67,11 +66,9 @@ public partial class DoorBreakEvent : Interactable
 
 	private void UpdateHold() => HoldSeconds = ToolFor(_inventory) == ToolKind.Hammer ? HammerSeconds : 0f;
 
-	private static bool GiantSeen => StoryManager.Instance is { GiantEventDone: true };
-
 	public override bool CanInteract(PlayerController player)
 	{
-		if (!base.CanInteract(player) || _busy || !GiantSeen) return false;
+		if (!base.CanInteract(player) || _busy) return false;
 		return ToolFor(player.Inventory) != ToolKind.None;
 	}
 
@@ -80,7 +77,6 @@ public partial class DoorBreakEvent : Interactable
 		if (_busy) return "Chopping through the boards...";
 		var tool = ToolFor(player.Inventory);
 		if (tool == ToolKind.None) return "The door is boarded shut.";
-		if (!GiantSeen) return "Boarded shut.";
 		return tool == ToolKind.Axe
 			? "Chop the boards with the axe"
 			: HoldProgress > 0f ? $"Prying the boards loose... {HoldProgress * 100f:0}%" : "Pry the boards loose";
@@ -89,7 +85,7 @@ public partial class DoorBreakEvent : Interactable
 	public override void Interact(PlayerController player)
 	{
 		var inv = player.Inventory;
-		if (inv == null || _busy || !GiantSeen) return;
+		if (inv == null || _busy) return;
 		var tool = ToolFor(inv);
 		if (tool == ToolKind.None) return;
 		_busy = true;
@@ -102,7 +98,7 @@ public partial class DoorBreakEvent : Interactable
 			Enabled = false;
 			StoryManager.Instance?.SetFlag(StoryManager.Flag.CabinDoorOpen);
 			base.Interact(player);
-			await StoryBeat.Caption(this, "The door gives way.", 1.0f, 1.8f, 1.0f, ct);
+			await Cutscene.Wait(this, 1.2, ct);   // no line (Dan, 2026-09-22): the door itself says it
 		});
 	}
 

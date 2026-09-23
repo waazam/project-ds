@@ -65,7 +65,7 @@ public static class Voice
 	public static void Sing(double[] buf, int sr, Rng r, bool female, IEnumerable<Take> takes, double wobble = 1.0)
 	{
 		var set = female ? Female : Male;
-		double vibRate = r.R(4.4, 5.8), vibDepth = r.R(0.008, 0.015) * wobble, breathy = r.R(0.8, 1.3);
+		double vibRate = r.R(4.0, 6.2), vibDepth = r.R(0.006, 0.016) * wobble, breathy = r.R(0.7, 1.5);
 		double fShift = r.R(0.96, 1.05);   // vocal tract size
 		double tilt = r.R(0.1, 0.3);   // the table levels are already output levels: only a slight extra roll-off
 		foreach (var take in takes) Phrase(buf, sr, r.Fork(), set, take, vibRate * r.R(0.95, 1.05), vibDepth, breathy, fShift, tilt, wobble);
@@ -76,6 +76,10 @@ public static class Voice
 		double dur = PhraseSeconds * tk.Tempo;
 		int len = (int)((dur + 0.05) * sr), s0 = (int)(tk.Start * sr), nb = buf.Length;
 		var jit = new Smooth(r, dur + 1, 0.05); var drift = new Smooth(r, dur + 1, r.R(0.6, 1.2)); var rateWob = new Smooth(r, dur + 1, 0.7);
+		// This take's habits: when the vibrato sets in and how fast, how wide the formants sit, and an
+		// amplitude tremor riding the vibrato plus a slow breath-pressure swell (a held note never sits still).
+		double vibStart = r.R(0.15, 0.5), vibRise = r.R(0.35, 0.9), bwMul = r.R(1.15, 1.6), tremDepth = r.R(0.06, 0.14) * wobble, tremPh = r.R(0, TwoPi);
+		var press = new Smooth(r, dur + 1, 0.35);
 		const int H = 48, Block = 32;
 		var cur = new double[H + 1]; var tgt = new double[H + 1];
 		var F = new double[5]; var G = new double[5]; var B = new double[5];
@@ -111,8 +115,8 @@ public static class Voice
 			// slow wander, fine jitter, and the long "see" sagging flat as the breath runs out.
 			double since = lastVoicedOnset >= 0 ? t - lastVoicedOnset : 0;
 			double scoop = -0.045 * Math.Exp(-since / 0.07);
-			vph += TwoPi * vibRate * (1 + 0.15 * (rateWob.At(t) - 0.5)) / sr;
-			double vibOn = Math.Clamp((t - 0.25) / 0.6, 0, 1);
+			vph += TwoPi * vibRate * (1 + (0.15 + 0.1 * wobble) * (rateWob.At(t) - 0.5)) / sr;
+			double vibOn = Math.Clamp((t - vibStart) / vibRise, 0, 1);
 			double sag = 0;
 			if (seg == Script.Length - 1) { double u = Math.Clamp((st - 1.6) / (PhraseSeconds - 1.6), 0, 1); sag = tk.SeeSagCents * u * u; }
 			double cents = sag + 25 * wobble * (drift.At(t) - 0.5);
@@ -126,7 +130,7 @@ public static class Voice
 				{
 					F[k] += (p.F[k] * fShift - F[k]) * aForm;
 					G[k] += (FromDb(p.Db[k]) - G[k]) * aForm;
-					B[k] += (p.Bw[k] * 1.3 - B[k]) * aForm;
+					B[k] += (p.Bw[k] * bwMul - B[k]) * aForm;
 				}
 				for (int h = 1; h <= H; h++)
 				{
@@ -151,7 +155,8 @@ public static class Voice
 			double breath = aspF[0].P(src) + 0.8 * aspF[1].P(src) + 0.5 * aspF[2].P(src);
 			double s = (fr1.P(wn) + 0.6 * fr2.P(wn)) * fric * 0.2;
 			double k0 = st < Script[0].end ? burst.P(wn) * Perc(t, 0.0003, 0.004) * 1.4 : 0;
-			buf[((s0 + i) % nb + nb) % nb] += (v * voice * 0.55 + breath * 1.1 + s + k0) * tk.Amp;
+			double trem = (1 + tremDepth * vibOn * Math.Sin(vph + tremPh)) * (0.85 + 0.3 * press.At(t));
+			buf[((s0 + i) % nb + nb) % nb] += (v * voice * 0.55 * trem + breath * 1.1 + s + k0) * tk.Amp;
 		}
 	}
 }

@@ -58,23 +58,36 @@ public static class StoryBeat
 	public static void SetMood(Node n, ForestAtmosphere.Mood mood, float seconds)
 		=> Atmosphere(n)?.SetMood(mood, seconds);
 
-	/// <summary>The lighting mood the saved story implies (applied instantly on Continue).</summary>
+	/// <summary>
+	/// The lighting mood the saved story implies (applied instantly on Continue). One rule (Dan,
+	/// 2026-09-22): the only daylight is Act 1 on the trail; everything in the Hollow, from the wake
+	/// to the credits, happens on the same night. No dawn at the cabin, no night "falling" later:
+	/// the clearing's deep-forest tone is the one variation, and the fall's wake is still that night.
+	/// </summary>
 	public static ForestAtmosphere.Mood ExpectedMood(StoryManager s)
 	{
-		if (s == null) return ForestAtmosphere.Mood.Auto;
-		if (s.Current >= Checkpoint.Act11GiantEncounter) return ForestAtmosphere.Mood.Dawn;
-		if (s.HasFlag(StoryManager.Flag.Act6NightFell)) return ForestAtmosphere.Mood.Night;
+		if (s == null || s.Current < Checkpoint.Act2StairsClimbed) return ForestAtmosphere.Mood.Auto;   // Act 1: daylight, the fog closing in
+		if (s.HasFlag(StoryManager.Flag.Act6NightFell) || s.HasFlag(StoryManager.Flag.ClearingLoopDone)) return ForestAtmosphere.Mood.Night;
 		if (Act6Revealed(s)) return ForestAtmosphere.Mood.Menacing;
-		if (s.HasFlag(StoryManager.Flag.DawnBroke)) return ForestAtmosphere.Mood.Dawn;
-		return ForestAtmosphere.Mood.Auto;
+		return ForestAtmosphere.Mood.Night;
 	}
 
 	/// <summary>Act 6's clearing turns once the bridge is crossed with the newel post taken.</summary>
 	public static bool Act6Revealed(StoryManager s) => s is { NewelPostTaken: true } && s.Current >= Checkpoint.Act6BridgeCrossed;
 
-	/// <summary>Whether the storm is raging in the saved story.</summary>
+	/// <summary>Whether the storm is raging in the saved story: from the moment the player wakes in the
+	/// Hollow (the rain is the first thing they hear, before their eyes open) until it stops as they carry
+	/// the cap out of the cabin (<see cref="StoryManager.Flag.DawnBroke"/>, a name kept for old saves: it is still night).</summary>
 	public static bool StormShouldRage(StoryManager s)
-		=> s != null && s.HasFlag(StoryManager.Flag.StormStarted) && !s.HasFlag(StoryManager.Flag.DawnBroke);
+		=> s != null && s.Current >= Checkpoint.Act2StairsClimbed && !s.HasFlag(StoryManager.Flag.DawnBroke);
+
+	/// <summary>Brings a just-started player up from silence over <paramref name="seconds"/>, so a voice, a
+	/// sting or a radio burst arrives instead of bursting in. Call right after Play().</summary>
+	public static void FadeIn(Node player, float toDb, float seconds = 0.4f, float fromDb = -40f)
+	{
+		if (player is AudioStreamPlayer p2) { p2.VolumeDb = fromDb; p2.CreateTween().TweenProperty(p2, "volume_db", toDb, seconds); }
+		else if (player is AudioStreamPlayer3D p3) { p3.VolumeDb = fromDb; p3.CreateTween().TweenProperty(p3, "volume_db", toDb, seconds); }
+	}
 
 	/// <summary>Whether the cabin door has been broken open in the saved story.</summary>
 	public static bool CabinDoorOpen(StoryManager s)

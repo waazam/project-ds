@@ -7,10 +7,10 @@ using ProjectDS.Systems;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Act 7's aftermath: once the cabin is seen burning, a voice starts calling
-/// "come up and see" out of the forest at random intervals, in different
-/// speeds and sometimes doubled like an overlapping echo, until the player
-/// finds the bunker. Purely atmospheric — it never blocks or redirects.
+/// RETIRED (see <see cref="Active"/>): formerly Act 7's aftermath, a voice calling
+/// "come up and see" out of the forest at random intervals on the walk to the
+/// bunker. The voice now belongs to the stairs alone (Act 6's loop; the last
+/// staircase). Kept, inert, so the scene node and its references still load.
 ///
 /// Stateless beyond the checkpoint, so Continue restores it for free. Waits are
 /// pausable; the harsh takes play on the always-distorted "VoiceHarsh" bus
@@ -29,7 +29,10 @@ public partial class Act7Whispers : Node
 
 	public override void _Ready() => _ = Cutscene.Run(this, Loop);
 
-	private static bool Active(StoryManager s) => s != null && s.Current >= Checkpoint.Act7CabinBurning && s.Current < Checkpoint.Act8BunkerEntered;
+	// Retired (Dan, 2026-09-22): "come up and see" is only heard where staircases stand (the Act 6
+	// clearing's loop, once or twice on the last staircase), never on the walk to the bunker. The
+	// node stays in the scene so saves, previews and the autotest keep their references; it never fires.
+	private static bool Active(StoryManager s) => false;
 
 	private async Task Loop(CancellationToken ct)
 	{
@@ -49,21 +52,11 @@ public partial class Act7Whispers : Node
 		if (_player == null || !IsInstanceValid(_player)) _player = StoryBeat.Player(this);
 		PlaySting();
 		bool echo = _rng.Randf() < 0.3f;
-		float fadeIn = _rng.RandfRange(0.8f, 2.2f), hold = _rng.RandfRange(1.6f, 3.4f), fadeOut = _rng.RandfRange(0.8f, 2.0f);
-		if (StoryBeat.Fader(this) == null) return;
-		if (!echo)
-		{
-			await StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut, ct);
-			return;
-		}
+		// No caption: the voice is heard, never read (Dan, 2026-09-22: only the radio's lines go on screen).
+		if (!echo) return;
 		// A second, overlapping voice a beat behind the first: the "multiplicity" the outline asks for.
-		// It goes on the fader's echo line, so the two captions stand as two lines and neither cuts
-		// the other short. Both come down with this sequence if it is cancelled.
-		var first = StoryBeat.Caption(this, "\"Come up and see.\"", fadeIn, hold, fadeOut, ct);
 		await Cutscene.Wait(this, _rng.RandfRange(0.3f, 0.7f), ct);
 		PlaySting();
-		await StoryBeat.Echo(this, "\"...come up and see...\"", fadeIn * 0.6f, hold * 0.7f, fadeOut, ct);
-		await first;
 	}
 
 	// The four recorded takes read "close/quiet" to "far/harsh"; each gets its own baseline
@@ -82,12 +75,12 @@ public partial class Act7Whispers : Node
 
 		(float baseDb, float unitSize, float maxDist, bool harsh) = variant switch
 		{
-			"distant" => (-8f, 9f, 100f, false),
-			"light" => (-2f, 5f, 60f, false),
-			"medium" => (3f, 4f, 55f, false),
-			_ => (8f, 3f, 50f, true),   // "loud"
+			"distant" => (-14f, 9f, 100f, false),
+			"light" => (-9f, 5f, 60f, false),
+			"medium" => (-5f, 4f, 55f, false),
+			_ => (-1f, 3f, 50f, true),   // "loud" (the take itself is loud; it must sit inside the mix, not explode out of it)
 		};
-		bool distorted = recorded && harsh && _rng.Randf() < 0.6f;
+		bool distorted = recorded && harsh && _rng.Randf() < 0.35f;
 		float ang = _rng.RandfRange(0f, Mathf.Tau);
 		float dist = _rng.RandfRange(9f, 24f);
 		Vector3 pos = _player.GlobalPosition + new Vector3(Mathf.Cos(ang), 0.5f, Mathf.Sin(ang)) * dist;
@@ -103,5 +96,6 @@ public partial class Act7Whispers : Node
 		voice.GlobalPosition = pos;
 		voice.Finished += voice.QueueFree;
 		voice.Play();
+		StoryBeat.FadeIn(voice, voice.VolumeDb, 0.5f);   // it comes up out of the trees, never bursts in
 	}
 }

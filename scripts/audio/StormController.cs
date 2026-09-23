@@ -9,7 +9,7 @@ namespace ProjectDS.Audio;
 /// lantern and compass in hand, the forest goes dead silent (the same signal
 /// as the stairs), rain fades in, and lightning flashes with a rolling thunder
 /// crack at random intervals. It runs until <see cref="Deactivate"/> is called
-/// (Act 5's dawn breaks it), which is otherwise never automatic.
+/// (carrying the cap out of the cabin in Act 5 breaks it), which is otherwise never automatic.
 ///
 /// Restores itself on Continue: raging if the story has
 /// <see cref="StoryManager.Flag.StormStarted"/> but not yet
@@ -27,7 +27,7 @@ public partial class StormController : Node
 	[Export] public NodePath RainPath = "../Rain";
 	[Export] public NodePath ThunderPath = "../Thunder";
 	[Export] public float RainFadeSeconds = 5f;
-	[Export] public Vector2 LightningInterval = new(6f, 17f);
+	[Export] public Vector2 LightningInterval = new(12f, 28f);   // Dan, 2026-09-22: 6-17 was too much, 20-48 too rare
 	/// <summary>Peak alpha of the full-screen overlay flash (the scene itself is lit by RainVfx).</summary>
 	[Export] public Vector2 OverlayAlpha = new(0.04f, 0.08f);
 	/// <summary>Silence priority: the storm's hush yields to scripted set pieces (Act 11).</summary>
@@ -89,7 +89,7 @@ public partial class StormController : Node
 		FadeRain(1f, fadeSeconds);
 	}
 
-	/// <summary>Act 5's dawn: the storm breaks. Rain fades out, the forced silence lifts, no more lightning.</summary>
+	/// <summary>Act 5, the cap carried out: the storm breaks. Rain fades out, the forced silence lifts, no more lightning. Still night.</summary>
 	public void Deactivate(float fadeSeconds = 6f)
 	{
 		if (!Active) return;
@@ -109,9 +109,22 @@ public partial class StormController : Node
 			_rainTween.TweenProperty(vfx, "Intensity", to, seconds);
 	}
 
+	/// <summary>For tests: the rain loop is faded down because the listener is indoors.</summary>
+	public bool RainMuffled => _rainLoop != null && _rainLoop.ExtraDb < -30f;
+	/// <summary>For tests: the rain loop's effective level right now (dB; -100 when silent or absent).</summary>
+	public float RainAudibleDb => _rainLoop == null || _rainLoop.Gain <= 0.001f ? -100f
+		: _rainLoop.BaseVolumeDb + _rainLoop.ExtraDb + 20f * Mathf.Log(_rainLoop.Gain) / Mathf.Log(10f);
+
 	public override void _Process(double delta)
 	{
 		_clock += delta;
+		// Indoors (the cabin, the bunker) the rain stops (Dan, 2026-09-22): the loop fades out in ~0.4 s and
+		// back when they step out; the thunder stays, muffled by the indoor duck on the Weather bus.
+		if (_rainLoop != null)
+		{
+			bool indoor = ForestAmbienceManager.Instance is { IsIndoor: true };
+			_rainLoop.ExtraDb = Mathf.MoveToward(_rainLoop.ExtraDb, indoor ? -60f : 0f, (float)delta * 150f);
+		}
 		if (_flash.Color.A > 0f)
 		{
 			var c = _flash.Color;
@@ -138,8 +151,8 @@ public partial class StormController : Node
 		if (alpha > 0f) _flash.Color = new Color(1f, 1f, 0.95f, alpha);
 		if (_thunder.Count == 0 || _thunderVoice == null) return;
 		_thunderVoice.Stream = _thunder[_rng.RandiRange(0, _thunder.Count - 1)];
-		_thunderVoice.VolumeDb = _rng.RandfRange(-9f, -1f);
-		_thunderVoice.PitchScale = _rng.RandfRange(0.88f, 1.06f);
+		_thunderVoice.VolumeDb = _rng.RandfRange(-10f, -3f);
+		_thunderVoice.PitchScale = _rng.RandfRange(0.85f, 0.95f);   // the depth is in the takes now; a big shift made the rumble grainy
 		_thunderVoice.Play();
 	}
 }
