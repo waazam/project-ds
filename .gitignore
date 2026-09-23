@@ -27,3 +27,6 @@ desktop.ini
 
 # Local tooling state
 .claude/
+
+# Session test logs
+/scratchpad_*.log
