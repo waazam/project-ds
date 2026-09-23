@@ -225,6 +225,37 @@ public static class Ambient
 		return o;
 	}
 
+	/// <summary>
+	/// A large still lake from the shore: no current, so none of Stream's turbulence or bubbling -
+	/// just a very soft, low hush of air over open water and an occasional round, low lap against
+	/// the bank (never a bright tick; a lake's lap is a soft "vwomp", not a stream's "plink").
+	/// Deliberately quiet and plain: the point is to sit under a scene unnoticed, not perform.
+	/// </summary>
+	public static double[] Lake(Rng r, int sr, double sec)
+	{
+		int n = (int)(sec * sr), xf = 2 * sr, pre = sr / 2, tot = pre + n + xf;
+		double T = (double)tot / sr;
+		var breathe = new Smooth(r, T, 14.0);
+		var hp = Biquad.Hp(sr, 35); var lp1 = Biquad.Lp(sr, 320); var lp2 = Biquad.Lp(sr, 400);
+		var br = new Brown();
+		var x = new double[tot];
+		for (int i = 0; i < tot; i++)
+		{
+			double t = (double)i / sr;
+			double b = 0.6 + 0.4 * breathe.At(t);
+			x[i] = hp.P(lp2.P(lp1.P(br.P(r.W())))) * 0.05 * b;
+		}
+		var rl = r.Fork();
+		foreach (double t in Poisson(rl, T, 0.4, _ => 1))
+		{
+			double a = 0.1 * rl.LogR(0.35, 1);
+			Tick(x, rl, sr, t, a, rl.LogR(160, 340), rl.R(0.5, 0.9), rl.LogR(0.02, 0.045), 0.02);
+			Body(x, rl, sr, t, a * 0.85, rl.R(85, 150), rl.R(0.05, 0.11));
+		}
+		var o = MakeLoop(x, pre, n, xf);
+		NormRms(o, -34);
+		return o;
+	}
 
 	/// <summary>
 	/// A periodic random control signal in roughly 0..1: random-phase sines with whole cycles per loop,

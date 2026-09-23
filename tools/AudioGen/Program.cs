@@ -30,6 +30,7 @@ var jobs = new List<(string name, string dir, bool loop, int sr, Func<Rng, int, 
 	("undertone_loop", ambient, true, Lo, (r, sr) => Ambient.Undertone(r, sr, 40)),
 	("ringing_loop", ambient, true, Hi, (r, sr) => Ambient.Ringing(sr, 20)),
 	("rain_loop", ambient, true, Lo, (r, sr) => Ambient.Rain(r, sr, 180)),
+	("lake_loop", ambient, true, Lo, (r, sr) => Ambient.Lake(r, sr, 40)),
 	("fire_crackle_loop", ambient, true, Lo, (r, sr) => Ambient.FireCrackle(r, sr, 30)),
 	("choir_chant_loop", ambient, true, Lo, (r, sr) => Ambient.ChoirChant(r, sr, 108)),
 	("stairs_hum_loop", ambient, true, Lo, (r, sr) => Ambient.StairsHum(r, sr, 40)),
@@ -77,6 +78,7 @@ jobs.Add(("creature_rattle_cand_c", sfx, true, Lo, (r, sr) => Creature.RattleWet
 jobs.Add(("creature_rattle_cand_d", sfx, true, Lo, (r, sr) => Creature.RattleBone(r, sr, 26, Creature.RattleVar.Base)));
 jobs.Add(("creature_rattle_cand_e", sfx, true, Lo, (r, sr) => Creature.RattleRatchet(r, sr, 22, Creature.RattleVar.Base)));
 jobs.Add(("creature_rattle_cand_f", sfx, true, Lo, (r, sr) => Creature.RattleCroakClicks(r, sr, 24, Creature.RattleVar.Base)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"creature_foghorn_{i:00}", sfx, false, Lo, (r, sr) => Creature.Foghorn(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_moan_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantMoan(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_bellow_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantBellow(r, sr)));
 for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"creature_jumpscream_{k:00}", sfx, false, Lo, (r, sr) => Creature.JumpScream(r, sr, k))); }

@@ -97,6 +97,40 @@ public static class Creature
 	}
 
 	/// <summary>
+	/// The lake creature's breach: a real foghorn's slow, mournful pitch (a low pipe resonance, built
+	/// from a pulse train through a formant, not a clean synth tone) with something alive underneath
+	/// it - a second throat a few percent flat for a dissonant beat, a slow creature-like pulse
+	/// instead of a steady drone, and a very slow wobble so it never sits perfectly still. Long swell
+	/// in, a held mournful sag, slow swell out, in a big hall (heard across open water).
+	/// </summary>
+	public static double[] Foghorn(Rng r, int sr)
+	{
+		double dur = r.R(4.5, 5.5);
+		var x = Buf(sr, dur);
+		double f0 = r.R(58, 72);
+		var larA = new Larynx(r, sr) { Jitter = 0.02, Fry = r.R(0.1, 0.25), Width = 0.3 };
+		var larB = new Larynx(r.Fork(), sr) { Jitter = 0.03, Fry = 0.15, Width = 0.28 };
+		var pipe = new Mouth(sr) { F1 = f0 * 1.9, F2 = f0 * 3.1, F3 = f0 * 5.4, G1 = 1.0, G2 = 0.6, G3 = 0.25, Q = 9 };
+		double wobbleHz = r.R(0.35, 0.55);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr, u = t / dur;
+			double env = Env(u, 0.16, 0.4);   // slow swell in, slow release
+			double sag = 1.0 - 0.05 * Math.Min(1, u / 0.5);   // a mournful droop as it holds
+			double wobble = 1 + 0.015 * Math.Sin(TwoPi * wobbleHz * t);
+			double f = f0 * sag * wobble;
+			double src = larA.P(f) + larB.P(f * 0.982) * 0.75;
+			double horn = Math.Tanh(pipe.P(src) * 3.0);
+			x[i] = horn * env;
+		}
+		LowPass(x, sr, 900);
+		var hall = new Hall(sr, 3.8, 0.45, 60, 1.8);
+		var o = new double[x.Length];
+		for (int i = 0; i < x.Length; i++) o[i] = x[i] * 0.5 + hall.P(x[i]) * 1.3;
+		return FinishOneShot(o, sr, -3, 700);
+	}
+
+	/// <summary>
 	/// A full roar: the pitch climbs from ~55 Hz to ~110 Hz and breaks, the mouth opens wide, two
 	/// detuned throats for size, a sub layer under it all. <paramref name="far"/> puts it a few hundred
 	/// metres off through the trees (the giant): mostly hall, no top end.

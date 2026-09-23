@@ -18,6 +18,7 @@ public enum Checkpoint
 	Act8BunkerEntered = 7,
 	Act10WalkieFound = 8,
 	Act11GiantEncounter = 9,
+	Act12LakeCrossed = 10,
 }
 
 public class SaveData

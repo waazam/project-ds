@@ -129,6 +129,7 @@ public partial class Act11Ending : Node3D
 
 	public override void _Ready()
 	{
+		AddToGroup("act11_ending");
 		_original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
 		SetProcess(false);   // only while the way up is open
 		Callable.From(Restore).CallDeferred();
@@ -701,7 +702,42 @@ public partial class Act11Ending : Node3D
 		s?.SetFlag(StoryManager.Flag.NewelSeated);
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act11GiantEncounter);
 		await Cutscene.Wait(this, 1.0, ct);
-		await Credits(fader, ct);
+		// Act 12 picks up from here: the lake, at sunrise. Credits roll once LakeCrossingEvent
+		// carries the player across and reaches checkpoint 10 (see Lake.cs / LakeCrossingEvent.cs).
+		await WakeAtLake(player, fader, ct);
+	}
+
+	/// <summary>
+	/// Still black from the pass-out: the player is carried (unseen) to the lake's near shore and
+	/// comes to at sunrise, eyes adjusting, head lifting from a down-turned start — the same shape
+	/// as GameFlow's hollow wake-up, just shorter, since this one has no level load to hide behind.
+	/// A rowboat is right there; control comes back once they are looking level.
+	/// </summary>
+	private async Task WakeAtLake(PlayerController player, ScreenFader fader, CancellationToken ct)
+	{
+		if (GetTree().GetFirstNodeInGroup("lake_marker") is not Lake lake) return;
+		var rig = player.CameraRig;
+		if (fader != null) fader.SetBlack(true);
+		player.Teleport(lake.WakeSpotWorld, lake.WakeYaw);
+		StoryBeat.SetMood(this, ForestAtmosphere.Mood.Dawn, 4.0f);
+		// Not rig.Pitch: after the giant they were still looking steeply up at it (Teleport only resets
+		// yaw), and waking up should mean a level, ordinary view, not picking that stare back up.
+		const float levelPitch = 0f;
+		float downPitch = Mathf.DegToRad(-45f);
+		rig.SetPitch(downPitch);
+		await Cutscene.Wait(this, 1.2, ct);
+		if (fader != null) await fader.Fade(0f, 3.2f, ct);
+		const double riseSeconds = 3.0;
+		double t = 0;
+		while (t < riseSeconds)
+		{
+			await Cutscene.Frame(this, ct);
+			t += GetProcessDeltaTime();
+			float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, (float)(t / riseSeconds)));
+			rig.SetPitch(Mathf.Lerp(downPitch, levelPitch, u));
+		}
+		rig.SetPitch(levelPitch);
+		GD.Print("[story] Act 12: woke at the lake");
 	}
 
 	/// <summary>Hard ceiling on the driven pitch (degrees): well short of the zenith, where yaw is ill-defined.</summary>
@@ -757,8 +793,10 @@ public partial class Act11Ending : Node3D
 		player.PlayerInput.AddCutsceneLook(new Vector2((GD.Randf() - 0.5f) * 2f * radians, (GD.Randf() - 0.5f) * 2f * radians * 0.7f));
 	}
 
-	/// <summary>The end card, the studio, the thanks; then the menu. The pause menu is locked meanwhile.</summary>
-	private async Task Credits(ScreenFader fader, CancellationToken ct)
+	/// <summary>The end card, the studio, the thanks; then the menu (the pause menu is locked
+	/// meanwhile). Called once the real ending (Act 12's lake crossing) hands back checkpoint 10,
+	/// not directly by this class any more.</summary>
+	public async Task Credits(ScreenFader fader, CancellationToken ct)
 	{
 		var pause = FindPauseMenu();
 		if (pause != null) pause.Locked = true;

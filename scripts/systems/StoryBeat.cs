@@ -67,6 +67,8 @@ public static class StoryBeat
 	public static ForestAtmosphere.Mood ExpectedMood(StoryManager s)
 	{
 		if (s == null || s.Current < Checkpoint.Act2StairsClimbed) return ForestAtmosphere.Mood.Auto;   // Act 1: daylight, the fog closing in
+		// Act 12: sunrise at the lake, for the rest of the game (the Hollow is never seen again).
+		if (s.Current >= Checkpoint.Act11GiantEncounter) return ForestAtmosphere.Mood.Dawn;
 		if (s.HasFlag(StoryManager.Flag.Act6NightFell) || s.HasFlag(StoryManager.Flag.ClearingLoopDone)) return ForestAtmosphere.Mood.Night;
 		if (Act6Revealed(s)) return ForestAtmosphere.Mood.Menacing;
 		return ForestAtmosphere.Mood.Night;

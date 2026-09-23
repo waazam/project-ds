@@ -25,6 +25,8 @@
 [ext_resource type="Script" path="res://scripts/world/SafeZoneWatcher.cs" id="32_safezone"]
 [ext_resource type="Script" path="res://scripts/world/Woodpile.cs" id="33_woodpile"]
 [ext_resource type="Script" path="res://scripts/world/SurveyLot.cs" id="34_lot"]
+[ext_resource type="Script" path="res://scripts/world/Lake.cs" id="40_lake"]
+[ext_resource type="Script" path="res://scripts/world/LakeCrossingEvent.cs" id="41_lakecrossing"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -600,4 +602,12 @@ ClearFoliage = false
 
 [node name="Act7Whispers" type="Node" parent="."]
 script = ExtResource("23_whispers")
+
+[node name="Lake" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2600, 0, -200)
+script = ExtResource("40_lake")
+
+[node name="LakeCrossing" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2600, 0, -200)
+script = ExtResource("41_lakecrossing")
 

@@ -220,6 +220,7 @@ public partial class StoryTest : Node
 			new("Act 7: the lookout", hollow, Act7Lookout),
 			new("Acts 8-10: the bunker", hollow, Act8To10Bunker),
 			new("Act 11: the last climb", hollow, Act11),
+			new("Act 12: the lake crossing", hollow, Act12Lake),
 		};
 	}
 
@@ -1182,11 +1183,93 @@ public partial class StoryTest : Node
 		Check("trembling, then passed out looking at it", act11.Trembled && act11.PassedOut);
 		Check("the hum hummed out over black", act11.HumOut);
 		Check("the view never flipped during the ending (up-vector and pitch watched every driven frame)", !act11.ViewFlipped);
-		Check("the screen is black for the credits", StoryBeat.Fader(this) is { IsBlack: true });
-		Check("control never comes back", !_input.Enabled);
 		Engine.TimeScale = 1.0;
-		await Seconds(1.0, ct);
-		Screenshot("ending");
+		// Act 12 picks up from here: they wake at the lake instead of the credits rolling straight away.
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		Check("control comes back at the lake, not the credits", _input.Enabled);
+		Screenshot("giant_touch");
+	}
+
+	private async Task Act12Lake(CancellationToken ct)
+	{
+		var lake = GetTree().GetFirstNodeInGroup("lake_marker") as Lake;
+		var crossing = AllOf<LakeCrossingEvent>().FirstOrDefault();
+		Check("the lake and its crossing exist", lake != null && crossing != null);
+		if (lake == null || crossing == null) return;
+
+		var atmo = StoryBeat.Atmosphere(this);
+		Check("dawn light at the lake", atmo == null || atmo.CurrentMood == ForestAtmosphere.Mood.Dawn, $"{atmo?.CurrentMood}");
+		Check("woke near the lake", _player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 30f, $"{_player.GlobalPosition}");
+		Screenshot("lake_wake");
+
+		Check("the boat can be boarded", crossing.BoardPrompt != null);
+		if (crossing.BoardPrompt == null) return;
+		await WalkTo(crossing.BoardPrompt.GlobalPosition, 1.5f, ct, giveUp: 15f);
+		await UseIt(crossing.BoardPrompt, ct);
+		await WaitUntil(() => crossing.Boarded, 5, ct);
+		Check("boarded the boat", crossing.Boarded);
+
+		Engine.TimeScale = 3.0;
+		await PaddleUntil(() => !crossing.Paddling || crossing.InBreach, ct, 20);
+		Check("paddled to the breach point", crossing.InBreach || crossing.Progress >= crossing.BreachAtFraction - 0.02f, $"progress {crossing.Progress:0.00}");
+		await WaitUntil(() => crossing.InBreach, 5, ct);
+		Check("the creature breaches", crossing.InBreach && crossing.LastCreature is { Breaching: true });
+		Screenshot("breach");
+		await WaitUntil(() => !crossing.InBreach, 15, ct);
+		Check("the water turns rough for the current", crossing.InCurrent);
+
+		await PaddleUntil(() => crossing.Landed, ct, 30);
+		Check("crossed the current and landed", crossing.Landed, $"progress {crossing.Progress:0.00}");
+		Screenshot("landed");
+
+		// Checkpoint 10 fires the real credits in the same synchronous call (LakeCrossingEvent.OnArrival),
+		// and under AutoTest they run to "back to the menu" fast enough to race a polled WaitUntil (the
+		// main menu then starts a fresh game, confusing this session's loop). Subscribing to the event
+		// itself — exactly Act2Climb's fix for the same class of race — lets Finish() win: it runs
+		// synchronously inside ReachCheckpoint, before OnArrival's next line even starts the credits.
+		bool reached = false;
+		void OnCheckpoint(Checkpoint cp)
+		{
+			if (cp != Checkpoint.Act12LakeCrossed) return;
+			reached = true;
+			Check("checkpoint 10: reached the rescue station", true);
+			Engine.TimeScale = 1.0;
+			Finish();
+		}
+		StoryManager.Instance.CheckpointReached += OnCheckpoint;
+		try
+		{
+			await WalkTo(lake.StationApproachWorld, 1.5f, ct, giveUp: 20f);
+			await WalkTo(lake.StationDoorWorld, 1.0f, ct, giveUp: 15f);
+			await WaitUntil(() => reached, 10, ct);
+			if (!reached) Check("checkpoint 10: reached the rescue station", false, "trigger never fired");
+		}
+		finally { StoryManager.Instance.CheckpointReached -= OnCheckpoint; }
+	}
+
+	/// <summary>Spams the paddle keys in alternation (A, D, A, D...) until <paramref name="done"/>
+	/// is true or <paramref name="giveUp"/> seconds pass, mirroring <see cref="PushFor"/> but
+	/// alternating sides instead of holding one.</summary>
+	private async Task PaddleUntil(Func<bool> done, CancellationToken ct, double giveUp)
+	{
+		double t = 0, sideTimer = 0; bool left = true;
+		try
+		{
+			while (!done())
+			{
+				ct.ThrowIfCancellationRequested();
+				if (_input.Enabled)
+				{
+					sideTimer -= GetProcessDeltaTime();
+					if (sideTimer <= 0) { left = !left; sideTimer = 0.15; }
+					_input.ScriptedMove = new Vector2(left ? -1f : 1f, 0f);
+				}
+				await Frames(1, ct);
+				t += GetProcessDeltaTime();
+				if (t > giveUp) { Check("paddling", "made it before giving up", false, $"stuck after {giveUp:0}s"); return; }
+			}
+		}
+		finally { if (_input != null) _input.ScriptedMove = Vector2.Zero; }
 	}
 
 	// ------------------------------------------------------------------ bot
