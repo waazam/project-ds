@@ -372,39 +372,42 @@ public static class Ambient
 		double D(double t) => 0.75 + 0.25 * dens(t);
 		var far = new double[n]; var mid = new double[n]; var near = new double[n];
 
+		// Duller and rounder than the canopy patter above: rain landing on soil has no crisp leaf
+		// "tick", just a soft, low plip and a bit of wet body. Longer attacks and lower, wider
+		// bands than a leaf-drop keep every layer out of the popcorn-kernel "pop" register.
 		var rf = r.Fork();
 		foreach (double t in Poisson(rf, sec, 935, D))
-			Tick(far, rf, sr, t, 0.12 * rf.LogR(0.3, 1), rf.LogR(1500, 4500), rf.R(1.5, 3.0), rf.LogR(0.0004, 0.0016));
+			Tick(far, rf, sr, t, 0.14 * rf.LogR(0.3, 1), rf.LogR(500, 1600), rf.R(0.8, 1.5), rf.LogR(0.0009, 0.003), 0.0003);
 
 		var rm = r.Fork();
 		foreach (double t in Poisson(rm, sec, 42, D))
 		{
-			double a = 0.3 * rm.LogR(0.25, 1);
-			Tick(mid, rm, sr, t, a, rm.LogR(1200, 3500), rm.R(1.4, 2.8), rm.LogR(0.0006, 0.002));
-			if (rm.Chance(0.25)) Body(mid, rm, sr, t, a * 0.5, rm.R(350, 700), rm.R(0.003, 0.006));
+			double a = 0.32 * rm.LogR(0.25, 1);
+			Tick(mid, rm, sr, t, a, rm.LogR(450, 1400), rm.R(0.8, 1.5), rm.LogR(0.0012, 0.0035), 0.0004);
+			if (rm.Chance(0.7)) Body(mid, rm, sr, t, a * 0.7, rm.R(220, 450), rm.R(0.004, 0.008));
 		}
 
 		var rn = r.Fork();
-		foreach (double t in Poisson(rn, sec, 2.1, D))
+		foreach (double t in Poisson(rn, sec, 3.4, D))
 		{
-			double a = 0.4 * rn.LogR(0.3, 1);
-			Tick(near, rn, sr, t, a, rn.LogR(1800, 4200), rn.R(1.2, 2.4), rn.LogR(0.0006, 0.002));
-			if (rn.Chance(0.5)) Body(near, rn, sr, t, a * 0.5, rn.R(400, 800), rn.R(0.003, 0.007));
+			double a = 0.32 * rn.LogR(0.3, 1);
+			Tick(near, rn, sr, t, a, rn.LogR(550, 1600), rn.R(0.7, 1.3), rn.LogR(0.0012, 0.0035), 0.0005);
+			if (rn.Chance(0.85)) Body(near, rn, sr, t, a * 0.75, rn.R(200, 420), rn.R(0.005, 0.01));
 			if (rn.Chance(0.25))
 			{
 				double td = t, gap = rn.R(0.05, 0.12), ad = a;
 				for (int k = rn.I(1, 4); k > 0; k--)
 				{
 					td += gap; gap *= rn.R(1.3, 1.9); ad *= rn.R(0.35, 0.6);
-					Tick(near, rn, sr, td, ad, rn.LogR(1800, 4200), rn.R(1.2, 2.4), rn.LogR(0.0004, 0.0012));
+					Tick(near, rn, sr, td, ad, rn.LogR(550, 1600), rn.R(0.7, 1.3), rn.LogR(0.0008, 0.002), 0.0004);
 				}
 			}
 		}
 
 		// Distance and the trees between: the patter loses its top and its bottom and sits partly in the reverb.
-		var fl1 = Biquad.Lp(sr, 3600); var fl2 = Biquad.Lp(sr, 4200); var fh = Biquad.Hp(sr, 900);
+		var fl1 = Biquad.Lp(sr, 2200); var fl2 = Biquad.Lp(sr, 2800); var fh = Biquad.Hp(sr, 300);
 		var farD = Circular(far, v => fh.P(fl2.P(fl1.P(v))));
-		var ml = Biquad.Lp(sr, 5000);
+		var ml = Biquad.Lp(sr, 3200);
 		var midD = Circular(mid, ml.P);
 		var send = new double[n];
 		for (int i = 0; i < n; i++) send[i] = farD[i] * 0.6 + midD[i] * 0.3 + near[i] * 0.08;
@@ -412,7 +415,7 @@ public static class Ambient
 		var wet = Circular(send, hall.P);
 		var o = new double[n];
 		for (int i = 0; i < n; i++) o[i] = farD[i] * 0.8 + midD[i] + near[i] + wet[i] * 0.7;
-		var dh = Biquad.Hp(sr, 200);
+		var dh = Biquad.Hp(sr, 150);
 		o = Circular(o, dh.P);
 		NormRms(o, -30, -6);
 		return o;

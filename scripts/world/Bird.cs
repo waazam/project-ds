@@ -369,7 +369,7 @@ public partial class Bird : Node3D
 		{
 			Stream = GD.Load<AudioStream>(path), Bus = "Birds",
 			UnitSize = 4f, MaxDistance = SingRange + 5f,
-			VolumeDb = IsOmen ? -8f : -6f + _rng.RandfRange(-2f, 1f),
+			VolumeDb = IsOmen ? 4f : -6f + _rng.RandfRange(-2f, 1f),
 			PitchScale = _rng.RandfRange(0.94f, 1.08f),
 			Position = new Vector3(0, 0.3f, 0),
 		};
@@ -379,7 +379,8 @@ public partial class Bird : Node3D
 		if (!Perched) _hop = 0f;   // a little hop as it calls
 	}
 
-	/// <summary>Startles up and away, then gone, rather than just vanishing in place. The perch stays.</summary>
+	/// <summary>Startles up and away, then gone, rather than just vanishing in place. The perch stays.
+	/// The omen instead lunges straight at whoever took the shot, for a jumpscare.</summary>
 	public void Capture()
 	{
 		if (Photographed) return;
@@ -388,8 +389,19 @@ public partial class Bird : Node3D
 		if (_model == null || !IsInstanceValid(_model)) return;
 		var model = _model;
 		var tween = CreateTween();
-		tween.TweenProperty(model, "position", model.Position + Vector3.Back * 2.2f + Vector3.Up * 1.6f, 0.55f)
-			.SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+		if (IsOmen && GetTree().GetFirstNodeInGroup("player") is Node3D player)
+		{
+			Vector3 face = player.GlobalPosition + Vector3.Up * 1.6f;
+			Vector3 dir = (face - GlobalPosition).Normalized();
+			Vector3 through = ToLocal(face + dir * 1.5f);   // fly past the player, not just up to them
+			tween.TweenProperty(model, "position", through, 0.2f)
+				.SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.In);
+		}
+		else
+		{
+			tween.TweenProperty(model, "position", model.Position + Vector3.Back * 2.2f + Vector3.Up * 1.6f, 0.55f)
+				.SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+		}
 		tween.TweenCallback(Callable.From(() => { if (IsInstanceValid(model)) model.QueueFree(); }));
 	}
 }

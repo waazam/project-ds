@@ -11,8 +11,8 @@ namespace ProjectDS.Player;
 /// </summary>
 public partial class PlayerFootsteps : Node
 {
-	[Export] public float WalkStride = 0.72f;   // metres per step while walking
-	[Export] public float RunStride = 1.15f;
+	[Export] public float WalkStride = 1.3f;   // metres per step while walking
+	[Export] public float RunStride = 1.9f;
 	[Export] public float StepVolumeDb = -26f;
 	[Export] public float ClothVolumeDb = -32f;
 	[Export] public int Voices = 4;

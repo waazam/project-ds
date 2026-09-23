@@ -182,11 +182,12 @@ public static class Forest
 	{
 		var src = Buf(sr, 1.8);
 		int k = r.I(2, 4);
-		double t = 0.02, f0 = r.R(240, 320);
+		double t = 0.02, f0 = r.R(120, 165);
 		var jit = new Smooth(r, 2, 0.01);
 		for (int c = 0; c < k; c++)
 		{
-			double d = r.R(0.2, 0.3), a = r.R(0.8, 1.0), fc = f0 * r.R(0.95, 1.05), gurgle = r.R(22, 34);
+			// A slow (4-7 Hz) gurgle reads as a low throb rather than the buzzy rattle a fast one gives.
+			double d = r.R(0.2, 0.3), a = r.R(0.8, 1.0), fc = f0 * r.R(0.95, 1.05), gurgle = r.R(4, 7);
 			int s0 = (int)(t * sr), len = (int)(d * sr);
 			double ph = 0;
 			for (int i = 0; i < len && s0 + i < src.Length; i++)
@@ -201,11 +202,12 @@ public static class Forest
 			}
 			t += d + r.R(0.14, 0.24);
 		}
-		var f1 = Biquad.Bp(sr, r.R(650, 800), 3); var f2 = Biquad.Bp(sr, r.R(1150, 1400), 4);
+		// Formants track down with the lower fundamental so the deeper pitch still reads as a voice.
+		var f1 = Biquad.Bp(sr, r.R(320, 420), 3); var f2 = Biquad.Bp(sr, r.R(600, 750), 4);
 		var x = new double[src.Length];
 		for (int i = 0; i < src.Length; i++) x[i] = f1.P(src[i]) + 0.6 * f2.P(src[i]);
 		// Distance: highs gone, more room than voice.
-		LowPass(x, sr, 1700); LowPass(x, sr, 2200);
+		LowPass(x, sr, 900); LowPass(x, sr, 1300);
 		return FinishOneShot(Space(x, sr, 0.6, 0.9, 0.85, 0.6), sr, -3, 150, t + 0.15);
 	}
 
