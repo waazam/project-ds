@@ -62,6 +62,9 @@ public partial class LakeCreature : Node3D
 		public float BaseYaw;
 		public GpuParticles3D Drips;
 		public float UpFor;
+		/// <summary>The one that follows the boat after the breach: placed and raised from outside.</summary>
+		public bool Hunter;
+		public float HuntRise;
 	}
 
 	private readonly List<Limb> _limbs = new();
@@ -204,7 +207,7 @@ public partial class LakeCreature : Node3D
 	/// faces the camera): a yellowed, veined white ball; on its front, a domed dark-red iris with a faint
 	/// glow of its own, and a black pupil. Real geometry, so it reads the same from any angle and at the
 	/// game's low resolution.</summary>
-	private static void BuildEye(Node3D socket)
+	internal static void BuildEye(Node3D socket)
 	{
 		_ball ??= new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 12, Rings = 8 };
 		_irisMat ??= new StandardMaterial3D
@@ -407,11 +410,49 @@ public partial class LakeCreature : Node3D
 		return true;
 	}
 
+	private Limb _hunter;
+
+	/// <summary>Adds the hunter: one more limb, kept mostly under the water, that the crossing moves
+	/// along behind the boat (<see cref="SetHunter"/>). It survives <see cref="Release"/>.</summary>
+	public void AddHunter(Vector3 world)
+	{
+		if (_hunter != null) return;
+		_hunter = BuildLimb(ToLocal(world) with { Y = 0f }, 7.5f, 0.72f, 18);
+		_hunter.Hunter = true;
+		_hunter.Watcher = true;
+		_hunter.State = State.Up;
+		_hunter.RiseTime = 1f;
+		_hunter.HuntRise = 0f;
+		_hunter.Speed = 1.3f;
+	}
+
+	/// <summary>Moves the hunter to <paramref name="world"/> (on the water) facing <paramref name="toward"/>;
+	/// <paramref name="rise"/> 0 = just a shadow under the surface, 1 = reared right up out of it.</summary>
+	public void SetHunter(Vector3 world, Vector3 toward, float rise)
+	{
+		if (_hunter == null || _hunter.State == State.Sinking || _hunter.State == State.Under) return;
+		Vector3 local = ToLocal(world);
+		var p = _hunter.Root.Position;
+		_hunter.Root.Position = new Vector3(local.X, p.Y, local.Z);
+		Vector3 look = toward - world; look.Y = 0;
+		if (look.LengthSquared() > 0.01f) _hunter.BaseYaw = Mathf.Atan2(look.X, look.Z);
+		_hunter.HuntRise = Mathf.Clamp(rise, 0f, 1f);
+	}
+
+	/// <summary>The hunter rears over the boat to take it (the drowning).</summary>
+	public void HunterStrike()
+	{
+		if (_hunter == null) return;
+		_hunter.HuntRise = 1f;
+		_hunter.LoomTarget = 1f;
+	}
+
 	/// <summary>All but the watchers go back under; the watchers stay up, swaying, staring.</summary>
 	public void Release()
 	{
 		foreach (var l in _limbs)
 		{
+			if (l.Hunter) continue;
 			l.LoomTarget = 0f;
 			if (!l.Watcher && l.State is State.Up or State.Rising) { l.State = State.Sinking; l.T = l.Colossus ? -0.6f : _rng.RandfRange(-0.3f, 0f); }
 		}
@@ -454,7 +495,7 @@ public partial class LakeCreature : Node3D
 					if (l.T >= l.RiseTime) { l.State = State.Up; l.T = 0f; l.UpFor = 0f; }
 					break;
 				case State.Up:
-					l.Rise = 1f;
+					l.Rise = l.Hunter ? Mathf.MoveToward(l.Rise, l.HuntRise, dt * 0.8f) : 1f;
 					l.UpFor += dt;
 					if (l.Drips != null && l.Drips.Emitting && l.UpFor > 3.5f) l.Drips.Emitting = false;
 					break;
@@ -530,7 +571,7 @@ public partial class LakeCreature : Node3D
 
 	private void UpdateEyes(Limb l, float dt)
 	{
-		bool open = _eyesOpened && (l.State is State.Up or State.Rising) && l.Rise > 0.6f;
+		bool open = (_eyesOpened || l.Hunter) && (l.State is State.Up or State.Rising) && (l.Rise > 0.6f || l.Hunter);
 		if (l.State == State.Sinking) l.EyeScale = Mathf.MoveToward(l.EyeScale, 0f, dt * 1.5f);
 		else if (open && l.EyeScale < 1f)
 		{

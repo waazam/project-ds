@@ -107,6 +107,24 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"tentacle_slam_{i:00}", sfx, false, Lo, 
 for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"loon_{k:00}", sfx, false, Hi, (r, sr) => Lake.Loon(r, sr, k))); }
 jobs.Add(("hull_lap_loop", ambient, true, Lo, (r, sr) => Lake.HullLap(r, sr, 24)));
 jobs.Add(("lake_rough_loop", ambient, true, Lo, (r, sr) => Lake.RoughWater(r, sr, 30)));
+// Act 13: the forester station.
+jobs.Add(("bulb_buzz_loop", sfx, true, Lo, (r, sr) => Station.BulbBuzz(r, sr, 20)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"bulb_sputter_{i:00}", sfx, false, Lo, (r, sr) => Station.BulbSputter(r, sr)));
+jobs.Add(("bulb_pop_01", sfx, false, Lo, (r, sr) => Station.BulbPop(r, sr)));
+jobs.Add(("drain_gurgle_01", sfx, false, Lo, (r, sr) => Station.DrainGurgle(r, sr)));
+jobs.Add(("clock_tick_loop", sfx, true, Lo, (r, sr) => Station.ClockTick(r, sr, 20)));
+jobs.Add(("glass_crack_01", sfx, false, Lo, (r, sr) => Station.GlassCrack(r, sr)));
+jobs.Add(("glass_shatter_01", sfx, false, Lo, (r, sr) => Station.GlassShatter(r, sr)));
+jobs.Add(("water_torrent_loop", ambient, true, Lo, (r, sr) => Station.Torrent(r, sr, 24)));
+jobs.Add(("blood_suck_01", sfx, false, Lo, (r, sr) => Station.BloodSuck(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"cryptex_click_{i:00}", sfx, false, Lo, (r, sr) => Station.CryptexClick(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"cryptex_stick_{i:00}", sfx, false, Lo, (r, sr) => Station.CryptexStick(r, sr)));
+jobs.Add(("cryptex_open_01", sfx, false, Lo, (r, sr) => Station.CryptexOpen(r, sr)));
+jobs.Add(("lighter_flick_01", sfx, false, Lo, (r, sr) => Station.LighterFlick(r, sr)));
+jobs.Add(("web_burn_01", sfx, false, Lo, (r, sr) => Station.WebBurn(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"wade_{i:00}", sfx, false, Lo, (r, sr) => Station.Wade(r, sr)));
+jobs.Add(("door_creak_01", sfx, false, Lo, (r, sr) => Station.SmallCreak(r, sr)));
+jobs.Add(("industrial_drone_loop", ambient, true, Lo, (r, sr) => Station.IndustrialDrone(r, sr, 30)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

@@ -25,6 +25,10 @@ public partial class StationDoor : Node3D
 
 	public bool Locked { get; private set; } = true;
 	public bool IsOpen { get; private set; }
+	/// <summary>Raised the moment the door starts to swing open.</summary>
+	public event System.Action Opened;
+	private float _closedYaw;
+	private bool _yawKnown;
 
 	private PickupInteractable _use;
 	private StaticBody3D _blocker;
@@ -81,10 +85,32 @@ public partial class StationDoor : Node3D
 	{
 		if (IsOpen) return;
 		IsOpen = true;
+		if (!_yawKnown) { _closedYaw = Rotation.Y; _yawKnown = true; }
 		if (_use != null) _use.Enabled = false;
-		if (_blocker != null) { _blocker.QueueFree(); _blocker = null; }
+		if (_blocker != null) _blocker.ProcessMode = ProcessModeEnum.Disabled;
+		SetBlocking(false);
 		var tween = CreateTween();
-		tween.TweenProperty(this, "rotation:y", Rotation.Y + Mathf.DegToRad(OpenDegrees), OpenSeconds)
+		tween.TweenProperty(this, "rotation:y", _closedYaw + Mathf.DegToRad(OpenDegrees), OpenSeconds)
 			.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		Opened?.Invoke();
+	}
+
+	/// <summary>Slams the door shut and locks it again (Room 2 shutting behind the player).</summary>
+	public void SlamShut(float seconds = 0.25f)
+	{
+		if (!_yawKnown) { _closedYaw = Rotation.Y; _yawKnown = true; }
+		IsOpen = false;
+		Locked = true;
+		if (_use != null) { _use.Enabled = true; }
+		SetBlocking(true);
+		var tween = CreateTween();
+		tween.TweenProperty(this, "rotation:y", _closedYaw, seconds).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+	}
+
+	private void SetBlocking(bool on)
+	{
+		if (_blocker == null) return;
+		foreach (var c in _blocker.GetChildren())
+			if (c is CollisionShape3D cs) cs.SetDeferred(CollisionShape3D.PropertyName.Disabled, !on);
 	}
 }

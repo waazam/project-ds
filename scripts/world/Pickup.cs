@@ -51,7 +51,10 @@ public partial class Pickup : Area3D
 	[Export] public string TakenLine = "";
 
 	public const string TakenFlagPrefix = "pickup_taken_";
-	public string TakenFlag => TakenFlagPrefix + Kind.ToString().ToLowerInvariant();
+	/// <summary>Set when more than one pickup of the same kind exists in the story (Act 4's key and the
+	/// station clock's key): each then remembers being taken on its own.</summary>
+	[Export] public string TakenId = "";
+	public string TakenFlag => TakenFlagPrefix + (string.IsNullOrEmpty(TakenId) ? Kind.ToString().ToLowerInvariant() : TakenId);
 	public bool Taken { get; private set; }
 	public PickupInteractable Use => _use;
 
@@ -139,6 +142,10 @@ public partial class Pickup : Area3D
 		ToolKind.NewelPost => "newel post",
 		ToolKind.Radio => "walkie-talkie",
 		ToolKind.Knife => "knife",
+		ToolKind.Lighter => "lighter",
+		ToolKind.DeadEye => "eye",
+		ToolKind.PaleHand => "hand",
+		ToolKind.StairTread => "step",
 		_ => "item",
 	};
 

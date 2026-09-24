@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-24 — Act 12 death, Act 13 rebuilt: the station puzzles](2026-09-24-act13-station-puzzles.md)
 - [2026-09-23c — Act 12 polish: the lake, the row, and the thing under it](2026-09-23c-act12-polish.md)
 - [2026-09-23b — Act 13: the forester station](2026-09-23b-act13-forester-station.md)
 - [2026-09-23 — Act 12: the lake crossing](2026-09-23-act12-lake-crossing.md)

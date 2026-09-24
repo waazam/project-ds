@@ -60,6 +60,13 @@ public partial class LakeCrossingEvent : Node3D
 	/// <summary>How far behind the breach point the current may drag the boat (it never pushes it all the way home).</summary>
 	[Export] public float MaxFallback = 8f;
 	[Export] public float PaddleSideThreshold = 0.45f;
+	/// <summary>The hunter: how far behind the boat it starts, how fast it follows (m/s), the grace
+	/// before it moves, and how close is caught. Stop rowing (or dawdle under ~2 strokes a second) and it
+	/// has the boat; a steady ~2.2 a second pulls away from it slowly, 3 a second comfortably.</summary>
+	[Export] public float HuntStart = 14f;
+	[Export] public float HuntSpeed = 0.9f;
+	[Export] public float HuntGrace = 3f;
+	[Export] public float CatchGap = 1.8f;
 	/// <summary>Kept for compatibility with older tuning; the current is now <see cref="CurrentPull"/>.</summary>
 	[Export] public float CurrentPushbackPerSecond = 1.5f;
 
@@ -70,6 +77,10 @@ public partial class LakeCrossingEvent : Node3D
 	public bool InCurrent { get; private set; }
 	public bool Landed { get; private set; }
 	public bool Arrived { get; private set; }
+	/// <summary>The hunter caught the boat: the drowning is playing and the checkpoint will reload.</summary>
+	public bool Caught { get; private set; }
+	/// <summary>How far behind the boat the hunter is right now (m); large when there is none.</summary>
+	public float HuntGap => _huntOn ? _s - _hunt : 999f;
 	public int StrokeCount { get; private set; }
 	/// <summary>0..1 across the whole crossing.</summary>
 	public float Progress { get; private set; }
@@ -104,6 +115,9 @@ public partial class LakeCrossingEvent : Node3D
 	private PlayerController _riding;
 	private float _shake;
 	private float _wakeTimer;
+	private bool _huntOn;
+	private float _hunt, _capsize;
+	private double _knockTimer;
 
 	// strokes
 	private bool? _lastStrokeWasLeft;
@@ -251,6 +265,7 @@ public partial class LakeCrossingEvent : Node3D
 		float roll = Mathf.Atan2(hr - hl, Rowboat.Beam) + _rollOff;
 		float y = (hc + (hb + hs + hr + hl) * 0.25f) * 0.5f + _dip + _groundLift;
 
+		roll += _capsize;
 		var basis = new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, pitch) * new Basis(Vector3.Back, roll);
 		_boat.GlobalTransform = new Transform3D(basis, _lake.ToGlobal(new Vector3(pos.X, y, pos.Y)));
 		// cut the boat's own footprint out of the lake surface, so the water never shows inside the hull
@@ -321,6 +336,11 @@ public partial class LakeCrossingEvent : Node3D
 			await Row(player, BreachAtFraction * _total, _total - 2.6f, true, ct);
 			InCurrent = false;
 			Paddling = false;
+			if (Caught)
+			{
+				await Drown(player, ct);
+				return;
+			}
 			await Land(player, ct);
 			Landed = true;
 			GD.Print("[story] Act 12: crossed the lake; the station waits");
@@ -464,6 +484,7 @@ public partial class LakeCrossingEvent : Node3D
 		_prompt.ShowDrift = rough;
 		_prompt.Next = 0;
 		float floor = Mathf.Max(_pushLen, from - (rough ? MaxFallback : 0f));
+		if (rough) StartHunt();
 		double clock = 0, swellAt = _rng.RandfRange(SwellEvery.X * 0.5f, SwellEvery.Y);
 		bool hushed = false, stirred = false, shadowed = false;
 		_s = Mathf.Max(_s, from);
@@ -494,6 +515,7 @@ public partial class LakeCrossingEvent : Node3D
 			if (_s < floor) { _s = floor; _v = Mathf.Max(_v, 0f); }
 			Wake(dt);
 			_prompt.Drift = _v;
+			if (rough && Hunt(dt, clock)) { Caught = true; break; }
 
 			if (!rough)
 			{
@@ -549,8 +571,8 @@ public partial class LakeCrossingEvent : Node3D
 		bool rough = InCurrent;
 		LakeFx.Splash(Cutscene.SceneRoot(this), w, rough ? 0.7f : 0.45f, rough ? 12 : 7);
 		LakeFx.Ripple(Cutscene.SceneRoot(this), w, 1.3f, 1.4f, 0.35f);
-		Sfx("oar_stroke", 4, w, "Player", rough ? -3f : -7f, 5f);
-		if (_rng.Randf() < 0.3f) Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(side)), "Player", -12f);
+		Sfx("oar_stroke", 4, w, "Player", rough ? -5f : -9f, 5f);
+		if (_rng.Randf() < 0.15f) Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(side)), "Player", -15f);
 	}
 
 	private void OnBladeOut(int side, Vector3 at)
@@ -593,6 +615,128 @@ public partial class LakeCrossingEvent : Node3D
 		Sfx("wave_slap", 4, bow, "Weather", -2f, 6f);
 		if (_rng.Randf() < 0.5f) Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -6f);
 	}
+
+	// ------------------------------------------------------------------ the hunt, and being taken
+
+	/// <summary>The fight back is a chase: one limb follows the boat from behind at a steady pace, a
+	/// shadow sliding under the water with its eyes breaking the surface, rising higher the closer it
+	/// gets. Row fast enough and it falls behind; too slow and it catches the boat.</summary>
+	private void StartHunt()
+	{
+		_huntOn = true;
+		_hunt = _s - HuntStart;
+		_knockTimer = 0;
+		if (LastCreature != null && GodotObject.IsInstanceValid(LastCreature))
+			LastCreature.AddHunter(RailWorld(_hunt));
+		_ = StoryBeat.Caption(this, "Row. It's following you.", 0.4f, 1.8f, 0.9f);
+	}
+
+	private Vector3 RailWorld(float s)
+	{
+		Vector2 p = RailAt(Mathf.Clamp(s, 0f, _total), out _);
+		return _lake.ToGlobal(new Vector3(p.X, 0f, p.Y));
+	}
+
+	/// <summary>Moves the hunter on; true once it has the boat.</summary>
+	private bool Hunt(float dt, double clock)
+	{
+		if (clock > HuntGrace) _hunt += HuntSpeed * dt;
+		// it never falls hopelessly far behind: a fast rower loses it, but it keeps coming
+		_hunt = Mathf.Max(_hunt, _s - HuntStart * 1.6f);
+		float gap = _s - _hunt;
+		float near = 1f - Mathf.Clamp((gap - CatchGap) / (HuntStart - CatchGap), 0f, 1f);
+		Vector3 at = RailWorld(_hunt);
+		Vector2 l = new Vector2(at.X - _lake.GlobalPosition.X, at.Z - _lake.GlobalPosition.Z);
+		_lake.Waves.ShadowAt = l;
+		_lake.Waves.ShadowRadius = 7f;
+		_lake.Waves.Shadow = 0.45f + 0.45f * near;
+		if (LastCreature != null && GodotObject.IsInstanceValid(LastCreature))
+			LastCreature.SetHunter(at, _boat.GlobalPosition, Mathf.Lerp(0.12f, 0.6f, near));
+		if (_heart != null) _heart.VolumeDb = Mathf.Lerp(-16f, -2f, near);
+		// close behind: it knocks on the hull
+		_knockTimer -= dt;
+		if (near > 0.6f && _knockTimer <= 0)
+		{
+			_knockTimer = _rng.RandfRange(1.2f, 2.4f);
+			Sfx("wall_knock", 3, _boat.ToGlobal(new Vector3(0, -0.1f, Rowboat.HalfLength * 0.8f)), "Unnatural", -4f, 4f);
+			_pitchVel -= 0.1f;
+		}
+		return gap <= CatchGap;
+	}
+
+	/// <summary>Taken: it rears up over the stern, the boat goes over, and the player is dragged down
+	/// through the murk — where the eye from before rises out of the dark to meet them. Then black,
+	/// and back to the checkpoint at the lake's shore.</summary>
+	private async Task Drown(PlayerController player, CancellationToken ct)
+	{
+		PlayerDeath.Begin();
+		_prompt.SetShown(false);
+		Cutscene.Lock(player, input: true);
+		var rig = player.CameraRig;
+		var under = UnderwaterView.For(this);
+		var murk = new Color(0.05f, 0.09f, 0.08f);
+		Vector3 behind = _boat.ToGlobal(new Vector3(0, 0, Rowboat.HalfLength + 2.2f));
+		LastCreature?.SetHunter(behind with { Y = _lake.GlobalPosition.Y }, _boat.GlobalPosition, 1f);
+		LastCreature?.HunterStrike();
+		Sfx("breach_erupt", 1, behind, "Unnatural", -2f, 12f, 120f);
+		LakeFx.Column(Cutscene.SceneRoot(this), behind with { Y = _lake.GlobalPosition.Y }, 6f);
+		_shake = 0.6f;
+		if (_heart != null) _heart.VolumeDb = 0f;
+		await LookAt(player, () => behind + Vector3.Up * 4f, 1.1f, 3f, ct);
+		Sfx("tentacle_slam", 2, _boat.GlobalPosition, "Unnatural", 2f, 10f);
+		Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", 0f);
+		// over she goes
+		double t = 0;
+		while (t < 0.9)
+		{
+			await Cutscene.Frame(this, ct);
+			t += GetProcessDeltaTime();
+			_capsize = Mathf.SmoothStep(0f, 1.9f, (float)(t / 0.9));
+		}
+		// under: dragged down and back, the light going green then black above
+		_riding = null;
+		rig.PitchSwim = 0f;
+		rig.RollSwim = 0f;
+		Vector3 from = player.GlobalPosition;
+		Vector3 to = from + Vector3.Down * 3.4f + _boat.GlobalBasis.Z * 2.5f;
+		Sfx("underwater_thoom", 1, from + Vector3.Down * 4f, "Unnatural", 0f, 10f);
+		t = 0;
+		const double sink = 3.2;
+		while (t < sink)
+		{
+			await Cutscene.Frame(this, ct);
+			float dt = (float)GetProcessDeltaTime();
+			t += dt;
+			float u = (float)(t / sink);
+			player.GlobalPosition = from.Lerp(to, Mathf.SmoothStep(0f, 1f, u));
+			under.Set(Mathf.Clamp(u * 4f, 0f, 1f), murk, 0.35f * u);
+			rig.SetPitch(Mathf.Lerp(rig.Pitch, Mathf.DegToRad(35f), dt * 1.5f));
+		}
+		// the eye, rising out of the dark in front of them
+		var eye = new Node3D { Name = "DrownEye" };
+		Cutscene.SceneRoot(this).AddChild(eye);
+		Vector3 fwd = -rig.Camera.GlobalBasis.Z; fwd.Y = 0; fwd = fwd.Normalized();
+		Vector3 eyeAt = rig.Camera.GlobalPosition + fwd * 3.2f + Vector3.Down * 2.5f;
+		eye.GlobalPosition = eyeAt;
+		LakeCreature.BuildEye(eye);
+		eye.Scale = Vector3.One * 1.4f;
+		Sfx("squelch_open", 2, eyeAt, "Unnatural", 0f, 6f);
+		t = 0;
+		while (t < 2.6)
+		{
+			await Cutscene.Frame(this, ct);
+			float dt = (float)GetProcessDeltaTime();
+			t += dt;
+			float u = (float)(t / 2.6);
+			Vector3 cam = rig.Camera.GlobalPosition;
+			eye.GlobalPosition = eyeAt.Lerp(cam + fwd * 2.1f + Vector3.Down * 0.1f, Mathf.SmoothStep(0f, 1f, u));
+			eye.GlobalBasis = Basis.LookingAt(cam - eye.GlobalPosition, Vector3.Up).Scaled(Vector3.One * 1.4f);
+			rig.SetPitch(Mathf.Lerp(rig.Pitch, Mathf.DegToRad(-8f), dt * 2f));
+			under.Set(1f, murk, 0.35f + 0.55f * u);
+		}
+		await PlayerDeath.Reload(this, "The lake took you.", ct);
+	}
+
 
 	// ------------------------------------------------------------------ the breach
 
@@ -747,7 +891,6 @@ public partial class LakeCrossingEvent : Node3D
 			Cutscene.Unlock(player, input: true);
 		}
 		_prompt.SetShown(true);
-		_ = StoryBeat.Caption(this, "Row.", 0.3f, 1.4f, 0.8f, ct);
 	}
 
 	private Vector2 Local2(Vector3 world)
@@ -918,6 +1061,8 @@ public partial class LakeCrossingEvent : Node3D
 		Cutscene.Lock(player, input: true);
 		_prompt.SetShown(false);
 		LastCreature?.SinkAll();
+		_huntOn = false;
+		_ = RampWaves((ref LakeShape.Waves w, float u) => w.Shadow *= 1f - u, 2f, ct);
 		try
 		{
 			// run in on the last of the way, slowing as the keel takes the ground

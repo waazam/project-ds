@@ -170,6 +170,10 @@ public partial class ContinueRoundTripTest : Node
 		}
 		var terrain = GroundSnap.FindTerrain(this);
 		float ground = terrain?.HeightAt(_player.GlobalPosition.X, _player.GlobalPosition.Z) ?? _player.GlobalPosition.Y;
+		// the lake (Act 12) and the station (Acts 13-14) are built off the forest's heightfield, on their own ground
+		bool offForest = GetTree().GetFirstNodeInGroup("lake_marker") is Lake lakeHere && _player.GlobalPosition.DistanceTo(lakeHere.WakeSpotWorld) < 300f
+			|| StationInterior.Instance is { } st && _player.GlobalPosition.DistanceTo(st.GlobalPosition) < 400f;
+		if (offForest) ground = _player.GlobalPosition.Y;
 		Check("standing on something", _player.IsOnFloor() && _player.GlobalPosition.Y > ground - 1.5f,
 			$"on floor {_player.IsOnFloor()}, y {_player.GlobalPosition.Y:0.0} vs ground {ground:0.0}");
 
@@ -178,6 +182,8 @@ public partial class ContinueRoundTripTest : Node
 		await Drive(input, new Vector2(0, 1), 0.6);
 		if (_player.GlobalPosition.DistanceTo(before) < 0.2f) await Drive(input, new Vector2(0, -1), 0.6);
 		Check("player can move", _player.GlobalPosition.DistanceTo(before) > 0.2f, $"{_player.GlobalPosition.DistanceTo(before):0.00} m");
+		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
+			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");
 
 		// Restored systems.
 		if (cabin != null)

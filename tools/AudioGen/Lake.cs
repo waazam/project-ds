@@ -17,7 +17,7 @@ public static class Lake
 	static double[] Buf(int sr, double sec) => new double[(int)(sec * sr)];
 
 	/// <summary>One bubble: a sine chirping up from <paramref name="f"/> by about half, decaying fast.</summary>
-	static void Bubble(double[] x, int sr, double t, double f, double amp, double tau, bool wrap = false)
+	internal static void Bubble(double[] x, int sr, double t, double f, double amp, double tau, bool wrap = false)
 	{
 		int n = (int)((tau * 6 + 0.004) * sr), s0 = (int)(t * sr);
 		double ph = 0;
@@ -34,7 +34,7 @@ public static class Lake
 	}
 
 	/// <summary>A band-limited noise impact (slap, knock, thump), peak-normalised to <paramref name="amp"/>.</summary>
-	static void Slap(double[] x, Rng r, int sr, double t, double amp, double lo, double hi, double tau, double attack = 0.0006, bool wrap = false)
+	internal static void Slap(double[] x, Rng r, int sr, double t, double amp, double lo, double hi, double tau, double attack = 0.0006, bool wrap = false)
 	{
 		var hp = Biquad.Hp(sr, lo); var lp = Biquad.Lp(sr, hi); var lp2 = Biquad.Lp(sr, hi * 1.2);
 		var ev = new double[(int)((tau * 7 + attack + 0.004) * sr)];
@@ -50,7 +50,7 @@ public static class Lake
 	}
 
 	/// <summary>A hollow resonant knock (wood, a hull): a noise impulse through a tuned band-pass.</summary>
-	static void Knock(double[] x, Rng r, int sr, double t, double amp, double f, double q, double tau, bool wrap = false)
+	internal static void Knock(double[] x, Rng r, int sr, double t, double amp, double f, double q, double tau, bool wrap = false)
 	{
 		var bp = Biquad.Bp(sr, f, q);
 		var ev = new double[(int)((tau * 7 + 0.004) * sr)];
@@ -67,7 +67,7 @@ public static class Lake
 	}
 
 	/// <summary>A cluster of bubbles over [t0, t1): a gulp, a gurgle, a splash's churn.</summary>
-	static void Churn(double[] x, Rng r, int sr, double t0, double t1, double rate, double fLo, double fHi, double amp, bool wrap = false)
+	internal static void Churn(double[] x, Rng r, int sr, double t0, double t1, double rate, double fLo, double fHi, double amp, bool wrap = false)
 	{
 		for (double t = t0; t < t1; t += r.R(0.3, 1.7) / rate)
 		{
@@ -77,7 +77,7 @@ public static class Lake
 	}
 
 	/// <summary>Spray and drops pattering back down over [t0, t1), thinning out.</summary>
-	static void Patter(double[] x, Rng r, int sr, double t0, double t1, double rate, double amp, bool wrap = false)
+	internal static void Patter(double[] x, Rng r, int sr, double t0, double t1, double rate, double amp, bool wrap = false)
 	{
 		for (double t = t0; t < t1; t += r.R(0.3, 1.7) / rate)
 		{
@@ -88,7 +88,7 @@ public static class Lake
 		}
 	}
 
-	static double[] Wet(double[] x, int sr, double dry, double wet, double rt60, double damp = 0.45, double size = 1.0)
+	internal static double[] Wet(double[] x, int sr, double dry, double wet, double rt60, double damp = 0.45, double size = 1.0)
 	{
 		var h = new Hall(sr, rt60, damp, 25, size);
 		var o = new double[x.Length];
@@ -98,16 +98,20 @@ public static class Lake
 
 	// ------------------------------------------------------------------ the boat
 
-	/// <summary>An oar biting the water and pulling through: the plunge (a slap and a few bubbles),
-	/// a gurgle of churned water through the drive, and drips off the blade as it lifts.</summary>
+	/// <summary>An oar dipping in: a light, bright splash. A soft high "plish" as the blade cuts the
+	/// surface, a spray of small bright bubbles, a little body under it, and a few drips falling off
+	/// the blade. Nothing low or thumping: owner playtest, the old deep slap-and-gurgle read as wrong.</summary>
 	public static double[] OarStroke(Rng r, int sr)
 	{
-		var x = Buf(sr, 1.0);
-		Slap(x, r, sr, 0.01, 0.55, 250, 2600, r.R(0.012, 0.02));
-		for (int i = 0; i < 3; i++) Bubble(x, sr, 0.012 + r.R(0, 0.03), r.LogR(380, 850), r.R(0.5, 0.9), r.R(0.01, 0.025));
-		Churn(x, r, sr, 0.05, 0.42, r.R(40, 70), 220, 700, 0.35);
-		Patter(x, r, sr, 0.46, 0.8, r.R(10, 18), 0.22);
-		return FinishOneShot(Wet(x, sr, 1.0, 0.18, 0.8, 0.5, 0.6), sr, -3, 80);
+		var x = Buf(sr, 0.9);
+		Slap(x, r, sr, 0.01, 0.3, 1400, 7000, r.R(0.006, 0.01), 0.002);
+		Slap(x, r, sr, 0.03 + r.R(0, 0.02), 0.14, 1800, 8000, r.R(0.01, 0.018), 0.004);
+		int n = r.I(12, 18);
+		for (int i = 0; i < n; i++)
+			Bubble(x, sr, 0.012 + r.R(0, 0.13) * r.R(0.3, 1), r.LogR(1000, 3400), r.R(0.12, 0.4), r.R(0.004, 0.01));
+		for (int i = 0; i < 3; i++) Bubble(x, sr, 0.02 + r.R(0, 0.06), r.LogR(600, 1000), r.R(0.1, 0.18), r.R(0.006, 0.012));
+		Patter(x, r, sr, 0.3, 0.8, r.R(7, 11), 0.12);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.14, 0.6, 0.55, 0.5), sr, -3, 60);
 	}
 
 	/// <summary>Wood rubbing in a bronze lock: a short stick-slip creak through woody and metal resonances.</summary>

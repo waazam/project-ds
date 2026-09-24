@@ -39,6 +39,7 @@ public partial class PlayerFootsteps : Node
 		_sets["dirt"] = LoadSet("res://assets/audio/sfx/step_dirt_{0:00}.wav", 6);
 		_sets["wood"] = LoadSet("res://assets/audio/sfx/step_wood_{0:00}.wav", 4);
 		_sets["stone"] = LoadSet("res://assets/audio/sfx/step_stone_{0:00}.wav", 6);
+		_sets["water"] = LoadSet("res://assets/audio/sfx/wade_{0:00}.wav", 4);
 		_cloth = LoadSet("res://assets/audio/sfx/cloth_{0:00}.wav", 4);
 		for (int i = 0; i < Voices; i++)
 		{

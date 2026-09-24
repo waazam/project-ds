@@ -216,6 +216,7 @@ public static class ItemMeshes
 			case ToolKind.NewelPost: NewelPost(k, ref b); break;
 			case ToolKind.Radio: Walkie(k, parent, ref b); break;
 			case ToolKind.Knife: Knife(k, ref b); break;
+			case ToolKind.Lighter: Lighter(k, ref b); break;
 		}
 		if (!k.IsEmpty)
 		{
@@ -438,6 +439,24 @@ public static class ItemMeshes
 		k.Xf = Transform3D.Identity;
 		b.PickCenter = new Vector3(0, 0.06f, 0);
 		b.PickRadius = 0.28f;
+	}
+
+	/// <summary>An old brass flip-top lighter, worn to the metal at the corners, lid shut.</summary>
+	private static void Lighter(MeshKit k, ref Built b)
+	{
+		k.Xf = new Transform3D(new Basis(Vector3.Up, 0.3f), new Vector3(0, 0.03f, 0));
+		k.Color = new Color(0.85f, 0.7f, 0.42f);
+		k.Mat(ItemTextures.BrassMat);
+		k.Box(new Vector3(0, 0, 0), new Vector3(0.038f, 0.04f, 0.014f), 8f);               // case
+		k.Box(new Vector3(0, 0.029f, 0), new Vector3(0.038f, 0.018f, 0.014f), 8f);        // lid
+		k.Color = new Color(0.3f, 0.26f, 0.2f);
+		k.Box(new Vector3(0, 0.0205f, 0.0072f), new Vector3(0.036f, 0.0015f, 0.0004f), 8f);   // the seam
+		k.Mat(ItemTextures.SteelMat);
+		k.Color = new Color(0.6f, 0.6f, 0.6f);
+		k.Cylinder(new Vector3(0.019f, 0.03f, -0.004f), new Vector3(0.021f, 0.03f, -0.004f), 0.004f, 0.004f, 6, true);   // hinge
+		k.Xf = Transform3D.Identity;
+		b.PickCenter = new Vector3(0, 0.04f, 0);
+		b.PickRadius = 0.2f;
 	}
 
 	private static void Camera(MeshKit k, ref Built b)

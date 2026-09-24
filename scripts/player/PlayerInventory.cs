@@ -3,7 +3,7 @@ using Godot;
 
 namespace ProjectDS.Player;
 
-public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio, Knife }
+public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio, Knife, Lighter, DeadEye, PaleHand, StairTread }
 
 /// <summary>
 /// One inventory, all of it usable at any time, with no selecting and no hands-full
@@ -116,9 +116,17 @@ public partial class PlayerInventory : Node
 		if (HasCompass) list.Add((ToolKind.Compass, "Compass"));
 		if (HasNewelPost) list.Add((ToolKind.NewelPost, "Newel Post"));
 		if (HasRadio) list.Add((ToolKind.Radio, "Radio"));
-		foreach (var t in _tools) list.Add((t, t.ToString()));
+		foreach (var t in _tools) list.Add((t, Label(t)));
 		return list;
 	}
+
+	private static string Label(ToolKind t) => t switch
+	{
+		ToolKind.DeadEye => "The Eye",
+		ToolKind.PaleHand => "The Hand",
+		ToolKind.StairTread => "The Step",
+		_ => t.ToString(),
+	};
 
 	/// <summary>Everything is usable at once (no selecting): any change just tells the HUD to redraw.</summary>
 	private void Changed(ToolKind? _ = null) => EmitSignal(SignalName.ToolChanged);

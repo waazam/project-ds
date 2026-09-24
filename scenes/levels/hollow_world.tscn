@@ -407,14 +407,6 @@ script = ExtResource("9_clear")
 Radius = 3
 ClearFoliage = true
 
-[node name="respawn_Act11GiantEncounter" type="Marker3D" parent="." groups=["respawn_Act11GiantEncounter"]]
-transform = Transform3D(0.9578, 0, -0.2873, 0, 1, 0, 0.2873, 0, 0.9578, 6, 0, -578)
-
-[node name="GroundSnap" type="Node" parent="respawn_Act11GiantEncounter"]
-script = ExtResource("4_snap")
-Offset = 0
-FootprintRadius = 0
-
 [node name="Lookout" type="Marker3D" parent="." groups=["fire_lookout_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61, 0, -465)
 

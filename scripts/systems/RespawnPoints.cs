@@ -35,7 +35,13 @@ public static class RespawnPoints
 			return (cabin.InsidePoint + Vector3.Up * 0.1f, YawToward(cabin.InsidePoint, cabin.ApproachPoint));
 
 		if (tree.GetFirstNodeInGroup($"respawn_{cp}") is Node3D marker)
+		{
+			// A marker placed in code already sits where it should (the lake shore, inside the station -
+			// far outside the forest terrain, whose height lookup means nothing there); only the scene's
+			// own markers, which carry a GroundSnap, go through the terrain.
+			if (marker.GetNodeOrNull("GroundSnap") == null) return (marker.GlobalPosition + Vector3.Up * 0.1f, YawOf(-marker.GlobalBasis.Z));
 			return OnGround(n, marker.GlobalPosition, YawOf(-marker.GlobalBasis.Z));
+		}
 
 		var top = tree.GetFirstNodeInGroup("stairs_top_trigger") as Node3D;
 		var bridge = tree.GetFirstNodeInGroup("bridge_marker") as Node3D;

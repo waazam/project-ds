@@ -8,6 +8,7 @@ using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Entities;
 using ProjectDS.Player;
+using ProjectDS.World.StationParts;
 using ProjectDS.UI;
 using ProjectDS.World;
 
@@ -49,6 +50,11 @@ public partial class StoryTest : Node
 		public float Walked, Jumped;
 		public float FpsSum; public int FpsCount; public float FpsMin = 999f;
 		public string CurrentAct = "";
+		/// <summary>Act 12 is run twice: once letting the hunter catch the boat (the drowning reloads the
+		/// checkpoint and this step starts over), then crossing properly.</summary>
+		public bool LakeDeathDone;
+		/// <summary>Act 13's Room 2 is flooded to the top once on purpose (the reload restarts the step).</summary>
+		public bool Room2DeathDone;
 	}
 
 	private static Session _s;
@@ -95,6 +101,8 @@ public partial class StoryTest : Node
 			6 => (Checkpoint.Act5CabinEntered, f5, gear5),
 			7 => (Checkpoint.Act6BridgeCrossed, f7, gear5),
 			8 or 9 or 10 => (Checkpoint.Act7CabinBurning, f8, gear5),
+			12 => (Checkpoint.Act11GiantEncounter, f11.Concat(new[] { StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated }).ToArray(), gear11),
+			13 => (Checkpoint.Act12LakeCrossed, f11.Concat(new[] { StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated }).ToArray(), gear11),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -104,7 +112,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 11) return false;
+		if (_fromApplied || act < 3 || act > 13) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -1201,6 +1209,9 @@ public partial class StoryTest : Node
 		var atmo = StoryBeat.Atmosphere(this);
 		Check("dawn light at the lake", atmo == null || atmo.CurrentMood == ForestAtmosphere.Mood.Dawn, $"{atmo?.CurrentMood}");
 		Check("woke near the lake", _player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 30f, $"{_player.GlobalPosition}");
+		if (_s.LakeDeathDone)
+			Check("after drowning: back at the lake's shore, at the Act 12 checkpoint", StoryManager.Instance.Current == Checkpoint.Act11GiantEncounter
+				&& _player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 3f && PlayerDeath.Deaths >= 1, $"{StoryManager.Instance.Current} at {_player.GlobalPosition}");
 		Screenshot("lake_wake");
 
 		Check("the boat can be boarded", crossing.BoardPrompt != null);
@@ -1242,6 +1253,25 @@ public partial class StoryTest : Node
 		await WaitUntil(() => !crossing.InBreach, 20, ct);
 		Check("the water turns rough for the current", crossing.InCurrent);
 		Check("white-capped chop", lake.Waves.Intensity > 0.8f, $"intensity {lake.Waves.Intensity:0.00}");
+		Check("something follows the boat", crossing.HuntGap < 100f, $"gap {crossing.HuntGap:0.0}");
+
+		if (!_s.LakeDeathDone)
+		{
+			// First time through: stop rowing. It should catch the boat and drag them under.
+			_s.LakeDeathDone = true;
+			await WaitUntil(() => crossing.Caught, 60, ct);
+			Check("too slow: the hunter catches the boat", crossing.Caught, $"gap {crossing.HuntGap:0.0}");
+			await WaitUntil(() => _player.GlobalPosition.Y < lake.GlobalPosition.Y - 2.5f, 15, ct);
+			Screenshot("drowning");
+			Check("dragged under the water", _player.GlobalPosition.Y < lake.GlobalPosition.Y - 2f, $"{_player.GlobalPosition}");
+			Engine.TimeScale = 1.0;
+			// The drowning reloads the checkpoint: this step is cancelled and starts over in the reloaded level.
+			await WaitUntil(() => false, 40, ct);
+			Check("the drowning reloaded the checkpoint", false, "no reload");
+			return;
+		}
+		// Second time: row for it, at full speed, so the hunter falls behind.
+		Engine.TimeScale = 1.0;
 
 		await PaddleUntil(() => crossing.Progress > 0.7f || crossing.Landed, ct, 30);
 		Screenshot("rowing_current");
@@ -1274,119 +1304,271 @@ public partial class StoryTest : Node
 		await WaitUntil(() => _input.Enabled, 5, ct);
 	}
 
+/// <summary>
+	/// Act 13, the whole station. Every stage checks whether the story already has it (the Room 2 flood
+	/// kills the player once on purpose and the checkpoint reload starts this step over with the first
+	/// half already done), so the step reads as "do whatever is left".
+	/// </summary>
 	private async Task Act13Station(CancellationToken ct)
 	{
 		var station = StationInterior.Instance;
 		Check("the station interior exists", station != null);
 		if (station == null) return;
-		Screenshot("station_lobby");
-
-		var knife = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Knife);
-		Check("the knife is on the desk", knife != null);
-		if (knife != null) await UseIt(knife, ct);
-		Check("the knife is in hand", _inv.HasTool(ToolKind.Knife));
-
-		// The basement: cut the tape, turn the wheel three times, wait for the drain and the clock.
+		var s = StoryManager.Instance;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Frames(5, ct);
 		var basement = station.Basement;
-		Check("the basement exists", basement != null);
-		var basementDoorUse = basement?.GetNodeOrNull<Interactable>("Door/Use");
-		Check("the basement door can be interacted with", basementDoorUse != null);
-		if (basementDoorUse != null) await UseIt(basementDoorUse, ct);
-		await WaitUntil(() => TapeCutOverlay.Instance is { IsOpen: true }, 5, ct);
-		Check("the tape-cut view opens", TapeCutOverlay.Instance is { IsOpen: true });
-		Screenshot("basement_tape_cut");
-		TapeCutOverlay.Instance?.TestCompleteCut();
-		await WaitUntil(() => basement != null && basement.TapeCut, 5, ct);
-		Check("the basement tape is cut", basement is { TapeCut: true });
-
-		var wheelUse = basement?.GetNodeOrNull<Interactable>("Wheel/Use");
-		Check("the wheel can be turned", wheelUse != null);
-		for (int i = 0; i < 3 && wheelUse != null; i++) await UseIt(wheelUse, ct);
-		Check("the wheel was turned three times", basement is { Turns: >= 3 }, $"{basement?.Turns}");
-		Engine.TimeScale = 3.0;
-		await WaitUntil(() => basement != null && basement.Drained, 15, ct);
-		Check("the basement drains", basement is { Drained: true });
-		await WaitUntil(() => basement != null && basement.ClockBroken, 15, ct);
-		Check("the clock chimes, drowned, and breaks apart, dropping the key", basement is { ClockBroken: true });
-		Engine.TimeScale = 1.0;
-		Screenshot("clock_broken");
-
-		// The key opens room 1.
-		var key = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Key && !p.Taken);
-		Check("the clock's key can be taken", key != null);
-		if (key != null) await UseIt(key, ct);
-		Check("the key is in hand", _inv.HasTool(ToolKind.Key));
-		var room1Door = station.GetNodeOrNull<StationDoor>("Room1Door");
-		Check("room 1's door exists", room1Door != null);
-		if (room1Door != null) await UseIt(room1Door, ct);
-		Check("the key opens room 1", room1Door is { Locked: false, IsOpen: true });
-
-		// Room 1: cut the box's three sides, press the button, the writing melts.
 		var room1 = station.Room1;
-		var boxUse = room1?.GetNodeOrNull<Interactable>("CigarBox/Use");
-		Check("the cigar box can be interacted with", boxUse != null);
-		if (boxUse != null) await UseIt(boxUse, ct);
-		for (int i = 0; i < 3; i++)
-		{
-			await WaitUntil(() => TapeCutOverlay.Instance is { IsOpen: true }, 5, ct);
-			TapeCutOverlay.Instance?.TestCompleteCut();
-			await Frames(3, ct);
-		}
-		await WaitUntil(() => room1 != null && room1.BoxOpen, 5, ct);
-		Check("all three sides are cut and the box opens on a button", room1 is { BoxCutsDone: 3, BoxOpen: true }, $"{room1?.BoxCutsDone} cuts");
-		var buttonUse = room1?.GetNodeOrNull<Interactable>("CigarBox/Button/Press");
-		Check("the button can be pressed", buttonUse != null);
-		if (buttonUse != null) await UseIt(buttonUse, ct);
-		Check("room 1 is solved", room1 is { Solved: true });
-		Screenshot("room1_solved");
-
-		// Room 2: read the code off the wall, use the keypad.
-		await WaitUntil(() => station.GetNodeOrNull<StationDoor>("Room2Door") is { Locked: false }, 5, ct);
-		Check("solving room 1 unlocks room 2's door", station.GetNodeOrNull<StationDoor>("Room2Door") is { Locked: false });
-		var room2Door = station.GetNodeOrNull<StationDoor>("Room2Door");
-		if (room2Door != null) await UseIt(room2Door, ct);
 		var room2 = station.Room2;
-		var padUse = room2?.GetNodeOrNull<Interactable>("Keypad/Use");
-		Check("the keypad can be interacted with", padUse != null);
-		if (padUse != null) await UseIt(padUse, ct);
-		await WaitUntil(() => CodeLockOverlay.Instance is { IsOpen: true }, 5, ct);
-		Check("the keypad view opens", CodeLockOverlay.Instance is { IsOpen: true });
-		if (room2 != null) CodeLockOverlay.Instance?.EnterAndSubmit(room2.Code);
-		await WaitUntil(() => room2 != null && room2.Solved, 5, ct);
-		Check("room 2 takes the code", room2 is { Solved: true });
+		var door3 = station.Door3;
+		bool afterDeath = _s.Room2DeathDone;
 
-		// Room 3: collect the three coins, use the pedestal - the act's real end.
-		await WaitUntil(() => station.GetNodeOrNull<StationDoor>("Room3Door") is { Locked: false }, 5, ct);
-		Check("solving room 2 unlocks room 3's door", station.GetNodeOrNull<StationDoor>("Room3Door") is { Locked: false });
-		var room3Door = station.GetNodeOrNull<StationDoor>("Room3Door");
-		if (room3Door != null) await UseIt(room3Door, ct);
+		if (!s.HasFlag(StoryManager.Flag.StationRoom1Solved))
+		{
+			Check("inside the lobby", station.InLobby(_player.GlobalPosition), $"{_player.GlobalPosition}");
+			Check("the lobby starts kept (decay stage 0)", station.Stage == 0, $"stage {station.Stage}");
+			Screenshot("station_lobby_kept");
+
+			var knife = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Knife && !p.Taken);
+			Check("the knife is stuck in the desk", knife != null);
+			if (knife != null) await UseIt(knife, ct);
+			Check("the knife is in hand", _inv.HasTool(ToolKind.Knife));
+
+			// the basement: cut the tape, down the brick stairs, the lights die
+			var tapeUse = basement.GetNode<Interactable>("Door/Use");
+			await Inside(station.ToGlobal(new Vector3(StationInterior.BasementGapX, 0, -StationInterior.HalfDepth + 1.5f)), tapeUse.GlobalPosition, ct);
+			await UseIt(tapeUse, ct);
+			Check("the tape-cut close-up opens", TapeCutOverlay.Instance is { IsOpen: true });
+			while (TapeCutOverlay.Instance is { IsOpen: true }) { TapeCutOverlay.Instance.TestCompleteCut(); await Frames(2, ct); }
+			Check("the basement tape is cut", basement.TapeCut);
+			await Seconds(1.0, ct);
+			await Inside(basement.ToGlobal(new Vector3(0, -0.2f, -1.6f)), basement.StairFootWorld, ct);
+			Screenshot("basement_stairs");
+			await WalkTo(basement.StairFootWorld, 0.8f, ct, giveUp: 12f);
+			Check("down the red brick stairs", _player.GlobalPosition.Y < basement.GlobalPosition.Y + StationBasement.Floor + 1f, $"{_player.GlobalPosition}");
+			await WaitUntil(() => basement.LightsDead, 16, ct);
+			Check("the lights struggle and die", basement.LightsDead);
+			Screenshot("basement_dark_flooded");
+
+			var wheel = basement.GetNode<Interactable>("Wheel/Use");
+			for (int i = 0; i < 3; i++)
+			{
+				await UseIt(wheel, ct);
+				await Seconds(1.8, ct);
+			}
+			Check("the wheel was turned three times", basement.Turns >= 3, $"{basement.Turns}");
+			await WaitUntil(() => basement.Drained, 14, ct);
+			Check("the drain takes the water", basement.Drained);
+			Check("a dead eye is stuck in the drain", basement.Eye is { Visible: true });
+			await Aim(basement.Eye.GlobalPosition, ct);
+			Screenshot("basement_dead_eye");
+			// it only moves when it isn't watched: look away, look back, it's facing us
+			var eyeModel = basement.Eye.GetNode<Node3D>("DeadEye");
+			await Aim(basement.Eye.GlobalPosition + (basement.Eye.GlobalPosition - _player.CameraRig.Camera.GlobalPosition).Normalized() * -8f + Vector3.Up * 3f, ct);
+			_player.CameraRig.SnapBehind(_player.CameraRig.Yaw + Mathf.Pi);
+			await Seconds(0.5, ct);
+			Vector3 toCam = (_player.CameraRig.Camera.GlobalPosition - basement.Eye.GlobalPosition).Normalized();
+			Check("the dead eye turned to face us while we looked away", (-eyeModel.GlobalBasis.Z).Dot(toCam) > 0.8f, $"dot {(-eyeModel.GlobalBasis.Z).Dot(toCam):0.00}");
+			await WaitUntil(() => basement.ClockBroken, 14, ct);
+			Check("the drowned clock chimes, spits a key and bursts", basement.ClockBroken);
+			var key = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Key && !p.Taken);
+			Check("the clock's key is out on the floor", key != null);
+			if (key != null)
+			{
+				// a step back from it, as anyone would stand to pick something off the floor
+				Vector3 kp = key.GlobalPosition;
+				Vector3 back = Flat(basement.RoomCentreWorld - kp).Normalized();
+				Vector3 stand = kp + back * 1.2f;
+				stand.Y = basement.GlobalPosition.Y + StationBasement.Floor + 0.02f;
+				await Inside(stand, kp, ct);
+				await UseIt(key, ct);
+			}
+			Check("the key is in hand", _inv.HasTool(ToolKind.Key));
+
+			// Room 1
+			await Inside(station.ToGlobal(new Vector3(StationInterior.HalfWidth - 1.6f, 0, 0.3f)), station.ToGlobal(new Vector3(StationInterior.HalfWidth, 1f, 0)), ct);
+			Check("the lobby has rotted a stage while we were downstairs", station.Stage == 1, $"stage {station.Stage}");
+			var room1Door = station.GetNode<StationDoor>("Room1Door");
+			await UseIt(room1Door.GetNode<Interactable>("Use"), ct);
+			Check("the key opens room 1", room1Door is { Locked: false, IsOpen: true });
+			await Seconds(1.0, ct);
+			var boxUse = room1.GetNode<Interactable>("CigarBox/Use");
+			await Inside(room1.ToGlobal(new Vector3(-1.2f, 0, 0.2f)), boxUse.GlobalPosition, ct);
+			Screenshot("room1_writing");
+			await UseIt(boxUse, ct);
+			while (TapeCutOverlay.Instance is { IsOpen: true }) { TapeCutOverlay.Instance.TestCompleteCut(); await Frames(2, ct); }
+			Check("all three sides cut, the box opens on a button", room1.BoxOpen && room1.BoxCutsDone == 3, $"{room1.BoxCutsDone} cuts");
+			await Seconds(1.0, ct);
+			var button = room1.GetNodeOrNull<Interactable>("CigarBox/Button/Press");
+			if (button != null) await UseIt(button, ct);
+			Check("the button melts the writing", room1.Solved);
+			Check("checkpoint: Room 1 solved, saved before Room 2", s.Current == Checkpoint.Act13Room1Solved, $"{s.Current}");
+			await Seconds(5.5, ct);
+			Screenshot("room1_melted");
+		}
+
+		if (!s.HasFlag(StoryManager.Flag.StationRoom2Solved))
+		{
+			if (afterDeath)
+				Check("after drowning: back at the Room 1 checkpoint, by Room 2's door", s.Current == Checkpoint.Act13Room1Solved && station.InLobby(_player.GlobalPosition) && PlayerDeath.Deaths >= 1, $"{s.Current} at {_player.GlobalPosition}");
+			var room2Door = station.Room2Door;
+			await WaitUntil(() => !room2Door.Locked, 5, ct);
+			Check("Room 2's door stands open", !room2Door.Locked);
+			await Inside(station.ToGlobal(new Vector3(-StationInterior.HalfWidth + 1.4f, 0, 0.3f)), room2.GlobalPosition, ct);
+			await WalkTo(room2.ToGlobal(new Vector3(1.2f, 0, 0.9f)), 0.6f, ct, giveUp: 8f);
+			await WaitUntil(() => room2.DoorShut, 3, ct);
+			Check("the door slams shut behind us", room2.DoorShut && room2Door.Locked);
+			await Seconds(6.5, ct);
+			Check("someone knocks, softly", room2.Knocks > 0, $"{room2.Knocks}");
+			Screenshot("room2_red_room");
+			await UseIt(room2.BoxUse, ct);
+			await WaitUntil(() => room2.Flooding, 8, ct);
+			Check("using the box breaks the window: the lake comes in", room2.WindowBroken && room2.Flooding);
+			await WaitUntil(() => _input.Enabled, 8, ct);
+			Screenshot("room2_flooding");
+
+			if (!_s.Room2DeathDone)
+			{
+				// First time: leave the box alone and let it fill. It should drown us and reload the checkpoint.
+				_s.Room2DeathDone = true;
+				Engine.TimeScale = 4.0;
+				await WaitUntil(() => room2.Blood, 30, ct);
+				Check("at the knees, the water turns to blood", room2.Blood, $"level {room2.Level:0.00}");
+				Engine.TimeScale = 1.0;
+				Screenshot("room2_blood");
+				Engine.TimeScale = 4.0;
+				await WaitUntil(() => PlayerDeath.Dying, 40, ct);
+				Check("the room fills: drowned", PlayerDeath.Dying, $"level {room2.Level:0.00}");
+				Engine.TimeScale = 1.0;
+				await WaitUntil(() => false, 30, ct);
+				Check("the drowning reloaded the checkpoint", false, "no reload");
+				return;
+			}
+			// Second time: work the cryptex. Six rings to STAIRS, one clunky turn at a time.
+			await UseIt(room2.BoxUse, ct);
+			Check("the cryptex close-up opens", CryptexOverlay.Instance is { IsOpen: true });
+			var box = room2.Box;
+			int stuck = 0;
+			for (int r = 0; r < Cryptex.Rings && !box.Solved; r++)
+			{
+				box.Select(r);
+				int guard = 0;
+				while (box.Letters[r] != Cryptex.Word[r] - 'A' && guard++ < 60)
+				{
+					int diff = ((Cryptex.Word[r] - 'A') - box.Letters[r] + 26) % 26;
+					if (!box.Turn(diff <= 13 ? 1 : -1)) { stuck++; await Seconds(0.35, ct); }
+					await Frames(2, ct);
+				}
+			}
+			Check("the cryptex spells STAIRS", box.Solved, box.Reading);
+			Check("it stuck at least once on the way (old and clunky)", stuck > 0, $"{stuck} sticks");
+			await WaitUntil(() => room2.Solved, 12, ct);
+			Check("the blood goes back out of the window; the room is as it was", room2.Solved && room2.Level < 0.05f, $"level {room2.Level:0.00}");
+			await WaitUntil(() => _input.Enabled, 5, ct);
+			Screenshot("room2_restored");
+			var lighter = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Lighter && !p.Taken);
+			Check("the cryptex opens on a lighter", lighter != null);
+			if (lighter != null) await UseIt(lighter, ct);
+			Check("the lighter is in hand", _inv.HasTool(ToolKind.Lighter));
+		}
+
+		// The web, and the door behind it.
+		if (!s.HasFlag(StoryManager.Flag.StationWebBurned))
+		{
+			await Inside(station.ToGlobal(new Vector3(-1.4f, 0, 3.8f)), door3.GlobalPosition + Vector3.Up * 1.2f, ct);
+			Check("the lobby is industrial now", station.Stage == 3, $"stage {station.Stage}");
+			Screenshot("lobby_industrial");
+			await UseIt(door3.WebUse, ct);
+			await WaitUntil(() => s.HasFlag(StoryManager.Flag.StationWebBurned), 8, ct);
+			Check("the lighter burns the web", door3.WebBurned);
+			await Seconds(0.5, ct);
+		}
+		await Inside(station.ToGlobal(new Vector3(0.6f, 0, 3.8f)), door3.GlobalPosition + Vector3.Up * 1.3f, ct);
+		await WaitUntil(() => door3.Seen, 3, ct);
+		Check("an iron door: LOOK, TOUCH, CLIMB", door3.Seen);
+		Screenshot("iron_door");
+
+		// CLIMB: the staircase in Room 2
+		if (!s.HasFlag(StoryManager.Flag.StationStepTaken))
+		{
+			await Inside(station.ToGlobal(new Vector3(-StationInterior.HalfWidth + 1.2f, 0, 0.3f)), room2.GlobalPosition, ct);
+			await Seconds(0.3, ct);
+			Check("a staircase has grown where the table was", room2.StairsUp);
+			await Inside(room2.ToGlobal(new Vector3(1.6f, 0, 1.8f)), room2.StairTopWorld, ct);
+			Screenshot("room2_staircase");
+			await WalkTo(room2.StairFootWorld, 0.5f, ct, giveUp: 6f);
+			await WalkTo(room2.StairTopWorld, 0.4f, ct, stopWhen: () => s.HasFlag(StoryManager.Flag.StationStepTaken), giveUp: 10f);
+			await WaitUntil(() => s.HasFlag(StoryManager.Flag.StationStepTaken), 8, ct);
+			Check("climbed them: holding one of the steps", _inv.HasTool(ToolKind.StairTread));
+			await WaitUntil(() => _input.Enabled, 8, ct);
+		}
+		// TOUCH: the hand in the right puddle
+		if (!s.HasFlag(StoryManager.Flag.StationHandTaken))
+		{
+			await Inside(room1.ToGlobal(new Vector3(-1.4f, 0, 0f)), room1.Puddles[0].GlobalPosition, ct);
+			await UseIt(room1.Puddles[0], ct);
+			await Seconds(3.5, ct);
+			Check("the wrong puddle: something takes our wrist and lets go", room1.WrongReaches == 1 && !_inv.HasTool(ToolKind.PaleHand));
+			await UseIt(room1.Puddles[1], ct);
+			await Seconds(1.0, ct);
+			Check("under DO NOT TOUCH THEM: the hand", _inv.HasTool(ToolKind.PaleHand));
+		}
+		// LOOK: the eye, loose in the dark basement
+		if (!s.HasFlag(StoryManager.Flag.StationEyeTaken))
+		{
+			await Inside(basement.StairFootWorld, basement.RoomCentreWorld, ct);
+			var eye = basement.Eye;
+			Check("the eye is loose now", eye.Wandering);
+			// look away from it for a while: it moves
+			await Aim(eye.GlobalPosition, ct);
+			_player.CameraRig.SnapBehind(_player.CameraRig.Yaw + Mathf.Pi);
+			await Seconds(5, ct);
+			Check("while unwatched, it moved", eye.Hops > 0, $"{eye.Hops} hops");
+			// come at it keeping it in sight
+			Vector3 at = eye.GlobalPosition;
+			Vector3 near = at + (Flat(basement.RoomCentreWorld - at).Normalized() * 1.4f);
+			await Inside(near with { Y = basement.GlobalPosition.Y + StationBasement.Floor + 0.05f }, at, ct);
+			await Aim(eye.GlobalPosition, ct);
+			Screenshot("basement_eye_hunt");
+			var take = eye.GetNode<Interactable>("Take");
+			await WaitUntil(() => take.Enabled, 2, ct);
+			await UseIt(take, ct);
+			Check("caught it looking: the eye is taken", _inv.HasTool(ToolKind.DeadEye), $"hops {eye.Hops}, seen {eye.SeenNow}");
+		}
+		// set all three
+		await Inside(station.ToGlobal(new Vector3(0.6f, 0, 3.8f)), door3.GlobalPosition + Vector3.Up * 1.3f, ct);
+		for (int i = 0; i < 3 && !door3.Opened; i++) { await UseIt(door3.DoorUse, ct); await Seconds(0.8, ct); }
+		await WaitUntil(() => door3.Opened, 6, ct);
+		Check("all three set: the iron door opens", door3.Opened && door3.PiecesSet == 3, $"{door3.PiecesSet} set");
+		await Seconds(4, ct);
+
+		// the last room, and up
 		var room3 = station.Room3;
-		for (int i = 0; i < 3; i++)
-		{
-			var coin = room3?.GetNodeOrNull<Node3D>($"Coin{i}");
-			if (coin != null) await UseIt(coin, ct);
-		}
-		Check("all three coins collected", room3?.CoinsCollected == 3, $"{room3?.CoinsCollected}");
-		var pedestalUse = room3?.GetNodeOrNull<Interactable>("Pedestal/Use");
-		Check("the pedestal can be used", pedestalUse != null);
-		Screenshot("room3_coins");
-
-		bool reached = false;
-		void OnCheckpoint(Checkpoint cp)
-		{
-			if (cp != Checkpoint.Act13StationSolved) return;
-			reached = true;
-			Check("checkpoint 11: the station is solved", true);
-			Finish();
-		}
-		StoryManager.Instance.CheckpointReached += OnCheckpoint;
+		bool finished = false;
+		void OnCp(Checkpoint cp) { if (cp == Checkpoint.Act13Finished) finished = true; }
+		s.CheckpointReached += OnCp;
 		try
 		{
-			if (pedestalUse != null) await UseIt(pedestalUse, ct);
-			await WaitUntil(() => reached, 5, ct);
-			if (!reached) Check("checkpoint 11: the station is solved", false, "trigger never fired");
+			await Inside(room3.ToGlobal(new Vector3(0, 0, 2f)), room3.StairFootWorld, ct);
+			await WalkTo(room3.ToGlobal(new Vector3(0, 0, StationRoom3.CorridorEnd + 1.5f)), 0.8f, ct, giveUp: 10f);
+			Screenshot("room3_hell");
+			await WalkTo(room3.StairFootWorld, 0.6f, ct, giveUp: 8f);
+			await WalkTo(room3.StairTopWorld, 0.6f, ct, stopWhen: () => finished || room3.Solved, giveUp: 14f);
+			await WaitUntil(() => finished, 10, ct);
+			Check("up the last staircase: Act 13's final checkpoint", finished);
+			Check("the lobby had turned to flesh behind us", station.Stage == 4, $"stage {station.Stage}");
 		}
-		finally { StoryManager.Instance.CheckpointReached -= OnCheckpoint; }
+		finally { s.CheckpointReached -= OnCp; }
+	}
+
+	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>
+	private async Task Inside(Vector3 at, Vector3 faceToward, CancellationToken ct)
+	{
+		_s.Jumped += Flat(at).DistanceTo(Flat(_player.GlobalPosition));
+		var d = Flat(faceToward - at);
+		_player.Teleport(at + Vector3.Up * 0.08f, d.LengthSquared() > 0.01f ? Mathf.Atan2(-d.X, -d.Z) : _player.CameraRig.Yaw);
+		_lastPos = _player.GlobalPosition;
+		await Frames(4, ct);
 	}
 
 	/// <summary>Spams the paddle keys in alternation (A, D, A, D...) until <paramref name="done"/>

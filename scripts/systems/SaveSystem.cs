@@ -19,7 +19,13 @@ public enum Checkpoint
 	Act10WalkieFound = 8,
 	Act11GiantEncounter = 9,
 	Act12LakeCrossed = 10,
+	/// <summary>The first Act 13's ending (a coin pedestal). Kept so saves that reached it still load;
+	/// nothing reaches it any more.</summary>
 	Act13StationSolved = 11,
+	/// <summary>Act 13: Room 1's button pressed - saved just before the flooding room.</summary>
+	Act13Room1Solved = 12,
+	/// <summary>Act 13's end: up the last staircase behind the iron door.</summary>
+	Act13Finished = 13,
 }
 
 public class SaveData

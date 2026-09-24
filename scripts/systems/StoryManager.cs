@@ -97,8 +97,26 @@ public partial class StoryManager : Node
 		public const string StationClockBroken = "station_clock_broken";
 		/// <summary>Act 13, room 1: the cut-open cigar box's button has been pressed (the wall writing melts).</summary>
 		public const string StationRoom1Solved = "station_room1_solved";
-		/// <summary>Act 13, room 2: the keypad has taken its code.</summary>
+		/// <summary>Act 13, room 2: the cryptex spelled its word; the flood went back out of the window.</summary>
 		public const string StationRoom2Solved = "station_room2_solved";
+		/// <summary>Act 13: the basement's lights have struggled and died (they stay dead).</summary>
+		public const string StationLightsDead = "station_lights_dead";
+		/// <summary>Act 13: Room 1's door has been opened with the clock's key.</summary>
+		public const string StationRoom1Open = "station_room1_open";
+		/// <summary>Act 13: the web over the door behind the desk has been burned away.</summary>
+		public const string StationWebBurned = "station_web_burned";
+		/// <summary>Act 13: the iron door's three hollows (LOOK / TOUCH / CLIMB) have been read.</summary>
+		public const string StationDoor3Seen = "station_door3_seen";
+		/// <summary>Act 13: the scavenger pieces taken (the dead eye, the pale hand, the step).</summary>
+		public const string StationEyeTaken = "station_eye_taken";
+		public const string StationHandTaken = "station_hand_taken";
+		public const string StationStepTaken = "station_step_taken";
+		/// <summary>Act 13: each piece set in its hollow in the iron door.</summary>
+		public const string StationEyeSet = "station_eye_set";
+		public const string StationHandSet = "station_hand_set";
+		public const string StationStepSet = "station_step_set";
+		/// <summary>Act 13: the iron door has opened onto the last room.</summary>
+		public const string StationDoor3Open = "station_door3_open";
 	}
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>
