@@ -57,6 +57,8 @@ public partial class StoryTest : Node
 		public bool Room2DeathDone;
 		/// <summary>Act 14 is run twice: jumping across, then (after a Continue) jumping down.</summary>
 		public bool Act14AcrossDone;
+		/// <summary>Act 15 is run twice: once walking on into the red (taken, reloaded), then properly.</summary>
+		public bool Act15DeathDone;
 	}
 
 	private static Session _s;
@@ -112,6 +114,7 @@ public partial class StoryTest : Node
 				StoryManager.Flag.StationEyeTaken, StoryManager.Flag.StationHandTaken, StoryManager.Flag.StationStepTaken,
 				StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet,
 				StoryManager.Flag.StationDoor3Open }).ToArray(), "lantern,compass,radio,knife,lighter;tool=None"),
+			15 => (Checkpoint.Act14Finished, StateFor(14).flags.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -121,7 +124,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 14) return false;
+		if (_fromApplied || act < 3 || act > 15) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -240,6 +243,7 @@ public partial class StoryTest : Node
 			new("Act 12: the lake crossing", hollow, Act12Lake),
 			new("Act 13: the forester station", hollow, Act13Station),
 			new("Act 14: the stairwell", hollow, Act14Stairwell),
+			new("Act 15: the long hallway", hollow, Act15Hall),
 		};
 	}
 
@@ -1743,6 +1747,145 @@ public partial class StoryTest : Node
 		StoryManager.Instance.ContinueGame();
 		await WaitUntil(() => false, 30, ct);
 		Check("Continue reloaded the level", false, "no reload");
+	}
+
+	// ------------------------------------------------------------------ Act 15
+
+	/// <summary>Walks straight down the hallway toward local z <paramref name="toZ"/> in short hops (never
+	/// running unless asked), obeying the lights if <paramref name="obey"/>: moving only while green.</summary>
+	private async Task<bool> HallWalk(Act15Hallway hw, float toZ, bool obey, CancellationToken ct, float giveUp = 600f, bool run = false)
+	{
+		double t = 0;
+		try
+		{
+			while (hw.PlayerZ < toZ)
+			{
+				ct.ThrowIfCancellationRequested();
+				bool go = _input.Enabled && (!obey || hw.State is Act15Hallway.Phase.Waiting or Act15Hallway.Phase.Green);
+				if (go)
+				{
+					Vector3 target = hw.AlongWorld(Mathf.Min(hw.PlayerZ + 6f, toZ + 0.5f));
+					// step round him if he's in the way
+					Vector3 sl = hw.ToLocal(hw.Shadow.GlobalPosition);
+					if (sl.Z > hw.PlayerZ - 1f && sl.Z < hw.PlayerZ + 6f && Mathf.Abs(sl.X) < 1.2f)
+						target = hw.ToGlobal(new Vector3(sl.X > 0 ? -1.8f : 1.8f, 0.05f, Mathf.Min(hw.PlayerZ + 3f, toZ + 0.5f)));
+					Steer(target);
+					_input.ScriptedMove = new Vector2(0, 1);
+					_input.ScriptedRun = run;
+				}
+				else { _input.ScriptedMove = Vector2.Zero; _input.ScriptedRun = false; }
+				await Frames(1, ct);
+				t += GetProcessDeltaTime();
+				if (t > giveUp) { Check("hallway walk", "got there", false, $"stuck at z {hw.PlayerZ:0}"); return false; }
+			}
+			return true;
+		}
+		finally { _input.ScriptedMove = Vector2.Zero; _input.ScriptedRun = false; }
+	}
+
+	private async Task Act15Hall(CancellationToken ct)
+	{
+		var sw = StationInterior.Instance?.Room3?.Stairs;
+		await WaitUntil(() => sw?.Hallway?.Shadow != null, 10, ct);
+		var hw = sw?.Hallway;
+		Check("the long hallway exists", hw != null);
+		if (hw == null) return;
+		var s = StoryManager.Instance;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Frames(5, ct);
+		Check("Act 15 starts at its save: the chamber under the stairwell", s.Current == Checkpoint.Act14Finished
+			&& _player.GlobalPosition.DistanceTo(sw.LandingSpotWorld) < 2.5f, $"{s.Current} at {_player.GlobalPosition}");
+
+		// into the passage, and the hallway
+		await WalkTo(sw.ChamberExitWorld, 0.6f, ct, giveUp: 10f);
+		await WalkTo(hw.AlongWorld(2f), 0.6f, ct, giveUp: 10f);
+		await Seconds(2.0, ct);
+		var atmo = StoryBeat.Atmosphere(this);
+		Check("the hallway is underground, and green", atmo == null || atmo.Underground > 0.9f && atmo.UndergroundFogColor.G > atmo.UndergroundFogColor.R, $"fog {atmo?.UndergroundFogColor}");
+		Screenshot("hallway_narrow");
+		await Aim(hw.AlongWorld(12f) + Vector3.Up * 16f, ct);
+		Screenshot("hallway_looking_up");
+
+		Engine.TimeScale = 3.0;
+		try
+		{
+			ulong t0 = Time.GetTicksMsec();
+			float z0 = hw.PlayerZ;
+			await HallWalk(hw, Act15Hallway.Part1, false, ct);
+			double walked = (Time.GetTicksMsec() - t0) / 1000.0 * Engine.TimeScale;
+			double full = walked * Act15Hallway.Part1 / Mathf.Max(1f, Act15Hallway.Part1 - z0);
+			Check("the narrow stretch: about two minutes at a walk", full > 100 && full < 150, $"{full:0} s");
+			await HallWalk(hw, Act15Hallway.Part1 + Act15Hallway.Taper + 4f, false, ct);
+			Engine.TimeScale = 1.0;
+			await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.8f, ct);
+			Screenshot("the_shadow_man");
+			Check("he stands frozen in the green", hw.State == ProjectDS.World.Act15Hallway.Phase.Waiting);
+			Engine.TimeScale = 3.0;
+			// past him
+			await HallWalk(hw, Act15Hallway.ShadowZ + 3f, false, ct);
+			Check("past him: red light, green light begins", hw.State != ProjectDS.World.Act15Hallway.Phase.Waiting, $"{hw.State}");
+
+			if (!_s.Act15DeathDone)
+			{
+				// First time: keep walking into the red. He should take them, and it's back to Act 15's start.
+				_s.Act15DeathDone = true;
+				var walk = HallWalk(hw, Act15Hallway.End - 2f, false, ct, 90f);
+				await WaitUntil(() => hw.State == ProjectDS.World.Act15Hallway.Phase.Red, 60, ct);
+				Engine.TimeScale = 1.0;
+				await Frames(3, ct);
+				Vector3 toShadow = hw.Shadow.GlobalPosition - _player.GlobalPosition;
+				Vector3 fwd = -_player.CameraRig.GlobalBasis.Z;
+				Check("red: the lights change, and he is right behind you", toShadow.Length() < 2f && fwd.Dot(toShadow.Normalized()) < 0f, $"{toShadow.Length():0.0} m, behind {fwd.Dot(toShadow.Normalized()):0.00}");
+				await Seconds(0.8, ct);
+				Screenshot("taken");
+				await WaitUntil(() => PlayerDeath.Dying, 5, ct);
+				Check("moved in the red: taken", PlayerDeath.Dying);
+				await WaitUntil(() => false, 30, ct);
+				Check("taken: the checkpoint reloaded", false, "no reload");
+				return;
+			}
+			Check("after being taken: back at Act 15's start", PlayerDeath.Deaths >= 1);
+
+			// play it properly: walk in the green, stand still in the red
+			ulong t1 = Time.GetTicksMsec();
+			bool redShot = false, turnedShot = false;
+			var game = HallWalk(hw, Act15Hallway.End - 1.2f, true, ct, 900f);
+			while (!game.IsCompleted)
+			{
+				await Frames(1, ct);
+				if (hw.State == ProjectDS.World.Act15Hallway.Phase.Red && !redShot && hw.Reds >= 2)
+				{
+					redShot = true;
+					Engine.TimeScale = 1.0;
+					await Seconds(0.5, ct);
+					Screenshot("red_light_standing_still");
+					// look round at him (looking is allowed; moving isn't)
+					await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.9f, ct);
+					Screenshot("he_is_behind_you");
+					turnedShot = true;
+					Engine.TimeScale = 3.0;
+				}
+			}
+			await game;
+			double minutes = (Time.GetTicksMsec() - t1) / 1000.0 * 3.0 / 60.0;
+			Check("red light, green light all the way to the door: never taken", !PlayerDeath.Dying && hw.Reds >= 8, $"{hw.Reds} reds, about {minutes:0.0} min");
+			Check("looked round at him in the red and lived", turnedShot);
+		}
+		finally { Engine.TimeScale = 1.0; }
+
+		// the door, the closet
+		while (hw.State is ProjectDS.World.Act15Hallway.Phase.Red or ProjectDS.World.Act15Hallway.Phase.Flicker) await Frames(1, ct);
+		var door = hw.GetNode<Interactable>("ClosetDoor/Use");
+		await UseIt(door, ct);
+		await WaitUntil(() => hw.DoorOpen, 3, ct);
+		Check("the closet door at the end opens", hw.DoorOpen);
+		await Seconds(1.4, ct);
+		Screenshot("closet_door");
+		await WalkTo(hw.ClosetWorld, 0.4f, ct, stopWhen: () => hw.InCloset, giveUp: 10f);
+		await WaitUntil(() => hw.Finished, 5, ct);
+		Check("into the janitor's closet: the door shuts behind them (Act 16's save)", hw.Finished && s.Current == Checkpoint.Act15Finished, $"{s.Current}");
+		await Seconds(1.0, ct);
+		Screenshot("closet_dark");
 	}
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>

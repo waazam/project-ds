@@ -72,6 +72,7 @@ public partial class ContinueRoundTripTest : Node
 		// Act 14's start (Room 3, through the iron door) and end (the chamber under the stairwell)
 		new("act13_finished", Checkpoint.Act13Finished, F13, "lantern,compass,radio;tool=None"),
 		new("act14_finished", Checkpoint.Act14Finished, F13.Append(StoryManager.Flag.Act14JumpedAcross).ToArray(), "lantern,compass,radio;tool=None"),
+		new("act15_finished", Checkpoint.Act15Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -183,7 +184,7 @@ public partial class ContinueRoundTripTest : Node
 		float ground = terrain?.HeightAt(_player.GlobalPosition.X, _player.GlobalPosition.Z) ?? _player.GlobalPosition.Y;
 		// the lake (Act 12) and the station (Acts 13-14) are built off the forest's heightfield, on their own ground
 		bool offForest = GetTree().GetFirstNodeInGroup("lake_marker") is Lake lakeHere && _player.GlobalPosition.DistanceTo(lakeHere.WakeSpotWorld) < 300f
-			|| StationInterior.Instance is { } st && _player.GlobalPosition.DistanceTo(st.GlobalPosition) < 400f;
+			|| StationInterior.Instance is { } st && _player.GlobalPosition.DistanceTo(st.GlobalPosition) < 2000f;   // the station, the stairwell and the hallway beyond
 		if (offForest) ground = _player.GlobalPosition.Y;
 		Check("standing on something", _player.IsOnFloor() && _player.GlobalPosition.Y > ground - 1.5f,
 			$"on floor {_player.IsOnFloor()}, y {_player.GlobalPosition.Y:0.0} vs ground {ground:0.0}");
@@ -197,6 +198,8 @@ public partial class ContinueRoundTripTest : Node
 			Check("Act 14's start respawns just inside Room 3", before.DistanceTo(r3.EntryWorld) < 1.5f, $"{before} vs {r3.EntryWorld}");
 		if (sc.Cp == Checkpoint.Act14Finished && StationInterior.Instance?.Room3?.Stairs is { } sw)
 			Check("Act 14's end respawns on the chamber floor under the stairwell", before.DistanceTo(sw.LandingSpotWorld) < 1.5f, $"{before} vs {sw.LandingSpotWorld}");
+		if (sc.Cp == Checkpoint.Act15Finished && StationInterior.Instance?.Room3?.Stairs?.Hallway is { } hw)
+			Check("Act 15's end respawns in the janitor's closet, door shut", before.DistanceTo(hw.ClosetWorld) < 1.5f && hw.Finished && !hw.DoorOpen, $"{before} vs {hw.ClosetWorld}");
 		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");
 

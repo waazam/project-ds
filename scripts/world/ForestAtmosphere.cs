@@ -129,6 +129,8 @@ public partial class ForestAtmosphere : Node
 	public float Underground { get; set; }
 	/// <summary>The black fog's density fully underground: a couple of turns of the stair and it's gone.</summary>
 	[Export] public float UndergroundFogDensity = 0.085f;
+	/// <summary>The fog's colour fully underground (black in the stairwell; Act 15's hallway tints it).</summary>
+	[Export] public Color UndergroundFogColor = new(0.004f, 0.004f, 0.005f);
 
 	private Environment _env;
 	private DirectionalLight3D _sun;
@@ -460,7 +462,7 @@ public partial class ForestAtmosphere : Node
 		float under = Mathf.Clamp(Underground, 0f, 1f);
 		if (under > 0f)
 		{
-			fog = fog.Lerp(new Color(0.004f, 0.004f, 0.005f), under);
+			fog = fog.Lerp(UndergroundFogColor, under);
 			density = Mathf.Lerp(density, UndergroundFogDensity, under);
 			ambient *= 1f - 0.97f * under;
 			sunEnergy *= 1f - under;

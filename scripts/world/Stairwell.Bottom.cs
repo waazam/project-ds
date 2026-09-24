@@ -36,6 +36,9 @@ public partial class Stairwell
 
 	private Vector3 GapEdgeLocal => FlightStart(GapCorner).start;
 	private Node3D _across;
+	/// <summary>Where the chamber's passage meets Act 15's hallway (this node's space).</summary>
+	public const float HallwayZ = 15f;
+	public Act15Hallway Hallway { get; private set; }
 	private Area3D _edge;
 	private float _edgeCooldown;
 
@@ -131,8 +134,10 @@ public partial class Stairwell
 		Slab(new Vector3(0.9f, y + 1.2f, half + 4f), new Vector3(0.2f, 2.4f, 8f));
 		Slab(new Vector3(0, y + 2.45f, half + 4f), new Vector3(2f, 0.1f, 8f), false);
 		Slab(new Vector3(0, y - 0.1f, half + 4f), new Vector3(2f, 0.2f, 8f));
-		Slab(new Vector3(0, y + 1.2f, half + 8f), new Vector3(2f, 2.4f, 0.2f));
 		k.CommitTo(this, "Chamber", true);
+		// the passage opens into Act 15's hallway
+		Hallway = new Act15Hallway { Name = "Act15Hallway", Position = new Vector3(0, y, HallwayZ) };
+		AddChild(Hallway);
 
 		// stairs that came down before: twisted flights, treads, a railing, heaped against the walls
 		var junk = new MeshKit();
@@ -151,7 +156,7 @@ public partial class Stairwell
 		junk.CommitTo(this, "Wreckage", true);
 
 		// a little light: a cold glow far down the passage, as if something is lit round the corner
-		AddChild(new OmniLight3D { Name = "FarGlow", Position = new Vector3(0, y + 1.8f, half + 7.5f), LightColor = new Color(0.6f, 0.75f, 0.9f), LightEnergy = 0.9f, OmniRange = 7f, ShadowEnabled = false });
+		AddChild(new OmniLight3D { Name = "FarGlow", Position = new Vector3(0, y + 1.8f, half + 7.5f), LightColor = new Color(0.4f, 0.9f, 0.5f), LightEnergy = 0.7f, OmniRange = 7f, ShadowEnabled = false });
 		AddChild(new OmniLight3D { Name = "ChamberDim", Position = new Vector3(0, y + 5f, 0), LightColor = new Color(0.45f, 0.5f, 0.6f), LightEnergy = 0.25f, OmniRange = 9f, ShadowEnabled = false });
 	}
 
@@ -404,21 +409,6 @@ public partial class Stairwell
 		GD.Print($"[story] Act 14: down ({(across ? "across, and the landing fell" : "straight down, on their feet")}) - Act 15 begins here");
 		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.Underground = 1f;
 		await Cutscene.Wait(this, 0.1, ct);
-		// control back: they can look round, take a few steps toward the passage. Act 15 isn't built
-		// yet, so after a few seconds the screen goes and the credits roll.
-		GetTree().CreateTimer(CreditsAfter).Timeout += () => _ = Cutscene.Run(this, RollCredits, lockInput: true, freezeBody: true);
-	}
-
-	/// <summary>Seconds of control in the chamber before the (for now) end.</summary>
-	[Export] public double CreditsAfter = 7.0;
-
-	private async Task RollCredits(CancellationToken ct)
-	{
-		var fader = StoryBeat.Fader(this);
-		if (fader != null) await fader.Fade(1f, 2.5f, ct);
-		_drone?.Stop();
-		_hum?.Stop();
-		if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending)
-			await ending.Credits(fader, ct);
+		// control back: the passage out of the chamber is Act 15's hallway (Act15Hallway)
 	}
 }

@@ -132,6 +132,12 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"stair_groan_{i:00}", sfx, false, Lo, (r
 jobs.Add(("fall_past_01", sfx, false, Lo, (r, sr) => Stairwell.FallPast(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"far_clang_{i:00}", sfx, false, Lo, (r, sr) => Stairwell.FarClang(r, sr)));
 jobs.Add(("stair_break_01", sfx, false, Lo, (r, sr) => Stairwell.StairBreak(r, sr)));
+// Act 15: the long hallway
+jobs.Add(("hall_hum_loop", ambient, true, Lo, (r, sr) => Hallway.HallHum(r, sr, 30)));
+jobs.Add(("relay_clunk_01", sfx, false, Lo, (r, sr) => Hallway.RelayClunk(r, sr)));
+jobs.Add(("siren_low_01", sfx, false, Lo, (r, sr) => Hallway.SirenLow(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"shadow_breath_{i:00}", sfx, false, Lo, (r, sr) => Hallway.ShadowBreath(r, sr)));
+jobs.Add(("shadow_strike_01", sfx, false, Lo, (r, sr) => Hallway.ShadowStrike(r, sr)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

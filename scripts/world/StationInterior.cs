@@ -96,6 +96,9 @@ public partial class StationInterior : Node3D
 		// Act 14's end (Act 15's start): on the floor of the chamber under the stairwell, facing the way on
 		Marker("Act15Marker", Room3.ToGlobal(StationRoom3.StairwellAt + new Vector3(0, Stairwell.BottomYFor(Stairwell.DefaultRevolutions) + 0.05f, 0)),
 			Rotation.Y + Mathf.Pi, "respawn_Act14Finished");
+		// Act 15's end (Act 16's start): in the janitor's closet at the end of the long hallway, facing its door
+		Marker("Act16Marker", Room3.ToGlobal(StationRoom3.StairwellAt + new Vector3(0, Stairwell.BottomYFor(Stairwell.DefaultRevolutions), Stairwell.HallwayZ) + Act15Hallway.ClosetCentre + Vector3.Up * 0.05f),
+			Rotation.Y, "respawn_Act15Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		// the scavenger hunt's breadcrumbs: a bloody hand on Room 1's door, a staircase scrawled on Room 2's

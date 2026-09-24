@@ -29,6 +29,8 @@ public enum Checkpoint
 	/// <summary>Act 14's end: down the stairwell, jumped (across or down), on the floor of the chamber
 	/// under it, where Act 15 begins.</summary>
 	Act14Finished = 14,
+	/// <summary>Act 15's end: through the long hallway, into the janitor's closet (Act 16's start).</summary>
+	Act15Finished = 15,
 }
 
 public class SaveData

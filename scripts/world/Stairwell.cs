@@ -446,7 +446,7 @@ public partial class Stairwell : Node3D
 	{
 		Vector3 l = ToLocal(world);
 		bool trench = Mathf.Abs(l.X + A) < W && l.Z < -H + 0.2f && l.Z > TrenchZ0 - 0.5f && l.Y < -0.4f;
-		bool chamber = l.Y < BottomY + 9f && Mathf.Abs(l.X) < 8f && l.Z > -8f && l.Z < 16f;
+		bool chamber = l.Y < BottomY + 9f && Mathf.Abs(l.X) < 8f && l.Z > -8f && l.Z < HallwayZ;
 		return trench || InShaft(world) || chamber;
 	}
 
@@ -462,9 +462,15 @@ public partial class Stairwell : Node3D
 		PlayerRev = Mathf.FloorToInt(rev);
 		if (PlayerInShaft && PlayerRev > DeepestRev && l.Y > CornerY(GapCorner) - 1f) DeepestRev = PlayerRev;
 
-		// underground: the world's light goes and the fog turns black
+		// underground: the world's light goes and the fog turns black (past the chamber, the hallway has it)
 		float want = under ? Mathf.Clamp(-l.Y / 3f, 0f, 1f) : 0f;
-		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.Underground = Mathf.MoveToward(atmo.Underground, want, dt * 0.8f);
+		bool ours = Mathf.Abs(l.X) < 12f && l.Z < HallwayZ && l.Z > -30f;
+		if (ours && StoryBeat.Atmosphere(this) is { } atmo)
+		{
+			atmo.Underground = Mathf.MoveToward(atmo.Underground, want, dt * 0.8f);
+			atmo.UndergroundFogDensity = 0.085f;
+			atmo.UndergroundFogColor = new Color(0.004f, 0.004f, 0.005f);
+		}
 
 		// the shaft's air, and the hum, rising with depth
 		float depth = Mathf.Clamp(rev / Revolutions, 0f, 1f);
