@@ -117,6 +117,9 @@ public partial class StoryManager : Node
 		public const string StationStepSet = "station_step_set";
 		/// <summary>Act 13: the iron door has opened onto the last room.</summary>
 		public const string StationDoor3Open = "station_door3_open";
+		/// <summary>Act 14: how they came down at the bottom of the stairwell (Act 15 starts differently).</summary>
+		public const string Act14JumpedAcross = "act14_jumped_across";
+		public const string Act14JumpedDown = "act14_jumped_down";
 	}
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>

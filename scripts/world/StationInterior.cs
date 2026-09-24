@@ -24,7 +24,8 @@ namespace ProjectDS.World;
 ///     TOUCH, CLIMB — Room 1's three rules, broken. The dead eye (caught in the dark basement, and it
 ///     only moves when unwatched), the pale hand (from the right one of Room 1's blood puddles), the
 ///     step (from a staircase that has grown in the drained Room 2 and must be climbed).
-///  6. Behind the iron door (<see cref="StationRoom3"/>): the last staircase, up.
+///  6. Behind the iron door (<see cref="StationRoom3"/>): Act 14's gallery of burnt portraits, and
+///     the stairwell down.
 ///
 /// Layout (local, floor y=0): lobby x in [-5, 5], z in [-4.5, 4.5], 3.2 m high.
 /// <code>
@@ -90,7 +91,11 @@ public partial class StationInterior : Node3D
 		Marker("EntranceMarker", EntranceMarkerWorld, EntranceYaw, "respawn_Act12LakeCrossed");
 		// Room 1 solved: back by Room 2's door, facing it, when the flood takes them.
 		Marker("Room2Marker", ToGlobal(new Vector3(-HalfWidth + 1.6f, 0.05f, 0.6f)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act13Room1Solved");
-		Marker("EndMarker", EntranceMarkerWorld, EntranceYaw, "respawn_Act13Finished");
+		// Act 14's start: just inside Room 3's corridor, facing down it
+		Marker("Room3Marker", Room3.EntryWorld, Rotation.Y + Mathf.Pi, "respawn_Act13Finished");
+		// Act 14's end (Act 15's start): on the floor of the chamber under the stairwell, facing the way on
+		Marker("Act15Marker", Room3.ToGlobal(StationRoom3.StairwellAt + new Vector3(0, Stairwell.BottomYFor(Stairwell.DefaultRevolutions) + 0.05f, 0)),
+			Rotation.Y + Mathf.Pi, "respawn_Act14Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		// the scavenger hunt's breadcrumbs: a bloody hand on Room 1's door, a staircase scrawled on Room 2's

@@ -125,6 +125,10 @@ public partial class ForestAtmosphere : Node
 	public float Flash { get; set; }
 	/// <summary>0..1: the fog light goes dark red (Act 11's blood rain). Blended in after the mood each frame.</summary>
 	public float BloodTint { get; set; }
+	/// <summary>0..1: below ground (Act 14's stairwell). Sky, sun and ambient go and the fog turns black.</summary>
+	public float Underground { get; set; }
+	/// <summary>The black fog's density fully underground: a couple of turns of the stair and it's gone.</summary>
+	[Export] public float UndergroundFogDensity = 0.085f;
 
 	private Environment _env;
 	private DirectionalLight3D _sun;
@@ -451,13 +455,23 @@ public partial class ForestAtmosphere : Node
 		fog += new Color(0.35f, 0.37f, 0.42f) * flash * 0.6f;
 
 		if (BloodTint > 0f) fog = fog.Lerp(new Color(0.30f, 0.04f, 0.03f), Mathf.Clamp(BloodTint, 0f, 1f));
+		// Underground (Act 14's stairwell): no sky, no sun, next to no ambient, and a black fog that
+		// swallows everything a few metres past the lantern.
+		float under = Mathf.Clamp(Underground, 0f, 1f);
+		if (under > 0f)
+		{
+			fog = fog.Lerp(new Color(0.004f, 0.004f, 0.005f), under);
+			density = Mathf.Lerp(density, UndergroundFogDensity, under);
+			ambient *= 1f - 0.97f * under;
+			sunEnergy *= 1f - under;
+		}
 		_env.FogLightColor = fog;
 		_env.FogDensity = density;
 		_env.FogSkyAffect = _baseSkyFog;
 		_env.AmbientLightColor = ambColor;
 		_env.AmbientLightEnergy = ambient;
 		_env.TonemapExposure = _exposureBase + OpenExposureBoost * _open;
-		_env.BackgroundEnergyMultiplier = _bgEnergyBase * _baseSkyEnergy * (1f + OpenSkyBoost * _open) * (1f - 0.35f * storm) + flash * 2.5f;
+		_env.BackgroundEnergyMultiplier = (_bgEnergyBase * _baseSkyEnergy * (1f + OpenSkyBoost * _open) * (1f - 0.35f * storm) + flash * 2.5f) * (1f - under);
 		if (_sun == null) return;
 		_sun.LightEnergy = sunEnergy;
 		_sun.LightColor = _baseSunColor;

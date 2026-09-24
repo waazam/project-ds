@@ -125,6 +125,13 @@ jobs.Add(("web_burn_01", sfx, false, Lo, (r, sr) => Station.WebBurn(r, sr)));
 for (int i = 1; i <= 4; i++) jobs.Add(($"wade_{i:00}", sfx, false, Lo, (r, sr) => Station.Wade(r, sr)));
 jobs.Add(("door_creak_01", sfx, false, Lo, (r, sr) => Station.SmallCreak(r, sr)));
 jobs.Add(("industrial_drone_loop", ambient, true, Lo, (r, sr) => Station.IndustrialDrone(r, sr, 30)));
+// Act 14: the stairwell
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_metal_{i:00}", sfx, false, Lo, (r, sr) => Stairwell.StepMetal(r, sr)));
+jobs.Add(("stairwell_drone_loop", ambient, true, Lo, (r, sr) => Stairwell.ShaftDrone(r, sr, 36)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"stair_groan_{i:00}", sfx, false, Lo, (r, sr) => Stairwell.Groan(r, sr)));
+jobs.Add(("fall_past_01", sfx, false, Lo, (r, sr) => Stairwell.FallPast(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"far_clang_{i:00}", sfx, false, Lo, (r, sr) => Stairwell.FarClang(r, sr)));
+jobs.Add(("stair_break_01", sfx, false, Lo, (r, sr) => Stairwell.StairBreak(r, sr)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

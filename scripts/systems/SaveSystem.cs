@@ -24,8 +24,11 @@ public enum Checkpoint
 	Act13StationSolved = 11,
 	/// <summary>Act 13: Room 1's button pressed - saved just before the flooding room.</summary>
 	Act13Room1Solved = 12,
-	/// <summary>Act 13's end: up the last staircase behind the iron door.</summary>
+	/// <summary>Act 13's end, and Act 14's start: through the iron door into Room 3.</summary>
 	Act13Finished = 13,
+	/// <summary>Act 14's end: down the stairwell, jumped (across or down), on the floor of the chamber
+	/// under it, where Act 15 begins.</summary>
+	Act14Finished = 14,
 }
 
 public class SaveData

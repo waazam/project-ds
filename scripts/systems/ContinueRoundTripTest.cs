@@ -38,6 +38,14 @@ public partial class ContinueRoundTripTest : Node
 	private static readonly string[] F10Scared = F9.Concat(new[] { StoryManager.Flag.BunkerMazeEntered, BunkerRooms.ScaredFlag }).ToArray();
 	private static readonly string[] F10 = F10Scared.Concat(new[] { StoryManager.Flag.BunkerMazeExited }).ToArray();
 	private static readonly string[] F11 = F10.Concat(new[] { StoryManager.Flag.Act11DialogueDone }).ToArray();
+	// Act 13 all done: every puzzle in the station solved and the iron door open.
+	private static readonly string[] F13 = F11.Concat(new[] { StoryManager.Flag.NewelSeated,
+		StoryManager.Flag.StationBasementTapeCut, StoryManager.Flag.StationLightsDead, StoryManager.Flag.StationBasementDrained,
+		StoryManager.Flag.StationClockBroken, StoryManager.Flag.StationRoom1Open, StoryManager.Flag.StationRoom1Solved,
+		StoryManager.Flag.StationRoom2Solved, StoryManager.Flag.StationWebBurned, StoryManager.Flag.StationDoor3Seen,
+		StoryManager.Flag.StationEyeTaken, StoryManager.Flag.StationHandTaken, StoryManager.Flag.StationStepTaken,
+		StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet,
+		StoryManager.Flag.StationDoor3Open }).ToArray();
 
 	private static readonly Scenario[] Scenarios =
 	{
@@ -61,6 +69,9 @@ public partial class ContinueRoundTripTest : Node
 		new("act10_walkie_found", Checkpoint.Act10WalkieFound, F10, "lantern,compass,newel_post,radio;tool=None"),
 		new("act10_after_radio", Checkpoint.Act10WalkieFound, F11, "lantern,compass,newel_post,radio;tool=None"),
 		new("act11_giant_encounter", Checkpoint.Act11GiantEncounter, F11.Append(StoryManager.Flag.NewelSeated).ToArray(), "lantern,compass,radio;tool=None"),
+		// Act 14's start (Room 3, through the iron door) and end (the chamber under the stairwell)
+		new("act13_finished", Checkpoint.Act13Finished, F13, "lantern,compass,radio;tool=None"),
+		new("act14_finished", Checkpoint.Act14Finished, F13.Append(StoryManager.Flag.Act14JumpedAcross).ToArray(), "lantern,compass,radio;tool=None"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -182,6 +193,10 @@ public partial class ContinueRoundTripTest : Node
 		await Drive(input, new Vector2(0, 1), 0.6);
 		if (_player.GlobalPosition.DistanceTo(before) < 0.2f) await Drive(input, new Vector2(0, -1), 0.6);
 		Check("player can move", _player.GlobalPosition.DistanceTo(before) > 0.2f, $"{_player.GlobalPosition.DistanceTo(before):0.00} m");
+		if (sc.Cp == Checkpoint.Act13Finished && StationInterior.Instance?.Room3 is { } r3)
+			Check("Act 14's start respawns just inside Room 3", before.DistanceTo(r3.EntryWorld) < 1.5f, $"{before} vs {r3.EntryWorld}");
+		if (sc.Cp == Checkpoint.Act14Finished && StationInterior.Instance?.Room3?.Stairs is { } sw)
+			Check("Act 14's end respawns on the chamber floor under the stairwell", before.DistanceTo(sw.LandingSpotWorld) < 1.5f, $"{before} vs {sw.LandingSpotWorld}");
 		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");
 

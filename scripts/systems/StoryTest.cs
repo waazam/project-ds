@@ -55,6 +55,8 @@ public partial class StoryTest : Node
 		public bool LakeDeathDone;
 		/// <summary>Act 13's Room 2 is flooded to the top once on purpose (the reload restarts the step).</summary>
 		public bool Room2DeathDone;
+		/// <summary>Act 14 is run twice: jumping across, then (after a Continue) jumping down.</summary>
+		public bool Act14AcrossDone;
 	}
 
 	private static Session _s;
@@ -103,6 +105,13 @@ public partial class StoryTest : Node
 			8 or 9 or 10 => (Checkpoint.Act7CabinBurning, f8, gear5),
 			12 => (Checkpoint.Act11GiantEncounter, f11.Concat(new[] { StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated }).ToArray(), gear11),
 			13 => (Checkpoint.Act12LakeCrossed, f11.Concat(new[] { StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated }).ToArray(), gear11),
+			14 => (Checkpoint.Act13Finished, f11.Concat(new[] { StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated,
+				StoryManager.Flag.StationBasementTapeCut, StoryManager.Flag.StationLightsDead, StoryManager.Flag.StationBasementDrained,
+				StoryManager.Flag.StationClockBroken, StoryManager.Flag.StationRoom1Open, StoryManager.Flag.StationRoom1Solved,
+				StoryManager.Flag.StationRoom2Solved, StoryManager.Flag.StationWebBurned, StoryManager.Flag.StationDoor3Seen,
+				StoryManager.Flag.StationEyeTaken, StoryManager.Flag.StationHandTaken, StoryManager.Flag.StationStepTaken,
+				StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet,
+				StoryManager.Flag.StationDoor3Open }).ToArray(), "lantern,compass,radio,knife,lighter;tool=None"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -112,7 +121,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 13) return false;
+		if (_fromApplied || act < 3 || act > 14) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -230,6 +239,7 @@ public partial class StoryTest : Node
 			new("Act 11: the last climb", hollow, Act11),
 			new("Act 12: the lake crossing", hollow, Act12Lake),
 			new("Act 13: the forester station", hollow, Act13Station),
+			new("Act 14: the stairwell", hollow, Act14Stairwell),
 		};
 	}
 
@@ -1542,23 +1552,197 @@ public partial class StoryTest : Node
 		Check("all three set: the iron door opens", door3.Opened && door3.PiecesSet == 3, $"{door3.PiecesSet} set");
 		await Seconds(4, ct);
 
-		// the last room, and up
+		// through the iron door: Act 13 done, Act 14's save
 		var room3 = station.Room3;
 		bool finished = false;
 		void OnCp(Checkpoint cp) { if (cp == Checkpoint.Act13Finished) finished = true; }
 		s.CheckpointReached += OnCp;
 		try
 		{
-			await Inside(room3.ToGlobal(new Vector3(0, 0, 2f)), room3.StairFootWorld, ct);
-			await WalkTo(room3.ToGlobal(new Vector3(0, 0, StationRoom3.CorridorEnd + 1.5f)), 0.8f, ct, giveUp: 10f);
-			Screenshot("room3_hell");
-			await WalkTo(room3.StairFootWorld, 0.6f, ct, giveUp: 8f);
-			await WalkTo(room3.StairTopWorld, 0.6f, ct, stopWhen: () => finished || room3.Solved, giveUp: 14f);
-			await WaitUntil(() => finished, 10, ct);
-			Check("up the last staircase: Act 13's final checkpoint", finished);
+			await Inside(station.ToGlobal(new Vector3(0, 0, StationInterior.HalfDepth - 1.2f)), room3.EntryWorld, ct);
+			await WalkTo(room3.ToGlobal(new Vector3(0, 0, 2.2f)), 0.6f, ct, stopWhen: () => finished, giveUp: 8f);
+			await WaitUntil(() => finished, 5, ct);
+			Check("through the iron door: Act 13's final checkpoint (Act 14 starts here)", finished && room3.Entered);
 			Check("the lobby had turned to flesh behind us", station.Stage == 4, $"stage {station.Stage}");
 		}
 		finally { s.CheckpointReached -= OnCp; }
+	}
+
+	// ------------------------------------------------------------------ Act 14
+
+	/// <summary>The stairwell corner the player is nearest to, going down.</summary>
+	private int CornerOf(Stairwell sw) =>
+		Mathf.Max(0, Mathf.FloorToInt((Stairwell.Y0 - sw.ToLocal(_player.GlobalPosition).Y) / Stairwell.FlightDrop + 0.25f));
+
+	/// <summary>Walks the stairwell corner to corner, never running, from wherever the player is down to
+	/// corner <paramref name="toCorner"/>. Returns false if it got stuck.</summary>
+	private async Task<bool> DescendTo(Stairwell sw, int toCorner, CancellationToken ct, System.Action<int> atCorner = null)
+	{
+		int stuck = 0;
+		while (true)
+		{
+			int k = Mathf.Min(CornerOf(sw), toCorner);
+			atCorner?.Invoke(k);
+			if (k >= toCorner && _player.GlobalPosition.DistanceTo(sw.CornerWorld(toCorner)) < 0.9f) return true;
+			int next = Mathf.Min(k + 1, toCorner);
+			float before = _player.GlobalPosition.Y;
+			await WalkTo(sw.CornerWorld(next), 0.45f, ct, giveUp: 6f);
+			if (Mathf.Abs(_player.GlobalPosition.Y - before) < 0.05f && _player.GlobalPosition.DistanceTo(sw.CornerWorld(next)) > 0.9f)
+			{
+				if (++stuck > 3) { Check("descending", "kept going down", false, $"stuck at corner {k}, {_player.GlobalPosition}"); return false; }
+			}
+			else stuck = 0;
+		}
+	}
+
+	private async Task Act14Stairwell(CancellationToken ct)
+	{
+		var station = StationInterior.Instance;
+		var room3 = station?.Room3;
+		var sw = room3?.Stairs;
+		Check("Room 3 and its stairwell exist", sw != null);
+		if (sw == null) return;
+		var s = StoryManager.Instance;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Frames(5, ct);
+		var atmo = StoryBeat.Atmosphere(this);
+
+		if (_s.Act14AcrossDone)
+		{
+			// Second time: Continue from Act 14's end put us on the chamber floor; go back up and jump down instead.
+			await Seconds(1.5, ct);
+			Check("Continue from Act 14's end: standing in the chamber under the shaft", s.Current == Checkpoint.Act14Finished
+				&& _player.GlobalPosition.DistanceTo(sw.LandingSpotWorld) < 2f, $"{s.Current} at {_player.GlobalPosition}");
+			Check("it's dark down here", atmo == null || atmo.Underground > 0.5f, $"underground {atmo?.Underground:0.00}");
+			Screenshot("act15_start");
+			await Inside(sw.CornerWorld(sw.GapCorner - 2), sw.CornerWorld(sw.GapCorner - 1), ct);
+			await DescendTo(sw, sw.GapCorner, ct);
+			await WalkTo(sw.GapEdgeWorld, 0.3f, ct, stopWhen: () => sw.Choosing, giveUp: 4f);
+			await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+			Check("the question again at the edge", ChoicePrompt.Instance is { IsOpen: true });
+			ChoicePrompt.Instance?.TestChoose(1);
+			await WaitUntil(() => sw.StoodUp, 20, ct);
+			Check("jumped down: landed on their feet in the chamber", sw.Jumped && !sw.JumpedAcross && sw.StoodUp
+				&& _player.GlobalPosition.DistanceTo(sw.LandingSpotWorld) < 1.5f, $"at {_player.GlobalPosition}");
+			await WaitUntil(() => _input.Enabled, 3, ct);
+			Check("ready to run: control straight back, standing tall", _input.Enabled && _player.CameraRig.EyeHeight > 1.5f, $"eye {_player.CameraRig.EyeHeight:0.00}");
+			Check("the way down is remembered for Act 15", s.HasFlag(StoryManager.Flag.Act14JumpedDown));
+			Screenshot("jumped_down");
+			return;
+		}
+
+		Check("Act 14 starts at its save: Room 3", s.Current >= Checkpoint.Act13Finished && room3.Entered, $"{s.Current}");
+		Check("the walls are hung with burnt-out portraits", room3.Portraits >= 20, $"{room3.Portraits}");
+		await Inside(room3.ToGlobal(new Vector3(0, 0, StationRoom3.CorridorEnd + 2f)), room3.ToGlobal(new Vector3(-4.5f, 2.2f, 12f)), ct);
+		await Aim(room3.ToGlobal(new Vector3(-4.5f, 2.2f, 12f)), ct);
+		Screenshot("room3_portraits");
+		await Inside(room3.ToGlobal(new Vector3(-3.2f, 0, 11f)), room3.ToGlobal(new Vector3(-5f, 1.8f, 11f)), ct);
+		await Aim(room3.ToGlobal(new Vector3(-5f, 1.75f, 11f)), ct);
+		Screenshot("portrait_close");
+		await Aim(sw.TrenchTopWorld + Vector3.Down * 0.5f, ct);
+		Screenshot("room3_hole");
+
+		// down the trench into the top of the shaft
+		await WalkTo(sw.TrenchTopWorld, 0.6f, ct, giveUp: 12f);
+		await WalkTo(sw.CornerWorld(0), 0.5f, ct, giveUp: 8f);
+		Check("down the concrete steps to the top landing", _player.GlobalPosition.DistanceTo(sw.CornerWorld(0)) < 1f, $"{_player.GlobalPosition}");
+		await Seconds(2.5, ct);
+		Check("underground: the world's light is gone", atmo == null || atmo.Underground > 0.6f, $"underground {atmo?.Underground:0.00}");
+		await Aim(sw.ToGlobal(new Vector3(0, Stairwell.CornerY(12), 0)), ct);
+		Screenshot("stairwell_down_the_well");
+
+		Engine.TimeScale = 3.0;
+		try
+		{
+			await DescendTo(sw, 8 * 4, ct);
+			Check("walking down: turn 8 reached, never taken back", sw.DeepestRev >= 7 && sw.LoopBacks == 0, $"deepest {sw.DeepestRev}, loops {sw.LoopBacks}");
+			Screenshot("stairwell_turn8");
+			await Aim(sw.ToGlobal(new Vector3(-Stairwell.H, Stairwell.CornerY(32) + 1.45f, Stairwell.CornerXZ(32).Y)), ct);
+			Screenshot("painted_number");
+
+			// run: taken back up, seamlessly
+			int revBefore = sw.PlayerRev;
+			int k = CornerOf(sw);
+			float maxStep = 0f, maxY = 0f;
+			double t = 0;
+			_input.ScriptedRun = true;
+			try
+			{
+				while (sw.LoopBacks == 0 && t < 12)
+				{
+					var d = Flat(sw.CornerWorld(k + 1) - _player.GlobalPosition);
+					if (d.Length() < 0.5f) { k++; continue; }
+					_player.CameraRig.SnapBehind(Mathf.Atan2(-d.X, -d.Z));
+					_input.ScriptedMove = new Vector2(0, 1);
+					Vector3 lp = sw.ToLocal(_player.GlobalPosition);
+					await Frames(1, ct);
+					t += GetProcessDeltaTime();
+					Vector3 now = sw.ToLocal(_player.GlobalPosition);
+					if (sw.LoopBacks > 0) { maxStep = new Vector2(now.X - lp.X, now.Z - lp.Z).Length(); maxY = now.Y - lp.Y; }
+				}
+			}
+			finally { _input.ScriptedRun = false; _input.ScriptedMove = Vector2.Zero; }
+			Check("sprinting on the stairs: taken back up the shaft", sw.LoopBacks >= 1 && sw.PlayerRev < revBefore, $"turn {revBefore} -> {sw.PlayerRev}");
+			float turns = maxY / Stairwell.RevDrop;
+			Check("the move is seamless: whole turns, same place on the turn, grime held", Mathf.Abs(turns - Mathf.Round(turns)) < 0.05f && maxStep < 0.5f && sw.GrimeBias > 0f,
+				$"{turns:0.00} turns up, xz step {maxStep:0.00}, grime bias {sw.GrimeBias:0.000}");
+			Check("back near the top (two to four turns down)", sw.PlayerRev >= Stairwell.Period - 1 && sw.PlayerRev <= Stairwell.Period * 2, $"turn {sw.PlayerRev}");
+			await Frames(10, ct);
+			Check("still on the stairs after it", sw.InShaft(_player.GlobalPosition), $"{_player.GlobalPosition}");
+			Screenshot("after_the_loop");
+
+			// all the way down, walking
+			ulong descentStart = Time.GetTicksMsec();
+			int descentFrom = sw.PlayerRev;
+			bool deepShot = false, midShot = false;
+			await DescendTo(sw, sw.GapCorner - 1, ct, k2 =>
+			{
+				if (!midShot && k2 >= 30 * 4) { midShot = true; Screenshot("stairwell_turn30"); }
+				if (!deepShot && k2 >= 60 * 4) { deepShot = true; Screenshot("stairwell_turn60_grimy"); }
+			});
+			double gameSec = (Time.GetTicksMsec() - descentStart) / 1000.0 * Engine.TimeScale;
+			double perTurn = gameSec / Mathf.Max(1, sw.Revolutions - descentFrom);
+			Check("walked all the way down", sw.DeepestRev >= sw.Revolutions - 1,
+				$"deepest {sw.DeepestRev} of {sw.Revolutions}; {perTurn:0.0} s a turn at a walk, so about {perTurn * sw.Revolutions / 60.0:0.0} min top to bottom");
+		}
+		finally { Engine.TimeScale = 1.0; _input.ScriptedRun = false; }
+		Check("hardly any light down here: most bulbs dead", sw.LitBulbs < sw.Revolutions / Stairwell.Period, $"{sw.LitBulbs} lit");
+
+		// the fallen flight, and the question
+		await DescendTo(sw, sw.GapCorner, ct);
+		await Aim(sw.GapEdgeWorld + sw.GapDir * 2f, ct);
+		Screenshot("the_gap");
+		await WalkTo(sw.GapEdgeWorld, 0.3f, ct, stopWhen: () => sw.Choosing, giveUp: 4f);
+		await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+		Check("at the edge: jump across? or jump down?", ChoicePrompt.Instance is { IsOpen: true } && sw.Choosing);
+		Screenshot("the_choice");
+		// stepping back lets go of it; it asks again at the edge
+		ChoicePrompt.Instance?.TestChoose(-1);
+		await Seconds(1.0, ct);
+		Check("stepping back from it lets go of the question", !sw.Choosing && _input.Enabled);
+		await Seconds(2.0, ct);
+		await WalkTo(sw.GapEdgeWorld, 0.3f, ct, stopWhen: () => sw.Choosing, giveUp: 4f);
+		await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+		ChoicePrompt.Instance?.TestChoose(0);
+		await WaitUntil(() => sw.AcrossFell, 10, ct);
+		Check("jumped across: the far landing holds, then goes", sw.JumpedAcross && sw.AcrossFell);
+		await Seconds(0.6, ct);
+		Screenshot("falling");
+		await WaitUntil(() => sw.Landed, 10, ct);
+		await Seconds(4.5, ct);
+		Screenshot("on_the_floor");
+		await WaitUntil(() => sw.StoodUp, 25, ct);
+		Check("came to on the floor and got up, slowly", sw.StoodUp && _player.CameraRig.EyeHeight > 1.5f && _player.GlobalPosition.Y < sw.LandingSpotWorld.Y + 1f, $"at {_player.GlobalPosition}");
+		await WaitUntil(() => s.Current == Checkpoint.Act14Finished, 5, ct);
+		Check("Act 14's end saved: Act 15 starts here", s.Current == Checkpoint.Act14Finished && s.HasFlag(StoryManager.Flag.Act14JumpedAcross), $"{s.Current}");
+		Screenshot("stood_up");
+
+		// Continue from here and take the other way down
+		_s.Act14AcrossDone = true;
+		await Seconds(0.5, ct);
+		StoryManager.Instance.ContinueGame();
+		await WaitUntil(() => false, 30, ct);
+		Check("Continue reloaded the level", false, "no reload");
 	}
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>

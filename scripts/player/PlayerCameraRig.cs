@@ -95,6 +95,10 @@ public partial class PlayerCameraRig : Node3D
 		ApplyRotation();
 	}
 
+	/// <summary>The body was just moved by <paramref name="d"/> (Act 14's stairwell loop): move the
+	/// eye's eased position with it, so the view doesn't glide after it.</summary>
+	public void ShiftBy(Vector3 d) => GlobalPosition += d;
+
 	/// <summary>Forces the pitch directly (clamped to the current mode's limits), for scripted
 	/// camera moments (the top-of-the-stairs look-down) rather than player input.</summary>
 	public void SetPitch(float radians)
