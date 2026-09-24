@@ -94,6 +94,20 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"cricket_chirp_{i:00}", sfx, false, Hi, 
 for (int i = 1; i <= 2; i++) jobs.Add(($"raven_{i:00}", sfx, false, Lo, (r, sr) => Forest.Raven(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"rustle_{i:00}", sfx, false, Lo, (r, sr) => Forest.Rustle(r, sr)));
 jobs.Add(("heartbeat_loop", ambient, true, Lo, (r, sr) => Forest.Heartbeat(r, sr, 20)));
+// Act 12: the lake crossing (the rowboat, the water, the creature, the dawn).
+for (int i = 1; i <= 4; i++) jobs.Add(($"oar_stroke_{i:00}", sfx, false, Lo, (r, sr) => Lake.OarStroke(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"oarlock_creak_{i:00}", sfx, false, Lo, (r, sr) => Lake.OarlockCreak(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"boat_creak_{i:00}", sfx, false, Lo, (r, sr) => Lake.BoatCreak(r, sr)));
+jobs.Add(("boat_board_01", sfx, false, Lo, (r, sr) => Lake.BoatBoard(r, sr)));
+jobs.Add(("boat_ground_01", sfx, false, Lo, (r, sr) => Lake.BoatGround(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"wave_slap_{i:00}", sfx, false, Lo, (r, sr) => Lake.WaveSlap(r, sr)));
+jobs.Add(("underwater_thoom_01", sfx, false, Lo, (r, sr) => Lake.UnderwaterThoom(r, sr)));
+jobs.Add(("breach_erupt_01", sfx, false, Lo, (r, sr) => Lake.BreachErupt(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"tentacle_slam_{i:00}", sfx, false, Lo, (r, sr) => Lake.TentacleSlam(r, sr)));
+for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"loon_{k:00}", sfx, false, Hi, (r, sr) => Lake.Loon(r, sr, k))); }
+jobs.Add(("hull_lap_loop", ambient, true, Lo, (r, sr) => Lake.HullLap(r, sr, 24)));
+jobs.Add(("lake_rough_loop", ambient, true, Lo, (r, sr) => Lake.RoughWater(r, sr, 30)));
+
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));
 jobs.Add(("score_pad_loop", music, true, Lo, (r, sr) => Music.ScorePadLoop(r, sr, 40)));

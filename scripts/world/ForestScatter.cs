@@ -104,7 +104,7 @@ public partial class ForestScatter : Node3D
 	/// crownStart = fraction of the height where live branches begin; ragged =
 	/// chance a bough is missing (irregular silhouette).
 	/// </summary>
-	private static Mesh FirMesh(int seed, float height, float trunkR, float crownStart, int tiers, float maxR, float ragged)
+	internal static Mesh FirMesh(int seed, float height, float trunkR, float crownStart, int tiers, float maxR, float ragged)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7919) };
 		var k = new MeshKit();
@@ -211,7 +211,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh BoulderMesh(int seed)
+	internal static Mesh BoulderMesh(int seed)
 	{
 		var k = new MeshKit();
 		k.Color = new Color(0.8f, 0.8f, 0.78f);
@@ -221,7 +221,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh DeciduousMesh(int seed)
+	internal static Mesh DeciduousMesh(int seed)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 104729) };
 		var k = new MeshKit();
@@ -251,7 +251,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh SnagMesh(int seed, float h)
+	internal static Mesh SnagMesh(int seed, float h)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 31337) };
 		var k = new MeshKit();
@@ -276,7 +276,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh StumpMesh()
+	internal static Mesh StumpMesh()
 	{
 		var k = new MeshKit();
 		k.Color = new Color(0.8f, 0.78f, 0.74f);
@@ -286,7 +286,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh RockMesh(int seed)
+	internal static Mesh RockMesh(int seed)
 	{
 		var k = new MeshKit();
 		k.Color = new Color(0.85f, 0.85f, 0.82f);
@@ -294,7 +294,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh LogMesh()
+	internal static Mesh LogMesh()
 	{
 		var k = new MeshKit();
 		k.Color = new Color(0.62f, 0.6f, 0.55f);
@@ -305,7 +305,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh BranchMesh()
+	internal static Mesh BranchMesh()
 	{
 		var k = new MeshKit();
 		k.Color = new Color(0.55f, 0.52f, 0.48f);
@@ -326,7 +326,7 @@ public partial class ForestScatter : Node3D
 			return m;
 		});
 
-	private static Mesh FernMesh()
+	internal static Mesh FernMesh()
 	{
 		var k = new MeshKit();
 		k.Mat(FoliageMat("fern_mat", ProcTextures.Fern(), new Color(0.95f, 1f, 0.9f), 0.04f));
@@ -351,7 +351,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	private static Mesh GrassMesh()
+	internal static Mesh GrassMesh()
 	{
 		var k = new MeshKit();
 		k.Mat(FoliageMat("grass_mat", ProcTextures.GrassTuft(), new Color(0.95f, 0.95f, 0.85f), 0.07f));

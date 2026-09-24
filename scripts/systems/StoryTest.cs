@@ -1207,20 +1207,47 @@ public partial class StoryTest : Node
 		if (crossing.BoardPrompt == null) return;
 		await WalkTo(crossing.BoardPrompt.GlobalPosition, 1.5f, ct, giveUp: 15f);
 		await UseIt(crossing.BoardPrompt, ct);
-		await WaitUntil(() => crossing.Boarded, 5, ct);
+		await WaitUntil(() => crossing.Boarded, 15, ct);
 		Check("boarded the boat", crossing.Boarded);
 
+		Check("sat down in the boat (the eye came down to a seated height)", _player.CameraRig.EyeHeight < 1.2f, $"eye {_player.CameraRig.EyeHeight:0.00}");
+		await WaitUntil(() => crossing.Paddling, 8, ct);
+		Check("pushed off from the dock and handed the oars over", crossing.Paddling);
+
 		Engine.TimeScale = 3.0;
+		await PaddleUntil(() => crossing.Progress > 0.3f || crossing.InBreach, ct, 20);
+		Check("rowing makes way: strokes counted, the boat moving", crossing.StrokeCount > 4 && crossing.Speed > 0.5f, $"{crossing.StrokeCount} strokes, {crossing.Speed:0.0} m/s");
+		Screenshot("rowing_calm");
 		await PaddleUntil(() => !crossing.Paddling || crossing.InBreach, ct, 20);
 		Check("paddled to the breach point", crossing.InBreach || crossing.Progress >= crossing.BreachAtFraction - 0.02f, $"progress {crossing.Progress:0.00}");
 		await WaitUntil(() => crossing.InBreach, 5, ct);
-		Check("the creature breaches", crossing.InBreach && crossing.LastCreature is { Breaching: true });
-		Screenshot("breach");
-		await WaitUntil(() => !crossing.InBreach, 15, ct);
-		Check("the water turns rough for the current", crossing.InCurrent);
 
+		// the breach, beat by beat
+		await WaitUntil(() => lake.Waves.EyeOpen > 0.9f, 10, ct);
+		Check("an eye opens in the deep under the boat", lake.Waves.EyeOpen > 0.9f, $"open {lake.Waves.EyeOpen:0.00}");
+		Screenshot("deep_eye");
+		await WaitUntil(() => crossing.LastCreature is { Breaching: true }, 10, ct);
+		Check("the creature breaches", crossing.LastCreature is { Breaching: true });
+		await WaitUntil(() => crossing.LastCreature is { ColossusUp: true }, 8, ct);
+		Check("the colossus towers out of the lake", crossing.LastCreature is { ColossusUp: true });
+		Check("the world went red for a moment", crossing.RedPeak > 0.2f, $"peak {crossing.RedPeak:0.00}");
+		Screenshot("breach_colossus");
+		await WaitUntil(() => crossing.LastCreature is { EyesOpen: > 0 }, 8, ct);
+		await Seconds(0.9, ct);
+		Check("its eyes open, all together", crossing.LastCreature is { EyesOpen: > 20 }, $"{crossing.LastCreature?.EyesOpen} eyes");
+		Screenshot("breach_eyes");
+		await WaitUntil(() => crossing.LastCreature is { Looming: true }, 8, ct);
+		Check("one bends over the boat to look inside", crossing.LastCreature is { Looming: true });
+		Screenshot("breach_loom");
+		await WaitUntil(() => !crossing.InBreach, 20, ct);
+		Check("the water turns rough for the current", crossing.InCurrent);
+		Check("white-capped chop", lake.Waves.Intensity > 0.8f, $"intensity {lake.Waves.Intensity:0.00}");
+
+		await PaddleUntil(() => crossing.Progress > 0.7f || crossing.Landed, ct, 30);
+		Screenshot("rowing_current");
 		await PaddleUntil(() => crossing.Landed, ct, 30);
 		Check("crossed the current and landed", crossing.Landed, $"progress {crossing.Progress:0.00}");
+		Check("stood up again on the beach", _player.CameraRig.EyeHeight > 1.5f && _player.GlobalPosition.DistanceTo(lake.FarDockWorld) < 1.5f, $"eye {_player.CameraRig.EyeHeight:0.00} at {_player.GlobalPosition}");
 		Screenshot("landed");
 
 		// Subscribed rather than polled for the same reason Act2Climb's checkpoint watch is: the

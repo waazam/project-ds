@@ -104,6 +104,13 @@ public static class Verify
 		_ when name.StartsWith("cricket_chirp") => (0.3, 0.8),
 		_ when name.StartsWith("raven") => (0.8, 1.8),
 		_ when name.StartsWith("rustle") => (0.4, 1.2),
+		_ when name.StartsWith("oar_stroke") => (0.5, 1.0),
+		_ when name.StartsWith("oarlock_creak") => (0.15, 0.7),
+		_ when name.StartsWith("boat_creak") => (0.5, 1.4),
+		_ when name.StartsWith("wave_slap") => (0.4, 1.1),
+		_ when name.StartsWith("breach_erupt") => (2.5, 4.6),
+		_ when name.StartsWith("tentacle_slam") => (1.2, 2.6),
+		_ when name.StartsWith("loon") => (2.0, 6.0),
 		_ => (0, 1e9),
 	};
 
@@ -122,6 +129,8 @@ public static class Verify
 		if (name.StartsWith("raven") && (centroid > 1500 || b[4] > 0.01)) yield return "raven not dull/distant";
 		if (name.StartsWith("twig_snap") && b[2] + b[3] < 0.4) yield return "twig not broadband";
 		if (name.StartsWith("rustle") && b[2] + b[3] + b[4] < 0.5) yield return "rustle not crunchy";
+		if (name.StartsWith("underwater_thoom") && b[0] + b[1] < 0.9) yield return "thoom not low";
+		if (name.StartsWith("boat_creak") && (b[1] < 0.5 || centroid > 900)) yield return "hull creak not low/woody";
 	}
 
 	/// <summary>Files that get the extra taste measurements (the reworked sounds and the new ones).</summary>

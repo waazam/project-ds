@@ -182,6 +182,12 @@ public partial class ForestAtmosphere : Node
 	private float _shaftIntensity = 0.16f, _shaftStrength;
 	/// <summary>For tests: the shafts node this atmosphere drives.</summary>
 	public LightShafts Shafts => _shafts;
+	/// <summary>Scales the light shafts on top of the mood (1 normally). Act 12's lake sets 0: its
+	/// sunrise sun is so low the shafts lie almost flat and smear across the sky as grey slabs.</summary>
+	public float ShaftScale { get; set; } = 1f;
+	/// <summary>The environment and sun this atmosphere drives (for a local override like the lake's sunrise).</summary>
+	public Environment Env => _env;
+	public DirectionalLight3D Sun => _sun;
 	/// <summary>Sky (background) energy scale by mood: dim overcast at night, a little less in the menace.</summary>
 	[Export] public float SkyEnergyNight = 0.3f;
 	[Export] public float SkyEnergyMenacing = 0.45f;
@@ -409,11 +415,11 @@ public partial class ForestAtmosphere : Node
 			_ => (new Color(1f, 0.88f, 0.66f), 0.16f, Mathf.Lerp(0.55f, 1f, _open)),
 		};
 		bool indoors = Audio.ForestAmbienceManager.Instance is { IsIndoor: true };
-		float strength = indoors ? 0f : target.strength * (1f - 0.85f * storm);
+		float strength = indoors ? 0f : target.strength * (1f - 0.85f * storm) * ShaftScale;
 		float k = 1f - Mathf.Exp(-(float)GetProcessDeltaTime() * 1.2f);
 		_shaftTint = _shaftTint.Lerp(target.tint, k);
 		_shaftIntensity = Mathf.Lerp(_shaftIntensity, target.intensity, k);
-		_shaftStrength = Mathf.Lerp(_shaftStrength, strength, k);
+		_shaftStrength = ShaftScale <= 0f ? 0f : Mathf.Lerp(_shaftStrength, strength, k);
 		_shafts.Tint = _shaftTint;
 		_shafts.Intensity = _shaftIntensity;
 		_shafts.Strength = _shaftStrength;

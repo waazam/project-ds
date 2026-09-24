@@ -34,6 +34,12 @@ public partial class PlayerCameraRig : Node3D
 	public float FovSwim;
 	/// <summary>A slow roll of the view in radians (Act 6's daze); 0 normally. Added on top of the pitch/yaw.</summary>
 	public float RollSwim;
+	/// <summary>A pitch added on top of the look (radians), for a view that rides something: Act 12's
+	/// boat rocking under the rower. 0 normally; never touches <see cref="Pitch"/> itself.</summary>
+	public float PitchSwim;
+	/// <summary>A positional jolt added to the first-person camera (metres, camera-local): Act 12's
+	/// breach and slams. 0 normally.</summary>
+	public Vector3 Shake;
 	[Export] public float FirstPersonMinPitch = -80f;
 	[Export] public float FirstPersonMaxPitch = 80f;
 	[Export] public float EyeVerticalSharpness = 18f;   // smooths stairs without feeling floaty
@@ -168,7 +174,7 @@ public partial class PlayerCameraRig : Node3D
 		Camera.Position = new Vector3(
 			Mathf.Sin(_bobPhase) * BobSway * _bobAmount,
 			-Mathf.Abs(Mathf.Cos(_bobPhase)) * BobHeight * _bobAmount,
-			0f);
+			0f) + Shake;
 	}
 
 	private void UpdateThirdPerson(float dt)
@@ -198,7 +204,7 @@ public partial class PlayerCameraRig : Node3D
 
 	private void ApplyRotation()
 	{
-		Rotation = new Vector3(Pitch, Yaw, RollSwim);
+		Rotation = new Vector3(Pitch + PitchSwim, Yaw, RollSwim);
 		_arm.Position = new Vector3(IsFirstPerson ? 0f : ShoulderOffset, 0, 0);
 	}
 }
