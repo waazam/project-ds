@@ -44,6 +44,9 @@ public partial class BossRoom : Node3D
 	public Vector3 LandingWorld => ToGlobal(LandingLocal);
 	public Vector3 DoorWorld => ToGlobal(new Vector3(0, 0.05f, Half - 1.0f));
 	public Vector3 TidyWorld => ToGlobal(TidyLocal);
+	/// <summary>Act 19's library, through the door (Act 20's round room is inside it: <see cref="World.Library.Round"/>).</summary>
+	public Library Library { get; private set; }
+	public static readonly Vector3 LibraryLocal = new(0, 0, Half + 0.6f);
 
 	private StaticBody3D _body;
 	private ShaderMaterial _bloodMat;
@@ -617,41 +620,11 @@ public partial class BossRoom : Node3D
 		db.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.2f, 0), Shape = new BoxShape3D { Size = new Vector3(1.3f, 2.4f, 0.1f) } });
 		_door.AddChild(db);
 
-		var room = new MeshKit();
-		room.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.93f, 0.92f, 0.88f), Roughness = 0.8f, VertexColorUseAsAlbedo = true });
-		float z0 = Half + 0.6f, z1 = Half + 6.6f;
-		Slab(room, new Vector3(-3f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0), true, 1f);
-		Slab(room, new Vector3(3f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0), true, 1f);
-		Slab(room, new Vector3(0, 1.5f, z1), new Vector3(6.2f, 3f, 0.2f), true, 1f);
-		Slab(room, new Vector3(0, 3.1f, (z0 + z1) * 0.5f), new Vector3(6.2f, 0.2f, z1 - z0), false, 1f);
-		room.CommitTo(this, "TidyRoom", true);
-		var floor = new MeshKit();
-		floor.Mat(PropTextures.DeckMat);
-		floor.Color = new Color(0.75f, 0.6f, 0.45f);
-		Slab(floor, new Vector3(0, -0.05f, (z0 + z1) * 0.5f - 0.2f), new Vector3(6f, 0.1f, z1 - z0 + 0.6f), true, 1f);
-		floor.CommitTo(this, "TidyFloor", true);
-		// a few tidy things: a rug, a table with a lamp, an armchair, a plant, a clock
-		var things = new MeshKit();
-		things.Mat(new StandardMaterial3D { Roughness = 0.7f, VertexColorUseAsAlbedo = true });
-		things.Color = new Color(0.55f, 0.18f, 0.15f);
-		BuildKit.Box(things, new Vector3(0, 0.005f, z0 + 3f), new Vector3(3f, 0.01f, 2f));
-		things.Color = new Color(0.45f, 0.3f, 0.2f);
-		BuildKit.Box(things, new Vector3(1.8f, 0.7f, z0 + 4.8f), new Vector3(1.2f, 0.06f, 0.7f));
-		foreach (var (x, z) in new[] { (1.3f, 4.5f), (2.3f, 4.5f), (1.3f, 5.1f), (2.3f, 5.1f) })
-			BuildKit.Box(things, new Vector3(x, 0.34f, z0 + z), new Vector3(0.05f, 0.68f, 0.05f));
-		things.Color = new Color(0.25f, 0.35f, 0.3f);
-		BuildKit.Box(things, new Vector3(-1.9f, 0.3f, z0 + 4.5f), new Vector3(1f, 0.6f, 0.9f));
-		BuildKit.Box(things, new Vector3(-1.9f, 0.75f, z0 + 4.9f), new Vector3(1f, 0.9f, 0.2f));
-		things.Color = new Color(0.4f, 0.3f, 0.22f);
-		things.Cylinder(new Vector3(2.5f, 0, z0 + 1f), new Vector3(2.5f, 0.35f, z0 + 1f), 0.18f, 0.22f, 12, true);
-		things.Color = new Color(0.2f, 0.45f, 0.2f);
-		things.Blob(new Vector3(2.5f, 0.75f, z0 + 1f), new Vector3(0.35f, 0.45f, 0.35f), 7, 0.25f);
-		things.Color = new Color(0.95f, 0.9f, 0.75f);
-		things.Cylinder(new Vector3(1.8f, 0.73f, z0 + 4.8f), new Vector3(1.8f, 1.1f, z0 + 4.8f), 0.12f, 0.2f, 12, true);
-		things.Color = new Color(0.9f, 0.9f, 0.88f);
-		things.Cylinder(new Vector3(0, 2.1f, z1 - 0.12f), new Vector3(0, 2.1f, z1 - 0.08f), 0.2f, 0.2f, 16, true);
-		things.CommitTo(this, "Things", true);
-		_tidyLight = new OmniLight3D { Name = "TidyLight", Position = new Vector3(0, 2.6f, z0 + 3f), LightColor = new Color(1f, 0.93f, 0.8f), LightEnergy = 0f, OmniRange = 9f, ShadowEnabled = true };
+		// behind it: Act 19's library (and past that, Act 20's round room)
+		float z0 = Half + 0.6f;
+		Library = new Library { Name = "Library", Position = new Vector3(0, 0, z0), Visible = false };   // unseen (and not drawn) until the door opens
+		AddChild(Library);
+		_tidyLight = new OmniLight3D { Name = "TidyLight", Position = new Vector3(0, 2.6f, z0 + 3f), LightColor = new Color(1f, 0.93f, 0.8f), LightEnergy = 0f, OmniRange = 9f, ShadowEnabled = false };
 		AddChild(_tidyLight);
 		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(4f, 2f, 2f) }, new Vector3(0, 1f, z0 + 2.5f), OnTidyRoom, "TidyRoomTrigger");
 	}

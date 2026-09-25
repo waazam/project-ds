@@ -148,6 +148,15 @@ jobs.Add(("blood_drain_01", sfx, false, Lo, (r, sr) => Boss.BloodDrain(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"catwalk_slam_{i:00}", sfx, false, Lo, (r, sr) => Boss.CatwalkSlam(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"limb_rise_{i:00}", sfx, false, Lo, (r, sr) => Boss.LimbRise(r, sr)));
 jobs.Add(("boss_loop", ambient, true, Lo, (r, sr) => Boss.PitAir(r, sr, 33)));
+// Acts 19-20: the library and the round room
+for (int i = 1; i <= 3; i++) jobs.Add(($"wood_take_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.WoodTake(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"wood_place_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.WoodPlace(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"wood_bump_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.WoodBump(r, sr)));
+jobs.Add(("puzzle_glow_01", sfx, false, Lo, (r, sr) => LibrarySounds.PuzzleGlow(r, sr)));
+jobs.Add(("bookcase_swing_01", sfx, false, Lo, (r, sr) => LibrarySounds.BookcaseSwing(r, sr)));
+jobs.Add(("lift_start_01", sfx, false, Lo, (r, sr) => LibrarySounds.LiftStart(r, sr)));
+jobs.Add(("lift_loop", sfx, true, Lo, (r, sr) => LibrarySounds.LiftLoop(r, sr, 20.16)));
+jobs.Add(("lift_stop_01", sfx, false, Lo, (r, sr) => LibrarySounds.LiftStop(r, sr)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

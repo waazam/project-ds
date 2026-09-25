@@ -115,8 +115,12 @@ public partial class StationInterior : Node3D
 		Marker("Act18Marker", ToGlobal(BossAt + BossRoom.LandingLocal), Rotation.Y + Mathf.Pi, "respawn_Act17Finished");
 		// Act 18's end (Act 19's start): in the clean, lit room past the far door
 		Marker("Act19Marker", ToGlobal(BossAt + BossRoom.TidyLocal + Vector3.Back * 1.5f), Rotation.Y + Mathf.Pi, "respawn_Act18Finished");
+		// Act 20's start: just inside the round room; the demo's end: the little room at the top of the shaft
+		Marker("Act20Marker", ToGlobal(BossAt + BossRoom.LibraryLocal + Library.RoundRoomAt + RoundRoom.EntryLocal), Rotation.Y + Mathf.Pi, "respawn_Act19Finished");
+		Marker("Act20EndMarker", ToGlobal(BossAt + BossRoom.LibraryLocal + Library.RoundRoomAt + RoundRoom.TopLocal), Rotation.Y + Mathf.Pi, "respawn_Act20Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
+		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });
 		// the scavenger hunt's breadcrumbs: a bloody hand on Room 1's door, a staircase scrawled on Room 2's
 		_handMark = new Node3D { Name = "HandMark", Visible = false };
 		_room1Door.AddChild(_handMark);

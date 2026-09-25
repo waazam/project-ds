@@ -57,6 +57,7 @@ public partial class BossRoom
 			Beast.Die();
 			_door.Position += Vector3.Up * 2.5f;
 			_tidyLight.LightEnergy = 1.6f;
+			Library.Visible = true;
 		}
 		// otherwise it waits: the fight starts (in _Process) once they are standing on the catwalk
 	}
@@ -563,6 +564,7 @@ public partial class BossRoom
 		var open = CreateTween().SetParallel();
 		open.TweenProperty(_door, "position", _door.Position + Vector3.Up * 2.5f, 2.4f).SetTrans(Tween.TransitionType.Sine);
 		open.TweenProperty(_tidyLight, "light_energy", 1.6f, 1.5f);
+		Library.Visible = true;
 		await Cutscene.Wait(this, 2.6, ct);
 		DoorOpen = true;
 		GD.Print("[story] Act 18: it is dead; the door on the far side is open");
@@ -574,15 +576,7 @@ public partial class BossRoom
 		Finished = true;
 		State = Phase.Done;
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act18Finished);
-		GD.Print("[story] Act 18 done: into the clean, lit room - Act 19 starts here");
-		// Act 19 isn't built yet: a moment in the light, then the credits
-		_ = Cutscene.Run(this, async ct =>
-		{
-			await Cutscene.Wait(this, 5.0, ct);
-			var fader = StoryBeat.Fader(this);
-			if (fader != null) await fader.Fade(1f, 2.5f, ct);
-			if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) await ending.Credits(fader, ct);
-		});
+		GD.Print("[story] Act 18 done: into the library - Act 19 starts here");
 	}
 
 	// ------------------------------------------------------------------ for tests

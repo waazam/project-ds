@@ -146,6 +146,7 @@ public partial class Pickup : Area3D
 		ToolKind.DeadEye => "eye",
 		ToolKind.PaleHand => "hand",
 		ToolKind.StairTread => "step",
+		ToolKind.Bookmark => "bookmark",
 		_ => "item",
 	};
 

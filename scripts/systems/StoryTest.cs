@@ -117,10 +117,12 @@ public partial class StoryTest : Node
 				StoryManager.Flag.StationEyeTaken, StoryManager.Flag.StationHandTaken, StoryManager.Flag.StationStepTaken,
 				StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet,
 				StoryManager.Flag.StationDoor3Open }).ToArray(), "lantern,compass,radio,knife,lighter;tool=None"),
-			15 => (Checkpoint.Act14Finished, StateFor(14).flags.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
-			16 => (Checkpoint.Act15Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
-			17 => (Checkpoint.Act16Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
-			18 => (Checkpoint.Act17Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
+			15 => (Checkpoint.Act14Finished, StateFor(14).flags.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tools=Lighter"),
+			16 => (Checkpoint.Act15Finished, StateFor(15).flags, "lantern,compass,radio;tools=Lighter"),
+			17 => (Checkpoint.Act16Finished, StateFor(15).flags, "lantern,compass,radio;tools=Lighter"),
+			18 => (Checkpoint.Act17Finished, StateFor(15).flags, "lantern,compass,radio;tools=Lighter"),
+			19 => (Checkpoint.Act18Finished, StateFor(15).flags.Append(StoryManager.Flag.Act18IntroSeen).ToArray(), "lantern,compass,radio;tools=Lighter"),
+			20 => (Checkpoint.Act19Finished, StateFor(19).flags, "lantern,compass,radio;tools=Lighter"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -130,7 +132,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 18) return false;
+		if (_fromApplied || act < 3 || act > 20) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -253,6 +255,8 @@ public partial class StoryTest : Node
 			new("Act 16: the closet", hollow, Act16Closet),
 			new("Act 17: the sewer", hollow, Act17Sewer),
 			new("Act 18: the pit", hollow, Act18Boss),
+			new("Act 19: the library", hollow, Act19Library),
+			new("Act 20: the round room", hollow, Act20Round),
 		};
 	}
 
@@ -2169,7 +2173,7 @@ public partial class StoryTest : Node
 			return;
 		}
 		Check("after being crushed: back on the catwalk at Act 18's start, the fight starting over", PlayerDeath.Deaths >= 1 && boss.ValvesTurned == 0);
-		if (++_s.Act18Attempts > 3) { Check("the fight", "won within three tries", false, "crushed every time"); return; }
+		if (++_s.Act18Attempts > 5) { Check("the fight", "won within five tries", false, "crushed every time"); return; }
 
 		// the fight, played
 		ulong t0 = Time.GetTicksMsec();
@@ -2202,7 +2206,7 @@ public partial class StoryTest : Node
 			}
 		}
 		finally { Engine.TimeScale = 1.0; _input.ScriptedMove = Vector2.Zero; _input.ScriptedInteract = false; _input.ScriptedRun = false; }
-		if (PlayerDeath.Dying && _s.Act18Attempts < 3)
+		if (PlayerDeath.Dying && _s.Act18Attempts < 5)
 		{
 			// crushed partway (a bot's reflexes): it goes round again, like a player would, up to three tries
 			GD.Print($"[storytest] Act 18: crushed on try {_s.Act18Attempts} at valve {boss.ValvesTurned} - trying again");
@@ -2238,6 +2242,162 @@ public partial class StoryTest : Node
 		Check("into the clean, lit room: Act 18 done (Act 19's save)", s.Current == Checkpoint.Act18Finished, $"{s.Current}");
 		Screenshot("tidy_room");
 		Check("the camera is still with you at the end of Act 18", _inv.HasCamera);
+	}
+
+	private async Task Act19Library(CancellationToken ct)
+	{
+		var lib = StationInterior.Instance?.Boss?.Library;
+		await WaitUntil(() => lib?.Puzzle != null && lib.SheetUse != null && lib.Round != null, 10, ct);
+		Check("the library is there, through the pit's door", lib?.Puzzle != null);
+		if (lib?.Puzzle == null) return;
+		var s = StoryManager.Instance;
+		Check("Act 19 starts at its save, in the library", s.Current == Checkpoint.Act18Finished && lib.PlayerInside(_player.GlobalPosition), $"{s.Current} at {_player.GlobalPosition}");
+		if (s.Current != Checkpoint.Act18Finished) return;   // Act 18 wasn't won: nothing here to test
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Seconds(0.5, ct);
+		await Aim(lib.ToGlobal(new Vector3(0, 1.5f, Library.Depth)), ct);
+		Screenshot("library");
+		await Aim(lib.ToGlobal(new Vector3(Library.HalfW, 1.0f, 6.5f)), ct);
+		Screenshot("library_fireplace");
+		// the book that sticks out, before there's a bookmark
+		await WalkTo(lib.BookcaseFrontWorld, 0.6f, ct, giveUp: 10f);
+		await Aim(lib.BookUse.GlobalPosition, ct);
+		Check("one book on the back wall sticks out (nothing to do with it yet)", _player.Interaction?.PromptText == "One of the books sticks out." && !lib.BookcaseOpen, $"'{_player.Interaction?.PromptText}'");
+		Screenshot("the_jutting_book");
+		// the sheet
+		Check("a sheet covers something square on a side table", !lib.SheetOff && !lib.BoxUse.Enabled);
+		await WalkTo(lib.TableWorld, 0.6f, ct, giveUp: 10f);
+		await Aim(lib.SheetUse.GlobalPosition, ct);
+		Screenshot("the_sheet");
+		await UseIt(lib.SheetUse, ct);
+		await Seconds(0.5, ct);
+		Screenshot("the_sheet_coming_off");
+		await WaitUntil(() => lib.BoxUse.Enabled, 8, ct);
+		Check("pulled off: a bamboo puzzle box and five loose pieces", lib.SheetOff && lib.BoxUse.Enabled && lib.Puzzle.Pieces.Count == 5 && lib.Puzzle.Pieces.TrueForAll(p => p.At == null));
+		await WaitUntil(() => _input.Enabled, 5, ct);
+		Screenshot("puzzle_box_revealed");
+		// the puzzle
+		await UseIt(lib.BoxUse, ct);
+		var o = PuzzleOverlay.Instance;
+		await WaitUntil(() => o is { IsOpen: true }, 3, ct);
+		Check("working the box opens the close-up", o is { IsOpen: true });
+		if (o is not { IsOpen: true }) return;
+		await Frames(5, ct);
+		Screenshot("puzzle_closeup");
+		var plan = lib.Puzzle.Solve();
+		Check("the box can be filled (a solution exists)", plan.Count == 5, $"{plan.Count} pieces placed by the solver");
+		int longIdx = lib.Puzzle.Pieces.FindIndex(p => p.Name == "long");
+		o.TestSelect(longIdx);
+		o.TestHold(new Vector2I(2, 0), 0);   // three across from the third column: over the edge
+		await Frames(3, ct);
+		Screenshot("puzzle_holding_a_piece");
+		int bumps = o.Bumps;
+		bool wrong = o.SetIn();
+		Check("a piece that doesn't fit knocks against the rim and stays in hand", !wrong && o.Bumps == bumps + 1 && o.Holding && lib.Puzzle.Pieces[longIdx].At == null);
+		// and a key press moves the held piece over the box
+		Vector2I before = o.Cursor;
+		Input.ParseInputEvent(new InputEventAction { Action = "move_left", Pressed = true });
+		await Frames(2, ct);
+		Input.ParseInputEvent(new InputEventAction { Action = "move_left", Pressed = false });
+		await Frames(2, ct);
+		Check("A moves the held piece one cell left", o.Cursor == before + new Vector2I(-1, 0), $"{before} -> {o.Cursor}");
+		for (int i = 0; i < plan.Count; i++)
+		{
+			var (p, rot, at) = plan[i];
+			o.TestSelect(lib.Puzzle.Pieces.IndexOf(p));
+			o.TestHold(at, rot);
+			await Frames(2, ct);
+			bool ok = o.SetIn();
+			if (!ok) { Check("placing the solution", $"piece {p.Name} at {at} turned {rot}", false, "it didn't fit"); break; }
+			if (i == 2) { await Frames(2, ct); Screenshot("puzzle_half_done"); }
+			await Seconds(0.2, ct);
+		}
+		Check("every piece in: the box is solved, the close-up closes", lib.Puzzle.IsSolved && !o.IsOpen);
+		await Seconds(1.6, ct);
+		Screenshot("the_box_glowing");
+		await Seconds(1.6, ct);
+		Screenshot("the_box_dissolving");
+		await WaitUntil(() => lib.Bookmark != null, 10, ct);
+		Check("it glows once, softly, and goes out of the world, leaving a bookmark", lib.PuzzleSolved && !lib.Puzzle.Visible && lib.Bookmark != null);
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		Screenshot("the_bookmark");
+		await UseIt(lib.Bookmark, ct);
+		Check("the bookmark taken", _inv.HasTool(ToolKind.Bookmark));
+		// the bookcase
+		await WalkTo(lib.BookcaseFrontWorld, 0.6f, ct, giveUp: 10f);
+		await Aim(lib.BookUse.GlobalPosition, ct);
+		Check("with the bookmark: slide it in", _player.Interaction?.PromptText == "Slide the bookmark in", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => lib.BookcaseOpen, 3, ct);
+		await Seconds(1.0, ct);
+		Screenshot("the_bookmark_slides_in");
+		await WaitUntil(() => _input.Enabled, 15, ct);
+		Check("the bookmark goes in, the book slides home, the bookcase swings open", lib.BookcaseOpen && !_inv.HasTool(ToolKind.Bookmark));
+		Screenshot("the_bookcase_open");
+		// through the passage, into the round room
+		await WalkTo(lib.PassageWorld, 0.5f, ct, giveUp: 10f);
+		Screenshot("the_passage");
+		await WalkTo(lib.Round.EntryWorld, 0.6f, ct, stopWhen: () => s.Current == Checkpoint.Act19Finished, giveUp: 10f);
+		await WaitUntil(() => s.Current == Checkpoint.Act19Finished, 5, ct);
+		Check("through the bookcase into the round room: Act 19 done (Act 20's save)", s.Current == Checkpoint.Act19Finished, $"{s.Current} at {_player.GlobalPosition}");
+		Check("the camera is still with you", _inv.HasCamera);
+	}
+
+	private async Task Act20Round(CancellationToken ct)
+	{
+		var rr = StationInterior.Instance?.Boss?.Library?.Round;
+		await WaitUntil(() => rr?.Dais != null && rr.WebUse != null, 10, ct);
+		Check("the round room is there", rr?.Dais != null);
+		if (rr?.Dais == null) return;
+		var s = StoryManager.Instance;
+		Check("Act 20 starts at its save, inside the round room", s.Current == Checkpoint.Act19Finished && _player.GlobalPosition.DistanceTo(rr.EntryWorld) < 3f, $"{s.Current} at {_player.GlobalPosition}");
+		if (s.Current != Checkpoint.Act19Finished) return;
+		await Aim(rr.CentreWorld + Vector3.Up * 1f, ct);
+		Screenshot("round_room");
+		await Aim(rr.ToGlobal(new Vector3(0, 14f, RoundRoom.Radius)), ct);
+		Screenshot("the_bricked_windows");
+		await Aim(rr.ToGlobal(new Vector3(0, RoundRoom.Height, 0.5f)), ct);
+		Screenshot("the_high_ceiling");
+		if (!_inv.HasTool(ToolKind.Lighter))
+		{
+			rr.EnsureLighter(_player);
+			await Frames(3, ct);
+			await UseIt(rr.GetNodeOrNull<Pickup>("SpareLighter"), ct);
+		}
+		Check("the lighter is in hand", _inv.HasTool(ToolKind.Lighter));
+		// the web keeps you off the dais
+		await WalkTo(rr.CentreWorld, 0.5f, ct, giveUp: 4f);
+		Check("the web won't let you onto the dais", Flat(_player.GlobalPosition - rr.CentreWorld).Length() > RoundRoom.DaisFoot - 0.4f, $"{Flat(_player.GlobalPosition - rr.CentreWorld).Length():0.00} m from the middle");
+		await WalkTo(rr.DaisEdgeWorld, 0.5f, ct, giveUp: 8f);
+		await Aim(rr.CentreWorld + Vector3.Up * 0.6f, ct);
+		Check("the lighter: burn the webs", _player.Interaction?.PromptText == "Burn the webs", $"'{_player.Interaction?.PromptText}'");
+		Screenshot("the_webbed_dais");
+		await Press(ct);
+		await WaitUntil(() => rr.WebsBurned, 3, ct);
+		await Seconds(2.0, ct);
+		Screenshot("the_webs_burning");
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		Check("the webs burn away", rr.WebsBurned && s.HasFlag(StoryManager.Flag.RoundRoomWebBurned));
+		// into the middle: twenty seconds up
+		await WalkTo(rr.CentreWorld, 0.3f, ct, stopWhen: () => rr.Rising, giveUp: 8f);
+		await WaitUntil(() => rr.Rising, 3, ct);
+		Check("stepping into the middle of the dais starts it rising, the player held", rr.Rising && !_input.Enabled);
+		ulong t0 = Time.GetTicksMsec();
+		await Seconds(6, ct);
+		Screenshot("rising_past_the_windows");
+		await Seconds(6, ct);
+		Screenshot("rising_into_the_shaft");
+		await WaitUntil(() => rr.Arrived, 20, ct);
+		double took = (Time.GetTicksMsec() - t0) / 1000.0;
+		Check("a twenty-second ascent", rr.Arrived && took > 17 && took < 24, $"{took:0.0} s");
+		Check("up through the ceiling into the room above: Act 20 done", s.Current == Checkpoint.Act20Finished && _player.GlobalPosition.Y > rr.ToGlobal(new Vector3(0, RoundRoom.Rise, 0)).Y, $"{s.Current} at {_player.GlobalPosition}");
+		await WaitUntil(() => _input.Enabled, 3, ct);
+		await Frames(10, ct);
+		Check("standing on the dais at the top", _player.IsOnFloor());
+		Screenshot("the_room_above");
+		await WalkTo(rr.TopWorld, 0.5f, ct, giveUp: 4f);
+		Check("off the dais onto the room's floor", _player.IsOnFloor() && Flat(_player.GlobalPosition - rr.TopWorld).Length() < 1f, $"{_player.GlobalPosition}");
+		Check("the camera is still with you at the end of the demo", _inv.HasCamera);
 	}
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>

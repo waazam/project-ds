@@ -75,7 +75,9 @@ public partial class ContinueRoundTripTest : Node
 		new("act15_finished", Checkpoint.Act15Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 		new("act16_finished", Checkpoint.Act16Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 		new("act17_finished", Checkpoint.Act17Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen }).ToArray(), "lantern,compass,radio;tool=None"),
-		new("act18_finished", Checkpoint.Act18Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen }).ToArray(), "lantern,compass,radio;tool=None"),
+		new("act18_finished", Checkpoint.Act18Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+		new("act19_finished", Checkpoint.Act19Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+		new("act20_finished", Checkpoint.Act20Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -192,7 +194,9 @@ public partial class ContinueRoundTripTest : Node
 		Check("standing on something", _player.IsOnFloor() && _player.GlobalPosition.Y > ground - 1.5f,
 			$"on floor {_player.IsOnFloor()}, y {_player.GlobalPosition.Y:0.0} vs ground {ground:0.0}");
 
-		// Can actually move: forward, or back if forward is blocked.
+		// Can actually move: forward, or back if forward is blocked. (A scene may open with a moment's
+		// scripted look, e.g. the boss room's short intro after Continue: wait for control first.)
+		for (int i = 0; i < 300 && !input.Enabled; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		Vector3 before = _player.GlobalPosition;
 		await Drive(input, new Vector2(0, 1), 0.6);
 		if (_player.GlobalPosition.DistanceTo(before) < 0.2f) await Drive(input, new Vector2(0, -1), 0.6);
@@ -208,7 +212,13 @@ public partial class ContinueRoundTripTest : Node
 		if (sc.Cp == Checkpoint.Act17Finished && StationInterior.Instance?.Boss is { } boss17)
 			Check("Act 17's end respawns on the boss room's catwalk, the fight starting", before.DistanceTo(boss17.LandingWorld) < 2f && boss17.State != BossRoom.Phase.Waiting, $"{before} vs {boss17.LandingWorld}, {boss17.State}");
 		if (sc.Cp == Checkpoint.Act18Finished && StationInterior.Instance?.Boss is { } boss18)
-			Check("Act 18's end respawns in the lit room, the thing dead, the door open", before.DistanceTo(boss18.TidyWorld) < 3f && boss18.DoorOpen && boss18.Beast.Dead, $"{before} vs {boss18.TidyWorld}");
+			Check("Act 18's end respawns in the library, the thing dead, the door open", before.DistanceTo(boss18.TidyWorld) < 3f && boss18.DoorOpen && boss18.Beast.Dead, $"{before} vs {boss18.TidyWorld}");
+		if (sc.Cp == Checkpoint.Act18Finished && StationInterior.Instance?.Boss?.Library is { } lib18)
+			Check("the library: the sheet on the side table, the bookcase shut", !lib18.SheetOff && !lib18.PuzzleSolved && !lib18.BookcaseOpen && lib18.PlayerInside(before));
+		if (sc.Cp == Checkpoint.Act19Finished && StationInterior.Instance?.Boss?.Library is { } lib19)
+			Check("Act 19's end respawns in the round room, the bookcase open, the web still on the dais", before.DistanceTo(lib19.Round.EntryWorld) < 1.5f && lib19.BookcaseOpen && lib19.PuzzleSolved && !lib19.Round.WebsBurned, $"{before} vs {lib19.Round.EntryWorld}");
+		if (sc.Cp == Checkpoint.Act20Finished && StationInterior.Instance?.Boss?.Library?.Round is { } rr20)
+			Check("Act 20's end respawns in the room at the top, the dais up, the web gone", before.DistanceTo(rr20.TopWorld) < 1.5f && rr20.Arrived && rr20.WebsBurned && _player.IsOnFloor(), $"{before} vs {rr20.TopWorld}");
 		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");
 

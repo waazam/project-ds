@@ -217,6 +217,7 @@ public static class ItemMeshes
 			case ToolKind.Radio: Walkie(k, parent, ref b); break;
 			case ToolKind.Knife: Knife(k, ref b); break;
 			case ToolKind.Lighter: Lighter(k, ref b); break;
+			case ToolKind.Bookmark: Bookmark(k, ref b); break;
 		}
 		if (!k.IsEmpty)
 		{
@@ -439,6 +440,21 @@ public static class ItemMeshes
 		k.Xf = Transform3D.Identity;
 		b.PickCenter = new Vector3(0, 0.06f, 0);
 		b.PickRadius = 0.28f;
+	}
+
+	/// <summary>A bookmark: a strip of deep red silk ribbon, gold-stitched, a small gold tassel on its end.</summary>
+	private static void Bookmark(MeshKit k, ref Built b)
+	{
+		k.Xf = new Transform3D(new Basis(Vector3.Up, 0.5f), new Vector3(0, 0.002f, 0));
+		k.Mat(ItemTextures.BrassMat);
+		k.Color = new Color(0.55f, 0.06f, 0.08f);
+		k.Box(new Vector3(0, 0, 0), new Vector3(0.035f, 0.003f, 0.16f), 8f);
+		k.Color = new Color(0.9f, 0.72f, 0.3f);
+		k.Box(new Vector3(0, 0.0018f, 0), new Vector3(0.028f, 0.0005f, 0.15f), 8f);
+		k.Cylinder(new Vector3(0, 0.004f, 0.08f), new Vector3(0, 0.004f, 0.11f), 0.004f, 0.009f, 6, true);
+		k.Xf = Transform3D.Identity;
+		b.PickCenter = new Vector3(0, 0.02f, 0);
+		b.PickRadius = 0.18f;
 	}
 
 	/// <summary>An old brass flip-top lighter, worn to the metal at the corners, lid shut.</summary>

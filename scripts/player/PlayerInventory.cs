@@ -3,7 +3,7 @@ using Godot;
 
 namespace ProjectDS.Player;
 
-public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio, Knife, Lighter, DeadEye, PaleHand, StairTread }
+public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio, Knife, Lighter, DeadEye, PaleHand, StairTread, Bookmark }
 
 /// <summary>
 /// One inventory, all of it usable at any time, with no selecting and no hands-full
@@ -127,6 +127,7 @@ public partial class PlayerInventory : Node
 		ToolKind.DeadEye => "The Eye",
 		ToolKind.PaleHand => "The Hand",
 		ToolKind.StairTread => "The Step",
+		ToolKind.Bookmark => "Bookmark",
 		_ => t.ToString(),
 	};
 
