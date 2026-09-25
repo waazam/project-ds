@@ -11,6 +11,8 @@ public partial class PlayerController : CharacterBody3D
 {
 	[Export] public float WalkSpeed = 2.7f;
 	[Export] public float RunSpeed = 5.4f;
+	/// <summary>0..1 drag on the player's speed from wading (Act 17's sewer water sets it; 1 = none).</summary>
+	public float WadeScale { get; set; } = 1f;
 	[Export] public float Acceleration = 9f;
 	[Export] public float Deceleration = 12f;
 	[Export] public float TurnSpeed = 10f;          // how fast the visual faces travel direction
@@ -73,7 +75,7 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 wish = right * move.X + forward * move.Y;
 
 		IsRunning = PlayerInput.Run && move.LengthSquared() > 0.04f && (Stamina?.CanRun ?? true);
-		float targetSpeed = (IsRunning ? RunSpeed : WalkSpeed) * move.Length();
+		float targetSpeed = (IsRunning ? RunSpeed : WalkSpeed) * move.Length() * WadeScale;
 		Vector3 targetVel = wish.LengthSquared() > 0.0001f ? wish.Normalized() * targetSpeed : Vector3.Zero;
 
 		var horizontal = new Vector3(v.X, 0, v.Z);

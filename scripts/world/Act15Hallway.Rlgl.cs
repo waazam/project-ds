@@ -12,7 +12,7 @@ public partial class Act15Hallway
 	/// <summary>Seconds of green between reds (random in this range).</summary>
 	[Export] public Vector2 GreenSeconds = new(20f, 30f);
 	/// <summary>Seconds of red (random in this range).</summary>
-	[Export] public Vector2 RedSeconds = new(4f, 6f);
+	[Export] public Vector2 RedSeconds = new(5f, 10f);
 	/// <summary>After the red comes on, how long before moving counts (a first red is kinder).</summary>
 	[Export] public float Grace = 0.35f, FirstGrace = 1.0f;
 	/// <summary>Faster than this (m/s, across the floor) is moving.</summary>
@@ -70,7 +70,11 @@ public partial class Act15Hallway
 				break;
 			case Phase.Red:
 				_redT += dt;
-				bool moving = new Vector2(player.Velocity.X, player.Velocity.Z).Length() > MoveThreshold || !player.IsOnFloor();
+				// he closes in, a jump at a time, until he is at their back
+				if (_step < ApproachAt.Length && _redT >= ApproachAt[_step] * _timer) { StepCloser(player); _step++; }
+				// moving means the keys (WASD), a jump, or still sliding: looking round with the mouse is fine
+				bool moving = new Vector2(player.Velocity.X, player.Velocity.Z).Length() > MoveThreshold || !player.IsOnFloor()
+					|| player.PlayerInput.Move.LengthSquared() > 0.04f;
 				if (_redT > (_firstRed ? FirstGrace : Grace) && moving && player.PlayerInput.Enabled) { _dying = true; _ = Cutscene.Run(this, ct => Taken(player, ct), lockInput: true, freezeBody: true); break; }
 				if (_redT >= _timer) GoGreen(player);
 				break;
@@ -86,19 +90,33 @@ public partial class Act15Hallway
 		SetLights(Red, 1f);
 		Sfx("relay_clunk", 1, player.GlobalPosition + Vector3.Up * 6f, 0f);
 		Sfx("siren_low", 1, player.GlobalPosition + new Vector3(0, 8f, 30f), 2f, 30f);
-		// he is right behind them
+		// he is behind them: a few metres back at first, then a jump at a time closer (StepCloser)
 		var cam = player.CameraRig;
 		float yaw = cam?.Yaw ?? 0f;
-		Vector3 back = new(Mathf.Sin(yaw), 0, Mathf.Cos(yaw));   // the camera looks along -Z of its yaw: behind is +Z
-		Vector3 at = player.GlobalPosition + back * 1.3f;
-		Vector3 la = ToLocal(at);
-		la.X = Mathf.Clamp(la.X, -W2 * 0.5f + 0.4f, W2 * 0.5f - 0.4f);
+		_redBack = new Vector3(Mathf.Sin(yaw), 0, Mathf.Cos(yaw));   // the camera looks along -Z of its yaw: behind is +Z
+		_step = 0;
+		StepCloser(player);
+		_step = 1;
+		_shadow.Glare = 0.35f;
+		GD.Print($"[story] Act 15: red light #{Reds} - he is behind you");
+	}
+
+	/// <summary>When in the red (as a fraction of it) he jumps closer, and how far behind he lands each time.</summary>
+	private static readonly float[] ApproachAt = { 0f, 0.28f, 0.5f, 0.7f };
+	private static readonly float[] ApproachDist = { 6f, 4.2f, 2.6f, 1.3f };
+	private Vector3 _redBack = Vector3.Back;
+	private int _step;
+
+	/// <summary>Not walking: simply somewhere nearer, between one moment and the next. Anyone looking round sees it.</summary>
+	private void StepCloser(PlayerController player)
+	{
+		float d = ApproachDist[Mathf.Min(_step, ApproachDist.Length - 1)];
+		Vector3 la = ToLocal(player.GlobalPosition + _redBack * d);
+		la.X = Mathf.Clamp(la.X, -W2 * 0.5f + 0.35f, W2 * 0.5f - 0.35f);
 		la.Z = Mathf.Max(la.Z, Part1 + Taper + 0.5f);
 		la.Y = 0f;
 		_shadow.StandAt(ToGlobal(la), player.GlobalPosition);
-		_shadow.Glare = 0.35f;
-		Sfx("shadow_breath", 2, _shadow.GlobalPosition + Vector3.Up * 1.8f, -6f, 2f);
-		GD.Print($"[story] Act 15: red light #{Reds} - he is behind you");
+		Sfx("shadow_breath", 2, _shadow.GlobalPosition + Vector3.Up * 1.8f, _step == ApproachDist.Length - 1 ? -4f : -12f, 2f);
 	}
 
 	private void GoGreen(PlayerController player)
@@ -151,7 +169,7 @@ public partial class Act15Hallway
 			_shadow.GlobalPosition = from.Lerp(toward, u * 0.6f);
 		}
 		StoryBeat.Fader(this)?.SetBlack(true);
-		await PlayerDeath.Reload(this, "You moved.", ct);
+		await PlayerDeath.Reload(this, "The Shadowman Taketh", ct);
 	}
 
 	private void OnDoorUsed(PlayerController player)
@@ -187,11 +205,9 @@ public partial class Act15Hallway
 		Finished = true;
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act15Finished);
 		GD.Print("[story] Act 15 done: into the janitor's closet, the door shut behind - Act 16 starts here");
-		// Act 16 isn't built yet: a few seconds in the dark, then the credits
-		await Cutscene.Wait(this, 5.0, ct);
-		var fader = StoryBeat.Fader(this);
-		if (fader != null) await fader.Fade(1f, 2.5f, ct);
-		if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) await ending.Credits(fader, ct);
+		ArmCloset();
+		await Cutscene.Wait(this, 2.0, ct);
+		_ = StoryBeat.Caption(this, "Pitch black in here. There was a switch by the door.", 0.6f, 2.6f, 1f);
 	}
 
 	private void Sfx(string name, int variants, Vector3 at, float db, float unit = 5f)

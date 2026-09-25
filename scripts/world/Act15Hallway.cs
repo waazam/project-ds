@@ -30,8 +30,8 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class Act15Hallway : Node3D
 {
-	public const float Part1 = 324f, Taper = 30f, Part2 = 1030f;
-	public const float W1 = 1.6f, H1 = 22f, W2 = 7f, H2 = 34f;
+	public const float Part1 = 324f, Taper = 30f, Part2 = 950f;
+	public const float W1 = 1.6f, H1 = 22f, W2 = 3.8f, H2 = 34f;
 	public const float ShadowZ = Part1 + Taper + 20f;
 	public const float End = Part1 + Taper + Part2;
 	public const float ClosetDepth = 2.6f, ClosetHalf = 1.2f, DoorWidth = 1.0f;
@@ -190,6 +190,7 @@ public partial class Act15Hallway : Node3D
 			Finished = InCloset = true;
 			State = Phase.Done;
 			foreach (var l in _lamps) l.Visible = false;
+			ArmCloset();
 		}
 		SetProcess(true);
 		GD.Print($"[story] Act 15: the hallway - {End:0} m to the closet door, the shadow man at {ShadowZ:0} m");
@@ -345,5 +346,6 @@ public partial class Act15Hallway : Node3D
 		_doorHinge.AddChild(_doorUse);
 		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(ClosetHalf * 2f - 0.2f, 2f, ClosetDepth - 1.1f) },
 			new Vector3(0, 1f, z1 - (ClosetDepth - 1.1f) * 0.5f - 0.05f), OnInCloset, "ClosetInside");
+		BuildClosetAct16();
 	}
 }

@@ -73,6 +73,28 @@ public static class Hallway
 		return FinishOneShot(x, sr, -3, 150);
 	}
 
+	/// <summary>The sewer's air: water dripping into water from all over, near and far, a slow trickle
+	/// somewhere, and a very low hollow tone of the big room.</summary>
+	public static double[] SewerAir(Rng r, int sr, double sec)
+	{
+		var x = Buf(sr, sec);
+		double W(double f) => Math.Round(f * sec) / sec;
+		double f0 = W(38), f1 = W(57.3);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			x[i] = 0.06 * (Math.Sin(TwoPi * f0 * t) + 0.5 * Math.Sin(TwoPi * f1 * t + 1)) * (0.7 + 0.3 * Math.Sin(TwoPi * W(0.07) * t));
+		}
+		for (double t = r.R(0, 0.5); t < sec; t += r.R(0.15, 1.1))
+			Bubble(x, sr, t, r.LogR(700, 2600), r.LogR(0.1, 0.8), r.R(0.005, 0.015), true);
+		for (double t = 0; t < sec; t += r.R(0.03, 0.09))
+			Bubble(x, sr, t, r.LogR(300, 900), r.LogR(0.03, 0.12), r.R(0.006, 0.02), true);
+		var h = new Hall(sr, 3.0, 0.55, 30, 1.6);
+		var o = Circular(x, v => v * 0.6 + h.P(v) * 0.7);
+		NormRms(o, -24);
+		return o;
+	}
+
 	/// <summary>Taken: a sub drop, a swelling dissonant cluster, and the hit.</summary>
 	public static double[] ShadowStrike(Rng r, int sr)
 	{

@@ -16,10 +16,12 @@ public partial class ChoicePrompt : CanvasLayer
 	public static ChoicePrompt Instance { get; private set; }
 	public bool IsOpen { get; private set; }
 	public int Selected { get; private set; }
+	/// <summary>The question on screen, if any (tests read it).</summary>
+	public string Question => _question?.Text ?? "";
 
 	private PlayerController _player;
 	private Control _root;
-	private Label _a, _b, _hint;
+	private Label _a, _b, _hint, _question;
 	private string _textA = "", _textB = "";
 	private TaskCompletionSource<int> _tcs;
 	private float _fade;
@@ -33,6 +35,15 @@ public partial class ChoicePrompt : CanvasLayer
 		_root = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
 		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_root);
+		_question = new Label { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
+		_question.AddThemeFontOverride("font", UiKit.Mono);
+		_question.AddThemeFontSizeOverride("font_size", 18);
+		_question.AddThemeColorOverride("font_color", new Color(0.8f, 0.78f, 0.72f));
+		_question.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
+		_question.AddThemeConstantOverride("shadow_offset_x", 2);
+		_question.AddThemeConstantOverride("shadow_offset_y", 2);
+		_question.AnchorLeft = 0.1f; _question.AnchorRight = 0.9f; _question.AnchorTop = 0.34f; _question.AnchorBottom = 0.44f;
+		_root.AddChild(_question);
 		_a = Option(-1);
 		_b = Option(1);
 		_hint = new Label { HorizontalAlignment = HorizontalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -44,7 +55,6 @@ public partial class ChoicePrompt : CanvasLayer
 		_hint.AddThemeConstantOverride("shadow_offset_y", 1);
 		_hint.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
 		_hint.OffsetTop = -44; _hint.OffsetBottom = -16;
-		_hint.Text = "A / D  choose      E  jump      S  step back";
 		_root.AddChild(_hint);
 	}
 
@@ -64,8 +74,10 @@ public partial class ChoicePrompt : CanvasLayer
 	}
 
 	/// <summary>Puts the two options up and waits for the player.</summary>
-	public Task<int> Ask(PlayerController player, string a, string b)
+	public Task<int> Ask(PlayerController player, string a, string b, string question = null, string hint = null)
 	{
+		_question.Text = question ?? "";
+		_hint.Text = hint ?? "A / D  choose      E  jump      S  step back";
 		if (IsOpen) Close(-1);
 		_player = player;
 		_textA = a; _textB = b;

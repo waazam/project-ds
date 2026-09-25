@@ -138,6 +138,8 @@ jobs.Add(("relay_clunk_01", sfx, false, Lo, (r, sr) => Hallway.RelayClunk(r, sr)
 jobs.Add(("siren_low_01", sfx, false, Lo, (r, sr) => Hallway.SirenLow(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"shadow_breath_{i:00}", sfx, false, Lo, (r, sr) => Hallway.ShadowBreath(r, sr)));
 jobs.Add(("shadow_strike_01", sfx, false, Lo, (r, sr) => Hallway.ShadowStrike(r, sr)));
+// Act 17: the sewer
+jobs.Add(("sewer_loop", ambient, true, Lo, (r, sr) => Hallway.SewerAir(r, sr, 30)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

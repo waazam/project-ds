@@ -51,6 +51,9 @@ public partial class StationInterior : Node3D
 	public StationRoom1 Room1 { get; private set; }
 	public StationRoom2 Room2 { get; private set; }
 	public StationRoom3 Room3 { get; private set; }
+	/// <summary>Act 17's sewer: through the black of the closet door, somewhere else entirely.</summary>
+	public Sewer Sewer { get; private set; }
+	public static readonly Vector3 SewerAt = new(400f, -360f, 0f);
 	public IronDoor Door3 { get; private set; }
 	public LobbyDecor Decor { get; private set; }
 	/// <summary>For tests: the lobby's current decay stage (0 kept .. 4 hell).</summary>
@@ -85,6 +88,8 @@ public partial class StationInterior : Node3D
 		AddChild(Door3);
 		Room3 = new StationRoom3 { Name = "Room3", Position = new Vector3(0, 0, HalfDepth) };
 		AddChild(Room3);
+		Sewer = new Sewer { Name = "Sewer", Position = SewerAt };
+		AddChild(Sewer);
 
 		EntranceMarkerWorld = ToGlobal(new Vector3(EntryGapX, 0.05f, -HalfDepth + 1.2f));
 		EntranceYaw = Rotation.Y + Mathf.Pi;   // facing local +Z: into the lobby, toward the desk
@@ -99,6 +104,10 @@ public partial class StationInterior : Node3D
 		// Act 15's end (Act 16's start): in the janitor's closet at the end of the long hallway, facing its door
 		Marker("Act16Marker", Room3.ToGlobal(StationRoom3.StairwellAt + new Vector3(0, Stairwell.BottomYFor(Stairwell.DefaultRevolutions), Stairwell.HallwayZ) + Act15Hallway.ClosetCentre + Vector3.Up * 0.05f),
 			Rotation.Y, "respawn_Act15Finished");
+		// Act 16's end (Act 17's start): on the landing inside the sewer door, facing down the pipe
+		Marker("Act17Marker", ToGlobal(SewerAt + Sewer.EntranceLocal), Rotation.Y + Mathf.Pi, "respawn_Act16Finished");
+		// Act 17's end (Act 18's start, for now): on the platform by the hole
+		Marker("Act18Marker", ToGlobal(SewerAt + Sewer.PlatformLocal), Rotation.Y + Mathf.Pi, "respawn_Act17Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		// the scavenger hunt's breadcrumbs: a bloody hand on Room 1's door, a staircase scrawled on Room 2's

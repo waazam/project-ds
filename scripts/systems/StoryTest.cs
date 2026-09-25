@@ -115,6 +115,8 @@ public partial class StoryTest : Node
 				StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet,
 				StoryManager.Flag.StationDoor3Open }).ToArray(), "lantern,compass,radio,knife,lighter;tool=None"),
 			15 => (Checkpoint.Act14Finished, StateFor(14).flags.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
+			16 => (Checkpoint.Act15Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
+			17 => (Checkpoint.Act16Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -124,7 +126,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 15) return false;
+		if (_fromApplied || act < 3 || act > 17) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -244,6 +246,8 @@ public partial class StoryTest : Node
 			new("Act 13: the forester station", hollow, Act13Station),
 			new("Act 14: the stairwell", hollow, Act14Stairwell),
 			new("Act 15: the long hallway", hollow, Act15Hall),
+			new("Act 16: the closet", hollow, Act16Closet),
+			new("Act 17: the sewer", hollow, Act17Sewer),
 		};
 	}
 
@@ -1768,7 +1772,7 @@ public partial class StoryTest : Node
 					// step round him if he's in the way
 					Vector3 sl = hw.ToLocal(hw.Shadow.GlobalPosition);
 					if (sl.Z > hw.PlayerZ - 1f && sl.Z < hw.PlayerZ + 6f && Mathf.Abs(sl.X) < 1.2f)
-						target = hw.ToGlobal(new Vector3(sl.X > 0 ? -1.8f : 1.8f, 0.05f, Mathf.Min(hw.PlayerZ + 3f, toZ + 0.5f)));
+						target = hw.ToGlobal(new Vector3(sl.X > 0 ? -1.2f : 1.2f, 0.05f, Mathf.Min(hw.PlayerZ + 3f, toZ + 0.5f)));
 					Steer(target);
 					_input.ScriptedMove = new Vector2(0, 1);
 					_input.ScriptedRun = run;
@@ -1835,7 +1839,7 @@ public partial class StoryTest : Node
 				await Frames(3, ct);
 				Vector3 toShadow = hw.Shadow.GlobalPosition - _player.GlobalPosition;
 				Vector3 fwd = -_player.CameraRig.GlobalBasis.Z;
-				Check("red: the lights change, and he is right behind you", toShadow.Length() < 2f && fwd.Dot(toShadow.Normalized()) < 0f, $"{toShadow.Length():0.0} m, behind {fwd.Dot(toShadow.Normalized()):0.00}");
+				Check("red: the lights change, and he is behind you", toShadow.Length() < 7f && fwd.Dot(toShadow.Normalized()) < 0f, $"{toShadow.Length():0.0} m, behind {fwd.Dot(toShadow.Normalized()):0.00}");
 				await Seconds(0.8, ct);
 				Screenshot("taken");
 				await WaitUntil(() => PlayerDeath.Dying, 5, ct);
@@ -1857,7 +1861,13 @@ public partial class StoryTest : Node
 				{
 					redShot = true;
 					Engine.TimeScale = 1.0;
-					await Seconds(0.5, ct);
+					float firstD = hw.Shadow.GlobalPosition.DistanceTo(_player.GlobalPosition);
+					// look round at him (looking is allowed; moving isn't) and watch him come
+					await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.9f, ct);
+					await WaitUntil(() => hw.State != ProjectDS.World.Act15Hallway.Phase.Red || hw.Shadow.GlobalPosition.DistanceTo(_player.GlobalPosition) < 1.8f, 12, ct);
+					float lastD = hw.Shadow.GlobalPosition.DistanceTo(_player.GlobalPosition);
+					Check("in the red he jumps closer, a step at a time, while you watch", firstD > 3f && lastD < 1.8f, $"{firstD:0.0} m, then {lastD:0.0} m");
+					await Seconds(0.3, ct);
 					Screenshot("red_light_standing_still");
 					// look round at him (looking is allowed; moving isn't)
 					await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.9f, ct);
@@ -1886,6 +1896,146 @@ public partial class StoryTest : Node
 		Check("into the janitor's closet: the door shuts behind them (Act 16's save)", hw.Finished && s.Current == Checkpoint.Act15Finished, $"{s.Current}");
 		await Seconds(1.0, ct);
 		Screenshot("closet_dark");
+	}
+
+	// ------------------------------------------------------------------ Acts 16-17
+
+	private async Task Act16Closet(CancellationToken ct)
+	{
+		var hw = StationInterior.Instance?.Room3?.Stairs?.Hallway;
+		await WaitUntil(() => hw?.SwitchUse != null, 10, ct);
+		Check("the closet exists", hw != null);
+		if (hw == null) return;
+		var s = StoryManager.Instance;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Frames(5, ct);
+		Check("Act 16 starts at its save: shut in the janitor's closet", s.Current == Checkpoint.Act15Finished
+			&& _player.GlobalPosition.DistanceTo(hw.ClosetWorld) < 1.5f && hw.Finished, $"{s.Current} at {_player.GlobalPosition}");
+		Screenshot("closet_dark");
+		// the door first: can't find the handle in the dark
+		await UseIt(hw.InsideDoorUse, ct);
+		await Seconds(0.5, ct);
+		Check("in the dark the door won't open", !hw.ClosetDoorOpen);
+		// the switch: red, green, then an ordinary light, in about six seconds
+		await UseIt(hw.SwitchUse, ct);
+		Check("the light switch", hw.LightsOn);
+		await Seconds(1.0, ct);
+		Screenshot("closet_red");
+		await Seconds(2.3, ct);
+		Screenshot("closet_green");
+		ulong t0 = Time.GetTicksMsec();
+		await WaitUntil(() => hw.LightsSettled, 6, ct);
+		double took = 3.3 + (Time.GetTicksMsec() - t0) / 1000.0;
+		Check("the light settles, red to green to white, in about six seconds", hw.LightsSettled && took > 5 && took < 7.5, $"{took:0.0} s");
+		Screenshot("closet_lit");
+		// now the door: pitch black beyond it
+		await UseIt(hw.InsideDoorUse, ct);
+		Check("with the light on, the door opens", hw.ClosetDoorOpen);
+		await Seconds(1.6, ct);
+		await Aim(hw.DoorWorld + Vector3.Up * 1.2f, ct);
+		Screenshot("pitch_black_threshold");
+		var sewer = StationInterior.Instance.Sewer;
+		await WalkTo(hw.DoorWorld, 0.3f, ct, stopWhen: () => hw.Through, giveUp: 6f);
+		await WaitUntil(() => s.Current == Checkpoint.Act16Finished && _input.Enabled, 8, ct);
+		await Frames(10, ct);
+		Check("through the black and out into the sewer (Act 17's save)", s.Current == Checkpoint.Act16Finished
+			&& _player.GlobalPosition.DistanceTo(sewer.EntranceWorld) < 1.5f, $"{s.Current} at {_player.GlobalPosition}");
+	}
+
+	private async Task Act17Sewer(CancellationToken ct)
+	{
+		var sewer = StationInterior.Instance?.Sewer;
+		await WaitUntil(() => sewer?.HoleUse != null, 10, ct);
+		Check("the sewer exists", sewer != null);
+		if (sewer == null) return;
+		var s = StoryManager.Instance;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Frames(5, ct);
+		Check("Act 17 starts at its save: inside the sewer door", s.Current == Checkpoint.Act16Finished
+			&& _player.GlobalPosition.DistanceTo(sewer.EntranceWorld) < 2f, $"{s.Current} at {_player.GlobalPosition}");
+		Screenshot("sewer_pipe");
+		// down the steps into the water
+		await WalkTo(sewer.AlongWorld(5f), 0.5f, ct, giveUp: 8f);
+		await Seconds(1.0, ct);
+		Check("ankle deep: wading", sewer.PlayerWading && _player.WadeScale < 0.75f, $"wading {sewer.PlayerWading}, scale {_player.WadeScale:0.00}");
+		// how fast, in the water
+		Vector3 a = _player.GlobalPosition;
+		ulong t0 = Time.GetTicksMsec();
+		await WalkTo(sewer.AlongWorld(12f), 0.5f, ct, giveUp: 10f);
+		double secs = (Time.GetTicksMsec() - t0) / 1000.0;
+		float speed = (float)(Flat(_player.GlobalPosition - a).Length() / Mathf.Max(0.01, secs));
+		Check("the water drags: slower than a walk", speed < _player.WalkSpeed * 0.8f, $"{speed:0.00} m/s");
+		Screenshot("sewer_wading");
+		// shove against both sides of the pipe: body and eye stay inside the brick
+		float worst = 0f, worstEye = 0f;
+		float bodyR = _player.GetNodeOrNull<CollisionShape3D>("Collision")?.Shape is CapsuleShape3D cap ? cap.Radius : 0.3f;
+		foreach (float side in new[] { 1f, -1f })
+		{
+			_player.CameraRig.SnapBehind(sewer.GlobalRotation.Y + Mathf.Pi);   // facing down the pipe
+			double tt = 0;
+			while (tt < 1.8)
+			{
+				_input.ScriptedMove = new Vector2(side, 0.15f);
+				await Frames(1, ct);
+				tt += GetProcessDeltaTime();
+				worstEye = Mathf.Max(worstEye, sewer.PipeAxisDistance(_player.CameraRig.Camera.GlobalPosition));
+				// the body at its widest (the capsule's straight middle), out toward the wall
+				Vector3 mid = _player.GlobalPosition + Vector3.Up * 0.9f;
+				worst = Mathf.Max(worst, sewer.PipeAxisDistance(mid) + bodyR);
+			}
+			_input.ScriptedMove = Vector2.Zero;
+		}
+		Check("pushed against the curved sides: nothing clips into the brick", worst < Sewer.PipeR + 0.03f && worstEye < Sewer.PipeR - 0.15f,
+			$"body out to {worst:0.00} m, eye {worstEye:0.00} m from the axis (brick at {Sewer.PipeR})");
+		Screenshot("sewer_side");
+
+		Engine.TimeScale = 3.0;
+		try { await WalkTo(sewer.TunnelEndWorld, 0.8f, ct, giveUp: 90f); }
+		finally { Engine.TimeScale = 1.0; }
+		Check("down the long pipe to the cistern", _player.GlobalPosition.DistanceTo(sewer.TunnelEndWorld) < 1.5f, $"{_player.GlobalPosition}");
+		await Aim(sewer.HoleWorld + Vector3.Up * 2f, ct);
+		Screenshot("the_cistern");
+		await WalkTo(sewer.PlatformEdgeWorld, 0.5f, ct, giveUp: 20f);
+		Check("up onto the platform", _player.GlobalPosition.DistanceTo(sewer.PlatformEdgeWorld) < 1f && !sewer.PlayerWading, $"{_player.GlobalPosition}");
+		await Aim(sewer.HoleWorld, ct);
+		Screenshot("the_hole");
+
+		// no, the first time: whispers going round the room
+		await UseIt(sewer.HoleUse, ct);
+		await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+		Check("the hole asks: drop down into the hole?", ChoicePrompt.Instance is { IsOpen: true } && ChoicePrompt.Instance.Question.StartsWith("Drop down"), ChoicePrompt.Instance?.Question);
+		Screenshot("drop_down_question");
+		ChoicePrompt.Instance?.TestChoose(1);
+		await Seconds(5.0, ct);
+		Check("the first no: come and see, whispered from round the room", sewer.Noes == 1 && sewer.Whispers >= 3 && !sewer.Teal, $"{sewer.Whispers} whispers");
+		// no again (a yes, then a no at "are you sure?"): the teal haze, and more whispers
+		await UseIt(sewer.HoleUse, ct);
+		await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+		ChoicePrompt.Instance?.TestChoose(0);
+		await Seconds(0.6, ct);
+		await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+		Check("a yes asks again: are you sure?", ChoicePrompt.Instance is { IsOpen: true } && ChoicePrompt.Instance.Question.StartsWith("Are you sure"), ChoicePrompt.Instance?.Question);
+		ChoicePrompt.Instance?.TestChoose(1);
+		int w0 = sewer.Whispers;
+		await Seconds(8.0, ct);
+		var atmo = StoryBeat.Atmosphere(this);
+		Check("the second no: a hazy teal light, and the whispers multiply", sewer.Noes == 2 && sewer.Teal && sewer.Whispers >= w0 + 3
+			&& (atmo == null || atmo.UndergroundFogColor.G > atmo.UndergroundFogColor.R * 2f), $"{sewer.Whispers - w0} more whispers, fog {atmo?.UndergroundFogColor}");
+		await Aim(sewer.ToGlobal(new Vector3(-12f, 3f, Sewer.RoomZ0 + 10f)), ct);
+		Screenshot("teal_haze");
+		// yes, and yes
+		await Aim(sewer.HoleWorld, ct);
+		await UseIt(sewer.HoleUse, ct);
+		await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+		ChoicePrompt.Instance?.TestChoose(0);
+		await Seconds(0.6, ct);
+		await WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
+		ChoicePrompt.Instance?.TestChoose(0);
+		await WaitUntil(() => sewer.Dropped, 3, ct);
+		await Seconds(1.2, ct);
+		Screenshot("dropping");
+		await WaitUntil(() => s.Current == Checkpoint.Act17Finished, 8, ct);
+		Check("yes and yes: down the hole (Act 18's save)", sewer.Dropped && s.Current == Checkpoint.Act17Finished, $"{s.Current}");
 	}
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>
