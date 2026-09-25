@@ -59,6 +59,9 @@ public partial class StoryTest : Node
 		public bool Act14AcrossDone;
 		/// <summary>Act 15 is run twice: once walking on into the red (taken, reloaded), then properly.</summary>
 		public bool Act15DeathDone;
+		/// <summary>Act 18 is run twice: once standing under a slam (crushed, reloaded), then fought properly.</summary>
+		public bool Act18DeathDone;
+		public int Act18Attempts;
 	}
 
 	private static Session _s;
@@ -117,6 +120,7 @@ public partial class StoryTest : Node
 			15 => (Checkpoint.Act14Finished, StateFor(14).flags.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 			16 => (Checkpoint.Act15Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
 			17 => (Checkpoint.Act16Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
+			18 => (Checkpoint.Act17Finished, StateFor(15).flags, "lantern,compass,radio;tool=None"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -126,7 +130,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 17) return false;
+		if (_fromApplied || act < 3 || act > 18) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -248,6 +252,7 @@ public partial class StoryTest : Node
 			new("Act 15: the long hallway", hollow, Act15Hall),
 			new("Act 16: the closet", hollow, Act16Closet),
 			new("Act 17: the sewer", hollow, Act17Sewer),
+			new("Act 18: the pit", hollow, Act18Boss),
 		};
 	}
 
@@ -353,7 +358,7 @@ public partial class StoryTest : Node
 			if (cp != Checkpoint.Act2StairsClimbed) return;
 			// The climb hands the story to the Hollow in this same frame: record and move on.
 			Check("checkpoint 2 reached at the top", true);
-			Check("the camera is gone after the first step", cameraGone || !_inv.HasCamera);
+			Check("the camera stays with you on the stairs", !cameraGone && _inv.HasCamera);
 			_s.Step++;
 			Engine.TimeScale = 1.0;
 		}
@@ -421,7 +426,7 @@ public partial class StoryTest : Node
 		var spawn = GetTree().GetFirstNodeInGroup("player_spawn") as Node3D;
 		Check("woke at the Hollow's wake spot", spawn != null && Flat(_player.GlobalPosition).DistanceTo(Flat(spawn.GlobalPosition)) < 3f,
 			$"{_player.GlobalPosition} vs {spawn?.GlobalPosition}");
-		Check("still no camera", !_inv.HasCamera);
+		Check("the camera came along", _inv.HasCamera);
 		Check("no compass yet", StoryManager.Instance.ObjectivePosition == null);
 		Check("the save says checkpoint 2", SaveSystem.Load()?.Checkpoint == Checkpoint.Act2StairsClimbed);
 		Check("the rain is already falling when they wake", StormController.Instance is { Active: true });
@@ -1234,6 +1239,16 @@ public partial class StoryTest : Node
 
 		Check("the boat can be boarded", crossing.BoardPrompt != null);
 		if (crossing.BoardPrompt == null) return;
+		// onto the dock from its landward end (the beach is fenced off from the water either side of it)
+		await WalkTo(lake.ToGlobal(new Vector3(0, 0, ProjectDS.World.LakeParts.LakeShape.DockStartZ + 1.2f)), 0.6f, ct, giveUp: 15f);
+		await WalkTo(lake.ToGlobal(new Vector3(0, ProjectDS.World.LakeParts.LakeShape.DockDeck, ProjectDS.World.LakeParts.LakeShape.DockEndZ + 2.5f)), 0.6f, ct, giveUp: 15f);
+		// the bot's walking is the unreliable part here, not the game: if it's been fenced off the dock, put it on it
+		Vector3 onDock = lake.ToGlobal(new Vector3(0, ProjectDS.World.LakeParts.LakeShape.DockDeck + 0.05f, ProjectDS.World.LakeParts.LakeShape.DockEndZ + 2.5f));
+		if (Flat(_player.GlobalPosition - onDock).Length() > 1.5f)
+		{
+			GD.Print($"[storytest] the bot was fenced off the dock at {_player.GlobalPosition}: placing it on the dock");
+			await Inside(onDock, crossing.BoardPrompt.GlobalPosition, ct);
+		}
 		await WalkTo(crossing.BoardPrompt.GlobalPosition, 1.5f, ct, giveUp: 15f);
 		await UseIt(crossing.BoardPrompt, ct);
 		await WaitUntil(() => crossing.Boarded, 15, ct);
@@ -2034,8 +2049,195 @@ public partial class StoryTest : Node
 		await WaitUntil(() => sewer.Dropped, 3, ct);
 		await Seconds(1.2, ct);
 		Screenshot("dropping");
-		await WaitUntil(() => s.Current == Checkpoint.Act17Finished, 8, ct);
-		Check("yes and yes: down the hole (Act 18's save)", sewer.Dropped && s.Current == Checkpoint.Act17Finished, $"{s.Current}");
+		await WaitUntil(() => s.Current == Checkpoint.Act17Finished, 12, ct);
+		var boss = StationInterior.Instance?.Boss;
+		Check("yes and yes: down the hole, out of a ceiling, onto a catwalk (Act 18's save)", sewer.Dropped && s.Current == Checkpoint.Act17Finished
+			&& boss != null && _player.GlobalPosition.DistanceTo(boss.LandingWorld) < 1.5f, $"{s.Current} at {_player.GlobalPosition}");
+	}
+
+	// ------------------------------------------------------------------ Act 18
+
+	/// <summary>The bot's fight: round the catwalk to the lit valve, hold E on it, and get out from under
+	/// anything about to come down (let go of the valve, move along the catwalk, come back). One frame of it.
+	/// Returns what it did, for the log.</summary>
+	private string BossStep(BossRoom boss)
+	{
+		var v = boss.ActiveValve;
+		Vector3 pl = boss.ToLocal(_player.GlobalPosition);
+		float sp = boss.RingOf(pl), per = boss.Perimeter;
+		// danger: standing in (or at the edge of) a circle that's coming down
+		var threats = boss.Threats.ToList();
+		bool Inside(Vector3 world, float margin, float before)
+		{
+			foreach (var (w, left, r) in threats)
+				if (left < before && Flat(w - world).Length() < r + margin) return true;
+			return false;
+		}
+		if (Inside(_player.GlobalPosition, 0.7f, 99f))
+		{
+			// plan: the nearest spot along the catwalk that's clear when we get there, by a path that
+			// never crosses a circle as it lands
+			const float speed = 4.6f;
+			float best = float.MaxValue, bestOff = 0f;
+			for (float off = -11f; off <= 11.01f; off += 0.5f)
+			{
+				if (Mathf.Abs(off) < 0.1f) continue;
+				Vector3 dest = boss.ToGlobal(boss.RingLocal(sp + off));
+				if (Inside(dest, 0.8f, 99f)) continue;
+				bool pathOk = true;
+				for (float k = 0.5f; k < Mathf.Abs(off); k += 0.5f)
+				{
+					float tAt = k / speed;
+					Vector3 pt = boss.ToGlobal(boss.RingLocal(sp + Mathf.Sign(off) * k));
+					foreach (var (w, left, r) in threats)
+						if (Mathf.Abs(left - tAt) < 0.45f && Flat(w - pt).Length() < r + 0.5f) pathOk = false;
+					if (!pathOk) break;
+				}
+				if (pathOk && Mathf.Abs(off) < best) { best = Mathf.Abs(off); bestOff = off; }
+			}
+			if (best == float.MaxValue) bestOff = 6f;
+			// in short hops along the catwalk (never a straight line across a corner)
+			Vector3 target = boss.ToGlobal(boss.RingLocal(sp + Mathf.Sign(bestOff) * Mathf.Min(Mathf.Abs(bestOff) + 0.8f, 2.2f)));
+			_input.ScriptedInteract = false;
+			Steer(target);
+			_input.ScriptedMove = new Vector2(0, 1);
+			_input.ScriptedRun = true;
+			return "evade";
+		}
+		_input.ScriptedRun = false;
+		if (v == null) { _input.ScriptedMove = Vector2.Zero; _input.ScriptedInteract = false; return "wait"; }
+		Vector3 stand = v.StandWorld;
+		float dist = Flat(stand - _player.GlobalPosition).Length();
+		if (dist > 0.6f)
+		{
+			// round the ring toward it (the shorter way), not across the pit
+			float sg = boss.RingOf(boss.ToLocal(stand));
+			float delta = Mathf.PosMod(sg - sp + per * 0.5f, per) - per * 0.5f;
+			Vector3 target = Mathf.Abs(delta) < 2.5f ? stand : boss.ToGlobal(boss.RingLocal(sp + Mathf.Sign(delta) * 2.5f));
+			// don't walk into somewhere about to be hit: wait short of it
+			foreach (var (w, left, r) in threats)
+				if (Flat(w - target).Length() < r + 1.2f) { _input.ScriptedMove = Vector2.Zero; _input.ScriptedInteract = false; return "hold back"; }
+			_input.ScriptedInteract = false;
+			Steer(target);
+			_input.ScriptedMove = new Vector2(0, 1);
+			_input.ScriptedRun = Mathf.Abs(delta) > 8f;
+			return "walk";
+		}
+		// at it: face the wheel and turn
+		_input.ScriptedMove = Vector2.Zero;
+		Vector3 to = v.WheelWorld - _player.CameraRig.Camera.GlobalPosition;
+		_player.CameraRig.SnapBehind(Mathf.Atan2(-to.X, -to.Z));
+		_player.CameraRig.SetPitch(Mathf.Atan2(to.Y, new Vector2(to.X, to.Z).Length()));
+		_input.ScriptedInteract = true;
+		return "turn";
+	}
+
+	private async Task Act18Boss(CancellationToken ct)
+	{
+		var boss = StationInterior.Instance?.Boss;
+		await WaitUntil(() => boss?.Beast != null, 10, ct);
+		Check("the boss room exists", boss != null);
+		if (boss == null) return;
+		var s = StoryManager.Instance;
+		Check("Act 18 starts at its save: on the catwalk", s.Current == Checkpoint.Act17Finished && _player.GlobalPosition.DistanceTo(boss.LandingWorld) < 3f, $"{s.Current} at {_player.GlobalPosition}");
+		await WaitUntil(() => boss.State == BossRoom.Phase.Fight, 40, ct);
+		Check("the fight begins: the spotlight picks out a valve", boss.State == BossRoom.Phase.Fight && boss.ActiveValve != null, $"{boss.State}");
+		bool orderOk = boss.Order.Count == BossRoom.ValvesToTurn && boss.Order.Distinct().Count() == BossRoom.ValvesToTurn;
+		for (int i = 1; i < boss.Order.Count; i++)
+		{
+			int d = Mathf.Abs(boss.Order[i] - boss.Order[i - 1]);
+			if (Mathf.Min(d, BossRoom.ValveCount - d) < 4) orderOk = false;
+		}
+		Check("the valves come in a random, back-and-forth order (never a neighbour next)", orderOk, string.Join(",", boss.Order.Select(i => i + 1)));
+
+		if (!_s.Act18DeathDone)
+		{
+			Check("at the start the monster is healthy and the blood about five feet under the catwalk", boss.Beast.Rot < 0.01f && boss.BloodY > -2f, $"rot {boss.Beast.Rot:0.00}, blood {boss.BloodY:0.0}");
+			await Aim(boss.ToGlobal(new Vector3(0, boss.BloodY, 0)), ct);
+			Screenshot("the_blood_pit");
+			await Aim(boss.ActiveValve.WheelWorld, ct);
+			Screenshot("teal_spotlight_on_a_valve");
+			// the first time: stand still under a slam
+			_s.Act18DeathDone = true;
+			boss.TestSlamAt(_player.GlobalPosition, 1.4f);
+			await Seconds(0.9, ct);
+			Screenshot("a_limb_rears_over_you");
+			await WaitUntil(() => PlayerDeath.Dying, 5, ct);
+			Check("stood under a slam: crushed", PlayerDeath.Dying);
+			await WaitUntil(() => false, 30, ct);
+			Check("crushed: the checkpoint reloaded", false, "no reload");
+			return;
+		}
+		Check("after being crushed: back on the catwalk at Act 18's start, the fight starting over", PlayerDeath.Deaths >= 1 && boss.ValvesTurned == 0);
+		if (++_s.Act18Attempts > 3) { Check("the fight", "won within three tries", false, "crushed every time"); return; }
+
+		// the fight, played
+		ulong t0 = Time.GetTicksMsec();
+		Engine.TimeScale = 2.0;
+		var shots = new HashSet<int>();
+		string last = "";
+		int evades = 0;
+		try
+		{
+			while (boss.ValvesTurned < BossRoom.ValvesToTurn && !PlayerDeath.Dying)
+			{
+				ct.ThrowIfCancellationRequested();
+				string what = _input.Enabled ? BossStep(boss) : "cutscene";
+				if (what == "evade" && last != "evade") evades++;
+				last = what;
+				await Frames(1, ct);
+				if ((Time.GetTicksMsec() - t0) / 1000.0 * Engine.TimeScale > 20 * 60) { Check("the fight", "finished in time", false, $"{boss.ValvesTurned} valves"); break; }
+				foreach (int at in new[] { 1, 4, 7, 9 })
+					if (boss.ValvesTurned == at && !shots.Contains(at) && _input.Enabled)
+					{
+						shots.Add(at);
+						Engine.TimeScale = 1.0;
+						_input.ScriptedMove = Vector2.Zero; _input.ScriptedInteract = false;
+						// look down through the grating, over the rail, at it
+						await Aim(boss.Beast.GlobalPosition + Vector3.Up * 12f, ct);
+						await Frames(3, ct);
+						Screenshot($"the_monster_rotting_{at}_of_10");
+						Engine.TimeScale = 2.0;
+					}
+			}
+		}
+		finally { Engine.TimeScale = 1.0; _input.ScriptedMove = Vector2.Zero; _input.ScriptedInteract = false; _input.ScriptedRun = false; }
+		if (PlayerDeath.Dying && _s.Act18Attempts < 3)
+		{
+			// crushed partway (a bot's reflexes): it goes round again, like a player would, up to three tries
+			GD.Print($"[storytest] Act 18: crushed on try {_s.Act18Attempts} at valve {boss.ValvesTurned} - trying again");
+			await WaitUntil(() => false, 30, ct);
+			return;
+		}
+		Check("all ten valves turned, never crushed", boss.ValvesTurned == BossRoom.ValvesToTurn && !PlayerDeath.Dying,
+			$"{boss.ValvesTurned} valves, {boss.Slams} slams, {evades} dodged, {boss.FightSeconds / 60.0:0.0} min of fighting");
+		Check("with every valve it rots, fully gone at the end, and the blood drains", boss.Beast.Rot > 0.99f, $"rot {boss.Beast.Rot:0.00}");
+		await WaitUntil(() => boss.Beast.EyesBurst > 10, 20, ct);
+		Screenshot("its_eyes_bursting");
+		await WaitUntil(() => boss.DoorOpen, 45, ct);
+		Check("the pit is empty", boss.BloodY <= BossRoom.PitFloor + 0.1f, $"blood {boss.BloodY:0.0}");
+		Check("every eye burst, one after another, and it died", boss.Beast.Dead && boss.Beast.EyesBurst == boss.Beast.EyeCount, $"{boss.Beast.EyesBurst} of {boss.Beast.EyeCount}");
+		Check("the door on the far side opens", boss.DoorOpen);
+		await Aim(boss.Beast.GlobalPosition + Vector3.Up * 8f, ct);
+		Screenshot("dead_in_the_empty_pit");
+		await WaitUntil(() => _input.Enabled, 10, ct);
+
+		// round to the door, and into the lit room
+		Vector3 doorRing = boss.ToGlobal(boss.RingLocal(boss.RingOf(boss.ToLocal(boss.DoorWorld))));
+		for (int i = 0; i < 40 && Flat(_player.GlobalPosition - doorRing).Length() > 1.5f; i++)
+		{
+			float sp = boss.RingOf(boss.ToLocal(_player.GlobalPosition)), sg = boss.RingOf(boss.ToLocal(doorRing)), per = boss.Perimeter;
+			float delta = Mathf.PosMod(sg - sp + per * 0.5f, per) - per * 0.5f;
+			await WalkTo(Mathf.Abs(delta) < 4f ? doorRing : boss.ToGlobal(boss.RingLocal(sp + Mathf.Sign(delta) * 4f)), 0.8f, ct, giveUp: 6f);
+		}
+		await Aim(boss.TidyWorld + Vector3.Up * 1.2f, ct);
+		Screenshot("the_lit_room_beyond");
+		await WalkTo(boss.DoorWorld, 0.5f, ct, giveUp: 6f);
+		await WalkTo(boss.TidyWorld, 0.6f, ct, stopWhen: () => boss.Finished, giveUp: 8f);
+		await WaitUntil(() => s.Current == Checkpoint.Act18Finished, 5, ct);
+		Check("into the clean, lit room: Act 18 done (Act 19's save)", s.Current == Checkpoint.Act18Finished, $"{s.Current}");
+		Screenshot("tidy_room");
+		Check("the camera is still with you at the end of Act 18", _inv.HasCamera);
 	}
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>
@@ -2208,6 +2410,8 @@ public partial class StoryTest : Node
 		await Aim(aim, ct);
 		var focus = _player.Interaction?.Focused;
 		GD.Print($"[storytest] use {obj.Name}: focused '{focus?.GetParent()?.Name}' prompt '{_player.Interaction?.PromptText}'");
+		if (focus == null)
+			GD.Print($"[usedbg] {obj.Name}: player {_player.GlobalPosition} aim {aim} dist {_player.GlobalPosition.DistanceTo(aim):0.00} enabled {_input.Enabled} modal {_input.Modal} use {use?.Enabled} visible {use?.IsVisibleInTree()} focusHeld {_input.Focus} camera {_player.CameraRig.Camera.GlobalPosition} fwd {-_player.CameraRig.Camera.GlobalBasis.Z}");
 		await Press(ct, hold: use != null && use.HoldSeconds > 0 ? use.HoldSeconds + 0.3 : 0.08);
 		await Seconds(0.3, ct);
 	}

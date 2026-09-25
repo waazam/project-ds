@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-24e — Act 18: the pit (boss fight), and the camera kept all game](2026-09-24e-act18-the-pit.md)
 - [2026-09-24d — Acts 16-17: the closet, the sewer, and the hole](2026-09-24d-acts16-17-closet-sewer.md)
 - [2026-09-24c — Act 15: the long hallway](2026-09-24c-act15-hallway.md)
 - [2026-09-24b — Act 14: the stairwell](2026-09-24b-act14-stairwell.md)

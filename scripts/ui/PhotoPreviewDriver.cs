@@ -592,12 +592,7 @@ public partial class PhotoPreviewDriver : Node
 		Check(log.Photos[log.RecordedCount - 1].Number == log.RecordedCount, "newest last");
 		_lastAlbumCount = log.RecordedCount;
 
-		// ---- the stairs take the camera
-		_inv.TakeAwayCamera();
-		await Frames(5);
-		Check(!_page.IsOpen, "take-away: page hidden");
-		await Raise(true);
-		Check(!_camera.IsRaised, "take-away: focus never raises");
+		// ---- the camera stays with the player all game now (it used to be taken at the first stairs)
 		await Raise(false);
 		_thumb.ShowPrints = true;
 	}
@@ -673,7 +668,7 @@ public partial class PhotoPreviewDriver : Node
 		var scene = GetTree().CurrentScene;
 		for (int f = 0; f < 60 * 4; f++) { _pin.ScriptedMove = new Vector2(0, 1); await Physics(1); }
 		_pin.ScriptedMove = Vector2.Zero;
-		Check(!_inv.HasCamera, "the first step takes the camera");
+		Check(_inv.HasCamera, "the first step keeps the camera");
 		for (int i = 0; i < 120 && !reached; i++) await Seconds(0.5);
 		StoryManager.Instance.CheckpointReached -= OnCp;
 		Check(reached, "the climb reaches checkpoint Act2StairsClimbed");

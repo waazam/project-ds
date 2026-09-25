@@ -140,6 +140,14 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"shadow_breath_{i:00}", sfx, false, Lo, 
 jobs.Add(("shadow_strike_01", sfx, false, Lo, (r, sr) => Hallway.ShadowStrike(r, sr)));
 // Act 17: the sewer
 jobs.Add(("sewer_loop", ambient, true, Lo, (r, sr) => Hallway.SewerAir(r, sr, 30)));
+// Act 18: the boss room
+for (int i = 1; i <= 5; i++) jobs.Add(($"valve_squeak_{i:00}", sfx, false, Hi, (r, sr) => Boss.ValveSqueak(r, sr)));
+jobs.Add(("valve_clunk_01", sfx, false, Lo, (r, sr) => Boss.ValveClunk(r, sr)));
+jobs.Add(("valve_siren_01", sfx, false, Lo, (r, sr) => Boss.Siren(r, sr)));
+jobs.Add(("blood_drain_01", sfx, false, Lo, (r, sr) => Boss.BloodDrain(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"catwalk_slam_{i:00}", sfx, false, Lo, (r, sr) => Boss.CatwalkSlam(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"limb_rise_{i:00}", sfx, false, Lo, (r, sr) => Boss.LimbRise(r, sr)));
+jobs.Add(("boss_loop", ambient, true, Lo, (r, sr) => Boss.PitAir(r, sr, 33)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

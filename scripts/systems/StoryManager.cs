@@ -120,6 +120,8 @@ public partial class StoryManager : Node
 		/// <summary>Act 14: how they came down at the bottom of the stairwell (Act 15 starts differently).</summary>
 		public const string Act14JumpedAcross = "act14_jumped_across";
 		public const string Act14JumpedDown = "act14_jumped_down";
+		/// <summary>Act 18: the long introduction to the boss has been seen (after a death it's short).</summary>
+		public const string Act18IntroSeen = "act18_intro_seen";
 	}
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>

@@ -164,10 +164,10 @@ public partial class Sewer
 			if (t > 0.45 && fader != null && !fader.IsBlack) fader.SetBlack(true);
 		}
 		fader?.SetBlack(true);
-		StoryBeat.ReachCheckpoint(player, Checkpoint.Act17Finished);
-		GD.Print("[story] Act 17 done: down the hole - Act 18 starts here");
-		// Act 18 isn't built yet: the credits, from the black
-		await Cutscene.Wait(this, 2.0, ct);
-		if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) await ending.Credits(fader, ct);
+		GD.Print("[story] Act 17 done: down the hole - Act 18 starts below");
+		await Cutscene.Wait(this, 1.0, ct);
+		// out of the black: dropping out of the ceiling of the boss room (Act 18's save is on landing)
+		if (StationInterior.Instance?.Boss is { } boss) await boss.Arrive(player, ct);
+		else StoryBeat.ReachCheckpoint(player, Checkpoint.Act17Finished);
 	}
 }

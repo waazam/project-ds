@@ -83,13 +83,13 @@ public partial class FirstClimbEvent : StoryTrigger
 		AddChild(box);
 	}
 
-	/// <summary>The first step: the camera is gone, the flight is one-way, and the player is lifted
+	/// <summary>The first step: the flight is one-way (the camera stays with them now: the owner wants it
+	/// kept all game), and the player is lifted
 	/// off their feet for the glide to the top (<see cref="FloatUp"/>). The post at the top can be
 	/// inspected only once they land there.</summary>
 	protected override void Fire(PlayerController player)
 	{
 		OnTheStairs = true;
-		player.GetNodeOrNull<PlayerInventory>("Inventory")?.TakeAwayCamera();
 		if (GetParent() is StaircaseBuilder stairs)
 		{
 			OneWay = OneWayFlight.Attach(stairs);

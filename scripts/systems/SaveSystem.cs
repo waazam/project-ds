@@ -35,6 +35,8 @@ public enum Checkpoint
 	Act16Finished = 16,
 	/// <summary>Act 17's end: yes, and yes, down the square hole in the sewer's great room (Act 18's start).</summary>
 	Act17Finished = 17,
+	/// <summary>Act 18's end: the thing in the pit dead, through the far door into the clean, lit room (Act 19's start).</summary>
+	Act18Finished = 18,
 }
 
 public class SaveData

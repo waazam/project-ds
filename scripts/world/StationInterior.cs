@@ -54,6 +54,9 @@ public partial class StationInterior : Node3D
 	/// <summary>Act 17's sewer: through the black of the closet door, somewhere else entirely.</summary>
 	public Sewer Sewer { get; private set; }
 	public static readonly Vector3 SewerAt = new(400f, -360f, 0f);
+	/// <summary>Act 18's boss room: down the hole in the sewer.</summary>
+	public BossRoom Boss { get; private set; }
+	public static readonly Vector3 BossAt = new(400f, -470f, 330f);
 	public IronDoor Door3 { get; private set; }
 	public LobbyDecor Decor { get; private set; }
 	/// <summary>For tests: the lobby's current decay stage (0 kept .. 4 hell).</summary>
@@ -90,6 +93,8 @@ public partial class StationInterior : Node3D
 		AddChild(Room3);
 		Sewer = new Sewer { Name = "Sewer", Position = SewerAt };
 		AddChild(Sewer);
+		Boss = new BossRoom { Name = "BossRoom", Position = BossAt };
+		AddChild(Boss);
 
 		EntranceMarkerWorld = ToGlobal(new Vector3(EntryGapX, 0.05f, -HalfDepth + 1.2f));
 		EntranceYaw = Rotation.Y + Mathf.Pi;   // facing local +Z: into the lobby, toward the desk
@@ -106,8 +111,10 @@ public partial class StationInterior : Node3D
 			Rotation.Y, "respawn_Act15Finished");
 		// Act 16's end (Act 17's start): on the landing inside the sewer door, facing down the pipe
 		Marker("Act17Marker", ToGlobal(SewerAt + Sewer.EntranceLocal), Rotation.Y + Mathf.Pi, "respawn_Act16Finished");
-		// Act 17's end (Act 18's start, for now): on the platform by the hole
-		Marker("Act18Marker", ToGlobal(SewerAt + Sewer.PlatformLocal), Rotation.Y + Mathf.Pi, "respawn_Act17Finished");
+		// Act 17's end (Act 18's start): on the catwalk, where the drop from the ceiling lands, facing into the room
+		Marker("Act18Marker", ToGlobal(BossAt + BossRoom.LandingLocal), Rotation.Y + Mathf.Pi, "respawn_Act17Finished");
+		// Act 18's end (Act 19's start): in the clean, lit room past the far door
+		Marker("Act19Marker", ToGlobal(BossAt + BossRoom.TidyLocal + Vector3.Back * 1.5f), Rotation.Y + Mathf.Pi, "respawn_Act18Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		// the scavenger hunt's breadcrumbs: a bloody hand on Room 1's door, a staircase scrawled on Room 2's

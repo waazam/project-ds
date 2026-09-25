@@ -74,7 +74,8 @@ public partial class ContinueRoundTripTest : Node
 		new("act14_finished", Checkpoint.Act14Finished, F13.Append(StoryManager.Flag.Act14JumpedAcross).ToArray(), "lantern,compass,radio;tool=None"),
 		new("act15_finished", Checkpoint.Act15Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 		new("act16_finished", Checkpoint.Act16Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
-		new("act17_finished", Checkpoint.Act17Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
+		new("act17_finished", Checkpoint.Act17Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen }).ToArray(), "lantern,compass,radio;tool=None"),
+		new("act18_finished", Checkpoint.Act18Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen }).ToArray(), "lantern,compass,radio;tool=None"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -204,8 +205,10 @@ public partial class ContinueRoundTripTest : Node
 			Check("Act 15's end respawns in the janitor's closet, door shut", before.DistanceTo(hw.ClosetWorld) < 1.5f && hw.Finished && !hw.DoorOpen, $"{before} vs {hw.ClosetWorld}");
 		if (sc.Cp == Checkpoint.Act16Finished && StationInterior.Instance?.Sewer is { } sewer16)
 			Check("Act 16's end respawns inside the sewer door", before.DistanceTo(sewer16.EntranceWorld) < 1.5f, $"{before} vs {sewer16.EntranceWorld}");
-		if (sc.Cp == Checkpoint.Act17Finished && StationInterior.Instance?.Sewer is { } sewer17)
-			Check("Act 17's end respawns on the platform by the hole", before.DistanceTo(sewer17.PlatformEdgeWorld) < 1.5f, $"{before} vs {sewer17.PlatformEdgeWorld}");
+		if (sc.Cp == Checkpoint.Act17Finished && StationInterior.Instance?.Boss is { } boss17)
+			Check("Act 17's end respawns on the boss room's catwalk, the fight starting", before.DistanceTo(boss17.LandingWorld) < 2f && boss17.State != BossRoom.Phase.Waiting, $"{before} vs {boss17.LandingWorld}, {boss17.State}");
+		if (sc.Cp == Checkpoint.Act18Finished && StationInterior.Instance?.Boss is { } boss18)
+			Check("Act 18's end respawns in the lit room, the thing dead, the door open", before.DistanceTo(boss18.TidyWorld) < 3f && boss18.DoorOpen && boss18.Beast.Dead, $"{before} vs {boss18.TidyWorld}");
 		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");
 
@@ -265,6 +268,7 @@ public partial class ContinueRoundTripTest : Node
 		Check("taken pickups stay taken", reappeared.Count == 0, reappeared.Count == 0 ? "" : string.Join(",", reappeared));
 
 		var inv = _player.GetNodeOrNull<PlayerInventory>("Inventory");
+		if (sc.Cp >= Checkpoint.Act2StairsClimbed) Check("the camera is kept all game", inv?.HasCamera == true);
 		Check("inventory restored", inv != null && GearOf(inv.Serialize()) == GearOf(sc.Inventory) || (sc.Cp == Checkpoint.Act10WalkieFound && inv?.HasRadio == true),
 			$"{inv?.Serialize()} (saved {sc.Inventory})");
 
@@ -287,7 +291,8 @@ public partial class ContinueRoundTripTest : Node
 		Screenshot(sc.Name);
 	}
 
-	private static string GearOf(string inv) => string.Join(",", (inv ?? "").Split(';')[0].Split(',', System.StringSplitOptions.RemoveEmptyEntries).OrderBy(s => s));
+	// the camera is always given back from Act 2 on (it stays with the player all game), so it isn't compared
+	private static string GearOf(string inv) => string.Join(",", (inv ?? "").Split(';')[0].Split(',', System.StringSplitOptions.RemoveEmptyEntries).Where(s => s != "camera").OrderBy(s => s));
 
 	private void CheckFired<T>(bool want) where T : StoryTrigger
 	{

@@ -55,7 +55,9 @@ public partial class PlayerInventory : Node
 		var gear = new HashSet<string>(parts[0].Split(',', System.StringSplitOptions.RemoveEmptyEntries));
 		HasLantern = gear.Contains("lantern");
 		HasCompass = gear.Contains("compass");
-		HasCamera = gear.Contains("camera");
+		// the camera stays with the player the whole game once they have it (older saves, from before it
+		// did, had it taken away at the first stairs: give it back)
+		HasCamera = gear.Contains("camera") || (Systems.StoryManager.Instance?.Current ?? Systems.Checkpoint.None) >= Systems.Checkpoint.Act2StairsClimbed;
 		HasNewelPost = gear.Contains("newel_post");
 		HasRadio = gear.Contains("radio");
 		_tools.Clear();
@@ -91,7 +93,7 @@ public partial class PlayerInventory : Node
 		if (_tools.Remove(kind)) Changed();
 	}
 
-	/// <summary>The camera is put away for good once the first stairs take over (Act 2); it has no further use.</summary>
+	/// <summary>Takes the camera away (no longer used by the story: it stays with the player all game).</summary>
 	public void TakeAwayCamera()
 	{
 		if (!HasCamera) return;
