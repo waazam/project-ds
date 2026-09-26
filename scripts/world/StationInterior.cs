@@ -210,6 +210,44 @@ public partial class StationInterior : Node3D
 		_room1Door = MakeDoor("Room1Door", new Vector3(HalfWidth, 0, -1.05f), -Mathf.Pi * 0.5f, ToolKind.Key);
 		_room1Door.Opened += () => StoryManager.Instance?.SetFlag(StoryManager.Flag.StationRoom1Open);
 		_room2Door = MakeDoor("Room2Door", new Vector3(-HalfWidth, 0, 1.05f), Mathf.Pi * 0.5f, ToolKind.None);
+		// frames round every doorway off the lobby (the linings hide the wall's cut ends and close the
+		// slits round a shut leaf)
+		var frames = new MeshKit();
+		frames.Mat(PropTextures.DeckMat);
+		frames.Color = new Color(0.42f, 0.31f, 0.21f);
+		StationKit.DoorFrame(frames, new Vector3(HalfWidth, 0, 0), Vector3.Back, 2.2f, 2.2f);
+		StationKit.DoorFrame(frames, new Vector3(-HalfWidth, 0, 0), Vector3.Back, 2.2f, 2.2f);
+		StationKit.DoorFrame(frames, new Vector3(BasementGapX, 0, -HalfDepth), Vector3.Right, 2.2f, 2.2f);
+		StationKit.DoorFrame(frames, new Vector3(EntryGapX, 0, -HalfDepth), Vector3.Right, 2.2f, 2.2f);
+		frames.Color = Colors.White;
+		frames.CommitTo(this, "DoorFrames", true);
+		BuildFrontDoor();
+	}
+
+	/// <summary>The way in, shut behind them: the lake is out there, and it doesn't open again.</summary>
+	private void BuildFrontDoor()
+	{
+		var front = new Node3D { Name = "FrontDoor", Position = new Vector3(EntryGapX, 0, -HalfDepth) };
+		AddChild(front);
+		var k = new MeshKit();
+		k.Mat(BuildingTextures.BoardsMat);
+		k.Color = new Color(0.34f, 0.25f, 0.17f);
+		BuildKit.Box(k, new Vector3(0, 1.08f, 0), new Vector3(2.12f, 2.16f, 0.06f), 1.2f);
+		// raised panels on the inside face
+		k.Color = new Color(0.3f, 0.22f, 0.15f);
+		foreach (float x in new[] { -0.5f, 0.5f })
+			foreach (var (y, h) in new[] { (0.55f, 0.8f), (1.55f, 0.9f) })
+				BuildKit.Box(k, new Vector3(x, y, 0.035f), new Vector3(0.78f, h, 0.02f), 1.2f);
+		k.Mat(ItemTextures.BrassMat);
+		k.Color = new Color(0.8f, 0.65f, 0.4f);
+		k.Cylinder(new Vector3(0.85f, 1.02f, 0), new Vector3(0.85f, 1.02f, 0.08f), 0.03f, 0.03f, 8, true);
+		k.Color = Colors.White;
+		k.CommitTo(front, "Leaf", true);
+		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
+		body.SetMeta("surface", "wood");
+		body.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.1f, 0), Shape = new BoxShape3D { Size = new Vector3(2.2f, 2.2f, 0.14f) } });
+		front.AddChild(body);
+		front.AddChild(new Interactable { Name = "Use", Prompt = "It won't open.", PickRadius = 0.8f, MaxDistance = 2.4f, Position = new Vector3(0, 1.1f, 0.1f) });
 	}
 
 	/// <summary>Room 2's door (it slams shut behind the player, then lets them out when they win).</summary>
@@ -223,7 +261,7 @@ public partial class StationInterior : Node3D
 		var k = new MeshKit();
 		k.Mat(BuildingTextures.BoardsMat);
 		k.Color = new Color(0.38f, 0.28f, 0.18f);
-		BuildKit.Box(k, new Vector3(1.03f, 1.08f, 0), new Vector3(2.02f, 2.14f, 0.05f), 1.2f);
+		BuildKit.Box(k, new Vector3(1.05f, 1.08f, 0), new Vector3(2.08f, 2.16f, 0.05f), 1.2f);
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.8f, 0.65f, 0.4f);
 		foreach (int s in new[] { -1, 1 })

@@ -147,7 +147,7 @@ public partial class StationBasement : Node3D
 		var leaf = new MeshKit();
 		leaf.Mat(BuildingTextures.BoardsMat);
 		leaf.Color = new Color(0.36f, 0.27f, 0.18f);
-		BuildKit.Box(leaf, new Vector3(1.03f, 1.08f, 0), new Vector3(2.02f, 2.14f, 0.05f), 1.2f);
+		BuildKit.Box(leaf, new Vector3(1.05f, 1.08f, 0), new Vector3(2.08f, 2.16f, 0.05f), 1.2f);
 		leaf.Mat(ItemTextures.BrassMat);
 		leaf.Color = new Color(0.8f, 0.65f, 0.4f);
 		leaf.Cylinder(new Vector3(1.85f, 1.02f, 0), new Vector3(1.85f, 1.02f, 0.08f), 0.03f, 0.03f, 8, true);
@@ -211,8 +211,8 @@ public partial class StationBasement : Node3D
 		k.Mat(StationTextures.BrickMat);
 		k.Color = Colors.White;
 		const float hw = 0.95f;
-		// the landing just inside the door
-		BuildKit.Box(k, new Vector3(0, -0.06f, StairTop * 0.5f), new Vector3(hw * 2f, 0.12f, -StairTop), 2f);
+		// the landing just inside the door: solid brick right down, so there's no slit under its lip
+		BuildKit.Box(k, new Vector3(0, Floor * 0.5f, StairTop * 0.5f), new Vector3(hw * 2f, -Floor, -StairTop), 2f);
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, -0.06f, StairTop * 0.5f), Shape = new BoxShape3D { Size = new Vector3(hw * 2f, 0.12f, -StairTop) } });
 		float rise = -Floor / Steps;
 		for (int i = 0; i < Steps; i++)
@@ -247,7 +247,8 @@ public partial class StationBasement : Node3D
 		{
 			float z0 = i < 0 ? 0f : StairTop - i * Run, z1 = i < 0 ? StairTop : z0 - Run;
 			float y = (i < 0 ? 0f : -(i + 1) * rise) + 2.3f;
-			BuildKit.Box(k, new Vector3(0, y + 0.1f, (z0 + z1) * 0.5f), new Vector3(hw * 2f + 0.4f, 0.2f, Mathf.Abs(z1 - z0) + 0.02f), 2f);
+			// thick enough that each step of it overlaps the next (no slits between them)
+			BuildKit.Box(k, new Vector3(0, y + 0.2f, (z0 + z1) * 0.5f), new Vector3(hw * 2f + 0.4f, 0.4f, Mathf.Abs(z1 - z0) + 0.02f), 2f);
 		}
 		k.Color = Colors.White;
 		k.CommitTo(this, "Stairwell", true);

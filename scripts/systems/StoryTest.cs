@@ -1365,6 +1365,16 @@ public partial class StoryTest : Node
 			Check("inside the lobby", station.InLobby(_player.GlobalPosition), $"{_player.GlobalPosition}");
 			Check("the lobby starts kept (decay stage 0)", station.Stage == 0, $"stage {station.Stage}");
 			Screenshot("station_lobby_kept");
+			// a look round the lobby's doorways: frames, the shut front door, no wall fighting another
+			await Inside(station.ToGlobal(new Vector3(-1.5f, 0, 1.5f)), station.ToGlobal(new Vector3(StationInterior.HalfWidth, 1.3f, 0)), ct);
+			Screenshot("tour_room1_door");
+			await Inside(station.ToGlobal(new Vector3(1.5f, 0, -1.0f)), station.ToGlobal(new Vector3(-StationInterior.HalfWidth, 1.3f, 0.3f)), ct);
+			Screenshot("tour_room2_door");
+			await Inside(station.ToGlobal(new Vector3(0.2f, 0, 2.0f)), station.ToGlobal(new Vector3(0.2f, 1.3f, -StationInterior.HalfDepth)), ct);
+			Screenshot("tour_front_wall");
+			await Inside(station.ToGlobal(new Vector3(StationInterior.EntryGapX + 0.5f, 0, -StationInterior.HalfDepth + 1.0f)), station.ToGlobal(new Vector3(StationInterior.EntryGapX, 1.2f, -StationInterior.HalfDepth)), ct);
+			Check("the front door is shut: the way in is no way out", _player.Interaction?.PromptText == "It won't open." || _player.Interaction?.Focused != null, $"'{_player.Interaction?.PromptText}'");
+			Screenshot("tour_front_door");
 
 			var knife = AllOf<Pickup>().FirstOrDefault(p => p.Kind == ToolKind.Knife && !p.Taken);
 			Check("the knife is stuck in the desk", knife != null);
@@ -1382,6 +1392,8 @@ public partial class StoryTest : Node
 			await Inside(basement.ToGlobal(new Vector3(0, -0.2f, -1.6f)), basement.StairFootWorld, ct);
 			Screenshot("basement_stairs");
 			await WalkTo(basement.StairFootWorld, 0.8f, ct, giveUp: 12f);
+			await Aim(station.ToGlobal(new Vector3(StationInterior.BasementGapX, 1.2f, -StationInterior.HalfDepth)), ct);
+			Screenshot("tour_basement_stairs_up");
 			Check("down the red brick stairs", _player.GlobalPosition.Y < basement.GlobalPosition.Y + StationBasement.Floor + 1f, $"{_player.GlobalPosition}");
 			await WaitUntil(() => basement.LightsDead, 16, ct);
 			Check("the lights struggle and die", basement.LightsDead);
@@ -1430,6 +1442,8 @@ public partial class StoryTest : Node
 			Check("the key opens room 1", room1Door is { Locked: false, IsOpen: true });
 			await Seconds(1.0, ct);
 			var boxUse = room1.GetNode<Interactable>("CigarBox/Use");
+			await Inside(room1.ToGlobal(new Vector3(1.2f, 0, 0.6f)), station.ToGlobal(new Vector3(StationInterior.HalfWidth, 1.3f, 0)), ct);
+			Screenshot("tour_room1_door_inside");
 			await Inside(room1.ToGlobal(new Vector3(-1.2f, 0, 0.2f)), boxUse.GlobalPosition, ct);
 			Screenshot("room1_writing");
 			await UseIt(boxUse, ct);
@@ -1458,6 +1472,8 @@ public partial class StoryTest : Node
 			await Seconds(6.5, ct);
 			Check("someone knocks, softly", room2.Knocks > 0, $"{room2.Knocks}");
 			Screenshot("room2_red_room");
+			await Aim(station.ToGlobal(new Vector3(-StationInterior.HalfWidth, 1.3f, 0)), ct);
+			Screenshot("tour_room2_door_inside");
 			await UseIt(room2.BoxUse, ct);
 			await WaitUntil(() => room2.Flooding, 8, ct);
 			Check("using the box breaks the window: the lake comes in", room2.WindowBroken && room2.Flooding);
@@ -1484,6 +1500,14 @@ public partial class StoryTest : Node
 			// Second time: work the cryptex. Six rings to STAIRS, one clunky turn at a time.
 			await UseIt(room2.BoxUse, ct);
 			Check("the cryptex close-up opens", CryptexOverlay.Instance is { IsOpen: true });
+			await Frames(3, ct);
+			Screenshot("cryptex_closeup");
+			// let the blood rise over it: it must stay readable through the surface
+			Engine.TimeScale = 4.0;
+			await WaitUntil(() => room2.Level > 1.02f, 40, ct);
+			Engine.TimeScale = 1.0;
+			await Frames(3, ct);
+			Screenshot("cryptex_under_blood");
 			var box = room2.Box;
 			int stuck = 0;
 			for (int r = 0; r < Cryptex.Rings && !box.Solved; r++)

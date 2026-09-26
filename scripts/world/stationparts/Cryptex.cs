@@ -87,7 +87,7 @@ public partial class Cryptex : Node3D
 				var b = new Basis(Vector3.Right, -a);
 				var label = new Label3D
 				{
-					Text = ((char)('A' + L)).ToString(), Font = SignKit.RoutedFont, FontSize = 48, PixelSize = 0.00075f,
+					Text = ((char)('A' + L)).ToString(), Font = SignKit.RoutedFont, FontSize = 48, PixelSize = 0.00032f,   // one letter per 1/26 of the ring, never overlapping its neighbours
 					Modulate = new Color(0.14f, 0.1f, 0.05f), OutlineSize = 0, Shaded = true,
 					AlphaCut = Label3D.AlphaCutMode.Discard, DoubleSided = false,
 					// on the surface, facing out along its radius (+Y rotated back by the letter's angle)

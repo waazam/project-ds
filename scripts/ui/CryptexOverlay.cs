@@ -58,7 +58,8 @@ public partial class CryptexOverlay : CanvasLayer
 		_cam = new Camera3D { Fov = 42f };
 		Cutscene.SceneRoot(this).AddChild(_cam);
 		Vector3 focus = box.GlobalPosition;
-		Vector3 eye = box.ToGlobal(new Vector3(0, 0.2f, 0.26f));
+		// looking down onto the reading line along the top, where the letters that count sit between the guides
+		Vector3 eye = box.ToGlobal(new Vector3(0, 0.3f, 0.13f));
 		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(focus - eye, Vector3.Up), eye);
 		_cam.Current = true;
 		_root.Visible = true;

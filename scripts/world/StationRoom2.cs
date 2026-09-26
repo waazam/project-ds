@@ -100,7 +100,9 @@ public partial class StationRoom2 : Node3D
 		var k = new MeshKit();
 		k.Mat(_wallMat);
 		k.Color = Colors.White;
-		StationKit.WallAlongZ(k, body, Half, -Half, Half, Height, 0, (0f, 2.2f));
+		// the wall shared with the lobby: a thin skin just inside the lobby's own wall (never in the same
+		// plane, or the two wallpapers fight), no collision of its own (the lobby's wall has it)
+		StationKit.WallAlongZ(k, null, Half - 0.085f, -Half, Half, Height, 0, (0f, 2.2f), 2.2f, 0.02f);
 		StationKit.WallAlongX(k, body, Half, -Half, Half, Height, 0, null);
 		// the window wall: solid round a 1.6 x 1.4 opening
 		float wx0 = -1.2f, wx1 = 0.4f, wy0 = 1.0f, wy1 = 2.4f;
@@ -482,13 +484,17 @@ public partial class StationRoom2 : Node3D
 		// under it: the view goes red and muffled
 		float eye = player.CameraRig.Camera.GlobalPosition.Y - GlobalPosition.Y;
 		float under = Mathf.Clamp((Level - eye + 0.05f) / 0.15f, 0f, 1f);
+		// bent over the cryptex, keep the murk light enough to read the rings through
+		if (CryptexOverlay.Instance is { IsOpen: true }) under = Mathf.Min(under, 0.3f);
 		UnderwaterView.For(this).Set(under, Blood ? new Color(0.3f, 0.02f, 0.02f) : Lake);
 		if (Level >= Height - 0.12f && !_dying) _ = Cutscene.Run(this, ct => Drown(player, ct), lockInput: true, freezeBody: true);
 	}
 
 	private void BuildWater()
 	{
-		_waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/basement_water.gdshader") };
+		// see-through (the owner: the cryptex must stay readable under it)
+		_waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/flood_water.gdshader") };
+		_waterMat.SetShaderParameter("opacity", 0.5f);
 		_waterMat.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
 		_waterMat.SetShaderParameter("drain", new Vector2(99f, 99f));
 		_waterMat.SetShaderParameter("water_color", Lake);

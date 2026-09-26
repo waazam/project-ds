@@ -73,7 +73,9 @@ public partial class StationRoom1 : Node3D
 		AddChild(body);
 		k.Mat(StationTextures.WallpaperStainedMat);
 		k.Color = new Color(0.85f, 0.8f, 0.75f);
-		StationKit.WallAlongZ(k, body, -Half, -Half, Half, Height, 0, (0f, 2.2f));
+		// the wall shared with the lobby: a thin skin just inside the lobby's own wall (never in the same
+		// plane, or the two wallpapers fight), no collision of its own (the lobby's wall has it)
+		StationKit.WallAlongZ(k, null, -Half + 0.085f, -Half, Half, Height, 0, (0f, 2.2f), 2.2f, 0.02f);
 		StationKit.WallAlongX(k, body, Half, -Half, Half, Height, 0, null);
 		StationKit.WallAlongX(k, body, -Half, -Half, Half, Height, 0, null);
 		StationKit.WallAlongZ(k, body, Half, -Half, Half, Height, 0, null);

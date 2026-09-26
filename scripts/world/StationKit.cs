@@ -42,6 +42,30 @@ public static class StationKit
 		if (height > doorH) Slab(k, body, new Vector3(x, y0 + (doorH + height) * 0.5f, c), new Vector3(thick, height - doorH, w));
 	}
 
+	/// <summary>A wooden door frame in a wall gap: linings round the inside of the opening (so the cut ends
+	/// of the wall slabs never show, and a closed leaf sits snug) and a casing proud of the wall on both
+	/// faces. <paramref name="bottomCenter"/> is the gap's middle at floor level, on the wall's centre
+	/// plane; <paramref name="along"/> runs along the wall; <paramref name="depth"/> is how thick a wall
+	/// (or pair of walls) the linings span.</summary>
+	public static void DoorFrame(MeshKit k, Vector3 bottomCenter, Vector3 along, float gapW, float gapH, float depth = 0.2f)
+	{
+		along = along.Normalized();
+		var b = new Basis(along, Vector3.Up, along.Cross(Vector3.Up));
+		void Piece(Vector3 c, Vector3 size) => BuildKit.Box(k, bottomCenter + b * c, size, 1.2f, BuildKit.Face.None, b);
+		const float lt = 0.035f, cw = 0.09f, ct = 0.06f;
+		float hw = gapW * 0.5f;
+		Piece(new Vector3(-hw + lt * 0.5f, gapH * 0.5f, 0), new Vector3(lt, gapH, depth));
+		Piece(new Vector3(hw - lt * 0.5f, gapH * 0.5f, 0), new Vector3(lt, gapH, depth));
+		Piece(new Vector3(0, gapH - lt * 0.5f, 0), new Vector3(gapW, lt, depth));
+		foreach (int s in new[] { -1, 1 })
+		{
+			float z = s * (depth * 0.5f - 0.005f);
+			Piece(new Vector3(-hw - cw * 0.5f + lt, (gapH + cw) * 0.5f, z), new Vector3(cw, gapH + cw, ct));
+			Piece(new Vector3(hw + cw * 0.5f - lt, (gapH + cw) * 0.5f, z), new Vector3(cw, gapH + cw, ct));
+			Piece(new Vector3(0, gapH + cw * 0.5f, z), new Vector3(gapW + cw * 2f - lt * 2f, cw, ct));
+		}
+	}
+
 	/// <summary>Flat floor and (optional) ceiling slab spanning the room's footprint, with collision
 	/// on the floor only (the ceiling is never walked on).</summary>
 	public static void FloorAndCeiling(MeshKit floorK, MeshKit ceilK, StaticBody3D body, float hw, float hd, float height, float y0, bool ceiling = true)
