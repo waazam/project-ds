@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.World;
 
 namespace ProjectDS.World.BossParts;
 
@@ -61,6 +62,7 @@ public static class BossTextures
 	{
 		if (_mat.TryGetValue(key, out var m)) return (StandardMaterial3D)m;
 		var s = make();
+		ProcTextures.AddGrime(s as StandardMaterial3D);
 		_mat[key] = s;
 		return s;
 	}

@@ -230,6 +230,7 @@ public static class StairTextures
 			m.AlphaScissorThreshold = 0.5f;
 			m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
 		}
+		ProcTextures.AddGrime(m as StandardMaterial3D);
 		_mat[key] = m;
 		return m;
 	}

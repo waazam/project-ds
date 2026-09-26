@@ -10,7 +10,7 @@ namespace ProjectDS.World.LakeParts;
 /// </summary>
 public static class LakeTerrain
 {
-	public const float MinX = -175f, MaxX = 175f, MinZ = LakeShape.FarShoreZ - 125f, MaxZ = 105f;
+	public const float MinX = -235f, MaxX = 235f, MinZ = LakeShape.FarShoreZ - 125f, MaxZ = 105f;
 	private const float Cell = 2f;
 
 	public static MeshInstance3D BuildGround(Node3D parent)

@@ -17,7 +17,7 @@ namespace ProjectDS.Entities;
 /// draws back. <see cref="Impact"/> fires when it lands.
 ///
 /// <see cref="Rot"/> (0..1) is how far gone it is. The hide goes from glossy purple-grey to mottled,
-/// sore-covered, sloughing zombie flesh (<c>rot_skin.gdshader</c>), the eyes cloud over, and it
+/// sore-covered, sloughing zombie flesh (<c>octopus_flesh.gdshader</c>), the eyes cloud over, and it
 /// thrashes harder and faster: hurt, and rabid.
 ///
 /// Local space: y=0 is the pit floor; the body sits in the middle.
@@ -63,7 +63,7 @@ public partial class Leviathan : Node3D
 	private readonly List<Node3D> _bodyEyes = new();
 	private readonly List<float> _eyeSize = new();
 	private Node3D _body;
-	private ShaderMaterial _skin;
+	private ShaderMaterial _skin, _bodySkin;
 	private StandardMaterial3D _sclera, _iris;
 	private float _rot, _time, _convulse;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 1818 };
@@ -71,8 +71,10 @@ public partial class Leviathan : Node3D
 
 	public override void _Ready()
 	{
-		_skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/rot_skin.gdshader") };
-		_skin.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
+		// gooey, grimy octopus flesh that rots as the fight goes on (octopus_flesh.gdshader); the body's
+		// back is its top, the limbs' is away from their suckers
+		_skin = TentacleKit.Flesh(null, 0.8f);
+		_bodySkin = TentacleKit.Flesh(Vector3.Up, 0.35f, 0.4f);
 		BuildBody();
 		for (int i = 0; i < LimbCount; i++) BuildTentacle(i);
 		ApplyRot();
@@ -85,7 +87,7 @@ public partial class Leviathan : Node3D
 		_body = new Node3D { Name = "Body", Position = new Vector3(0, 5f, 0) };
 		AddChild(_body);
 		var k = new MeshKit();
-		k.Mat(_skin);
+		k.Mat(_bodySkin);
 		k.Color = Colors.White;
 		k.Blob(Vector3.Zero, new Vector3(10.5f, 8f, 10.5f), 18, 0.14f, false, 1f);
 		for (int i = 0; i < 9; i++)
@@ -142,25 +144,32 @@ public partial class Leviathan : Node3D
 			var k = new MeshKit();
 			k.Mat(_skin);
 			k.Color = Colors.White;
-			k.Cylinder(Vector3.Zero, Vector3.Up * segLen, r0, r1, 10, false, 1f);
+			k.Cylinder(Vector3.Zero, Vector3.Up * segLen, r0, r1, 12, false, 1f);
 			k.Blob(Vector3.Up * segLen, Vector3.One * r1 * 1.05f, s * 7 + i, 0.06f, false);
+			if (s < Segments - 1) TentacleKit.Suckers(k, segLen, r0, r1, 2);
 			k.CommitTo(seg, "Seg", true);
 			t.Segs.Add(seg);
-			if (s >= 5 && s <= 15 && s % 2 == 1)
+			// eyes the whole way up: big (and two to a segment) where it meets the body, shrinking to the tip
+			int perSeg = s < 4 ? 2 : s % 2 == 0 ? 1 : 0;
+			for (int e = 0; e < perSeg && s < Segments - 1; e++)
 			{
-				float ang = _rng.RandfRange(0, Mathf.Tau), rr = Mathf.Lerp(r0, r1, 0.5f);
-				var socket = new Node3D { Name = $"Eye{s}", Position = new Vector3(Mathf.Cos(ang) * rr, segLen * 0.5f, Mathf.Sin(ang) * rr) };
+				float f = (s + 0.5f) / Segments;
+				float ang = Mathf.Pi * 0.5f + _rng.RandfRange(0.8f, Mathf.Tau - 0.8f), rr = Mathf.Lerp(r0, r1, 0.5f);
+				var socket = new Node3D { Name = $"Eye{s}_{e}", Position = new Vector3(Mathf.Cos(ang) * rr, segLen * (0.3f + 0.4f * e), Mathf.Sin(ang) * rr) };
 				seg.AddChild(socket);
 				BuildEye(socket);
+				socket.SetMeta("size", Mathf.Min(TentacleKit.EyeSize(t.BaseR * 1.05f, 0.22f, f) * _rng.RandfRange(0.85f, 1.15f), rr * 1.0f));
 				t.Eyes.Add(socket);
 			}
 		}
+		// the mouth at the tip: jaws round a toothed throat
+		TentacleKit.Maw(t.Segs[Segments - 1], Radius(t.BaseR, 1f), t.BaseR * 1.5f, _skin, i * 7 + 3).Position = Vector3.Up * segLen;
 		t.Tip = IdleTip(t);
 		t.Ctrl = IdleCtrl(t, t.Tip);
 		_tentacles.Add(t);
 	}
 
-	private static float Radius(float baseR, float f) => Mathf.Lerp(baseR, Mathf.Max(0.14f, baseR * 0.12f), Mathf.Pow(f, 1.4f));
+	private static float Radius(float baseR, float f) => Mathf.Lerp(baseR, Mathf.Max(0.3f, baseR * 0.3f), Mathf.Pow(f, 1.4f));   // thick enough at the tip to carry its mouth
 
 	// ------------------------------------------------------------------ the fight's API
 
@@ -354,7 +363,7 @@ public partial class Leviathan : Node3D
 			{
 				if (!eye.Visible) continue;
 				Vector3 at = eye.GlobalPosition;
-				float s = 0.55f * eye.GetMeta("swell", 1f).AsSingle();
+				float s = eye.GetMeta("size", 0.55f).AsSingle() * eye.GetMeta("swell", 1f).AsSingle();
 				if (at.DistanceSquaredTo(target) > 0.01f) eye.GlobalBasis = Basis.LookingAt(target - at, Vector3.Up) * Basis.FromScale(Vector3.One * s);
 			}
 	}
@@ -362,6 +371,7 @@ public partial class Leviathan : Node3D
 	private void ApplyRot()
 	{
 		_skin?.SetShaderParameter("rot", _rot);
+		_bodySkin?.SetShaderParameter("rot", _rot);
 		if (_sclera != null)
 		{
 			// bloodshot white -> milky, clouded, yellow-grey

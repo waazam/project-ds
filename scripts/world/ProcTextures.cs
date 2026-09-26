@@ -430,6 +430,7 @@ public static class ProcTextures
 			VertexColorUseAsAlbedo = vertexColor,
 		};
 		if (cullOff) s.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+		AddGrime(s);
 		_mat[key] = s;
 		return s;
 	}
@@ -442,6 +443,44 @@ public static class ProcTextures
 		return s;
 	}
 
+	/// <summary>
+	/// The texture pass's grime (the owner: good detail, the PS2 horror look shining): a fine, tileable
+	/// layer of stains, speckle, pitting and hairline scratches, multiplied over a material's own texture
+	/// at a finer grain than it (<see cref="AddGrime"/>). It breaks up the flat low-res look into the dirty,
+	/// worn surfaces of the era's horror games. Values stay near white, so it darkens only where it's dirty.
+	/// </summary>
+	public static Texture2D Grime() => Make("grime_detail", 128, 128, (x, y) =>
+	{
+		float stain = Fbm(x, y, 128, 128, 4, 4, 9001);
+		float blot = Mathf.SmoothStep(0.55f, 0.8f, Fbm(x, y, 128, 128, 8, 3, 9002));
+		float speck = Hash(x, y, 9003) > 0.965f ? Hash(x + 7, y, 9004) : 0f;
+		float pit = Mathf.SmoothStep(0.7f, 0.9f, Fbm(x, y, 128, 128, 32, 2, 9005)) * 0.6f;
+		// hairline scratches: a few long diagonal lines
+		float scratch = 0f;
+		for (int i = 0; i < 6; i++)
+		{
+			float a = Hash(i, 1, 9006) * Mathf.Pi, off = Hash(i, 2, 9007) * 128f;
+			float dist = Mathf.Abs(Mathf.PosMod(x * Mathf.Cos(a) + y * Mathf.Sin(a) + off, 128f) - 64f);
+			float along = Mathf.PosMod(-x * Mathf.Sin(a) + y * Mathf.Cos(a) + off * 1.7f, 128f);
+			if (dist < 0.6f && along < 30f + Hash(i, 3, 9008) * 40f) scratch = Mathf.Max(scratch, 0.6f);
+		}
+		float v = 1f - 0.16f * stain - 0.12f * blot - 0.2f * speck - 0.1f * pit - 0.12f * scratch;
+		v = Mathf.Clamp(v + 0.08f, 0.62f, 1f);
+		return new Color(v, v * 0.995f, v * 0.985f);
+	});
+
+	/// <summary>Lays the grime detail over a textured, opaque material (once): multiplied at a finer
+	/// grain than its own texture, so it adds detail without shifting the pattern.</summary>
+	public static void AddGrime(StandardMaterial3D m, float grain = 1.6f)
+	{
+		if (m == null || m.AlbedoTexture == null || m.DetailEnabled || m.Transparency != BaseMaterial3D.TransparencyEnum.Disabled) return;
+		m.DetailEnabled = true;
+		m.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mul;
+		m.DetailUVLayer = BaseMaterial3D.DetailUV.UV1;
+		m.DetailAlbedo = Grime();
+		_ = grain;
+	}
+
 	public static Material Cached(string key, Func<Material> make)
 	{
 		if (_mat.TryGetValue(key, out var m)) return m;
@@ -452,6 +491,18 @@ public static class ProcTextures
 
 	// Named materials used across props
 	public static StandardMaterial3D BarkMat => Std("bark", Bark(), vertexColor: true);
+
+	/// <summary>A tree's solid parts (trunk, stubs, broken tops, leaf masses): as the plain materials, but
+	/// swaying with the woods' breeze together with the tree's boughs (tree_solid.gdshader).</summary>
+	private static ShaderMaterial TreeSolid(string key, Texture2D tex) => (ShaderMaterial)Cached(key, () =>
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/tree_solid.gdshader") };
+		m.SetShaderParameter("albedo_tex", tex);
+		return m;
+	});
+	public static ShaderMaterial TreeBarkMat => TreeSolid("tree_bark", Bark());
+	public static ShaderMaterial TreeEndGrainMat => TreeSolid("tree_endgrain", EndGrain());
+	public static ShaderMaterial TreeLeafMat => TreeSolid("tree_leaves", Leaves());
 	public static StandardMaterial3D NeedleMat => Std("needles", Needles(), vertexColor: true);
 	public static StandardMaterial3D LeafMat => Std("leaves", Leaves(), vertexColor: true);
 	public static StandardMaterial3D RockMat => Std("rock", Rock(), vertexColor: true);

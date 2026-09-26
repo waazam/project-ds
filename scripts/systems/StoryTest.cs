@@ -1189,9 +1189,21 @@ public partial class StoryTest : Node
 		var target = GetTree().GetFirstNodeInGroup("final_stairs_marker") as Node3D;
 		Check("the last staircase exists, tall", act11 is { StairsTall: true }, $"{act11?.StairsTall}");
 		if (act11 == null || target == null) return;
+		await WaitUntil(() => act11.Pursuer != null, 10, ct);
+		Check("the thing from the bunker follows them out", act11.Pursuer != null);
 		await WalkAlongTrail(target.GlobalPosition, 40f, ct);
 		if (act11.ApproachWorld is { } approach) await WalkTo(approach, 1f, ct);
 		Screenshot("last_stairs");
+		if (act11.Pursuer is { } chaser)
+		{
+			Check("it kept to their trail all the way to the stairs, never far behind", chaser.DistanceToPlayer < 30f, $"{chaser.DistanceToPlayer:0.0} m behind");
+			var facing = _player.CameraRig.Yaw;
+			await Aim(chaser.GlobalPosition + Vector3.Up * 1.6f, ct);
+			await Frames(3, ct);
+			Screenshot("it_follows_you");
+			_player.CameraRig.SnapBehind(facing);
+			await Frames(3, ct);
+		}
 		// The climb is the player's own: up the whole flight on foot (a ramp collider), no pull.
 		Check("the last staircase is still broken", act11.OriginalStairs is { NewelCapped: false });
 		Check("the cap is still in hand at the last staircase", _inv.HasNewelPost);
@@ -1199,6 +1211,13 @@ public partial class StoryTest : Node
 		Check("the top landing exists", top != null);
 		bool climbed = top != null && await WalkTo(top.GlobalPosition, 1.2f, ct, giveUp: 40f);
 		Check("walked up the tall flight to the top landing", climbed, $"progress {act11.Progress:0.00} at {_player.GlobalPosition}");
+		if (act11.Pursuer is { } stuck)
+		{
+			await WaitUntil(() => stuck.StuckAtFoot, 20, ct);
+			Check("it can't climb: stuck at the foot of the stairs, staring up after them", stuck.StuckAtFoot, $"{stuck.GlobalPosition.DistanceTo(stuck.FootWorld):0.0} m from the foot, {stuck.Shoves} shoves");
+			await Aim(stuck.GlobalPosition + Vector3.Up * 1.8f, ct);
+			Screenshot("it_stares_up_from_the_foot");
+		}
 		Check("the hum rose with the climb", act11.Progress > 0.9f, $"progress {act11.Progress:0.00}");
 		Check("the last staircase called once or twice on the way up", act11.CallCount is 1 or 2, $"{act11.CallCount} calls");
 		Check("still in control at the top", _input.Enabled);
@@ -1263,10 +1282,10 @@ public partial class StoryTest : Node
 		Check("pushed off from the dock and handed the oars over", crossing.Paddling);
 
 		Engine.TimeScale = 3.0;
-		await PaddleUntil(() => crossing.Progress > 0.3f || crossing.InBreach, ct, 20);
+		await PaddleUntil(() => crossing.Progress > 0.3f || crossing.InBreach, ct, 45);
 		Check("rowing makes way: strokes counted, the boat moving", crossing.StrokeCount > 4 && crossing.Speed > 0.5f, $"{crossing.StrokeCount} strokes, {crossing.Speed:0.0} m/s");
 		Screenshot("rowing_calm");
-		await PaddleUntil(() => !crossing.Paddling || crossing.InBreach, ct, 20);
+		await PaddleUntil(() => !crossing.Paddling || crossing.InBreach, ct, 45);
 		Check("paddled to the breach point", crossing.InBreach || crossing.Progress >= crossing.BreachAtFraction - 0.02f, $"progress {crossing.Progress:0.00}");
 		await WaitUntil(() => crossing.InBreach, 5, ct);
 
@@ -1310,9 +1329,9 @@ public partial class StoryTest : Node
 		// Second time: row for it, at full speed, so the hunter falls behind.
 		Engine.TimeScale = 1.0;
 
-		await PaddleUntil(() => crossing.Progress > 0.7f || crossing.Landed, ct, 30);
+		await PaddleUntil(() => crossing.Progress > 0.7f || crossing.Landed, ct, 60);
 		Screenshot("rowing_current");
-		await PaddleUntil(() => crossing.Landed, ct, 30);
+		await PaddleUntil(() => crossing.Landed, ct, 60);
 		Check("crossed the current and landed", crossing.Landed, $"progress {crossing.Progress:0.00}");
 		Check("stood up again on the beach", _player.CameraRig.EyeHeight > 1.5f && _player.GlobalPosition.DistanceTo(lake.FarDockWorld) < 1.5f, $"eye {_player.CameraRig.EyeHeight:0.00} at {_player.GlobalPosition}");
 		Screenshot("landed");
@@ -1895,11 +1914,26 @@ public partial class StoryTest : Node
 
 			// play it properly: walk in the green, stand still in the red
 			ulong t1 = Time.GetTicksMsec();
-			bool redShot = false, turnedShot = false;
+			bool redShot = false, turnedShot = false, frontShot = false, frontOk = true, doorClear = true;
 			var game = HallWalk(hw, Act15Hallway.End - 1.2f, true, ct, 900f);
 			while (!game.IsCompleted)
 			{
 				await Frames(1, ct);
+				if (hw.State == ProjectDS.World.Act15Hallway.Phase.Red)
+				{
+					float sz = hw.ToLocal(hw.Shadow.GlobalPosition).Z;
+					if (sz > Act15Hallway.End - Act15Hallway.DoorKeepClear + 0.01f) doorClear = false;
+					if (hw.InFront && sz < hw.PlayerZ + 0.5f) frontOk = false;
+					if (hw.InFront && !frontShot && hw.PlayerZ > Act15Hallway.FrontFromZ + 20f)
+					{
+						frontShot = true;
+						Engine.TimeScale = 1.0;
+						await Seconds(1.2, ct);
+						await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.9f, ct);
+						Screenshot("he_is_in_front_of_you");
+						Engine.TimeScale = 3.0;
+					}
+				}
 				if (hw.State == ProjectDS.World.Act15Hallway.Phase.Red && !redShot && hw.Reds >= 2)
 				{
 					redShot = true;
@@ -1923,6 +1957,8 @@ public partial class StoryTest : Node
 			double minutes = (Time.GetTicksMsec() - t1) / 1000.0 * 3.0 / 60.0;
 			Check("red light, green light all the way to the door: never taken", !PlayerDeath.Dying && hw.Reds >= 8, $"{hw.Reds} reds, about {minutes:0.0} min");
 			Check("looked round at him in the red and lived", turnedShot);
+			Check("from halfway down the hall, the reds put him in front of you: stand still, then go round him", hw.FrontReds >= 1 && frontOk && frontShot, $"{hw.FrontReds} reds in front");
+			Check("he never stands in front of the door", doorClear);
 		}
 		finally { Engine.TimeScale = 1.0; }
 

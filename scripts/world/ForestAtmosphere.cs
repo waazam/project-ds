@@ -88,6 +88,21 @@ public partial class ForestAtmosphere : Node
 	/// <summary>0..1 how much of the open-trail grade is applied right now (for tests and the HUD).</summary>
 	public float OpenAmount => _open;
 
+	[ExportGroup("Act 1 fog (the walk to the fallen tree)")]
+	/// <summary>The owner's Act 1 fog: hardly there at the trailhead, closing in the further they walk,
+	/// until at the fallen tree they can see only about twenty feet (a see-through bubble round them) and
+	/// past it the fog is a wall. Depth fog: clear up to the begin distance, fully thick by the end one.</summary>
+	[Export] public bool Act1Fog = true;
+	[Export] public float Act1FarBegin = 70f, Act1FarEnd = 650f;
+	[Export] public float Act1NearBegin = 3.5f, Act1NearEnd = 15f;
+	[Export] public Color Act1FogColor = new(0.44f, 0.45f, 0.47f);
+	/// <summary>0..1 how far the Act 1 fog has closed in (0 at the trailhead, 1 at the fallen tree); -1 when it isn't Act 1.</summary>
+	public float Act1FogAmount => _act1On ? _act1 : -1f;
+	private float _act1, _act1Target;
+	private bool _act1On, _act1Applied;
+	private Environment.FogModeEnum _levelFogMode;
+	private float _levelDepthBegin, _levelDepthEnd, _levelDepthCurve;
+
 	// Scripted mood targets (Act 6 onward). Fog colour/density, sky-fog, ambient and sun energy
 	// all cross-fade from whatever the auto system last set toward these over SetMood's duration.
 	[Export] public Color FogColorDawn = new(0.55f, 0.4f, 0.32f);
@@ -314,8 +329,24 @@ public partial class ForestAtmosphere : Node
 			_openSampleTimer = 0.2f;   // the trail lookup needn't run every frame
 			var cam = GetViewport().GetCamera3D();
 			_openTarget = cam == null ? 0f : OpenTarget(cam.GlobalPosition);
+			_act1On = cam != null && Act1FogActive();
+			if (_act1On)
+			{
+				float along = TrailAlong(cam.GlobalPosition);
+				float end = _terrain != null && IsInstanceValid(_terrain) ? _terrain.TrailLength : 480f;
+				_act1Target = Mathf.SmoothStep(OpenHoldMeters * 0.5f, Mathf.Max(end - 15f, OpenHoldMeters + 20f), along);
+			}
 		}
 		_open = Mathf.Lerp(_open, _openTarget, 1f - Mathf.Exp(-dt / Mathf.Max(OpenSmoothing, 0.01f)));
+		_act1 = Mathf.Lerp(_act1, _act1Target, 1f - Mathf.Exp(-dt / 1.5f));
+	}
+
+	/// <summary>Act 1's walk in (before the first climb), in the woods' own mood, no storm, not underground.</summary>
+	private bool Act1FogActive()
+	{
+		if (!Act1Fog || _mood != Mood.Auto || Storm > 0.01f || Underground > 0.01f) return false;
+		if (Systems.StoryManager.Instance is not { } story) return false;
+		return story.Current < Systems.Checkpoint.Act2StairsClimbed;
 	}
 
 	private float OpenTarget(Vector3 p)
@@ -470,6 +501,32 @@ public partial class ForestAtmosphere : Node
 		_env.FogLightColor = fog;
 		_env.FogDensity = density;
 		_env.FogSkyAffect = _baseSkyFog;
+		if (_act1On)
+		{
+			// Act 1: depth fog closing in round them as they walk toward the fallen tree (the level's
+			// own fog settings are kept, and put back the moment Act 1's fog is over)
+			if (!_act1Applied)
+			{
+				_act1Applied = true;
+				_levelFogMode = _env.FogMode;
+				_levelDepthBegin = _env.FogDepthBegin; _levelDepthEnd = _env.FogDepthEnd; _levelDepthCurve = _env.FogDepthCurve;
+			}
+			float f = Mathf.Clamp(_act1, 0f, 1f);
+			float e = f * f * (3f - 2f * f);
+			_env.FogMode = Environment.FogModeEnum.Depth;
+			_env.FogDepthBegin = Mathf.Lerp(Act1FarBegin, Act1NearBegin, e);
+			_env.FogDepthEnd = Mathf.Lerp(Act1FarEnd, Act1NearEnd, Mathf.Sqrt(e));
+			_env.FogDepthCurve = Mathf.Lerp(1.4f, 0.75f, e);
+			_env.FogDensity = Mathf.Lerp(0.35f, 1f, e);
+			_env.FogLightColor = fog.Lerp(Act1FogColor, e);
+			_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 1f, e);
+		}
+		else if (_act1Applied)
+		{
+			_act1Applied = false;
+			_env.FogMode = _levelFogMode;
+			_env.FogDepthBegin = _levelDepthBegin; _env.FogDepthEnd = _levelDepthEnd; _env.FogDepthCurve = _levelDepthCurve;
+		}
 		_env.AmbientLightColor = ambColor;
 		_env.AmbientLightEnergy = ambient;
 		_env.TonemapExposure = _exposureBase + OpenExposureBoost * _open;

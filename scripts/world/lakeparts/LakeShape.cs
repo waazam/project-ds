@@ -17,13 +17,14 @@ namespace ProjectDS.World.LakeParts;
 public static class LakeShape
 {
 	// Wide enough that the side shores sit far out in the morning mist (it must read as open water,
-	// not a pond you could walk round), long enough for a real crossing.
-	public const float SemiX = 95f;
-	public const float SemiZ = 48f;
+	// not a pond you could walk round), long enough for a real crossing. Doubled (the owner: the lake
+	// must feel massive, and the crossing take long enough to be remembered): about 190 m of rowing.
+	public const float SemiX = 150f;
+	public const float SemiZ = 96f;
 	public const float CenterZ = 1f - SemiZ;
 	/// <summary>Where the waterline crosses the long axis (x = 0).</summary>
 	public const float NearShoreZ = CenterZ + SemiZ;   // +1
-	public const float FarShoreZ = CenterZ - SemiZ;    // -83
+	public const float FarShoreZ = CenterZ - SemiZ;    // -191
 
 	/// <summary>The dock: runs from the near beach out over the water along x = 0.</summary>
 	public const float DockStartZ = 5.5f, DockEndZ = -7.2f, DockHalfWidth = 0.95f, DockDeck = 0.45f;

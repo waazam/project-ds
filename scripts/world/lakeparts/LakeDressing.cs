@@ -108,7 +108,7 @@ public partial class LakeDressing : Node3D
 	private void ScatterShoreline()
 	{
 		var clump = new FastNoiseLite { Seed = 1211, Frequency = 0.09f };
-		for (int i = 0; i < 26000; i++)
+		for (int i = 0; i < 52000; i++)   // scaled with the doubled lake
 		{
 			float x = _rng.RandfRange(-LakeShape.SemiX - 12f, LakeShape.SemiX + 12f);
 			float z = _rng.RandfRange(LakeShape.FarShoreZ - 12f, LakeShape.NearShoreZ + 12f);

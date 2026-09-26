@@ -115,16 +115,23 @@ public partial class ForestScatter : Node3D
 			return new Vector3(Mathf.Sin(f * 2.1f + seed) * 0.18f * f, y, Mathf.Cos(f * 1.7f + seed * 2) * 0.14f * f);
 		}
 		float topY = height * 0.93f;
-		k.Mat(ProcTextures.BarkMat);
-		k.Color = new Color(0.62f, 0.6f, 0.58f);
-		k.Cylinder(new Vector3(0, -0.5f, 0), new Vector3(0, 0.6f, 0), trunkR * 1.45f, trunkR * 1.02f, 7, false, 1f);   // root flare
-		float[] ys = { 0.6f, height * 0.3f, height * 0.62f, topY };
-		for (int s = 0; s < ys.Length - 1; s++)
+		k.Mat(ProcTextures.TreeBarkMat);
+		// one continuous trunk from the root flare in the ground up to the top: smooth shading and bark
+		// that runs on unbroken, so there is no seam where the flare meets the trunk
+		var rings = new System.Collections.Generic.List<(Vector3 c, float r, Color col)>
 		{
-			float r0 = trunkR * Mathf.Lerp(1.02f, 0.08f, ys[s] / topY), r1 = trunkR * Mathf.Lerp(1.02f, 0.08f, ys[s + 1] / topY);
-			k.Color = new Color(0.62f, 0.6f, 0.58f).Lerp(new Color(0.8f, 0.78f, 0.74f), (float)s / 2f);
-			k.Cylinder(Axis(ys[s]), Axis(ys[s + 1]), r0, r1, s == 0 ? 7 : 6, false, 1f);
+			(new Vector3(0, -0.5f, 0), trunkR * 1.55f, new Color(0.56f, 0.54f, 0.52f)),
+			(new Vector3(0, -0.12f, 0), trunkR * 1.42f, new Color(0.58f, 0.56f, 0.54f)),
+			(new Vector3(0, 0.22f, 0), trunkR * 1.2f, new Color(0.6f, 0.58f, 0.56f)),
+			(Axis(0.6f), trunkR * 1.06f, new Color(0.62f, 0.6f, 0.58f)),
+			(Axis(1.2f), trunkR * 1.0f, new Color(0.62f, 0.6f, 0.58f)),
+		};
+		foreach (float fy in new[] { 0.3f, 0.46f, 0.62f, 0.78f, 1f })
+		{
+			float y = topY * fy;
+			rings.Add((Axis(y), trunkR * Mathf.Lerp(1.02f, 0.08f, y / topY), new Color(0.62f, 0.6f, 0.58f).Lerp(new Color(0.8f, 0.78f, 0.74f), fy)));
 		}
+		TrunkLoft(k, rings, 8, 1f);
 		// dead stubs on the bare trunk
 		int stubs = Mathf.RoundToInt(crownStart * height * 0.55f);
 		k.Color = new Color(0.5f, 0.48f, 0.46f);
@@ -211,6 +218,37 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
+	/// <summary>A trunk as one smooth tube through <paramref name="rings"/> (bottom to top): per-vertex
+	/// normals round and along it, bark UVs running on unbroken, vertex colours blended ring to ring.</summary>
+	internal static void TrunkLoft(MeshKit k, System.Collections.Generic.List<(Vector3 c, float r, Color col)> rings, int sides, float uvScale)
+	{
+		float v0 = 0f;
+		for (int i = 0; i < rings.Count - 1; i++)
+		{
+			var (c0, r0, col0) = rings[i];
+			var (c1, r1, col1) = rings[i + 1];
+			float len = c0.DistanceTo(c1);
+			float v1 = v0 + len * uvScale * 0.5f;
+			Vector3 ax = (c1 - c0).Normalized();
+			Vector3 side = Mathf.Abs(ax.Y) > 0.9f ? Vector3.Right : Vector3.Up;
+			Vector3 bx = ax.Cross(side).Normalized(), bz = bx.Cross(ax).Normalized();
+			// slope of the taper, for the normals
+			float slope = (r0 - r1) / Mathf.Max(len, 0.001f);
+			for (int s = 0; s < sides; s++)
+			{
+				float a0 = Mathf.Tau * s / sides, a1 = Mathf.Tau * (s + 1) / sides;
+				Vector3 d0 = bx * Mathf.Cos(a0) + bz * Mathf.Sin(a0), d1 = bx * Mathf.Cos(a1) + bz * Mathf.Sin(a1);
+				Vector3 p00 = c0 + d0 * r0, p01 = c0 + d1 * r0, p10 = c1 + d0 * r1, p11 = c1 + d1 * r1;
+				Vector3 n0 = (d0 + ax * slope).Normalized(), n1 = (d1 + ax * slope).Normalized();
+				float u0 = (float)s / sides * 2f, u1 = (float)(s + 1) / sides * 2f;
+				k.Color = col0;
+				k.Tri(p00, p10, p11, n0, n0, n1, new Vector2(u0, v0), new Vector2(u0, v1), new Vector2(u1, v1));
+				k.Tri(p00, p11, p01, n0, n1, n1, new Vector2(u0, v0), new Vector2(u1, v1), new Vector2(u1, v0));
+			}
+			v0 = v1;
+		}
+	}
+
 	internal static Mesh BoulderMesh(int seed)
 	{
 		var k = new MeshKit();
@@ -228,7 +266,12 @@ public partial class ForestScatter : Node3D
 		k.Color = new Color(0.75f, 0.72f, 0.68f);
 		float lean = rng.RandfRange(-0.25f, 0.25f);
 		Vector3 top = new(lean, 4.2f, rng.RandfRange(-0.2f, 0.2f));
-		k.Mat(ProcTextures.BarkMat).Cylinder(new Vector3(0, -0.4f, 0), top, 0.23f, 0.13f, 6, false, 1f);
+		k.Mat(ProcTextures.TreeBarkMat);
+		TrunkLoft(k, new System.Collections.Generic.List<(Vector3, float, Color)>
+		{
+			(new Vector3(0, -0.4f, 0), 0.34f, k.Color), (new Vector3(0, 0.0f, 0), 0.29f, k.Color), (new Vector3(0, 0.35f, 0), 0.245f, k.Color),
+			(top * 0.35f + new Vector3(0, 0.1f, 0), 0.2f, k.Color), (top, 0.13f, k.Color),
+		}, 7, 1f);
 		for (int b = 0; b < 3; b++)
 		{
 			float a = rng.RandfRange(0, Mathf.Tau);
@@ -237,7 +280,7 @@ public partial class ForestScatter : Node3D
 			k.Cylinder(from, to, 0.09f, 0.04f, 5, false, 1f);
 		}
 		k.Cylinder(top, top + new Vector3(0, 1.6f, 0), 0.13f, 0.05f, 5, false);
-		k.Mat(ProcTextures.LeafMat);
+		k.Mat(ProcTextures.TreeLeafMat);
 		int blobs = 5;
 		for (int i = 0; i < blobs; i++)
 		{
@@ -258,12 +301,17 @@ public partial class ForestScatter : Node3D
 		float r = 0.2f + h * 0.012f;
 		Vector3 top = new(0.02f * h, h, 0.01f * h);
 		k.Color = new Color(0.72f, 0.72f, 0.72f);
-		k.Mat(ProcTextures.BarkMat).Cylinder(new Vector3(0, -0.4f, 0), top * 0.5f, r * 1.1f, r * 0.7f, 6, false, 1f);
-		k.Color = new Color(0.9f, 0.9f, 0.88f);          // bleached, bark sloughing off higher up
-		k.Cylinder(top * 0.5f, top, r * 0.7f, r * 0.25f, 6, false, 1f);
+		k.Mat(ProcTextures.TreeBarkMat);
+		// one smooth trunk from its flare in the ground, bleached higher up where the bark is sloughing off
+		TrunkLoft(k, new System.Collections.Generic.List<(Vector3, float, Color)>
+		{
+			(new Vector3(0, -0.4f, 0), r * 1.5f, new Color(0.7f, 0.7f, 0.7f)), (new Vector3(0, 0.0f, 0), r * 1.3f, new Color(0.72f, 0.72f, 0.72f)),
+			(new Vector3(0, 0.4f, 0), r * 1.1f, new Color(0.72f, 0.72f, 0.72f)), (top * 0.5f, r * 0.7f, new Color(0.8f, 0.8f, 0.78f)),
+			(top, r * 0.25f, new Color(0.9f, 0.9f, 0.88f)),
+		}, 7, 1f);
 		k.Color = new Color(0.62f, 0.6f, 0.56f);
-		k.Mat(ProcTextures.EndGrainMat).Cylinder(top, top + new Vector3(0.05f, 0.08f, 0), r * 0.25f, 0.02f, 6, false, 1f);   // broken top
-		k.Mat(ProcTextures.BarkMat);
+		k.Mat(ProcTextures.TreeEndGrainMat).Cylinder(top, top + new Vector3(0.05f, 0.08f, 0), r * 0.25f, 0.02f, 6, false, 1f);   // broken top
+		k.Mat(ProcTextures.TreeBarkMat);
 		int nb = Mathf.RoundToInt(h * 0.7f);
 		for (int b = 0; b < nb; b++)
 		{
@@ -539,7 +587,9 @@ public partial class ForestScatter : Node3D
 				// the odd stump beside a tree
 				if (_rng.Randf() < 0.035f)
 				{
-					Vector3 sp = pos + new Vector3(_rng.RandfRange(-1.8f, 1.8f), 0, _rng.RandfRange(-1.8f, 1.8f));
+					// clear of the trunk and its root flare, so the two never run into each other
+					float sa = _rng.RandfRange(0, Mathf.Tau), sd = trunkR * scale * 1.6f + 0.55f + _rng.RandfRange(0f, 1.2f);
+					Vector3 sp = pos + new Vector3(Mathf.Cos(sa) * sd, 0, Mathf.Sin(sa) * sd);
 					_terrain.SampleFields(sp.X, sp.Z, out float sdT, out _, out float sdS, out _);
 					if (sdT > 2.2f && sdS > 3f && _terrain.RouteDistance(sp.X, sp.Z) > 2f && _terrain.SampleBranch(sp.X, sp.Z, out float sbh) > sbh + 1.2f)
 					{

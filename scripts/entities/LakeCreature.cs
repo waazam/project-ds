@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Godot;
 using ProjectDS.World;
@@ -71,7 +71,8 @@ public partial class LakeCreature : Node3D
 	private RandomNumberGenerator _rng;
 	private double _time;
 	private Camera3D _cam;
-	private static StandardMaterial3D _skin, _sucker, _eyeMat;
+	private static ShaderMaterial _skin;
+	private static StandardMaterial3D _eyeMat;
 	private const int Segments = 9;
 	private float _blinkT = -1f;
 	private bool _eyesOpened;
@@ -108,32 +109,28 @@ public partial class LakeCreature : Node3D
 			parent.AddChild(joint);
 			var k = new MeshKit();
 			k.Mat(Skin());
-			float sh = Mathf.Lerp(0.9f, 1.25f, f0);
-			k.Color = new Color(sh, sh, sh);
-			k.Cylinder(Vector3.Zero, Vector3.Up * segLen, r0, r1, 9, false, 1.5f);
+			k.Color = Colors.White;
+			k.Cylinder(Vector3.Zero, Vector3.Up * segLen, r0, r1, 12, false, 1.5f);
 			// a knuckle to hide the seam at the next joint
 			k.Blob(Vector3.Up * segLen, Vector3.One * r1 * 1.04f, i * 7 + 3, 0.05f, false);
-			// suckers down the inner face (the side it curls toward, +Z)
-			k.Mat(Sucker());
-			for (int s = 0; s < 2; s++)
-			{
-				float y = segLen * (0.3f + 0.4f * s);
-				float r = Mathf.Lerp(r0, r1, y / segLen);
-				k.Cylinder(new Vector3(0, y, r * 0.92f), new Vector3(0, y, r * 1.02f), r * 0.32f, r * 0.26f, 7, true);
-			}
+			// ring suckers in two staggered rows down the inner face (the side it curls toward, +Z)
+			if (i < Segments - 1) TentacleKit.Suckers(k, segLen, r0, r1, i < 3 ? 2 : 3);
 			k.CommitTo(joint, "Seg", true);
 			limb.Joints.Add(joint);
 			parent = joint;
 		}
-		// eyes all over it, thickest halfway up, a few big ones low down
+		// the mouth at the tip (the owner's references): jaws flaring round a toothed throat
+		TentacleKit.Maw(limb.Joints[Segments - 1], Radius(baseR, 1f), baseR * 1.45f, Skin(), limb.Joints.Count * 31 + _limbs.Count).Position = Vector3.Up * segLen;
+		// eyes all the way up it, crowded and huge at the root where it meets the body, shrinking to
+		// small ones toward the tip (never on the sucker side)
 		for (int e = 0; e < eyes; e++)
 		{
-			float f = Mathf.Clamp(_rng.RandfRange(0.04f, 0.82f) * (e < 3 ? 0.5f : 1f), 0.04f, 0.88f);
+			float f = Mathf.Clamp(Mathf.Pow(_rng.Randf(), 1.35f) * 0.9f + 0.03f, 0.03f, 0.9f);
 			int seg = Mathf.Clamp((int)(f * Segments), 0, Segments - 1);
 			float local = (f * Segments - seg) * segLen;
 			float r = Radius(baseR, f);
-			float ang = _rng.RandfRange(0, Mathf.Tau);
-			float size = Mathf.Clamp(r * _rng.RandfRange(0.45f, 0.8f) * (e < 3 ? 1.35f : 1f), 0.1f, 0.95f);
+			float ang = Mathf.Pi * 0.5f + _rng.RandfRange(0.75f, Mathf.Tau - 0.75f);
+			float size = Mathf.Min(TentacleKit.EyeSize(baseR * 0.9f, baseR * 0.14f, f) * _rng.RandfRange(0.85f, 1.15f), r * 0.95f);
 			var socket = new Node3D { Name = $"Eye{e}", Position = new Vector3(Mathf.Cos(ang) * r * 1.0f, local, Mathf.Sin(ang) * r * 1.0f) };
 			limb.Joints[seg].AddChild(socket);
 			BuildEye(socket);
@@ -181,26 +178,13 @@ public partial class LakeCreature : Node3D
 
 	/// <summary>The limb's radius a fraction f of the way up: thick most of the way, narrowing late
 	/// into a blunt, curling tip (a tentacle, not a spike).</summary>
-	private static float Radius(float baseR, float f) => Mathf.Lerp(baseR, Mathf.Max(0.08f, baseR * 0.14f), Mathf.Pow(f, 1.7f));
+	private static float Radius(float baseR, float f) => Mathf.Lerp(baseR, Mathf.Max(0.12f, baseR * 0.3f), Mathf.Pow(f, 1.7f));   // thick enough at the tip to carry its mouth
 
-	private static StandardMaterial3D Skin() => _skin ??= new StandardMaterial3D
-	{
-		AlbedoTexture = ProcTextures.WaterNoise(),
-		AlbedoColor = new Color(0.34f, 0.25f, 0.29f),
-		VertexColorUseAsAlbedo = true,
-		Roughness = 0.14f,
-		MetallicSpecular = 0.7f,
-		RimEnabled = true, Rim = 0.85f, RimTint = 0.7f,
-		Uv1Scale = new Vector3(2f, 3f, 1f),
-		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
-	};
-
-	private static StandardMaterial3D Sucker() => _sucker ??= new StandardMaterial3D
-	{
-		AlbedoColor = new Color(0.22f, 0.14f, 0.15f), Roughness = 0.3f, MetallicSpecular = 0.5f,
-	};
+	/// <summary>Gooey, grimy octopus flesh (<see cref="TentacleKit.Flesh"/>): maroon underneath, green-teal down the back.</summary>
+	private static ShaderMaterial Skin() => _skin ??= TentacleKit.Flesh(null, 1.1f);
 
 	private static SphereMesh _ball;
+	private static TorusMesh _lidMesh;
 	private static StandardMaterial3D _irisMat, _pupilMat;
 
 	/// <summary>One eyeball in a unit socket (the socket is scaled to the eye's size and turned so its -Z
@@ -212,8 +196,9 @@ public partial class LakeCreature : Node3D
 		_ball ??= new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 12, Rings = 8 };
 		_irisMat ??= new StandardMaterial3D
 		{
-			AlbedoColor = new Color(0.45f, 0.03f, 0.02f), Roughness = 0.1f, MetallicSpecular = 0.8f,
-			EmissionEnabled = true, Emission = new Color(0.85f, 0.08f, 0.03f), EmissionEnergyMultiplier = 1.1f,
+			AlbedoColor = new Color(0.32f, 0.03f, 0.02f), Roughness = 0.08f, MetallicSpecular = 0.85f,
+			EmissionEnabled = true, Emission = new Color(0.6f, 0.05f, 0.02f), EmissionEnergyMultiplier = 0.55f,
+			ClearcoatEnabled = true, Clearcoat = 1f, ClearcoatRoughness = 0.03f,
 		};
 		_pupilMat ??= new StandardMaterial3D { AlbedoColor = new Color(0.01f, 0.005f, 0.005f), Roughness = 0.05f, MetallicSpecular = 0.9f };
 		MeshInstance3D Part(Material m, Vector3 pos, Vector3 scale) => new()
@@ -224,6 +209,13 @@ public partial class LakeCreature : Node3D
 		socket.AddChild(Part(EyeMat(), Vector3.Zero, Vector3.One));
 		socket.AddChild(Part(_irisMat, new Vector3(0, 0, -0.84f), new Vector3(0.5f, 0.5f, 0.2f)));
 		socket.AddChild(Part(_pupilMat, new Vector3(0, 0, -0.99f), new Vector3(0.14f, 0.3f, 0.08f)));
+		// a swollen, wet lid round it, so it sits in the flesh rather than on it
+		_lidMesh ??= new TorusMesh { InnerRadius = 0.72f, OuterRadius = 1.12f, Rings = 14, RingSegments = 8 };
+		socket.AddChild(new MeshInstance3D
+		{
+			Name = "Lid", Mesh = _lidMesh, MaterialOverride = TentacleKit.Lid, Position = new Vector3(0, 0, -0.18f),
+			Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		});
 	}
 
 	/// <summary>The white of the eye: yellowed, bloodshot, veins wandering across it.</summary>

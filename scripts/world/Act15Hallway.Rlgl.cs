@@ -90,15 +90,19 @@ public partial class Act15Hallway
 		SetLights(Red, 1f);
 		Sfx("relay_clunk", 1, player.GlobalPosition + Vector3.Up * 6f, 0f);
 		Sfx("siren_low", 1, player.GlobalPosition + new Vector3(0, 8f, 30f), 2f, 30f);
-		// he is behind them: a few metres back at first, then a jump at a time closer (StepCloser)
+		// he is behind them: a few metres back at first, then a jump at a time closer (StepCloser). From
+		// halfway down the hall (the owner) he is in front of them instead, in their way: stand still till
+		// it's green, then go round him. Never near the door at the end, so the way out stays clear.
 		var cam = player.CameraRig;
 		float yaw = cam?.Yaw ?? 0f;
 		_redBack = new Vector3(Mathf.Sin(yaw), 0, Mathf.Cos(yaw));   // the camera looks along -Z of its yaw: behind is +Z
+		_inFront = InFrontZone(PlayerZ);
 		_step = 0;
 		StepCloser(player);
 		_step = 1;
 		_shadow.Glare = 0.35f;
-		GD.Print($"[story] Act 15: red light #{Reds} - he is behind you");
+		if (_inFront) FrontReds++;
+		GD.Print($"[story] Act 15: red light #{Reds} - he is {(_inFront ? "in front of" : "behind")} you");
 	}
 
 	/// <summary>When in the red (as a fraction of it) he jumps closer, and how far behind he lands each time.</summary>
@@ -106,14 +110,37 @@ public partial class Act15Hallway
 	private static readonly float[] ApproachDist = { 6f, 4.2f, 2.6f, 1.3f };
 	private Vector3 _redBack = Vector3.Back;
 	private int _step;
+	private bool _inFront;
+	/// <summary>Where, down the hall, he starts appearing in front instead of behind (halfway along).</summary>
+	public static float FrontFromZ => (ShadowZ + End) * 0.5f;
+	/// <summary>How far short of the door he must always stay (in front of them or not).</summary>
+	public const float DoorKeepClear = 7f;
+	/// <summary>For tests: reds in which he stood in front of them.</summary>
+	public int FrontReds { get; private set; }
+	/// <summary>For tests: whether he is in front of the player this red.</summary>
+	public bool InFront => _inFront;
+	/// <summary>The second half of the hall, far enough short of the door that he can stand ahead of them.</summary>
+	public static bool InFrontZone(float playerZ) => playerZ > FrontFromZ && playerZ + FrontDist[0] < End - DoorKeepClear;
+	private static readonly float[] FrontDist = { 5f, 3.8f, 2.8f, 2.0f };
 
 	/// <summary>Not walking: simply somewhere nearer, between one moment and the next. Anyone looking round sees it.</summary>
 	private void StepCloser(PlayerController player)
 	{
-		float d = ApproachDist[Mathf.Min(_step, ApproachDist.Length - 1)];
-		Vector3 la = ToLocal(player.GlobalPosition + _redBack * d);
-		la.X = Mathf.Clamp(la.X, -W2 * 0.5f + 0.35f, W2 * 0.5f - 0.35f);
-		la.Z = Mathf.Max(la.Z, Part1 + Taper + 0.5f);
+		Vector3 la;
+		if (_inFront)
+		{
+			// straight ahead down the hall, square in their path, a jump at a time closer (never past the door's clear zone)
+			float fd = FrontDist[Mathf.Min(_step, FrontDist.Length - 1)];
+			la = ToLocal(player.GlobalPosition) + new Vector3(0, 0, fd);
+			la.Z = Mathf.Min(la.Z, End - DoorKeepClear);
+		}
+		else
+		{
+			float d = ApproachDist[Mathf.Min(_step, ApproachDist.Length - 1)];
+			la = ToLocal(player.GlobalPosition + _redBack * d);
+			la.Z = Mathf.Min(Mathf.Max(la.Z, Part1 + Taper + 0.5f), End - DoorKeepClear);
+		}
+		la.X = Mathf.Clamp(la.X, -W2 * 0.5f + 0.45f, W2 * 0.5f - 0.45f);
 		la.Y = 0f;
 		_shadow.StandAt(ToGlobal(la), player.GlobalPosition);
 		Sfx("shadow_breath", 2, _shadow.GlobalPosition + Vector3.Up * 1.8f, _step == ApproachDist.Length - 1 ? -4f : -12f, 2f);

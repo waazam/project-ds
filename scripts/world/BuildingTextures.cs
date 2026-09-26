@@ -246,6 +246,7 @@ public static class BuildingTextures
 			VertexColorUseAsAlbedo = true,
 		};
 		if (cullOff) s.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+		ProcTextures.AddGrime(s as StandardMaterial3D);
 		_mat[key] = s;
 		return s;
 	}

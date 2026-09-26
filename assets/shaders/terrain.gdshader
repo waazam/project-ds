@@ -61,6 +61,11 @@ void fragment() {
 	// canopy shade is baked into the vertex colour, but open ground (trail, gravel, grass) stays lighter
 	float open_ground = max(max(m.r, m.g), m.b);
 	float shade = mix(COLOR.r, 1.0, open_ground * 0.8);
+	// the texture pass: fine grit and wet dark pockets at close range, so the ground holds detail underfoot
+	float grit = texture(tex_noise, wpos.xz * 1.9 + vec2(0.13, 0.71)).r;
+	float pocket = smoothstep(0.62, 0.8, texture(tex_noise, wpos.xz * 0.9 + vec2(0.5, 0.2)).r);
+	float near = 1.0 - smoothstep(6.0, 22.0, length(VERTEX));
+	c *= mix(1.0, (0.88 + 0.2 * grit) * (1.0 - 0.18 * pocket), near);
 	ALBEDO = c * shade;
 	ROUGHNESS = 1.0;
 }

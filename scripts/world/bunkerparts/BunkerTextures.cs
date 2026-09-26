@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.World;
 
 namespace ProjectDS.World.BunkerParts;
 
@@ -541,6 +542,7 @@ public static class BunkerTextures
 	{
 		if (_mat.TryGetValue(key, out var m)) return m;
 		m = make();
+		ProcTextures.AddGrime(m as StandardMaterial3D);
 		_mat[key] = m;
 		return m;
 	}

@@ -370,6 +370,39 @@ public partial class Act11Ending : Node3D
 			CapSeat = seat;
 		}
 		SetProcess(true);
+		// once the game is running (a Continue restores this before the player is placed)
+		_ = Cutscene.Run(this, async ct =>
+		{
+			while (GameFlow.Instance is { Started: false }) await Cutscene.Frame(this, ct);
+			await Cutscene.Wait(this, 1.5, ct);
+			SpawnPursuer();
+		});
+	}
+
+	/// <summary>For tests: the thing from the bunker, following them to the stairs.</summary>
+	public Act11Pursuer Pursuer { get; private set; }
+
+	/// <summary>The thing from the bunker's rooms comes out after them (the owner's addition): out of the
+	/// bunker's door if they are still near it, otherwise somewhere behind them, well back.</summary>
+	private void SpawnPursuer()
+	{
+		if (Pursuer != null || _climbFired || _original == null) return;
+		var player = StoryBeat.Player(this);
+		if (player == null) return;
+		var bunker = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
+		Vector3 at;
+		if (bunker != null && bunker.GlobalPosition.DistanceTo(player.GlobalPosition) < 45f) at = bunker.GlobalTransform * new Vector3(0, 0, 3f);
+		else
+		{
+			Vector3 back = player.CameraRig != null ? player.CameraRig.GlobalBasis.Z with { Y = 0 } : Vector3.Back;
+			at = player.GlobalPosition + back.Normalized() * 24f;
+		}
+		var terrain = GroundSnap.FindTerrain(this);
+		if (terrain != null) at.Y = terrain.HeightAt(at.X, at.Z);
+		Pursuer = new Act11Pursuer { Name = "Act11Pursuer", Stairs = _original };
+		Cutscene.SceneRoot(this).AddChild(Pursuer);
+		Pursuer.GlobalPosition = at;
+		GD.Print("[story] Act 11: the thing from the bunker follows them out");
 	}
 
 	/// <summary>
@@ -454,6 +487,7 @@ public partial class Act11Ending : Node3D
 		_climbFired = true;
 		SetProcess(false);
 		if (CapSeat != null) { CapSeat.Enabled = false; CapSeat.QueueFree(); CapSeat = null; }
+		if (Pursuer != null && IsInstanceValid(Pursuer)) { Pursuer.QueueFree(); Pursuer = null; }
 		player.Inventory.ConsumeNewelPost();
 		RampFog(false);
 		_ = Cutscene.Run(this, async ct =>

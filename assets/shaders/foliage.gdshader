@@ -4,6 +4,7 @@
 // cards don't thin out to nothing far away.
 shader_type spatial;
 render_mode cull_disabled, diffuse_lambert, specular_disabled;
+#include "res://assets/shaders/tree_wind.gdshaderinc"
 
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_disable;
 uniform vec3 tint : source_color = vec3(1.0);
@@ -22,6 +23,8 @@ void vertex() {
 	float t = TIME * sway_speed + wp.x * 0.35 + wp.z * 0.27;
 	VERTEX.x += sin(t) * sway * w;
 	VERTEX.z += cos(t * 0.8) * sway * 0.6 * w;
+	// the whole tree's lean in the breeze (boughs move with their trunk)
+	VERTEX = tree_wind(VERTEX, MODEL_MATRIX, TIME);
 	NORMAL = normalize(mix(NORMAL, vec3(0.0, 1.0, 0.0), normal_up));
 }
 

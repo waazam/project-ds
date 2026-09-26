@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.World;
 
 namespace ProjectDS.World.SewerParts;
 
@@ -95,6 +96,7 @@ public static class SewerTextures
 			Roughness = rough, MetallicSpecular = spec, VertexColorUseAsAlbedo = true,
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		};
+		ProcTextures.AddGrime(s as StandardMaterial3D);
 		_mat[key] = s;
 		return s;
 	}

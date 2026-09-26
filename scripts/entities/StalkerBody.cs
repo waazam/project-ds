@@ -285,17 +285,53 @@ public partial class StalkerBody : Node3D
 			float m = 1f;
 			if (r >= 3 && r <= 8 && Mathf.Abs(deg - 270f) < 1f) m *= 1.14f;
 			if (r >= 6 && r <= 7 && (Mathf.Abs(deg - 240f) < 1f || Mathf.Abs(deg - 300f) < 1f)) m *= 1.12f;
-			if (r >= 6 && r <= 8 && deg > 200f && deg < 340f) m *= 1.16f;   // rounded hunch of the upper back
+			if (r >= 6 && r <= 8 && deg > 200f && deg < 340f) m *= 1.06f;   // the hunch of the upper back (the shoulders' roots carry the mass now)
 			if (r >= 4 && r <= 5 && (Mathf.Abs(deg - 60f) < 1f || Mathf.Abs(deg - 120f) < 1f)) m *= 1.05f;   // rib edges
 			return m;
 		}, jitter: 0.03f);
 
-		// Heavy shoulders that sit high, and a trapezius mass either side of the neck.
-		k.Color = HideTone;
-		k.Blob(new Vector3(-0.36f, 2.07f, 0.05f), new Vector3(0.15f, 0.16f, 0.16f), Seed + 1, 0.12f);
-		k.Blob(new Vector3(0.37f, 2.1f, 0.05f), new Vector3(0.15f, 0.17f, 0.16f), Seed + 2, 0.12f);
-		k.Blob(new Vector3(-0.25f, 2.05f, 0.0f), new Vector3(0.09f, 0.07f, 0.1f), Seed + 3, 0.1f);
-		k.Blob(new Vector3(0.26f, 2.07f, 0.0f), new Vector3(0.09f, 0.07f, 0.1f), Seed + 4, 0.1f);
+		// The shoulders (the owner: not round and bubbly, spiked roots): each a tight, knotted mass of
+		// root where the arm hangs from, and out of it a crown of gnarled root spikes twisting up, out
+		// and back, splitting as they go, so the side profile is jagged, not a ball.
+		foreach (int side in new[] { -1, 1 })
+		{
+			Vector3 c = side < 0 ? new Vector3(-0.36f, 2.06f, 0.05f) : new Vector3(0.37f, 2.09f, 0.05f);
+			k.Color = HideTone;
+			// the knot: small, angular, twisted strands wrapped round the top of the arm
+			for (int w = 0; w < 5; w++)
+			{
+				float a = w / 5f * Mathf.Tau + _rng.RandfRange(-0.3f, 0.3f);
+				Vector3 from = c + new Vector3(Mathf.Cos(a) * 0.09f, -0.1f + _rng.RandfRange(-0.03f, 0.03f), Mathf.Sin(a) * 0.08f);
+				Vector3 to = c + new Vector3(Mathf.Cos(a + 1.3f) * 0.07f * side, 0.08f, Mathf.Sin(a + 1.3f) * 0.07f);
+				k.Cylinder(from, to, 0.045f, 0.03f, 4, true, 1f, _rng.RandfRange(0f, Mathf.Tau));
+			}
+			k.Cylinder(c + new Vector3(-0.12f * side, -0.02f, 0), c + new Vector3(0.05f * side, 0.04f, 0), 0.07f, 0.055f, 5, true);   // trapezius into the root
+			// the spikes: roots bent at a joint or two, tapering to points, a side shoot off some
+			(Vector3 dir, float len)[] spikes =
+			{
+				(new(0.55f * side, 0.9f, -0.25f), 0.34f), (new(0.9f * side, 0.45f, -0.1f), 0.3f), (new(0.35f * side, 0.8f, -0.75f), 0.36f),
+				(new(0.8f * side, 0.15f, -0.55f), 0.27f), (new(0.15f * side, 1f, 0.2f), 0.22f), (new(0.95f * side, 0.6f, 0.35f), 0.2f),
+				(new(0.5f * side, 0.3f, -0.95f), 0.3f),
+			};
+			foreach (var (dir0, len) in spikes)
+			{
+				Vector3 dir = dir0.Normalized();
+				Vector3 p0 = c + dir * 0.06f;
+				Vector3 kink = new(_rng.RandfRange(-0.35f, 0.35f), _rng.RandfRange(-0.2f, 0.3f), _rng.RandfRange(-0.35f, 0.35f));
+				Vector3 p1 = p0 + (dir + kink * 0.4f).Normalized() * len * 0.45f;
+				Vector3 p2 = p1 + (dir - kink * 0.3f).Normalized() * len * 0.35f;
+				Vector3 p3 = p2 + (dir + kink * 0.2f + Vector3.Up * 0.15f).Normalized() * len * 0.3f;
+				k.Color = Bark;
+				k.Cylinder(p0, p1, 0.04f, 0.028f, 4, true, 1f, _rng.RandfRange(0f, Mathf.Tau));
+				k.Cylinder(p1, p2, 0.028f, 0.016f, 4, true, 1f, _rng.RandfRange(0f, Mathf.Tau));
+				k.Cylinder(p2, p3, 0.016f, 0f, 3, true, 1f, _rng.RandfRange(0f, Mathf.Tau));
+				if (_rng.Randf() < 0.6f)
+				{
+					Vector3 shoot = (dir + new Vector3(_rng.RandfRange(-0.8f, 0.8f), _rng.RandfRange(0.1f, 0.6f), _rng.RandfRange(-0.8f, 0.8f))).Normalized();
+					k.Cylinder(p1, p1 + shoot * len * 0.3f, 0.014f, 0f, 3, true);
+				}
+			}
+		}
 
 		// Bark-like shards along the shoulders and the top of the spine.
 		(Vector3 root, Vector3 dir, float len)[] shards =
