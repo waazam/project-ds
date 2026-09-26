@@ -2042,6 +2042,25 @@ public partial class StoryTest : Node
 		Check("up onto the platform", _player.GlobalPosition.DistanceTo(sewer.PlatformEdgeWorld) < 1f && !sewer.PlayerWading, $"{_player.GlobalPosition}");
 		await Aim(sewer.HoleWorld, ct);
 		Screenshot("the_hole");
+		Check("aiming at the hole lights up only the hole, not the whole cistern", sewer.GetNode<GeometryInstance3D>("Cistern").MaterialOverlay == null && sewer.GetNode<GeometryInstance3D>("Platform").MaterialOverlay == null);
+		_input.ScriptedLight = true; await Frames(3, ct); _input.ScriptedLight = false; await Frames(3, ct);
+		// a look round the cistern: pillars, vaults, the water (textured, nothing clipping)
+		foreach (var (look, name) in new[] { (new Vector3(5.5f, 3f, Sewer.RoomZ0 + 15f), "tour_pillar"), (new Vector3(-5.5f, 10f, Sewer.RoomZ0 + 29f), "tour_vault"),
+			(new Vector3(9f, 0.1f, Sewer.HoleLocal.Z + 6f), "tour_water"), (new Vector3(Sewer.RoomX, 3f, Sewer.HoleLocal.Z), "tour_east_wall"),
+			(new Vector3(5.5f, 3f, Sewer.RoomZ0 + 29f), "tour_far_pillar"), (new Vector3(-5.5f, 3f, Sewer.RoomZ0 + 29f), "tour_far_pillar_w"), (new Vector3(3f, 8f, Sewer.RoomZ0 + 38f), "tour_far_vault") })
+		{
+			await Aim(sewer.ToGlobal(look), ct);
+			await Frames(2, ct);
+			Screenshot(name);
+		}
+		// right at the hole's edge, in its smoke, looking across the room (the owner's view: it must not grey out)
+		await Inside(sewer.ToGlobal(Sewer.HoleLocal + new Vector3(0.9f, 0.05f, -1.9f)), sewer.ToGlobal(new Vector3(3f, 3f, Sewer.RoomZ0 + 38f)), ct);
+		await Seconds(0.3, ct);
+		Screenshot("tour_from_the_hole");
+		await Aim(sewer.ToGlobal(new Vector3(-8f, 6f, Sewer.RoomZ0 + 36f)), ct);
+		await Seconds(0.3, ct);
+		Screenshot("tour_from_the_hole_arches");
+		await Inside(sewer.PlatformEdgeWorld, sewer.HoleWorld, ct);
 
 		// no, the first time: whispers going round the room
 		await UseIt(sewer.HoleUse, ct);

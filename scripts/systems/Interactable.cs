@@ -94,12 +94,31 @@ public partial class Interactable : Node3D
 	private void CollectMeshes()
 	{
 		_meshes.Clear();
-		var root = HighlightRoot.IsEmpty ? GetParent() : GetNodeOrNull(HighlightRoot);
+		bool implicitRoot = HighlightRoot.IsEmpty;
+		var root = implicitRoot ? GetParent() : GetNodeOrNull(HighlightRoot);
 		if (root == null) return;
 		if (root is GeometryInstance3D self) _meshes.Add(self);
 		foreach (var n in root.FindChildren("*", "GeometryInstance3D", true, false))
-			_meshes.Add((GeometryInstance3D)n);
+		{
+			var g = (GeometryInstance3D)n;
+			// With no highlight root given, the parent may be a whole level (a room, the sewer): only
+			// light up the small things right by this interactable, never the walls round it.
+			if (implicitRoot && !Near(g)) continue;
+			_meshes.Add(g);
+		}
 	}
+
+	private bool Near(GeometryInstance3D g)
+	{
+		Aabb box = g.GlobalTransform * g.GetAabb();
+		if (box.Size[(int)box.GetLongestAxisIndex()] > MaxImplicitSize) return false;
+		Vector3 p = GlobalPosition + GlobalBasis * PickOffset;
+		Vector3 closest = p.Clamp(box.Position, box.End);
+		return closest.DistanceTo(p) <= PickRadius + 1.5f;
+	}
+
+	/// <summary>The biggest mesh an interactable with no <see cref="HighlightRoot"/> will light up (metres).</summary>
+	private const float MaxImplicitSize = 6f;
 
 	private static ShaderMaterial HighlightMaterial => _highlight ??= new ShaderMaterial
 	{

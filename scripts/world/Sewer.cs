@@ -204,6 +204,29 @@ public partial class Sewer : Node3D
 				Slab(brick, null, new Vector3(x, 0.25f, z), new Vector3(1.7f, 0.5f, 1.7f), 0.8f);        // a plinth
 				Slab(brick, null, new Vector3(x, Spring - 0.2f, z), new Vector3(1.7f, 0.4f, 1.7f), 0.8f); // a capital
 			}
+		// arches along each row of pillars, pillar to pillar (and to the end walls), for the vaults to rest
+		// on: a brick web over each span, its underside a shallow segmental curve up from the capitals
+		float[] supports = { RoomZ0, pz[0], pz[1], pz[2], pz[3], RoomZ1 };
+		const float archTop = Spring + 1.1f, springY = Spring - 0.4f, crownRise = 0.9f, archHalf = 0.62f;
+		foreach (float x in px)
+			for (int sp = 0; sp < supports.Length - 1; sp++)
+			{
+				float za = supports[sp] + (sp == 0 ? 0f : 0.7f), zb = supports[sp + 1] - (sp == supports.Length - 2 ? 0f : 0.7f);
+				const int n = 12;
+				float Under(float z) { float u = (z - za) / (zb - za) * 2f - 1f; return springY + crownRise * (1f - u * u); }
+				brick.Color = Colors.White * 0.9f;
+				for (int i = 0; i < n; i++)
+				{
+					float z0 = Mathf.Lerp(za, zb, i / (float)n), z1 = Mathf.Lerp(za, zb, (i + 1) / (float)n);
+					float y0 = Under(z0), y1 = Under(z1);
+					foreach (int side in new[] { -1, 1 })
+					{
+						float fx = x + side * archHalf;
+						QuadN(brick, new Vector3(fx, y0, z0), new Vector3(fx, y1, z1), new Vector3(fx, archTop, z1), new Vector3(fx, archTop, z0), new Vector3(side, 0, 0));
+					}
+					QuadN(brick, new Vector3(x - archHalf, y0, z0), new Vector3(x + archHalf, y0, z0), new Vector3(x + archHalf, y1, z1), new Vector3(x - archHalf, y1, z1), Vector3.Down);
+				}
+			}
 		float[] bays = { -RoomX, -16.5f, -5.5f, 5.5f, 16.5f, RoomX };
 		for (int b = 0; b < bays.Length - 1; b++)
 		{
@@ -336,20 +359,23 @@ public partial class Sewer : Node3D
 			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(inner * 0.8f, 0.1f, inner * 0.8f),
 			Direction = Vector3.Up, Spread = 25f, InitialVelocityMin = 0.15f, InitialVelocityMax = 0.4f, Gravity = new Vector3(0, 0.05f, 0),
 			ScaleMin = 1.2f, ScaleMax = 2.6f, DampingMin = 0.05f, DampingMax = 0.1f,
-			ColorRamp = new GradientTexture1D { Gradient = new Gradient { Colors = new[] { new Color(1, 1, 1, 0f), new Color(1, 1, 1, 0.07f), new Color(1, 1, 1, 0f) }, Offsets = new[] { 0f, 0.35f, 1f } } },
+			ColorRamp = new GradientTexture1D { Gradient = new Gradient { Colors = new[] { new Color(1, 1, 1, 0f), new Color(1, 1, 1, 0.05f), new Color(1, 1, 1, 0f) }, Offsets = new[] { 0f, 0.35f, 1f } } },
 		};
 		AddChild(new GpuParticles3D
 		{
-			Name = "Smoke", Amount = 22, Lifetime = 7.0, Position = new Vector3(0, PlatTop + 0.9f, zc), ProcessMaterial = pm, Preprocess = 6.0,
+			Name = "Smoke", Amount = 14, Lifetime = 7.0, Position = new Vector3(0, PlatTop + 0.9f, zc), ProcessMaterial = pm, Preprocess = 6.0,
 			VisibilityAabb = new Aabb(new Vector3(-4, -1, -4), new Vector3(8, 8, 8)),
 			DrawPass1 = new QuadMesh
 			{
 				Size = Vector2.One,
 				Material = new StandardMaterial3D
 				{
-					AlbedoTexture = LakeParts.LakeFx.SoftDot(), AlbedoColor = new Color(0.85f, 0.87f, 0.88f, 0.7f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+					AlbedoTexture = LakeParts.LakeFx.SoftDot(), AlbedoColor = new Color(0.7f, 0.72f, 0.74f, 0.5f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 					BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, VertexColorUseAsAlbedo = true,
-					ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+					// lit by the light over the hole (not glowing on its own), and faded out close to the eye:
+					// standing in it at the hole's edge must not grey out the whole room
+					DistanceFadeMode = BaseMaterial3D.DistanceFadeModeEnum.PixelAlpha, DistanceFadeMinDistance = 2f, DistanceFadeMaxDistance = 8f,
+					ProximityFadeEnabled = true, ProximityFadeDistance = 0.8f,
 				},
 			},
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,

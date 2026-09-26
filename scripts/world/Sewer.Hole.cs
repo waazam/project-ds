@@ -35,7 +35,8 @@ public partial class Sewer
 
 	private void BuildHole()
 	{
-		_holeUse = new Interactable { Name = "HoleUse", Prompt = "Drop down into the hole?", PickRadius = 1.3f, MaxDistance = 2.8f, Position = HoleLocal + Vector3.Up * 0.7f };
+		// no highlight: the hole stays pitch black while it asks (a path to nothing lights nothing up)
+		_holeUse = new Interactable { Name = "HoleUse", Prompt = "Drop down into the hole?", PickRadius = 1.3f, MaxDistance = 2.8f, Position = HoleLocal + Vector3.Up * 0.7f, HighlightRoot = new NodePath("NoHighlight") };
 		_holeUse.Interacted += OnHole;
 		AddChild(_holeUse);
 	}
