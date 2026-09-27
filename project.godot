@@ -56,3 +56,22 @@ lights_and_shadows/directional_shadow/soft_shadow_filter_quality=0
 lights_and_shadows/positional_shadow/soft_shadow_filter_quality=0
 textures/default_filters/anisotropic_filtering_level=0
 environment/defaults/default_clear_color=Color(0.16, 0.18, 0.17, 1)
+
+[shader_globals]
+
+uv_light_pos={
+"type": "vec3",
+"value": Vector3(0, -1000, 0)
+}
+uv_light_dir={
+"type": "vec3",
+"value": Vector3(0, 0, -1)
+}
+uv_light_on={
+"type": "float",
+"value": 0.0
+}
+uv_light_range={
+"type": "float",
+"value": 9.0
+}

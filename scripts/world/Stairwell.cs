@@ -44,7 +44,7 @@ public partial class Stairwell : Node3D
 	public const float TrenchZ0 = -H - TrenchSteps * TrenchRun;
 	public const float CeilingY = -0.25f;
 	public const float RevDrop = FlightDrop * 4f;
-	/// <summary>Turns of the stair. 64 is about five minutes at a walk.</summary>
+	/// <summary>Turns of the stair (about 4.5 s each at a walk).</summary>
 	[Export] public int Revolutions = DefaultRevolutions;
 	/// <summary>How long a sprint lasts on these stairs before it is taken back.</summary>
 	[Export] public float SprintGrace = 0.7f;
@@ -57,7 +57,14 @@ public partial class Stairwell : Node3D
 	/// <summary>The top of the fallen flight: the last landing anyone reaches on foot.</summary>
 	public int GapCorner => Flights;
 	public float BottomY => BottomYFor(Revolutions);
-	public const int DefaultRevolutions = 64;
+	/// <summary>Turns of the shaft (the owner: 64 was far too long; 40 is about three minutes at a walk).</summary>
+	public const int DefaultRevolutions = 40;
+	/// <summary>The descent's events and signs were written for 64 turns; they're placed at the same
+	/// fraction of the way down whatever the length (<see cref="R"/>).</summary>
+	public const int DesignRevolutions = 64;
+
+	/// <summary>A turn of the 64-turn design, at the same fraction of the way down this shaft.</summary>
+	public int R(int designRev) => Mathf.Clamp(Mathf.RoundToInt(designRev * Revolutions / (float)DesignRevolutions), 0, Revolutions - 1);
 	/// <summary>The chamber floor under a stairwell of <paramref name="revs"/> turns (Continue's marker needs it before the stairwell is built).</summary>
 	public static float BottomYFor(int revs) => CornerY(revs * 4 + 1) - FallDepth;
 	public const float FallDepth = 21f;

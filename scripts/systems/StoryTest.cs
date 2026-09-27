@@ -307,9 +307,13 @@ public partial class StoryTest : Node
 		Check("no camera left lying around", !Pickups(ToolKind.Camera).Any());
 		Check("the opening ran at the car", GetTree().GetFirstNodeInGroup("opening") is OpeningAtCar);
 		var page = FirstOf<PhotoLogPage>();
-		await WaitUntil(() => _input.Enabled, 5, ct);   // (under load, the last note can still be closing)
-		_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false;
-		await WaitUntil(() => page is { IsOpen: true }, 2, ct);
+		// (under load, the last note's overlay can still be letting go: wait for it, and press again if a press was lost)
+		for (int i = 0; i < 4 && page is not { IsOpen: true }; i++)
+		{
+			await WaitUntil(() => _input.Enabled && !_input.Modal, 5, ct);
+			_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false;
+			await WaitUntil(() => page is { IsOpen: true }, 1, ct);
+		}
 		Check("Tab opens the album", page is { IsOpen: true });
 		Screenshot("album");
 		_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false; await Frames(3, ct);
@@ -1042,6 +1046,20 @@ public partial class StoryTest : Node
 		string read = lot?.Known ?? "";
 		Check("the four notes' digits were read on the way", lot != null && lot.ReadCount == 4 && read == lot.Code, $"known {read}, code {lot?.Code}");
 		Check("the tracker shows the whole code", (CodeLockOverlay.Instance?.TrackerText ?? "").Replace(" ", "").EndsWith(lot?.Code ?? "?"), $"'{CodeLockOverlay.Instance?.TrackerText}'");
+		// the blacklight footprints lead to the door (a look along them)
+		if (lot != null)
+		{
+			Check("bare footprints in the blacklight ink lead from the lookout to the bunker's door", lot.Footprints > 60 && lot.FootprintsEnd.DistanceTo(bunker.HatchWorld) < 16f,
+				$"{lot.Footprints} prints, ending {lot.FootprintsEnd.DistanceTo(bunker.HatchWorld):0.0} m from the hatch");
+			var lantern = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern");
+			lantern?.SetBlacklight(true);
+			Vector3 look = lot.FootprintsEnd + (lot.FootprintsStart - lot.FootprintsEnd).Normalized() * 6f;
+			await Teleport(look + (look - lot.FootprintsEnd).Normalized() * 2.5f, look, ct);
+			await Aim(look, ct);
+			await Frames(4, ct);
+			Screenshot("footprints_blacklight");
+			lantern?.SetBlacklight(false);
+		}
 
 		// The dial: a wrong code keeps it shut, the notes' code opens it.
 		await Teleport(bunker.ApproachPointWorld, bunker.HatchWorld, ct);
@@ -1778,8 +1796,8 @@ public partial class StoryTest : Node
 			bool deepShot = false, midShot = false;
 			await DescendTo(sw, sw.GapCorner - 1, ct, k2 =>
 			{
-				if (!midShot && k2 >= 30 * 4) { midShot = true; Screenshot("stairwell_turn30"); }
-				if (!deepShot && k2 >= 60 * 4) { deepShot = true; Screenshot("stairwell_turn60_grimy"); }
+				if (!midShot && k2 >= sw.Flights / 2) { midShot = true; Screenshot("stairwell_halfway"); }
+				if (!deepShot && k2 >= sw.Flights * 15 / 16) { deepShot = true; Screenshot("stairwell_deep_grimy"); }
 			});
 			double gameSec = (Time.GetTicksMsec() - descentStart) / 1000.0 * Engine.TimeScale;
 			double perTurn = gameSec / Mathf.Max(1, sw.Revolutions - descentFrom);
@@ -1788,6 +1806,22 @@ public partial class StoryTest : Node
 		}
 		finally { Engine.TimeScale = 1.0; _input.ScriptedRun = false; }
 		Check("hardly any light down here: most bulbs dead", sw.LitBulbs < sw.Revolutions / Stairwell.Period, $"{sw.LitBulbs} lit");
+		// the lantern's flame died a quarter of the way down; F won't bring it back, the blacklight still works
+		{
+			var lantern = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern");
+			Check("a quarter of the way down, the lantern's flame guttered out (saved)", ProjectDS.Player.Lantern.FlameDead && StoryManager.Instance.HasFlag(StoryManager.Flag.LanternFlameDead));
+			lantern?.SetBlacklight(false);
+			await Frames(4, ct);
+			_input.ScriptedLight = true; await Frames(3, ct); _input.ScriptedLight = false; await Frames(3, ct);
+			_input.ScriptedLight = true; await Frames(3, ct); _input.ScriptedLight = false; await Frames(6, ct);
+			Check("F won't light the flame again", lantern is { Shining: false }, $"shining {lantern?.Shining}");
+			await PressLanternMode(lantern, true, ct);
+			await Frames(4, ct);
+			Check("the blacklight still works", lantern is { Blacklight: true, Shining: true } && ProjectDS.Player.Lantern.Uv.on);
+			await Aim(_player.GlobalPosition + new Vector3(-3f, 0.5f, 0f), ct);
+			Screenshot("stairwell_blacklight_writing");
+			await PressLanternMode(lantern, false, ct);
+		}
 
 		// the fallen flight, and the question
 		await DescendTo(sw, sw.GapCorner, ct);
@@ -2488,6 +2522,9 @@ public partial class StoryTest : Node
 		await WalkTo(rr.TopWorld, 0.5f, ct, giveUp: 4f);
 		Check("off the dais onto the room's floor", _player.IsOnFloor() && Flat(_player.GlobalPosition - rr.TopWorld).Length() < 1f, $"{_player.GlobalPosition}");
 		Check("the camera is still with you at the end of the demo", _inv.HasCamera);
+		Check("after Act 20 the lantern's flame works again", !ProjectDS.Player.Lantern.FlameDead);
+		Check("the blacklight's secrets are written round the Hollow", GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets") is { Written: >= 25 },
+			$"{GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets")?.Written}");
 	}
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>
@@ -2712,23 +2749,52 @@ public partial class StoryTest : Node
 	{
 		var note = lot.Notes[i];
 		var terrain = GroundSnap.FindTerrain(this);
+		var lantern = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern");
 		Vector3 from = note.GlobalPosition + Vector3.Forward * 6f;
 		if (terrain != null) { terrain.TrailDistance(note.GlobalPosition.X, note.GlobalPosition.Z, out float s); from = terrain.TrailPoint(s - 6f, out _); }
 		await Teleport(from, note.PlateWorld, ct);
-		Check($"note {note.Label}'s tree stands beside the path", note.GlobalPosition.DistanceTo(from) < 9f, $"{note.GlobalPosition.DistanceTo(from):0.0} m from the path point");
+		Check($"number {note.Label}'s tree stands off the path, among decoys", note.GlobalPosition.DistanceTo(from) < 11f && lot.Decoys.Count >= 4 * lot.DecoysPerNote, $"{note.GlobalPosition.DistanceTo(from):0.0} m from the path point, {lot.Decoys.Count} decoys");
+		// Under the flame, even right up to it and looking at it: nothing to read.
+		lantern?.SetBlacklight(false);
+		Vector3 near = note.PlateWorld + Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 2.4f;
+		near.Y = note.GlobalPosition.Y;
+		await Teleport(near, note.PlateWorld, ct);
 		await Aim(note.PlateWorld, ct);
-		await Seconds(0.4, ct);
-		Check($"note {note.Label} is not read from 6 m", !note.Revealed, $"glow {note.Glow:0.00}");
-		// Walk in to it: within a few metres, the sheet in view is enough (no lantern needed).
-		Vector3 near = note.PlateWorld + (from - note.PlateWorld).Normalized() * 2.2f;
-		await WalkTo(near, 0.8f, ct, giveUp: 6f);
+		await Seconds(0.6, ct);
+		Check($"number {note.Label} can't be seen by the lantern's flame", !note.Revealed, $"glow {note.Glow:0.00}");
+		if (i == 0) Screenshot("number_tree_flame");
+		// The blacklight (B): it shows.
+		await PressLanternMode(lantern, true, ct);
+		Check("B switches the lantern to its blacklight", lantern is { Blacklight: true } && ProjectDS.Player.Lantern.Uv.on, $"{lantern?.Blacklight}");
 		await Aim(note.PlateWorld, ct);
 		await WaitUntil(() => note.Revealed, 4, ct);
-		Check($"note {note.Label} reads up close, lantern or not", note.Revealed, $"glow {note.Glow:0.00}");
-		if (i == 0) Screenshot("tree_note");
+		Check($"number {note.Label} shows under the blacklight, and reads", note.Revealed, $"glow {note.Glow:0.00}, blacklight on it {ProjectDS.Player.Lantern.UvOn(note.PlateWorld):0.00}");
+		if (i == 0)
+		{
+			Screenshot("number_tree_blacklight");
+			// the decoys, under the blacklight too
+			var decoy = lot.Decoys.OrderBy(d => d.GlobalPosition.DistanceTo(note.GlobalPosition)).FirstOrDefault();
+			if (decoy != null) { await Aim(decoy.GlobalPosition + Vector3.Up * 1.3f, ct); await Frames(3, ct); Screenshot("decoy_tree_blacklight"); }
+			await Aim(note.GlobalPosition + Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 1.2f, ct);
+			await Frames(3, ct);
+			Screenshot("ground_marks_blacklight");
+		}
 		await Seconds(0.6, ct);
 		Check($"digit {i + 1} is saved and shown in the tracker", StoryManager.Instance.HasFlag(StoryManager.Flag.CodeDigit(i + 1))
 			&& (CodeLockOverlay.Instance?.TrackerText ?? "").Contains(note.Digit.ToString()), $"tracker '{CodeLockOverlay.Instance?.TrackerText}'");
+		// back to the flame for the walk on
+		await PressLanternMode(lantern, false, ct);
+		Check("B switches it back to the flame", lantern is { Blacklight: false });
+	}
+
+	/// <summary>B until the lantern is in the wanted mode (a press made while control is briefly held doesn't count).</summary>
+	private async Task PressLanternMode(ProjectDS.Player.Lantern lantern, bool blacklight, CancellationToken ct)
+	{
+		for (int i = 0; i < 6 && lantern != null && lantern.Blacklight != blacklight; i++)
+		{
+			await WaitUntil(() => _input.Enabled && !_input.Modal, 3, ct);
+			_input.ScriptedLanternMode = true; await Frames(3, ct); _input.ScriptedLanternMode = false; await Frames(3, ct);
+		}
 	}
 
 	private void CheckObjective(string name, string group)

@@ -33,6 +33,8 @@ public partial class Camp : Node3D
 		"If you're reading this, it got you too.\n" +
 		"Don't stay out here after dark. There's an old cabin up the hollow. The needle knows the way.\n" +
 		"Past it there's a bunker. Steel door, four numbers.\n" +
+		"I put them on the trees on the way, in the ink only the lantern's black light shows. Look close.\n" +
+		"Not every mark out there is mine.\n" +
 		"Leave the lantern lit. — R.H.";
 
 	public const string NoteReadFlag = "read_camp_note";

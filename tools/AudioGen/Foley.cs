@@ -108,6 +108,15 @@ public static class Foley
 		return FinishOneShot(Wet(x, sr, 1.0, 0.06, 0.3, 0.5, 0.3), sr, -3, 60);
 	}
 
+	/// <summary>The lantern's blacklight coming on: a switch click and the tube's electric buzz swelling in (tonal).</summary>
+	public static double[] UvHum(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.0);
+		Knock(x, r, sr, 0.0, 0.8, r.R(2400, 2900), 20, 0.01);
+		AddTone(x, sr, 0.03, 0.8, u => 120 * (1 + 0.002 * Math.Sin(u * 90)), u => 0.4 * Env(u, 0.3, 0.5), new[] { 0.5, 1.0, 0.7, 0.5, 0.35, 0.25, 0.15 });
+		return FinishOneShot(Wet(x, sr, 1.0, 0.08, 0.3, 0.5, 0.3), sr, -3, 150);
+	}
+
 	// ------------------------------------------------------------------ the haunting
 
 	/// <summary>Somewhere overhead, or in the next room: old boards taking a slow weight, one step,

@@ -122,6 +122,8 @@ public partial class StationInterior : Node3D
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });
+		// the blacklight's secrets round the whole Hollow (placed once everything is built)
+		if (Cutscene.SceneRoot(this).GetNodeOrNull("BlacklightSecrets") == null) Cutscene.SceneRoot(this).CallDeferred(Node.MethodName.AddChild, new BlacklightSecrets { Name = "BlacklightSecrets" });
 		// the scavenger hunt's breadcrumbs: a bloody hand on Room 1's door, a staircase scrawled on Room 2's
 		_handMark = new Node3D { Name = "HandMark", Visible = false };
 		_room1Door.AddChild(_handMark);

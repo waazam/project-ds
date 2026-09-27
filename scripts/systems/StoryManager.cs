@@ -122,6 +122,9 @@ public partial class StoryManager : Node
 		public const string Act14JumpedDown = "act14_jumped_down";
 		/// <summary>Act 18: the long introduction to the boss has been seen (after a death it's short).</summary>
 		public const string Act18IntroSeen = "act18_intro_seen";
+		/// <summary>Act 14: the lantern's flame guttered out a quarter of the way down the stairwell (it stays dead
+		/// until after Act 20; the blacklight still works).</summary>
+		public const string LanternFlameDead = "lantern_flame_dead";
 		/// <summary>Act 20: the web over the round room's dais has been burned away.</summary>
 		public const string RoundRoomWebBurned = "round_room_web_burned";
 	}

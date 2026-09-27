@@ -62,11 +62,14 @@ public partial class Stairwell
 		// the numbers, stencilled on the wall of each turn's first landing, facing the stairs coming down
 		for (int r = 0; r < Revolutions; r++)
 		{
-			string text = SignText(r);
+			// the design's sign for this point of the descent; plain counting ("B7") counts this shaft's own turns
+			int d = Mathf.RoundToInt(r * DesignRevolutions / (float)Revolutions);
+			string text = SignText(d);
+			if (text == $"B{d + 1}") text = $"B{r + 1}";
 			if (text.Length == 0) continue;
 			int k = r * 4;
 			Vector2 p = CornerXZ(k);
-			bool scrawl = r >= 46;
+			bool scrawl = d >= 46;
 			var l = new Label3D
 			{
 				Name = $"Sign{r}", Text = text, Font = Paint, FontSize = scrawl ? 64 : 128, PixelSize = 0.0035f,
@@ -78,26 +81,55 @@ public partial class Stairwell
 			AddChild(l);
 		}
 
-		// a steel door on turn 10's third landing, painted shut, in the outer wall
-		AddDoor(10 * 4 + 2);
-		// turn 20: a portrait on the landing wall, face burnt away like the ones upstairs
-		AddPortrait(20 * 4 + 1, 3);
-		// turn 42: a wooden chair on the landing, set to face the wall
-		AddChair(42 * 4 + 3);
+		// the blacklight's writing on the landings (the flame dies a quarter of the way down: after that,
+		// the violet light is all there is, and these are what it finds)
+		void Uv(int r, string text, Color ink)
+		{
+			int k = Mathf.Clamp(r, 0, Revolutions - 1) * 4;
+			Vector2 p = CornerXZ(k);
+			UvInk.Write(this, new Vector3(-H + 0.02f, CornerY(k) + 0.95f, p.Y), Vector3.Right, text, 1.4f, ink);
+		}
+		Uv(R(8), "COUNT THEM", UvInk.Pale);
+		Uv(Revolutions / 4 + 1, "THE LIGHT WON'T COME BACK", UvInk.Cyan);
+		Uv(R(30), "IT'S BEHIND YOU", UvInk.Green);
+		Uv(R(44), "NOBODY COUNTS RIGHT DOWN HERE", UvInk.Pale);
+		Uv(R(54), "IT WANTS YOU TO JUMP", UvInk.Cyan);
+		Uv(Revolutions - 1, "JUMP", UvInk.Green);
+		// and hands down the rail, all the way, as if someone felt their way down in the dark
+		for (int r = Revolutions / 4 + 2; r < Revolutions; r += 3)
+		{
+			int k = r * 4 + 2;
+			Vector2 p = CornerXZ(k);
+			UvInk.OnSurface(this, new Vector3(-H + 0.02f, CornerY(k) + 1.0f, p.Y + 0.4f), Vector3.Right, new Vector2(0.18f, 0.18f), UvInk.Hand(), UvInk.Pale, 1.3f, r * 0.7f);
+		}
 
-		_events.Add((5, p => { _echoFrom = 5; _echoTo = 9; _echoPlayer = p; }));
-		_events.Add((10, p => { }));   // the door knocks by proximity (see ProcessEvents)
-		_events.Add((15, p => DropSomething(p)));
-		_events.Add((22, p => Whisper(p, 3f)));
-		_events.Add((28, p => Sfx("stair_groan", 3, p.GlobalPosition + Vector3.Down * 3f, -2f, 8f)));
-		_events.Add((30, p => { _echoAboveFrom = 30; _echoAboveTo = 32; _echoPlayer = p; }));
-		_events.Add((33, p => AddFigure(p, 35)));
-		_events.Add((38, p => Sfx("far_clang", 2, p.GlobalPosition + Vector3.Down * 40f, 4f, 30f)));
-		_events.Add((44, p => _ = StoryBeat.Caption(this, "How far down does this go?", 0.8f, 2.6f, 1.2f)));
-		_events.Add((50, p => Silence(40f)));
-		_events.Add((55, p => Sfx("stair_groan", 3, p.GlobalPosition + Vector3.Up * 2f, 0f, 8f)));
-		_events.Add((58, p => { _echoAboveFrom = 58; _echoAboveTo = 60; _echoPlayer = p; }));
-		_events.Add((61, p => Whisper(p, -2f)));
+		// a steel door on turn 10's third landing, painted shut, in the outer wall
+		AddDoor(R(10) * 4 + 2);
+		// turn 20: a portrait on the landing wall, face burnt away like the ones upstairs
+		AddPortrait(R(20) * 4 + 1, 3);
+		// turn 42: a wooden chair on the landing, set to face the wall
+		AddChair(R(42) * 4 + 3);
+
+		// (the design's turns, placed at the same fraction of the way down: R)
+		_events.Add((R(5), p => { _echoFrom = R(5); _echoTo = Mathf.Max(R(5) + 1, R(9)); _echoPlayer = p; }));
+		_events.Add((R(10), p => { }));   // the door knocks by proximity (see ProcessEvents)
+		_events.Add((R(15), p => DropSomething(p)));
+		_events.Add((R(22), p => Whisper(p, 3f)));
+		_events.Add((R(28), p => Sfx("stair_groan", 3, p.GlobalPosition + Vector3.Down * 3f, -2f, 8f)));
+		_events.Add((R(30), p => { _echoAboveFrom = R(30); _echoAboveTo = Mathf.Max(R(30) + 1, R(32)); _echoPlayer = p; }));
+		_events.Add((R(33), p => AddFigure(p, Mathf.Max(R(33) + 1, R(35)))));
+		_events.Add((R(38), p => Sfx("far_clang", 2, p.GlobalPosition + Vector3.Down * 40f, 4f, 30f)));
+		_events.Add((R(44), p => _ = StoryBeat.Caption(this, "How far down does this go?", 0.8f, 2.6f, 1.2f)));
+		_events.Add((R(50), p => Silence(40f)));
+		_events.Add((R(55), p => Sfx("stair_groan", 3, p.GlobalPosition + Vector3.Up * 2f, 0f, 8f)));
+		_events.Add((R(58), p => { _echoAboveFrom = R(58); _echoAboveTo = Mathf.Max(R(58) + 1, R(60)); _echoPlayer = p; }));
+		_events.Add((R(61), p => Whisper(p, -2f)));
+		// a quarter of the way down, the lantern's flame gutters out (the owner), for the rest of the game
+		_events.Add((Revolutions / 4, p =>
+		{
+			if (p.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern") is { } lantern && !ProjectDS.Player.Lantern.FlameDead) lantern.KillFlame();
+			else StoryManager.Instance?.SetFlag(StoryManager.Flag.LanternFlameDead);
+		}));
 		_events.Sort((a, b) => a.rev.CompareTo(b.rev));
 	}
 

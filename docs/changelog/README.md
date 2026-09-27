@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-26e — The lantern's blacklight, the code in invisible ink, the flame dying in the stairwell, and the blacklight's secrets](2026-09-26e-lantern-blacklight.md)
 - [2026-09-26d — The audio sweep: spatial audio, rooms, occlusion, Foley, the oars, and the haunting](2026-09-26d-audio-sweep.md)
 - [2026-09-26c — Art pass: textures, wind, fog, the monsters remodelled; a bigger lake; new beats in Acts 11 and 15](2026-09-26c-art-pass-and-new-beats.md)
 - [2026-09-26b — Act 17 fixes: the grey-washed cistern, floating vaults, and the interact highlight](2026-09-26b-act17-sewer-fixes.md)

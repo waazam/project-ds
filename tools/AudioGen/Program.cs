@@ -101,6 +101,7 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"paper_rustle_{i:00}", sfx, false, Lo, (
 for (int i = 1; i <= 3; i++) jobs.Add(($"item_take_{i:00}", sfx, false, Lo, (r, sr) => Foley.ItemTake(r, sr)));
 jobs.Add(("lantern_on_01", sfx, false, Lo, (r, sr) => Foley.LanternOn(r, sr)));
 jobs.Add(("lantern_off_01", sfx, false, Lo, (r, sr) => Foley.LanternOff(r, sr)));
+jobs.Add(("uv_hum_01", sfx, false, Lo, (r, sr) => Foley.UvHum(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"door_locked_{i:00}", sfx, false, Lo, (r, sr) => Foley.DoorLocked(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_gravel_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepGravel(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_boards_{i:00}", sfx, false, Lo, (r, sr) => Foley.BoardsOverhead(r, sr)));

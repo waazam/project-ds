@@ -31,6 +31,8 @@ public partial class PlayerInput : Node
 	public bool ItemPrevPressed => Live && Edge(ItemPrev);
 	/// <summary>Tab / Back: the Act 1 shot list opened or put away.</summary>
 	public bool PhotoLogPressed => Live && Edge(PhotoLog);
+	/// <summary>B / right shoulder: the lantern between its warm flame and its blacklight.</summary>
+	public bool LanternModePressed => Live && Edge(LanternMode);
 
 	/// <summary>When true, the fields below replace real input.</summary>
 	public bool Scripted;
@@ -38,20 +40,20 @@ public partial class PlayerInput : Node
 	public bool ScriptedRun;
 	public bool ScriptedFocus;
 	/// <summary>Scripted buttons are "held" while true; the Pressed edge fires on the frame they turn true.</summary>
-	public bool ScriptedInteract, ScriptedLight, ScriptedPhoto, ScriptedItemNext, ScriptedItemPrev, ScriptedPhotoLog;
+	public bool ScriptedInteract, ScriptedLight, ScriptedPhoto, ScriptedItemNext, ScriptedItemPrev, ScriptedPhotoLog, ScriptedLanternMode;
 
 	public bool Enabled => _enabled;
 
-	private const int Interact = 0, Light = 1, Photo = 2, ItemNext = 3, ItemPrev = 4, PhotoLog = 5;
-	private static readonly string[] Actions = { "interact", "flashlight_toggle", "photo", "item_next", "item_prev", "photo_log" };
-	private readonly bool[] _held = new bool[6];
-	private readonly bool[] _wasHeld = new bool[6];
-	private readonly bool[] _pressed = new bool[6];
+	private const int Interact = 0, Light = 1, Photo = 2, ItemNext = 3, ItemPrev = 4, PhotoLog = 5, LanternMode = 6;
+	private static readonly string[] Actions = { "interact", "flashlight_toggle", "photo", "item_next", "item_prev", "photo_log", "lantern_mode" };
+	private readonly bool[] _held = new bool[7];
+	private readonly bool[] _wasHeld = new bool[7];
+	private readonly bool[] _pressed = new bool[7];
 	// Physics-frame view of the edges: every press since the last physics tick, so a reader in
 	// _PhysicsProcess (PlayerInteraction) never misses a one-frame press when the render rate
 	// is higher than the physics rate.
-	private readonly bool[] _pendingPhysics = new bool[6];
-	private readonly bool[] _pressedPhysics = new bool[6];
+	private readonly bool[] _pendingPhysics = new bool[7];
+	private readonly bool[] _pressedPhysics = new bool[7];
 
 	private bool Edge(int i) => Engine.IsInPhysicsFrame() ? _pressedPhysics[i] : _pressed[i];
 
@@ -194,6 +196,7 @@ public partial class PlayerInput : Node
 		Photo => ScriptedPhoto,
 		ItemNext => ScriptedItemNext,
 		ItemPrev => ScriptedItemPrev,
-		_ => ScriptedPhotoLog,
+		PhotoLog => ScriptedPhotoLog,
+		_ => ScriptedLanternMode,
 	};
 }

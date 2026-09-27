@@ -32,7 +32,7 @@ public partial class Bunker : Node3D
 		"REMOTE MONITORING STATION 3\n" +
 		"AUTHORISED PERSONNEL ONLY\n" +
 		"Unstaffed since 09/98.\n" +
-		"Door code: four numbers, posted on the way in.\n" +
+		"Door code: four numbers, marked on the way in (UV).\n" +
 		"In order.";
 
 	/// <summary>The one line at the locked dial, once.</summary>
