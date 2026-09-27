@@ -74,7 +74,11 @@ public partial class StationDoor : Node3D
 		if (IsOpen) return;
 		if (Locked)
 		{
-			if (RequiredTool == ToolKind.None || player?.Inventory is not { } inv || !inv.HasTool(RequiredTool)) return;
+			if (RequiredTool == ToolKind.None || player?.Inventory is not { } inv || !inv.HasTool(RequiredTool))
+			{
+				Audio.AudioDirector.OneShot(this, "door_locked", 2, ToGlobal(new Vector3(1.8f, 1.0f, 0)), -6f, "Events", 3f);
+				return;
+			}
 			inv.Consume(RequiredTool);
 			Locked = false;
 		}
@@ -92,6 +96,7 @@ public partial class StationDoor : Node3D
 		var tween = CreateTween();
 		tween.TweenProperty(this, "rotation:y", _closedYaw + Mathf.DegToRad(OpenDegrees), OpenSeconds)
 			.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		Audio.AudioDirector.OneShot(this, "door_creak", 1, ToGlobal(new Vector3(0.1f, 1.8f, 0)), -6f, "Events", 3f, 0.12f);
 		Opened?.Invoke();
 	}
 

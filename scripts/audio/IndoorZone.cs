@@ -1,4 +1,5 @@
 using Godot;
+using ProjectDS.Audio;
 
 namespace ProjectDS.Audio;
 
@@ -19,6 +20,12 @@ public partial class IndoorZone : Area3D
 		CollisionLayer = 0;
 		CollisionMask = 1u << 1;
 		Monitorable = false;
+		// the same space rings as a small room (the cabin): a reverb zone the shape of each box in it
+		Callable.From(() =>
+		{
+			foreach (var c in GetChildren())
+				if (c is CollisionShape3D { Shape: BoxShape3D b } cs) AudioDirector.Zone(this, cs.Position, b.Size, AudioDirector.Space.Room, "IndoorVerb");
+		}).CallDeferred();
 		BodyEntered += b => { if (b.IsInGroup("player")) { _inside++; Apply(); } };
 		BodyExited += b => { if (b.IsInGroup("player")) { _inside = Mathf.Max(0, _inside - 1); Apply(); } };
 	}

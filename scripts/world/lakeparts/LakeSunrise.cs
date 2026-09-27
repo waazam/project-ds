@@ -22,7 +22,7 @@ public partial class LakeSunrise : Node
 	/// <summary>Degrees the sun sits left of straight across the lake, and above the horizon.</summary>
 	[Export] public float SunAzimuthLeft = 24f;
 	[Export] public float SunElevation = 7.5f;
-	[Export] public float FogSunScatter = 0.32f;
+	[Export] public float FogSunScatter = 0.1f;   // was 0.32: the far treeline glowed whiter than the sky (the owner)
 	/// <summary>Half-size of the box (world metres, around the Lake node) that counts as "at the lake".</summary>
 	[Export] public float Reach = 260f;
 

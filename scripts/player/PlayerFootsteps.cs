@@ -41,6 +41,8 @@ public partial class PlayerFootsteps : Node
 		_sets["stone"] = LoadSet("res://assets/audio/sfx/step_stone_{0:00}.wav", 6);
 		_sets["water"] = LoadSet("res://assets/audio/sfx/wade_{0:00}.wav", 4);
 		_sets["metal"] = LoadSet("res://assets/audio/sfx/step_metal_{0:00}.wav", 6);
+		_sets["gravel"] = LoadSet("res://assets/audio/sfx/step_gravel_{0:00}.wav", 6);
+		_sets["rock"] = _sets["stone"];
 		_cloth = LoadSet("res://assets/audio/sfx/cloth_{0:00}.wav", 4);
 		for (int i = 0; i < Voices; i++)
 		{
@@ -112,6 +114,13 @@ public partial class PlayerFootsteps : Node
 		p.Play();
 	}
 
+	private static bool IsGround(Node n)
+	{
+		for (var p = n; p != null; p = p.GetParent())
+			if (p.IsInGroup("terrain") || p.IsInGroup("lake_marker") || p is ProjectDS.World.ForestTerrain) return true;
+		return false;
+	}
+
 	private string SurfaceUnderfoot()
 	{
 		var space = _player.GetWorld3D().DirectSpaceState;
@@ -119,8 +128,17 @@ public partial class PlayerFootsteps : Node
 		var query = PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 1.0f, 1);
 		query.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
 		var hit = space.IntersectRay(query);
-		if (hit.Count > 0 && hit["collider"].AsGodotObject() is Node n && n.HasMeta("surface"))
-			return n.GetMeta("surface").AsString();
+		if (hit.Count > 0 && hit["collider"].AsGodotObject() is Node n)
+		{
+			if (n.HasMeta("surface"))
+			{
+				string s = n.GetMeta("surface").AsString();
+				if (!_sets.ContainsKey(s)) Audio.AudioDirector.Instance?.NoteSilentSurface($"{n.Name}: '{s}'");
+				return s;
+			}
+			// the forest floor is dirt; anything else without a surface of its own is a gap in the sweep
+			if (!IsGround(n)) Audio.AudioDirector.Instance?.NoteSilentSurface(n.GetPath().ToString());
+		}
 		return "dirt";
 	}
 }

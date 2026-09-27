@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.Systems;
 using ProjectDS.UI;
@@ -67,6 +68,9 @@ public partial class Library : Node3D
 		BuildFurniture();
 		BuildSideTable();
 		BuildPassage();
+		// the library is the one quiet, warm room: a small, dead, bookish space (no haunting here)
+		AudioDirector.Zone(this, new Vector3(0, Height * 0.5f, Depth * 0.5f), new Vector3(HalfW * 2f, Height, Depth), AudioDirector.Space.Room, "LibraryVerb");
+		AudioDirector.Zone(this, new Vector3(0, 1.25f, Depth + PassageLen * 0.5f + 0.3f), new Vector3(1.4f, 2.5f, PassageLen), AudioDirector.Space.Tunnel, "PassageVerb");
 		Round = new RoundRoom { Name = "RoundRoom", Position = RoundRoomAt };
 		AddChild(Round);
 		var s = StoryManager.Instance;

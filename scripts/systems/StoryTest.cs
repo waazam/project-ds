@@ -196,6 +196,15 @@ public partial class StoryTest : Node
 				await step.Run(_cts.Token);
 				if (_cts.IsCancellationRequested) return;   // the level changed under us: the next level's StoryTest resumes
 				GD.Print($"[storytest] {step.Act} took {(Time.GetTicksMsec() - t0) / 1000.0:0.0}s");
+				// the audio sweep's QA: every act's sounds on real buses, bounded, not too loud, freed when done,
+				// and footsteps on everything walked on
+				if (Audio.AudioDirector.Instance is { } ad)
+				{
+					GD.Print($"[storytest] audio after {step.Act}: {ad.Report()}");
+					Check("audio: every sound on a real bus, none over +8 dB, finished ones freed", ad.BadBuses.Count == 0 && ad.TooLoud.Count == 0 && ad.Leaks < 200, ad.Report());
+					Check("audio: a footstep sound for everything walked on", ad.SilentSurfaces.Count == 0, string.Join(", ", ad.SilentSurfaces));
+					ad.BadBuses.Clear(); ad.TooLoud.Clear(); ad.SilentSurfaces.Clear(); ad.Unbounded.Clear();
+				}
 				_s.Step++;
 				int to = StoryToArg();
 				if (to > 0 && ActOf(step) >= to && (_s.Step >= _steps.Count || ActOf(_steps[_s.Step]) > to)) break;   // --story-to: done
@@ -298,7 +307,9 @@ public partial class StoryTest : Node
 		Check("no camera left lying around", !Pickups(ToolKind.Camera).Any());
 		Check("the opening ran at the car", GetTree().GetFirstNodeInGroup("opening") is OpeningAtCar);
 		var page = FirstOf<PhotoLogPage>();
-		_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false; await Frames(3, ct);
+		await WaitUntil(() => _input.Enabled, 5, ct);   // (under load, the last note can still be closing)
+		_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false;
+		await WaitUntil(() => page is { IsOpen: true }, 2, ct);
 		Check("Tab opens the album", page is { IsOpen: true });
 		Screenshot("album");
 		_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false; await Frames(3, ct);

@@ -209,6 +209,9 @@ public partial class FirstClimbEvent : StoryTrigger
 			await Cutscene.Frame(this, ct);
 		}
 		if (fader != null) fader.BlackAlpha = 1f;
+		// behind the black, put the vignette back: the post material is shared by every level, and a raised
+		// value carried into the next one was read there as the resting look (the owner's "eye" view)
+		postMat?.SetShaderParameter("vignette", baseVignette);
 		await Cutscene.Wait(this, BlackHoldSeconds, ct);
 		GD.Print("[story] Act 2: blacked out at the top of the stairs");
 	}

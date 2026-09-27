@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Entities;
 using ProjectDS.Systems;
 using ProjectDS.World.BossParts;
@@ -99,6 +100,9 @@ public partial class BossRoom : Node3D
 		BuildRig();
 		BuildBlood();
 		BuildDoor();
+		AudioDirector.Zone(this, new Vector3(0, (PitFloor + Ceil) * 0.5f, 0), new Vector3(Half * 2f, Ceil - PitFloor, Half * 2f), AudioDirector.Space.Cavern, "PitVerb");
+		AudioDirector.Haunt(this, new[] { new Vector3(-Half + 2f, 10f, 0), new Vector3(Half - 2f, 12f, 6f), new Vector3(0, 13f, -Half + 2f), new Vector3(6f, 11f, Half - 2f) },
+			new[] { "haunt_chain" }, new Vector2(14f, 30f), -10f, 50f, () => !Finished);
 		Beast = new Leviathan { Name = "Leviathan", Position = new Vector3(0, PitFloor, 0) };
 		AddChild(Beast);
 		Beast.Level = BloodY - PitFloor;

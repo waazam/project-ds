@@ -120,7 +120,9 @@ public partial class FriendReveal : StoryTrigger
 			// jolt of the view, and the last one a shade harder.
 			int take = (int)(GD.Randi() % 3) + 1;
 			// Flat at the ear (no 3D falloff) with a low thump under each (Dan: way louder).
-			PlayFlat($"res://assets/audio/sfx/wall_pound_{take:00}.wav", PoundDb + (i == 2 ? 1.5f : 0f), (float)GD.RandRange(0.9, 1.0));
+			// from the wall itself (panned to it, full weight), with a flat body under it so it still shakes you
+			Audio.AudioDirector.Directional(this, $"res://assets/audio/sfx/wall_pound_{take:00}.wav", _cabin.ToGlobal(at), PoundDb + (i == 2 ? 1.5f : 0f), (float)GD.RandRange(0.9, 1.0));
+			PlayFlat($"res://assets/audio/sfx/wall_pound_{take:00}.wav", PoundDb - 8f, (float)GD.RandRange(0.9, 1.0));
 			PlayFlat("res://assets/audio/sfx/steel_door_slam_02.wav", PoundDb - 14f, 0.8f);
 			player?.PlayerInput?.AddCutsceneLook(new Vector2((float)GD.RandRange(-0.02, 0.02), (float)GD.RandRange(0.015, 0.03)));
 			if (i < 2) await Cutscene.Wait(this, KnockGap, ct);

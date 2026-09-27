@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.Systems;
 using ProjectDS.World.HallwayParts;
@@ -193,6 +194,8 @@ public partial class Act15Hallway : Node3D
 			ArmCloset();
 		}
 		SetProcess(true);
+		// a kilometre of corridor: a tunnel, every sound running away down it and coming back
+		AudioDirector.Zone(this, new Vector3(0, H2 * 0.5f, End * 0.5f), new Vector3(W2 + 0.4f, H2, End + 2f), AudioDirector.Space.Tunnel, "HallwayVerb");
 		GD.Print($"[story] Act 15: the hallway - {End:0} m to the closet door, the shadow man at {ShadowZ:0} m");
 	}
 

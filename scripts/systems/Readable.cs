@@ -47,6 +47,7 @@ public partial class Readable : Interactable
 	{
 		if (!string.IsNullOrEmpty(ReadFlag) && StoryManager.Instance is { } s && !s.HasFlag(ReadFlag)) s.SetFlag(ReadFlag);
 		NoteOverlay.Instance?.Open(this, player);
+		Audio.AudioDirector.OneShot(this, "paper_rustle", 3, null, -12f, "Player");
 		Read?.Invoke(player);
 		base.Interact(player);
 	}

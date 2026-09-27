@@ -1,4 +1,5 @@
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.Systems;
 using ProjectDS.UI;
@@ -131,6 +132,12 @@ public partial class StationInterior : Node3D
 		// Continue: open whatever the story says is open.
 		if (s != null && s.HasFlag(StoryManager.Flag.StationRoom1Open)) _room1Door.Unlock();
 		if (s != null && s.HasFlag(StoryManager.Flag.StationRoom1Solved)) _room2Door.Unlock();
+		// the station's spaces: small wooden rooms; and old boards taking a weight overhead once it has started to turn
+		AudioDirector.Zone(this, new Vector3(0, 1.6f, 0), new Vector3(HalfWidth * 2f, Height, HalfDepth * 2f), AudioDirector.Space.Room, "LobbyVerb");
+		AudioDirector.Zone(this, new Vector3(HalfWidth + StationRoom1.Half, 1.5f, 0), new Vector3(StationRoom1.Half * 2f, StationRoom1.Height, StationRoom1.Half * 2f), AudioDirector.Space.Room, "Room1Verb");
+		AudioDirector.Zone(this, new Vector3(-HalfWidth - StationRoom2.Half, 1.5f, 0), new Vector3(StationRoom2.Half * 2f, StationRoom2.Height, StationRoom2.Half * 2f), AudioDirector.Space.Room, "Room2Verb");
+		AudioDirector.Haunt(this, new[] { new Vector3(0, Height + 0.4f, 0), new Vector3(-3.5f, Height + 0.4f, 3f), new Vector3(3.5f, Height + 0.4f, -3f), new Vector3(-3f, Height + 0.4f, -3.5f) },
+			new[] { "haunt_boards" }, new Vector2(22f, 48f), -9f, 14f, () => Stage >= 1);
 		SetProcess(true);
 	}
 

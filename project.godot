@@ -20,6 +20,8 @@ config/icon="res://icon.svg"
 
 GameSettings="*res://scripts/systems/GameSettings.cs"
 StoryManager="*res://scripts/systems/StoryManager.cs"
+AudioDirector="*res://scripts/audio/AudioDirector.cs"
+PostGuard="*res://scripts/ui/PostGuard.cs"
 
 [display]
 

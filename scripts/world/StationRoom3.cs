@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.Systems;
 using ProjectDS.World.StairwellParts;
@@ -141,6 +142,8 @@ public partial class StationRoom3 : Node3D
 		HangPortraits(rng);
 
 		// the stairwell under the hole
+		AudioDirector.Zone(this, new Vector3(0, 1.3f, CorridorEnd * 0.5f), new Vector3(2.6f, 2.6f, CorridorEnd), AudioDirector.Space.Tunnel, "CorridorVerb");
+		AudioDirector.Zone(this, new Vector3(0, HallHeight * 0.5f, (CorridorEnd + HallEnd) * 0.5f), new Vector3(HallHalf * 2f, HallHeight, HallEnd - CorridorEnd), AudioDirector.Space.Hall, "GalleryVerb");
 		Stairs = new Stairwell { Name = "Stairwell", Position = StairwellAt };
 		AddChild(Stairs);
 

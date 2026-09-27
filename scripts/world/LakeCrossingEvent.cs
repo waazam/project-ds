@@ -556,6 +556,7 @@ public partial class LakeCrossingEvent : Node3D
 		_lastStrokeTime = clock;
 		float duration = Mathf.Clamp((float)sinceSame * 0.95f, 0.28f, 0.62f);
 		_boat.Stroke(side, rough ? 1.3f : 1f, duration);
+		_strokeDur[side < 0 ? 0 : 1] = duration;
 		_thrust += rough ? RoughStrokeImpulse : StrokeImpulse;
 		// a left stroke turns the bow right, and the other way round; each pull rocks the boat a little
 		_yawVel += -side * 0.07f;
@@ -565,19 +566,29 @@ public partial class LakeCrossingEvent : Node3D
 		_prompt.Next = -side;
 	}
 
+	private readonly float[] _strokeDur = { 0.62f, 0.62f };
+	private readonly System.Collections.Generic.List<AudioStreamPlayer3D> _oarVoices = new();
+
+	/// <summary>The blade goes in: the catch (a plunge), and the pull through the water, pitched to how
+	/// fast the stroke is (a hurried stroke is a shorter, sharper rush). Rougher water, heavier strokes.</summary>
 	private void OnBladeIn(int side, Vector3 at)
 	{
 		Vector3 w = at with { Y = _lake.WaterHeightAt(at, out _) };
 		bool rough = InCurrent;
 		LakeFx.Splash(Cutscene.SceneRoot(this), w, rough ? 0.7f : 0.45f, rough ? 12 : 7);
 		LakeFx.Ripple(Cutscene.SceneRoot(this), w, 1.3f, 1.4f, 0.35f);
-		Sfx("oar_stroke", 4, w, "Player", rough ? -5f : -9f, 5f);
-		if (_rng.Randf() < 0.15f) Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(side)), "Player", -15f);
+		float dur = _strokeDur[side < 0 ? 0 : 1];
+		Sfx("oar_catch", 4, w, "Player", rough ? -7f : -11f, 4f);
+		var pull = Sfx("oar_pull", 4, w, "Player", rough ? -6f : -10f, 4f);
+		if (pull != null) pull.PitchScale = Mathf.Clamp(0.62f / Mathf.Max(0.25f, dur), 0.85f, 1.35f) * _rng.RandfRange(0.95f, 1.04f);
+		// the oar turning in its lock as it loads (often, not always)
+		if (_rng.Randf() < 0.35f) Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(side)), "Player", -17f);
 	}
 
 	private void OnBladeOut(int side, Vector3 at)
 	{
 		Vector3 w = at with { Y = _lake.WaterHeightAt(at, out _) };
+		Sfx("oar_release", 4, w, "Player", InCurrent ? -9f : -13f, 4f);
 		LakeFx.Ripple(Cutscene.SceneRoot(this), w, 0.7f, 1.0f, 0.25f);
 	}
 
@@ -969,7 +980,7 @@ public partial class LakeCrossingEvent : Node3D
 			t += 0.22;
 			Vector3 p = _boat.ToGlobal(new Vector3(_rng.RandfRange(-1f, 1f), 0.35f, _rng.RandfRange(-1.4f, 1.2f)));
 			LakeFx.Splash(Cutscene.SceneRoot(this), p, 0.22f, 4);
-			if (_rng.Randf() < 0.4f) Sfx("oar_stroke", 4, p, "Player", -18f, 3f);
+			if (_rng.Randf() < 0.4f) Sfx("oar_release", 4, p, "Player", -18f, 3f);
 		}
 	}
 
@@ -1137,20 +1148,28 @@ public partial class LakeCrossingEvent : Node3D
 
 	/// <summary>One of <paramref name="variants"/> takes of <c>sfx/{name}_NN.wav</c> (or <c>{name}.wav</c>
 	/// / <c>{name}_01.wav</c> for a single take), placed in the world, on a bus.</summary>
-	private void Sfx(string name, int variants, Vector3 at, string bus, float db, float unit = 5f, float maxDistance = 70f)
+	private AudioStreamPlayer3D Sfx(string name, int variants, Vector3 at, string bus, float db, float unit = 5f, float maxDistance = 70f)
 	{
 		string path = $"res://assets/audio/sfx/{name}_{_rng.RandiRange(1, Mathf.Max(1, variants)):00}.wav";
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/sfx/{name}.wav";
-		if (!ResourceLoader.Exists(path)) return;
+		if (!ResourceLoader.Exists(path)) return null;
 		var voice = new AudioStreamPlayer3D
 		{
 			Stream = GD.Load<AudioStream>(path), Bus = bus, VolumeDb = db,
 			UnitSize = unit, MaxDistance = maxDistance, PitchScale = _rng.RandfRange(0.94f, 1.05f),
 		};
+		// the oars: at most six of their sounds at once (the oldest is cut), however hard the rowing
+		if (name.StartsWith("oar_"))
+		{
+			_oarVoices.RemoveAll(v => !IsInstanceValid(v));
+			while (_oarVoices.Count >= 6) { var old = _oarVoices[0]; _oarVoices.RemoveAt(0); if (IsInstanceValid(old)) old.QueueFree(); }
+			_oarVoices.Add(voice);
+		}
 		Cutscene.SceneRoot(this).AddChild(voice);
 		voice.GlobalPosition = at;
 		voice.Finished += voice.QueueFree;
 		voice.Play();
+		return voice;
 	}
 
 	// ------------------------------------------------------------------ arrival: on foot, at the door

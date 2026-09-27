@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.World.BunkerParts;
 using static ProjectDS.World.BunkerParts.BunkerLayout;
@@ -72,6 +73,13 @@ public partial class BunkerInterior : Node3D
 		AddChild(Crt);
 		Rooms = new BunkerRooms { Name = "Rooms" };
 		AddChild(Rooms);
+		// concrete: the long vaulted hall is a tunnel, the CRT room a hall, the looping rooms small and dead
+		AudioDirector.Zone(this, new Vector3(0, HallHeight * 0.5f, -HallLength * 0.5f), new Vector3(HallHalfWidth * 2f, HallHeight, HallLength), AudioDirector.Space.Tunnel, "BunkerHallVerb");
+		AudioDirector.Zone(this, new Vector3(0, CrtRoomHeight * 0.5f, (CrtRoomFrontZ + CrtRoomBackZ) * 0.5f), new Vector3(CrtRoomHalfWidth * 2f, CrtRoomHeight, CrtRoomFrontZ - CrtRoomBackZ), AudioDirector.Space.Hall, "CrtVerb");
+		AudioDirector.Zone(this, MazeOffset + new Vector3(0, 1.35f, -3.5f), new Vector3(9f, 2.7f, 7f), AudioDirector.Space.Room, "RoomsVerb");
+		AudioDirector.Zone(this, MazeOffset + new Vector3(0, 1.2f, 20f), new Vector3(3f, 2.4f, 40f), AudioDirector.Space.Tunnel, "ExitHallVerb");
+		AudioDirector.Haunt(this, new[] { new Vector3(0, 2.8f, -20f), new Vector3(1.5f, 2.8f, -45f), new Vector3(-1.5f, 2.8f, -70f) },
+			new[] { "haunt_drip" }, new Vector2(10f, 24f), -12f, 60f);
 
 		// One marker node, moved (never swapped: StoryManager caches the node and reads its position).
 		_entranceMarker = new Node3D { Name = "BunkerEntranceMarker", Position = HallwayEntranceLocal };

@@ -88,7 +88,11 @@ public partial class Lantern : Node3D
 		var cam = _player.CameraRig?.Camera;
 		if (cam == null) return;
 		GlobalTransform = cam.GlobalTransform;
-		if (_player.PlayerInput.LightPressed && _inv.HasLantern) _lit = !_lit;
+		if (_player.PlayerInput.LightPressed && _inv.HasLantern)
+		{
+			_lit = !_lit;
+			Audio.AudioDirector.OneShot(this, _lit ? "lantern_on" : "lantern_off", 1, null, -12f, "Player");
+		}
 		// Restored with the lantern already in hand: no how-to. Taken in play: say it once.
 		if (_firstFrame) { _firstFrame = false; _hinted = _inv.HasLantern; }
 		else if (!_hinted && _inv.HasLantern)

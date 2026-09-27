@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.Systems;
 using ProjectDS.World.SewerParts;
@@ -91,6 +92,11 @@ public partial class Sewer : Node3D
 		BuildLights();
 		BuildHole();
 
+		// the pipe is a long tunnel, the cistern a cavern: drips and a chain somewhere far off in it
+		AudioDirector.Zone(this, new Vector3(0, PipeCy, TunnelLen * 0.5f), new Vector3(PipeR * 2f, PipeR * 2f, TunnelLen), AudioDirector.Space.Tunnel, "PipeVerb");
+		AudioDirector.Zone(this, new Vector3(0, (Spring + 5.5f) * 0.5f, (RoomZ0 + RoomZ1) * 0.5f), new Vector3(RoomX * 2f, Spring + 5.5f, RoomZ1 - RoomZ0), AudioDirector.Space.Cavern, "CisternVerb");
+		AudioDirector.Haunt(this, new[] { new Vector3(0, 3f, RoomZ0 + 20f), new Vector3(-RoomX + 2f, 6f, RoomZ0 + 6f), new Vector3(RoomX - 2f, 6f, RoomZ1 - 6f), new Vector3(-12f, 8f, RoomZ1 - 3f), new Vector3(14f, 7f, RoomZ0 + 3f) },
+			new[] { "haunt_drip", "haunt_drip", "haunt_chain" }, new Vector2(8f, 20f), -8f, 45f, () => !Dropped);
 		_drip = new AudioStreamPlayer { Name = "Air", Bus = "Unnatural", VolumeDb = -80f };
 		if (ResourceLoader.Exists("res://assets/audio/ambient/sewer_loop.wav"))
 		{

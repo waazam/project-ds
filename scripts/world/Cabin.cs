@@ -1089,7 +1089,9 @@ public partial class Cabin : Node3D
 			// jolt of the view, and the lantern guttering for a moment.
 			// Way louder (Dan): flat at the ear, no 3D falloff, with a steel sub under it for weight.
 			int take = (int)(GD.Randi() % 2) + 1;
-			PlayFlat($"res://assets/audio/sfx/cabin_slam_{take:00}.wav", SlamDb, 0.97f);
+			// from the door (panned to it, full weight), and a flat body under it
+			Audio.AudioDirector.Directional(this, $"res://assets/audio/sfx/cabin_slam_{take:00}.wav", _door.GlobalPosition + Vector3.Up * 1.1f, SlamDb, 0.97f);
+			PlayFlat($"res://assets/audio/sfx/cabin_slam_{take:00}.wav", SlamDb - 8f, 0.97f);
 			PlayFlat("res://assets/audio/sfx/steel_door_slam_01.wav", SlamDb - 6f, 0.9f);
 			if (StoryBeat.Player(this) is { } p)
 			{

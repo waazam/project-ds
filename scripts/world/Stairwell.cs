@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Audio;
 using ProjectDS.Player;
 using ProjectDS.Systems;
 using ProjectDS.World.StairwellParts;
@@ -134,6 +135,8 @@ public partial class Stairwell : Node3D
 		_drone = Ambient("res://assets/audio/ambient/stairwell_drone_loop.wav");
 		_hum = Ambient("res://assets/audio/ambient/stairs_hum_loop.wav");
 		SetProcess(true);
+		// the shaft: a cavern of a space, all the way down
+		AudioDirector.Zone(this, new Vector3(0, BottomY * 0.5f, 0), new Vector3(2f * H + 3f, -BottomY + 6f, 2f * H + 3f), AudioDirector.Space.Cavern, "ShaftVerb");
 		GD.Print($"[story] Act 14: the stairwell - {Revolutions} turns, {Flights} flights, {-CornerY(GapCorner):0} m down");
 	}
 

@@ -182,6 +182,7 @@ public partial class Pickup : Area3D
 		if (inv == null || !CanTake(player)) return;
 		if (RequiredKey != ToolKind.None) inv.Consume(RequiredKey);
 		if (!inv.TryPickup(Kind)) return;
+		Audio.AudioDirector.OneShot(this, "item_take", 3, GlobalPosition, -10f, "Player", 2f);
 		if (Kind == ToolKind.NewelPost) StoryManager.Instance?.MarkNewelPostTaken();
 		else StoryManager.Instance?.SetFlag(TakenFlag);
 		SayTakenLine();

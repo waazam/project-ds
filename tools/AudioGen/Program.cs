@@ -96,6 +96,21 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"rustle_{i:00}", sfx, false, Lo, (r, sr)
 jobs.Add(("heartbeat_loop", ambient, true, Lo, (r, sr) => Forest.Heartbeat(r, sr, 20)));
 // Act 12: the lake crossing (the rowboat, the water, the creature, the dawn).
 for (int i = 1; i <= 4; i++) jobs.Add(($"oar_stroke_{i:00}", sfx, false, Lo, (r, sr) => Lake.OarStroke(r, sr)));
+// the audio sweep: Foley that was missing, and the interiors' haunting
+for (int i = 1; i <= 3; i++) jobs.Add(($"paper_rustle_{i:00}", sfx, false, Lo, (r, sr) => Foley.PaperRustle(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"item_take_{i:00}", sfx, false, Lo, (r, sr) => Foley.ItemTake(r, sr)));
+jobs.Add(("lantern_on_01", sfx, false, Lo, (r, sr) => Foley.LanternOn(r, sr)));
+jobs.Add(("lantern_off_01", sfx, false, Lo, (r, sr) => Foley.LanternOff(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"door_locked_{i:00}", sfx, false, Lo, (r, sr) => Foley.DoorLocked(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_gravel_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepGravel(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_boards_{i:00}", sfx, false, Lo, (r, sr) => Foley.BoardsOverhead(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_moan_{i:00}", sfx, false, Lo, (r, sr) => Foley.WindMoan(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_drip_{i:00}", sfx, false, Lo, (r, sr) => Foley.DripEcho(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"haunt_chain_{i:00}", sfx, false, Lo, (r, sr) => Foley.ChainShift(r, sr)));
+// the oars, in three parts synced to the blade (catch, pull, release)
+for (int i = 1; i <= 4; i++) jobs.Add(($"oar_catch_{i:00}", sfx, false, Lo, (r, sr) => Paddle.Catch(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"oar_pull_{i:00}", sfx, false, Lo, (r, sr) => Paddle.Pull(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"oar_release_{i:00}", sfx, false, Lo, (r, sr) => Paddle.Release(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"oarlock_creak_{i:00}", sfx, false, Lo, (r, sr) => Lake.OarlockCreak(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"boat_creak_{i:00}", sfx, false, Lo, (r, sr) => Lake.BoatCreak(r, sr)));
 jobs.Add(("boat_board_01", sfx, false, Lo, (r, sr) => Lake.BoatBoard(r, sr)));
