@@ -11,7 +11,7 @@ Commit: this entry's single commit on `main` (see `git log` for the hash).
     It now starts where that floor ends.
 - **Shadow atlas contention**: four lamps plus the fire all cast shadows at the door, on top of the
   pit's lights. Now only the banker's lamp on the table casts them. The standing lamp, the
-  sconces and the fire light without shadows.
+  sconces and the fire now light without shadows.
 
 ## The flicker past the secret bookcase
 - The passage's walls and ceiling ran on into the round room's wall and doubled its entry sides.
