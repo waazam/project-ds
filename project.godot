@@ -16,6 +16,10 @@ run/main_scene="res://scenes/ui/main_menu.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
+[audio]
+
+general/3d_panning_strength=0.9
+
 [autoload]
 
 GameSettings="*res://scripts/systems/GameSettings.cs"

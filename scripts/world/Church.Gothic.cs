@@ -29,6 +29,7 @@ public partial class Church
 		BuildTranseptAltars();
 		BuildApseChapels();
 		BuildSigil();
+		BuildDoorSconces();
 		// high up, a faint warm glow along the triforium, so the vault's ribs read in the dark over the candles
 		foreach (float x in new[] { -6.2f, 6.2f })
 			foreach (float z in new[] { 11f, 26f, 41f, 60.5f, 75f })
@@ -52,7 +53,54 @@ public partial class Church
 	}
 
 	private void Warm(Vector3 at, float energy, float range, bool shadows = false)
-		=> AddChild(new OmniLight3D { Position = at, LightColor = new Color(1f, 0.64f, 0.32f), LightEnergy = energy * 1.25f, OmniRange = range * 1.1f, OmniAttenuation = 1.3f, ShadowEnabled = shadows });
+	{
+		var l = new OmniLight3D { Position = at, LightColor = new Color(1f, 0.64f, 0.32f), LightEnergy = energy * 1.25f, OmniRange = range * 1.1f, OmniAttenuation = 1.3f, ShadowEnabled = shadows };
+		AddChild(l);
+		_warm.Add((l, l.LightEnergy));
+	}
+
+	private readonly List<(OmniLight3D light, float energy)> _warm = new();
+	private float _flickerT;
+
+	/// <summary>The candlelight breathes: every flame's light wavers a little, slowly and softly, each out of
+	/// step with the rest (small and slow: a glow that lives, never a flicker that flashes).</summary>
+	private void FlickerCandles(float dt)
+	{
+		_flickerT += dt;
+		for (int i = 0; i < _warm.Count; i++)
+		{
+			var (l, e) = _warm[i];
+			float w = 0.93f + 0.045f * Mathf.Sin(_flickerT * 2.1f + i * 1.9f) + 0.025f * Mathf.Sin(_flickerT * 4.7f + i * 0.7f);
+			l.LightEnergy = e * w;
+		}
+	}
+
+	/// <summary>A candle on an iron bracket beside a door, so the way (or the way that isn't open yet) can
+	/// always be found in the dark.</summary>
+	private void DoorSconce(MeshKit iron, MeshKit wax, Vector3 at, Vector3 outOfWall)
+	{
+		iron.Beam(at - outOfWall * 0.02f, at + outOfWall * 0.22f, 0.04f, 0.04f);
+		iron.Cylinder(at + outOfWall * 0.22f + Vector3.Down * 0.02f, at + outOfWall * 0.22f + Vector3.Up * 0.02f, 0.07f, 0.07f, 8, true);
+		Candle(wax, at + outOfWall * 0.22f + Vector3.Up * 0.02f, 0.18f, 0.03f);
+		Warm(at + outOfWall * 0.5f + Vector3.Up * 0.3f, 0.75f, 7f);
+	}
+
+	private void BuildDoorSconces()
+	{
+		var iron = new MeshKit();
+		iron.Mat(ChurchTextures.IronMat);
+		iron.Color = Colors.White;
+		var wax = new MeshKit();
+		wax.Mat(Wax);
+		float mid = (NaveEnd + CrossEnd) * 0.5f;
+		foreach (float x in new[] { -3.7f, 3.7f }) DoorSconce(iron, wax, new Vector3(x, 2.7f, 0.02f), Vector3.Back);
+		DoorSconce(iron, wax, new Vector3(9.9f, 2.3f, 0.02f), Vector3.Back);
+		foreach (float s in new[] { -1f, 1f })
+			foreach (float dz in new[] { -2f, 2f })
+				DoorSconce(iron, wax, new Vector3(s * (TransHalf - 0.02f), 2.4f, mid + dz), new Vector3(-s, 0, 0));
+		iron.CommitTo(this, "DoorSconces", true);
+		wax.CommitTo(this, "DoorSconceCandles", false);
+	}
 
 	// ------------------------------------------------------------------ the aisles' candle alcoves
 

@@ -180,6 +180,7 @@ jobs.Add(("ring_charge_01", sfx, false, Lo, (r, sr) => LibrarySounds.RingCharge(
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_snow_{i:00}", sfx, false, Lo, (r, sr) => ChurchSounds.StepSnow(r, sr)));
 jobs.Add(("winter_wind_loop", ambient, true, Lo, (r, sr) => ChurchSounds.WinterWind(r, sr, 38)));
 jobs.Add(("church_tone_loop", ambient, true, Lo, (r, sr) => ChurchSounds.ChurchTone(r, sr, 36)));
+jobs.Add(("trailer_score", music, false, Hi, (r, sr) => TrailerSounds.Score(r, sr)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

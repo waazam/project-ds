@@ -49,6 +49,8 @@ public partial class StoryTest : Node
 		public int Shot;
 		public float Walked, Jumped;
 		public float FpsSum; public int FpsCount; public float FpsMin = 999f;
+		/// <summary>Frame rate per act (the optimization pass: where the game is heavy).</summary>
+		public readonly Dictionary<string, (float sum, int n, float min)> ActFps = new();
 		public string CurrentAct = "";
 		/// <summary>Act 12 is run twice: once letting the hunter catch the boat (the drowning reloads the
 		/// checkpoint and this step starts over), then crossing properly.</summary>
@@ -234,6 +236,11 @@ public partial class StoryTest : Node
 			_fpsTimer = 0;
 			float fps = (float)Engine.GetFramesPerSecond();
 			_s.FpsSum += fps; _s.FpsCount++; _s.FpsMin = Mathf.Min(_s.FpsMin, fps);
+			if (_s.CurrentAct != null)
+			{
+				_s.ActFps.TryGetValue(_s.CurrentAct, out var af);
+				_s.ActFps[_s.CurrentAct] = (af.sum + fps, af.n + 1, af.n == 0 ? fps : Mathf.Min(af.min, fps));
+			}
 		}
 	}
 
@@ -3142,6 +3149,8 @@ public partial class StoryTest : Node
 		sb.AppendLine($"Project DS story test  {Time.GetDatetimeStringFromSystem()}");
 		sb.AppendLine($"{_s.Checks.Count - failed}/{_s.Checks.Count} passed in {secs:0} s  (walked {_s.Walked:0} m, jumped {_s.Jumped:0} m)");
 		if (_s.FpsCount > 0) sb.AppendLine($"fps while walking: avg {_s.FpsSum / _s.FpsCount:0}, min {_s.FpsMin:0}");
+		foreach (var (actName, af) in _s.ActFps)
+			if (af.n > 0) sb.AppendLine($"  fps {af.sum / af.n,4:0} avg {af.min,4:0} min   {actName}");
 		string act = null;
 		foreach (var c in _s.Checks)
 		{

@@ -61,6 +61,11 @@ public partial class GameSettings : Node
 	/// <summary>`--continue-test`: instead of the walkthrough, write a save for every checkpoint in
 	/// turn, Continue from it, and check the restored world (see ContinueRoundTripTest).</summary>
 	public bool ContinueTest { get; private set; }
+	/// <summary>`--trailer`: straight into the Hollow at an early save (the test slots, never the player's) and
+	/// run <see cref="TrailerDirector"/>; record it with Godot's `--write-movie`.</summary>
+	public bool Trailer { get; private set; }
+	/// <summary>`--trailer-ending`: the teaser's last shot instead (Act 1's first staircase in the fog, then the title).</summary>
+	public bool TrailerEnding { get; private set; }
 	/// <summary>Dev: `--start-act=2` writes a save at that act's checkpoint and Continues into it from the menu
 	/// (only 2 today: the Hollow wake). 0 = normal start. Overwrites the real save slot.</summary>
 	public int StartAct { get; private set; }
@@ -76,6 +81,11 @@ public partial class GameSettings : Node
 		AutoTestSkipToAct7 = args.Contains("--skip-to-act7");
 		AutoTestSkipToAct11 = args.Contains("--skip-to-act11");
 		ContinueTest = args.Contains("--continue-test");
+		Trailer = args.Contains("--trailer") || args.Contains("--trailer-ending");
+		TrailerEnding = args.Contains("--trailer-ending");
+		// the game's title (the owner, 2026-09-27: "Dead Silent" from now on). The project's own name stays
+		// "Project DS" so the save and settings folder doesn't move.
+		DisplayServer.WindowSetTitle("Dead Silent");
 		foreach (var a in args) if (a.StartsWith("--start-act=") && int.TryParse(a["--start-act=".Length..], out int sa)) StartAct = sa;
 		if (ContinueTest) AutoTest = true;   // same test save slots and defaults
 		RegisterInputActions();

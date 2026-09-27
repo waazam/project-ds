@@ -111,7 +111,7 @@ public partial class StationBasement : Node3D
 		AudioDirector.Zone(this, new Vector3((MinX + MaxX) * 0.5f, Floor + RoomHeight * 0.5f, (MinZ + StairBottom) * 0.5f), new Vector3(MaxX - MinX, RoomHeight, StairBottom - MinZ), AudioDirector.Space.Hall, "BasementVerb");
 		AudioDirector.Zone(this, new Vector3(0, Floor * 0.5f + 1f, StairBottom * 0.5f), new Vector3(2.2f, -Floor + 2.4f, -StairBottom), AudioDirector.Space.Tunnel, "BasementStairVerb");
 		AudioDirector.Haunt(this, new[] { new Vector3(-0.5f, Floor + 2.4f, -9f), new Vector3(MinX + 1f, Floor + 2.5f, MinZ + 1.5f), new Vector3(MaxX - 1f, Floor + 2.5f, -7f) },
-			new[] { "haunt_drip" }, new Vector2(9f, 22f), -12f, 12f);
+			new[] { "haunt_drip" }, new Vector2(14f, 30f), -12f, 12f);
 		SetProcess(true);
 	}
 

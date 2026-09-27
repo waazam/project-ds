@@ -71,7 +71,7 @@ public partial class TitleTv : Control
 		Osd("CH 03", 20, new Vector2(262, 12));
 		Osd("SEP. 21 1998", 18, new Vector2(16, 264));
 		_clock = Osd("", 18, new Vector2(212, 264));
-		_title = Osd("PROJECT DS", 34, new Vector2(0, 200));
+		_title = Osd("DEAD SILENT", 34, new Vector2(0, 200));
 		_title.HorizontalAlignment = HorizontalAlignment.Center;
 		_title.Size = new Vector2(340, 40);
 		UpdateClock();
@@ -193,7 +193,7 @@ public partial class TitleTv : Control
 			_burstLeft -= dt;
 			float k = 1f - Mathf.Abs(_burstLeft / _burstLength * 2f - 1f);   // up, then back down
 			burst = Mathf.Clamp(k * 1.6f, 0f, 1f);
-			if (_burstLeft <= 0f) _title.Text = "PROJECT DS";
+			if (_burstLeft <= 0f) _title.Text = "DEAD SILENT";
 		}
 		else if ((_nextBurst -= dt) <= 0f)
 		{

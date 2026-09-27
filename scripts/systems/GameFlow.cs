@@ -51,7 +51,8 @@ public partial class GameFlow : Node
 		// Deferred: every stateful system restores itself deferred from its own _Ready first
 		// (they sit earlier in the tree), then the player is placed into that restored world.
 		Callable.From(Begin).CallDeferred();
-		if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
+		if (GameSettings.Instance.Trailer) AddChild(new TrailerDirector());
+		else if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
 		else if (GameSettings.Instance.AutoTest) AddChild(new StoryTest());
 	}
 

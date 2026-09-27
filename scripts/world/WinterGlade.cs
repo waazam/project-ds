@@ -48,6 +48,30 @@ public partial class WinterGlade : Node3D
 		BuildSnowfall();
 	}
 
+	private readonly System.Collections.Generic.List<GpuParticles3D> _snow = new();
+	/// <summary>The trailer's church shots want snow whatever the save says.</summary>
+	public static bool ForceSnow;
+	private double _check;
+
+	/// <summary>The snowfall only runs while the camera is near enough to see it (the optimization pass:
+	/// fourteen thousand flakes were falling all game, underground and in the summer woods).</summary>
+	public override void _Process(double delta)
+	{
+		_check -= delta;
+		if (_check > 0) return;
+		_check = 0.25;
+		var cam = GetViewport()?.GetCamera3D();
+		bool near = cam != null && cam.GlobalPosition.DistanceTo(ToGlobal(new Vector3(Centre.X, 0, Centre.Y))) < Radius + 120f
+			&& (ForceSnow || (Systems.StoryManager.Instance?.Current ?? Systems.Checkpoint.None) >= Systems.Checkpoint.Act20Finished);
+		foreach (var p in _snow)
+			if (p.Emitting != near)
+			{
+				p.Emitting = near;
+				p.Visible = near;
+				if (near) p.Restart();   // already falling (its preprocess), not starting from the sky
+			}
+	}
+
 	private void BuildGround()
 	{
 		var k = new MeshKit();
@@ -195,6 +219,7 @@ public partial class WinterGlade : Node3D
 				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 			};
 			AddChild(p);
+			_snow.Add(p);
 		}
 	}
 }

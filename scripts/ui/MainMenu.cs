@@ -21,6 +21,25 @@ public partial class MainMenu : Node
 	public override void _Ready()
 	{
 		if (GameSettings.Instance.AutoTest) { StoryManager.Instance.StartNewGame(); return; }
+		if (GameSettings.Instance.Trailer)
+		{
+			// the teaser: the Hollow as it is at the cabin (early: summer woods, the cabin boarded), in the test slots
+			if (GameSettings.Instance.TrailerEnding)
+			{
+				// the ending: the trailhead, at the start of Act 1 (the first staircase is at the trail's end)
+				SaveSystem.Save(new SaveData { Checkpoint = Checkpoint.Act1Start, Flags = System.Array.Empty<string>(), Inventory = ";tool=None" });
+				Callable.From(() => StoryManager.Instance.ContinueGame()).CallDeferred();
+				return;
+			}
+			SaveSystem.Save(new SaveData
+			{
+				Checkpoint = Checkpoint.Act3DoorBoarded,
+				Flags = new[] { StoryManager.Flag.StairsClimbed, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, "read_camp_note" },
+				Inventory = "lantern,compass;tool=None",
+			});
+			Callable.From(() => StoryManager.Instance.ContinueGame()).CallDeferred();
+			return;
+		}
 		if (GameSettings.Instance.StartAct == 2)
 		{
 			// Dev launch straight into the Hollow wake (Dan, 2026-09-22): a fresh save at checkpoint 2, then Continue.

@@ -84,7 +84,7 @@ public partial class Act11Ending : Node3D
 	public int CallCount { get; private set; }
 
 	/// <summary>The end card: what the title screen's tape calls the game.</summary>
-	public const string EndCardTitle = "PROJECT DS";
+	public const string EndCardTitle = "DEAD SILENT";
 	public const string ClosingLine = "\"Did you see them?\"";
 	public const string CreditStudio = "GLHFDD";
 	public const string CreditThanks = "Thanks for playing.";

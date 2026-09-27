@@ -98,6 +98,8 @@ public partial class ForestAtmosphere : Node
 	[Export] public Color Act1FogColor = new(0.44f, 0.45f, 0.47f);
 	/// <summary>0..1 how far the Act 1 fog has closed in (0 at the trailhead, 1 at the fallen tree); -1 when it isn't Act 1.</summary>
 	public float Act1FogAmount => _act1On ? _act1 : -1f;
+	/// <summary>The trailer holds the Act 1 fog where it wants it (null: the fog follows the camera along the trail).</summary>
+	public float? Act1FogOverride { get; set; }
 	private float _act1, _act1Target;
 	private bool _act1On, _act1Applied;
 	private Environment.FogModeEnum _levelFogMode;
@@ -360,6 +362,7 @@ public partial class ForestAtmosphere : Node
 				float along = TrailAlong(cam.GlobalPosition);
 				float end = _terrain != null && IsInstanceValid(_terrain) ? _terrain.TrailLength : 480f;
 				_act1Target = Mathf.SmoothStep(OpenHoldMeters * 0.5f, Mathf.Max(end - 15f, OpenHoldMeters + 20f), along);
+				if (Act1FogOverride is float f) _act1Target = f;
 			}
 		}
 		_open = Mathf.Lerp(_open, _openTarget, 1f - Mathf.Exp(-dt / Mathf.Max(OpenSmoothing, 0.01f)));

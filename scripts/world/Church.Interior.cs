@@ -174,7 +174,8 @@ public partial class Church
 		{
 			BuildKit.Box(k, new Vector3(x, 0.5f, -0.02f), new Vector3(0.07f, 1.0f, 0.66f), 1f);
 			k.Cylinder(new Vector3(x - 0.035f, 1.0f, -0.02f), new Vector3(x + 0.035f, 1.0f, -0.02f), 0.33f, 0.33f, 12, true);
-			k.Cylinder(new Vector3(x, 1.28f, -0.02f), new Vector3(x, 1.5f, -0.02f), 0.06f, 0.01f, 6, false);   // a finial
+			k.Cylinder(new Vector3(x, 1.28f, -0.02f), new Vector3(x, 1.34f, -0.02f), 0.035f, 0.045f, 8, false);   // a turned neck
+			k.Blob(new Vector3(x, 1.39f, -0.02f), new Vector3(0.06f, 0.055f, 0.06f), 3, 0.08f);                     // and a round poppyhead
 		}
 		var mesh = k.Commit();
 		var xf = new List<Transform3D>();
@@ -585,7 +586,7 @@ public partial class Church
 		AudioDirector.Zone(this, new Vector3(0, 18f, (0 + ChancelEnd) * 0.5f), new Vector3(TransHalf * 2f, 36f, ChancelEnd + ApseR), AudioDirector.Space.Cavern, "NaveVerb");
 		AudioDirector.Zone(this, new Vector3((VestryX0 + VestryX1) * 0.5f, VestryH * 0.5f, (VestryZ0 + VestryZ1) * 0.5f), new Vector3(8f, VestryH, VestryZ1 - VestryZ0), AudioDirector.Space.Room, "VestryVerb");
 		AudioDirector.Haunt(this, new[] { new Vector3(-10f, 16f, 10f), new Vector3(10f, 22f, 40f), new Vector3(0f, 30f, 60f), new Vector3(-18f, 10f, 60f) },
-			new[] { "haunt_boards", "haunt_moan", "haunt_chain" }, new Vector2(18f, 36f), -14f, 50f, () => StoryManager.Instance is { } s && s.Current >= Checkpoint.Act21ChurchReached);
+			new[] { "haunt_boards", "haunt_moan", "haunt_chain" }, new Vector2(30f, 56f), -14f, 50f, () => StoryManager.Instance is { } s && s.Current >= Checkpoint.Act21ChurchReached);
 		foreach (var (name, at, db) in new[] { ("winter_wind_loop", new Vector3(-16f, 8f, 26f), -16f), ("winter_wind_loop", new Vector3(16f, 8f, 26f), -18f), ("church_tone_loop", new Vector3(0, 12f, 40f), -20f) })
 		{
 			string path = $"res://assets/audio/ambient/{name}.wav";

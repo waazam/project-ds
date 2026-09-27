@@ -96,6 +96,7 @@ public partial class Church
 			if (inside) amb.RequestSilence(this, 1f, 5); else amb.ReleaseSilence(this);
 		}
 		UpdateObjective(player);
+		if (player != null && player.GlobalPosition.DistanceTo(ToGlobal(new Vector3(0, 0, 44f))) < 160f) FlickerCandles(dt);
 	}
 
 	public override void _ExitTree()

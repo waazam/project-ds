@@ -122,6 +122,9 @@ public partial class AudioDirector : Node
 		}
 		if (p.VolumeDb > 8f && p.AttenuationModel != AudioStreamPlayer3D.AttenuationModelEnum.Disabled) TooLoud.Add($"{Where(p)} {p.VolumeDb:0} dB");   // a flat, falloff-free event is loud by design
 		p.AreaMask |= ReverbLayer;
+		// strict 3D (the audio spatialization sweep): full left/right separation, so a whisper at your left
+		// ear is at your left ear and steps behind you sound behind you. The player's own sounds stay centred.
+		if (p.Bus != "Player" && p.AttenuationModel != AudioStreamPlayer3D.AttenuationModelEnum.Disabled && Mathf.IsEqualApprox(p.PanningStrength, 1f)) p.PanningStrength = 1.6f;
 		// air absorbs the top end over distance (a touch more than Godot's default, for the dark woods)
 		if (Mathf.IsEqualApprox(p.AttenuationFilterCutoffHz, 5000f)) { p.AttenuationFilterCutoffHz = 6000f; p.AttenuationFilterDb = -18f; }
 		_tracked.Add(new Tracked { P = p, BaseCutoff = p.AttenuationFilterCutoffHz, LastPlayed = _clock });

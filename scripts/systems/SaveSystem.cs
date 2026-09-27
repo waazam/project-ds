@@ -66,7 +66,7 @@ public class SaveData
 public static class SaveSystem
 {
 	// Test runs write their own slots so they never overwrite a real save.
-	private static string Prefix => GameSettings.Instance?.AutoTest == true ? "user://test_save_" : "user://save_";
+	private static string Prefix => GameSettings.Instance?.AutoTest == true || GameSettings.Instance?.Trailer == true ? "user://test_save_" : "user://save_";
 	private static string PathA => Prefix + "a.cfg";
 	private static string PathB => Prefix + "b.cfg";
 

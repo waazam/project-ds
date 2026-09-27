@@ -119,7 +119,7 @@ public partial class LongStair : Node3D
 		AudioDirector.Zone(this, new Vector3(0, TopY * 0.5f, (StartZ + TopZ0) * 0.5f), new Vector3(2.4f, TopY + 6f, TopZ0 - StartZ + 6f), AudioDirector.Space.Tunnel, "StairVerb");
 		var along = new List<Vector3>();
 		for (int f = 6; f < Flights; f += 9) along.Add(new Vector3(0, f * FlightRise + 3f, StartZ + f * Pitch + 4f));
-		AudioDirector.Haunt(this, along.ToArray(), new[] { "haunt_moan", "haunt_boards", "haunt_drip" }, new Vector2(10f, 22f), -12f, 30f,
+		AudioDirector.Haunt(this, along.ToArray(), new[] { "haunt_moan", "haunt_boards", "haunt_drip" }, new Vector2(18f, 34f), -12f, 30f,
 			() => StoryManager.Instance is { } s && s.Current >= Checkpoint.Act20Finished && s.Current < Checkpoint.Act21ChurchReached);
 	}
 
