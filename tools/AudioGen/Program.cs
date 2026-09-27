@@ -177,6 +177,9 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"lever_throw_{i:00}", sfx, false, Lo, (r
 jobs.Add(("power_surge_01", sfx, false, Lo, (r, sr) => LibrarySounds.PowerSurge(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"candle_ignite_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.CandleIgnite(r, sr)));
 jobs.Add(("ring_charge_01", sfx, false, Lo, (r, sr) => LibrarySounds.RingCharge(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_snow_{i:00}", sfx, false, Lo, (r, sr) => ChurchSounds.StepSnow(r, sr)));
+jobs.Add(("winter_wind_loop", ambient, true, Lo, (r, sr) => ChurchSounds.WinterWind(r, sr, 38)));
+jobs.Add(("church_tone_loop", ambient, true, Lo, (r, sr) => ChurchSounds.ChurchTone(r, sr, 36)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

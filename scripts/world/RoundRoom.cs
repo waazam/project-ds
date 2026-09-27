@@ -37,6 +37,7 @@ public partial class RoundRoom : Node3D
 	public bool Arrived { get; private set; }
 	public Node3D Dais { get; private set; }
 	public PickupInteractable WebUse { get; private set; }
+	public LongStair Stair { get; private set; }
 	public Vector3 CentreWorld => ToGlobal(new Vector3(0, DaisTop + 0.05f, 0));
 	public Vector3 DaisEdgeWorld => ToGlobal(new Vector3(0, 0.05f, -DaisFoot - 0.9f));
 	public Vector3 EntryWorld => ToGlobal(EntryLocal);
@@ -381,7 +382,7 @@ public partial class RoundRoom : Node3D
 		{
 			float a = Mathf.Tau * i / n;
 			Vector3 dir = new(Mathf.Sin(a), 0, Mathf.Cos(a));
-			bool way = Mathf.Abs(Mathf.AngleDifference(a, 0f)) < 0.15f;   // an arch on +Z, the way on
+			bool way = Mathf.Abs(Mathf.AngleDifference(a, 0f)) < 0.3f;   // a wide arch on +Z: the way on, up the long stair
 			if (way) { Seg(k, dir * (TopR + 0.3f) + Vector3.Up * (y0 + (2.4f + TopH + 0.2f) * 0.5f), new Vector3(segW, TopH + 0.2f - 2.4f, 0.6f), a, true); continue; }
 			Seg(k, dir * (TopR + 0.3f) + Vector3.Up * (y0 + TopH * 0.5f), new Vector3(segW, TopH + 0.4f, 0.6f), a, true);
 		}
@@ -397,18 +398,9 @@ public partial class RoundRoom : Node3D
 			k.Quad(y + d0 * (DaisR + 0.02f), y + d0 * (TopR + 0.4f), y + d1 * (TopR + 0.4f), y + d1 * (DaisR + 0.02f), Vector3.Up);
 		}
 		k.CommitTo(this, "TopRoom", true);
-		// the way on: a dark stone stair going up, out of sight
-		var st = new MeshKit();
-		st.Mat(_stone);
-		for (int s = 0; s < 10; s++)
-			Seg(st, new Vector3(0, y0 + 0.09f * (s + 1), TopR + 0.5f + s * 0.28f), new Vector3(1.2f, 0.18f * (s + 1), 0.28f), 0, false);
-		// its narrow stone throat, climbing out of the light
-		Seg(st, new Vector3(-0.75f, y0 + 2.6f, TopR + 1.9f), new Vector3(0.3f, 5.2f, 3.2f), 0, false);
-		Seg(st, new Vector3(0.75f, y0 + 2.6f, TopR + 1.9f), new Vector3(0.3f, 5.2f, 3.2f), 0, false);
-		Seg(st, new Vector3(0, y0 + 5.1f, TopR + 1.9f), new Vector3(1.8f, 0.3f, 3.2f), 0, false);
-		Seg(st, new Vector3(0, y0 + 2.6f, TopR + 3.5f), new Vector3(1.8f, 5.2f, 0.3f), 0, false);
-		st.CommitTo(this, "Stair", true);
-		_body.AddChild(new CollisionShape3D { Position = new Vector3(0, y0 + 1.2f, TopR + 0.5f), Shape = new BoxShape3D { Size = new Vector3(1.4f, 2.4f, 0.4f) } });
+		// the way on (Act 21): the long stair up to the surface, and the church at its top
+		Stair = new LongStair { Name = "LongStair", Position = new Vector3(0, y0, 0) };
+		AddChild(Stair);
 		AddChild(new OmniLight3D { Position = new Vector3(0, y0 + 2.8f, 0), LightColor = new Color(1f, 0.85f, 0.65f), LightEnergy = 1.3f, OmniRange = 8f, ShadowEnabled = true });
 		AddChild(new OmniLight3D { Position = new Vector3(0, y0 + 2.2f, TopR + 2.5f), LightColor = new Color(0.75f, 0.8f, 0.95f), LightEnergy = 0.5f, OmniRange = 4f });
 		// the floor's collision (a box round the shaft's top; switched on once the dais is up, so it
@@ -583,14 +575,11 @@ public partial class RoundRoom : Node3D
 		player.Velocity = Vector3.Zero;
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act20Finished);
 		GD.Print("[story] Act 20 done: up through the ceiling into the room above - the end of the demo");
+		// (Act 21 goes on from here: up the long stair)
 		_ = Cutscene.Run(this, async ct2 =>
 		{
 			await Cutscene.Wait(this, 1.5, ct2);
 			await StoryBeat.Caption(this, "Up. Always up, from here.", 0.8f, 2.6f, 1.2f, ct2);
-			await Cutscene.Wait(this, 1.0, ct2);
-			var fader = StoryBeat.Fader(this);
-			if (fader != null) await fader.Fade(1f, 2.5f, ct2);
-			if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) await ending.Credits(fader, ct2);
 		});
 	}
 

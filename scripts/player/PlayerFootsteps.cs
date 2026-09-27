@@ -43,6 +43,8 @@ public partial class PlayerFootsteps : Node
 		_sets["metal"] = LoadSet("res://assets/audio/sfx/step_metal_{0:00}.wav", 6);
 		_sets["gravel"] = LoadSet("res://assets/audio/sfx/step_gravel_{0:00}.wav", 6);
 		_sets["rock"] = _sets["stone"];
+		// Act 21 on: snow (soft, the owner: softer steps for the winter)
+		_sets["snow"] = LoadSet("res://assets/audio/sfx/step_snow_{0:00}.wav", 6);
 		_cloth = LoadSet("res://assets/audio/sfx/cloth_{0:00}.wav", 4);
 		for (int i = 0; i < Voices; i++)
 		{

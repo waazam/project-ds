@@ -110,6 +110,14 @@ public partial class PhotoSubjects : Node
 						foreach (var w in rr.Switches) plates.Add(rr.ToLocal(w.Root.GlobalPosition));
 						if (plates.Count > 0) A(rr, "switches", plates[0], 0.5f, 8f, 16f, false, plates.GetRange(1, plates.Count - 1).ToArray());
 						A(rr, "room_above", RoundRoom.TopLocal + new Vector3(0, 1.5f, 1.5f), 1f, 10f, 24f, false);
+						if (rr.Stair?.Church is { } ch)
+						{
+							A(ch, "church_nave", new Vector3(0, 12f, 40f), 10f, 90f, 22f, false);
+							A(ch, "font", Church.FontLocal + Vector3.Up * 1f, 1f, 10f, 16f, false);
+							A(ch, "altar", new Vector3(0, Church.ChancelY + 2f, Church.ChancelEnd - 0.4f), 3f, 60f, 16f, false);
+							A(ch, "crypt", new Vector3(0, Church.CryptFloor + 1.5f, 56f), 3f, 30f, 24f, false);
+							A(ch, "church_door", new Vector3(0, 3f, -0.6f), 2f, 40f, 16f, false);
+						}
 					}
 				}
 			}

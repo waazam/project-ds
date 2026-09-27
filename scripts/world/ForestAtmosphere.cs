@@ -142,6 +142,21 @@ public partial class ForestAtmosphere : Node
 	public float BloodTint { get; set; }
 	/// <summary>0..1: below ground (Act 14's stairwell). Sky, sun and ambient go and the fog turns black.</summary>
 	public float Underground { get; set; }
+	/// <summary>Act 21 on: back on the surface, and it is winter (0..1): a pale, cold overcast, a thin
+	/// blue-grey haze, cool flat ambient light and a weak white sun, whatever the mood was.</summary>
+	public float Winter { get; set; }
+	/// <summary>Inside the church (0..1): a dark, thin, smoky haze and little ambient light, so the candles,
+	/// the stained glass and the lantern do the lighting (the owner: the white glare hurt; more gothic).</summary>
+	public float Interior { get; set; }
+	[Export] public Color InteriorFogColor = new(0.03f, 0.026f, 0.026f);
+	[Export] public float InteriorFogDensity = 0.014f;
+	[Export] public float InteriorAmbientScale = 0.22f;
+	[Export] public Color WinterFogColor = new(0.56f, 0.6f, 0.66f);
+	[Export] public float WinterFogDensity = 0.012f;
+	[Export] public Color WinterAmbientColor = new(0.62f, 0.68f, 0.78f);
+	[Export] public float WinterAmbient = 0.9f;
+	[Export] public float WinterSun = 0.35f;
+	[Export] public Color WinterSunColor = new(0.86f, 0.9f, 1f);
 	/// <summary>The black fog's density fully underground: a couple of turns of the stair and it's gone.</summary>
 	[Export] public float UndergroundFogDensity = 0.085f;
 	/// <summary>The fog's colour fully underground (black in the stairwell; Act 15's hallway tints it).</summary>
@@ -500,6 +515,25 @@ public partial class ForestAtmosphere : Node
 		if (BloodTint > 0f) fog = fog.Lerp(new Color(0.30f, 0.04f, 0.03f), Mathf.Clamp(BloodTint, 0f, 1f));
 		// Underground (Act 14's stairwell): no sky, no sun, next to no ambient, and a black fog that
 		// swallows everything a few metres past the lantern.
+		float winter = Mathf.Clamp(Winter, 0f, 1f);
+		Color sunColor = _baseSunColor;
+		if (winter > 0f)
+		{
+			fog = fog.Lerp(WinterFogColor, winter);
+			density = Mathf.Lerp(density, WinterFogDensity, winter);
+			ambColor = ambColor.Lerp(WinterAmbientColor, winter);
+			ambient = Mathf.Lerp(ambient, WinterAmbient, winter);
+			sunEnergy = Mathf.Lerp(sunEnergy, WinterSun, winter);
+			sunColor = sunColor.Lerp(WinterSunColor, winter);
+		}
+		float inside = Mathf.Clamp(Interior, 0f, 1f);
+		if (inside > 0f)
+		{
+			fog = fog.Lerp(InteriorFogColor, inside);
+			density = Mathf.Lerp(density, InteriorFogDensity, inside);
+			ambient *= Mathf.Lerp(1f, InteriorAmbientScale, inside);
+			sunEnergy *= 1f - 0.75f * inside;
+		}
 		float under = Mathf.Clamp(Underground, 0f, 1f);
 		if (under > 0f)
 		{
@@ -540,10 +574,10 @@ public partial class ForestAtmosphere : Node
 		_env.AmbientLightColor = ambColor;
 		_env.AmbientLightEnergy = ambient;
 		_env.TonemapExposure = _exposureBase + OpenExposureBoost * _open;
-		_env.BackgroundEnergyMultiplier = (_bgEnergyBase * _baseSkyEnergy * (1f + OpenSkyBoost * _open) * (1f - 0.35f * storm) + flash * 2.5f) * (1f - under);
+		_env.BackgroundEnergyMultiplier = (_bgEnergyBase * Mathf.Lerp(_baseSkyEnergy, 0.75f, winter) * (1f + OpenSkyBoost * _open) * (1f - 0.35f * storm) + flash * 2.5f) * (1f - under);
 		if (_sun == null) return;
 		_sun.LightEnergy = sunEnergy;
-		_sun.LightColor = _baseSunColor;
+		_sun.LightColor = sunColor;
 		DriveShafts(storm);
 		// Raise the sun with the grade (about its own horizontal axis), in small steps.
 		float raise = Mathf.Snapped(_open * (OpenWarmAmbientAndSky ? OpenSunRaiseDegrees : 0f), 0.25f);

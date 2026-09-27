@@ -123,6 +123,7 @@ public partial class StoryTest : Node
 			18 => (Checkpoint.Act17Finished, StateFor(15).flags, "lantern,compass,radio;tools=Lighter"),
 			19 => (Checkpoint.Act18Finished, StateFor(15).flags.Append(StoryManager.Flag.Act18IntroSeen).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			20 => (Checkpoint.Act19Finished, StateFor(19).flags, "lantern,compass,radio;tools=Lighter"),
+			21 => (Checkpoint.Act20Finished, StateFor(19).flags.Concat(new[] { StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -132,7 +133,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 20) return false;
+		if (_fromApplied || act < 3 || act > 21) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -266,6 +267,7 @@ public partial class StoryTest : Node
 			new("Act 18: the pit", hollow, Act18Boss),
 			new("Act 19: the library", hollow, Act19Library),
 			new("Act 20: the round room", hollow, Act20Round),
+			new("Act 21: the church", hollow, Act21Church),
 		};
 	}
 
@@ -2654,6 +2656,179 @@ public partial class StoryTest : Node
 		Check("off the dais onto the room's floor", _player.IsOnFloor() && Flat(_player.GlobalPosition - rr.TopWorld).Length() < 1f, $"{_player.GlobalPosition}");
 		Check("the camera is still with you at the end of the demo", _inv.HasCamera);
 		Check("after Act 20 the lantern's flame works again", !ProjectDS.Player.Lantern.FlameDead);
+		// and the way on is open: the long stair (Act 21)
+		Check("the room above opens onto the long stair up", rr.Stair != null && rr.Stair.Church != null);
+		Check("the blacklight's secrets are written round the Hollow", GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets") is { Written: >= 25 },
+			$"{GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets")?.Written}");
+	}
+
+	private async Task Act21Church(CancellationToken ct)
+	{
+		var rr = StationInterior.Instance?.Boss?.Library?.Round;
+		await WaitUntil(() => rr?.Stair?.Church?.FontKeyPickup != null, 15, ct);
+		var stair = rr?.Stair;
+		var church = stair?.Church;
+		Check("the long stair and the church are there", stair != null && church != null);
+		if (church == null) return;
+		var s = StoryManager.Instance;
+		Check("Act 21 starts at Act 20's save, in the room at the top", s.Current == Checkpoint.Act20Finished && _player.GlobalPosition.DistanceTo(rr.TopWorld) < 3f, $"{s.Current} at {_player.GlobalPosition}");
+		if (s.Current != Checkpoint.Act20Finished) return;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		// ---- the long stair
+		await WalkTo(stair.BottomWorld, 0.5f, ct, giveUp: 8f);
+		await Aim(stair.PointAt(0.03f) + Vector3.Up * 1.4f, ct);
+		Screenshot("long_stair_bottom");
+		// three minutes at a sprint: run up it for thirty seconds and see how far that got
+		float p0 = stair.Progress(_player.GlobalPosition);
+		ulong t0 = Time.GetTicksMsec();
+		_input.ScriptedRun = true;
+		await WalkTo(stair.PointAt(1f), 0.5f, ct, stopWhen: () => Time.GetTicksMsec() - t0 > 30000, giveUp: 31f);
+		_input.ScriptedRun = false;
+		float p1 = stair.Progress(_player.GlobalPosition);
+		double secs = (Time.GetTicksMsec() - t0) / 1000.0;
+		double estimate = (p1 - p0) > 0.001f ? secs / (p1 - p0) : 9999;
+		Check("the long stair takes about three minutes at a sprint", estimate > 140 && estimate < 240, $"{p1 - p0:P1} of the way in {secs:0} s: about {estimate:0} s to the top");
+		Screenshot("long_stair_climbing");
+		// the change from concrete to wood, long and slow
+		foreach (var (at, name) in new[] { (0.3f, "stair_first_timber"), (0.5f, "stair_half_wood"), (0.7f, "stair_mostly_wood"), (0.93f, "stair_old_wood") })
+		{
+			await Inside(stair.PointAt(at), stair.PointAt(at + 0.01f), ct);
+			await Aim(stair.PointAt(at + 0.012f) + Vector3.Up * 1.3f, ct);
+			await Frames(4, ct);
+			Screenshot(name);
+		}
+		Check("concrete at the bottom, timber at the top, a long change between", LongStair.WoodAt(0) < 0.01f && LongStair.WoodAt(LongStair.Flights - 1) > 0.99f && LongStair.WoodAt(LongStair.Flights / 2) is > 0.3f and < 0.7f);
+		// ---- the hatch at the top
+		await Inside(stair.PointAt(0.995f), stair.TopLandingWorld, ct);
+		await WalkTo(stair.TopLandingWorld, 0.4f, ct, giveUp: 8f);
+		await Aim(stair.ToGlobal(LongStair.HatchLocal), ct);
+		await Frames(3, ct);
+		Screenshot("the_hatch");
+		Check("a hatch in the ceiling: push it open", _player.Interaction?.PromptText == "Push the hatch open", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => s.Current == Checkpoint.Act21ChurchReached, 8, ct);
+		await WaitUntil(() => _input.Enabled, 6, ct);
+		Check("up through the hatch into the church's crypt: a new save", s.Current == Checkpoint.Act21ChurchReached && church.Inside(_player.GlobalPosition) && _player.GlobalPosition.Y < church.ToGlobal(Vector3.Zero).Y - 4f, $"{s.Current} at {_player.GlobalPosition}");
+		await Frames(10, ct);
+		Check("standing on the crypt's floor", _player.IsOnFloor());
+		Screenshot("the_crypt");
+		await Aim(church.ToGlobal(new Vector3(0, Church.CryptFloor + 1.5f, Church.CryptZ1)), ct);
+		Screenshot("the_crypt_far_end");
+		await Aim(church.ToGlobal(Church.HatchLocal), ct);
+		await Frames(3, ct);
+		Check("the hatch has fallen shut behind: it won't lift", _player.Interaction?.PromptText == "It won't lift. Shut fast.", $"'{_player.Interaction?.PromptText}'");
+		var atmo = StoryBeat.Atmosphere(_player);
+		Check("back on the surface: no underground black, and it is winter", atmo != null && atmo.Underground < 0.2f && atmo.Winter > 0.5f, $"underground {atmo?.Underground:0.00} winter {atmo?.Winter:0.00}");
+		var obj = s.ObjectivePosition;
+		Check("the compass lives again: it points at a candle", obj is Vector3 o && Enumerable.Range(0, 4).Any(i => o.DistanceTo(church.CandleWorld(i)) < 1f), $"{obj}");
+		// ---- up the crypt stairs into the nave
+		await WalkTo(church.CryptStairFootWorld, 0.6f, ct, giveUp: 12f);
+		await WalkTo(church.CryptStairTopWorld, 0.6f, ct, giveUp: 14f);
+		Check("up the crypt's stairs into the nave", Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) < 0.5f, $"church-local {church.ToLocal(_player.GlobalPosition)}");
+		if (Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) >= 0.5f)
+		{
+			var space = _player.GetWorld3D().DirectSpaceState;
+			foreach (float h in new[] { 0.2f, 0.9f, 1.6f, 2.2f })
+			{
+				var from = _player.GlobalPosition + Vector3.Up * h;
+				var q = PhysicsRayQueryParameters3D.Create(from, from + church.GlobalBasis * Vector3.Forward * 1.5f, 1u);
+				q.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+				var hit = space.IntersectRay(q);
+				GD.Print($"[storytest] blocker at {h}: {(hit.Count > 0 ? (hit["collider"].AsGodotObject() as Node)?.GetPath() + " shape " + hit["shape"] + " at " + church.ToLocal((Vector3)hit["position"]) : "none")}");
+			}
+		}
+		Vector3 L(float x, float y, float z) => church.ToGlobal(new Vector3(x, y, z));
+		await WalkTo(L(0, 0.05f, 30.3f), 0.5f, ct, giveUp: 6f);
+		await Aim(L(0, 8f, Church.ChancelEnd), ct);
+		Screenshot("the_nave_to_the_altar");
+		await Aim(L(0, 34f, 34f), ct);
+		Screenshot("the_vault");
+		await Aim(L(0, 20f, 0), ct);
+		Screenshot("the_rose_window");
+		await Aim(L(Church.AisleOuter, 4.5f, (Church.BrokenBay + 1.5f) * Church.BayLen), ct);
+		Screenshot("winter_through_the_glass");
+		await Inside(L(9f, 0.05f, 12f), L(Church.AisleOuter, 4.5f, 12f), ct);
+		await Aim(L(Church.AisleOuter, 4.5f, 11.25f), ct);
+		Screenshot("the_aisle_window_snow");
+		await Inside(L(0, 0.05f, 65.5f), L(0, 2f, Church.ChancelEnd), ct);
+		await Aim(L(0, 3f, Church.ChancelEnd), ct);
+		Screenshot("the_altar");
+		await Aim(L(-Church.TransHalf, 6f, 60.5f), ct);
+		Screenshot("the_left_transept");
+		// ---- locked: the great door, the font, the vestry
+		await Inside(L(0, 0.05f, 3.5f), L(0, 1.5f, 0), ct);
+		await Aim(L(0, 2.6f, -0.6f), ct);
+		Check("the great door: locked, four empty niches", _player.Interaction?.PromptText == "Locked fast. Four empty niches in it.", $"'{_player.Interaction?.PromptText}'");
+		Screenshot("the_great_door");
+		await Aim(church.NicheWorld(0), ct);
+		Screenshot("the_niches");
+		await WalkTo(L(-4f, 0.05f, 5f), 0.8f, ct, giveUp: 10f);
+		await WalkTo(church.FontStandWorld, 0.5f, ct, giveUp: 10f);
+		await Aim(church.FontWorld, ct);
+		Check("the font's lid is chained and locked", _player.Interaction?.PromptText == "The font's lid is chained and locked.", $"'{_player.Interaction?.PromptText}'");
+		Screenshot("the_font_locked");
+		// ---- the four candles
+		for (int i = 0; i < 4; i++)
+		{
+			// along the middle aisle (the pews fill either side of it)
+			await WalkTo(L(0, 0.05f, church.ToLocal(_player.GlobalPosition).Z), 0.8f, ct, giveUp: 12f);
+			await WalkTo(L(0, 0.05f, Church.CandleLocal[i].Z < 20f ? 4.6f : 47.4f), 0.8f, ct, giveUp: 25f);
+			await WalkTo(church.CandleStandWorld(i), 0.5f, ct, giveUp: 10f);
+			await Aim(church.CandleWorld(i) + Vector3.Up * 0.1f, ct);
+			await Frames(2, ct);
+			if (i == 0) Check("a tall candle: light it", _player.Interaction?.PromptText == "Light the candle", $"'{_player.Interaction?.PromptText}'");
+			await Press(ct);
+			await Seconds(0.8, ct);
+			Check($"candle {i + 1} lit", church.CandleLit(i));
+			if (i == 0) Screenshot("a_candle_lit");
+			await WaitUntil(() => _input.Enabled, 12, ct);
+		}
+		Check("all four burning: the vestry's door has opened", church.VestryOpen && s.HasFlag(StoryManager.Flag.ChurchVestryOpen));
+		Screenshot("the_vestry_door_open");
+		// ---- the vestry, and the key
+		await WalkTo(L(0, 0.05f, 50f), 0.8f, ct, giveUp: 12f);
+		await WalkTo(L(-4f, 0.05f, 55.5f), 0.8f, ct, giveUp: 12f);
+		await WalkTo(L(-16f, 0.05f, 57f), 0.8f, ct, giveUp: 20f);
+		await WalkTo(church.VestryDoorWorld, 0.5f, ct, giveUp: 25f);
+		await WalkTo(church.VestryInsideWorld, 0.6f, ct, giveUp: 10f);
+		Check("into the vestry", church.Inside(_player.GlobalPosition) && church.ToLocal(_player.GlobalPosition).X < Church.VestryX0, $"{church.ToLocal(_player.GlobalPosition)}");
+		await Aim(church.KeyWorld, ct);
+		Screenshot("the_vestry");
+		await UseIt(church.FontKeyPickup, ct);
+		await Seconds(0.4, ct);
+		Check("the font's key taken from the hooks", _inv.HasTool(ToolKind.FontKey));
+		// ---- the font
+		await WalkTo(church.VestryDoorWorld, 0.6f, ct, giveUp: 10f);
+		await WalkTo(L(-16f, 0.05f, 57f), 0.8f, ct, giveUp: 20f);
+		await WalkTo(L(-4f, 0.05f, 55.5f), 0.8f, ct, giveUp: 20f);
+		await WalkTo(L(0, 0.05f, 50f), 0.8f, ct, giveUp: 25f);
+		await WalkTo(L(0, 0.05f, 5f), 0.8f, ct, giveUp: 30f);
+		await WalkTo(L(-4f, 0.05f, 5f), 0.8f, ct, giveUp: 10f);
+		await WalkTo(church.FontStandWorld, 0.5f, ct, giveUp: 12f);
+		await Aim(church.FontWorld, ct);
+		Check("with the key: unlock the font", _player.Interaction?.PromptText == "Unlock the font", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => church.ChalicePickup != null, 6, ct);
+		await WaitUntil(() => _input.Enabled, 6, ct);
+		await Aim(church.FontWorld + Vector3.Down * 0.1f, ct);
+		Screenshot("the_font_open");
+		await UseIt(church.ChalicePickup, ct);
+		await Seconds(0.4, ct);
+		Check("the chalice, out of the font's black water", _inv.HasTool(ToolKind.Chalice));
+		// ---- the camera: the font is one of the sixty
+		var fontShot = await TakePicture(church.FontWorld, 1, ct);
+		Check("a picture of the font", fontShot is { SubjectId: "font", Scored: true }, Describe(fontShot));
+		// ---- the great door: the chalice in its niche
+		await WalkTo(L(-4f, 0.05f, 4f), 0.8f, ct, giveUp: 10f);
+		await WalkTo(church.NicheStandWorld, 0.5f, ct, giveUp: 12f);
+		await Aim(church.NicheWorld(0), ct);
+		await Frames(2, ct);
+		Check("the niche with the chalice's shape: set it in", _player.Interaction?.PromptText == "Set the chalice in its place", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => s.Current == Checkpoint.Act21Finished, 6, ct);
+		Check("the chalice in the great door: one of four (Act 21 done)", s.Current == Checkpoint.Act21Finished && church.ChalicePlaced && !_inv.HasTool(ToolKind.Chalice), $"{s.Current}");
+		await Seconds(0.6, ct);
+		Screenshot("one_of_four");
 		// the credits: every picture, polaroid by polaroid
 		int want = Math.Min(2, PhotoLog.Instance?.RecordedCount ?? 0);
 		await WaitUntil(() => FirstOf<PolaroidMontage>() is { } m && m.Shown >= want, 45, ct);
@@ -2661,10 +2836,6 @@ public partial class StoryTest : Node
 		Check("the credits play the pictures back as polaroids", want > 0 && mont != null && mont.Shown >= want, $"{mont?.Shown} shown of {PhotoLog.Instance?.RecordedCount}");
 		await Seconds(1.5, ct);
 		Screenshot("credits_polaroids");
-		await Seconds(3.0, ct);
-		Screenshot("credits_polaroids_collage");
-		Check("the blacklight's secrets are written round the Hollow", GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets") is { Written: >= 25 },
-			$"{GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets")?.Written}");
 	}
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>

@@ -119,6 +119,10 @@ public partial class StationInterior : Node3D
 		// Act 20's start: just inside the round room; the demo's end: the little room at the top of the shaft
 		Marker("Act20Marker", ToGlobal(BossAt + BossRoom.LibraryLocal + Library.RoundRoomAt + RoundRoom.EntryLocal), Rotation.Y + Mathf.Pi, "respawn_Act19Finished");
 		Marker("Act20EndMarker", ToGlobal(BossAt + BossRoom.LibraryLocal + Library.RoundRoomAt + RoundRoom.TopLocal), Rotation.Y + Mathf.Pi, "respawn_Act20Finished");
+		// Act 21: in the church's crypt beside the hatch, facing along it; and inside the great door, facing the altar
+		Vector3 church = BossAt + BossRoom.LibraryLocal + Library.RoundRoomAt + new Vector3(0, RoundRoom.Rise + RoundRoom.DaisTop, 0) + LongStair.ChurchOrigin;
+		Marker("Act21ChurchMarker", ToGlobal(church + Church.HatchLocal + new Vector3(0, 0.08f, -1.3f)), Rotation.Y + Mathf.Pi, "respawn_Act21ChurchReached");
+		Marker("Act21EndMarker", ToGlobal(church + new Vector3(0, 0.05f, 3.5f)), Rotation.Y + Mathf.Pi, "respawn_Act21Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });

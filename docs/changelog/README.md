@@ -13,10 +13,11 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
-- [2026-09-26f — The visual pass: texel density, filtering, supersampling, shadows, contact shadows](2026-09-26f-visual-pass.md)
-- [2026-09-26g — The library: the door and passage flicker fixed, a blacklight handprint on the secret book](2026-09-26g-library-flicker-handprint.md)
-- [2026-09-26h — Act 20: the switches, the power surge, candlelight and the green ring; the library journal](2026-09-26h-act20-power.md)
+- [2026-09-27 — Act 21: the long stair, and the church in the snow (and its gothic pass)](2026-09-27-act21-church.md)
 - [2026-09-26i — The camera: sixty subjects, scored pictures, zoom and autofocus; the credits polaroid montage; the save indicator](2026-09-26i-camera-montage-save.md)
+- [2026-09-26h — Act 20: the switches, the power surge, candlelight and the green ring; the library journal](2026-09-26h-act20-power.md)
+- [2026-09-26g — The library: the door and passage flicker fixed, a blacklight handprint on the secret book](2026-09-26g-library-flicker-handprint.md)
+- [2026-09-26f — The visual pass: texel density, filtering, supersampling, shadows, contact shadows](2026-09-26f-visual-pass.md)
 - [2026-09-26e — The lantern's blacklight, the code in invisible ink, the flame dying in the stairwell, and the blacklight's secrets](2026-09-26e-lantern-blacklight.md)
 - [2026-09-26d — The audio sweep: spatial audio, rooms, occlusion, Foley, the oars, and the haunting](2026-09-26d-audio-sweep.md)
 - [2026-09-26c — Art pass: textures, wind, fog, the monsters remodelled; a bigger lake; new beats in Acts 11 and 15](2026-09-26c-art-pass-and-new-beats.md)
@@ -38,6 +39,6 @@ than one entry lands the same day) and list it below.
 - [2026-09-22a — Pre-rework checkpoint](2026-09-22a-pre-rework-checkpoint.md)
 - [2026-09-21b — Opus rework: foundations, saves, rebuilt models, Act 1 flow, title screen](2026-09-21b-opus-rework.md)
 - [2026-09-21a — Acts 8-11: the bunker, the maze, and the giant's return](2026-09-21a-acts-8-11.md)
-- [2026-09-18/19 — Acts 1-7 story slice](2026-09-19-acts-1-7-story-slice.md)
 - [2026-09-18b — Moodboard pass: stalker, audio rework, first-person polish](2026-09-18b-moodboard-pass.md)
 - [2026-09-18a — Foundations and forest vertical slice](2026-09-18a-foundations-and-vertical-slice.md)
+- [2026-09-18/19 — Acts 1-7 story slice](2026-09-19-acts-1-7-story-slice.md)

@@ -169,6 +169,7 @@ public static class StairwellTextures
 	/// <summary>Plain clean concrete as an ordinary material (Room 3's hole, the landing at the top).</summary>
 	public static StandardMaterial3D CleanMat => Std("sw_clean_m", CleanConcrete, 0.92f, 0.25f);
 	public static StandardMaterial3D GrimeMat => Std("sw_grime_m", GrimeConcrete, 0.6f, 0.5f);
+	public static StandardMaterial3D StainedMat => Std("sw_stained_m", StainedConcrete, 0.85f, 0.3f);
 
 	// ------------------------------------------------------------------ steel
 

@@ -131,6 +131,14 @@ public partial class StoryManager : Node
 		public const string RoundRoomPowered = "round_room_powered";
 		/// <summary>Act 19: the journal on the library's shelves has been found by blacklight (it can be taken down and read).</summary>
 		public const string LibraryJournalFound = "library_journal_found";
+		/// <summary>Act 21: each of the church's four candles, lit with the lighter (1-4).</summary>
+		public static string ChurchCandle(int i) => $"church_candle_{i}";
+		/// <summary>Act 21: all four candles lit: the vestry door unlocked and swung open.</summary>
+		public const string ChurchVestryOpen = "church_vestry_open";
+		/// <summary>Act 21: the font unlocked with the vestry's iron key.</summary>
+		public const string ChurchFontOpen = "church_font_open";
+		/// <summary>Act 21: the chalice set in the great door (the first of its four pieces).</summary>
+		public const string ChurchChalicePlaced = "church_chalice_placed";
 	}
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>
@@ -191,6 +199,8 @@ public partial class StoryManager : Node
 			if (Current < Checkpoint.Act10WalkieFound) return MarkerPos("bunker_entrance_marker");
 			if (Current < Checkpoint.Act11GiantEncounter)
 				return MarkerPos("final_stairs_marker");   // from the bunker on, the compass leads to the last staircase (Dan, 2026-09-22)
+			// Act 21: back on the surface, the compass comes back to life: it points at what the church wants next
+			if (Current >= Checkpoint.Act21ChurchReached && Current < Checkpoint.Act21Finished) return MarkerPos("church_objective_marker");
 			return null;
 		}
 	}

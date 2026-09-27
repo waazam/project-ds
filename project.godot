@@ -82,3 +82,7 @@ uv_light_range={
 "type": "float",
 "value": 9.0
 }
+winter={
+"type": "float",
+"value": 0.0
+}

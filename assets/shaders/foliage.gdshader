@@ -16,6 +16,7 @@ uniform float mip_boost = 0.35;
 uniform vec2 tex_size = vec2(64.0, 64.0);
 /// Extra darkening of the back (under) side of cards.
 uniform float back_shade = 0.0;
+global uniform float winter;
 
 void vertex() {
 	float w = 1.0 - UV.y;
@@ -35,6 +36,13 @@ void fragment() {
 	float a = c.a * (1.0 + max(lod, 0.0) * mip_boost);
 	float back = FRONT_FACING ? 1.0 : 1.0 - back_shade;
 	ALBEDO = c.rgb * tint * COLOR.rgb * back;
+	if (winter > 0.001) {
+		// winter: snow lying along the tops of the boughs, frost on the rest of the needles
+		vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float n = fract(sin(dot(floor(wp * 5.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+		float top = FRONT_FACING ? smoothstep(0.35, 0.95, 1.0 - UV.y * 0.6 + 0.25 * n) : 0.15;
+		ALBEDO = mix(mix(ALBEDO, vec3(0.5, 0.54, 0.56), 0.3 * winter), vec3(0.86, 0.9, 0.95), winter * top * 0.8);
+	}
 	ALPHA = a;
 	ALPHA_SCISSOR_THRESHOLD = alpha_cut;
 	ROUGHNESS = 1.0;

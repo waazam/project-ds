@@ -218,6 +218,8 @@ public static class ItemMeshes
 			case ToolKind.Knife: Knife(k, ref b); break;
 			case ToolKind.Lighter: Lighter(k, ref b); break;
 			case ToolKind.Bookmark: Bookmark(k, ref b); break;
+			case ToolKind.FontKey: FontKey(k, ref b); break;
+			case ToolKind.Chalice: Chalice(k, ref b); break;
 		}
 		if (!k.IsEmpty)
 		{
@@ -455,6 +457,54 @@ public static class ItemMeshes
 		k.Xf = Transform3D.Identity;
 		b.PickCenter = new Vector3(0, 0.02f, 0);
 		b.PickRadius = 0.18f;
+	}
+
+	/// <summary>Act 21: the font's key, a long black iron church key lying flat: a trefoil bow, a round
+	/// shank, a heavy toothed bit.</summary>
+	private static void FontKey(MeshKit k, ref Built b)
+	{
+		k.Xf = new Transform3D(new Basis(Vector3.Up, 0.4f), new Vector3(0, 0.012f, 0));
+		k.Mat(StairwellParts.StairwellTextures.SteelMat);
+		k.Color = new Color(0.22f, 0.21f, 0.2f);
+		// the bow: three rings round a hole
+		for (int i = 0; i < 3; i++)
+		{
+			float a = Mathf.Tau * i / 3f + Mathf.Pi * 0.5f;
+			Vector3 c = new(Mathf.Cos(a) * 0.017f, 0, -0.1f + Mathf.Sin(a) * 0.017f);
+			for (int s = 0; s < 10; s++)
+			{
+				float a0 = Mathf.Tau * s / 10f, a1 = Mathf.Tau * (s + 1) / 10f;
+				k.Beam(c + new Vector3(Mathf.Cos(a0), 0, Mathf.Sin(a0)) * 0.014f, c + new Vector3(Mathf.Cos(a1), 0, Mathf.Sin(a1)) * 0.014f, 0.005f, 0.006f);
+			}
+		}
+		k.Cylinder(new Vector3(0, 0, -0.078f), new Vector3(0, 0, 0.09f), 0.0065f, 0.0055f, 8, true);   // the shank
+		k.Cylinder(new Vector3(0, 0, -0.07f), new Vector3(0, 0, -0.062f), 0.01f, 0.01f, 8, true);       // a collar
+		k.Box(new Vector3(0.016f, 0, 0.078f), new Vector3(0.026f, 0.006f, 0.022f));                      // the bit
+		k.Box(new Vector3(0.024f, 0, 0.07f), new Vector3(0.01f, 0.006f, 0.006f));
+		k.Box(new Vector3(0.024f, 0, 0.086f), new Vector3(0.01f, 0.006f, 0.006f));
+		k.Xf = Transform3D.Identity;
+		b.PickCenter = new Vector3(0, 0.02f, 0);
+		b.PickRadius = 0.16f;
+	}
+
+	/// <summary>Act 21: the first of the great door's four pieces, a silver chalice, tarnished dark in its
+	/// hollows: a round foot, a knotted stem, a deep bowl.</summary>
+	private static void Chalice(MeshKit k, ref Built b)
+	{
+		k.Mat(ItemTextures.BrassMat);
+		k.Color = new Color(0.78f, 0.8f, 0.84f);
+		k.Cylinder(new Vector3(0, 0, 0), new Vector3(0, 0.012f, 0), 0.055f, 0.05f, 16, true);        // the foot
+		k.Cylinder(new Vector3(0, 0.012f, 0), new Vector3(0, 0.04f, 0), 0.045f, 0.012f, 16, false);
+		k.Cylinder(new Vector3(0, 0.04f, 0), new Vector3(0, 0.1f, 0), 0.011f, 0.011f, 10, false);     // the stem
+		k.Color = new Color(0.62f, 0.64f, 0.68f);
+		k.Blob(new Vector3(0, 0.07f, 0), new Vector3(0.022f, 0.016f, 0.022f), 3, 0.05f);              // the knot
+		k.Color = new Color(0.8f, 0.82f, 0.86f);
+		k.Cylinder(new Vector3(0, 0.1f, 0), new Vector3(0, 0.13f, 0), 0.012f, 0.04f, 16, false);      // the bowl
+		k.Cylinder(new Vector3(0, 0.13f, 0), new Vector3(0, 0.185f, 0), 0.04f, 0.05f, 16, false);
+		k.Color = new Color(0.3f, 0.3f, 0.32f);
+		k.Cylinder(new Vector3(0, 0.183f, 0), new Vector3(0, 0.12f, 0), 0.046f, 0.01f, 16, false);    // its dark inside
+		b.PickCenter = new Vector3(0, 0.1f, 0);
+		b.PickRadius = 0.16f;
 	}
 
 	/// <summary>An old brass flip-top lighter, worn to the metal at the corners, lid shut.</summary>

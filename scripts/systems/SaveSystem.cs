@@ -41,6 +41,10 @@ public enum Checkpoint
 	Act19Finished = 19,
 	/// <summary>Act 20's end: the webs burned, the dais risen through the ceiling into the room above (the end of the demo).</summary>
 	Act20Finished = 20,
+	/// <summary>Act 21: up the long stair, through the hatch into the church's crypt, back on the surface (a new save).</summary>
+	Act21ChurchReached = 21,
+	/// <summary>Act 21's end: the four candles lit, the vestry's key, the font opened, the chalice set in the great door.</summary>
+	Act21Finished = 22,
 }
 
 public class SaveData
