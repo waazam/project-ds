@@ -26,6 +26,16 @@ The owner's requests:
 - The encode is now one script, `make_teaser.py`, in place of a long ffmpeg command. The logos get
   real silence under them, not a timestamp gap, which some players mishandle.
 
+## The ending, polished (the owner: "so close to being a perfect transition")
+- **The jump into the song's ending is now a crossfade.** It runs over the half bar from the title
+  hit, on the song's grid: the groove fades out as the ending (from its pickup hit at 4:21.18) fades
+  in, both equal-power. Before, it was a hard cut 11 s from the end.
+- **The title lands over the game.** On the 3:56 hit, DEAD SILENT appears over the last shot of the
+  stairs. The camera drifts on and settles; the shot fades to black behind the title over 3 s. Then
+  the title holds on black and fades out as the song rings out.
+- The title has a soft shadow so it reads over the pale fog.
+- The game's own sound fades out over those 3 s with the picture.
+
 ## The company logo at startup (`StartupLogo`, `scenes/ui/startup_logo.tscn`)
 - The game's first scene is now the Flicker Archive logo (`assets/video/flicker_archive_logo.ogv`,
   converted to Ogg Theora for Godot). It plays after the engine's boot splash, then goes to the

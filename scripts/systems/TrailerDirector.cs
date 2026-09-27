@@ -37,13 +37,15 @@ public partial class TrailerDirector : Node
 	/// 16.9 s of eight shots, three beats each, from 1:40.24; then the song jumps to the big downbeat at 3:28.94
 	/// on the cut to the stairs, and the title lands on the hit at 3:56.12. The song's own ending rings out under
 	/// the title (docs/trailer.md).</summary>
-	public const float Beat = 60f / 85f, StairsAt = 24f * Beat, TitleAtSong = StairsAt + (236.123f - 208.94f), TitleHold = 9f;
+	public const float Beat = 60f / 85f, StairsAt = 24f * Beat, TitleAtSong = StairsAt + (236.123f - 208.94f), TitleHold = 11f;
+	/// <summary>How long the last shot plays on under the title before it has faded to black.</summary>
+	public const float TitleOverShot = 5f;
 	/// <summary>The ending recording: a pre-roll (trimmed off) so Act 1's fog is settled, the stairs, the title.</summary>
 	public const float EndingPreroll = 4f, EndingStairs = TitleAtSong - StairsAt;
 	private bool _ending, _prerolled;
 	private float Seconds => _ending ? EndingPreroll + EndingStairs + TitleHold : StairsAt;
 	private float TitleAt => _ending ? EndingPreroll + EndingStairs : 9999f;
-	private float TitleEnd => TitleAt + TitleHold - 1.5f;
+	private float TitleEnd => TitleAt + TitleHold - 1f;
 
 	private Camera3D _cam;
 	private OmniLight3D _lanternGlow;
@@ -136,6 +138,11 @@ public partial class TrailerDirector : Node
 		_title.AddThemeFontOverride("font", UiKit.SerifTitle);
 		_title.AddThemeFontSizeOverride("font_size", 40);
 		_title.AddThemeColorOverride("font_color", UiKit.Bone);
+		// a soft shadow, so it reads over the pale fog of the last shot as well as on black
+		_title.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.55f));
+		_title.AddThemeConstantOverride("shadow_offset_x", 0);
+		_title.AddThemeConstantOverride("shadow_offset_y", 1);
+		_title.AddThemeConstantOverride("shadow_outline_size", 6);
 		_title.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_layer.AddChild(_title);
 	}
@@ -266,11 +273,17 @@ public partial class TrailerDirector : Node
 			pref = ((end - foot) with { Y = 0 }).Normalized();
 		}
 		Vector3 dir = ClearestWay(foot, 26f, prefer: pref);
-		Add("first_stairs", EndingPreroll, EndingStairs, s => { s.Mood = ForestAtmosphere.Mood.Auto; s.Exposure = 0.78f; s.FadeIn = 1.2f; s.FadeOut = 0.05f; }, u =>
+		// the shot runs on under the title (the owner: the title over the game, then the game fades to black behind it)
+		float len = EndingStairs + TitleOverShot;
+		Add("first_stairs", EndingPreroll, len, s => { s.Mood = ForestAtmosphere.Mood.Auto; s.Exposure = 0.78f; s.FadeIn = 1.2f; s.FadeOut = TitleOverShot - 2f; }, u =>
 		{
-			float e = u * 0.75f + u * u * (3f - 2f * u) * 0.25f;
-			Vector3 cam = foot + dir * Mathf.Lerp(24f, 4.5f, e) + dir.Cross(Vector3.Up) * 0.5f * Mathf.Sin(u * 2.2f);
-			cam.Y = Ground(cam) + 1.62f + 0.025f * Mathf.Sin(u * 30f);   // a walker's slow step, barely there
+			float v = u * len / EndingStairs;   // 1 at the title
+			float e = v <= 1f
+				? v * 0.75f + v * v * (3f - 2f * v) * 0.25f
+				: 1f + 0.75f * 0.1f * (1f - Mathf.Exp(-(v - 1f) / 0.1f));   // then drifting on, settling to a stop
+			float pace = v <= 1f ? 1f : Mathf.Exp(-(v - 1f) / 0.1f);
+			Vector3 cam = foot + dir * Mathf.Lerp(24f, 4.5f, e) + dir.Cross(Vector3.Up) * 0.5f * Mathf.Sin(Mathf.Min(v, 1f + (e - 1f) / 0.75f) * 2.2f);
+			cam.Y = Ground(cam) + 1.62f + 0.025f * pace * Mathf.Sin(v * 30f);   // a walker's slow step, barely there
 			return (cam, foot + Vector3.Up * 2.2f);
 		});
 	}

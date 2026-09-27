@@ -56,9 +56,9 @@ It writes `DeadSilent-Teaser.mp4`, in this order:
    - 1:40.24–1:57.18 under part A: 24 beats, eight shots of three beats each;
    - a jump to the big downbeat at 3:28.94, on the cut to the stairs;
    - the title on the hit at 3:56.12.
-3. **The ring-out:** half a bar after the title hit, the song jumps (on its grid) to its own ending
-   at 4:22.59 and rings out to silence under the title. The picture holds black after the title
-   fades.
+3. **The ring-out:** over the half bar after the title hit, the song crossfades (on its grid) into
+   its own ending (from 4:21.18) and rings out to silence. The title comes in over the last shot,
+   which fades to black behind it; the picture holds black after the title fades.
 
 The game's own sound sits low under the music until the title. (`pip install imageio-ffmpeg`
 provides an ffmpeg binary. `yt-dlp` can fetch the song.)
@@ -83,4 +83,4 @@ The owner's notes shaped it:
 | 12.7–14.9 | Its decayed depths, and the drop |
 | 14.9–17.0 | The church's nave: a high, slow, surreal swoop toward the altar |
 | 16.9–44.1 | The song jumps to the 3:28.94 downbeat: a slow walk up the end of the Act 1 trail, and the first staircase peeking out of the fog |
-| 44.1–56.9 | DEAD SILENT on the 3:56 hit; the song's ending rings out |
+| 44.1–56.9 | DEAD SILENT on the 3:56 hit, over the stairs; the shot fades to black behind it and the song's ending rings out |

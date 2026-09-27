@@ -22,13 +22,14 @@ S1 = 100.242                        # 1:40, on the beat
 S2 = 208.93                         # the big downbeat at 3:28.94 (a hair early, to keep its attack)
 TITLE_SONG = 236.123                # the hit the title lands on
 STAIRS = TITLE_SONG - 208.94        # the ending shot, to the title (TrailerDirector.EndingStairs)
-TITLE_HOLD = 9.0                    # TrailerDirector.TitleHold
+TITLE_HOLD = 11.0                   # TrailerDirector.TitleHold
 JUMP_FROM, JUMP_TO = 237.534, 262.589   # half a bar after the title hit, into the song's own ending, both on the hit
+XF = 2 * BEAT                       # the crossfade into the ending: the half bar from the title hit, on the grid
 SONG_END = 273.9
 FLICKER, GODOT = 5.0, 3.5           # the logos before it
 
 B_LEN = STAIRS + TITLE_HOLD
-music = A_LEN + (JUMP_FROM - S2) + (SONG_END - JUMP_TO)
+music = A_LEN + (JUMP_FROM - S2) + (SONG_END - (JUMP_TO - XF)) - XF
 video = A_LEN + B_LEN
 pad = max(0.0, music - video)
 intro = FLICKER + GODOT
@@ -49,13 +50,13 @@ fc = (
     f"[lf][lg][vt]concat=n=3:v=1:a=0[v];"
     # the game's own sound, low, gone by the title
     f"[2:a]atrim=0:{A_LEN},asetpts=PTS-STARTPTS[ga];[3:a]atrim=0:{B_LEN},asetpts=PTS-STARTPTS[gb];"
-    f"[ga][gb]concat=n=2:v=0:a=1,volume=0.13,afade=t=out:st={title_at - 0.5}:d=0.5[game];"
+    f"[ga][gb]concat=n=2:v=0:a=1,volume=0.13,afade=t=out:st={title_at}:d=3[game];"
     # the song: 1:40, then 3:28.94 to the title and half a bar on, then its own ending ringing out
     f"[4:a]asplit=3[s1][s2][s3];"
     f"[s1]atrim={S1}:{S1 + A_LEN},asetpts=PTS-STARTPTS,afade=t=out:st={A_LEN - 0.04}:d=0.04[m1];"
-    f"[s2]atrim={S2}:{JUMP_FROM + 0.03},asetpts=PTS-STARTPTS[m2];"
-    f"[s3]atrim={JUMP_TO - 0.03}:{SONG_END},asetpts=PTS-STARTPTS,afade=t=out:st={SONG_END - JUMP_TO - 1.5}:d=1.5[m3];"
-    f"[m2][m3]acrossfade=d=0.06:c1=tri:c2=tri[m23];"
+    f"[s2]atrim={S2}:{JUMP_FROM},asetpts=PTS-STARTPTS[m2];"
+    f"[s3]atrim={JUMP_TO - XF}:{SONG_END},asetpts=PTS-STARTPTS,afade=t=out:st={SONG_END - JUMP_TO + XF - 1.5}:d=1.5[m3];"
+    f"[m2][m3]acrossfade=d={XF:.4f}:c1=hsin:c2=hsin[m23];"
     f"[m1][m23]concat=n=2:v=0:a=1[music];"
     f"[music][game]amix=inputs=2:duration=longest:normalize=0,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[mix];"
     # silence under the logos (real samples: adelay only leaves a timestamp gap, which players treat differently)
