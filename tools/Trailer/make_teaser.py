@@ -23,13 +23,13 @@ S2 = 208.93                         # the big downbeat at 3:28.94 (a hair early,
 TITLE_SONG = 236.123                # the hit the title lands on
 STAIRS = TITLE_SONG - 208.94        # the ending shot, to the title (TrailerDirector.EndingStairs)
 TITLE_HOLD = 11.0                   # TrailerDirector.TitleHold
-# after the title hit the song fades away to silence, then its own ending comes back in (the owner: back in at
-# 0:56, for the drop at 0:57). The ending keeps its place on the song's grid: its 4:21.18 pickup would fall on
-# the title hit.
-FADE_AFTER_TITLE = (0.15, 2.2)      # the groove's fade to silence: its start after the title hit, and its length
-TAIL_ALIGN = 261.177                # the song time the ending is lined up to the title hit with
-RETURN_AT = 56.0                    # the ending comes back in (in the finished teaser, logos included)
-RETURN_FADE = 0.4
+# the ending (the owner): the music fades out from 0:51 and is muted by 0:52, so the title lands in the forest's
+# own sound, which plays out on its own until the song's ending drops back in at 0:57 (its hit at 4:25.41) and
+# rings out. Times here are in the finished teaser, logos included.
+MUSIC_OUT = (51.0, 52.0)
+RETURN_AT = 57.0
+RETURN_HIT = 265.41
+AMBIENCE = 7.0                      # the game's sound, brought up (+34 dB on its level under the music) in the quiet
 SONG_END = 273.9
 FLICKER, GODOT = 5.0, 3.5           # the logos before it
 
@@ -37,10 +37,11 @@ B_LEN = STAIRS + TITLE_HOLD
 video = A_LEN + B_LEN
 intro = FLICKER + GODOT
 title_at = A_LEN + STAIRS
-M2_LEN = (TITLE_SONG - S2) + sum(FADE_AFTER_TITLE)
-return_t = RETURN_AT - intro                     # in the trailer's own time
-RETURN_SONG = TAIL_ALIGN + (return_t - title_at)
-GAP = return_t - (A_LEN + M2_LEN)
+out0, out1 = MUSIC_OUT[0] - intro, MUSIC_OUT[1] - intro   # in the trailer's own time
+return_t = RETURN_AT - intro - 0.02
+RETURN_SONG = RETURN_HIT - 0.02
+M2_LEN = out1 - A_LEN
+GAP = return_t - out1
 music = return_t + (SONG_END - RETURN_SONG)
 pad = max(0.0, music - video)
 total = intro + video + pad
@@ -57,16 +58,15 @@ fc = (
     f"[va][vb]concat=n=2:v=1:a=0,eq=gamma=1.1:brightness=0.015,scale=out_range=tv,format=yuv420p,"
     f"tpad=stop_mode=add:stop_duration={pad + 0.1}:color=black[vt];"
     f"[lf][lg][vt]concat=n=3:v=1:a=0[v];"
-    # the game's own sound, low, gone by the title
+    # the game's own sound: low under the music, up in the quiet between (the forest)
     f"[2:a]atrim=0:{A_LEN},asetpts=PTS-STARTPTS[ga];[3:a]atrim=0:{B_LEN},asetpts=PTS-STARTPTS[gb];"
-    f"[ga][gb]concat=n=2:v=0:a=1,volume=0.13,afade=t=out:st={title_at}:d=3[game];"
-    # the song: 1:40, then 3:28.94 to the title and half a bar on, then its own ending ringing out
+    f"[ga][gb]concat=n=2:v=0:a=1,volume='if(lt(t,{out0}),0.13,if(lt(t,{out1}),0.13+({AMBIENCE}-0.13)*(t-{out0})/({out1}-{out0}),if(lt(t,{return_t}),{AMBIENCE},if(lt(t,{return_t}+1.5),{AMBIENCE}-({AMBIENCE}-0.13)*(t-{return_t})/1.5,0.13))))':eval=frame,afade=t=out:st={video - 1.5}:d=1.5,alimiter=limit=0.9[game];"
+    # the song: 1:40, then 3:28.94 until it fades before the title, then its own ending from the drop
     f"[4:a]asplit=3[s1][s2][s3];"
     f"[s1]atrim={S1}:{S1 + A_LEN},asetpts=PTS-STARTPTS,afade=t=out:st={A_LEN - 0.04}:d=0.04[m1];"
-    f"[s2]atrim={S2}:{S2 + M2_LEN},asetpts=PTS-STARTPTS,"
-    f"afade=t=out:st={TITLE_SONG - S2 + FADE_AFTER_TITLE[0]}:d={FADE_AFTER_TITLE[1]}:curve=qsin[m2];"
+    f"[s2]atrim={S2}:{S2 + M2_LEN},asetpts=PTS-STARTPTS,afade=t=out:st={out0 - A_LEN}:d={out1 - out0}:curve=qsin[m2];"
     f"aevalsrc=0|0:s=44100:d={GAP:.4f}[gap];"
-    f"[s3]atrim={RETURN_SONG}:{SONG_END},asetpts=PTS-STARTPTS,afade=t=in:d={RETURN_FADE},"
+    f"[s3]atrim={RETURN_SONG}:{SONG_END},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,"
     f"afade=t=out:st={SONG_END - RETURN_SONG - 1.5}:d=1.5[m3];"
     f"[m1][m2][gap][m3]concat=n=4:v=0:a=1[music];"
     f"[music][game]amix=inputs=2:duration=longest:normalize=0,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[mix];"

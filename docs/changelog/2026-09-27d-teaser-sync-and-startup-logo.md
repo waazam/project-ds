@@ -27,18 +27,15 @@ The owner's requests:
   real silence under them, not a timestamp gap, which some players mishandle.
 
 ## The ending, polished (the owner: "so close to being a perfect transition")
-- **The splice into the song's ending.** A hard cut, then a half-bar crossfade; neither worked.
-  Following the owner's direction, it is now:
-  - after the title hit, the groove fades away to silence over 2.2 s;
-  - it stays muted;
-  - the song's ending comes back in at 0:56 (a 0.4 s fade-in), for its drop at 0:57, and rings
-    out.
-  - The ending keeps its place on the song's grid.
+- **The ending's sound (the owner's direction, after trying a hard cut, a crossfade and a later return):**
+  - the music fades out from 0:51 and is fully muted by 0:52;
+  - the title lands in the forest's own sound: the game's ambience comes up from under the music and
+    plays on its own;
+  - at 0:57 the song's ending drops back in on its hit (4:25.41) and rings out.
 - **The title lands over the game.** On the 3:56 hit, DEAD SILENT appears over the last shot of the
   stairs. The camera drifts on and settles; the shot fades to black behind the title over 3 s. Then
   the title holds on black and fades out as the song rings out.
 - The title has a soft shadow so it reads over the pale fog.
-- The game's own sound fades out over those 3 s with the picture.
 
 ## The company logo at startup (`StartupLogo`, `scenes/ui/startup_logo.tscn`)
 - The game's first scene is now the Flicker Archive logo (`assets/video/flicker_archive_logo.ogv`,
