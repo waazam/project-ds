@@ -6,7 +6,7 @@ namespace ProjectDS.UI;
 /// <summary>
 /// The game's first scene, after the engine's own boot splash: the owner's company logo (Flicker Archive,
 /// a 5 s video), then the main menu. Any key, click or button skips it. Runs with a command line (the tests,
-/// the trailer) go straight to the menu. The candle's blowing out has its sound (`candle_blow_out`).
+/// the trailer) go straight to the menu. The candle crackles and is blown out (`flicker_logo_candle`).
 ///
 /// The game renders at 640x360 (the project's viewport stretch), which would blur the logo's thin lettering,
 /// so for the logo the window draws at its full resolution; the menu gets the usual scaling back.
@@ -14,10 +14,9 @@ namespace ProjectDS.UI;
 public partial class StartupLogo : Control
 {
 	public const string VideoPath = "res://assets/video/flicker_archive_logo.ogv";
-	/// <summary>The candle being blown out (the owner): a breath, then the smoke's wispy draught. The breath
-	/// starts here, so it peaks as the flame goes.</summary>
-	public const string BlowPath = "res://assets/audio/sfx/candle_blow_out.wav";
-	public const double BlowAt = 2.62;
+	/// <summary>The candle (the owner's pick, a royalty-free clip cut to the logo): its crackle while it burns, then
+	/// the blow as the flame goes (2.82 s in) and the smoke's wisp. It starts with the video.</summary>
+	public const string BlowPath = "res://assets/audio/sfx/flicker_logo_candle.wav";
 	private AudioStreamPlayer _blow;
 
 	private VideoStreamPlayer _video;
@@ -47,16 +46,15 @@ public partial class StartupLogo : Control
 		_video.Play();
 		if (ResourceLoader.Exists(BlowPath))
 		{
-			_blow = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(BlowPath), VolumeDb = -4.5f };
+			_blow = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(BlowPath), VolumeDb = -1.5f };
 			AddChild(_blow);
+			_blow.Play();
 		}
 	}
 
 	public override void _Process(double delta)
 	{
-		double was = _t;
 		_t += delta;
-		if (_blow != null && was < BlowAt && _t >= BlowAt) _blow.Play((float)(_t - BlowAt));
 		if (_t > 12.0) ToMenu();   // a video that never reports finishing never strands the player here
 	}
 

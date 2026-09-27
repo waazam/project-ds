@@ -33,8 +33,8 @@ AMBIENCE = 3.0                      # the game's sound in the quiet: brought up 
 GAME_UNDER = 0.13                   # the game's sound under the music
 SONG_END = 273.9
 FLICKER, GODOT = 5.0, 3.5           # the logos before it
-BLOW_AT, BLOW_LEN, BLOW_GAIN = 2.62, 2.6, 0.6   # StartupLogo.BlowAt; candle_blow_out.wav's length
-SCOPE_H = 816                       # the 2.35:1 frame's height at 1920 wide (1920 / 2.35, even)
+BLOW_AT, BLOW_LEN, BLOW_GAIN = 0.0, 4.348, 0.85   # the logo's candle sound starts with it; flicker_logo_candle.wav's length
+SCOPE_H = 872                       # the 2.2:1 frame's height at 1920 wide (the owner: a little less bar than 2.35:1)
 
 B_LEN = STAIRS + TITLE_HOLD
 video = A_LEN + B_LEN
@@ -88,8 +88,8 @@ fc = (
     f"[m1][m2][gap][m3]concat=n=4:v=0:a=1[music];"
     f"[music][game]amix=inputs=2:duration=longest:normalize=0,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[mix];"
     # silence under the logos (real samples: adelay only leaves a timestamp gap, which players treat differently)
-    # the candle in the Flicker Archive logo, blown out (the same sound the game's startup logo plays)
-    f"aevalsrc=0|0:s=44100:d={BLOW_AT},aformat=sample_fmts=fltp:channel_layouts=stereo[sil0];"
+    # the candle in the Flicker Archive logo: its crackle, then blown out (the same sound the game's startup logo plays)
+    f"aevalsrc=0|0:s=44100:d=0.001,aformat=sample_fmts=fltp:channel_layouts=stereo[sil0];"
     f"[6:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={BLOW_GAIN}[blow];"
     f"aevalsrc=0|0:s=44100:d={intro - BLOW_AT - BLOW_LEN:.4f},aformat=sample_fmts=fltp:channel_layouts=stereo[sil1];"
     f"[sil0][blow][sil1]concat=n=3:v=0:a=1[sil];"
@@ -108,7 +108,7 @@ args = [FF, "-y", "-hide_banner", "-loglevel", "error",
         "-ss", f"{fb / 60 + 4.0 + 0.01:.4f}", "-i", os.path.join(OUT, "partB.avi"),   # past the 4 s pre-roll
         "-i", os.path.join(OUT, "song.wav"),
         "-loop", "1", "-framerate", "60", "-i", scan,
-        "-i", os.path.join(HERE, "..", "..", "assets", "audio", "sfx", "candle_blow_out.wav"),
+        "-i", os.path.join(HERE, "..", "..", "assets", "audio", "sfx", "flicker_logo_candle.wav"),
         "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
         "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p", "-r", "60",
         "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", "-t", f"{total:.3f}",
