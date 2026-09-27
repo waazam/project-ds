@@ -20,6 +20,8 @@ public partial class PlayerInteraction : Node
 	[Export] public float ProbeDistance = 4f;
 
 	public Interactable Focused { get; private set; }
+	/// <summary>True while a hold-to-use interaction is being held (the feet planted, the head drawn in).</summary>
+	public bool Holding { get; private set; }
 	public string PromptText { get; private set; } = "";
 
 	private PlayerController _player;
@@ -47,6 +49,7 @@ public partial class PlayerInteraction : Node
 		// A blocked one (hands full) stays focusable so its prompt can say why; Probe skips disabled or hidden ones.
 		var target = input.Enabled && !input.Modal ? Probe() : null;
 		SetFocus(target);
+		Holding = false;
 		if (Focused == null) { PromptText = ""; return; }
 
 		PromptText = Focused.GetPrompt(_player);
@@ -59,6 +62,7 @@ public partial class PlayerInteraction : Node
 		}
 		if (input.InteractHeld)
 		{
+			Holding = true;
 			Focused.HoldProgress = Mathf.Min(1f, Focused.HoldProgress + (float)delta / Focused.HoldSeconds);
 			if (Focused.HoldProgress >= 1f) { Focused.HoldProgress = 0f; Focused.Interact(_player); }
 		}

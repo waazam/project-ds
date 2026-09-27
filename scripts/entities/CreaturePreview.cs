@@ -48,6 +48,23 @@ public partial class CreaturePreview : Node3D
 	private async void Run()
 	{
 		await Frames(10);
+		// the crawler (Act 14), on a floor, walking a few metres so its gait shows
+		var floor = new StaticBody3D { Name = "Floor" };
+		floor.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(40, 1, 40) }, Position = new Vector3(0, -0.5f, 0) });
+		floor.AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(40, 40) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.2f, 0.21f) } });
+		AddChild(floor);
+		var crawler = new Crawler { Name = "Crawler" };
+		AddChild(crawler);
+		for (int i = 0; i < 90; i++)
+		{
+			crawler.Place(new Vector3(0, 0, 3f - i * 0.03f), Vector3.Forward);
+			await Frames(1);
+		}
+		await Shot("crawler_side", new Vector3(3.2f, 1.1f, 0.3f), new Vector3(0, 0.4f, 0.3f));
+		await Shot("crawler_front", new Vector3(0.6f, 0.9f, -2.6f), new Vector3(0, 0.35f, 0.3f));
+		await Shot("crawler_above", new Vector3(1.8f, 3.2f, 1.8f), new Vector3(0, 0.3f, 0.3f));
+		crawler.QueueFree();
+		floor.QueueFree();
 		// the pit's leviathan (its local y=0 is the pit floor; the body sits ~5 m up)
 		var lev = new Leviathan { Name = "Leviathan", Position = new Vector3(0, 0, 0) };
 		AddChild(lev);

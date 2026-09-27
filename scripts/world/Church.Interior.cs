@@ -33,13 +33,14 @@ public partial class Church
 		var red = ChurchTextures.RedMarbleMat;
 		var marble = ChurchTextures.CobbleMat;
 		float w = NaveHalf - 0.45f;
-		// five steps up from the crossing
+		// five steps up from the crossing: each its own block, side by side (stacked blocks shared their side
+		// faces and fought over them - the owner saw the steps clipping)
 		for (int i = 0; i < 5; i++)
 		{
 			float z0 = CrossEnd + i * 0.4f, stepTop = (i + 1) * 0.18f;
 			k.Mat(red);
 			k.Color = Colors.White;
-			BuildKit.Box(k, new Vector3(0, stepTop * 0.5f, z0 + (5 - i) * 0.2f), new Vector3(w * 2f, stepTop, (5 - i) * 0.4f), 1f, BuildKit.Face.NY);
+			BuildKit.Box(k, new Vector3(0, stepTop * 0.5f, z0 + 0.2f), new Vector3(w * 2f, stepTop, 0.4f), 1f, BuildKit.Face.NY);
 		}
 		var basis = new Basis(Vector3.Right, -Mathf.Atan2(0.9f, 2f));
 		Collide(_marbleBody, new Vector3(0, 0.45f - 0.2f, CrossEnd + 1f), new Vector3(w * 2f, 0.4f, 2.3f), basis);

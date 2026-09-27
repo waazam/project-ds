@@ -6,6 +6,12 @@ namespace ProjectDS.Player;
 /// Player body: camera-relative movement, gravity, and turning the visual
 /// toward the direction of travel. Input, camera, and audio live in sibling
 /// components. The body only moves.
+///
+/// It moves like a body with weight (the owner's movement overhaul): speed builds up over a moment
+/// rather than snapping on, and carries on a little when the keys are let go (so a corner can't be
+/// "pixel-peeked" in and out of in an instant). Walking backwards is slower (60%) and strafing a little
+/// slower (80%), and both gather speed more slowly than walking forward. Changing direction bends the
+/// momentum round rather than reversing it at once. The automated tests keep the old, snappy response.
 /// </summary>
 public partial class PlayerController : CharacterBody3D
 {
@@ -13,8 +19,13 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float RunSpeed = 5.4f;
 	/// <summary>0..1 drag on the player's speed from wading (Act 17's sewer water sets it; 1 = none).</summary>
 	public float WadeScale { get; set; } = 1f;
-	[Export] public float Acceleration = 9f;
-	[Export] public float Deceleration = 12f;
+	/// <summary>How quickly speed builds toward the target (an exponential rate per second: 3.5 reaches
+	/// about 70% in a third of a second, all of it in about a second).</summary>
+	[Export] public float Acceleration = 3.5f;
+	/// <summary>How quickly speed dies away with the keys let go (the momentum carried).</summary>
+	[Export] public float Friction = 5f;
+	/// <summary>Walking backwards and strafing: their top speeds, and how much more slowly they build.</summary>
+	[Export] public float BackwardScale = 0.6f, StrafeScale = 0.8f, SideAccelScale = 0.75f;
 	[Export] public float TurnSpeed = 10f;          // how fast the visual faces travel direction
 	[Export] public float GravityScale = 1.6f;
 	[Export] public NodePath VisualPath = "Visual";
@@ -38,6 +49,8 @@ public partial class PlayerController : CharacterBody3D
 	/// <summary>Horizontal speed in m/s.</summary>
 	public float GroundSpeed => new Vector2(Velocity.X, Velocity.Z).Length();
 	public bool IsRunning { get; private set; }
+	/// <summary>This tick's horizontal change of velocity (m/s²): the camera leans its head against it.</summary>
+	public Vector3 Acceleration3 { get; private set; }
 
 	private float _gravity;
 	private float _bobTime;
@@ -74,13 +87,32 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 right = cam.X; right.Y = 0; right = right.Normalized();
 		Vector3 wish = right * move.X + forward * move.Y;
 
-		IsRunning = PlayerInput.Run && move.LengthSquared() > 0.04f && (Stamina?.CanRun ?? true);
-		float targetSpeed = (IsRunning ? RunSpeed : WalkSpeed) * move.Length() * WadeScale;
+		// running is forward only: backing away or sidling is never at a run
+		IsRunning = PlayerInput.Run && move.Y > 0.3f && (Stamina?.CanRun ?? true);
+		// the direction's cap: full forward, 60% backward, 80% sideways, blended for diagonals
+		float fw = Mathf.Max(move.Y, 0f), bk = Mathf.Max(-move.Y, 0f), sd = Mathf.Abs(move.X), sum = fw + bk + sd;
+		float dirScale = sum > 0.001f ? (fw + bk * BackwardScale + sd * StrafeScale) / sum : 1f;
+		float accelScale = sum > 0.001f ? (fw + (bk + sd) * SideAccelScale) / sum : 1f;
+		// holding still to work something (a held interaction) plants the feet
+		bool planted = Interaction?.Holding ?? false;
+		float targetSpeed = planted ? 0f : (IsRunning ? RunSpeed : WalkSpeed) * move.Length() * dirScale * WadeScale;
 		Vector3 targetVel = wish.LengthSquared() > 0.0001f ? wish.Normalized() * targetSpeed : Vector3.Zero;
 
 		var horizontal = new Vector3(v.X, 0, v.Z);
-		float rate = targetVel.LengthSquared() > horizontal.LengthSquared() ? Acceleration : Deceleration;
-		horizontal = horizontal.MoveToward(targetVel, rate * dt);
+		bool tests = Systems.GameSettings.Instance?.AutoTest ?? false;
+		if (tests)
+		{
+			// the tests steer by the frame: they keep the old, snappy response
+			float rate = targetVel.LengthSquared() > horizontal.LengthSquared() ? 9f : 12f;
+			horizontal = horizontal.MoveToward(targetVel, rate * dt);
+		}
+		else
+		{
+			// weight: speed eases toward the target (building up, or dying away with the keys let go)
+			float rate = targetVel.LengthSquared() > 0.0001f ? Acceleration * accelScale : Friction;
+			horizontal = horizontal.Lerp(targetVel, 1f - Mathf.Exp(-rate * dt));
+		}
+		Acceleration3 = (horizontal - new Vector3(v.X, 0, v.Z)) / Mathf.Max(dt, 1e-4f);
 		v.X = horizontal.X;
 		v.Z = horizontal.Z;
 

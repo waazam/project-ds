@@ -48,6 +48,18 @@ public partial class PlayerCameraRig : Node3D
 	[Export] public float BobHeight = 0.022f;
 	[Export] public float BobSway = 0.012f;
 
+	[ExportGroup("Weight (first person)")]
+	/// <summary>How closely the view follows the mouse: a slight catch-up, never a lag you'd notice as
+	/// such, but a snap round to look behind takes a beat to arrive (the owner). Kept gentle: the owner
+	/// gets headaches from strong camera motion.</summary>
+	[Export] public float LookSharpness = 24f;
+	/// <summary>The head's inertia: metres it trails behind the body per m/s² of acceleration, and the most.</summary>
+	[Export] public float HeadLag = 0.012f, HeadLagMax = 0.05f;
+	/// <summary>The roll into a strafe (radians at walking speed: about a degree and a quarter).</summary>
+	[Export] public float StrafeRoll = 0.022f;
+	/// <summary>Peeking: how far the head moves out to the side, and how much it tilts.</summary>
+	[Export] public float PeekReach = 0.32f, PeekRoll = 0.06f;
+
 	[ExportGroup("Third person")]
 	[Export] public float PivotHeight = 1.5f;
 	[Export] public float ShoulderOffset = 0.38f;
@@ -62,6 +74,10 @@ public partial class PlayerCameraRig : Node3D
 
 	public float Yaw { get; private set; }
 	public float Pitch { get; private set; }
+	// where the look is going (the mouse moves these; the view eases after them)
+	private float _yawGoal, _pitchGoal;
+	private Vector3 _lag;
+	private float _lean, _peek;
 	/// <summary>A story beat that needs the view driven past the mode's pitch limit (Act 11: looking up the
 	/// giant to its eyes) sets this (degrees) for its duration and clears it after.</summary>
 	public float? MaxPitchOverride { get; set; }
@@ -92,7 +108,7 @@ public partial class PlayerCameraRig : Node3D
 
 	public void SnapBehind(float yaw)
 	{
-		Yaw = yaw;
+		Yaw = _yawGoal = yaw;
 		GlobalPosition = PivotPosition();
 		ApplyRotation();
 	}
@@ -107,7 +123,7 @@ public partial class PlayerCameraRig : Node3D
 	{
 		float minPitch = IsFirstPerson ? FirstPersonMinPitch : MinPitch;
 		float maxPitch = MaxPitchOverride ?? (IsFirstPerson ? FirstPersonMaxPitch : MaxPitch);
-		Pitch = Mathf.Clamp(radians, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
+		Pitch = _pitchGoal = Mathf.Clamp(radians, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
 	}
 
 	private void ApplyMode(CameraMode mode)
@@ -118,7 +134,7 @@ public partial class PlayerCameraRig : Node3D
 		_baseFov = fp ? FirstPersonFov : ThirdPersonFov;
 		Camera.Fov = _baseFov;
 		Camera.Position = Vector3.Zero;
-		Pitch = fp ? 0f : Mathf.DegToRad(-12f);
+		Pitch = _pitchGoal = fp ? 0f : Mathf.DegToRad(-12f);
 		// First person: the placeholder body is hidden entirely, shadow included.
 		_target.Visual.Visible = !fp;
 		_arm.ProcessMode = fp ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
@@ -152,10 +168,18 @@ public partial class PlayerCameraRig : Node3D
 		Camera.Fov = Mathf.Lerp(Camera.Fov, fovGoal, 1f - Mathf.Exp(-FocusSharpness * dt));
 
 		Vector2 look = _target.PlayerInput.ConsumeLook() * (Camera.Fov / _baseFov);
+		// working something with a held use: the look slows (the stance is locked, the eyes still move)
+		if (_target.Interaction?.Holding ?? false) look *= 0.4f;
 		float minPitch = IsFirstPerson ? FirstPersonMinPitch : MinPitch;
 		float maxPitch = MaxPitchOverride ?? (IsFirstPerson ? FirstPersonMaxPitch : MaxPitch);
-		Yaw = Mathf.Wrap(Yaw + look.X, -Mathf.Pi, Mathf.Pi);
-		Pitch = Mathf.Clamp(Pitch + look.Y, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
+		// a story beat may have set the view directly (SetPitch/SnapBehind) or clamped it: the goal follows
+		_yawGoal = Mathf.Wrap(_yawGoal + look.X, -Mathf.Pi, Mathf.Pi);
+		_pitchGoal = Mathf.Clamp(_pitchGoal + look.Y, Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
+		bool tests = GameSettings.Instance?.AutoTest ?? false;
+		bool motion = GameSettings.Instance?.HeadMotion ?? true;
+		float k = tests || !IsFirstPerson || !motion ? 1f : 1f - Mathf.Exp(-LookSharpness * dt);
+		Yaw = Mathf.Wrap(Yaw + Mathf.AngleDifference(Yaw, _yawGoal) * k, -Mathf.Pi, Mathf.Pi);
+		Pitch = Mathf.Clamp(Mathf.Lerp(Pitch, _pitchGoal, k), Mathf.DegToRad(minPitch), Mathf.DegToRad(maxPitch));
 
 		if (IsFirstPerson) UpdateFirstPerson(dt);
 		else UpdateThirdPerson(dt);
@@ -172,15 +196,54 @@ public partial class PlayerCameraRig : Node3D
 		GlobalPosition = pos;
 		ApplyRotation();
 
-		// Head bob: one vertical dip per footstep, one sway per stride pair.
+		// Head bob, driven by the real stride (PlayerFootsteps): the head dips on each footfall and sways
+		// toward the foot that's down; its size follows the body's actual speed, not the keys.
 		float speed = _target.IsOnFloor() ? _target.GroundSpeed : 0f;
-		float stride = _target.IsRunning ? 1.15f : 0.72f;   // matches PlayerFootsteps
-		_bobPhase += speed / stride * Mathf.Pi * dt;
-		_bobAmount = Mathf.Lerp(_bobAmount, Mathf.Clamp(speed / 2f, 0f, 1.4f), 1f - Mathf.Exp(-6f * dt));
+		float motion = (GameSettings.Instance?.HeadMotion ?? true) ? 1f : 0f;
+		_bobAmount = Mathf.Lerp(_bobAmount, Mathf.Clamp(speed / 2f, 0f, 1.4f) * motion, 1f - Mathf.Exp(-6f * dt));
+		float dip, sway;
+		if (_target.Footsteps is { } steps)
+		{
+			float ph = steps.StepPhase;
+			dip = 0.5f + 0.5f * Mathf.Cos(ph * Mathf.Tau);                         // 1 on the footfall, 0 mid-stride
+			sway = Mathf.Sin((steps.Steps + ph) * Mathf.Pi);                         // side to side, a step each way
+		}
+		else
+		{
+			float stride = _target.IsRunning ? 1.9f : 1.3f;
+			_bobPhase += speed / stride * Mathf.Pi * dt;
+			dip = Mathf.Abs(Mathf.Cos(_bobPhase));
+			sway = Mathf.Sin(_bobPhase);
+		}
+		// the head's inertia: it trails a little behind the body as it sets off, and runs on as it stops
+		Vector3 acc = _target.Acceleration3;
+		Vector3 lagGoal = (-acc * HeadLag).LimitLength(HeadLagMax) * motion;
+		_lag = _lag.Lerp(lagGoal, 1f - Mathf.Exp(-7f * dt));
+		// rolling a touch into a strafe, as the body is pushed sideways
+		Vector3 right = GlobalBasis.X with { Y = 0 };
+		float lateral = right.LengthSquared() > 0.01f ? new Vector3(_target.Velocity.X, 0, _target.Velocity.Z).Dot(right.Normalized()) : 0f;
+		_lean = Mathf.Lerp(_lean, -lateral / Mathf.Max(_target.WalkSpeed, 0.1f) * StrafeRoll * motion, 1f - Mathf.Exp(-4f * dt));
+		// peeking round a corner: the head moves out to the side (never through a wall) and tilts with it
+		float peekGoal = _target.PlayerInput.Lean;
+		if (Mathf.Abs(peekGoal) > 0.01f)
+		{
+			var space = GetWorld3D().DirectSpaceState;
+			Vector3 side = right.Normalized() * Mathf.Sign(peekGoal);
+			var q = PhysicsRayQueryParameters3D.Create(GlobalPosition, GlobalPosition + side * (PeekReach + 0.2f), 1u, new Godot.Collections.Array<Rid> { _target.GetRid() });
+			var hit = space.IntersectRay(q);
+			if (hit.Count > 0)
+			{
+				float room = Mathf.Max(0f, GlobalPosition.DistanceTo((Vector3)hit["position"]) - 0.2f);
+				peekGoal *= Mathf.Clamp(room / PeekReach, 0f, 1f);
+			}
+		}
+		_peek = Mathf.Lerp(_peek, peekGoal, 1f - Mathf.Exp(-6f * dt));
+		Rotation = Rotation with { Z = RollSwim + _lean - _peek * PeekRoll };
+		Vector3 local = GlobalBasis.Inverse() * (_lag + right.Normalized() * _peek * PeekReach);
 		Camera.Position = new Vector3(
-			Mathf.Sin(_bobPhase) * BobSway * _bobAmount,
-			-Mathf.Abs(Mathf.Cos(_bobPhase)) * BobHeight * _bobAmount,
-			0f) + Shake;
+			sway * BobSway * _bobAmount,
+			-dip * BobHeight * _bobAmount,
+			0f) + local + Shake;
 	}
 
 	private void UpdateThirdPerson(float dt)

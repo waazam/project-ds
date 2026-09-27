@@ -396,11 +396,12 @@ public partial class LobbyDecor : Node3D
 			StationProps.Decal(blood, StationTextures.HandprintMat, at, n, new Vector2(0.24f, 0.24f), spin);
 
 		var webs = Group("CornerWebs", 2, 4);
-		foreach (var at in new[] { new Vector3(-W + 0.35f, H - 0.35f, D - 0.35f), new Vector3(W - 0.35f, H - 0.35f, -D + 0.35f), new Vector3(W - 0.35f, H - 0.35f, D - 0.35f) })
+		foreach (var (corner, a, b) in new[]
 		{
-			Vector3 n = (new Vector3(0, H * 0.5f, 0) - at).Normalized();
-			StationProps.Decal(webs, StationTextures.WebMat, at, n, new Vector2(1.1f, 1.1f), rng.RandfRange(0, 3f));
-		}
+			(new Vector3(-W, H, D), Vector3.Right, Vector3.Forward), (new Vector3(W, H, -D), Vector3.Left, Vector3.Back),
+			(new Vector3(W, H, D), Vector3.Left, Vector3.Forward),
+		})
+			World.WebKit.Corner(webs, rng, corner, a, b, 1.3f);
 	}
 
 	/// <summary>Stage 3+: industrial. Rusted steel plate bolted over the walls, pipes, chains, grating,

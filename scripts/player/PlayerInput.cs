@@ -21,6 +21,8 @@ public partial class PlayerInput : Node
 	public bool Run { get; private set; }
 	/// <summary>Held to focus on something (right mouse / right trigger): a slight zoom.</summary>
 	public bool Focus { get; private set; }
+	/// <summary>Leaning to peek: -1 left (Q), +1 right (R), 0 upright.</summary>
+	public float Lean { get; private set; }
 
 	public bool InteractHeld => Live && _held[Interact];
 	public bool InteractPressed => Live && Edge(Interact);
@@ -143,14 +145,16 @@ public partial class PlayerInput : Node
 	{
 		if (!_enabled) return;
 		UpdateButtons();
-		if (_modal > 0) { Move = Vector2.Zero; Run = false; Focus = false; _pendingLook = Vector2.Zero; return; }
+		if (_modal > 0) { Move = Vector2.Zero; Run = false; Focus = false; Lean = 0f; _pendingLook = Vector2.Zero; return; }
 		if (Scripted)
 		{
 			Move = ScriptedMove.LimitLength(1f);
 			Run = ScriptedRun;
 			Focus = ScriptedFocus;
+			Lean = 0f;
 			return;
 		}
+		Lean = Input.GetAxis("lean_left", "lean_right");
 
 		Move = new Vector2(
 			Input.GetAxis("move_left", "move_right"),

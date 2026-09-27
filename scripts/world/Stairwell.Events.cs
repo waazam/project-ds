@@ -7,8 +7,9 @@ using ProjectDS.World.StairwellParts;
 namespace ProjectDS.World;
 
 /// <summary>
-/// What happens on the way down (Act 14). Nothing chases, nothing attacks: the stairwell is meant to
-/// wear the player down. The numbers painted on the landings stop making sense. Footsteps go on
+/// What happens on the way down (Act 14). For the first quarter nothing chases, nothing attacks: the
+/// stairwell is meant to wear the player down. Then the flame dies, and the crawler comes down after
+/// them (Stairwell.Crawler.cs). The numbers painted on the landings stop making sense. Footsteps go on
 /// below them in step with their own, and carry on for a step or two after they stop. Something drops
 /// past down the well and never lands. A figure stands at the rail far below, looking up, and isn't
 /// there when they get down to it. A portrait with its face burnt out hangs on a landing, and later
@@ -130,6 +131,8 @@ public partial class Stairwell
 			if (p.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern") is { } lantern && !ProjectDS.Player.Lantern.FlameDead) lantern.KillFlame();
 			else StoryManager.Instance?.SetFlag(StoryManager.Flag.LanternFlameDead);
 		}));
+		// and a turn after the flame dies, something lets itself down onto the stairs above them (the owner)
+		_events.Add((Revolutions / 4 + 1, p => StartCrawler(p)));
 		_events.Sort((a, b) => a.rev.CompareTo(b.rev));
 	}
 

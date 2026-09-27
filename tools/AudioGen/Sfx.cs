@@ -518,6 +518,48 @@ public static class Sfx
 	// A boot on old concrete/stone steps: a hard, dry heel tap with almost no
 	// body (stone doesn't resonate like planks), a softer toe tap, and sandy
 	// grit ground under the sole. Occasionally a small crumb skitters off.
+	/// <summary>The crawler's hand or foot coming down on a steel stair tread (Act 14): a wet slap of palm on
+	/// metal, the tread ringing under it (a stamped plate: a few inharmonic, quickly damped modes), a tick of
+	/// nail-tips, and a small rattle of the tread in its frame. <paramref name="limb"/> (0..3) sets the weight
+	/// and the plate's pitch, so its four limbs don't sound alike.</summary>
+	public static double[] CrawlerStep(Rng r, int sr, int limb)
+	{
+		double dur = 0.7;
+		var x = Buf(sr, dur);
+		double heavy = limb % 2 == 0 ? 1.0 : 0.72;                   // the feet land harder than the hands
+		double f0 = r.R(360, 520) * (1.0 + 0.09 * limb);            // the tread's first mode
+		double[] ratio = { 1.0, 2.71, 5.18, 8.43, 11.6 };
+		double[] amp = { 1.0, 0.55, 0.32, 0.18, 0.1 };
+		double[] tau = { 0.1, 0.07, 0.045, 0.03, 0.02 };
+		var slap = Biquad.Bp(sr, r.R(900, 1400), 0.9);
+		var flesh = Biquad.Lp(sr, 420);
+		var tick = Biquad.Hp(sr, 4200);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			double v = 0;
+			// the palm: a short, wet slap
+			v += slap.P(r.W()) * Perc(t, 0.0005, 0.012) * 1.6 * heavy;
+			v += flesh.P(r.W()) * Perc(t, 0.001, 0.02) * 2.2 * heavy;
+			// nail-tips
+			v += tick.P(r.W()) * Perc(t, 0.0001, 0.003) * 0.6;
+			// the tread ringing
+			for (int m = 0; m < ratio.Length; m++)
+				v += Math.Sin(Math.Tau * f0 * ratio[m] * t + m) * amp[m] * Math.Exp(-t / tau[m]) * 0.28 * heavy * Math.Min(1.0, t / 0.002);
+			x[i] = v;
+		}
+		// the tread rattling in its frame, a beat after
+		double r0 = r.R(0.035, 0.06);
+		var rat = Biquad.Bp(sr, f0 * r.R(1.8, 2.4), 3.0);
+		for (int b = 0; b < 3; b++)
+		{
+			int s0 = (int)((r0 + b * r.R(0.018, 0.03)) * sr);
+			for (int i = 0; i < 0.03 * sr && s0 + i < x.Length; i++)
+				x[s0 + i] += rat.P(r.W()) * Perc((double)i / sr, 0.0003, 0.008) * 0.5 * Math.Pow(0.55, b);
+		}
+		return FinishOneShot(x, sr, -3, 60, 0.3);
+	}
+
 	public static double[] StepStone(Rng r, int sr)
 	{
 		var x = Buf(sr, 0.4);

@@ -201,7 +201,7 @@ public partial class IronDoor : Node3D
 		for (int i = 0; i < 6; i++)
 		{
 			Vector3 at = new(rng.RandfRange(-0.4f, 0.4f), 1.3f + rng.RandfRange(-0.2f, 0.25f), -0.12f - i * 0.05f);
-			StationProps.Decal(_web, StationTextures.WebMat, at, Vector3.Forward, new Vector2(3.2f, 2.8f) * rng.RandfRange(0.9f, 1.15f), rng.RandfRange(0, 3f));
+			World.WebKit.Card(_web, i % 3 == 1 ? World.WebKit.Kind.Sheet : World.WebKit.Kind.Tangle, rng, at, Vector3.Forward, new Vector2(3.2f, 2.8f) * rng.RandfRange(0.9f, 1.15f), rng.RandfRange(0, 3f));
 		}
 		var sheet = StationProps.Decal(_web, StationTextures.Flat("st_websheet", new Color(0.55f, 0.54f, 0.5f), 1f, 0.05f), new Vector3(0, 1.25f, -0.06f), Vector3.Forward, new Vector2(2.5f, 2.6f));
 		sheet.Transparency = 0.25f;

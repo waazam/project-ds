@@ -9,7 +9,7 @@ namespace ProjectDS.World.StationParts;
 /// Procedural textures and materials for the forester station (Act 13), low-res like the rest of the
 /// game (32-128 px, filtered and mip-mapped): striped wallpaper and its peeled-back state, red brick,
 /// a black-and-white marble diamond floor, rusted riveted steel plate, raw meat, and alpha decals —
-/// blood splatter, handprints, water stains and spider web. Deterministic; built once and cached.
+/// blood splatter, handprints, water stains (the spider webs are photographs now: WebKit). Deterministic; built once and cached.
 /// </summary>
 public static class StationTextures
 {
@@ -262,18 +262,6 @@ public static class StationTextures
 		float rim = Mathf.Exp(-Mathf.Pow((v - line) / 0.03f, 2f)) * 0.35f;
 		return new Color(0.16f, 0.12f, 0.06f, Mathf.Clamp(a + rim, 0f, 1f));
 	}), 0.9f, 0.1f, alpha: true);
-
-	/// <summary>Thick old web: radial threads and a spiral, dusty, dense at the middle.</summary>
-	public static StandardMaterial3D WebMat => Std("st_web", Make("st_web", 128, 128, (x, y) =>
-	{
-		float dx = x - 64f, dy = y - 64f;
-		float r = Mathf.Sqrt(dx * dx + dy * dy) / 64f, ang = Mathf.Atan2(dy, dx);
-		float spokes = Mathf.SmoothStep(0.9f, 1f, Mathf.Abs(Mathf.Cos(ang * 9f + r * 2f)));
-		float spiral = Mathf.SmoothStep(0.86f, 1f, Mathf.Abs(Mathf.Sin(r * 42f + ang * 1.2f)));
-		float fluff = Fbm(x, y, 128, 16, 3, 101);
-		float a = Mathf.Max(spokes, spiral * 0.8f) * (1f - Mathf.SmoothStep(0.8f, 1f, r)) + fluff * 0.35f * (1f - r);
-		return new Color(0.86f, 0.85f, 0.82f, Mathf.Clamp(a, 0f, 1f) * 0.85f);
-	}), 1f, 0.05f, alpha: true, cullOff: true);
 
 	/// <summary>A smooth unlit colour, cached (for glowing bulbs and the like).</summary>
 	public static StandardMaterial3D Glow(string key, Color c, float energy = 1f) => (StandardMaterial3D)(

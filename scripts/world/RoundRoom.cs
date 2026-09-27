@@ -331,8 +331,10 @@ public partial class RoundRoom : Node3D
 		_webs = new Node3D { Name = "Webs" };
 		Dais.AddChild(_webs);
 		var k = new MeshKit();
-		k.Mat(StationTextures.WebMat);
 		k.Color = Colors.White;
+		var wr = new RandomNumberGenerator { Seed = 2020 };
+		// every card its own photographed web (the owner: the old radial texture looked geometric)
+		void W(WebKit.Kind kind) => k.Mat(WebKit.Pick(kind, wr));
 		var anchors = new List<Vector3>();
 		for (int i = 0; i < 8; i++)
 		{
@@ -347,14 +349,18 @@ public partial class RoundRoom : Node3D
 			Vector3 outward = (((a + b) * 0.5f) with { Y = 0 }).Normalized();
 			// the side sheet, sagging, and the tent up to the peak
 			Vector3 sag = (a + b) * 0.5f + Vector3.Down * 0.25f + outward * 0.1f;
+			W(i % 3 == 0 ? WebKit.Kind.Corner : WebKit.Kind.Tangle);
 			k.Card(fa, fb, b, a, outward, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+			W(i % 2 == 0 ? WebKit.Kind.Sheet : WebKit.Kind.Tangle);
 			k.Card(a, sag, peak, peak, outward, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 0), new Vector2(0.5f, 0));
 			k.Card(sag, b, peak, peak, outward, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0.5f, 0), new Vector2(0.5f, 0));
 			// strands off to the floor
 			Vector3 foot = outward * (DaisFoot + 0.4f + _rng.Randf() * 0.5f) + Vector3.Up * 0.01f;
+			W(WebKit.Kind.Tangle);
 			k.Card(a, a + Vector3.Up * 0.05f, foot + Vector3.Up * 0.05f, foot, outward.Cross(Vector3.Up), new Vector2(0, 0), new Vector2(0, 0.1f), new Vector2(1, 0.1f), new Vector2(1, 0));
 		}
 		// the mat over the top
+		W(WebKit.Kind.Tangle);
 		k.Card(new Vector3(-1.6f, DaisTop + 0.01f, -1.6f), new Vector3(-1.6f, DaisTop + 0.01f, 1.6f), new Vector3(1.6f, DaisTop + 0.01f, 1.6f), new Vector3(1.6f, DaisTop + 0.01f, -1.6f), Vector3.Up,
 			new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
 		_webMeshes.Add(k.CommitTo(_webs, "Web", false));

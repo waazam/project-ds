@@ -337,16 +337,10 @@ public partial class LongStair : Node3D
 		k.Color = Colors.White * 0.8f;
 		float zEnd = TopZ0 + TopLanding;
 		Solid(k, _wood, new Vector3(0, TopY + Head * 0.5f, zEnd + 0.15f), new Vector3(HalfW * 2f + WallT * 2f, Head + 0.6f, 0.3f));
-		// the rungs
-		k.Mat(StairwellTextures.SteelMat);
-		k.Color = new Color(0.32f, 0.3f, 0.28f);
-		for (int i = 0; i < 6; i++)
-		{
-			float y = TopY + 0.35f + i * 0.38f;
-			k.Beam(new Vector3(-0.25f, y, zEnd - 0.12f), new Vector3(0.25f, y, zEnd - 0.12f), 0.03f, 0.03f);
-			foreach (float x in new[] { -0.25f, 0.25f }) k.Beam(new Vector3(x, y, zEnd - 0.12f), new Vector3(x, y, zEnd), 0.025f, 0.025f);
-		}
 		k.CommitTo(this, "Top", true);
+		BuildLadder();
+		// old webs up in the top landing's corners (nobody has been up here in a long time)
+		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 2101 }, -HalfW, HalfW, TopZ0, zEnd, TopY, TopY + Head, 0.9f, 1f);
 		// the hatch: a square of heavy boards with an iron ring, hinged on its far edge
 		// flush with the crypt's floor above (the slab is 0.3 thick), hinged on its far edge
 		_hatch = new Node3D { Name = "Hatch", Position = HatchLocal + new Vector3(0, 0.25f, 0.5f) };
@@ -381,6 +375,45 @@ public partial class LongStair : Node3D
 		AddChild(stuck);
 	}
 
+	/// <summary>The ladder foot and top (local): a loft ladder rising under the opening to rest on its far lip,
+	/// so a climber (on its near side, facing it) comes up with their head inside the opening, not the boards.</summary>
+	private static Vector3 LadderFoot => new(0, TopY, HatchLocal.Z + 0.44f - LadderLean);
+	private static Vector3 LadderTop => new(0, HatchLocal.Y + 0.2f, HatchLocal.Z + 0.44f);
+	private const float LadderLean = 0.8f;
+
+	/// <summary>A wooden loft ladder (the owner: the old iron rungs on the end wall were blocky, and led
+	/// nowhere near the hatch): two worn side rails and round rungs, leaning from the landing's floor up into
+	/// the hatch's shaft, iron hooks over its lip.</summary>
+	private void BuildLadder()
+	{
+		var k = new MeshKit();
+		Vector3 foot = LadderFoot, top = LadderTop;
+		Vector3 along = (top - foot).Normalized();
+		k.Mat(ChurchTextures.OldPlankMat);
+		k.Color = new Color(0.62f, 0.52f, 0.42f);
+		const float half = 0.24f;
+		foreach (float x in new[] { -half, half })
+			k.Beam(foot + new Vector3(x, 0, 0), top + new Vector3(x, 0.08f, 0) + along * 0.08f, 0.028f, 0.045f);
+		k.Mat(ChurchTextures.OldPlankMat);
+		k.Color = new Color(0.5f, 0.42f, 0.34f);
+		float len = foot.DistanceTo(top);
+		for (float d = 0.24f; d < len - 0.05f; d += 0.28f)
+		{
+			Vector3 p = foot + along * d;
+			k.Cylinder(p + new Vector3(-half, 0, 0), p + new Vector3(half, 0, 0), 0.019f, 0.019f, 8, false);
+		}
+		// the hooks over the hatch's lip
+		k.Mat(StairwellTextures.SteelMat);
+		k.Color = new Color(0.3f, 0.28f, 0.26f);
+		foreach (float x in new[] { -half, half })
+		{
+			Vector3 h = top + new Vector3(x, 0.08f, 0) + along * 0.08f;
+			k.Beam(h, h + new Vector3(0, 0.06f, 0.05f), 0.012f, 0.012f);
+			k.Beam(h + new Vector3(0, 0.06f, 0.05f), h + new Vector3(0, 0.02f, 0.09f), 0.012f, 0.012f);
+		}
+		k.CommitTo(this, "Ladder", true);
+	}
+
 	public void Attach(Church church) => Church = church;
 
 	/// <summary>The hatch drops shut (a boom through the crypt), and from above it won't lift again.</summary>
@@ -407,25 +440,50 @@ public partial class LongStair : Node3D
 	private async Task ClimbOut(PlayerController player, CancellationToken ct)
 	{
 		GD.Print("[story] Act 21: the hatch at the top of the long stair");
-		AudioDirector.OneShot(this, "door_creak", 1, ToGlobal(HatchLocal), 0f);
-		var tw = CreateTween();
-		foreach (var c in _lidBody.GetChildren()) if (c is CollisionShape3D cs) cs.Disabled = true;
-		tw.TweenProperty(_hatch, "rotation:x", 1.75f, 1.3f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		// the path (the owner: it looked like going through the floorboards): to the ladder's foot, up the
+		// rungs, the lid pushed over at the top, straight up through the opening, then a step onto the floor
 		Vector3 from = player.GlobalPosition;
-		Vector3 under = ToGlobal(HatchLocal + new Vector3(0, -Head + 0.05f, -0.3f));
+		Vector3 foot = ToGlobal(LadderFoot + new Vector3(0, 0.02f, -0.35f));
+		// feet 1.3 m up: the climber's just behind the ladder, under the opening, head up in it
+		Vector3 high = ToGlobal(new Vector3(0, TopY + 1.3f, LadderFoot.Z + LadderLean * 1.3f / (Head + 0.2f) - 0.35f));
+		Vector3 through = ToGlobal(HatchLocal + new Vector3(0, 0.12f, 0f));    // standing up through the opening
 		Vector3 up = Church != null ? Church.HatchExitWorld : ToGlobal(HatchLocal + new Vector3(0, 0.35f, -0.9f));
+		var rig = player.CameraRig;
+		Vector3 face = ToGlobal(Vector3.Back) - ToGlobal(Vector3.Zero);   // toward the ladder
+		float yaw0 = rig.Yaw, faceYaw = Mathf.Atan2(-face.X, -face.Z);
+		bool lidUp = false;
+		const float T1 = 0.9f, T2 = 3.0f, T3 = 4.1f, T4 = 5.0f;
 		double t = 0;
-		while (t < 3.4)
+		while (t < T4)
 		{
 			await Cutscene.Frame(this, ct);
 			float dt = (float)GetProcessDeltaTime();
 			t += dt;
 			float u = (float)t;
-			Vector3 p = u < 0.9f ? from.Lerp(under, Mathf.SmoothStep(0f, 1f, u / 0.9f))
-				: under.Lerp(up, Mathf.SmoothStep(0f, 1f, Mathf.Clamp((u - 1.1f) / 2.1f, 0f, 1f)));
+			Vector3 p;
+			if (u < T1) p = from.Lerp(foot, Mathf.SmoothStep(0f, 1f, u / T1));
+			else if (u < T2)
+			{
+				// rung by rung: a small ease in each step up, so it reads as climbing, not floating (gentle)
+				float c = (u - T1) / (T2 - T1);
+				float steps = 7f, s = c * steps, stepEase = Mathf.Floor(s) + Mathf.SmoothStep(0f, 1f, s - Mathf.Floor(s));
+				p = foot.Lerp(high, stepEase / steps);
+			}
+			else if (u < T3) p = high.Lerp(through, Mathf.SmoothStep(0f, 1f, (u - T2) / (T3 - T2)));
+			else p = through.Lerp(up, Mathf.SmoothStep(0f, 1f, (u - T3) / (T4 - T3)));
+			if (!lidUp && u >= T1 + (T2 - T1) * 0.5f)   // pushed open halfway up, before the head reaches it
+			{
+				// the lid, pushed up and over on its hinge
+				lidUp = true;
+				AudioDirector.OneShot(this, "door_creak", 1, ToGlobal(HatchLocal), 0f);
+				foreach (var c in _lidBody.GetChildren()) if (c is CollisionShape3D cs) cs.Disabled = true;
+				CreateTween().TweenProperty(_hatch, "rotation:x", 1.75f, 1.0f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+			}
 			player.GlobalPosition = p;
-			var rig = player.CameraRig;
-			rig.SetPitch(Mathf.Lerp(rig.Pitch, u < 2.4f ? 0.9f : 0f, Mathf.Min(1f, dt * 2f)));
+			// face the ladder, look up it; level out as the head comes up into the crypt
+			float wantPitch = u < T1 ? 0.25f : u < T3 - 0.3f ? 0.7f : 0f;
+			rig.SetPitch(Mathf.Lerp(rig.Pitch, wantPitch, Mathf.Min(1f, dt * 2.2f)));
+			if (u < T1 + 0.4f) rig.SnapBehind(Mathf.LerpAngle(yaw0, faceYaw, Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, u / (T1 + 0.4f)))));
 		}
 		player.GlobalPosition = up;
 		player.Velocity = Vector3.Zero;

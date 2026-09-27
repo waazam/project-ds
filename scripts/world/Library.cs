@@ -69,6 +69,8 @@ public partial class Library : Node3D
 		BuildFurniture();
 		BuildSideTable();
 		BuildPassage();
+		// webs up in the corners, over the shelves
+		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1901 }, -HalfW, HalfW, 0f, Depth, 0f, Height, 1.2f, 0.75f);
 		// the library is the one quiet, warm room: a small, dead, bookish space (no haunting here)
 		AudioDirector.Zone(this, new Vector3(0, Height * 0.5f, Depth * 0.5f), new Vector3(HalfW * 2f, Height, Depth), AudioDirector.Space.Room, "LibraryVerb");
 		AudioDirector.Zone(this, new Vector3(0, 1.25f, Depth + PassageLen * 0.5f + 0.3f), new Vector3(1.4f, 2.5f, PassageLen), AudioDirector.Space.Tunnel, "PassageVerb");
@@ -429,13 +431,13 @@ public partial class Library : Node3D
 		AddChild(BoxUse);
 	}
 
-	/// <summary>A white sheet thrown over the table: flat on the top, lifted over the box, hanging down
-	/// the sides in soft folds.</summary>
-	private MeshInstance3D Drape()
+	/// <summary>The sheet's grid (in the sheet node's space): flat on the table's top, lifted over the box
+	/// and the pieces, hanging down the sides in soft folds.</summary>
+	private const int DrapeNx = 18, DrapeNz = 30;
+	private static Vector3[,] DrapeGrid()
 	{
-		const int nx = 18, nz = 30;
+		const int nx = DrapeNx, nz = DrapeNz;
 		const float w = 1.3f, l = 1.95f;
-		var h = new float[nx + 1, nz + 1];
 		var pos = new Vector3[nx + 1, nz + 1];
 		for (int i = 0; i <= nx; i++)
 			for (int j = 0; j <= nz; j++)
@@ -449,8 +451,22 @@ public partial class Library : Node3D
 				y += 0.02f * Mathf.Sin(z * 14f + x * 3f) * Mathf.Clamp(over * 5f, 0f, 1f);   // folds where it hangs
 				pos[i, j] = new Vector3(x * (1f - Mathf.Clamp(over, 0f, 0.3f) * 0.2f), Mathf.Max(y, -0.66f), z);
 			}
+		return pos;
+	}
+
+	private static StandardMaterial3D _sheetMat;
+	private static StandardMaterial3D SheetMat => _sheetMat ??= new StandardMaterial3D
+	{
+		AlbedoColor = new Color(0.74f, 0.72f, 0.67f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+	};
+
+	/// <summary>A white sheet thrown over the table, at rest (a still mesh: it costs nothing until pulled).</summary>
+	private MeshInstance3D Drape()
+	{
+		const int nx = DrapeNx, nz = DrapeNz;
+		var pos = DrapeGrid();
 		var k = new MeshKit();
-		k.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.74f, 0.72f, 0.67f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled });
+		k.Mat(SheetMat);
 		k.Color = Colors.White;
 		for (int i = 0; i < nx; i++)
 			for (int j = 0; j < nz; j++)
@@ -463,6 +479,32 @@ public partial class Library : Node3D
 		var mi = k.CommitTo(this, "Drape", true);
 		RemoveChild(mi);
 		return mi;
+	}
+
+	/// <summary>The same sheet as one welded grid (a vertex per grid point, shared by its quads), for the cloth
+	/// simulation: point (i, j) is vertex i * (DrapeNz + 1) + j.</summary>
+	private static ArrayMesh DrapeClothMesh()
+	{
+		const int nx = DrapeNx, nz = DrapeNz;
+		var pos = DrapeGrid();
+		var st = new SurfaceTool();
+		st.Begin(Mesh.PrimitiveType.Triangles);
+		for (int i = 0; i <= nx; i++)
+			for (int j = 0; j <= nz; j++)
+			{
+				st.SetUV(new Vector2((float)i / nx, (float)j / nz));
+				st.AddVertex(pos[i, j]);
+			}
+		for (int i = 0; i < nx; i++)
+			for (int j = 0; j < nz; j++)
+			{
+				int a = i * (nz + 1) + j, b = (i + 1) * (nz + 1) + j, c = b + 1, d = a + 1;
+				st.AddIndex(a); st.AddIndex(b); st.AddIndex(c);
+				st.AddIndex(a); st.AddIndex(c); st.AddIndex(d);
+			}
+		st.GenerateNormals();
+		st.SetMaterial(SheetMat);
+		return st.Commit();
 	}
 
 	private void BuildPassage()

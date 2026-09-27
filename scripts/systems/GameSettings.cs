@@ -27,6 +27,10 @@ public partial class GameSettings : Node
 	// Accessibility
 	/// <summary>Tones down lightning, the camera flash and other full-screen flashes.</summary>
 	public bool ReduceFlashing = false;
+	/// <summary>The head's life in first person: the bob with each step, the roll into a strafe, the head
+	/// trailing as the body sets off, and the look easing after the mouse. Off, the view is steady and the
+	/// look is direct (for anyone the motion bothers; the body's own weight stays).</summary>
+	public bool HeadMotion = true;
 
 	// Display (the owner, from the teaser): a cinematic frame and an old TV's look
 	/// <summary>2.2:1 letterbox bars over the game (not the HUD; they slide away while the camera is raised).</summary>
@@ -40,6 +44,18 @@ public partial class GameSettings : Node
 		get => _crtFilter;
 		set { _crtFilter = value; ApplyDisplay(); }
 	}
+
+	/// <summary>The sun's and moon's shadows: 0 off, 1 medium (the default: out to 40 m, a 2048 map, a light
+	/// filter), 2 high (each level's own reach, a 4096 map, the soft filter). The shadow pass was most of the
+	/// forest's frame (performance pass, 2026-09-27).</summary>
+	private int _shadows = 1;
+	public int Shadows
+	{
+		get => _shadows;
+		set { _shadows = Mathf.Clamp(value, 0, 2); ApplyShadows(); }
+	}
+	public static readonly string[] ShadowNames = { "off", "medium", "high" };
+	public const float MediumShadowDistance = 40f;
 
 	// Audio: linear 0..1, applied to the Master bus. Defaults below full — playtesting found the
 	// mix considerably louder than expected at 100%.
@@ -129,8 +145,10 @@ public partial class GameSettings : Node
 		cfg.SetValue("camera", "mode", (int)Camera);
 		cfg.SetValue("audio", "master_volume", MasterVolume);
 		cfg.SetValue("accessibility", "reduce_flashing", ReduceFlashing);
+		cfg.SetValue("accessibility", "head_motion", HeadMotion);
 		cfg.SetValue("display", "cinema_bars", CinemaBars);
 		cfg.SetValue("display", "crt_filter", _crtFilter);
+		cfg.SetValue("display", "shadows", _shadows);
 		cfg.Save(SavePath);
 		EmitSignal(SignalName.Changed);
 	}
@@ -147,8 +165,10 @@ public partial class GameSettings : Node
 		Camera = (CameraMode)(int)cfg.GetValue("camera", "mode", (int)Camera);
 		_masterVolume = (float)cfg.GetValue("audio", "master_volume", _masterVolume);
 		ReduceFlashing = (bool)cfg.GetValue("accessibility", "reduce_flashing", ReduceFlashing);
+		HeadMotion = (bool)cfg.GetValue("accessibility", "head_motion", HeadMotion);
 		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
 		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
+		_shadows = Mathf.Clamp((int)cfg.GetValue("display", "shadows", _shadows), 0, 2);
 	}
 
 	/// <summary>Game pixels per window pixel's worth: how many window rows draw one of the game's 360 lines.</summary>
@@ -185,8 +205,37 @@ public partial class GameSettings : Node
 		ApplyDisplay();
 	}
 
+	/// <summary>Applies the shadow setting to the renderer and to every sun and moon in the tree (and, through
+	/// NodeAdded, to each one a level brings in). A light's own reach is remembered, for High.</summary>
+	public void ApplyShadows()
+	{
+		if (!IsInsideTree()) return;
+		RenderingServer.DirectionalShadowAtlasSetSize(_shadows >= 2 ? 4096 : 2048, true);
+		RenderingServer.DirectionalSoftShadowFilterSetQuality(_shadows >= 2 ? RenderingServer.ShadowQuality.SoftMedium : RenderingServer.ShadowQuality.SoftVeryLow);
+		foreach (var n in GetTree().Root.FindChildren("*", "DirectionalLight3D", true, false))
+			if (n is DirectionalLight3D d) ApplyShadows(d);
+	}
+
+	private void ApplyShadows(DirectionalLight3D d)
+	{
+		if (!d.HasMeta("own_shadow")) d.SetMeta("own_shadow", d.ShadowEnabled);
+		if (!d.HasMeta("own_shadow_reach")) d.SetMeta("own_shadow_reach", d.DirectionalShadowMaxDistance);
+		bool own = (bool)d.GetMeta("own_shadow");
+		float reach = (float)d.GetMeta("own_shadow_reach");
+		d.ShadowEnabled = own && _shadows > 0;
+		float want = _shadows >= 2 ? reach : Mathf.Min(reach, MediumShadowDistance);
+		if (!Mathf.IsEqualApprox(d.DirectionalShadowMaxDistance, want)) d.DirectionalShadowMaxDistance = want;
+	}
+
+	private void OnNodeAdded(Node n)
+	{
+		if (n is DirectionalLight3D d) Callable.From(() => { if (IsInstanceValid(d)) ApplyShadows(d); }).CallDeferred();
+	}
+
 	public override void _Ready()
 	{
+		GetTree().NodeAdded += OnNodeAdded;
+		ApplyShadows();
 		GetTree().Root.SizeChanged += OnRootSizeChanged;
 		ApplyDisplay();
 	}
@@ -207,6 +256,8 @@ public partial class GameSettings : Node
 		AddMouse("item_prev", MouseButton.WheelUp);
 		AddKeys("photo_log", Key.Tab);
 		AddKeys("lantern_mode", Key.B);
+		AddKeys("lean_left", Key.Q);
+		AddKeys("lean_right", Key.R);
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);
@@ -225,6 +276,8 @@ public partial class GameSettings : Node
 		AddButton("photo", JoyButton.X);
 		AddButton("photo_log", JoyButton.Back);
 		AddButton("lantern_mode", JoyButton.RightShoulder);
+		AddButton("lean_left", JoyButton.DpadLeft);
+		AddButton("lean_right", JoyButton.DpadRight);
 		AddButton("item_next", JoyButton.LeftShoulder);   // the item in hand (the HUD), the camera's zoom, the album's pages
 	}
 

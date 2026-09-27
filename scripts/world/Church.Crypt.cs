@@ -90,6 +90,18 @@ public partial class Church
 				BuildKit.Box(k, new Vector3(x, CryptSpring - 0.175f, z), new Vector3(0.72f, 0.35f, 0.72f), 1f);
 				_stone.AddChild(new CollisionShape3D { Position = new Vector3(x, (y0 + CryptSpring) * 0.5f, z), Shape = new CylinderShape3D { Radius = 0.36f, Height = CryptSpring - y0 } });
 			}
+		// ---- webs: in the crypt's corners, and slung from the column tops up into the vaults
+		var wr = new RandomNumberGenerator { Seed = 2121 };
+		WebKit.DressRoom(this, wr, -CryptHalf, CryptHalf, CryptZ0, CryptZ1, y0, CryptSpring + 0.5f, 1.5f, 0.9f);
+		for (float x = -CryptHalf + CryptBay; x < CryptHalf - 0.01f; x += CryptBay)
+			for (float z = CryptZ0 + CryptBay; z < CryptZ1 - 0.01f; z += CryptBay)
+			{
+				if (wr.Randf() > 0.45f) continue;
+				float ang = wr.RandiRange(0, 3) * Mathf.Pi * 0.5f + Mathf.Pi * 0.25f;
+				Vector3 dir = new(Mathf.Cos(ang), 0, Mathf.Sin(ang));
+				Vector3 at = new Vector3(x, CryptSpring + 0.35f, z) + dir * 0.55f;
+				WebKit.Card(this, wr.Randf() < 0.5f ? WebKit.Kind.Sheet : WebKit.Kind.Tangle, wr, at, new Vector3(-dir.Z, 0, dir.X), new Vector2(1.3f, 1.0f), wr.RandfRange(-0.3f, 0.3f), "VaultWeb");
+			}
 		// ---- the stairs up: 30 steps each, and their walls, under the nave's floor
 		foreach (var (x0, x1, z0, z1) in StairOpenings)
 		{

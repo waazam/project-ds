@@ -496,7 +496,8 @@ public partial class Stairwell : Node3D
 		}
 
 		// running: taken back up
-		if (PlayerInShaft && player.IsRunning && player.PlayerInput.Enabled && rev >= Period + 1f && PlayerRev < Revolutions - 2)
+		// (not while the crawler hunts them: then running is the way to live)
+		if (PlayerInShaft && player.IsRunning && player.PlayerInput.Enabled && rev >= Period + 1f && PlayerRev < Revolutions - 2 && !CrawlerHunting)
 		{
 			_sprint += dt;
 			if (_sprint > SprintGrace) LoopBack(player, PlayerRev);
@@ -504,6 +505,8 @@ public partial class Stairwell : Node3D
 		else _sprint = Mathf.Max(0f, _sprint - dt * 2f);
 
 		ProcessEvents(player, l, dt);
+		ProcessDescentMusic(player, l);
+		ProcessCrawler(player, l, dt);
 		PollEdge();
 	}
 

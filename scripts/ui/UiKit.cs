@@ -188,7 +188,7 @@ public static class UiKit
 	}
 
 	/// <summary>One settings row: fog-grey name, a thin slider, and its value in quiet monospace.</summary>
-	public static HSlider AddSlider(Container parent, string label, double min, double max, double value, Action<double> onChanged)
+	public static HSlider AddSlider(Container parent, string label, double min, double max, double value, Action<double> onChanged, double step = 0, Func<double, string> format = null)
 	{
 		var row = new HBoxContainer();
 		row.AddThemeConstantOverride("separation", 10);
@@ -197,14 +197,14 @@ public static class UiKit
 		row.AddChild(l);
 		var slider = new HSlider
 		{
-			MinValue = min, MaxValue = max, Step = (max - min) / 100.0, Value = value,
+			MinValue = min, MaxValue = max, Step = step > 0 ? step : (max - min) / 100.0, Value = value,
 			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
 			CustomMinimumSize = new Vector2(0, 12),
 		};
 		var readout = MakeLabel("", MonoLabel, HorizontalAlignment.Right);
 		readout.AddThemeFontOverride("font", Mono);
-		readout.CustomMinimumSize = new Vector2(26, 0);
-		void Show(double v) => readout.Text = $"{Mathf.RoundToInt((v - min) / (max - min) * 100.0)}";
+		readout.CustomMinimumSize = new Vector2(format != null ? 40 : 26, 0);
+		void Show(double v) => readout.Text = format != null ? format(v) : $"{Mathf.RoundToInt((v - min) / (max - min) * 100.0)}";
 		Show(value);
 		slider.ValueChanged += v => { Show(v); onChanged(v); };
 		slider.MouseEntered += () => slider.GrabFocus();
@@ -250,8 +250,10 @@ public static class UiKit
 			AddSlider(box, "Camera distance", 1.6, 5.5, s.CameraDistance, v => s.CameraDistance = (float)v);
 		AddToggle(box, "Invert Y", s.InvertY, on => s.InvertY = on);
 		AddToggle(box, "Reduce flashing", s.ReduceFlashing, on => s.ReduceFlashing = on);
+		AddToggle(box, "Head motion", s.HeadMotion, on => s.HeadMotion = on);
 		AddToggle(box, "Cinematic bars", s.CinemaBars, on => s.CinemaBars = on);
 		AddToggle(box, "CRT filter", s.CrtFilter, on => s.CrtFilter = on);
+		AddSlider(box, "Shadows", 0, 2, s.Shadows, v => s.Shadows = Mathf.RoundToInt(v), 1, v => GameSettings.ShadowNames[Mathf.Clamp(Mathf.RoundToInt(v), 0, 2)]);
 	}
 
 	/// <summary>A hairline rule in fog grey, like the website's section borders.</summary>

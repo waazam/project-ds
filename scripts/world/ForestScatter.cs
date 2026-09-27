@@ -838,7 +838,9 @@ public partial class ForestScatter : Node3D
 					Name = $"{meshKey}_{key.X}_{key.Y}",
 					Multimesh = mm,
 					VisibilityRangeEnd = (foliage ? FoliageViewDistance : (small ? 70f : TreeViewDistance)) + chunk * 0.7f,
-					CastShadow = foliage ? GeometryInstance3D.ShadowCastingSetting.Off : GeometryInstance3D.ShadowCastingSetting.On,
+					// only the trees throw shadows: the branches, stumps and ground cover were half the shadow pass
+					// for shadows no one could see under the canopy's (performance pass, 2026-09-27)
+					CastShadow = small ? GeometryInstance3D.ShadowCastingSetting.Off : GeometryInstance3D.ShadowCastingSetting.On,
 				};
 				root.AddChild(mmi);
 			}

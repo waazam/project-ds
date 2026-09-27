@@ -23,6 +23,10 @@ public partial class PlayerFootsteps : Node
 	private readonly List<AudioStreamPlayer> _voices = new();
 	private int _nextVoice;
 	private float _distance;
+	/// <summary>0 at a footfall, rising to 1 at the next (the camera's bob dips on the footfall).</summary>
+	public float StepPhase => Mathf.Clamp(_distance / (_player != null && _player.IsRunning ? RunStride : WalkStride), 0f, 1f);
+	/// <summary>Steps taken (their parity is which foot: the head sways toward it).</summary>
+	public int Steps { get; private set; }
 	private string _lastSurface = "";
 	private readonly RandomNumberGenerator _rng = new();
 	private Audio.SamplePicker _stepPicker, _clothPicker;
@@ -75,6 +79,7 @@ public partial class PlayerFootsteps : Node
 		float stride = _player.IsRunning ? RunStride : WalkStride;
 		if (_distance < stride) return;
 		_distance -= stride;
+		Steps++;
 		PlayStep(speed);
 	}
 

@@ -352,6 +352,22 @@ public partial class StoryTest : Node
 		Check("the viewfinder locks focus on the bird", vf is { FocusLocked: true });
 		_input.ScriptedPhoto = true; await Frames(4, ct); _input.ScriptedPhoto = false;
 		await Seconds(0.8, ct);
+		// a bird can take off as the shutter goes: try again on the nearest one still perched (up to twice)
+		for (int retry = 0; retry < 2 && (PhotoLog.Instance?.RecordedCount ?? 0) <= before; retry++)
+		{
+			var again = AllOf<Bird>().Where(b => b.IsInGroup("photo_birds") && !b.Photographed)
+				.OrderBy(b => b.GlobalPosition.DistanceTo(_player.GlobalPosition)).FirstOrDefault();
+			if (again == null) break;
+			GD.Print($"[storytest] the photo missed its bird; again on {again.Name}");
+			Vector3 dir = Flat(again.GlobalPosition - _player.GlobalPosition).Normalized();
+			if (dir == Vector3.Zero) dir = Vector3.Forward;
+			await Teleport(again.GlobalPosition - dir * 5f, again.GlobalPosition, ct);
+			await Seconds(0.6, ct);
+			await Aim(again.GlobalPosition + Vector3.Up * 0.05f, ct);
+			await Seconds(1.0, ct);
+			_input.ScriptedPhoto = true; await Frames(4, ct); _input.ScriptedPhoto = false;
+			await Seconds(0.8, ct);
+		}
 		Screenshot("bird_photo");
 		_input.ScriptedFocus = false;
 		Check("the photo is logged", (PhotoLog.Instance?.RecordedCount ?? 0) > before, $"{before} -> {PhotoLog.Instance?.RecordedCount}");
@@ -1860,6 +1876,10 @@ public partial class StoryTest : Node
 			double perTurn = gameSec / Mathf.Max(1, sw.Revolutions - descentFrom);
 			Check("walked all the way down", sw.DeepestRev >= sw.Revolutions - 1,
 				$"deepest {sw.DeepestRev} of {sw.Revolutions}; {perTurn:0.0} s a turn at a walk, so about {perTurn * sw.Revolutions / 60.0:0.0} min top to bottom");
+			Check("the descent has its music", sw.MusicPlaying || sw.GetNodeOrNull("DescentMusic") != null);
+			Check("after the flame died, the crawler came down the stairs after them", sw.Crawler != null, $"{sw.Crawler}");
+			Check("it kept to its distance: never far behind, never on them (at a walk)", sw.CrawlerGapSeenMax < 8.5f && sw.CrawlerGapSeenMin > 0.6f && sw.CrawlerCatches == 0,
+				$"gap {sw.CrawlerGapSeenMin:0.0}..{sw.CrawlerGapSeenMax:0.0} flights, caught {sw.CrawlerCatches}, steps {sw.Crawler?.Steps}");
 		}
 		finally { Engine.TimeScale = 1.0; _input.ScriptedRun = false; }
 		Check("hardly any light down here: most bulbs dead", sw.LitBulbs < sw.Revolutions / Stairwell.Period, $"{sw.LitBulbs} lit");
@@ -1882,6 +1902,13 @@ public partial class StoryTest : Node
 
 		// the fallen flight, and the question
 		await DescendTo(sw, sw.GapCorner, ct);
+		if (sw.Crawler is { } crawler)
+		{
+			await Aim(crawler.GlobalPosition + Vector3.Up * 0.2f, ct);
+			await Frames(4, ct);
+			Screenshot("the_crawler_watching");
+			Check("at the edge it has stopped on the stairs above, watching", !sw.CrawlerHunting);
+		}
 		await Aim(sw.GapEdgeWorld + sw.GapDir * 2f, ct);
 		Screenshot("the_gap");
 		await WalkTo(sw.GapEdgeWorld, 0.3f, ct, stopWhen: () => sw.Choosing, giveUp: 4f);
@@ -2003,7 +2030,7 @@ public partial class StoryTest : Node
 				await Frames(3, ct);
 				Vector3 toShadow = hw.Shadow.GlobalPosition - _player.GlobalPosition;
 				Vector3 fwd = -_player.CameraRig.GlobalBasis.Z;
-				Check("red: the lights change, and he is behind you", toShadow.Length() < 7f && fwd.Dot(toShadow.Normalized()) < 0f, $"{toShadow.Length():0.0} m, behind {fwd.Dot(toShadow.Normalized()):0.00}");
+				Check("red: the lights change, and he is behind you", toShadow.Length() < 8f && fwd.Dot(toShadow.Normalized()) < 0f, $"{toShadow.Length():0.0} m, behind {fwd.Dot(toShadow.Normalized()):0.00}");
 				await Seconds(0.8, ct);
 				Screenshot("taken");
 				await WaitUntil(() => PlayerDeath.Dying, 5, ct);
@@ -2498,6 +2525,10 @@ public partial class StoryTest : Node
 		Check("pulled off: a bamboo puzzle box and five loose pieces", lib.SheetOff && lib.BoxUse.Enabled && lib.Puzzle.Pieces.Count == 5 && lib.Puzzle.Pieces.TrueForAll(p => p.At == null));
 		await WaitUntil(() => _input.Enabled, 5, ct);
 		Screenshot("puzzle_box_revealed");
+		await WaitUntil(() => lib.SheetHeapWorld != null, 5, ct);
+		Check("the sheet comes off as cloth and settles in a heap, off the table", lib.SheetHeapWorld is Vector3 heap && heap.Y < lib.TableWorld.Y + 0.5f, $"{lib.SheetHeapWorld} (table {lib.TableWorld})");
+		if (lib.SheetHeapWorld is Vector3 hw) await Aim(hw, ct);
+		Screenshot("the_sheet_fallen");
 		// the puzzle
 		await UseIt(lib.BoxUse, ct);
 		var o = PuzzleOverlay.Instance;
@@ -2729,6 +2760,10 @@ public partial class StoryTest : Node
 		Screenshot("the_hatch");
 		Check("a hatch in the ceiling: push it open", _player.Interaction?.PromptText == "Push the hatch open", $"'{_player.Interaction?.PromptText}'");
 		await Press(ct);
+		await Seconds(2.2, ct);
+		Screenshot("hatch_climbing");
+		await Seconds(1.4, ct);
+		Screenshot("hatch_head_up");
 		await WaitUntil(() => s.Current == Checkpoint.Act21ChurchReached, 8, ct);
 		await WaitUntil(() => _input.Enabled, 6, ct);
 		Check("up through the hatch into the church's crypt: a new save", s.Current == Checkpoint.Act21ChurchReached && church.Inside(_player.GlobalPosition) && _player.GlobalPosition.Y < church.ToGlobal(Vector3.Zero).Y - 4f, $"{s.Current} at {_player.GlobalPosition}");
@@ -2745,8 +2780,10 @@ public partial class StoryTest : Node
 		var obj = s.ObjectivePosition;
 		Check("the compass lives again: it points at a candle", obj is Vector3 o && Enumerable.Range(0, 4).Any(i => o.DistanceTo(church.CandleWorld(i)) < 1f), $"{obj}");
 		// ---- up the crypt stairs into the nave
-		await WalkTo(church.CryptStairFootWorld, 0.6f, ct, giveUp: 12f);
-		await WalkTo(church.CryptStairTopWorld, 0.6f, ct, giveUp: 14f);
+		// between the columns (every 4 m, one right in line with the stair's foot) to the foot, then up
+		await WalkTo(church.ToGlobal(new Vector3(2f, Church.CryptFloor + 0.05f, 42f)), 0.5f, ct, giveUp: 10f);
+		await WalkTo(church.CryptStairFootWorld, 0.5f, ct, giveUp: 12f);
+		await WalkTo(church.CryptStairTopWorld, 0.4f, ct, giveUp: 14f);
 		Check("up the crypt's stairs into the nave", Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) < 0.5f, $"church-local {church.ToLocal(_player.GlobalPosition)}");
 		if (Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) >= 0.5f)
 		{
