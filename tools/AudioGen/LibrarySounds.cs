@@ -142,4 +142,80 @@ public static class LibrarySounds
 		Knock(x, r, sr, 0.6, 0.35, r.R(600, 700), 16, 0.04);
 		return FinishOneShot(Wet(x, sr, 1.0, 0.6, 2.6, 0.55, 1.5), sr, -3, 400);
 	}
+
+	/// <summary>Act 20: a heavy old knife switch thrown one notch: the blades scraping out of (or into) their
+	/// jaws, a detent catching, the lever's weight clunking home, and a small dry snap of an arc.</summary>
+	public static double[] LeverThrow(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.4);
+		for (double t = 0.0; t < 0.12; t += r.R(0.008, 0.02))
+			Slap(x, r, sr, t, r.R(0.15, 0.35), 1800, 7000, 0.006, 0.0005);   // the scrape
+		Knock(x, r, sr, 0.13, 0.55, r.R(2600, 3200), 24, 0.015);           // the detent
+		Knock(x, r, sr, 0.14, 1.0, r.R(100, 130), 7, 0.1);                  // the lever's weight
+		Knock(x, r, sr, 0.14, 0.5, r.R(650, 800), 14, 0.05);
+		Slap(x, r, sr, 0.14, 0.6, 200, 3000, 0.02, 0.001);
+		double arc = r.R(0.15, 0.2);
+		for (int i = 0; i < 9; i++) Slap(x, r, sr, arc + i * r.R(0.003, 0.012), r.R(0.1, 0.3), 2500, 10000, 0.002, 0.0001);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.45, 2.2, 0.55, 1.4), sr, -3, 250);
+	}
+
+	/// <summary>Act 20: the power surging through the round room: a mains buzz climbing, crackle thickening
+	/// as the bulbs strain, then one deep thump as it all lets go (the bulbs' pops are separate).</summary>
+	public static double[] PowerSurge(Rng r, int sr)
+	{
+		double dur = 2.6;
+		var x = Buf(sr, dur + 3.0);
+		AddTone(x, sr, 0.0, dur, u => 60 + 170 * u * u, u => 0.55 * Math.Min(1, u * 1.6 + 0.1), new[] { 1.0, 0.0, 0.6, 0.0, 0.4, 0.0, 0.25, 0.0, 0.15 });
+		AddTone(x, sr, 0.3, dur - 0.3, u => 120 + 400 * u * u, u => 0.18 * u, new[] { 1.0, 0.3, 0.1 });
+		for (double t = 0.1; t < dur; t += r.R(0.004, 0.09) * (1.1 - t / dur))
+			Slap(x, r, sr, t, r.LogR(0.05, 0.4) * (0.3 + t / dur), 1500, 9000, r.R(0.001, 0.004), 0.0001);
+		Knock(x, r, sr, dur, 1.0, r.R(45, 55), 4, 0.45);
+		Slap(x, r, sr, dur, 0.8, 40, 900, 0.15, 0.002);
+		LowPass(x, sr, 9000);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.55, 3.0, 0.55, 1.8), sr, -3, 600);
+	}
+
+	/// <summary>Act 20: a candle catching by itself: a soft breath of flame, a little flutter, a tick of the wick.</summary>
+	public static double[] CandleIgnite(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.2);
+		var bp = Biquad.Bp(sr, r.R(380, 520), 0.8); var lp = Biquad.Lp(sr, 1600);
+		int n = (int)(0.55 * sr);
+		for (int i = 0; i < n; i++)
+		{
+			double u = (double)i / n;
+			double e = Env(u, 0.12, 0.7) * (1 + 0.25 * Math.Sin(u * r.R(40, 60)));
+			x[i] += lp.P(bp.P(r.W())) * e * 2.2;
+		}
+		Knock(x, r, sr, 0.02, 0.2, r.R(2500, 3500), 16, 0.008);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.4, 2.4, 0.5, 1.4), sr, -3, 200);
+	}
+
+	/// <summary>Act 20: the ring round the dais charging from red to green: a pulse chasing round and round,
+	/// quicker and higher each lap, settling into a warm open chord that holds and fades.</summary>
+	public static double[] RingCharge(Rng r, int sr)
+	{
+		double chase = 4.2, dur = chase + 3.5;
+		var x = Buf(sr, dur + 2.0);
+		// the chaser: short tone pips, the rate and pitch climbing
+		double t = 0.0; int k = 0;
+		while (t < chase)
+		{
+			double u = t / chase;
+			double f = 220 * Math.Pow(2, u * 1.0) * (k % 4 == 0 ? 1.0 : 1.5);
+			AddTone(x, sr, t, 0.16, v => f, v => 0.35 * Math.Exp(-v * 5) * (0.4 + 0.6 * u), new[] { 1.0, 0.25, 0.08 });
+			t += 0.2 - 0.14 * u; k++;
+		}
+		// under it, a swell
+		AddTone(x, sr, 0.0, chase, u => 110 * (1 + u), u => 0.2 * u, new[] { 1.0, 0.4, 0.15 });
+		// the chord, green and whole
+		double[] notes = { 220.0, 329.63, 440.0, 554.37, 659.25 };
+		for (int i = 0; i < notes.Length; i++)
+		{
+			double f = notes[i], vib = r.R(4, 6);
+			AddTone(x, sr, chase, dur - chase, u => f * (1 + 0.002 * Math.Sin(u * vib * 6)), u => (0.5 - i * 0.06) * Env(u, 0.05, 0.6), new[] { 1.0, 0.2, 0.05 });
+		}
+		LowPass(x, sr, 6000);
+		return FinishOneShot(Wet(x, sr, 0.7, 0.7, 3.2, 0.5, 1.6), sr, -3, 900);
+	}
 }

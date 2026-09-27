@@ -62,6 +62,8 @@ public partial class RoundRoom : Node3D
 		BuildWindows();
 		BuildSconces();
 		BuildDais();
+		BuildRing();
+		BuildSwitches();
 		BuildWebs();
 		BuildTopRoom();
 		// a tall stone drum: a cavern of a space, air moaning through the bricked windows high up
@@ -74,6 +76,8 @@ public partial class RoundRoom : Node3D
 		var s = StoryManager.Instance;
 		if (s != null && (s.Current >= Checkpoint.Act20Finished || s.HasFlag(StoryManager.Flag.RoundRoomWebBurned))) ClearWebs();
 		if (s != null && s.Current >= Checkpoint.Act20Finished) { Arrived = _checkpointed = true; PlaceDais(1f); SetTopFloor(true); }
+		Powered = s != null && (s.Current >= Checkpoint.Act20Finished || s.HasFlag(StoryManager.Flag.RoundRoomPowered));
+		ApplyPower(Powered);
 		// the air here: still, a faint low hum high up
 		var hum = "res://assets/audio/ambient/stairs_hum_loop.wav";
 		if (ResourceLoader.Exists(hum))
@@ -249,13 +253,20 @@ public partial class RoundRoom : Node3D
 				k.Beam(d * (Radius - 0.02f) + Vector3.Up * (y - 0.15f), at, 0.04f, 0.04f);
 				k.Cylinder(at, at + Vector3.Up * 0.04f, 0.09f, 0.08f, 10, true);
 				wax.Cylinder(at + Vector3.Up * 0.04f, at + Vector3.Up * 0.22f, 0.025f, 0.025f, 8, true);
-				AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.018f, Height = 0.05f, RadialSegments = 6, Rings = 3 }, Position = at + Vector3.Up * 0.25f, MaterialOverride = flameMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-				AddChild(new OmniLight3D { Position = at + Vector3.Up * 0.3f - d * 0.1f, LightColor = new Color(1f, 0.72f, 0.42f), LightEnergy = energy, OmniRange = 7.5f, OmniAttenuation = 1.3f, ShadowEnabled = shadows });
+				// (unlit until the power comes back: then they light themselves)
+				var flame = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.018f, Height = 0.05f, RadialSegments = 6, Rings = 3 }, Position = at + Vector3.Up * 0.25f, MaterialOverride = flameMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+				AddChild(flame);
+				var light = new OmniLight3D { Position = at + Vector3.Up * 0.3f - d * 0.1f, LightColor = CandleColour, LightEnergy = energy, OmniRange = 7.5f, OmniAttenuation = 1.3f, ShadowEnabled = shadows };
+				AddChild(light);
+				_candles.Add((flame, light, energy, y, a));
 			}
 		k.CommitTo(this, "Sconces", false);
-		// the drum's warm fill, so the bricked windows and the height read (soft, shadowless)
-		AddChild(new OmniLight3D { Name = "Fill", Position = new Vector3(0, 7f, 0), LightColor = new Color(1f, 0.8f, 0.58f), LightEnergy = 0.9f, OmniRange = 16f, OmniAttenuation = 0.8f, ShadowEnabled = false });
-		AddChild(new OmniLight3D { Name = "FillHigh", Position = new Vector3(0, 21f, 0), LightColor = new Color(1f, 0.8f, 0.58f), LightEnergy = 0.7f, OmniRange = 15f, OmniAttenuation = 0.8f, ShadowEnabled = false });
+		// the drum's fill, so the bricked windows and the height read (soft, shadowless): a thin grey one
+		// under the bulbs, warm once the candles are lit
+		_fill = new OmniLight3D { Name = "Fill", Position = new Vector3(0, 7f, 0), LightColor = new Color(1f, 0.8f, 0.58f), LightEnergy = 0.9f, OmniRange = 16f, OmniAttenuation = 0.8f, ShadowEnabled = false };
+		AddChild(_fill);
+		_fillHigh = new OmniLight3D { Name = "FillHigh", Position = new Vector3(0, 21f, 0), LightColor = new Color(1f, 0.8f, 0.58f), LightEnergy = 0.7f, OmniRange = 15f, OmniAttenuation = 0.8f, ShadowEnabled = false };
+		AddChild(_fillHigh);
 		wax.CommitTo(this, "Candles", false);
 	}
 
@@ -509,7 +520,9 @@ public partial class RoundRoom : Node3D
 
 	private void OnCentre(PlayerController player)
 	{
-		if (!WebsBurned || Rising || Arrived || player == null) return;
+		if (Rising || Arrived || player == null) return;
+		if (WebsBurned && !Powered && !Surging) RemarkRed();
+		if (!WebsBurned || !Powered || Surging) return;
 		Rising = true;
 		_ = Cutscene.Run(this, ct => Ascend(player, ct), lockInput: true, freezeBody: true);
 	}

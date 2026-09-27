@@ -2412,6 +2412,27 @@ public partial class StoryTest : Node
 		await Frames(4, ct);
 		Screenshot("the_jutting_book_blacklight");
 		uvLantern?.SetBlacklight(false);
+		// the journal: nothing by lamplight; under the blacklight a hand on it, and it can be read
+		await WalkTo(lib.JournalStandWorld, 0.5f, ct, giveUp: 12f);
+		await Aim(lib.JournalWorld, ct);
+		await Frames(3, ct);
+		Check("by lamplight the journal on the shelf is just another book", !lib.JournalFound && _player.Interaction?.PromptText != "Read the journal", $"'{_player.Interaction?.PromptText}'");
+		Screenshot("journal_by_lamplight");
+		uvLantern?.SetBlacklight(true);
+		await WaitUntil(() => lib.JournalFound, 3, ct);
+		await Frames(4, ct);
+		Screenshot("journal_under_blacklight");
+		Check("under the blacklight: a hand on its cover, READ over it - found", lib.JournalFound && s.HasFlag(StoryManager.Flag.LibraryJournalFound));
+		uvLantern?.SetBlacklight(false);
+		await Frames(3, ct);
+		Check("now it can be read", _player.Interaction?.PromptText == "Read the journal", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => NoteOverlay.Instance is { IsOpen: true }, 3, ct);
+		Check("the journal has the switches, as the riddle", NoteOverlay.Instance is { IsOpen: true } && NoteOverlay.Instance.Current == lib.Journal && lib.Journal.Text.Contains("the rights are all right"));
+		await Frames(4, ct);
+		Screenshot("journal_read");
+		NoteOverlay.Instance?.Close();
+		await WaitUntil(() => _input.Enabled && !_input.Modal, 3, ct);
 		// the sheet
 		Check("a sheet covers something square on a side table", !lib.SheetOff && !lib.BoxUse.Enabled);
 		await WalkTo(lib.TableWorld, 0.6f, ct, giveUp: 10f);
@@ -2532,6 +2553,47 @@ public partial class StoryTest : Node
 		Screenshot("the_webs_burning");
 		await WaitUntil(() => _input.Enabled, 10, ct);
 		Check("the webs burn away", rr.WebsBurned && s.HasFlag(StoryManager.Flag.RoundRoomWebBurned));
+		// the ring is still red: the dais does nothing
+		await WalkTo(rr.CentreWorld, 0.3f, ct, stopWhen: () => rr.Rising, giveUp: 6f);
+		await Seconds(1.0, ct);
+		Check("with the ring red, standing in the middle does nothing", !rr.Rising && !rr.Powered, $"{Flat(_player.GlobalPosition - rr.CentreWorld).Length():0.00} m from the middle");
+		Screenshot("the_red_ring");
+		// the six switches: facing either wall, left down, middle in the middle, right up
+		Check("six three-way switches, three on each side wall, none set right", rr.Switches.Count == 6 && rr.Switches.Count(w => w.OnPlusX) == 3 && !rr.Switches.Any(w => w.Pos == w.Want));
+		for (int i = 0; i < rr.Switches.Count; i++)
+		{
+			var w = rr.Switches[i];
+			await WalkTo(rr.SwitchStandWorld(i), 0.4f, ct, giveUp: 12f);
+			for (int k = 0; k < 3 && w.Pos != w.Want; k++)
+			{
+				await Aim(rr.SwitchGripWorld(i), ct);
+				await Frames(2, ct);
+				if (k == 0 && i == 0) { Check("a switch: throw it", _player.Interaction?.PromptText == "Throw the switch", $"'{_player.Interaction?.PromptText}'"); Screenshot("a_switch"); }
+				var was = w.Pos;
+				await Press(ct);
+				await Seconds(0.4, ct);
+				if (w.Pos == was) { Check($"switch {i + 1} throws", false, $"still {w.Pos}; focused {_player.Interaction?.Focused?.GetParent()?.GetParent()?.Name}/'{_player.Interaction?.PromptText}', {_player.GlobalPosition.DistanceTo(rr.SwitchStandWorld(i)):0.00} m from its spot"); break; }
+			}
+			if (i == 2) { await Aim(rr.SwitchGripWorld(1) + Vector3.Down * 0.3f, ct); Screenshot("one_wall_set"); }
+		}
+		Check("all six set: facing each wall, left down, middle middle, right up", rr.AllSwitchesRight, string.Join(" ", rr.Switches.Select(w => w.Pos)));
+		await WaitUntil(() => rr.Surging || rr.Powered, 3, ct);
+		Check("the power surges", rr.Surging || rr.Powered);
+		await Seconds(1.8, ct);
+		Screenshot("surge_bulbs_straining");
+		await Seconds(1.9, ct);
+		Screenshot("surge_dark_but_the_ring");
+		await Seconds(1.9, ct);
+		Screenshot("candles_lighting");
+		await Seconds(2.2, ct);
+		Screenshot("ring_turning_green");
+		await WaitUntil(() => rr.Powered, 12, ct);
+		await WaitUntil(() => _input.Enabled, 5, ct);
+		Check("candlelight, the ring solid green, the power saved", rr.Powered && !rr.Surging && s.HasFlag(StoryManager.Flag.RoundRoomPowered));
+		await Aim(rr.CentreWorld + Vector3.Up * 0.5f, ct);
+		Screenshot("candlelit_ring_green");
+		await Aim(rr.ToGlobal(new Vector3(0, 12f, RoundRoom.Radius)), ct);
+		Screenshot("candlelit_drum");
 		// into the middle: twenty seconds up
 		await WalkTo(rr.CentreWorld, 0.3f, ct, stopWhen: () => rr.Rising, giveUp: 8f);
 		await WaitUntil(() => rr.Rising, 3, ct);

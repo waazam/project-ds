@@ -63,6 +63,7 @@ public partial class Library : Node3D
 		_wood = new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.36f, 0.22f, 0.14f), Roughness = 0.55f, MetallicSpecular = 0.4f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.3f };
 		BuildShell();
 		BuildShelves();
+		BuildJournal();
 		BuildSecretBookcase();
 		BuildFireplace();
 		BuildFurniture();
@@ -149,6 +150,9 @@ public partial class Library : Node3D
 			Shelves(frame, books, colors, a, b, inw, this, _body);
 		}
 		frame.CommitTo(this, "Bookcases", true);
+		// the gap where the journal lies
+		for (int i = books.Count - 1; i >= 0; i--)
+			if (InJournalSlot(books[i].Origin)) { books.RemoveAt(i); colors.RemoveAt(i); }
 		AddBooks(this, books, colors, "Books");
 	}
 

@@ -173,6 +173,10 @@ jobs.Add(("bookcase_swing_01", sfx, false, Lo, (r, sr) => LibrarySounds.Bookcase
 jobs.Add(("lift_start_01", sfx, false, Lo, (r, sr) => LibrarySounds.LiftStart(r, sr)));
 jobs.Add(("lift_loop", sfx, true, Lo, (r, sr) => LibrarySounds.LiftLoop(r, sr, 20.16)));
 jobs.Add(("lift_stop_01", sfx, false, Lo, (r, sr) => LibrarySounds.LiftStop(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"lever_throw_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.LeverThrow(r, sr)));
+jobs.Add(("power_surge_01", sfx, false, Lo, (r, sr) => LibrarySounds.PowerSurge(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"candle_ignite_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.CandleIgnite(r, sr)));
+jobs.Add(("ring_charge_01", sfx, false, Lo, (r, sr) => LibrarySounds.RingCharge(r, sr)));
 
 jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));

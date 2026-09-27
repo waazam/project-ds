@@ -20,6 +20,7 @@ public partial class Library
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
+		SeekJournal();
 		var player = StoryBeat.Player(this);
 		if (player == null || !PlayerInside(player.GlobalPosition)) return;
 		// out of the pit's red-black murk: clear, warm, still air

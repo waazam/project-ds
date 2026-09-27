@@ -127,6 +127,10 @@ public partial class StoryManager : Node
 		public const string LanternFlameDead = "lantern_flame_dead";
 		/// <summary>Act 20: the web over the round room's dais has been burned away.</summary>
 		public const string RoundRoomWebBurned = "round_room_web_burned";
+		/// <summary>Act 20: the six switches set right, the power surged back: candlelight, and the ring round the dais green.</summary>
+		public const string RoundRoomPowered = "round_room_powered";
+		/// <summary>Act 19: the journal on the library's shelves has been found by blacklight (it can be taken down and read).</summary>
+		public const string LibraryJournalFound = "library_journal_found";
 	}
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>
