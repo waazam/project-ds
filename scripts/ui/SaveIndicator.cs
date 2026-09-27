@@ -32,8 +32,11 @@ public partial class SaveIndicator : CanvasLayer
 		ProcessMode = ProcessModeEnum.Always;
 		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-		_draw.Position = new Vector2(-72, 14);
+		// small, grey and faint (the owner: it was too big and too bright): about half the size it was, up in
+		// the top bar's corner, where it sits on the black
 		_draw.Size = new Vector2(60, 44);
+		_draw.Scale = Vector2.One * 0.5f;
+		_draw.Position = new Vector2(-44, 6);
 		_draw.Draw += Paint;
 		AddChild(_draw);
 		Callable.From(() => { if (StoryManager.Instance != null) StoryManager.Instance.Saved += Play; }).CallDeferred();
@@ -61,8 +64,8 @@ public partial class SaveIndicator : CanvasLayer
 		// in and out softly; between, a slow swell of contrast (about one and a half breaths: never a flicker)
 		float fade = Mathf.Min(Mathf.Clamp(_t / 0.35f, 0f, 1f), Mathf.Clamp((Seconds - _t) / 0.5f, 0f, 1f));
 		float breath = 0.5f - 0.5f * Mathf.Cos(_t * Mathf.Tau * 0.6f);   // 0 dark .. 1 bright
-		float light = Mathf.Lerp(0.55f, 0.95f, breath), dark = Mathf.Lerp(0.3f, 0.12f, breath);
-		float a = fade * 0.72f;
+		float light = Mathf.Lerp(0.42f, 0.66f, breath), dark = Mathf.Lerp(0.26f, 0.16f, breath);
+		float a = fade * 0.42f;
 		Color body = new(light, light, light * 0.98f, a);
 		Color ink = new(dark, dark, dark, a);
 		Color rim = new(light * 0.8f, light * 0.8f, light * 0.78f, a);

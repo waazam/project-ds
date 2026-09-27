@@ -36,8 +36,14 @@ public partial class CameraViewfinder : CanvasLayer
 	private Control _draw;
 	private Font _mono;
 
+	/// <summary>The viewfinder in play, if any (the letterbox bars step aside while it is raised).</summary>
+	public static CameraViewfinder Current { get; private set; }
+
+	public override void _ExitTree() { if (Current == this) Current = null; }
+
 	public override void _Ready()
 	{
+		Current = this;
 		Layer = 25;
 		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.FullRect);

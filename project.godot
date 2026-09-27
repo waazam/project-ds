@@ -27,6 +27,7 @@ StoryManager="*res://scripts/systems/StoryManager.cs"
 AudioDirector="*res://scripts/audio/AudioDirector.cs"
 PostGuard="*res://scripts/ui/PostGuard.cs"
 SaveIndicator="*res://scripts/ui/SaveIndicator.cs"
+CinemaFrame="*res://scripts/ui/CinemaFrame.cs"
 
 [display]
 

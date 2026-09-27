@@ -28,6 +28,19 @@ public partial class GameSettings : Node
 	/// <summary>Tones down lightning, the camera flash and other full-screen flashes.</summary>
 	public bool ReduceFlashing = false;
 
+	// Display (the owner, from the teaser): a cinematic frame and an old TV's look
+	/// <summary>2.2:1 letterbox bars over the game (not the HUD; they slide away while the camera is raised).</summary>
+	public bool CinemaBars = true;
+	private bool _crtFilter = true;
+	/// <summary>The CRT look: the game's 360 lines drawn as a TV's scanlines, a slight colour fringe and a darker
+	/// grade. It draws the 2D and the finish at the window's full resolution, while the 3D still renders at 360
+	/// lines (so it costs about the same). Off: the plain 640x360 picture, pixel for pixel.</summary>
+	public bool CrtFilter
+	{
+		get => _crtFilter;
+		set { _crtFilter = value; ApplyDisplay(); }
+	}
+
 	// Audio: linear 0..1, applied to the Master bus. Defaults below full — playtesting found the
 	// mix considerably louder than expected at 100%.
 	private float _masterVolume = 0.6f;
@@ -116,6 +129,8 @@ public partial class GameSettings : Node
 		cfg.SetValue("camera", "mode", (int)Camera);
 		cfg.SetValue("audio", "master_volume", MasterVolume);
 		cfg.SetValue("accessibility", "reduce_flashing", ReduceFlashing);
+		cfg.SetValue("display", "cinema_bars", CinemaBars);
+		cfg.SetValue("display", "crt_filter", _crtFilter);
 		cfg.Save(SavePath);
 		EmitSignal(SignalName.Changed);
 	}
@@ -132,6 +147,48 @@ public partial class GameSettings : Node
 		Camera = (CameraMode)(int)cfg.GetValue("camera", "mode", (int)Camera);
 		_masterVolume = (float)cfg.GetValue("audio", "master_volume", _masterVolume);
 		ReduceFlashing = (bool)cfg.GetValue("accessibility", "reduce_flashing", ReduceFlashing);
+		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
+		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
+	}
+
+	/// <summary>Game pixels per window pixel's worth: how many window rows draw one of the game's 360 lines.</summary>
+	public float LineScale { get; private set; } = 1f;
+
+	/// <summary>Puts the window's scaling in line with the CRT setting. With the filter the root draws its 2D at the
+	/// window's resolution (canvas_items) and renders the 3D at the game's 360 lines (supersampled 1.5x, as
+	/// always), scaled up smoothly, like a TV's picture; without it the whole frame is drawn at 640x360 and
+	/// scaled up (the project's own setting).</summary>
+	public void ApplyDisplay()
+	{
+		if (!IsInsideTree() || Trailer) return;   // the trailer frames itself
+		var root = GetTree().Root;
+		if (root.ContentScaleMode == Window.ContentScaleModeEnum.Disabled) return;   // the startup logo, full-size
+		// the project renders its 3D supersampled (rendering/scaling_3d/scale, 1.5): keep that either way
+		float supersample = (float)ProjectSettings.GetSetting("rendering/scaling_3d/scale", 1.0f);
+		var mode = _crtFilter ? Window.ContentScaleModeEnum.CanvasItems : Window.ContentScaleModeEnum.Viewport;
+		float lines = Mathf.Max(360f, root.Size.Y);
+		float scale = _crtFilter ? Mathf.Clamp(360f * supersample / lines, 0.25f, 2f) : supersample;
+		// only touch what changed: setting the window's scaling re-lays it out (and signals a size change)
+		if (root.ContentScaleMode != mode) root.ContentScaleMode = mode;
+		if (_crtFilter && root.Scaling3DMode != Viewport.Scaling3DModeEnum.Bilinear) root.Scaling3DMode = Viewport.Scaling3DModeEnum.Bilinear;
+		if (!Mathf.IsEqualApprox(root.Scaling3DScale, scale)) root.Scaling3DScale = scale;
+		LineScale = _crtFilter ? lines / 360f : 1f;
+	}
+
+	private Vector2I _lastSize;
+
+	private void OnRootSizeChanged()
+	{
+		var size = GetTree().Root.Size;
+		if (size == _lastSize) return;
+		_lastSize = size;
+		ApplyDisplay();
+	}
+
+	public override void _Ready()
+	{
+		GetTree().Root.SizeChanged += OnRootSizeChanged;
+		ApplyDisplay();
 	}
 
 	private static void RegisterInputActions()
@@ -168,6 +225,7 @@ public partial class GameSettings : Node
 		AddButton("photo", JoyButton.X);
 		AddButton("photo_log", JoyButton.Back);
 		AddButton("lantern_mode", JoyButton.RightShoulder);
+		AddButton("item_next", JoyButton.LeftShoulder);   // the item in hand (the HUD), the camera's zoom, the album's pages
 	}
 
 	private static void Ensure(string action)

@@ -250,6 +250,8 @@ public static class UiKit
 			AddSlider(box, "Camera distance", 1.6, 5.5, s.CameraDistance, v => s.CameraDistance = (float)v);
 		AddToggle(box, "Invert Y", s.InvertY, on => s.InvertY = on);
 		AddToggle(box, "Reduce flashing", s.ReduceFlashing, on => s.ReduceFlashing = on);
+		AddToggle(box, "Cinematic bars", s.CinemaBars, on => s.CinemaBars = on);
+		AddToggle(box, "CRT filter", s.CrtFilter, on => s.CrtFilter = on);
 	}
 
 	/// <summary>A hairline rule in fog grey, like the website's section borders.</summary>

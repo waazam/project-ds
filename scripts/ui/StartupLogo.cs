@@ -20,7 +20,6 @@ public partial class StartupLogo : Control
 	private AudioStreamPlayer _blow;
 
 	private VideoStreamPlayer _video;
-	private Window.ContentScaleModeEnum _scaleMode;
 	private double _t;
 	private bool _leaving;
 
@@ -32,7 +31,6 @@ public partial class StartupLogo : Control
 			return;
 		}
 		var root = GetTree().Root;
-		_scaleMode = root.ContentScaleMode;
 		root.ContentScaleMode = Window.ContentScaleModeEnum.Disabled;
 
 		SetAnchorsPreset(LayoutPreset.FullRect);
@@ -76,7 +74,8 @@ public partial class StartupLogo : Control
 		{
 			_video.Stop();
 			_blow?.Stop();
-			GetTree().Root.ContentScaleMode = _scaleMode;
+			GetTree().Root.ContentScaleMode = Window.ContentScaleModeEnum.Viewport;
+			GameSettings.Instance?.ApplyDisplay();   // the CRT filter's scaling, or the project's own
 		}
 		GetTree().ChangeSceneToFile(StoryManager.MenuScene);
 	}

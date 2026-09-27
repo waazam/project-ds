@@ -50,6 +50,7 @@ public partial class PhotoLogPage : CanvasLayer
 
 	public override void _Ready()
 	{
+		AddToGroup("photo_log_page");
 		Layer = 14;
 		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, TextureFilter = CanvasItem.TextureFilterEnum.Linear };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.Center);

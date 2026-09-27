@@ -39,6 +39,8 @@ public partial class StationRoom2 : Node3D
 	public bool Solved { get; private set; }
 	public bool Flooding { get; private set; }
 	public bool WindowBroken { get; private set; }
+	/// <summary>For tests: the lake thing's tentacle is in through the window.</summary>
+	public bool TentacleIn => _tentacle is { Visible: true } && _tentacle.Reach > 0.6f;
 	public float Level { get; private set; }
 	public bool Blood { get; private set; }
 	public bool DoorShut { get; private set; }
@@ -52,6 +54,7 @@ public partial class StationRoom2 : Node3D
 	public Vector3 StairFootWorld => ToGlobal(new Vector3(0, 0.05f, 1.2f));
 
 	private Node3D _table, _stairs, _windowPane, _shards;
+	private Entities.WindowTentacle _tentacle;
 	private Interactable _boxUse;
 	private MeshInstance3D _water, _torrent;
 	private ShaderMaterial _waterMat, _torrentMat;
@@ -205,6 +208,11 @@ public partial class StationRoom2 : Node3D
 		_torrent = tk.CommitTo(this, "Torrent", false);
 		_torrent.Visible = false;
 		BuildCurtains(cx);
+		// what breaks it (the owner): a limb of the thing in the lake, waiting outside, hidden behind the wall
+		_tentacle = new Entities.WindowTentacle { Name = "WindowTentacle", ReachMetres = 3.2f };
+		AddChild(_tentacle);
+		Vector3 dir = new Vector3(0, -0.15f, 1f).Normalized();   // in through the window, a little down
+		_tentacle.Transform = new Transform3D(new Basis(Vector3.Right, dir, Vector3.Right.Cross(dir).Normalized()), new Vector3(cx, cy, -Half - 0.9f));
 	}
 
 	/// <summary>Heavy crimson velvet drapes either side of the window on a brass rod, with a swagged
@@ -401,18 +409,37 @@ public partial class StationRoom2 : Node3D
 		if (CryptexOverlay.Instance != null && !CryptexOverlay.Instance.IsOpen) CryptexOverlay.Instance.Open(player, Box);
 	}
 
-	/// <summary>The window cracks, then bursts: glass everywhere, the lake pouring in, the player knocked
-	/// flat, and up again with the water already round their ankles.</summary>
+	/// <summary>Something outside strikes the glass and cracks it, draws back, and bursts through: one of the
+	/// lake thing's tentacles (the owner), in among the flying glass with the lake pouring in round it. The
+	/// player is knocked flat; it writhes in the room a moment and drags itself back out, and they get up
+	/// with the water already round their ankles.</summary>
 	private async Task BreakWindow(PlayerController player, CancellationToken ct)
 	{
 		var rig = player.CameraRig;
 		Vector3 win = ToGlobal(new Vector3(-0.4f, 1.7f, -Half));
 		await Cutscene.Wait(this, 0.5, ct);
+		// a dark shape against the glass: the first blow cracks it
+		_tentacle.Visible = true;
+		_tentacle.Aim = player.GlobalPosition + Vector3.Up * 1.5f;
+		_tentacle.Writhe = 0.25f;
+		var press = _tentacle.CreateTween();
+		press.TweenProperty(_tentacle, "Reach", 0.34f, 0.3f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+		await Cutscene.Wait(this, 0.28, ct);
+		PlaySfx("tentacle_slam", 1, win, -4f);
 		PlaySfx("glass_crack", 1, win, 0f);
+		// it draws back while the player turns to it
+		var back = _tentacle.CreateTween();
+		back.TweenProperty(_tentacle, "Reach", 0.18f, 0.9f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
 		await LookAt(player, win, 0.7f, ct);
-		await Cutscene.Wait(this, 0.5, ct);
+		await Cutscene.Wait(this, 0.3, ct);
+		// and bursts through
+		var strike = _tentacle.CreateTween().SetParallel();
+		strike.TweenProperty(_tentacle, "Reach", 1f, 0.24f).SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.Out);
+		strike.TweenProperty(_tentacle, "Writhe", 1f, 0.3f);
+		await Cutscene.Wait(this, 0.06, ct);
 		WindowBroken = true;
 		PlaySfx("glass_shatter", 1, win, 4f);
+		PlaySfx("tentacle_slam", 2, win, 2f);
 		_windowPane.Visible = false;
 		_shards.Visible = true;
 		foreach (var n in _shards.GetChildren())
@@ -444,6 +471,13 @@ public partial class StationRoom2 : Node3D
 			rig.Shake = new Vector3(_rng.RandfRange(-1, 1), _rng.RandfRange(-1, 1), 0) * 0.03f * (float)(1 - t / 0.5);
 		}
 		rig.Shake = Vector3.Zero;
+		// it thrashes a moment in the pouring water, then drags itself back out through the window
+		var retract = _tentacle.CreateTween();
+		retract.TweenInterval(0.35f);
+		retract.TweenCallback(Callable.From(() => PlaySfx("squelch_close", 2, win, 2f)));
+		retract.TweenProperty(_tentacle, "Reach", 0f, 0.85f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+		retract.Parallel().TweenProperty(_tentacle, "Writhe", 0.5f, 0.85f);
+		retract.TweenCallback(Callable.From(() => _tentacle.Visible = false));
 		await Cutscene.Wait(this, 1.4, ct);
 		PlaySfx("breath_in", 5, player.GlobalPosition, -2f);
 		var up = player.CreateTween();

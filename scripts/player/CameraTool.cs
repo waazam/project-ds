@@ -291,8 +291,12 @@ public partial class CameraTool : Node
 		var img = GetViewport()?.GetTexture()?.GetImage();
 		if (img == null) return null;
 		var frame = _viewfinder.FrameRect;
+		// the frame is in the game's 640x360 layout; with the CRT filter the rendered frame is the window's size
+		float k = img.GetWidth() / Mathf.Max(1f, GetViewport().GetVisibleRect().Size.X);
+		frame = new Rect2(frame.Position * k, frame.Size * k);
 		// Just inside the corner brackets.
-		var crop = new Rect2I((Vector2I)frame.Position + Vector2I.One * 2, (Vector2I)frame.Size - Vector2I.One * 4);
+		int inset = Mathf.RoundToInt(2 * k);
+		var crop = new Rect2I((Vector2I)frame.Position + Vector2I.One * inset, (Vector2I)frame.Size - Vector2I.One * inset * 2);
 		crop = crop.Intersection(new Rect2I(0, 0, img.GetWidth(), img.GetHeight()));
 		if (crop.Size.X < 8 || crop.Size.Y < 8) return null;
 		var cut = img.GetRegion(crop);

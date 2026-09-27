@@ -9,7 +9,7 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// Act 13, Room 1 (left of the lobby's desk; the clock's key opens it). Three walls of hurried,
-/// scrawled red writing, one line to a wall — DO NOT LOOK AT THEM / DO NOT TOUCH THEM / NEVER GO UP
+/// scrawled red writing, huge, over the whole of each wall, one sentence to a wall — DO NOT LOOK AT THEM / DO NOT TOUCH THEM / NEVER GO UP
 /// THEM — running with drips, and a duct-taped cigar box on the floor. The knife cuts its three sides
 /// (left, right, then the front: <see cref="TapeCutOverlay"/>), the lid comes up on a button, and
 /// pressing it (E) melts the writing down the walls into a blood puddle at each wall's foot. That is
@@ -38,10 +38,26 @@ public partial class StationRoom1 : Node3D
 	public Interactable[] Puddles { get; } = new Interactable[3];
 	public int WrongReaches { get; private set; }
 
-	private readonly List<Label3D> _wallText = new();
-	private readonly List<Label3D> _ghosts = new();
-	private readonly List<Node3D> _drips = new();
+	/// <summary>Per wall: the writing (a node holding its scrawled lines), its lines, and its faint ghost.</summary>
+	private readonly List<Node3D> _writing = new();
+	private readonly List<List<Label3D>> _lines = new();
+	private readonly List<Node3D> _ghosts = new();
+	/// <summary>Per wall: its drips, each a run of blood from under a letter and the bead at its end.</summary>
+	private readonly List<List<Drip>> _drips = new();
 	private readonly List<Node3D> _puddleDecals = new();
+
+	private sealed class Drip
+	{
+		public MeshInstance3D Run, Bead;
+		public Vector3 Top, N;
+		public float Len, Width;
+	}
+
+	/// <summary>How each wall's words are broken over it: three lines, filling the wall.</summary>
+	private static readonly string[][] Scrawls =
+	{
+		new[] { "DO NOT", "LOOK AT", "THEM" }, new[] { "DO NOT", "TOUCH", "THEM" }, new[] { "NEVER", "GO UP", "THEM" },
+	};
 	private Node3D _box, _lid, _button;
 	private Interactable _boxUse, _buttonUse;
 	private Transform3D _leftCam, _rightCam, _frontCam;
@@ -96,31 +112,52 @@ public partial class StationRoom1 : Node3D
 			OmniRange = 7f, OmniAttenuation = 1.2f, Position = new Vector3(0, Height - 0.3f, 0),
 		});
 
-		// the writing: big, hurried, red, running
+		// the writing (the owner: scrawled over the whole wall): three huge, hurried lines to a wall, each a
+		// little crooked, with blood running from under the letters
 		var red = new Color(0.62f, 0.03f, 0.02f);
-		string[] lines = { Wall1, Wall2, Wall3 };
 		var rng = new RandomNumberGenerator { Seed = 1331 };
+		float[] lineY = { 2.42f, 1.52f, 0.66f };
 		for (int i = 0; i < 3; i++)
 		{
 			var (foot, n) = Walls[i];
-			var b = Basis.LookingAt(-n, Vector3.Up) * new Basis(Vector3.Back, rng.RandfRange(-0.06f, 0.06f));
-			Vector3 at = foot + n * 0.075f + Vector3.Up * 1.75f;
-			var label = Scrawled(lines[i], at, b, 0.5f, red);
-			_wallText.Add(label);
-			// the ghost that stays behind once it melts
-			var ghost = Scrawled(lines[i], at - n * 0.002f, b, 0.5f, new Color(0.35f, 0.08f, 0.06f, 0.14f));
-			ghost.Visible = false;
-			_ghosts.Add(ghost);
-			// drips running from the letters
-			var drips = new Node3D { Name = $"Drips{i}" };
-			AddChild(drips);
 			Vector3 right = Vector3.Up.Cross(n).Normalized();
-			for (int d = 0; d < 10; d++)
+			var wall = new Node3D { Name = $"Writing{i}" };
+			var ghost = new Node3D { Name = $"Ghost{i}", Visible = false };
+			AddChild(wall);
+			AddChild(ghost);
+			var labels = new List<Label3D>();
+			var drips = new List<Drip>();
+			for (int li = 0; li < 3; li++)
 			{
-				Vector3 top = at + right * rng.RandfRange(-1.4f, 1.4f) + Vector3.Down * rng.RandfRange(0.1f, 0.35f);
-				float len = rng.RandfRange(0.15f, 0.7f);
-				StationProps.Decal(drips, StationTextures.Flat("st_drip", red * 0.85f, 0.3f, 0.5f), top + Vector3.Down * len * 0.5f, n, new Vector2(0.025f, len));
+				string line = Scrawls[i][li];
+				float target = line.Length <= 4 ? rng.RandfRange(3.0f, 3.8f) : rng.RandfRange(4.4f, 5.1f);
+				float px = Mathf.Max(1f, Scrawl.GetStringSize(line, HorizontalAlignment.Left, -1, 96).X);
+				float em = Mathf.Min(target * 96f / px, 1.15f);
+				float width = px * em / 96f;
+				float shift = rng.RandfRange(-0.25f, 0.25f);
+				var b = Basis.LookingAt(-n, Vector3.Up) * new Basis(Vector3.Back, rng.RandfRange(-0.07f, 0.07f));
+				Vector3 at = foot + n * 0.075f + right * shift + Vector3.Up * lineY[li];
+				labels.Add(Scrawled(wall, line, at, b, em, red));
+				// a second pass of the brush, a hair off the first: thick, smeared strokes
+				labels.Add(Scrawled(wall, line, at + n * 0.001f + right * em * 0.02f + Vector3.Down * em * 0.025f, b, em, new Color(0.45f, 0.02f, 0.015f, 0.6f)));
+				Scrawled(ghost, line, at - n * 0.002f, b, em, new Color(0.35f, 0.08f, 0.06f, 0.14f));
+				// drips from under the letters
+				int count = 3 + (int)(width * 1.4f);
+				for (int d = 0; d < count; d++)
+				{
+					Vector3 top = at + right * rng.RandfRange(-width * 0.45f, width * 0.45f) + Vector3.Down * em * rng.RandfRange(0.22f, 0.34f);
+					top.Y = Mathf.Max(top.Y, 0.2f);
+					float len = Mathf.Min(rng.RandfRange(0.06f, 0.42f), top.Y - 0.05f);
+					var drip = new Drip { Top = top, N = n, Len = len, Width = rng.RandfRange(0.03f, 0.06f) };
+					drip.Run = StationProps.Decal(this, StationTextures.BloodDripMat, top, n, new Vector2(drip.Width, 1f), 0f, $"Drip{i}_{li}_{d}");
+					drip.Bead = StationProps.Decal(this, StationTextures.BloodMat, top, n, Vector2.One * drip.Width * 1.5f, rng.RandfRange(0, 3f), "Bead");
+					SetDrip(drip, len);
+					drips.Add(drip);
+				}
 			}
+			_writing.Add(wall);
+			_lines.Add(labels);
+			_ghosts.Add(ghost);
 			_drips.Add(drips);
 		}
 
@@ -137,15 +174,25 @@ public partial class StationRoom1 : Node3D
 			_lid.Position += Vector3.Up * 0.16f;
 			_lid.Rotation = new Vector3(Mathf.DegToRad(-70f), 0, 0);
 			_boxUse.Enabled = false;
-			foreach (var l in _wallText) l.Visible = false;
-			foreach (var d in _drips) d.Visible = false;
+			foreach (var w in _writing) w.Visible = false;
+			// the runs stay on the walls, all the way down to the pools
+			foreach (var wall in _drips) foreach (var d in wall) { SetDrip(d, d.Top.Y - 0.01f); d.Bead.Visible = false; }
 			foreach (var g in _ghosts) g.Visible = true;
 			foreach (var p in _puddleDecals) { p.Visible = true; p.Scale = Vector3.One; }
 		}
 		SetProcess(true);
 	}
 
-	private Label3D Scrawled(string text, Vector3 at, Basis b, float em, Color c)
+	/// <summary>A drip's run from its top down <paramref name="len"/> metres, the bead at its foot.</summary>
+	private static void SetDrip(Drip d, float len)
+	{
+		len = Mathf.Max(len, 0.01f);
+		d.Run.Scale = new Vector3(1f, len, 1f);
+		d.Run.Position = d.Top + d.N * 0.006f + Vector3.Down * len * 0.5f;
+		d.Bead.Position = d.Top + d.N * 0.007f + Vector3.Down * len;
+	}
+
+	private Label3D Scrawled(Node3D parent, string text, Vector3 at, Basis b, float em, Color c)
 	{
 		var l = new Label3D
 		{
@@ -153,7 +200,7 @@ public partial class StationRoom1 : Node3D
 			Shaded = true, AlphaCut = c.A < 0.99f ? Label3D.AlphaCutMode.Disabled : Label3D.AlphaCutMode.Discard,
 			Transform = new Transform3D(b, at), DoubleSided = false, LineSpacing = -10f,
 		};
-		AddChild(l);
+		parent.AddChild(l);
 		return l;
 	}
 
@@ -288,28 +335,40 @@ public partial class StationRoom1 : Node3D
 		GD.Print("[story] Act 13, room 1: solved - the writing melts");
 	}
 
-	/// <summary>Each line slides down its wall and thins to nothing, the drips running with it, and pools
-	/// at the wall's foot; a faint ghost of the words stays on the wall.</summary>
+	/// <summary>The writing drips off the walls (the owner): every run of blood lets go and races down to the
+	/// floor, the words sag, stretch and slide down after them and thin to nothing, and the blood pools
+	/// wide at each wall's foot. The runs stay as stains; a faint ghost of the words stays on each wall.</summary>
 	private void MeltWalls()
 	{
 		PlayOneShot("res://assets/audio/sfx/squelch_open_01.wav", 0f, 0.6f);
+		var rng = new RandomNumberGenerator { Seed = 1333 };
 		for (int i = 0; i < 3; i++)
 		{
-			var label = _wallText[i];
-			var drips = _drips[i];
+			var wall = _writing[i];
 			var puddle = _puddleDecals[i];
 			float delay = i * 0.5f;
+			var (foot, n) = Walls[i];
+			PlayOneShotAt("res://assets/audio/sfx/blood_drain_01.wav", foot + n * 0.3f + Vector3.Up * 1.2f, -3f, 0.8f + i * 0.08f, delay + 0.3f);
 			var tw = CreateTween().SetParallel();
-			tw.TweenProperty(label, "position:y", label.Position.Y - 1.3f, 4.5f).SetDelay(delay).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
-			tw.TweenProperty(label, "scale", new Vector3(1.05f, 1.8f, 1f), 4.5f).SetDelay(delay);
-			tw.TweenProperty(label, "modulate:a", 0f, 4.5f).SetDelay(delay).SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.In);
-			tw.TweenProperty(drips, "position:y", -1.2f, 4.5f).SetDelay(delay);
-			tw.TweenProperty(drips, "scale", new Vector3(1f, 2f, 1f), 4.5f).SetDelay(delay);
+			// each run lets go and runs down to the floor, faster as it goes, its bead at its foot
+			foreach (var d in _drips[i])
+			{
+				var drip = d;
+				float from = drip.Len, to = drip.Top.Y - 0.01f;
+				float start = delay + rng.RandfRange(0f, 1.8f), time = rng.RandfRange(1.6f, 3.6f) * Mathf.Sqrt(Mathf.Max(to, 0.1f) / 2f);
+				tw.TweenMethod(Callable.From<float>(len => SetDrip(drip, len)), from, to, time).SetDelay(start).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+				tw.TweenCallback(Callable.From(() => drip.Bead.Visible = false)).SetDelay(start + time);
+			}
+			// the words sag and slide down after them, stretching, and thin away
+			tw.TweenProperty(wall, "position:y", -0.9f, 5.5f).SetDelay(delay + 0.6f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+			tw.TweenProperty(wall, "scale", new Vector3(1.03f, 1.5f, 1f), 5.5f).SetDelay(delay + 0.6f);
+			foreach (var l in _lines[i])
+				tw.TweenProperty(l, "modulate:a", 0f, 5.5f).SetDelay(delay + 0.6f).SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.In);
 			puddle.Visible = true;
 			puddle.Scale = Vector3.One * 0.05f;
-			tw.TweenProperty(puddle, "scale", Vector3.One, 3.5f).SetDelay(delay + 1.5f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+			tw.TweenProperty(puddle, "scale", Vector3.One, 4.5f).SetDelay(delay + 1.2f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
 			var ghost = _ghosts[i];
-			tw.TweenCallback(Callable.From(() => { ghost.Visible = true; label.Visible = false; drips.Visible = false; })).SetDelay(delay + 4.6f);
+			tw.TweenCallback(Callable.From(() => { ghost.Visible = true; wall.Visible = false; })).SetDelay(delay + 6.2f);
 		}
 	}
 
@@ -321,9 +380,17 @@ public partial class StationRoom1 : Node3D
 		for (int i = 0; i < 3; i++)
 		{
 			var (foot, n) = Walls[i];
-			var root = new Node3D { Name = $"Puddle{i}", Position = foot + n * 0.55f, Visible = false };
+			// wide pools along each wall's foot (the owner: larger), a few smaller splashes round them
+			var root = new Node3D { Name = $"Puddle{i}", Position = foot + n * 0.72f, Visible = false };
 			AddChild(root);
-			StationProps.Decal(root, StationTextures.BloodMat, new Vector3(0, 0.008f, 0), Vector3.Up, new Vector2(1.3f, 1.0f), rng.RandfRange(0, 3f));
+			float along = i == 1 ? Mathf.Pi * 0.5f : 0f;
+			StationProps.Decal(root, StationTextures.BloodPoolMat, new Vector3(0, 0.008f, 0), Vector3.Up, new Vector2(rng.RandfRange(3.2f, 3.8f), 1.45f), along + rng.RandfRange(-0.15f, 0.15f));
+			Vector3 right = Vector3.Up.Cross(n).Normalized();
+			for (int b = 0; b < 4; b++)
+			{
+				Vector3 off = right * rng.RandfRange(-2.0f, 2.0f) + n * rng.RandfRange(-0.3f, 0.9f);
+				StationProps.Decal(root, StationTextures.BloodMat, off + new Vector3(0, 0.009f + b * 0.0008f, 0), Vector3.Up, Vector2.One * rng.RandfRange(0.45f, 0.95f), rng.RandfRange(0, 3f));
+			}
 			_puddleDecals.Add(root);
 			int which = i;
 			var reach = new Interactable
@@ -371,6 +438,15 @@ public partial class StationRoom1 : Node3D
 			rig.Shake = Vector3.Zero;
 			await StoryBeat.Caption(this, "Something in it takes your wrist - and lets go.", 0.3f, 1.8f, 0.8f, ct);
 		}, lockInput: true);
+	}
+
+	private void PlayOneShotAt(string path, Vector3 local, float volumeDb, float pitch, float delay)
+	{
+		if (!ResourceLoader.Exists(path)) return;
+		var s = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(path), Bus = "Events", VolumeDb = volumeDb, PitchScale = pitch, UnitSize = 2f, MaxDistance = 15f, Position = local };
+		AddChild(s);
+		s.Finished += s.QueueFree;
+		GetTree().CreateTimer(delay).Timeout += () => { if (IsInstanceValid(s)) s.Play(); };
 	}
 
 	private void PlayOneShot(string path, float volumeDb, float pitch)

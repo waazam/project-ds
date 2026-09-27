@@ -58,8 +58,10 @@ public partial class Library
 		Journal = new Readable
 		{
 			Name = "Readable", Title = "A journal, hidden among the books", Text = JournalText, Style = Readable.NoteStyle.Handwritten,
-			Prompt = "Read the journal", PickRadius = 0.2f, MaxDistance = 2.6f, ReadFlag = "read_round_room_journal",
-			Position = new Vector3(0, 0.02f, 0),
+			Prompt = "Read the journal", PickRadius = 0.28f, MaxDistance = 2.6f, ReadFlag = "read_round_room_journal",
+			// out from the wall a little: the bookcase's collision is one deep box the book lies inside, and a
+			// pick sphere only just reaching its face could be missed by a hair
+			Position = new Vector3(0.14f, 0.03f, 0),
 		};
 		book.AddChild(Journal);
 		JournalFound = StoryManager.Instance?.HasFlag(StoryManager.Flag.LibraryJournalFound) ?? false;

@@ -128,7 +128,9 @@ public partial class PlayerInput : Node
 	public override void _UnhandledInput(InputEvent e)
 	{
 		if (!_enabled || Scripted || _modal > 0) return;
-		if (e is InputEventMouseMotion motion && Input.MouseMode == Input.MouseModeEnum.Captured)
+		// the automated tests look only by script: a real mouse moved on the desk (the machine in use while a run
+		// goes) must not turn the view off what a test has aimed at
+		if (e is InputEventMouseMotion motion && Input.MouseMode == Input.MouseModeEnum.Captured && !GameSettings.Instance.AutoTest)
 		{
 			var s = GameSettings.Instance;
 			float pitchSign = s.InvertY ? 1f : -1f;

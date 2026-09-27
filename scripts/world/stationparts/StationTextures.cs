@@ -211,6 +211,32 @@ public static class StationTextures
 		return new Color(0.32f, 0.02f, 0.02f, a * 0.92f);
 	}), 0.2f, 0.6f, alpha: true);
 
+	/// <summary>A wide pool of blood: a dense, glossy body with a ragged, lobed rim and a few flung drops round
+	/// it (Act 13, room 1: what the writing melts into).</summary>
+	public static StandardMaterial3D BloodPoolMat => Std("st_bloodpool", Make("st_bloodpool", 128, 128, (x, y) =>
+	{
+		float dx = (x - 64) / 64f, dy = (y - 64) / 64f;
+		float r = Mathf.Sqrt(dx * dx + dy * dy);
+		float ang = Mathf.Atan2(dy, dx);
+		float edge = 0.62f + 0.14f * Mathf.Sin(ang * 3f + 1.3f) + 0.08f * Mathf.Sin(ang * 7f) + 0.16f * (Fbm(x, y, 128, 6, 3, 171) - 0.5f);
+		float a = Mathf.SmoothStep(edge + 0.03f, edge - 0.03f, r);
+		if (Hash(x / 4, y / 4, 172) > 0.992f && r < 0.98f) a = 1f;
+		float depth = Mathf.Clamp(1f - r / Mathf.Max(edge, 0.1f), 0f, 1f);
+		var c = new Color(0.36f, 0.025f, 0.02f).Lerp(new Color(0.2f, 0.005f, 0.01f), depth * 0.8f);
+		return new Color(c.R, c.G, c.B, a * 0.95f);
+	}), 0.08f, 0.7f, alpha: true);
+
+	/// <summary>A run of blood down a wall: a thin wavering line, heavier toward its foot (the wall writing's
+	/// drips). The bead at its end is a separate decal, so the line can grow without stretching it.</summary>
+	public static StandardMaterial3D BloodDripMat => Std("st_blooddrip", Make("st_blooddrip", 16, 128, (x, y) =>
+	{
+		float v = y / 127f;                                  // 0 at the top .. 1 at the foot
+		float centre = 7.5f + 1.2f * Mathf.Sin(v * 9f) + 0.6f * Mathf.Sin(v * 23f + 1f);
+		float half = Mathf.Lerp(1.4f, 3.2f, v) * (0.85f + 0.3f * Fbm(x, y, 16, 2, 2, 181));
+		float a = Mathf.SmoothStep(half + 0.8f, half - 0.4f, Mathf.Abs(x - centre)) * Mathf.SmoothStep(0f, 0.06f, v);
+		return new Color(0.5f, 0.02f, 0.015f, a);
+	}), 0.15f, 0.6f, alpha: true);
+
 	/// <summary>A smeared bloody handprint (palm, four fingers, a thumb).</summary>
 	public static StandardMaterial3D HandprintMat => Std("st_hand", Make("st_hand", 64, 64, (x, y) =>
 	{

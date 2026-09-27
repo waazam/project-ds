@@ -25,6 +25,14 @@ uniform float halation_threshold = 0.55;
 uniform float edge_soft = 0.35;
 uniform float fringe = 0.0022;
 uniform float scanlines = 0.035;
+/// The CRT filter (a setting, on by default; the owner, from the teaser). When on, this runs at the window's
+/// resolution with px_scale window rows to each of the game's 360 lines, so each line is drawn as a TV's
+/// scanline (bright in its middle, dark at its lower edge), with a slight horizontal colour fringe and a
+/// darker, heavier grade. The dither and grain stay on the game's own pixel grid either way.
+uniform float crt = 0.0;
+uniform float px_scale = 1.0;
+uniform float crt_scan = 0.24;
+uniform float crt_fringe = 0.67;        // in game pixels: red a touch left, blue a touch right
 
 const float BAYER[16] = float[16](
 	0.0, 8.0, 2.0, 10.0,
@@ -39,15 +47,17 @@ float hash(vec2 p) {
 void fragment() {
 	vec2 uv = SCREEN_UV;
 	vec2 d = uv - 0.5;
+	vec2 gp = floor(FRAGCOORD.xy / px_scale);   // the game's own pixel (the same as FRAGCOORD at 640x360)
+	vec2 px = SCREEN_PIXEL_SIZE * px_scale;       // one game pixel, in uv
 	float edge = dot(d, d) * 4.0;   // 0 in the middle, ~1 in the corners
 
 	// the image, a hair fringed toward the edges (red out, blue in)
 	vec3 c;
-	c.r = texture(screen_tex, uv + d * fringe * edge * 4.0).r;
+	vec2 cf = vec2(px.x * crt_fringe * crt, 0.0);
+	c.r = texture(screen_tex, uv + d * fringe * edge * 4.0 - cf).r;
 	c.g = texture(screen_tex, uv).g;
-	c.b = texture(screen_tex, uv - d * fringe * edge * 4.0).b;
+	c.b = texture(screen_tex, uv - d * fringe * edge * 4.0 + cf).b;
 	// the lens goes soft toward the edges (a small tap blur: the screen has no mip levels to borrow)
-	vec2 px = SCREEN_PIXEL_SIZE;
 	vec3 soft1 = (texture(screen_soft, uv + px * vec2(1.5, 0.5)).rgb + texture(screen_soft, uv + px * vec2(-1.5, -0.5)).rgb
 		+ texture(screen_soft, uv + px * vec2(-0.5, 1.5)).rgb + texture(screen_soft, uv + px * vec2(0.5, -1.5)).rgb) * 0.25;
 	c = mix(c, soft1, clamp(edge * edge_soft, 0.0, 0.6));
@@ -69,19 +79,31 @@ void fragment() {
 	c = (c - 0.5) * contrast + 0.5;
 	c *= mix(shadow_tone, highlight_tone, smoothstep(0.1, 0.7, luma));
 	c = max(c, vec3(0.0)) + shadow_tint * (1.0 - luma);
+	// the CRT's heavier grade: a touch darker in the mids, a little more contrast, a little less colour
+	if (crt > 0.5) {
+		c = pow(max(c, vec3(0.0)), vec3(1.0 / 0.96));
+		c = (c - 0.5) * 1.05 + 0.5;
+		c = mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 0.92);
+	}
 
 	// vignette
 	c *= 1.0 - vignette * dot(d, d) * 1.6;
 
 	// faint static scanlines (every other line of the 360: the PS2's interlaced look, without the flicker)
-	c *= 1.0 - scanlines * step(1.0, mod(FRAGCOORD.y, 2.0));
+	if (crt > 0.5) {
+		// each of the game's lines a scanline: full in its upper part, darkening to its lower edge
+		float phase = fract(FRAGCOORD.y / px_scale);
+		c *= 1.0 - crt_scan * smoothstep(0.35, 1.0, phase);
+	} else {
+		c *= 1.0 - scanlines * step(1.0, mod(gp.y, 2.0));
+	}
 
 	// grain, re-rolled ~24 times a second, like film
 	float t = floor(TIME * 24.0);
-	c += (hash(FRAGCOORD.xy + t * 17.13) - 0.5) * grain;
+	c += (hash(gp + t * 17.13) - 0.5) * grain;
 
 	// ordered dither and quantise
-	ivec2 p = ivec2(mod(FRAGCOORD.xy, 4.0));
+	ivec2 p = ivec2(mod(gp, 4.0));
 	float b = (BAYER[p.y * 4 + p.x] + 0.5) / 16.0 - 0.5;
 	c = floor(c * levels + 0.5 + b * dither_strength) / levels;
 

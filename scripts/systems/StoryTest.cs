@@ -1280,6 +1280,18 @@ public partial class StoryTest : Node
 		Check("the cap is still in hand at the last staircase", _inv.HasNewelPost);
 		var top = act11.OriginalStairs?.GetNodeOrNull<Node3D>("TopTrigger");
 		Check("the top landing exists", top != null);
+		if (top != null)
+		{
+			// settle at the foot and face straight up the flight first: arriving at a run and turning onto it
+			// can carry the walk off the side of the treads (the flight is narrow), frame rate depending
+			_input.ScriptedMove = Vector2.Zero;
+			await Frames(20, ct);
+			var foot = act11.OriginalStairs.GlobalPosition;
+			await WalkTo(foot, 0.5f, ct, giveUp: 8f);
+			_input.ScriptedMove = Vector2.Zero;
+			await Frames(10, ct);
+			await Aim(new Vector3(top.GlobalPosition.X, _player.CameraRig.Camera.GlobalPosition.Y, top.GlobalPosition.Z), ct);
+		}
 		bool climbed = top != null && await WalkTo(top.GlobalPosition, 1.2f, ct, giveUp: 40f);
 		Check("walked up the tall flight to the top landing", climbed, $"progress {act11.Progress:0.00} at {_player.GlobalPosition}");
 		if (act11.Pursuer is { } stuck)
@@ -1567,6 +1579,9 @@ public partial class StoryTest : Node
 			await UseIt(room2.BoxUse, ct);
 			await WaitUntil(() => room2.Flooding, 8, ct);
 			Check("using the box breaks the window: the lake comes in", room2.WindowBroken && room2.Flooding);
+			await Seconds(0.25, ct);
+			Check("what breaks it is one of the lake thing's tentacles, in the room", room2.TentacleIn);
+			Screenshot("room2_tentacle");
 			await WaitUntil(() => _input.Enabled, 8, ct);
 			Screenshot("room2_flooding");
 
@@ -2461,7 +2476,8 @@ public partial class StoryTest : Node
 		Screenshot("journal_under_blacklight");
 		Check("under the blacklight: a hand on its cover, READ over it - found", lib.JournalFound && s.HasFlag(StoryManager.Flag.LibraryJournalFound));
 		uvLantern?.SetBlacklight(false);
-		await Frames(3, ct);
+		// the prompt follows on the next physics tick (a few render frames can pass before one, at a high frame rate)
+		await WaitUntil(() => _player.Interaction?.PromptText == "Read the journal", 1, ct);
 		Check("now it can be read", _player.Interaction?.PromptText == "Read the journal", $"'{_player.Interaction?.PromptText}'");
 		await Press(ct);
 		await WaitUntil(() => NoteOverlay.Instance is { IsOpen: true }, 3, ct);
@@ -2502,9 +2518,9 @@ public partial class StoryTest : Node
 		Check("a piece that doesn't fit knocks against the rim and stays in hand", !wrong && o.Bumps == bumps + 1 && o.Holding && lib.Puzzle.Pieces[longIdx].At == null);
 		// and a key press moves the held piece over the box
 		Vector2I before = o.Cursor;
-		Input.ParseInputEvent(new InputEventAction { Action = "move_left", Pressed = true });
+		Input.ParseInputEvent(new InputEventAction { Action = "move_left", Pressed = true }); Input.FlushBufferedEvents();
 		await Frames(2, ct);
-		Input.ParseInputEvent(new InputEventAction { Action = "move_left", Pressed = false });
+		Input.ParseInputEvent(new InputEventAction { Action = "move_left", Pressed = false }); Input.FlushBufferedEvents();
 		await Frames(2, ct);
 		Check("A moves the held piece one cell left", o.Cursor == before + new Vector2I(-1, 0), $"{before} -> {o.Cursor}");
 		for (int i = 0; i < plan.Count; i++)
@@ -2722,7 +2738,7 @@ public partial class StoryTest : Node
 		await Aim(church.ToGlobal(new Vector3(0, Church.CryptFloor + 1.5f, Church.CryptZ1)), ct);
 		Screenshot("the_crypt_far_end");
 		await Aim(church.ToGlobal(Church.HatchLocal), ct);
-		await Frames(3, ct);
+		await WaitUntil(() => _player.Interaction?.PromptText == "It won't lift. Shut fast.", 1, ct);
 		Check("the hatch has fallen shut behind: it won't lift", _player.Interaction?.PromptText == "It won't lift. Shut fast.", $"'{_player.Interaction?.PromptText}'");
 		var atmo = StoryBeat.Atmosphere(_player);
 		Check("back on the surface: no underground black, and it is winter", atmo != null && atmo.Underground < 0.2f && atmo.Winter > 0.5f, $"underground {atmo?.Underground:0.00} winter {atmo?.Winter:0.00}");
@@ -2985,6 +3001,8 @@ public partial class StoryTest : Node
 	/// <summary>Points the view straight at a world point (yaw and pitch), like a player lining up the crosshair.</summary>
 	private async Task Aim(Vector3 point, CancellationToken ct)
 	{
+		// any look still pending (the last frames of a walk's steering) would be added after the snap
+		_player.PlayerInput.ConsumeLook();
 		var eye = _player.CameraRig.Camera.GlobalPosition;
 		var d = point - eye;
 		float yaw = Mathf.Atan2(-d.X, -d.Z);
@@ -3057,9 +3075,9 @@ public partial class StoryTest : Node
 	/// <summary>One press and release of an input action through the real input pipeline (what a modal overlay's _Input sees).</summary>
 	private async Task Key(string action, CancellationToken ct)
 	{
-		Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = true });
+		Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = true }); Input.FlushBufferedEvents();
 		await Frames(2, ct);
-		Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false });
+		Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false }); Input.FlushBufferedEvents();
 		await Frames(2, ct);
 	}
 
