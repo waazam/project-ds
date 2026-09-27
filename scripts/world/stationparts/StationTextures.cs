@@ -54,6 +54,7 @@ public static class StationTextures
 		for (int y = 0; y < h; y++)
 			for (int x = 0; x < w; x++)
 				img.SetPixel(x, y, f(x, y));
+		img = TexelBoost.Apply(key, img);
 		img.GenerateMipmaps();
 		t = ImageTexture.CreateFromImage(img);
 		_tex[key] = t;

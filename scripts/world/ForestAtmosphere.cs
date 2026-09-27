@@ -222,6 +222,16 @@ public partial class ForestAtmosphere : Node
 		if (_sun != null) { _sunBaseColor = _sun.LightColor; _sunBaseBasis = _sun.GlobalBasis; }
 		if (_env != null)
 		{
+			// the visual pass: contact shadows (screen-space ambient occlusion) in every corner, under every root,
+			// step and plank, so things sit in the world instead of floating on it
+			_env.SsaoEnabled = true;
+			_env.SsaoRadius = 1.2f;
+			_env.SsaoIntensity = 2.2f;
+			_env.SsaoPower = 1.6f;
+			_env.SsaoDetail = 0.6f;
+			_env.SsaoHorizon = 0.06f;
+			_env.SsaoSharpness = 0.98f;
+			_env.SsaoLightAffect = 0.15f;
 			_ambientBaseColor = _env.AmbientLightColor;
 			_bgEnergyBase = _env.BackgroundEnergyMultiplier;
 			_exposureBase = _env.TonemapExposure;

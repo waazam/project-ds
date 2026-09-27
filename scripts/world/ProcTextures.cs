@@ -77,6 +77,7 @@ public static class ProcTextures
 			for (int x = 0; x < w; x++)
 				img.SetPixel(x, y, f(x, y));
 		if (alpha) FixAlphaBorder(img);
+		img = TexelBoost.Apply(key, img);
 		img.GenerateMipmaps();
 		t = ImageTexture.CreateFromImage(img);
 		_tex[key] = t;

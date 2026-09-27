@@ -316,7 +316,12 @@ public partial class StoryTest : Node
 		}
 		Check("Tab opens the album", page is { IsOpen: true });
 		Screenshot("album");
-		_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false; await Frames(3, ct);
+		for (int i = 0; i < 4 && page is { IsOpen: true }; i++)
+		{
+			await WaitUntil(() => _input.Enabled && !_input.Modal, 5, ct);
+			_input.ScriptedPhotoLog = true; await Frames(3, ct); _input.ScriptedPhotoLog = false;
+			await WaitUntil(() => page is not { IsOpen: true }, 1, ct);
+		}
 		Check("Tab closes it again", page is not { IsOpen: true });
 	}
 

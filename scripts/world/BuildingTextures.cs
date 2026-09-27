@@ -66,6 +66,7 @@ public static class BuildingTextures
 				var c = f(x, y); c.A = 1f;
 				img.SetPixel(x, y, c);
 			}
+		img = TexelBoost.Apply(key, img);
 		img.GenerateMipmaps();
 		t = ImageTexture.CreateFromImage(img);
 		_tex[key] = t;

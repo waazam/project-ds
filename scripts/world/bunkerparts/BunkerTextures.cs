@@ -71,6 +71,7 @@ public static class BunkerTextures
 
 	private static Texture2D Store(string key, Image img)
 	{
+		img = TexelBoost.Apply(key, img);
 		img.GenerateMipmaps();
 		var t = ImageTexture.CreateFromImage(img);
 		_tex[key] = t;

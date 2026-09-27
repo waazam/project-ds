@@ -62,6 +62,7 @@ public static class StairTextures
 			for (int x = 0; x < w; x++)
 				img.SetPixel(x, y, f(x, y));
 		if (alpha) BleedAlpha(img);
+		img = TexelBoost.Apply(key, img);
 		img.GenerateMipmaps();
 		t = ImageTexture.CreateFromImage(img);
 		_tex[key] = t;
