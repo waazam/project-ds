@@ -587,6 +587,39 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 40, dur);
 	}
 
+	/// <summary>The Flicker Archive logo's candle, blown out (the owner): a soft breath of air that swells and
+	/// passes, the flame fluttering under it, then the smoke - a thin, wispy draught with a faint whistle
+	/// in it, curling away to nothing. The breath peaks about 0.25 s in, when the flame goes.</summary>
+	public static double[] CandleBlowOut(Rng r, int sr)
+	{
+		double dur = 2.6;
+		var x = Buf(sr, dur);
+		var breath = Biquad.Bp(sr, 800, 0.7); var body = Biquad.Lp(sr, 700); var air = Biquad.Hp(sr, 2500);
+		var flutter = Biquad.Lp(sr, 260);
+		var smoke = Biquad.Bp(sr, 3600, 1.2);
+		var whistle = Biquad.Bp(sr, 1000, 9);
+		var gust = new Smooth(r, dur + 0.1, 0.03);
+		var curl = new Smooth(r, dur + 0.1, 0.18);
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			// the breath: a quick soft swell and a longer fall, its colour rising a little as it pushes
+			if (i % 64 == 0) breath.SetBp(700 + 700 * Math.Min(1, t / 0.3), 0.7);
+			double eb = t < 0.22 ? Math.Pow(Math.Sin(Math.PI / 2 * t / 0.22), 2) : Math.Exp(-(t - 0.22) / 0.16);
+			double w = r.W();
+			double b = (breath.P(w) + 0.7 * body.P(w) + 0.1 * air.P(r.W())) * eb * (0.75 + 0.25 * gust.At(t));
+			// the flame whipping in it for an instant
+			double ef = t > 0.12 && t < 0.42 ? Math.Sin(Math.PI * (t - 0.12) / 0.3) : 0;
+			double f = flutter.P(r.W()) * ef * (0.5 + 0.5 * Math.Sin(2 * Math.PI * 23 * t)) * 0.9;
+			// the smoke: a thin draught that rises as the breath passes and curls away
+			double es = t < 0.35 ? 0 : Math.Min(1, (t - 0.35) / 0.3) * Math.Exp(-(t - 0.65) * Math.Max(0, Math.Sign(t - 0.65)) / 0.6);
+			if (i % 64 == 0) { smoke.SetBp(3000 + 1600 * curl.At(t), 1.2); whistle.SetBp(900 + 450 * Math.Min(1, (t - 0.35) / 1.4) + 60 * curl.At(t), 9); }
+			double sm = 2.5 * (0.1 * smoke.P(r.W()) + 0.5 * whistle.P(r.W())) * es * (0.6 + 0.4 * curl.At(t));
+			x[i] = b + f + sm;
+		}
+		return FinishOneShot(x, sr, -3, 300, dur);
+	}
+
 	/// <summary>A knife dragged through duct tape: a fast, textured rip - brighter and more
 	/// plasticky than cloth, with a stickier crinkle riding on top as the tape gives.</summary>
 	public static double[] KnifeSlice(Rng r, int sr)

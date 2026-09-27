@@ -61,6 +61,11 @@ It writes `DeadSilent-Teaser.mp4`, in this order:
    the song's ending drops back in on its hit (4:25.41) and rings out. The title comes in over the
    last shot, which fades to black behind it; the picture holds black after the title fades.
 
+The trailer's footage is framed at 2.35:1 (1920x816, letterboxed) with a subtle CRT look: scanlines,
+a slight colour fringe, softness, a vignette and fine grain, with no flicker. The grade is a little
+dark (gamma 0.96). The Flicker Archive logo carries the candle's blow-out sound
+(`assets/audio/sfx/candle_blow_out.wav`, from AudioGen).
+
 The game's own sound sits low under the music, and comes up in the quiet before the drop. (`pip install imageio-ffmpeg`
 provides an ffmpeg binary. `yt-dlp` can fetch the song.)
 

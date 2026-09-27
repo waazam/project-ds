@@ -33,6 +33,8 @@ AMBIENCE = 3.0                      # the game's sound in the quiet: brought up 
 GAME_UNDER = 0.13                   # the game's sound under the music
 SONG_END = 273.9
 FLICKER, GODOT = 5.0, 3.5           # the logos before it
+BLOW_AT, BLOW_LEN, BLOW_GAIN = 2.62, 2.6, 0.6   # StartupLogo.BlowAt; candle_blow_out.wav's length
+SCOPE_H = 816                       # the 2.35:1 frame's height at 1920 wide (1920 / 2.35, even)
 
 B_LEN = STAIRS + TITLE_HOLD
 video = A_LEN + B_LEN
@@ -64,7 +66,13 @@ fc = (
     # the trailer
     f"[2:v]trim=0:{A_LEN},setpts=PTS-STARTPTS,setsar=1[va];"
     f"[3:v]trim=0:{B_LEN},setpts=PTS-STARTPTS,setsar=1[vb];"
-    f"[va][vb]concat=n=2:v=1:a=0,eq=gamma=1.1:brightness=0.015,scale=out_range=tv,format=yuv420p,"
+    # the look (the owner): a 2.35:1 frame, an old CRT's softness and scanlines, and a slightly darker grade so the
+    # tunnels and the stairwell feel more ominous. No flicker or roll: nothing that flashes.
+    f"[va][vb]concat=n=2:v=1:a=0,eq=gamma=0.96:contrast=1.05:saturation=0.92,"
+    f"crop=1920:{SCOPE_H},rgbashift=rh=-2:bh=2,gblur=sigma=0.7,format=gbrp[vg];"
+    f"[5:v]format=gbrp[sl];"
+    f"[vg][sl]blend=all_mode=multiply:shortest=0,vignette=angle=PI/5,noise=alls=5:allf=t,"
+    f"pad=1920:1080:0:{(1080 - SCOPE_H) // 2}:black,scale=out_range=tv,format=yuv420p,"
     f"tpad=stop_mode=add:stop_duration={pad + 0.1}:color=black[vt];"
     f"[lf][lg][vt]concat=n=3:v=1:a=0[v];"
     # the game's own sound: low under the music, up in the quiet between (the forest)
@@ -80,15 +88,27 @@ fc = (
     f"[m1][m2][gap][m3]concat=n=4:v=0:a=1[music];"
     f"[music][game]amix=inputs=2:duration=longest:normalize=0,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[mix];"
     # silence under the logos (real samples: adelay only leaves a timestamp gap, which players treat differently)
-    f"aevalsrc=0|0:s=44100:d={intro},aformat=sample_fmts=fltp:channel_layouts=stereo[sil];"
+    # the candle in the Flicker Archive logo, blown out (the same sound the game's startup logo plays)
+    f"aevalsrc=0|0:s=44100:d={BLOW_AT},aformat=sample_fmts=fltp:channel_layouts=stereo[sil0];"
+    f"[6:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={BLOW_GAIN}[blow];"
+    f"aevalsrc=0|0:s=44100:d={intro - BLOW_AT - BLOW_LEN:.4f},aformat=sample_fmts=fltp:channel_layouts=stereo[sil1];"
+    f"[sil0][blow][sil1]concat=n=3:v=0:a=1[sil];"
     f"[sil][mix]concat=n=2:v=0:a=1,asetpts=N/SR/TB,apad[a]"
 )
+# the CRT's scanlines, one every three pixel rows (the game's own 360 lines at 1080p)
+scan = os.path.join(OUT, "scanlines.png")
+subprocess.run([FF, "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", f"color=white:s=1920x{SCOPE_H}",
+                "-vf", "format=gray,geq=lum='if(eq(mod(Y,3),2),196,if(eq(mod(Y,3),1),236,255))'",
+                "-frames:v", "1", scan], check=True)
+
 args = [FF, "-y", "-hide_banner", "-loglevel", "error",
         "-i", os.path.join(OUT, "flicker_logo.mp4"),
         "-loop", "1", "-t", f"{GODOT}", "-i", os.path.join(HERE, "godot_logo.png"),
         "-ss", f"{fa / 60:.4f}", "-i", os.path.join(OUT, "partA.avi"),
         "-ss", f"{fb / 60 + 4.0 + 0.01:.4f}", "-i", os.path.join(OUT, "partB.avi"),   # past the 4 s pre-roll
         "-i", os.path.join(OUT, "song.wav"),
+        "-loop", "1", "-framerate", "60", "-i", scan,
+        "-i", os.path.join(HERE, "..", "..", "assets", "audio", "sfx", "candle_blow_out.wav"),
         "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
         "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p", "-r", "60",
         "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", "-t", f"{total:.3f}",

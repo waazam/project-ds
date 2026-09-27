@@ -44,6 +44,7 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"squelch_open_{i:00}", sfx, false, Lo, (
 for (int i = 1; i <= 2; i++) jobs.Add(($"squelch_close_{i:00}", sfx, false, Lo, (r, sr) => Sfx.Squelch(r, sr, false)));
 for (int i = 1; i <= 4; i++) jobs.Add(($"radio_tick_{i:00}", sfx, false, Lo, (r, sr) => Sfx.RadioTick(r, sr)));
 jobs.Add(("camera_shutter", sfx, false, Lo, (r, sr) => Sfx.CameraShutter(r, sr)));
+jobs.Add(("candle_blow_out", sfx, false, Hi, (r, sr) => Sfx.CandleBlowOut(r, sr)));
 jobs.Add(("distant_scream", sfx, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"whisper_voice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WhisperVoice(r, sr)));
 for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"bird_{k:00}", sfx, false, Lo, (r, sr) => Sfx.Bird(k, r, sr))); }
