@@ -320,15 +320,78 @@ public partial class Library : Node3D
 		}
 		lad.CommitTo(this, "Ladder", false);
 		// warm light: the table lamp, the floor lamp, two sconces
-		Lamp(new Vector3(0.4f, 1.1f, 8.2f), new Color(0.2f, 0.5f, 0.25f), 1.3f);
-		Lamp(new Vector3(-1.6f, 1.6f, 1.0f), new Color(0.9f, 0.85f, 0.7f), 1.1f);
-		Lamp(new Vector3(-HalfW + 0.5f, 2.6f, 3.5f), new Color(0.9f, 0.7f, 0.4f), 0.7f);
-		Lamp(new Vector3(HalfW - 0.5f, 2.6f, 10.5f), new Color(0.9f, 0.7f, 0.4f), 0.7f);
+		// a green banker's lamp on the reading table (its top is at 0.77)
+		Lamp(new Vector3(0.4f, 1.1f, 8.2f), new Color(0.2f, 0.5f, 0.25f), 1.3f, LampKind.Desk, 0.77f);
+		// a standing lamp by the door
+		Lamp(new Vector3(-1.6f, 1.6f, 1.0f), new Color(0.9f, 0.85f, 0.7f), 1.1f, LampKind.Floor, 0f);
+		// wall sconces over the shelves, on brass arms from the shelf crowns
+		Lamp(new Vector3(-HalfW + 0.5f, 2.6f, 3.5f), new Color(0.9f, 0.7f, 0.4f), 0.7f, LampKind.Sconce, 0f, Vector3.Left);
+		Lamp(new Vector3(HalfW - 0.5f, 2.6f, 10.5f), new Color(0.9f, 0.7f, 0.4f), 0.7f, LampKind.Sconce, 0f, Vector3.Right);
 	}
 
-	private void Lamp(Vector3 at, Color shade, float energy)
+	private enum LampKind { Desk, Floor, Sconce }
+
+	/// <summary>A lamp with its body: <paramref name="at"/> is the shade's centre. A desk lamp stands on a
+	/// brass base on the surface at <paramref name="baseY"/>; a floor lamp on a weighted foot on the floor;
+	/// a sconce hangs off a brass arm and plate on the wall it points away from (<paramref name="wall"/>).</summary>
+	private void Lamp(Vector3 at, Color shade, float energy, LampKind kind, float baseY, Vector3? wall = null)
 	{
-		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.08f, BottomRadius = 0.16f, Height = 0.14f }, Position = at, MaterialOverride = new StandardMaterial3D { AlbedoColor = shade, Roughness = 0.4f, EmissionEnabled = true, Emission = shade, EmissionEnergyMultiplier = 0.4f } });
+		var brass = new MeshKit();
+		brass.Mat(ItemTextures.BrassMat);
+		brass.Color = new Color(0.78f, 0.6f, 0.34f);
+		var dark = new MeshKit();
+		dark.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.09f, 0.07f), Roughness = 0.5f, MetallicSpecular = 0.5f });
+		dark.Color = Colors.White;
+		float shadeH = 0.14f, shadeR = 0.16f;
+		switch (kind)
+		{
+			case LampKind.Desk:
+			{
+				Vector3 b = new(at.X, baseY, at.Z);
+				brass.Cylinder(b, b + Vector3.Up * 0.025f, 0.11f, 0.1f, 16, true);                  // the base
+				brass.Cylinder(b + Vector3.Up * 0.025f, b + Vector3.Up * 0.05f, 0.07f, 0.04f, 12, true);
+				brass.Cylinder(b + Vector3.Up * 0.05f, at + Vector3.Down * 0.05f, 0.012f, 0.012f, 8, false);   // the stem
+				brass.Cylinder(at + Vector3.Down * 0.07f, at + Vector3.Down * 0.02f, 0.02f, 0.02f, 8, true);   // the collar
+				// the pull chain
+				brass.Cylinder(at + new Vector3(0.05f, -0.05f, 0), at + new Vector3(0.05f, -0.2f, 0), 0.003f, 0.003f, 4, false);
+				brass.Cylinder(at + new Vector3(0.05f, -0.21f, 0), at + new Vector3(0.05f, -0.23f, 0), 0.008f, 0.004f, 6, true);
+				// the banker's shade: a long half-round of green glass, lying across the stem
+				shadeH = 0.08f; shadeR = 0.13f;
+				break;
+			}
+			case LampKind.Floor:
+			{
+				Vector3 b = new(at.X, 0f, at.Z);
+				dark.Cylinder(b, b + Vector3.Up * 0.04f, 0.2f, 0.18f, 18, true);                       // a weighted foot
+				brass.Cylinder(b + Vector3.Up * 0.04f, b + Vector3.Up * 0.1f, 0.06f, 0.025f, 12, true);
+				brass.Cylinder(b + Vector3.Up * 0.1f, at + Vector3.Down * 0.05f, 0.017f, 0.014f, 8, false);   // the pole
+				foreach (float f in new[] { 0.35f, 0.7f }) brass.Cylinder(b + Vector3.Up * (at.Y * f), b + Vector3.Up * (at.Y * f + 0.03f), 0.025f, 0.025f, 8, true);   // turned rings
+				brass.Cylinder(at + Vector3.Down * 0.07f, at, 0.025f, 0.02f, 8, true);
+				shadeH = 0.28f; shadeR = 0.22f;
+				break;
+			}
+			default:
+			{
+				Vector3 n = (wall ?? Vector3.Left).Normalized();   // toward the wall behind it
+				Vector3 plate = at + n * 0.5f;
+				brass.Cylinder(plate - n * 0.02f, plate, 0.06f, 0.06f, 12, true);                       // the wall plate
+				Vector3 elbow = plate - n * 0.25f + Vector3.Down * 0.12f;
+				brass.Cylinder(plate - n * 0.02f, elbow, 0.012f, 0.012f, 8, false);                   // the arm, out and down
+				brass.Cylinder(elbow, at + Vector3.Down * 0.08f, 0.012f, 0.012f, 8, false);           // and up to the cup
+				brass.Cylinder(at + Vector3.Down * 0.1f, at + Vector3.Down * 0.06f, 0.045f, 0.03f, 10, true);
+				shadeH = 0.16f; shadeR = 0.12f;
+				break;
+			}
+		}
+		brass.CommitTo(this, "LampBody", true);
+		if (!dark.IsEmpty) dark.CommitTo(this, "LampFoot", true);
+		var shadeMat = new StandardMaterial3D { AlbedoColor = shade, Roughness = 0.4f, EmissionEnabled = true, Emission = shade, EmissionEnergyMultiplier = 0.45f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+		if (kind == LampKind.Desk)
+			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = shadeR, BottomRadius = shadeR, Height = 0.32f, RadialSegments = 16 }, Position = at + Vector3.Up * 0.02f, Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), Scale = new Vector3(1f, 1f, 0.55f), MaterialOverride = shadeMat });
+		else
+			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = shadeR * 0.6f, BottomRadius = shadeR, Height = shadeH, RadialSegments = 16 }, Position = at + Vector3.Up * (shadeH * 0.5f - 0.06f), MaterialOverride = shadeMat });
+		// the bulb, glowing warm under the shade
+		AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.03f, Height = 0.06f }, Position = at + Vector3.Down * 0.02f, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.9f, 0.7f), EmissionEnabled = true, Emission = new Color(1f, 0.82f, 0.55f), EmissionEnergyMultiplier = 3f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded }, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 		AddChild(new OmniLight3D { Position = at + Vector3.Down * 0.12f, LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = energy > 1f });
 	}
 

@@ -38,9 +38,19 @@ global LOD and mip bias, and make the game pop visually.
   props sit in their own shadow instead of floating on the ground (radius 1.2 m, intensity 2.2,
   mostly on ambient light).
 
+## The library's lamps (the owner: only the shades were there)
+- Every lamp in the library now has its body:
+  - **the banker's lamp on the reading table**: a brass base, a stem and collar, a pull chain, and its
+    long green glass shade lying across the top;
+  - **the standing lamp by the door**: a weighted foot, a brass pole with turned rings, and a tall
+    shade;
+  - **the two wall sconces**: a brass wall plate, and an arm out, down and up to a cup under the shade.
+- Each has a bulb glowing warm under its shade.
+
 ## Tests
 - `--story-from=3 --story-to=4`: 39/39, 77 fps average walking.
 - `--story-from=12 --story-to=13`: 99/99, 102 fps average walking.
+- `--story-from=19`: 18/18, with a screenshot of each lamp.
 - Results:
   - Full `--autotest` (the whole game, start to finish): 522/523, at 95 fps average walking over the
     whole game. The one failure was the Act 1 album's "Tab closes it" step, flaking under load the

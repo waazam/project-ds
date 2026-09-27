@@ -2388,6 +2388,14 @@ public partial class StoryTest : Node
 		Screenshot("library");
 		await Aim(lib.ToGlobal(new Vector3(Library.HalfW, 1.0f, 6.5f)), ct);
 		Screenshot("library_fireplace");
+		// the lamps, with their bodies (the owner: they were only shades)
+		foreach (var (look, from, name) in new[] { (new Vector3(0.4f, 0.95f, 8.2f), new Vector3(1.6f, 0.05f, 6.4f), "library_table_lamp"), (new Vector3(-1.6f, 0.9f, 1.0f), new Vector3(0.4f, 0.05f, 2.8f), "library_floor_lamp"), (new Vector3(-Library.HalfW + 0.5f, 2.5f, 3.5f), new Vector3(-2f, 0.05f, 4.5f), "library_sconce") })
+		{
+			await Inside(lib.ToGlobal(from), lib.ToGlobal(look), ct);
+			await Aim(lib.ToGlobal(look), ct);
+			await Frames(3, ct);
+			Screenshot(name);
+		}
 		// the book that sticks out, before there's a bookmark
 		await WalkTo(lib.BookcaseFrontWorld, 0.6f, ct, giveUp: 10f);
 		await Aim(lib.BookUse.GlobalPosition, ct);
