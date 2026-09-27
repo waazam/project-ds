@@ -22,6 +22,8 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class RoundRoom : Node3D
 {
+	/// <summary>The floor disc's radius: just inside the wall (the wall's foot covers the join).</summary>
+	public const float FloorR = 7.45f;
 	public const float Radius = 7.5f, Height = 32f, DaisTop = 0.35f, DaisR = 2.0f, DaisFoot = 2.9f, ShaftR = 3.1f;
 	/// <summary>How far the dais rises: from the floor to the room above.</summary>
 	public const float Rise = 42f;
@@ -127,7 +129,7 @@ public partial class RoundRoom : Node3D
 		var f = new MeshKit();
 		f.Mat(_stone);
 		f.Color = new Color(0.75f, 0.72f, 0.66f);
-		f.Cylinder(new Vector3(0, -0.2f, 0), new Vector3(0, 0, 0), Radius + 0.1f, Radius + 0.1f, 48, true);
+		f.Cylinder(new Vector3(0, -0.2f, 0), new Vector3(0, 0, 0), FloorR, FloorR, 48, true);
 		f.CommitTo(this, "Floor", true);
 		_body.AddChild(new CollisionShape3D { Position = new Vector3(0, -0.1f, 0), Shape = new CylinderShape3D { Radius = Radius + 0.2f, Height = 0.2f } });
 		var joints = new MeshKit();
@@ -139,11 +141,11 @@ public partial class RoundRoom : Node3D
 				joints.Beam(new Vector3(Mathf.Sin(a0) * r, 0.003f, Mathf.Cos(a0) * r), new Vector3(Mathf.Sin(a1) * r, 0.003f, Mathf.Cos(a1) * r), 0.03f, 0.004f);
 			}
 		joints.CommitTo(this, "Joints", false);
-		// the passage's end into the room
+		// the passage's end into the room: its sides through the wall's thickness (the passage stops at the wall)
 		var p = new MeshKit();
 		p.Mat(_stone);
-		Seg(p, new Vector3(-0.85f, 1.25f, -Radius - 0.1f), new Vector3(0.3f, 2.5f, 1.0f), 0, true);
-		Seg(p, new Vector3(0.85f, 1.25f, -Radius - 0.1f), new Vector3(0.3f, 2.5f, 1.0f), 0, true);
+		Seg(p, new Vector3(-0.85f, 1.25f, -Radius - 0.3f), new Vector3(0.3f, 2.5f, 0.6f), 0, true);
+		Seg(p, new Vector3(0.85f, 1.25f, -Radius - 0.3f), new Vector3(0.3f, 2.5f, 0.6f), 0, true);
 		p.CommitTo(this, "Entry", true);
 		// the ceiling: a stone ring with the shaft through it, and the shaft up to the room above
 		var c = new MeshKit();

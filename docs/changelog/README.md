@@ -14,6 +14,7 @@ than one entry lands the same day) and list it below.
 ## Entries (newest first)
 
 - [2026-09-26f — The visual pass: texel density, filtering, supersampling, shadows, contact shadows](2026-09-26f-visual-pass.md)
+- [2026-09-26g — The library: the door and passage flicker fixed, a blacklight handprint on the secret book](2026-09-26g-library-flicker-handprint.md)
 - [2026-09-26e — The lantern's blacklight, the code in invisible ink, the flame dying in the stairwell, and the blacklight's secrets](2026-09-26e-lantern-blacklight.md)
 - [2026-09-26d — The audio sweep: spatial audio, rooms, occlusion, Foley, the oars, and the haunting](2026-09-26d-audio-sweep.md)
 - [2026-09-26c — Art pass: textures, wind, fog, the monsters remodelled; a bigger lake; new beats in Acts 11 and 15](2026-09-26c-art-pass-and-new-beats.md)

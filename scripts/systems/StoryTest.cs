@@ -2386,6 +2386,11 @@ public partial class StoryTest : Node
 		await Seconds(0.5, ct);
 		await Aim(lib.ToGlobal(new Vector3(0, 1.5f, Library.Depth)), ct);
 		Screenshot("library");
+		// the door from the pit, twice a few frames apart (its walls used to fight and flicker)
+		await Aim(lib.ToGlobal(new Vector3(0.6f, 1.4f, 0)), ct);
+		Screenshot("library_door_a");
+		await Frames(7, ct);
+		Screenshot("library_door_b");
 		await Aim(lib.ToGlobal(new Vector3(Library.HalfW, 1.0f, 6.5f)), ct);
 		Screenshot("library_fireplace");
 		// the lamps, with their bodies (the owner: they were only shades)
@@ -2401,6 +2406,12 @@ public partial class StoryTest : Node
 		await Aim(lib.BookUse.GlobalPosition, ct);
 		Check("one book on the back wall sticks out (nothing to do with it yet)", _player.Interaction?.PromptText == "One of the books sticks out." && !lib.BookcaseOpen, $"'{_player.Interaction?.PromptText}'");
 		Screenshot("the_jutting_book");
+		// the handprint on it, under the blacklight
+		var uvLantern = _player.GetNodeOrNull<Lantern>("Lantern");
+		uvLantern?.SetBlacklight(true);
+		await Frames(4, ct);
+		Screenshot("the_jutting_book_blacklight");
+		uvLantern?.SetBlacklight(false);
 		// the sheet
 		Check("a sheet covers something square on a side table", !lib.SheetOff && !lib.BoxUse.Enabled);
 		await WalkTo(lib.TableWorld, 0.6f, ct, giveUp: 10f);
@@ -2474,6 +2485,12 @@ public partial class StoryTest : Node
 		// through the passage, into the round room
 		await WalkTo(lib.PassageWorld, 0.5f, ct, giveUp: 10f);
 		Screenshot("the_passage");
+		await Aim(lib.Round.EntryWorld + Vector3.Up * 1.4f, ct);
+		Screenshot("passage_ahead_a");
+		await Frames(7, ct);
+		Screenshot("passage_ahead_b");
+		await Aim(lib.BookcaseFrontWorld + Vector3.Up * 1.4f, ct);
+		Screenshot("passage_back");
 		await WalkTo(lib.Round.EntryWorld, 0.6f, ct, stopWhen: () => s.Current == Checkpoint.Act19Finished, giveUp: 10f);
 		await WaitUntil(() => s.Current == Checkpoint.Act19Finished, 5, ct);
 		Check("through the bookcase into the round room: Act 19 done (Act 20's save)", s.Current == Checkpoint.Act19Finished, $"{s.Current} at {_player.GlobalPosition}");

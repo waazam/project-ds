@@ -98,16 +98,18 @@ public partial class Library : Node3D
 		Slab(plaster, new Vector3(-(HalfW + 0.62f) * 0.5f, Height * 0.5f, Depth + 0.15f), new Vector3(HalfW - 0.62f, Height, 0.3f));
 		Slab(plaster, new Vector3((HalfW + 0.62f) * 0.5f, Height * 0.5f, Depth + 0.15f), new Vector3(HalfW - 0.62f, Height, 0.3f));
 		Slab(plaster, new Vector3(0, (2.4f + Height) * 0.5f, Depth + 0.15f), new Vector3(1.24f, Height - 2.4f, 0.3f));
-		// the front wall, round the door from the pit
-		Slab(plaster, new Vector3(-(HalfW + 0.65f) * 0.5f, Height * 0.5f, -0.15f), new Vector3(HalfW - 0.65f, Height, 0.3f));
-		Slab(plaster, new Vector3((HalfW + 0.65f) * 0.5f, Height * 0.5f, -0.15f), new Vector3(HalfW - 0.65f, Height, 0.3f));
-		Slab(plaster, new Vector3(0, (2.4f + Height) * 0.5f, -0.15f), new Vector3(1.3f, Height - 2.4f, 0.3f));
+		// the front wall, round the door from the pit: the pit's own north wall is behind it (and carries the
+		// collision), so only a thin plaster skin just inside it; never in the same plane (they fought)
+		// (only round the door: the rest of that wall is bookcases)
+		Slab(plaster, new Vector3(-0.86f, Height * 0.5f, 0.05f), new Vector3(0.28f, Height, 0.08f), false);
+		Slab(plaster, new Vector3(0.86f, Height * 0.5f, 0.05f), new Vector3(0.28f, Height, 0.08f), false);
+		Slab(plaster, new Vector3(0, (2.48f + Height) * 0.5f, 0.05f), new Vector3(1.44f, Height - 2.48f, 0.08f), false);
 		Slab(plaster, new Vector3(0, Height + 0.1f, Depth * 0.5f), new Vector3(HalfW * 2f, 0.2f, Depth), false, 0.95f);
 		plaster.CommitTo(this, "Plaster", true);
 		// a parquet floor, beams across the ceiling
 		var floor = new MeshKit();
 		floor.Mat(new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.55f, 0.36f, 0.22f), Roughness = 0.4f, MetallicSpecular = 0.5f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.8f });
-		Slab(floor, new Vector3(0, -0.05f, (Depth - 0.8f) * 0.5f), new Vector3(HalfW * 2f, 0.1f, Depth + 0.8f));
+		Slab(floor, new Vector3(0, -0.05f, Depth * 0.5f), new Vector3(HalfW * 2f, 0.1f, Depth));
 		floor.CommitTo(this, "Floor", true);
 		var beams = new MeshKit();
 		beams.Mat(_wood);
@@ -229,21 +231,21 @@ public partial class Library : Node3D
 		frame.CommitTo(_bookcase, "Frame", true);
 		// leave a slot for the one that sticks out
 		for (int i = books.Count - 1; i >= 0; i--)
-			if (Mathf.Abs(books[i].Origin.X + 0.55f) < 0.07f && Mathf.Abs(books[i].Origin.Y - (Rows[3] + 0.15f)) < 0.2f) { books.RemoveAt(i); colors.RemoveAt(i); }
+			if (Mathf.Abs(books[i].Origin.X + 0.55f) < 0.08f && Mathf.Abs(books[i].Origin.Y - (Rows[3] + 0.15f)) < 0.2f) { books.RemoveAt(i); colors.RemoveAt(i); }
 		AddBooks(_bookcase, books, colors, "Books");
-		// the one sticking out
-		_jutting = new Node3D { Name = "JuttingBook", Position = new Vector3(-0.55f, Rows[3] + 0.15f, -(0.03f + 0.11f) - 0.07f) };
+		// the one sticking out: an old tome, only just proud of the rest; nothing on it to see by lamplight, but under
+		// the blacklight a handprint glows on its spine, where someone has pulled it before
+		_jutting = new Node3D { Name = "JuttingBook", Position = new Vector3(-0.55f, Rows[3] + 0.16f, -(0.03f + 0.12f) - 0.04f) };
 		_bookcase.AddChild(_jutting);
 		_jutting.AddChild(new MeshInstance3D
 		{
-			Mesh = new BoxMesh { Size = new Vector3(0.05f, 0.3f, 0.22f) },
+			Mesh = new BoxMesh { Size = new Vector3(0.09f, 0.32f, 0.24f) },
 			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.4f, 0.08f, 0.07f), Roughness = 0.6f },
 		});
-		_jutting.AddChild(new Label3D
-		{
-			Text = "S", FontSize = 32, PixelSize = 0.003f, Modulate = new Color(0.85f, 0.7f, 0.3f), OutlineSize = 0, Shaded = true,
-			Position = new Vector3(0, 0.05f, -0.112f), Rotation = new Vector3(0, Mathf.Pi, 0),
-		});
+		// the palm on the spine, the fingers up over the top of it (the way you'd tip a book out)
+		UvInk.OnSurface(_jutting, new Vector3(0, 0.06f, -0.12f), Vector3.Forward, new Vector2(0.09f, 0.13f), UvInk.Hand(), UvInk.Pale, 2f);
+		// and fingertip smudges along its top, from tipping it out
+		UvInk.OnSurface(_jutting, new Vector3(0, 0.16f, -0.06f), Vector3.Up, new Vector2(0.08f, 0.1f), UvInk.Smear(7), UvInk.Pale, 1.4f, 0.3f);
 		BookUse = new PickupInteractable { Name = "Book", PickRadius = 0.2f, MaxDistance = 2.4f, PromptFor = p => p?.Inventory is { } inv && inv.HasTool(ToolKind.Bookmark) ? "Slide the bookmark in" : "One of the books sticks out.", CanUse = _ => !BookcaseOpen, Position = _jutting.Position + new Vector3(0, 0, -0.12f) };
 		BookUse.Interacted += OnBook;
 		_bookcase.AddChild(BookUse);
@@ -262,7 +264,7 @@ public partial class Library : Node3D
 		stone.Color = new Color(0.08f, 0.07f, 0.06f);
 		BuildKit.Box(stone, new Vector3(x - 0.05f, 0.6f, z), new Vector3(0.1f, 1.2f, 1.4f));        // the soot-black back
 		stone.CommitTo(this, "Fireplace", true);
-		var fire = new FireVfx { Name = "Fire", Extent = new Vector3(0.5f, 0.45f, 0.8f), Seed = 19, LightRange = 9f, Smoke = false, SmokeAmount = 0.3f };
+		var fire = new FireVfx { Name = "Fire", Extent = new Vector3(0.5f, 0.45f, 0.8f), Seed = 19, LightRange = 9f, Smoke = false, SmokeAmount = 0.3f, LightShadows = false };
 		AddChild(fire);
 		fire.Position = new Vector3(x - 0.35f, 0.08f, z);
 		fire.Intensity = 0.45f;
@@ -392,7 +394,7 @@ public partial class Library : Node3D
 			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = shadeR * 0.6f, BottomRadius = shadeR, Height = shadeH, RadialSegments = 16 }, Position = at + Vector3.Up * (shadeH * 0.5f - 0.06f), MaterialOverride = shadeMat });
 		// the bulb, glowing warm under the shade
 		AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.03f, Height = 0.06f }, Position = at + Vector3.Down * 0.02f, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.9f, 0.7f), EmissionEnabled = true, Emission = new Color(1f, 0.82f, 0.55f), EmissionEnergyMultiplier = 3f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded }, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-		AddChild(new OmniLight3D { Position = at + Vector3.Down * 0.12f, LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = energy > 1f });
+		AddChild(new OmniLight3D { Position = at + Vector3.Down * 0.12f, LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = kind == LampKind.Desk });
 	}
 
 	/// <summary>The side table by the west shelves: the puzzle box and its pieces on it, a sheet over everything.</summary>
@@ -463,11 +465,13 @@ public partial class Library : Node3D
 	{
 		var stone = new MeshKit();
 		stone.Mat(new StandardMaterial3D { AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.6f, 0.58f, 0.54f), Roughness = 0.9f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.8f });
-		float z0 = Depth + 0.3f, z1 = Depth + PassageLen + 0.4f, zc = (z0 + z1) * 0.5f;
-		Slab(stone, new Vector3(-0.85f, 1.25f, zc), new Vector3(0.3f, 2.5f, z1 - z0));
-		Slab(stone, new Vector3(0.85f, 1.25f, zc), new Vector3(0.3f, 2.5f, z1 - z0));
-		Slab(stone, new Vector3(0, 2.6f, zc), new Vector3(2f, 0.2f, z1 - z0), false);
-		Slab(stone, new Vector3(0, -0.05f, zc), new Vector3(1.8f, 0.1f, z1 - z0 + 0.4f));
+		// the round room's wall starts at its radius; its floor disc reaches just short of it
+		float z0 = Depth + 0.3f, zWall = RoundRoomAt.Z - RoundRoom.Radius - 0.6f, zc = (z0 + zWall) * 0.5f;   // up to the round wall's outer face
+		Slab(stone, new Vector3(-0.85f, 1.25f, zc), new Vector3(0.3f, 2.5f, zWall - z0));
+		Slab(stone, new Vector3(0.85f, 1.25f, zc), new Vector3(0.3f, 2.5f, zWall - z0));
+		Slab(stone, new Vector3(0, 2.6f, zc), new Vector3(2f, 0.2f, zWall - z0), false);
+		float f0 = Depth, f1 = RoundRoomAt.Z - RoundRoom.FloorR;
+		Slab(stone, new Vector3(0, -0.05f, (f0 + f1) * 0.5f), new Vector3(1.8f, 0.1f, f1 - f0));
 		stone.CommitTo(this, "Passage", true);
 		foreach (float dz in new[] { 0.9f, 2.4f })
 		{
