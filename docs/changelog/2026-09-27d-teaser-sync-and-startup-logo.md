@@ -28,9 +28,11 @@ The owner's requests:
 
 ## The ending, polished (the owner: "so close to being a perfect transition")
 - **The ending's sound (the owner's direction, after trying a hard cut, a crossfade and a later return):**
-  - the music fades out from 0:51 and is fully muted by 0:52;
-  - the title lands in the forest's own sound: the game's ambience comes up from under the music and
-    plays on its own;
+  - the music fades out gently, over 0:50.5–0:53 (it was 0:51–0:52, which the owner found too
+    abrupt);
+  - the title lands in the forest's own sound. The game's ambience comes up in step with the
+    music's fade: eased, in decibels, and quiet (about -38 dB; at first it came in loud and
+    intrusive);
   - at 0:57 the song's ending drops back in on its hit (4:25.41) and rings out.
 - **The title lands over the game.** On the 3:56 hit, DEAD SILENT appears over the last shot of the
   stairs. The camera drifts on and settles; the shot fades to black behind the title over 3 s. Then

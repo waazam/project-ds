@@ -56,8 +56,8 @@ It writes `DeadSilent-Teaser.mp4`, in this order:
    - 1:40.24–1:57.18 under part A: 24 beats, eight shots of three beats each;
    - a jump to the big downbeat at 3:28.94, on the cut to the stairs;
    - the title on the hit at 3:56.12.
-3. **The ending:** the music fades out from 0:51 of the finished teaser and is muted by 0:52. The
-   title lands in the forest's own sound, the game's ambience brought up to play on its own. At 0:57
+3. **The ending:** the music fades out gently over 0:50.5–0:53 of the finished teaser. The title
+   lands in the forest's own sound, the game's ambience eased up (quietly) in step with the fade. At 0:57
    the song's ending drops back in on its hit (4:25.41) and rings out. The title comes in over the
    last shot, which fades to black behind it; the picture holds black after the title fades.
 
@@ -84,5 +84,5 @@ The owner's notes shaped it:
 | 12.7–14.9 | Its decayed depths, and the drop |
 | 14.9–17.0 | The church's nave: a high, slow, surreal swoop toward the altar |
 | 16.9–44.1 | The song jumps to the 3:28.94 downbeat: a slow walk up the end of the Act 1 trail, and the first staircase peeking out of the fog |
-| 42.5–43.5 | The music fades out, leaving the forest |
+| 42.0–44.5 | The music fades out as the forest comes up |
 | 44.1–57.0 | DEAD SILENT over the stairs, in the forest's sound; the shot fades to black behind it; at 48.5 (0:57 in all) the song's ending drops back in and rings out |

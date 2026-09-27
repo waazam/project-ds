@@ -6,7 +6,7 @@ Inputs in build/trailer: partA.avi, partB.avi (1080p60), song.wav ("Petty Theft"
 owner's company logo). The Godot logo (tools/Trailer/godot_logo.png) is the engine's own, rendered from the
 SVG built into the editor. Output: build/trailer/DeadSilent-Teaser.mp4.
 """
-import subprocess, sys, os
+import subprocess, sys, os, math
 import imageio_ffmpeg
 
 FF = imageio_ffmpeg.get_ffmpeg_exe()
@@ -26,10 +26,11 @@ TITLE_HOLD = 11.0                   # TrailerDirector.TitleHold
 # the ending (the owner): the music fades out from 0:51 and is muted by 0:52, so the title lands in the forest's
 # own sound, which plays out on its own until the song's ending drops back in at 0:57 (its hit at 4:25.41) and
 # rings out. Times here are in the finished teaser, logos included.
-MUSIC_OUT = (51.0, 52.0)
+MUSIC_OUT = (50.5, 53.0)          # a long, gentle fade (the owner: "a little more subtle")
 RETURN_AT = 57.0
 RETURN_HIT = 265.41
-AMBIENCE = 7.0                      # the game's sound, brought up (+34 dB on its level under the music) in the quiet
+AMBIENCE = 3.0                      # the game's sound in the quiet: brought up in step with the music's fade, never loud
+GAME_UNDER = 0.13                   # the game's sound under the music
 SONG_END = 273.9
 FLICKER, GODOT = 5.0, 3.5           # the logos before it
 
@@ -46,6 +47,14 @@ music = return_t + (SONG_END - RETURN_SONG)
 pad = max(0.0, music - video)
 total = intro + video + pad
 
+# the game's sound follows the music's fade the other way, in decibels and eased, so the forest comes up as the
+# music goes and settles back under it when the ending drops in
+def _ease(x): return f"(({x})*({x})*(3-2*({x})))"
+_up = f"clip((t-{out0:.3f})/{out1 - out0:.3f},0,1)"
+_down = f"clip((t-{return_t:.3f})/1.5,0,1)"
+_db0, _db1 = 20 * math.log10(GAME_UNDER), 20 * math.log10(AMBIENCE)
+game_gain = f"pow(10,({_db0:.2f}+{_db1 - _db0:.2f}*{_ease(_up)}*(1-{_ease(_down)}))/20)"
+
 fc = (
     # the logos: the owner's company, then the engine
     f"[0:v]scale=1920:1080:flags=lanczos,fps=60,format=yuv420p,setsar=1,trim=0:{FLICKER},setpts=PTS-STARTPTS[lf];"
@@ -60,11 +69,11 @@ fc = (
     f"[lf][lg][vt]concat=n=3:v=1:a=0[v];"
     # the game's own sound: low under the music, up in the quiet between (the forest)
     f"[2:a]atrim=0:{A_LEN},asetpts=PTS-STARTPTS[ga];[3:a]atrim=0:{B_LEN},asetpts=PTS-STARTPTS[gb];"
-    f"[ga][gb]concat=n=2:v=0:a=1,volume='if(lt(t,{out0}),0.13,if(lt(t,{out1}),0.13+({AMBIENCE}-0.13)*(t-{out0})/({out1}-{out0}),if(lt(t,{return_t}),{AMBIENCE},if(lt(t,{return_t}+1.5),{AMBIENCE}-({AMBIENCE}-0.13)*(t-{return_t})/1.5,0.13))))':eval=frame,afade=t=out:st={video - 1.5}:d=1.5,alimiter=limit=0.9[game];"
+    f"[ga][gb]concat=n=2:v=0:a=1,volume='{game_gain}':eval=frame,afade=t=out:st={video - 1.5}:d=1.5,alimiter=limit=0.9[game];"
     # the song: 1:40, then 3:28.94 until it fades before the title, then its own ending from the drop
     f"[4:a]asplit=3[s1][s2][s3];"
     f"[s1]atrim={S1}:{S1 + A_LEN},asetpts=PTS-STARTPTS,afade=t=out:st={A_LEN - 0.04}:d=0.04[m1];"
-    f"[s2]atrim={S2}:{S2 + M2_LEN},asetpts=PTS-STARTPTS,afade=t=out:st={out0 - A_LEN}:d={out1 - out0}:curve=qsin[m2];"
+    f"[s2]atrim={S2}:{S2 + M2_LEN},asetpts=PTS-STARTPTS,afade=t=out:st={out0 - A_LEN}:d={out1 - out0}:curve=esin[m2];"
     f"aevalsrc=0|0:s=44100:d={GAP:.4f}[gap];"
     f"[s3]atrim={RETURN_SONG}:{SONG_END},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,"
     f"afade=t=out:st={SONG_END - RETURN_SONG - 1.5}:d=1.5[m3];"
