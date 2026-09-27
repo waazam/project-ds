@@ -338,7 +338,7 @@ public partial class StoryTest : Node
 		_input.ScriptedFocus = true;
 		await Seconds(0.6, ct);
 		await Aim(bird.GlobalPosition + Vector3.Up * 0.05f, ct);
-		await Seconds(0.3, ct);
+		await Seconds(1.0, ct);
 		var vf = FirstOf<CameraViewfinder>();
 		Check("the viewfinder locks focus on the bird", vf is { FocusLocked: true });
 		_input.ScriptedPhoto = true; await Frames(4, ct); _input.ScriptedPhoto = false;
@@ -346,8 +346,36 @@ public partial class StoryTest : Node
 		Screenshot("bird_photo");
 		_input.ScriptedFocus = false;
 		Check("the photo is logged", (PhotoLog.Instance?.RecordedCount ?? 0) > before, $"{before} -> {PhotoLog.Instance?.RecordedCount}");
+		var last = PhotoLog.Instance?.Photos.LastOrDefault();
+		Check("the bird's picture is scored: clarity, focus, framing, zoom, and stars", last is { Scored: true, Stars: >= 1 } && last.Focus > 50,
+			last == null ? "none" : $"{last.SubjectId}: clarity {last.Clarity} focus {last.Focus} framing {last.Framing} zoom {last.Zoom}, {last.Stars} stars");
+		Check("sixty pictures on the list", PhotoCatalog.All.Count == PhotoCatalog.Total && PhotoCatalog.Total == 60, $"{PhotoCatalog.All.Count}");
 		await Seconds(0.5, ct);
 	}
+
+	/// <summary>Raises the camera, zooms, aims at <paramref name="at"/>, lets the focus come in, and takes the picture.</summary>
+	private async Task<PhotoLog.Photo> TakePicture(Vector3 at, int zoom, CancellationToken ct, string shot = null)
+	{
+		var cam = FirstOf<CameraTool>();
+		int before = PhotoLog.Instance?.RecordedCount ?? 0;
+		_input.ScriptedFocus = true;
+		await Seconds(0.4, ct);
+		cam?.SetZoom(zoom);
+		await Aim(at, ct);
+		await Seconds(1.2, ct);
+		if (shot != null) Screenshot(shot);
+		for (int i = 0; i < 3 && (PhotoLog.Instance?.RecordedCount ?? 0) == before; i++)
+		{
+			_input.ScriptedPhoto = true; await Frames(4, ct); _input.ScriptedPhoto = false;
+			await Seconds(0.6, ct);
+		}
+		_input.ScriptedFocus = false;
+		cam?.SetZoom(0);
+		await Seconds(0.3, ct);
+		return (PhotoLog.Instance?.RecordedCount ?? 0) > before ? PhotoLog.Instance.Photos.LastOrDefault() : null;
+	}
+
+	private static string Describe(PhotoLog.Photo p) => p == null ? "no picture" : $"'{p.SubjectId}': clarity {p.Clarity} focus {p.Focus} framing {p.Framing} zoom {p.Zoom}, {p.Stars} stars, {p.Points} pts";
 
 	private async Task Act1ToStairs(CancellationToken ct)
 	{
@@ -2594,6 +2622,17 @@ public partial class StoryTest : Node
 		Screenshot("candlelit_ring_green");
 		await Aim(rr.ToGlobal(new Vector3(0, 12f, RoundRoom.Radius)), ct);
 		Screenshot("candlelit_drum");
+		// the camera: the green ring is one of the sixty; a good steady shot scores well
+		var ps = GetTree().CurrentScene.GetNodeOrNull<PhotoSubjects>("PhotoSubjects");
+		Check("the camera's subjects are hung round the Hollow", ps is { Done: true, Attached: >= 30 }, $"{ps?.Attached}");
+		await WalkTo(rr.DaisEdgeWorld + (rr.DaisEdgeWorld - rr.CentreWorld).Normalized() * 2f, 0.6f, ct, giveUp: 6f);
+		var ring = await TakePicture(rr.ToGlobal(new Vector3(0, 0.3f, 0)), 0, ct, "viewfinder_on_the_ring");
+		Check("a picture of the green ring, scored", ring is { SubjectId: "the_ring", Scored: true } && ring.Stars >= 3, Describe(ring));
+		await Seconds(0.3, ct);
+		Screenshot("the_print_with_its_score");
+		var sw = await TakePicture(rr.SwitchGripWorld(0), 2, ct, "viewfinder_zoomed_on_a_switch");
+		Check("zoomed in on a switch (x2)", sw is { SubjectId: "switches", Scored: true }, Describe(sw));
+		Check("the save indicator shows on a save", SaveIndicator.Instance != null && SaveIndicator.Instance.Shown > 0, $"{SaveIndicator.Instance?.Shown}");
 		// into the middle: twenty seconds up
 		await WalkTo(rr.CentreWorld, 0.3f, ct, stopWhen: () => rr.Rising, giveUp: 8f);
 		await WaitUntil(() => rr.Rising, 3, ct);
@@ -2615,6 +2654,15 @@ public partial class StoryTest : Node
 		Check("off the dais onto the room's floor", _player.IsOnFloor() && Flat(_player.GlobalPosition - rr.TopWorld).Length() < 1f, $"{_player.GlobalPosition}");
 		Check("the camera is still with you at the end of the demo", _inv.HasCamera);
 		Check("after Act 20 the lantern's flame works again", !ProjectDS.Player.Lantern.FlameDead);
+		// the credits: every picture, polaroid by polaroid
+		int want = Math.Min(2, PhotoLog.Instance?.RecordedCount ?? 0);
+		await WaitUntil(() => FirstOf<PolaroidMontage>() is { } m && m.Shown >= want, 45, ct);
+		var mont = FirstOf<PolaroidMontage>();
+		Check("the credits play the pictures back as polaroids", want > 0 && mont != null && mont.Shown >= want, $"{mont?.Shown} shown of {PhotoLog.Instance?.RecordedCount}");
+		await Seconds(1.5, ct);
+		Screenshot("credits_polaroids");
+		await Seconds(3.0, ct);
+		Screenshot("credits_polaroids_collage");
 		Check("the blacklight's secrets are written round the Hollow", GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets") is { Written: >= 25 },
 			$"{GetTree().CurrentScene.GetNodeOrNull<BlacklightSecrets>("BlacklightSecrets")?.Written}");
 	}

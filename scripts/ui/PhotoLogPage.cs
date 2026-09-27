@@ -51,7 +51,7 @@ public partial class PhotoLogPage : CanvasLayer
 	public override void _Ready()
 	{
 		Layer = 14;
-		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, TextureFilter = CanvasItem.TextureFilterEnum.Nearest };
+		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, TextureFilter = CanvasItem.TextureFilterEnum.Linear };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.Center);
 		_draw.OffsetLeft = -PageW * 0.5f; _draw.OffsetRight = PageW * 0.5f;
 		_draw.OffsetTop = -PageH * 0.5f; _draw.OffsetBottom = PageH * 0.5f;
@@ -164,6 +164,8 @@ public partial class PhotoLogPage : CanvasLayer
 		// Footer: the film left, and the page when there is more than one.
 		int left = _camera != null && IsInstanceValid(_camera) ? _camera.FramesLeft : 0;
 		_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{left} exp. left", HorizontalAlignment.Left, -1, 9, footer);
+		if (_log != null)
+			_draw.DrawString(UiKit.Mono, new Vector2(0f, PageH - 9f), $"{_log.SubjectsFound}/{PhotoCatalog.Total} found   {_log.TotalScore} pts", HorizontalAlignment.Center, PageW, 9, footer);
 		if (PageCount > 1)
 			_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{Page + 1} / {PageCount}", HorizontalAlignment.Right, PageW - 24f, 9, footer);
 	}
@@ -176,8 +178,13 @@ public partial class PhotoLogPage : CanvasLayer
 		_draw.DrawRect(card, PrintPaper);
 		var img = new Rect2(card.Position + new Vector2(Border, Border), new Vector2(CardW - Border * 2, CardH - Border - BottomBorder));
 		if (p.Texture != null) _draw.DrawTextureRect(p.Texture, img, false);
-		string stamp = p.Wrong ? "F--  1/--" : "F2.8  1/60";
-		_draw.DrawString(UiKit.Mono, new Vector2(card.Position.X + Border, card.End.Y - 3f), stamp, HorizontalAlignment.Right, CardW - Border * 2, 7, new Color(Graphite, 0.7f));
+		if (p.Scored && !p.Wrong)
+			UiKit.DrawStars(_draw, new Vector2(card.End.X - Border - 5.5f * 1.15f * 5f, card.End.Y - 5f), p.Stars, 5.5f, new Color(Graphite, 0.9f), new Color(Graphite, 0.2f));
+		else
+		{
+			string stamp = p.Wrong ? "F--  1/--" : "F2.8  1/60";
+			_draw.DrawString(UiKit.Mono, new Vector2(card.Position.X + Border, card.End.Y - 3f), stamp, HorizontalAlignment.Right, CardW - Border * 2, 7, new Color(Graphite, 0.7f));
+		}
 		_draw.DrawString(UiKit.Mono, new Vector2(card.Position.X + Border, card.End.Y - 3f), p.Number.ToString(), HorizontalAlignment.Left, -1, 7, new Color(Graphite, 0.55f));
 		_draw.DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
 		string caption = p.Caption;

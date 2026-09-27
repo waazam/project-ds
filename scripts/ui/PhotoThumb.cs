@@ -126,10 +126,31 @@ public partial class PhotoThumb : CanvasLayer
 		if (_photo.Texture != null) _draw.DrawTextureRect(_photo.Texture, img, false);
 		else _draw.DrawRect(img, new Color(0.42f, 0.44f, 0.46f));
 
-		// Exposure stamp on the bottom border: a lab's frame print, wrong on the stairs.
+		// Exposure stamp on the bottom border: a lab's frame print, wrong on the stairs. A print of
+		// something on the list gets its stars there instead, in pencil.
 		bool wrong = _photo.Wrong;
-		string stamp = wrong ? "F--  1/--" : "F2.8  1/60";
-		_draw.DrawString(UiKit.Mono, new Vector2(x + Border, y + CardH - 3f), stamp, HorizontalAlignment.Right, ImageW, 7, new Color(Graphite, 0.7f));
+		if (_photo.Scored && !wrong)
+			UiKit.DrawStars(_draw, new Vector2(x + Border, y + CardH - 5f), _photo.Stars, 5.5f, new Color(Graphite, 0.9f), new Color(Graphite, 0.2f));
+		else
+		{
+			string stamp = wrong ? "F--  1/--" : "F2.8  1/60";
+			_draw.DrawString(UiKit.Mono, new Vector2(x + Border, y + CardH - 3f), stamp, HorizontalAlignment.Right, ImageW, 7, new Color(Graphite, 0.7f));
+		}
+		if (_photo.Scored)
+		{
+			// the breakdown, small, to the right of the card
+			var tx = new Vector2(x + CardW + 6f, y + 10f);
+			var col = new Color(UiKit.Bone, 0.8f);
+			foreach (var (label, v) in new[] { ("clarity", _photo.Clarity), ("focus", _photo.Focus), ("framing", _photo.Framing), ("zoom", _photo.Zoom) })
+			{
+				_draw.DrawString(UiKit.Mono, tx + new Vector2(1, 1), $"{label,-8}{v,3}", HorizontalAlignment.Left, -1, 7, new Color(0, 0, 0, 0.6f));
+				_draw.DrawString(UiKit.Mono, tx, $"{label,-8}{v,3}", HorizontalAlignment.Left, -1, 7, col);
+				tx.Y += 9f;
+			}
+			string pts = _photo.Monster ? $"{_photo.Points} pts  x2" : $"{_photo.Points} pts";
+			_draw.DrawString(UiKit.Mono, tx + new Vector2(1, 3), pts, HorizontalAlignment.Left, -1, 7, new Color(0, 0, 0, 0.6f));
+			_draw.DrawString(UiKit.Mono, tx + new Vector2(0, 2), pts, HorizontalAlignment.Left, -1, 7, _photo.Monster ? new Color(UiKit.Eye, 0.9f) : col);
+		}
 
 		// The pencil caption under the print, bone over the forest with the HUD's soft shadow.
 		var font = UiKit.SerifItalic;

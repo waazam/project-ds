@@ -35,6 +35,7 @@ public partial class ShadowMan : Node3D
 
 	public override void _Ready()
 	{
+		PhotoSubject.Attach(this, "shadowman", new Vector3(0, 1.6f, 0), 1f, 45f, 12f, true, new Vector3(0, 1.0f, 0));
 		_ink = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ink_shadow.gdshader") };
 		_ink.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
 		var k = new MeshKit();

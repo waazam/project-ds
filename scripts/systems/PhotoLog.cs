@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace ProjectDS.Systems;
@@ -34,21 +35,30 @@ public partial class PhotoLog : Node
 		public string SubjectId = "";
 		public ImageTexture Texture;
 		public bool Wrong;
+		/// <summary>How good a picture it is (0-100 each; all 0 for a picture of nothing on the list).</summary>
+		public int Clarity, Focus, Framing, Zoom;
+		public bool Scored => SubjectId.Length > 0 && PhotoCatalog.Contains(SubjectId);
+		public int Total => Scored ? (Clarity + Focus + Framing + Zoom) / 4 : 0;
+		/// <summary>One to five stars (0 for nothing on the list).</summary>
+		public int Stars => Scored ? Mathf.Clamp(Mathf.RoundToInt(Total / 20f), 1, 5) : 0;
+		public bool Monster => PhotoCatalog.Get(SubjectId)?.Monster ?? false;
+		/// <summary>Points: the total, doubled for a monster.</summary>
+		public int Points => Total * (Monster ? 2 : 1);
 		public string Caption => CaptionFor(SubjectId);
 	}
 
-	/// <summary>Small captions for recognised subjects (a print's pencil note). Anything else has none.</summary>
-	private static readonly Dictionary<string, string> Captions = new()
+	/// <summary>How a scored shot came out (CameraTool works it out at the press).</summary>
+	public struct Score
 	{
-		["bird_red"] = "a red bird", ["bird_blue"] = "a blue bird", ["bird_purple"] = "a purple bird",
-		["bird_black"] = "a black bird", ["deer"] = "a deer", ["frog"] = "a frog", ["wildflowers"] = "wildflowers",
-		["mushrooms"] = "mushrooms", ["waterfall"] = "the waterfall", ["weird_stone"] = "a strange stone", ["stairs"] = "stairs?",
-	};
+		public int Clarity, Focus, Framing, Zoom;
+		public int Total => (Clarity + Focus + Framing + Zoom) / 4;
+	}
 
-	public static string CaptionFor(string id) => id != null && Captions.TryGetValue(id, out var c) ? c : "";
+	/// <summary>Small captions for recognised subjects (a print's pencil note, from <see cref="PhotoCatalog"/>). Anything else has none.</summary>
+	public static string CaptionFor(string id) => PhotoCatalog.Get(id)?.Caption ?? "";
 
-	/// <summary>Thumbnail size (a 3:2 frame).</summary>
-	public const int ThumbWidth = 96, ThumbHeight = 64;
+	/// <summary>Print size (a 3:2 frame; big enough for the credits' polaroids).</summary>
+	public const int ThumbWidth = 192, ThumbHeight = 128;
 
 	/// <summary>H2: the black bird's print comes out near black with red eyes; the stairs' print comes out dark and misexposed.</summary>
 	[Export] public bool WrongPhotos = true;
@@ -72,6 +82,14 @@ public partial class PhotoLog : Node
 	private bool _inShot;
 	private string _shotSubject;
 	private Vector3? _shotEyes;
+	private Score _shotScore;
+	private readonly Dictionary<string, int> _best = new();
+
+	/// <summary>The best points for each subject on the list photographed so far.</summary>
+	public IReadOnlyDictionary<string, int> Best => _best;
+	/// <summary>How many of the sixty have been photographed (ever: the flags), and the album's score (the best of each).</summary>
+	public int SubjectsFound => PhotoCatalog.All.Count(e => _has.Contains(e.Id));
+	public int TotalScore => _best.Values.Sum();
 
 	/// <summary>Whether this subject has ever been photographed (its story flag).</summary>
 	public bool Has(string id) => _has.Contains(id);
@@ -110,11 +128,11 @@ public partial class PhotoLog : Node
 	/// sets its story flag (saved at once). <paramref name="worldPoint"/> is where the subject's eyes
 	/// were, for the black bird's wrong print.
 	/// </summary>
-	public void Record(string id, Vector3? worldPoint = null)
+	public void Record(string id, Vector3? worldPoint = null, Score score = default)
 	{
 		if (string.IsNullOrEmpty(id)) return;
 		if (_has.Add(id)) StoryManager.Instance?.SetFlag(StoryManager.Flag.Photo(id));
-		if (_inShot) { _shotSubject = id; _shotEyes = worldPoint; }
+		if (_inShot) { _shotSubject = id; _shotEyes = worldPoint; _shotScore = score; }
 	}
 
 	/// <summary>CameraTool, after the shot: the picture goes into the album (and to disk), whatever it shows.</summary>
@@ -126,10 +144,12 @@ public partial class PhotoLog : Node
 			string id = _shotSubject ?? "";
 			if (WrongPhotos && id == "bird_black") DarkenWithEyes(img, _shotEyes);
 			else if (WrongPhotos && id == "stairs") Multiply(img, 0.3f);
-			var photo = new Photo { Number = _photos.Count + 1, SubjectId = id, Texture = ImageTexture.CreateFromImage(img), Wrong = IsWrong(id) };
+			var photo = new Photo { Number = _photos.Count + 1, SubjectId = id, Texture = ImageTexture.CreateFromImage(img), Wrong = IsWrong(id),
+				Clarity = _shotScore.Clarity, Focus = _shotScore.Focus, Framing = _shotScore.Framing, Zoom = _shotScore.Zoom };
 			_photos.Add(photo);
+			NoteBest(photo);
 			SavePhoto(photo, img);
-			GD.Print($"[photo] #{photo.Number} taken{(id.Length > 0 ? " (" + id + ")" : "")}");
+			GD.Print($"[photo] #{photo.Number} taken{(id.Length > 0 ? " (" + id + ")" : "")}{(photo.Scored ? $" clarity {photo.Clarity} focus {photo.Focus} framing {photo.Framing} zoom {photo.Zoom}: {photo.Stars} stars, {photo.Points} pts" : "")}");
 			Taken?.Invoke(photo);
 		}
 		_frame = null;
@@ -137,6 +157,13 @@ public partial class PhotoLog : Node
 		_inShot = false;
 		_shotSubject = null;
 		_shotEyes = null;
+		_shotScore = default;
+	}
+
+	private void NoteBest(Photo p)
+	{
+		if (!p.Scored) return;
+		if (!_best.TryGetValue(p.SubjectId, out int b) || p.Points > b) _best[p.SubjectId] = p.Points;
 	}
 
 	// ------------------------------------------------------------------ disk
@@ -152,7 +179,7 @@ public partial class PhotoLog : Node
 		using var f = FileAccess.Open(Folder + IndexFile, exists ? FileAccess.ModeFlags.ReadWrite : FileAccess.ModeFlags.Write);
 		if (f == null) return;
 		f.SeekEnd();
-		f.StoreLine($"{p.Number}|{p.SubjectId}|{(p.Wrong ? 1 : 0)}");
+		f.StoreLine($"{p.Number}|{p.SubjectId}|{(p.Wrong ? 1 : 0)}|{p.Clarity}|{p.Focus}|{p.Framing}|{p.Zoom}");
 	}
 
 	private void LoadFolder()
@@ -166,7 +193,14 @@ public partial class PhotoLog : Node
 			if (parts.Length < 3 || !int.TryParse(parts[0], out int n)) continue;
 			var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(Folder + FileName(n)));
 			if (img == null || img.IsEmpty()) continue;
-			_photos.Add(new Photo { Number = _photos.Count + 1, SubjectId = parts[1], Texture = ImageTexture.CreateFromImage(img), Wrong = parts[2] == "1" });
+			var ph = new Photo { Number = _photos.Count + 1, SubjectId = parts[1], Texture = ImageTexture.CreateFromImage(img), Wrong = parts[2] == "1" };
+			if (parts.Length >= 7)
+			{
+				int.TryParse(parts[3], out ph.Clarity); int.TryParse(parts[4], out ph.Focus);
+				int.TryParse(parts[5], out ph.Framing); int.TryParse(parts[6], out ph.Zoom);
+			}
+			_photos.Add(ph);
+			NoteBest(ph);
 		}
 		GD.Print($"[photo] album restored: {_photos.Count} picture(s)");
 	}
@@ -205,7 +239,13 @@ public partial class PhotoLog : Node
 			ey = Mathf.Clamp(Mathf.RoundToInt(s.Y / _frameRect.Size.Y * h), 0, h - 1);
 		}
 		var red = new Color(0.82f, 0.07f, 0.05f);
-		img.SetPixel(ex, ey, red);
-		img.SetPixel(ex + 2, ey, red);
+		// two red eyes, a pixel or two each at the print's size
+		int k = Mathf.Max(1, w / 96);
+		for (int dx = 0; dx < k; dx++)
+			for (int dy = 0; dy < k; dy++)
+			{
+				img.SetPixel(Mathf.Min(w - 1, ex + dx), Mathf.Min(h - 1, ey + dy), red);
+				img.SetPixel(Mathf.Min(w - 1, ex + 2 * k + dx), Mathf.Min(h - 1, ey + dy), red);
+			}
 	}
 }

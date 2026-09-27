@@ -459,8 +459,26 @@ public partial class LakeCreature : Node3D
 
 	// ------------------------------------------------------------------ animation
 
+	private World.PhotoSubject _shotColossus, _shotLimb;
+
+	/// <summary>The camera's subjects ride the limbs: the colossus, and any limb that is up.</summary>
+	private void TrackPhotoSubjects()
+	{
+		_shotColossus ??= World.PhotoSubject.Attach(this, "leviathan", Vector3.Zero, 3f, 160f, 18f, false);
+		_shotLimb ??= World.PhotoSubject.Attach(this, "lake_creature", Vector3.Zero, 2f, 90f, 16f, false);
+		Limb col = null, up = null;
+		foreach (var l in _limbs)
+		{
+			if (l.State != State.Up) continue;
+			if (l.Colossus) col = l; else up ??= l;
+		}
+		if (_shotColossus != null) { _shotColossus.Visible = col != null; if (col != null) _shotColossus.GlobalPosition = col.Joints[Segments / 2].GlobalPosition; }
+		if (_shotLimb != null) { _shotLimb.Visible = up != null; if (up != null) _shotLimb.GlobalPosition = up.Joints[Segments * 2 / 3].GlobalPosition; }
+	}
+
 	public override void _Process(double delta)
 	{
+		TrackPhotoSubjects();
 		if (!Breaching) return;
 		float dt = (float)delta;
 		_time += dt;

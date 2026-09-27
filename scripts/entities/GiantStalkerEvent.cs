@@ -349,6 +349,8 @@ public partial class GiantStalkerEvent : Node
 		// for an orphan node, and silently no-ops (with a console warning) instead.
 		Cutscene.SceneRoot(this).AddChild(body);
 		Body = body;
+		// the camera can take it: a speck on the skyline unless you zoom right in
+		World.PhotoSubject.Attach(body, "giant", new Vector3(0, 1.2f * BodyScale, 0), 10f, 700f, 18f, false, new Vector3(0, 1.8f * BodyScale, 0));
 		try
 		{
 			body.GlobalPosition = start;

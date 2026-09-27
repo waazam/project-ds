@@ -44,7 +44,41 @@ public partial class PhotoSubject : Node3D
 
 	public bool Captured => PhotoLog.Instance?.Has(Id) ?? false;
 
+	/// <summary>How big the subject is (metres, for the zoom and framing scores); 0 takes it from <see cref="PhotoCatalog"/>.</summary>
+	[Export] public float Radius;
+	public float SubjectRadius => Radius > 0f ? Radius : PhotoCatalog.Get(Id)?.Radius ?? 0.5f;
+	public bool Monster => PhotoCatalog.Get(Id)?.Monster ?? false;
+	/// <summary>The look point the last <see cref="TryScore"/> judged best (world): where the subject is in the shot.</summary>
+	public Vector3 BestPoint { get; private set; }
+	/// <summary>The middle of the subject (world): the average of its look points.</summary>
+	public Vector3 Centre
+	{
+		get
+		{
+			if (LookPoints == null || LookPoints.Length == 0) return GlobalPosition;
+			Vector3 sum = Vector3.Zero;
+			foreach (var l in LookPoints) sum += l;
+			Vector3 mid = GlobalTransform * (sum / LookPoints.Length);
+			// points spread far apart are separate things (six switches, eight windows): the one in shot
+			foreach (var l in LookPoints)
+				if ((GlobalTransform * l).DistanceTo(mid) > SubjectRadius * 2.5f) return BestPoint;
+			return mid;
+		}
+	}
+
 	public override void _Ready() => AddToGroup("photo_subjects");
+
+	/// <summary>Hangs a subject on <paramref name="host"/> (its colliders count as the subject for the line of sight).</summary>
+	public static PhotoSubject Attach(Node3D host, string id, Vector3 local, float minDistance = 1f, float maxDistance = 30f, float cone = 14f, bool lineOfSight = true, params Vector3[] more)
+	{
+		if (host == null || !GodotObject.IsInstanceValid(host)) return null;
+		var pts = new Vector3[1 + more.Length];
+		pts[0] = local;
+		for (int i = 0; i < more.Length; i++) pts[i + 1] = more[i];
+		var s = new PhotoSubject { Name = "PhotoSubject_" + id, Id = id, LookPoints = pts, MinDistance = minDistance, MaxDistance = maxDistance, ConeDegrees = cone, RequireLineOfSight = lineOfSight, OwnerPath = ".." };
+		host.AddChild(s);
+		return s;
+	}
 
 	/// <summary>Whether this shot gets the subject. Lower score = more central (point subjects: the smallest angle to a look point).</summary>
 	public bool TryScore(Camera3D cam, PlayerController player, out float score)
@@ -66,6 +100,7 @@ public partial class PhotoSubject : Node3D
 			if (dYaw > Mathf.DegToRad(YawToleranceDegrees)) return false;
 			if (pitch < Mathf.DegToRad(MinPitchDegrees)) return false;
 			score = dYaw;
+			BestPoint = origin + fwd * Mathf.Max(MinDistance, 10f);
 			return true;
 		}
 
@@ -81,7 +116,7 @@ public partial class PhotoSubject : Node3D
 			if (dot < cosLimit) continue;
 			if (RequireLineOfSight && !Clear(origin, p, player)) continue;
 			float angle = Mathf.Acos(Mathf.Clamp(dot, -1f, 1f));
-			if (angle < score) score = angle;
+			if (angle < score) { score = angle; BestPoint = p; }
 		}
 		return score < float.MaxValue;
 	}

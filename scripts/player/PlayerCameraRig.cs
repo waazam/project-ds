@@ -32,6 +32,8 @@ public partial class PlayerCameraRig : Node3D
 	[Export] public float FirstPersonFov = 70f;
 	/// <summary>Degrees added to the field of view by a story beat (the clearing loop's swim); tweened by the beat, 0 at rest.</summary>
 	public float FovSwim;
+	/// <summary>The camera's zoom while it's up to the eye (CameraTool sets it; 1 when not).</summary>
+	public float PhotoZoom = 1f;
 	/// <summary>A slow roll of the view in radians (Act 6's daze); 0 normally. Added on top of the pitch/yaw.</summary>
 	public float RollSwim;
 	/// <summary>A pitch added on top of the look (radians), for a view that rides something: Act 12's
@@ -146,7 +148,7 @@ public partial class PlayerCameraRig : Node3D
 		ApplyMode(GameSettings.Instance.Camera);
 
 		// Focus: ease the field of view in, and slow the aim to match so it stays steady.
-		float fovGoal = _baseFov * (_target.PlayerInput.Focus ? FocusFovScale : 1f) + FovSwim;
+		float fovGoal = _baseFov * (_target.PlayerInput.Focus ? FocusFovScale / Mathf.Max(1f, PhotoZoom) : 1f) + FovSwim;
 		Camera.Fov = Mathf.Lerp(Camera.Fov, fovGoal, 1f - Mathf.Exp(-FocusSharpness * dt));
 
 		Vector2 look = _target.PlayerInput.ConsumeLook() * (Camera.Fov / _baseFov);

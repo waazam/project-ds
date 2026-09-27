@@ -204,6 +204,7 @@ public partial class BunkerRooms : Node3D
 		JumpscareDone = true;
 		StoryManager.Instance?.SetFlag(ScaredFlag);
 		SpawnHanging(player);
+		PhotoSubject.Attach(_scareBody, "room_thing", new Vector3(0, 1.0f, 0), 0.5f, 14f, 18f, false, new Vector3(0, 1.8f, 0));
 		_joltUntil = _clockNow + 0.5;
 		ScareVoice(this, _scareBody.Position + Vector3.Up * 1.7f);
 		GD.Print($"[story] Act 10: it is in the room (room {RoomsEntered})");

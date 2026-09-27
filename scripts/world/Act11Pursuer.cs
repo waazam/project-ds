@@ -47,6 +47,7 @@ public partial class Act11Pursuer : Node3D
 
 	public override void _Ready()
 	{
+		PhotoSubject.Attach(this, "bunker_creature", new Vector3(0, 1.5f, 0), 1f, 45f, 12f, true, new Vector3(0, 2.1f, 0));
 		_terrain = GroundSnap.FindTerrain(this);
 		Body = new StalkerBody { Name = "Body", Seed = 2077, Size = 1.08f, Idle = true };
 		AddChild(Body);

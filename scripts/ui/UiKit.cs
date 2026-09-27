@@ -253,6 +253,23 @@ public static class UiKit
 	}
 
 	/// <summary>A hairline rule in fog grey, like the website's section borders.</summary>
+	/// <summary>A row of five little stars, <paramref name="lit"/> of them filled (a print's rating), from <paramref name="at"/> (left, middle).</summary>
+	public static void DrawStars(CanvasItem c, Vector2 at, int lit, float size, Color on, Color off)
+	{
+		for (int i = 0; i < 5; i++)
+		{
+			var centre = at + new Vector2(size * 0.5f + i * size * 1.15f, 0);
+			var pts = new Vector2[10];
+			for (int k = 0; k < 10; k++)
+			{
+				float ang = -Mathf.Pi * 0.5f + k * Mathf.Pi / 5f;
+				float r = (k % 2 == 0 ? 0.5f : 0.22f) * size;
+				pts[k] = centre + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * r;
+			}
+			c.DrawColoredPolygon(pts, i < lit ? on : off);
+		}
+	}
+
 	public static ColorRect Rule(float width) => new()
 	{
 		Color = new Color(Fog, 0.35f),

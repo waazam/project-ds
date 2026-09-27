@@ -211,6 +211,7 @@ public partial class Stalker : Node3D
 	public override void _Ready()
 	{
 		AddToGroup("stalker");
+		World.PhotoSubject.Attach(this, "stalker", new Vector3(0, 1.5f, 0), 1.5f, 70f, 12f, true, new Vector3(0, 2.2f, 0));
 		ProjectDS.Player.CameraTool.PhotoTaken += OnPhotoTaken;
 		_body = GetNode<Node3D>("Body");
 		// Every visible part dissolves together: collect each distinct shader material under Body.

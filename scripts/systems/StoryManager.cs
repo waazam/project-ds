@@ -137,6 +137,8 @@ public partial class StoryManager : Node
 	public event System.Action<Checkpoint> CheckpointReached;
 	/// <summary>Raised after a new flag is set (and saved).</summary>
 	public event System.Action<string> FlagSet;
+	/// <summary>Raised after every save (the film-roll indicator in the corner plays).</summary>
+	public event System.Action Saved;
 
 	public Checkpoint Current { get; private set; } = Checkpoint.None;
 
@@ -322,5 +324,6 @@ public partial class StoryManager : Node
 			Flags = _flags.ToArray(),
 			Inventory = inv?.Serialize() ?? PendingInventory ?? "",
 		});
+		Saved?.Invoke();
 	}
 }

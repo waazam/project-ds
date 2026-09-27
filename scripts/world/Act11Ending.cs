@@ -840,6 +840,15 @@ public partial class Act11Ending : Node3D
 			{
 				await ShowEndCard(fader, EndCardHoldSeconds);
 				ct.ThrowIfCancellationRequested();
+				// every picture taken, polaroid by polaroid (the owner), and what the roll came to
+				if (PhotoLog.Instance is { RecordedCount: > 0 } log)
+				{
+					var montage = new PolaroidMontage { Name = "PolaroidMontage" };
+					AddChild(montage);
+					await montage.Play(log.Photos, ct);
+					montage.QueueFree();
+					await fader.ShowCaption($"{log.SubjectsFound} of {PhotoCatalog.Total}", $"{log.TotalScore} points", 1.2f, CreditHoldSeconds, 1.2f, ct);
+				}
 				await fader.ShowCaption(CreditStudio, "", 1.2f, CreditHoldSeconds, 1.2f, ct);
 				await fader.ShowCaption("", CreditThanks, 1.2f, CreditHoldSeconds, 1.2f, ct);
 			}
