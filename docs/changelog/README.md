@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-27c — The teaser re-cut: 48 s, 1080p60, cut to the owner's song](2026-09-27c-teaser-recut.md)
 - [2026-09-27b — Alpha polish (optimization, lighting, pacing, 3D audio), the title Dead Silent, and the teaser](2026-09-27b-alpha-polish-and-teaser.md)
 - [2026-09-27 — Act 21: the long stair, and the church in the snow (and its gothic pass)](2026-09-27-act21-church.md)
 - [2026-09-26i — The camera: sixty subjects, scored pictures, zoom and autofocus; the credits polaroid montage; the save indicator](2026-09-26i-camera-montage-save.md)

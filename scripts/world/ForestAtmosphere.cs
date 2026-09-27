@@ -107,8 +107,8 @@ public partial class ForestAtmosphere : Node
 
 	// Scripted mood targets (Act 6 onward). Fog colour/density, sky-fog, ambient and sun energy
 	// all cross-fade from whatever the auto system last set toward these over SetMood's duration.
-	[Export] public Color FogColorDawn = new(0.55f, 0.4f, 0.32f);
-	[Export] public float FogDensityDawn = 0.0105f;   // the doubled lake: the far shore stays a dark treeline in haze, not a wall of lit fog
+	[Export] public Color FogColorDawn = new(0.46f, 0.36f, 0.31f);
+	[Export] public float FogDensityDawn = 0.003f;   // the far shore's treeline reads green-grey through the haze, not a white wall (the owner, 2026-09-27)
 	[Export] public float AmbientDawn = 1.0f;
 	[Export] public float SunEnergyDawn = 0.95f;
 	[Export] public Color SunColorDawn = new(1f, 0.72f, 0.5f);

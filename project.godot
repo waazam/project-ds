@@ -90,3 +90,7 @@ winter={
 "type": "float",
 "value": 0.0
 }
+
+[editor]
+
+movie_writer/mjpeg_quality=0.95

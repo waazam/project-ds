@@ -2,49 +2,58 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Godot;
-using ProjectDS.Entities;
 using ProjectDS.UI;
 using ProjectDS.World;
 
 namespace ProjectDS.Systems;
 
 /// <summary>
-/// The teaser (about 90 seconds; the owner: the first 30-second cut looked fast-forwarded, and it was too dark) (`-- --trailer`, recorded with Godot's movie writer: see docs/trailer.md). The
-/// owner asked for the Evil Dead trailer's camera: "the force", a low, fast, gliding point of view
-/// rushing through the dark woods at the cabin. Here those rushes are smooth (the owner gets headaches from
-/// shaky or rocking cameras) with only a slight sway, and there's no strobing anywhere: cuts, and dips to
-/// black.
+/// The Dead Silent teaser (docs/trailer.md), about 48 s, cut to the owner's own song, "Petty Theft": 17 s from
+/// its 1:40 (eight shots, a cut on every third beat), then the song jumps to 3:28 for the first staircase
+/// coming out of the fog, and the title lands as the song stops at 3:56. It is filmed in-engine at full 1080p, recorded with Godot's movie writer, and joined from two
+/// recordings: the Hollow's shots (`-- --trailer`) and the ending in Act 1's trail level
+/// (`-- --trailer-ending`).
 ///
-/// It reveals little: the woods at night and the cabin, something standing in the trees (only a shape
-/// and two eyes), the cabin, the bunker's hallway, the lake at dawn, the stairwell's drop,
-/// the long hallway, the church's candlelit nave and its red circle, and the great door, then black, a
-/// slam, and the title: DEAD SILENT.
+/// The owner's notes on the earlier cuts shaped it:
+/// <list type="bullet">
+/// <item>short (30-45 s) and smooth (60 fps), camera moves gentle but not slow;</item>
+/// <item>no monsters shown (the horror should surprise people);</item>
+/// <item>the bunker and the stairwell as the heart of it, each broken in two: the bunker's hallway, then the
+/// same hallway gone red; the stairwell from the top, then its decayed depths;</item>
+/// <item>a bird's-eye view down on the trail as the fog rolls in;</item>
+/// <item>the lake's far trees green, not white;</item>
+/// <item>the church's nave as a high, slow, surreal swoop toward the altar;</item>
+/// <item>no church door, no long-stair climb, no clipping through trees.</item>
+/// </list>
+/// Smooth, gentle cameras (the owner gets headaches from shaky ones); no strobing.
 ///
 /// The player is parked and hidden; this node flies its own camera (with a lantern's light for the dark
-/// places), sets the atmosphere for each shot itself (after everything else, every frame), plays the
-/// score, and quits when the title has faded.
+/// places), sets the atmosphere for every shot after everything else each frame, and quits at the end. The
+/// music is laid under the joined video afterwards (the recording carries only the game's own sound).
 /// </summary>
 public partial class TrailerDirector : Node
 {
-	/// <summary>The trailer is two recordings joined (docs/trailer.md): the Hollow's shots (0-84 s), and the
-	/// ending in Act 1's trail level (84 s on): the first staircase peeking out of the fog, then the title.</summary>
-	public const float MainSeconds = 84f, EndingSeconds = 17.5f, EndingTitleAt = 12.5f, EndingTitleEnd = 17f, EndingPreroll = 4f;
+	/// <summary>Where the song's cues fall in the trailer's time (song time minus 1:40).</summary>
+	/// <summary>The cut (the owner: a 30-45 second teaser): 17 s of eight shots from the song's 1:40.2 (on its beat),
+	/// then the song cuts to 3:28.24 for the stairs, and the title lands as it stops at 3:56.</summary>
+	public const float Beat = 60f / 84.7f, StairsAt = 24f * 60f / 84.7f, TitleAtSong = StairsAt + (236f - 208.24f), TitleHold = 3.5f;
+	/// <summary>The ending recording: a pre-roll (trimmed off) so Act 1's fog is settled, the stairs, the title.</summary>
+	public const float EndingPreroll = 4f, EndingStairs = TitleAtSong - StairsAt;
 	private bool _ending, _prerolled;
-	private float Seconds => _ending ? EndingSeconds : MainSeconds;
-	private float TitleAt => _ending ? EndingTitleAt : 999f;
-	private float TitleEnd => _ending ? EndingTitleEnd : 999f;
+	private float Seconds => _ending ? EndingPreroll + EndingStairs + TitleHold : StairsAt;
+	private float TitleAt => _ending ? EndingPreroll + EndingStairs : 9999f;
+	private float TitleEnd => TitleAt + TitleHold - 0.4f;
 
 	private Camera3D _cam;
 	private OmniLight3D _lanternGlow;
 	private SpotLight3D _lanternBeam;
 	private ColorRect _black;
-	private Label _title, _tag;
+	private Label _title;
 	private CanvasLayer _layer;
 	private ForestAtmosphere _atmo;
 	private float _t, _baseExposure = 1f;
 	private int _shot = -1;
 	private readonly List<Shot> _shots = new();
-	private StalkerBody _figure;
 
 	private sealed class Shot
 	{
@@ -56,9 +65,12 @@ public partial class TrailerDirector : Node
 		public ForestAtmosphere.Mood Mood = ForestAtmosphere.Mood.Night;
 		public float Underground, Interior, Winter;
 		public bool Lantern;
-		public float Roll;
-		/// <summary>How far the shot opens up the exposure (the owner: the first cut was too dark).</summary>
+		/// <summary>How far the shot opens up the exposure.</summary>
 		public float Exposure = 1f;
+		/// <summary>Seconds of fade in from black at its start (a cut otherwise).</summary>
+		public float FadeIn = 0.08f, FadeOut = 0.08f;
+		/// <summary>Every frame, after the atmosphere: a shot's own touch on the environment at u.</summary>
+		public Action<Godot.Environment, float> Tick;
 	}
 
 	public override void _Ready()
@@ -85,9 +97,15 @@ public partial class TrailerDirector : Node
 
 	private void Setup()
 	{
+		// full resolution (the owner: the first cuts were rendered at the game's 640x360 and looked low): the 3D
+		// draws at the window's size, the interface still laid out for 640x360
+		var root = GetTree().Root;
+		root.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
+		root.ContentScaleSize = new Vector2I(640, 360);
+		root.ContentScaleAspect = Window.ContentScaleAspectEnum.Keep;
 		_atmo = StoryBeat.Atmosphere(this);
 		_baseExposure = _atmo?.Env?.TonemapExposure ?? 1f;
-		// the player: parked where it is, hidden, frozen, deaf and blind
+		// the player: parked where it is, hidden, frozen
 		if (StoryBeat.Player(this) is { } player)
 		{
 			Cutscene.Lock(player, input: true);
@@ -95,10 +113,10 @@ public partial class TrailerDirector : Node
 			player.ProcessMode = ProcessModeEnum.Disabled;
 		}
 		// every HUD layer off (the PS2 post effect stays: it's the look)
-		foreach (var n in GetTree().Root.FindChildren("*", "CanvasLayer", true, false))
+		foreach (var n in root.FindChildren("*", "CanvasLayer", true, false))
 			if (n is CanvasLayer c && !c.IsInGroup("post_screen") && c.GetParent()?.IsInGroup("post_screen") != true) c.Visible = false;
 		if (SaveIndicator.Instance != null) SaveIndicator.Instance.Visible = false;
-		_cam = new Camera3D { Name = "TrailerCam", Fov = 62f, Near = 0.05f, Far = 400f };
+		_cam = new Camera3D { Name = "TrailerCam", Fov = 60f, Near = 0.05f, Far = 600f };
 		GetTree().CurrentScene.AddChild(_cam);
 		_cam.MakeCurrent();
 		var ear = new AudioListener3D();
@@ -108,7 +126,6 @@ public partial class TrailerDirector : Node
 		_lanternBeam = new SpotLight3D { LightColor = new Color(1f, 0.78f, 0.5f), LightEnergy = 2.2f, SpotRange = 22f, SpotAngle = 32f, ShadowEnabled = true };
 		_cam.AddChild(_lanternGlow);
 		_cam.AddChild(_lanternBeam);
-		// the black and the title card
 		_layer = new CanvasLayer { Layer = 120, Name = "TrailerLayer" };
 		GetTree().CurrentScene.AddChild(_layer);
 		_black = new ColorRect { Color = new Color(0, 0, 0, 1), MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -120,21 +137,6 @@ public partial class TrailerDirector : Node
 		_title.AddThemeColorOverride("font_color", UiKit.Bone);
 		_title.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_layer.AddChild(_title);
-		_tag = new Label { Text = "", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Modulate = new Color(1, 1, 1, 0) };
-		_tag.AddThemeFontOverride("font", UiKit.SerifItalic);
-		_tag.AddThemeFontSizeOverride("font_size", 13);
-		_tag.AddThemeColorOverride("font_color", new Color(UiKit.Bone, 0.8f));
-		_tag.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		_tag.OffsetTop = 58f;
-		_layer.AddChild(_tag);
-		// the score
-		string score = "res://assets/audio/music/trailer_score.wav";
-		if (ResourceLoader.Exists(score))
-		{
-			var p = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(score), Bus = "Master", VolumeDb = -1f };
-			AddChild(p);
-			p.Play(_ending ? MainSeconds - EndingPreroll : 0f);   // the ending picks the score up where the first recording stops (its pre-roll is trimmed)
-		}
 	}
 
 	// ------------------------------------------------------------------ the shots
@@ -146,146 +148,100 @@ public partial class TrailerDirector : Node
 		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
 		var st = StationInterior.Instance;
 		var church = st?.Boss?.Library?.Round?.Stair?.Church;
-		var longStair = st?.Boss?.Library?.Round?.Stair;
 		var lake = GetTree().GetFirstNodeInGroup("lake_marker") as Lake;
 		var bunker = BunkerInterior.Instance;
 		var well = st?.Room3?.Stairs;
-		var hall = well?.Hallway;
-
-		// the force: a low glide over the ground at the cabin, weaving gently, clear of the trees. Slow enough
-		// to read (the owner: the first cut looked fast-forwarded): about four metres a second.
 		Vector3 door = cabin?.DoorCenter ?? Vector3.Zero;
 		Vector3 away = ClearestWay(door, 70f);
-		Func<float, (Vector3, Vector3)> Rush(Vector3 from, Vector3 to, float h, float weave)
-			=> u =>
-			{
-				float e = u * u * (3f - 2f * u) * 0.3f + u * 0.7f;
-				Vector3 p = from.Lerp(to, e);
-				Vector3 side = (to - from).Cross(Vector3.Up).Normalized();
-				p += side * Mathf.Sin(u * 4.5f) * weave;
-				p.Y = Ground(p) + h + 0.05f * Mathf.Sin(u * 11f);
-				Vector3 ahead = from.Lerp(to, Mathf.Min(1f, e + 0.1f));
-				ahead.Y = Ground(ahead) + h * 1.15f;
-				return (p, ahead);
-			};
-		Add("woods_rush", 3f, 10f, s => { s.Mood = ForestAtmosphere.Mood.Menacing; s.Exposure = 2.1f; }, Rush(door + away * 50f, door + away * 9f, 0.6f, 0.9f));
+		// eight shots of three beats each (the song runs at 84.7 bpm: a beat is 0.708 s), every cut on a beat
+		float T(int shot) => shot * Beat * 3f;
+		float L = Beat * 3f;
 
-		// the cabin, a light in its window, and nobody home
-		Add("cabin", 13f, 6f, s => { s.Mood = ForestAtmosphere.Mood.Night; s.Exposure = 2.3f; }, u =>
+		// the cabin at dusk, a light in its window
+		Add("cabin", T(0), L, s => { s.Mood = ForestAtmosphere.Mood.Night; s.Exposure = 2.2f; s.FadeIn = 0.5f; }, u =>
 		{
-			Vector3 cam = door + away * Mathf.Lerp(15f, 12f, u) + away.Cross(Vector3.Up) * 1.5f;
+			Vector3 cam = door + away * Mathf.Lerp(15f, 12.5f, u) + away.Cross(Vector3.Up) * 1.5f;
 			cam.Y = Ground(cam) + 1.5f;
 			return (cam, door + Vector3.Up * 0.4f);
 		});
-
-		// a glimpse: the camera drifts along the treeline; for a moment, between two trunks, something tall is
-		// standing there, and the camera keeps drifting as if it didn't see
-		Vector3 treeSpot = door + away.Rotated(Vector3.Up, 0.9f) * 24f;
-		Vector3 toTree = (treeSpot - door).Normalized();
-		Vector3 across = toTree.Cross(Vector3.Up).Normalized();
-		Add("glimpse", 19f, 3f, s =>
+		// from the treetops, looking down on the trail as the fog rolls in round the trunks
+		if (terrain != null && terrain.TrailLength > 60f)
 		{
-			s.Mood = ForestAtmosphere.Mood.Night; s.Exposure = 2.3f;
-			_figure = new StalkerBody { Name = "TrailerFigure", Size = 1.15f };
-			GetTree().CurrentScene.AddChild(_figure);
-			_figure.GlobalPosition = treeSpot with { Y = Ground(treeSpot) };
-			_figure.LookAt(door with { Y = _figure.GlobalPosition.Y }, Vector3.Up);
-			_figure.Rotate(Vector3.Up, Mathf.Pi);
-			_figure.GlowEyes(new Color(0.9f, 0.85f, 0.7f), 2f);
-			var rim = new OmniLight3D { LightColor = new Color(0.55f, 0.62f, 0.8f), LightEnergy = 2.2f, OmniRange = 6f, ShadowEnabled = false };
-			GetTree().CurrentScene.AddChild(rim);
-			rim.GlobalPosition = _figure.GlobalPosition + toTree * 2.2f + Vector3.Up * 2.2f;
-		}, u =>
-		{
-			Vector3 cam = treeSpot - toTree * 12f + across * Mathf.Lerp(-3.5f, 3.5f, u);
-			cam.Y = Ground(cam) + 1.6f;
-			Vector3 look = treeSpot + across * Mathf.Lerp(-4.5f, 5.5f, u);
-			look.Y = Ground(treeSpot) + 1.8f;
-			return (cam, look);
-		});
-
-		// the lake at dawn: skimming the water out into the fog, slowly
+			float s0 = terrain.TrailLength * 0.4f;
+			Vector3 c = terrain.TrailPoint(s0, out Vector3 tan);
+			tan = (tan with { Y = 0 }).Normalized();
+			c.Y = Ground(c);
+			Add("treetops", T(1), L, s =>
+			{
+				// the thin dawn air, so the woods read from above; the fog is the height fog, pooling up round the trunks
+				s.Mood = ForestAtmosphere.Mood.Dawn; s.Exposure = 1.0f;
+				s.Tick = (env, u) =>
+				{
+					env.FogDensity = 0.0025f;
+					env.FogHeight = c.Y + 3.5f;
+					env.FogHeightDensity = Mathf.Lerp(0.02f, 0.4f, u * u * (3f - 2f * u));
+				};
+			}, u =>
+			{
+				Vector3 p = terrain.TrailPoint(s0 + Mathf.Lerp(-8f, -2f, u), out _);
+				p.Y = c.Y + 52f;
+				Vector3 look = terrain.TrailPoint(s0 + Mathf.Lerp(6f, 10f, u), out _);
+				look.Y = Ground(look);
+				return (p, look);
+			});
+		}
+		// the lake at dawn, skimming the water
 		if (lake != null)
 		{
 			Vector3 a = lake.NearDockWorld, b = lake.FarDockWorld;
 			Vector3 dir = ((b - a) with { Y = 0 }).Normalized();
-			Add("lake", 22f, 8f, s => { s.Mood = ForestAtmosphere.Mood.Dawn; s.Exposure = 1.1f; }, u =>
+			Add("lake", T(2), L, s => { s.Mood = ForestAtmosphere.Mood.Dawn; s.Exposure = 1.05f; s.Tick = (env, _) => env.FogDensity = 0.0022f; }, u =>
 			{
-				Vector3 p = a + dir * Mathf.Lerp(8f, 26f, u);
-				p.Y = a.Y + 0.9f + 0.04f * Mathf.Sin(u * 5f);
+				Vector3 p = a + dir * Mathf.Lerp(10f, 17f, u);
+				p.Y = a.Y + 0.9f;
 				return (p, p + dir * 20f + Vector3.Down * 0.6f);
 			});
 		}
-
-		// the bunker's hallway, walked slowly, lantern in hand
+		// the bunker's hallway, lantern in hand; then the same hallway gone red
 		if (bunker != null)
-			Add("bunker", 30f, 7f, s => { s.Underground = 1f; s.Lantern = true; s.Exposure = 1.3f; }, u =>
-				(bunker.ToGlobal(new Vector3(0.15f * Mathf.Sin(u * 2f), 1.55f, Mathf.Lerp(-10f, -19f, u))), bunker.ToGlobal(new Vector3(0, 1.4f, -60f))));
-
-		// straight down the stairwell, sinking, turning slowly
+		{
+			Add("bunker", T(3), L, s => { s.Underground = 1f; s.Lantern = true; s.Exposure = 1.3f; }, u =>
+				(bunker.ToGlobal(new Vector3(0, 1.55f, Mathf.Lerp(-9f, -12.5f, u))), bunker.ToGlobal(new Vector3(0, 1.4f, -60f))));
+			Add("bunker_red", T(4), L, s => { s.Underground = 1f; s.Lantern = false; s.Exposure = 1.5f; bunker.Hallway?.SetRedInstant(); }, u =>
+				(bunker.ToGlobal(new Vector3(0, 1.5f, Mathf.Lerp(-40f, -43.5f, u))), bunker.ToGlobal(new Vector3(0, 1.3f, -90f))));
+		}
+		// straight down the stairwell from the top; then deep down, where it has gone to rot
 		if (well != null)
-			Add("stairwell", 37f, 7f, s => { s.Underground = 1f; s.Lantern = true; s.Exposure = 1.5f; }, u =>
+		{
+			Add("stairwell", T(5), L, s => { s.Underground = 1f; s.Lantern = true; s.Exposure = 1.5f; }, u =>
 			{
-				Vector3 p = well.ToGlobal(new Vector3(0, Mathf.Lerp(-1f, -6f, u), 0));
-				float a = u * 0.5f;
+				Vector3 p = well.ToGlobal(new Vector3(0, Mathf.Lerp(-1f, -3f, u), 0));
+				float a = u * 0.35f;
 				return (p, p + Vector3.Down * 10f + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.6f);
 			});
-
-		// the long hallway, crept along, the far end lost in the dark
-		if (hall != null)
-			Add("hallway", 44f, 7f, s => { s.Underground = 1f; s.Lantern = true; s.Exposure = 1.3f; }, u =>
-				(hall.ToGlobal(new Vector3(0, 1.6f, Mathf.Lerp(40f, 48f, u))), hall.ToGlobal(new Vector3(0, 1.5f, 200f))));
-
-		// the crypt: under the brick vaults with a lantern, and at the far end, for a breath, two eyes
-		if (church != null)
-		{
-			Add("crypt", 51f, 7f, s =>
+			float bottom = Stairwell.BottomYFor(Stairwell.DefaultRevolutions);
+			Add("stairwell_deep", T(6), L, s => { s.Underground = 1f; s.Lantern = true; s.Exposure = 1.6f; }, u =>
 			{
-				s.Underground = 0.6f; s.Interior = 1f; s.Lantern = true; s.Exposure = 1.6f;
-				for (Node n = church; n != null; n = n.GetParent()) if (n is Node3D n3) n3.Visible = true;
-				var eyes = new StalkerBody { Name = "TrailerEyes", Size = 1.05f };
-				church.AddChild(eyes);
-				eyes.Position = new Vector3(-6f, Church.CryptFloor, Church.CryptZ1 - 1.2f);
-				eyes.LookAt(church.ToGlobal(new Vector3(-2f, Church.CryptFloor, 44f)) with { Y = eyes.GlobalPosition.Y }, Vector3.Up);
-				eyes.Rotate(Vector3.Up, Mathf.Pi);
-				eyes.GlowEyes(new Color(1f, 0.2f, 0.08f), 3f);
-				_cryptEyes = eyes;
-			}, u =>
-			{
-				// the eyes are only there for the last second of it
-				if (_cryptEyes != null) _cryptEyes.Visible = u > 0.78f;
-				return (church.ToGlobal(new Vector3(-2f, Church.CryptFloor + 1.6f, Mathf.Lerp(43f, 52f, u))), church.ToGlobal(new Vector3(-4.5f, Church.CryptFloor + 1.4f, Church.CryptZ1)));
+				// among the last flights, looking down past them into the rotten drop
+				Vector3 p = well.ToGlobal(new Vector3(0, Mathf.Lerp(bottom + Stairwell.FallDepth + 9f, bottom + Stairwell.FallDepth + 7.2f, u), 0));
+				float a = 1.2f + u * 0.25f;
+				return (p, p + Vector3.Down * 10f + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.9f);
 			});
 		}
-
-		// the force again, at night, from another side
-		Vector3 away2 = ClearestWay(door, 60f, exclude: away);
-		Add("woods_rush2", 58f, 8f, s => { s.Mood = ForestAtmosphere.Mood.Night; s.Exposure = 2.6f; }, Rush(door + away2 * 45f, door + away2 * 12f, 0.45f, 0.7f));
-
-		// the church: down the candlelit nave toward the red circle round the altar
+		// the church: a high, slow swoop down the candlelit nave toward the red circle round the altar
 		if (church != null)
-			Add("nave", 66f, 8f, s => { s.Interior = 1f; s.Winter = 1f; s.Mood = ForestAtmosphere.Mood.Night; s.Exposure = 1.5f; }, u =>
-				(church.ToGlobal(new Vector3(0.25f * Mathf.Sin(u * 1.5f), 1.7f, Mathf.Lerp(12f, 34f, u))), church.ToGlobal(new Vector3(0, 2.5f, Church.ChancelEnd))));
-
-		// the long stair: looking up it into the dark
-		if (longStair != null)
-			Add("long_stair", 74f, 4f, s => { s.Underground = 1f; s.Lantern = true; s.Exposure = 1.5f; }, u =>
+		{
+			for (Node n = church; n != null; n = n.GetParent()) if (n is Node3D n3) n3.Visible = true;
+			Add("nave", T(7), L, s => { s.Interior = 1f; s.Winter = 1f; s.Mood = ForestAtmosphere.Mood.Night; s.Exposure = 1.55f; s.FadeOut = 0.3f; }, u =>
 			{
-				float pr = Mathf.Lerp(0.05f, 0.058f, u);
-				var p = longStair.PointAt(pr) + Vector3.Up * 1.5f;
-				return (p, longStair.PointAt(pr + 0.04f) + Vector3.Up * 1.4f);
+				Vector3 p = church.ToGlobal(new Vector3(0, Mathf.Lerp(11f, 9f, u), Mathf.Lerp(14f, 22f, u)));
+				return (p, church.ToGlobal(new Vector3(0, 1.4f, Church.ChancelEnd - 0.4f)));
 			});
-
-		// and at the great door, then the slam
-		if (church != null)
-			Add("the_door", 78f, 4f, s => { s.Interior = 1f; s.Winter = 1f; s.Exposure = 1.5f; }, u =>
-			{
-				float e = u * u * (3f - 2f * u);
-				return (church.ToGlobal(new Vector3(0, 1.6f, Mathf.Lerp(16f, 1.4f, e))), church.ToGlobal(new Vector3(0, 1.8f, -1f)));
-			});
+		}
 	}
 
-	private StalkerBody _cryptEyes;
+	private void Add(string name, float start, float length, Action<Shot> setup, Func<float, (Vector3, Vector3)> path)
+		=> _shots.Add(new Shot { Name = name, Start = start, Length = length, Setup = setup, Path = path });
 
 	private FirstClimbEvent FindClimb()
 	{
@@ -294,8 +250,8 @@ public partial class TrailerDirector : Node
 		return null;
 	}
 
-	/// <summary>The last shot (the owner): a slow walk up the trail's end, and out of the fog, just showing, the
-	/// first staircase. Then the title. The Act 1 fog closes round the camera the way it closes round the player.</summary>
+	/// <summary>The last shot (the owner): from the song's 3:28, a slow walk up the trail's end, and out of the
+	/// fog, just showing, the first staircase; the title as the song stops. Act 1's fog is held closed right in.</summary>
 	private void BuildEnding()
 	{
 		var terrain = GroundSnap.FindTerrain(this);
@@ -309,22 +265,16 @@ public partial class TrailerDirector : Node
 			pref = ((end - foot) with { Y = 0 }).Normalized();
 		}
 		Vector3 dir = ClearestWay(foot, 26f, prefer: pref);
-		// (it starts after a pre-roll, trimmed from the recording, with the camera already standing at its start,
-		// so the Act 1 fog has closed right in before anything is seen)
-		Add("first_stairs", EndingPreroll + 1.0f, 7.0f, s => { s.Mood = ForestAtmosphere.Mood.Auto; s.Exposure = 0.78f; }, u =>
+		Add("first_stairs", EndingPreroll, EndingStairs, s => { s.Mood = ForestAtmosphere.Mood.Auto; s.Exposure = 0.78f; s.FadeIn = 1.2f; s.FadeOut = 0.05f; }, u =>
 		{
-			float e = u * 0.8f + u * u * (3f - 2f * u) * 0.2f;
-			Vector3 cam = foot + dir * Mathf.Lerp(16f, 5.5f, e) + dir.Cross(Vector3.Up) * 0.6f * Mathf.Sin(u * 2.5f);
-			cam.Y = Ground(cam) + 1.62f + 0.03f * Mathf.Sin(u * 14f);   // a walker's slow step, barely there
+			float e = u * 0.75f + u * u * (3f - 2f * u) * 0.25f;
+			Vector3 cam = foot + dir * Mathf.Lerp(24f, 4.5f, e) + dir.Cross(Vector3.Up) * 0.5f * Mathf.Sin(u * 2.2f);
+			cam.Y = Ground(cam) + 1.62f + 0.025f * Mathf.Sin(u * 30f);   // a walker's slow step, barely there
 			return (cam, foot + Vector3.Up * 2.2f);
 		});
 	}
 
-	private void Add(string name, float start, float length, Action<Shot> setup, Func<float, (Vector3, Vector3)> path)
-		=> _shots.Add(new Shot { Name = name, Start = start, Length = length, Setup = setup, Path = path });
-
-	/// <summary>The direction out from <paramref name="from"/> with the longest clear run at head height, so a
-	/// low rush doesn't fly through a trunk.</summary>
+	/// <summary>The direction out from <paramref name="from"/> with the longest clear run at head height.</summary>
 	private Vector3 ClearestWay(Vector3 from, float reach, Vector3? exclude = null, Vector3? prefer = null)
 	{
 		var space = GetTree().CurrentScene is Node3D n ? n.GetWorld3D().DirectSpaceState : null;
@@ -354,7 +304,6 @@ public partial class TrailerDirector : Node
 	{
 		if (_cam == null) return;
 		_t += (float)delta;
-		// which shot
 		int idx = -1;
 		for (int i = 0; i < _shots.Count; i++) if (_t >= _shots[i].Start && _t < _shots[i].Start + _shots[i].Length) idx = i;
 		if (idx != _shot)
@@ -363,7 +312,7 @@ public partial class TrailerDirector : Node
 			if (idx >= 0) { _shots[idx].Setup?.Invoke(_shots[idx]); if (_atmo != null) _atmo.SetMood(_shots[idx].Mood, 0.01f); }
 		}
 		float black = 1f;
-		// the ending's pre-roll: stand at the first shot's start in the dark, so its fog is settled
+		// the ending's pre-roll: stand at the shot's start in the dark, so Act 1's fog has closed in
 		if (idx < 0 && _ending && _shots.Count > 0 && _t < _shots[0].Start)
 		{
 			var (pp, pl) = _shots[0].Path(0f);
@@ -371,9 +320,9 @@ public partial class TrailerDirector : Node
 			_cam.LookAt(pl, Vector3.Up);
 			if (_atmo != null)
 			{
-				// once (again every frame would restart it), with the shot's own settings (its mood is what lets the fog in)
+				// once (every frame would restart it), with the shot's own settings (its mood is what lets the fog in)
 				if (!_prerolled) { _prerolled = true; _shots[0].Setup?.Invoke(_shots[0]); _atmo.SetMood(_shots[0].Mood, 0.01f); }
-				if (RainVfx.Instance != null) RainVfx.Instance.Intensity = 0f;   // (the rain drives the storm, which turns the Act 1 fog off)
+				if (RainVfx.Instance != null) RainVfx.Instance.Intensity = 0f;   // (the rain drives the storm, which turns the fog off)
 				_atmo.Storm = 0f;
 				_atmo.Underground = 0f;
 				_atmo.Act1FogOverride = 1f;
@@ -386,28 +335,28 @@ public partial class TrailerDirector : Node
 			var (pos, look) = s.Path(u);
 			_cam.GlobalPosition = pos;
 			if ((look - pos).LengthSquared() > 1e-4f) _cam.LookAt(look, Mathf.Abs((look - pos).Normalized().Dot(Vector3.Up)) > 0.98f ? Vector3.Forward : Vector3.Up);
-			// a short dip at each end of every shot: cuts, never flashes
-			float edge = Mathf.Min(_t - s.Start, s.Start + s.Length - _t);
-			black = Mathf.Clamp(1f - edge / 0.12f, 0f, 1f);
+			float fin = Mathf.Clamp((_t - s.Start) / Mathf.Max(s.FadeIn, 0.01f), 0f, 1f);
+			float fout = Mathf.Clamp((s.Start + s.Length - _t) / Mathf.Max(s.FadeOut, 0.01f), 0f, 1f);
+			black = 1f - Mathf.Min(fin, fout);
 			if (_atmo?.Env != null) _atmo.Env.TonemapExposure = _baseExposure * s.Exposure;
 			if (_atmo != null)
 			{
 				_atmo.Underground = s.Underground;
 				_atmo.Interior = s.Interior;
 				_atmo.Winter = s.Winter;
+				_atmo.Storm = 0f;
 			}
 			RenderingServer.GlobalShaderParameterSet("winter", s.Winter);
 			if (RainVfx.Instance != null) RainVfx.Instance.Intensity = 0f;
-			if (_atmo != null) _atmo.Storm = 0f;
 			WinterGlade.ForceSnow = s.Winter > 0.5f;
 			_lanternGlow.Visible = s.Lantern;
 			_lanternBeam.Visible = s.Lantern;
+			if (_atmo?.Env is { } env) { env.FogHeightDensity = 0f; s.Tick?.Invoke(env, u); }
 		}
 		_black.Color = new Color(0, 0, 0, black);
-		// the title: after the slam and a beat of black
-		float ta = Mathf.Clamp((_t - TitleAt) / 1.6f, 0f, 1f) * Mathf.Clamp((TitleEnd - _t) / 1.4f, 0f, 1f);
+		// the title, as the song stops
+		float ta = Mathf.Clamp((_t - TitleAt) / 0.9f, 0f, 1f) * Mathf.Clamp((TitleEnd - _t) / 1.2f, 0f, 1f);
 		_title.Modulate = new Color(1, 1, 1, ta);
-		_tag.Modulate = new Color(1, 1, 1, 0);
 		if (_t >= Seconds)
 		{
 			SetProcess(false);

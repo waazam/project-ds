@@ -265,7 +265,7 @@ public partial class LakeDressing : Node3D
 				{
 					Name = $"{meshKey}_{key.X}_{key.Y}",
 					Multimesh = mm,
-					VisibilityRangeEnd = small ? 70f : 260f,
+					VisibilityRangeEnd = small ? 70f : 340f,
 					CastShadow = small ? GeometryInstance3D.ShadowCastingSetting.Off : GeometryInstance3D.ShadowCastingSetting.On,
 				});
 			}
