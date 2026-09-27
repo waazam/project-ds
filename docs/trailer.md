@@ -56,8 +56,9 @@ It writes `DeadSilent-Teaser.mp4`, in this order:
    - 1:40.24–1:57.18 under part A: 24 beats, eight shots of three beats each;
    - a jump to the big downbeat at 3:28.94, on the cut to the stairs;
    - the title on the hit at 3:56.12.
-3. **The ring-out:** over the half bar after the title hit, the song crossfades (on its grid) into
-   its own ending (from 4:21.18) and rings out to silence. The title comes in over the last shot,
+3. **The ring-out:** after the title hit the groove fades to silence (2.2 s) and stays muted. The
+   song's own ending comes back in at 0:56 of the finished teaser, on its grid, for its drop at
+   0:57, and rings out. The title comes in over the last shot,
    which fades to black behind it; the picture holds black after the title fades.
 
 The game's own sound sits low under the music until the title. (`pip install imageio-ffmpeg`

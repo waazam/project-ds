@@ -27,9 +27,13 @@ The owner's requests:
   real silence under them, not a timestamp gap, which some players mishandle.
 
 ## The ending, polished (the owner: "so close to being a perfect transition")
-- **The jump into the song's ending is now a crossfade.** It runs over the half bar from the title
-  hit, on the song's grid: the groove fades out as the ending (from its pickup hit at 4:21.18) fades
-  in, both equal-power. Before, it was a hard cut 11 s from the end.
+- **The splice into the song's ending.** A hard cut, then a half-bar crossfade; neither worked.
+  Following the owner's direction, it is now:
+  - after the title hit, the groove fades away to silence over 2.2 s;
+  - it stays muted;
+  - the song's ending comes back in at 0:56 (a 0.4 s fade-in), for its drop at 0:57, and rings
+    out.
+  - The ending keeps its place on the song's grid.
 - **The title lands over the game.** On the 3:56 hit, DEAD SILENT appears over the last shot of the
   stairs. The camera drifts on and settles; the shot fades to black behind the title over 3 s. Then
   the title holds on black and fades out as the song rings out.

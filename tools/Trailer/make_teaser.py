@@ -23,18 +23,27 @@ S2 = 208.93                         # the big downbeat at 3:28.94 (a hair early,
 TITLE_SONG = 236.123                # the hit the title lands on
 STAIRS = TITLE_SONG - 208.94        # the ending shot, to the title (TrailerDirector.EndingStairs)
 TITLE_HOLD = 11.0                   # TrailerDirector.TitleHold
-JUMP_FROM, JUMP_TO = 237.534, 262.589   # half a bar after the title hit, into the song's own ending, both on the hit
-XF = 2 * BEAT                       # the crossfade into the ending: the half bar from the title hit, on the grid
+# after the title hit the song fades away to silence, then its own ending comes back in (the owner: back in at
+# 0:56, for the drop at 0:57). The ending keeps its place on the song's grid: its 4:21.18 pickup would fall on
+# the title hit.
+FADE_AFTER_TITLE = (0.15, 2.2)      # the groove's fade to silence: its start after the title hit, and its length
+TAIL_ALIGN = 261.177                # the song time the ending is lined up to the title hit with
+RETURN_AT = 56.0                    # the ending comes back in (in the finished teaser, logos included)
+RETURN_FADE = 0.4
 SONG_END = 273.9
 FLICKER, GODOT = 5.0, 3.5           # the logos before it
 
 B_LEN = STAIRS + TITLE_HOLD
-music = A_LEN + (JUMP_FROM - S2) + (SONG_END - (JUMP_TO - XF)) - XF
 video = A_LEN + B_LEN
-pad = max(0.0, music - video)
 intro = FLICKER + GODOT
-total = intro + video + pad
 title_at = A_LEN + STAIRS
+M2_LEN = (TITLE_SONG - S2) + sum(FADE_AFTER_TITLE)
+return_t = RETURN_AT - intro                     # in the trailer's own time
+RETURN_SONG = TAIL_ALIGN + (return_t - title_at)
+GAP = return_t - (A_LEN + M2_LEN)
+music = return_t + (SONG_END - RETURN_SONG)
+pad = max(0.0, music - video)
+total = intro + video + pad
 
 fc = (
     # the logos: the owner's company, then the engine
@@ -54,10 +63,12 @@ fc = (
     # the song: 1:40, then 3:28.94 to the title and half a bar on, then its own ending ringing out
     f"[4:a]asplit=3[s1][s2][s3];"
     f"[s1]atrim={S1}:{S1 + A_LEN},asetpts=PTS-STARTPTS,afade=t=out:st={A_LEN - 0.04}:d=0.04[m1];"
-    f"[s2]atrim={S2}:{JUMP_FROM},asetpts=PTS-STARTPTS[m2];"
-    f"[s3]atrim={JUMP_TO - XF}:{SONG_END},asetpts=PTS-STARTPTS,afade=t=out:st={SONG_END - JUMP_TO + XF - 1.5}:d=1.5[m3];"
-    f"[m2][m3]acrossfade=d={XF:.4f}:c1=hsin:c2=hsin[m23];"
-    f"[m1][m23]concat=n=2:v=0:a=1[music];"
+    f"[s2]atrim={S2}:{S2 + M2_LEN},asetpts=PTS-STARTPTS,"
+    f"afade=t=out:st={TITLE_SONG - S2 + FADE_AFTER_TITLE[0]}:d={FADE_AFTER_TITLE[1]}:curve=qsin[m2];"
+    f"aevalsrc=0|0:s=44100:d={GAP:.4f}[gap];"
+    f"[s3]atrim={RETURN_SONG}:{SONG_END},asetpts=PTS-STARTPTS,afade=t=in:d={RETURN_FADE},"
+    f"afade=t=out:st={SONG_END - RETURN_SONG - 1.5}:d=1.5[m3];"
+    f"[m1][m2][gap][m3]concat=n=4:v=0:a=1[music];"
     f"[music][game]amix=inputs=2:duration=longest:normalize=0,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[mix];"
     # silence under the logos (real samples: adelay only leaves a timestamp gap, which players treat differently)
     f"aevalsrc=0|0:s=44100:d={intro},aformat=sample_fmts=fltp:channel_layouts=stereo[sil];"
