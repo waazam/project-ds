@@ -33,16 +33,17 @@ namespace ProjectDS.Systems;
 /// </summary>
 public partial class TrailerDirector : Node
 {
-	/// <summary>Where the song's cues fall in the trailer's time (song time minus 1:40).</summary>
-	/// <summary>The cut (the owner: a 30-45 second teaser): 17 s of eight shots from the song's 1:40.2 (on its beat),
-	/// then the song cuts to 3:28.24 for the stairs, and the title lands as it stops at 3:56.</summary>
-	public const float Beat = 60f / 84.7f, StairsAt = 24f * 60f / 84.7f, TitleAtSong = StairsAt + (236f - 208.24f), TitleHold = 3.5f;
+	/// <summary>The cut (the owner: a 30-45 second teaser), on the song's grid (85 bpm, measured from the song):
+	/// 16.9 s of eight shots, three beats each, from 1:40.24; then the song jumps to the big downbeat at 3:28.94
+	/// on the cut to the stairs, and the title lands on the hit at 3:56.12. The song's own ending rings out under
+	/// the title (docs/trailer.md).</summary>
+	public const float Beat = 60f / 85f, StairsAt = 24f * Beat, TitleAtSong = StairsAt + (236.123f - 208.94f), TitleHold = 9f;
 	/// <summary>The ending recording: a pre-roll (trimmed off) so Act 1's fog is settled, the stairs, the title.</summary>
 	public const float EndingPreroll = 4f, EndingStairs = TitleAtSong - StairsAt;
 	private bool _ending, _prerolled;
 	private float Seconds => _ending ? EndingPreroll + EndingStairs + TitleHold : StairsAt;
 	private float TitleAt => _ending ? EndingPreroll + EndingStairs : 9999f;
-	private float TitleEnd => TitleAt + TitleHold - 0.4f;
+	private float TitleEnd => TitleAt + TitleHold - 1.5f;
 
 	private Camera3D _cam;
 	private OmniLight3D _lanternGlow;
@@ -355,7 +356,7 @@ public partial class TrailerDirector : Node
 		}
 		_black.Color = new Color(0, 0, 0, black);
 		// the title, as the song stops
-		float ta = Mathf.Clamp((_t - TitleAt) / 0.9f, 0f, 1f) * Mathf.Clamp((TitleEnd - _t) / 1.2f, 0f, 1f);
+		float ta = Mathf.Clamp((_t - TitleAt) / 0.4f, 0f, 1f) * Mathf.Clamp((TitleEnd - _t) / 2.5f, 0f, 1f);   // in on the hit, out slowly as the song rings out
 		_title.Modulate = new Color(1, 1, 1, ta);
 		if (_t >= Seconds)
 		{

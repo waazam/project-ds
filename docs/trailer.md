@@ -1,4 +1,4 @@
-# The teaser trailer (0:48)
+# The teaser trailer (1:05)
 
 `scripts/systems/TrailerDirector.cs` films it in-engine. The music is the owner's own song,
 "Petty Theft" (soundcloud.com/alf452/petty-theft). It isn't in the repo; download it as
@@ -37,19 +37,31 @@ Godot_v4.7.2-stable_mono_win64_console.exe --path . --windowed --resolution 1920
 
 ## Make the MP4
 
-The music is edited in two parts:
-- song 1:40.2–1:57.2 under part A: 24 beats at 84.7 bpm, eight shots of three beats, with a cut on
-  every third beat;
-- a jump to 3:28.24–3:56.0 under part B.
-
-The title lands as the song stops at 3:56. The game's own sound sits low under the music.
-With part A starting at frame 21 and part B at frame 22:
-
 ```
-ffmpeg -ss 0.35 -t 17.0 -i partA.avi -ss 4.367 -t 31.26 -i partB.avi -i song.wav -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0,eq=gamma=1.1:brightness=0.015,scale=out_range=tv,format=yuv420p[v];[0:a][1:a]concat=n=2:v=0:a=1,volume=0.13,afade=t=out:st=44.2:d=0.5[game];[2:a]asplit=2[s1][s2];[s1]atrim=100.2:117.2,asetpts=PTS-STARTPTS,afade=t=out:st=16.8:d=0.2[m1];[s2]atrim=208.24:236.0,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.12[m2];[m1][m2]concat=n=2:v=0:a=1,apad=pad_dur=3.6[music];[music][game]amix=inputs=2:duration=longest:normalize=0[a]" -map "[v]" -map "[a]" -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p -r 60 -c:a aac -b:a 256k -movflags +faststart -t 48.3 DeadSilent-Teaser.mp4
+python tools/Trailer/make_teaser.py 21 21
 ```
 
-(`pip install imageio-ffmpeg` provides an ffmpeg binary. `yt-dlp` can fetch the song.)
+The two numbers are the start frames the recordings printed. The script needs these in
+`build/trailer`:
+- `partA.avi` and `partB.avi`;
+- `song.wav`;
+- `flicker_logo.mp4`, the owner's company logo.
+
+It writes `DeadSilent-Teaser.mp4`, in this order:
+1. **The logos:** Flicker Archive (the owner's company, 5 s), then the Godot logo (3.5 s). The Godot
+   logo is `tools/Trailer/godot_logo.png`, the engine's own vector logo, rendered from the SVG built
+   into the editor.
+2. **The trailer:** part A, then part B. The music is edited to the song's grid, 85 bpm, measured
+   from its onsets:
+   - 1:40.24–1:57.18 under part A: 24 beats, eight shots of three beats each;
+   - a jump to the big downbeat at 3:28.94, on the cut to the stairs;
+   - the title on the hit at 3:56.12.
+3. **The ring-out:** half a bar after the title hit, the song jumps (on its grid) to its own ending
+   at 4:22.59 and rings out to silence under the title. The picture holds black after the title
+   fades.
+
+The game's own sound sits low under the music until the title. (`pip install imageio-ffmpeg`
+provides an ffmpeg binary. `yt-dlp` can fetch the song.)
 
 ## The cut
 
@@ -60,7 +72,7 @@ The owner's notes shaped it:
 - gentle cameras (the owner gets headaches from shaky ones);
 - no strobing.
 
-| s | Shot |
+| s (after the 8.5 s of logos) | Shot |
 | --- | --- |
 | 0.0–2.1 | The cabin at dusk, a light in its window (fades up) |
 | 2.1–4.3 | From the treetops, looking down on the trail as the fog rolls in round the trunks |
@@ -70,5 +82,5 @@ The owner's notes shaped it:
 | 10.6–12.7 | Straight down the stairwell |
 | 12.7–14.9 | Its decayed depths, and the drop |
 | 14.9–17.0 | The church's nave: a high, slow, surreal swoop toward the altar |
-| 17.0–44.8 | The song jumps to 3:28: a slow walk up the end of the Act 1 trail, and the first staircase peeking out of the fog |
-| 44.8–48.3 | DEAD SILENT, as the song stops |
+| 16.9–44.1 | The song jumps to the 3:28.94 downbeat: a slow walk up the end of the Act 1 trail, and the first staircase peeking out of the fog |
+| 44.1–56.9 | DEAD SILENT on the 3:56 hit; the song's ending rings out |

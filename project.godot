@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Project DS"
 config/description="Third-person psychological horror. Working title."
-run/main_scene="res://scenes/ui/main_menu.tscn"
+run/main_scene="res://scenes/ui/startup_logo.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
