@@ -58,6 +58,11 @@ public partial class Crawler : Node3D
 	private Vector3 _lastPos;
 	private float _speed;
 	private AudioStreamPlayer3D _voice;
+	// its steps: a pool of three voices it rings round (a new player per plant stacked up to nine of one step at once)
+	private const int StepVoices = 3;
+	private readonly AudioStreamPlayer3D[] _steps = new AudioStreamPlayer3D[StepVoices];
+	private int _stepVoice;
+	private static AudioStream[] _stepStreams;
 
 	public override void _Ready()
 	{
@@ -244,7 +249,7 @@ public partial class Crawler : Node3D
 				{
 					l.Plant = l.To;
 					Steps++;
-					AudioDirector.OneShot(this, "crawler_step", 8, l.Plant, Mathf.Lerp(-4f, 0f, Hurry), "Events", 4f, 0.08f);
+					PlayStep(l.Plant, Mathf.Lerp(-4f, 0f, Hurry));
 				}
 			}
 			Solve(l);
@@ -279,6 +284,31 @@ public partial class Crawler : Node3D
 	}
 
 	/// <summary>Two bones from the shoulder/hip to the planted hand/foot, the elbow/knee thrown up and out.</summary>
+	private void PlayStep(Vector3 at, float db)
+	{
+		if (_stepStreams == null)
+		{
+			var list = new List<AudioStream>();
+			for (int i = 1; i <= 8; i++)
+				if (ResourceLoader.Exists($"res://assets/audio/sfx/crawler_step_{i:00}.wav")) list.Add(GD.Load<AudioStream>($"res://assets/audio/sfx/crawler_step_{i:00}.wav"));
+			_stepStreams = list.ToArray();
+		}
+		if (_stepStreams.Length == 0) return;
+		var p = _steps[_stepVoice];
+		if (p == null || !IsInstanceValid(p))
+		{
+			p = new AudioStreamPlayer3D { Name = $"Step{_stepVoice}", Bus = "Events", UnitSize = 4f, MaxDistance = 64f, TopLevel = true };
+			AddChild(p);
+			_steps[_stepVoice] = p;
+		}
+		_stepVoice = (_stepVoice + 1) % StepVoices;
+		p.Stream = _stepStreams[_rng.RandiRange(0, _stepStreams.Length - 1)];
+		p.VolumeDb = db;
+		p.PitchScale = 1f + _rng.RandfRange(-0.08f, 0.08f);
+		p.GlobalPosition = at;
+		p.Play();
+	}
+
 	private void Solve(Limb l)
 	{
 		Vector3 root = GlobalTransform * l.Root;

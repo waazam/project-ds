@@ -222,6 +222,8 @@ public partial class StoryTest : Node
 		}
 	}
 
+	private static string _lastEvent = "";
+
 	public override void _Process(double delta)
 	{
 		// Quit() only schedules the exit; a frame or two can still land after Finish() nulls the session.
@@ -230,6 +232,9 @@ public partial class StoryTest : Node
 		float moved = Flat(_player.GlobalPosition).DistanceTo(Flat(_lastPos));
 		if (moved < 3f) _s.Walked += moved;
 		_lastPos = _player.GlobalPosition;
+		// hitches: any frame over 100 ms, with what came just before it (a check, a screenshot, a load)
+		if (Engine.TimeScale == 1.0 && delta > 0.1 && _s.CurrentAct != null)
+			GD.Print($"[hitch] {delta * 1000:0} ms in {_s.CurrentAct} after '{_lastEvent}' at {_player.GlobalPosition.Round()}");
 		_fpsTimer += delta / Math.Max(Engine.TimeScale, 0.01);
 		if (_fpsTimer >= 0.5 && Engine.TimeScale == 1.0)
 		{
@@ -846,7 +851,10 @@ public partial class StoryTest : Node
 			if (leg < 2 && act6.LoopStage == stageBefore)
 			{
 				// A few treads up, there is no backing down, even facing up and pressing back (Dan, 2026-09-22).
+				// Walked until the way back shuts (not a fixed 0.7 s: with the movement's run-up that was sometimes a tread short).
 				await WalkFor(goal, 0.7, ct);
+				if (act6.LoopStage == stageBefore && act6.OneWay is { Armed: false })
+					await WalkTo(goal, 0.6f, ct, stopWhen: () => act6.OneWay is { Armed: true } || act6.LoopStage != stageBefore, giveUp: 3f);
 				if (act6.LoopStage == stageBefore)
 				{
 					Vector3 beforePush = _player.GlobalPosition;
@@ -1114,7 +1122,7 @@ public partial class StoryTest : Node
 			Vector3 look = lot.FootprintsEnd + (lot.FootprintsStart - lot.FootprintsEnd).Normalized() * 6f;
 			await Teleport(look + (look - lot.FootprintsEnd).Normalized() * 2.5f, look, ct);
 			await Aim(look, ct);
-			await Frames(4, ct);
+			await Seconds(0.6, ct);   // the look's smoothing settles (4 frames caught it still turning)
 			Screenshot("footprints_blacklight");
 			lantern?.SetBlacklight(false);
 		}
@@ -1719,7 +1727,17 @@ public partial class StoryTest : Node
 		}
 		// set all three
 		await Inside(station.ToGlobal(new Vector3(0.6f, 0, 3.8f)), door3.GlobalPosition + Vector3.Up * 1.3f, ct);
-		for (int i = 0; i < 3 && !door3.Opened; i++) { await UseIt(door3.DoorUse, ct); await Seconds(0.8, ct); }
+		for (int i = 0; i < 3 && !door3.Opened; i++)
+		{
+			await UseIt(door3.DoorUse, ct);
+			await Seconds(0.8, ct);
+			// the eye in the LOOK hollow, close to: nothing may cut across it (the owner's report)
+			if (i == 0 && door3.FindChild("Piece0", true, false) is Node3D eyePiece)
+			{
+				await Aim(eyePiece.GlobalPosition, ct);
+				Screenshot("iron_door_eye_set");
+			}
+		}
 		await WaitUntil(() => door3.Opened, 6, ct);
 		Check("all three set: the iron door opens", door3.Opened && door3.PiecesSet == 3, $"{door3.PiecesSet} set");
 		await Seconds(4, ct);
@@ -3182,11 +3200,13 @@ public partial class StoryTest : Node
 	private static void Check(string act, string name, bool ok, string detail)
 	{
 		_s.Checks.Add((act, name, ok, detail ?? ""));
+		_lastEvent = name;
 		GD.Print($"[storytest] {(ok ? "PASS" : "FAIL")} {name} {detail}");
 	}
 
 	private void Screenshot(string label)
 	{
+		_lastEvent = $"screenshot {label}";
 		try
 		{
 			var img = GetViewport()?.GetTexture()?.GetImage();

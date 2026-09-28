@@ -252,7 +252,8 @@ public partial class ContinueRoundTripTest : Node
 			return;
 		}
 		var fire = FindFirst<CabinFireEvent>();
-		bool wantFire = story.Current >= Checkpoint.Act7CabinBurning;
+		// burning from the wake after the fall (the loop's end), not only from checkpoint 6 on: they wake to it (Dan, 2026-09-22)
+		bool wantFire = story.Current >= Checkpoint.Act7CabinBurning || story.HasFlag(StoryManager.Flag.ClearingLoopDone);
 		Check("cabin fire state", fire != null && fire.Burning == wantFire, $"burning {fire?.Burning} (want {wantFire})");
 
 		var act6 = FindFirst<Act6ClearingEvent>();

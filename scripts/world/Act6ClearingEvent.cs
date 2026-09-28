@@ -348,7 +348,7 @@ public partial class Act6ClearingEvent : Node3D
 
 	private void TryReveal()
 	{
-		if (_revealed || !StoryBeat.Act6Revealed(StoryManager.Instance)) return;
+		if (_revealed || _loopDone || !StoryBeat.Act6Revealed(StoryManager.Instance) || StoryManager.Instance.HasFlag(StoryManager.Flag.ClearingLoopDone)) return;
 		Reveal(restoring: false);
 	}
 
@@ -362,6 +362,9 @@ public partial class Act6ClearingEvent : Node3D
 		if (_loopDone)
 		{
 			// Act 7 on: the stairs and the ring are gone (the meadow and the trails stay; the compass leads on).
+			// Counted as revealed, or the next flag set (the radio's, Act 11) would run the reveal live: 15 stairs
+			// back up and the mood turned menacing (the continue test).
+			_revealed = true;
 			ResetWorld(restoring: true);
 			return;
 		}

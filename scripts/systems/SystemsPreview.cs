@@ -348,10 +348,14 @@ public partial class SystemsPreview : Node3D
 		_player.Teleport(bridge.GlobalPosition + new Vector3(0, 0.3f, 3f), 0f);
 		await Frames(5);
 		Check(!stalker.Awake, "still dormant on the cabin side of the bridge");
-		// Past it: it wakes.
+		// Past it, it still sleeps until the lantern and the compass are both taken (the story rework's rule, Stalker.ShouldWake).
 		_player.Teleport(bridge.GlobalPosition + new Vector3(0, 0.3f, -10f), 0f);
 		await Frames(5);
-		Check(stalker.Awake && stalker.Current != Stalker.State.Dormant, $"awake once past the bridge ({stalker.Current})");
+		Check(!stalker.Awake, $"past the bridge, still asleep without the lantern and compass ({stalker.Current})");
+		StoryManager.Instance?.SetFlag(StoryManager.Flag.PickupTakenLantern);
+		StoryManager.Instance?.SetFlag(StoryManager.Flag.PickupTakenCompass);
+		await Frames(5);
+		Check(stalker.Awake && stalker.Current != Stalker.State.Dormant, $"awake once the lantern and compass are taken ({stalker.Current})");
 		// Indoors: nothing to hide behind.
 		ForestAmbienceManager.Instance.SetIndoor(this, true);
 		await Frames(3);
@@ -410,8 +414,10 @@ public partial class SystemsPreview : Node3D
 	{
 		var cabin = StoryBeat.Cabin(this);
 		var door = cabin == null ? null : FindDoor(cabin);
-		Check(cabin != null && door != null, "cabin door break event found");
-		if (cabin == null || door == null) return;
+		// The cabin is in the Hollow since the story rework (the story test plays its door); this harness loads the trail.
+		if (cabin == null) { GD.Print("[systems] SKIP cabin door: no cabin in the forest world (it is in the Hollow)"); return; }
+		Check(door != null, "cabin door break event found");
+		if (door == null) return;
 		var inv = _player.Inventory;
 		cabin.SetBoarded(true);
 		door.Enabled = true;
@@ -447,8 +453,9 @@ public partial class SystemsPreview : Node3D
 	{
 		var cabin = StoryBeat.Cabin(this);
 		var line = cabin?.GetNodeOrNull<CabinExitLine>("ExitLineTrigger");
-		Check(cabin != null && line != null, "cabin exit line found");
-		if (cabin == null || line == null) return;
+		if (cabin == null) { GD.Print("[systems] SKIP cabin exit: no cabin in the forest world (it is in the Hollow)"); return; }
+		Check(line != null, "cabin exit line found");
+		if (line == null) return;
 		_player.Inventory.TryPickup(ToolKind.NewelPost);
 		Vector3 Local(float z) => cabin.GlobalTransform * new Vector3(0, 0.1f, z);
 		float hd = cabin.Depth * 0.5f;
