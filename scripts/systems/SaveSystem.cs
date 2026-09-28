@@ -43,8 +43,11 @@ public enum Checkpoint
 	Act20Finished = 20,
 	/// <summary>Act 21: up the long stair, through the hatch into the church's crypt, back on the surface (a new save).</summary>
 	Act21ChurchReached = 21,
-	/// <summary>Act 21's end: the four candles lit, the vestry's key, the font opened, the chalice set in the great door.</summary>
+	/// <summary>Act 21's end: the four candles lit, the vestry's key, the font opened, the chalice set in the great door, and
+	/// the great door open onto the snow (Act 22's start, outside it).</summary>
 	Act21Finished = 22,
+	/// <summary>Act 22's end: down the plowed road through the winter woods, round the ski lodge, its iced-in back door forced.</summary>
+	Act22Finished = 23,
 }
 
 public class SaveData

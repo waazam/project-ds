@@ -19,7 +19,7 @@ namespace ProjectDS.World;
 /// </summary>
 public static class DetailKit
 {
-	public enum Kind { Wood, Plaster, Concrete, Metal, Fabric, Leather, Stone, Marble, Bark, Foliage, Ground, Grime }
+	public enum Kind { Wood, Plaster, Concrete, Metal, Fabric, Leather, Stone, Marble, Bark, Foliage, Ground, Grime, Snow, Ice }
 
 
 	private static readonly Dictionary<Kind, (Texture2D albedo, Texture2D normal)> _tex = new();
@@ -94,6 +94,8 @@ public static class DetailKit
 
 	private static readonly (string[] words, Kind kind)[] Words =
 	{
+		(new[] { "icicle", "ice_", "frozen", "glaze" }, Kind.Ice),
+		(new[] { "snow", "drift" }, Kind.Snow),
 		(new[] { "leather", "seat", "sofa", "couch", "armchair", "saddle", "book", "ledger", "journal", "album" }, Kind.Leather),
 		(new[] { "fabric", "cloth", "velvet", "curtain", "drape", "sheet", "rug", "carpet", "tapestry", "blanket", "cushion", "linen", "canvas", "felt", "bag", "tape" }, Kind.Fabric),
 		(new[] { "bark", "trunk", "stump", "log", "branch", "root" }, Kind.Bark),

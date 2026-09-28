@@ -82,6 +82,11 @@ public partial class ContinueRoundTripTest : Node
 		new("act21_finished", Checkpoint.Act21Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
 			StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
 			StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced, "pickup_taken_church_font_key", "pickup_taken_church_chalice" }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+		// Act 22's end: through the lodge's back door, in the mudroom
+		new("act22_finished", Checkpoint.Act22Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
+			StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
+			StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced, "pickup_taken_church_font_key", "pickup_taken_church_chalice",
+			StoryManager.Flag.LodgeFrontTried, StoryManager.Flag.LodgeBackDoorOpen }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -226,7 +231,9 @@ public partial class ContinueRoundTripTest : Node
 		if (sc.Cp == Checkpoint.Act21ChurchReached && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church is { } ch21)
 			Check("Act 21's save respawns in the church's crypt by the shut hatch, winter, no candles lit", ch21.Inside(before) && before.DistanceTo(ch21.HatchExitWorld) < 1.5f && ch21.CandlesLit == 0 && !ch21.VestryOpen, $"{before} vs {ch21.HatchExitWorld}");
 		if (sc.Cp == Checkpoint.Act21Finished && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church is { } ch22)
-			Check("Act 21's end respawns inside the great door: four candles burning, the vestry open, the font open, the chalice in its niche", ch22.Inside(before) && ch22.CandlesLit == 4 && ch22.VestryOpen && ch22.FontOpen && ch22.ChalicePlaced, $"{before}");
+			Check("Act 21's end respawns outside the great door, standing open on the snow: four candles burning, the vestry and the font open, the chalice in its niche", !ch22.Inside(before) && before.DistanceTo(ch22.DoorWorld) < 8f && ch22.DoorOpen && ch22.CandlesLit == 4 && ch22.VestryOpen && ch22.FontOpen && ch22.ChalicePlaced && _player.IsOnFloor(), $"{before}");
+		if (sc.Cp == Checkpoint.Act22Finished && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.Woods?.Lodge is { } lodge22)
+			Check("Act 22's end respawns in the lodge's mudroom, the back door forced open", lodge22.Inside(before) && lodge22.BackOpen, $"{before} (lodge-local {lodge22.ToLocal(before)})");
 		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");
 
@@ -291,9 +298,9 @@ public partial class ContinueRoundTripTest : Node
 		Check("inventory restored", inv != null && GearOf(inv.Serialize()) == GearOf(sc.Inventory) || (sc.Cp == Checkpoint.Act10WalkieFound && inv?.HasRadio == true),
 			$"{inv?.Serialize()} (saved {sc.Inventory})");
 
-		// (and again in Act 21's church, where the compass comes back to life)
+		// (dead from Act 14's stairwell through the church; alive again outside it, in Act 22, pointing at the lodge)
 		bool wantObjective = (story.Current >= Checkpoint.Act3DoorBoarded && story.Current < Checkpoint.Act11GiantEncounter)
-			|| (story.Current >= Checkpoint.Act21ChurchReached && story.Current < Checkpoint.Act21Finished);
+			|| story.Current == Checkpoint.Act21Finished;
 		Check("compass has an objective", (story.ObjectivePosition != null) == wantObjective, $"{story.ObjectivePosition}");
 
 		if (sc.Cp == Checkpoint.Act8BunkerEntered && GetTree().GetFirstNodeInGroup("bunker_marker") is Bunker bunker)

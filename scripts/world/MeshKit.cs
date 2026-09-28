@@ -59,6 +59,20 @@ public class MeshKit
 		_cur.I.Add(i0); _cur.I.Add(i1); _cur.I.Add(i2);
 	}
 
+	/// <summary>Triangle whose corners carry their own colours (a blend across it: the winter ground's road and ice).</summary>
+	public void TriC(Vector3 a, Vector3 b, Vector3 c, Vector3 na, Vector3 nb, Vector3 nc, Vector2 ua, Vector2 ub, Vector2 uc, Color ca, Color cb, Color cc)
+	{
+		var face = (b - a).Cross(c - a);
+		if (face.LengthSquared() < 4e-14f) return;
+		if (face.Dot(na + nb + nc) > 0f) { (b, c) = (c, b); (nb, nc) = (nc, nb); (ub, uc) = (uc, ub); (cb, cc) = (cc, cb); }
+		var keep = Color;
+		Color = ca; int i0 = Vert(a, na, ua);
+		Color = cb; int i1 = Vert(b, nb, ub);
+		Color = cc; int i2 = Vert(c, nc, uc);
+		Color = keep;
+		_cur.I.Add(i0); _cur.I.Add(i1); _cur.I.Add(i2);
+	}
+
 	public void Tri(Vector3 a, Vector3 b, Vector3 c, Vector3 n, Vector2 ua, Vector2 ub, Vector2 uc)
 		=> Tri(a, b, c, n, n, n, ua, ub, uc);
 

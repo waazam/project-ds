@@ -14,8 +14,10 @@ namespace ProjectDS.World;
 /// door is locked, with four empty niches in it; the font's lid is chained and locked; lighting the four
 /// tall candles round the nave with the lighter unlocks the vestry's door off the left transept, and it
 /// swings open; the font's key hangs in the vestry; the font holds the chalice; the chalice goes into the
-/// first niche of the great door (<see cref="Checkpoint.Act21Finished"/>): one of four. Act 22 finds the
-/// other three. The compass lives again up here: it points at whatever the church wants next.
+/// first niche of the great door, the other three take its light, and the great door swings open onto the
+/// snow (<see cref="Checkpoint.Act21Finished"/>; the owner: the church is left through its entrance once the
+/// puzzle is done; the niches will be refined later). The compass is still dead in here (it died on the
+/// stairwell in Act 14); it comes back outside, in Act 22. The objective marker below is kept for the tests.
 /// Winter: from Act 20's end, the whole world's trees and the atmosphere are wintry (the global shader
 /// value "winter" and <see cref="ForestAtmosphere.Winter"/>); in here, no underground black.
 /// </summary>
@@ -67,6 +69,8 @@ public partial class Church
 		ChalicePlaced = s?.HasFlag(StoryManager.Flag.ChurchChalicePlaced) ?? false;
 		if (FontOpen) PlaceChaliceInFont();
 		if (ChalicePlaced) ShowChaliceInDoor(instant: true);
+		// Act 22 on: the great door stands open onto the snow
+		if (s != null && s.Current >= Checkpoint.Act21Finished) OpenGreatDoor(instant: true);
 		if (s != null && s.Current >= Checkpoint.Act21ChurchReached) Stair?.CloseHatch(instant: true);
 		SetProcess(true);
 	}
@@ -246,15 +250,16 @@ public partial class Church
 		_niches[0].Enabled = false;
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.ChurchChalicePlaced);
 		ShowChaliceInDoor();
-		GD.Print("[story] Act 21: the chalice set in the great door - one of four");
+		GD.Print("[story] Act 21: the chalice set in the great door");
 		_ = Cutscene.Run(this, ct => OneOfFour(player, ct), lockInput: true);
 	}
 
 	private void ShowChaliceInDoor(bool instant = false)
 	{
 		if (_chaliceInDoor != null) return;
-		_chaliceInDoor = new Node3D { Name = "ChaliceInDoor", Position = new Vector3(NicheX[0], NicheY - 0.2f, -0.75f + 0.14f) };
-		AddChild(_chaliceInDoor);
+		// on the left leaf, so it swings with the door
+		_chaliceInDoor = new Node3D { Name = "ChaliceInDoor", Position = new Vector3(NicheX[0] + 2.6f, NicheY - 0.2f, 0.14f) };
+		(_greatLeft ?? (Node3D)this).AddChild(_chaliceInDoor);
 		ItemMeshes.Build(ToolKind.Chalice, _chaliceInDoor);
 		_chaliceInDoor.Scale = Vector3.One * 1.9f;
 		var glow = new OmniLight3D { Name = "Glow", Position = new Vector3(0, 0.25f, 0.2f), LightColor = new Color(1f, 0.85f, 0.55f), LightEnergy = instant ? 0.6f : 0f, OmniRange = 2.2f, ShadowEnabled = false };
@@ -262,19 +267,77 @@ public partial class Church
 		if (!instant) CreateTween().TweenProperty(glow, "light_energy", 0.6f, 2.5f);
 	}
 
-	/// <summary>One of four: the chalice settles into its niche with a low tone, the gold outlines of the
-	/// other three catch the light for a moment. The save. The first half of the church is done.</summary>
+	/// <summary>The door's puzzle (the owner: Act 21 ends leaving through the church's entrance once the puzzle is
+	/// done; the other three niches will be refined later): the chalice settles into its niche with a low tone,
+	/// the gold shapes in the other three catch its light one by one, the bars inside the door draw back, and
+	/// the two leaves swing in on the snow. The save: Act 22 starts on the step outside.</summary>
 	private async Task OneOfFour(PlayerController player, CancellationToken ct)
 	{
 		Ending = true;
 		AudioDirector.OneShot(this, "puzzle_glow", 1, NicheWorld(0), 0f);
-		await Cutscene.Wait(this, 2.0, ct);
+		await Cutscene.Wait(this, 1.6, ct);
+		for (int i = 1; i < 4; i++)
+		{
+			NicheGlow(i);
+			AudioDirector.OneShot(this, "candle_ignite", 3, NicheWorld(i), -8f, "Events", 3f, 0.1f);
+			await Cutscene.Wait(this, 0.55, ct);
+		}
+		await Cutscene.Wait(this, 0.6, ct);
+		AudioDirector.OneShot(this, "valve_clunk", 1, DoorWorld + Vector3.Up * 2f, 2f);
+		await Cutscene.Wait(this, 0.5, ct);
+		AudioDirector.OneShot(this, "lever_throw", 3, DoorWorld + Vector3.Up * 2f, 0f);
+		await Cutscene.Wait(this, 0.9, ct);
+		OpenGreatDoor();
+		await Cutscene.Wait(this, 2.2, ct);
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act21Finished);
-		GD.Print("[story] Act 21 done: one of the great door's four pieces in place");
-		await StoryBeat.Caption(this, "One of four.", 0.8f, 2.6f, 1.2f, ct);
-		await Cutscene.Wait(this, 0.8, ct);
-		var fader = StoryBeat.Fader(this);
-		if (fader != null) await fader.Fade(1f, 2.5f, ct);
-		if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) await ending.Credits(fader, ct);
+		GD.Print("[story] Act 21 done: the great door opens onto the snow");
+	}
+
+	public bool DoorOpen { get; private set; }
+
+	/// <summary>The great door's leaves swing in (slow, heavy, the hinges groaning) and the winter comes in with them.</summary>
+	public void OpenGreatDoor(bool instant = false)
+	{
+		if (DoorOpen || _greatLeft == null || _greatRight == null) return;
+		DoorOpen = true;
+		if (_greatBody != null) foreach (var c in _greatBody.GetChildren()) if (c is CollisionShape3D cs) cs.Disabled = true;
+		const float open = 1.75f;
+		for (int i = 1; i < 4; i++) NicheGlow(i, instant);
+		if (instant) { _greatLeft.Rotation = new Vector3(0, -open, 0); _greatRight.Rotation = new Vector3(0, open, 0); return; }
+		AudioDirector.OneShot(this, "door_creak", 1, DoorWorld + Vector3.Up * 2f, 4f, "Events", 6f, 0.02f);
+		AudioDirector.OneShot(this, "door_creak", 1, DoorWorld + Vector3.Up * 2f, 2f, "Events", 6f, 0.02f);
+		var tw = CreateTween().SetParallel();
+		tw.TweenProperty(_greatLeft, "rotation:y", -open, 5.5f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		tw.TweenProperty(_greatRight, "rotation:y", open, 5.8f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		// the cold: snow blows in over the threshold for a while
+		var gust = new GpuParticles3D
+		{
+			Name = "DoorGust", Amount = 260, Lifetime = 3f, OneShot = false, Position = new Vector3(0, 2.4f, -1.6f),
+			ProcessMaterial = new ParticleProcessMaterial
+			{
+				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(2.2f, 2.2f, 0.3f),
+				Direction = new Vector3(0, -0.2f, 1f), Spread = 25f, InitialVelocityMin = 1.2f, InitialVelocityMax = 2.6f,
+				Gravity = new Vector3(0, -0.5f, 0), TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.8f, ScaleMin = 0.6f, ScaleMax = 1.3f,
+			},
+			DrawPass1 = new QuadMesh
+			{
+				Size = new Vector2(0.04f, 0.04f),
+				Material = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.93f, 1f, 0.8f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles },
+			},
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		};
+		AddChild(gust);
+		GetTree().CreateTimer(14.0).Timeout += () => { if (IsInstanceValid(gust)) gust.Emitting = false; };
+	}
+
+	/// <summary>A niche's gold shape lit from within (the puzzle's answer, for now: all four take the light).</summary>
+	private void NicheGlow(int i, bool instant = false)
+	{
+		var leaf = NicheX[i] < 0 ? _greatLeft : _greatRight;
+		if (leaf == null || leaf.GetNodeOrNull($"NicheGlow{i}") != null) return;
+		float hx = NicheX[i] < 0 ? -2.6f : 2.6f;
+		var glow = new OmniLight3D { Name = $"NicheGlow{i}", Position = new Vector3(NicheX[i] - hx, NicheY, 0.35f), LightColor = new Color(1f, 0.82f, 0.5f), LightEnergy = instant ? 0.45f : 0f, OmniRange = 1.6f, ShadowEnabled = false };
+		leaf.AddChild(glow);
+		if (!instant) CreateTween().TweenProperty(glow, "light_energy", 0.45f, 1.2f);
 	}
 }

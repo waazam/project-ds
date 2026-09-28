@@ -126,6 +126,8 @@ public partial class StoryTest : Node
 			19 => (Checkpoint.Act18Finished, StateFor(15).flags.Append(StoryManager.Flag.Act18IntroSeen).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			20 => (Checkpoint.Act19Finished, StateFor(19).flags, "lantern,compass,radio;tools=Lighter"),
 			21 => (Checkpoint.Act20Finished, StateFor(19).flags.Concat(new[] { StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+			22 => (Checkpoint.Act21Finished, StateFor(21).flags.Concat(new[] { StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4),
+				StoryManager.Flag.ChurchVestryOpen, StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -135,7 +137,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 21) return false;
+		if (_fromApplied || act < 3 || act > 22) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -280,6 +282,7 @@ public partial class StoryTest : Node
 			new("Act 19: the library", hollow, Act19Library),
 			new("Act 20: the round room", hollow, Act20Round),
 			new("Act 21: the church", hollow, Act21Church),
+			new("Act 22: the winter woods", hollow, Act22Woods),
 		};
 	}
 
@@ -379,7 +382,7 @@ public partial class StoryTest : Node
 		var last = PhotoLog.Instance?.Photos.LastOrDefault();
 		Check("the bird's picture is scored: clarity, focus, framing, zoom, and stars", last is { Scored: true, Stars: >= 1 } && last.Focus > 50,
 			last == null ? "none" : $"{last.SubjectId}: clarity {last.Clarity} focus {last.Focus} framing {last.Framing} zoom {last.Zoom}, {last.Stars} stars");
-		Check("sixty pictures on the list", PhotoCatalog.All.Count == PhotoCatalog.Total && PhotoCatalog.Total == 60, $"{PhotoCatalog.All.Count}");
+		Check("sixty-nine pictures on the list (the winter woods added nine)", PhotoCatalog.All.Count == PhotoCatalog.Total && PhotoCatalog.Total == 69, $"{PhotoCatalog.All.Count}");
 		await Seconds(0.5, ct);
 	}
 
@@ -1796,6 +1799,7 @@ public partial class StoryTest : Node
 		await WaitUntil(() => _input.Enabled, 10, ct);
 		await Frames(5, ct);
 		var atmo = StoryBeat.Atmosphere(this);
+		Check("the compass has died: no heading holds, nothing to point at (until Act 22)", FirstOf<Compass>() is { Dead: true } && s.ObjectivePosition == null, $"dead {FirstOf<Compass>()?.Dead}, objective {s.ObjectivePosition}");
 
 		if (_s.Act14AcrossDone)
 		{
@@ -2795,8 +2799,7 @@ public partial class StoryTest : Node
 		Check("the hatch has fallen shut behind: it won't lift", _player.Interaction?.PromptText == "It won't lift. Shut fast.", $"'{_player.Interaction?.PromptText}'");
 		var atmo = StoryBeat.Atmosphere(_player);
 		Check("back on the surface: no underground black, and it is winter", atmo != null && atmo.Underground < 0.2f && atmo.Winter > 0.5f, $"underground {atmo?.Underground:0.00} winter {atmo?.Winter:0.00}");
-		var obj = s.ObjectivePosition;
-		Check("the compass lives again: it points at a candle", obj is Vector3 o && Enumerable.Range(0, 4).Any(i => o.DistanceTo(church.CandleWorld(i)) < 1f), $"{obj}");
+		Check("the compass is still dead in the church (it comes back outside)", FirstOf<Compass>() is { Dead: true } && s.ObjectivePosition == null, $"{s.ObjectivePosition}");
 		// ---- up the crypt stairs into the nave
 		// between the columns (every 4 m, one right in line with the stair's foot) to the foot, then up
 		await WalkTo(church.ToGlobal(new Vector3(2f, Church.CryptFloor + 0.05f, 42f)), 0.5f, ct, giveUp: 10f);
@@ -2903,18 +2906,131 @@ public partial class StoryTest : Node
 		await Frames(2, ct);
 		Check("the niche with the chalice's shape: set it in", _player.Interaction?.PromptText == "Set the chalice in its place", $"'{_player.Interaction?.PromptText}'");
 		await Press(ct);
-		await WaitUntil(() => s.Current == Checkpoint.Act21Finished, 6, ct);
-		Check("the chalice in the great door: one of four (Act 21 done)", s.Current == Checkpoint.Act21Finished && church.ChalicePlaced && !_inv.HasTool(ToolKind.Chalice), $"{s.Current}");
-		await Seconds(0.6, ct);
-		Screenshot("one_of_four");
+		await WaitUntil(() => s.Current == Checkpoint.Act21Finished, 14, ct);
+		Check("the chalice in the great door: the door's puzzle done, it swings open (Act 21 done)", s.Current == Checkpoint.Act21Finished && church.ChalicePlaced && church.DoorOpen && !_inv.HasTool(ToolKind.Chalice), $"{s.Current}");
+		await WaitUntil(() => Cutscene.ActiveCount == 0 && _input.Enabled, 10, ct);
+		await Seconds(3, ct);
+		await Aim(church.ToGlobal(new Vector3(0, 1.6f, -12f)), ct);
+		Screenshot("the_great_door_open");
+	}
+
+	// ------------------------------------------------------------------ Act 22
+
+	private async Task Act22Woods(CancellationToken ct)
+	{
+		var s = StoryManager.Instance;
+		var church = StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church;
+		var woods = church?.Woods;
+		var lodge = woods?.Lodge;
+		Check("the church, its woods and the lodge exist", church != null && woods != null && lodge != null);
+		if (woods == null || lodge == null) return;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Frames(5, ct);
+		Check("Act 22 starts at Act 21's save, the great door open", s.Current == Checkpoint.Act21Finished && church.DoorOpen, $"{s.Current}");
+		Check("the woods: a long plowed road to the lodge", WinterWoods.Length > 1150f && WinterWoods.Length < 1500f && woods.TreeCount > 2000, $"{WinterWoods.Length:0} m, {woods.TreeCount} trees, {woods.Chunks} chunks");
+		Vector3 R(float along) => woods.ToGlobal(WinterWoods.RoadAt(along, out _));
+		// out through the door onto the road
+		await WalkTo(R(6f), 0.8f, ct, giveUp: 12f);
+		await WalkTo(R(20f), 0.8f, ct, giveUp: 12f);
+		await Seconds(0.5, ct);
+		Check("out on the plowed road, in the snow", woods.PlayerOutside && _player.IsOnFloor(), $"outside {woods.PlayerOutside} at {_player.GlobalPosition}");
+		Check("the compass works again: it points down the road to the lodge", FirstOf<Compass>() is { Dead: false } && s.ObjectivePosition is Vector3 obj && obj.DistanceTo(lodge.FrontDoorWorld) < 4f, $"{s.ObjectivePosition}");
+		await Aim(church.DoorWorld + Vector3.Up * 3f, ct);
+		Screenshot("act22_the_church_behind");
+		await Aim(R(70f) + Vector3.Up * 1.6f, ct);
+		await Seconds(1.0, ct);
+		var atmo = StoryBeat.Atmosphere(_player);
+		Check("dusk under a snow sky, and it's snowing", atmo != null && atmo.WinterDusk > 0.1f && woods.SnowRatio > 0.8f, $"dusk {atmo?.WinterDusk:0.00}, snow {woods.SnowRatio:0.00}");
+		Screenshot("act22_the_plowed_road");
+		// down the road a way on foot: the road holds (ruts, windrows), the trees keep off it
+		float along = 20f;
+		for (; along < 150f; along += 15f)
+			if (!await WalkTo(R(along), 1.2f, ct, giveUp: 12f)) break;
+		Check("walked the road's first 150 m", along >= 150f, $"stuck near {along} m at {_player.GlobalPosition}");
+		// the first sighting: far down the road ahead, in the middle of it; look at it and it's gone up into the trees
+		await Aim(_player.GlobalPosition + (_player.GlobalPosition - R(along + 40f)) with { Y = 0 }, ct);   // look back the way they came
+		await WaitUntil(() => woods.Appearances >= 1, 40, ct);
+		Check("it takes its place on the road ahead", woods.Appearances >= 1 && woods.Wendigo.Visible, $"{woods.Appearances} appearances");
+		await Aim(woods.Wendigo.ChestWorld, ct);
+		Screenshot("act22_wendigo_on_the_road");
+		await WaitUntil(() => woods.Wendigo.Leaps >= 1, 2, ct);
+		Check("looked at, it leaps into the trees at once", woods.Wendigo.Leaps >= 1 && woods.Glimpses >= 1, $"{woods.Glimpses} glimpses, {woods.Wendigo.Leaps} leaps");
+		await Frames(3, ct);
+		Screenshot("act22_wendigo_leaps");
+		await Seconds(1.0, ct);
+		Check("and it's gone", !woods.Wendigo.Visible);
+		// behind them, by a tree: turn round and it goes
+		await Aim(R(along + 40f) + Vector3.Up * 1.6f, ct);
+		bool behind = false;
+		for (int i = 0; i < 20 && !behind; i++) { behind = woods.DebugAppearBehind(); if (!behind) await Seconds(0.3, ct); }
+		Check("it takes its place behind them, by a tree", behind && woods.Wendigo.Visible, $"at {woods.Wendigo.GlobalPosition}");
+		float dist = woods.Wendigo.GlobalPosition.DistanceTo(_player.GlobalPosition);
+		Check("16-40 m back", dist > 12f && dist < 44f, $"{dist:0.0} m");
+		await Seconds(1.0, ct);
+		Check("while they look away, it stays", woods.Wendigo.Visible && woods.Wendigo.Leaps == 1);
+		int leaps = woods.Wendigo.Leaps;
+		await Aim(woods.Wendigo.ChestWorld, ct);
+		Screenshot("act22_wendigo_behind");
+		await WaitUntil(() => woods.Wendigo.Leaps > leaps, 2, ct);
+		Check("turn round and it's up the tree", woods.Wendigo.Leaps > leaps);
+		await Seconds(0.8, ct);
+		Check("it never lays a hand on them", _input.Enabled && _player.IsOnFloor());
+		// a voice from the trees (the first comes within a minute)
+		await WaitUntil(() => woods.Mimics >= 1, 60, ct);
+		Check("a copied voice from the trees", woods.Mimics >= 1, $"{woods.Mimics}");
+		// a picture of the snowman
+		var sm = woods.Props["snowman"];
+		await Inside(woods.ToGlobal(WinterWoods.RoadAt(WinterWoods.PropSpots[0].s, out _)), sm.GlobalPosition, ct);
+		var smShot = await TakePicture(sm.GlobalPosition + Vector3.Up * 1.3f, 1, ct);
+		Check("a picture of the snowman", smShot is { SubjectId: "snowman", Scored: true }, Describe(smShot));
+		// the rest of the weird things on the road, a look at each
+		foreach (var (id, sp, _, _) in WinterWoods.PropSpots)
+		{
+			if (id == "snowman") continue;
+			await Inside(woods.ToGlobal(WinterWoods.RoadAt(sp, out _)), woods.Props[id].GlobalPosition, ct);
+			await Aim(woods.Props[id].GlobalPosition + Vector3.Up * 1.1f, ct);
+			await Seconds(0.3, ct);
+			Screenshot($"act22_{id}");
+		}
+		// the frozen end: no snow falling, the ice on the trees, the air clear and still
+		await Inside(R(WinterWoods.Length - 90f), R(WinterWoods.Length - 40f), ct);
+		await Seconds(4, ct);
+		Check("near the lodge it's frozen: the snow has stopped, ice on everything", woods.PlayerProgress > 0.9f && woods.SnowRatio < 0.15f && (atmo?.Frost ?? 0f) > 0.2f, $"progress {woods.PlayerProgress:0.00}, snow {woods.SnowRatio:0.00}, frost {atmo?.Frost:0.00}");
+		await Aim(lodge.GlobalPosition + Vector3.Up * 10f, ct);
+		Screenshot("act22_the_lodge");
+		// the front doors: chained
+		await WalkTo(R(WinterWoods.Length - 2f), 1.2f, ct, giveUp: 40f);
+		await WalkTo(lodge.FrontStandWorld, 0.6f, ct, giveUp: 25f);
+		await Aim(lodge.FrontDoorWorld + Vector3.Up * 1.4f, ct);
+		await Frames(2, ct);
+		Check("the front doors: chained shut from inside", _player.Interaction?.PromptText == "Chained shut from inside.", $"'{_player.Interaction?.PromptText}' at lodge-local {lodge.ToLocal(_player.GlobalPosition)}");
+		Screenshot("act22_front_doors");
+		await Press(ct);
+		await Seconds(0.5, ct);
+		Check("tried: the compass turns round to the back", s.HasFlag(StoryManager.Flag.LodgeFrontTried) && s.ObjectivePosition is Vector3 b2 && b2.DistanceTo(lodge.BackDoorWorld) < 3f, $"{s.ObjectivePosition}");
+		// round the west wing to the back door
+		await WalkTo(lodge.ToGlobal(new Vector3(-SkiLodge.WingX1 - 6f, 0.05f, SkiLodge.Apothem + 2f)), 1.2f, ct, giveUp: 25f);
+		await WalkTo(lodge.ToGlobal(new Vector3(-SkiLodge.WingX1 - 6f, 0.05f, -SkiLodge.WingHalfZ - 5f)), 1.2f, ct, giveUp: 25f);
+		await WalkTo(lodge.BackStandWorld, 0.6f, ct, giveUp: 25f);
+		await Aim(lodge.BackDoorWorld, ct);
+		await Frames(2, ct);
+		Check("round the back: the door stands open a crack, iced in", _player.Interaction?.PromptText == "Force the door", $"'{_player.Interaction?.PromptText}' at {lodge.ToLocal(_player.GlobalPosition)}");
+		Screenshot("act22_back_door");
+		await Press(ct);
+		await Seconds(2.2, ct);
+		Screenshot("act22_forcing_the_door");
+		await WaitUntil(() => s.Current == Checkpoint.Act22Finished, 20, ct);
+		Check("three shoves, the ice splits, the door swings in: inside (Act 22 done)", s.Current == Checkpoint.Act22Finished && lodge.BackOpen && lodge.Shoves == 3 && lodge.Inside(_player.GlobalPosition), $"{s.Current}, shoves {lodge.Shoves}, at {lodge.ToLocal(_player.GlobalPosition)}");
+		Screenshot("act22_inside");
 		// the credits: every picture, polaroid by polaroid
 		int want = Math.Min(2, PhotoLog.Instance?.RecordedCount ?? 0);
-		await WaitUntil(() => FirstOf<PolaroidMontage>() is { } m && m.Shown >= want, 45, ct);
+		await WaitUntil(() => FirstOf<PolaroidMontage>() is { } m && m.Shown >= want, 60, ct);
 		var mont = FirstOf<PolaroidMontage>();
 		Check("the credits play the pictures back as polaroids", want > 0 && mont != null && mont.Shown >= want, $"{mont?.Shown} shown of {PhotoLog.Instance?.RecordedCount}");
 		await Seconds(1.5, ct);
 		Screenshot("credits_polaroids");
 	}
+
 
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>
 	private async Task Inside(Vector3 at, Vector3 faceToward, CancellationToken ct)

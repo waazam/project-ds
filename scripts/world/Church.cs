@@ -53,6 +53,9 @@ public partial class Church : Node3D
 	private StaticBody3D _stone, _wood, _marbleBody;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 2121 };
 
+	/// <summary>Act 22's woods, road and lodge.</summary>
+	public WinterWoods Woods { get; private set; }
+
 	/// <summary>The long stair this church sits at the top of.</summary>
 	public LongStair Stair { get; set; }
 
@@ -78,6 +81,9 @@ public partial class Church : Node3D
 		BuildGothic();
 		BuildSound();
 		AddChild(new WinterGlade { Name = "WinterGlade" });
+		// Act 22: the winter woods beyond the great door, the plowed road, the ski lodge (it lays all the snow round here)
+		Woods = new WinterWoods { Name = "WinterWoods", Church = this };
+		AddChild(Woods);
 		StartStory();
 		GD.Print("[story] Act 21: the church stands in the snow");
 	}

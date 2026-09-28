@@ -11,10 +11,12 @@ KINDS = {
     "wood": "fine_grained_wood", "plaster": "grey_plaster", "concrete": "concrete", "metal": "rusty_metal_02",
     "fabric": "denim_fabric", "leather": "brown_leather", "stone": "dark_rock", "marble": "marble_01",
     "bark": "bark_brown_02", "foliage": "leafy_grass", "ground": "forest_leaves_02", "grime": "dirty_concrete",
+    "snow": "snow_03", "ice": "snow_floor",
 }
 # how strong each one's grain is (the standard deviation of the albedo multiplier)
 STRENGTH = {"wood": 0.07, "plaster": 0.05, "concrete": 0.06, "metal": 0.08, "fabric": 0.07, "leather": 0.06,
-            "stone": 0.08, "marble": 0.04, "bark": 0.09, "foliage": 0.08, "ground": 0.1, "grime": 0.06}
+            "stone": 0.08, "marble": 0.04, "bark": 0.09, "foliage": 0.08, "ground": 0.1, "grime": 0.06,
+            "snow": 0.07, "ice": 0.05}
 
 
 def read(path, pix, ch):

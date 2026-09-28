@@ -38,14 +38,19 @@ public static class PhotoCatalog
 		// the church (Act 21)
 		new("church_nave", "the church", 12f), new("font", "the font", 0.8f), new("altar", "the altar", 2f),
 		new("crypt", "the crypt", 3f), new("church_door", "the great door", 2.5f),
+		// the winter woods (Act 22)
+		new("snowman", "a snowman", 1.2f), new("plow", "the snowplow", 3f), new("antler_tree", "antlers in a tree", 3f),
+		new("ski_tracks", "tracks that stop", 1.5f), new("empty_clothes", "empty clothes", 1.2f), new("frozen_deer", "a frozen deer", 1f),
+		new("lodge_sign", "the lodge sign", 1f), new("the_lodge", "the ski lodge", 20f),
 		// the things that hunt you: hard to get, worth double
 		new("stalker", "IT", 1.2f, true), new("giant", "the giant", 12f, true), new("room_thing", "the thing in the room", 1f, true),
 		new("bunker_creature", "it followed me", 1.2f, true), new("leviathan", "the lake thing", 9f, true), new("dead_eye", "the eye", 0.7f, true),
 		new("shadowman", "the shadow man", 1.1f, true), new("pit_beast", "the beast in the pit", 7f, true),
 		new("lake_creature", "something in the water", 2f, true),
+		new("wendigo", "it wears antlers", 1.8f, true),
 	};
 
-	public const int Total = 60;
+	public const int Total = 69;   // sixty, and the winter woods' nine (Act 22)
 
 	private static readonly Dictionary<string, Entry> _byId = All.ToDictionary(e => e.Id);
 

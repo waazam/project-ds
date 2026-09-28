@@ -21,7 +21,10 @@ public partial class Church
 	public const float VestryX0 = -TransHalf - WallT, VestryX1 = VestryX0 - 8f, VestryZ0 = 55.5f, VestryZ1 = 65.5f, VestryH = 4.6f;
 
 	private readonly List<(Node3D flame, OmniLight3D light, PickupInteractable use)> _candles = new();
-	private Node3D _fontLid, _vestryDoor, _chaliceInDoor;
+	private Node3D _fontLid, _vestryDoor, _chaliceInDoor, _greatLeft, _greatRight;
+	private StaticBody3D _greatBody;
+	private static StandardMaterial3D _nicheBack;
+	private static StandardMaterial3D NicheBackMat => _nicheBack ??= new StandardMaterial3D { AlbedoColor = new Color(0.04f, 0.035f, 0.03f), Roughness = 1f };
 	private PickupInteractable _fontUse;
 	private readonly List<PickupInteractable> _niches = new();
 
@@ -323,56 +326,66 @@ public partial class Church
 	private void BuildDoors()
 	{
 		// ---- the great door: two tall oak leaves under the pointed arch, banded with iron, great rings,
-		// and four niches cut into them for the four pieces
-		var k = new MeshKit();
+		// and four niches cut into them for the four pieces. Each leaf hangs on its own hinge (at the jamb,
+		// x = +-2.6) so the door can swing in at Act 21's end.
 		float z = -0.75f;
+		_greatBody = new StaticBody3D { Name = "GreatDoorBody", CollisionLayer = 1, CollisionMask = 0 };
+		_greatBody.SetMeta("surface", "wood");
+		AddChild(_greatBody);
 		foreach (float s in new[] { -1f, 1f })
 		{
+			var hinge = new Node3D { Name = s < 0 ? "GreatDoorLeft" : "GreatDoorRight", Position = new Vector3(s * 2.6f, 0, z) };
+			AddChild(hinge);
+			if (s < 0) _greatLeft = hinge; else _greatRight = hinge;
+			var k = new MeshKit();
+			// the leaf in the hinge's space: its x runs from the jamb (0) toward the middle (-s * 2.6)
+			float hx = s * 2.6f;
 			k.Mat(ChurchTextures.OakMat);
 			k.Color = Colors.White * 0.85f;
 			for (float u = 0f; u < 2.59f; u += 0.2f)
 			{
 				float ua = s * u, ub = s * Mathf.Min(u + 0.2f, 2.6f);
 				float ta = 5f + Pointed(ua, 2.6f, 2.6f * 2f * 0.6f), tb = 5f + Pointed(ub, 2.6f, 2.6f * 2f * 0.6f);
-				float x0 = Mathf.Min(ua, ub), x1 = Mathf.Max(ua, ub), t0 = ua < ub ? ta : tb, t1 = ua < ub ? tb : ta;
+				float x0 = Mathf.Min(ua, ub) - hx, x1 = Mathf.Max(ua, ub) - hx, t0 = ua < ub ? ta : tb, t1 = ua < ub ? tb : ta;
 				// a board, front and back, following the arch at its top
-				k.Quad(new Vector3(x0, 0, z + 0.08f), new Vector3(x1, 0, z + 0.08f), new Vector3(x1, t1, z + 0.08f), new Vector3(x0, t0, z + 0.08f), Vector3.Back,
-					new Vector2(x0, t0), new Vector2(x1, t1), new Vector2(x1, 0), new Vector2(x0, 0));
-				k.Quad(new Vector3(x1, 0, z - 0.08f), new Vector3(x0, 0, z - 0.08f), new Vector3(x0, t0, z - 0.08f), new Vector3(x1, t1, z - 0.08f), Vector3.Forward);
+				k.Quad(new Vector3(x0, 0, 0.08f), new Vector3(x1, 0, 0.08f), new Vector3(x1, t1, 0.08f), new Vector3(x0, t0, 0.08f), Vector3.Back,
+					new Vector2(x0 + hx, t0), new Vector2(x1 + hx, t1), new Vector2(x1 + hx, 0), new Vector2(x0 + hx, 0));
+				k.Quad(new Vector3(x1, 0, -0.08f), new Vector3(x0, 0, -0.08f), new Vector3(x0, t0, -0.08f), new Vector3(x1, t1, -0.08f), Vector3.Forward);
 			}
 			// iron bands with scrolled ends, a great ring and its boss
 			k.Mat(ChurchTextures.IronMat);
 			k.Color = Colors.White;
 			foreach (float y in new[] { 0.6f, 2.6f, 4.6f })
 			{
-				BuildKit.Box(k, new Vector3(s * 1.3f, y, z + 0.1f), new Vector3(2.5f, 0.1f, 0.03f), 1f);
-				k.Cylinder(new Vector3(s * 0.2f, y, z + 0.1f), new Vector3(s * 0.2f, y, z + 0.14f), 0.07f, 0.07f, 8, true);
+				BuildKit.Box(k, new Vector3(s * 1.3f - hx, y, 0.1f), new Vector3(2.5f, 0.1f, 0.03f), 1f);
+				k.Cylinder(new Vector3(s * 0.2f - hx, y, 0.1f), new Vector3(s * 0.2f - hx, y, 0.14f), 0.07f, 0.07f, 8, true);
 			}
-			k.Cylinder(new Vector3(s * 0.45f, 3.2f, z + 0.1f), new Vector3(s * 0.45f, 3.2f, z + 0.16f), 0.12f, 0.1f, 10, true);
+			k.Cylinder(new Vector3(s * 0.45f - hx, 3.2f, 0.1f), new Vector3(s * 0.45f - hx, 3.2f, 0.16f), 0.12f, 0.1f, 10, true);
 			for (int i = 0; i < 16; i++)
 			{
 				float a0 = Mathf.Tau * i / 16f, a1 = Mathf.Tau * (i + 1) / 16f;
-				k.Beam(new Vector3(s * 0.45f + Mathf.Cos(a0) * 0.2f, 3.0f + Mathf.Sin(a0) * 0.2f, z + 0.17f), new Vector3(s * 0.45f + Mathf.Cos(a1) * 0.2f, 3.0f + Mathf.Sin(a1) * 0.2f, z + 0.17f), 0.03f, 0.03f);
+				k.Beam(new Vector3(s * 0.45f - hx + Mathf.Cos(a0) * 0.2f, 3.0f + Mathf.Sin(a0) * 0.2f, 0.17f), new Vector3(s * 0.45f - hx + Mathf.Cos(a1) * 0.2f, 3.0f + Mathf.Sin(a1) * 0.2f, 0.17f), 0.03f, 0.03f);
 			}
+			// the niches on this leaf: a carved stone frame round a dark hollow, and on its back, the shape of what goes in it
+			for (int i = 0; i < 4; i++)
+			{
+				if (Mathf.Sign(NicheX[i]) != s) continue;
+				var c = new Vector3(NicheX[i] - hx, NicheY, 0.09f);
+				k.Mat(ChurchTextures.AshlarMat);
+				k.Color = Colors.White;
+				BuildKit.Box(k, c + new Vector3(0, 0.32f, 0.04f), new Vector3(0.56f, 0.08f, 0.1f), 1f);
+				BuildKit.Box(k, c + new Vector3(0, -0.32f, 0.04f), new Vector3(0.56f, 0.08f, 0.1f), 1f);
+				BuildKit.Box(k, c + new Vector3(-0.24f, 0, 0.04f), new Vector3(0.08f, 0.56f, 0.1f), 1f);
+				BuildKit.Box(k, c + new Vector3(0.24f, 0, 0.04f), new Vector3(0.08f, 0.56f, 0.1f), 1f);
+				k.Mat(NicheBackMat);
+				k.Quad(c + new Vector3(-0.2f, -0.28f, 0.005f), c + new Vector3(0.2f, -0.28f, 0.005f), c + new Vector3(0.2f, 0.28f, 0.005f), c + new Vector3(-0.2f, 0.28f, 0.005f), Vector3.Back);
+				k.Mat(ChurchTextures.GoldMat);
+				NicheIcon(k, i, c + new Vector3(0, 0, 0.02f));
+			}
+			k.CommitTo(hinge, "Leaf", true);
+			_greatBody.AddChild(new CollisionShape3D { Name = s < 0 ? "LeftShape" : "RightShape", Position = new Vector3(s * 1.3f, 3.5f, z), Shape = new BoxShape3D { Size = new Vector3(2.6f, 7f, 0.3f) } });
 		}
-		// the niches: a carved stone frame round a dark hollow, and on its back, the shape of what goes in it
-		for (int i = 0; i < 4; i++)
-		{
-			var c = new Vector3(NicheX[i], NicheY, z + 0.09f);
-			k.Mat(ChurchTextures.AshlarMat);
-			k.Color = Colors.White;
-			BuildKit.Box(k, c + new Vector3(0, 0.32f, 0.04f), new Vector3(0.56f, 0.08f, 0.1f), 1f);
-			BuildKit.Box(k, c + new Vector3(0, -0.32f, 0.04f), new Vector3(0.56f, 0.08f, 0.1f), 1f);
-			BuildKit.Box(k, c + new Vector3(-0.24f, 0, 0.04f), new Vector3(0.08f, 0.56f, 0.1f), 1f);
-			BuildKit.Box(k, c + new Vector3(0.24f, 0, 0.04f), new Vector3(0.08f, 0.56f, 0.1f), 1f);
-			k.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.04f, 0.035f, 0.03f), Roughness = 1f });
-			k.Quad(c + new Vector3(-0.2f, -0.28f, 0.005f), c + new Vector3(0.2f, -0.28f, 0.005f), c + new Vector3(0.2f, 0.28f, 0.005f), c + new Vector3(-0.2f, 0.28f, 0.005f), Vector3.Back);
-			k.Mat(ChurchTextures.GoldMat);
-			NicheIcon(k, i, c + new Vector3(0, 0, 0.02f));
-		}
-		k.CommitTo(this, "GreatDoor", true);
-		Collide(_wood, new Vector3(0, 3.5f, z), new Vector3(5.2f, 7f, 0.3f));
-		var doorUse = new PickupInteractable { Name = "GreatDoorUse", PickRadius = 1.4f, MaxDistance = 3.2f, Position = new Vector3(0, 2.6f, z + 0.2f), PromptFor = _ => "Locked fast. Four empty niches in it.", CanUse = _ => false };
+		var doorUse = new PickupInteractable { Name = "GreatDoorUse", PickRadius = 1.4f, MaxDistance = 3.2f, Position = new Vector3(0, 2.6f, z + 0.2f), PromptFor = _ => DoorOpen ? "" : "Locked fast. Four empty niches in it.", CanUse = _ => false };
 		doorUse.Interacted += _ => { };
 		AddChild(doorUse);
 		for (int i = 0; i < 4; i++)

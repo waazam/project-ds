@@ -139,7 +139,15 @@ public partial class StoryManager : Node
 		public const string ChurchFontOpen = "church_font_open";
 		/// <summary>Act 21: the chalice set in the great door (the first of its four pieces).</summary>
 		public const string ChurchChalicePlaced = "church_chalice_placed";
+		/// <summary>Act 22: the ski lodge's front door tried (locked): the compass moves round to the back door.</summary>
+		public const string LodgeFrontTried = "lodge_front_tried";
+		/// <summary>Act 22: the lodge's iced-in back door forced open (the act's end).</summary>
+		public const string LodgeBackDoorOpen = "lodge_back_door_open";
 	}
+
+	/// <summary>The compass is dead (the owner: it stops working down the stairwell in Act 14 and comes back to
+	/// life outside the church in Act 22): the strip drifts and swings, no bearing holds, no objective shows.</summary>
+	public bool CompassDead => Current >= Checkpoint.Act13Finished && Current < Checkpoint.Act21Finished;
 
 	/// <summary>Raised after a checkpoint is reached (and saved). Triggers use it to re-check a waiting condition.</summary>
 	public event System.Action<Checkpoint> CheckpointReached;
@@ -199,8 +207,10 @@ public partial class StoryManager : Node
 			if (Current < Checkpoint.Act10WalkieFound) return MarkerPos("bunker_entrance_marker");
 			if (Current < Checkpoint.Act11GiantEncounter)
 				return MarkerPos("final_stairs_marker");   // from the bunker on, the compass leads to the last staircase (Dan, 2026-09-22)
-			// Act 21: back on the surface, the compass comes back to life: it points at what the church wants next
-			if (Current >= Checkpoint.Act21ChurchReached && Current < Checkpoint.Act21Finished) return MarkerPos("church_objective_marker");
+			// Act 22: out of the church's great door, the compass comes back to life: it points down the plowed road
+			// to the ski lodge's front door, then (once that is found locked) round to the back door.
+			if (Current == Checkpoint.Act21Finished)
+				return HasFlag(Flag.LodgeFrontTried) ? MarkerPos("lodge_back_marker") : MarkerPos("lodge_front_marker");
 			return null;
 		}
 	}

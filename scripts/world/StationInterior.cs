@@ -122,7 +122,11 @@ public partial class StationInterior : Node3D
 		// Act 21: in the church's crypt beside the hatch, facing along it; and inside the great door, facing the altar
 		Vector3 church = BossAt + BossRoom.LibraryLocal + Library.RoundRoomAt + new Vector3(0, RoundRoom.Rise + RoundRoom.DaisTop, 0) + LongStair.ChurchOrigin;
 		Marker("Act21ChurchMarker", ToGlobal(church + Church.HatchLocal + new Vector3(0, 0.08f, -1.3f)), Rotation.Y + Mathf.Pi, "respawn_Act21ChurchReached");
-		Marker("Act21EndMarker", ToGlobal(church + new Vector3(0, 0.05f, 3.5f)), Rotation.Y + Mathf.Pi, "respawn_Act21Finished");
+		// Act 21's end (Act 22's start): outside the great door, on the plowed road, facing away down it
+		var step = WinterWoods.RoadAt(5f, out _);
+		Marker("Act21EndMarker", ToGlobal(church + step + new Vector3(0, 0.1f, 0)), Rotation.Y, "respawn_Act21Finished");
+		// Act 22's end (Act 23's start): in the ski lodge's mudroom, just in from the back door, facing the inner door
+		Marker("Act22EndMarker", ToGlobal(church + SkiLodge.OriginLocal + new Vector3(SkiLodge.BackDoorX, 0.1f, -SkiLodge.WingHalfZ + 3.2f)), Rotation.Y + Mathf.Pi, "respawn_Act22Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });

@@ -147,6 +147,19 @@ public partial class ForestAtmosphere : Node
 	/// <summary>Act 21 on: back on the surface, and it is winter (0..1): a pale, cold overcast, a thin
 	/// blue-grey haze, cool flat ambient light and a weak white sun, whatever the mood was.</summary>
 	public float Winter { get; set; }
+	/// <summary>Act 22's woods (0..1): the winter light going to dusk under a low snow sky: a dark blue-grey murk
+	/// that closes in at a hundred metres, little ambient, a weak sun (the owner: isolated and creepy; and a
+	/// field of snow must never glare).</summary>
+	public float WinterDusk { get; set; }
+	/// <summary>Act 22, nearing the ski lodge (0..1): the snow stops and the air freezes still: the murk thins a
+	/// little and goes a colder, clearer blue.</summary>
+	public float Frost { get; set; }
+	[Export] public Color DuskFogColor = new(0.15f, 0.17f, 0.21f);
+	[Export] public float DuskFogDensity = 0.028f;
+	[Export] public Color DuskAmbientColor = new(0.42f, 0.48f, 0.6f);
+	[Export] public float DuskAmbientScale = 0.5f;
+	[Export] public Color FrostFogColor = new(0.13f, 0.17f, 0.24f);
+	[Export] public float FrostFogDensity = 0.02f;
 	/// <summary>Inside the church (0..1): a dark, thin, smoky haze and little ambient light, so the candles,
 	/// the stained glass and the lantern do the lighting (the owner: the white glare hurt; more gothic).</summary>
 	public float Interior { get; set; }
@@ -529,6 +542,16 @@ public partial class ForestAtmosphere : Node
 			sunEnergy = Mathf.Lerp(sunEnergy, WinterSun, winter);
 			sunColor = sunColor.Lerp(WinterSunColor, winter);
 		}
+		float dusk = Mathf.Clamp(WinterDusk, 0f, 1f);
+		if (dusk > 0f)
+		{
+			float frost = Mathf.Clamp(Frost, 0f, 1f);
+			fog = fog.Lerp(DuskFogColor.Lerp(FrostFogColor, frost), dusk);
+			density = Mathf.Lerp(density, Mathf.Lerp(DuskFogDensity, FrostFogDensity, frost), dusk);
+			ambColor = ambColor.Lerp(DuskAmbientColor, dusk);
+			ambient *= Mathf.Lerp(1f, DuskAmbientScale, dusk);
+			sunEnergy *= 1f - 0.6f * dusk;
+		}
 		float inside = Mathf.Clamp(Interior, 0f, 1f);
 		if (inside > 0f)
 		{
@@ -547,7 +570,8 @@ public partial class ForestAtmosphere : Node
 		}
 		_env.FogLightColor = fog;
 		_env.FogDensity = density;
-		_env.FogSkyAffect = _baseSkyFog;
+		// Act 22's dusk: the fog swallows the sky's warm glow too (a low snow sky, not a sunset)
+		_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 0.92f, Mathf.Clamp(WinterDusk, 0f, 1f));
 		if (_act1On)
 		{
 			// Act 1: depth fog closing in round them as they walk toward the fallen tree (the level's

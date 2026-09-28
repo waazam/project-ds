@@ -48,6 +48,7 @@ public partial class CreaturePreview : Node3D
 	private async void Run()
 	{
 		await Frames(10);
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		// the crawler (Act 14), on a floor, walking a few metres so its gait shows
 		var floor = new StaticBody3D { Name = "Floor" };
 		floor.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(40, 1, 40) }, Position = new Vector3(0, -0.5f, 0) });
@@ -146,5 +147,25 @@ public partial class CreaturePreview : Node3D
 		await Shot("stalker_side", new Vector3(904.5f, 1.8f, 0.2f), new Vector3(900, 1.6f, 0));
 		await Shot("stalker_shoulder", new Vector3(901.6f, 2.3f, 1.4f), new Vector3(900.3f, 2.05f, 0));
 		GetTree().Quit();
+	}
+
+	/// <summary>The wendigo (Act 22): standing in snow at dusk, lit low and cold, front, side, three-quarter, the head close.</summary>
+	private async Task WendigoShots()
+	{
+		env.BackgroundColor = new Color(0.1f, 0.11f, 0.14f);
+		env.AmbientLightColor = new Color(0.45f, 0.5f, 0.62f);
+		env.AmbientLightEnergy = 0.35f;
+		var ground = new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(30, 30) }, MaterialOverride = World.WinterWoods.PropSnow };
+		AddChild(ground);
+		var w = new Wendigo { Name = "Wendigo" };
+		AddChild(w);
+		w.StandAt(Vector3.Zero, new Vector3(0, 0, -10));
+		await Seconds(1.5);
+		await Shot("wendigo_front", new Vector3(0.6f, 2.2f, -6.5f), new Vector3(0, 2.0f, 0));
+		await Shot("wendigo_three_quarter", new Vector3(3.8f, 2.4f, -4.2f), new Vector3(0, 2.1f, 0));
+		await Shot("wendigo_side", new Vector3(5.5f, 2.0f, 0.2f), new Vector3(0, 1.9f, 0));
+		await Shot("wendigo_back", new Vector3(-2.5f, 2.6f, 5f), new Vector3(0, 2.2f, 0));
+		await Shot("wendigo_head", new Vector3(0.7f, 3.3f, -2.2f), new Vector3(0, 3.2f, -0.7f));
+		await Shot("wendigo_far_dusk", new Vector3(2f, 1.7f, -22f), new Vector3(0, 2f, 0));
 	}
 }

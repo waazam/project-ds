@@ -24,17 +24,10 @@ public partial class WinterGlade : Node3D
 
 	/// <summary>The snow's height at local (x, z): flat round the church, then slow drifts and low rises
 	/// climbing gently toward the edge so the horizon is trees, not a rim.</summary>
-	public static float HeightAt(float x, float z)
-	{
-		float d = OutsideChurch(x, z);
-		float swell = Mathf.SmoothStep(8f, 40f, d);
-		float n = Mathf.Sin(x * 0.045f + 1.3f) * Mathf.Cos(z * 0.038f - 0.7f) * 2.2f + Mathf.Sin(x * 0.11f + z * 0.07f) * 0.7f;
-		float rise = Mathf.Max(0f, new Vector2(x - Centre.X, z - Centre.Y).Length() - 110f) * 0.12f;
-		return GroundY + swell * (n + 1.2f + rise);
-	}
+	public static float HeightAt(float x, float z) => WinterWoods.Height(x, z);   // one ground for the clearing and Act 22's woods
 
 	/// <summary>How far a point is outside the church's footprint (0 inside it).</summary>
-	private static float OutsideChurch(float x, float z)
+	public static float OutsideChurch(float x, float z)
 	{
 		float dx = Mathf.Max(Mathf.Max(Church.VestryX1 - 1f - x, x - (Church.TransHalf + 1.5f)), 0f);
 		float dz = Mathf.Max(Mathf.Max(-2f - z, z - (Church.ChancelEnd + Church.ApseR + 1f)), 0f);
@@ -43,7 +36,8 @@ public partial class WinterGlade : Node3D
 
 	public override void _Ready()
 	{
-		BuildGround();
+		// (the snow on the ground is WinterWoods': one ground from the church's walls to the ski lodge)
+		WinterWoods.TreeSpots.Clear();   // the glade is built first: it starts the list
 		BuildTrees();
 		BuildSnowfall();
 	}
@@ -72,36 +66,6 @@ public partial class WinterGlade : Node3D
 			}
 	}
 
-	private void BuildGround()
-	{
-		var k = new MeshKit();
-		k.Mat(ChurchTextures.SnowMat);
-		const float cell = 5f;
-		for (float x = Centre.X - Radius; x < Centre.X + Radius; x += cell)
-			for (float z = Centre.Y - Radius; z < Centre.Y + Radius; z += cell)
-			{
-				if (new Vector2(x + cell * 0.5f - Centre.X, z + cell * 0.5f - Centre.Y).Length() > Radius) continue;
-				// under the church (and its crypt) there's no snow to draw
-				if (OutsideChurch(x + cell * 0.5f, z + cell * 0.5f) <= 0f && OutsideChurch(x, z) <= 0f && OutsideChurch(x + cell, z + cell) <= 0f) continue;
-				Vector3 P(float px, float pz) => new(px, HeightAt(px, pz), pz);
-				Vector3 a = P(x, z), b = P(x + cell, z), c = P(x + cell, z + cell), d = P(x, z + cell);
-				Vector3 n = (d - a).Cross(b - a).Normalized();
-				if (n.Y < 0) n = -n;
-				k.Color = Colors.White * (0.92f + 0.08f * Mathf.Sin(x * 0.3f + z * 0.2f));
-				k.Quad(a, b, c, d, n, new Vector2(x, z), new Vector2(x + cell, z), new Vector2(x + cell, z + cell), new Vector2(x, z + cell));
-			}
-		var mi = k.CommitTo(this, "Snowfield", false);
-		// something to stand on round the walls (Act 22 may go outside): a plain collision slab
-		var body = new StaticBody3D { Name = "SnowBody", CollisionLayer = 1, CollisionMask = 0 };
-		body.SetMeta("surface", "snow");
-		// four slabs round the church's footprint, never under it (its crypt and the crypt's stairs are down there)
-		float x0 = Church.VestryX1 - 1f, x1 = Church.TransHalf + 1.5f, z0 = -2f, z1 = Church.ChancelEnd + Church.ApseR + 1f;
-		float X0 = Centre.X - 60f, X1 = Centre.X + 60f, Z0 = Centre.Y - 75f, Z1 = Centre.Y + 75f;
-		foreach (var (a0, a1, b0, b1) in new[] { (X0, x0, Z0, Z1), (x1, X1, Z0, Z1), (x0, x1, Z0, z0), (x0, x1, z1, Z1) })
-			body.AddChild(new CollisionShape3D { Position = new Vector3((a0 + a1) * 0.5f, GroundY - 0.5f, (b0 + b1) * 0.5f), Shape = new BoxShape3D { Size = new Vector3(a1 - a0, 1f, b1 - b0) } });
-		AddChild(body);
-	}
-
 	private void BuildTrees()
 	{
 		var kinds = new List<(Mesh mesh, float weight, float scale)>
@@ -124,6 +88,7 @@ public partial class WinterGlade : Node3D
 			float a = _rng.RandfRange(0, Mathf.Tau), r = Mathf.Sqrt(_rng.RandfRange(0.02f, 1f)) * (Radius - 10f);
 			var p = Centre + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
 			if (OutsideChurch(p.X, p.Y) < 16f) continue;
+			if (WinterWoods.Nearest(p.X, p.Y, out _, out _) < 16f) continue;   // off Act 22's plowed road
 			bool close = false;
 			foreach (var q in placed) if (q.DistanceSquaredTo(p) < 36f) { close = true; break; }
 			if (close) continue;
@@ -134,6 +99,7 @@ public partial class WinterGlade : Node3D
 			float s = _rng.RandfRange(0.8f, 1.2f);
 			var basis = new Basis(Vector3.Up, _rng.RandfRange(0, Mathf.Tau)).Scaled(Vector3.One * s);
 			byKind[kind].Add(new Transform3D(basis, new Vector3(p.X, HeightAt(p.X, p.Y) - 0.1f, p.Y)));
+			WinterWoods.TreeSpots.Add((p, 16f * s, kind < 3));   // the wendigo leaps into these too
 		}
 		for (int i = 0; i < kinds.Count; i++)
 		{

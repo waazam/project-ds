@@ -48,6 +48,11 @@ public partial class Compass : CanvasLayer
 	private float _jitter;
 	private readonly RandomNumberGenerator _rng = new();
 	private float _glitchPhase;
+	// dead (Act 14's stairwell to the church's great door): the strip shows a heading that wanders on its own
+	private float _deadYaw, _deadVel, _deadGoal;
+	private double _deadNextSwing;
+	/// <summary>For tests: the compass is dead (no heading holds, no objective).</summary>
+	public bool Dead { get; private set; }
 	private float _falseBearing;
 	private double _nextFalseBearing;
 	private double _clock;
@@ -90,6 +95,8 @@ public partial class Compass : CanvasLayer
 		_jitter = distortion > 0.15f ? (distortion - 0.15f) / 0.85f : 0f;
 
 		_glitchPhase += (float)delta;
+		Dead = Systems.StoryManager.Instance?.CompassDead ?? false;
+		if (Dead) UpdateDead((float)delta);
 		UpdateShownBearing((float)delta);
 		_draw.QueueRedraw();
 	}
@@ -99,8 +106,8 @@ public partial class Compass : CanvasLayer
 		if (_player == null || !IsInstanceValid(_player) || _player.CameraRig == null) return;
 		var size = _draw.Size;
 		float cx = size.X * 0.5f, cy = size.Y * 0.5f;
-		float yawDeg = Mathf.RadToDeg(_player.CameraRig.Yaw);
-		float jitter = _jitter;
+		float yawDeg = Dead ? _deadYaw : Mathf.RadToDeg(_player.CameraRig.Yaw);
+		float jitter = Dead ? 0.35f : _jitter;
 
 		// A thin baseline, Skyrim-style but fainter — no backing bar, just the line and its ticks,
 		// fading out at both ends.
@@ -157,6 +164,22 @@ public partial class Compass : CanvasLayer
 			float dir = bx < 4 ? -1f : 1f;
 			_draw.DrawColoredPolygon(new[] { new Vector2(ex, cy - 3.5f), new Vector2(ex + dir * 4.5f, cy), new Vector2(ex, cy + 3.5f) }, markColor);
 		}
+	}
+
+	/// <summary>The dead compass: it drifts, hunts back and forth, and now and then swings round to somewhere new
+	/// and settles there, as if something else were pulling it; turning the player does nothing to it.</summary>
+	private void UpdateDead(float dt)
+	{
+		if (_clock >= _deadNextSwing)
+		{
+			_deadNextSwing = _clock + _rng.RandfRange(2.5f, 7f);
+			_deadGoal = _deadYaw + _rng.RandfRange(-160f, 160f);
+		}
+		float wander = Mathf.Sin((float)_clock * 0.7f) * 12f + Mathf.Sin((float)_clock * 1.9f + 1.3f) * 4f;
+		_deadVel = Mathf.Lerp(_deadVel, (_deadGoal + wander - _deadYaw) * 1.4f, 1f - Mathf.Exp(-dt * 2.5f));
+		_deadVel = Mathf.Clamp(_deadVel, -90f, 90f);
+		_deadYaw = Mathf.Wrap(_deadYaw + _deadVel * dt, -180f, 180f);
+		_deadGoal = _deadYaw + Mathf.Wrap(_deadGoal - _deadYaw, -180f, 180f);
 	}
 
 	private float JitterPx(float jitter, float amount) => jitter <= 0f ? 0f : Mathf.Sin(_glitchPhase * 41f + amount) * amount * jitter;
