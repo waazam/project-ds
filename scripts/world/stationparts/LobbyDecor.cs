@@ -223,9 +223,11 @@ public partial class LobbyDecor : Node3D
 		foreach (int s in new[] { -1, 1 })
 			BuildKit.Box(ck, new Vector3(-3.4f + s * 0.7f, 0.21f, D - 0.4f), new Vector3(0.06f, 0.42f, 0.38f), 1.2f);
 		ck.Color = Colors.White;
-		ck.CommitTo(bench, "Bench", true);
+		MeshKit.Solidify(ck.CommitTo(bench, "Bench", true), null, "wood", true);
 
-		Chair(Group("ChairUp", 0, 1), new Vector3(0.9f, 0, 3.7f), 0.2f, false);
+		var chairUp = Group("ChairUp", 0, 1);
+		Chair(chairUp, new Vector3(0.9f, 0, 3.7f), 0.2f, false);
+		MeshKit.SolidifyAll(chairUp, new Vector3(0.85f, 0.9f, 0.85f), "wood", true);
 		Chair(Group("ChairDown", 2, 4), new Vector3(1.6f, 0, 2.0f), 1.1f, true);
 
 		var coat = Group("CoatStand", 0, 3);
@@ -242,10 +244,14 @@ public partial class LobbyDecor : Node3D
 		ct.Mat(StationTextures.Flat("st_jacket", new Color(0.28f, 0.34f, 0.2f), 0.9f, 0.1f));
 		ct.Color = Colors.White;
 		ct.Blob(cs + new Vector3(0.05f, 1.35f, 0.05f), new Vector3(0.22f, 0.4f, 0.12f), 5, 0.12f, false);
-		ct.CommitTo(coat, "CoatStand", true);
+		MeshKit.Solidify(ct.CommitTo(coat, "CoatStand", true), new Vector3(0.35f, 1f, 0.35f), "wood", true);
 
-		PlantPot(Group("Plant", 0, 0), new Vector3(4.3f, 0, 3.9f), false);
-		PlantPot(Group("PlantDead", 1, 2), new Vector3(4.3f, 0, 3.9f), true);
+		var plant = Group("Plant", 0, 0);
+		var plantDead = Group("PlantDead", 1, 2);
+		PlantPot(plant, new Vector3(4.3f, 0, 3.9f), false);
+		PlantPot(plantDead, new Vector3(4.3f, 0, 3.9f), true);
+		MeshKit.SolidifyAll(plant, new Vector3(0.6f, 0.9f, 0.6f), "stone", true);
+		MeshKit.SolidifyAll(plantDead, new Vector3(0.6f, 0.9f, 0.6f), "stone", true);
 
 		// the wall clock over Room 1's door (ticks while all is well; stops in the damp)
 		var clock = Group("WallClock", 0, 2);

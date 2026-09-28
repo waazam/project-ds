@@ -52,7 +52,7 @@ public partial class DeadEye : Node3D
 		if (!SeenNow)
 		{
 			_unseen += dt;
-			// turn to face them (and settle, lid drooping, looking right at where they'll look back from)
+			// turn to face them (and settle, looking right at where they'll look back from)
 			Vector3 to = cam.GlobalPosition - GlobalPosition;
 			if (to.LengthSquared() > 0.01f) _model.GlobalBasis = Basis.LookingAt(to, Vector3.Up);
 			if (Wandering && _unseen > 0.6f && Anchors.Count > 1 && _rng.Randf() < dt * 1.4f) Hop(cam);

@@ -574,7 +574,8 @@ public partial class BunkerRooms : Node3D
 				k.Cylinder(r, r + inward * 0.014f, 0.014f, 0.011f, 6);
 			}
 		}
-		k.CommitTo(this, index < 0 ? "EntryFrame" : $"DoorFrame{index}");
+		// its threshold lies on the floor: lifted a hair so the two don't fight (the clip audit)
+		MeshKit.Shrink(k.CommitTo(this, index < 0 ? "EntryFrame" : $"DoorFrame{index}"));
 
 		// The leaf pivots on its hinge edge (so the entry door can swing); its mesh is authored in room space and shifted back.
 		Vector3 hinge = at + side * (-w * 0.5f);
@@ -639,7 +640,8 @@ public partial class BunkerRooms : Node3D
 		k.Box(new Vector3(0, RoomH * 0.5f, HallZ1 + 0.15f), new Vector3(HallHalfW * 2f + 0.6f, RoomH, 0.3f));
 		k.Color = new Color(0.8f, 0.8f, 0.8f);
 		k.Box(new Vector3(0, RoomH + 0.05f, mid), new Vector3(HallHalfW * 2f, 0.1f, len));
-		k.CommitTo(this, "ExitHallShell");
+		// its end wall shares the room's wall plane: set a hair back behind it (the clip audit)
+		MeshKit.NudgeAll(k.CommitTo(this, "ExitHallShell"), new Vector3(1, 1, -1));
 		var f = new MeshKit();
 		f.Mat(BunkerTextures.MazeFloorMat);
 		f.Color = Colors.White;

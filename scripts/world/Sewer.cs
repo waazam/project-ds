@@ -162,7 +162,7 @@ public partial class Sewer : Node3D
 		BuildKit.Box(door, new Vector3(0, 0.8f + 1.05f, 0.03f), new Vector3(1.0f, 2.1f, 0.06f));
 		door.Color = new Color(0.8f, 0.78f, 0.7f);
 		BuildKit.Box(door, new Vector3(0.38f, 0.8f + 1.0f, 0.08f), new Vector3(0.1f, 0.03f, 0.04f));
-		door.CommitTo(this, "Door", true);
+		MeshKit.Solidify(door.CommitTo(this, "Door", true), Vector3.One, "metal");
 		brick.CommitTo(this, "Pipe", true);
 	}
 

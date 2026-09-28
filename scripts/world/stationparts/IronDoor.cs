@@ -136,7 +136,7 @@ public partial class IronDoor : Node3D
 		_leaf.AddChild(holder);
 		switch (i)
 		{
-			case 0: StationProps.DeadEye(holder, 0.11f); break;
+			case 0: StationProps.DeadEye(holder, 0.11f, stump: false); break;
 			case 1: { var h = StationProps.PaleHand(holder); h.Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0); h.Scale = Vector3.One * 1.3f; break; }
 			default: { var t = StationProps.StairTread(holder); t.Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0); t.Scale = Vector3.One * 0.95f; break; }
 		}

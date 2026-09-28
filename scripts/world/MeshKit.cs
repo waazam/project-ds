@@ -53,6 +53,7 @@ public class MeshKit
 	public void Tri(Vector3 a, Vector3 b, Vector3 c, Vector3 na, Vector3 nb, Vector3 nc, Vector2 ua, Vector2 ub, Vector2 uc)
 	{
 		var face = (b - a).Cross(c - a);
+		if (face.LengthSquared() < 4e-14f) return;   // a sliver under 0.1 mm² (a cone's tip, a closed cap's centre): nothing to draw
 		if (face.Dot(na + nb + nc) > 0f) { (b, c) = (c, b); (nb, nc) = (nc, nb); (ub, uc) = (uc, ub); }
 		int i0 = Vert(a, na, ua), i1 = Vert(b, nb, ub), i2 = Vert(c, nc, uc);
 		_cur.I.Add(i0); _cur.I.Add(i1); _cur.I.Add(i2);
@@ -253,8 +254,145 @@ public class MeshKit
 
 	public bool IsEmpty => _order.Count == 0;
 
+	/// <summary>Moves a node a hair (1.5 mm by default) along a world direction: for a piece laid flush on
+	/// another mesh's surface (a frame on a wall, a threshold on a floor), so the two don't fight over the same
+	/// plane (the clip audit). Far below anything visible; the depth buffer tells them apart.</summary>
+	/// <summary>Gives a prop a collider (the collision audit: things the player could walk through): a box over
+	/// its mesh's bounds, shrunk per axis by <paramref name="shrink"/> (a coat stand's arms, a flag on its pole).
+	/// The collider goes and comes with the mesh's visibility (the lobby swaps its decor by hiding groups).</summary>
+	public static StaticBody3D Solidify(MeshInstance3D mi, Vector3? shrink = null, string surface = "wood", bool followVisibility = false)
+	{
+		if (mi?.Mesh == null) return null;
+		var aabb = mi.Mesh.GetAabb();
+		var body = new StaticBody3D { Name = "Solid", CollisionLayer = 1, CollisionMask = 0 };
+		body.SetMeta("surface", surface);
+		var shape = new CollisionShape3D { Position = aabb.GetCenter(), Shape = new BoxShape3D { Size = aabb.Size * (shrink ?? Vector3.One * 0.9f) } };
+		body.AddChild(shape);
+		mi.AddChild(body);
+		if (followVisibility)
+		{
+			void Sync() { if (GodotObject.IsInstanceValid(shape)) shape.Disabled = !mi.IsVisibleInTree(); }
+			mi.VisibilityChanged += Sync;
+			Callable.From(Sync).CallDeferred();
+		}
+		return body;
+	}
+
+	/// <summary><see cref="Solidify"/> for every mesh under a prop's node.</summary>
+	public static void SolidifyAll(Node n, Vector3? shrink = null, string surface = "wood", bool followVisibility = false)
+	{
+		foreach (var c in n.GetChildren())
+		{
+			if (c is MeshInstance3D mi) Solidify(mi, shrink, surface, followVisibility);
+			else SolidifyAll(c, shrink, surface, followVisibility);
+		}
+	}
+
+	/// <summary>A lining laid into an opening or on a surface (a door's frame and threshold): shrunk a hair about
+	/// its own centre, so its jambs sit just inside the opening's sides and its sill just up off the floor,
+	/// instead of sharing their planes (the clip audit).</summary>
+	public static void Shrink(MeshInstance3D mi, float f = 0.998f)
+	{
+		if (mi?.Mesh == null) return;
+		Vector3 c = mi.Mesh.GetAabb().GetCenter();
+		mi.Transform = mi.Transform * new Transform3D(Basis.FromScale(Vector3.One * f), c * (1f - f));
+	}
+
+	/// <summary>A whole shell set a hair aside on every axis (1.5 mm each), so none of its walls, floors or ceilings
+	/// share a plane with a neighbouring shell's (the clip audit). The signs pick which side it goes.</summary>
+	public static void NudgeAll(Node3D n, Vector3 signs, float d = 0.0015f) => Nudge(n, signs, d * signs.Length());
+
+	public static void Nudge(Node3D n, Vector3 worldDir, float d = 0.0015f)
+	{
+		if (n == null) return;
+		Vector3 local = n.GetParent() is Node3D p && p.IsInsideTree() ? p.GlobalBasis.Inverse() * worldDir.Normalized() : worldDir.Normalized();
+		n.Position += local * d;
+	}
+
+	/// <summary>
+	/// Resolves z-fighting inside the mesh (the clip audit): where a triangle of one surface lies in the plane of a
+	/// triangle of another, facing the same way and overlapping it (a painted band on a post, a dial on its face, a
+	/// sign's lettering on its board), the overlay is lifted 1.5 mm off along its normal, so it's drawn cleanly on
+	/// top instead of flickering through. The overlay is the later-added surface (builders lay the base first),
+	/// unless it's much the larger of the two.
+	/// </summary>
+	private void SeparateCoplanar()
+	{
+		if (_order.Count < 2) return;
+		const float tol = 0.003f, lift = 0.0015f;
+		var surfs = new List<Surf>();
+		int total = 0;
+		foreach (var m in _order) { surfs.Add(_surfs[m]); total += _surfs[m].I.Count / 3; }
+		if (total > 150000) return;
+		var buckets = new Dictionary<(int, int, int, int), List<(int s, int t, Vector3 n, float area)>>();
+		for (int si = 0; si < surfs.Count; si++)
+		{
+			var sf = surfs[si];
+			for (int t = 0; t < sf.I.Count / 3; t++)
+			{
+				Vector3 a = sf.V[sf.I[t * 3]], b = sf.V[sf.I[t * 3 + 1]], c = sf.V[sf.I[t * 3 + 2]];
+				Vector3 cr = (b - a).Cross(c - a);
+				float area = cr.Length() * 0.5f;
+				if (area < 1e-6f) continue;
+				Vector3 n = cr / (area * 2f);
+				var key = (Mathf.RoundToInt(n.X * 40f), Mathf.RoundToInt(n.Y * 40f), Mathf.RoundToInt(n.Z * 40f), Mathf.RoundToInt(n.Dot(a) / tol));
+				if (!buckets.TryGetValue(key, out var list)) buckets[key] = list = new();
+				list.Add((si, t, n, area));
+			}
+		}
+		var lifted = new Dictionary<(int s, int v), Vector3>();
+		foreach (var (key, list) in buckets)
+		{
+			var near = list;
+			if (buckets.TryGetValue((key.Item1, key.Item2, key.Item3, key.Item4 + 1), out var up)) { near = new List<(int s, int t, Vector3 n, float area)>(list); near.AddRange(up); }
+			int first = near[0].s;
+			bool mixed = false;
+			foreach (var e in near) if (e.s != first) { mixed = true; break; }
+			if (!mixed) continue;
+			Vector3 n0 = near[0].n;
+			Vector3 u = (Mathf.Abs(n0.Y) < 0.9f ? Vector3.Up : Vector3.Right).Cross(n0).Normalized(), w = n0.Cross(u);
+			Vector2[] Proj(int si, int t)
+			{
+				var sf = surfs[si];
+				var pts = new Vector2[3];
+				for (int k = 0; k < 3; k++) { Vector3 p = sf.V[sf.I[t * 3 + k]]; pts[k] = new Vector2(p.Dot(u), p.Dot(w)); }
+				return pts;
+			}
+			// a sweep over the triangles' boxes along one axis, so a big floor of many triangles stays cheap
+			var items = new List<(int s, int t, Vector3 n, float area, Vector2[] pts, Vector2 min, Vector2 max)>(near.Count);
+			foreach (var (si, ti, ni, ai) in near)
+			{
+				var pts = Proj(si, ti);
+				items.Add((si, ti, ni, ai, pts, new Vector2(Mathf.Min(pts[0].X, Mathf.Min(pts[1].X, pts[2].X)), Mathf.Min(pts[0].Y, Mathf.Min(pts[1].Y, pts[2].Y))),
+					new Vector2(Mathf.Max(pts[0].X, Mathf.Max(pts[1].X, pts[2].X)), Mathf.Max(pts[0].Y, Mathf.Max(pts[1].Y, pts[2].Y)))));
+			}
+			items.Sort((x, y) => x.min.X.CompareTo(y.min.X));
+			for (int i = 0; i < items.Count; i++)
+				for (int j = i + 1; j < items.Count && items[j].min.X < items[i].max.X; j++)
+				{
+					var A = items[i];
+					var B = items[j];
+					if (A.s == B.s || B.min.Y > A.max.Y || B.max.Y < A.min.Y || A.n.Dot(B.n) < 0.999f) continue;
+					Vector3 pi = surfs[A.s].V[surfs[A.s].I[A.t * 3]], pj = surfs[B.s].V[surfs[B.s].I[B.t * 3]];
+					if (Mathf.Abs(A.n.Dot(pj - pi)) > tol) continue;
+					var inter = Geometry2D.IntersectPolygons(A.pts, B.pts);
+					if (inter.Count == 0) continue;
+					float area = 0f;
+					foreach (var poly in inter)
+						for (int k = 0; k < poly.Length; k++) area += poly[k].X * poly[(k + 1) % poly.Length].Y - poly[k].Y * poly[(k + 1) % poly.Length].X;
+					if (Mathf.Abs(area) * 0.5f < 1e-5f) continue;
+					// the overlay: the later surface, unless it's much bigger than the other
+					bool liftB = B.s > A.s ? B.area < A.area * 4f : !(A.area < B.area * 4f);
+					var L = liftB ? B : A;
+					for (int k = 0; k < 3; k++) lifted[(L.s, surfs[L.s].I[L.t * 3 + k])] = L.n;
+				}
+		}
+		foreach (var ((si, vi), n) in lifted) surfs[si].V[vi] += n * lift;
+	}
+
 	public ArrayMesh Commit()
 	{
+		SeparateCoplanar();
 		var mesh = new ArrayMesh();
 		foreach (var m in _order)
 		{

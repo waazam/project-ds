@@ -184,7 +184,8 @@ public partial class Stairwell : Node3D
 		BuildKit.Box(k, new Vector3(x0 - 0.06f, 0.01f, (TrenchZ0 - H) * 0.5f), new Vector3(0.08f, 0.03f, -H - TrenchZ0 + 0.1f));
 		BuildKit.Box(k, new Vector3(x1 + 0.06f, 0.01f, (TrenchZ0 - H) * 0.5f), new Vector3(0.08f, 0.03f, -H - TrenchZ0 + 0.1f));
 		BuildKit.Box(k, new Vector3(cx, 0.01f, TrenchZ0 - 0.06f), new Vector3(W + 0.2f, 0.03f, 0.08f));
-		k.CommitTo(this, "Trench", true);
+		// its walls share planes with the shaft's top and Room 3's floor edge: set a hair back (the clip audit)
+		MeshKit.NudgeAll(k.CommitTo(this, "Trench", true), new Vector3(1, 1, 1));
 		// its ramp
 		float len = TrenchSteps * TrenchRun, drop = -Y0;
 		concrete.AddChild(new CollisionShape3D

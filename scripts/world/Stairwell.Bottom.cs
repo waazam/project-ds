@@ -62,7 +62,7 @@ public partial class Stairwell
 			Vector3 s0 = start + perp * side * (W * 0.5f - 0.03f) + Vector3.Down * 0.14f;
 			wreck.Beam(s0, s0 + dir * 0.35f + Vector3.Down * (0.2f + 0.15f * side), 0.05f, 0.24f, 1f, Vector3.Up);
 		}
-		wreck.CommitTo(this, "Wreck", true);
+		MeshKit.Solidify(wreck.CommitTo(this, "Wreck", true));
 
 		// the far landing, still bolted to the wall, a stub of the next flight hanging from it
 		int ka = GapCorner + 1;
@@ -134,7 +134,8 @@ public partial class Stairwell
 		Slab(new Vector3(0.9f, y + 1.2f, half + 4f), new Vector3(0.2f, 2.4f, 8f));
 		Slab(new Vector3(0, y + 2.45f, half + 4f), new Vector3(2f, 0.1f, 8f), false);
 		Slab(new Vector3(0, y - 0.1f, half + 4f), new Vector3(2f, 0.2f, 8f));
-		k.CommitTo(this, "Chamber", true);
+		// its end wall shares the shaft wall's plane: set a hair back (the clip audit)
+		MeshKit.NudgeAll(k.CommitTo(this, "Chamber", true), new Vector3(1, 1, 1));
 		// the passage opens into Act 15's hallway
 		Hallway = new Act15Hallway { Name = "Act15Hallway", Position = new Vector3(0, y, HallwayZ) };
 		AddChild(Hallway);

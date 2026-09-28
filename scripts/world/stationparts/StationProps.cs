@@ -80,39 +80,31 @@ public static class StationProps
 	/// <summary>The dead eye: one of the lake thing's eyeballs, fist-sized, the lid hanging half shut and
 	/// slack over a dull, filmed iris, a ragged stump of tentacle behind it. Built facing -Z (its gaze)
 	/// under <paramref name="parent"/>, <paramref name="r"/> = the ball's radius.</summary>
-	public static Node3D DeadEye(Node3D parent, float r = 0.13f)
+	public static Node3D DeadEye(Node3D parent, float r = 0.13f, bool stump = true)
 	{
 		var root = new Node3D { Name = "DeadEye" };
 		parent.AddChild(root);
 		var ball = new Node3D { Name = "Ball", Scale = Vector3.One * r };
 		root.AddChild(ball);
 		LakeCreature.BuildEye(ball);
-		// a milky film over it: dead
+		// a milky film over it: dead. Clear of the iris and pupil (which stand to 1.07 of the radius): at 1.03 they poked
+		// through its facets and read as something clipping through the eye.
 		ball.AddChild(new MeshInstance3D
 		{
-			Mesh = new SphereMesh { Radius = 1.03f, Height = 2.06f, RadialSegments = 12, Rings = 8 },
+			Mesh = new SphereMesh { Radius = 1.12f, Height = 2.24f, RadialSegments = 16, Rings = 10 },
 			MaterialOverride = new StandardMaterial3D
 			{
-				AlbedoColor = new Color(0.8f, 0.8f, 0.72f, 0.45f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+				AlbedoColor = new Color(0.8f, 0.8f, 0.72f, 0.28f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 				Roughness = 0.3f, MetallicSpecular = 0.6f,
 			},
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
+		if (!stump) return root;       // set in the iron door: the stump would come out through the back of it
 		var k = new MeshKit();
-		// the droopy upper lid: a slack fold of skin sagging over the top half of the eye
+		// (it had a droopy upper lid: a sheet of skin whose drooping front edge cut through the eyeball and read as a
+		// dark band across it (the owner: the eye should never be obscured). The wet rim round it stays: BuildEye's.)
 		k.Mat(StationTextures.MeatMat);
 		k.Color = new Color(0.55f, 0.42f, 0.44f);
-		const int segs = 10;
-		for (int i = 0; i < segs; i++)
-		{
-			float a0 = Mathf.Pi * i / segs, a1 = Mathf.Pi * (i + 1) / segs;
-			// a dome over the top, drooping lower in front (-Z) than behind
-			Vector3 P(float a, float droop) => new(Mathf.Cos(a) * r * 1.12f, Mathf.Sin(a) * r * 1.12f * (1f - droop), -r * 0.25f);
-			Vector3 lid0 = P(a0, 0f) + new Vector3(0, 0, r * 0.6f), lid1 = P(a1, 0f) + new Vector3(0, 0, r * 0.6f);
-			Vector3 edge0 = P(a0, 0.62f) + new Vector3(0, -r * 0.05f, -r * 0.85f), edge1 = P(a1, 0.62f) + new Vector3(0, -r * 0.05f, -r * 0.85f);
-			k.Quad(lid0, lid1, edge1, edge0, Vector3.Up);
-			k.Quad(edge0, edge1, lid1, lid0, Vector3.Down);
-		}
 		// the stump: a torn plug of tentacle flesh behind
 		k.Cylinder(new Vector3(0, 0, r * 0.4f), new Vector3(0.02f, -0.03f, r * 2.1f), r * 0.75f, r * 0.55f, 8, true, 1.5f);
 		k.Blob(new Vector3(0.02f, -0.03f, r * 2.1f), Vector3.One * r * 0.6f, 7, 0.35f, false, 1f);

@@ -64,7 +64,7 @@ public partial class StationRoom3 : Node3D
 		Slab(new Vector3((HallHalf + 1.3f) * 0.5f, HallHeight * 0.5f, CorridorEnd), new Vector3(HallHalf - 1.3f, HallHeight, 0.3f));
 		Slab(new Vector3(0, (HallHeight + 2.6f) * 0.5f, CorridorEnd), new Vector3(2.6f, HallHeight - 2.6f, 0.3f));
 		Slab(new Vector3(0, HallHeight + 0.1f, hc), new Vector3(HallHalf * 2f, 0.2f, hz * 2f), false);
-		k.CommitTo(this, "Plate", true);
+		MeshKit.Nudge(k.CommitTo(this, "Plate", true), Vector3.Left);   // flush on the lobby's wall: a hair proud of it (the clip audit)
 
 		// the floor: steel plate, with the hole cut out of it
 		var f = new MeshKit();
@@ -116,7 +116,7 @@ public partial class StationRoom3 : Node3D
 			bol.Cylinder(prev, p, 0.012f, 0.012f, 4, false);
 			prev = p;
 		}
-		bol.CommitTo(this, "Bollards", true);
+		bol.CommitTo(this, "Bollards", true);   // (the posts have their colliders above: one box round it all sealed the steps)
 
 		// pipes along the top of the walls and across the roof, conduit, a sealed hatch
 		var pk = new MeshKit();

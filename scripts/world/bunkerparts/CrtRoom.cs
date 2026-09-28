@@ -319,7 +319,7 @@ public partial class CrtRoom : Node3D
 			"", LogText, Readable.NoteStyle.Typed, "Read the log", 3);
 
 		// The marked set: on the console, facing the room.
-		_target = new Node3D { Name = "CrtTarget", Position = new Vector3(0, ConsoleTop, ConsoleZ - 0.1f) };
+		_target = new Node3D { Name = "CrtTarget", Position = new Vector3(0, ConsoleTop + 0.0015f, ConsoleZ - 0.1f) };   // a hair up off the console's top (the clip audit)
 		AddChild(_target);
 		_target.AddToGroup("crt_target_marker");
 		var body = new MeshKit();

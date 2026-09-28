@@ -291,6 +291,7 @@ public partial class Stairwell
 		var chair = new Node3D { Name = "Chair", Position = new Vector3(c.X + Mathf.Sign(c.X) * 0.1f, CornerY(k), c.Y + Mathf.Sign(c.Y) * 0.1f) };
 		AddChild(chair);
 		BuildChairMesh(chair);
+		MeshKit.SolidifyAll(chair, new Vector3(0.8f, 0.9f, 0.8f));   // it stands on the landing: not to be walked through
 		// facing into the corner, away from the stairs
 		chair.LookAt(chair.GlobalPosition + ToGlobal(new Vector3(Mathf.Sign(c.X), 0, Mathf.Sign(c.Y))) - ToGlobal(Vector3.Zero), Vector3.Up);
 	}

@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/ClipAudit.cs" id="1_clip"]
+
+[node name="ClipAudit" type="Node"]
+script = ExtResource("1_clip")

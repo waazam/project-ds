@@ -482,7 +482,7 @@ public static class LakeStructures
 			k.Tri(prev, inner, top + e, Vector3.Forward, Vector2.Zero, Vector2.Down, Vector2.Right);
 			prev = top + e;
 		}
-		k.CommitTo(gen, "Flagpole");
+		MeshKit.Solidify(k.CommitTo(gen, "Flagpole"), new Vector3(0.25f, 1f, 1f), "metal");
 	}
 
 	/// <summary>An old aluminium rescue boat, upturned on two sawhorses, a hole stove in its bottom.</summary>
@@ -511,7 +511,7 @@ public static class LakeStructures
 		k.Color = Colors.White;
 		k.Quad(c + new Vector3(-0.25f, 0.34f, -0.8f), c + new Vector3(0.2f, 0.34f, -0.7f), c + new Vector3(0.15f, 0.34f, -0.25f), c + new Vector3(-0.2f, 0.34f, -0.35f), Vector3.Up);
 		k.Color = Colors.White;
-		k.CommitTo(gen, "UpturnedBoat");
+		MeshKit.Solidify(k.CommitTo(gen, "UpturnedBoat"));
 	}
 
 	// ------------------------------------------------------------------ fences

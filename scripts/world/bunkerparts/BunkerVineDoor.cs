@@ -143,7 +143,7 @@ public partial class BunkerVineDoor : Node3D
 		k.Mat(ProcTextures.MetalMat);
 		k.Color = new Color(0.5f, 0.45f, 0.4f);
 		k.Box(new Vector3(0, 0.01f, Z), new Vector3(DoorHalfWidth * 2f, 0.02f, d));
-		k.CommitTo(this, "DoorFrame");
+		MeshKit.Shrink(k.CommitTo(this, "DoorFrame"));   // its sill and jambs just clear of the floor and walls (the clip audit)
 	}
 
 	private void BuildLeaf()

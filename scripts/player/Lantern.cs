@@ -46,10 +46,10 @@ public partial class Lantern : Node3D
 	[ExportGroup("Blacklight")]
 	[Export] public Color UvColor = new(0.38f, 0.12f, 1.0f);
 	[Export] public float UvRange = 9f;
-	[Export] public float UvEnergy = 2.6f;   // enough violet on the bark and ground to see where it points
+	[Export] public float UvEnergy = 3.2f;   // enough violet on the bark and ground to see where it points (the polish pass: 2.6 left the stairwell black)
 	/// <summary>Half-angle of the violet cone (degrees).</summary>
 	[Export] public float UvAngle = 24f;
-	[Export] public float UvGlowEnergy = 0.32f;   // a little violet round you: with the flame dead (Acts 14-20) it's all there is
+	[Export] public float UvGlowEnergy = 0.55f;   // a little violet round you: with the flame dead (Acts 14-20) it's all there is: enough to see the steps (the polish pass)
 
 	/// <summary>The blacklight is the lantern's mode (on or off, it keeps the mode).</summary>
 	public bool Blacklight { get; private set; }

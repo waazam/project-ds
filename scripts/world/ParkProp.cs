@@ -948,5 +948,7 @@ public partial class ParkProp : Node3D
 		Guy(Cloth(-1, 0.98f, 0.95f), new Vector3(x1 + 0.35f, 0, -hw - 0.55f), false);
 		Guy(Cloth(1, 0.98f, 0.95f), new Vector3(x1 + 0.4f, 0, hw + 0.5f), true);
 		_k.Color = Colors.White;
+		// the tent's body stops you (the collision audit: it could be walked through); the guy lines don't
+		Col(new Vector3(0, ridgeH * 0.45f, 0), new Vector3(L, ridgeH * 0.9f, hw * 1.8f));
 	}
 }

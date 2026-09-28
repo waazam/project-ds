@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-27j — Polish pass: a collision, clipping and UV audit; the dead eye; the deep stairwell no longer pitch black](2026-09-27j-polish-and-audits.md)
 - [2026-09-27i — A clean sky, and micro-surface detail maps on everything (Poly Haven, in the PS2 style)](2026-09-27i-sky-and-detail-maps.md)
 - [2026-09-27h — Act 14: the descent's music, and the crawler](2026-09-27h-crawler-and-descent-music.md)
 - [2026-09-27g — Movement with weight: acceleration, momentum, head inertia, the bob on the footfall, peeking](2026-09-27g-movement-weight.md)

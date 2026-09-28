@@ -500,6 +500,18 @@ public static class ProcTextures
 	public static StandardMaterial3D NeedleMat => Std("needles", Needles(), vertexColor: true);
 	public static StandardMaterial3D LeafMat => Std("leaves", Leaves(), vertexColor: true);
 	public static StandardMaterial3D RockMat => Std("rock", Rock(), vertexColor: true);
+	/// <summary>The rock texture projected from the world's axes (triplanar), for the round, squashed stream and
+	/// waterfall stones: their sphere-wrapped UVs pinched at the poles and stretched where they're flattened
+	/// (the texture audit: up to 73x from one part of a stone to another).</summary>
+	public static StandardMaterial3D RockTriMat => (StandardMaterial3D)Cached("rock_tri", () =>
+	{
+		var m = (StandardMaterial3D)RockMat.Duplicate();
+		m.Uv1Triplanar = true;
+		m.Uv1WorldTriplanar = true;
+		m.Uv1Scale = Vector3.One * 0.9f;
+		m.Uv1TriplanarSharpness = 3f;
+		return m;
+	});
 	public static StandardMaterial3D WoodMat => Std("wwood", WeatheredWood(), vertexColor: true);
 	public static StandardMaterial3D SignWoodMat => Std("swood", SignWood(), vertexColor: true);
 	public static StandardMaterial3D PaintMat => Std("paint", Paint(), specular: 0.35f, rough: 0.85f);

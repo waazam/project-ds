@@ -37,6 +37,9 @@ public partial class StationBasement : Node3D
 	/// <summary>The room: x in [MinX, MaxX], z in [MinZ, StairBottom].</summary>
 	public const float MinX = -4.4f, MaxX = 3.4f, MinZ = -12.6f;
 	public static readonly Vector2 Drain = new(-0.5f, -9.2f);
+	/// <summary>How high the dead eye sits (its centre) when it rests on the floor or the drain grate: its radius plus the
+	/// grate bars, so the bars never cut across the ball.</summary>
+	private const float EyeRest = 0.17f;
 	[Export] public float FloodDepth = 0.75f;
 	[Export] public int TurnsNeeded = 3;
 	[Export] public float DrainSeconds = 7f;
@@ -78,19 +81,19 @@ public partial class StationBasement : Node3D
 		BuildClock(new Vector3(MinX + 0.55f, Floor, MinZ + 0.6f));
 		Eye = new DeadEye { Name = "DeadEye" };
 		AddChild(Eye);
-		Eye.Position = new Vector3(Drain.X, Floor + 0.1f, Drain.Y);
+		Eye.Position = new Vector3(Drain.X, Floor + EyeRest, Drain.Y);
 		Eye.Visible = false;
 		float midZ = (MinZ + StairBottom) * 0.5f;
 		Eye.Anchors = new List<Vector3>
 		{
-			new(Drain.X, Floor + 0.08f, Drain.Y),                 // back in its grate
+			new(Drain.X, Floor + EyeRest, Drain.Y),                 // back in its grate
 			new(-0.5f, Floor + 2.3f, MinZ + 0.3f),                 // on top of the pump housing
-			new(MinX + 1.4f, Floor + 0.1f, MinZ + 1.3f),           // in the clock's wreckage
+			new(MinX + 1.4f, Floor + EyeRest, MinZ + 1.3f),           // in the clock's wreckage
 			new(0.3f, Floor + 0.3f, StairBottom + 0.15f),          // on the bottom stair
 			new(MinX + 0.3f, Floor + 2.15f, midZ + 1f),            // on the slit window's ledge
-			new(MaxX - 0.4f, Floor + 0.1f, MinZ + 0.4f),           // in the far corner
+			new(MaxX - 0.4f, Floor + EyeRest, MinZ + 0.4f),           // in the far corner
 			new(MinX + 4.2f, Floor + 2.58f, -8.2f),                // up on a ceiling beam
-			new(MaxX - 0.35f, Floor + 0.1f, StairBottom - 0.4f),   // tucked by the stairwell
+			new(MaxX - 0.35f, Floor + EyeRest, StairBottom - 0.4f),   // tucked by the stairwell
 		};
 
 		// the breadcrumb once the iron door has been read: an eye drawn in blood on the door
@@ -473,7 +476,7 @@ public partial class StationBasement : Node3D
 		if (StoryManager.Instance?.HasFlag(StoryManager.Flag.StationEyeTaken) != true)
 		{
 			Eye.Visible = true;
-			Eye.Position = new Vector3(Drain.X, Floor + 0.08f, Drain.Y);
+			Eye.Position = new Vector3(Drain.X, Floor + EyeRest, Drain.Y);
 		}
 		LeaveWetFloor();
 	}
@@ -594,7 +597,7 @@ public partial class StationBasement : Node3D
 			{
 				float e = Mathf.SmoothStep(0.62f, 0.95f, u);
 				float er = Mathf.Lerp(1.6f, 0f, e), ea = e * 14f;
-				Eye.Position = new Vector3(Drain.X + Mathf.Cos(ea) * er, Mathf.Max(level, Floor) + 0.08f, Drain.Y + Mathf.Sin(ea) * er);
+				Eye.Position = new Vector3(Drain.X + Mathf.Cos(ea) * er, Mathf.Max(level, Floor) + EyeRest, Drain.Y + Mathf.Sin(ea) * er);
 				Eye.Rotation = new Vector3(0, ea * 1.3f, 0);
 			}
 			// the view is held on the drain, pitched down at it
@@ -604,7 +607,7 @@ public partial class StationBasement : Node3D
 			rig.SetPitch(Mathf.Lerp(rig.Pitch, Mathf.Atan2(to.Y, new Vector2(to.X, to.Z).Length()), Mathf.Min(1f, dt * 3f)));
 		}
 		PlayOneShot("res://assets/audio/sfx/squelch_close_01.wav", drainW, -2f, 0.8f);
-		Eye.Position = new Vector3(Drain.X, Floor + 0.08f, Drain.Y);
+		Eye.Position = new Vector3(Drain.X, Floor + EyeRest, Drain.Y);
 		Eye.Frozen = false;
 		_draining = false;
 		Drained = true;

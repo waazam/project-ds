@@ -103,7 +103,7 @@ public partial class Waterfall : Node3D
 		body.SetMeta("surface", "rock");
 		AddChild(body);
 		var k = new MeshKit();
-		var rock = ProcTextures.RockMat;
+		var rock = ProcTextures.RockTriMat;
 		int id = 0;
 		void Rock(Vector3 c, Vector3 r, float wet, bool collide, bool onGround = true)
 		{

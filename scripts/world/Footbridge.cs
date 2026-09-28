@@ -178,7 +178,7 @@ public partial class Footbridge : Node3D
 	{
 		var toLocal = GlobalTransform.AffineInverse();
 		var k = new MeshKit();
-		var rock = ProcTextures.RockMat;
+		var rock = ProcTextures.RockTriMat;   // triplanar: no stretching over the round stones (the texture audit)
 		var body = new StaticBody3D { Name = "Rocks", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "rock");
 		gen.AddChild(body);

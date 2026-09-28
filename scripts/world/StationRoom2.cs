@@ -158,7 +158,7 @@ public partial class StationRoom2 : Node3D
 		BuildKit.Box(k, new Vector3(cx, 2.42f, -Half + 0.05f), new Vector3(1.8f, 0.08f, 0.12f));
 		foreach (int s in new[] { -1, 1 }) BuildKit.Box(k, new Vector3(cx + s * 0.84f, cy, -Half + 0.05f), new Vector3(0.08f, 1.5f, 0.12f));
 		BuildKit.Box(k, new Vector3(cx, cy, -Half + 0.05f), new Vector3(0.05f, 1.4f, 0.06f));   // the glazing bar
-		k.CommitTo(this, "WindowFrame", true);
+		MeshKit.Nudge(k.CommitTo(this, "WindowFrame", true), Vector3.Left);   // flush on the wall: a hair proud of it (the clip audit)
 		// outside, pressing against the glass: dark lake water, a faint green light far off in it
 		AddChild(new MeshInstance3D
 		{
