@@ -543,7 +543,7 @@ public static class BunkerTextures
 	{
 		if (_mat.TryGetValue(key, out var m)) return m;
 		m = make();
-		ProcTextures.AddGrime(m as StandardMaterial3D);
+		ProcTextures.AddGrime(m as StandardMaterial3D, key);
 		_mat[key] = m;
 		return m;
 	}
@@ -611,6 +611,7 @@ public static class BunkerTextures
 	public static ShaderMaterial IvyMat => (ShaderMaterial)Cached("bk_m_ivy", () =>
 	{
 		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+		DetailKit.Hook(m, DetailKit.Kind.Foliage);
 		m.SetShaderParameter("albedo_tex", IvyLeaves());
 		m.SetShaderParameter("tint", new Color(1f, 1f, 1f));
 		m.SetShaderParameter("sway", 0.008f);

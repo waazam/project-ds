@@ -97,7 +97,7 @@ public static class SewerTextures
 			Roughness = rough, MetallicSpecular = spec, VertexColorUseAsAlbedo = true,
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		};
-		ProcTextures.AddGrime(s as StandardMaterial3D);
+		ProcTextures.AddGrime(s as StandardMaterial3D, key);
 		_mat[key] = s;
 		return s;
 	}

@@ -14,6 +14,9 @@ uniform sampler2D tex_gravel : source_color, filter_linear_mipmap, repeat_enable
 uniform sampler2D tex_rock : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D tex_noise : filter_linear_mipmap, repeat_enable;
 uniform sampler2D mask : filter_linear_mipmap, repeat_disable;
+/// The forest floor's micro-surface (DetailKit's ground: leaf litter grain, from Poly Haven), close up only.
+uniform sampler2D detail_tex : hint_default_white, filter_linear_mipmap, repeat_enable;
+uniform float detail_tile = 1.3;
 uniform vec2 mask_origin = vec2(-120.0, -360.0);
 uniform vec2 mask_size = vec2(240.0, 420.0);
 uniform float tile = 0.42;
@@ -66,6 +69,7 @@ void fragment() {
 	float pocket = smoothstep(0.62, 0.8, texture(tex_noise, wpos.xz * 0.9 + vec2(0.5, 0.2)).r);
 	float near = 1.0 - smoothstep(6.0, 22.0, length(VERTEX));
 	c *= mix(1.0, (0.88 + 0.2 * grit) * (1.0 - 0.18 * pocket), near);
+	c *= mix(1.0, texture(detail_tex, wpos.xz * detail_tile).r, near);
 	ALBEDO = c * shade;
 	ROUGHNESS = 1.0;
 }

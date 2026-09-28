@@ -21,18 +21,45 @@ uniform float ridge_scale = 2.0;
 /// World-space horizontal direction where the tallest peaks stand.
 uniform vec2 peak_dir = vec2(0.0, -1.0);
 
-float hash(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
+// An integer hash (no sin/fract on big numbers: those broke into streaks and lines far out in the clouds),
+// gradient noise with a quintic fade (value noise's grid showed as creases), and each octave turned, so no
+// grid lines up between them.
+uint pcg(uint v) {
+	uint state = v * 747796405u + 2891336453u;
+	uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+	return (word >> 22u) ^ word;
+}
+
+vec2 grad(vec2 i) {
+	ivec2 c = ivec2(floor(i));
+	uint h = pcg(uint(c.x) * 1597334677u ^ pcg(uint(c.y) * 3812015801u));
+	float a = float(h & 65535u) / 65535.0 * 6.2831853;
+	return vec2(cos(a), sin(a));
 }
 
 float vnoise(vec2 p) {
 	vec2 i = floor(p), f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	float a = hash(i), b = hash(i + vec2(1.0, 0.0)), c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
-	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+	vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	float a = dot(grad(i), f);
+	float b = dot(grad(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0));
+	float c = dot(grad(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0));
+	float d = dot(grad(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0));
+	return clamp(0.5 + 0.7 * mix(mix(a, b, u.x), mix(c, d, u.x), u.y), 0.0, 1.0);
 }
+
+// value noise on the same integer hash, for the ridges' broad, rounded crests (the gradient noise made cliffs)
+float hash1(vec2 i) {
+	ivec2 c = ivec2(floor(i));
+	return float(pcg(uint(c.x) * 1597334677u ^ pcg(uint(c.y) * 3812015801u)) & 65535u) / 65535.0;
+}
+
+float vnoise_v(vec2 p) {
+	vec2 i = floor(p), f = fract(p);
+	vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	return mix(mix(hash1(i), hash1(i + vec2(1.0, 0.0)), u.x), mix(hash1(i + vec2(0.0, 1.0)), hash1(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+const mat2 ROT = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8));
 
 float fbm(vec2 p, int oct) {
 	float s = 0.0, a = 0.5, n = 0.0;
@@ -40,9 +67,9 @@ float fbm(vec2 p, int oct) {
 		s += a * vnoise(p);
 		n += a;
 		a *= 0.5;
-		p = p * 2.03 + vec2(1.7, 9.2);
+		p = ROT * p * 2.03 + vec2(1.7, 9.2);
 	}
-	return s / n;
+	return clamp(s / n, 0.0, 1.0);
 }
 
 // ridged noise around the horizon circle (seamless in azimuth)
@@ -50,7 +77,7 @@ float ridge(vec2 hdir, float freq, vec2 off, float seed) {
 	vec2 q = hdir * freq + off;
 	float s = 0.0, a = 0.6, n = 0.0;
 	for (int i = 0; i < 5; i++) {
-		float v = vnoise(q + seed);
+		float v = vnoise_v(q + seed);
 		// broad, rounded crests from the big octaves; small octaves only roughen the skyline
 		if (i < 2) v = 1.0 - pow(abs(v * 2.0 - 1.0), 1.4);
 		s += a * v;
@@ -76,12 +103,12 @@ void sky() {
 
 	// clouds: projected on a flat ceiling, soft-edged low-res shapes
 	if (d.y > 0.0) {
-		vec2 cp = d.xz / (d.y + 0.15) * 1.1;
+		vec2 cp = d.xz / (d.y + 0.28) * 0.9;
 		float cn = fbm(cp + vec2(3.1, 1.7), 5);
 		float cm = smoothstep(1.0 - cloud_cover - 0.05, 1.0 - cloud_cover + 0.25, cn);
 		float body = fbm(cp * 2.2 + vec2(8.0, 2.0), 3);
 		vec3 cc = mix(cloud_dark, cloud_light, clamp(body * 0.9 + glow * 1.2 - (cn - 0.5) * 0.6, 0.0, 1.0));
-		cm *= smoothstep(0.0, 0.1, d.y);
+		cm *= smoothstep(0.02, 0.2, d.y);
 		col = mix(col, cc, cm * 0.85);
 	}
 

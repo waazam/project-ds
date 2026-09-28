@@ -218,6 +218,7 @@ public partial class LakeDressing : Node3D
 		var mat = (ShaderMaterial)ProcTextures.Cached("lake_reed", () =>
 		{
 			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+			DetailKit.Hook(m, DetailKit.Kind.Foliage);
 			m.SetShaderParameter("albedo_tex", ProcTextures.GrassTuft());
 			m.SetShaderParameter("tint", new Color(0.78f, 0.74f, 0.52f));
 			m.SetShaderParameter("sway", 0.09f);

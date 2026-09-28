@@ -431,7 +431,7 @@ public static class ProcTextures
 			VertexColorUseAsAlbedo = vertexColor,
 		};
 		if (cullOff) s.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-		AddGrime(s);
+		AddGrime(s, key);
 		_mat[key] = s;
 		return s;
 	}
@@ -470,17 +470,9 @@ public static class ProcTextures
 		return new Color(v, v * 0.995f, v * 0.985f);
 	});
 
-	/// <summary>Lays the grime detail over a textured, opaque material (once): multiplied at a finer
-	/// grain than its own texture, so it adds detail without shifting the pattern.</summary>
-	public static void AddGrime(StandardMaterial3D m, float grain = 1.6f)
-	{
-		if (m == null || m.AlbedoTexture == null || m.DetailEnabled || m.Transparency != BaseMaterial3D.TransparencyEnum.Disabled) return;
-		m.DetailEnabled = true;
-		m.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mul;
-		m.DetailUVLayer = BaseMaterial3D.DetailUV.UV1;
-		m.DetailAlbedo = Grime();
-		_ = grain;
-	}
+	/// <summary>Lays the micro-surface detail over an opaque material (once), its kind from the material's
+	/// key (<see cref="DetailKit"/>): the grain of its surface with the game's grime baked in.</summary>
+	public static void AddGrime(StandardMaterial3D m, string key = null) => DetailKit.ApplyByKey(m, key);
 
 	public static Material Cached(string key, Func<Material> make)
 	{
@@ -498,6 +490,7 @@ public static class ProcTextures
 	private static ShaderMaterial TreeSolid(string key, Texture2D tex) => (ShaderMaterial)Cached(key, () =>
 	{
 		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/tree_solid.gdshader") };
+		DetailKit.Hook(m, DetailKit.Kind.Bark);
 		m.SetShaderParameter("albedo_tex", tex);
 		return m;
 	});
@@ -522,6 +515,7 @@ public static class ProcTextures
 	public static ShaderMaterial FirBranchMat => (ShaderMaterial)Cached("firbranch", () =>
 	{
 		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+		DetailKit.Hook(m, DetailKit.Kind.Foliage);
 		m.SetShaderParameter("albedo_tex", FirBranch());
 		m.SetShaderParameter("tint", new Color(1f, 1f, 1f));
 		m.SetShaderParameter("sway", 0.06f);

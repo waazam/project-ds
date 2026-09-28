@@ -192,6 +192,7 @@ public static class ItemTextures
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 			VertexColorUseAsAlbedo = vertexColor,
 		};
+		DetailKit.ApplyByKey(s, key);
 		_mat[key] = s;
 		return s;
 	}

@@ -130,7 +130,7 @@ public static class PropTextures
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 			VertexColorUseAsAlbedo = true,
 		};
-		ProcTextures.AddGrime(m as StandardMaterial3D);
+		ProcTextures.AddGrime(m as StandardMaterial3D, key);
 		_mat[key] = m;
 		return m;
 	}

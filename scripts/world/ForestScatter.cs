@@ -368,6 +368,7 @@ public partial class ForestScatter : Node3D
 		=> (ShaderMaterial)ProcTextures.Cached(key, () =>
 		{
 			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+			DetailKit.Hook(m, DetailKit.Kind.Foliage);
 			m.SetShaderParameter("albedo_tex", tex);
 			m.SetShaderParameter("tint", tint);
 			m.SetShaderParameter("sway", sway);

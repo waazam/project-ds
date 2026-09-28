@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-27i — A clean sky, and micro-surface detail maps on everything (Poly Haven, in the PS2 style)](2026-09-27i-sky-and-detail-maps.md)
 - [2026-09-27h — Act 14: the descent's music, and the crawler](2026-09-27h-crawler-and-descent-music.md)
 - [2026-09-27g — Movement with weight: acceleration, momentum, head inertia, the bob on the footfall, peeking](2026-09-27g-movement-weight.md)
 - [2026-09-27f — Performance (the shadow pass), photographed webs, the cloth sheet, the church's hatch and steps](2026-09-27f-performance-webs-cloth-church.md)

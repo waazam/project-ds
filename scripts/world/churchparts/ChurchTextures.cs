@@ -73,6 +73,7 @@ public static class ChurchTextures
 			VertexColorUseAsAlbedo = true, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
 			Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One / metresPerTile, Uv1TriplanarSharpness = 4f,
 		};
+		DetailKit.ApplyByKey(s, key);
 		_mat[key] = s;
 		return s;
 	}
@@ -87,6 +88,7 @@ public static class ChurchTextures
 			VertexColorUseAsAlbedo = true, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
 			Uv1Scale = Vector3.One / metresPerTile,
 		};
+		DetailKit.ApplyByKey(s, key);
 		_mat[key] = s;
 		return s;
 	}

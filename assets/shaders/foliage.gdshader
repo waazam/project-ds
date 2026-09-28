@@ -7,6 +7,9 @@ render_mode cull_disabled, diffuse_lambert, specular_disabled;
 #include "res://assets/shaders/tree_wind.gdshaderinc"
 
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_disable;
+/// A leaf's micro-surface (DetailKit's foliage), faint.
+uniform sampler2D detail_tex : hint_default_white, filter_linear_mipmap, repeat_enable;
+uniform float detail_tile = 2.0;
 uniform vec3 tint : source_color = vec3(1.0);
 uniform float alpha_cut = 0.45;
 uniform float sway = 0.05;
@@ -35,7 +38,7 @@ void fragment() {
 	float lod = 0.5 * log2(max(dot(dFdx(d), dFdx(d)), dot(dFdy(d), dFdy(d))));
 	float a = c.a * (1.0 + max(lod, 0.0) * mip_boost);
 	float back = FRONT_FACING ? 1.0 : 1.0 - back_shade;
-	ALBEDO = c.rgb * tint * COLOR.rgb * back;
+	ALBEDO = c.rgb * tint * COLOR.rgb * back * mix(1.0, texture(detail_tex, UV * detail_tile).r, 0.8);
 	if (winter > 0.001) {
 		// winter: snow lying along the tops of the boughs, frost on the rest of the needles
 		vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;

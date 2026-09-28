@@ -74,7 +74,7 @@ public static class StationTextures
 		};
 		if (alpha) { s.Transparency = BaseMaterial3D.TransparencyEnum.Alpha; s.ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel; }
 		if (cullOff) s.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-		ProcTextures.AddGrime(s as StandardMaterial3D);
+		ProcTextures.AddGrime(s as StandardMaterial3D, key);
 		_mat[key] = s;
 		return s;
 	}

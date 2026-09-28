@@ -6,6 +6,9 @@ render_mode diffuse_lambert, specular_schlick_ggx;
 #include "res://assets/shaders/tree_wind.gdshaderinc"
 
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_enable;
+/// Bark's micro-surface (DetailKit), finer than the bark texture.
+uniform sampler2D detail_tex : hint_default_white, filter_linear_mipmap, repeat_enable;
+uniform float detail_tile = 3.0;
 uniform vec3 tint : source_color = vec3(1.0);
 uniform float roughness = 1.0;
 uniform float specular = 0.25;
@@ -19,7 +22,7 @@ void vertex() {
 }
 
 void fragment() {
-	ALBEDO = texture(albedo_tex, UV).rgb * tint * COLOR.rgb;
+	ALBEDO = texture(albedo_tex, UV).rgb * tint * COLOR.rgb * texture(detail_tex, UV * detail_tile).r;
 	if (winter > 0.001) {
 		// Act 21 on, it is winter: snow on every upward face, a grey hoarfrost over the bark
 		vec3 wn = (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz;

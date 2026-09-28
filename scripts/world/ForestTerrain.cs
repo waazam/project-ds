@@ -551,6 +551,7 @@ public partial class ForestTerrain : Node3D
 	private void BuildMesh()
 	{
 		var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/terrain.gdshader") };
+		DetailKit.Hook(mat, DetailKit.Kind.Ground);
 		mat.SetShaderParameter("tex_litter", ProcTextures.LeafLitter());
 		mat.SetShaderParameter("tex_floor", ProcTextures.ForestFloor());
 		mat.SetShaderParameter("tex_moss", ProcTextures.Moss());

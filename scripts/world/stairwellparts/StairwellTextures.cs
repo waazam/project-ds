@@ -82,7 +82,7 @@ public static class StairwellTextures
 			AlbedoTexture = tex, Roughness = rough, MetallicSpecular = spec, Metallic = metal,
 			VertexColorUseAsAlbedo = true, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		};
-		ProcTextures.AddGrime(s as StandardMaterial3D);
+		ProcTextures.AddGrime(s as StandardMaterial3D, key);
 		_mat[key] = s;
 		return s;
 	}
