@@ -134,11 +134,16 @@ public partial class SkiLodge
 		SnowPile = new Node3D { Name = "SnowPile", Position = new Vector3(BackDoorX, 0, -WingHalfZ) };
 		AddChild(SnowPile);
 		var k = new MeshKit();
-		k.Mat(RoofSnow);
+		// the woods' own snow (Poly Haven's, world-mapped), not the roofs' glazed look: packed hard into the
+		// doorway to the lintel, heaped outside, and a soft fan of it spilled in over the sill with loose clumps
+		k.Mat(WinterWoods.SoftSnow);
 		k.Color = Colors.White;
-		k.Blob(new Vector3(0, 0, -1.2f), new Vector3(1.9f, 2.6f, 1.6f), 2301, 0.25f, true, 1f);
-		k.Blob(new Vector3(0.2f, 0, -0.35f), new Vector3(0.75f, 2.4f, 0.5f), 2302, 0.2f, true, 1f);
-		k.Blob(new Vector3(-0.1f, 0, 0.55f), new Vector3(0.9f, 0.5f, 0.8f), 2303, 0.3f, true, 1f);   // spilled in over the sill
+		k.Blob(new Vector3(0, 0, -1.3f), new Vector3(2.1f, 2.7f, 1.7f), 2301, 0.18f, true, 1f);
+		k.Blob(new Vector3(0.05f, 0, -0.4f), new Vector3(0.78f, 2.35f, 0.62f), 2302, 0.12f, true, 1f);   // the doorway, packed full
+		k.Blob(new Vector3(-0.05f, 0, 0.45f), new Vector3(1.05f, 0.62f, 0.85f), 2303, 0.2f, true, 1f);   // spilled in over the sill
+		k.Blob(new Vector3(0.25f, 0, 1.15f), new Vector3(0.7f, 0.16f, 0.55f), 2304, 0.3f, true, 1f);     // the fan's thin edge
+		k.Blob(new Vector3(-0.75f, 0, 0.95f), new Vector3(0.16f, 0.12f, 0.14f), 2305, 0.3f, true, 1f);   // clumps thrown in
+		k.Blob(new Vector3(0.7f, 0, 1.4f), new Vector3(0.12f, 0.09f, 0.1f), 2306, 0.3f, true, 1f);
 		k.CommitTo(SnowPile, "Mesh", false);
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "snow");
@@ -385,7 +390,9 @@ public partial class SkiLodge
 			{
 				float x = Mathf.Lerp(-hx, hx, i / (float)SheetNx), z = Mathf.Lerp(-hz, hz, j / (float)SheetNz);
 				float over = Mathf.Max(Mathf.Abs(x) - TableLen * 0.5f, 0f) + Mathf.Max(Mathf.Abs(z) - TableW * 0.5f, 0f);
-				float y = TableH + 0.012f - over * 1.5f;
+				// flat a hand past the edge before it falls (the grid's coarse: falling from the edge itself, the straight
+				// span to the next row cut under the table top's edge and the wood showed through the linen)
+				float y = TableH + 0.012f - Mathf.Max(over - 0.15f, 0f) * 1.5f;
 				foreach (var l in lumps) y += l.Y * Mathf.Max(0f, 1f - new Vector2(x - l.X, z - l.Z).Length() / 0.45f);
 				y += 0.02f * Mathf.Sin(x * 9f + z * 4f) * Mathf.Clamp(over * 5f, 0f, 1f);
 				pos[i, j] = new Vector3(x * (1f - Mathf.Clamp(over, 0f, 0.3f) * 0.05f), Mathf.Max(y, TableH - 0.6f), z);
@@ -427,7 +434,7 @@ public partial class SkiLodge
 				st.AddIndex(a); st.AddIndex(c); st.AddIndex(d);
 			}
 		st.GenerateNormals();
-		st.SetMaterial(LodgeTextures.LinenMat);
+		st.SetMaterial(LodgeTextures.SheetLinenMat);
 		return st.Commit();
 	}
 
@@ -501,7 +508,7 @@ public partial class SkiLodge
 		for (int i = 0; i < verts.Length; i++) { st.SetUV(uvs[i]); st.AddVertex(verts[i]); }
 		foreach (int idx in arrays[(int)Mesh.ArrayType.Index].AsInt32Array()) st.AddIndex(idx);
 		st.GenerateNormals();
-		st.SetMaterial(LodgeTextures.LinenMat);
+		st.SetMaterial(LodgeTextures.SheetLinenMat);
 		parent.AddChild(new MeshInstance3D { Name = "Heap", Mesh = st.Commit() });
 		cloth.QueueFree();
 	}
@@ -656,7 +663,7 @@ public partial class SkiLodge
 		k.Color = new Color(0.35f, 0.27f, 0.2f);
 		var rng = new RandomNumberGenerator { Seed = 5340 };
 		for (int i = 0; i < 18; i++) k.Blob(new Vector3(rng.RandfRange(-1f, 1.3f), 0.03f, rng.RandfRange(-0.3f, 0.3f)), new Vector3(0.05f, 0.02f, 0.05f), 5341 + i, 0.4f, true, 1f);
-		k.Mat(RoofSnow);
+		k.Mat(WinterWoods.SoftSnow);
 		k.Color = Colors.White;
 		for (int i = 0; i < 10; i++) k.Blob(new Vector3(rng.RandfRange(-1f, 1.3f), 0.05f, rng.RandfRange(-0.3f, 0.3f)), new Vector3(0.07f, 0.03f, 0.06f), 5360 + i, 0.3f, true, 1f);
 		k.Mat(WinterWoods.IceMat);

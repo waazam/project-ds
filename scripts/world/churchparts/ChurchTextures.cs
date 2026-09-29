@@ -95,37 +95,25 @@ public static class ChurchTextures
 
 	// ------------------------------------------------------------------ stone
 
-	/// <summary>Limestone ashlar: courses half a metre high (a 2 m tile), blocks of varied length in running
-	/// bond, each its own shade of cream, fine pale mortar joints, grain and pitting, a little soot low down
-	/// on each block's face.</summary>
+	/// <summary>Limestone ashlar: Poly Haven's limestone blocks (its courses about 0.4 m at the 2 m tile), cream,
+	/// a little pitting and a faint mottle of soot over it, so it reads old.</summary>
 	public static Texture2D Ashlar => Make("ch_ashlar", 256, 256, (x, y) =>
 	{
-		int course = y / 64;
-		int off = (course % 2) * 37 + course * 11;
-		int bx = ((x + off) % 256);
-		// block boundaries: a few irregular lengths per course
-		int[] cuts = { 0, 71, 150, 203 };
-		int bi = 0;
-		for (int i = 0; i < cuts.Length; i++) if (bx >= cuts[i]) bi = i;
-		int localX = bx - cuts[bi], localY = y % 64;
-		int blockW = (bi + 1 < cuts.Length ? cuts[bi + 1] : 256) - cuts[bi];
-		float tone = 0.9f + 0.12f * Hash(bi, course, 501) - 0.04f * Hash(bi + 3, course, 502);
-		float grain = Fbm(x, y, 256, 8, 4, 503);
-		float g = tone * (0.84f + 0.16f * grain);
-		if (Hash(x, y, 504) > 0.992f) g -= 0.12f;                        // pits
-		// soft edges and a darker band where soot and damp gathered on the lower face
-		float edge = Mathf.Min(Mathf.Min(localX, blockW - localX), Mathf.Min(localY, 64 - localY));
-		g *= 1f - 0.07f * Mathf.Clamp(1f - edge / 4f, 0f, 1f);
-		g *= 1f - 0.05f * Mathf.Clamp((localY - 40f) / 24f, 0f, 1f);
-		Color c = new Color(0.86f, 0.82f, 0.74f) * g;
-		// the joints: pale mortar, slightly recessed (a shadow line on the upper edge)
-		bool joint = localY < 2 || localX < 2;
-		if (joint) c = new Color(0.72f, 0.7f, 0.66f) * (0.9f + 0.1f * grain);
-		if (localY == 2 || localX == 2) c *= 0.88f;
+		float u = x / 256f, v = y / 256f;
+		Color c = SurfaceKit.Tinted("limestone", u, v, new Color(0.97f, 0.94f, 0.88f), 0.74f, 0.7f);
+		c *= 0.92f + 0.08f * Fbm(x, y, 256, 4, 3, 503);
+		if (Hash(x, y, 504) > 0.994f) c *= 0.88f;                           // pits
 		return c;
 	});
 
-	public static StandardMaterial3D AshlarMat => Tint(Tri("ch_ashlar", Ashlar, 2f, 0.88f, 0.28f), new Color(0.5f, 0.47f, 0.44f));
+	public static StandardMaterial3D AshlarMat => Tint(Relief(Tri("ch_ashlar", Ashlar, 2f, 0.88f, 0.28f), "limestone", 0.8f), new Color(0.5f, 0.47f, 0.44f));
+
+	/// <summary>A photo surface's relief on a material (the photo drawn at the same repeat as its albedo).</summary>
+	private static StandardMaterial3D Relief(StandardMaterial3D m, string surface, float strength)
+	{
+		if (!m.HasMeta("relief")) { SurfaceKit.Relief(m, surface, strength); m.SetMeta("relief", surface); }
+		return m;
+	}
 
 	/// <summary>Everything in the church is a good deal darker than its texture: old, sooted stone (the owner:
 	/// the pale version glared like cloud on a sunny day).</summary>
@@ -156,7 +144,7 @@ public static class ChurchTextures
 		if (stain > 0.66f) c = c.Lerp(new Color(0.66f, 0.58f, 0.46f), Mathf.Clamp((stain - 0.66f) * 3f, 0f, 0.45f));
 		float cr = Fbm(x, y, 256, 5, 3, 514);
 		if (Mathf.Abs(cr - 0.5f) < 0.006f) c *= 0.8f;
-		return c;
+		return c * SurfaceKit.Grain("vault_plaster", x / 256f, y / 256f, 0.55f);
 	});
 
 	public static StandardMaterial3D PlasterMat => Tint(Tri("ch_plaster", Plaster, 3f, 0.95f, 0.2f), new Color(0.4f, 0.37f, 0.34f));
@@ -176,45 +164,18 @@ public static class ChurchTextures
 		c = c.Lerp(new Color(0.48f, 0.47f, 0.47f), Mathf.Clamp(1f - vein / 0.08f, 0f, 1f) * 0.55f);
 		c = c.Lerp(new Color(0.62f, 0.6f, 0.58f), Mathf.Clamp(1f - vein / 0.2f, 0f, 1f) * 0.15f);
 		if (x % 128 == 0 || y % 128 == 0) c = new Color(0.32f, 0.3f, 0.28f);
-		return c;
+		return c * SurfaceKit.Grain("limestone", x / 256f, y / 256f, 0.18f, 2f);
 	});
 
 	public static StandardMaterial3D MarbleMat => Tint(Uv("ch_marble", Marble, 2f, 0.3f, 0.5f), new Color(0.4f, 0.38f, 0.37f));
 
-	/// <summary>Old cobbles (the owner's reference): rounded stones of every size and shade of grey and brown,
-	/// worn smooth on top, packed in dark grit, a 2 m tile. Each stone is a cell of a jittered grid, domed
-	/// by its distance to the cell's edge.</summary>
+	/// <summary>Old cobbles (the owner's reference): Poly Haven's cobblestone floor, rounded stones of every shade of
+	/// grey and brown packed in dark grit; its green moss mostly greyed out (inside a church), a 2 m tile.</summary>
 	public static Texture2D Cobbles => Make("ch_cobbles", 256, 256, (x, y) =>
-	{
-		const float cell = 26f;
-		float gx = x / cell, gy = y / cell;
-		int cx = Mathf.FloorToInt(gx), cy = Mathf.FloorToInt(gy);
-		const int period = (int)(256 / cell) + 0;
-		float best = 9, second = 9; int bi = 0, bj = 0;
-		for (int j = -1; j <= 1; j++)
-			for (int i = -1; i <= 1; i++)
-			{
-				int ii = ((cx + i) % 10 + 10) % 10, jj = ((cy + j) % 10 + 10) % 10;
-				float px = cx + i + 0.2f + 0.6f * Hash(ii, jj, 661), py = cy + j + 0.2f + 0.6f * Hash(ii, jj, 662);
-				float d = new Vector2((gx - px) * (0.85f + 0.3f * Hash(ii, jj, 663)), gy - py).Length();
-				if (d < best) { second = best; best = d; bi = ii; bj = jj; }
-				else if (d < second) second = d;
-			}
-		float edge = second - best;                                   // 0 at the joint, growing into the stone
-		float dome = Mathf.Clamp(edge / 0.35f, 0f, 1f);
-		float tone = 0.75f + 0.35f * Hash(bi, bj, 664);
-		float warm = Hash(bi, bj, 665);
-		Color stone = new Color(0.5f + 0.08f * warm, 0.47f + 0.03f * warm, 0.43f - 0.03f * warm) * tone;
-		float grain = Fbm(x, y, 256, 16, 3, 666);
-		stone *= 0.82f + 0.26f * grain;
-		stone *= 0.6f + 0.4f * Mathf.Sqrt(dome);                      // darker down its sides
-		if (dome > 0.75f && Hash(x / 2, y / 2, 667) > 0.7f) stone *= 1.08f;   // polished tops catch the light
-		Color grit = new Color(0.12f, 0.1f, 0.09f) * (0.8f + 0.4f * Fbm(x, y, 256, 8, 2, 668));
-		return edge < 0.06f ? grit : stone.Lerp(grit, Mathf.Clamp(1f - (edge - 0.06f) / 0.05f, 0f, 1f) * 0.6f);
-	});
+		SurfaceKit.Tinted("cobbles", x / 256f, y / 256f, new Color(1f, 0.97f, 0.93f), 0.46f, 0.3f) * (0.9f + 0.1f * Fbm(x, y, 256, 3, 3, 668)));
 
 	/// <summary>The church's floor (the owner: more cobblestoned).</summary>
-	public static StandardMaterial3D CobbleMat => Tint(Uv("ch_cobbles", Cobbles, 2f, 0.75f, 0.35f), new Color(0.62f, 0.6f, 0.58f));
+	public static StandardMaterial3D CobbleMat => Tint(Relief(Uv("ch_cobbles", Cobbles, 2f, 0.75f, 0.35f), "cobbles", 0.9f), new Color(0.62f, 0.6f, 0.58f));
 
 	/// <summary>Red-brown marble with pale veining, for the nave's aisle runner and the chancel's steps.</summary>
 	public static Texture2D RedMarble => Make("ch_redmarble", 256, 256, (x, y) =>
@@ -264,24 +225,17 @@ public static class ChurchTextures
 
 	// ------------------------------------------------------------------ the crypt
 
-	/// <summary>The crypt's vaults: small orange-brown bricks in running bond, dark mortar, some bricks
-	/// darker (over-fired), a bloom of damp salt here and there.</summary>
+	/// <summary>The crypt's vaults: Poly Haven's medieval red brick (small orange-brown bricks, dark mortar), a
+	/// bloom of damp salt here and there.</summary>
 	public static Texture2D CryptBrick => Make("ch_cryptbrick", 256, 256, (x, y) =>
 	{
-		int row = y / 16;
-		int bx = (x + (row % 2) * 16) / 32;
-		int lx = (x + (row % 2) * 16) % 32, ly = y % 16;
-		float tone = 0.82f + 0.3f * Hash(bx, row, 551);
-		if (Hash(bx, row, 552) > 0.9f) tone *= 0.7f;
-		float grain = Fbm(x, y, 256, 16, 3, 553);
-		Color c = new Color(0.64f, 0.36f, 0.22f) * tone * (0.85f + 0.2f * grain);
-		if (lx < 2 || ly < 2) c = new Color(0.22f, 0.19f, 0.16f) * (0.9f + 0.2f * grain);
+		Color c = SurfaceKit.Tinted("crypt_brick", x / 256f, y / 256f, new Color(1.05f, 0.92f, 0.82f), 0.46f, 0.85f);
 		float salt = Fbm(x, y, 256, 3, 3, 554);
-		if (salt > 0.7f) c = c.Lerp(new Color(0.8f, 0.78f, 0.72f), Mathf.Clamp((salt - 0.7f) * 2.5f, 0f, 0.5f));
+		if (salt > 0.7f) c = c.Lerp(new Color(0.8f, 0.78f, 0.72f), Mathf.Clamp((salt - 0.7f) * 2.5f, 0f, 0.4f));
 		return c;
 	});
 
-	public static StandardMaterial3D CryptBrickMat => Tint(Tri("ch_cryptbrick", CryptBrick, 2f, 0.92f, 0.2f), new Color(0.46f, 0.4f, 0.38f));
+	public static StandardMaterial3D CryptBrickMat => Tint(Relief(Tri("ch_cryptbrick", CryptBrick, 2f, 0.92f, 0.2f), "crypt_brick", 0.8f), new Color(0.46f, 0.4f, 0.38f));
 
 	/// <summary>The crypt's floor: black and white marble squares, half a metre each, worn dull.</summary>
 	public static Texture2D Chequer => Make("ch_chequer", 256, 256, (x, y) =>
@@ -292,27 +246,22 @@ public static class ChurchTextures
 		Color c = white ? new Color(0.86f, 0.84f, 0.8f) * (0.92f + 0.1f * fine) : new Color(0.09f, 0.09f, 0.1f) * (0.9f + 0.4f * fine);
 		c = c.Lerp(white ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.3f, 0.3f, 0.32f), Mathf.Clamp(1f - vein / 0.05f, 0f, 1f) * 0.4f);
 		if (x % 64 == 0 || y % 64 == 0) c = new Color(0.4f, 0.38f, 0.35f);
-		return c;
+		return c * SurfaceKit.Grain("limestone", x / 256f, y / 256f, 0.2f, 2f);
 	});
 
 	public static StandardMaterial3D ChequerMat => Tint(Uv("ch_chequer", Chequer, 2f, 0.45f, 0.4f), new Color(0.45f, 0.44f, 0.43f));
 
 	// ------------------------------------------------------------------ wood, metal, glass, snow
 
-	/// <summary>Dark stained oak: close grain running along U, open pores, a darker edge to each board.</summary>
+	/// <summary>Dark stained oak: Poly Haven's close-grained dark wood (the grain along V), a darker edge to each board.</summary>
 	public static Texture2D Oak => Make("ch_oak", 128, 256, (x, y) =>
 	{
-		float warp = Fbm(x * 0.5f, y, 128, 4, 3, 571);
-		float lines = Mathf.Sin((x + warp * 18f) * 0.9f) * 0.5f + 0.5f;
-		float fine = Fbm(x, y * 0.2f, 128, 16, 2, 572);
-		float g = 0.75f + 0.18f * lines + 0.12f * (fine - 0.5f);
-		if (Hash(x, y / 3, 573) > 0.985f) g *= 0.7f;
-		Color c = new Color(0.34f, 0.2f, 0.11f) * g;
+		Color c = SurfaceKit.Tinted("oak", x / 128f, y / 256f, new Color(1.2f, 0.78f, 0.52f), 0.26f, 0.5f);
 		if (x % 64 < 1) c *= 0.55f;
 		return c;
 	});
 
-	public static StandardMaterial3D OakMat => Uv("ch_oak", Oak, 1f, 0.55f, 0.35f);
+	public static StandardMaterial3D OakMat => Relief(Uv("ch_oak", Oak, 1f, 0.55f, 0.35f), "oak", 0.5f);
 
 	/// <summary>Old grey-brown planks, split and weathered, dark gaps between boards, the nail heads rusted.</summary>
 	public static Texture2D OldPlank => Make("ch_oldplank", 128, 256, (x, y) =>
@@ -323,6 +272,7 @@ public static class ChurchTextures
 		float grain = Mathf.Sin((lx + warp * 12f) * 1.3f) * 0.5f + 0.5f;
 		float tone = 0.8f + 0.25f * Hash(board, 0, 582);
 		float g = tone * (0.72f + 0.2f * grain + 0.1f * Fbm(x, y, 128, 12, 2, 583));
+		g *= SurfaceKit.Grain("old_planks", y / 256f, x / 128f, 0.75f);   // the photo's weathered grain, turned to run along the board
 		Color c = new Color(0.44f, 0.36f, 0.28f) * g;
 		c = c.Lerp(new Color(0.46f, 0.46f, 0.44f), 0.35f * Fbm(x, y, 128, 3, 3, 584));    // silvered with age
 		if (lx < 2) c = new Color(0.08f, 0.07f, 0.06f);

@@ -18,13 +18,20 @@ namespace ProjectDS.World;
 /// UVs, and surfaces whose texel density varies by more than 12x across their triangles (stretching).</item>
 /// <item><b>Degenerate triangles</b>: zero-area slivers (they catch light as sparkles).</item>
 /// </list>
+/// <item><b>Pierce-through</b> (Act 23's hard check): two meshes that cut through each other where it shows: a thin
+/// sliver of something behind a surface poking out through it (the lodge's exterior sill through the dining hall's
+/// panelling), or a thing passing right through a wall into the room beyond.</item>
 /// Report: test-output/clipping/report.txt (worst first).
-/// Run: <c>&lt;godot&gt; --path . res://scenes/levels/clip_audit.tscn --windowed</c>
+/// Run: <c>&lt;godot&gt; --path . res://scenes/levels/clip_audit.tscn --windowed</c>; add <c>-- --winter</c> for the church,
+/// the winter woods and the ski lodge alone (Acts 21-23), with the pierce-through check on the church and the lodge.
 /// </summary>
 public partial class ClipAudit : Node
 {
 	private const float PlaneTol = 0.0001f, MinOverlap = 0.002f;
 	private readonly StringBuilder _log = new();
+	/// <summary>The ski lodge's origin (the winter audit), so its entries can say where in the lodge's own space.</summary>
+	private Vector3? _lodge;
+	private string Where(Vector3 at) => _lodge is { } o ? $"({at.X:0.00},{at.Y:0.00},{at.Z:0.00}) lodge ({at.X - o.X:0.00},{at.Y - o.Y:0.00},{at.Z - o.Z:0.00})" : $"({at.X:0.00},{at.Y:0.00},{at.Z:0.00})";
 	private readonly List<string> _backedUp = new();
 
 	private sealed class Tri
@@ -43,6 +50,7 @@ public partial class ClipAudit : Node
 	private readonly List<(string level, string what, string detail)> _uv = new();
 	private readonly Dictionary<string, int> _degen = new();
 	private readonly List<(string level, string path, Vector3 at, Vector3 size)> _ghosts = new();
+	private readonly List<(string level, string kind, string surface, string piercer, float front, float back, Vector3 at)> _pierce = new();
 
 	private static readonly string[] Passable =
 	{
@@ -55,6 +63,8 @@ public partial class ClipAudit : Node
 		// checked and meant to be so: mounted flat on a wall, overhead, or walked into on purpose
 		"sewer/hole", "act15hallway/closet", "act15hallway/things", "act15hallway/shelves", "bossroom/ladder", "bossroom/fixture",
 		"stairwell/door/door", "wheel/spokes", "noticeboard", "wallclock", "exitnight", "bollards",
+		// Acts 21-23: a mop leaning (it falls), ski poles stuck in the snow, the vestment hanging, the font's lid on the font
+		"skilodge/mop", "ski_tracks/poles", "church/alb", "church/fontlid",
 	};
 
 	public override void _Ready() => Run();
@@ -71,8 +81,13 @@ public partial class ClipAudit : Node
 		try
 		{
 			await Frames(5);
-			await AuditLevel("trailhead", "res://scenes/levels/forest_world.tscn");
-			await AuditLevel("hollow", "res://scenes/levels/hollow_world.tscn");
+			if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--winter") >= 0)
+				await AuditWorld("winter", () => { var w = new Node3D { Name = "Winter" }; w.AddChild(new Church { Name = "Church" }); return w; });
+			else
+			{
+				await AuditLevel("trailhead", "res://scenes/levels/forest_world.tscn");
+				await AuditLevel("hollow", "res://scenes/levels/hollow_world.tscn");
+			}
 			WriteReport();
 		}
 		catch (Exception e) { GD.PushError("[clip] " + e); }
@@ -104,9 +119,11 @@ public partial class ClipAudit : Node
 		_ => true,
 	};
 
-	private async Task AuditLevel(string level, string path)
+	private Task AuditLevel(string level, string path) => AuditWorld(level, () => GD.Load<PackedScene>(path).Instantiate<Node3D>());
+
+	private async Task AuditWorld(string level, Func<Node3D> make)
 	{
-		var world = GD.Load<PackedScene>(path).Instantiate<Node3D>();
+		var world = make();
 		AddChild(world);
 		await PhysicsFrames(90);
 		await Frames(10);
@@ -164,8 +181,14 @@ public partial class ClipAudit : Node
 			}
 		}
 		Log($"{level}: {meshes} meshes, {owners.Count} opaque surfaces, {tris.Count} triangles, {degenerate} degenerate");
+		if (world.FindChild("SkiLodge", true, false) is Node3D lodge) _lodge = lodge.GlobalPosition;
 		FindGhosts(level, world);
 		FindFights(level, owners, tris);
+		if (level == "winter")
+		{
+			FindPierce(level, owners, tris, o => o.Path.Contains("SkiLodge"), "lodge");
+			FindPierce(level, owners, tris, o => o.Path.StartsWith("Church/") && !o.Path.Contains("WinterWoods") && !o.Path.Contains("WinterGlade"), "church");
+		}
 		RemoveChild(world);
 		world.QueueFree();
 		await Frames(5);
@@ -249,6 +272,89 @@ public partial class ClipAudit : Node
 		Log($"{level}: {n} walk-through props (solid-looking, body height, no collider)");
 	}
 
+	/// <summary>Meshes cutting through each other where it shows. For each pair of triangles of two different meshes
+	/// that intersect (not coplanar: that's z-fighting), how far the second mesh's triangle reaches in front of the
+	/// first's face and behind it. A sliver in front with the bulk behind is something poking out through a
+	/// surface; a big reach both ways through a large face is a thing passing through a wall.</summary>
+	private void FindPierce(string level, List<Owner> owners, List<Tri> all, Func<Owner, bool> inSet, string set)
+	{
+		var tris = all.Where(t => inSet(owners[t.Owner])).ToList();
+		const float cell = 0.5f;
+		var grid = new Dictionary<(int, int, int), List<int>>();
+		for (int i = 0; i < tris.Count; i++)
+		{
+			var t = tris[i];
+			Vector3 mn = t.A.Min(t.B).Min(t.C), mx = t.A.Max(t.B).Max(t.C);
+			for (int x = Mathf.FloorToInt(mn.X / cell); x <= Mathf.FloorToInt(mx.X / cell); x++)
+				for (int y = Mathf.FloorToInt(mn.Y / cell); y <= Mathf.FloorToInt(mx.Y / cell); y++)
+					for (int z = Mathf.FloorToInt(mn.Z / cell); z <= Mathf.FloorToInt(mx.Z / cell); z++)
+					{
+						if (!grid.TryGetValue((x, y, z), out var l)) grid[(x, y, z)] = l = new List<int>();
+						l.Add(i);
+					}
+		}
+		var seen = new HashSet<long>();
+		// per (surface owner, piercing owner): the largest reach in front of and behind the surface, and where
+		var acc = new Dictionary<(int, int), (float front, float back, float area, Vector3 at)>();
+		void Note(Tri surf, Tri other)
+		{
+			// (N is by the vertex winding, which points away from the face's seen side: Godot's front faces wind clockwise)
+			float da = -surf.N.Dot(other.A - surf.A), db = -surf.N.Dot(other.B - surf.A), dc = -surf.N.Dot(other.C - surf.A);
+			float front = Mathf.Max(0f, Mathf.Max(da, Mathf.Max(db, dc))), back = Mathf.Max(0f, -Mathf.Min(da, Mathf.Min(db, dc)));
+			float area = (surf.B - surf.A).Cross(surf.C - surf.A).Length() * 0.5f;
+			var k = (surf.Owner, other.Owner);
+			acc.TryGetValue(k, out var cur);
+			acc[k] = (Mathf.Max(cur.front, front), Mathf.Max(cur.back, back), Mathf.Max(cur.area, area), cur.front > 0 || cur.back > 0 ? cur.at : (other.A + other.B + other.C) / 3f);
+		}
+		foreach (var l in grid.Values)
+			for (int i = 0; i < l.Count; i++)
+				for (int j = i + 1; j < l.Count; j++)
+				{
+					int a = Math.Min(l[i], l[j]), b = Math.Max(l[i], l[j]);
+					Tri ta = tris[a], tb = tris[b];
+					if (ta.Owner == tb.Owner) continue;
+					if (!seen.Add((long)a * 4000000L + b)) continue;
+					if (Mathf.Abs(ta.N.Dot(tb.N)) > 0.999f) continue;   // parallel: never a clean cut (coplanar is the z-fight check's)
+					if (!TrisIntersect(ta, tb)) continue;
+					Note(ta, tb);
+					Note(tb, ta);
+				}
+		int n = 0;
+		foreach (var ((so, po), (front, back, area, at)) in acc)
+		{
+			string kind = null;
+			if (front > 0.002f && front < 0.05f && back > 0.08f && area > 0.02f) kind = "pokes out through a surface (a sliver in front, the bulk behind)";
+			else if (front > 0.12f && back > 0.5f && area > 0.3f) kind = "passes right through a wall";
+			if (kind == null) continue;
+			_pierce.Add((level + "/" + set, kind, $"{owners[so].Path} [{owners[so].Material}]", $"{owners[po].Path} [{owners[po].Material}]", front, back, at));
+			n++;
+		}
+		Log($"{level}/{set}: {tris.Count} triangles, {n} pierce-throughs");
+	}
+
+	private static bool TrisIntersect(Tri p, Tri q)
+	{
+		// any edge of one through the other
+		return SegTri(p.A, p.B, q) || SegTri(p.B, p.C, q) || SegTri(p.C, p.A, q) || SegTri(q.A, q.B, p) || SegTri(q.B, q.C, p) || SegTri(q.C, q.A, p);
+	}
+
+	private static bool SegTri(Vector3 s0, Vector3 s1, Tri t)
+	{
+		Vector3 dir = s1 - s0, e1 = t.B - t.A, e2 = t.C - t.A;
+		Vector3 h = dir.Cross(e2);
+		float a = e1.Dot(h);
+		if (Mathf.Abs(a) < 1e-9f) return false;
+		float f = 1f / a;
+		Vector3 s = s0 - t.A;
+		float u = f * s.Dot(h);
+		if (u < 1e-4f || u > 1f - 1e-4f) return false;
+		Vector3 q = s.Cross(e1);
+		float v = f * dir.Dot(q);
+		if (v < 1e-4f || u + v > 1f - 1e-4f) return false;
+		float w = f * e2.Dot(q);
+		return w > 1e-4f && w < 1f - 1e-4f;
+	}
+
 	/// <summary>The area two triangles share (Sutherland-Hodgman: clip one by the other's edges).</summary>
 	private static float Overlap(Vector2[] subject, Vector2[] clip)
 	{
@@ -297,11 +403,15 @@ public partial class ClipAudit : Node
 		sb.AppendLine();
 		sb.AppendLine($"== Z-fighting: {_fights.Count} pairs (coplanar within {PlaneTol * 1000:0.0} mm, same facing, overlapping), worst first ==");
 		foreach (var f in _fights.OrderByDescending(f => f.area))
-			sb.AppendLine($"{f.area,8:0.000} m²  [{f.level}] at ({f.at.X:0.00},{f.at.Y:0.00},{f.at.Z:0.00})\n    {f.a}\n    {f.b}\n      e.g. {f.ex}");
+			sb.AppendLine($"{f.area,8:0.000} m²  [{f.level}] at {Where(f.at)}\n    {f.a}\n    {f.b}\n      e.g. {f.ex}");
 		sb.AppendLine();
 		sb.AppendLine($"== Walk-through props: {_ghosts.Count} ==");
 		foreach (var g in _ghosts.OrderByDescending(g => g.size.X * g.size.Y * g.size.Z))
-			sb.AppendLine($"[{g.level}] {g.path} at ({g.at.X:0.0},{g.at.Y:0.0},{g.at.Z:0.0}) size ({g.size.X:0.00}x{g.size.Y:0.00}x{g.size.Z:0.00})");
+			sb.AppendLine($"[{g.level}] {g.path} at {Where(g.at)} size ({g.size.X:0.00}x{g.size.Y:0.00}x{g.size.Z:0.00})");
+		sb.AppendLine();
+		sb.AppendLine($"== Pierce-through: {_pierce.Count} ==");
+		foreach (var p2 in _pierce.OrderBy(p2 => p2.kind).ThenByDescending(p2 => p2.back))
+			sb.AppendLine($"[{p2.level}] {p2.kind}: front {p2.front * 100:0.0} cm, back {p2.back * 100:0.0} cm at {Where(p2.at)}\n    surface {p2.surface}\n    through {p2.piercer}");
 		sb.AppendLine();
 		sb.AppendLine("== Degenerate triangles, most first ==");
 		foreach (var (k, n) in _degen.OrderByDescending(d => d.Value).Take(15)) sb.AppendLine($"{n,7}  {k}");

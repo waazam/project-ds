@@ -188,6 +188,7 @@ public static class LodgeKit
 		k.Box(new Vector3(0, 0.75f, 1.02f), new Vector3(w + 0.1f, 1.4f, 0.1f), 1f);
 		k.Mat(LodgeTextures.LinenMat);
 		k.Box(new Vector3(0, 0.44f, 0.05f), new Vector3(w - 0.06f, 0.18f, 1.94f), 1f);
+		k.Mat(LodgeTextures.PillowMat);   // (plain: a blob's round UVs pinch the linen's weave at its ends)
 		foreach (float s in new[] { -1f, 1f }) k.Blob(new Vector3(s * w * 0.24f, 0.58f, 0.78f), new Vector3(w * 0.2f, 0.07f, 0.16f), (int)(s * 7 + 700), 0.1f, false, 1f);
 		k.Mat(cover);
 		k.Box(new Vector3(0, 0.55f, -0.25f), new Vector3(w + 0.04f, 0.06f, 1.5f), 1f);

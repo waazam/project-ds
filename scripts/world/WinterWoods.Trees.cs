@@ -183,4 +183,24 @@ public partial class WinterWoods
 	}
 
 	public static StandardMaterial3D PropSnow => _snowStd ??= SnowStd("winter_prop_snow", 0.8f, 0.92f);
+
+	/// <summary>Soft, fresh snow blown in indoors (the lodge's drifts): the same snow at a broader grain, a touch
+	/// cooler and smoother (at the props' grain, heaped on carpet under lamplight, it read as grey granite).</summary>
+	public static StandardMaterial3D SoftSnow
+	{
+		get
+		{
+			if (_softSnow != null) return _softSnow;
+			// near-white with only the snow's fine grain over it (the photo at any scale read as marble indoors)
+			_softSnow = new StandardMaterial3D
+			{
+				ResourceName = "winter_soft_snow", AlbedoColor = new Color(0.74f, 0.77f, 0.84f), Roughness = 0.85f,
+				NormalEnabled = true, NormalTexture = GD.Load<Texture2D>("res://assets/textures/snow/snow_normal.png"), NormalScale = 0.35f,
+				Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f,
+			};
+			DetailKit.Apply(_softSnow, DetailKit.Kind.Snow);
+			return _softSnow;
+		}
+	}
+	private static StandardMaterial3D _softSnow;
 }

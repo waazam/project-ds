@@ -185,7 +185,7 @@ public partial class CreaturePreview : Node3D
 		await Shot("lodge_lobby_fireplace", new Vector3(-2f, 1.7f, 2f), new Vector3(8f, 2.5f, -4.6f));
 		await Shot("lodge_lobby_stairs", new Vector3(4f, 1.7f, 2f), new Vector3(-3f, 2.8f, -9f));
 		await Shot("lodge_lobby_from_balcony", new Vector3(-8.5f, 5.9f, -1.5f), new Vector3(6f, 3f, 0f));
-		await Shot("lodge_lobby_desk", new Vector3(0f, 1.7f, 3f), new Vector3(-5f, 1.5f, 8f));
+		await Shot("lodge_lobby_desk", new Vector3(0f, 1.7f, 3f), new Vector3(5f, 1.5f, 8f));
 		await Shot("lodge_lobby_ceiling", new Vector3(0, 1.7f, 0), new Vector3(0.1f, 20f, 0.2f));
 		await Shot("lodge_bar", new Vector3(-10.8f, 1.7f, 4f), new Vector3(-22f, 1.4f, 4f));
 		await Shot("lodge_bar_counter", new Vector3(-15f, 1.6f, 6.8f), new Vector3(-19.4f, 1f, 2.5f));
@@ -201,6 +201,15 @@ public partial class CreaturePreview : Node3D
 		await Shot("lodge_exterior_front", new Vector3(0f, 3f, 55f), new Vector3(0f, 10f, 0f));
 		await Shot("lodge_room204_hole", new Vector3(-24f, 5.9f, -3.5f), new Vector3(-19f, 5.2f, -2.4f));
 		await Shot("lodge_dining_tables", new Vector3(22f, 2.6f, 6.5f), new Vector3(27f, 0.8f, 0f));
+		await Shot("lodge_exterior_chimney", new Vector3(26f, 9f, -24f), new Vector3(8f, 13f, -4.6f));
+		await Shot("lodge_fireplace_top", new Vector3(-7f, 5.9f, 1f), new Vector3(8.3f, 11f, -4.8f));
+		// the audit's sweep: all round the lobby, looking up at the walls and the roof, for anything from outside
+		// showing through
+		for (int i = 0; i < 6; i++)
+		{
+			float a = Mathf.DegToRad(30f + 60f * i);
+			await Shot($"lodge_sweep_{i}", new Vector3(0, 1.7f, 0), new Vector3(Mathf.Sin(a) * 10f, 8f, Mathf.Cos(a) * 10f));
+		}
 		await Shot("lodge_mudroom", new Vector3(-28f, 1.6f, -5.5f), new Vector3(-30f, 1.2f, -1.7f));
 	}
 }

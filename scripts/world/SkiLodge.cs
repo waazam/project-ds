@@ -223,10 +223,14 @@ public partial class SkiLodge : Node3D
 		k.Mat(BuildingTextures.StoneMat);
 		k.Color = new Color(0.55f, 0.55f, 0.58f);
 		// (over the lobby's fireplace, on the back-east side: it rises out of the roof there)
-		Vector3 chim = ((HexVert(1) + HexVert(2)) * 0.5f) * 0.86f;
-		k.Box(chim + Vector3.Up * 21f, new Vector3(2.4f, 18f, 2.4f), 0.5f, new Basis(Vector3.Up, Mathf.Pi / 6f));
+		// It stands flush over the lobby's chimney breast (the breast's stack runs up inside it): its inner face on the
+		// breast's face, 9.24 m out, its foot where the roof crosses that face (10.9 m), so nothing of it shows
+		// in the lobby under the roof and no gap shows under it outside.
+		Vector3 radial = ((HexVert(1) + HexVert(2)) * 0.5f).Normalized();
+		Vector3 chim = radial * 9.94f;
+		k.Box(chim + Vector3.Up * 20.45f, new Vector3(1.4f, 19.1f, 2.4f), 0.5f, new Basis(Vector3.Up, Mathf.Pi / 6f));
 		k.Mat(RoofSnow);
-		k.Box(chim + Vector3.Up * 30.1f, new Vector3(2.6f, 0.25f, 2.6f), 1f, new Basis(Vector3.Up, Mathf.Pi / 6f));
+		k.Box(chim + Vector3.Up * 30.1f, new Vector3(1.6f, 0.25f, 2.6f), 1f, new Basis(Vector3.Up, Mathf.Pi / 6f));
 		// one window high over the doors is lit, dimly, as if by a candle: the only light at the road's end (nobody should be here)
 		k.Mat(LitWindow);
 		{
@@ -242,8 +246,10 @@ public partial class SkiLodge : Node3D
 		var k = new MeshKit();
 		foreach (float s in new[] { -1f, 1f })
 		{
-			float x0 = s * WingX0, x1 = s * WingX1;
-			float lo = Mathf.Min(x0, x1), hi = Mathf.Max(x0, x1);
+			// (the walls start where the hall's wall is, not at the wing's nominal start inside the hall: their ends
+			// stood into the lobby's corners)
+			float x0 = s * WingX0, x1 = s * WingX1, xw = s * (WingX0 + 1.4f);
+			float lo = Mathf.Min(xw, x1), hi = Mathf.Max(xw, x1);
 			// front and back walls (the west wing's back wall has the back door in it)
 			Wall(k, new Vector3(lo, 0, WingHalfZ), new Vector3(hi, 0, WingHalfZ), WingWall, Vector3.Back, 0.7f);
 			if (s < 0)
@@ -264,22 +270,43 @@ public partial class SkiLodge : Node3D
 			else Wall(k, new Vector3(hi, 0, -WingHalfZ), new Vector3(lo, 0, -WingHalfZ), WingWall, Vector3.Forward, 0.7f);
 			// the far end wall
 			Wall(k, new Vector3(x1, 0, s * WingHalfZ), new Vector3(x1, 0, -s * WingHalfZ), WingWall, new Vector3(s, 0, 0), 0.7f, true, 4f);
-			// the steep roof: two snow slopes to a ridge along the wing, gables at the end
+			// the steep roof: two snow slopes to a ridge along the wing, gables at the end. Its inner end follows the
+			// hall's outer wall (the facets either side of the vertex at the ridge): from the wing's nominal start the
+			// slopes ran on into the lobby and their dark undersides crossed its upper walls.
 			const float over = 1f;
 			float ex = x1 + s * over;
-			Vector3 fa = new(x0, WingWall - 0.4f, WingHalfZ + over), fb = new(ex, WingWall - 0.4f, WingHalfZ + over);
-			Vector3 ra = new(x0, WingRidge, 0), rb = new(ex, WingRidge, 0);
-			Vector3 ba = new(x0, WingWall - 0.4f, -WingHalfZ - over), bb = new(ex, WingWall - 0.4f, -WingHalfZ - over);
+			float FacetX(float z) => s * (HexR - Mathf.Abs(z) * (HexR * 0.5f) / Apothem);   // the hall's outer wall at z
+			float eaveZ = WingHalfZ + over;
+			Vector3 fa = new(FacetX(eaveZ), WingWall - 0.4f, eaveZ), fb = new(ex, WingWall - 0.4f, eaveZ);
+			Vector3 ra = new(s * HexR, WingRidge, 0), rb = new(ex, WingRidge, 0);
+			Vector3 ba = new(FacetX(eaveZ), WingWall - 0.4f, -eaveZ), bb = new(ex, WingWall - 0.4f, -eaveZ);
 			k.Mat(RoofSnow);
 			k.Color = Colors.White;
 			var nf = new Vector3(0, WingHalfZ + over, WingRidge - WingWall + 0.4f).Normalized();
 			var nb = new Vector3(0, WingHalfZ + over, -(WingRidge - WingWall + 0.4f)).Normalized();
-			k.Quad(fa, fb, rb, ra, nf, new Vector2(0, 0), new Vector2(38f * 0.25f, 0), new Vector2(38f * 0.25f, 3f), new Vector2(0, 3f));
-			k.Quad(bb, ba, ra, rb, nb, new Vector2(0, 0), new Vector2(38f * 0.25f, 0), new Vector2(38f * 0.25f, 3f), new Vector2(0, 3f));
+			Vector2 U(Vector3 p, float v) => new(Mathf.Abs(p.X) * 0.25f, v);
+			k.Quad(fa, fb, rb, ra, nf, U(fa, 0), U(fb, 0), U(rb, 3f), U(ra, 3f));
+			k.Quad(bb, ba, ra, rb, nb, U(bb, 0), U(ba, 0), U(ra, 3f), U(rb, 3f));
 			k.Mat(BuildingTextures.ShingleMat);
 			k.Color = new Color(0.35f, 0.33f, 0.32f);
 			k.Quad(ra, rb, fb - Vector3.Up * 0.25f, fa - Vector3.Up * 0.25f, -nf);
 			k.Quad(rb, ra, ba - Vector3.Up * 0.25f, bb - Vector3.Up * 0.25f, -nb);
+			// where the roof meets the hall: timber filling the wing's section above the hall's wall top, on the hall's
+			// two outer facets (the hall's own roof slopes away inward from there)
+			{
+				k.Mat(LodgeTimber);
+				k.Color = Colors.White;
+				float zWall = eaveZ * (1f - (HexWall - (WingWall - 0.4f)) / (WingRidge - (WingWall - 0.4f)));   // where the slope passes the wall top
+				foreach (float sz in new[] { 1f, -1f })
+				{
+					Vector3 j0 = new(FacetX(zWall), HexWall, sz * zWall), j1 = new(s * HexR, HexWall, 0), j2 = new(s * HexR, WingRidge, 0);
+					Vector3 jn = new Vector3(s * 0.5f, 0, sz * 0.866f);
+					float w = j0.DistanceTo(j1) * 0.5f, h = (WingRidge - HexWall) * 0.5f;
+					// both faces (it's seen from outside; from the wing's attic side it's never seen)
+					k.Tri(j0, j1, j2, jn, Vector2.Zero, new Vector2(w, 0), new Vector2(w, h));
+					k.Tri(j0, j2, j1, -jn, Vector2.Zero, new Vector2(w, h), new Vector2(w, 0));
+				}
+			}
 			// the gable: timber, a small window, and the snow's edge over it
 			k.Mat(LodgeTimber);
 			k.Color = Colors.White;
@@ -601,7 +628,14 @@ public partial class SkiLodge : Node3D
 		k.Mat(BuildingTextures.BoardsMat);
 		k.Color = new Color(0.42f, 0.4f, 0.4f);
 		k.Quad(new Vector3(x0, top, z1), new Vector3(x1, top, z1), new Vector3(x1, top, z0), new Vector3(x0, top, z0), Vector3.Down);
-		k.Quad(new Vector3(x1, 0, z0), new Vector3(x0, 0, z0), new Vector3(x0, top, z0), new Vector3(x1, top, z0), Vector3.Back);
+		// the back wall's boards: round the back door's opening (a whole board wall hid the doorway from inside), a
+		// hair in front of the stone's inner face (level with it, the two fought)
+		{
+			float zb = z0 + 0.012f, d0 = BackDoorX - BackDoorW * 0.5f - 0.15f, d1 = BackDoorX + BackDoorW * 0.5f + 0.15f;
+			k.Quad(new Vector3(x1, 0, zb), new Vector3(d1, 0, zb), new Vector3(d1, top, zb), new Vector3(x1, top, zb), Vector3.Back);
+			k.Quad(new Vector3(d0, 0, zb), new Vector3(x0, 0, zb), new Vector3(x0, top, zb), new Vector3(d0, top, zb), Vector3.Back);
+			k.Quad(new Vector3(d1, BackDoorH, zb), new Vector3(d0, BackDoorH, zb), new Vector3(d0, top, zb), new Vector3(d1, top, zb), Vector3.Back);
+		}
 		k.Quad(new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), new Vector3(x0, top, z1), new Vector3(x0, top, z0), Vector3.Right);
 		k.Quad(new Vector3(x1, 0, z1), new Vector3(x1, 0, z0), new Vector3(x1, top, z0), new Vector3(x1, top, z1), Vector3.Left);
 		// (its inner wall, with the door on into the lodge, is the service corridor's: SkiLodge.Interior.cs)
@@ -650,7 +684,8 @@ public partial class SkiLodge : Node3D
 		}
 		foreach (float s in new[] { -1f, 1f })
 		{
-			float x0 = s * WingX0, ex = s * (WingX1 + 1f);
+			// (from outside the hall's walls: from the wing's own start, the first few hung inside the lobby's corners)
+			float x0 = s * (WingX0 + 1.6f), ex = s * (WingX1 + 1f);
 			Along(new Vector3(x0, WingWall - 0.7f, WingHalfZ + 1f), new Vector3(ex, WingWall - 0.7f, WingHalfZ + 1f), 0.3f);
 			Along(new Vector3(x0, WingWall - 0.7f, -WingHalfZ - 1f), new Vector3(ex, WingWall - 0.7f, -WingHalfZ - 1f), 0.3f);
 		}

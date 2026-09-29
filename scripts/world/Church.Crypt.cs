@@ -111,7 +111,8 @@ public partial class Church
 			{
 				float top = -(i + 1) * rise, za = z0 + i * run;
 				BuildKit.Box(k, new Vector3((x0 + x1) * 0.5f, top - 0.1f, za + run * 0.5f), new Vector3(x1 - x0, 0.2f, run), 1f, BuildKit.Face.NY);
-				k.Quad(new Vector3(x0, top, za), new Vector3(x1, top, za), new Vector3(x1, top + rise, za), new Vector3(x0, top + rise, za), Vector3.Back);
+				float zr = i == 0 ? za + 0.004f : za;   // (the top riser a hair in: level with the nave floor's cut edge, the two fought)
+				k.Quad(new Vector3(x0, top, zr), new Vector3(x1, top, zr), new Vector3(x1, top + rise, zr), new Vector3(x0, top + rise, zr), Vector3.Back);
 			}
 			float pitch = Mathf.Atan2(-y0, z1 - z0), len = Mathf.Sqrt((z1 - z0) * (z1 - z0) + y0 * y0);
 			var rb = new Basis(Vector3.Right, pitch);

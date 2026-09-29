@@ -93,7 +93,7 @@ public partial class SkiLodge
 			}
 			foreach (float u in windows) holes.Add(new Hole(u - 0.6f, u + 0.6f, 5.4f, 7.2f));
 			k.Color = Colors.White;
-			LodgeKit.Wall(k, _body, a, b, 0f, StoneTop, 0.8f, outward, BuildingTextures.StoneMat, BuildingTextures.StoneMat, LodgeTrim, holes, 0.5f);
+			LodgeKit.Wall(k, _body, a, b, 0f, StoneTop, 0.8f, outward, BuildingTextures.StoneMat, LodgeTextures.LobbyStoneMat, LodgeTrim, holes, 0.5f);
 			LodgeKit.Wall(k, _body, a, b, StoneTop, HexWall, 0.8f, outward, LodgeTimber, LodgeTextures.LogWallMat, LodgeTrim, holes, 0.5f);
 			Vector3 along = (b - a).Normalized();
 			foreach (float u in windows)
@@ -106,7 +106,7 @@ public partial class SkiLodge
 			foreach (var h in holes)
 				if (h.V0 < 0.1f || h.V0 >= UpperY - 0.01f)
 				{
-					float y = h.V0 < 0.1f ? FloorY : UpperY;
+					float y = (h.V0 < 0.1f ? FloorY : UpperY) + 0.003f;   // a hair proud (level, they fought the floors running under the walls)
 					k.Mat(h.V0 < 0.1f ? BuildingTextures.StoneMat : LodgeTextures.CorridorCarpetMat);
 					Vector3 p0 = a + along * h.U0, p1 = a + along * h.U1;
 					k.Quad(p0 - outward * 0.41f + Vector3.Up * y, p1 - outward * 0.41f + Vector3.Up * y, p1 + outward * 0.41f + Vector3.Up * y, p0 + outward * 0.41f + Vector3.Up * y, Vector3.Up,
@@ -256,7 +256,7 @@ public partial class SkiLodge
 			k.Tri(a, b, c, Vector3.Up, new Vector2(a.X, a.Z) * 0.5f, new Vector2(b.X, b.Z) * 0.5f, new Vector2(c.X, c.Z) * 0.5f);
 			k.Mat(LodgeTextures.CeilingMat);
 			var d = Vector3.Down * 0.28f;
-			k.Tri(a + d, c + d, b + d, Vector3.Down, Vector2.Zero, Vector2.Right, Vector2.Up);
+			CeilTri(k, a + d, c + d, b + d);
 			faces.Add(a); faces.Add(b); faces.Add(c);
 		}
 		// the two sides' walks (west-back 240 degrees, west-front 300 degrees)
@@ -376,7 +376,7 @@ public partial class SkiLodge
 		k.Quad(new Vector3(BarX0, FloorY, InnerZ), new Vector3(barX1Front, FloorY, InnerZ), new Vector3(barX1Back, FloorY, BarZ0), new Vector3(BarX0, FloorY, BarZ0), Vector3.Up,
 			new Vector2(BarX0, InnerZ) * 0.5f, new Vector2(barX1Front, InnerZ) * 0.5f, new Vector2(barX1Back, BarZ0) * 0.5f, new Vector2(BarX0, BarZ0) * 0.5f);
 		k.Mat(LodgeTextures.CeilingMat);
-		k.Quad(new Vector3(BarX0, SlabY, BarZ0), new Vector3(barX1Back, SlabY, BarZ0), new Vector3(barX1Front, SlabY, InnerZ), new Vector3(BarX0, SlabY, InnerZ), Vector3.Down);
+		CeilQuad(k, new Vector3(BarX0, SlabY, BarZ0), new Vector3(barX1Back, SlabY, BarZ0), new Vector3(barX1Front, SlabY, InnerZ), new Vector3(BarX0, SlabY, InnerZ));
 		Lining(k, BarX0, barX1Front, InnerZ, FloorY, SlabY, LodgeTextures.DarkWoodMat, LodgeTextures.DamaskMat, 1.1f, true);
 		// the bar's back wall (west) and its south wall to the service corridor (a door near its west end)
 		Split(k, new Vector3(BarX0, 0, BarZ0), new Vector3(BarX0, 0, InnerZ), Vector3.Right, LodgeTextures.DamaskMat, LodgeTextures.PlasterMat, null);
@@ -387,7 +387,7 @@ public partial class SkiLodge
 		k.Quad(new Vector3(SvcX0, FloorY, BarZ0), new Vector3(SvcX1, FloorY, BarZ0), new Vector3(SvcX1, FloorY, SvcZ0), new Vector3(SvcX0, FloorY, SvcZ0), Vector3.Up,
 			new Vector2(SvcX0, BarZ0) * 0.5f, new Vector2(SvcX1, BarZ0) * 0.5f, new Vector2(SvcX1, SvcZ0) * 0.5f, new Vector2(SvcX0, SvcZ0) * 0.5f);
 		k.Mat(LodgeTextures.CeilingMat);
-		k.Quad(new Vector3(SvcX0, 3.0f, SvcZ0), new Vector3(SvcX1, 3.0f, SvcZ0), new Vector3(SvcX1, 3.0f, BarZ0), new Vector3(SvcX0, 3.0f, BarZ0), Vector3.Down);
+		CeilQuad(k, new Vector3(SvcX0, 3.0f, SvcZ0), new Vector3(SvcX1, 3.0f, SvcZ0), new Vector3(SvcX1, 3.0f, BarZ0), new Vector3(SvcX0, 3.0f, BarZ0));
 		LodgeKit.Solid(_inBody, new Vector3((SvcX0 + SvcX1) * 0.5f, 3.1f, (SvcZ0 + BarZ0) * 0.5f), new Vector3(SvcX1 - SvcX0, 0.2f, BarZ0 - SvcZ0));
 		Split(k, new Vector3(SvcX0, 0, SvcZ0), new Vector3(SvcX0, 0, BarZ0), Vector3.Right, LodgeTextures.PlasterMat, LodgeTextures.PlasterMat, null, 3.0f);
 		Split(k, new Vector3(SvcX1, 0, SvcZ0), new Vector3(SvcX1, 0, BarZ0), Vector3.Left, LodgeTextures.PlasterMat, LodgeTextures.PlasterMat, null, 3.0f);
@@ -400,7 +400,7 @@ public partial class SkiLodge
 		k.Quad(new Vector3(BarX0, FloorY, PantryZ1), new Vector3(pX1Front, FloorY, PantryZ1), new Vector3(pX1Back, FloorY, -InnerZ), new Vector3(BarX0, FloorY, -InnerZ), Vector3.Up,
 			new Vector2(BarX0, PantryZ1) * 0.5f, new Vector2(pX1Front, PantryZ1) * 0.5f, new Vector2(pX1Back, -InnerZ) * 0.5f, new Vector2(BarX0, -InnerZ) * 0.5f);
 		k.Mat(LodgeTextures.CeilingMat);
-		k.Quad(new Vector3(BarX0, 3.0f, -InnerZ), new Vector3(pX1Back, 3.0f, -InnerZ), new Vector3(pX1Front, 3.0f, PantryZ1), new Vector3(BarX0, 3.0f, PantryZ1), Vector3.Down);
+		CeilQuad(k, new Vector3(BarX0, 3.0f, -InnerZ), new Vector3(pX1Back, 3.0f, -InnerZ), new Vector3(pX1Front, 3.0f, PantryZ1), new Vector3(BarX0, 3.0f, PantryZ1));
 		LodgeKit.Solid(_inBody, new Vector3((BarX0 + pX1Front) * 0.5f, 3.1f, (PantryZ1 - InnerZ) * 0.5f), new Vector3(pX1Front - BarX0 + 1f, 0.2f, InnerZ + PantryZ1));
 		Lining(k, BarX0, pX1Back, -InnerZ, FloorY, 3.0f, LodgeTextures.PlasterMat, LodgeTextures.PlasterMat, 0f, true);
 		Split(k, new Vector3(BarX0, 0, PantryZ1), new Vector3(pX1Front + 0.3f, 0, PantryZ1), Vector3.Forward, LodgeTextures.PlasterMat, LodgeTextures.PlasterMat, null, 3.0f);
@@ -438,7 +438,7 @@ public partial class SkiLodge
 		k.Quad(new Vector3(CorrX0, UpperY, CorrHalf), new Vector3(CorrX1 - 0.3f, UpperY, CorrHalf), new Vector3(CorrX1 - 0.3f, UpperY, -CorrHalf), new Vector3(CorrX0, UpperY, -CorrHalf), Vector3.Up,
 			new Vector2(0, 0), new Vector2((CorrX1 - 0.3f - CorrX0) / 1.5f, 0), new Vector2((CorrX1 - 0.3f - CorrX0) / 1.5f, 2f / 1.5f), new Vector2(0, 2f / 1.5f));
 		k.Mat(LodgeTextures.CeilingMat);
-		k.Quad(new Vector3(CorrX0, RoomTop, -CorrHalf), new Vector3(CorrX1 - 0.3f, RoomTop, -CorrHalf), new Vector3(CorrX1 - 0.3f, RoomTop, CorrHalf), new Vector3(CorrX0, RoomTop, CorrHalf), Vector3.Down);
+		CeilQuad(k, new Vector3(CorrX0, RoomTop, -CorrHalf), new Vector3(CorrX1 - 0.3f, RoomTop, -CorrHalf), new Vector3(CorrX1 - 0.3f, RoomTop, CorrHalf), new Vector3(CorrX0, RoomTop, CorrHalf));
 		LodgeKit.Solid(_inBody, new Vector3((CorrX0 + CorrX1) * 0.5f, RoomTop + 0.1f, 0), new Vector3(CorrX1 - CorrX0, 0.2f, InnerZ * 2f));
 		// its two walls, the rooms' doors in them (hinges at the doors' west ends on the north wall, east on the south)
 		var north = new List<Hole> { new(-14.2f - CorrX0, -13.2f - CorrX0, UpperY, UpperY + 2.2f), new(-21.8f - CorrX0, -20.8f - CorrX0, UpperY, UpperY + 2.2f) };
@@ -478,6 +478,16 @@ public partial class SkiLodge
 
 	/// <summary>A hotel room's shell: the carpet, the ceiling, the outer wall's lining with its two windows, the walls
 	/// between rooms, and a bathroom tiled green (its door; 203's broken through into 204).</summary>
+	/// <summary>A ceiling's quad or triangle (facing down), its plaster mapped in metres over the plan (a single tile
+	/// stretched over a room showed as a blur).</summary>
+	private static void CeilQuad(MeshKit k, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+		=> k.Quad(a, b, c, d, Vector3.Down, CeilUv(a), CeilUv(b), CeilUv(c), CeilUv(d));
+
+	private static void CeilTri(MeshKit k, Vector3 a, Vector3 b, Vector3 c)
+		=> k.Tri(a, b, c, Vector3.Down, CeilUv(a), CeilUv(b), CeilUv(c));
+
+	private static Vector2 CeilUv(Vector3 p) => new(p.X * 0.5f, p.Z * 0.5f);
+
 	private void RoomShell(MeshKit k, int num, float x0, float x1, bool front)
 	{
 		float zIn = front ? CorrHalf : -CorrHalf, zOut = front ? InnerZ : -InnerZ, s = front ? 1f : -1f;
@@ -487,7 +497,7 @@ public partial class SkiLodge
 		k.Quad(new Vector3(x0, UpperY, zb), new Vector3(x1, UpperY, zb), new Vector3(x1, UpperY, za), new Vector3(x0, UpperY, za), Vector3.Up,
 			new Vector2(x0, zb) / 1.6f, new Vector2(x1, zb) / 1.6f, new Vector2(x1, za) / 1.6f, new Vector2(x0, za) / 1.6f);
 		k.Mat(LodgeTextures.CeilingMat);
-		k.Quad(new Vector3(x0, RoomTop, za), new Vector3(x1, RoomTop, za), new Vector3(x1, RoomTop, zb), new Vector3(x0, RoomTop, zb), Vector3.Down);
+		CeilQuad(k, new Vector3(x0, RoomTop, za), new Vector3(x1, RoomTop, za), new Vector3(x1, RoomTop, zb), new Vector3(x0, RoomTop, zb));
 		// the outer wall: its lining and windows (202's banked with snow, blue; 203's frosted, one left open)
 		System.Func<float, float, Material> glass = num switch
 		{
@@ -533,7 +543,7 @@ public partial class SkiLodge
 		// the ceiling, coffered with dark beams
 		k.Mat(LodgeTextures.CeilingMat);
 		for (int i = 1; i < pts.Length - 1; i++)
-			k.Tri(pts[0] with { Y = RoomTop }, pts[i + 1] with { Y = RoomTop }, pts[i] with { Y = RoomTop }, Vector3.Down, Vector2.Zero, Vector2.Right, Vector2.Up);
+			CeilTri(k, pts[0] with { Y = RoomTop }, pts[i + 1] with { Y = RoomTop }, pts[i] with { Y = RoomTop });
 		k.Mat(LodgeTextures.DarkWoodMat);
 		for (float x = 12f; x < DiningX1; x += 4f) k.Box(new Vector3(x, RoomTop - 0.14f, 0), new Vector3(0.28f, 0.28f, InnerZ * 2f), 1f);
 		k.Box(new Vector3((12f + DiningX1) * 0.5f, RoomTop - 0.14f, 0), new Vector3(DiningX1 - 12f, 0.2f, 0.24f), 1f);

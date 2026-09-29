@@ -1891,6 +1891,9 @@ public partial class StoryTest : Node
 			ulong descentStart = Time.GetTicksMsec();
 			int descentFrom = sw.PlayerRev;
 			bool deepShot = false, midShot = false;
+			// the blacklight on for the way down, as a player would once the flame gutters (without it the halfway and
+			// deep shots were black frames, checking nothing)
+			await PressLanternMode(_player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern"), true, ct);
 			await DescendTo(sw, sw.GapCorner - 1, ct, k2 =>
 			{
 				if (!midShot && k2 >= sw.Flights / 2) { midShot = true; Screenshot("stairwell_halfway"); }
@@ -3148,8 +3151,13 @@ public partial class StoryTest : Node
 		await UseIt(sill, ct);
 		await Seconds(0.4, ct);
 		Check("the dining room's key, from the sill", _inv.HasTool(ToolKind.DiningKey));
+		// (the pickup's moment can still hold the controls: in the full run's timing the walk below started and
+		// gave up before they came back)
+		await WaitUntil(() => _input.Enabled && !_input.Modal, 5, ct);
 		// through the bathroom's broken wall into 204
-		await Go(L(-15.2f, UpperYOf(lodge), -4.0f), L(-16.6f, UpperYOf(lodge), -2.65f), L(-18.6f, UpperYOf(lodge), -2.45f), L(-21.6f, UpperYOf(lodge), -2.45f));
+		// (down the gap between the bed and the sofa, then round the bed's foot: straight from the sill the line cut
+		// the bed's corner, and a step off stuck there)
+		await Go(L(-13.9f, UpperYOf(lodge), -5.0f), L(-14.6f, UpperYOf(lodge), -4.6f), L(-15.2f, UpperYOf(lodge), -4.0f), L(-16.6f, UpperYOf(lodge), -2.65f), L(-18.6f, UpperYOf(lodge), -2.45f), L(-21.6f, UpperYOf(lodge), -2.45f));
 		Check("through the hole in 203's bathroom, into 204", lodge.ToLocal(_player.GlobalPosition).X < SkiLodge.RoomSplitX - 0.5f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
 		await Aim(L(-18.5f, 5.3f, -2.4f), ct);
 		Screenshot("act23_the_hole");

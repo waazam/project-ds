@@ -96,7 +96,8 @@ public static class LodgeTextures
 			if (d < 0.02f) c = gold;
 		}
 		if (fv < 0.1f) c = black;   // the ground line under each row of arches
-		return c * Wear(u, v, 11) * (0.93f + 0.07f * Fbm(u * 3f, v * 3f, 12));
+		// the pile's weave and wear under the pattern (Poly Haven's dirty carpet)
+		return c * Wear(u, v, 11) * (0.93f + 0.07f * Fbm(u * 3f, v * 3f, 12)) * SurfaceKit.Grain("carpet", u, v, 0.55f, 2f);
 	});
 
 	/// <summary>The rooms' carpet: peacock scales, overlapping scallops in bottle green and bruise violet.</summary>
@@ -113,7 +114,7 @@ public static class LodgeTextures
 		Color c = ring % 3 == 0 ? violet : ring % 3 == 1 ? teal : green;
 		if (band - ring < 0.18f) c = dark;
 		if (r > 0.52f) c = green * 0.8f;
-		return c * Wear(u, v, 21);
+		return c * Wear(u, v, 21) * SurfaceKit.Grain("carpet", u, v, 0.5f, 2f);
 	});
 
 	/// <summary>Cream wallpaper, a fine gold pinstripe and a wider soft band (rooms, the corridor).</summary>
@@ -123,11 +124,11 @@ public static class LodgeTextures
 		float x = u * 4f % 1f;
 		Color c = x < 0.34f ? band : cream;
 		if (Mathf.Abs(x - 0.34f) < 0.012f || Mathf.Abs(x - 0.02f) < 0.01f) c = gold;
-		return c * (0.9f + 0.1f * Fbm(u, v, 31)) * (0.95f + 0.05f * Fbm(u * 4f, v * 8f, 32));
+		return c * (0.9f + 0.1f * Fbm(u, v, 31)) * (0.95f + 0.05f * Fbm(u * 4f, v * 8f, 32)) * SurfaceKit.Grain("plaster", u, v, 0.18f, 2f);
 	});
 
 	/// <summary>The bar's walls: deep red damask with gold (a repeating teardrop medallion).</summary>
-	public static Texture2D Damask => Make("lodge_damask", 128, 128, (u, v) =>
+	public static Texture2D Damask => Make("lodge_damask", 256, 256, (u, v) =>
 	{
 		Color red = new(0.3f, 0.05f, 0.05f), deep = new(0.18f, 0.03f, 0.03f), gold = new(0.55f, 0.38f, 0.14f);
 		float cu = u * 2f, cv = v * 2f;
@@ -136,7 +137,8 @@ public static class LodgeTextures
 		float drop = new Vector2(fu * 1.6f, fv + Mathf.Abs(fu) * 0.6f).Length();
 		Color c = drop < 0.28f ? (drop > 0.22f ? gold : deep) : red;
 		if (Mathf.Abs(drop - 0.38f) < 0.015f) c = gold * 0.8f;
-		return c * (0.9f + 0.1f * Fbm(u, v, 41));
+		// woven: a jacquard's figured weave under the medallions
+		return c * (0.9f + 0.1f * Fbm(u, v, 41)) * SurfaceKit.Grain("jacquard", u, v, 0.45f, 2f);
 	});
 
 	/// <summary>Mint-green square tiles, dark grout (the bathrooms).</summary>
@@ -145,47 +147,24 @@ public static class LodgeTextures
 		float fu = u * 8f % 1f, fv = v * 8f % 1f;
 		bool grout = fu < 0.06f || fv < 0.06f;
 		Color mint = new Color(0.42f, 0.66f, 0.54f) * (0.92f + 0.08f * Hash((int)(u * 8), (int)(v * 8), 51));
-		return grout ? new Color(0.16f, 0.2f, 0.18f) : mint * (0.94f + 0.06f * Fbm(u, v, 52));
+		return grout ? new Color(0.16f, 0.2f, 0.18f) * SurfaceKit.Grain("plaster", u, v, 0.5f) : mint * (0.94f + 0.06f * Fbm(u, v, 52)) * SurfaceKit.Grain("plaster", u, v, 0.12f, 2f);
 	});
 
-	/// <summary>Grey flagstone laid in courses (the lobby floor).</summary>
+	/// <summary>Flagstones (the lobby floor): Poly Haven's monastery floor, big irregular flags in dark grout, their
+	/// brown cooled a little toward grey.</summary>
 	public static Texture2D Flagstone => Make("lodge_flag", 256, 256, (u, v) =>
-	{
-		float rows = 4f;
-		int r = Mathf.FloorToInt(v * rows);
-		float off = Hash(r, 0, 61) * 0.7f;
-		float cols = 3f + (int)(Hash(r, 1, 61) * 2f);
-		float cu = (u + off) * cols;
-		int ci = Mathf.FloorToInt(cu);
-		float fu = cu - ci, fv = v * rows - r;
-		bool joint = fu < 0.025f || fv < 0.03f;
-		float tone = 0.5f + 0.18f * Hash(ci, r, 62);
-		Color stone = new Color(tone, tone * 0.97f, tone * 0.92f) * (0.85f + 0.15f * Fbm(u, v, 63, 5, 8));
-		return joint ? new Color(0.18f, 0.17f, 0.16f) : stone;
-	});
+		SurfaceKit.Tinted("flagstone", u, v, new Color(0.98f, 0.95f, 0.92f), 0.4f, 0.6f) * (0.94f + 0.06f * Fbm(u, v, 63, 4, 4)));
 
-	/// <summary>Herringbone parquet (the dining hall).</summary>
+	/// <summary>Herringbone parquet (the dining hall): Poly Haven's, in a darker, older honey.</summary>
 	public static Texture2D Parquet => Make("lodge_parquet", 256, 256, (u, v) =>
-	{
-		float x = u * 8f, y = v * 8f;
-		// herringbone: blocks 2 long x 1 wide, alternating 45-degree directions
-		float a = x + y, b = x - y;
-		int ia = Mathf.FloorToInt(a), ib = Mathf.FloorToInt(b / 2f);
-		bool dir = (ia + ib) % 2 == 0;
-		float grain = dir ? Mathf.Sin(b * 40f + Hash(ia, ib, 71) * 6f) : Mathf.Sin(a * 40f + Hash(ia, ib, 72) * 6f);
-		float tone = 0.32f + 0.08f * Hash(ia, ib, 73);
-		Color wood = new Color(tone * 1.25f, tone * 0.85f, tone * 0.55f) * (0.95f + 0.05f * grain);
-		float fa = a - ia;
-		if (fa < 0.04f || (b / 2f - Mathf.Floor(b / 2f)) < 0.02f) wood *= 0.6f;
-		return wood * (0.9f + 0.1f * Fbm(u, v, 74));
-	});
+		SurfaceKit.Tinted("parquet", u, v, new Color(1f, 0.86f, 0.7f), 0.3f) * (0.9f + 0.1f * Fbm(u, v, 74)));
 
 	/// <summary>Chequered linoleum, black and cream, scuffed (the servants' pantry).</summary>
 	public static Texture2D Checker => Make("lodge_checker", 128, 128, (u, v) =>
 	{
 		bool w = ((int)(u * 4f) + (int)(v * 4f)) % 2 == 0;
 		Color c = w ? new Color(0.72f, 0.68f, 0.58f) : new Color(0.1f, 0.09f, 0.09f);
-		return c * (0.88f + 0.12f * Fbm(u, v, 81));
+		return c * (0.88f + 0.12f * Fbm(u, v, 81)) * SurfaceKit.Grain("plaster", u, v, 0.4f);   // scuffed
 	});
 
 	/// <summary>A big medallion rug: a red field, a navy border with a lozenge band, a medallion in the middle.</summary>
@@ -209,53 +188,56 @@ public static class LodgeTextures
 			float fx = u * 8f % 1f, fy = v * 8f % 1f;
 			if (lz > 0.25f && Mathf.Abs(fx - 0.5f) + Mathf.Abs(fy - 0.5f) < 0.12f) c = navy * 1.3f;
 		}
-		return c * (0.85f + 0.15f * Fbm(u, v, 91, 5, 16));
+		return c * (0.85f + 0.15f * Fbm(u, v, 91, 5, 16)) * SurfaceKit.Grain("carpet", u, v, 0.5f, 3f);
 	});
 
-	/// <summary>Dark stained wood panelling (the bar, the front desk, doors).</summary>
-	public static Texture2D DarkWood => Make("lodge_darkwood", 128, 128, (u, v) =>
-	{
-		float grain = Mathf.Sin(v * 90f + Fbm(u, v, 101) * 18f);
-		float tone = 0.2f + 0.05f * grain + 0.05f * Fbm(u, v * 4f, 102);
-		return new Color(tone * 1.35f, tone * 0.8f, tone * 0.5f);
-	});
+	/// <summary>Dark stained wood panelling (the bar, the front desk, doors): Poly Haven's dark wood, a shade deeper.</summary>
+	public static Texture2D DarkWood => Make("lodge_darkwood", 256, 256, (u, v) =>
+		SurfaceKit.Tinted("darkwood", u, v, new Color(1f, 0.9f, 0.82f), 0.2f, 0.5f));   // (its red taken down: mahogany read orange)
 
 	/// <summary>Split-log walls (the lobby's upper walls): rounded courses with dark chinking.</summary>
-	public static Texture2D LogWall => Make("lodge_logwall", 128, 128, (u, v) =>
+	public static Texture2D LogWall => Make("lodge_logwall", 256, 256, (u, v) =>
 	{
 		float f = v * 4f % 1f;
 		float round = Mathf.Sin(f * Mathf.Pi);
 		float chink = f < 0.06f || f > 0.94f ? 0.35f : 1f;
-		float grain = 0.9f + 0.1f * Mathf.Sin(u * 60f + Fbm(u, v, 111) * 10f);
+		float grain = (0.94f + 0.06f * Mathf.Sin(u * 60f + Fbm(u, v, 111) * 10f)) * SurfaceKit.Grain("pine", v * 0.25f, u, 0.6f);   // the grain along the log
 		float tone = (0.34f + 0.16f * round) * grain * chink;
 		return new Color(tone * 1.05f, tone * 0.82f, tone * 0.62f);   // weathered pine, not orange
 	});
 
 	// ---------------------------------------------------------------- materials
 
-	private static StandardMaterial3D Std(string key, Texture2D tex, float rough = 0.85f, float spec = 0.3f, Color? tint = null, DetailKit.Kind? detail = null)
+	private static StandardMaterial3D Std(string key, Texture2D tex, float rough = 0.85f, float spec = 0.3f, Color? tint = null, DetailKit.Kind? detail = null,
+		string relief = null, float reliefStrength = 0.6f, float metresPerTile = 1f)
 	{
 		if (_mat.TryGetValue(key, out var m)) return m;
 		m = new StandardMaterial3D
 		{
 			ResourceName = key, AlbedoTexture = tex, AlbedoColor = tint ?? Colors.White, Roughness = rough, MetallicSpecular = spec,
-			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true,
+			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true,
+			Uv1Scale = Vector3.One / metresPerTile,
 		};
+		// the photo's own relief, at its repeat (before the detail, which keeps a normal map it finds)
+		if (relief != null) SurfaceKit.Relief(m, relief, reliefStrength);
 		if (detail is { } d) DetailKit.Apply(m, d);
+		else m.SetMeta("detail_kind", -1);   // none, on purpose (the sweep would otherwise give it one by its node's name)
 		_mat[key] = m;
 		return m;
 	}
 
+	// (the wallpaper, the plaster and the ceilings take no detail layer: it shares their UVs, a tile of two or three
+	// metres, and blown up that much its fine grime showed as metre-wide stains; the photo's grain does its work)
 	public static StandardMaterial3D CorridorCarpetMat => Std("lodge_m_carpet_corr", CorridorCarpet, 1f, 0.1f, null, DetailKit.Kind.Fabric);
 	public static StandardMaterial3D RoomCarpetMat => Std("lodge_m_carpet_room", RoomCarpet, 1f, 0.1f, null, DetailKit.Kind.Fabric);
-	public static StandardMaterial3D WallpaperMat => Std("lodge_m_wallpaper", Wallpaper, 0.9f, 0.2f, null, DetailKit.Kind.Plaster);
-	public static StandardMaterial3D DamaskMat => Std("lodge_m_damask", Damask, 0.8f, 0.25f, null, DetailKit.Kind.Fabric);
+	public static StandardMaterial3D WallpaperMat => Std("lodge_m_wallpaper", Wallpaper, 0.9f, 0.2f, null, null);
+	public static StandardMaterial3D DamaskMat => Std("lodge_m_damask", Damask, 0.8f, 0.25f, null, DetailKit.Kind.Fabric, "jacquard", 0.35f);
 	public static StandardMaterial3D GreenTileMat => Std("lodge_m_greentile", GreenTile, 0.25f, 0.6f);
-	public static StandardMaterial3D FlagstoneMat => Std("lodge_m_flag", Flagstone, 0.8f, 0.25f, null, DetailKit.Kind.Stone);
-	public static StandardMaterial3D ParquetMat => Std("lodge_m_parquet", Parquet, 0.5f, 0.45f, null, DetailKit.Kind.Wood);
+	public static StandardMaterial3D FlagstoneMat => Std("lodge_m_flag", Flagstone, 0.8f, 0.25f, null, DetailKit.Kind.Stone, "flagstone", 0.8f);
+	public static StandardMaterial3D ParquetMat => Std("lodge_m_parquet", Parquet, 0.5f, 0.45f, null, DetailKit.Kind.Wood, "parquet", 0.5f);
 	public static StandardMaterial3D CheckerMat => Std("lodge_m_checker", Checker, 0.45f, 0.4f);
 	public static StandardMaterial3D RugMat => Std("lodge_m_rug", Rug, 1f, 0.1f, null, DetailKit.Kind.Fabric);
-	public static StandardMaterial3D DarkWoodMat => Std("lodge_m_darkwood", DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood);
+	public static StandardMaterial3D DarkWoodMat => Std("lodge_m_darkwood", DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f);
 	public static StandardMaterial3D LogWallMat => Std("lodge_m_logwall", LogWall, 0.8f, 0.25f, null, DetailKit.Kind.Wood);
 
 	private static StandardMaterial3D _plain(string key, Color c, float rough, float spec, float metal = 0f)
@@ -271,15 +253,36 @@ public static class LodgeTextures
 	public static StandardMaterial3D MustardMat => _plain("lodge_m_mustard", new Color(0.72f, 0.54f, 0.2f), 0.6f, 0.3f);
 	public static StandardMaterial3D PorcelainMat => _plain("lodge_m_porcelain", new Color(0.84f, 0.86f, 0.82f), 0.15f, 0.6f);
 	public static StandardMaterial3D MintPorcelainMat => _plain("lodge_m_mint_porcelain", new Color(0.55f, 0.74f, 0.64f), 0.15f, 0.6f);
-	public static StandardMaterial3D LeatherMat => _plain("lodge_m_leather", new Color(0.3f, 0.14f, 0.08f), 0.55f, 0.35f);
-	public static StandardMaterial3D VelvetVioletMat => _plain("lodge_m_velvet", new Color(0.36f, 0.14f, 0.4f), 0.9f, 0.15f);
-	public static StandardMaterial3D LinenMat => _plain("lodge_m_linen", new Color(0.8f, 0.78f, 0.72f), 0.95f, 0.1f);
+	// the upholstery, the linen, the plaster and the fireplace: Poly Haven's photo surfaces (a tile a metre or so)
+	public static Texture2D Leather => Make("lodge_leather", 256, 256, (u, v) => SurfaceKit.Tinted("leather", u, v, new Color(1.25f, 0.62f, 0.4f), 0.24f, 0.6f));
+	public static Texture2D Velvet => Make("lodge_velvet", 256, 256, (u, v) => new Color(0.36f, 0.14f, 0.4f) * SurfaceKit.Grain("velvet", u, v, 0.8f));
+	public static Texture2D Linen => Make("lodge_linen", 256, 256, (u, v) => new Color(0.8f, 0.78f, 0.72f) * SurfaceKit.Grain("linen", u, v, 0.9f));
+	public static Texture2D Plaster => Make("lodge_plaster", 256, 256, (u, v) => Colors.White * SurfaceKit.Grain("plaster", u, v, 0.3f, 2f) * (0.96f + 0.04f * Fbm(u, v, 121)));
+	public static Texture2D FireStone => Make("lodge_firestone", 256, 256, (u, v) => SurfaceKit.Tinted("fireplace_stone", u, v, new Color(0.96f, 0.94f, 0.92f), 0.46f, 0.55f));
+	public static StandardMaterial3D LeatherMat => Std("lodge_m_leather", Leather, 0.55f, 0.35f, null, DetailKit.Kind.Leather, "leather", 0.5f, 0.6f);
+	public static StandardMaterial3D VelvetVioletMat => Std("lodge_m_velvet", Velvet, 0.9f, 0.15f, null, DetailKit.Kind.Fabric, "velvet", 0.4f, 0.5f);
+	public static StandardMaterial3D LinenMat => Std("lodge_m_linen", Linen, 0.95f, 0.1f, null, DetailKit.Kind.Fabric, "linen", 0.5f, 0.6f);
+	/// <summary>The dining tables' sheets (their UVs run 0..1 over the whole sheet: the linen repeats across it).</summary>
+	public static StandardMaterial3D SheetLinenMat => _sheet ??= SheetFrom(LinenMat);
+	private static StandardMaterial3D _sheet;
+	private static StandardMaterial3D SheetFrom(StandardMaterial3D m)
+	{
+		var s = (StandardMaterial3D)m.Duplicate();
+		s.ResourceName = "lodge_m_linen_sheet";
+		s.Uv1Scale = new Vector3(14f, 4f, 1f);
+		return s;
+	}
+	public static StandardMaterial3D PillowMat => _plain("lodge_m_pillow", new Color(0.8f, 0.78f, 0.72f), 0.95f, 0.1f);
 	public static StandardMaterial3D BlackMat => _plain("lodge_m_black", new Color(0.035f, 0.03f, 0.03f), 0.6f, 0.3f);
 	public static StandardMaterial3D IronMat => _plain("lodge_m_iron", new Color(0.12f, 0.12f, 0.13f), 0.5f, 0.5f, 0.6f);
 	public static StandardMaterial3D MirrorMat => _plain("lodge_m_mirror", new Color(0.4f, 0.42f, 0.45f), 0.02f, 1f, 1f);
-	public static StandardMaterial3D PlasterMat => _plain("lodge_m_plaster", new Color(0.74f, 0.7f, 0.62f), 0.9f, 0.2f);
-	public static StandardMaterial3D CeilingMat => _plain("lodge_m_ceiling", new Color(0.62f, 0.58f, 0.5f), 0.95f, 0.1f);
-	public static StandardMaterial3D RiverStoneMat => Std("lodge_m_riverstone", ProcTextures.Grime(), 0.9f, 0.2f, new Color(0.55f, 0.53f, 0.5f), DetailKit.Kind.Stone);
+	public static StandardMaterial3D PlasterMat => Std("lodge_m_plaster", Plaster, 0.9f, 0.2f, new Color(0.74f, 0.7f, 0.62f), null, null, 0.3f, 1.5f);
+	public static StandardMaterial3D CeilingMat => Std("lodge_m_ceiling", Plaster, 0.95f, 0.1f, new Color(0.62f, 0.58f, 0.5f), null, null, 0.3f, 2f);
+	/// <summary>The lobby's lower walls inside: Poly Haven's stacked stone, cool and even (the outside's mossy stone
+	/// read as dirt in here).</summary>
+	public static Texture2D LobbyStone => Make("lodge_lobbystone", 256, 256, (u, v) => SurfaceKit.Tinted("lobby_stone", u, v, new Color(0.98f, 0.96f, 0.94f), 0.36f, 0.5f));
+	public static StandardMaterial3D LobbyStoneMat => Std("lodge_m_lobbystone", LobbyStone, 0.9f, 0.2f, null, DetailKit.Kind.Stone, "lobby_stone", 0.9f);
+	public static StandardMaterial3D RiverStoneMat => Std("lodge_m_riverstone", FireStone, 0.9f, 0.2f, null, DetailKit.Kind.Stone, "fireplace_stone", 0.9f, 1.6f);
 
 	/// <summary>Lit from within (lamp shades, the bar's backlit counter, candle glass): warm, never harsh.</summary>
 	public static StandardMaterial3D Glow(string key, Color c, float energy)

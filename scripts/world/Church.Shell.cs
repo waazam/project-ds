@@ -308,8 +308,9 @@ public partial class Church
 	/// their castle-arch reference): a plain plinth standing out from the wall, a sloped weathering on
 	/// top of it, and a round roll moulding under the slope. From <paramref name="a"/> to <paramref name="b"/>
 	/// along the wall's face, standing out toward <paramref name="inward"/>, stopping at each gap (doorways).
+	/// 0.54 m high by default: a hair under the arcade piers' bases (0.55), whose tops it met level and fought.
 	/// </summary>
-	public static void BaseCourse(MeshKit k, Vector3 a, Vector3 b, Vector3 inward, float y0, IList<(float u0, float u1)> gaps = null, float h = 0.55f, float d = 0.16f)
+	public static void BaseCourse(MeshKit k, Vector3 a, Vector3 b, Vector3 inward, float y0, IList<(float u0, float u1)> gaps = null, float h = 0.54f, float d = 0.16f)
 	{
 		Vector3 along = (b - a).Normalized();
 		float len = (b - a).Length();
