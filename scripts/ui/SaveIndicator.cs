@@ -7,7 +7,8 @@ namespace ProjectDS.UI;
 /// The owner: when the game saves, a translucent grey-white roll of film, drawn in the UI's own style,
 /// shows in the corner and slowly brightens and darkens in contrast, three seconds at most. A 35mm
 /// canister (body, the spool's knob on top, the lip) with its leader strip, sprocket holes and all,
-/// running out of its side. Every save (checkpoints and flags) plays it from the start again.
+/// running out of its side, winding into it while the save runs (the spool's knob turning, the holes running
+/// in, the leader drawing shorter). Every save (checkpoints and flags) plays it from the start again.
 /// </summary>
 public partial class SaveIndicator : CanvasLayer
 {
@@ -70,22 +71,33 @@ public partial class SaveIndicator : CanvasLayer
 		Color ink = new(dark, dark, dark, a);
 		Color rim = new(light * 0.8f, light * 0.8f, light * 0.78f, a);
 		var c = _draw;
-		// the leader strip, out of the right side of the canister: film grey, a row of holes top and bottom
-		var strip = new Rect2(24, 12, 30, 20);
-		c.DrawRect(strip, new Color(light * 0.78f, light * 0.78f, light * 0.76f, a * 0.85f));
-		c.DrawRect(new Rect2(strip.Position + new Vector2(strip.Size.X - 3, 0), new Vector2(3, strip.Size.Y)), new Color(0, 0, 0, 0));
-		for (int i = 0; i < 4; i++)
+		// the leader strip, out of the right side of the canister: film grey, a row of holes top and bottom. It winds
+		// in as the save runs (the owner): the holes run steadily into the canister and the leader shortens, as if
+		// the spool were being turned
+		float wind = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_t / (Seconds - 0.3f), 0f, 1f));
+		float len = Mathf.Lerp(30f, 12f, wind);
+		float travel = _t * 12f + wind * 18f;   // how far the film has moved in (px): the holes keep pace with the leader
+		var strip = new Rect2(24, 12, len, 20);
+		Color film = new(light * 0.78f, light * 0.78f, light * 0.76f, a * 0.85f);
+		c.DrawRect(strip, film);
+		const float pitch = 6.5f;
+		float first = strip.Position.X + 5f - Mathf.PosMod(travel, pitch) - pitch;
+		for (float x = first; x < strip.End.X; x += pitch)
 		{
-			float x = strip.Position.X + 5 + i * 6.5f;
+			// only whole holes, clear of the canister's mouth and the cut end
+			if (x < strip.Position.X + 1.5f || x + 3.2f > strip.End.X - 1f) continue;
 			c.DrawRect(new Rect2(x, strip.Position.Y + 2, 3.2f, 3.2f), ink);
 			c.DrawRect(new Rect2(x, strip.End.Y - 5.2f, 3.2f, 3.2f), ink);
 		}
 		// the cut end of the leader, angled
-		c.DrawColoredPolygon(new[] { new Vector2(strip.End.X, strip.Position.Y), new Vector2(strip.End.X + 5, strip.Position.Y + 6), new Vector2(strip.End.X + 5, strip.End.Y), new Vector2(strip.End.X, strip.End.Y) },
-			new Color(light * 0.78f, light * 0.78f, light * 0.76f, a * 0.85f));
+		c.DrawColoredPolygon(new[] { new Vector2(strip.End.X, strip.Position.Y), new Vector2(strip.End.X + 5, strip.Position.Y + 6), new Vector2(strip.End.X + 5, strip.End.Y), new Vector2(strip.End.X, strip.End.Y) }, film);
 		// the canister: a rounded body, a darker lip top and bottom, the spool's knob on top
 		c.DrawRect(new Rect2(12, 3, 7, 5), ink);                 // the knob
 		c.DrawRect(new Rect2(13.5f, 1, 4, 3), ink);
+		// the knob turning with the spool: a notch going round (a slow turn, about one a second)
+		float turn = travel / 18f * Mathf.Tau;
+		float nx = 15.5f + 2.6f * Mathf.Sin(turn);
+		if (Mathf.Cos(turn) > -0.2f) c.DrawRect(new Rect2(nx - 0.6f, 3.5f, 1.2f, 4f), new Color(light * 0.9f, light * 0.9f, light * 0.88f, a * 0.8f));
 		c.DrawRect(new Rect2(5, 7, 21, 3), rim);                   // the top lip
 		c.DrawRect(new Rect2(6, 10, 19, 26), body);                // the body
 		c.DrawRect(new Rect2(5, 36, 21, 3), rim);                  // the bottom lip
@@ -94,6 +106,8 @@ public partial class SaveIndicator : CanvasLayer
 		c.DrawRect(new Rect2(9, 18, 10, 2), body);
 		c.DrawRect(new Rect2(9, 22, 13, 1.5f), body);
 		c.DrawRect(new Rect2(9, 25, 7, 1.5f), body);
+		// the mouth the film runs into: the felt light-trap, a dark slot down the body's right edge
+		c.DrawRect(new Rect2(23.5f, 11, 1.8f, 22), new Color(dark * 0.7f, dark * 0.7f, dark * 0.7f, a));
 		// a glint down the body's edge
 		c.DrawRect(new Rect2(8, 10, 1.5f, 26), new Color(1, 1, 1, a * 0.35f * breath));
 	}

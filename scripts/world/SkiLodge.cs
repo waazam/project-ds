@@ -136,9 +136,10 @@ public partial class SkiLodge : Node3D
 		k.Mat(LodgeTimber);
 		k.Color = Colors.White;
 		k.Box(mid + Vector3.Up * (StoneTop + (top - StoneTop) * 0.5f) - outward * 0.05f, new Vector3(len, top - StoneTop, thick - 0.1f), 0.5f, basis);
-		// a timber sill between the two
+		// a timber sill between the two (on the outside only: through the whole wall it showed inside the dining
+		// hall as a black band through the panelling)
 		k.Mat(LodgeTrim);
-		k.Box(mid + Vector3.Up * (StoneTop + 0.08f) + outward * 0.02f, new Vector3(len + 0.1f, 0.16f, thick + 0.12f), 1f, basis);
+		k.Box(mid + Vector3.Up * (StoneTop + 0.08f) + outward * (thick * 0.25f + 0.04f), new Vector3(len + 0.1f, 0.16f, thick * 0.5f + 0.08f), 1f, basis);
 		if (!windows) return;
 		int n = Mathf.FloorToInt(len / windowEvery);
 		for (int i = 0; i < n; i++)

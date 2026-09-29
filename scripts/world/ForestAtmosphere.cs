@@ -161,24 +161,28 @@ public partial class ForestAtmosphere : Node
 	[Export] public float LodgeFogDensity = 0.004f;
 	[Export] public Color LodgeAmbientColor = new(0.78f, 0.68f, 0.56f);
 	[Export] public float LodgeAmbient = 0.42f;
-	[Export] public Color DuskFogColor = new(0.15f, 0.17f, 0.21f);
-	[Export] public float DuskFogDensity = 0.028f;
-	[Export] public Color DuskAmbientColor = new(0.42f, 0.48f, 0.6f);
-	[Export] public float DuskAmbientScale = 0.5f;
-	[Export] public Color FrostFogColor = new(0.13f, 0.17f, 0.24f);
-	[Export] public float FrostFogDensity = 0.02f;
+	// (now the woods' early morning: a dim lilac murk under the pink sky, the trees dark against it)
+	[Export] public Color DuskFogColor = new(0.27f, 0.21f, 0.3f);
+	[Export] public float DuskFogDensity = 0.02f;
+	[Export] public Color DuskAmbientColor = new(0.56f, 0.48f, 0.66f);
+	[Export] public float DuskAmbientScale = 0.85f;
+	[Export] public Color FrostFogColor = new(0.24f, 0.22f, 0.34f);
+	[Export] public float FrostFogDensity = 0.015f;
 	/// <summary>Inside the church (0..1): a dark, thin, smoky haze and little ambient light, so the candles,
 	/// the stained glass and the lantern do the lighting (the owner: the white glare hurt; more gothic).</summary>
 	public float Interior { get; set; }
 	[Export] public Color InteriorFogColor = new(0.03f, 0.026f, 0.026f);
 	[Export] public float InteriorFogDensity = 0.014f;
 	[Export] public float InteriorAmbientScale = 0.22f;
-	[Export] public Color WinterFogColor = new(0.56f, 0.6f, 0.66f);
-	[Export] public float WinterFogDensity = 0.012f;
-	[Export] public Color WinterAmbientColor = new(0.62f, 0.68f, 0.78f);
-	[Export] public float WinterAmbient = 0.9f;
-	[Export] public float WinterSun = 0.35f;
-	[Export] public Color WinterSunColor = new(0.86f, 0.9f, 1f);
+	// the winter's early morning (the owner, 2026-09-28: the trees were white and flat against the sky; it wants
+	// contrast, and pink): a lilac haze a step darker than the horizon, a cool violet ambient kept low so the
+	// trees keep their shading, and a low rose-gold sun that tints the snow
+	[Export] public Color WinterFogColor = new(0.4f, 0.32f, 0.42f);
+	[Export] public float WinterFogDensity = 0.011f;
+	[Export] public Color WinterAmbientColor = new(0.6f, 0.5f, 0.68f);
+	[Export] public float WinterAmbient = 0.72f;
+	[Export] public float WinterSun = 0.78f;
+	[Export] public Color WinterSunColor = new(1f, 0.7f, 0.64f);
 	/// <summary>The black fog's density fully underground: a couple of turns of the stair and it's gone.</summary>
 	[Export] public float UndergroundFogDensity = 0.085f;
 	/// <summary>The fog's colour fully underground (black in the stairwell; Act 15's hallway tints it).</summary>
@@ -227,6 +231,29 @@ public partial class ForestAtmosphere : Node
 		("below_color", new Vector3(0.58f, 0.55f, 0.48f)),
 	};
 	private float _skyGlowBase = 0.55f, _skyCloudBase = 0.55f;
+	private float _skyWinterApplied = -1f;
+
+	/// <summary>The winter's sky (Acts 21-22, the owner's reference: early morning, pink): a deep violet-blue
+	/// zenith over a rose-pink horizon, a salmon glow where the sun's coming up, pink-lit cloud and lilac ridges.
+	/// Held a step under the references' brightness so the snow never glares.</summary>
+	private static readonly (string name, Vector3 dawn)[] WinterDawnSky =
+	{
+		("zenith_color", new Vector3(0.2f, 0.19f, 0.36f)),
+		("horizon_color", new Vector3(0.8f, 0.52f, 0.62f)),
+		("glow_color", new Vector3(0.98f, 0.6f, 0.56f)),
+		("cloud_dark", new Vector3(0.42f, 0.33f, 0.48f)),
+		("cloud_light", new Vector3(0.86f, 0.6f, 0.68f)),
+		("ridge_far", new Vector3(0.5f, 0.4f, 0.55f)),
+		("ridge_mid", new Vector3(0.37f, 0.3f, 0.44f)),
+		("ridge_near", new Vector3(0.25f, 0.21f, 0.32f)),
+		("haze_color", new Vector3(0.7f, 0.52f, 0.62f)),
+		("below_color", new Vector3(0.5f, 0.4f, 0.5f)),
+	};
+	/// <summary>The winter dawn's sun: low (degrees above the horizon), a little east of north, rose-gold.</summary>
+	[Export] public float WinterSunElevation = 13f;
+	[Export] public float WinterSunAzimuth = 28f;
+	private Basis _winterSunBasis;
+	private bool _winterSunOn;
 
 	// The last "base" values (before the per-frame layers), so SetMood blends from what the mood system
 	// had, not from a value that already includes a lightning flash or the ambient floor.
@@ -308,12 +335,20 @@ public partial class ForestAtmosphere : Node
 	{
 		if (_skyMat == null || _skyBase.Count == 0) return;
 		float q = OpenWarmAmbientAndSky ? Mathf.Snapped(_open, 0.05f) : 0f;
-		if (Mathf.IsEqualApprox(q, _skyOpenApplied)) return;
+		// the winter's dawn, in steps too
+		float w = Mathf.Snapped(Mathf.Clamp(Mathf.Max(Winter, WinterDusk), 0f, 1f), 0.1f);
+		if (Mathf.IsEqualApprox(q, _skyOpenApplied) && Mathf.IsEqualApprox(w, _skyWinterApplied)) return;
 		_skyOpenApplied = q;
+		_skyWinterApplied = w;
 		foreach (var (name, open) in OpenSky)
-			if (_skyBase.TryGetValue(name, out var b)) _skyMat.SetShaderParameter(name, b.Lerp(open, q));
-		_skyMat.SetShaderParameter("glow_strength", Mathf.Lerp(_skyGlowBase, 0.95f, q));
-		_skyMat.SetShaderParameter("cloud_cover", Mathf.Lerp(_skyCloudBase, 0.3f, q));
+		{
+			if (!_skyBase.TryGetValue(name, out var b)) continue;
+			var v = b.Lerp(open, q);
+			foreach (var (dn, dawn) in WinterDawnSky) if (dn == name) v = v.Lerp(dawn, w);
+			_skyMat.SetShaderParameter(name, v);
+		}
+		_skyMat.SetShaderParameter("glow_strength", Mathf.Lerp(Mathf.Lerp(_skyGlowBase, 0.95f, q), 1.2f, w));
+		_skyMat.SetShaderParameter("cloud_cover", Mathf.Lerp(Mathf.Lerp(_skyCloudBase, 0.3f, q), 0.34f, w));
 	}
 
 	/// <summary>Cross-fades from the current lighting to a fixed mood over <paramref name="seconds"/>, then holds it (no more auto distance blend).</summary>
@@ -500,11 +535,11 @@ public partial class ForestAtmosphere : Node
 			_ => (new Color(1f, 0.88f, 0.66f), 0.16f, Mathf.Lerp(0.55f, 1f, _open)),
 		};
 		bool indoors = Audio.ForestAmbienceManager.Instance is { IsIndoor: true };
-		float strength = indoors ? 0f : target.strength * (1f - 0.85f * storm) * ShaftScale;
+		float strength = indoors || _winterSunOn ? 0f : target.strength * (1f - 0.85f * storm) * ShaftScale;   // (the dawn sun lies too low for shafts)
 		float k = 1f - Mathf.Exp(-(float)GetProcessDeltaTime() * 1.2f);
 		_shaftTint = _shaftTint.Lerp(target.tint, k);
 		_shaftIntensity = Mathf.Lerp(_shaftIntensity, target.intensity, k);
-		_shaftStrength = ShaftScale <= 0f ? 0f : Mathf.Lerp(_shaftStrength, strength, k);
+		_shaftStrength = ShaftScale <= 0f || _winterSunOn ? 0f : Mathf.Lerp(_shaftStrength, strength, k);
 		_shafts.Tint = _shaftTint;
 		_shafts.Intensity = _shaftIntensity;
 		_shafts.Strength = _shaftStrength;
@@ -557,7 +592,7 @@ public partial class ForestAtmosphere : Node
 			density = Mathf.Lerp(density, Mathf.Lerp(DuskFogDensity, FrostFogDensity, frost), dusk);
 			ambColor = ambColor.Lerp(DuskAmbientColor, dusk);
 			ambient *= Mathf.Lerp(1f, DuskAmbientScale, dusk);
-			sunEnergy *= 1f - 0.6f * dusk;
+			sunEnergy *= 1f - 0.25f * dusk;
 		}
 		float lodge = Mathf.Clamp(Lodge, 0f, 1f);
 		if (lodge > 0f)
@@ -587,7 +622,8 @@ public partial class ForestAtmosphere : Node
 		_env.FogLightColor = fog;
 		_env.FogDensity = density;
 		// Act 22's dusk: the fog swallows the sky's warm glow too (a low snow sky, not a sunset)
-		_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 0.92f, Mathf.Clamp(WinterDusk, 0f, 1f));
+		// (the woods' morning: the fog lies over the sky's horizon but leaves its pink showing above)
+		_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 0.45f, Mathf.Clamp(Mathf.Max(Winter, WinterDusk), 0f, 1f));
 		if (_act1On)
 		{
 			// Act 1: depth fog closing in round them as they walk toward the fallen tree (the level's
@@ -622,6 +658,22 @@ public partial class ForestAtmosphere : Node
 		_sun.LightEnergy = sunEnergy;
 		_sun.LightColor = sunColor;
 		DriveShafts(storm);
+		// the winter's dawn: the sun low over the trees, where the sky's pink glow is
+		bool winterSun = Mathf.Max(Winter, WinterDusk) > 0.5f && Underground < 0.5f;
+		if (winterSun != _winterSunOn)
+		{
+			_winterSunOn = winterSun;
+			if (winterSun)
+			{
+				float az = Mathf.DegToRad(WinterSunAzimuth), el = Mathf.DegToRad(WinterSunElevation);
+				Vector3 toSun = new(Mathf.Sin(az) * Mathf.Cos(el), Mathf.Sin(el), -Mathf.Cos(az) * Mathf.Cos(el));
+				_winterSunBasis = Basis.LookingAt(-toSun, Vector3.Up);
+				_sun.GlobalBasis = _winterSunBasis;
+			}
+			else _sunRaiseApplied = -999f;   // put the grade's sun back below
+			_skyWinterApplied = -1f;
+		}
+		if (winterSun) return;
 		// Raise the sun with the grade (about its own horizontal axis), in small steps.
 		float raise = Mathf.Snapped(_open * (OpenWarmAmbientAndSky ? OpenSunRaiseDegrees : 0f), 0.25f);
 		if (!Mathf.IsEqualApprox(raise, _sunRaiseApplied))
