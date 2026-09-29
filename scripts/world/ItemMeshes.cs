@@ -220,6 +220,9 @@ public static class ItemMeshes
 			case ToolKind.Bookmark: Bookmark(k, ref b); break;
 			case ToolKind.FontKey: FontKey(k, ref b); break;
 			case ToolKind.Chalice: Chalice(k, ref b); break;
+			case ToolKind.Keycard202: case ToolKind.Keycard203: case ToolKind.Keycard201: Keycard(k, ref b, kind); break;
+			case ToolKind.PantryKey: PantryKey(k, ref b); break;
+			case ToolKind.DiningKey: DiningKey(k, ref b); break;
 		}
 		if (!k.IsEmpty)
 		{
@@ -461,6 +464,63 @@ public static class ItemMeshes
 
 	/// <summary>Act 21: the font's key, a long black iron church key lying flat: a trefoil bow, a round
 	/// shank, a heavy toothed bit.</summary>
+	/// <summary>A hotel keycard: cream plastic, a gilt antler crest and the room's number band, a brown stripe.</summary>
+	private static void Keycard(MeshKit k, ref Built b, ToolKind kind)
+	{
+		k.Xf = new Transform3D(new Basis(Vector3.Up, 0.3f), new Vector3(0, 0.002f, 0));
+		k.Mat(LodgeParts.LodgeTextures.PorcelainMat);
+		k.Color = new Color(0.86f, 0.82f, 0.72f);
+		k.Box(Vector3.Zero, new Vector3(0.086f, 0.0015f, 0.054f));
+		k.Mat(LodgeParts.LodgeTextures.GoldMat);
+		k.Color = Colors.White;
+		k.Box(new Vector3(-0.02f, 0.0009f, -0.005f), new Vector3(0.03f, 0.0004f, 0.024f));
+		// a band per room, so the three read differently in the hand
+		float z = kind switch { ToolKind.Keycard202 => -0.018f, ToolKind.Keycard203 => 0f, _ => 0.018f };
+		k.Mat(kind == ToolKind.Keycard201 ? LodgeParts.LodgeTextures.VelvetVioletMat : LodgeParts.LodgeTextures.MustardMat);
+		k.Box(new Vector3(0.025f, 0.0009f, z), new Vector3(0.024f, 0.0004f, 0.012f));
+		k.Mat(LodgeParts.LodgeTextures.LeatherMat);
+		k.Box(new Vector3(0, -0.0009f, 0.012f), new Vector3(0.086f, 0.0004f, 0.012f));
+		k.Xf = Transform3D.Identity;
+		b.PickCenter = new Vector3(0, 0.01f, 0);
+		b.PickRadius = 0.1f;
+	}
+
+	/// <summary>A brass key with a sheet of paper folded round it like an envelope.</summary>
+	private static void PantryKey(MeshKit k, ref Built b)
+	{
+		k.Xf = new Transform3D(new Basis(Vector3.Up, -0.5f), new Vector3(0, 0.006f, 0));
+		k.Mat(LodgeParts.LodgeTextures.LinenMat);
+		k.Color = new Color(0.86f, 0.82f, 0.72f);
+		k.Box(Vector3.Zero, new Vector3(0.1f, 0.012f, 0.06f));
+		k.Box(new Vector3(0, 0.007f, -0.01f), new Vector3(0.1f, 0.003f, 0.04f), 1f, new Basis(Vector3.Right, 0.12f));
+		k.Mat(LodgeParts.LodgeTextures.BrassMat);
+		k.Color = Colors.White;
+		k.Cylinder(new Vector3(-0.07f, 0, 0.01f), new Vector3(-0.052f, 0, 0.01f), 0.012f, 0.012f, 8, true);   // its bow, out of the fold
+		k.Xf = Transform3D.Identity;
+		b.PickCenter = new Vector3(0, 0.02f, 0);
+		b.PickRadius = 0.12f;
+	}
+
+	/// <summary>A big ornate brass key on a ring, a card tag on a string: DINING.</summary>
+	private static void DiningKey(MeshKit k, ref Built b)
+	{
+		k.Xf = new Transform3D(new Basis(Vector3.Up, 0.8f), new Vector3(0, 0.008f, 0));
+		k.Mat(LodgeParts.LodgeTextures.BrassMat);
+		k.Color = Colors.White;
+		for (int s = 0; s < 12; s++)
+		{
+			float a0 = Mathf.Tau * s / 12f, a1 = Mathf.Tau * (s + 1) / 12f;
+			k.Beam(new Vector3(Mathf.Cos(a0) * 0.022f, 0, -0.1f + Mathf.Sin(a0) * 0.022f), new Vector3(Mathf.Cos(a1) * 0.022f, 0, -0.1f + Mathf.Sin(a1) * 0.022f), 0.007f, 0.008f);
+		}
+		k.Cylinder(new Vector3(0, 0, -0.078f), new Vector3(0, 0, 0.07f), 0.006f, 0.006f, 8, true);
+		k.Box(new Vector3(0.012f, 0, 0.06f), new Vector3(0.02f, 0.006f, 0.02f));
+		k.Mat(LodgeParts.LodgeTextures.LinenMat);
+		k.Box(new Vector3(0.05f, -0.002f, -0.14f), new Vector3(0.05f, 0.002f, 0.03f));
+		k.Xf = Transform3D.Identity;
+		b.PickCenter = new Vector3(0, 0.02f, -0.03f);
+		b.PickRadius = 0.14f;
+	}
+
 	private static void FontKey(MeshKit k, ref Built b)
 	{
 		k.Xf = new Transform3D(new Basis(Vector3.Up, 0.4f), new Vector3(0, 0.012f, 0));

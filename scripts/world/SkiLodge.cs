@@ -83,7 +83,10 @@ public partial class SkiLodge : Node3D
 	}
 
 	/// <summary>Is a world point inside the lodge (its mudroom)?</summary>
-	public bool Inside(Vector3 world)
+	public bool Inside(Vector3 world) => InsideLocal(ToLocal(world));
+
+	/// <summary>In the mudroom (just in from the back door).</summary>
+	public bool InMudroom(Vector3 world)
 	{
 		var l = ToLocal(world);
 		return l.X > RoomX0 && l.X < RoomX1 && l.Z > -WingHalfZ + 0.1f && l.Z < RoomZ1 && l.Y > -1f && l.Y < 4f;
@@ -101,6 +104,9 @@ public partial class SkiLodge : Node3D
 		BuildPorch();
 		BuildBackDoor();
 		BuildMudroom();
+		BuildInterior();
+		BuildFurnishings();
+		StartAct23();
 		BuildIcicles();
 		BuildDrifts();
 		_frontMarker = new Node3D { Name = "FrontMarker", Position = new Vector3(0, 1.4f, Apothem + 1.2f) };
@@ -170,20 +176,8 @@ public partial class SkiLodge : Node3D
 	private void BuildHall()
 	{
 		var k = new MeshKit();
-		for (int i = 0; i < 6; i++)
-		{
-			Vector3 a = HexVert(i), b = HexVert(i + 1);
-			Vector3 mid = (a + b) * 0.5f, outward = new Vector3(mid.X, 0, mid.Z).Normalized();
-			// the front facet (facing +Z) holds the great doors: no windows low down there
-			bool front = outward.Z > 0.95f;
-			// b -> a runs left to right seen from outside
-			Wall(k, b, a, HexWall, outward, 0.8f, !front);
-			if (front)
-			{
-				Window(k, mid + outward * 0.42f + Vector3.Up * 6.3f + Vector3.Left * 2.6f, Vector3.Right, outward, 1.2f, 1.8f);
-				Window(k, mid + outward * 0.42f + Vector3.Up * 6.3f + Vector3.Right * 2.6f, Vector3.Right, outward, 1.2f, 1.8f);
-			}
-		}
+		// the six walls, cut for their doors and windows (SkiLodge.Interior.cs: the lobby is inside them)
+		BuildHallWalls(k);
 		// the great steep roof: six snow-laden faces up to a lantern
 		const float eave = 1.3f;
 		float lanternR = 1.8f, lanternTop = HexPeak + 3.2f;
@@ -227,9 +221,11 @@ public partial class SkiLodge : Node3D
 		// a great stone chimney through the roof
 		k.Mat(BuildingTextures.StoneMat);
 		k.Color = new Color(0.55f, 0.55f, 0.58f);
-		k.Box(new Vector3(-5.5f, 15f, -3f), new Vector3(2.2f, 30f, 2.2f), 0.5f);
+		// (over the lobby's fireplace, on the back-east side: it rises out of the roof there)
+		Vector3 chim = ((HexVert(1) + HexVert(2)) * 0.5f) * 0.86f;
+		k.Box(chim + Vector3.Up * 21f, new Vector3(2.4f, 18f, 2.4f), 0.5f, new Basis(Vector3.Up, Mathf.Pi / 6f));
 		k.Mat(RoofSnow);
-		k.Box(new Vector3(-5.5f, 30.1f, -3f), new Vector3(2.4f, 0.25f, 2.4f), 1f);
+		k.Box(chim + Vector3.Up * 30.1f, new Vector3(2.6f, 0.25f, 2.6f), 1f, new Basis(Vector3.Up, Mathf.Pi / 6f));
 		// one window high over the doors is lit, dimly, as if by a candle: the only light at the road's end (nobody should be here)
 		k.Mat(LitWindow);
 		{
@@ -304,7 +300,8 @@ public partial class SkiLodge : Node3D
 			k.Color = new Color(0.55f, 0.55f, 0.58f);
 			foreach (float cx in new[] { x0 + s * 14f, x1 - s * 4f })
 			{
-				k.Box(new Vector3(cx, (WingRidge + 2f) * 0.5f, -2.5f), new Vector3(1.4f, WingRidge + 2f, 1.4f), 0.5f);
+				// only above the rooms' ceilings (the stack runs up through the attic and out of the roof)
+				k.Box(new Vector3(cx, (RoomTop + 0.2f + WingRidge + 2f) * 0.5f, -2.5f), new Vector3(1.4f, WingRidge + 2f - RoomTop - 0.2f, 1.4f), 0.5f);
 				k.Mat(RoofSnow);
 				k.Box(new Vector3(cx, WingRidge + 2.05f, -2.5f), new Vector3(1.55f, 0.18f, 1.55f), 1f);
 				k.Mat(BuildingTextures.StoneMat);
@@ -504,13 +501,10 @@ public partial class SkiLodge : Node3D
 		await StoryBeat.PanTowards(this, player, inside + (inside - stand).Normalized() * 4f + Vector3.Up * 1.4f, 1.2f, ct);
 		await Cutscene.Tween(this, into, ct);
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.LodgeBackDoorOpen);
-		StoryBeat.ReachCheckpoint(player, Checkpoint.Act22Finished);
 		GD.Print("[story] Act 22 done: the lodge's back door forced; inside");
-		await Cutscene.Wait(this, 1.5, ct);
-		var fader = StoryBeat.Fader(this);
-		if (fader != null) await fader.Fade(1f, 3f, ct);
-		// the demo's end, for now: Act 23 is inside (the credits play the pictures back)
-		if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) await ending.Credits(fader, ct);
+		// Act 23 begins: behind them, the roof lets go its snow and buries the way out (SkiLodge.Act23.cs)
+		await SnowedIn(player, ct);
+		StoryBeat.ReachCheckpoint(player, Checkpoint.Act22Finished);
 	}
 
 	private async Task Shove(PlayerController player, int i, CancellationToken ct)
@@ -606,13 +600,10 @@ public partial class SkiLodge : Node3D
 		k.Mat(BuildingTextures.BoardsMat);
 		k.Color = new Color(0.42f, 0.4f, 0.4f);
 		k.Quad(new Vector3(x0, top, z1), new Vector3(x1, top, z1), new Vector3(x1, top, z0), new Vector3(x0, top, z0), Vector3.Down);
-		k.Quad(new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), new Vector3(x1, top, z1), new Vector3(x0, top, z1), Vector3.Forward);
 		k.Quad(new Vector3(x1, 0, z0), new Vector3(x0, 0, z0), new Vector3(x0, top, z0), new Vector3(x1, top, z0), Vector3.Back);
 		k.Quad(new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), new Vector3(x0, top, z1), new Vector3(x0, top, z0), Vector3.Right);
 		k.Quad(new Vector3(x1, 0, z1), new Vector3(x1, 0, z0), new Vector3(x1, top, z0), new Vector3(x1, top, z1), Vector3.Left);
-		// the inner door on (Act 23), shut
-		k.Mat(LodgeDoor);
-		k.Box(new Vector3((x0 + x1) * 0.5f, 1.05f, z1 - 0.04f), new Vector3(0.95f, 2.1f, 0.06f), 0.5f);
+		// (its inner wall, with the door on into the lodge, is the service corridor's: SkiLodge.Interior.cs)
 		// a ski rack along one wall with the skis still in it, a bench, boots under it
 		k.Mat(LodgeTrim);
 		k.Color = Colors.White;
@@ -630,7 +621,7 @@ public partial class SkiLodge : Node3D
 		k.Box(new Vector3(x1 - 0.3f, 0.22f, (z0 + z1) * 0.5f - 1.4f), new Vector3(0.4f, 0.45f, 0.08f), 1f);
 		k.Box(new Vector3(x1 - 0.3f, 0.22f, (z0 + z1) * 0.5f + 1.4f), new Vector3(0.4f, 0.45f, 0.08f), 1f);
 		k.CommitTo(this, "Mudroom", true);
-		foreach (var (c, s) in new[] { (new Vector3(x0 - 0.1f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0)), (new Vector3(x1 + 0.1f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0)), (new Vector3((x0 + x1) * 0.5f, 1.5f, z1 + 0.1f), new Vector3(x1 - x0, 3f, 0.2f)) })
+		foreach (var (c, s) in new[] { (new Vector3(x0 - 0.1f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0)), (new Vector3(x1 + 0.1f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0)) })
 			Col(c, s);
 	}
 

@@ -149,6 +149,9 @@ public partial class Pickup : Area3D
 		ToolKind.Bookmark => "bookmark",
 		ToolKind.FontKey => "iron key",
 		ToolKind.Chalice => "chalice",
+		ToolKind.Keycard202 or ToolKind.Keycard203 or ToolKind.Keycard201 => "keycard",
+		ToolKind.PantryKey => "pantry key",
+		ToolKind.DiningKey => "dining room key",
 		_ => "item",
 	};
 

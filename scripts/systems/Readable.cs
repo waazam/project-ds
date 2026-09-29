@@ -23,7 +23,8 @@ namespace ProjectDS.Systems;
 [GlobalClass]
 public partial class Readable : Interactable
 {
-	public enum NoteStyle { Handwritten, Typed, Printed }
+	/// <summary>Smudged: handwriting that's been wet and rubbed, hard to read but legible (the lodge's last note).</summary>
+	public enum NoteStyle { Handwritten, Typed, Printed, Smudged }
 
 	/// <summary>Small heading above the text ("Trail register"). Empty for none.</summary>
 	[Export] public string Title = "";

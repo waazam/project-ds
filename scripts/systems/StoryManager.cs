@@ -211,6 +211,8 @@ public partial class StoryManager : Node
 			// to the ski lodge's front door, then (once that is found locked) round to the back door.
 			if (Current == Checkpoint.Act21Finished)
 				return HasFlag(Flag.LodgeFrontTried) ? MarkerPos("lodge_back_marker") : MarkerPos("lodge_front_marker");
+			// Act 23: inside the lodge, whatever it wants next (the bar, the rooms, the pantry, the dining hall, 201)
+			if (Current >= Checkpoint.Act22Finished) return MarkerPos("lodge_objective_marker");
 			return null;
 		}
 	}

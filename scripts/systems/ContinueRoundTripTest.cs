@@ -47,6 +47,13 @@ public partial class ContinueRoundTripTest : Node
 		StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet,
 		StoryManager.Flag.StationDoor3Open }).ToArray();
 
+	private static readonly string[] F22 = F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
+		StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
+		StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced, "pickup_taken_church_font_key", "pickup_taken_church_chalice",
+		StoryManager.Flag.LodgeFrontTried, StoryManager.Flag.LodgeBackDoorOpen, LodgeFlag.SnowedIn }).ToArray();
+	private static readonly string[] F23a = F22.Concat(new[] { LodgeFlag.Taken(LodgeFlag.Card202), LodgeFlag.Room202Open, LodgeFlag.Taken(LodgeFlag.PantryKey), LodgeFlag.Room202Jammed }).ToArray();
+	private static readonly string[] F23b = F23a.Concat(new[] { LodgeFlag.PantryOpen, LodgeFlag.Taken(LodgeFlag.Card203), LodgeFlag.Room203Open, LodgeFlag.Taken(LodgeFlag.DiningKey), LodgeFlag.Note204, LodgeFlag.Room204Open, LodgeFlag.Room203Jammed }).ToArray();
+	private static readonly string[] F23c = F23b.Concat(new[] { LodgeFlag.DiningOpen, LodgeFlag.StormUp, LodgeFlag.Table(0, 1), LodgeFlag.Table(3, 2), LodgeFlag.Table(1, 3), LodgeFlag.Table(4, 4), LodgeFlag.Table(2, 5), LodgeFlag.Table(5, 6), LodgeFlag.Taken(LodgeFlag.Card201) }).ToArray();
 	private static readonly Scenario[] Scenarios =
 	{
 		new("act1_start", Checkpoint.Act1Start, new string[0], "camera;tool=None"),
@@ -87,6 +94,10 @@ public partial class ContinueRoundTripTest : Node
 			StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
 			StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced, "pickup_taken_church_font_key", "pickup_taken_church_chalice",
 			StoryManager.Flag.LodgeFrontTried, StoryManager.Flag.LodgeBackDoorOpen }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+		// Act 23's saves: out of 202 (the pantry key), out of 203/204 (the dining key), the bowl (201's card)
+		new("act23_room202", Checkpoint.Act23Room202Done, F23a, "lantern,compass,radio;tools=Lighter+PantryKey"),
+		new("act23_room203", Checkpoint.Act23Room203Done, F23b, "lantern,compass,radio;tools=Lighter+DiningKey"),
+		new("act23_card201", Checkpoint.Act23Keycard201, F23c, "lantern,compass,radio;tools=Lighter+Keycard201"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -233,7 +244,17 @@ public partial class ContinueRoundTripTest : Node
 		if (sc.Cp == Checkpoint.Act21Finished && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church is { } ch22)
 			Check("Act 21's end respawns outside the great door, standing open on the snow: four candles burning, the vestry and the font open, the chalice in its niche", !ch22.Inside(before) && before.DistanceTo(ch22.DoorWorld) < 8f && ch22.DoorOpen && ch22.CandlesLit == 4 && ch22.VestryOpen && ch22.FontOpen && ch22.ChalicePlaced && _player.IsOnFloor(), $"{before}");
 		if (sc.Cp == Checkpoint.Act22Finished && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.Woods?.Lodge is { } lodge22)
-			Check("Act 22's end respawns in the lodge's mudroom, the back door forced open", lodge22.Inside(before) && lodge22.BackOpen, $"{before} (lodge-local {lodge22.ToLocal(before)})");
+			Check("Act 22's end respawns in the lodge's mudroom, the back door forced open, snowed in", lodge22.InMudroom(before) && lodge22.BackOpen && lodge22.SnowPile.Visible, $"{before} (lodge-local {lodge22.ToLocal(before)})");
+		if (sc.Cp >= Checkpoint.Act23Room202Done && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.Woods?.Lodge is { } lodge23)
+		{
+			var lb = lodge23.ToLocal(before);
+			if (sc.Cp == Checkpoint.Act23Room202Done)
+				Check("Act 23's first save: in the upstairs corridor, 202 jammed shut, the pantry still locked", lb.Y > SkiLodge.UpperY - 0.3f && Mathf.Abs(lb.Z) < 1f && lodge23.Room202Jammed && lodge23.PantryDoor.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Locked, $"{lb}");
+			if (sc.Cp == Checkpoint.Act23Room203Done)
+				Check("Act 23's second save: in the corridor, 202 and 203 jammed, the pantry open, the dining room locked", lb.Y > SkiLodge.UpperY - 0.3f && lodge23.Room202Jammed && lodge23.Room203Jammed && lodge23.PantryDoor.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open && lodge23.DiningDoorL.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Locked, $"{lb}");
+			if (sc.Cp == Checkpoint.Act23Keycard201)
+				Check("Act 23's third save: in the dining hall, all six sheets off (their things on the tables), the storm up, the fifth table down", SkiLodge.InsideLocal(lb) && lb.X > 10f && lodge23.TablesPulled == 6 && lodge23.PlatterSkull != null && lodge23.Storm > 0.9f, $"{lb}, pulled {lodge23.TablesPulled}, storm {lodge23.Storm:0.00}");
+		}
 		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");
 
@@ -298,9 +319,9 @@ public partial class ContinueRoundTripTest : Node
 		Check("inventory restored", inv != null && GearOf(inv.Serialize()) == GearOf(sc.Inventory) || (sc.Cp == Checkpoint.Act10WalkieFound && inv?.HasRadio == true),
 			$"{inv?.Serialize()} (saved {sc.Inventory})");
 
-		// (dead from Act 14's stairwell through the church; alive again outside it, in Act 22, pointing at the lodge)
+		// (dead from Act 14's stairwell through the church; alive again outside it, in Act 22, pointing at the lodge, and in it)
 		bool wantObjective = (story.Current >= Checkpoint.Act3DoorBoarded && story.Current < Checkpoint.Act11GiantEncounter)
-			|| story.Current == Checkpoint.Act21Finished;
+			|| story.Current >= Checkpoint.Act21Finished;
 		Check("compass has an objective", (story.ObjectivePosition != null) == wantObjective, $"{story.ObjectivePosition}");
 
 		if (sc.Cp == Checkpoint.Act8BunkerEntered && GetTree().GetFirstNodeInGroup("bunker_marker") is Bunker bunker)

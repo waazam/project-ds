@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-28c — Act 23: the ski lodge (snowed in; the Gilded Antler, rooms 202–204, the pantry, the dining hall's six sheets; ends at 201's door)](2026-09-28c-act23-the-ski-lodge.md)
 - [2026-09-28b — Act 22: the winter woods, the wendigo, the ski lodge (Act 21 now leaves through the great door; the compass dies on the stairwell and lives again outside)](2026-09-28b-act22-winter-woods-and-wendigo.md)
 - [2026-09-28a — Save/load fixes (Act 6's clearing on later saves), the crawler's steps, a hitch logger, test and audit repairs](2026-09-28a-save-fixes-and-polish.md)
 - [2026-09-27j — Polish pass: a collision, clipping and UV audit; the dead eye; the deep stairwell no longer pitch black](2026-09-27j-polish-and-audits.md)

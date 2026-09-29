@@ -127,6 +127,11 @@ public partial class StationInterior : Node3D
 		Marker("Act21EndMarker", ToGlobal(church + step + new Vector3(0, 0.1f, 0)), Rotation.Y, "respawn_Act21Finished");
 		// Act 22's end (Act 23's start): in the ski lodge's mudroom, just in from the back door, facing the inner door
 		Marker("Act22EndMarker", ToGlobal(church + SkiLodge.OriginLocal + new Vector3(SkiLodge.BackDoorX, 0.1f, -SkiLodge.WingHalfZ + 3.2f)), Rotation.Y + Mathf.Pi, "respawn_Act22Finished");
+		// Act 23's saves: in the upstairs corridor (after 202, after 203), and in the dining hall by the bowl
+		Vector3 lodge = church + SkiLodge.OriginLocal;
+		Marker("Act23Room202Marker", ToGlobal(lodge + new Vector3(-15.5f, SkiLodge.UpperY + 0.1f, 0f)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act23Room202Done");
+		Marker("Act23Room203Marker", ToGlobal(lodge + new Vector3(-19f, SkiLodge.UpperY + 0.1f, 0f)), Rotation.Y - Mathf.Pi * 0.5f, "respawn_Act23Room203Done");
+		Marker("Act23Card201Marker", ToGlobal(lodge + new Vector3(24f, 0.1f, 0f)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act23Keycard201");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });

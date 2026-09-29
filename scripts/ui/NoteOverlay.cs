@@ -119,6 +119,7 @@ public partial class NoteOverlay : CanvasLayer
 		{
 			Readable.NoteStyle.Typed => (new Color(0.78f, 0.75f, 0.63f), new Color(0.13f, 0.12f, 0.13f), UiKit.Mono, 11),
 			Readable.NoteStyle.Printed => (new Color(0.84f, 0.83f, 0.78f), new Color(0.12f, 0.12f, 0.14f), UiKit.Serif, 12),
+			Readable.NoteStyle.Smudged => (new Color(0.74f, 0.7f, 0.6f), new Color(0.2f, 0.17f, 0.22f), UiKit.SerifItalic, 13),
 			_ => (new Color(0.80f, 0.76f, 0.66f), new Color(0.17f, 0.15f, 0.20f), UiKit.SerifItalic, 12),
 		};
 		_cardStyle.BgColor = paper;
@@ -128,7 +129,17 @@ public partial class NoteOverlay : CanvasLayer
 		_body.AddThemeFontOverride("normal_font", font);
 		_body.AddThemeFontSizeOverride("normal_font_size", size);
 		_body.AddThemeColorOverride("default_color", ink);
-		_body.Text = note.Text ?? "";
+		_body.BbcodeEnabled = note.Style == Readable.NoteStyle.Smudged;
+		_body.Text = note.Style == Readable.NoteStyle.Smudged ? Smudge(note.Text ?? "", ink) : note.Text ?? "";
+		if (note.Style == Readable.NoteStyle.Smudged)
+		{
+			// the ink run and rubbed: a soft doubled shadow under every stroke
+			_body.AddThemeColorOverride("font_shadow_color", new Color(ink, 0.35f));
+			_body.AddThemeConstantOverride("shadow_offset_x", 1);
+			_body.AddThemeConstantOverride("shadow_offset_y", 1);
+			_body.AddThemeConstantOverride("shadow_outline_size", 2);
+		}
+		else _body.RemoveThemeColorOverride("font_shadow_color");
 		_body.ScrollToLine(0);
 
 		// A handwritten sheet is held a little askew; cards and logs sit square.
@@ -147,6 +158,31 @@ public partial class NoteOverlay : CanvasLayer
 		_tween = CreateTween();
 		_tween.TweenProperty(_root, "modulate:a", 1f, 0.15f);
 	}
+
+	/// <summary>Smudged handwriting: each word's ink a different strength (some nearly rubbed away), a letter
+	/// here and there blotted darker. Deterministic per text, so it reads the same every time.</summary>
+	private static string Smudge(string text, Color ink)
+	{
+		var sb = new System.Text.StringBuilder();
+		uint h = 2166136261;
+		foreach (char ch in text) h = (h ^ ch) * 16777619;
+		var rng = new RandomNumberGenerator { Seed = h };
+		foreach (var word in text.Split(' '))
+		{
+			float a = rng.RandfRange(0.42f, 0.95f);
+			var c = new Color(ink, a);
+			sb.Append($"[color=#{c.ToHtml(true)}]");
+			foreach (char ch in word)
+			{
+				if (rng.Randf() < 0.08f) sb.Append($"[color=#{new Color(ink * 0.6f, 1f).ToHtml(true)}]{Esc(ch)}[/color]");
+				else sb.Append(Esc(ch));
+			}
+			sb.Append("[/color] ");
+		}
+		return sb.ToString().TrimEnd();
+	}
+
+	private static string Esc(char c) => c == '[' ? "[lb]" : c.ToString();
 
 	private float _width = CardWidth;
 	private int _layoutTries;

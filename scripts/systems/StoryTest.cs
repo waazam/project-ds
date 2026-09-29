@@ -128,6 +128,7 @@ public partial class StoryTest : Node
 			21 => (Checkpoint.Act20Finished, StateFor(19).flags.Concat(new[] { StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			22 => (Checkpoint.Act21Finished, StateFor(21).flags.Concat(new[] { StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4),
 				StoryManager.Flag.ChurchVestryOpen, StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+			23 => (Checkpoint.Act22Finished, StateFor(22).flags.Concat(new[] { StoryManager.Flag.LodgeFrontTried, StoryManager.Flag.LodgeBackDoorOpen, LodgeFlag.SnowedIn }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
 	}
@@ -137,7 +138,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 22) return false;
+		if (_fromApplied || act < 3 || act > 23) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -283,6 +284,7 @@ public partial class StoryTest : Node
 			new("Act 20: the round room", hollow, Act20Round),
 			new("Act 21: the church", hollow, Act21Church),
 			new("Act 22: the winter woods", hollow, Act22Woods),
+			new("Act 23: the ski lodge", hollow, Act23Lodge),
 		};
 	}
 
@@ -3021,14 +3023,267 @@ public partial class StoryTest : Node
 		Screenshot("act22_forcing_the_door");
 		await WaitUntil(() => s.Current == Checkpoint.Act22Finished, 20, ct);
 		Check("three shoves, the ice splits, the door swings in: inside (Act 22 done)", s.Current == Checkpoint.Act22Finished && lodge.BackOpen && lodge.Shoves == 3 && lodge.Inside(_player.GlobalPosition), $"{s.Current}, shoves {lodge.Shoves}, at {lodge.ToLocal(_player.GlobalPosition)}");
-		Screenshot("act22_inside");
-		// the credits: every picture, polaroid by polaroid
-		int want = Math.Min(2, PhotoLog.Instance?.RecordedCount ?? 0);
-		await WaitUntil(() => FirstOf<PolaroidMontage>() is { } m && m.Shown >= want, 60, ct);
+		Check("behind them, the roof's snow buries the doorway: snowed in", lodge.SnowPile.Visible && s.HasFlag(LodgeFlag.SnowedIn));
+		Screenshot("act22_snowed_in");
+	}
+
+	// ------------------------------------------------------------------ Act 23
+
+	private async Task Act23Lodge(CancellationToken ct)
+	{
+		var s = StoryManager.Instance;
+		var lodge = StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.Woods?.Lodge;
+		Check("the lodge exists", lodge != null);
+		if (lodge == null) return;
+		await WaitUntil(() => _input.Enabled, 10, ct);
+		await Frames(5, ct);
+		Check("Act 23 starts at Act 22's save, in the mudroom, snowed in", s.Current == Checkpoint.Act22Finished && lodge.Inside(_player.GlobalPosition) && lodge.SnowPile.Visible, $"{s.Current} at {lodge.ToLocal(_player.GlobalPosition)}");
+		Vector3 L(float x, float y, float z) => lodge.ToGlobal(new Vector3(x, y, z));
+		var atmo = StoryBeat.Atmosphere(_player);
+		async Task Go(params Vector3[] pts) { foreach (var p in pts) await WalkTo(p, 0.45f, ct, giveUp: 14f); }
+		// the lantern's flame: lit (the blacklight later)
+		var lantern = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern");
+		lantern?.SetBlacklight(false);
+		// ---- out of the mudroom, along the service corridor, into the bar
+		await UseIt(lodge.MudroomDoor.Use, ct);
+		await Seconds(0.8, ct);
+		Check("the mudroom's inner door opens", lodge.MudroomDoor.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		await Go(L(-30f, 0.05f, -1.0f), L(-24.5f, 0.05f, -0.7f), L(-22.7f, 0.05f, -0.6f), L(-22.7f, 0.05f, 1.0f), L(-18.4f, 0.05f, 1.0f), L(-18.3f, 0.05f, 3.9f));
+		Check("into the bar, round the end of the counter", lodge.ToLocal(_player.GlobalPosition).DistanceTo(new Vector3(-18.3f, 0f, 3.9f)) < 1.0f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
+		await Seconds(1.5, ct);
+		Check("inside, it's clean and lit: the lodge's own light, not the woods' murk", atmo != null && atmo.Lodge > 0.5f, $"lodge {atmo?.Lodge:0.00}");
+		await Aim(L(-24f, 1.6f, 4f), ct);
+		Screenshot("act23_the_bar");
+		// ---- 202's keycard under the counter's lip: nothing in the flame's light; the blacklight finds it
+		await Aim(lodge.Card202Pickup.GlobalPosition, ct);
+		await Frames(3, ct);
+		Check("under the counter, by the flame: nothing to see", string.IsNullOrEmpty(_player.Interaction?.PromptText) || _player.Interaction?.PromptText != "Peel the card off", $"'{_player.Interaction?.PromptText}'");
+		lantern?.SetBlacklight(true);
+		await WaitUntil(() => _player.Interaction?.PromptText == "Peel the card off", 2, ct);
+		Check("by the blacklight: a handprint, UNDER, a card taped under the lip", _player.Interaction?.PromptText == "Peel the card off", $"'{_player.Interaction?.PromptText}', uv {ProjectDS.Player.Lantern.UvOn(lodge.Card202Pickup.GlobalPosition):0.00}");
+		Screenshot("act23_blacklight_under_the_counter");
+		await Press(ct);
+		await Seconds(0.6, ct);
+		Check("202's keycard, and the note taped to its back", _inv.HasTool(ToolKind.Keycard202) && NoteOverlay.Instance is { IsOpen: true } && (NoteOverlay.Instance.Current?.Text ?? "").Contains("closing staff"), $"{NoteOverlay.Instance?.Current?.Text}");
+		Screenshot("act23_the_staff_note");
+		await PutDown(ct);
+		lantern?.SetBlacklight(false);
+		// ---- up to 202: through the arch into the lobby, up the grand stair, round the balcony, down the corridor
+		await Go(L(-18.3f, 0.05f, 5.5f), L(-12.5f, 0.05f, 4.2f), L(-7.5f, 0.05f, 3.4f), L(-2f, 0.05f, 1f));
+		await Aim(L(3f, 3f, -5f), ct);
+		Screenshot("act23_the_lobby");
+		await Go(L(6.2f, 0.05f, -7.4f), L(5.4f, 0.05f, -9.0f), L(-3.6f, UpperYOf(lodge), -9.0f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-9.4f, UpperYOf(lodge), 0f), L(-12.4f, UpperYOf(lodge), 0f), L(-13.7f, UpperYOf(lodge), 0f));
+		Check("up the stair, round the balcony, into the rooms' corridor", lodge.ToLocal(_player.GlobalPosition).Y > SkiLodge.UpperY - 0.3f && lodge.ToLocal(_player.GlobalPosition).X < -12.8f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
+		await Aim(L(-28f, 5.8f, 0f), ct);
+		Screenshot("act23_the_corridor");
+		var d202 = lodge.RoomDoors[202];
+		await Aim(d202.CentreWorld, ct);
+		await Frames(2, ct);
+		Check("202's reader: use the keycard", _player.Interaction?.PromptText == "Use the keycard", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await Seconds(1.2, ct);
+		Check("the reader goes green, the door opens", d202.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		await Go(L(-13.7f, UpperYOf(lodge), 2.2f), L(-15.5f, UpperYOf(lodge), 4.2f));
+		await Aim(L(-16f, 5.0f, 7f), ct);
+		Screenshot("act23_room_202");
+		// search: an empty one, then the one it's in
+		var empty = lodge.Search202.First(x => x != lodge.Search202[lodge.PantryKeyIn] && !x.Name.ToString().Contains("Vanity"));
+		await SearchIt(lodge, empty, ct);
+		await Seconds(0.8, ct);
+		Check("an empty drawer: nothing", empty.IsOpen && !empty.HasSomething);
+		var holds = lodge.Search202[lodge.PantryKeyIn];
+		await SearchIt(lodge, holds, ct, leave: false);
+		await Seconds(0.8, ct);
+		Check($"the {holds.What} opens", holds.IsOpen);
+		var find = holds.Part.GetNodeOrNull<Pickup>("Find");
+		Check("a key wrapped in a note, inside", find != null);
+		await UseIt(find, ct);
+		await Seconds(0.6, ct);
+		Check("the servants' pantry key, and its note", _inv.HasTool(ToolKind.PantryKey) && (NoteOverlay.Instance?.Current?.Text ?? "").Contains("Servant's Pantry key"), $"{NoteOverlay.Instance?.Current?.Text}");
+		await PutDown(ct);
+		await LeaveBath(lodge, holds, ct);
+		// out: the door slams and jams behind
+		await Go(L(-14.2f, UpperYOf(lodge), 2f), L(-14.2f, UpperYOf(lodge), 0.2f), L(-15.5f, UpperYOf(lodge), 0f));
+		await WaitUntil(() => lodge.Room202Jammed, 3, ct);
+		await Seconds(1.0, ct);
+		Check("out with the key: 202's reader sparks, the door slams and jams (a save)", lodge.Room202Jammed && d202.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Jammed && s.Current == Checkpoint.Act23Room202Done, $"{s.Current}");
+		await Aim(d202.CentreWorld, ct);
+		await WaitUntil(() => lodge.Whispers > 0, 16, ct);
+		Check("stand at the door and listen: something inside, saying it's cold", lodge.Whispers > 0, $"{lodge.Whispers}");
+		// ---- down to the pantry
+		await Go(L(-12.4f, UpperYOf(lodge), 0f), L(-9.4f, UpperYOf(lodge), 0f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-3.6f, UpperYOf(lodge), -9.0f), L(5.4f, 0.05f, -9.0f), L(6.2f, 0.05f, -7.4f), L(0f, 0.05f, -4f));
+		await Go(lodge.PantryDoor.FrontWorld);
+		await Aim(lodge.PantryDoor.CentreWorld, ct);
+		await Frames(2, ct);
+		Check("the pantry door: unlock it", _player.Interaction?.PromptText == "Unlock it", $"'{_player.Interaction?.PromptText}' at {lodge.ToLocal(_player.GlobalPosition)}");
+		await Press(ct);
+		await Seconds(1.2, ct);
+		Check("it opens, and the mop leaning inside comes down across the doorway", lodge.PantryDoor.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open && lodge.MopFell);
+		Screenshot("act23_the_mop");
+		var drawer = lodge.SearchPantry[lodge.Card203In];
+		await Go(L(-9.0f, 0.05f, -6.5f));
+		await SearchIt(lodge, drawer, ct);
+		await Seconds(0.8, ct);
+		var card203 = drawer.Part.GetNodeOrNull<Pickup>("Find");
+		Check("in one of the drawers: 203's keycard", card203 != null);
+		await UseIt(card203, ct);
+		await Seconds(0.4, ct);
+		Check("203's keycard taken", _inv.HasTool(ToolKind.Keycard203));
+		Screenshot("act23_the_pantry");
+		// ---- 203: up again
+		await Go(L(-9.0f, 0.05f, -6.5f), L(-6f, 0.05f, -5f), L(0f, 0.05f, -4f), L(6.2f, 0.05f, -7.4f), L(5.4f, 0.05f, -9.0f), L(-3.6f, UpperYOf(lodge), -9.0f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-9.4f, UpperYOf(lodge), 0f), L(-12.4f, UpperYOf(lodge), 0f), L(-13.7f, UpperYOf(lodge), 0f));
+		var d203 = lodge.RoomDoors[203];
+		await Aim(d203.CentreWorld, ct);
+		await Frames(2, ct);
+		await Press(ct);
+		await Seconds(1.2, ct);
+		Check("203's door opens: the cold comes out", d203.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		await Go(L(-13.7f, UpperYOf(lodge), -2.2f), L(-14.4f, UpperYOf(lodge), -5.4f));
+		await Aim(L(-14.3f, 5.2f, -7.6f), ct);
+		Screenshot("act23_room_203");
+		await WaitUntil(() => lodge.Mumbles > 0, 12, ct);
+		Check("the window open on the storm, and outside, a voice mumbling", lodge.Mumbles > 0);
+		var sill = lodge.GetNodeOrNull<Pickup>("DiningKey");
+		await Go(L(-14.0f, UpperYOf(lodge), -6.4f));
+		await UseIt(sill, ct);
+		await Seconds(0.4, ct);
+		Check("the dining room's key, from the sill", _inv.HasTool(ToolKind.DiningKey));
+		// through the bathroom's broken wall into 204
+		await Go(L(-15.2f, UpperYOf(lodge), -4.0f), L(-16.6f, UpperYOf(lodge), -2.65f), L(-18.6f, UpperYOf(lodge), -2.45f), L(-21.6f, UpperYOf(lodge), -2.45f));
+		Check("through the hole in 203's bathroom, into 204", lodge.ToLocal(_player.GlobalPosition).X < SkiLodge.RoomSplitX - 0.5f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
+		await Aim(L(-18.5f, 5.3f, -2.4f), ct);
+		Screenshot("act23_the_hole");
+		var hides = lodge.Search204[lodge.Note204In];
+		await SearchIt(lodge, hides, ct, leave: false);
+		await Seconds(0.8, ct);
+		Check("in one of 204's drawers, a note", lodge.Note204 != null);
+		await UseIt(lodge.Note204, ct);
+		await Seconds(0.5, ct);
+		Check("smudged, hard to read: \"If you can hear it, it already knows you are here.\"", s.HasFlag(LodgeFlag.Note204) && NoteOverlay.Instance?.Current?.Style == Readable.NoteStyle.Smudged);
+		Screenshot("act23_the_smudged_note");
+		await PutDown(ct);
+		await LeaveBath(lodge, hides, ct);
+		var d204 = lodge.RoomDoors[204];
+		await Go(L(-21.3f, UpperYOf(lodge), -2.0f));
+		await UseIt(d204.Use, ct);
+		await Seconds(1.2, ct);
+		Check("204's door, from inside, opens", d204.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		await Go(L(-21.3f, UpperYOf(lodge), -0.2f), L(-19f, UpperYOf(lodge), 0f));
+		await WaitUntil(() => lodge.Room203Jammed, 3, ct);
+		await Seconds(0.8, ct);
+		Check("out in the corridor: 203's door slams and jams too (a save)", lodge.Room203Jammed && s.Current == Checkpoint.Act23Room203Done, $"{s.Current}");
+		// ---- the dining hall
+		await Go(L(-12.4f, UpperYOf(lodge), 0f), L(-9.4f, UpperYOf(lodge), 0f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-3.6f, UpperYOf(lodge), -9.0f), L(5.4f, 0.05f, -9.0f), L(6.2f, 0.05f, -7.4f), L(4f, 0.05f, 1f));
+		await Go(lodge.DiningDoorL.FrontWorld);
+		await UseIt(lodge.DiningDoorL.Use, ct);
+		await Seconds(1.5, ct);
+		Check("the dining room's doors open", lodge.DiningDoorL.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open && lodge.DiningDoorR.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		await Go(L(8.36f, 0.05f, 3.9f), L(10.6f, 0.05f, 5.2f), L(14f, 0.05f, 3f), L(14f, 0.05f, 0f));
+		await Aim(L(40f, 1.2f, 0f), ct);
+		Screenshot("act23_the_dining_hall");
+		// the sheets, one table after another
+		int[] order = { 0, 3, 1, 4, 2, 5 };
+		string[] want = { "dishes", "blood", "skeleton", "skull", "collapse", "card" };
+		for (int i = 0; i < 6; i++)
+		{
+			int t = order[i];
+			var c = SkiLodge.TableCentre(t);
+			float side = c.Z > 0 ? -1f : 1f;
+			await Go(L(c.X, 0.05f, c.Z + side * 1.55f));
+			await Aim(lodge.ToGlobal(c + new Vector3(0, SkiLodge.TableH + 0.1f, 0)), ct);
+			await Frames(2, ct);
+			if (_player.Interaction?.PromptText != "Pull the sheet off")
+			{
+				GD.Print($"[tabledbg] table {t}: at {lodge.ToLocal(_player.GlobalPosition)}, focused '{_player.Interaction?.Focused?.Name}' prompt '{_player.Interaction?.PromptText}'");
+				await UseIt(lodge.SheetUses[t], ct);
+				await Frames(2, ct);
+			}
+			Check($"table {i + 1}: pull the sheet off", lodge.TableEvents.Count > i || _player.Interaction?.PromptText == "Pull the sheet off", $"'{_player.Interaction?.PromptText}' at {lodge.ToLocal(_player.GlobalPosition)}");
+			if (lodge.TableEvents.Count <= i) await Press(ct);
+			await WaitUntil(() => lodge.TableEvents.Count > i, 6, ct);
+			await Seconds(i == 1 || i == 2 || i == 3 ? 3.0 : 1.2, ct);
+			Check($"sheet {i + 1} off (cloth): under it, {want[i]}", lodge.TableEvents.Count > i && lodge.TableEvents[i] == want[i], lodge.TableEvents.Count > i ? lodge.TableEvents[i] : "nothing");
+			Screenshot($"act23_table_{i + 1}_{want[i]}");
+			if (i == 2) Check("the storm gets up outside", lodge.Storm > 0.2f, $"{lodge.Storm:0.00}");
+			if (i == 3) Check("a wendigo's skull on a platter", lodge.PlatterSkull != null && lodge.PlatterSkull.Visible);
+			if (i == 4) Check("the table breaks and comes down", lodge.Collapsed == t);
+		}
+		Check("201's keycard, standing in a bowl of snow", lodge.Card201Pickup != null && IsInstanceValid(lodge.Card201Pickup));
+		await UseIt(lodge.Card201Pickup, ct);
+		await WaitUntil(() => lodge.BowlMelted, 6, ct);
+		Check("taken: the snow melts into blood (a save)", _inv.HasTool(ToolKind.Keycard201) && lodge.BowlMelted && s.Current == Checkpoint.Act23Keycard201, $"{s.Current}");
+		Screenshot("act23_blood_in_the_bowl");
+		// ---- room 201
+		await Go(L(14f, 0.05f, 0f), L(14f, 0.05f, 3f), L(10.6f, 0.05f, 5.2f), L(8.36f, 0.05f, 3.9f), L(4f, 0.05f, 1f), L(6.2f, 0.05f, -7.4f), L(5.4f, 0.05f, -9.0f), L(-3.6f, UpperYOf(lodge), -9.0f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-9.4f, UpperYOf(lodge), 0f), L(-12.4f, UpperYOf(lodge), 0f), L(-21.3f, UpperYOf(lodge), 0f));
+		var d201 = lodge.RoomDoors[201];
+		await Aim(d201.CentreWorld, ct);
+		await Frames(2, ct);
+		Check("201: use the keycard", _player.Interaction?.PromptText == "Use the keycard", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await Seconds(1.0, ct);
+		Check("201's reader goes green; the door opens on the dark", d201.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		Screenshot("act23_room_201");
+		// the credits (for now)
+		int wantShots = Math.Min(2, PhotoLog.Instance?.RecordedCount ?? 0);
+		if (wantShots == 0) { GD.Print("[storytest] no pictures taken this run (started mid-story): the polaroid check is skipped"); return; }
+		await WaitUntil(() => FirstOf<PolaroidMontage>() is { } m && m.Shown >= wantShots, 60, ct);
 		var mont = FirstOf<PolaroidMontage>();
-		Check("the credits play the pictures back as polaroids", want > 0 && mont != null && mont.Shown >= want, $"{mont?.Shown} shown of {PhotoLog.Instance?.RecordedCount}");
+		Check("the credits play the pictures back as polaroids", wantShots > 0 && mont != null && mont.Shown >= wantShots, $"{mont?.Shown} shown of {PhotoLog.Instance?.RecordedCount}");
 		await Seconds(1.5, ct);
 		Screenshot("credits_polaroids");
+	}
+
+	private static float UpperYOf(SkiLodge l) => SkiLodge.UpperY + 0.05f;
+
+	/// <summary>Walks to stand square in front of a drawer or cabinet (round through its bathroom's door if it's a
+	/// vanity drawer) and opens it.</summary>
+	private async Task SearchIt(SkiLodge lodge, ProjectDS.World.LodgeParts.Searchable sr, CancellationToken ct, bool leave = true)
+	{
+		float floorY = lodge.ToLocal(sr.GlobalPosition).Y > 3f ? SkiLodge.UpperY + 0.05f : 0.05f;
+		if (sr.Name.ToString().Contains("Vanity"))
+		{
+			var (outside, inside) = BathDoor(sr.Name.ToString());
+			await WalkTo(lodge.ToGlobal(outside with { Y = floorY }), 0.4f, ct, giveUp: 10f);
+			await WalkTo(lodge.ToGlobal(inside with { Y = floorY }), 0.4f, ct, giveUp: 10f);
+		}
+		Vector3 front = sr.Type == ProjectDS.World.LodgeParts.Searchable.Kind.Drawer ? new Vector3(0, 0, 1.0f) : new Vector3(0.55f, 0, 1.1f);
+		var stand = sr.GlobalPosition + sr.GlobalBasis * front;
+		stand.Y = lodge.ToGlobal(new Vector3(0, floorY, 0)).Y;
+		// straight in from further out, square to its front (round the furniture, not across it)
+		var approach = sr.GlobalPosition + sr.GlobalBasis * (front * 1.9f);
+		approach.Y = stand.Y;
+		await WalkTo(approach, 0.4f, ct, giveUp: 10f);
+		await WalkTo(stand, 0.35f, ct, giveUp: 10f);
+		// drawers stacked in a vanity sit close: if the aim caught its neighbour, that one's open now; try again
+		for (int tries = 0; tries < 3 && !sr.IsOpen; tries++) await UseIt(sr.Use, ct);
+		if (leave) { await Seconds(0.6, ct); await LeaveBath(lodge, sr, ct); }
+	}
+
+	private async Task LeaveBath(SkiLodge lodge, ProjectDS.World.LodgeParts.Searchable sr, CancellationToken ct)
+	{
+		if (!sr.Name.ToString().Contains("Vanity")) return;
+		var (outside, inside) = BathDoor(sr.Name.ToString());
+		await WalkTo(lodge.ToGlobal(inside with { Y = SkiLodge.UpperY + 0.05f }), 0.4f, ct, giveUp: 10f);
+		await WalkTo(lodge.ToGlobal(outside with { Y = SkiLodge.UpperY + 0.05f }), 0.4f, ct, giveUp: 10f);
+	}
+
+	/// <summary>A room's bathroom door: a point just outside it and one just inside (lodge-local).</summary>
+	private static (Vector3 outside, Vector3 inside) BathDoor(string name)
+	{
+		bool front = name.Contains("201") || name.Contains("202");
+		float x = name.Contains("201") || name.Contains("204") ? SkiLodge.CorrX0 + 2.7f : SkiLodge.RoomSplitX + 2.7f;
+		float z = front ? SkiLodge.CorrHalf + 1.65f : -SkiLodge.CorrHalf - 1.65f;
+		return (new Vector3(x + 0.8f, 0, z), new Vector3(x - 0.9f, 0, z));
+	}
+
+	/// <summary>Puts a note down (E), and makes sure it's gone.</summary>
+	private async Task PutDown(CancellationToken ct)
+	{
+		await Seconds(0.5, ct);
+		if (NoteOverlay.Instance is { IsOpen: true }) await Press(ct);
+		await Seconds(0.4, ct);
+		if (NoteOverlay.Instance is { IsOpen: true }) NoteOverlay.Instance.Close();
+		await Seconds(0.3, ct);
 	}
 
 

@@ -48,6 +48,12 @@ public enum Checkpoint
 	Act21Finished = 22,
 	/// <summary>Act 22's end: down the plowed road through the winter woods, round the ski lodge, its iced-in back door forced.</summary>
 	Act22Finished = 23,
+	/// <summary>Act 23: out of room 202 with the pantry key; its door slammed and jammed behind them.</summary>
+	Act23Room202Done = 24,
+	/// <summary>Act 23: out of rooms 203 and 204 with the dining room's key and 204's note; 203's door jammed too.</summary>
+	Act23Room203Done = 25,
+	/// <summary>Act 23: the dining hall's sixth sheet off, 201's keycard taken from the bowl of snow (and the snow gone to blood).</summary>
+	Act23Keycard201 = 26,
 }
 
 public class SaveData

@@ -49,6 +49,7 @@ public partial class CreaturePreview : Node3D
 	{
 		await Frames(10);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lodge") >= 0) { await LodgeShots(); GetTree().Quit(); return; }
 		// the crawler (Act 14), on a floor, walking a few metres so its gait shows
 		var floor = new StaticBody3D { Name = "Floor" };
 		floor.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(40, 1, 40) }, Position = new Vector3(0, -0.5f, 0) });
@@ -167,5 +168,39 @@ public partial class CreaturePreview : Node3D
 		await Shot("wendigo_back", new Vector3(-2.5f, 2.6f, 5f), new Vector3(0, 2.2f, 0));
 		await Shot("wendigo_head", new Vector3(0.7f, 3.3f, -2.2f), new Vector3(0, 3.2f, -0.7f));
 		await Shot("wendigo_far_dusk", new Vector3(2f, 1.7f, -22f), new Vector3(0, 2f, 0));
+	}
+
+	/// <summary>The ski lodge's interior (Act 23), standing alone: the lobby, the bar, the pantry, the corridor, the rooms, the dining hall.</summary>
+	private async Task LodgeShots()
+	{
+		env.BackgroundColor = new Color(0.3f, 0.32f, 0.36f);
+		env.AmbientLightColor = new Color(0.78f, 0.68f, 0.56f);
+		env.AmbientLightEnergy = 0.42f;
+		foreach (var c in GetChildren()) if (c is DirectionalLight3D d) d.LightEnergy = 0.15f;
+		var lodge = new World.SkiLodge { Name = "Lodge" };
+		AddChild(lodge);
+		await Seconds(2.0);
+		_cam.Fov = 75f;
+		await Shot("lodge_lobby_from_door", new Vector3(0, 1.7f, 8.8f), new Vector3(0, 2.5f, -6f));
+		await Shot("lodge_lobby_fireplace", new Vector3(-2f, 1.7f, 2f), new Vector3(8f, 2.5f, -4.6f));
+		await Shot("lodge_lobby_stairs", new Vector3(4f, 1.7f, 2f), new Vector3(-3f, 2.8f, -9f));
+		await Shot("lodge_lobby_from_balcony", new Vector3(-8.5f, 5.9f, -1.5f), new Vector3(6f, 3f, 0f));
+		await Shot("lodge_lobby_desk", new Vector3(0f, 1.7f, 3f), new Vector3(-5f, 1.5f, 8f));
+		await Shot("lodge_lobby_ceiling", new Vector3(0, 1.7f, 0), new Vector3(0.1f, 20f, 0.2f));
+		await Shot("lodge_bar", new Vector3(-10.8f, 1.7f, 4f), new Vector3(-22f, 1.4f, 4f));
+		await Shot("lodge_bar_counter", new Vector3(-15f, 1.6f, 6.8f), new Vector3(-19.4f, 1f, 2.5f));
+		await Shot("lodge_service_corridor", new Vector3(-31f, 1.6f, -0.7f), new Vector3(-22f, 1.4f, -0.7f));
+		await Shot("lodge_pantry", new Vector3(-9.3f, 1.6f, -6.4f), new Vector3(-22f, 1.2f, -6.4f));
+		await Shot("lodge_corridor", new Vector3(-12.2f, 5.9f, 0f), new Vector3(-28f, 5.5f, 0f));
+		await Shot("lodge_room202", new Vector3(-13.2f, 5.9f, 1.6f), new Vector3(-17f, 5f, 6.5f));
+		await Shot("lodge_room202_bath", new Vector3(-17f, 5.9f, 2.7f), new Vector3(-19.5f, 5f, 3.6f));
+		await Shot("lodge_room203", new Vector3(-13.2f, 5.9f, -1.6f), new Vector3(-15f, 5f, -7f));
+		await Shot("lodge_room203_hole", new Vector3(-17.8f, 5.9f, -2.4f), new Vector3(-21f, 5.2f, -2.4f));
+		await Shot("lodge_room204", new Vector3(-21f, 5.9f, -1.6f), new Vector3(-25f, 5f, -6f));
+		await Shot("lodge_dining", new Vector3(13.5f, 1.8f, 0f), new Vector3(40f, 1.5f, 0f));
+		await Shot("lodge_exterior_front", new Vector3(0f, 3f, 55f), new Vector3(0f, 10f, 0f));
+		await Shot("lodge_room204_hole", new Vector3(-24f, 5.9f, -3.5f), new Vector3(-19f, 5.2f, -2.4f));
+		await Shot("lodge_dining_tables", new Vector3(22f, 2.6f, 6.5f), new Vector3(27f, 0.8f, 0f));
+		await Shot("lodge_mudroom", new Vector3(-28f, 1.6f, -5.5f), new Vector3(-30f, 1.2f, -1.7f));
 	}
 }

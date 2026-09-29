@@ -384,6 +384,21 @@ public partial class Wendigo : Node3D
 		_head.AddChild(_breath);
 	}
 
+	/// <summary>Just the head (the dining hall's platter, Act 23): everything else hidden, the skull at the node's origin.
+	/// It still twitches.</summary>
+	public void ShowOnlyHead()
+	{
+		foreach (var c in _body.GetChildren()) if (c is Node3D n && n != _head) n.Visible = false;
+		_head.Position = Vector3.Zero;
+		_headRest = new Vector3(0.1f, 0f, 0.25f);
+		_head.Rotation = _headRest;
+		_headGoal = _headRest;
+		Visible = true;
+	}
+
+	/// <summary>The skull's mouth (for the blood).</summary>
+	public Vector3 MouthWorld => _head.ToGlobal(new Vector3(0, -0.2f, -0.42f));
+
 	// ------------------------------------------------------------------ life
 
 	/// <summary>Stand at <paramref name="ground"/> facing <paramref name="look"/>, visible.</summary>
