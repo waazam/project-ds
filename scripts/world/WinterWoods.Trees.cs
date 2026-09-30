@@ -4,38 +4,52 @@ using Godot;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Act 22's trees: the winter forest either side of the plowed road, thick right up to the windrows and on into
-/// the dark. Firs heavy with snow (the world's "winter" frost on them), grey dead snags, black bare broadleaves;
-/// toward the lodge they are caked in ice (a glassy glaze drawn over them) and hung with icicles. MultiMeshes in
-/// 96 m chunks that fade out past the murk, and a trunk collider for every tree the player could reach.
+/// Act 22's trees: the winter forest either side of the plowed road, thick right up to the windrows and on up the
+/// hills into the murk. Mostly bare broadleaves (the owner, 2026-09-30: trunks and branches, no leaves; see
+/// <see cref="WinterTreeKit"/>), a few firs heavy with snow, grey dead snags; toward the lodge they are caked in ice
+/// (the bare trees' own shader glazes them, per tree; the firs a glassy shell drawn over them, and hung with icicles).
+/// MultiMeshes in 96 m chunks, drawn only as far as the fog lets anything be seen, and a trunk collider for every tree
+/// the player could reach.
 /// </summary>
 public partial class WinterWoods
 {
 	public const float TreeChunk = 96f;
+	/// <summary>How far the trees are drawn: past the fog's end (nothing shows through it, so nothing pops in).</summary>
+	public const float TreeDrawRange = 82f;
 	/// <summary>Where the trees are (church-local xz) and how big: the wendigo leaps into them.</summary>
 	public static readonly List<(Vector2 at, float height, bool fir)> TreeSpots = new();
 
+	/// <summary>The kinds of tree, their share, height, crown radius (firs), crown start (firs); bare ones take the ice
+	/// from their instance's custom data, firs through an overlay.</summary>
+	public static List<(Mesh mesh, float weight, float h, float maxR, float crown, bool fir, bool bare)> WinterTreeKinds()
+	{
+		return new()
+		{
+			(WinterTreeKit.BareTree(501, 15f, 0), 1.5f, 15f, 4f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(502, 19f, 0), 1.3f, 19f, 5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(503, 12f, 1), 1.2f, 12f, 3.5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(504, 22f, 1), 1.0f, 22f, 5.5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(505, 16f, 1), 1.3f, 16f, 4f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(506, 9f, 0), 1.1f, 9f, 2.8f, 0.4f, false, true),
+			(ForestScatter.FirMesh(221, 22f, 0.38f, 0.3f, 11, 3.4f, 0.16f), 0.55f, 22f, 3.4f, 0.3f, true, false),
+			(ForestScatter.FirMesh(222, 16f, 0.3f, 0.26f, 9, 2.8f, 0.2f), 0.45f, 16f, 2.8f, 0.26f, true, false),
+			(ForestScatter.SnagMesh(224, 15f), 0.8f, 15f, 0.5f, 0.9f, false, false),
+		};
+	}
+
 	private void BuildTrees()
 	{
-		var kinds = new List<(Mesh mesh, float weight, float h, float maxR, float crown, bool fir)>
-		{
-			(ForestScatter.FirMesh(221, 22f, 0.38f, 0.3f, 11, 3.4f, 0.16f), 3f, 22f, 3.4f, 0.3f, true),
-			(ForestScatter.FirMesh(222, 16f, 0.3f, 0.26f, 9, 2.8f, 0.2f), 3f, 16f, 2.8f, 0.26f, true),
-			(ForestScatter.FirMesh(223, 28f, 0.46f, 0.38f, 12, 3.9f, 0.14f), 1.6f, 28f, 3.9f, 0.38f, true),
-			(ForestScatter.SnagMesh(224, 15f), 1.1f, 15f, 0.5f, 0.9f, false),
-			(WinterGlade.BareTreeMesh(225, 14f), 1.6f, 14f, 3f, 0.4f, false),
-			(WinterGlade.BareTreeMesh(226, 18f), 1.2f, 18f, 3.5f, 0.4f, false),
-		};
+		var kinds = WinterTreeKinds();
 		float total = 0; foreach (var k in kinds) total += k.weight;
-		// per chunk: per kind, the plain trees and the iced ones; icicles; trunks
-		var chunks = new Dictionary<Vector2I, (List<Transform3D>[] plain, List<Transform3D>[] iced, List<Transform3D> icicles, List<Vector3> trunks)>();
-		(List<Transform3D>[] plain, List<Transform3D>[] iced, List<Transform3D> icicles, List<Vector3> trunks) ChunkAt(Vector2 p)
+		// per chunk: per kind, the trees (and their ice, 0..1); icicles; trunks
+		var chunks = new Dictionary<Vector2I, (List<(Transform3D xf, float ice)>[] trees, List<Transform3D> icicles, List<Vector3> trunks)>();
+		(List<(Transform3D xf, float ice)>[] trees, List<Transform3D> icicles, List<Vector3> trunks) ChunkAt(Vector2 p)
 		{
 			var key = new Vector2I(Mathf.FloorToInt(p.X / TreeChunk), Mathf.FloorToInt(p.Y / TreeChunk));
 			if (!chunks.TryGetValue(key, out var c))
 			{
-				c = (new List<Transform3D>[kinds.Count], new List<Transform3D>[kinds.Count], new List<Transform3D>(), new List<Vector3>());
-				for (int i = 0; i < kinds.Count; i++) { c.plain[i] = new List<Transform3D>(); c.iced[i] = new List<Transform3D>(); }
+				c = (new List<(Transform3D, float)>[kinds.Count], new List<Transform3D>(), new List<Vector3>());
+				for (int i = 0; i < kinds.Count; i++) c.trees[i] = new List<(Transform3D, float)>();
 				chunks[key] = c;
 			}
 			return c;
@@ -61,7 +75,7 @@ public partial class WinterWoods
 					if (new Vector2(p.X - WinterGlade.Centre.X, p.Y - WinterGlade.Centre.Y).Length() < WinterGlade.Radius - 10f) continue;   // the clearing's own
 					if (SkiLodge.NearLodge(p.X, p.Y, 62f) && Mathf.Abs(p.X - lodge.X) < SkiLodge.WingX1 + 14f && p.Y > lodge.Z - SkiLodge.WingHalfZ - 16f) continue;
 					if (Mathf.Abs(p.X - lodge.X) < SkiLodge.WingX1 + 8f && p.Y > lodge.Z - SkiLodge.WingHalfZ - 12f && p.Y < lodge.Z + SkiLodge.Apothem + 26f) continue;
-					float keep = d < 8f ? 0f : d < 12f ? 0.35f : d < 60f ? 0.85f : 0.55f;
+					float keep = d < 8f ? 0f : d < 12f ? 0.4f : d < 70f ? 0.9f : 0.6f;
 					if (rng.Randf() > keep || NearProp(p, 5f)) continue;
 					float pick = rng.RandfRange(0, total);
 					int kind = 0;
@@ -71,11 +85,12 @@ public partial class WinterWoods
 					var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * sc);
 					var at = new Vector3(p.X, Height(p.X, p.Y) - 0.1f, p.Y);
 					var ch = ChunkAt(p);
-					bool iced = rng.Randf() < FrozenAt(s) * 0.95f;
-					(iced ? ch.iced : ch.plain)[kind].Add(new Transform3D(basis, at));
+					float frozen = FrozenAt(s);
+					float ice = kinds[kind].bare ? Mathf.Clamp(frozen * rng.RandfRange(0.75f, 1.15f), 0f, 1f) : (rng.Randf() < frozen * 0.95f ? 1f : 0f);
+					ch.trees[kind].Add((new Transform3D(basis, at), ice));
 					if (d < 80f) ch.trunks.Add(at);
 					TreeSpots.Add((p, kinds[kind].h * sc, kinds[kind].fir));
-					if (iced && kinds[kind].fir)
+					if (ice > 0.5f && kinds[kind].fir)
 					{
 						// icicles under the tiers' edges
 						float H = kinds[kind].h * sc, R = kinds[kind].maxR * sc, cs = kinds[kind].crown;
@@ -98,14 +113,17 @@ public partial class WinterWoods
 			AddChild(holder);
 			for (int k = 0; k < kinds.Count; k++)
 			{
-				AddTrees(holder, kinds[k].mesh, c.plain[k], $"K{k}", null);
-				AddTrees(holder, kinds[k].mesh, c.iced[k], $"K{k}Ice", IceOverlay);
+				if (kinds[k].bare) { AddTrees(holder, kinds[k].mesh, c.trees[k], $"K{k}", null); continue; }
+				var plain = new List<(Transform3D, float)>(); var iced = new List<(Transform3D, float)>();
+				foreach (var t in c.trees[k]) (t.ice > 0.5f ? iced : plain).Add(t);
+				AddTrees(holder, kinds[k].mesh, plain, $"K{k}", null);
+				AddTrees(holder, kinds[k].mesh, iced, $"K{k}Ice", IceOverlay);
 			}
 			if (c.icicles.Count > 0)
 			{
 				var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = IcicleMesh, InstanceCount = c.icicles.Count };
 				for (int j = 0; j < c.icicles.Count; j++) mm.SetInstanceTransform(j, c.icicles[j]);
-				holder.AddChild(new MultiMeshInstance3D { Name = "Icicles", Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, VisibilityRangeEnd = 90f, VisibilityRangeEndMargin = 10f });
+				holder.AddChild(new MultiMeshInstance3D { Name = "Icicles", Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, VisibilityRangeEnd = 60f, VisibilityRangeEndMargin = 8f });
 			}
 			if (c.trunks.Count > 0)
 			{
@@ -121,15 +139,19 @@ public partial class WinterWoods
 	private static CylinderShape3D _trunk;
 	private static CylinderShape3D TrunkShape => _trunk ??= new CylinderShape3D { Radius = 0.42f, Height = 4.6f };
 
-	private static void AddTrees(Node3D holder, Mesh mesh, List<Transform3D> list, string name, Material overlay)
+	private static void AddTrees(Node3D holder, Mesh mesh, List<(Transform3D xf, float ice)> list, string name, Material overlay)
 	{
 		if (list.Count == 0) return;
-		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh, InstanceCount = list.Count };
-		for (int i = 0; i < list.Count; i++) mm.SetInstanceTransform(i, list[i]);
+		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = mesh, InstanceCount = list.Count };
+		for (int i = 0; i < list.Count; i++)
+		{
+			mm.SetInstanceTransform(i, list[i].xf);
+			mm.SetInstanceCustomData(i, new Color(list[i].ice, 0, 0, 0));
+		}
 		holder.AddChild(new MultiMeshInstance3D
 		{
 			Name = name, Multimesh = mm, MaterialOverlay = overlay,
-			VisibilityRangeEnd = 175f, VisibilityRangeEndMargin = 15f,
+			VisibilityRangeEnd = TreeDrawRange, VisibilityRangeEndMargin = 6f,
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
 	}
@@ -151,8 +173,8 @@ public partial class WinterWoods
 	/// it), so the bark and the needles show through dulled and glazed.</summary>
 	public static StandardMaterial3D IceOverlay => _iceOverlay ??= new StandardMaterial3D
 	{
-		ResourceName = "ice_overlay", AlbedoColor = new Color(0.62f, 0.74f, 0.88f, 0.42f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-		Roughness = 0.1f, MetallicSpecular = 0.8f, Grow = true, GrowAmount = 0.035f,
+		ResourceName = "ice_overlay", AlbedoColor = new Color(0.6f, 0.7f, 0.84f, 0.34f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+		Roughness = 0.35f, MetallicSpecular = 0.5f, Grow = true, GrowAmount = 0.035f,
 	};
 
 	/// <summary>An icicle: a thin tapering cone 1 m long (scaled per instance), a few faces.</summary>

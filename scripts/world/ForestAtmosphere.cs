@@ -167,13 +167,21 @@ public partial class ForestAtmosphere : Node
 	[Export] public float LodgeFogDensity = 0.004f;
 	[Export] public Color LodgeAmbientColor = new(0.78f, 0.68f, 0.56f);
 	[Export] public float LodgeAmbient = 0.42f;
-	// (now the woods' early morning: a dim lilac murk under the pink sky, the trees dark against it)
-	[Export] public Color DuskFogColor = new(0.27f, 0.21f, 0.3f);
+	// (2026-09-30, the owner: dark, the lantern needed, seen only so far round it; and past that not black but a
+	// whitish haze. Before first light: little ambient, the sun a faint glow, and a pale depth fog that lets the near
+	// dark alone and closes in white-grey at forty-odd metres, the trees going into it as silhouettes; held a step
+	// under white so it never glares)
+	[Export] public Color DuskFogColor = new(0.35f, 0.35f, 0.4f);
 	[Export] public float DuskFogDensity = 0.02f;
-	[Export] public Color DuskAmbientColor = new(0.56f, 0.48f, 0.66f);
-	[Export] public float DuskAmbientScale = 0.85f;
-	[Export] public Color FrostFogColor = new(0.24f, 0.22f, 0.34f);
+	[Export] public Color DuskAmbientColor = new(0.4f, 0.47f, 0.64f);
+	[Export] public float DuskAmbient = 0.2f;
+	[Export] public float DuskSunScale = 0.1f;
+	[Export] public float DuskFogBegin = 4.5f;
+	[Export] public float DuskFogEnd = 46f;
+	[Export] public float DuskFogCurve = 0.9f;
+	[Export] public Color FrostFogColor = new(0.33f, 0.36f, 0.43f);
 	[Export] public float FrostFogDensity = 0.015f;
+	[Export] public float FrostFogEnd = 58f;
 	/// <summary>Inside the church (0..1): a dark, thin, smoky haze and little ambient light, so the candles,
 	/// the stained glass and the lantern do the lighting (the owner: the white glare hurt; more gothic).</summary>
 	public float Interior { get; set; }
@@ -597,8 +605,8 @@ public partial class ForestAtmosphere : Node
 			fog = fog.Lerp(DuskFogColor.Lerp(FrostFogColor, frost), dusk);
 			density = Mathf.Lerp(density, Mathf.Lerp(DuskFogDensity, FrostFogDensity, frost), dusk);
 			ambColor = ambColor.Lerp(DuskAmbientColor, dusk);
-			ambient *= Mathf.Lerp(1f, DuskAmbientScale, dusk);
-			sunEnergy *= 1f - 0.25f * dusk;
+			ambient = Mathf.Lerp(ambient, DuskAmbient, dusk);
+			sunEnergy *= Mathf.Lerp(1f, DuskSunScale, dusk);
 		}
 		float lodge = Mathf.Clamp(Lodge, 0f, 1f);
 		if (lodge > 0f)
@@ -631,25 +639,40 @@ public partial class ForestAtmosphere : Node
 		// Act 22's dusk: the fog swallows the sky's warm glow too (a low snow sky, not a sunset)
 		// (the woods' morning: the fog lies over the sky's horizon but leaves its pink showing above)
 		_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 0.45f, Mathf.Clamp(Mathf.Max(Winter, WinterDusk), 0f, 1f));
-		if (_act1On)
+		float woods = dusk * (1f - lodge) * (1f - inside) * (1f - under);
+		if (_act1On || woods > 0.01f)
 		{
 			// Act 1: depth fog closing in round them as they walk toward the fallen tree (the level's
-			// own fog settings are kept, and put back the moment Act 1's fog is over)
+			// own fog settings are kept, and put back the moment Act 1's fog is over); and Act 22's woods
 			if (!_act1Applied)
 			{
 				_act1Applied = true;
 				_levelFogMode = _env.FogMode;
 				_levelDepthBegin = _env.FogDepthBegin; _levelDepthEnd = _env.FogDepthEnd; _levelDepthCurve = _env.FogDepthCurve;
 			}
-			float f = Mathf.Clamp(_act1, 0f, 1f);
-			float e = f * f * (3f - 2f * f);
 			_env.FogMode = Environment.FogModeEnum.Depth;
-			_env.FogDepthBegin = Mathf.Lerp(Act1FarBegin, Act1NearBegin, e);
-			_env.FogDepthEnd = Mathf.Lerp(Act1FarEnd, Act1NearEnd, Mathf.Sqrt(e));
-			_env.FogDepthCurve = Mathf.Lerp(1.4f, 0.75f, e);
-			_env.FogDensity = Mathf.Lerp(0.35f, 1f, e);
-			_env.FogLightColor = fog.Lerp(Act1FogColor, e);
-			_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 1f, e);
+			if (_act1On)
+			{
+				float f = Mathf.Clamp(_act1, 0f, 1f);
+				float e = f * f * (3f - 2f * f);
+				_env.FogDepthBegin = Mathf.Lerp(Act1FarBegin, Act1NearBegin, e);
+				_env.FogDepthEnd = Mathf.Lerp(Act1FarEnd, Act1NearEnd, Mathf.Sqrt(e));
+				_env.FogDepthCurve = Mathf.Lerp(1.4f, 0.75f, e);
+				_env.FogDensity = Mathf.Lerp(0.35f, 1f, e);
+				_env.FogLightColor = fog.Lerp(Act1FogColor, e);
+				_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 1f, e);
+			}
+			else
+			{
+				// the woods: clear dark close in, the pale haze from forty-odd metres (a little further, colder, near the lodge)
+				float e = woods * woods * (3f - 2f * woods);
+				float frost = Mathf.Clamp(Frost, 0f, 1f);
+				_env.FogDepthBegin = Mathf.Lerp(120f, DuskFogBegin, e);
+				_env.FogDepthEnd = Mathf.Lerp(400f, Mathf.Lerp(DuskFogEnd, FrostFogEnd, frost), e);
+				_env.FogDepthCurve = DuskFogCurve;
+				_env.FogDensity = Mathf.Lerp(0.2f, 1f, e);
+				_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 1f, e);
+			}
 		}
 		else if (_act1Applied)
 		{

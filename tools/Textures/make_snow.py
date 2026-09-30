@@ -7,6 +7,9 @@ blue-grey so a field of snow never glares (the owner finds bright white scenes p
 - packed: the frozen, glazed crust near the lodge  (snow_floor)
 
     python tools/Textures/make_snow.py
+
+(2026-09-30: superseded for the snow, the packed crust and the plowed road by make_winter_forest.py, from the owner's
+own snow sets; run that after this one if this is ever run again.)
 """
 import subprocess, os
 import numpy as np

@@ -68,18 +68,9 @@ public partial class WinterGlade : Node3D
 
 	private void BuildTrees()
 	{
-		var kinds = new List<(Mesh mesh, float weight, float scale)>
-		{
-			(ForestScatter.FirMesh(71, 24f, 0.4f, 0.34f, 12, 3.6f, 0.14f), 3f, 1f),
-			(ForestScatter.FirMesh(72, 17f, 0.3f, 0.26f, 10, 2.9f, 0.18f), 3f, 1f),
-			(ForestScatter.FirMesh(73, 30f, 0.48f, 0.4f, 13, 4.1f, 0.12f), 1.5f, 1f),
-			(ForestScatter.SnagMesh(74, 14f), 1.2f, 1f),
-			(ForestScatter.SnagMesh(75, 20f), 0.8f, 1f),
-			(BareTreeMesh(76, 13f), 1.8f, 1f),
-			(BareTreeMesh(77, 17f), 1.4f, 1f),
-			(BareTreeMesh(78, 10f), 1.2f, 1f),
-		};
-		float total = 0; foreach (var (_, w, _) in kinds) total += w;
+		// (Act 22's own mix: mostly bare broadleaves, a few firs and snags)
+		var kinds = WinterWoods.WinterTreeKinds();
+		float total = 0; foreach (var k in kinds) total += k.weight;
 		var byKind = new List<Transform3D>[kinds.Count];
 		for (int i = 0; i < kinds.Count; i++) byKind[i] = new List<Transform3D>();
 		var placed = new List<Vector2>();
@@ -99,58 +90,20 @@ public partial class WinterGlade : Node3D
 			float s = _rng.RandfRange(0.8f, 1.2f);
 			var basis = new Basis(Vector3.Up, _rng.RandfRange(0, Mathf.Tau)).Scaled(Vector3.One * s);
 			byKind[kind].Add(new Transform3D(basis, new Vector3(p.X, HeightAt(p.X, p.Y) - 0.1f, p.Y)));
-			WinterWoods.TreeSpots.Add((p, 16f * s, kind < 3));   // the wendigo leaps into these too
+			WinterWoods.TreeSpots.Add((p, kinds[kind].h * s, kinds[kind].fir));   // the wendigo leaps into these too
 		}
 		for (int i = 0; i < kinds.Count; i++)
 		{
 			if (byKind[i].Count == 0) continue;
-			var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = kinds[i].mesh, InstanceCount = byKind[i].Count };
-			for (int j = 0; j < byKind[i].Count; j++) mm.SetInstanceTransform(j, byKind[i][j]);
-			AddChild(new MultiMeshInstance3D { Name = $"Trees{i}", Multimesh = mm });
+			var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = kinds[i].mesh, InstanceCount = byKind[i].Count };
+			for (int j = 0; j < byKind[i].Count; j++) { mm.SetInstanceTransform(j, byKind[i][j]); mm.SetInstanceCustomData(j, new Color(0, 0, 0, 0)); }
+			AddChild(new MultiMeshInstance3D { Name = $"Trees{i}", Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 			Trees += byKind[i].Count;
 		}
 	}
 
-	/// <summary>A leafless broadleaf: a trunk that forks, forks again, and again, into a fine black crown of
-	/// twigs (the owner: trees with no leaves, just branches). The winter frost lays snow along the tops of
-	/// the limbs.</summary>
-	public static Mesh BareTreeMesh(int seed, float height)
-	{
-		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 6007) };
-		var k = new MeshKit();
-		k.Mat(ProcTextures.TreeBarkMat);
-		k.Color = new Color(0.55f, 0.53f, 0.52f);
-		float trunkR = 0.14f + height * 0.018f;
-		Vector3 fork = new(rng.RandfRange(-0.4f, 0.4f), height * rng.RandfRange(0.32f, 0.42f), rng.RandfRange(-0.4f, 0.4f));
-		ForestScatter.TrunkLoft(k, new List<(Vector3, float, Color)>
-		{
-			(new Vector3(0, -0.4f, 0), trunkR * 1.5f, k.Color), (new Vector3(0, 0.1f, 0), trunkR * 1.2f, k.Color),
-			(fork * 0.5f, trunkR * 1.02f, k.Color), (fork, trunkR * 0.9f, k.Color),
-		}, 8, 1f);
-		void Branch(Vector3 from, Vector3 dir, float len, float r, int depth)
-		{
-			Vector3 to = from + dir * len;
-			k.Cylinder(from, to, r, r * 0.68f, depth > 1 ? 6 : 4, false, 1f);
-			if (depth == 0 || r < 0.012f) return;
-			int n = depth > 2 ? 3 : 2 + (rng.Randf() < 0.5f ? 1 : 0);
-			for (int i = 0; i < n; i++)
-			{
-				float spread = rng.RandfRange(0.35f, 0.75f);
-				float a = rng.RandfRange(0, Mathf.Tau);
-				Vector3 side = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
-				Vector3 d = (dir + side * spread + Vector3.Up * rng.RandfRange(0.05f, 0.35f)).Normalized();
-				Branch(to, d, len * rng.RandfRange(0.62f, 0.8f), r * 0.68f, depth - 1);
-			}
-		}
-		int limbs = 3 + rng.RandiRange(0, 1);
-		for (int i = 0; i < limbs; i++)
-		{
-			float a = Mathf.Tau * i / limbs + rng.RandfRange(-0.3f, 0.3f);
-			Vector3 d = new Vector3(Mathf.Cos(a) * 0.55f, 1f, Mathf.Sin(a) * 0.55f).Normalized();
-			Branch(fork, d, height * 0.28f, trunkR * 0.75f, 4);
-		}
-		return k.Commit();
-	}
+	/// <summary>A leafless broadleaf (now <see cref="WinterTreeKit"/>'s).</summary>
+	public static Mesh BareTreeMesh(int seed, float height) => WinterTreeKit.BareTree(seed, height, seed % 2);
 
 	/// <summary>Snow falling round the church in four great sheets, one to each side, never over its roof.</summary>
 	private void BuildSnowfall()

@@ -117,8 +117,9 @@ public partial class WinterWoods
 		Nearest(pl.X, pl.Z, out float s, out _);
 		if (Appearances == 0)
 		{
-			// ahead down the road, standing in the middle of it, at the edge of the murk
-			var at = RoadAt(Mathf.Min(s + 36f, Length - 60f), out _);
+			// ahead down the road, standing in the middle of it, at the edge of the murk (in the pale haze now: a dark
+			// shape in it, 24 m off)
+			var at = RoadAt(Mathf.Min(s + 24f, Length - 60f), out _);
 			var world = ToGlobal(at);
 			if (Seen(cam, world + Vector3.Up * 2.4f, 50f)) { _nextAppear = _stalkClock + 2; return false; }   // wait until they're not looking that way
 			Place(world, player.GlobalPosition);

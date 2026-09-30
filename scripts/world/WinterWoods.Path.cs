@@ -12,14 +12,18 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class WinterWoods
 {
-	/// <summary>The road's bends (church-local x, z): out of the great door (z = 0, facing -Z) and away.
-	/// Bends are kept wide (radius 40 m or more) so the road's cross-section never folds.</summary>
+	/// <summary>The road's bends (church-local x, z): out of the great door (z = 0, facing -Z) and away, snaking
+	/// left and right round the hills every hundred metres or so (the owner, 2026-09-30: never a straight line to the
+	/// lodge; a bend and a rise hide what's ahead, the trees included). The tightest bend is 23 m in radius, still
+	/// wider than the ribbon's half (so its cross-sections never fold), and no two legs of it come within 90 m.</summary>
 	private static readonly Vector2[] Ctrl =
 	{
-		new(0f, -1.2f), new(0f, -24f), new(-8f, -60f), new(-4f, -105f), new(22f, -150f), new(48f, -205f), new(40f, -265f),
-		new(4f, -320f), new(-30f, -380f), new(-38f, -445f), new(-8f, -505f), new(36f, -560f), new(58f, -630f),
-		new(40f, -700f), new(-2f, -755f), new(-22f, -820f), new(-6f, -885f), new(34f, -935f), new(66f, -1000f),
-		new(62f, -1070f), new(36f, -1125f), new(22f, -1180f), new(22f, -1225f),
+		new(0f, -1.2f), new(0f, -22f), new(-10f, -52f), new(-34f, -78f), new(-50f, -112f), new(-40f, -150f), new(-6f, -170f),
+		new(30f, -192f), new(46f, -228f), new(30f, -262f), new(-4f, -280f), new(-36f, -306f), new(-46f, -344f), new(-26f, -378f),
+		new(10f, -398f), new(42f, -424f), new(50f, -462f), new(28f, -494f), new(-8f, -512f), new(-40f, -540f), new(-48f, -580f),
+		new(-24f, -612f), new(12f, -630f), new(42f, -660f), new(48f, -700f), new(22f, -730f), new(-14f, -748f), new(-42f, -778f),
+		new(-44f, -818f), new(-16f, -848f), new(22f, -866f), new(46f, -898f), new(40f, -940f), new(10f, -966f), new(-8f, -1000f),
+		new(-4f, -1040f), new(4f, -1070f), new(4f, -1100f),
 	};
 	public const float Step = 1.5f, RoadHalf = 3.4f, BermPeak = 4.6f, BermHalf = 5.0f, DeepSnow = 6.8f, BlendOut = 12.5f, RibbonHalf = 14.5f;
 	public const float RegionHalf = 125f;
@@ -104,7 +108,7 @@ public partial class WinterWoods
 	}
 
 	/// <summary>The rolling snow before any road is cut through it: flat round the church, low drifts in the
-	/// clearing, then long slow hills through the woods.</summary>
+	/// clearing, then long slow swells the road rises and falls over.</summary>
 	public static float BaseHeight(float x, float z)
 	{
 		float d = WinterGlade.OutsideChurch(x, z);
@@ -112,6 +116,23 @@ public partial class WinterWoods
 		float n = Mathf.Sin(x * 0.045f + 1.3f) * Mathf.Cos(z * 0.038f - 0.7f) * 2.2f + Mathf.Sin(x * 0.11f + z * 0.07f) * 0.7f;
 		float hills = Mathf.Sin(x * 0.011f + 0.4f) * Mathf.Cos(z * 0.0085f + 1.1f) * 6f + Mathf.Sin(z * 0.004f) * 4f;
 		return WinterGlade.GroundY + swell * (n + 1.2f) + Mathf.SmoothStep(30f, 140f, d) * hills;
+	}
+
+	/// <summary>The hills the road winds between (metres above the rolling snow), church-local: the ground climbs away
+	/// from the road on both sides, highest between its legs (a ridge inside every bend, so a bend hides what's round
+	/// it), knolls and hollows on the slopes; flat in the church's clearing and on the lodge's shelf.</summary>
+	public static float Hills(float x, float z, float d)
+	{
+		float away = Mathf.SmoothStep(9f, 52f, d);
+		if (away <= 0f) return 0f;
+		// how high they get here: a slow field, 6-17 m
+		float tall = 11.5f + Mathf.Sin(x * 0.019f + 0.6f) * Mathf.Cos(z * 0.014f - 1.2f) * 4f + Mathf.Sin((x + z) * 0.008f) * 1.5f;
+		// knolls and hollows on the slopes
+		float knolls = Mathf.Sin(x * 0.083f + 1.7f) * Mathf.Cos(z * 0.071f + 0.3f) * 2.4f + Mathf.Sin(x * 0.17f - z * 0.13f) * 0.8f;
+		float h = tall * away + knolls * Mathf.SmoothStep(12f, 32f, d);
+		// none right round the church (its yard stays level; the hills rise from 40 m out)
+		h *= Mathf.SmoothStep(30f, 90f, WinterGlade.OutsideChurch(x, z));
+		return h;
 	}
 
 	/// <summary>The nearest point of the road: its distance, the arc length there, and which side (+1 right of the
@@ -180,7 +201,7 @@ public partial class WinterWoods
 		else
 		{
 			float roadSide = RoadY(s) + Profile(DeepSnow);
-			h = Mathf.Lerp(roadSide, basey, Mathf.SmoothStep(DeepSnow, BlendOut + 6f, d));
+			h = Mathf.Lerp(roadSide, basey, Mathf.SmoothStep(DeepSnow, BlendOut + 6f, d)) + Hills(x, z, d);
 		}
 		return Flats(x, z, h);
 	}

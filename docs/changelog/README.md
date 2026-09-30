@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-30 — Act 22's winter forest overhauled: the road snakes through hills, dark with the lantern and a pale haze past it, bare winter trees with fine twigs and snow on their limbs, the owner's snow textures and Poly Haven bark](2026-09-30-act22-winter-forest.md)
 - [2026-09-29c — Act 23 finished: Room 201's welcome letter, the wall-cavity crawlspace and the wendigo's arm through the boards, the lodge frozen over, the front doors and the leap; tablecloth glitching fixed; light switches; the lodge optimized; Act 15's failing centre lights](2026-09-29c-act23-finale.md)
 - [2026-09-29b — Crouching (C / left Ctrl, a toggle), and the dining hall's sheets and table collapse smoothed](2026-09-29b-crouch-and-the-sheets.md)
 - [2026-09-29a — Act 23 hard check: a clipping/UV audit with a new pierce-through check (doubled tables, wing roofs in the lobby, a post through the desk, the chimney), Poly Haven surfaces for the lodge and the church](2026-09-29a-act23-hard-check.md)

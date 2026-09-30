@@ -163,8 +163,8 @@ public partial class WinterWoods : Node3D
 			}
 		if (faces.Count == 0) return;
 		var mi = k.CommitTo(this, $"Ground_{Chunks}", false);
-		mi.VisibilityRangeEnd = 320f;
-		mi.VisibilityRangeEndMargin = 20f;
+		mi.VisibilityRangeEnd = 170f;   // (the fog is solid by 60 m: nothing further shows)
+		mi.VisibilityRangeEndMargin = 10f;
 		var body = new StaticBody3D { Name = $"GroundBody_{Chunks}", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "snow");
 		var shape = new ConcavePolygonShape3D { BackfaceCollision = true };
@@ -235,7 +235,7 @@ public partial class WinterWoods : Node3D
 				prev = row; prevC = rc;
 			}
 			var mi = k.CommitTo(this, $"Road_{start / segs}", false);
-			mi.VisibilityRangeEnd = 300f;
+			mi.VisibilityRangeEnd = 170f;
 			var body = new StaticBody3D { Name = $"RoadBody_{start / segs}", CollisionLayer = 1, CollisionMask = 0 };
 			body.SetMeta("surface", "snow");
 			var shape = new ConcavePolygonShape3D { BackfaceCollision = true };
@@ -270,8 +270,10 @@ public partial class WinterWoods : Node3D
 		var flake = new QuadMesh { Size = new Vector2(0.045f, 0.045f) };
 		flake.Material = new StandardMaterial3D
 		{
-			AlbedoColor = new Color(0.82f, 0.85f, 0.92f, 0.8f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			// lit (in the dark the flakes show in the lantern's light, faint past it; unshaded they were a static of white dots)
+			AlbedoColor = new Color(0.82f, 0.85f, 0.92f, 0.8f), ShadingMode = BaseMaterial3D.ShadingModeEnum.PerVertex, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+			EmissionEnabled = true, Emission = new Color(0.2f, 0.2f, 0.23f),
 		};
 		// soft snow round the player (world space: the flakes don't follow them, only the cloud they fall from)
 		_snowfall = new GpuParticles3D

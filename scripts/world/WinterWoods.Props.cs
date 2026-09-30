@@ -14,8 +14,8 @@ public partial class WinterWoods
 	/// <summary>Where each thing stands along the road (arc length m, side, metres out).</summary>
 	public static readonly (string id, float s, float side, float d)[] PropSpots =
 	{
-		("snowman", 150f, 1f, 7.2f), ("plow", 330f, -1f, 6.2f), ("antler_tree", 480f, 1f, 9.5f), ("ski_tracks", 610f, -1f, 6.5f),
-		("clothes", 735f, 1f, 6.9f), ("frozen_deer", 905f, -1f, 6.4f), ("lodge_sign", 1150f, 1f, 5.8f),
+		("snowman", 150f, 1f, 7.2f), ("plow", 340f, -1f, 6.2f), ("antler_tree", 520f, 1f, 9.5f), ("ski_tracks", 700f, -1f, 6.5f),
+		("clothes", 880f, 1f, 6.9f), ("frozen_deer", 1090f, -1f, 6.4f), ("lodge_sign", 1370f, 1f, 5.8f),
 	};
 	public readonly Dictionary<string, Node3D> Props = new();
 
@@ -166,7 +166,7 @@ public partial class WinterWoods
 	{
 		var k = new MeshKit();
 		var tree = WinterGlade.BareTreeMesh(481, 12f);
-		n.AddChild(new MeshInstance3D { Name = "Tree", Mesh = tree });
+		n.AddChild(WinterTreeKit.Single(tree, "Tree"));
 		var rng = new RandomNumberGenerator { Seed = 4811 };
 		k.Mat(Bone);
 		k.Color = Colors.White;
