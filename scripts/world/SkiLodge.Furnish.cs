@@ -15,6 +15,8 @@ public partial class SkiLodge
 {
 	/// <summary>The things to search, by place (the story puts the finds in them).</summary>
 	public readonly List<Searchable> Search202 = new(), SearchPantry = new(), Search204 = new();
+	/// <summary>The rooms' light switches (by their doors) and their bathrooms' (Act 23: all off to begin with).</summary>
+	public readonly Dictionary<int, LightSwitch> RoomSwitches = new(), BathSwitches = new();
 	public Node3D BarCardSpot { get; private set; }
 	public Node3D Mop { get; private set; }
 	public Node3D SillSpot203 { get; private set; }
@@ -133,28 +135,8 @@ public partial class SkiLodge
 		SignKit.Text(this, "RECEPTION", new Vector3(4.3f, 2.95f, HexIn - 0.26f), new Basis(Vector3.Up, Mathf.Pi), 0.11f, new Color(0.75f, 0.58f, 0.3f), shadow: false);
 		foreach (var (num, x) in new[] { ("201", 5.35f), ("202", 5.0f), ("203", 4.65f), ("204", 4.3f) })
 			SignKit.Text(this, num, new Vector3(x, 2.72f, HexIn - 0.245f), new Basis(Vector3.Up, Mathf.Pi), 0.04f, new Color(0.8f, 0.7f, 0.45f), shadow: false);
-		// ---- the front doors, from inside: two tall leaves, chained through their handles, a padlock on this side
-		Vector3 dc = new(0, 1.55f, HexIn - 0.03f);
-		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Box(dc, new Vector3(2.6f, 3.1f, 0.06f), 1f);
-		k.Mat(LodgeTextures.IronMat);
-		k.Box(dc + new Vector3(0, 0, -0.035f), new Vector3(0.04f, 3.1f, 0.02f), 1f);
-		for (int i = 0; i < 11; i++)
-		{
-			float u = (i - 5) / 5f;
-			Vector3 p = dc + new Vector3(u * 0.45f, 0.05f - Mathf.Cos(u * 1.2f) * 0.1f + 0.1f, -0.09f);
-			k.Cylinder(p - new Vector3(0.035f, 0, 0), p + new Vector3(0.035f, 0, 0), 0.02f, 0.02f, 4, true);
-		}
-		k.Box(dc + new Vector3(0.05f, -0.15f, -0.11f), new Vector3(0.12f, 0.15f, 0.05f), 1f);
-		k.Mat(LodgeTextures.BrassMat);
-		foreach (float x in new[] { -0.2f, 0.2f }) k.Cylinder(dc + new Vector3(x, 0.05f, -0.03f), dc + new Vector3(x, 0.05f, -0.12f), 0.035f, 0.035f, 6, true);
-		FrontInsideUse = new PickupInteractable
-		{
-			Name = "FrontInsideUse", PickRadius = 1.2f, MaxDistance = 2.8f, Position = dc + new Vector3(0, 0, -0.3f),
-			PromptFor = _ => "Chained shut. The padlock's on this side, and there's no key.", CanUse = _ => true,
-		};
-		FrontInsideUse.Interacted += _ => Audio.AudioDirector.OneShot(this, "haunt_chain", 2, ToGlobal(dc), -8f);
-		AddChild(FrontInsideUse);
+		// ---- the front doors, from inside (their own nodes: they're pushed, and then they're gone: SkiLodge.Finale.cs)
+		BuildFrontDoorsInside();
 		// ---- the chandelier: iron and antler, three rings of candle bulbs, hanging over the middle of it all
 		var bulbs = LodgeKit.Chandelier(k, new Vector3(0, 18f, 0), 8.2f, 2.8f, 14, Bulb);
 		Light(new Vector3(0, 8.8f, 0), Warm, 2.4f, 18f, "Chandelier");
@@ -422,8 +404,13 @@ public partial class SkiLodge
 		var k = new MeshKit();
 		k.Color = Colors.White;
 		var face = new Basis(Vector3.Up, front ? Mathf.Pi : 0f);   // furniture 'forward' (-Z) toward the corridor side... turned to face into the room
-		float cx = (x0 + x1) * 0.5f + 1.2f;
+		// (1.2 left only a body's width between the bed and the sofa: a squeeze to the window; 204 has no sofa, but its
+		// closet, whose door swung open into a pocket between the bed and the window a body could be shut in)
+		float cx = (x0 + x1) * 0.5f + (num == 204 ? -0.2f : 1.0f);
 		bool wrecked = num == 203;
+		// the room's lights, on its switch (off: the lodge was shut down for the holidays; 201 excepted, its own)
+		var roomLights = new List<Light3D>();
+		var shade = LodgeTextures.Glow($"lodge_shade_{num}", new Color(0.95f, 0.78f, 0.52f), 0.9f);
 		// the bed, its head against the outer wall
 		var bedAt = new Vector3(cx, y, zOut - s * 1.15f);
 		LodgeKit.Bed(k, bedAt, front ? 0f : Mathf.Pi, LodgeTextures.VelvetVioletMat, LodgeTextures.VelvetVioletMat, 1.7f);
@@ -441,8 +428,8 @@ public partial class SkiLodge
 			room?.Add(d);
 			if (!wrecked)
 			{
-				var bulb = LodgeKit.Lamp(k, ns + new Vector3(0, 0.6f, 0), 0.5f, Shade);
-				Light(bulb, Warm, 0.35f, 3.5f);
+				var bulb = LodgeKit.Lamp(k, ns + new Vector3(0, 0.6f, 0), 0.5f, shade);
+				roomLights.Add(Light(bulb, Warm, 0.35f, 3.5f));
 			}
 		}
 		// the wardrobe on the far side wall, the closet by the door (both searchable)
@@ -460,7 +447,7 @@ public partial class SkiLodge
 		// a violet sofa under the second window, a writing desk and chair, a rug
 		if (num != 204)
 		{
-			var sofaAt = new Vector3(x1 - 0.55f, y, zOut - s * 2.8f);   // against the side wall, facing into the room
+			var sofaAt = new Vector3(x1 - 0.48f, y, zOut - s * 2.8f);   // against the side wall (its back to it), facing into the room
 			LodgeKit.Sofa(k, sofaAt, Mathf.Pi * 0.5f, LodgeTextures.VelvetVioletMat, 1.8f);
 			LodgeKit.Solid(_inBody, sofaAt + new Vector3(0, 0.45f, 0), new Vector3(0.9f, 0.9f, 1.8f));
 		}
@@ -470,7 +457,7 @@ public partial class SkiLodge
 		// the ceiling light
 		k.Mat(LodgeTextures.GoldMat);
 		k.Cylinder(new Vector3(cx, RoomTop - 0.02f, (zIn + zOut) * 0.5f), new Vector3(cx, RoomTop - 0.12f, (zIn + zOut) * 0.5f), 0.22f, 0.26f, 12, true);
-		if (!wrecked) Light(new Vector3(cx, RoomTop - 0.5f, (zIn + zOut) * 0.5f), num == 202 ? new Color(0.72f, 0.78f, 1f) : Warm, 0.8f, 7f, $"Room{num}Light");
+		if (!wrecked) roomLights.Add(Light(new Vector3(cx, RoomTop - 0.5f, (zIn + zOut) * 0.5f), num == 202 ? new Color(0.72f, 0.78f, 1f) : Warm, 0.8f, 7f, $"Room{num}Light"));
 		// 202: the blue from the snow banked up the windows
 		if (num == 202) Light(new Vector3(cx, y + 1.6f, zOut - s * 0.8f), new Color(0.4f, 0.55f, 1f), 1.1f, 6f, "SnowBlue");
 		// ---- the bathroom: green tile, the tub in an arched alcove with a mustard trim, the vanity (two drawers)
@@ -519,7 +506,26 @@ public partial class SkiLodge
 			k.Box(wc + new Vector3(0, 0.22f, 0), new Vector3(0.5f, 0.44f, 0.38f), 1f);
 			k.Box(wc + new Vector3(-0.2f, 0.62f, 0), new Vector3(0.14f, 0.36f, 0.42f), 1f);
 		}
-		Light(new Vector3((bx0 + bx1) * 0.5f, RoomTop - 0.5f, (zIn + bz) * 0.5f), new Color(0.85f, 1f, 0.9f), wrecked ? 0.15f : 0.5f, 4f, $"Bath{num}");
+		// (201's bathroom: its bulb throws a deep red, and only just reaches the hacked-through wall)
+		var bathLight = num == 201
+			? Light(new Vector3((bx0 + bx1) * 0.5f, RoomTop - 0.6f, (zIn + bz) * 0.5f), new Color(0.85f, 0.05f, 0.04f), 1.5f, 3.3f, "Bath201Red")
+			: Light(new Vector3((bx0 + bx1) * 0.5f, RoomTop - 0.5f, (zIn + bz) * 0.5f), new Color(0.85f, 1f, 0.9f), wrecked ? 0.15f : 0.5f, 4f, $"Bath{num}");
+		// the switches: the room's by its door (on the latch side, at a hand's height), the bathroom's beside its door,
+		// on the room's side (so it can be put on before stepping in)
+		var door = RoomDoors.GetValueOrDefault(num);
+		if (door != null)
+		{
+			float latch = front ? door.Position.X + door.Width : door.Position.X - door.Width;
+			var rs = new LightSwitch { Name = $"Switch{num}", Room = $"room {num}", Position = new Vector3(latch + (front ? 0.3f : -0.3f), y + 1.25f, zIn + s * 0.072f), Rotation = new Vector3(0, front ? 0f : Mathf.Pi, 0) };
+			AddChild(rs);
+			foreach (var l in roomLights) rs.Wire(l);
+			rs.WireGlow(shade);
+			RoomSwitches[num] = rs;
+		}
+		var bsw = new LightSwitch { Name = $"BathSwitch{num}", Room = $"{num}'s bathroom", Position = new Vector3(bx1 + 0.075f, y + 1.25f, zIn + s * 2.35f), Rotation = new Vector3(0, Mathf.Pi * 0.5f, 0) };
+		AddChild(bsw);
+		bsw.Wire(bathLight);
+		BathSwitches[num] = bsw;
 		// 204: a desk with a drawer and a dresser with two (where the note is)
 		if (num == 204)
 		{

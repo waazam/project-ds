@@ -60,6 +60,7 @@ public partial class SkiLodge
 	/// <summary>Is a lodge-local point inside the building (the hall or either wing), at a height anyone could be?</summary>
 	public static bool InsideLocal(Vector3 l)
 	{
+		if (l.Y < -40f && l.Y > -80f) return true;   // the crawlspace's maze (SkiLodge.Crawlspace.cs: CrawlDown below)
 		if (l.Y < -1f || l.Y > 12f) return false;
 		if (Mathf.Abs(l.Z) < WingHalfZ - 0.3f && Mathf.Abs(l.X) > WingX0 && Mathf.Abs(l.X) < WingX1 - 0.3f) return true;
 		// the hexagon: within the apothem of every side
@@ -89,7 +90,7 @@ public partial class SkiLodge
 				case 2: windows.AddRange(new[] { 3f, 6f, 9f }); break;                                        // the back: high windows
 				case 3: holes.Add(new Hole(3.3f, 4.4f, 0f, 2.25f)); holes.Add(new Hole(10.8f, 12f, UpperY, 6.7f)); break;   // the pantry; the corridor
 				case 4: holes.Add(new Hole(3.0f, 6.0f, 0f, 3.0f)); holes.Add(new Hole(0f, 1.2f, UpperY, 6.7f)); break;       // the bar's arch; the corridor
-				case 5: windows.AddRange(new[] { 3.4f, 8.6f }); break;                                        // the front: two high windows over the doors
+				case 5: windows.AddRange(new[] { 3.4f, 8.6f }); holes.Add(new Hole(4.75f, 7.25f, 0f, 3.05f)); break;   // the front: two high windows over the doors; the doorway (inside its casing)
 			}
 			foreach (float u in windows) holes.Add(new Hole(u - 0.6f, u + 0.6f, 5.4f, 7.2f));
 			k.Color = Colors.White;
@@ -123,6 +124,7 @@ public partial class SkiLodge
 	/// <summary>A window's inner face: the daylight glass, a painted frame and a sill.</summary>
 	private void InnerWindow(MeshKit k, Vector3 c, Vector3 along, Vector3 inward, float w, float h, Material glass)
 	{
+		_winSpots.Add((c, along, inward, w, h));   // (Act 23's freeze breaks the lobby's and the dining hall's)
 		k.Mat(glass);
 		k.Color = Colors.White;
 		k.Quad(c - along * w * 0.5f - Vector3.Up * h * 0.5f, c + along * w * 0.5f - Vector3.Up * h * 0.5f, c + along * w * 0.5f + Vector3.Up * h * 0.5f, c - along * w * 0.5f + Vector3.Up * h * 0.5f, inward);
@@ -508,7 +510,9 @@ public partial class SkiLodge
 		Lining(k, x0, x1, zOut, UpperY, RoomTop, LodgeTextures.DarkWoodMat, LodgeTextures.WallpaperMat, UpperY + 1.0f, true, glass);
 		// the side walls: east of 202/203 against the hall's corner, west of 201/204 at the corridor's end, and the split between
 		if (x1 >= CorrX1 - 0.01f) UpWall(k, new Vector3(x1, 0, zIn), new Vector3(x1, 0, zOut), Vector3.Left, true, null);
-		if (x0 <= CorrX0 + 0.01f) UpWall(k, new Vector3(x0, 0, zIn), new Vector3(x0, 0, zOut), Vector3.Right, true, null);
+		// (201's, in its bathroom, is hacked through: the doorway into the wall cavity, SkiLodge.Room201.cs)
+		var west = num == 201 ? new List<Hole> { new(Hole201.Z - 0.45f - zIn, Hole201.Z + 0.45f - zIn, UpperY, UpperY + 2.0f) } : null;
+		if (x0 <= CorrX0 + 0.01f) UpWall(k, new Vector3(x0, 0, zIn), new Vector3(x0, 0, zOut), Vector3.Right, true, west);
 		// the bathroom: in the room's west corner by the corridor, 2.7 x 3.1, green tile
 		float bx0 = x0, bx1 = x0 + 2.7f, bz = zIn + s * 3.1f;
 		if (num == 202 || num == 203)
@@ -550,6 +554,26 @@ public partial class SkiLodge
 		// the walls: wainscot to 1.3 m, damask-free cream paper above (it's a dining room: pale, grand); both window rows
 		Lining(k, fx, DiningX1, InnerZ, FloorY, RoomTop, LodgeTextures.DarkWoodMat, LodgeTextures.WallpaperMat, 1.3f, false);
 		Lining(k, fx, DiningX1, -InnerZ, FloorY, RoomTop, LodgeTextures.DarkWoodMat, LodgeTextures.WallpaperMat, 1.3f, false);
+		// the near end: the hall's two east sides, a V pointing into the room; lined as the room is (their outside's stone
+		// and dark boards had shown in here as a black end wall), the lobby's doors through the one
+		foreach (int side in new[] { 0, 1 })
+		{
+			Vector3 va = HexVert(side == 0 ? 0 : 2), vb = HexVert(1);
+			Vector3 n = (((va + vb) * 0.5f) with { Y = 0 }).Normalized(), along = (vb - va).Normalized();
+			Vector3 o = va + n * 0.43f;
+			float s0 = (Mathf.Abs(o.Z) - InnerZ) / Mathf.Abs(along.Z), s1 = Mathf.Abs(o.Z) / Mathf.Abs(along.Z);
+			Vector3 la = o + along * s0, lb = o + along * s1;
+			var doorHole = new List<Hole>();
+			if (side == 0) doorHole.Add(new Hole(5.6f - s0, 8.0f - s0, 0f, 2.8f));
+			LodgeKit.Wall(k, null, la, lb, FloorY, 1.3f, 0.03f, n, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat, doorHole);
+			LodgeKit.Wall(k, null, la, lb, 1.3f, RoomTop, 0.03f, n, LodgeTextures.WallpaperMat, LodgeTextures.WallpaperMat, LodgeTextures.DarkWoodMat, doorHole);
+			k.Mat(LodgeTextures.DarkWoodMat);
+			var rb = new Basis(along, Vector3.Up, n);
+			float len = la.DistanceTo(lb);
+			var runs = side == 0 ? new[] { (0f, 5.6f - s0 - 0.06f), (8.0f - s0 + 0.06f, len) } : new[] { (0f, len) };
+			foreach (var (r0, r1) in runs)   // the rail (either side of the doors)
+				k.Box(la + along * ((r0 + r1) * 0.5f) + Vector3.Up * 1.32f + n * 0.03f, new Vector3(r1 - r0, 0.05f, 0.04f), 1f, rb);
+		}
 		// the far end: a lining across it with its windows (one left open: the frost comes in there)
 		var endHoles = new List<Hole>();
 		foreach (float wz in new[] { -6f, -2f, 2f, 6f })

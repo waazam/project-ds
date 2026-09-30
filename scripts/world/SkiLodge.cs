@@ -46,6 +46,8 @@ public partial class SkiLodge : Node3D
 	public Vector3 BackStandWorld => ToGlobal(new Vector3(BackDoorX, 0.05f, -WingHalfZ - 1.9f));
 	public Vector3 MudroomWorld => ToGlobal(new Vector3(BackDoorX, 0.05f, -WingHalfZ + 3.2f));
 	public PickupInteractable FrontUse { get; private set; }
+	/// <summary>The front doors' leaves outside (Act 23's end blows them out).</summary>
+	public MeshInstance3D PorchDoors { get; private set; }
 	public PickupInteractable BackUse { get; private set; }
 	public bool BackOpen { get; private set; }
 	public int Shoves { get; private set; }
@@ -381,29 +383,34 @@ public partial class SkiLodge : Node3D
 		k.Mat(LodgeTimber);
 		k.Tri(l0 + Vector3.Down * 0.02f, r0 + Vector3.Down * 0.02f, p0 + Vector3.Down * 0.2f, Vector3.Back, Vector2.Zero, Vector2.Right, Vector2.Down);
 		// the great doors: two dark leaves, iron straps, a chain wound through their handles from inside the glass
-		k.Mat(LodgeDoor);
-		k.Color = Colors.White;
+		// (the leaves their own mesh: at Act 23's end the wendigo goes out through them, SkiLodge.Finale.cs)
+		var dk = new MeshKit();
+		dk.Mat(LodgeDoor);
+		dk.Color = Colors.White;
 		Vector3 dc = new(0, 1.55f, z0 + 0.42f);
-		k.Box(dc, new Vector3(2.6f, 3.1f, 0.12f), 0.5f);
+		dk.Box(dc - new Vector3(0, 0.025f, 0), new Vector3(2.6f, 3.05f, 0.12f), 0.5f);   // (its top clear of the lintel's)
 		k.Mat(LodgeTrim);
+		k.Color = Colors.White;
 		k.Box(dc + new Vector3(0, 1.62f, 0.04f), new Vector3(3.0f, 0.2f, 0.2f), 1f);
 		k.Box(dc + new Vector3(-1.4f, 0, 0.04f), new Vector3(0.2f, 3.2f, 0.2f), 1f);
 		k.Box(dc + new Vector3(1.4f, 0, 0.04f), new Vector3(0.2f, 3.2f, 0.2f), 1f);
-		k.Box(dc + new Vector3(0, 0, 0.07f), new Vector3(0.05f, 3.1f, 0.03f), 1f);
-		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.35f, 0.35f, 0.38f);
+		dk.Mat(LodgeTrim);
+		dk.Box(dc + new Vector3(0, 0, 0.07f), new Vector3(0.05f, 3.1f, 0.03f), 1f);
+		dk.Mat(BuildingTextures.IronMat);
+		dk.Color = new Color(0.35f, 0.35f, 0.38f);
 		foreach (float y in new[] { -0.9f, 0.9f })
-			k.Box(dc + new Vector3(0, y, 0.08f), new Vector3(2.5f, 0.08f, 0.03f), 1f);
+			dk.Box(dc + new Vector3(0, y, 0.08f), new Vector3(2.5f, 0.08f, 0.03f), 1f);
 		foreach (float x in new[] { -0.18f, 0.18f })
-			k.Cylinder(dc + new Vector3(x, 0.05f, 0.08f), dc + new Vector3(x, 0.05f, 0.18f), 0.05f, 0.05f, 6, true);
+			dk.Cylinder(dc + new Vector3(x, 0.05f, 0.08f), dc + new Vector3(x, 0.05f, 0.18f), 0.05f, 0.05f, 6, true);
 		// the chain through the handles, and its padlock
 		for (int i = 0; i < 9; i++)
 		{
 			float u = (i - 4) / 4f;
 			Vector3 p = dc + new Vector3(u * 0.3f, 0.05f - Mathf.Cos(u * 1.2f) * 0.06f + 0.06f, 0.2f);
-			k.Cylinder(p - new Vector3(0.03f, 0, 0), p + new Vector3(0.03f, 0, 0), 0.02f, 0.02f, 4, true);
+			dk.Cylinder(p - new Vector3(0.03f, 0, 0), p + new Vector3(0.03f, 0, 0), 0.02f, 0.02f, 4, true);
 		}
-		k.Box(dc + new Vector3(0, -0.12f, 0.21f), new Vector3(0.12f, 0.15f, 0.05f), 1f);
+		dk.Box(dc + new Vector3(0, -0.12f, 0.21f), new Vector3(0.12f, 0.15f, 0.05f), 1f);
+		PorchDoors = dk.CommitTo(this, "PorchDoors", true);
 		// the name, carved over the doors: HOLLOW PEAK LODGE
 		k.CommitTo(this, "Porch", true);
 		SignKit.Text(this, "HOLLOW PEAK LODGE", new Vector3(0, 5.45f, z1 - 0.2f), Basis.Identity, 0.36f, new Color(0.62f, 0.55f, 0.44f));

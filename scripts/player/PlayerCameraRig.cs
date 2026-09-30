@@ -269,7 +269,7 @@ public partial class PlayerCameraRig : Node3D
 	}
 
 	private Vector3 PivotPosition() =>
-		_target.GlobalPosition + new Vector3(0, IsFirstPerson ? EyeHeight : PivotHeight, 0);
+		_target.GlobalPosition + new Vector3(0, (IsFirstPerson ? EyeHeight : PivotHeight) - _target.CrouchEyeDrop * _target.CrouchAmount, 0);
 
 	private void ApplyRotation()
 	{

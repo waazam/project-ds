@@ -54,6 +54,14 @@ public enum Checkpoint
 	Act23Room203Done = 25,
 	/// <summary>Act 23: the dining hall's sixth sheet off, 201's keycard taken from the bowl of snow (and the snow gone to blood).</summary>
 	Act23Keycard201 = 26,
+	/// <summary>Act 23: in room 201, the letter read ("Welcome Back"), the door slammed shut behind them for good.</summary>
+	Act23Letter201 = 27,
+	/// <summary>Act 23: halfway through the crawlspace between the walls (before the arms come through).</summary>
+	Act23Crawlspace = 28,
+	/// <summary>Act 23: out of the crawlspace, the wardrobe pushed over, back in the dining hall (the lodge frozen over).</summary>
+	Act23Frozen = 29,
+	/// <summary>Act 23's end: the front door, the wendigo off the balcony and out through it; at the splintered doorway.</summary>
+	Act23Finished = 30,
 }
 
 public class SaveData

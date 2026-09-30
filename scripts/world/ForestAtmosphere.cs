@@ -157,6 +157,12 @@ public partial class ForestAtmosphere : Node
 	/// <summary>Inside the ski lodge (0..1, Act 23): noon behind the snow, every lamp lit: a clean warm interior, only
 	/// a faint haze, a warm ambient, no sun through the roof.</summary>
 	public float Lodge { get; set; }
+	/// <summary>Act 23, the lodge frozen over (0..1): the warm haze gone cold and blue-grey, the ambient chilled and lower.</summary>
+	public float LodgeCold { get; set; }
+	[Export] public Color LodgeColdFogColor = new(0.12f, 0.14f, 0.18f);
+	[Export] public float LodgeColdFogDensity = 0.011f;
+	[Export] public Color LodgeColdAmbientColor = new(0.55f, 0.62f, 0.76f);
+	[Export] public float LodgeColdAmbient = 0.36f;
 	[Export] public Color LodgeFogColor = new(0.1f, 0.08f, 0.065f);
 	[Export] public float LodgeFogDensity = 0.004f;
 	[Export] public Color LodgeAmbientColor = new(0.78f, 0.68f, 0.56f);
@@ -597,10 +603,11 @@ public partial class ForestAtmosphere : Node
 		float lodge = Mathf.Clamp(Lodge, 0f, 1f);
 		if (lodge > 0f)
 		{
-			fog = fog.Lerp(LodgeFogColor, lodge);
-			density = Mathf.Lerp(density, LodgeFogDensity, lodge);
-			ambColor = ambColor.Lerp(LodgeAmbientColor, lodge);
-			ambient = Mathf.Lerp(ambient, LodgeAmbient, lodge);
+			float cold = Mathf.Clamp(LodgeCold, 0f, 1f);
+			fog = fog.Lerp(LodgeFogColor.Lerp(LodgeColdFogColor, cold), lodge);
+			density = Mathf.Lerp(density, Mathf.Lerp(LodgeFogDensity, LodgeColdFogDensity, cold), lodge);
+			ambColor = ambColor.Lerp(LodgeAmbientColor.Lerp(LodgeColdAmbientColor, cold), lodge);
+			ambient = Mathf.Lerp(ambient, Mathf.Lerp(LodgeAmbient, LodgeColdAmbient, cold), lodge);
 			sunEnergy *= 1f - lodge;
 		}
 		float inside = Mathf.Clamp(Interior, 0f, 1f);

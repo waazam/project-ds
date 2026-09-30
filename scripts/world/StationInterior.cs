@@ -132,6 +132,12 @@ public partial class StationInterior : Node3D
 		Marker("Act23Room202Marker", ToGlobal(lodge + new Vector3(-15.5f, SkiLodge.UpperY + 0.1f, 0f)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act23Room202Done");
 		Marker("Act23Room203Marker", ToGlobal(lodge + new Vector3(-19f, SkiLodge.UpperY + 0.1f, 0f)), Rotation.Y - Mathf.Pi * 0.5f, "respawn_Act23Room203Done");
 		Marker("Act23Card201Marker", ToGlobal(lodge + new Vector3(24f, 0.1f, 0f)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act23Keycard201");
+		// the second half: in 201 by its bathroom, halfway through the crawlspace (in the maze, below), out in the
+		// frozen dining hall, and at the splintered front doorway
+		Marker("Act23Letter201Marker", ToGlobal(lodge + new Vector3(-24.6f, SkiLodge.UpperY + 0.1f, 2.6f)), Rotation.Y - Mathf.Pi * 0.5f, "respawn_Act23Letter201");
+		Marker("Act23CrawlMarker", ToGlobal(lodge + SkiLodge.CellCentre(SkiLodge.CrawlSave) + SkiLodge.CrawlDown + new Vector3(0, 0.1f, 0)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act23Crawlspace");
+		Marker("Act23FrozenMarker", ToGlobal(lodge + new Vector3(32.05f, 0.1f, -2.6f)), Rotation.Y, "respawn_Act23Frozen");
+		Marker("Act23EndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_Act23Finished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });

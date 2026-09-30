@@ -258,6 +258,7 @@ public partial class GameSettings : Node
 		AddKeys("lantern_mode", Key.B);
 		AddKeys("lean_left", Key.Q);
 		AddKeys("lean_right", Key.R);
+		AddKeys("crouch", Key.C, Key.Ctrl);   // a toggle (either Ctrl answers, the left one included)
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);
@@ -278,6 +279,7 @@ public partial class GameSettings : Node
 		AddButton("lantern_mode", JoyButton.RightShoulder);
 		AddButton("lean_left", JoyButton.DpadLeft);
 		AddButton("lean_right", JoyButton.DpadRight);
+		AddButton("crouch", JoyButton.RightStick);
 		AddButton("item_next", JoyButton.LeftShoulder);   // the item in hand (the HUD), the camera's zoom, the album's pages
 	}
 

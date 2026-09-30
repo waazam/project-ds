@@ -13,6 +13,8 @@ public partial class PlayerFootsteps : Node
 {
 	[Export] public float WalkStride = 1.3f;   // metres per step while walking
 	[Export] public float RunStride = 1.9f;
+	[Export] public float CrouchStride = 0.8f;   // short, careful steps
+	[Export] public float CrouchQuietDb = -6f;
 	[Export] public float StepVolumeDb = -26f;
 	[Export] public float ClothVolumeDb = -32f;
 	[Export] public int Voices = 4;
@@ -24,7 +26,8 @@ public partial class PlayerFootsteps : Node
 	private int _nextVoice;
 	private float _distance;
 	/// <summary>0 at a footfall, rising to 1 at the next (the camera's bob dips on the footfall).</summary>
-	public float StepPhase => Mathf.Clamp(_distance / (_player != null && _player.IsRunning ? RunStride : WalkStride), 0f, 1f);
+	public float StepPhase => Mathf.Clamp(_distance / Stride, 0f, 1f);
+	private float Stride => _player == null ? WalkStride : _player.IsRunning ? RunStride : Mathf.Lerp(WalkStride, CrouchStride, _player.CrouchAmount);
 	/// <summary>Steps taken (their parity is which foot: the head sways toward it).</summary>
 	public int Steps { get; private set; }
 	private string _lastSurface = "";
@@ -76,7 +79,7 @@ public partial class PlayerFootsteps : Node
 		if (speed < 0.3f) { _distance = Mathf.Min(_distance, 0.3f); return; }
 
 		_distance += speed * (float)delta;
-		float stride = _player.IsRunning ? RunStride : WalkStride;
+		float stride = Stride;
 		if (_distance < stride) return;
 		_distance -= stride;
 		Steps++;
@@ -103,7 +106,7 @@ public partial class PlayerFootsteps : Node
 		if (!_sets.TryGetValue(_lastSurface, out var set) || set.Length == 0) set = _sets["dirt"];
 		if (set.Length == 0) return;
 
-		float loudness = Mathf.Remap(Mathf.Clamp(speed, 1f, 5f), 1f, 5f, -2f, 3f);
+		float loudness = Mathf.Remap(Mathf.Clamp(speed, 1f, 5f), 1f, 5f, -2f, 3f) + CrouchQuietDb * _player.CrouchAmount;
 		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.92f, 1.08f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
 			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.9f, 1.1f));

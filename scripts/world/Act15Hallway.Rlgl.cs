@@ -46,6 +46,7 @@ public partial class Act15Hallway
 			else if (_hum.VolumeDb <= -79f && _hum.Playing) _hum.Stop();
 		}
 
+		CentreFlicker(delta);
 		if (_dying || Finished) return;
 		switch (State)
 		{
@@ -164,6 +165,8 @@ public partial class Act15Hallway
 		_stripMat2.AlbedoColor = c * Mathf.Max(0.15f, level);
 		_stripMat2.Emission = c;
 		_stripMat2.EmissionEnergyMultiplier = 1.3f * Mathf.Max(0.15f, level);
+		_centreColor = c;
+		_centreLevel = level;
 	}
 
 	/// <summary>They moved. The view is turned round onto him, his eyes flare, he comes in, and it's

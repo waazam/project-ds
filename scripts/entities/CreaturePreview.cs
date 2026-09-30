@@ -210,6 +210,30 @@ public partial class CreaturePreview : Node3D
 			float a = Mathf.DegToRad(30f + 60f * i);
 			await Shot($"lodge_sweep_{i}", new Vector3(0, 1.7f, 0), new Vector3(Mathf.Sin(a) * 10f, 8f, Mathf.Cos(a) * 10f));
 		}
+		// Act 23's second half: 201, the crawlspace (lit by a lantern-like light at the eye), the chase, the frozen lodge
+		var lamp = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.55f), LightEnergy = 1.2f, OmniRange = 6f };
+		AddChild(lamp);
+		async Task Lit(string n, Vector3 at, Vector3 look) { lamp.Position = at; await Shot(n, at, look); }
+		lodge.BathSwitches[201].Set(true);
+		await Shot("act23_room201", new Vector3(-21.3f, 5.9f, 1.8f), new Vector3(-23f, 4.9f, 6.2f));
+		await Shot("act23_201_bath_hole", new Vector3(-25.8f, 5.9f, 2.4f), new Vector3(-28f, 5.2f, 1.95f));
+		await Lit("crawl_entry", new Vector3(-28.9f, 5.8f, 1.95f), new Vector3(-31f, 5.6f, 1.95f));
+		var dn = World.SkiLodge.CrawlDown;
+		await Lit("crawl_maze_pipe", World.SkiLodge.CellCentre(new Vector2I(-4, -3)) + dn + new Vector3(0, 4.2f + 1.6f, 0), World.SkiLodge.CellCentre(new Vector2I(-9, -3)) + dn + new Vector3(0, 4.2f + 1.3f, 0));
+		await Lit("crawl_stairs", World.SkiLodge.CellCentre(new Vector2I(3, -8)) + dn + new Vector3(0, 4.2f + 1.6f, 0), World.SkiLodge.CellCentre(new Vector2I(10, -8)) + dn + new Vector3(0, 1.0f, 0));
+		lodge.Arms[0].Burst();
+		await Seconds(0.6);
+		await Lit("crawl_arm", World.SkiLodge.CellCentre(new Vector2I(38, -3)) + dn + new Vector3(0.1f, 1.15f, -0.1f), World.SkiLodge.CellCentre(new Vector2I(39, -3)) + dn + new Vector3(0, 1.5f, 0.2f));
+		await Lit("crawl_arm_far", World.SkiLodge.CellCentre(new Vector2I(37, -3)) + dn + new Vector3(0, 1.6f, 0), World.SkiLodge.CellCentre(new Vector2I(39, -3)) + dn + new Vector3(0, 1.5f, 0.2f));
+		await Lit("crawl_brick", World.SkiLodge.CellCentre(new Vector2I(16, 1)) + dn + new Vector3(0, 1.6f, 0), World.SkiLodge.CellCentre(new Vector2I(16, -4)) + dn + new Vector3(0, 1.2f, 0));
+		await Shot("dining_chase", new Vector3(32f, 1.7f, 1.5f), new Vector3(33.5f, 1.4f, -5.5f));
+		await Shot("dining_west", new Vector3(38f, 1.7f, 0f), new Vector3(10f, 2.2f, 0f));
+		lodge.FreezeNow();
+		await Seconds(1.0);
+		await Shot("frozen_dining", new Vector3(13.5f, 1.8f, 0f), new Vector3(40f, 1.5f, 0f));
+		await Shot("frozen_dining_west", new Vector3(38f, 1.7f, 0f), new Vector3(10f, 2.2f, 0f));
+		await Shot("frozen_dining_window", new Vector3(24f, 1.7f, 3f), new Vector3(24f, 2f, -7.6f));
+		await Shot("frozen_lobby", new Vector3(0, 1.7f, -2f), new Vector3(0f, 3f, 10f));
 		await Shot("lodge_mudroom", new Vector3(-28f, 1.6f, -5.5f), new Vector3(-30f, 1.2f, -1.7f));
 	}
 }

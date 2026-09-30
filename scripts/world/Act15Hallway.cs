@@ -57,7 +57,12 @@ public partial class Act15Hallway : Node3D
 	public float Timer => _timer;
 
 	private ShadowMan _shadow;
-	private StandardMaterial3D _lampMat, _stripMat2;
+	private StandardMaterial3D _lampMat, _stripMat2, _centreMat;
+	// the centre row's colour and level (the phase's), and its failing: a soft dip now and then (see CentreFlicker)
+	private Color _centreColor = Green;
+	private float _centreLevel = 1f, _centreDip = 1f;
+	private double _centreNext = 2.0, _centreT = -1.0;
+	private bool _centreDouble;
 	private readonly List<OmniLight3D> _lamps = new();
 	private float _timer, _flickT, _redT;
 	private int _flickStep;
@@ -222,6 +227,45 @@ public partial class Act15Hallway : Node3D
 			foreach (float s in new[] { -1f, 1f }) Strip(s2, s * (W2 * 0.5f - 0.5f), z);
 		s1.CommitTo(this, "Strips1", false);
 		s2.CommitTo(this, "Strips2", false);
+		// (the owner) a row down the middle too, going bad: the whole row dips now and then, and here and there a
+		// segment has all but died
+		var c1 = new MeshKit();
+		_centreMat = Glow(Green, 1.2f);
+		c1.Mat(_centreMat);
+		c1.Color = Colors.White;
+		var c2 = new MeshKit();
+		c2.Mat(Glow(new Color(0.1f, 0.32f, 0.14f), 0.22f));
+		c2.Color = Colors.White;
+		var rng = new RandomNumberGenerator { Seed = 1515 };
+		for (float z = 1.5f; z < End - 0.5f; z += 1f)
+			Strip(rng.Randf() < 0.09f ? c2 : c1, 0f, z);
+		c1.CommitTo(this, "StripsCentre", false);
+		c2.CommitTo(this, "StripsCentreDead", false);
+	}
+
+	/// <summary>The centre row's failing: every few seconds a soft dip (down to a third and back over a quarter of a
+	/// second), sometimes two close together. Slow and never off: a light going bad, not a strobe.</summary>
+	private void CentreFlicker(double dt)
+	{
+		if (_centreMat == null) return;
+		if (_centreT < 0.0)
+		{
+			_centreNext -= dt;
+			if (_centreNext <= 0.0) { _centreT = 0.0; _centreDouble = GD.Randf() < 0.35f; }
+		}
+		else
+		{
+			_centreT += dt;
+			const double dip = 0.28, gap = 0.2;
+			double t = _centreT;
+			if (_centreDouble && t > dip + gap) t -= dip + gap;
+			_centreDip = t < dip ? 1f - 0.68f * Mathf.Sin((float)(t / dip) * Mathf.Pi) : 1f;
+			if (_centreT > (_centreDouble ? dip * 2 + gap : dip)) { _centreT = -1.0; _centreDip = 1f; _centreNext = GD.RandRange(1.4, 4.6); }
+		}
+		float level = Mathf.Max(0.15f, _centreLevel);
+		_centreMat.AlbedoColor = _centreColor * level * Mathf.Lerp(0.55f, 1f, _centreDip);
+		_centreMat.Emission = _centreColor;
+		_centreMat.EmissionEnergyMultiplier = 1.2f * level * _centreDip;
 	}
 
 	/// <summary>Part 1: a few weak green lights high up, and a stronger glow where the hall opens out

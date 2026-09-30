@@ -71,12 +71,12 @@ public partial class Wendigo : Node3D
 	// ------------------------------------------------------------------ the model
 
 	// its colours (vertex colours over one grimy skin material: ash grey, darker and bluer to the extremities)
-	private static readonly Color Ash = new(0.47f, 0.46f, 0.45f), AshDark = new(0.33f, 0.33f, 0.34f), Frostbite = new(0.1f, 0.11f, 0.14f),
+	internal static readonly Color Ash = new(0.47f, 0.46f, 0.45f), AshDark = new(0.33f, 0.33f, 0.34f), Frostbite = new(0.1f, 0.11f, 0.14f),
 		Bruise = new(0.28f, 0.26f, 0.29f), BoneCol = new(0.74f, 0.71f, 0.64f), Sore = new(0.3f, 0.12f, 0.1f);
 
 	/// <summary>A lofted limb or trunk: rings along a path, each an ellipse (rx across, rz front-to-back) with its own
 	/// colour, the frame carried smoothly along so it never twists. Knobbed joints, wasted muscle, bone under skin.</summary>
-	private static void Loft(MeshKit k, List<(Vector3 c, float rx, float rz, Color col)> rings, int sides = 9)
+	internal static void Loft(MeshKit k, List<(Vector3 c, float rx, float rz, Color col)> rings, int sides = 9)
 	{
 		int n = rings.Count;
 		var bx = new Vector3[n]; var bz = new Vector3[n];

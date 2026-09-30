@@ -16,7 +16,8 @@ public static class LodgeFlag
 {
 	public const string SnowedIn = "lodge_snowed_in", Room202Open = "lodge_202_open", Room202Jammed = "lodge_202_jammed", PantryOpen = "lodge_pantry_open",
 		Room203Open = "lodge_203_open", Room204Open = "lodge_204_open", Note204 = "lodge_note_204", Room203Jammed = "lodge_203_jammed", DiningOpen = "lodge_dining_open",
-		StormUp = "lodge_storm_up", Room201Open = "lodge_201_open";
+		StormUp = "lodge_storm_up", Room201Open = "lodge_201_open", Letter201 = "lodge_201_letter", Room201Jammed = "lodge_201_jammed",
+		InCrawlspace = "lodge_crawlspace", Frozen = "lodge_frozen", WardrobeDown = "lodge_wardrobe_down", FrontBroken = "lodge_front_broken";
 	public const string Card202 = "lodge_card_202", PantryKey = "lodge_pantry_key", Card203 = "lodge_card_203", DiningKey = "lodge_dining_key", Card201 = "lodge_card_201";
 	public static string Taken(string id) => Pickup.TakenFlagPrefix + id;
 	/// <summary>Table t's sheet was the n-th pulled (1..6).</summary>
@@ -88,6 +89,9 @@ public partial class SkiLodge
 		BuildRoom203();
 		BuildDiningStory();
 		BuildRoom201();
+		BuildCrawlspace();
+		if (Has(LodgeFlag.Frozen)) Freeze(instant: true);
+		if (Has(LodgeFlag.FrontBroken)) ExplodeFrontDoor(instant: true);
 		_whisper202 = Voice("Whisper202", new Vector3(-14.4f, UpperY + 1.3f, 3.2f), -13f, 1.2f, 6.5f);
 		_mumble203 = Voice("Mumble203", new Vector3(-14.31f, UpperY + 1.2f, -InnerZ - 1.2f), -7f, 2.6f, 16f);
 		_snow203 = Voice("Snow203", new Vector3(-15.5f, UpperY + 1.2f, -3.5f), -18f, 1.2f, 5.5f);
@@ -113,6 +117,9 @@ public partial class SkiLodge
 	{
 		for (int i = 0; i < count; i++) if (Has($"{prefix}_{i}")) return i;
 		int pick = (int)(GD.Randi() % (uint)count);
+		// (tests: --pick=<prefix>:<n> fixes where a hidden thing goes)
+		foreach (var arg in OS.GetCmdlineUserArgs())
+			if (arg.StartsWith($"--pick={prefix}:") && int.TryParse(arg[(prefix.Length + 8)..], out int forced) && forced >= 0 && forced < count) pick = forced;
 		StoryManager.Instance?.SetFlag($"{prefix}_{pick}");
 		return pick;
 	}
@@ -318,8 +325,12 @@ public partial class SkiLodge
 		sr.HasSomething = true;
 		sr.OnOpened = s2 =>
 		{
-			var at = s2.Type == Searchable.Kind.Drawer ? new Vector3(0, -0.06f, 0.02f) : new Vector3(0.45f, 1.0f, -0.3f);
-			Note204 = PaperKit.Flat(s2.Part, at, 12f, new Vector2(0.12f, 0.16f), PaperKit.Look.Note, "", "If you can hear it, it already knows you are here.", Readable.NoteStyle.Smudged, "Read the note", 204);
+			const string text = "If you can hear it, it already knows you are here.";
+			// in a drawer, lying in it; in a wardrobe or a closet, tucked into the door's inside face (it had hung 0.3 m
+			// behind the door, and swung open with it, floated in the air beside it)
+			Note204 = s2.Type == Searchable.Kind.Drawer
+				? PaperKit.Flat(s2.Part, new Vector3(0, -0.06f, 0.02f), 12f, new Vector2(0.12f, 0.16f), PaperKit.Look.Note, "", text, Readable.NoteStyle.Smudged, "Read the note", 204)
+				: PaperKit.Pinned(s2.Part, new Vector3(s2.Grip.X * 0.5f + 0.04f, 1.3f, -0.006f), Vector3.Forward, new Vector2(0.12f, 0.16f), PaperKit.Look.Note, "", text, Readable.NoteStyle.Smudged, 4f, "Read the note", 204);
 			Note204.ReadFlag = LodgeFlag.Note204;
 			Note204.Read += _ => GD.Print("[story] Act 23: a smudged note in 204 - \"If you can hear it, it already knows you are here.\"");
 		};
@@ -454,8 +465,12 @@ public partial class SkiLodge
 			int n = ++TablesPulled;
 			StoryManager.Instance?.SetFlag(LodgeFlag.Table(t, n));
 			await StoryBeat.PanTowards(this, player, ToGlobal(TableCentre(t) + new Vector3(0, TableH, 0)), 0.5f, ct);
-			// what's under it is there before it lifts
+			// what's under it: built now, shown as the linen sweeps past it (below: nothing pokes up through the moving
+			// cloth, and the cloth has nothing small to catch on and fight)
 			Reveal(t, n, instant: false, soon: true);
+			var under = GetNodeOrNull<Node3D>($"Under{t}");
+			bool showUnder = n != 5;   // (the fifth has nothing on it: its holder shows with the collapse)
+			if (under != null && showUnder) under.Visible = false;
 			AudioDirector.OneShot(this, "cloth", 4, sheet.GlobalPosition + Vector3.Up, -2f, "Events", 3f, 0.08f);
 			var toward = (player.GlobalPosition - sheet.GlobalPosition) with { Y = 0 };
 			var towardLocal = sheet.GlobalBasis.Inverse() * toward.Normalized();
@@ -470,19 +485,39 @@ public partial class SkiLodge
 			sheet.AddChild(hand);
 			var cloth = new SoftBody3D
 			{
+				// linen (the settings the owner liked, a shade more damped so it doesn't shiver as it lands)
 				Name = "Cloth", Mesh = mesh, SimulationPrecision = 10, TotalMass = 0.6f, LinearStiffness = 1f,
-				PressureCoefficient = 0f, DampingCoefficient = 0.03f, DragCoefficient = 0.01f, CollisionLayer = 0, CollisionMask = 1, RayPickable = false,
+				PressureCoefficient = 0f, DampingCoefficient = 0.05f, DragCoefficient = 0.02f, CollisionLayer = 0, CollisionMask = 1, RayPickable = false,
 			};
 			sheet.AddChild(cloth);
 			foreach (var c in sheet.GetChildren()) if (c is MeshInstance3D m && m != cloth) m.Visible = false;
 			foreach (int g in grips) cloth.SetPointPinned(g, true, cloth.GetPathTo(hand));
 			Vector3 dir = new(0, 0, Mathf.Sign(towardLocal.Z == 0 ? 1 : towardLocal.Z));
+			// the hand's path: one curve, eased at both ends (it was a jerk up and a yank): the edge gathered up high off
+			// the table first, then drawn off toward the player and down, as it was. (Drawn off sideways, it dragged
+			// along itself and folded through itself: a soft body doesn't feel its own cloth.)
+			Vector3 p0 = gripLocal, p1 = gripLocal + Vector3.Up * 0.9f + dir * 0.25f,
+				p2 = gripLocal + Vector3.Up * 0.8f + dir * 1.3f, p3 = gripLocal + Vector3.Up * 0.05f + dir * 2.4f;
 			var tw = CreateTween();
-			tw.TweenProperty(hand, "position", gripLocal + Vector3.Up * 0.7f + dir * 0.4f, 0.3f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
-			tw.TweenProperty(hand, "position", gripLocal + dir * 2.6f + Vector3.Down * 0.3f, 0.6f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
-			tw.TweenInterval(0.2f);
+			tw.TweenMethod(Callable.From<float>(u =>
+			{
+				if (!IsInstanceValid(hand)) return;
+				float v = 1f - u;
+				hand.Position = v * v * v * p0 + 3f * v * v * u * p1 + 3f * v * u * u * p2 + u * u * u * p3;
+				// what was under it, there once the linen has swept up off it
+				if (showUnder && u > 0.5f && under != null && IsInstanceValid(under) && !under.Visible) under.Visible = true;
+			}), 0f, 1f, 1.05f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+			tw.TweenInterval(0.12f);
 			await Cutscene.Tween(this, tw, ct);
-			foreach (int g in grips) cloth.SetPointPinned(g, false);
+			// let go a few points at a time from the ends in, so it slips from the hand rather than all at once
+			for (int r = 0; r < 5; r++)
+			{
+				if (!IsInstanceValid(cloth)) break;
+				cloth.SetPointPinned(grips[r], false);
+				cloth.SetPointPinned(grips[grips.Count - 1 - r], false);
+				await Cutscene.Wait(this, 0.04, ct);
+			}
+			AudioDirector.OneShot(this, "cloth", 4, sheet.ToGlobal(p3), -8f, "Events", 3f, 0.1f);
 			_ = SettleSheet(cloth);
 			GD.Print($"[story] Act 23: sheet {n} off (table {t})");
 			await Cutscene.Wait(this, 0.4, ct);
@@ -494,7 +529,28 @@ public partial class SkiLodge
 
 	private async Task SettleSheet(SoftBody3D cloth)
 	{
-		await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
+		// wait for it to come to rest: its points still (a centimetre over a quarter-second, three times running),
+		// at least two seconds, at most eight
+		double waited = 0;
+		int still = 0;
+		Vector3[] last = null;
+		while (waited < 8.0 && IsInstanceValid(cloth))
+		{
+			await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
+			waited += 0.25;
+			if (!IsInstanceValid(cloth)) return;
+			int n = (SheetNx + 1) * (SheetNz + 1);   // the sheet's grid: one point a vertex
+			var now = new Vector3[n];
+			float moved = 0f;
+			for (int i = 0; i < n; i++)
+			{
+				now[i] = cloth.GetPointTransform(i);
+				if (last != null) moved = Mathf.Max(moved, now[i].DistanceTo(last[i]));
+			}
+			last = now;
+			still = last != null && moved < 0.01f ? still + 1 : 0;
+			if (waited >= 2.0 && still >= 3) break;
+		}
 		if (!IsInstanceValid(cloth)) return;
 		if (cloth.Mesh is not ArrayMesh src) return;
 		var arrays = src.SurfaceGetArrays(0);
@@ -674,7 +730,7 @@ public partial class SkiLodge
 	/// blood pouring from its mouth and spreading over the plate and the linen.</summary>
 	private void Platter(MeshKit k, Node3D holder, bool instant)
 	{
-		k.Mat(LodgeTextures.MirrorMat);
+		k.Mat(LodgeTextures.SilverMat);   // (a mirror finish reflected the dark room: a black disc)
 		k.Cylinder(Vector3.Zero, new Vector3(0, 0.025f, 0), 0.5f, 0.45f, 20, true);
 		k.Mat(StationParts.StationTextures.BloodPoolMat);
 		k.Cylinder(new Vector3(0.05f, 0.026f, -0.1f), new Vector3(0.05f, 0.028f, -0.1f), instant ? 0.42f : 0.2f, instant ? 0.42f : 0.2f, 14, true);
@@ -745,7 +801,8 @@ public partial class SkiLodge
 		foreach (var cs in table.GetNode("Body").GetChildren()) if (cs is CollisionShape3D c) c.Disabled = true;
 		var holder = GetNodeOrNull<Node3D>($"Under{t}");
 		if (holder != null) holder.Visible = true;
-		// the pieces: two halves of the top folding down into a V, the legs kicking out
+		// the pieces: the top cracks in the middle and sags, then comes down flat as all four legs kick out from
+		// under it, and settles with a small bounce (it used to stop in a V with its ends in the air)
 		var pieces = new Node3D { Name = $"Collapse{t}", Position = TableCentre(t) with { Y = FloorY } };
 		AddChild(pieces);
 		foreach (float s in new[] { -1f, 1f })
@@ -758,23 +815,38 @@ public partial class SkiLodge
 			k.Box(new Vector3(s * TableLen * 0.25f, -0.03f, 0), new Vector3(TableLen * 0.5f - 0.02f, 0.06f, TableW), 1f);
 			k.CommitTo(half, "Top", true);
 			var tw = CreateTween();
-			tw.TweenProperty(half, "position:y", 0.1f, 0.35f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
-			tw.Parallel().TweenProperty(half, "rotation:z", s * 0.22f, 0.35f);
-			var leg = new Node3D { Position = new Vector3(s * (TableLen * 0.5f - 0.1f), 0, 0) };
-			pieces.AddChild(leg);
-			var lk = new MeshKit();
-			lk.Mat(LodgeTextures.DarkWoodMat);
-			lk.Box(new Vector3(0, 0.34f, 0), new Vector3(0.07f, 0.68f, 0.07f), 1f);
-			lk.CommitTo(leg, "Leg", false);
-			var lt = CreateTween();
-			lt.TweenProperty(leg, "rotation:z", -s * 1.5f, 0.5f).SetTrans(Tween.TransitionType.Bounce).SetEase(Tween.EaseType.Out);
+			// the crack: the middle drops and the halves tip in
+			tw.TweenProperty(half, "position:y", TableH - 0.16f, 0.16f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+			tw.Parallel().TweenProperty(half, "rotation:z", s * 0.26f, 0.16f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+			// the fall: down flat to the floor
+			tw.TweenProperty(half, "position:y", CollapsedTopY, 0.32f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+			tw.Parallel().TweenProperty(half, "rotation:z", s * CollapsedTilt, 0.32f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+			// a small bounce, and still
+			tw.TweenProperty(half, "position:y", CollapsedTopY + 0.05f, 0.08f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+			tw.TweenProperty(half, "position:y", CollapsedTopY, 0.1f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+			foreach (float sz in new[] { -1f, 1f })
+			{
+				var leg = new Node3D { Position = LegFoot(s, sz) };
+				pieces.AddChild(leg);
+				var lk = new MeshKit();
+				lk.Mat(LodgeTextures.DarkWoodMat);
+				lk.Color = Colors.White;
+				lk.Box(new Vector3(0, (TableH - 0.06f) * 0.5f, 0), new Vector3(0.07f, TableH - 0.06f, 0.07f), 1f);
+				lk.CommitTo(leg, "Leg", false);
+				var lt = CreateTween();
+				lt.TweenInterval(0.1f);
+				lt.TweenProperty(leg, "rotation:z", -s * LegFallen, 0.36f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+				lt.TweenProperty(leg, "rotation:z", -s * (LegFallen - 0.1f), 0.07f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+				lt.TweenProperty(leg, "rotation:z", -s * LegFallen, 0.09f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+			}
 		}
 		AudioDirector.OneShot(this, "table_collapse", 1, ToGlobal(TableCentre(t) + Vector3.Up * 0.6f), 6f, "Events", 6f, 0.02f);
 		var dust = new GpuParticles3D
 		{
 			Name = "Dust", Amount = 90, Lifetime = 2f, OneShot = true, Explosiveness = 0.9f, Position = TableCentre(t) + Vector3.Up * 0.2f,
-			ProcessMaterial = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(3.5f, 0.1f, 0.6f), Direction = Vector3.Up, Spread = 70f, InitialVelocityMin = 0.2f, InitialVelocityMax = 0.8f, Gravity = new Vector3(0, -0.3f, 0), ScaleMin = 1f, ScaleMax = 3f, Color = new Color(0.55f, 0.5f, 0.45f, 0.4f) },
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.12f, 0.12f), Material = new StandardMaterial3D { AlbedoTexture = LakeParts.LakeFx.SoftDot(), VertexColorUseAsAlbedo = true, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
+			ProcessMaterial = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(3.5f, 0.1f, 0.6f), Direction = Vector3.Up, Spread = 70f, InitialVelocityMin = 0.15f, InitialVelocityMax = 0.6f, Gravity = new Vector3(0, -0.15f, 0), ScaleMin = 1.5f, ScaleMax = 4f, Color = new Color(0.36f, 0.32f, 0.28f, 0.16f) },
+			// (soft and faint: bright and small, the puffs read as snowballs)
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.16f, 0.16f), Material = new StandardMaterial3D { AlbedoTexture = LakeParts.LakeFx.SoftDot(), VertexColorUseAsAlbedo = true, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Emitting = true,
 		};
 		AddChild(dust);
@@ -783,12 +855,28 @@ public partial class SkiLodge
 
 	public int Collapsed { get; private set; } = -1;
 
+	/// <summary>The fallen table's rest: the top's halves' centre height and tilt, and how far the legs fell.</summary>
+	private const float CollapsedTopY = 0.1f, CollapsedTilt = 0.03f, LegFallen = 1.45f;
+
+	private static Vector3 LegFoot(float s, float sz) => new(s * (TableLen * 0.5f - 0.08f), 0, sz * (TableW * 0.5f - 0.08f));
+
+	/// <summary>The fallen table as it lies (a Continue after it came down): the same rest as the collapse ends in.
+	/// In the space of the things on the table (its top's height above the floor).</summary>
 	private static void Wreckage(MeshKit k)
 	{
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
+		var down = new Vector3(0, -TableH, 0);   // the floor (the pieces' base), from the table top
 		foreach (float s in new[] { -1f, 1f })
-			k.Box(new Vector3(s * TableLen * 0.25f, -TableH + 0.2f, 0), new Vector3(TableLen * 0.5f, 0.06f, TableW), 1f, new Basis(Vector3.Back, s * 0.22f));
+		{
+			var tilt = new Basis(Vector3.Back, s * CollapsedTilt);
+			k.Box(down + new Vector3(0, CollapsedTopY, 0) + tilt * new Vector3(s * TableLen * 0.25f, -0.03f, 0), new Vector3(TableLen * 0.5f - 0.02f, 0.06f, TableW), 1f, tilt);
+			foreach (float sz in new[] { -1f, 1f })
+			{
+				var fall = new Basis(Vector3.Back, -s * LegFallen);
+				k.Box(down + LegFoot(s, sz) + fall * new Vector3(0, (TableH - 0.06f) * 0.5f, 0), new Vector3(0.07f, TableH - 0.06f, 0.07f), 1f, fall);
+			}
+		}
 	}
 
 	private Node3D _bowlSnow;
@@ -803,7 +891,7 @@ public partial class SkiLodge
 		holder.AddChild(_bowlSnow);
 		var s = new MeshKit();
 		bool melted = Taken(LodgeFlag.Card201);
-		s.Mat(melted ? StationParts.StationTextures.BloodPoolMat : RoofSnow);
+		s.Mat(melted ? StationParts.StationTextures.BloodPoolMat : WinterWoods.SoftSnow);
 		s.Color = Colors.White;
 		if (melted) s.Cylinder(new Vector3(0, 0.06f, 0), new Vector3(0, 0.065f, 0), 0.14f, 0.14f, 14, true);
 		else s.Blob(new Vector3(0, 0.08f, 0), new Vector3(0.15f, 0.09f, 0.15f), 5600, 0.2f, true, 1f);
@@ -882,25 +970,6 @@ public partial class SkiLodge
 
 	// ------------------------------------------------------------------ 7. room 201
 
-	private void BuildRoom201()
-	{
-		var d = RoomDoors[201];
-		d.ConsumeKey = false;
-		d.LockedPrompt = "Room 201. The reader wants a keycard.";
-		// the card opens it (the act goes on inside 201 later; for now the reader turns green, the lock clicks back,
-		// and it's the end of the demo)
-		d.Opened += p => { StoryManager.Instance?.SetFlag(LodgeFlag.Room201Open); _ = Cutscene.Run(this, ct => End201(p, ct), lockInput: true); };
-	}
-
-	private async Task End201(PlayerController player, CancellationToken ct)
-	{
-		GD.Print("[story] Act 23: the card in 201's reader - green; the door opens on the dark (to be continued)");
-		await Cutscene.Wait(this, 1.8, ct);
-		var fader = StoryBeat.Fader(this);
-		if (fader != null) await fader.Fade(1f, 3f, ct);
-		if (GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) await ending.Credits(fader, ct);
-	}
-
 	// ------------------------------------------------------------------ every frame
 
 	public override void _Process(double delta)
@@ -913,18 +982,33 @@ public partial class SkiLodge
 		if (player == null || s == null) return;
 		var l = ToLocal(player.GlobalPosition);
 		bool inside = InsideLocal(l);
-		// the light in here: clean and warm (noon, every lamp lit), not the woods' murk
+		// performance: the shaders warmed on the way in, the woods put away while indoors (SkiLodge.Perf.cs)
+		WarmProcess();
+		if (inside && !WarmedUp) WarmUp();
+		UpdateOutdoor(inside);
+		// the crawlspace (its hand-overs, its dust, its howls, its arms), and the frozen lodge's storm
+		CrawlProcess(player, l, dt);
+		l = ToLocal(player.GlobalPosition);
+		FrozenProcess(dt);
+		// the light in here: clean and warm (noon, every lamp lit), not the woods' murk; cold once it's frozen over
 		var atmo = StoryBeat.Atmosphere(this);
-		if (atmo != null) atmo.Lodge = Mathf.MoveToward(atmo.Lodge, inside ? 1f : 0f, dt * 1.2f);
+		if (atmo != null)
+		{
+			atmo.Lodge = Mathf.MoveToward(atmo.Lodge, inside ? 1f : 0f, dt * 1.2f);
+			atmo.LodgeCold = Mathf.MoveToward(atmo.LodgeCold, Frozen && inside && !InMaze ? 1f : 0f, dt * 0.5f);
+		}
 		// the storm
 		Storm = Mathf.MoveToward(Storm, _stormTarget, dt * 0.2f);
 		var day = LodgeTextures.DayGlass;
-		day.EmissionEnergyMultiplier = Mathf.Lerp(0.9f, 0.28f, Storm);
-		day.Emission = new Color(0.62f, 0.68f, 0.76f).Lerp(new Color(0.34f, 0.38f, 0.45f), Storm);
+		if (!Frozen)
+		{
+			day.EmissionEnergyMultiplier = Mathf.Lerp(0.9f, 0.28f, Storm);
+			day.Emission = new Color(0.62f, 0.68f, 0.76f).Lerp(new Color(0.34f, 0.38f, 0.45f), Storm);
+		}
 		foreach (var dl in _dayLights) dl.LightEnergy = Mathf.Lerp(0.9f, 0.25f, Storm);
 		if (_stormWind != null)
 		{
-			float want = inside ? Mathf.Lerp(-40f, -9f, Storm) : -60f;
+			float want = inside && !InMaze ? Mathf.Lerp(-40f, Frozen ? -4f : -9f, Storm) : InMaze ? -30f : -60f;
 			if (want > -55f && !_stormWind.Playing) _stormWind.Play();
 			_stormWind.VolumeDb = Mathf.MoveToward(_stormWind.VolumeDb, want, dt * 10f);
 		}
@@ -995,7 +1079,11 @@ public partial class SkiLodge
 		else if (!Has(LodgeFlag.Note204)) goal = new Vector3(-23.5f, UpperY + 1f, -4f);
 		else if (!Has(LodgeFlag.DiningOpen)) goal = DiningDoorL.Position + DiningDoorL.Basis * new Vector3(1.2f, 1.4f, 0);
 		else if (!Taken(LodgeFlag.Card201)) goal = new Vector3(27f, 1f, 0);
-		else goal = RoomDoors[201].Position + new Vector3(0.5f, 1.2f, 0);
+		else if (!Has(LodgeFlag.Room201Open)) goal = RoomDoors[201].Position + new Vector3(0.5f, 1.2f, 0);
+		else if (!Has(LodgeFlag.Letter201)) goal = Envelope201 != null && IsInstanceValid(Envelope201) ? Envelope201.Position : new Vector3(-23f, UpperY + 0.6f, 5.9f);
+		else if (!WardrobeDown) goal = InMaze ? CellCentre(new Vector2I(62, PortalOutJ)) + CrawlDown + Vector3.Up * 1f : Hole201 + Vector3.Up;
+		else if (!FrontBroken) goal = FrontDoorInside;
+		else goal = FrontDoorInside + new Vector3(0, 0, 4f);
 		_objective.Position = goal;
 	}
 }

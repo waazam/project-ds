@@ -13,6 +13,8 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-09-29c — Act 23 finished: Room 201's welcome letter, the wall-cavity crawlspace and the wendigo's arm through the boards, the lodge frozen over, the front doors and the leap; tablecloth glitching fixed; light switches; the lodge optimized; Act 15's failing centre lights](2026-09-29c-act23-finale.md)
+- [2026-09-29b — Crouching (C / left Ctrl, a toggle), and the dining hall's sheets and table collapse smoothed](2026-09-29b-crouch-and-the-sheets.md)
 - [2026-09-29a — Act 23 hard check: a clipping/UV audit with a new pierce-through check (doubled tables, wing roofs in the lobby, a post through the desk, the chimney), Poly Haven surfaces for the lodge and the church](2026-09-29a-act23-hard-check.md)
 - [2026-09-28d — The winter's pink dawn (sky, low sun, lilac haze: the trees against the sky), the save icon's film winding in, the dining hall's wall fix](2026-09-28d-winter-dawn-and-save-reel.md)
 - [2026-09-28c — Act 23: the ski lodge (snowed in; the Gilded Antler, rooms 202–204, the pantry, the dining hall's six sheets; ends at 201's door)](2026-09-28c-act23-the-ski-lodge.md)

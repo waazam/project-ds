@@ -3075,6 +3075,13 @@ public partial class StoryTest : Node
 		await Go(L(-18.3f, 0.05f, 5.5f), L(-12.5f, 0.05f, 4.2f), L(-7.5f, 0.05f, 3.4f), L(-2f, 0.05f, 1f));
 		await Aim(L(3f, 3f, -5f), ct);
 		Screenshot("act23_the_lobby");
+		Check("indoors, the woods behind the walls put away (performance); the shaders warmed on the way in", lodge.OutdoorHidden && lodge.WarmedUp);
+		await Go(L(0.3f, 0.05f, 8.4f));
+		await Aim(lodge.ToGlobal(SkiLodge.FrontDoorInside), ct);
+		await Frames(2, ct);
+		Check("the front doors from inside: \"Requires Master Key.\"", _player.Interaction?.PromptText == "Requires Master Key.", $"'{_player.Interaction?.PromptText}'");
+		await Go(L(-2f, 0.05f, 1f));
+		await CrouchCheck(lodge, ct);
 		await Go(L(6.2f, 0.05f, -7.4f), L(5.4f, 0.05f, -9.0f), L(-3.6f, UpperYOf(lodge), -9.0f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-9.4f, UpperYOf(lodge), 0f), L(-12.4f, UpperYOf(lodge), 0f), L(-13.7f, UpperYOf(lodge), 0f));
 		Check("up the stair, round the balcony, into the rooms' corridor", lodge.ToLocal(_player.GlobalPosition).Y > SkiLodge.UpperY - 0.3f && lodge.ToLocal(_player.GlobalPosition).X < -12.8f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
 		await Aim(L(-28f, 5.8f, 0f), ct);
@@ -3141,7 +3148,7 @@ public partial class StoryTest : Node
 		await Press(ct);
 		await Seconds(1.2, ct);
 		Check("203's door opens: the cold comes out", d203.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
-		await Go(L(-13.7f, UpperYOf(lodge), -2.2f), L(-14.4f, UpperYOf(lodge), -5.4f));
+		await Go(L(-13.7f, UpperYOf(lodge), -2.2f), L(-13.95f, UpperYOf(lodge), -5.0f));
 		await Aim(L(-14.3f, 5.2f, -7.6f), ct);
 		Screenshot("act23_room_203");
 		await WaitUntil(() => lodge.Mumbles > 0, 12, ct);
@@ -3157,11 +3164,13 @@ public partial class StoryTest : Node
 		// through the bathroom's broken wall into 204
 		// (down the gap between the bed and the sofa, then round the bed's foot: straight from the sill the line cut
 		// the bed's corner, and a step off stuck there)
-		await Go(L(-13.9f, UpperYOf(lodge), -5.0f), L(-14.6f, UpperYOf(lodge), -4.6f), L(-15.2f, UpperYOf(lodge), -4.0f), L(-16.6f, UpperYOf(lodge), -2.65f), L(-18.6f, UpperYOf(lodge), -2.45f), L(-21.6f, UpperYOf(lodge), -2.45f));
+		await Go(L(-13.95f, UpperYOf(lodge), -5.0f), L(-14.8f, UpperYOf(lodge), -4.6f), L(-15.2f, UpperYOf(lodge), -4.0f), L(-16.6f, UpperYOf(lodge), -2.65f), L(-18.6f, UpperYOf(lodge), -2.45f), L(-21.6f, UpperYOf(lodge), -2.45f));
 		Check("through the hole in 203's bathroom, into 204", lodge.ToLocal(_player.GlobalPosition).X < SkiLodge.RoomSplitX - 0.5f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
 		await Aim(L(-18.5f, 5.3f, -2.4f), ct);
 		Screenshot("act23_the_hole");
 		var hides = lodge.Search204[lodge.Note204In];
+		// (out into the middle of the room first: straight from the hole to the dresser, a walk once stuck on the way)
+		await Go(L(-22.6f, UpperYOf(lodge), -3.3f));
 		await SearchIt(lodge, hides, ct, leave: false);
 		await Seconds(0.8, ct);
 		Check("in one of 204's drawers, a note", lodge.Note204 != null);
@@ -3208,6 +3217,14 @@ public partial class StoryTest : Node
 			}
 			Check($"table {i + 1}: pull the sheet off", lodge.TableEvents.Count > i || _player.Interaction?.PromptText == "Pull the sheet off", $"'{_player.Interaction?.PromptText}' at {lodge.ToLocal(_player.GlobalPosition)}");
 			if (lodge.TableEvents.Count <= i) await Press(ct);
+			if (i == 0)
+			{
+				// the cloth mid-pull and just let go (to see the motion, not only where it ended)
+				await Seconds(1.2, ct);
+				Screenshot("act23_sheet_coming_off");
+				await Seconds(0.6, ct);
+				Screenshot("act23_sheet_let_go");
+			}
 			await WaitUntil(() => lodge.TableEvents.Count > i, 6, ct);
 			await Seconds(i == 1 || i == 2 || i == 3 ? 3.0 : 1.2, ct);
 			Check($"sheet {i + 1} off (cloth): under it, {want[i]}", lodge.TableEvents.Count > i && lodge.TableEvents[i] == want[i], lodge.TableEvents.Count > i ? lodge.TableEvents[i] : "nothing");
@@ -3229,8 +3246,108 @@ public partial class StoryTest : Node
 		Check("201: use the keycard", _player.Interaction?.PromptText == "Use the keycard", $"'{_player.Interaction?.PromptText}'");
 		await Press(ct);
 		await Seconds(1.0, ct);
-		Check("201's reader goes green; the door opens on the dark", d201.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		Check("201's reader goes green; the door opens on the cleanest room in the lodge", d201.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
+		Check("201: every light on (the only room lit)", lodge.RoomSwitches[201].On && !lodge.RoomSwitches[202].On, $"201 {lodge.RoomSwitches[201].On}, 202 {lodge.RoomSwitches[202].On}");
+		await Go(L(-21.3f, UpperYOf(lodge), 2.4f), L(-22.6f, UpperYOf(lodge), 4.2f));
 		Screenshot("act23_room_201");
+		// the envelope on the bed: up to the eyes, the flap, the letter
+		Check("an envelope on the bed", lodge.Envelope201Use != null);
+		await UseIt(lodge.Envelope201Use, ct);
+		await WaitUntil(() => NoteOverlay.Instance is { IsOpen: true }, 8, ct);
+		Check("\"Welcome Back. We missed you as a valued guest.\"", NoteOverlay.Instance?.Current == lodge.Letter201 && s.HasFlag(LodgeFlag.Letter201), $"{NoteOverlay.Instance?.Current?.Name}");
+		Screenshot("act23_welcome_back");
+		await PutDown(ct);
+		await WaitUntil(() => lodge.Room201Jammed, 5, ct);
+		Check("put down: the door behind them slams, for good (a save)", lodge.Room201Jammed && d201.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Jammed, $"{d201.Current}");
+		await WaitUntil(() => s.Current == Checkpoint.Act23Letter201, 4, ct);
+		Check("the save in 201", s.Current == Checkpoint.Act23Letter201, $"{s.Current}");
+		// the bathroom: dark; the switch by its door lights it red
+		var bath = lodge.BathSwitches[201];
+		Check("201's bathroom is dark", !bath.On);
+		await UseIt(bath.Use, ct);
+		Check("its switch: a deep red light", bath.On && bath.Lights.Count > 0 && bath.Lights[0].LightColor.R > 0.6f && bath.Lights[0].LightColor.G < 0.2f);
+		await Go(L(-24.9f, UpperYOf(lodge), 2.6f), L(-26.2f, UpperYOf(lodge), 1.95f));
+		await Aim(L(-28.5f, 5.3f, 1.95f), ct);
+		Screenshot("act23_the_hole_in_201");
+		// into the wall
+		Vector3 Cell(Godot.Vector2I c, bool maze)
+		{
+			var w = SkiLodge.CellCentre(c) + (maze ? SkiLodge.CrawlDown : Vector3.Zero);
+			return lodge.ToGlobal(w + Vector3.Up * 0.05f);
+		}
+		async Task Crouch(bool down)
+		{
+			for (int i = 0; i < 4 && _player.Crouching != down; i++) { _input.ScriptedCrouch = true; await Frames(3, ct); _input.ScriptedCrouch = false; await Frames(3, ct); }
+		}
+		var path = lodge.CrawlPath;
+		var low = new System.Collections.Generic.HashSet<Godot.Vector2I>(SkiLodge.CrouchPipes);
+		foreach (var (ac, _) in SkiLodge.ArmSpots) low.Add(ac);
+		bool NearLow(Godot.Vector2I c) { foreach (var q in low) if (Mathf.Abs(q.X - c.X) + Mathf.Abs(q.Y - c.Y) <= 2) return true; return false; }
+		bool crossedIn = false, stuck = false;
+		float fastestIn = 0f;
+		var crawlStart = Time.GetTicksMsec();
+		for (int i = 0; i < path.Count; i++)
+		{
+			var c = path[i];
+			bool entryCell = i < 4, exitCell = System.Array.IndexOf(new[] { new Godot.Vector2I(64, -8), new Godot.Vector2I(63, -8), new Godot.Vector2I(62, -8), new Godot.Vector2I(61, -8), new Godot.Vector2I(61, -7) }, c) >= 0 && i > path.Count - 6;
+			await Crouch(NearLow(c) || (i > 0 && NearLow(path[i - 1])));
+			if (!await WalkTo(Cell(c, !entryCell && !exitCell), 0.3f, ct, giveUp: 9f))
+			{
+				GD.Print($"[crawldbg] stuck going to cell {c} (#{i}) at {lodge.ToLocal(_player.GlobalPosition)}, crouched {_player.Crouching}");
+				stuck = true;
+				break;
+			}
+			fastestIn = Mathf.Max(fastestIn, _player.GroundSpeed);
+			if (i == 5 && !crossedIn) { crossedIn = lodge.InMaze; Check("round 201's first turn, carried into the walls seamlessly (no jump)", lodge.InMaze && lodge.CrawlShifts == 1, $"in maze {lodge.InMaze}, shifts {lodge.CrawlShifts}"); }
+			if (i == 12) { Screenshot("act23_crawlspace"); Check("in there, the lodge freezes over", lodge.Frozen && s.HasFlag(LodgeFlag.Frozen)); }
+			if (c == SkiLodge.CrawlSave) { await Seconds(0.3, ct); Check("halfway: a save in the crawlspace", s.Current == Checkpoint.Act23Crawlspace, $"{s.Current}"); }
+			if (c == SkiLodge.ArmSpots[0].cell)
+			{
+				await Aim(lodge.Arms[0].GlobalPosition + Vector3.Down * 0.35f, ct);
+				await Seconds(0.2, ct);
+				Screenshot("act23_arm_through_the_wall");
+			}
+		}
+		await Crouch(false);
+		double crawlSec = (Time.GetTicksMsec() - crawlStart) / 1000.0 * Engine.TimeScale;
+		Check("the crawlspace, walked end to end (its maze, its stairs down)", !stuck && path.Count > 180, $"{path.Count} cells, {crawlSec:0} s, stuck {stuck}");
+		Check("pipes across at the height of a head: under them crouched", !stuck);
+		Check("its arm through the wall, four times: under it, crouched", lodge.ArmsBurst == 4 && lodge.ArmGrabs == 0, $"burst {lodge.ArmsBurst}, grabs {lodge.ArmGrabs}");
+		Check("dust flaking off the walls on the way", lodge.DustFalls > 5, $"{lodge.DustFalls}");
+		Check("carried back out at the chase (the dining hall's wall)", !lodge.InMaze && lodge.CrawlShifts == 2, $"shifts {lodge.CrawlShifts}");
+		// the wardrobe: over it goes
+		await Aim(lodge.WardrobeUse.GlobalPosition, ct);
+		await UseIt(lodge.WardrobeUse, ct);
+		await WaitUntil(() => lodge.WardrobeDown, 6, ct);
+		await Seconds(1.2, ct);
+		Check("the back of a wardrobe: pushed over, the dining hall", lodge.WardrobeDown);
+		await Crouch(true);
+		await WalkTo(L(SkiLodge.CellCentre(new Godot.Vector2I(61, -7)).X, 0.05f, -3.4f), 0.3f, ct, giveUp: 8f);
+		await Crouch(false);
+		await Seconds(0.5, ct);
+		Check("out through the slit, clear of the fallen wardrobe", lodge.ToLocal(_player.GlobalPosition).Z > -3.7f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
+		await Aim(L(24f, 1.4f, 2f), ct);
+		Screenshot("act23_frozen_dining");
+		Check("out of the wall: the dining hall frozen over (a save)", s.Current == Checkpoint.Act23Frozen && lodge.WindowsBroken > 10, $"{s.Current}, {lodge.WindowsBroken} windows broken");
+		// to the front doors: ajar now
+		await Go(L(32f, 0.05f, 0f), L(14f, 0.05f, 0f), L(14f, 0.05f, 3f), L(10.6f, 0.05f, 5.2f), L(8.36f, 0.05f, 3.9f), L(2f, 0.05f, 6.5f), L(0.3f, 0.05f, 8.4f));
+		await Aim(L(-3f, 2.2f, 0f), ct);
+		Screenshot("act23_frozen_lobby");
+		await Aim(lodge.ToGlobal(SkiLodge.FrontDoorInside), ct);
+		await Frames(2, ct);
+		Check("the front doors: ajar now, and they can be pushed", _player.Interaction?.PromptText == "Push the door open", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => lodge.FinaleWendigo != null && lodge.FinaleWendigo.Visible, 12, ct);
+		await Seconds(3.0, ct);   // (turned round to it, looking up)
+		Screenshot("act23_on_the_balcony");
+		await WaitUntil(() => lodge.FrontBroken, 20, ct);
+		Check("it leaps off the balcony at them; they dive; it goes out through the doors", lodge.FrontBroken && lodge.FinaleWendigo.Leaps == 1);
+		await Seconds(0.9, ct);
+		Screenshot("act23_the_doors_gone");
+		Check("the woods back in view through the doorway", !lodge.OutdoorHidden);
+		await WaitUntil(() => lodge.FinaleDone, 30, ct);
+		Check("at the splintered doorway, left, and right: the end of Act 23 (a save)", lodge.FinaleDone && s.Current == Checkpoint.Act23Finished, $"{s.Current}");
+		Screenshot("act23_the_doorway");
 		// the credits (for now)
 		int wantShots = Math.Min(2, PhotoLog.Instance?.RecordedCount ?? 0);
 		if (wantShots == 0) { GD.Print("[storytest] no pictures taken this run (started mid-story): the polaroid check is skipped"); return; }
@@ -3242,6 +3359,53 @@ public partial class StoryTest : Node
 	}
 
 	private static float UpperYOf(SkiLodge l) => SkiLodge.UpperY + 0.05f;
+
+	/// <summary>The crouch (C / left Ctrl, a toggle), on a beam put up in the lobby for the test, 1.25 m off the floor:
+	/// standing, it stops the body; crouched, the body folds, the eye drops, it goes under at half pace; under it,
+	/// standing is refused; clear of it, the body stands again.</summary>
+	private async Task CrouchCheck(SkiLodge lodge, CancellationToken ct)
+	{
+		Vector3 L(float x, float y, float z) => lodge.ToGlobal(new Vector3(x, y, z));
+		async Task PressCrouch() { _input.ScriptedCrouch = true; await Frames(3, ct); _input.ScriptedCrouch = false; await Frames(3, ct); }
+		var beam = new StaticBody3D { Name = "TestLowBeam", CollisionLayer = 1, CollisionMask = 0 };
+		beam.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(6f, 0.3f, 0.5f) } });
+		beam.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(6f, 0.3f, 0.5f) } });
+		lodge.AddChild(beam);
+		beam.Position = new Vector3(-2f, SkiLodge.FloorY + 1.25f + 0.15f, -1.5f);
+		try
+		{
+			await Frames(4, ct);
+			await WalkTo(L(-2f, 0.05f, 1.2f), 0.3f, ct, giveUp: 6f);
+			// standing: the beam stops the body (a short give-up: the walker sidesteps round what stops it)
+			await WalkTo(L(-2f, 0.05f, -3.5f), 0.3f, ct, giveUp: 1.0f);
+			Check("crouch: standing, a beam at 1.25 m stops the body", lodge.ToLocal(_player.GlobalPosition).Z > -1.2f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
+			float eyeUp = _player.CameraRig.Camera.GlobalPosition.Y;
+			await PressCrouch();
+			await Seconds(0.5, ct);
+			float capH = _player.GetNodeOrNull<CollisionShape3D>("Collision")?.Shape is CapsuleShape3D cap ? cap.Height : 0f;
+			float drop = eyeUp - _player.CameraRig.Camera.GlobalPosition.Y;
+			Check("crouch (C / left Ctrl): the body folds to 1.1 m and the eye drops", _player.Crouching && _player.CrouchAmount > 0.99f && capH < 1.15f && drop > 0.45f,
+				$"crouching {_player.Crouching}, amount {_player.CrouchAmount:0.00}, capsule {capH:0.00} m, eye down {drop:0.00} m");
+			Screenshot("crouch_under_the_beam");
+			// crouched: under it, at half pace
+			float fastest = 0f;
+			await WalkTo(L(-2f, 0.05f, -1.6f), 0.12f, ct, giveUp: 6f, stopWhen: () => { fastest = Mathf.Max(fastest, _player.GroundSpeed); return false; });
+			Check("crouched, it goes under, at half pace or less", lodge.ToLocal(_player.GlobalPosition).Z < -1.4f && fastest < _player.WalkSpeed * 0.56f,
+				$"at {lodge.ToLocal(_player.GlobalPosition)}, fastest {fastest:0.00} m/s of {_player.WalkSpeed:0.00}");
+			// under it: no room to stand
+			int blocked = _player.StandBlocked;
+			await PressCrouch();
+			await Seconds(0.3, ct);
+			Check("under the beam, standing is refused (no room overhead)", _player.Crouching && _player.StandBlocked > blocked, $"crouching {_player.Crouching}, blocked {_player.StandBlocked - blocked}");
+			// out the far side: up again
+			await WalkTo(L(-2f, 0.05f, -3.5f), 0.3f, ct, giveUp: 8f);
+			await PressCrouch();
+			await Seconds(0.5, ct);
+			Check("clear of it, the body stands again", !_player.Crouching && _player.CrouchAmount < 0.01f && Mathf.Abs(_player.CameraRig.Camera.GlobalPosition.Y - eyeUp) < 0.1f,
+				$"crouching {_player.Crouching}, amount {_player.CrouchAmount:0.00}, eye {_player.CameraRig.Camera.GlobalPosition.Y - eyeUp:+0.00;-0.00} m");
+		}
+		finally { beam.QueueFree(); }
+	}
 
 	/// <summary>Walks to stand square in front of a drawer or cabinet (round through its bathroom's door if it's a
 	/// vanity drawer) and opens it.</summary>
@@ -3260,8 +3424,8 @@ public partial class StoryTest : Node
 		// straight in from further out, square to its front (round the furniture, not across it)
 		var approach = sr.GlobalPosition + sr.GlobalBasis * (front * 1.9f);
 		approach.Y = stand.Y;
-		await WalkTo(approach, 0.4f, ct, giveUp: 10f);
-		await WalkTo(stand, 0.35f, ct, giveUp: 10f);
+		if (!await WalkTo(approach, 0.4f, ct, giveUp: 10f)) GD.Print($"[searchdbg] {sr.Name}: stuck short of its approach {lodge.ToLocal(approach)} at {lodge.ToLocal(_player.GlobalPosition)}");
+		if (!await WalkTo(stand, 0.35f, ct, giveUp: 10f)) GD.Print($"[searchdbg] {sr.Name}: stuck short of standing at {lodge.ToLocal(stand)} at {lodge.ToLocal(_player.GlobalPosition)}");
 		// drawers stacked in a vanity sit close: if the aim caught its neighbour, that one's open now; try again
 		for (int tries = 0; tries < 3 && !sr.IsOpen; tries++) await UseIt(sr.Use, ct);
 		if (leave) { await Seconds(0.6, ct); await LeaveBath(lodge, sr, ct); }
