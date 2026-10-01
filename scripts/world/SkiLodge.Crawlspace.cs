@@ -296,7 +296,14 @@ public partial class SkiLodge
 				var across = new Vector2(side.Y, -side.X);   // along the wall
 				float ix = side.X * 0.46f, iz = side.Y * 0.46f;
 				float sink = cell.Stair ? -0.12f : 0f;   // (a stair's walls go down past its treads' edges)
-				Vector3 w0 = P(ix + across.X * 0.5f, iz + across.Y * 0.5f, sink), w1 = P(ix - across.X * 0.5f, iz - across.Y * 0.5f, sink);
+				// (each panel runs 6 cm past its cell's edge at both ends: inset 4 cm from the edge, two panels meeting at a turn or
+				// a branch left a slit between them at the corner, the outside showing through the stud space; the owner saw it)
+				// (only where the wall turns: along a straight run the next cell's panel continues it exactly, and an overlap
+				// there put boards and brick in one plane, flickering)
+				var acr = new Vector2I(Mathf.RoundToInt(across.X), Mathf.RoundToInt(across.Y));
+				bool Continues(Vector2I n) => cells.ContainsKey(n) && !Opens(cells, n, side) && !open.Contains((n, side));
+				float r0 = Continues(at + acr) ? 0.5f : 0.56f, r1 = Continues(at - acr) ? 0.5f : 0.56f;
+				Vector3 w0 = P(ix + across.X * r0, iz + across.Y * r0, sink), w1 = P(ix - across.X * r1, iz - across.Y * r1, sink);
 				// (a stair's side walls follow its slope; the floor under a wall's end is the edge's own)
 				Vector3 w0t = w0 + Vector3.Up * (CrawlH - sink), w1t = w1 + Vector3.Up * (CrawlH - sink);
 				var inward = new Vector3(-side.X, 0, -side.Y);
@@ -498,6 +505,8 @@ public partial class SkiLodge
 
 	// ------------------------------------------------------------------ every frame (from _Process)
 
+	private bool _crawlSlowed;
+
 	private void CrawlProcess(PlayerController player, Vector3 l, float dt)
 	{
 		if (_maze.Count == 0) return;
@@ -515,14 +524,20 @@ public partial class SkiLodge
 		}
 		_crawlPrev = l;
 		_crawlPrevSet = true;
-		InMaze = l.Y < -40f;
 		var cell = new Vector2I(Mathf.RoundToInt(l.X - CrawlOX), Mathf.RoundToInt(l.Z - CrawlOZ));
+		// (in its footprint, not just that deep: Act 15's hallway is far below the lodge too, and was read as the maze,
+		// its pace slowed to the crawlspace's)
+		InMaze = l.Y < -40f && l.Y > -80f && _maze.ContainsKey(cell);
 		bool realEnd = !InMaze && ((l.Y > UpperY - 0.5f && System.Array.IndexOf(EntryCells, cell) >= 0) || (l.Y < 2f && System.Array.IndexOf(ExitCells, cell) >= 0));
 		InCrawlspace = InMaze || realEnd;
 		var atmo = StoryBeat.Atmosphere(this);
 		if (atmo != null) atmo.Interior = Mathf.MoveToward(atmo.Interior, InCrawlspace ? 0.85f : 0f, dt * 1.5f);
 		// cramped: a body goes slower between the walls
-		player.WadeScale = Mathf.MoveToward(player.WadeScale, InCrawlspace ? 0.75f : 1f, dt * 2f);
+		if (InCrawlspace || _crawlSlowed)
+		{
+			player.WadeScale = Mathf.MoveToward(player.WadeScale, InCrawlspace ? 0.75f : 1f, dt * 2f);
+			_crawlSlowed = InCrawlspace || player.WadeScale < 0.999f;
+		}
 		if (_motes != null)
 		{
 			_motes.Emitting = InCrawlspace;

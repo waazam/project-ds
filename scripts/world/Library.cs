@@ -212,13 +212,39 @@ public partial class Library : Node3D
 
 	private static void AddBooks(Node3D owner, List<Transform3D> xf, List<Color> colors, string name)
 	{
-		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = new BoxMesh { Size = Vector3.One }, InstanceCount = xf.Count };
+		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = BookMesh, InstanceCount = xf.Count };
 		for (int i = 0; i < xf.Count; i++) { mm.SetInstanceTransform(i, xf[i]); mm.SetInstanceColor(i, colors[i]); }
-		owner.AddChild(new MultiMeshInstance3D
+		owner.AddChild(new MultiMeshInstance3D { Name = name, Multimesh = mm });
+	}
+
+	private static Mesh _bookMesh;
+
+	/// <summary>A hardback in a unit box (scaled per book: X its thickness, Y its height, Z its depth; its spine toward -Z,
+	/// the room): the cover's two boards and the spine rounded over the page block, a pair of raised bands across the spine,
+	/// the cream page block set in from the boards' edges. The cloth takes the book's own colour (the instance colour); the
+	/// pages don't. (The owner, 2026-09-30: the fidelity pass; they were plain coloured boxes.)</summary>
+	public static Mesh BookMesh
+	{
+		get
 		{
-			Name = name, Multimesh = mm,
-			MaterialOverride = new StandardMaterial3D { VertexColorUseAsAlbedo = true, AlbedoColor = Colors.White, Roughness = 0.75f, MetallicSpecular = 0.3f },
-		});
+			if (_bookMesh != null) return _bookMesh;
+			var cloth = new StandardMaterial3D { ResourceName = "book_cloth", VertexColorUseAsAlbedo = true, AlbedoColor = Colors.White, Roughness = 0.72f, MetallicSpecular = 0.3f, AlbedoTexture = ProcTextures.Grime() };
+			var pages = new StandardMaterial3D { ResourceName = "book_pages", AlbedoColor = new Color(0.6f, 0.55f, 0.43f), Roughness = 0.95f };
+			var k = new MeshKit();
+			k.Color = Colors.White;
+			k.Mat(pages);
+			k.Box(new Vector3(0, 0, 0.03f), new Vector3(0.82f, 0.94f, 0.92f), 1f);
+			k.Mat(cloth);
+			foreach (float sx in new[] { -0.45f, 0.45f })
+				k.Box(new Vector3(sx, 0, 0.0f), new Vector3(0.1f, 1f, 1f), 1f);
+			// the spine: a half round across the page block's front (squashed flat: a book's spine bulges only a little)
+			k.Xf = new Transform3D(Basis.FromScale(new Vector3(1f, 1f, 0.12f)), new Vector3(0, 0, -0.5f));
+			k.Cylinder(new Vector3(0, -0.5f, 0), new Vector3(0, 0.5f, 0), 0.5f, 0.5f, 10, true);
+			foreach (float y in new[] { -0.28f, 0.28f })
+				k.Cylinder(new Vector3(0, y - 0.025f, 0), new Vector3(0, y + 0.025f, 0), 0.53f, 0.53f, 10, false);
+			k.Xf = Transform3D.Identity;
+			return _bookMesh = k.Commit();
+		}
 	}
 
 	/// <summary>The bookcase in the middle of the back wall: hinged at its right edge, one book on the

@@ -651,8 +651,21 @@ public partial class SkiLodge : Node3D
 		k.Color = Colors.White;
 		k.Box(new Vector3(x0 + 0.2f, 1.6f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 1f);
 		k.Box(new Vector3(x0 + 0.2f, 0.3f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 1f);
+		// the skis in it: the modelled pairs (their poles with them), leant back against the wall
+		var roles = Woodwork;
+		roles["ski"] = SkiPaint;
+		bool modelled = true;
+		for (int i = 0; i < 4 && modelled; i++)
+			modelled = FurnitureKit.Add(k, "skis", new Vector3(x0 + 0.47f, 0.02f, z0 + 0.8f + i * 0.85f), Mathf.Pi * 0.5f, roles);
+		// coats on hooks over the bench on the other wall, boots kicked off under it
+		if (modelled)
+		{
+			foreach (float zz in new[] { (z0 + z1) * 0.5f - 1.0f, (z0 + z1) * 0.5f - 0.3f, (z0 + z1) * 0.5f + 0.7f })
+				FurnitureKit.Add(k, "coat_on_hook", new Vector3(x1 - 0.02f, 1.95f, zz), -Mathf.Pi * 0.5f + Mathf.Pi, roles);
+			FurnitureKit.Add(k, "boots", new Vector3(x1 - 0.35f, 0.02f, (z0 + z1) * 0.5f + 0.2f), 1.9f, roles);
+		}
 		k.Mat(SkiPaint);
-		for (int i = 0; i < 7; i++)
+		for (int i = 0; i < (modelled ? 0 : 7); i++)
 		{
 			float zz = z0 + 0.6f + i * 0.5f;
 			k.Box(new Vector3(x0 + 0.26f, 1.05f, zz), new Vector3(0.03f, 1.8f, 0.08f), 1f, new Basis(Vector3.Forward, 0.12f));

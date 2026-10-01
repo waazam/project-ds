@@ -60,7 +60,7 @@ public partial class SkiLodge
 	/// <summary>Is a lodge-local point inside the building (the hall or either wing), at a height anyone could be?</summary>
 	public static bool InsideLocal(Vector3 l)
 	{
-		if (l.Y < -40f && l.Y > -80f) return true;   // the crawlspace's maze (SkiLodge.Crawlspace.cs: CrawlDown below)
+		if (l.Y < -40f && l.Y > -80f) return Mathf.Abs(l.Z - CrawlOZ) < 12f && l.X > CrawlOX - 2f && l.X < CrawlOX + 70f;   // the crawlspace's maze (SkiLodge.Crawlspace.cs: CrawlDown below), in its footprint
 		if (l.Y < -1f || l.Y > 12f) return false;
 		if (Mathf.Abs(l.Z) < WingHalfZ - 0.3f && Mathf.Abs(l.X) > WingX0 && Mathf.Abs(l.X) < WingX1 - 0.3f) return true;
 		// the hexagon: within the apothem of every side

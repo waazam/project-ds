@@ -12,8 +12,10 @@ namespace ProjectDS.Entities;
 /// height of a head and hangs across the cavity reaching and grabbing, and the only way on is to crouch under it. Four
 /// times, and it's bloodier each time (the boards tear it: blood and frost left on the holes as it pulls back).
 ///
-/// The same ash-grey skin as the wendigo itself (<see cref="Wendigo"/>), its fingers black and far too long. Two bones,
-/// solved toward what it's grabbing for each frame; the fingers clench and open; it twitches. Its colliders are the
+/// The wendigo's own arm (<see cref="Wendigo"/>; tools/Blender/wendigo.py: assets/models/wendigo/wendigo_arm.glb): ash-grey
+/// and sinewed, a knobbed wrist, a long frostbitten hand and fingers far too long, knuckled, hooked with black claws;
+/// skinned to its bones. The upper arm and the forearm are solved toward what it's grabbing each frame and the skeleton
+/// follows; every finger joint curls as it clenches and opens; it twitches. Its colliders are the
 /// upper arm, the forearm and the hand at the height they are: standing, it's a wall; crouched (the body's 1.1 m), it
 /// passes over. Stand within its reach and it grabs: a lunge at the head and a shove back down the cavity.
 ///
@@ -34,16 +36,22 @@ public partial class WendigoArm : Node3D
 	/// <summary>Where it's reaching for (world): the player's head, while they're near.</summary>
 	public Func<Vector3?> Prey;
 
-	private const float L1 = 0.62f, L2 = 0.6f;
-	private static readonly Vector3 Shoulder = new(-0.7f, 0.05f, 0f);
+	private const float L1 = 0.78f, L2 = 0.74f;   // (the model's: tools/Blender/wendigo.py, ARM_L1, ARM_L2)
+	private static readonly Vector3 Shoulder = new(-0.95f, 0.05f, 0f);
+	private Skeleton3D _skel;
+	private int _bUpper = -1, _bFore = -1, _bHand = -1;
+	private readonly List<int[]> _fingerBones = new();
+	private Transform3D[] _rest;
 	private Node3D _upper, _fore, _hand;
-	private readonly List<Node3D> _fingers = new();
 	private StaticBody3D _body;
 	private CollisionShape3D _cUpper, _cFore, _cHand;
 	private float _t, _out;   // _out: 0 in the wall .. 1 at full reach
 	private Vector3 _target, _aim;
 	private double _clock, _twitchAt;
 	private float _clench, _grabCool;
+	// (frantic: starved for them) a lunge at the prey now and then: out at it, the hand splayed, then snapped shut and
+	// dragged back
+	private double _nextLunge, _lungeUntil = -1, _recoilUntil = -1;
 	private readonly RandomNumberGenerator _rng = new();
 	private GpuParticles3D _drip;
 
@@ -57,35 +65,35 @@ public partial class WendigoArm : Node3D
 			AlbedoColor = new Color(0.32f, 0.015f, 0.015f, Mathf.Clamp(0.15f + Bloodiness * 0.7f, 0f, 0.9f)), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			Roughness = 0.2f, MetallicSpecular = 0.7f, AlbedoTexture = ProcTextures.Grime(), Grow = true, GrowAmount = 0.004f,
 		};
-		_upper = Bone("Upper", skin, blood, true);
-		_fore = Bone("Fore", skin, blood, false);
+		// the bones' markers (the drip hangs off the forearm's; the tests read the hand's)
+		_upper = new Node3D { Name = "Upper" };
+		_fore = new Node3D { Name = "Fore" };
 		_hand = new Node3D { Name = "Hand" };
-		AddChild(_hand);
-		var hk = new MeshKit();
-		hk.Mat(skin);
-		// a big frostbitten hand: black-blue, the knuckles knobbed
-		Wendigo.Loft(hk, new() { (new Vector3(-0.03f, 0, 0), 0.058f, 0.036f, Wendigo.Frostbite), (new Vector3(0.07f, 0, 0), 0.085f, 0.034f, Wendigo.Frostbite), (new Vector3(0.14f, 0, 0), 0.08f, 0.03f, new Color(0.06f, 0.06f, 0.08f)) }, 9);
-		hk.CommitTo(_hand, "Palm", false).MaterialOverlay = blood;
-		for (int f = 0; f < 5; f++)
+		AddChild(_upper); AddChild(_fore); AddChild(_hand);
+		var model = GD.Load<PackedScene>("res://assets/models/wendigo/wendigo_arm.glb").Instantiate<Node3D>();
+		model.Name = "Model";
+		AddChild(model);
+		_skel = FindSkeleton(model);
+		if (_skel != null)
 		{
-			bool thumb = f == 4;
-			float spread = thumb ? -0.08f : (f - 1.5f) * 0.045f;
-			var fn = new Node3D { Name = $"Finger{f}", Position = new Vector3(thumb ? 0.04f : 0.14f, thumb ? -0.03f : 0, spread), Rotation = new Vector3(0, thumb ? -0.8f : spread * 2.5f, 0) };
-			_hand.AddChild(fn);
-			var fk = new MeshKit();
-			fk.Mat(skin);
-			// far too long, knuckled twice, ending in a hooked black claw
-			float len = thumb ? 0.16f : 0.36f + 0.06f * (1.5f - Mathf.Abs(f - 1.5f));
-			var black = new Color(0.03f, 0.03f, 0.04f);
-			Wendigo.Loft(fk, new()
+			_bUpper = _skel.FindBone("upper");
+			_bFore = _skel.FindBone("fore");
+			_bHand = _skel.FindBone("hand");
+			for (int f = 0; f < 5; f++)
+				_fingerBones.Add(new[] { _skel.FindBone($"f{f}_1"), _skel.FindBone($"f{f}_2"), _skel.FindBone($"f{f}_3") });
+			_rest = new Transform3D[_skel.GetBoneCount()];
+			for (int b = 0; b < _rest.Length; b++) _rest[b] = _skel.GetBoneGlobalRest(b);
+			foreach (var mi in Meshes(model))
 			{
-				(Vector3.Zero, 0.024f, 0.022f, Wendigo.Frostbite), (new Vector3(len * 0.3f, -0.004f, 0), 0.018f, 0.017f, Wendigo.Frostbite),
-				(new Vector3(len * 0.36f, -0.006f, 0), 0.022f, 0.02f, Wendigo.Frostbite), (new Vector3(len * 0.64f, -0.014f, 0), 0.014f, 0.013f, Wendigo.Frostbite),
-				(new Vector3(len * 0.7f, -0.018f, 0), 0.016f, 0.015f, Wendigo.Frostbite), (new Vector3(len * 0.9f, -0.03f, 0), 0.011f, 0.01f, black),
-				(new Vector3(len + 0.04f, -0.06f, 0), 0.006f, 0.005f, black), (new Vector3(len + 0.09f, -0.1f, 0), 0.001f, 0.001f, black),
-			}, 6);
-			fk.CommitTo(fn, "Finger", false);
-			_fingers.Add(fn);
+				mi.MaterialOverlay = blood;
+				mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+				for (int si = 0; si < mi.Mesh.GetSurfaceCount(); si++)
+					if (mi.Mesh.SurfaceGetMaterial(si) is StandardMaterial3D m)
+					{
+						m.SetMeta("detail_kind", -1);
+						if ((m.ResourceName ?? "").StartsWith("w_skin")) { m.RimEnabled = true; m.Rim = 0.4f; m.RimTint = 0.25f; }
+					}
+			}
 		}
 		// solid where it is: a standing body can't get past it, a crouched one goes under
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
@@ -111,51 +119,24 @@ public partial class WendigoArm : Node3D
 		Pose(0f);
 	}
 
-	private Node3D Bone(string name, Material skin, Material blood, bool upper)
+	private static Skeleton3D FindSkeleton(Node n)
 	{
-		var n = new Node3D { Name = name };
-		AddChild(n);
-		var k = new MeshKit();
-		k.Mat(skin);
-		float L = upper ? L1 : L2;
-		// a giant's limb starved to rope and bone: thick at the shoulder, wasted between, a great knot of an elbow,
-		// the forearm going bruised and then black toward the hand (+X along the bone)
-		if (upper)
-			Wendigo.Loft(k, new()
-			{
-				(new Vector3(-0.06f, 0, 0), 0.125f, 0.115f, Wendigo.Ash), (new Vector3(L * 0.12f, 0.01f, 0), 0.118f, 0.105f, Wendigo.Ash),
-				(new Vector3(L * 0.38f, 0, 0), 0.092f, 0.085f, Wendigo.AshDark), (new Vector3(L * 0.62f, -0.005f, 0), 0.078f, 0.07f, Wendigo.Bruise),
-				(new Vector3(L * 0.86f, 0, 0), 0.088f, 0.08f, Wendigo.AshDark), (new Vector3(L, 0.01f, 0), 0.112f, 0.1f, Wendigo.BoneCol),
-			}, 10);
-		else
+		foreach (var c in n.GetChildren())
 		{
-			Wendigo.Loft(k, new()
-			{
-				(new Vector3(-0.05f, 0, 0), 0.105f, 0.095f, Wendigo.BoneCol), (new Vector3(L * 0.14f, 0, 0), 0.088f, 0.08f, Wendigo.AshDark),
-				(new Vector3(L * 0.45f, 0, 0), 0.074f, 0.064f, Wendigo.Bruise), (new Vector3(L * 0.75f, 0, 0), 0.058f, 0.05f, Wendigo.Frostbite),
-				(new Vector3(L, 0, 0), 0.052f, 0.042f, Wendigo.Frostbite),
-			}, 10);
-			// tendons standing out along it, like cords under the skin
-			for (int t = 0; t < 3; t++)
-			{
-				float a = t * 2.1f + 0.4f;
-				Vector3 o(float r) => new(0, Mathf.Cos(a) * r, Mathf.Sin(a) * r);
-				Wendigo.Loft(k, new() { (new Vector3(L * 0.1f, 0, 0) + o(0.075f), 0.008f, 0.008f, Wendigo.AshDark), (new Vector3(L * 0.5f, 0, 0) + o(0.068f), 0.013f, 0.012f, Wendigo.Bruise), (new Vector3(L * 0.92f, 0, 0) + o(0.048f), 0.006f, 0.006f, Wendigo.Frostbite) }, 5);
-			}
+			if (c is Skeleton3D sk) return sk;
+			var f = FindSkeleton(c);
+			if (f != null) return f;
 		}
-		k.CommitTo(n, "Bone", false).MaterialOverlay = blood;
-		// frost crusted on it (it's been out in the storm)
-		var f = new MeshKit();
-		f.Mat(WinterWoods.SoftSnow);
-		f.Color = Colors.White;
-		var rng = new RandomNumberGenerator { Seed = (ulong)(upper ? 71 : 73) };
-		for (int i = 0; i < 6; i++)
+		return null;
+	}
+
+	private static IEnumerable<MeshInstance3D> Meshes(Node n)
+	{
+		foreach (var c in n.GetChildren())
 		{
-			float x = rng.RandfRange(0.1f, 0.9f) * L, ang = rng.RandfRange(0f, Mathf.Tau), r = upper ? 0.09f : 0.065f;
-			f.Blob(new Vector3(x, Mathf.Cos(ang) * r, Mathf.Sin(ang) * r), new Vector3(0.04f, 0.018f, 0.03f), 90 + i + (upper ? 0 : 20), 0.4f, false, 1f);
+			if (c is MeshInstance3D mi && mi.Mesh != null) yield return mi;
+			foreach (var m in Meshes(c)) yield return m;
 		}
-		f.CommitTo(n, "Frost", false);
-		return n;
 	}
 
 	/// <summary>Out of the wall: the boards burst (the caller does the hole and the sound), and it's reaching.</summary>
@@ -204,31 +185,54 @@ public partial class WendigoArm : Node3D
 				}
 				break;
 		}
-		// what it's reaching for: the prey's head if it's anywhere near, else feeling along the cavity
+		// what it's reaching for: the prey's head if it's anywhere near, else clawing along the cavity. Frantic (the owner:
+		// desperate to get at them, starved): its aim jerks to a new spot every few hundredths of a second, it trembles, it
+		// lunges out at them with the hand splayed and snaps it shut, and drags it back to lunge again
 		Vector3 want;
 		var prey = Prey?.Invoke();
-		if (prey is { } head && head.DistanceTo(GlobalPosition) < 2.6f)
+		bool near = prey is { } head && head.DistanceTo(GlobalPosition) < 2.8f;
+		if (near)
 		{
-			want = ToLocal(head);
+			want = ToLocal(prey.Value);
 			want.X = Mathf.Clamp(want.X, 0.3f, Across - 0.38f);   // (its fingers, 0.3 m past the hand, just scratch the far boards)
-			want.Z = Mathf.Clamp(want.Z, -0.45f, 0.45f);
+			want.Z = Mathf.Clamp(want.Z, -0.5f, 0.5f);
 		}
-		else want = new Vector3(Across * 0.65f, 0.15f * Mathf.Sin((float)_clock * 1.7f), 0.3f * Mathf.Sin((float)_clock * 0.9f));
-		// jerky: a new twitch of the aim every so often, snapped to fast
+		else want = new Vector3(Across * 0.6f, 0.2f * Mathf.Sin((float)_clock * 2.3f), 0.4f * Mathf.Sin((float)_clock * 1.4f));
+		bool lunging = _clock < _lungeUntil, recoiling = !lunging && _clock < _recoilUntil;
+		if (Phase == State.Reach && near && !lunging && !recoiling && _clock >= _nextLunge)
+		{
+			_lungeUntil = _clock + _rng.RandfRange(0.14f, 0.22f);
+			_recoilUntil = _lungeUntil + _rng.RandfRange(0.18f, 0.3f);
+			_nextLunge = _recoilUntil + _rng.RandfRange(0.25f, 0.9f);
+			lunging = true;
+			if (_rng.Randf() < 0.6f) AudioDirector.OneShot(this, "claw_scrape", 2, GlobalPosition + GlobalBasis.X * 0.6f, -4f, "Events", 3f, 0.12f);
+		}
 		if (_clock >= _twitchAt)
 		{
-			_twitchAt = _clock + _rng.RandfRange(0.12f, 0.45f);
-			_aim = want + new Vector3(_rng.RandfRange(-0.08f, 0.08f), _rng.RandfRange(-0.1f, 0.12f), _rng.RandfRange(-0.15f, 0.15f));
+			_twitchAt = _clock + _rng.RandfRange(0.04f, 0.16f);
+			float j = near ? 0.16f : 0.1f;
+			_aim = want + new Vector3(_rng.RandfRange(-j, j) * 0.8f, _rng.RandfRange(-j, j * 1.4f), _rng.RandfRange(-j * 1.6f, j * 1.6f));
 		}
-		_target = _target.Lerp(_aim, 1f - Mathf.Exp(-dt * 14f));
+		Vector3 aim = _aim;
+		float rate = 18f;
+		if (lunging) { aim = want; rate = 34f; }   // straight at them
+		else if (recoiling) { aim = want with { X = want.X * 0.55f }; rate = 16f; }   // dragged back toward the wall
+		_target = _target.Lerp(aim, 1f - Mathf.Exp(-dt * rate));
+		// a tremble through it, always
+		float tr = near ? 0.018f : 0.01f;
+		_target += new Vector3(Mathf.Sin((float)_clock * 41f) * tr * 0.5f, Mathf.Sin((float)_clock * 37f + 1.3f) * tr, Mathf.Sin((float)_clock * 29f + 2.1f) * tr);
 		_target.Y = Mathf.Max(_target.Y, Floor);
-		_clench = 0.5f + 0.5f * Mathf.Sin((float)_clock * 9f + Mathf.Sin((float)_clock * 3.1f) * 2f);
+		// the hand: clawing open and shut fast; splayed wide on the lunge, snapped shut at its end
+		float claw = 0.5f + 0.5f * Mathf.Sin((float)_clock * 16f + Mathf.Sin((float)_clock * 5.3f) * 2.5f);
+		float wantClench = lunging ? -0.35f : recoiling ? 1f : claw;
+		_clench = Mathf.MoveToward(_clench, wantClench, dt * (lunging || recoiling ? 14f : 8f));
 		Pose(_out);
 		// the grab: someone standing within its reach
 		if (Phase == State.Reach && _grabCool <= 0f && prey is { } h2)
 		{
 			var hand = _hand.GlobalPosition;
-			if (new Vector2(hand.X - h2.X, hand.Z - h2.Z).Length() < 0.6f && Mathf.Abs(hand.Y - h2.Y) < 0.45f)
+			bool standing = h2.Y > GlobalPosition.Y + Floor - 0.15f;
+			if (standing && new Vector2(hand.X - h2.X, hand.Z - h2.Z).Length() < 0.6f && Mathf.Abs(hand.Y - h2.Y) < 0.45f)
 			{
 				_grabCool = 2.2f;
 				Grabs++;
@@ -259,8 +263,7 @@ public partial class WendigoArm : Node3D
 		Place(_upper, s, elbow);
 		Place(_fore, elbow, tgt);
 		_hand.Transform = new Transform3D(Along(tgt - elbow), tgt);
-		for (int i = 0; i < _fingers.Count; i++)
-			_fingers[i].Rotation = _fingers[i].Rotation with { Z = -(0.2f + 1.1f * _clench) * (i == 4 ? 0.5f : 1f) };
+		PoseSkeleton(s, elbow, tgt);
 		// its colliders along the bones
 		if (_cUpper != null)
 		{
@@ -271,6 +274,86 @@ public partial class WendigoArm : Node3D
 	}
 
 	private static void Place(Node3D bone, Vector3 from, Vector3 to) => bone.Transform = new Transform3D(Along(to - from), from);
+
+	/// <summary>The skeleton to the solved arm: the upper arm and the forearm turned from their rest onto their new lines,
+	/// the hand carried with the forearm, and every finger joint curled toward the palm by how hard it's clenching.</summary>
+	private void PoseSkeleton(Vector3 shoulder, Vector3 elbow, Vector3 wrist)
+	{
+		if (_skel == null || _bUpper < 0) return;
+		var toSkel = _skel.GlobalTransform.AffineInverse() * GlobalTransform;
+		Vector3 S = toSkel * shoulder, E = toSkel * elbow, W = toSkel * wrist;
+		var g = new Transform3D[_rest.Length];
+		// a bone turned from its rest line (to its child's head) onto a new one, its head at `at`
+		Transform3D Turn(int b, Vector3 restTo, Vector3 newDir, Vector3 at)
+		{
+			var rd = (restTo - _rest[b].Origin).Normalized();
+			var q = Arc(rd, newDir.Normalized());
+			return new Transform3D(new Basis(q) * _rest[b].Basis, at);
+		}
+		g[_bUpper] = Turn(_bUpper, _rest[_bFore].Origin, E - S, S);
+		g[_bFore] = Turn(_bFore, _rest[_bHand].Origin, W - E, E);
+		var handTurn = Arc((_rest[_bHand].Origin - _rest[_bFore].Origin).Normalized(), (W - E).Normalized());
+		g[_bHand] = new Transform3D(new Basis(handTurn) * _rest[_bHand].Basis, W);
+		// the fingers: carried with the hand, then each joint curled about its own across-axis (the finger's line crossed
+		// with the palm's normal: the palm is down, -Y, in the rest pose)
+		var handB = new Basis(handTurn);
+		var palmN = handB * Vector3.Down;
+		for (int f = 0; f < _fingerBones.Count; f++)
+		{
+			var fb = _fingerBones[f];
+			if (fb[0] < 0) continue;
+			Vector3 prevRest = _rest[_bHand].Origin, prevNew = W;
+			var cum = Basis.Identity;
+			for (int j = 0; j < 3; j++)
+			{
+				int b = fb[j];
+				Vector3 seg = handB * (_rest[b].Origin - prevRest);
+				Vector3 at = prevNew + (j == 0 ? seg : cum * seg);
+				// (the last joint's line: the one before it, carried on)
+				Vector3 dir = handB * (j < 2 ? _rest[fb[j + 1]].Origin - _rest[b].Origin : _rest[b].Origin - _rest[fb[j - 1]].Origin);
+				dir = (cum * dir).Normalized();
+				var axis = dir.Cross(palmN).Normalized();
+				float ang = Mathf.Max(0.15f + 0.85f * _clench, -0.2f) * (0.55f + 0.25f * j) * (f == 4 ? 0.6f : 1f);
+				if (axis.LengthSquared() > 0.5f) cum = new Basis(axis, ang) * cum;
+				g[b] = new Transform3D(cum * handB * _rest[b].Basis, at);
+				prevRest = _rest[b].Origin;
+				prevNew = at;
+			}
+		}
+		// into the bones' local poses
+		foreach (int b in AllPosed())
+		{
+			int parent = _skel.GetBoneParent(b);
+			var local = parent >= 0 ? g[parent].AffineInverse() * g[b] : g[b];
+			_skel.SetBonePosePosition(b, local.Origin);
+			_skel.SetBonePoseRotation(b, local.Basis.Orthonormalized().GetRotationQuaternion());
+		}
+	}
+
+	private IEnumerable<int> AllPosed()
+	{
+		yield return _bUpper;
+		yield return _bFore;
+		yield return _bHand;
+		foreach (var fb in _fingerBones)
+			foreach (int b in fb)
+				if (b >= 0) yield return b;
+	}
+
+	/// <summary>The shortest turn from one direction onto another.</summary>
+	private static Quaternion Arc(Vector3 from, Vector3 to)
+	{
+		float d = from.Dot(to);
+		if (d > 0.9999f) return Quaternion.Identity;
+		if (d < -0.9999f)
+		{
+			var ax = from.Cross(Vector3.Up);
+			if (ax.LengthSquared() < 1e-4f) ax = from.Cross(Vector3.Right);
+			return new Quaternion(ax.Normalized(), Mathf.Pi);
+		}
+		var c = from.Cross(to);
+		return new Quaternion(c.X, c.Y, c.Z, 1f + d).Normalized();
+	}
 
 	/// <summary>A basis whose +X runs along <paramref name="v"/> (its +Y kept as near up as can be).</summary>
 	private static Basis Along(Vector3 v)

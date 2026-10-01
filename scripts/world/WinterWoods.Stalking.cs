@@ -140,17 +140,39 @@ public partial class WinterWoods
 			float score = Mathf.Abs(d - (near + far) * 0.5f) + _rng.RandfRange(0f, 8f);
 			if (score < bestScore) { bestScore = score; best = t; found = true; }
 		}
-		if (!found) { _nextAppear = _stalkClock + 3; return false; }
-		// beside the trunk, on the player's side of it, half hidden
-		var trunk = new Vector3(best.at.X, 0, best.at.Y);
-		var side = (new Vector3(pl.X, 0, pl.Z) - trunk).Normalized().Cross(Vector3.Up) * (_rng.Randf() < 0.5f ? 1f : -1f);
-		var stand = trunk + side * 0.9f + (new Vector3(pl.X, 0, pl.Z) - trunk).Normalized() * 0.4f;
-		stand.Y = Height(stand.X, stand.Z) - 0.05f;
-		var sw = ToGlobal(stand);
-		if (!Clear(cam.GlobalPosition, sw + Vector3.Up * 2.4f)) { _nextAppear = _stalkClock + 2; return false; }
-		Place(sw, player.GlobalPosition);
-		_perchTree = best;
-		return true;
+		if (found)
+		{
+			// beside the trunk, on the player's side of it, half hidden
+			var trunk = new Vector3(best.at.X, 0, best.at.Y);
+			var side = (new Vector3(pl.X, 0, pl.Z) - trunk).Normalized().Cross(Vector3.Up) * (_rng.Randf() < 0.5f ? 1f : -1f);
+			var stand = trunk + side * 0.9f + (new Vector3(pl.X, 0, pl.Z) - trunk).Normalized() * 0.4f;
+			stand.Y = Height(stand.X, stand.Z) - 0.05f;
+			var sw = ToGlobal(stand);
+			if (Clear(cam.GlobalPosition, sw + Vector3.Up * 2.4f))
+			{
+				Place(sw, player.GlobalPosition);
+				_perchTree = best;
+				return true;
+			}
+		}
+		// the walls the plow cut hide the trees from the road: then up on top of one, back the way they came, looking down
+		for (int i = 0; i < 6; i++)
+		{
+			float back = _rng.RandfRange(near, far);
+			var q = RoadAt(Mathf.Max(s - back, 8f), out var dir);
+			float sd = _rng.Randf() < 0.5f ? 1f : -1f;
+			var top = new Vector3(q.X - dir.Y * sd * (WallTop + 0.6f), 0, q.Z + dir.X * sd * (WallTop + 0.6f));
+			top.Y = Height(top.X, top.Z) - 0.05f;
+			var tw = ToGlobal(top);
+			var to = (tw - cam.GlobalPosition) with { Y = 0 };
+			if (fwd.AngleTo(to.Normalized()) < Mathf.DegToRad(115f)) continue;
+			if (!Clear(cam.GlobalPosition, tw + Vector3.Up * 2.4f)) continue;
+			Place(tw, player.GlobalPosition);
+			_perchTree = (new Vector2(top.X, top.Z), 12f, false);
+			return true;
+		}
+		_nextAppear = _stalkClock + 2;
+		return false;
 	}
 
 	private (Vector2 at, float height, bool fir) _perchTree;

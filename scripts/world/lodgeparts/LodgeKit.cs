@@ -103,6 +103,10 @@ public static class LodgeKit
 	/// <summary>A chesterfield sofa facing -Z (turn it with <paramref name="yaw"/>): leather, rolled arms, buttoned back.</summary>
 	public static void Sofa(MeshKit k, Vector3 c, float yaw, Material mat, float w = 2.1f)
 	{
+		// the modelled chesterfield (deep-buttoned, rolled and pleated arms, piped cushions, bun feet), at its nearer width
+		string model = w > 2.25f ? "chesterfield_24" : "chesterfield_21";
+		float made = w > 2.25f ? 2.4f : 2.1f;
+		if (FurnitureKit.Add(k, model, c, yaw, new() { ["upholstery"] = mat, ["wood"] = LodgeTextures.DarkWoodMat }, new Vector3(w / made, 1f, 1f))) return;
 		var b = new Basis(Vector3.Up, yaw);
 		k.Xf = new Transform3D(b, c);
 		k.Mat(mat);
@@ -121,6 +125,7 @@ public static class LodgeKit
 	/// <summary>A wing armchair facing -Z.</summary>
 	public static void Armchair(MeshKit k, Vector3 c, float yaw, Material mat)
 	{
+		if (FurnitureKit.Add(k, "wing_chair", c, yaw, new() { ["upholstery"] = mat, ["wood"] = LodgeTextures.DarkWoodMat })) return;
 		k.Xf = new Transform3D(new Basis(Vector3.Up, yaw), c);
 		k.Mat(mat);
 		k.Color = Colors.White;
@@ -141,6 +146,11 @@ public static class LodgeKit
 	/// <summary>A table: a top and four legs (or a pedestal for round ones).</summary>
 	public static void Table(MeshKit k, Vector3 c, float yaw, Vector2 size, float h, Material top, Material legs, bool round = false)
 	{
+		// the modelled ones: the café table, the low table by the fire (scaled to the size asked, near enough)
+		if (round && Mathf.Abs(h - 0.74f) < 0.1f
+			&& FurnitureKit.Add(k, "bar_table", c, yaw, new() { ["top"] = top, ["metal"] = legs }, new Vector3(size.X / 0.82f, h / 0.74f, size.X / 0.82f))) return;
+		if (!round && h < 0.6f
+			&& FurnitureKit.Add(k, "coffee_table", c, yaw, new() { ["wood"] = top }, new Vector3(size.X / 1.4f, h / 0.42f, size.Y / 0.8f))) return;
 		k.Xf = new Transform3D(new Basis(Vector3.Up, yaw), c);
 		k.Mat(top);
 		k.Color = Colors.White;
@@ -164,6 +174,7 @@ public static class LodgeKit
 	/// <summary>A dining chair facing -Z: a turned frame, an upholstered seat and back.</summary>
 	public static void Chair(MeshKit k, Vector3 c, float yaw, Material seat)
 	{
+		if (FurnitureKit.Add(k, "dining_chair", c, yaw, new() { ["wood"] = LodgeTextures.DarkWoodMat, ["upholstery"] = seat })) return;
 		k.Xf = new Transform3D(new Basis(Vector3.Up, yaw), c);
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
@@ -180,6 +191,10 @@ public static class LodgeKit
 	/// <summary>A bed facing -Z (headboard at +Z): a tall buttoned headboard, a counterpane, two pillows.</summary>
 	public static void Bed(MeshKit k, Vector3 c, float yaw, Material cover, Material head, float w = 1.6f)
 	{
+		if (FurnitureKit.Add(k, "bed_17", c, yaw, new()
+			{
+				["wood"] = LodgeTextures.DarkWoodMat, ["upholstery"] = head, ["linen"] = LodgeTextures.LinenMat, ["pillow"] = LodgeTextures.PillowMat, ["cover"] = cover,
+			}, new Vector3(w / 1.7f, 1f, 1f))) return;
 		k.Xf = new Transform3D(new Basis(Vector3.Up, yaw), c);
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
@@ -200,6 +215,10 @@ public static class LodgeKit
 	/// <summary>A lamp: a turned base, a pleated shade that glows. Returns the bulb's position (parent space).</summary>
 	public static Vector3 Lamp(MeshKit k, Vector3 c, float h, Material shade, bool floor = false)
 	{
+		// the modelled lamps (a stepped, turned base, a reeded column, a pleated drum shade), scaled to the height asked
+		float made = floor ? 1.6f : 0.5f;
+		if (FurnitureKit.Add(k, floor ? "lamp_floor" : "lamp_table", c, 0f, new() { ["metal"] = LodgeTextures.BrassMat, ["shade"] = shade }, Vector3.One * (h / made)))
+			return c + Vector3.Up * (h - 0.1f);
 		k.Mat(LodgeTextures.BrassMat);
 		k.Color = Colors.White;
 		k.Cylinder(c, c + Vector3.Up * 0.03f, floor ? 0.16f : 0.09f, floor ? 0.14f : 0.08f, 10, true);

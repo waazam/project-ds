@@ -126,11 +126,15 @@ public partial class SkiLodge
 		AudioDirector.OneShot(this, "wendigo_howl_04", 1, perch + Vector3.Up * 3f, 7.5f, "Unnatural", 12f, 0.02f);
 		GD.Print("[story] Act 23: a howl behind them - it's on the balcony, watching");
 		await Cutscene.Wait(this, 0.6, ct);
-		// they turn, and look up
-		await StoryBeat.PanTowards(this, player, perch + Vector3.Up * 3.1f, 1.7f, ct);
+		// they turn, and look up, stumbling back out from under the balcony over the doors (from under it, its own edge
+		// hid the far side)
+		var back = player.CreateTween();
+		back.TweenProperty(player, "global_position", ToGlobal(new Vector3(-0.4f, FloorY, BalconyIn - 1.4f)), 1.5f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		await StoryBeat.PanTowards(this, player, perch + Vector3.Up * 3.4f, 1.7f, ct, pitch: true);
 		await Cutscene.Wait(this, 0.8, ct);
 		// it speaks
 		AudioDirector.OneShot(this, "wendigo_forever", 1, perch + Vector3.Up * 3f, 6f, "Voice", 10f, 0f);
+		FinaleWendigo.Speak(6.3f);   // (its jaw working with the words)
 		foreach (var (line, t) in new[] { ("STARVING.....", 1.8), ("FREEZING.....", 1.9), ("FOREVER....", 2.2) })
 		{
 			_ = StoryBeat.Caption(this, line, 0.2f, (float)t - 0.5f, 0.3f);

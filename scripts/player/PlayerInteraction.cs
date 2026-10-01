@@ -30,6 +30,10 @@ public partial class PlayerInteraction : Node
 	private PhysicsRayQueryParameters3D _query;
 	private Godot.Collections.Array<Rid> _exclude;
 	private const int MaxRecasts = 3;
+	/// <summary>A press is kept this long: if the focus wasn't on something usable on the very tick it landed (a slow frame,
+	/// the view a hair off the pick sphere), it still counts on the next ticks rather than being lost.</summary>
+	private const float PressBuffer = 0.15f;
+	private float _buffered;
 
 	public override void _Ready()
 	{
@@ -46,6 +50,9 @@ public partial class PlayerInteraction : Node
 	public override void _PhysicsProcess(double delta)
 	{
 		var input = _player.PlayerInput;
+		if (input.InteractPressed) _buffered = PressBuffer;
+		else _buffered = Mathf.Max(0f, _buffered - (float)delta);
+		if (!input.Enabled || input.Modal) _buffered = 0f;   // (a press that closed a note or a menu is spent)
 		// A blocked one (hands full) stays focusable so its prompt can say why; Probe skips disabled or hidden ones.
 		var target = input.Enabled && !input.Modal ? Probe() : null;
 		SetFocus(target);
@@ -57,7 +64,7 @@ public partial class PlayerInteraction : Node
 
 		if (Focused.HoldSeconds <= 0f)
 		{
-			if (input.InteractPressed) Focused.Interact(_player);
+			if (_buffered > 0f) { _buffered = 0f; Focused.Interact(_player); }
 			return;
 		}
 		if (input.InteractHeld)

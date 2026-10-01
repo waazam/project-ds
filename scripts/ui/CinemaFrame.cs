@@ -38,10 +38,15 @@ public partial class CinemaFrame : CanvasLayer
 		var size = GetViewport().GetVisibleRect().Size;
 		float bar = Mathf.Max(0f, (size.Y - size.X / Aspect) * 0.5f) * e;
 		_top.Visible = _bottom.Visible = bar > 0.01f;
-		_top.Position = Vector2.Zero;
-		_top.Size = new Vector2(size.X, bar);
-		_bottom.Position = new Vector2(0, size.Y - bar);
-		_bottom.Size = new Vector2(size.X, bar);
+		// (each bar runs well past its edge of the screen: drawn at the game's 640x360 and scaled to a window that isn't a
+		// whole multiple of it, a bar sized to the edge exactly could stop a fraction of a pixel short, a hairline of the
+		// game showing under it; the owner saw one at the bottom)
+		const float over = 16f;
+		bar = Mathf.Ceil(bar);
+		_top.Position = new Vector2(-over, -over);
+		_top.Size = new Vector2(size.X + over * 2f, bar + over);
+		_bottom.Position = new Vector2(-over, size.Y - bar);
+		_bottom.Size = new Vector2(size.X + over * 2f, bar + over);
 
 		if (inGame && s != null && StoryBeat.PostMaterial(this) is { } post)
 		{

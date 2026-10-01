@@ -762,10 +762,19 @@ public partial class Cabin : Node3D
 		BuildKit.Box(k, new Vector3(sx + 0.255f, 0.46f, sz), new Vector3(0.02f, 0.26f, 0.3f), 2f);
 		cols.Add((new Vector3(sx, 0.4f, sz), new Vector3(0.56f, 0.8f, 0.68f), Basis.Identity));
 
-		// woodpile beside the stove
+		// woodpile beside the stove (the modelled one: split logs in an iron cradle; the owner's fidelity pass, 2026-09-30)
+		var roles = new System.Collections.Generic.Dictionary<string, Material>
+		{
+			["bark"] = BuildingTextures.LogMat, ["wood"] = PropTextures.PostMat, ["iron"] = iron, ["metal"] = BuildingTextures.Plain("b_tin", new Color(0.4f, 0.37f, 0.33f), 0.5f),
+			["glass"] = BuildingTextures.Plain("b_jar", new Color(0.32f, 0.36f, 0.3f), 0.3f), ["label"] = BuildingTextures.Plain("b_label", new Color(0.55f, 0.5f, 0.4f)),
+			["leather"] = BuildingTextures.Plain("b_book", new Color(0.26f, 0.2f, 0.16f)), ["paper"] = BuildingTextures.Plain("b_label", new Color(0.55f, 0.5f, 0.4f)),
+			["rubber"] = BuildingTextures.Plain("b_rubber", new Color(0.05f, 0.05f, 0.05f)), ["cloth"] = BuildingTextures.Plain("b_blanket", new Color(0.3f, 0.12f, 0.09f)),
+			["ceramic"] = BuildingTextures.Plain("b_enamel", new Color(0.7f, 0.7f, 0.66f), 0.4f),
+		};
+		bool modelled = !IsBurnt && FurnitureKit.Add(k, "log_pile", new Vector3(sx + 0.05f, 0f, sz + 0.78f), 0f, roles);
 		k.Mat(BuildingTextures.LogMat);
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 31 + 3) };
-		for (int i = 0; i < 6; i++)
+		for (int i = 0; i < (modelled ? 0 : 6); i++)
 		{
 			int row = i < 3 ? 0 : (i < 5 ? 1 : 2);
 			float lx = sx - 0.05f + (i % 3 - 1) * 0.14f + row * 0.07f;
@@ -814,7 +823,17 @@ public partial class Cabin : Node3D
 		var glass = BuildingTextures.Plain("b_jar", new Color(0.32f, 0.36f, 0.3f), 0.3f);
 		var tin = BuildingTextures.Plain("b_tin", new Color(0.4f, 0.37f, 0.33f), 0.5f);
 		var book = BuildingTextures.Plain("b_book", new Color(0.26f, 0.2f, 0.16f));
-		for (int i = 0; i < 4; i++)
+		if (modelled)
+		{
+			// the modelled jars and tins, a row of books, a mug on the stove's top, boots by the door, a coat on a peg
+			for (int i = 0; i < 4; i++) FurnitureKit.Add(k, i % 2 == 0 ? "jar" : "tin", new Vector3(shx - 0.02f, 1.065f, shz0 + 0.15f + i * 0.14f), i * 1.3f, roles);
+			FurnitureKit.Add(k, "books_row_b", new Vector3(shx - 0.01f, 1.515f, shz0 + 0.85f), Mathf.Pi * 0.5f, roles);
+			FurnitureKit.Add(k, "tin", new Vector3(shx - 0.02f, 1.515f, shz0 + 0.2f), 0.4f, roles);
+			FurnitureKit.Add(k, "mug", new Vector3(sx + 0.12f, 0.76f, sz + 0.18f), 2.2f, roles);
+			FurnitureKit.Add(k, "boots", new Vector3(ix - 0.45f, 0.0f, iz - 0.4f), 2.6f, roles);
+			FurnitureKit.Add(k, "coat_on_hook", new Vector3(-ix + 0.02f, 1.8f, iz - 0.95f), -Mathf.Pi * 0.5f, roles);   // (on the side wall: the front one is all door and window)
+		}
+		for (int i = 0; i < (modelled ? 0 : 4); i++)
 		{
 			float z = shz0 + 0.15f + i * 0.14f;
 			k.Mat(i % 2 == 0 ? glass : tin);
@@ -822,7 +841,7 @@ public partial class Cabin : Node3D
 			k.Cylinder(new Vector3(shx - 0.02f, 1.065f, z), new Vector3(shx - 0.02f, 1.065f + (i % 2 == 0 ? 0.17f : 0.11f), z), 0.045f, 0.045f, 6, true);
 		}
 		k.Mat(book);
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < (modelled ? 0 : 5); i++)
 		{
 			float sh = rng.RandfRange(0.7f, 1.2f);
 			k.Color = new Color(sh, sh * rng.RandfRange(0.8f, 1f), sh * 0.8f);
@@ -831,7 +850,7 @@ public partial class Cabin : Node3D
 		}
 		k.Mat(tin);
 		k.Color = Colors.White;
-		k.Cylinder(new Vector3(shx - 0.02f, 1.515f, shz0 + 0.2f), new Vector3(shx - 0.02f, 1.63f, shz0 + 0.2f), 0.06f, 0.055f, 6, true);
+		if (!modelled) k.Cylinder(new Vector3(shx - 0.02f, 1.515f, shz0 + 0.2f), new Vector3(shx - 0.02f, 1.63f, shz0 + 0.2f), 0.06f, 0.055f, 6, true);
 
 		// crate in the front-left corner
 		k.Mat(BuildingTextures.BoardsMat);

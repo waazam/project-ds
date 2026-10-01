@@ -532,6 +532,8 @@ public partial class Sewer : Node3D
 		return l.Z > -1f && l.Z < RoomZ1 + 1f && Mathf.Abs(l.X) < RoomX + 1f && l.Y > -3f && l.Y < 16f;
 	}
 
+	private bool _slowed;
+
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
@@ -546,7 +548,12 @@ public partial class Sewer : Node3D
 		if (player == null) return;
 		bool inside = Inside(player.GlobalPosition);
 		PlayerWading = inside && InWater(player.GlobalPosition);
-		player.WadeScale = Mathf.MoveToward(player.WadeScale, PlayerWading ? WadeDrag : 1f, dt * 3f);
+		// (only while it's ours: written everywhere, it held Act 22's deep snow at full pace)
+		if (inside || _slowed)
+		{
+			player.WadeScale = Mathf.MoveToward(player.WadeScale, PlayerWading ? WadeDrag : 1f, dt * 3f);
+			_slowed = inside || player.WadeScale < 0.999f;
+		}
 		if (inside && StoryBeat.Atmosphere(this) is { } atmo)
 		{
 			atmo.Underground = Mathf.MoveToward(atmo.Underground, 1f, dt * 2f);

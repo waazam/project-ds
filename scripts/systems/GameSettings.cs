@@ -35,6 +35,51 @@ public partial class GameSettings : Node
 	// Display (the owner, from the teaser): a cinematic frame and an old TV's look
 	/// <summary>2.2:1 letterbox bars over the game (not the HUD; they slide away while the camera is raised).</summary>
 	public bool CinemaBars = true;
+
+	/// <summary>Fullscreen (borderless, the screen's own resolution: the default) or a window.</summary>
+	public bool Windowed
+	{
+		get => _windowed;
+		set { _windowed = value; ApplyWindow(); }
+	}
+	private bool _windowed;
+	/// <summary>The window's size when windowed (one of <see cref="Resolutions"/>; the screen's own size if it's bigger).</summary>
+	public Vector2I WindowSize
+	{
+		get => _windowSize;
+		set { _windowSize = value; ApplyWindow(); }
+	}
+	private Vector2I _windowSize = new(1600, 900);
+	/// <summary>The window sizes offered (those that fit the screen).</summary>
+	public static readonly Vector2I[] Resolutions =
+	{
+		new(1280, 720), new(1366, 768), new(1600, 900), new(1920, 1080), new(2560, 1440), new(3840, 2160),
+	};
+
+	/// <summary>The window sizes that fit on this screen.</summary>
+	public static Vector2I[] FittingResolutions()
+	{
+		var screen = DisplayServer.ScreenGetSize();
+		var list = new System.Collections.Generic.List<Vector2I>();
+		foreach (var r in Resolutions) if (r.X <= screen.X && r.Y <= screen.Y) list.Add(r);
+		if (list.Count == 0) list.Add(Resolutions[0]);
+		return list.ToArray();
+	}
+
+	/// <summary>Puts the window in the chosen mode and size (the game's picture scales to it either way).</summary>
+	public void ApplyWindow()
+	{
+		if (!IsInsideTree() || AutoTest || Trailer || DisplayServer.GetName() == "headless") return;
+		if (_windowed)
+		{
+			DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
+			var screen = DisplayServer.ScreenGetSize();
+			var size = new Vector2I(Mathf.Min(_windowSize.X, screen.X), Mathf.Min(_windowSize.Y, screen.Y));
+			DisplayServer.WindowSetSize(size);
+			DisplayServer.WindowSetPosition(DisplayServer.ScreenGetPosition() + (screen - size) / 2);
+		}
+		else DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
+	}
 	private bool _crtFilter = true;
 	/// <summary>The CRT look: the game's 360 lines drawn as a TV's scanlines, a slight colour fringe and a darker
 	/// grade. It draws the 2D and the finish at the window's full resolution, while the 3D still renders at 360
@@ -121,6 +166,7 @@ public partial class GameSettings : Node
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
 		ApplyMasterVolume();
+		if (_windowed) Callable.From(ApplyWindow).CallDeferred();   // (the project opens fullscreen)
 	}
 
 	public override void _UnhandledInput(InputEvent e)
@@ -128,9 +174,8 @@ public partial class GameSettings : Node
 		// F11 or Alt+Enter: switch between borderless fullscreen (the default) and a window.
 		if (e is InputEventKey { Pressed: true, Echo: false } k && (k.Keycode == Key.F11 || (k.Keycode == Key.Enter && k.AltPressed)))
 		{
-			var mode = DisplayServer.WindowGetMode();
-			DisplayServer.WindowSetMode(mode == DisplayServer.WindowMode.Fullscreen
-				? DisplayServer.WindowMode.Windowed : DisplayServer.WindowMode.Fullscreen);
+			Windowed = DisplayServer.WindowGetMode() == DisplayServer.WindowMode.Fullscreen;
+			Save();
 			GetViewport().SetInputAsHandled();
 		}
 	}
@@ -149,6 +194,9 @@ public partial class GameSettings : Node
 		cfg.SetValue("display", "cinema_bars", CinemaBars);
 		cfg.SetValue("display", "crt_filter", _crtFilter);
 		cfg.SetValue("display", "shadows", _shadows);
+		cfg.SetValue("display", "windowed", _windowed);
+		cfg.SetValue("display", "window_width", _windowSize.X);
+		cfg.SetValue("display", "window_height", _windowSize.Y);
 		cfg.Save(SavePath);
 		EmitSignal(SignalName.Changed);
 	}
@@ -169,6 +217,8 @@ public partial class GameSettings : Node
 		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
 		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
 		_shadows = Mathf.Clamp((int)cfg.GetValue("display", "shadows", _shadows), 0, 2);
+		_windowed = (bool)cfg.GetValue("display", "windowed", _windowed);
+		_windowSize = new Vector2I((int)cfg.GetValue("display", "window_width", _windowSize.X), (int)cfg.GetValue("display", "window_height", _windowSize.Y));
 	}
 
 	/// <summary>Game pixels per window pixel's worth: how many window rows draw one of the game's 360 lines.</summary>

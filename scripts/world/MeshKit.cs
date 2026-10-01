@@ -18,6 +18,11 @@ public class MeshKit
 		public readonly List<Vector2> UV = new();
 		public readonly List<Color> C = new();
 		public readonly List<int> I = new();
+		/// <summary>Tangents (x, y, z, w per vertex): only for geometry taken from a modelled mesh (<see cref="AddMesh"/>),
+		/// whose normal maps need them; a surface is never both.</summary>
+		public readonly List<float> T = new();
+		/// <summary>The second UV set (a modelled piece's baked maps), likewise only for <see cref="AddMesh"/>'s geometry.</summary>
+		public readonly List<Vector2> UV2 = new();
 	}
 
 	private readonly Dictionary<Material, Surf> _surfs = new();
@@ -404,6 +409,46 @@ public class MeshKit
 		foreach (var ((si, vi), n) in lifted) surfs[si].V[vi] += n * lift;
 	}
 
+	/// <summary>Adds a modelled mesh (assets/models: Blender's), transformed by <paramref name="xf"/> (then <see cref="Xf"/>),
+	/// each of its surfaces into its own material's surface here, normals and tangents kept (so its baked normal maps
+	/// hold), its vertex colour white. The kit's furniture stays one mesh per material, however many pieces.</summary>
+	public void AddMesh(Mesh mesh, Transform3D xf, Dictionary<Material, Material> materials = null)
+	{
+		if (mesh == null) return;
+		var full = Xf * xf;
+		var nb = full.Basis.Inverse().Transposed();
+		for (int si = 0; si < mesh.GetSurfaceCount(); si++)
+		{
+			var arr = mesh.SurfaceGetArrays(si);
+			var mat = mesh.SurfaceGetMaterial(si);
+			if (materials != null && mat != null && materials.TryGetValue(mat, out var swap)) mat = swap;
+			if (mat == null) continue;
+			Mat(mat);
+			var v = (Vector3[])arr[(int)Mesh.ArrayType.Vertex];
+			var n = arr[(int)Mesh.ArrayType.Normal].VariantType == Variant.Type.Nil ? null : (Vector3[])arr[(int)Mesh.ArrayType.Normal];
+			var uv = arr[(int)Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil ? null : (Vector2[])arr[(int)Mesh.ArrayType.TexUV];
+			var t = arr[(int)Mesh.ArrayType.Tangent].VariantType == Variant.Type.Nil ? null : (float[])arr[(int)Mesh.ArrayType.Tangent];
+			var uv2 = arr[(int)Mesh.ArrayType.TexUV2].VariantType == Variant.Type.Nil ? null : (Vector2[])arr[(int)Mesh.ArrayType.TexUV2];
+			var idx = arr[(int)Mesh.ArrayType.Index].VariantType == Variant.Type.Nil ? null : (int[])arr[(int)Mesh.ArrayType.Index];
+			int b = _cur.V.Count;
+			for (int i = 0; i < v.Length; i++)
+			{
+				_cur.V.Add(full * v[i]);
+				_cur.N.Add(n != null ? (nb * n[i]).Normalized() : Vector3.Up);
+				_cur.UV.Add(uv != null ? uv[i] : Vector2.Zero);
+				_cur.C.Add(Colors.White);
+				if (uv2 != null) _cur.UV2.Add(uv2[i]);
+				if (t != null)
+				{
+					var tv = (full.Basis * new Vector3(t[i * 4], t[i * 4 + 1], t[i * 4 + 2])).Normalized();
+					_cur.T.Add(tv.X); _cur.T.Add(tv.Y); _cur.T.Add(tv.Z); _cur.T.Add(t[i * 4 + 3] * (full.Basis.Determinant() < 0 ? -1f : 1f));
+				}
+			}
+			if (idx != null) foreach (int i in idx) _cur.I.Add(b + i);
+			else for (int i = 0; i < v.Length; i++) _cur.I.Add(b + i);
+		}
+	}
+
 	public ArrayMesh Commit()
 	{
 		SeparateCoplanar();
@@ -419,6 +464,8 @@ public class MeshKit
 			arr[(int)Mesh.ArrayType.TexUV] = s.UV.ToArray();
 			arr[(int)Mesh.ArrayType.Color] = s.C.ToArray();
 			arr[(int)Mesh.ArrayType.Index] = s.I.ToArray();
+			if (s.T.Count == s.V.Count * 4 && s.T.Count > 0) arr[(int)Mesh.ArrayType.Tangent] = s.T.ToArray();
+			if (s.UV2.Count == s.V.Count && s.UV2.Count > 0) arr[(int)Mesh.ArrayType.TexUV2] = s.UV2.ToArray();
 			mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arr);
 			mesh.SurfaceSetMaterial(mesh.GetSurfaceCount() - 1, m);
 		}

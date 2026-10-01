@@ -42,6 +42,25 @@ public static class WinterTreeKit
 		}
 	}
 
+	private static ShaderMaterial _boughs;
+	private static StandardMaterial3D _firSnow;
+
+	/// <summary>The winter firs' boughs: the twigs' shader (alpha-cut cards, the ice from custom data) with a fir bough.</summary>
+	public static ShaderMaterial Boughs
+	{
+		get
+		{
+			if (_boughs != null) return _boughs;
+			_boughs = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/winter_twigs.gdshader"), ResourceName = "winter_fir_boughs" };
+			_boughs.SetShaderParameter("twig_tex", GD.Load<Texture2D>("res://assets/textures/winter/fir_bough.png"));
+			_boughs.SetMeta("detail_kind", -1);
+			return _boughs;
+		}
+	}
+
+	/// <summary>The snow lying on the firs' tiers: the fresh snow, a step under white.</summary>
+	public static StandardMaterial3D FirSnow => _firSnow ??= WinterWoods.SnowStd("winter_fir_snow", 0.5f, 0.84f);
+
 	/// <summary>A loft through rings (centre, radius), its frame carried along so it never twists; bark u once or
 	/// twice round, v up it at <paramref name="vScale"/> per metre.</summary>
 	public static void Loft(MeshKit k, IList<(Vector3 c, float r)> rings, int sides, float uRound, float vScale, float v0 = 0f)
@@ -103,6 +122,100 @@ public static class WinterTreeKit
 		mm.SetInstanceTransform(0, Transform3D.Identity);
 		mm.SetInstanceCustomData(0, new Color(ice, 0, 0, 0));
 		return new MultiMeshInstance3D { Name = name, Multimesh = mm };
+	}
+
+	/// <summary>A winter fir about <paramref name="height"/> tall, <paramref name="maxR"/> across at its widest tier: a
+	/// pine-bark trunk, bare and stubbed low down; tiers of drooping boughs (each a V of two alpha-cut cards, so it has
+	/// body from any side), sweeping down and out, narrowing to a spire; and the snow lying heavy on every tier, a lumpy
+	/// cap over its boughs with a lip at its edge (the owner's references: dark green under white).</summary>
+	public static Mesh WinterFir(int seed, float height, float maxR)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7717 + 3) };
+		var k = new MeshKit();
+		float trunkR = 0.12f + height * 0.013f;
+		float ph = rng.RandfRange(0f, Mathf.Tau);
+		Vector3 Axis(float y) { float f = y / height; return new Vector3(Mathf.Sin(f * 2.1f + ph) * 0.14f * f, y, Mathf.Cos(f * 1.8f + ph) * 0.12f * f); }
+		// ---- the trunk
+		k.Mat(Bark(2));
+		k.Color = Colors.White;
+		var rings = new List<(Vector3, float)> { (new Vector3(0, -0.5f, 0), trunkR * 1.6f), (new Vector3(0, -0.1f, 0), trunkR * 1.45f), (Axis(0.3f), trunkR * 1.15f), (Axis(1.2f), trunkR) };
+		for (int i = 1; i <= 6; i++) { float y = Mathf.Lerp(1.2f, height * 0.97f, i / 6f); rings.Add((Axis(y), trunkR * Mathf.Lerp(0.95f, 0.06f, i / 6f))); }
+		Loft(k, rings, 8, 2f, 0.55f);
+		float crownStart = height * rng.RandfRange(0.16f, 0.26f);
+		// dead stubs on the bare trunk below the crown
+		int stubs = Mathf.RoundToInt(crownStart * 1.6f);
+		for (int i = 0; i < stubs; i++)
+		{
+			float y = rng.RandfRange(1.6f, crownStart);
+			float a = rng.RandfRange(0, Mathf.Tau);
+			var d = new Vector3(Mathf.Cos(a), rng.RandfRange(-0.4f, 0.05f), Mathf.Sin(a)).Normalized();
+			Loft(k, new List<(Vector3, float)> { (Axis(y), 0.04f), (Axis(y) + d * rng.RandfRange(0.3f, 0.9f), 0.012f) }, 4, 1f, 0.55f);
+		}
+		// ---- the tiers: boughs, then the snow on them
+		int tiers = Mathf.Clamp(Mathf.RoundToInt((height - crownStart) / 1.15f), 7, 18);
+		var caps = new List<(Vector3 c, float r, float droop, float rot)>();
+		k.Mat(Boughs);
+		for (int t = 0; t < tiers; t++)
+		{
+			float f = (float)t / (tiers - 1);
+			float y = Mathf.Lerp(crownStart, height * 0.95f, Mathf.Pow(f, 0.95f)) + rng.RandfRange(-0.15f, 0.15f);
+			float R = maxR * Mathf.Pow(1f - f, 0.85f) * rng.RandfRange(0.88f, 1.08f) * Mathf.Lerp(0.85f, 1f, Mathf.SmoothStep(0f, 0.2f, f)) + 0.28f;
+			int m = Mathf.Max(5, Mathf.RoundToInt(Mathf.Lerp(9f, 5f, f)));
+			float droop = Mathf.Lerp(0.42f, 0.22f, f);
+			float rot = rng.RandfRange(0, Mathf.Tau);
+			var c = Axis(y);
+			float shade = Mathf.Lerp(0.72f, 1f, f);   // the lower tiers in their own shade
+			k.Color = new Color(shade, shade, shade);
+			for (int b = 0; b < m; b++)
+			{
+				float a = rot + Mathf.Tau * b / m + rng.RandfRange(-0.2f, 0.2f);
+				var dir = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+				float len = R * rng.RandfRange(0.9f, 1.08f);
+				var tip = c + dir * len + Vector3.Down * len * Mathf.Tan(droop);
+				var along = (tip - c).Normalized();
+				var side = Vector3.Up.Cross(dir).Normalized();
+				float w = len * 0.78f;
+				foreach (float tilt in new[] { 0.42f, -0.42f })
+				{
+					// the card tilted about the bough's own line (a shallow V, open upward)
+					var sv = (side * Mathf.Cos(tilt) + Vector3.Up * Mathf.Sin(Mathf.Abs(tilt))).Normalized() * Mathf.Sign(tilt);
+					Vector3 b0 = c - along * 0.1f - sv * w * 0.5f, b1 = c - along * 0.1f + sv * w * 0.5f;
+					Vector3 t0 = b0 + along * len, t1 = b1 + along * len;
+					var nrm = (sv.Cross(along).Normalized() * 0.4f + Vector3.Up).Normalized();
+					if (nrm.Y < 0) nrm = -nrm;
+					k.Tri(b0, b1, t1, nrm, nrm, nrm, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
+					k.Tri(b0, t1, t0, nrm, nrm, nrm, new Vector2(0, 1), new Vector2(1, 0), new Vector2(0, 0));
+				}
+			}
+			caps.Add((c, R, droop, rot));
+		}
+		// the snow: a lumpy cap over each tier (its boughs' upper side), thinning to a lip at the edge
+		k.Mat(FirSnow);
+		k.Color = Colors.White;
+		foreach (var (c, R, droop, rot) in caps)
+		{
+			const int seg = 12;
+			float outer = R * 0.82f, inner = 0.12f;
+			var o = new Vector3[seg]; var i0 = new Vector3[seg]; var lip = new Vector3[seg];
+			for (int j = 0; j < seg; j++)
+			{
+				float a = rot + Mathf.Tau * j / seg;
+				float r = outer * rng.RandfRange(0.78f, 1.05f);
+				var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+				// (over the V's raised edges: at the bough's line it lay inside the V, hidden)
+				o[j] = c + d * r + Vector3.Down * (r * Mathf.Tan(droop) - r * 0.2f - 0.1f - rng.RandfRange(0f, 0.08f));
+				i0[j] = c + d * inner + Vector3.Up * 0.3f;
+				lip[j] = o[j] + Vector3.Down * rng.RandfRange(0.08f, 0.16f) - d * 0.03f;
+			}
+			for (int j = 0; j < seg; j++)
+			{
+				int n = (j + 1) % seg;
+				k.Quad(i0[j], i0[n], o[n], o[j], Vector3.Up);
+				var outN = ((o[j] + o[n]) * 0.5f - c) with { Y = 0 };
+				k.Quad(o[j], o[n], lip[n], lip[j], outN.Normalized());
+			}
+		}
+		return k.Commit();
 	}
 
 	/// <summary>A bare broadleaf about <paramref name="height"/> tall (its base at the origin, sunk a little).</summary>

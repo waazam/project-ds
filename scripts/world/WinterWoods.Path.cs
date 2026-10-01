@@ -174,19 +174,60 @@ public partial class WinterWoods
 		return Mathf.Lerp(_py[i], _py[i + 1], f - i);
 	}
 
+	/// <summary>Where the plowed walls stand (metres from the centreline): their foot (at the road's edge), and the top
+	/// of their face. Plowed a while ago, they've slumped: a long low toe sloping up off the road, steepening to a
+	/// near-sheer upper face and a rounded lip (the owner, 2026-09-30).</summary>
+	public const float WallFoot = 3.35f, WallTop = 4.75f;
+
+	/// <summary>How far up its wall a point at <paramref name="d"/> metres out is (0 at the foot, 1 at the top): the toe's
+	/// slow rise, the upper face's steep one.</summary>
+	public static float WallRise(float d, float top)
+	{
+		float f = Mathf.Clamp((d - WallFoot) / Mathf.Max(top - WallFoot, 0.01f), 0f, 1f);
+		return Mathf.Pow(f, 1.8f) * (1f - 0.15f * f) + 0.15f * f * f * f;
+	}
+
+	/// <summary>Where a wall reaches <paramref name="h"/> metres up (metres from the centreline), at arc length s on a side.</summary>
+	public static float WallAt(float h, float s, float side)
+	{
+		float H = WallHeight(s, side);
+		float lo = WallFoot, hi = WallTop;
+		for (int i = 0; i < 20; i++) { float m = (lo + hi) * 0.5f; if (H * WallRise(m, WallTop) < h) lo = m; else hi = m; }
+		return (lo + hi) * 0.5f;
+	}
+
+	/// <summary>How high the walls the plow cut are, at arc length <paramref name="s"/> on one side (+1 right, -1 left):
+	/// 1.6-3.6 m of sheer snow (the owner's references: a road cut through deep snow), rising out of the church's yard
+	/// and sinking into the lodge's shelf; low where something stands off the road on that side, so it can be seen
+	/// (and reached, wading).</summary>
+	public static float WallHeight(float s, float side)
+	{
+		float h = 2.6f + 0.7f * Mathf.Sin(s * 0.021f + side * 1.3f) + 0.35f * Mathf.Sin(s * 0.067f + side * 2.1f);
+		// (a prop's side is PropXZ's right-hand +1, which Nearest calls -1)
+		foreach (var (_, ps, pside, pd) in PropSpots)
+			if (pside == -side && pd > 5f)
+				h = Mathf.Lerp(0.55f, h, Mathf.SmoothStep(6f, 15f, Mathf.Abs(s - ps)));
+		float ramp = Mathf.SmoothStep(14f, 60f, s) * (1f - Mathf.SmoothStep(Length - 75f, Length - 30f, s));
+		return Mathf.Lerp(0.55f, h, ramp);
+	}
+
 	/// <summary>The road's cross-section, height above its centre at <paramref name="d"/> metres out: two tyre
-	/// ruts, the packed edge, the windrow the blade threw up, the deep undisturbed snow beyond it.</summary>
-	public static float Profile(float d)
+	/// ruts, the packed edge, then the wall the plow cut (a near-sheer face up to its height, a rounded lip), and
+	/// its top easing off into the deep undisturbed snow beyond.</summary>
+	public static float Profile(float d, float s, float side)
 	{
 		d = Mathf.Abs(d);
 		float y = 0f;
 		// the ruts: two shallow grooves a car's width apart
 		y -= 0.05f * Mathf.Exp(-Mathf.Pow((d - 1.0f) / 0.28f, 2f));
-		// the packed edge, then the windrow
-		y += Mathf.SmoothStep(RoadHalf - 0.3f, RoadHalf + 0.4f, d) * 0.12f;
-		float berm = Mathf.Exp(-Mathf.Pow((d - BermPeak) / 0.75f, 2f));
-		y += berm * 0.72f;
-		y += Mathf.SmoothStep(BermHalf - 0.4f, DeepSnow, d) * 0.3f;
+		// the packed edge
+		y += Mathf.SmoothStep(RoadHalf - 0.3f, RoadHalf + 0.1f, d) * 0.1f;
+		// the wall: its face, its lip, its top sagging a little away from the road
+		float H = WallHeight(s, side);
+		// (where it's low, at a gap, a bank to wade up rather than a step)
+		float top = Mathf.Lerp(WallTop + 1.8f, WallTop, Mathf.SmoothStep(0.8f, 1.5f, H));
+		y += H * WallRise(d, top);
+		y += 0.1f * Mathf.SmoothStep(top, top + 0.45f, d) - 0.2f * Mathf.SmoothStep(top + 0.7f, DeepSnow + 0.6f, d);
 		return y;
 	}
 
@@ -194,13 +235,13 @@ public partial class WinterWoods
 	/// is, the rolling snow away from it, the flats round the lodge.</summary>
 	public static float Height(float x, float z)
 	{
-		float d = Nearest(x, z, out float s, out _);
+		float d = Nearest(x, z, out float s, out float side);
 		float basey = BaseHeight(x, z);
 		float h;
-		if (d <= DeepSnow) h = RoadY(s) + Profile(d);
+		if (d <= DeepSnow) h = RoadY(s) + Profile(d, s, side);
 		else
 		{
-			float roadSide = RoadY(s) + Profile(DeepSnow);
+			float roadSide = RoadY(s) + Profile(DeepSnow, s, side);
 			h = Mathf.Lerp(roadSide, basey, Mathf.SmoothStep(DeepSnow, BlendOut + 6f, d)) + Hills(x, z, d);
 		}
 		return Flats(x, z, h);
@@ -212,7 +253,10 @@ public partial class WinterWoods
 		float d = Nearest(x, z, out float s, out _);
 		float w = 1f - Mathf.SmoothStep(RoadHalf - 0.2f, RoadHalf + 0.5f, d);
 		if (s >= Length - 1f) w *= 1f - Mathf.SmoothStep(0f, 3f, d);   // past the road's end: the circle's own
-		return Mathf.Max(w, SkiLodge.CircleWeight(x, z));
+		// round the lodge, all of it plowed (the owner: no drag there; it looks it too)
+		var lo = SkiLodge.OriginLocal;
+		float lodge = 1f - Mathf.SmoothStep(36f, 46f, new Vector2(x - lo.X, z - lo.Z).Length());
+		return Mathf.Max(Mathf.Max(w, SkiLodge.CircleWeight(x, z)), lodge);
 	}
 
 	/// <summary>How far toward the lodge (0 at the church, 1 at the lodge): the snow thins and the ice comes.</summary>

@@ -100,8 +100,9 @@ public partial class SkiLodge
 			new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1));
 		LodgeKit.Sofa(k, (sit - fout * 1.4f) with { Y = FloorY }, fyaw + Mathf.Pi, LodgeTextures.LeatherMat, 2.4f);
 		LodgeKit.Sofa(k, (sit + falong * 2.3f) with { Y = FloorY }, fyaw + Mathf.Pi + Mathf.Pi * 0.5f, LodgeTextures.LeatherMat, 2.1f);
-		LodgeKit.Armchair(k, (sit - falong * 2.2f + fout * 0.6f) with { Y = FloorY }, fyaw + Mathf.Pi - 0.9f, LodgeTextures.VelvetVioletMat);
-		LodgeKit.Armchair(k, (sit - falong * 2.3f - fout * 0.8f) with { Y = FloorY }, fyaw + Mathf.Pi - 1.4f, LodgeTextures.VelvetVioletMat);
+		// (spread further apart: the modelled wing chairs are broader than the old blocks, and the two overlapped)
+		LodgeKit.Armchair(k, (sit - falong * 2.1f + fout * 0.95f) with { Y = FloorY }, fyaw + Mathf.Pi - 0.9f, LodgeTextures.VelvetVioletMat);
+		LodgeKit.Armchair(k, (sit - falong * 2.45f - fout * 1.05f) with { Y = FloorY }, fyaw + Mathf.Pi - 1.4f, LodgeTextures.VelvetVioletMat);
 		LodgeKit.Table(k, (sit + fout * 0.1f) with { Y = FloorY }, fyaw, new Vector2(1.4f, 0.8f), 0.42f, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat);
 		foreach (var (p, sz) in new[] { (sit - fout * 1.4f, new Vector3(2.4f, 0.9f, 0.9f)), (sit + falong * 2.3f, new Vector3(0.9f, 0.9f, 2.1f)), (sit + fout * 0.1f, new Vector3(1.4f, 0.45f, 0.8f)) })
 			LodgeKit.Solid(_inBody, p with { Y = FloorY + sz.Y * 0.5f }, sz, Mathf.Atan2(-falong.Z, falong.X));
@@ -151,16 +152,65 @@ public partial class SkiLodge
 		// ---- daylight: the high windows (noon behind the snow): soft cool fill
 		foreach (var p in new[] { new Vector3(0, 7f, -7.5f), new Vector3(0, 7f, 7.5f) })
 			_dayLights.Add(Light(p, Day, 0.9f, 14f, "Daylight"));
-		// ---- odds and ends: a grandfather clock by the stairs, a writing table, a potted palm (dead)
-		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Box(new Vector3(6.5f, 1.05f, -6.6f), new Vector3(0.55f, 2.1f, 0.4f), 1f, new Basis(Vector3.Up, 0.52f));
-		k.Mat(LodgeTextures.PorcelainMat);
-		k.Cylinder(new Vector3(6.4f, 1.7f, -6.4f), new Vector3(6.35f, 1.7f, -6.3f), 0.17f, 0.17f, 14, true);
+		// ---- odds and ends: a grandfather clock by the stairs
+		if (!FurnitureKit.Add(k, "grandfather_clock", new Vector3(6.5f, FloorY, -6.6f), 0.52f + Mathf.Pi, Woodwork))
+		{
+			k.Mat(LodgeTextures.DarkWoodMat);
+			k.Box(new Vector3(6.5f, 1.05f, -6.6f), new Vector3(0.55f, 2.1f, 0.4f), 1f, new Basis(Vector3.Up, 0.52f));
+			k.Mat(LodgeTextures.PorcelainMat);
+			k.Cylinder(new Vector3(6.4f, 1.7f, -6.4f), new Vector3(6.35f, 1.7f, -6.3f), 0.17f, 0.17f, 14, true);
+		}
+		LobbyClutter(k, fc, fout, falong, sit, fyaw, d0);
 		LodgeKit.Solid(_inBody, new Vector3(6.5f, 1.05f, -6.6f), new Vector3(0.6f, 2.1f, 0.45f), 0.52f);
 		k.CommitTo(this, "LobbyFurniture", true);
 	}
 
 	public PickupInteractable FrontInsideUse { get; private set; }
+
+	/// <summary>The roles' materials for the modelled clutter (FurnitureKit): the lodge's own.</summary>
+	private static System.Collections.Generic.Dictionary<string, Material> Woodwork => new()
+	{
+		["wood"] = LodgeTextures.DarkWoodMat, ["metal"] = LodgeTextures.BrassMat, ["face"] = LodgeTextures.PorcelainMat, ["black"] = LodgeTextures.BlackMat,
+		["glass"] = BottleGlass, ["upholstery"] = LodgeTextures.LeatherMat, ["leather"] = LodgeTextures.LeatherMat, ["paper"] = Paper,
+		["label"] = Paper, ["cork"] = LodgeTextures.DarkWoodMat, ["ceramic"] = LodgeTextures.PorcelainMat, ["cloth"] = Wool,
+		["iron"] = LodgeTextures.IronMat, ["bark"] = BuildingTextures.LogMat, ["wax"] = Wax, ["rubber"] = LodgeTextures.BlackMat,
+		["ski"] = LodgeTextures.DarkWoodMat,
+	};
+	private static StandardMaterial3D _bottleGlass, _paper, _wool, _wax;
+	private static StandardMaterial3D BottleGlass => _bottleGlass ??= new StandardMaterial3D { ResourceName = "lodge_bottle_glass", AlbedoColor = new Color(0.16f, 0.2f, 0.12f), Roughness = 0.12f, MetallicSpecular = 0.7f, RimEnabled = true, Rim = 0.25f };
+	private static StandardMaterial3D Paper => _paper ??= new StandardMaterial3D { ResourceName = "lodge_paper", AlbedoColor = new Color(0.62f, 0.58f, 0.48f), Roughness = 0.95f };
+	private static StandardMaterial3D Wool => _wool ??= new StandardMaterial3D { ResourceName = "lodge_wool", AlbedoColor = new Color(0.2f, 0.16f, 0.13f), Roughness = 1f, AlbedoTexture = LodgeTextures.LinenMat.AlbedoTexture, Uv1Scale = Vector3.One * 2f };
+	private static StandardMaterial3D Wax => _wax ??= new StandardMaterial3D { ResourceName = "lodge_wax", AlbedoColor = new Color(0.8f, 0.76f, 0.64f), Roughness = 0.5f };
+
+	/// <summary>The lobby's clutter (the owner, 2026-09-30: more clutter, more environmental detail): logs by the hearth, a
+	/// clock and candlesticks on the mantel, books and magazines and glasses on the low table, a forgotten tumbler and an
+	/// ashtray by a wing chair, the desk's books.</summary>
+	private void LobbyClutter(MeshKit k, Vector3 fc, Vector3 fout, Vector3 falong, Vector3 sit, float fyaw, Vector3 d0)
+	{
+		var w = Woodwork;
+		float fy = Mathf.Atan2(-fout.X, -fout.Z) + Mathf.Pi;   // (facing out from the fire)
+		// logs on the hearth to the side of the firebox, in their cradle
+		FurnitureKit.Add(k, "log_pile", (fc - fout * 0.45f + falong * 1.45f) with { Y = 0.3f }, fy, w);
+		// the mantel (its top at 2.07): the clock in the middle, a candlestick each side, books at one end
+		float my = 2.07f;
+		FurnitureKit.Add(k, "mantel_clock", (fc - fout * 0.12f) with { Y = my }, fy, w);
+		foreach (float a in new[] { -1.1f, 1.1f }) FurnitureKit.Add(k, "candlestick", (fc - fout * 0.12f + falong * a) with { Y = my }, fy, w);
+		FurnitureKit.Add(k, "books_stack", (fc - fout * 0.1f - falong * 1.6f) with { Y = my }, fy + 0.3f, w);
+		// the low table before the fire (its top at 0.42): a stack of books, magazines fanned, two glasses, a bottle
+		var t = (sit + fout * 0.1f) with { Y = 0.42f };
+		FurnitureKit.Add(k, "magazines", t + falong * 0.3f, fyaw + 0.4f, w);
+		FurnitureKit.Add(k, "books_stack", t - falong * 0.4f + fout * 0.1f, fyaw - 0.2f, w);
+		FurnitureKit.Add(k, "tumbler", t + falong * 0.05f - fout * 0.22f, 0f, w);
+		FurnitureKit.Add(k, "tumbler", t - falong * 0.12f - fout * 0.18f, 0f, w);
+		FurnitureKit.Add(k, "bottle_whiskey", t - falong * 0.02f - fout * 0.05f, 0.5f, w);
+		// by the wing chairs, on the floor: an ashtray and a glass left beside one, a mug by the other
+		FurnitureKit.Add(k, "ashtray", (sit - falong * 2.75f + fout * 0.1f) with { Y = FloorY }, 0.3f, w);
+		FurnitureKit.Add(k, "wine_glass", (sit - falong * 2.6f + fout * 0.25f) with { Y = FloorY }, 0f, w);
+		FurnitureKit.Add(k, "mug", (sit - falong * 2.85f - fout * 1.35f) with { Y = FloorY }, 1f, w);
+		// the front desk (its top at 1.13): a few books at its end, an ashtray
+		FurnitureKit.Add(k, "books_row_b", d0 + new Vector3(1.05f, 1.13f, 0.15f), Mathf.Pi, w);
+		FurnitureKit.Add(k, "ashtray", d0 + new Vector3(0.45f, 1.13f, -0.1f), 0.2f, w);
+	}
 
 	/// <summary>A low fire's flames: a few soft orange billboards rising slowly (no flicker: they drift).</summary>
 	private void AddFlames(Vector3 at, Vector3 along)
@@ -215,6 +265,7 @@ public partial class SkiLodge
 		// stools
 		for (float z = z0 + 0.4f; z < z1; z += 0.8f)
 		{
+			if (FurnitureKit.Add(k, "bar_stool", new Vector3(cx + 0.6f, FloorY, z), (z * 1.7f) % 6.28f, Woodwork)) continue;
 			k.Mat(LodgeTextures.BrassMat);
 			k.Cylinder(new Vector3(cx + 0.6f, FloorY, z), new Vector3(cx + 0.6f, 0.72f, z), 0.025f, 0.025f, 6, false);
 			k.Cylinder(new Vector3(cx + 0.6f, FloorY, z), new Vector3(cx + 0.6f, 0.03f, z), 0.2f, 0.18f, 10, true);
@@ -231,9 +282,16 @@ public partial class SkiLodge
 		foreach (float y in new[] { 1.45f, 1.95f, 2.45f }) k.Box(new Vector3(BarX0 + 0.25f, y, (z0 + z1) * 0.5f), new Vector3(0.3f, 0.04f, z1 - z0), 1f);
 		var brng = new RandomNumberGenerator { Seed = 4242 };
 		var bottleMats = new[] { LodgeTextures.Glow("lodge_bottle_amber", new Color(0.6f, 0.32f, 0.08f), 0.15f), LodgeTextures.Glow("lodge_bottle_green", new Color(0.1f, 0.32f, 0.12f), 0.12f), LodgeTextures.Glow("lodge_bottle_clear", new Color(0.55f, 0.55f, 0.5f), 0.1f) };
+		var kinds = new[] { "bottle_wine", "bottle_whiskey", "bottle_liqueur" };
+		var bw = Woodwork;
 		foreach (float y in new[] { 1.47f, 1.97f, 2.47f })
 			for (float z = z0 + 0.15f; z < z1 - 0.1f; z += brng.RandfRange(0.1f, 0.2f))
 			{
+				// the modelled bottles, their glass the shelf's coloured glow (amber, green, clear)
+				var bg = bottleMats[brng.RandiRange(0, 2)];
+				bw["glass"] = bg;
+				var at = new Vector3(BarX0 + 0.25f + brng.RandfRange(-0.05f, 0.05f), y, z);
+				if (FurnitureKit.Add(k, kinds[brng.RandiRange(0, 2)], at, brng.RandfRange(0f, 6.28f), bw)) continue;
 				k.Mat(bottleMats[brng.RandiRange(0, 2)]);
 				float h = brng.RandfRange(0.22f, 0.34f);
 				var b = new Vector3(BarX0 + 0.25f + brng.RandfRange(-0.05f, 0.05f), y, z);
@@ -430,8 +488,12 @@ public partial class SkiLodge
 			{
 				var bulb = LodgeKit.Lamp(k, ns + new Vector3(0, 0.6f, 0), 0.5f, shade);
 				roomLights.Add(Light(bulb, Warm, 0.35f, 3.5f));
+				// on the nightstand beside the lamp: a mug on one, a glass on the other (somebody stayed here)
+				if (num != 201) FurnitureKit.Add(k, side < 0 ? "mug" : "wine_glass", ns + new Vector3(side * 0.16f, 0.6f, s * 0.06f), side * 0.7f, Woodwork);
 			}
 		}
+		// books stacked on the floor by the bed's foot (not in 201: it's perfect)
+		if (num == 202 || num == 204) FurnitureKit.Add(k, "books_stack", bedAt + new Vector3(-1.25f, 0, -s * 0.6f), 0.4f, Woodwork);
 		// the wardrobe on the far side wall, the closet by the door (both searchable)
 		float farX = x0 + 0.35f, doorSideX = x1 - 0.35f;
 		if (num == 202 || num == 204)

@@ -96,6 +96,9 @@ public partial class WinterWoods : Node3D
 		// only alongside the road (the ribbon only covers that): past its ends, at the church's step and the
 		// lodge's turning circle, the grid is the ground itself
 		if (s <= 0.01f || s >= Length - 0.01f) return Height(x, z);
+		// under the road and its walls, well down (its 4 m cells, spanning a wall's foot and its top, came up through
+		// the road); further out, just under the ribbon's edge
+		if (d < 10.8f) return RoadY(s) - 1.0f;
 		float duck = 0.7f * (1f - Mathf.SmoothStep(BlendOut, BlendOut + 4f, d));
 		return Height(x, z) - duck;
 	}
@@ -188,51 +191,91 @@ public partial class WinterWoods : Node3D
 
 	private static readonly float[] Across =
 	{
-		-RibbonHalf, -12.5f, -10.5f, -8.5f, -6.8f, -5.8f, -5.0f, -4.6f, -4.2f, -3.8f, -3.4f, -2.4f, -1.5f, -1.0f, -0.5f, 0f,
-		0.5f, 1.0f, 1.5f, 2.4f, 3.4f, 3.8f, 4.2f, 4.6f, 5.0f, 5.8f, 6.8f, 8.5f, 10.5f, 12.5f, RibbonHalf,
+		-RibbonHalf, -12.5f, -10.5f, -8.5f, -7.4f, -6.6f, -6.0f, -5.5f, -5.1f, -4.85f, -4.75f, -4.66f, -4.56f, -4.45f, -4.32f, -4.17f, -4.0f, -3.8f, -3.58f, -3.35f, -2.4f, -1.5f, -1.0f, -0.5f, 0f,
+		0.5f, 1.0f, 1.5f, 2.4f, 3.35f, 3.58f, 3.8f, 4.0f, 4.17f, 4.32f, 4.45f, 4.56f, 4.66f, 4.75f, 4.85f, 5.1f, 5.5f, 6.0f, 6.6f, 7.4f, 8.5f, 10.5f, 12.5f, RibbonHalf,
 	};
 
 	/// <summary>The road itself: a ribbon along the centreline, every Step metres a cross-section out to the ribbon's
-	/// edges (which dip under the grid), with its own collision.</summary>
+	/// edges (which dip under the grid), with its own collision. The plowed walls are part of it, roughed up (the owner:
+	/// lumpy, not straight and smooth; and plowed a while ago): a slumped toe off the road, their faces softly in and
+	/// out, their tops broken and lumpy, with snow clumps heaped along them.</summary>
 	private void BuildRibbon()
 	{
 		int segs = 60;   // cross-sections per piece (90 m), so each piece is culled on its own
+		int n = Across.Length;
 		for (int start = 0; start < Points - 1; start += segs)
 		{
 			int end = Mathf.Min(start + segs, Points - 1);
 			var k = new MeshKit();
 			k.Mat(_groundMat);
 			var faces = new List<Vector3>();
-			Vector3[] prev = null; Color[] prevC = null;
-			for (int i = start; i <= end; i++)
+			// the rows (one either side beyond the piece, for the normals), then the normals from the ribbon itself (the
+			// ground's finite differences had smeared the sheer faces into slopes, and knew nothing of their lumps)
+			int r0 = Mathf.Max(start - 1, 0), r1 = Mathf.Min(end + 1, Points - 1);
+			var rows = new Vector3[r1 - r0 + 1][];
+			var cols = new Color[r1 - r0 + 1][];
+			for (int i = r0; i <= r1; i++)
 			{
 				var p = RoadPoint(i);
 				var t = RoadDir(i);
 				var right = new Vector2(-t.Y, t.X);   // (x, z): the right-hand side walking along the road
-				var row = new Vector3[Across.Length];
-				var rc = new Color[Across.Length];
-				for (int a = 0; a < Across.Length; a++)
+				var row = new Vector3[n];
+				var rc = new Color[n];
+				for (int a = 0; a < n; a++)
 				{
 					var q = p + right * Across[a];
 					float y = Height(q.X, q.Y);
 					if (Mathf.Abs(Across[a]) >= RibbonHalf - 0.01f) y -= 0.8f;   // the edge tucks under the grid
-					row[a] = new Vector3(q.X, y, q.Y);
+					var v = new Vector3(q.X, y, q.Y);
+					float ad = Mathf.Abs(Across[a]), sgn = Mathf.Sign(Across[a]);
+					float roadY = RoadAt(i * Step, out _).Y;
+					float rise = y - roadY;
+					if (ad > WallFoot + 0.01f && ad < WallTop + 0.2f && rise > 0.35f)
+					{
+						// the face: softly in and out (weathered: the plow's sharp ledges long since slumped), not at the toe
+						float bulge = 0.05f * Mathf.Sin(rise * 2.6f + 1.6f * Lump(q.X * 0.4f, 0f, q.Y * 0.4f)) + 0.16f * Lump(q.X * 0.8f, rise * 0.7f, q.Y * 0.8f);
+						float fade = Mathf.SmoothStep(0.6f, 1.4f, rise);
+						v += new Vector3(right.X, 0, right.Y) * sgn * bulge * fade;
+					}
+					else if (ad >= WallTop + 0.2f && ad < DeepSnow + 0.5f)
+					{
+						// the top: broken and lumpy, most at its lip
+						float lip = 1f - Mathf.SmoothStep(WallTop + 0.3f, DeepSnow, ad);
+						v.Y += (0.2f * Lump(q.X * 1.1f, 0.5f, q.Y * 1.1f) + 0.12f * Lump(q.X * 2.9f, 1.7f, q.Y * 2.9f)) * (0.35f + 0.65f * lip) * Mathf.SmoothStep(0.4f, 1.2f, rise);
+					}
+					row[a] = v;
 					rc[a] = GroundColor(q.X, q.Y);
 				}
-				if (prev != null)
-					for (int a = 0; a < Across.Length - 1; a++)
+				rows[i - r0] = row; cols[i - r0] = rc;
+			}
+			var nrm = new Vector3[rows.Length][];
+			for (int ri = 0; ri < rows.Length; ri++)
+			{
+				nrm[ri] = new Vector3[n];
+				var prevRow = rows[Mathf.Max(ri - 1, 0)]; var nextRow = rows[Mathf.Min(ri + 1, rows.Length - 1)];
+				for (int a = 0; a < n; a++)
+				{
+					var across = rows[ri][Mathf.Min(a + 1, n - 1)] - rows[ri][Mathf.Max(a - 1, 0)];
+					var along = nextRow[a] - prevRow[a];
+					nrm[ri][a] = across.Cross(along).Normalized();   // (up on the flat, toward the road on either wall)
+				}
+			}
+			for (int i = start + 1; i <= end; i++)
+			{
+				int ri = i - r0;
+				Vector3[] prev = rows[ri - 1], row = rows[ri], prevN = nrm[ri - 1], rn = nrm[ri];
+				Color[] prevC = cols[ri - 1], rc = cols[ri];
+				for (int a = 0; a < n - 1; a++)
+				{
+					Vector3 v0 = prev[a], v1 = prev[a + 1], v2 = row[a + 1], v3 = row[a];
+					TriC(k, v0, v1, v2, prevN[a], prevN[a + 1], rn[a + 1], prevC[a], prevC[a + 1], rc[a + 1]);
+					TriC(k, v0, v2, v3, prevN[a], rn[a + 1], rn[a], prevC[a], rc[a + 1], rc[a]);
+					if (Mathf.Abs(Across[a]) < RibbonHalf - 1f || Mathf.Abs(Across[a + 1]) < RibbonHalf - 1f)
 					{
-						Vector3 v0 = prev[a], v1 = prev[a + 1], v2 = row[a + 1], v3 = row[a];
-						var n0 = RoadNormal(v0); var n1 = RoadNormal(v1); var n2 = RoadNormal(v2); var n3 = RoadNormal(v3);
-						TriC(k, v0, v1, v2, n0, n1, n2, prevC[a], prevC[a + 1], rc[a + 1]);
-						TriC(k, v0, v2, v3, n0, n2, n3, prevC[a], rc[a + 1], rc[a]);
-						if (Mathf.Abs(Across[a]) < RibbonHalf - 1f || Mathf.Abs(Across[a + 1]) < RibbonHalf - 1f)
-						{
-							faces.Add(v0); faces.Add(v1); faces.Add(v2);
-							faces.Add(v0); faces.Add(v2); faces.Add(v3);
-						}
+						faces.Add(v0); faces.Add(v1); faces.Add(v2);
+						faces.Add(v0); faces.Add(v2); faces.Add(v3);
 					}
-				prev = row; prevC = rc;
+				}
 			}
 			var mi = k.CommitTo(this, $"Road_{start / segs}", false);
 			mi.VisibilityRangeEnd = 170f;
@@ -242,15 +285,74 @@ public partial class WinterWoods : Node3D
 			shape.SetFaces(faces.ToArray());
 			body.AddChild(new CollisionShape3D { Shape = shape });
 			AddChild(body);
+			BuildWallClumps(start, end, $"WallClumps_{start / segs}");
 		}
 	}
 
-	private static Vector3 RoadNormal(Vector3 v)
+	/// <summary>A smooth-ish lumpy noise, about -1..1 (a few crossed sines: cheap, and the same every run).</summary>
+	public static float Lump(float x, float y, float z)
 	{
-		const float e = 0.35f;
-		float hx = Height(v.X + e, v.Z) - Height(v.X - e, v.Z), hz = Height(v.X, v.Z + e) - Height(v.X, v.Z - e);
-		return new Vector3(-hx, 2f * e, -hz).Normalized();
+		float v = Mathf.Sin(x * 1.31f + z * 0.47f + y * 0.9f) * 0.45f + Mathf.Sin(z * 1.73f - x * 0.61f + y * 1.7f + 1.3f) * 0.35f
+			+ Mathf.Sin((x + z) * 2.9f + y * 2.3f + 2.1f) * 0.2f + Mathf.Sin(x * 4.7f - z * 3.1f + y * 3.9f) * 0.12f;
+		return v / 1.12f;
 	}
+
+	private static Mesh[] _clumps;
+
+	/// <summary>Snow clumps heaped along the plowed walls' tops (on their faces and at their feet they read as stones).</summary>
+	private void BuildWallClumps(int start, int end, string name)
+	{
+		_clumps ??= new[] { ClumpMesh(7101), ClumpMesh(7102), ClumpMesh(7103) };
+		var lists = new[] { new List<Transform3D>(), new List<Transform3D>(), new List<Transform3D>() };
+		var rng = new RandomNumberGenerator { Seed = (ulong)(start * 131 + 7) };
+		for (int i = start; i < end; i++)
+		{
+			var p = RoadPoint(i);
+			var t = RoadDir(i);
+			var right = new Vector2(-t.Y, t.X);
+			foreach (float sd in new[] { -1f, 1f })
+			{
+				float H = WallHeight(i * Step, -sd);
+				if (H < 0.8f) continue;
+				// heaped along the top: a clump or two every step
+				int m = rng.RandiRange(1, 2);
+				for (int j = 0; j < m; j++)
+				{
+					float d = WallTop + rng.RandfRange(0.15f, 1.3f);
+					var q = p + right * sd * d + t * rng.RandfRange(-0.75f, 0.75f);
+					float sc = rng.RandfRange(0.35f, 0.8f);
+					var at = new Vector3(q.X, Height(q.X, q.Y) - sc * 0.35f, q.Y);
+					lists[rng.RandiRange(0, 2)].Add(new Transform3D(new Basis(Vector3.Up, rng.RandfRange(0, Mathf.Tau)).Scaled(new Vector3(sc * rng.RandfRange(0.9f, 1.4f), sc * rng.RandfRange(0.5f, 0.8f), sc)), at));
+				}
+			}
+		}
+		var holder = new Node3D { Name = name };
+		AddChild(holder);
+		for (int c = 0; c < 3; c++)
+		{
+			if (lists[c].Count == 0) continue;
+			var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = _clumps[c], InstanceCount = lists[c].Count };
+			for (int j = 0; j < lists[c].Count; j++) mm.SetInstanceTransform(j, lists[c][j]);
+			holder.AddChild(new MultiMeshInstance3D { Name = $"Clumps{c}", Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, VisibilityRangeEnd = 70f, VisibilityRangeEndMargin = 6f });
+		}
+	}
+
+	/// <summary>A clump of packed snow about a metre across (scaled per instance): a lumpy, broken ball.</summary>
+	private static Mesh ClumpMesh(int seed)
+	{
+		var k = new MeshKit();
+		k.Mat(WallSnow);
+		k.Color = Colors.White;
+		k.Blob(Vector3.Zero, new Vector3(0.5f, 0.42f, 0.46f), seed, 0.28f, false, 1f);
+		var rng = new RandomNumberGenerator { Seed = (ulong)seed };
+		for (int i = 0; i < 2; i++)
+			k.Blob(new Vector3(rng.RandfRange(-0.3f, 0.3f), rng.RandfRange(0.05f, 0.25f), rng.RandfRange(-0.3f, 0.3f)), new Vector3(0.26f, 0.2f, 0.24f), seed * 3 + i, 0.3f, false, 1f);
+		return k.Commit();
+	}
+
+	private static StandardMaterial3D _wallSnow;
+	/// <summary>The plowed walls' clumps: the ground's snow, world-triplanar, a hair darker (packed, in the wall's shade).</summary>
+	public static StandardMaterial3D WallSnow => _wallSnow ??= SnowStd("winter_wall_snow", 0.28f, 0.8f);
 
 	private static float Flats(float x, float z, float h) => SkiLodge.Flatten(x, z, h);
 
@@ -332,6 +434,7 @@ public partial class WinterWoods : Node3D
 			if (outside) { PlayerProgress = Mathf.Clamp(sAlong / Length, 0f, 1f); KeepInBounds(player, l, d); }
 		}
 		PlayerOutside = outside;
+		UpdateWading(player, outside, dt);
 		float frozen = FrozenAt(PlayerProgress * Length);
 		// the light: dusk out here, colder and clearer toward the lodge
 		var atmo = StoryBeat.Atmosphere(this);
@@ -379,6 +482,37 @@ public partial class WinterWoods : Node3D
 			AudioDirector.OneShot(this, "ice_tinkle", 3, at, Mathf.Lerp(-22f, -14f, frozen), "Events", 5f, 0.08f);
 		}
 		UpdateStalker(dt, player, cam, outside);
+	}
+
+	/// <summary>Off the plowed road the snow is deep (the owner: they should want to stick to the road): walking in
+	/// it drags them down to well under half their pace; the church's yard is trodden, only a little slower; round the
+	/// lodge it's plowed, full pace.</summary>
+	public const float DeepSnowPace = 0.42f, TroddenPace = 0.78f;
+	/// <summary>For tests: how deep the snow under them is (0 the road, 1 deep).</summary>
+	public float PlayerDeepSnow { get; private set; }
+	private bool _wading;
+
+	private void UpdateWading(PlayerController player, bool outside, float dt)
+	{
+		if (player == null) return;
+		float want = 1f;
+		if (outside)
+		{
+			var l = ToLocal(player.GlobalPosition);
+			float deep = 1f - PlowedWeight(l.X, l.Z);
+			float pace = DeepSnowPace;
+			// trodden round the church; and round the lodge it's plowed (the owner: no drag there at all)
+			if (WinterGlade.OutsideChurch(l.X, l.Z) < 14f) pace = TroddenPace;
+			if (SkiLodge.NearLodge(l.X, l.Z, 48f)) pace = 1f;
+			PlayerDeepSnow = deep;
+			want = Mathf.Lerp(1f, pace, deep);
+		}
+		else PlayerDeepSnow = 0f;
+		// (only while it's ours to set: the sewer and the crawlspace have their own)
+		if (!outside && !_wading) return;
+		player.WadeScale = Mathf.MoveToward(player.WadeScale, want, dt * 2.5f);
+		_wading = outside || player.WadeScale < 0.999f;
+		if (!_wading) player.WadeScale = 1f;
 	}
 
 	/// <summary>The woods go on for ever into the dark, but the ground doesn't: past ~95 m from the road the

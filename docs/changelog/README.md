@@ -13,6 +13,9 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-01 — Fidelity pass: the lodge's furniture modelled in Blender (tufted chesterfields, wing chairs, beds, chairs, tables, lamps) with baked cavity maps, a clutter library (bottles, glasses, books, clocks, logs, boots, skis, coats) through the lodge and the cabin, modelled library books; crawlspace flicker fixed; missed E presses fixed](2026-10-01-fidelity-pass.md)
+- [2026-09-30c — The wendigo remodelled in Blender: 4.7 m, lanky, ribs out of a torn chest, 110k triangles with baked 2048 maps, a 64-bone skeleton with idle, crouch, leap and pounce; the wall arm rigged to its fingers and frantic; the crawlspace's see-through corners closed; display settings (windowed, window size) and the letterbox gap fixed](2026-09-30c-the-wendigo.md)
+- [2026-09-30b — Act 22: high, lumpy plowed walls of snow along the road, deep snow off it that slows the player, winter firs, and the photo subjects remodelled in Blender (the snowman, the snowplow, the antler tree, the ski gear, an arm reaching out of the wall, the frozen deer, the lodge sign)](2026-09-30b-act22-plowed-road.md)
 - [2026-09-30 — Act 22's winter forest overhauled: the road snakes through hills, dark with the lantern and a pale haze past it, bare winter trees with fine twigs and snow on their limbs, the owner's snow textures and Poly Haven bark](2026-09-30-act22-winter-forest.md)
 - [2026-09-29c — Act 23 finished: Room 201's welcome letter, the wall-cavity crawlspace and the wendigo's arm through the boards, the lodge frozen over, the front doors and the leap; tablecloth glitching fixed; light switches; the lodge optimized; Act 15's failing centre lights](2026-09-29c-act23-finale.md)
 - [2026-09-29b — Crouching (C / left Ctrl, a toggle), and the dining hall's sheets and table collapse smoothed](2026-09-29b-crouch-and-the-sheets.md)

@@ -119,7 +119,7 @@ public static class StoryBeat
 
 	/// <summary>Turns the player's view toward a point over time (a scripted look through PlayerInput,
 	/// so it works with input disabled). Pausable.</summary>
-	public static async Task PanTowards(Node owner, PlayerController player, Vector3 target, float seconds, CancellationToken ct)
+	public static async Task PanTowards(Node owner, PlayerController player, Vector3 target, float seconds, CancellationToken ct, bool pitch = false)
 	{
 		double t = 0;
 		while (t < seconds)
@@ -129,7 +129,15 @@ public static class StoryBeat
 			{
 				float want = Mathf.Atan2(-to.X, -to.Z);
 				float diff = Mathf.AngleDifference(player.CameraRig.Yaw, want);
-				player.PlayerInput.AddCutsceneLook(new Vector2(Mathf.Clamp(diff, -0.06f, 0.06f), 0));
+				float up = 0f;
+				if (pitch && player.CameraRig.Camera is { } cam)
+				{
+					// (and up or down to it: the look's pitch, from the eye)
+					var d = target - cam.GlobalPosition;
+					float wantPitch = Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length());
+					up = Mathf.Clamp(wantPitch - player.CameraRig.Pitch, -0.04f, 0.04f);
+				}
+				player.PlayerInput.AddCutsceneLook(new Vector2(Mathf.Clamp(diff, -0.06f, 0.06f), up));
 			}
 			await Cutscene.Frame(owner, ct);
 			t += owner.GetProcessDeltaTime();

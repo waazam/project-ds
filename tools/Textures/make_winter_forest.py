@@ -191,3 +191,48 @@ alpha = np.maximum(alpha, snow * 0.9)
 rgb = np.where(alpha[:, :, None] > 0.02, rgb, bark[None, None, :])
 write(os.path.join(OUT, "twigs.png"), np.dstack([rgb, alpha]), pix="rgba")
 print("twigs", f"cover {alpha.mean():.3f}")
+
+# ---- a fir bough (the winter firs' tiers): a stem from the base (bottom middle) to the tip (top), its needles swept
+# forward either side in a long spindle, side shoots off it; dark cold green, a brown stem. The snow on the boughs is
+# the tree's own (the caps along each tier), not drawn here.
+cov[:] = 0
+top[:] = 0
+stemc = np.zeros((S, S), np.float32)
+
+
+def needles(p, ang, length, spread_len):
+    """A shoot from p at ang: its stem, and needles every few pixels both sides, longest mid-way."""
+    steps = int(length / 7)
+    x, y = p
+    for i in range(steps):
+        f = i / max(steps - 1, 1)
+        ang += rng.normal(0, 0.012)
+        nx, ny = x + np.cos(ang) * 7, y - np.sin(ang) * 7
+        seg((x, y), (nx, ny), 2.2)
+        nl = spread_len * (np.sin(np.pi * min(f * 1.1, 1.0)) * 0.85 + 0.15)
+        for side in (-1, 1):
+            a = ang + side * rng.uniform(0.75, 1.05)
+            l = nl * rng.uniform(0.8, 1.1)
+            seg((nx, ny), (nx + np.cos(a) * l, ny - np.sin(a) * l), 1.6)
+        x, y = nx, ny
+
+
+# the stem (and its side shoots), the needles on all
+seg((S * 0.5, S * 0.99), (S * 0.5, S * 0.07), 2.6)
+stemc[:] = cov
+needles((S * 0.5, S * 0.99), np.pi / 2, S * 0.92, S * 0.11)
+for i in range(9):
+    f = 0.1 + i * 0.09
+    y = S * (0.99 - 0.92 * f)
+    for side in (-1, 1):
+        if rng.random() < 0.9:
+            needles((S * 0.5, y), np.pi / 2 + side * rng.uniform(0.6, 0.9), S * 0.44 * (1 - f * 0.65), S * 0.07)
+alpha = np.clip(down(cov) * 1.4, 0, 1)
+green = np.array([0.1, 0.15, 0.12], np.float32)
+brown = np.array([0.2, 0.16, 0.13], np.float32)
+vary = rng.uniform(0.85, 1.15, (N, N)).astype(np.float32)
+rgb = green[None, None, :] * vary[:, :, None]
+rgb = np.where(down(stemc)[:, :, None] > 0.5, brown[None, None, :], rgb)
+rgb = np.where(alpha[:, :, None] > 0.02, rgb, green[None, None, :])
+write(os.path.join(OUT, "fir_bough.png"), np.dstack([rgb, alpha]), pix="rgba")
+print("fir bough", f"cover {alpha.mean():.3f}")

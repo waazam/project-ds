@@ -40,7 +40,7 @@ public static class PhotoCatalog
 		new("crypt", "the crypt", 3f), new("church_door", "the great door", 2.5f),
 		// the winter woods (Act 22)
 		new("snowman", "a snowman", 1.2f), new("plow", "the snowplow", 3f), new("antler_tree", "antlers in a tree", 3f),
-		new("ski_tracks", "tracks that stop", 1.5f), new("empty_clothes", "empty clothes", 1.2f), new("frozen_deer", "a frozen deer", 1f),
+		new("ski_tracks", "tracks that stop", 1.5f), new("buried_arm", "an arm in the snow", 1.4f), new("frozen_deer", "a frozen deer", 1f),
 		new("lodge_sign", "the lodge sign", 1f), new("the_lodge", "the ski lodge", 20f),
 		// the things that hunt you: hard to get, worth double
 		new("stalker", "IT", 1.2f, true), new("giant", "the giant", 12f, true), new("room_thing", "the thing in the room", 1f, true),

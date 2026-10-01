@@ -2,6 +2,8 @@
 // (Poly Haven's snow textures, made small and cold by tools/Textures/make_snow.py), tiled in world space.
 // Vertex colour: R = the plowed road, A = frozen (the glazed, icy crust near the lodge); G = a little
 // shade under the trees. A faint sheen only where it has frozen (the ice), never a glare.
+// The plowed walls' sheer faces (2026-09-30): the snow laid on them from the side (not stretched down them from
+// above), cut in the plow's layers and the blower's grooves, a touch bluer, like the owner's references.
 shader_type spatial;
 render_mode diffuse_lambert, specular_schlick_ggx;
 
@@ -16,9 +18,11 @@ uniform float road_tile = 0.36;
 uniform float detail_tile = 1.6;
 
 varying vec3 wpos;
+varying vec3 wnorm;
 
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wnorm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
 void fragment() {
@@ -30,6 +34,18 @@ void fragment() {
 	float r = COLOR.r, ice = COLOR.a;
 	vec3 c = mix(snow, road, r);
 	c = mix(c, mix(packed, road * 0.85 + packed * 0.15, r), ice * 0.85);
+	// a sheer face: the snow from the side, in layers and grooves
+	float steep = 1.0 - smoothstep(0.45, 0.8, abs(wnorm.y));
+	if (steep > 0.0) {
+		float along = abs(wnorm.x) > abs(wnorm.z) ? wpos.z : wpos.x;
+		vec2 suv = vec2(along, wpos.y) * tile;
+		vec3 face = texture(tex_snow, suv).rgb * 0.65 + texture(tex_snow, suv * 0.41 + vec2(0.2, 0.6)).rgb * 0.35;
+		float n = texture(tex_snow, vec2(along * 0.05, wpos.y * 0.3)).r;
+		float layers = 0.95 + 0.05 * sin(wpos.y * 4.0 + n * 4.0);
+		float grooves = 0.97 + 0.03 * sin(along * 6.0 + n * 2.0);
+		face *= layers * grooves * vec3(0.9, 0.95, 1.04);
+		c = mix(c, face, steep);
+	}
 	float near = clamp(1.0 - length(VERTEX) / 30.0, 0.0, 1.0);
 	c *= mix(1.0, texture(detail_tex, wpos.xz * detail_tile).r, near);
 	c *= 1.0 - COLOR.g * 0.35;

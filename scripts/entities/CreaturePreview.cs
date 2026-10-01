@@ -162,12 +162,26 @@ public partial class CreaturePreview : Node3D
 		AddChild(w);
 		w.StandAt(Vector3.Zero, new Vector3(0, 0, -10));
 		await Seconds(1.5);
-		await Shot("wendigo_front", new Vector3(0.6f, 2.2f, -6.5f), new Vector3(0, 2.0f, 0));
-		await Shot("wendigo_three_quarter", new Vector3(3.8f, 2.4f, -4.2f), new Vector3(0, 2.1f, 0));
-		await Shot("wendigo_side", new Vector3(5.5f, 2.0f, 0.2f), new Vector3(0, 1.9f, 0));
-		await Shot("wendigo_back", new Vector3(-2.5f, 2.6f, 5f), new Vector3(0, 2.2f, 0));
-		await Shot("wendigo_head", new Vector3(0.7f, 3.3f, -2.2f), new Vector3(0, 3.2f, -0.7f));
-		await Shot("wendigo_far_dusk", new Vector3(2f, 1.7f, -22f), new Vector3(0, 2f, 0));
+		await Shot("wendigo_front", new Vector3(0.6f, 2.6f, -8f), new Vector3(0, 2.5f, 0));
+		await Shot("wendigo_three_quarter", new Vector3(4.6f, 2.8f, -5.2f), new Vector3(0, 2.6f, 0));
+		await Shot("wendigo_side", new Vector3(7f, 2.4f, 0.2f), new Vector3(0, 2.4f, 0));
+		await Shot("wendigo_back", new Vector3(-3f, 3f, 6f), new Vector3(0, 2.8f, 0));
+		await Shot("wendigo_head", new Vector3(0.9f, 3.7f, -2.6f), w.MouthWorld + new Vector3(0, 0.15f, 0));
+		await Shot("wendigo_chest", new Vector3(-0.6f, 3.2f, -1.9f), w.ChestWorld);
+		await Shot("wendigo_hand", new Vector3(1.6f, 1.2f, -1.6f), w.ToGlobal(new Vector3(0.68f, 1.0f, -0.6f)));
+		await Shot("wendigo_far_dusk", new Vector3(2f, 1.7f, -22f), new Vector3(0, 2.4f, 0));
+		// the leap, frozen mid-air; the pounce
+		w.Leap(w.GlobalPosition + new Vector3(0, 0, 0.01f), 4f, null);
+		await Seconds(0.9);
+		w.ProcessMode = ProcessModeEnum.Disabled;
+		await Shot("wendigo_leaping", new Vector3(6f, 2.6f, -1f), w.GlobalPosition + new Vector3(0, 2.4f, 0));
+		w.ProcessMode = ProcessModeEnum.Inherit;
+		w.StandAt(new Vector3(0, 3f, 0), new Vector3(0, 0, -10));
+		w.Leap(new Vector3(0, 0, -6f), 4f, null);
+		await Seconds(1.2);
+		w.ProcessMode = ProcessModeEnum.Disabled;
+		await Shot("wendigo_pouncing", new Vector3(6f, 2.6f, -2f), w.GlobalPosition + new Vector3(0, 2.4f, 0));
+		w.ProcessMode = ProcessModeEnum.Inherit;
 	}
 
 	/// <summary>The ski lodge's interior (Act 23), standing alone: the lobby, the bar, the pantry, the corridor, the rooms, the dining hall.</summary>
@@ -186,6 +200,9 @@ public partial class CreaturePreview : Node3D
 		await Shot("lodge_lobby_stairs", new Vector3(4f, 1.7f, 2f), new Vector3(-3f, 2.8f, -9f));
 		await Shot("lodge_lobby_from_balcony", new Vector3(-8.5f, 5.9f, -1.5f), new Vector3(6f, 3f, 0f));
 		await Shot("lodge_lobby_desk", new Vector3(0f, 1.7f, 3f), new Vector3(5f, 1.5f, 8f));
+		await Shot("lodge_lobby_seating", new Vector3(1.5f, 1.6f, 1.5f), new Vector3(6.2f, 0.6f, -3.0f));
+		await Shot("lodge_lobby_mantel", new Vector3(3.6f, 2.2f, -1.6f), new Vector3(7.6f, 2.0f, -4.4f));
+		await Shot("lodge_mudroom_clutter", new Vector3(-28.2f, 1.5f, -2.4f), new Vector3(-32.6f, 1.0f, -5.4f));
 		await Shot("lodge_lobby_ceiling", new Vector3(0, 1.7f, 0), new Vector3(0.1f, 20f, 0.2f));
 		await Shot("lodge_bar", new Vector3(-10.8f, 1.7f, 4f), new Vector3(-22f, 1.4f, 4f));
 		await Shot("lodge_bar_counter", new Vector3(-15f, 1.6f, 6.8f), new Vector3(-19.4f, 1f, 2.5f));

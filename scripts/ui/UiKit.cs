@@ -203,7 +203,7 @@ public static class UiKit
 		};
 		var readout = MakeLabel("", MonoLabel, HorizontalAlignment.Right);
 		readout.AddThemeFontOverride("font", Mono);
-		readout.CustomMinimumSize = new Vector2(format != null ? 40 : 26, 0);
+		readout.CustomMinimumSize = new Vector2(format != null ? 52 : 26, 0);
 		void Show(double v) => readout.Text = format != null ? format(v) : $"{Mathf.RoundToInt((v - min) / (max - min) * 100.0)}";
 		Show(value);
 		slider.ValueChanged += v => { Show(v); onChanged(v); };
@@ -252,6 +252,13 @@ public static class UiKit
 		AddToggle(box, "Reduce flashing", s.ReduceFlashing, on => s.ReduceFlashing = on);
 		AddToggle(box, "Head motion", s.HeadMotion, on => s.HeadMotion = on);
 		AddToggle(box, "Cinematic bars", s.CinemaBars, on => s.CinemaBars = on);
+		// the window: fullscreen at the screen's own resolution, or a window of a chosen size
+		AddToggle(box, "Windowed", s.Windowed, on => s.Windowed = on);
+		var res = GameSettings.FittingResolutions();
+		int cur = System.Array.IndexOf(res, s.WindowSize);
+		if (cur < 0) cur = res.Length - 1;
+		AddSlider(box, "Window size", 0, res.Length - 1, cur, v => s.WindowSize = res[Mathf.Clamp(Mathf.RoundToInt(v), 0, res.Length - 1)], 1,
+			v => { var r = res[Mathf.Clamp(Mathf.RoundToInt(v), 0, res.Length - 1)]; return $"{r.X}x{r.Y}"; });
 		AddToggle(box, "CRT filter", s.CrtFilter, on => s.CrtFilter = on);
 		AddSlider(box, "Shadows", 0, 2, s.Shadows, v => s.Shadows = Mathf.RoundToInt(v), 1, v => GameSettings.ShadowNames[Mathf.Clamp(Mathf.RoundToInt(v), 0, 2)]);
 	}

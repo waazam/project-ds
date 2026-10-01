@@ -6,8 +6,8 @@ namespace ProjectDS.World;
 /// <summary>
 /// Act 22's trees: the winter forest either side of the plowed road, thick right up to the windrows and on up the
 /// hills into the murk. Mostly bare broadleaves (the owner, 2026-09-30: trunks and branches, no leaves; see
-/// <see cref="WinterTreeKit"/>), a few firs heavy with snow, grey dead snags; toward the lodge they are caked in ice
-/// (the bare trees' own shader glazes them, per tree; the firs a glassy shell drawn over them, and hung with icicles).
+/// <see cref="WinterTreeKit"/>), a few winter firs (<see cref="WinterTreeKit.WinterFir"/>) heavy with snow, grey dead snags; toward the lodge
+/// they are caked in ice (their own shaders glaze them, per tree; the iced firs hung with icicles too).
 /// MultiMeshes in 96 m chunks, drawn only as far as the fog lets anything be seen, and a trunk collider for every tree
 /// the player could reach.
 /// </summary>
@@ -19,8 +19,8 @@ public partial class WinterWoods
 	/// <summary>Where the trees are (church-local xz) and how big: the wendigo leaps into them.</summary>
 	public static readonly List<(Vector2 at, float height, bool fir)> TreeSpots = new();
 
-	/// <summary>The kinds of tree, their share, height, crown radius (firs), crown start (firs); bare ones take the ice
-	/// from their instance's custom data, firs through an overlay.</summary>
+	/// <summary>The kinds of tree, their share, height, crown radius (firs), crown start (firs), whether a fir, and whether
+	/// it takes its ice from its instance's custom data (all but the snag, which takes the glassy overlay).</summary>
 	public static List<(Mesh mesh, float weight, float h, float maxR, float crown, bool fir, bool bare)> WinterTreeKinds()
 	{
 		return new()
@@ -31,8 +31,9 @@ public partial class WinterWoods
 			(WinterTreeKit.BareTree(504, 22f, 1), 1.0f, 22f, 5.5f, 0.4f, false, true),
 			(WinterTreeKit.BareTree(505, 16f, 1), 1.3f, 16f, 4f, 0.4f, false, true),
 			(WinterTreeKit.BareTree(506, 9f, 0), 1.1f, 9f, 2.8f, 0.4f, false, true),
-			(ForestScatter.FirMesh(221, 22f, 0.38f, 0.3f, 11, 3.4f, 0.16f), 0.55f, 22f, 3.4f, 0.3f, true, false),
-			(ForestScatter.FirMesh(222, 16f, 0.3f, 0.26f, 9, 2.8f, 0.2f), 0.45f, 16f, 2.8f, 0.26f, true, false),
+			(WinterTreeKit.WinterFir(601, 20f, 3.6f), 0.7f, 20f, 3.6f, 0.2f, true, true),
+			(WinterTreeKit.WinterFir(602, 14f, 2.8f), 0.6f, 14f, 2.8f, 0.2f, true, true),
+			(WinterTreeKit.WinterFir(603, 26f, 4.2f), 0.35f, 26f, 4.2f, 0.2f, true, true),
 			(ForestScatter.SnagMesh(224, 15f), 0.8f, 15f, 0.5f, 0.9f, false, false),
 		};
 	}

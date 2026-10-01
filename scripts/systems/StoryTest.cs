@@ -2988,11 +2988,28 @@ public partial class StoryTest : Node
 		await Inside(woods.ToGlobal(WinterWoods.RoadAt(WinterWoods.PropSpots[0].s, out _)), sm.GlobalPosition, ct);
 		var smShot = await TakePicture(sm.GlobalPosition + Vector3.Up * 1.3f, 1, ct);
 		Check("a picture of the snowman", smShot is { SubjectId: "snowman", Scored: true }, Describe(smShot));
+		// the road between the walls the plow cut: higher than a head either side (low only where there's something off it)
+		{
+			var q = WinterWoods.RoadAt(260f, out var dir);
+			var right = new Vector3(-dir.Y, 0, dir.X);
+			float w = WinterWoods.WallTop + 0.05f, wl = WinterWoods.Height(q.X - right.X * w, q.Z - right.Z * w) - q.Y, wr = WinterWoods.Height(q.X + right.X * w, q.Z + right.Z * w) - q.Y;
+			Check("between plowed walls of snow higher than a head", wl > 1.5f && wr > 1.5f, $"left {wl:0.0} m, right {wr:0.0} m");
+		}
+		// off the road, up the bank at the antler tree's gap: the deep snow drags at them
+		var at = woods.Props["antler_tree"];
+		await Inside(woods.ToGlobal(WinterWoods.RoadAt(WinterWoods.PropSpots[2].s, out _)), at.GlobalPosition, ct);
+		await WalkTo(at.GlobalPosition, 2.0f, ct, giveUp: 14f);
+		await Seconds(1.0, ct);
+		Check("off the road, in the deep snow: wading, slowed right down", woods.PlayerDeepSnow > 0.6f && _player.WadeScale < 0.6f, $"deep {woods.PlayerDeepSnow:0.00}, pace {_player.WadeScale:0.00}");
+		await Inside(woods.ToGlobal(WinterWoods.RoadAt(WinterWoods.PropSpots[2].s, out _)), at.GlobalPosition, ct);
+		await Seconds(1.2, ct);
+		Check("back on the road: full pace", _player.WadeScale > 0.95f, $"pace {_player.WadeScale:0.00}");
 		// the rest of the weird things on the road, a look at each
 		foreach (var (id, sp, _, _) in WinterWoods.PropSpots)
 		{
 			if (id == "snowman") continue;
-			await Inside(woods.ToGlobal(WinterWoods.RoadAt(sp, out _)), woods.Props[id].GlobalPosition, ct);
+			// (from a few metres back down the road, so the whole of it's in the frame)
+			await Inside(woods.ToGlobal(WinterWoods.RoadAt(sp - (id == "plow" ? 11f : 5f), out _)), woods.Props[id].GlobalPosition, ct);
 			await Aim(woods.Props[id].GlobalPosition + Vector3.Up * 1.1f, ct);
 			await Seconds(0.3, ct);
 			Screenshot($"act22_{id}");
@@ -3303,7 +3320,7 @@ public partial class StoryTest : Node
 			if (c == SkiLodge.CrawlSave) { await Seconds(0.3, ct); Check("halfway: a save in the crawlspace", s.Current == Checkpoint.Act23Crawlspace, $"{s.Current}"); }
 			if (c == SkiLodge.ArmSpots[0].cell)
 			{
-				await Aim(lodge.Arms[0].GlobalPosition + Vector3.Down * 0.35f, ct);
+				await Aim(lodge.Arms[0].HandWorld, ct);
 				await Seconds(0.2, ct);
 				Screenshot("act23_arm_through_the_wall");
 			}

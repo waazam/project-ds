@@ -734,7 +734,7 @@ public partial class SkiLodge
 		k.Cylinder(Vector3.Zero, new Vector3(0, 0.025f, 0), 0.5f, 0.45f, 20, true);
 		k.Mat(StationParts.StationTextures.BloodPoolMat);
 		k.Cylinder(new Vector3(0.05f, 0.026f, -0.1f), new Vector3(0.05f, 0.028f, -0.1f), instant ? 0.42f : 0.2f, instant ? 0.42f : 0.2f, 14, true);
-		PlatterSkull = new Wendigo { Name = "Skull", Position = new Vector3(0, 0.18f, 0.05f), Scale = Vector3.One * 0.85f };
+		PlatterSkull = new Wendigo { Name = "Skull", Position = new Vector3(0, 0.12f, 0.05f), Scale = Vector3.One * 0.5f };   // (the new skull, its rack, is far bigger)
 		holder.AddChild(PlatterSkull);
 		PlatterSkull.ShowOnlyHead();
 		PlatterSkull.Rotation = new Vector3(0, 0.6f, 0);
