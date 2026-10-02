@@ -232,6 +232,11 @@ public partial class LobbyDecor : Node3D
 
 		var coat = Group("CoatStand", 0, 3);
 		var ct = new MeshKit();
+		if (World.FurnitureKit.Add(ct, "coat_stand", new Vector3(4.2f, 0, -3.8f), 2.4f, Roles))
+		{
+			MeshKit.Solidify(ct.CommitTo(coat, "CoatStand", true), new Vector3(0.35f, 1f, 0.35f), "wood", true);
+			goto plants;
+		}
 		ct.Mat(PropTextures.PostMat);
 		ct.Color = new Color(0.36f, 0.26f, 0.18f);
 		Vector3 cs = new(4.2f, 0, -3.8f);
@@ -246,6 +251,7 @@ public partial class LobbyDecor : Node3D
 		ct.Blob(cs + new Vector3(0.05f, 1.35f, 0.05f), new Vector3(0.22f, 0.4f, 0.12f), 5, 0.12f, false);
 		MeshKit.Solidify(ct.CommitTo(coat, "CoatStand", true), new Vector3(0.35f, 1f, 0.35f), "wood", true);
 
+		plants:
 		var plant = Group("Plant", 0, 0);
 		var plantDead = Group("PlantDead", 1, 2);
 		PlantPot(plant, new Vector3(4.3f, 0, 3.9f), false);
@@ -292,12 +298,28 @@ public partial class LobbyDecor : Node3D
 		k.CommitTo(parent, "Frame", false);
 	}
 
+	/// <summary>The station's materials for the modelled pieces' roles.</summary>
+	internal static System.Collections.Generic.Dictionary<string, Material> Roles => new()
+	{
+		["wood"] = PropTextures.DeckMat, ["upholstery"] = StationTextures.Flat("st_seat", new Color(0.3f, 0.16f, 0.1f), 0.6f, 0.3f),
+		["leather"] = StationTextures.Flat("st_leather", new Color(0.18f, 0.24f, 0.18f), 0.7f, 0.2f), ["brass"] = ItemTextures.BrassMat,
+		["cloth"] = StationTextures.Flat("st_jacket", new Color(0.28f, 0.34f, 0.2f), 0.9f, 0.1f), ["felt"] = StationTextures.Flat("st_hat", new Color(0.42f, 0.34f, 0.22f), 0.9f, 0.1f),
+		["paper"] = StationTextures.Flat("st_paper", new Color(0.66f, 0.62f, 0.52f), 0.95f, 0.05f), ["ceramic"] = StationTextures.Flat("st_mug", new Color(0.6f, 0.62f, 0.6f), 0.4f, 0.3f),
+		["glass"] = StationTextures.Flat("st_glass", new Color(0.2f, 0.22f, 0.2f), 0.1f, 0.7f), ["steel"] = ProcTextures.MetalMat,
+	};
+
 	private static void Chair(Node3D parent, Vector3 at, float yaw, bool toppled)
 	{
 		var k = new MeshKit();
 		k.Mat(PropTextures.DeckMat);
 		k.Color = new Color(0.4f, 0.28f, 0.18f);
 		var b = new Basis(Vector3.Up, yaw) * (toppled ? new Basis(Vector3.Right, -1.45f) : Basis.Identity);
+		// the modelled chair (turned legs, a carved crest rail, a piped seat; the fidelity pass, 2026-10-01)
+		if (World.FurnitureKit.Add(k, "dining_chair", new Transform3D(b, at + (toppled ? Vector3.Up * 0.24f : Vector3.Zero)), Roles))
+		{
+			k.CommitTo(parent, "Chair", true);
+			return;
+		}
 		k.Xf = new Transform3D(b, at + (toppled ? Vector3.Up * 0.24f : Vector3.Zero));
 		BuildKit.Box(k, new Vector3(0, 0.46f, 0), new Vector3(0.44f, 0.04f, 0.42f), 1.2f);
 		BuildKit.Box(k, new Vector3(0, 0.82f, 0.19f), new Vector3(0.44f, 0.5f, 0.04f), 1.2f);

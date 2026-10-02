@@ -538,6 +538,9 @@ public partial class Sewer : Node3D
 	{
 		float dt = (float)delta;
 		_t += dt;
+		// (its floating rubbish bobs only where it can be seen)
+		var camNear = GetViewport()?.GetCamera3D() is not { } sc || sc.GlobalPosition.DistanceSquaredTo(GlobalPosition) < 160f * 160f;
+		if (camNear)
 		foreach (var f in _floaters)
 		{
 			float ph = (float)f.GetMeta("phase");

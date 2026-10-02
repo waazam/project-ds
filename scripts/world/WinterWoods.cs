@@ -46,6 +46,8 @@ public partial class WinterWoods : Node3D
 		BuildProps();
 		BuildWeather();
 		BuildStalker();
+		BuildPrints();
+		BuildWallWind();
 		SetProcess(true);
 		GD.Print($"[story] Act 22: the winter woods - {Length:0} m of plowed road to the lodge, {Chunks} ground chunks, {TreeCount} trees");
 	}
@@ -434,7 +436,11 @@ public partial class WinterWoods : Node3D
 			if (outside) { PlayerProgress = Mathf.Clamp(sAlong / Length, 0f, 1f); KeepInBounds(player, l, d); }
 		}
 		PlayerOutside = outside;
+		// halfway down the road: a save (Continue comes back here, not to the church door)
+		if (outside && s.Current == Checkpoint.Act21Finished && PlayerProgress * Length > MidwayS && !s.HasFlag(StoryManager.Flag.Act22Midway))
+			s.SetFlag(StoryManager.Flag.Act22Midway);
 		UpdateWading(player, outside, dt);
+		UpdateWallWind(player, outside, dt);
 		float frozen = FrozenAt(PlayerProgress * Length);
 		// the light: dusk out here, colder and clearer toward the lodge
 		var atmo = StoryBeat.Atmosphere(this);
@@ -484,6 +490,68 @@ public partial class WinterWoods : Node3D
 		UpdateStalker(dt, player, cam, outside);
 	}
 
+	// ------------------------------------------------------------------ footprints
+
+	/// <summary>The prints in the snow (<see cref="SnowPrints"/>): the player's as they walk, the wendigo's where it's been.</summary>
+	public SnowPrints Prints { get; private set; }
+	private PlayerFootsteps _feet;
+	private bool _leftFoot;
+
+	private void BuildPrints()
+	{
+		Prints = new SnowPrints { Name = "Prints" };
+		AddChild(Prints);
+		// its tracks across the road ahead: out of the trees over one wall, across, and up over the other (it was here first)
+		foreach (float s in new[] { 270f, 640f, 1010f, 1290f })
+		{
+			var c = RoadAt(s, out var dir);
+			var right = new Vector2(-dir.Y, dir.X);
+			var across = (right + dir * 0.35f).Normalized();
+			for (float d = -WallTop - 1.5f; d <= WallTop + 1.5f; d += 1.25f)
+			{
+				var xz = new Vector2(c.X, c.Z) + across * d + new Vector2(-across.Y, across.X) * (Mathf.Sin(d * 1.7f) * 0.12f);
+				LayLocal(xz, new Vector3(across.X, 0, across.Y), ((int)((d + 10f) / 1.25f)) % 2 == 0, true, 0.6f);
+			}
+		}
+	}
+
+	/// <summary>A print at a church-local point on the snow.</summary>
+	private void LayLocal(Vector2 xz, Vector3 facingLocal, bool left, bool wendigo, float depth)
+	{
+		if (Prints == null) return;
+		const float e = 0.25f;
+		float h = Height(xz.X, xz.Y);
+		var n = new Vector3(Height(xz.X - e, xz.Y) - Height(xz.X + e, xz.Y), 2f * e, Height(xz.X, xz.Y - e) - Height(xz.X, xz.Y + e)).Normalized();
+		Prints.Lay(ToGlobal(new Vector3(xz.X, h, xz.Y)), GlobalBasis * n, GlobalBasis * facingLocal, left, wendigo, depth);
+	}
+
+	/// <summary>The wendigo's feet at a world point (it stood there, or sprang from there).</summary>
+	public void LayClaws(Vector3 world, Vector3 facingWorld, float depth)
+	{
+		var l = ToLocal(world);
+		var f = GlobalBasis.Inverse() * facingWorld;
+		f.Y = 0;
+		if (f.LengthSquared() < 1e-4f) f = Vector3.Forward;
+		f = f.Normalized();
+		var side = f.Cross(Vector3.Up) * 0.28f;
+		LayLocal(new Vector2(l.X - side.X, l.Z - side.Z), f, true, true, depth);
+		LayLocal(new Vector2(l.X + side.X, l.Z + side.Z), f, false, true, depth);
+	}
+
+	/// <summary>The player's step: a boot print at the foot that came down (left, right, left), deeper in deep snow.</summary>
+	private void OnStep()
+	{
+		var player = StoryBeat.Player(this);
+		if (player == null || !PlayerOutside || _feet == null || _feet.LastSurface != "snow") return;
+		var v = player.Velocity with { Y = 0 };
+		var f = v.LengthSquared() > 0.01f ? v.Normalized() : -player.CameraRig.Camera.GlobalBasis.Z with { Y = 0 };
+		var fl = (GlobalBasis.Inverse() * f).Normalized();
+		var l = ToLocal(player.GlobalPosition);
+		var side = fl.Cross(Vector3.Up) * (_leftFoot ? -0.11f : 0.11f);
+		LayLocal(new Vector2(l.X + side.X, l.Z + side.Z), fl, _leftFoot, false, Mathf.Lerp(0.35f, 1f, PlayerDeepSnow));
+		_leftFoot = !_leftFoot;
+	}
+
 	/// <summary>Off the plowed road the snow is deep (the owner: they should want to stick to the road): walking in
 	/// it drags them down to well under half their pace; the church's yard is trodden, only a little slower; round the
 	/// lodge it's plowed, full pace.</summary>
@@ -495,6 +563,8 @@ public partial class WinterWoods : Node3D
 	private void UpdateWading(PlayerController player, bool outside, float dt)
 	{
 		if (player == null) return;
+		// (the prints follow the footfalls)
+		if (_feet == null && player.Footsteps is { } feet) { _feet = feet; feet.Stepped += OnStep; }
 		float want = 1f;
 		if (outside)
 		{
@@ -508,11 +578,66 @@ public partial class WinterWoods : Node3D
 			want = Mathf.Lerp(1f, pace, deep);
 		}
 		else PlayerDeepSnow = 0f;
+		if (player.Footsteps != null) player.Footsteps.SnowDepth = PlayerDeepSnow;
 		// (only while it's ours to set: the sewer and the crawlspace have their own)
 		if (!outside && !_wading) return;
 		player.WadeScale = Mathf.MoveToward(player.WadeScale, want, dt * 2.5f);
 		_wading = outside || player.WadeScale < 0.999f;
 		if (!_wading) player.WadeScale = 1f;
+	}
+
+	// ------------------------------------------------------------------ the wind over the walls
+
+	private AudioStreamPlayer3D _windL, _windR;
+	private float _windLevel;
+	/// <summary>For tests: how loud the wind over the walls is (0..1).</summary>
+	public float WallWind => _windLevel;
+
+	/// <summary>Wind whistling over the plowed walls' crests (the detail pass): a source on each wall's top beside
+	/// the player, following them down the road, as loud as the walls are high.</summary>
+	private void BuildWallWind()
+	{
+		const string path = "res://assets/audio/sfx/wind_wall_loop.wav";
+		if (!ResourceLoader.Exists(path)) return;
+		AudioStreamPlayer3D One(string name, float from)
+		{
+			var wav = (AudioStreamWav)GD.Load<AudioStreamWav>(path).Duplicate();
+			wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
+			wav.LoopEnd = Mathf.RoundToInt(wav.GetLength() * wav.MixRate);
+			var p = new AudioStreamPlayer3D { Name = name, Stream = wav, Bus = "Weather", VolumeDb = -80f, UnitSize = 6f, MaxDistance = 40f };
+			AddChild(p);
+			p.Play(from);
+			p.StreamPaused = true;
+			return p;
+		}
+		_windL = One("WallWindL", 0f);
+		_windR = One("WallWindR", 5.3f);   // (the two sides out of step)
+	}
+
+	private void UpdateWallWind(PlayerController player, bool outside, float dt)
+	{
+		if (_windL == null) return;
+		float want = 0f;
+		if (outside && player != null)
+		{
+			var l = ToLocal(player.GlobalPosition);
+			Nearest(l.X, l.Z, out float s, out _);
+			var c = RoadAt(s, out var dir);
+			var right = new Vector3(-dir.Y, 0, dir.X);
+			foreach (var (p, side) in new[] { (_windL, -1f), (_windR, 1f) })
+			{
+				var crest = c + right * side * WallTop;
+				crest.Y = Height(crest.X, crest.Z) + 0.4f;
+				p.Position = crest;
+				float h = WallHeight(s, side);
+				p.VolumeDb = Mathf.LinearToDb(Mathf.Max(0.0001f, _windLevel * Mathf.Clamp(h / 2f, 0f, 1f))) - 13f;
+			}
+			// (the frozen stretch by the lodge is still: no wind)
+			want = 1f - Mathf.SmoothStep(0.86f, 0.95f, PlayerProgress);
+		}
+		_windLevel = Mathf.MoveToward(_windLevel, want, dt * 0.4f);
+		bool on = _windLevel > 0.01f;
+		_windL.StreamPaused = _windR.StreamPaused = !on;
 	}
 
 	/// <summary>The woods go on for ever into the dark, but the ground doesn't: past ~95 m from the road the

@@ -169,6 +169,9 @@ public partial class Lantern : Node3D
 		var cam = _player.CameraRig?.Camera;
 		if (cam == null) return;
 		GlobalTransform = cam.GlobalTransform;
+		// (its clock runs whatever it's showing: it had only run while the flame was lit, so a flame that died with the
+		// blacklight on stayed "dying" for ever, and lit again the moment the blacklight went off)
+		_t += delta;
 		bool dead = FlameDead && !Dying;
 		if (_player.PlayerInput.LightPressed && _inv.HasLantern)
 		{
@@ -225,7 +228,6 @@ public partial class Lantern : Node3D
 		_beam.SpotAngle = BeamAngle;
 
 		float dt = (float)delta;
-		_t += dt;
 		// Two incommensurate sines (~6.5 Hz and ~11 Hz) plus a rare short dip; never below 80%.
 		float flicker = 1f + FlickerAmount * (0.6f * Mathf.Sin((float)_t * Mathf.Tau * 6.5f) + 0.4f * Mathf.Sin((float)_t * Mathf.Tau * 11f + 1.3f));
 		if (_dip >= 0.999f && _rng.Randf() < DipChance * dt) _dip = DipLevel;

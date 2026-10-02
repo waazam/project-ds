@@ -92,6 +92,11 @@ public partial class ContinueRoundTripTest : Node
 		new("act21_finished", Checkpoint.Act21Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
 			StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
 			StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced, "pickup_taken_church_font_key", "pickup_taken_church_chalice" }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+		// Act 22's halfway save (a flag on Act 21's end): on the road, halfway to the lodge
+		new("act22_midway", Checkpoint.Act21Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
+			StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
+			StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced, "pickup_taken_church_font_key", "pickup_taken_church_chalice",
+			StoryManager.Flag.Act22Midway }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 		// Act 22's end: through the lodge's back door, in the mudroom
 		new("act22_finished", Checkpoint.Act22Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
 			StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
@@ -247,7 +252,14 @@ public partial class ContinueRoundTripTest : Node
 			Check("Act 20's end respawns in the room at the top, the dais up, the web gone", before.DistanceTo(rr20.TopWorld) < 1.5f && rr20.Arrived && rr20.WebsBurned && _player.IsOnFloor(), $"{before} vs {rr20.TopWorld}");
 		if (sc.Cp == Checkpoint.Act21ChurchReached && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church is { } ch21)
 			Check("Act 21's save respawns in the church's crypt by the shut hatch, winter, no candles lit", ch21.Inside(before) && before.DistanceTo(ch21.HatchExitWorld) < 1.5f && ch21.CandlesLit == 0 && !ch21.VestryOpen, $"{before} vs {ch21.HatchExitWorld}");
-		if (sc.Cp == Checkpoint.Act21Finished && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church is { } ch22)
+		bool midway = System.Array.IndexOf(sc.Flags, StoryManager.Flag.Act22Midway) >= 0;
+		if (midway && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.Woods is { } woods22)
+		{
+			var ml = woods22.ToLocal(before);
+			WinterWoods.Nearest(ml.X, ml.Z, out float ms, out _);
+			Check("Act 22's halfway save respawns on the road halfway to the lodge, on the ground", Mathf.Abs(ms - WinterWoods.MidwayS) < 4f && _player.IsOnFloor(), $"s {ms:0} (want {WinterWoods.MidwayS:0})");
+		}
+		if (!midway && sc.Cp == Checkpoint.Act21Finished && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church is { } ch22)
 			Check("Act 21's end respawns outside the great door, standing open on the snow: four candles burning, the vestry and the font open, the chalice in its niche", !ch22.Inside(before) && before.DistanceTo(ch22.DoorWorld) < 8f && ch22.DoorOpen && ch22.CandlesLit == 4 && ch22.VestryOpen && ch22.FontOpen && ch22.ChalicePlaced && _player.IsOnFloor(), $"{before}");
 		if (sc.Cp == Checkpoint.Act22Finished && StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.Woods?.Lodge is { } lodge22)
 			Check("Act 22's end respawns in the lodge's mudroom, the back door forced open, snowed in", lodge22.InMudroom(before) && lodge22.BackOpen && lodge22.SnowPile.Visible, $"{before} (lodge-local {lodge22.ToLocal(before)})");

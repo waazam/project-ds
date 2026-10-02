@@ -321,6 +321,26 @@ public static class LodgeTextures
 	public static StandardMaterial3D LinenMat => Std("lodge_m_linen", Linen, 0.95f, 0.1f, null, DetailKit.Kind.Fabric, "linen", 0.5f, 0.6f);
 	/// <summary>The dining tables' sheets (their UVs run 0..1 over the whole sheet: the linen repeats across it).</summary>
 	public static StandardMaterial3D SheetLinenMat => _sheet ??= SheetFrom(LinenMat);
+	/// <summary>The tablecloths (the owner chose it: Poly Haven's Quatrefoil Jacquard Fabric, CC0): a crimson jacquard,
+	/// its quatrefoil figure in the weave's relief, a little sheen. Two-sided (a cloth's underside shows as it falls).
+	/// UVs in metres.</summary>
+	public static StandardMaterial3D TableclothMat => _tablecloth ??= MakeTablecloth();
+	private static StandardMaterial3D _tablecloth;
+	private static StandardMaterial3D MakeTablecloth()
+	{
+		var m = new StandardMaterial3D
+		{
+			ResourceName = "m_tablecloth_jacquard",
+			AlbedoTexture = GD.Load<Texture2D>("res://assets/textures/surfaces/tablecloth_albedo.png"),
+			NormalEnabled = true, NormalTexture = GD.Load<Texture2D>("res://assets/textures/surfaces/tablecloth_normal.png"), NormalScale = 1.2f,
+			// (a shade darker, and little sheen: close under the lantern the crimson washed out to pink)
+			AlbedoColor = new Color(0.62f, 0.6f, 0.6f), Roughness = 0.82f, MetallicSpecular = 0.12f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+			Uv1Scale = Vector3.One,   // (the photo's own scale: a metre a repeat)
+		};
+		m.SetMeta("detail_kind", -1);
+		return m;
+	}
 	private static StandardMaterial3D _sheet;
 	private static StandardMaterial3D SheetFrom(StandardMaterial3D m)
 	{

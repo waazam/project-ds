@@ -48,7 +48,13 @@ public partial class DebugOverlay : CanvasLayer
 		_player ??= GetTree().GetFirstNodeInGroup("player") as PlayerController;
 		_stalker ??= GetTree().Root.FindChild("Stalker", true, false) as Entities.Stalker;
 		var m = ForestAmbienceManager.Instance;
-		var text = $"FPS {Engine.GetFramesPerSecond()}\n";
+		var text = $"FPS {Engine.GetFramesPerSecond()}  {Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000:0.0} ms process\n";
+		// the frame's cost where the player stands (the fidelity passes: what each room draws)
+		text += $"tris {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame) / 1000}k  draws {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)}"
+			+ $"  objects {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame)}  lights {LightsNear()}"
+			+ $"  vram {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed) / (1024 * 1024)} MB\n";
+		if (GetTree().CurrentScene?.GetNodeOrNull<ProjectDS.Systems.RenderBudget>("RenderBudget") is { } rb)
+			text += $"area {rb.CurrentArea} ({rb.AreasDrawn} drawn)  warm-up {ProjectDS.Systems.ShaderWarmup.Warmed}\n";
 		if (_player != null)
 			text += $"pos {_player.GlobalPosition.X:0.0} {_player.GlobalPosition.Y:0.0} {_player.GlobalPosition.Z:0.0}  speed {_player.GroundSpeed:0.0}{(_player.IsRunning ? " RUN" : "")}\n";
 		if (m != null)
@@ -65,6 +71,22 @@ public partial class DebugOverlay : CanvasLayer
 			text += $"stalker {_stalker.Current}{(_stalker.IsDistant ? " (ahead)" : "")} appearances {_stalker.PeekCount} (ahead {_stalker.DistantCount}) seen {_stalker.SeenCount} sounds {_stalker.SoundCount} tension {_stalker.Tension:0.00}\n";
 		_label.Text = text;
 		_marks.QueueRedraw();
+	}
+
+	private int _lights;
+	private double _lightsAt = -10;
+
+	/// <summary>Lights (omni and spot) switched on within 40 m of the player, recounted once a second.</summary>
+	private int LightsNear()
+	{
+		double now = Time.GetTicksMsec() / 1000.0;
+		if (now - _lightsAt < 1.0 || _player == null) return _lights;
+		_lightsAt = now;
+		_lights = 0;
+		foreach (var n in GetTree().Root.FindChildren("*", "Light3D", true, false))
+			if (n is Light3D l and not DirectionalLight3D && l.IsVisibleInTree() && l.LightEnergy > 0.001f
+				&& l.GlobalPosition.DistanceTo(_player.GlobalPosition) < 40f) _lights++;
+		return _lights;
 	}
 
 	/// <summary>A box around the stalker on screen, or an arrow at the screen edge pointing to it.</summary>

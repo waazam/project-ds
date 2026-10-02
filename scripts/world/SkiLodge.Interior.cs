@@ -28,6 +28,8 @@ public partial class SkiLodge
 	public static float HexIn => Apothem - 0.4f;
 	/// <summary>The upstairs corridor and the rooms off it.</summary>
 	public const float CorrX0 = -28f, CorrX1 = -12.6f, CorrHalf = 1f, RoomSplitX = -20f, InnerZ = 7.63f;
+	/// <summary>Where the corridor's walls end on the hall's side: inside the corner wall's thickness, at the doorway's cut.</summary>
+	private const float DoorwayInX = -11.15f;
 	/// <summary>The bar, the service corridor, the pantry (ground floor, west wing).</summary>
 	public const float BarX0 = -24f, BarZ0 = 0.3f, SvcX0 = -33.3f, SvcX1 = -22f, SvcZ0 = -1.7f, PantryZ1 = -5.2f;
 	/// <summary>The dining hall's far wall (inner face).</summary>
@@ -94,7 +96,7 @@ public partial class SkiLodge
 			}
 			foreach (float u in windows) holes.Add(new Hole(u - 0.6f, u + 0.6f, 5.4f, 7.2f));
 			k.Color = Colors.White;
-			LodgeKit.Wall(k, _body, a, b, 0f, StoneTop, 0.8f, outward, BuildingTextures.StoneMat, LodgeTextures.LobbyStoneMat, LodgeTrim, holes, 0.5f);
+			LodgeKit.Wall(k, _body, a, b, 0f, StoneTop, 0.8f, outward, BuildingTextures.StoneMat, LodgeTextures.LobbyStoneMat, LodgeTrim, holes, 0.5f, floorY: 0f, grime: -1);
 			LodgeKit.Wall(k, _body, a, b, StoneTop, HexWall, 0.8f, outward, LodgeTimber, LodgeTextures.LogWallMat, LodgeTrim, holes, 0.5f);
 			Vector3 along = (b - a).Normalized();
 			foreach (float u in windows)
@@ -183,10 +185,10 @@ public partial class SkiLodge
 		k.Color = Colors.White;
 		if (split > y0 && split < y1)
 		{
-			LodgeKit.Wall(k, null, a, b, y0, split, 0.04f, inward, lower, lower, LodgeTextures.DarkWoodMat, holes);
-			LodgeKit.Wall(k, null, a, b, split, y1, 0.04f, inward, upper, upper, LodgeTextures.DarkWoodMat, holes);
+			LodgeKit.Wall(k, null, a, b, y0, split, 0.04f, inward, lower, lower, LodgeTextures.DarkWoodMat, holes, floorY: y0, grime: 1, skirt: true);
+			LodgeKit.Wall(k, null, a, b, split, y1, 0.04f, inward, upper, upper, LodgeTextures.DarkWoodMat, holes, grime: 1, ceilingY: y1);
 		}
-		else LodgeKit.Wall(k, null, a, b, y0, y1, 0.04f, inward, upper, upper, LodgeTextures.DarkWoodMat, holes);
+		else LodgeKit.Wall(k, null, a, b, y0, y1, 0.04f, inward, upper, upper, LodgeTextures.DarkWoodMat, holes, floorY: y0, grime: 1, skirt: true, ceilingY: y1);
 		foreach (var (wx, wy, ww, wh) in wins)
 			InnerWindow(k, new Vector3(wx, wy, zFace + side * 0.015f), Vector3.Right, inward, ww, wh, glassFor?.Invoke(wx, wy) ?? LodgeTextures.DayGlass);
 	}
@@ -427,7 +429,7 @@ public partial class SkiLodge
 
 	/// <summary>A partition wall on the ground floor (to <paramref name="top"/>, default the slab), with a finish each side.</summary>
 	private void Split(MeshKit k, Vector3 a, Vector3 b, Vector3 sideA, Material matA, Material matB, List<Hole> holes, float top = SlabY)
-		=> LodgeKit.Wall(k, _inBody, a, b, FloorY, top, 0.15f, sideA, matA, matB, LodgeTextures.DarkWoodMat, holes);
+		=> LodgeKit.Wall(k, _inBody, a, b, FloorY, top, 0.15f, sideA, matA, matB, LodgeTextures.DarkWoodMat, holes, floorY: FloorY, grime: 2, skirt: true, ceilingY: top);
 
 	// ------------------------------------------------------------------ the west wing, upstairs
 
@@ -448,6 +450,13 @@ public partial class SkiLodge
 		UpWall(k, new Vector3(CorrX0, 0, CorrHalf), new Vector3(CorrX1, 0, CorrHalf), Vector3.Forward, true, north);
 		UpWall(k, new Vector3(CorrX0, 0, -CorrHalf), new Vector3(CorrX1, 0, -CorrHalf), Vector3.Back, true, south);
 		UpWall(k, new Vector3(CorrX0, 0, -CorrHalf), new Vector3(CorrX0, 0, CorrHalf), Vector3.Right, true, null);
+		// the corridor's walls carried on through the hall's corner wall to the doorway (the owner, coming up from the
+		// lobby: the corner is cut at an angle either side of the doorway, and between the corridor's square end and
+		// the angled cut there were open wedges, the outside through them), and a ceiling under the doorway's lintel
+		UpWall(k, new Vector3(CorrX1, 0, CorrHalf), new Vector3(DoorwayInX, 0, CorrHalf), Vector3.Forward, true, null);
+		UpWall(k, new Vector3(CorrX1, 0, -CorrHalf), new Vector3(DoorwayInX, 0, -CorrHalf), Vector3.Back, true, null);
+		k.Mat(LodgeTextures.CeilingMat);
+		CeilQuad(k, new Vector3(CorrX1 - 0.35f, 6.68f, -CorrHalf - 0.05f), new Vector3(DoorwayInX, 6.68f, -CorrHalf - 0.05f), new Vector3(DoorwayInX, 6.68f, CorrHalf + 0.05f), new Vector3(CorrX1 - 0.35f, 6.68f, CorrHalf + 0.05f));
 		// the rooms: 202 (front, east), 201 (front, west), 203 (back, east), 204 (back, west)
 		foreach (var (num, x0, x1, front) in new[] { (202, RoomSplitX, CorrX1, true), (201, CorrX0, RoomSplitX, true), (203, RoomSplitX, CorrX1, false), (204, CorrX0, RoomSplitX, false) })
 			RoomShell(k, num, x0, x1, front);
@@ -474,8 +483,8 @@ public partial class SkiLodge
 		var wB = tileB ? LodgeTextures.GreenTileMat : LodgeTextures.WallpaperMat;
 		var lA = tileA ? LodgeTextures.GreenTileMat : LodgeTextures.DarkWoodMat;
 		var lB = tileB ? LodgeTextures.GreenTileMat : LodgeTextures.DarkWoodMat;
-		LodgeKit.Wall(k, _inBody, a, b, UpperY, UpperY + 1.0f, 0.14f, sideA, lA, lB, LodgeTextures.DarkWoodMat, holes);
-		LodgeKit.Wall(k, _inBody, a, b, UpperY + 1.0f, RoomTop, 0.14f, sideA, wA, wB, LodgeTextures.DarkWoodMat, holes);
+		LodgeKit.Wall(k, _inBody, a, b, UpperY, UpperY + 1.0f, 0.14f, sideA, lA, lB, LodgeTextures.DarkWoodMat, holes, floorY: UpperY, grime: 2, skirt: true);
+		LodgeKit.Wall(k, _inBody, a, b, UpperY + 1.0f, RoomTop, 0.14f, sideA, wA, wB, LodgeTextures.DarkWoodMat, holes, grime: 2, ceilingY: RoomTop);
 	}
 
 	/// <summary>A hotel room's shell: the carpet, the ceiling, the outer wall's lining with its two windows, the walls
@@ -565,8 +574,8 @@ public partial class SkiLodge
 			Vector3 la = o + along * s0, lb = o + along * s1;
 			var doorHole = new List<Hole>();
 			if (side == 0) doorHole.Add(new Hole(5.6f - s0, 8.0f - s0, 0f, 2.8f));
-			LodgeKit.Wall(k, null, la, lb, FloorY, 1.3f, 0.03f, n, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat, doorHole);
-			LodgeKit.Wall(k, null, la, lb, 1.3f, RoomTop, 0.03f, n, LodgeTextures.WallpaperMat, LodgeTextures.WallpaperMat, LodgeTextures.DarkWoodMat, doorHole);
+			LodgeKit.Wall(k, null, la, lb, FloorY, 1.3f, 0.03f, n, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat, doorHole, floorY: FloorY, grime: 1, skirt: true);
+			LodgeKit.Wall(k, null, la, lb, 1.3f, RoomTop, 0.03f, n, LodgeTextures.WallpaperMat, LodgeTextures.WallpaperMat, LodgeTextures.DarkWoodMat, doorHole, grime: 1, ceilingY: RoomTop);
 			k.Mat(LodgeTextures.DarkWoodMat);
 			var rb = new Basis(along, Vector3.Up, n);
 			float len = la.DistanceTo(lb);

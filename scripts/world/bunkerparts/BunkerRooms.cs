@@ -542,6 +542,21 @@ public partial class BunkerRooms : Node3D
 		g.Color = new Color(0.3f, 0.3f, 0.28f);
 		g.Cylinder(new Vector3(1.4f, 0.002f, -3.6f), new Vector3(1.4f, 0.012f, -3.6f), 0.16f, 0.16f, 10);
 		g.CommitTo(this, "Drain", false);
+		// what was left down here (the fidelity pass, 2026-10-01): two crates stacked in one corner, a footlocker against the
+		// far wall in another; the same every time, like the rest of it
+		var roles = new System.Collections.Generic.Dictionary<string, Material>
+		{
+			["wood"] = BuildingTextures.BoardsMat, ["steel"] = BunkerTextures.PaintedMetalMat, ["iron"] = ProcTextures.MetalMat,
+		};
+		var cl = new MeshKit();
+		if (FurnitureKit.Add(cl, "crate", new Vector3(-hw + 0.45f, 0f, -0.85f), 0.1f, roles))
+		{
+			FurnitureKit.Add(cl, "crate", new Vector3(-hw + 0.47f, 0.68f, -0.83f), -0.2f, roles);
+			FurnitureKit.Add(cl, "footlocker", new Vector3(hw - 1.1f, 0f, -RoomD + 0.35f), 0f, roles);
+			cl.CommitTo(this, "Leftovers");
+			AddBox(new Vector3(-hw + 0.45f, 0.68f, -0.85f), new Vector3(0.66f, 1.36f, 0.66f));
+			AddBox(new Vector3(hw - 1.1f, 0.2f, -RoomD + 0.35f), new Vector3(0.84f, 0.4f, 0.46f));
+		}
 	}
 
 	/// <summary>A plank door in a frame set into a wall. <paramref name="inward"/> is the wall's inward normal (into the room).

@@ -39,6 +39,11 @@ public partial class PlayerFootsteps : Node
 
 	public int StepsPlayed { get; private set; }
 	public string LastSurface => _lastSurface;
+	/// <summary>How deep the snow underfoot is, 0..1 (set by the winter woods: off the plowed road it's deep). Deep,
+	/// a snow step is the muffled, dragging one.</summary>
+	public float SnowDepth { get; set; }
+	/// <summary>For tests: deep-snow steps played.</summary>
+	public int DeepSteps { get; private set; }
 
 	public override void _Ready()
 	{
@@ -52,6 +57,8 @@ public partial class PlayerFootsteps : Node
 		_sets["rock"] = _sets["stone"];
 		// Act 21 on: snow (soft, the owner: softer steps for the winter)
 		_sets["snow"] = LoadSet("res://assets/audio/sfx/step_snow_{0:00}.wav", 6);
+		// in deep snow: muffled, the leg dragged through (the detail pass)
+		_sets["snow_deep"] = LoadSet("res://assets/audio/sfx/step_snow_deep_{0:00}.wav", 6);
 		_cloth = LoadSet("res://assets/audio/sfx/cloth_{0:00}.wav", 4);
 		for (int i = 0; i < Voices; i++)
 		{
@@ -104,9 +111,11 @@ public partial class PlayerFootsteps : Node
 	{
 		_lastSurface = SurfaceUnderfoot();
 		if (!_sets.TryGetValue(_lastSurface, out var set) || set.Length == 0) set = _sets["dirt"];
+		bool deep = _lastSurface == "snow" && SnowDepth > 0.45f && _sets["snow_deep"].Length > 0;
+		if (deep) { set = _sets["snow_deep"]; DeepSteps++; }
 		if (set.Length == 0) return;
 
-		float loudness = Mathf.Remap(Mathf.Clamp(speed, 1f, 5f), 1f, 5f, -2f, 3f) + CrouchQuietDb * _player.CrouchAmount;
+		float loudness = Mathf.Remap(Mathf.Clamp(speed, 1f, 5f), 1f, 5f, -2f, 3f) + CrouchQuietDb * _player.CrouchAmount + (deep ? -1.5f : 0f);
 		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.92f, 1.08f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
 			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.9f, 1.1f));

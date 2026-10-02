@@ -217,6 +217,9 @@ def moulding(name, pts, profile, material):
 
 # ------------------------------------------------------------------ baking and export
 
+KEEP_UV = set()
+
+
 def uv_layers(ob):
     """UV 1: box projection at a metre a repeat (the game's own materials); UV 2: a unique layout for the cavity map."""
     me = ob.data
@@ -226,8 +229,13 @@ def uv_layers(ob):
     ob.select_set(True)
     bpy.context.view_layer.objects.active = ob
     me.uv_layers.active_index = 0
+    # (faces of a KEEP_UV role keep the UVs they were built with: a card of needles maps its spray photo whole)
+    keep = {i for i, m in enumerate(me.materials) if m is not None and m.name.split(".")[0] in KEEP_UV}
+    for p in me.polygons:
+        p.select = p.material_index not in keep
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
+    if not keep:
+        bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.cube_project(cube_size=1.0, scale_to_bounds=False, correct_aspect=False)
     bpy.ops.object.mode_set(mode="OBJECT")
     me.uv_layers.active_index = 1

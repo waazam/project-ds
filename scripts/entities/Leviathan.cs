@@ -252,6 +252,8 @@ public partial class Leviathan : Node3D
 		_time += dt;
 		_convulse = Mathf.Max(0f, _convulse - dt);
 		_cam ??= GetViewport().GetCamera3D();
+		// (out of sight across the world, nothing to move: its tentacles were 2 ms of every frame wherever the player was)
+		if (_cam != null && _cam.GlobalPosition.DistanceSquaredTo(GlobalPosition) > 300f * 300f) return;
 		foreach (var t in _tentacles) Step(t, dt);
 		foreach (var t in _tentacles) Pose(t);
 		LookAtCamera();

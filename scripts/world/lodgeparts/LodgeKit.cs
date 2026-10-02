@@ -18,7 +18,8 @@ public static class LodgeKit
 	/// edges round the holes (door and window reveals) and the top in <paramref name="edge"/>. Colliders go on
 	/// <paramref name="body"/>. UVs in metres (x along, y up).</summary>
 	public static void Wall(MeshKit k, StaticBody3D body, Vector3 a, Vector3 b, float y0, float y1, float thick, Vector3 side,
-		Material matA, Material matB, Material edge, IList<Hole> holes = null, float uvScale = 1f)
+		Material matA, Material matB, Material edge, IList<Hole> holes = null, float uvScale = 1f, bool occlude = true,
+		float floorY = float.NaN, int grime = 0, bool skirt = false, float ceilingY = float.NaN)
 	{
 		Vector3 along = (b - a).Normalized();
 		float len = a.DistanceTo(b);
@@ -55,6 +56,27 @@ public static class LodgeKit
 			{
 				if (s1 - s0 < 0.001f) continue;
 				float t = thick * 0.5f;
+				// the grime along its foot where it stands on a floor (grime: 1 the side face, -1 the other, 2 both)
+				if (grime != 0 && !float.IsNaN(floorY) && Mathf.Abs(s0 - y0) < 0.001f && Mathf.Abs(y0 - floorY) < 0.1f)
+				{
+					if (grime > 0) World.Weathering.ContactStrips(k, P(u0, floorY, t), P(u1, floorY, t), n, floorY);
+					if (grime < 0 || grime == 2) World.Weathering.ContactStrips(k, P(u1, floorY, -t), P(u0, floorY, -t), -n, floorY);
+					// a skirting board along its foot (the look pass, 2026-10-02: the walls met the floor bare)
+					if (skirt)
+					{
+						if (grime > 0) Trim(k, P(u0, floorY, t), P(u1, floorY, t), n, 0.14f, 0.016f, true);
+						if (grime < 0 || grime == 2) Trim(k, P(u1, floorY, -t), P(u0, floorY, -t), -n, 0.14f, 0.016f, true);
+					}
+				}
+				// a crown moulding where it meets the ceiling
+				if (grime != 0 && !float.IsNaN(ceilingY) && Mathf.Abs(s1 - y1) < 0.001f && Mathf.Abs(y1 - ceilingY) < 0.1f)
+				{
+					if (grime > 0) Trim(k, P(u0, ceilingY, t), P(u1, ceilingY, t), n, 0.11f, 0.05f, false);
+					if (grime < 0 || grime == 2) Trim(k, P(u1, ceilingY, -t), P(u0, ceilingY, -t), -n, 0.11f, 0.05f, false);
+				}
+				// (a span big enough to hide a room behind it: an occluder in the wall's middle, a hair inside its edges)
+				if (occlude && u1 - u0 >= 0.8f && s1 - s0 >= 0.8f)
+					k.Occlude(P(u0 + 0.03f, s0 + 0.03f, 0f), P(u1 - 0.03f, s0 + 0.03f, 0f), P(u1 - 0.03f, s1 - 0.03f, 0f), P(u0 + 0.03f, s1 - 0.03f, 0f));
 				// the two faces
 				k.Mat(matA);
 				k.Quad(P(u0, s0, t), P(u1, s0, t), P(u1, s1, t), P(u0, s1, t), n, new Vector2(u0, s0) * uvScale, new Vector2(u1, s0) * uvScale, new Vector2(u1, s1) * uvScale, new Vector2(u0, s1) * uvScale);
@@ -78,6 +100,40 @@ public static class LodgeKit
 				}
 			}
 		}
+	}
+
+	/// <summary>A run of trim along a wall's face from <paramref name="a"/> to <paramref name="b"/> (on the face, at the
+	/// floor or the ceiling): a skirting board standing up from the floor (a board, its top edge eased), or a crown moulding
+	/// hanging from the ceiling (stepped out in two). Dark wood.</summary>
+	public static void Trim(MeshKit k, Vector3 a, Vector3 b, Vector3 n, float height, float proud, bool floor)
+	{
+		float len = a.DistanceTo(b);
+		if (len < 0.05f) return;
+		var along = (b - a) / len;
+		// (its ends 3 mm short: flush, they lay in the planes of the door casings and the furniture against the walls)
+		len -= 0.006f;
+		var basis = new Basis(along, Vector3.Up, along.Cross(Vector3.Up).Normalized());
+		if (basis.Z.Dot(n) < 0) basis = new Basis(-along, Vector3.Up, -along.Cross(Vector3.Up).Normalized());
+		// (2 mm off the floor or the ceiling: flush with it, its face lay in the floor's plane and the things standing on
+		// it, and fought them; the clip audit found it)
+		var mid = (a + b) * 0.5f + Vector3.Up * (floor ? 0.002f : -0.002f) - n * 0.002f;   // (its back 2 mm into the wall, out of the wall's face's plane)
+		var mat = k.CurrentMaterial;
+		k.Mat(LodgeTextures.DarkWoodMat);
+		var c = k.Color;
+		k.Color = Colors.White;
+		float sg = floor ? 1f : -1f;
+		if (floor)
+		{
+			k.Box(mid + n * (proud * 0.5f) + Vector3.Up * (height * 0.5f - 0.02f), new Vector3(len, height - 0.04f, proud), 1f, basis);
+			k.Box(mid + n * (proud * 0.35f) + Vector3.Up * (height - 0.02f), new Vector3(len, 0.04f, proud * 0.7f), 1f, basis);   // the eased top
+		}
+		else
+		{
+			k.Box(mid + n * (proud * 0.25f) + Vector3.Up * (sg * height * 0.25f), new Vector3(len, height * 0.5f, proud * 0.5f), 1f, basis);
+			k.Box(mid + n * (proud * 0.5f) + Vector3.Up * (sg * height * 0.12f), new Vector3(len, height * 0.24f, proud), 1f, basis);
+		}
+		k.Color = c;
+		if (mat != null) k.Mat(mat);
 	}
 
 	private static bool HoleEdge(List<Hole> hs, float u, float s0, float s1)

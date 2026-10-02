@@ -76,8 +76,8 @@ public partial class Church
 		BuildKit.Box(k, new Vector3(0, ay + 0.5f, az - 0.61f), new Vector3(2.8f, 0.7f, 0.03f), 1f);
 		for (int i = 0; i < 5; i++)
 			k.Cylinder(new Vector3(-1.2f + i * 0.6f, ay + 0.2f, az - 0.63f), new Vector3(-1.2f + i * 0.6f, ay + 0.85f, az - 0.63f), 0.04f, 0.04f, 6, false);
-		var cloth = new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.88f, 0.84f), Roughness = 0.9f };
-		k.Mat(cloth);
+		// the altar cloth: the jacquard, as every tablecloth in the game (the owner)
+		k.Mat(LodgeParts.LodgeTextures.TableclothMat);
 		BuildKit.Box(k, new Vector3(0, ay + 1.065f, az), new Vector3(3.5f, 0.01f, 1.45f), 1f);
 		BuildKit.Box(k, new Vector3(0, ay + 0.85f, az - 0.73f), new Vector3(3.5f, 0.42f, 0.01f), 1f);
 		k.Mat(ChurchTextures.GoldMat);
@@ -181,13 +181,20 @@ public partial class Church
 			k.Cylinder(new Vector3(x, 1.28f, -0.02f), new Vector3(x, 1.34f, -0.02f), 0.035f, 0.045f, 8, false);   // a turned neck
 			k.Blob(new Vector3(x, 1.39f, -0.02f), new Vector3(0.06f, 0.055f, 0.06f), 3, 0.08f);                     // and a round poppyhead
 		}
-		var mesh = k.Commit();
+		Mesh mesh = k.Commit();
+		// the modelled pew (the owner's fidelity pass, 2026-10-01): carved ends with a poppyhead and a quatrefoil, a
+		// raked back of boards under a moulded rail, hymnals on its shelf, a padded kneeler; it faces -Z as built, so
+		// turned round to face the altar
+		var red = new StandardMaterial3D { ResourceName = "ch_kneeler", AlbedoColor = new Color(0.32f, 0.05f, 0.05f), Roughness = 0.9f, AlbedoTexture = LodgeParts.LodgeTextures.VelvetVioletMat.AlbedoTexture };
+		var modelled = FurnitureKit.Mesh("pew", new() { ["wood"] = ChurchTextures.OakMat, ["cushion"] = red, ["leather"] = new StandardMaterial3D { ResourceName = "ch_hymnal", AlbedoColor = new Color(0.12f, 0.05f, 0.04f), Roughness = 0.7f }, ["paper"] = new StandardMaterial3D { ResourceName = "ch_pages", AlbedoColor = new Color(0.6f, 0.56f, 0.45f), Roughness = 0.95f } });
+		var turn = modelled != null ? new Basis(Vector3.Up, Mathf.Pi) : Basis.Identity;
+		if (modelled != null) mesh = modelled;
 		var xf = new List<Transform3D>();
 		for (float z = 7.2f; z < 29.8f; z += 1.05f)
 			foreach (float s in new[] { -1f, 1f })
 			{
 				var at = new Vector3(s * (1.35f + len * 0.5f), 0, z);
-				xf.Add(new Transform3D(Basis.Identity, at));
+				xf.Add(new Transform3D(turn, at));
 				Collide(_wood, at + new Vector3(0, 0.55f, -0.04f), new Vector3(len + 0.1f, 1.1f, 0.7f));
 			}
 		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh, InstanceCount = xf.Count };
@@ -511,6 +518,19 @@ public partial class Church
 		BuildKit.Box(k, new Vector3(x1 + 5.2f, 1.6f, z0 + 0.06f), new Vector3(1.6f, 0.3f, 0.06f), 1f);
 		k.Mat(ChurchTextures.IronMat);
 		for (int i = 0; i < 4; i++) k.Cylinder(new Vector3(x1 + 4.6f + i * 0.4f, 1.62f, z0 + 0.09f), new Vector3(x1 + 4.6f + i * 0.4f, 1.6f, z0 + 0.2f), 0.012f, 0.012f, 5, false);
+		// on the long table: the registers stacked, an open hymnal's loose pages, a row of service books; a crate of
+		// candles under the window (the fidelity pass's clutter)
+		var vroles = new System.Collections.Generic.Dictionary<string, Material>
+		{
+			["wood"] = ChurchTextures.OakMat, ["leather"] = new StandardMaterial3D { ResourceName = "ch_binding", AlbedoColor = new Color(0.16f, 0.06f, 0.05f), Roughness = 0.7f },
+			["paper"] = new StandardMaterial3D { ResourceName = "ch_pages", AlbedoColor = new Color(0.6f, 0.56f, 0.45f), Roughness = 0.95f },
+			["metal"] = ChurchTextures.GoldMat, ["iron"] = ChurchTextures.IronMat,
+		};
+		float tz = (z0 + z1) * 0.5f;
+		FurnitureKit.Add(k, "books_stack", new Vector3(x1 + 1.3f, 0.81f, tz - 1.1f), 0.3f, vroles);
+		FurnitureKit.Add(k, "papers", new Vector3(x1 + 1.25f, 0.81f, tz + 0.4f), 1.2f, vroles);
+		FurnitureKit.Add(k, "books_row_a", new Vector3(x1 + 1.42f, 0.81f, tz + 1.5f), Mathf.Pi * 0.5f, vroles);
+		FurnitureKit.Add(k, "crate", new Vector3(x1 + 0.42f, 0f, z1 - 0.75f), 0.05f, vroles);
 		k.CommitTo(this, "Vestry", true);
 		// a white alb hanging on a peg, a candle burning low on the table
 		var alb = new MeshKit();

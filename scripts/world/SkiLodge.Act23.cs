@@ -65,6 +65,8 @@ public partial class SkiLodge
 
 	private Node3D _objective;
 	private readonly Node3D[] _sheets = new Node3D[6];
+	/// <summary>Each table's cloth once it has been pulled (for tests: where it came to rest).</summary>
+	public VerletCloth[] Cloths { get; } = new VerletCloth[6];
 	private readonly Node3D[] _tables = new Node3D[6];
 	private AudioStreamPlayer3D _whisper202, _mumble203, _snow203;
 	private AudioStreamPlayer _stormWind;
@@ -415,38 +417,12 @@ public partial class SkiLodge
 	{
 		var n = new Node3D { Name = $"Sheet{t}", Position = TableCentre(t) with { Y = FloorY } };
 		AddChild(n);
-		var pos = SheetGrid(t);
-		var k = new MeshKit();
-		k.Mat(LodgeTextures.LinenMat);
-		k.Color = Colors.White;
-		for (int i = 0; i < SheetNx; i++)
-			for (int j = 0; j < SheetNz; j++)
-			{
-				Vector3 a = pos[i, j], b = pos[i + 1, j], c = pos[i + 1, j + 1], d = pos[i, j + 1];
-				Vector3 nn = (b - a).Cross(d - a).Normalized();
-				if (nn.Y < 0) k.Quad(a, d, c, b, -nn); else k.Quad(a, b, c, d, nn);
-			}
-		k.CommitTo(n, "Drape", true);
+		// the cloth itself, lying as the drape until it's pulled (VerletCloth: calm, and it can't be flung)
+		var cloth = VerletCloth.Create(SheetGrid(t), new Vector2(TableLen + 0.8f, TableW + 0.8f), LodgeTextures.TableclothMat, "Drape");
+		cloth.Blocks.Add(new Aabb(new Vector3(-TableLen * 0.5f, 0f, -TableW * 0.5f), new Vector3(TableLen, TableH, TableW)));
+		cloth.FloorY = 0f;
+		n.AddChild(cloth);
 		return n;
-	}
-
-	private ArrayMesh SheetClothMesh(int t)
-	{
-		var pos = SheetGrid(t);
-		var st = new SurfaceTool();
-		st.Begin(Mesh.PrimitiveType.Triangles);
-		for (int i = 0; i <= SheetNx; i++)
-			for (int j = 0; j <= SheetNz; j++) { st.SetUV(new Vector2(i / (float)SheetNx, j / (float)SheetNz)); st.AddVertex(pos[i, j]); }
-		for (int i = 0; i < SheetNx; i++)
-			for (int j = 0; j < SheetNz; j++)
-			{
-				int a = i * (SheetNz + 1) + j, b = (i + 1) * (SheetNz + 1) + j, c = b + 1, d = a + 1;
-				st.AddIndex(a); st.AddIndex(b); st.AddIndex(c);
-				st.AddIndex(a); st.AddIndex(c); st.AddIndex(d);
-			}
-		st.GenerateNormals();
-		st.SetMaterial(LodgeTextures.SheetLinenMat);
-		return st.Commit();
 	}
 
 	private bool _pulling;
@@ -477,27 +453,21 @@ public partial class SkiLodge
 			int gj = towardLocal.Z >= 0 ? SheetNz : 0;
 			float px = Mathf.Clamp(sheet.ToLocal(player.GlobalPosition).X, -TableLen * 0.4f, TableLen * 0.4f);
 			int gi = Mathf.Clamp(Mathf.RoundToInt((px / (TableLen + 0.8f) + 0.5f) * SheetNx), 3, SheetNx - 3);
+			var cloth = sheet.GetNode<VerletCloth>("Drape");
+			Cloths[t] = cloth;
+			// a good handful of the near edge (a long table: a single point only stretches it)
 			var grips = new List<int>();
-			for (int d = -4; d <= 4; d++) grips.Add(Mathf.Clamp(gi + d, 0, SheetNx) * (SheetNz + 1) + gj);
-			var mesh = SheetClothMesh(t);
-			Vector3 gripLocal = mesh.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array()[grips[4]];
+			for (int d = -6; d <= 6; d++) grips.Add(cloth.IndexOf(gi + d, gj));
+			Vector3 gripLocal = cloth.Point(grips[6]);
 			var hand = new Node3D { Name = "Hand", Position = gripLocal };
 			sheet.AddChild(hand);
-			var cloth = new SoftBody3D
-			{
-				// linen (the settings the owner liked, a shade more damped so it doesn't shiver as it lands)
-				Name = "Cloth", Mesh = mesh, SimulationPrecision = 10, TotalMass = 0.6f, LinearStiffness = 1f,
-				PressureCoefficient = 0f, DampingCoefficient = 0.05f, DragCoefficient = 0.02f, CollisionLayer = 0, CollisionMask = 1, RayPickable = false,
-			};
-			sheet.AddChild(cloth);
-			foreach (var c in sheet.GetChildren()) if (c is MeshInstance3D m && m != cloth) m.Visible = false;
-			foreach (int g in grips) cloth.SetPointPinned(g, true, cloth.GetPathTo(hand));
+			cloth.Wake();
+			foreach (int g in grips) cloth.Pin(g, hand);
 			Vector3 dir = new(0, 0, Mathf.Sign(towardLocal.Z == 0 ? 1 : towardLocal.Z));
-			// the hand's path: one curve, eased at both ends (it was a jerk up and a yank): the edge gathered up high off
-			// the table first, then drawn off toward the player and down, as it was. (Drawn off sideways, it dragged
-			// along itself and folded through itself: a soft body doesn't feel its own cloth.)
-			Vector3 p0 = gripLocal, p1 = gripLocal + Vector3.Up * 0.9f + dir * 0.25f,
-				p2 = gripLocal + Vector3.Up * 0.8f + dir * 1.3f, p3 = gripLocal + Vector3.Up * 0.05f + dir * 2.4f;
+			// the hand's path, slow and eased (the owner: smoother, slower): the edge lifted off the table, drawn back
+			// over the player's side and down to the floor beside the table; the rest follows it off and settles there
+			Vector3 p0 = gripLocal, p1 = gripLocal + Vector3.Up * 0.55f + dir * 0.3f,
+				p2 = gripLocal with { Y = TableH + 0.35f } + dir * 1.2f, p3 = gripLocal with { Y = 0.3f } + dir * 1.5f;
 			var tw = CreateTween();
 			tw.TweenMethod(Callable.From<float>(u =>
 			{
@@ -506,67 +476,26 @@ public partial class SkiLodge
 				hand.Position = v * v * v * p0 + 3f * v * v * u * p1 + 3f * v * u * u * p2 + u * u * u * p3;
 				// what was under it, there once the linen has swept up off it
 				if (showUnder && u > 0.5f && under != null && IsInstanceValid(under) && !under.Visible) under.Visible = true;
-			}), 0f, 1f, 1.05f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-			tw.TweenInterval(0.12f);
+			}), 0f, 1f, 2.6f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+			tw.TweenInterval(0.25f);
 			await Cutscene.Tween(this, tw, ct);
 			// let go a few points at a time from the ends in, so it slips from the hand rather than all at once
-			for (int r = 0; r < 5; r++)
+			for (int r = 0; r < 6; r++)
 			{
 				if (!IsInstanceValid(cloth)) break;
-				cloth.SetPointPinned(grips[r], false);
-				cloth.SetPointPinned(grips[grips.Count - 1 - r], false);
-				await Cutscene.Wait(this, 0.04, ct);
+				cloth.Unpin(grips[r]);
+				cloth.Unpin(grips[grips.Count - 1 - r]);
+				await Cutscene.Wait(this, 0.06, ct);
 			}
+			cloth.Unpin(grips[6]);
+			hand.QueueFree();
 			AudioDirector.OneShot(this, "cloth", 4, sheet.ToGlobal(p3), -8f, "Events", 3f, 0.1f);
-			_ = SettleSheet(cloth);
 			GD.Print($"[story] Act 23: sheet {n} off (table {t})");
 			await Cutscene.Wait(this, 0.4, ct);
 		}
 		finally { _pulling = false; }
 		// what it sets off plays out without holding the player
 		_ = Aftermath(t, TablesPulled);
-	}
-
-	private async Task SettleSheet(SoftBody3D cloth)
-	{
-		// wait for it to come to rest: its points still (a centimetre over a quarter-second, three times running),
-		// at least two seconds, at most eight
-		double waited = 0;
-		int still = 0;
-		Vector3[] last = null;
-		while (waited < 8.0 && IsInstanceValid(cloth))
-		{
-			await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
-			waited += 0.25;
-			if (!IsInstanceValid(cloth)) return;
-			int n = (SheetNx + 1) * (SheetNz + 1);   // the sheet's grid: one point a vertex
-			var now = new Vector3[n];
-			float moved = 0f;
-			for (int i = 0; i < n; i++)
-			{
-				now[i] = cloth.GetPointTransform(i);
-				if (last != null) moved = Mathf.Max(moved, now[i].DistanceTo(last[i]));
-			}
-			last = now;
-			still = last != null && moved < 0.01f ? still + 1 : 0;
-			if (waited >= 2.0 && still >= 3) break;
-		}
-		if (!IsInstanceValid(cloth)) return;
-		if (cloth.Mesh is not ArrayMesh src) return;
-		var arrays = src.SurfaceGetArrays(0);
-		var verts = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-		var parent = (Node3D)cloth.GetParent();
-		var inv = parent.GlobalTransform.AffineInverse();
-		for (int i = 0; i < verts.Length; i++) verts[i] = inv * cloth.GetPointTransform(i);
-		var st = new SurfaceTool();
-		st.Begin(Mesh.PrimitiveType.Triangles);
-		var uvs = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-		for (int i = 0; i < verts.Length; i++) { st.SetUV(uvs[i]); st.AddVertex(verts[i]); }
-		foreach (int idx in arrays[(int)Mesh.ArrayType.Index].AsInt32Array()) st.AddIndex(idx);
-		st.GenerateNormals();
-		st.SetMaterial(LodgeTextures.SheetLinenMat);
-		parent.AddChild(new MeshInstance3D { Name = "Heap", Mesh = st.Commit() });
-		cloth.QueueFree();
 	}
 
 	/// <summary>What the n-th sheet had under it (built on table t).</summary>
@@ -851,6 +780,8 @@ public partial class SkiLodge
 		};
 		AddChild(dust);
 		Collapsed = t;
+		// its cloth (still lying on it, or across it) comes down with it
+		if (Cloths[t] is { } fallen && IsInstanceValid(fallen)) { fallen.Blocks.Clear(); fallen.Wake(); }
 	}
 
 	public int Collapsed { get; private set; } = -1;
@@ -990,6 +921,7 @@ public partial class SkiLodge
 		CrawlProcess(player, l, dt);
 		l = ToLocal(player.GlobalPosition);
 		FrozenProcess(dt);
+		SoundsProcess(l, inside);
 		// the light in here: clean and warm (noon, every lamp lit), not the woods' murk; cold once it's frozen over
 		var atmo = StoryBeat.Atmosphere(this);
 		if (atmo != null)

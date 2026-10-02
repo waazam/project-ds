@@ -237,7 +237,8 @@ public partial class StoryTest : Node
 		_lastPos = _player.GlobalPosition;
 		// hitches: any frame over 100 ms, with what came just before it (a check, a screenshot, a load)
 		if (Engine.TimeScale == 1.0 && delta > 0.1 && _s.CurrentAct != null)
-			GD.Print($"[hitch] {delta * 1000:0} ms in {_s.CurrentAct} after '{_lastEvent}' at {_player.GlobalPosition.Round()}");
+			GD.Print($"[hitch] {delta * 1000:0} ms in {_s.CurrentAct} after '{_lastEvent}' at {_player.GlobalPosition.Round()}"
+				+ $" (process {Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000:0} ms, physics {Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000:0} ms, {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame):0} draws)");
 		_fpsTimer += delta / Math.Max(Engine.TimeScale, 0.01);
 		if (_fpsTimer >= 0.5 && Engine.TimeScale == 1.0)
 		{
@@ -1916,8 +1917,9 @@ public partial class StoryTest : Node
 			Check("a quarter of the way down, the lantern's flame guttered out (saved)", ProjectDS.Player.Lantern.FlameDead && StoryManager.Instance.HasFlag(StoryManager.Flag.LanternFlameDead));
 			lantern?.SetBlacklight(false);
 			await Frames(4, ct);
-			_input.ScriptedLight = true; await Frames(3, ct); _input.ScriptedLight = false; await Frames(3, ct);
-			_input.ScriptedLight = true; await Frames(3, ct); _input.ScriptedLight = false; await Frames(6, ct);
+			// (each press held and released for a moment: a hitch here once swallowed one, and the flame looked lit)
+			_input.ScriptedLight = true; await Seconds(0.15, ct); _input.ScriptedLight = false; await Seconds(0.2, ct);
+			_input.ScriptedLight = true; await Seconds(0.15, ct); _input.ScriptedLight = false; await Seconds(0.3, ct);
 			Check("F won't light the flame again", lantern is { Shining: false }, $"shining {lantern?.Shining}");
 			await PressLanternMode(lantern, true, ct);
 			await Frames(4, ct);
@@ -2510,6 +2512,7 @@ public partial class StoryTest : Node
 		// the book that sticks out, before there's a bookmark
 		await WalkTo(lib.BookcaseFrontWorld, 0.6f, ct, giveUp: 10f);
 		await Aim(lib.BookUse.GlobalPosition, ct);
+		await Frames(2, ct);
 		Check("one book on the back wall sticks out (nothing to do with it yet)", _player.Interaction?.PromptText == "One of the books sticks out." && !lib.BookcaseOpen, $"'{_player.Interaction?.PromptText}'");
 		Screenshot("the_jutting_book");
 		// the handprint on it, under the blacklight
@@ -2658,12 +2661,29 @@ public partial class StoryTest : Node
 		await Aim(rr.CentreWorld + Vector3.Up * 0.6f, ct);
 		Check("the lighter: burn the webs", _player.Interaction?.PromptText == "Burn the webs", $"'{_player.Interaction?.PromptText}'");
 		Screenshot("the_webbed_dais");
+		// its cost (the owner found the room laggy): rendered frames (not physics ticks) over three seconds facing the
+		// webbed dais, the average and the worst
+		{
+			int frames = 0; double worst = 0; ulong f0 = Time.GetTicksUsec(), last = f0;
+			while (Time.GetTicksUsec() - f0 < 3_000_000)
+			{
+				await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+				ulong now = Time.GetTicksUsec(); worst = Math.Max(worst, (now - last) / 1000.0); last = now; frames++;
+			}
+			double fps = frames / ((Time.GetTicksUsec() - f0) / 1e6);
+			string cost = $"{fps:0} fps, worst frame {worst:0} ms, {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame)} draws, {RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame) / 1000}k tris";
+			GD.Print($"[storytest] round room cost: {cost}");
+			Check("the round room runs smoothly, facing the webbed dais (no hitches)", fps > 60 && worst < 50, cost);
+		}
 		await Press(ct);
 		await WaitUntil(() => rr.WebsBurned, 3, ct);
 		await Seconds(2.0, ct);
 		Screenshot("the_webs_burning");
+		await Seconds(2.5, ct);
+		Screenshot("the_webs_burning_across_the_floor");
+		Check("the burn spreads out across the floor, all round the room (the owner)", rr.BurnRadius > 3f, $"{rr.BurnRadius:0.0} m");
 		await WaitUntil(() => _input.Enabled, 10, ct);
-		Check("the webs burn away", rr.WebsBurned && s.HasFlag(StoryManager.Flag.RoundRoomWebBurned));
+		Check("the webs burn away, out to the walls", rr.WebsBurned && s.HasFlag(StoryManager.Flag.RoundRoomWebBurned) && rr.BurnRadius > RoundRoom.Radius + RoundRoom.DaisFoot, $"reached {rr.BurnRadius:0.0} m");
 		// the ring is still red: the dais does nothing
 		await WalkTo(rr.CentreWorld, 0.3f, ct, stopWhen: () => rr.Rising, giveUp: 6f);
 		await Seconds(1.0, ct);
@@ -2721,13 +2741,16 @@ public partial class StoryTest : Node
 		await WaitUntil(() => rr.Rising, 3, ct);
 		Check("stepping into the middle of the dais starts it rising, the player held", rr.Rising && !_input.Enabled);
 		ulong t0 = Time.GetTicksMsec();
-		await Seconds(6, ct);
+		await Seconds(0.3, ct);
+		int ridingSteps = _player.Footsteps?.StepsPlayed ?? 0;
+		await Seconds(5.7, ct);
 		Screenshot("rising_past_the_windows");
 		await Seconds(6, ct);
 		Screenshot("rising_into_the_shaft");
 		await WaitUntil(() => rr.Arrived, 20, ct);
 		double took = (Time.GetTicksMsec() - t0) / 1000.0;
 		Check("a twenty-second ascent", rr.Arrived && took > 17 && took < 24, $"{took:0.0} s");
+		Check("riding it up, they stand still: no footsteps, no walking bob (the owner)", (_player.Footsteps?.StepsPlayed ?? 0) == ridingSteps && _player.GroundSpeed < 0.01f, $"{(_player.Footsteps?.StepsPlayed ?? 0) - ridingSteps} steps, speed {_player.GroundSpeed:0.00}");
 		Check("up through the ceiling into the room above: Act 20 done", s.Current == Checkpoint.Act20Finished && _player.GlobalPosition.Y > rr.ToGlobal(new Vector3(0, RoundRoom.Rise, 0)).Y, $"{s.Current} at {_player.GlobalPosition}");
 		await WaitUntil(() => _input.Enabled, 3, ct);
 		await Frames(10, ct);
@@ -2952,6 +2975,19 @@ public partial class StoryTest : Node
 		for (; along < 150f; along += 15f)
 			if (!await WalkTo(R(along), 1.2f, ct, giveUp: 12f)) break;
 		Check("walked the road's first 150 m", along >= 150f, $"stuck near {along} m at {_player.GlobalPosition}");
+		// prints in the snow behind them (and the wendigo's tracks across the road, laid ahead of them)
+		Check("their boot prints in the snow behind them", woods.Prints.BootsLaid > 40, $"{woods.Prints.BootsLaid} prints");
+		Check("the wendigo's tracks across the road ahead", woods.Prints.ClawsLaid >= 40, $"{woods.Prints.ClawsLaid} claw prints");
+		await Aim(woods.Prints.LastBoot, ct);
+		await Frames(3, ct);
+		Screenshot("act22_footprints");
+		// and the wendigo's, where its tracks cross the road ahead
+		var cross = R(270f);
+		await Inside(R(262f), cross, ct);
+		await Aim(cross, ct);
+		await Frames(3, ct);
+		Screenshot("act22_wendigo_tracks");
+		await Inside(R(along), R(along + 10f), ct);
 		// the first sighting: far down the road ahead, in the middle of it; look at it and it's gone up into the trees
 		await Aim(_player.GlobalPosition + (_player.GlobalPosition - R(along + 40f)) with { Y = 0 }, ct);   // look back the way they came
 		await WaitUntil(() => woods.Appearances >= 1, 40, ct);
@@ -2980,6 +3016,29 @@ public partial class StoryTest : Node
 		Check("turn round and it's up the tree", woods.Wendigo.Leaps > leaps);
 		await Seconds(0.8, ct);
 		Check("it never lays a hand on them", _input.Enabled && _player.IsOnFloor());
+		// its other moves (the detail pass): crouched on a wall's top, halfway up a trunk, dropped onto the road behind them
+		foreach (var (move, what) in new[] { (WinterWoods.StalkMove.WallCrouch, "crouched on top of a plowed wall, looking down"), (WinterWoods.StalkMove.Climb, "caught halfway up a trunk, clinging to it"), (WinterWoods.StalkMove.Drop, "dropped off a wall onto the road behind them (they hear it land)") })
+		{
+			await WaitUntil(() => !woods.Wendigo.Leaping, 3, ct);
+			await Aim(R(along + 40f) + Vector3.Up * 1.6f, ct);
+			woods.DebugHoldStill = true;
+			bool shown = false;
+			for (int i = 0; i < 20 && !shown; i++) { shown = woods.DebugAppearBehind(move) && woods.LastMove == move; if (!shown) await Seconds(0.3, ct); }
+			await WaitUntil(() => !woods.Wendigo.Leaping, 2, ct);
+			float back = woods.Wendigo.GlobalPosition.DistanceTo(_player.GlobalPosition);
+			Check($"its moves: {what}", shown && woods.Wendigo.Visible && back > 9f && back < 44f, $"{woods.LastMove} at {back:0.0} m");
+			GD.Print($"[storytest] wendigo {move}: root {woods.Wendigo.GlobalPosition}, chest {woods.Wendigo.ChestWorld} ({woods.Wendigo.ChestWorld.DistanceTo(woods.Wendigo.GlobalPosition):0.0} m off), camera {_player.CameraRig.Camera.GlobalPosition}");
+			int before = woods.Wendigo.Leaps;
+			await Aim(woods.Wendigo.ChestWorld, ct);
+			await Seconds(0.2, ct);
+			Screenshot($"act22_wendigo_{move.ToString().ToLower()}");
+			woods.DebugHoldStill = false;
+			await WaitUntil(() => woods.Wendigo.Leaps > before, 2, ct);
+			Check($"seen {(move == WinterWoods.StalkMove.Climb ? "on the trunk" : move == WinterWoods.StalkMove.Drop ? "on the road" : "on the wall")}, it's gone up into the trees", woods.Wendigo.Leaps > before);
+		}
+		woods.DebugHoldStill = false;
+		await Seconds(0.8, ct);
+		Check("and it still never lays a hand on them", _input.Enabled && _player.IsOnFloor());
 		// a voice from the trees (the first comes within a minute)
 		await WaitUntil(() => woods.Mimics >= 1, 60, ct);
 		Check("a copied voice from the trees", woods.Mimics >= 1, $"{woods.Mimics}");
@@ -2994,12 +3053,15 @@ public partial class StoryTest : Node
 			var right = new Vector3(-dir.Y, 0, dir.X);
 			float w = WinterWoods.WallTop + 0.05f, wl = WinterWoods.Height(q.X - right.X * w, q.Z - right.Z * w) - q.Y, wr = WinterWoods.Height(q.X + right.X * w, q.Z + right.Z * w) - q.Y;
 			Check("between plowed walls of snow higher than a head", wl > 1.5f && wr > 1.5f, $"left {wl:0.0} m, right {wr:0.0} m");
+			Check("the wind whistling over the walls' tops", woods.WallWind > 0.5f, $"{woods.WallWind:0.00}");
 		}
 		// off the road, up the bank at the antler tree's gap: the deep snow drags at them
 		var at = woods.Props["antler_tree"];
 		await Inside(woods.ToGlobal(WinterWoods.RoadAt(WinterWoods.PropSpots[2].s, out _)), at.GlobalPosition, ct);
+		int deepSteps = _player.Footsteps?.DeepSteps ?? 0;
 		await WalkTo(at.GlobalPosition, 2.0f, ct, giveUp: 14f);
 		await Seconds(1.0, ct);
+		Check("their steps in the deep snow: muffled, dragging", (_player.Footsteps?.DeepSteps ?? 0) > deepSteps, $"{(_player.Footsteps?.DeepSteps ?? 0) - deepSteps} deep steps");
 		Check("off the road, in the deep snow: wading, slowed right down", woods.PlayerDeepSnow > 0.6f && _player.WadeScale < 0.6f, $"deep {woods.PlayerDeepSnow:0.00}, pace {_player.WadeScale:0.00}");
 		await Inside(woods.ToGlobal(WinterWoods.RoadAt(WinterWoods.PropSpots[2].s, out _)), at.GlobalPosition, ct);
 		await Seconds(1.2, ct);
@@ -3018,6 +3080,7 @@ public partial class StoryTest : Node
 		await Inside(R(WinterWoods.Length - 90f), R(WinterWoods.Length - 40f), ct);
 		await Seconds(4, ct);
 		Check("near the lodge it's frozen: the snow has stopped, ice on everything", woods.PlayerProgress > 0.9f && woods.SnowRatio < 0.15f && (atmo?.Frost ?? 0f) > 0.2f, $"progress {woods.PlayerProgress:0.00}, snow {woods.SnowRatio:0.00}, frost {atmo?.Frost:0.00}");
+		Check("past halfway down the road: a save there (Continue comes back to the road, not the church)", s.HasFlag(StoryManager.Flag.Act22Midway) && s.Current == Checkpoint.Act21Finished);
 		await Aim(lodge.GlobalPosition + Vector3.Up * 10f, ct);
 		Screenshot("act22_the_lodge");
 		// the front doors: chained
@@ -3049,6 +3112,56 @@ public partial class StoryTest : Node
 
 	// ------------------------------------------------------------------ Act 23
 
+	/// <summary>`--profile-nodes` (measuring): where the frame goes, standing in the lodge. Vsync off, rendered frames
+	/// timed; then each node that runs every frame switched off in turn and the frame timed without it; and the world's
+	/// big parts hidden in turn.</summary>
+	private async Task ProfileNodes(CancellationToken ct)
+	{
+		DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+		async Task<double> Ms(int n)
+		{
+			for (int i = 0; i < 10; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			ulong t0 = Time.GetTicksUsec();
+			for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			return (Time.GetTicksUsec() - t0) / 1000.0 / n;
+		}
+		double baseMs = await Ms(240);
+		GD.Print($"[profile] frame {baseMs:0.00} ms ({1000 / baseMs:0} fps) in the lodge");
+		var costs = new List<(string, double)>();
+		foreach (var n in GetTree().Root.FindChildren("*", "", true, false))
+		{
+			if (n == this || n is ProjectDS.Player.PlayerController || n is ProjectDS.Player.PlayerInput || !IsInstanceValid(n)) continue;
+			bool p1 = n.IsProcessing(), p2 = n.IsPhysicsProcessing();
+			if (!p1 && !p2) continue;
+			n.SetProcess(false); n.SetPhysicsProcess(false);
+			double without = await Ms(60);
+			if (IsInstanceValid(n)) { n.SetProcess(p1); n.SetPhysicsProcess(p2); }
+			costs.Add(($"{n.GetType().Name} {n.Name}", baseMs - without));
+		}
+		costs.Sort((a, b) => b.Item2.CompareTo(a.Item2));
+		foreach (var (name, c) in costs.Take(14)) GD.Print($"[profile]   {c:0.000} ms  {name}");
+		// the big parts of the world, hidden in turn
+		var scene = GetTree().CurrentScene;
+		foreach (var c in scene.GetChildren())
+			if (c is Node3D n3 && n3.Visible && n3 != _player)
+			{
+				n3.Visible = false;
+				double without = await Ms(90);
+				n3.Visible = true;
+				GD.Print($"[profile]   hidden {n3.Name}: {baseMs - without:0.000} ms saved");
+			}
+		if (scene.GetNodeOrNull<Node3D>("HollowWorld") is { } hw)
+			foreach (var c in hw.GetChildren())
+				if (c is Node3D n3 && n3.Visible)
+				{
+					n3.Visible = false;
+					double without = await Ms(90);
+					n3.Visible = true;
+					if (baseMs - without > 0.15) GD.Print($"[profile]     hidden HollowWorld/{n3.Name} ({n3.GetType().Name}): {baseMs - without:0.000} ms saved");
+				}
+		DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Enabled);
+	}
+
 	private async Task Act23Lodge(CancellationToken ct)
 	{
 		var s = StoryManager.Instance;
@@ -3058,6 +3171,7 @@ public partial class StoryTest : Node
 		await WaitUntil(() => _input.Enabled, 10, ct);
 		await Frames(5, ct);
 		Check("Act 23 starts at Act 22's save, in the mudroom, snowed in", s.Current == Checkpoint.Act22Finished && lodge.Inside(_player.GlobalPosition) && lodge.SnowPile.Visible, $"{s.Current} at {lodge.ToLocal(_player.GlobalPosition)}");
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--profile-nodes") >= 0) await ProfileNodes(ct);
 		Vector3 L(float x, float y, float z) => lodge.ToGlobal(new Vector3(x, y, z));
 		var atmo = StoryBeat.Atmosphere(_player);
 		async Task Go(params Vector3[] pts) { foreach (var p in pts) await WalkTo(p, 0.45f, ct, giveUp: 14f); }
@@ -3067,6 +3181,13 @@ public partial class StoryTest : Node
 		// ---- out of the mudroom, along the service corridor, into the bar
 		await UseIt(lodge.MudroomDoor.Use, ct);
 		await Seconds(0.8, ct);
+		// (straight after the level's load the first press has now and then gone astray; one more, and say so)
+		if (lodge.MudroomDoor.Current != ProjectDS.World.LodgeParts.LodgeDoor.State.Open)
+		{
+			GD.Print("[storytest] the mudroom door's first press didn't take: pressing again");
+			await UseIt(lodge.MudroomDoor.Use, ct);
+			await Seconds(0.8, ct);
+		}
 		Check("the mudroom's inner door opens", lodge.MudroomDoor.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
 		await Go(L(-30f, 0.05f, -1.0f), L(-24.5f, 0.05f, -0.7f), L(-22.7f, 0.05f, -0.6f), L(-22.7f, 0.05f, 1.0f), L(-18.4f, 0.05f, 1.0f), L(-18.3f, 0.05f, 3.9f));
 		Check("into the bar, round the end of the counter", lodge.ToLocal(_player.GlobalPosition).DistanceTo(new Vector3(-18.3f, 0f, 3.9f)) < 1.0f, $"at {lodge.ToLocal(_player.GlobalPosition)}");
@@ -3097,6 +3218,13 @@ public partial class StoryTest : Node
 		await Aim(lodge.ToGlobal(SkiLodge.FrontDoorInside), ct);
 		await Frames(2, ct);
 		Check("the front doors from inside: \"Requires Master Key.\"", _player.Interaction?.PromptText == "Requires Master Key.", $"'{_player.Interaction?.PromptText}'");
+		// the detail pass: the grandfather clock going; the clutter on the low table picked up and looked at
+		Check("the grandfather clock by the stairs is ticking", lodge.ClockTicking);
+		int examined = Curio.Examined;
+		await UseIt(lodge.Curios[0], ct);
+		Check("the whiskey on the low table: picked up, looked at (a line, the glass's clink), put back", Curio.Examined == examined + 1 && lodge.Curios[0].Looks == 1, $"examined {Curio.Examined - examined}, focused '{_player.Interaction?.Focused?.Name}'");
+		Screenshot("act23_curio");
+		await Seconds(2.5, ct);
 		await Go(L(-2f, 0.05f, 1f));
 		await CrouchCheck(lodge, ct);
 		await Go(L(6.2f, 0.05f, -7.4f), L(5.4f, 0.05f, -9.0f), L(-3.6f, UpperYOf(lodge), -9.0f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-9.4f, UpperYOf(lodge), 0f), L(-12.4f, UpperYOf(lodge), 0f), L(-13.7f, UpperYOf(lodge), 0f));
@@ -3237,14 +3365,21 @@ public partial class StoryTest : Node
 			if (i == 0)
 			{
 				// the cloth mid-pull and just let go (to see the motion, not only where it ended)
-				await Seconds(1.2, ct);
+				await Seconds(1.6, ct);
 				Screenshot("act23_sheet_coming_off");
-				await Seconds(0.6, ct);
+				await Seconds(2.0, ct);
 				Screenshot("act23_sheet_let_go");
 			}
 			await WaitUntil(() => lodge.TableEvents.Count > i, 6, ct);
 			await Seconds(i == 1 || i == 2 || i == 3 ? 3.0 : 1.2, ct);
 			Check($"sheet {i + 1} off (cloth): under it, {want[i]}", lodge.TableEvents.Count > i && lodge.TableEvents[i] == want[i], lodge.TableEvents.Count > i ? lodge.TableEvents[i] : "nothing");
+			// (the owner: slowly off, falling naturally to the floor beside the table, never thrown across the room)
+			if (lodge.Cloths[t] is { } cl && i != 4)
+			{
+				await WaitUntil(() => cl.Settled, 8, ct);
+				var (far, meanY) = cl.Spread(Vector3.Zero);
+				Check($"sheet {i + 1}'s cloth comes to rest on the floor beside its table", cl.Settled && far < SkiLodge.TableLen * 0.5f + 3f && meanY < SkiLodge.TableH * 0.6f, $"settled {cl.Settled}, farthest {far:0.0} m from the table's middle, mean height {meanY:0.00} m");
+			}
 			Screenshot($"act23_table_{i + 1}_{want[i]}");
 			if (i == 2) Check("the storm gets up outside", lodge.Storm > 0.2f, $"{lodge.Storm:0.00}");
 			if (i == 3) Check("a wendigo's skull on a platter", lodge.PlatterSkull != null && lodge.PlatterSkull.Visible);
@@ -3346,6 +3481,7 @@ public partial class StoryTest : Node
 		await Aim(L(24f, 1.4f, 2f), ct);
 		Screenshot("act23_frozen_dining");
 		Check("out of the wall: the dining hall frozen over (a save)", s.Current == Checkpoint.Act23Frozen && lodge.WindowsBroken > 10, $"{s.Current}, {lodge.WindowsBroken} windows broken");
+		Check("frozen over, the grandfather clock has stopped", !lodge.ClockTicking);
 		// to the front doors: ajar now
 		await Go(L(32f, 0.05f, 0f), L(14f, 0.05f, 0f), L(14f, 0.05f, 3f), L(10.6f, 0.05f, 5.2f), L(8.36f, 0.05f, 3.9f), L(2f, 0.05f, 6.5f), L(0.3f, 0.05f, 8.4f));
 		await Aim(L(-3f, 2.2f, 0f), ct);
@@ -3649,7 +3785,7 @@ public partial class StoryTest : Node
 		var focus = _player.Interaction?.Focused;
 		GD.Print($"[storytest] use {obj.Name}: focused '{focus?.GetParent()?.Name}' prompt '{_player.Interaction?.PromptText}'");
 		if (focus == null)
-			GD.Print($"[usedbg] {obj.Name}: player {_player.GlobalPosition} aim {aim} dist {_player.GlobalPosition.DistanceTo(aim):0.00} enabled {_input.Enabled} modal {_input.Modal} use {use?.Enabled} visible {use?.IsVisibleInTree()} focusHeld {_input.Focus} camera {_player.CameraRig.Camera.GlobalPosition} fwd {-_player.CameraRig.Camera.GlobalBasis.Z}");
+			GD.Print($"[usedbg] {obj.Name}: player {_player.GlobalPosition} aim {aim} dist {_player.GlobalPosition.DistanceTo(aim):0.00} enabled {_input.Enabled} modal {_input.Modal} use {use?.Enabled} visible {use?.IsVisibleInTree()} focusHeld {_input.Focus} camera {_player.CameraRig.Camera.GlobalPosition} fwd {-_player.CameraRig.Camera.GlobalBasis.Z} wade {_player.WadeScale:0.00} speed {_player.GroundSpeed:0.00} floor {_player.IsOnFloor()} physics {_player.IsPhysicsProcessing()} crouch {_player.CrouchAmount:0.00} against {(_player.GetLastSlideCollision()?.GetCollider() as Node)?.GetPath()} at {_player.GetLastSlideCollision()?.GetPosition()}");
 		await Press(ct, hold: use != null && use.HoldSeconds > 0 ? use.HoldSeconds + 0.3 : 0.08);
 		await Seconds(0.3, ct);
 	}

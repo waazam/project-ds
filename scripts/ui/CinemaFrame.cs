@@ -53,6 +53,7 @@ public partial class CinemaFrame : CanvasLayer
 			bool crt = s.CrtFilter && !s.Trailer;
 			post.SetShaderParameter("crt", crt ? 1f : 0f);
 			post.SetShaderParameter("px_scale", crt ? s.LineScale : 1f);
+			post.SetShaderParameter("gamma", s.Trailer ? 1f : s.Brightness);
 		}
 	}
 }

@@ -28,7 +28,9 @@ public partial class SkiLodge
 	private void BuildFurnishings()
 	{
 		BuildLobbyFurniture();
+		BuildChristmas();
 		BuildBar();
+		BuildDetailSounds();
 		BuildServiceAndPantry();
 		BuildRooms();
 		BuildDiningFurniture();
@@ -166,6 +168,8 @@ public partial class SkiLodge
 	}
 
 	public PickupInteractable FrontInsideUse { get; private set; }
+	/// <summary>The lobby's clutter that can be picked up and looked at (<see cref="Curio"/>).</summary>
+	public System.Collections.Generic.List<Curio> Curios { get; } = new();
 
 	/// <summary>The roles' materials for the modelled clutter (FurnitureKit): the lodge's own.</summary>
 	private static System.Collections.Generic.Dictionary<string, Material> Woodwork => new()
@@ -207,6 +211,15 @@ public partial class SkiLodge
 		FurnitureKit.Add(k, "ashtray", (sit - falong * 2.75f + fout * 0.1f) with { Y = FloorY }, 0.3f, w);
 		FurnitureKit.Add(k, "wine_glass", (sit - falong * 2.6f + fout * 0.25f) with { Y = FloorY }, 0f, w);
 		FurnitureKit.Add(k, "mug", (sit - falong * 2.85f - fout * 1.35f) with { Y = FloorY }, 1f, w);
+		// some of it can be picked up and looked at (the detail pass)
+		Curios.Add(Curio.Add(this, t - falong * 0.02f - fout * 0.05f + Vector3.Up * 0.16f, "Pick up the bottle", Curio.Kind.Glass,
+			"Whiskey. Two glasses poured beside it, and neither one touched.", "The glasses are still cold."));
+		Curios.Add(Curio.Add(this, t - falong * 0.4f + fout * 0.1f + Vector3.Up * 0.08f, "Look at the books", Curio.Kind.Book,
+			"Paperbacks, their spines cracked. Each one is dog-eared at the same page.", "Page 202."));
+		Curios.Add(Curio.Add(this, (sit - falong * 2.85f - fout * 1.35f) with { Y = FloorY + 0.06f }, "Pick up the mug", Curio.Kind.Ceramic,
+			"Coffee, with a skin of ice across it.", "Whoever left it was sitting right here."));
+		Curios.Add(Curio.Add(this, (fc - fout * 0.1f - falong * 1.6f) with { Y = my + 0.1f }, "Look at the books", Curio.Kind.Book,
+			"Trail guides from the season the lodge opened. Every run is circled in pencil but one.", "That one goes up into the trees, behind the lodge."));
 		// the front desk (its top at 1.13): a few books at its end, an ashtray
 		FurnitureKit.Add(k, "books_row_b", d0 + new Vector3(1.05f, 1.13f, 0.15f), Mathf.Pi, w);
 		FurnitureKit.Add(k, "ashtray", d0 + new Vector3(0.45f, 1.13f, -0.1f), 0.2f, w);
@@ -685,14 +698,19 @@ public partial class SkiLodge
 	{
 		var k = new MeshKit();
 		k.Color = Colors.White;
+		var chairs = new System.Collections.Generic.List<Transform3D>();
 		for (int t = 0; t < 6; t++)
 		{
 			var c = TableCentre(t);
 			// (the tables themselves are Act 23's, each its own node so one can fall apart: BuildTable)
 			for (float x = -TableLen * 0.5f + 0.6f; x < TableLen * 0.5f - 0.3f; x += 0.9f)
 				foreach (float sz in new[] { -1f, 1f })
-					LodgeKit.Chair(k, new Vector3(c.X + x, FloorY, c.Z + sz * (TableW * 0.5f + 0.25f)), sz > 0 ? 0f : Mathf.Pi, LodgeTextures.VelvetVioletMat);
+					chairs.Add(new Transform3D(new Basis(Vector3.Up, sz > 0 ? 0f : Mathf.Pi), new Vector3(c.X + x, FloorY, c.Z + sz * (TableW * 0.5f + 0.25f))));
 		}
+		// the chairs (all 72 the same model): one instanced set, drawn once for all of them, rather than 72 copies
+		// merged into the room's mesh (the optimization pass, 2026-10-02)
+		var chairMesh = FurnitureKit.Mesh("dining_chair", new() { ["wood"] = LodgeTextures.DarkWoodMat, ["upholstery"] = LodgeTextures.VelvetVioletMat });
+		if (chairMesh == null) foreach (var xf in chairs) LodgeKit.Chair(k, xf.Origin, xf.Basis.GetEuler().Y, LodgeTextures.VelvetVioletMat);
 		foreach (float x in new[] { 17f, 27f, 37f })
 		{
 			var bulbs = LodgeKit.Chandelier(k, new Vector3(x, RoomTop - 0.3f, 0), 1.6f, 1.2f, 8, Bulb);
@@ -710,7 +728,13 @@ public partial class SkiLodge
 			k.Box(new Vector3(DiningX1 - 0.1f, 4.2f, wz - 0.75f), new Vector3(0.04f, 5.4f, 0.4f), 1f);
 			k.Box(new Vector3(DiningX1 - 0.1f, 4.2f, wz + 0.75f), new Vector3(0.04f, 5.4f, 0.4f), 1f);
 		}
-		k.CommitTo(this, "DiningFurniture", true);
+		var dining = k.CommitTo(this, "DiningFurniture", true);
+		if (chairMesh != null)
+		{
+			var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = chairMesh, InstanceCount = chairs.Count };
+			for (int i = 0; i < chairs.Count; i++) mm.SetInstanceTransform(i, chairs[i]);
+			dining.AddChild(new MultiMeshInstance3D { Name = "Chairs", Multimesh = mm });   // (under the room's mesh: the frost glazes it too)
+		}
 		Light(new Vector3(DiningX1 - 1.2f, 2f, 2f), new Color(0.6f, 0.7f, 0.9f), 1f, 8f, "DiningFrost");
 		_diningCold = new GpuParticles3D
 		{

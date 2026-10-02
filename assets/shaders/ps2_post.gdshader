@@ -33,6 +33,9 @@ uniform float crt = 0.0;
 uniform float px_scale = 1.0;
 uniform float crt_scan = 0.24;
 uniform float crt_fringe = 0.67;        // in game pixels: red a touch left, blue a touch right
+/// The brightness setting: a gamma on the graded image (1 = as designed; up lifts the shadows and mids, not the
+/// whites, so a dark monitor can see into the dark without the brights glaring).
+uniform float gamma = 1.0;
 
 const float BAYER[16] = float[16](
 	0.0, 8.0, 2.0, 10.0,
@@ -85,6 +88,9 @@ void fragment() {
 		c = (c - 0.5) * 1.05 + 0.5;
 		c = mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 0.92);
 	}
+
+	// the player's brightness
+	c = pow(clamp(c, vec3(0.0), vec3(1.0)), vec3(1.0 / gamma));
 
 	// vignette
 	c *= 1.0 - vignette * dot(d, d) * 1.6;

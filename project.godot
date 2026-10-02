@@ -70,6 +70,7 @@ scaling_3d/mode=0
 scaling_3d/scale=1.5
 mesh_lod/lod_change/threshold_pixels=0.5
 anti_aliasing/quality/screen_space_aa=0
+occlusion_culling/use_occlusion_culling=false
 
 [shader_globals]
 

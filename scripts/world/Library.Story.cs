@@ -43,10 +43,9 @@ public partial class Library
 		_ = Cutscene.Run(this, ct => PullSheet(player, ct), lockInput: true);
 	}
 
-	/// <summary>The sheet comes off as cloth (the owner): the still drape becomes a soft body (Jolt's cloth),
-	/// one point of its near edge is taken in hand and drawn up and off towards the player, then let go; it
-	/// slides off the table and falls in a heap. Once it has settled it is set down as a still mesh again, so
-	/// nothing keeps simulating.</summary>
+	/// <summary>The sheet comes off as cloth: a handful of its near edge taken in hand, lifted and drawn slowly back
+	/// toward the player and down to the floor; let go, the rest slides off after it and settles in a heap beside the
+	/// table (VerletCloth: the owner found Jolt's cloth spasming and flung across the room).</summary>
 	private async Task PullSheet(PlayerController player, CancellationToken ct)
 	{
 		await Look(player, ToGlobal(TableAt + new Vector3(0, 0.75f, 0)), 0.8f, ct);
@@ -55,40 +54,40 @@ public partial class Library
 		Vector3 toward = (player.GlobalPosition - _sheet.GlobalPosition) with { Y = 0 };
 		Vector3 towardLocal = _sheet.GlobalBasis.Inverse() * toward.Normalized();
 		int gi = towardLocal.X >= 0 ? DrapeNx : 0, gj = DrapeNz / 2;
-		if (Mathf.Abs(towardLocal.Z) > Mathf.Abs(towardLocal.X)) { gi = DrapeNx / 2; gj = towardLocal.Z >= 0 ? DrapeNz : 0; }
-		int grip = gi * (DrapeNz + 1) + gj;
+		bool alongZ = Mathf.Abs(towardLocal.Z) > Mathf.Abs(towardLocal.X);
+		if (alongZ) { gi = DrapeNx / 2; gj = towardLocal.Z >= 0 ? DrapeNz : 0; }
+		var cloth = _sheet.GetNode<VerletCloth>("Drape");
 		// a handful of the edge, not one point (one point only stretches the cloth)
 		var grips = new List<int>();
-		for (int d = -3; d <= 3; d++)
-		{
-			int i2 = gi, j2 = gj;
-			if (gi == DrapeNx / 2) i2 = Mathf.Clamp(gi + d, 0, DrapeNx); else j2 = Mathf.Clamp(gj + d, 0, DrapeNz);
-			grips.Add(i2 * (DrapeNz + 1) + j2);
-		}
-		var mesh = DrapeClothMesh();
-		Vector3 gripLocal = mesh.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array()[grip];
+		for (int d = -4; d <= 4; d++) grips.Add(alongZ ? cloth.IndexOf(gi + d, gj) : cloth.IndexOf(gi, gj + d));
+		Vector3 gripLocal = cloth.Point(grips[4]);
 		var hand = new Node3D { Name = "Hand", Position = gripLocal };
 		_sheet.AddChild(hand);
-		var cloth = new SoftBody3D
-		{
-			Name = "Cloth", Mesh = mesh, SimulationPrecision = 12, TotalMass = 0.3f, LinearStiffness = 1f,
-			PressureCoefficient = 0f, DampingCoefficient = 0.03f, DragCoefficient = 0.01f,
-			CollisionLayer = 0, CollisionMask = 1, RayPickable = false,
-		};
-		_sheet.AddChild(cloth);
-		foreach (var c in _sheet.GetChildren()) if (c is MeshInstance3D m && m != cloth) m.Visible = false;
-		foreach (int g in grips) cloth.SetPointPinned(g, true, cloth.GetPathTo(hand));
-		// drawn up and off towards the player, then let go
-		Vector3 up = gripLocal + Vector3.Up * 0.55f + towardLocal * 0.3f;
-		Vector3 away = gripLocal + towardLocal * 1.9f + Vector3.Down * 0.25f;
+		cloth.Wake();
+		foreach (int g in grips) cloth.Pin(g, hand);
+		Vector3 dir = alongZ ? new Vector3(0, 0, Mathf.Sign(towardLocal.Z)) : new Vector3(Mathf.Sign(towardLocal.X), 0, 0);
+		// lifted off the table, drawn back over the near edge, and down to the floor beside it: slow, eased
+		Vector3 p0 = gripLocal, p1 = gripLocal + Vector3.Up * 0.45f + dir * 0.2f,
+			p2 = gripLocal with { Y = 0.3f } + dir * 0.8f, p3 = gripLocal with { Y = -0.5f } + dir * 1.05f;
 		var tw = CreateTween();
-		tw.TweenProperty(hand, "position", up, 0.35f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
-		tw.TweenProperty(hand, "position", away, 0.7f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
-		tw.TweenInterval(0.25f);
+		tw.TweenMethod(Callable.From<float>(u =>
+		{
+			if (!IsInstanceValid(hand)) return;
+			float v = 1f - u;
+			hand.Position = v * v * v * p0 + 3f * v * v * u * p1 + 3f * v * u * u * p2 + u * u * u * p3;
+		}), 0f, 1f, 2.2f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		tw.TweenInterval(0.2f);
 		await Cutscene.Tween(this, tw, ct);
-		foreach (int g in grips) cloth.SetPointPinned(g, false);
-		Sfx("cloth", 4, hand.GlobalPosition, -6f, 0.7f);
-		_ = SettleCloth(cloth);
+		for (int r = 0; r < 4; r++)
+		{
+			cloth.Unpin(grips[r]);
+			cloth.Unpin(grips[grips.Count - 1 - r]);
+			await Cutscene.Wait(this, 0.06, ct);
+		}
+		cloth.Unpin(grips[4]);
+		hand.QueueFree();
+		Sfx("cloth", 4, _sheet.ToGlobal(p3), -6f, 0.7f);
+		_ = Settled(cloth);
 		await Look(player, Puzzle.GlobalPosition, 1.2f, ct);
 		_ = StoryBeat.Caption(this, "A puzzle box. The pieces are beside it.", 0.4f, 2.4f, 1f);
 		await Cutscene.Wait(this, 0.6, ct);
@@ -99,30 +98,10 @@ public partial class Library
 	/// <summary>For tests: where the pulled-off sheet came to rest (null until it has).</summary>
 	public Vector3? SheetHeapWorld { get; private set; }
 
-	/// <summary>Once the fallen sheet has come to rest, it is set down as a still mesh and the cloth removed.</summary>
-	private async Task SettleCloth(SoftBody3D cloth)
+	private async Task Settled(VerletCloth cloth)
 	{
-		await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
-		if (!IsInstanceValid(cloth)) return;
-		var src = cloth.Mesh as ArrayMesh;
-		if (src == null) return;
-		var arrays = src.SurfaceGetArrays(0);
-		var verts = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-		// the cloth's points are in world space; the heap goes into the sheet node's
-		var parent = (Node3D)cloth.GetParent();
-		var inv = parent.GlobalTransform.AffineInverse();
-		for (int i = 0; i < verts.Length; i++) verts[i] = inv * cloth.GetPointTransform(i);
-		var st = new SurfaceTool();
-		st.Begin(Mesh.PrimitiveType.Triangles);
-		var uvs = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-		for (int i = 0; i < verts.Length; i++) { st.SetUV(uvs[i]); st.AddVertex(verts[i]); }
-		foreach (int idx in arrays[(int)Mesh.ArrayType.Index].AsInt32Array()) st.AddIndex(idx);
-		st.GenerateNormals();
-		st.SetMaterial(src.SurfaceGetMaterial(0));
-		var heap = new MeshInstance3D { Name = "Heap", Mesh = st.Commit() };
-		parent.AddChild(heap);
-		SheetHeapWorld = heap.GlobalTransform * heap.GetAabb().GetCenter();
-		cloth.QueueFree();
+		while (IsInstanceValid(cloth) && !cloth.Settled) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		if (IsInstanceValid(cloth)) SheetHeapWorld = cloth.GlobalTransform * cloth.GetAabb().GetCenter();
 	}
 
 	// ------------------------------------------------------------------ the puzzle

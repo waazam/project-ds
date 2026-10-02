@@ -12,9 +12,40 @@ namespace ProjectDS.World;
 /// </summary>
 public static class StationKit
 {
-	private static void Slab(MeshKit k, StaticBody3D body, Vector3 c, Vector3 s)
+	private static void Slab(MeshKit k, StaticBody3D body, Vector3 c, Vector3 s, float floorY = float.NaN)
 	{
+		// the grime along its feet, both faces, where it stands on the floor (not a lintel over a door)
+		if (!float.IsNaN(floorY) && Mathf.Abs(c.Y - s.Y * 0.5f - floorY) < 0.01f)
+		{
+			if (s.Z <= 0.5f && s.X >= 0.3f)
+			{
+				Vector3 a = new(c.X - s.X * 0.5f, floorY, c.Z), b = new(c.X + s.X * 0.5f, floorY, c.Z);
+				World.Weathering.ContactStrips(k, a + Vector3.Back * s.Z * 0.5f, b + Vector3.Back * s.Z * 0.5f, Vector3.Back, floorY);
+				World.Weathering.ContactStrips(k, b + Vector3.Forward * s.Z * 0.5f, a + Vector3.Forward * s.Z * 0.5f, Vector3.Forward, floorY);
+				LodgeParts.LodgeKit.Trim(k, a + Vector3.Back * s.Z * 0.5f, b + Vector3.Back * s.Z * 0.5f, Vector3.Back, 0.13f, 0.018f, true);
+				LodgeParts.LodgeKit.Trim(k, b + Vector3.Forward * s.Z * 0.5f, a + Vector3.Forward * s.Z * 0.5f, Vector3.Forward, 0.13f, 0.018f, true);
+			}
+			else if (s.X <= 0.5f && s.Z >= 0.3f)
+			{
+				Vector3 a = new(c.X, floorY, c.Z - s.Z * 0.5f), b = new(c.X, floorY, c.Z + s.Z * 0.5f);
+				World.Weathering.ContactStrips(k, b + Vector3.Right * s.X * 0.5f, a + Vector3.Right * s.X * 0.5f, Vector3.Right, floorY);
+				World.Weathering.ContactStrips(k, a + Vector3.Left * s.X * 0.5f, b + Vector3.Left * s.X * 0.5f, Vector3.Left, floorY);
+				LodgeParts.LodgeKit.Trim(k, b + Vector3.Right * s.X * 0.5f, a + Vector3.Right * s.X * 0.5f, Vector3.Right, 0.13f, 0.018f, true);
+				LodgeParts.LodgeKit.Trim(k, a + Vector3.Left * s.X * 0.5f, b + Vector3.Left * s.X * 0.5f, Vector3.Left, 0.13f, 0.018f, true);
+			}
+		}
 		BuildKit.Box(k, c, s, 1.1f);
+		// (a wall's slab big enough to hide a room: an occluder down its middle)
+		if (s.Z <= 0.5f && s.X >= 0.8f && s.Y >= 0.8f)
+		{
+			float hx = s.X * 0.5f - 0.03f, hy = s.Y * 0.5f - 0.03f;
+			k.Occlude(c + new Vector3(-hx, -hy, 0), c + new Vector3(hx, -hy, 0), c + new Vector3(hx, hy, 0), c + new Vector3(-hx, hy, 0));
+		}
+		else if (s.X <= 0.5f && s.Z >= 0.8f && s.Y >= 0.8f)
+		{
+			float hz = s.Z * 0.5f - 0.03f, hy = s.Y * 0.5f - 0.03f;
+			k.Occlude(c + new Vector3(0, -hy, -hz), c + new Vector3(0, -hy, hz), c + new Vector3(0, hy, hz), c + new Vector3(0, hy, -hz));
+		}
 		body?.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
 	}
 
@@ -22,24 +53,24 @@ public static class StationKit
 	public static void WallAlongX(MeshKit k, StaticBody3D body, float z, float x0, float x1, float height, float y0,
 		(float center, float width)? gap, float doorH = 2.2f, float thick = 0.14f)
 	{
-		if (gap == null) { Slab(k, body, new Vector3((x0 + x1) * 0.5f, y0 + height * 0.5f, z), new Vector3(x1 - x0, height, thick)); return; }
+		if (gap == null) { Slab(k, body, new Vector3((x0 + x1) * 0.5f, y0 + height * 0.5f, z), new Vector3(x1 - x0, height, thick), y0); return; }
 		var (c, w) = gap.Value;
 		float ga = c - w * 0.5f, gb = c + w * 0.5f;
-		if (ga > x0) Slab(k, body, new Vector3((x0 + ga) * 0.5f, y0 + height * 0.5f, z), new Vector3(ga - x0, height, thick));
-		if (gb < x1) Slab(k, body, new Vector3((gb + x1) * 0.5f, y0 + height * 0.5f, z), new Vector3(x1 - gb, height, thick));
-		if (height > doorH) Slab(k, body, new Vector3(c, y0 + (doorH + height) * 0.5f, z), new Vector3(w, height - doorH, thick));
+		if (ga > x0) Slab(k, body, new Vector3((x0 + ga) * 0.5f, y0 + height * 0.5f, z), new Vector3(ga - x0, height, thick), y0);
+		if (gb < x1) Slab(k, body, new Vector3((gb + x1) * 0.5f, y0 + height * 0.5f, z), new Vector3(x1 - gb, height, thick), y0);
+		if (height > doorH) Slab(k, body, new Vector3(c, y0 + (doorH + height) * 0.5f, z), new Vector3(w, height - doorH, thick), y0);
 	}
 
 	/// <summary>A wall running along Z at a fixed X (what you'd face walking +X or -X through it).</summary>
 	public static void WallAlongZ(MeshKit k, StaticBody3D body, float x, float z0, float z1, float height, float y0,
 		(float center, float width)? gap, float doorH = 2.2f, float thick = 0.14f)
 	{
-		if (gap == null) { Slab(k, body, new Vector3(x, y0 + height * 0.5f, (z0 + z1) * 0.5f), new Vector3(thick, height, z1 - z0)); return; }
+		if (gap == null) { Slab(k, body, new Vector3(x, y0 + height * 0.5f, (z0 + z1) * 0.5f), new Vector3(thick, height, z1 - z0), y0); return; }
 		var (c, w) = gap.Value;
 		float ga = c - w * 0.5f, gb = c + w * 0.5f;
-		if (ga > z0) Slab(k, body, new Vector3(x, y0 + height * 0.5f, (z0 + ga) * 0.5f), new Vector3(thick, height, ga - z0));
-		if (gb < z1) Slab(k, body, new Vector3(x, y0 + height * 0.5f, (gb + z1) * 0.5f), new Vector3(thick, height, z1 - gb));
-		if (height > doorH) Slab(k, body, new Vector3(x, y0 + (doorH + height) * 0.5f, c), new Vector3(thick, height - doorH, w));
+		if (ga > z0) Slab(k, body, new Vector3(x, y0 + height * 0.5f, (z0 + ga) * 0.5f), new Vector3(thick, height, ga - z0), y0);
+		if (gb < z1) Slab(k, body, new Vector3(x, y0 + height * 0.5f, (gb + z1) * 0.5f), new Vector3(thick, height, z1 - gb), y0);
+		if (height > doorH) Slab(k, body, new Vector3(x, y0 + (doorH + height) * 0.5f, c), new Vector3(thick, height - doorH, w), y0);
 	}
 
 	/// <summary>A wooden door frame in a wall gap: linings round the inside of the opening (so the cut ends

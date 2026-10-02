@@ -400,12 +400,12 @@ public partial class SkiLodge
 		k.Color = Colors.White;
 		// its front (+z) and two sides: wainscot to 1.3 m, the room's paper above, a slit at the foot of the front
 		var hole = new List<LodgeKit.Hole> { new(slit.X - 0.5f - x0, slit.X + 0.5f - x0, FloorY, 1.25f) };
-		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), FloorY, 1.3f, 0.06f, Vector3.Back, LodgeTextures.DarkWoodMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat, hole);
-		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), 1.3f, top, 0.06f, Vector3.Back, LodgeTextures.WallpaperMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat);
-		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), FloorY, 1.3f, 0.06f, Vector3.Left, LodgeTextures.DarkWoodMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat);
-		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), 1.3f, top, 0.06f, Vector3.Left, LodgeTextures.WallpaperMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat);
-		LodgeKit.Wall(k, _inBody, new Vector3(x1, 0, z0), new Vector3(x1, 0, z1), FloorY, 1.3f, 0.06f, Vector3.Right, LodgeTextures.DarkWoodMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat);
-		LodgeKit.Wall(k, _inBody, new Vector3(x1, 0, z0), new Vector3(x1, 0, z1), 1.3f, top, 0.06f, Vector3.Right, LodgeTextures.WallpaperMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat);
+		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), FloorY, 1.3f, 0.06f, Vector3.Back, LodgeTextures.DarkWoodMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat, hole, occlude: false);
+		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), 1.3f, top, 0.06f, Vector3.Back, LodgeTextures.WallpaperMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat, occlude: false);
+		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), FloorY, 1.3f, 0.06f, Vector3.Left, LodgeTextures.DarkWoodMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat, occlude: false);
+		LodgeKit.Wall(k, _inBody, new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), 1.3f, top, 0.06f, Vector3.Left, LodgeTextures.WallpaperMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat, occlude: false);
+		LodgeKit.Wall(k, _inBody, new Vector3(x1, 0, z0), new Vector3(x1, 0, z1), FloorY, 1.3f, 0.06f, Vector3.Right, LodgeTextures.DarkWoodMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat, occlude: false);
+		LodgeKit.Wall(k, _inBody, new Vector3(x1, 0, z0), new Vector3(x1, 0, z1), 1.3f, top, 0.06f, Vector3.Right, LodgeTextures.WallpaperMat, LodgeTextures.CrawlBoardsMat, LodgeTextures.DarkWoodMat, occlude: false);
 		// a picture rail and a skirting round it, as the room's walls have
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Box(new Vector3((x0 + x1) * 0.5f, 1.32f, z1 + 0.04f), new Vector3(x1 - x0 + 0.1f, 0.05f, 0.04f), 1f);

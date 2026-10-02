@@ -55,6 +55,7 @@ public partial class Wendigo : Node3D
 	private string _leapClip = "air";
 	private Vector3 _leapFrom, _leapTo;
 	private System.Action _landed;
+	private bool _stayOnLanding;
 	/// <summary>Points on the skull in the head bone's space (the mouth, the skull's middle), from the model's rest pose.</summary>
 	private Vector3 _mouthLocal, _skullLocal;
 
@@ -217,13 +218,23 @@ public partial class Wendigo : Node3D
 		Visible = true;
 	}
 
+	/// <summary>Holds a pose: <paramref name="clip"/> stopped at <paramref name="at"/> (0..1) of its length (crouched low
+	/// on a wall's top, clinging to a trunk mid-climb). The head's twitch goes on over it.</summary>
+	public void Hold(string clip, float at)
+	{
+		if (_anim == null || _headOnly || !_anim.HasAnimation(clip)) return;
+		_anim.Play(clip, 0.0, 0f);
+		_anim.Seek(_anim.GetAnimation(clip).Length * Mathf.Clamp(at, 0f, 1f), true);
+	}
+
 	/// <summary>Up into the trees (or down at its prey): a crouch of a few hundredths of a second, the legs folding to
 	/// spring; then gone along an arc to <paramref name="perch"/> in <paramref name="seconds"/>, the legs tucking under
 	/// it and the arms reaching (or, leaping down, flung flat at it, arms and claws thrown forward). <paramref name="landed"/>
 	/// runs when it's there (the snow falls, it vanishes).</summary>
-	public void Leap(Vector3 perch, float seconds, System.Action landed)
+	public void Leap(Vector3 perch, float seconds, System.Action landed, bool stay = false)
 	{
 		Leaps++;
+		_stayOnLanding = stay;
 		_leapFrom = GlobalPosition;
 		_leapTo = perch;
 		_leapDur = seconds;
@@ -260,7 +271,9 @@ public partial class Wendigo : Node3D
 			if (u >= 1f)
 			{
 				_leapT = -1f;
-				Visible = false;
+				// (dropped down onto the road: it stays, landed in a crouch and rising out of it; up into the trees: gone)
+				if (_stayOnLanding) { GlobalPosition = _leapTo; if (_anim != null && !_headOnly) _anim.Play("idle", 0.6); }
+				else Visible = false;
 				var cb = _landed; _landed = null;
 				cb?.Invoke();
 			}

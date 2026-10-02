@@ -34,6 +34,10 @@ public static class RespawnPoints
 			&& StoryManager.Instance is { NewelPostTaken: true } s5 && !s5.HasFlag(StoryManager.Flag.DawnBroke))
 			return (cabin.InsidePoint + Vector3.Up * 0.1f, YawToward(cabin.InsidePoint, cabin.ApproachPoint));
 
+		// Act 22's halfway save (a flag within Act 21's end checkpoint): on the road where it was passed
+		if (cp == Checkpoint.Act21Finished && System.Array.IndexOf(save.Flags, StoryManager.Flag.Act22Midway) >= 0
+			&& tree.GetFirstNodeInGroup("respawn_Act22Midway") is Node3D mid)
+			return (mid.GlobalPosition + Vector3.Up * 0.1f, YawOf(-mid.GlobalBasis.Z));
 		if (tree.GetFirstNodeInGroup($"respawn_{cp}") is Node3D marker)
 		{
 			// A marker placed in code already sits where it should (the lake shore, inside the station -

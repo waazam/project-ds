@@ -480,57 +480,17 @@ public partial class Library : Node3D
 		return pos;
 	}
 
-	private static StandardMaterial3D _sheetMat;
-	private static StandardMaterial3D SheetMat => _sheetMat ??= new StandardMaterial3D
+	/// <summary>The cloth thrown over the table (the jacquard, as all the tablecloths), lying still until it's pulled
+	/// (<see cref="VerletCloth"/>): the table and the puzzle box under it are what it lies on and slides off.</summary>
+	private VerletCloth Drape()
 	{
-		AlbedoColor = new Color(0.74f, 0.72f, 0.67f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-	};
-
-	/// <summary>A white sheet thrown over the table, at rest (a still mesh: it costs nothing until pulled).</summary>
-	private MeshInstance3D Drape()
-	{
-		const int nx = DrapeNx, nz = DrapeNz;
-		var pos = DrapeGrid();
-		var k = new MeshKit();
-		k.Mat(SheetMat);
-		k.Color = Colors.White;
-		for (int i = 0; i < nx; i++)
-			for (int j = 0; j < nz; j++)
-			{
-				Vector3 a = pos[i, j], b = pos[i + 1, j], c = pos[i + 1, j + 1], d = pos[i, j + 1];
-				Vector3 n = (b - a).Cross(d - a).Normalized();
-				if (n.Y < 0) k.Quad(a, d, c, b, -n);
-				else k.Quad(a, b, c, d, n);
-			}
-		var mi = k.CommitTo(this, "Drape", true);
-		RemoveChild(mi);
-		return mi;
-	}
-
-	/// <summary>The same sheet as one welded grid (a vertex per grid point, shared by its quads), for the cloth
-	/// simulation: point (i, j) is vertex i * (DrapeNz + 1) + j.</summary>
-	private static ArrayMesh DrapeClothMesh()
-	{
-		const int nx = DrapeNx, nz = DrapeNz;
-		var pos = DrapeGrid();
-		var st = new SurfaceTool();
-		st.Begin(Mesh.PrimitiveType.Triangles);
-		for (int i = 0; i <= nx; i++)
-			for (int j = 0; j <= nz; j++)
-			{
-				st.SetUV(new Vector2((float)i / nx, (float)j / nz));
-				st.AddVertex(pos[i, j]);
-			}
-		for (int i = 0; i < nx; i++)
-			for (int j = 0; j < nz; j++)
-			{
-				int a = i * (nz + 1) + j, b = (i + 1) * (nz + 1) + j, c = b + 1, d = a + 1;
-				st.AddIndex(a); st.AddIndex(b); st.AddIndex(c);
-				st.AddIndex(a); st.AddIndex(c); st.AddIndex(d);
-			}
-		st.GenerateNormals();
-		st.SetMaterial(SheetMat);
-		return st.Commit();
+		var cloth = VerletCloth.Create(DrapeGrid(), new Vector2(1.3f, 1.95f), ProjectDS.World.LodgeParts.LodgeTextures.TableclothMat, "Drape");
+		cloth.Blocks.Add(new Aabb(new Vector3(-0.3f, -0.72f, -0.625f), new Vector3(0.6f, 0.72f, 1.25f)));
+		// (the puzzle box, and the pieces laid out beside it: the cloth lies over them, not through them)
+		cloth.Blocks.Add(new Aabb(new Vector3(-0.19f, 0f, 0.11f), new Vector3(0.38f, 0.11f, 0.38f)));
+		cloth.Blocks.Add(new Aabb(new Vector3(-0.2f, 0f, -0.5f), new Vector3(0.4f, 0.06f, 0.56f)));
+		cloth.FloorY = -0.72f;
+		return cloth;
 	}
 
 	private void BuildPassage()

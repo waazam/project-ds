@@ -114,7 +114,9 @@ public partial class Crawler : Node3D
 				k.Cylinder(new Vector3(s * 0.02f, 0.07f, -0.28f + i * 0.07f), new Vector3(s * 0.19f, -0.04f, -0.24f + i * 0.07f), 0.012f, 0.01f, 5, false);
 		// the neck, craning down and forward, and the head hanging from it
 		k.Cylinder(new Vector3(0, 0.02f, -0.42f), new Vector3(0, -0.12f, -0.58f), 0.045f, 0.04f, 8, false);
-		k.CommitTo(_body, "Torso", false);
+		if (CreatureModels.Get("crawler", "Torso") is { } torso)
+			_body.AddChild(new MeshInstance3D { Name = "Torso", Mesh = torso, MaterialOverride = _skin, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+		else k.CommitTo(_body, "Torso", false);
 		_head = new Node3D { Name = "Head", Position = new Vector3(0, -0.17f, -0.63f) };
 		_body.AddChild(_head);
 		var h = new MeshKit();
@@ -126,14 +128,21 @@ public partial class Crawler : Node3D
 		h.Color = Colors.White;
 		foreach (float s in new[] { -1f, 1f }) h.Blob(new Vector3(s * 0.038f, 0.01f, -0.1f), new Vector3(0.026f, 0.022f, 0.02f), 33, 0.1f, false);   // sunken sockets
 		h.Blob(new Vector3(0, -0.045f, -0.105f), new Vector3(0.035f, 0.03f, 0.02f), 34, 0.1f, false);   // the open mouth
-		h.CommitTo(_head, "Skull", false);
+		if (CreatureModels.Get("crawler", "Skull") is { } skull)
+		{
+			var mi = new MeshInstance3D { Name = "Skull", Mesh = skull, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+			for (int i = 0; i < skull.GetSurfaceCount(); i++) mi.SetSurfaceOverrideMaterial(i, CreatureModels.SurfaceName(skull, i) == "dark" ? _dark : _skin);
+			_head.AddChild(mi);
+		}
+		else h.CommitTo(_head, "Skull", false);
 	}
 
 	private MeshInstance3D Bone(float r0, float r1)
 	{
 		var mi = new MeshInstance3D
 		{
-			Mesh = new CylinderMesh { TopRadius = r1, BottomRadius = r0, Height = 1f, RadialSegments = 8, Rings = 1 },
+			// (the remodelled limb: a starved bone under skin, its joints, its tendons; unit length along Y as before)
+			Mesh = CreatureModels.Get("crawler", r0 > 0.04f ? "Upper" : "Lower") ?? new CylinderMesh { TopRadius = r1, BottomRadius = r0, Height = 1f, RadialSegments = 8, Rings = 1 },
 			MaterialOverride = _limbSkin, CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
 		};
 		AddChild(mi);
@@ -170,7 +179,12 @@ public partial class Crawler : Node3D
 				Vector3 d = new(Mathf.Sin(a), 0, -Mathf.Cos(a));
 				pk.Cylinder(new Vector3(0, 0.012f, -0.08f), new Vector3(0, 0.004f, -0.08f) + d * (front ? 0.13f : 0.09f), 0.011f, 0.005f, 5, false);
 			}
-			l.Paw = pk.CommitTo(this, front ? "Hand" : "Foot", false);
+			if (CreatureModels.Get("crawler", front ? "Hand" : "Foot") is { } paw)
+			{
+				l.Paw = new MeshInstance3D { Name = front ? "Hand" : "Foot", Mesh = paw, MaterialOverride = _skin };
+				AddChild(l.Paw);
+			}
+			else l.Paw = pk.CommitTo(this, front ? "Hand" : "Foot", false);
 			l.Paw.TopLevel = true;
 			_limbs.Add(l);
 		}

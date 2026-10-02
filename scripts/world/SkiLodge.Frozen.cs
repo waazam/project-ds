@@ -145,7 +145,7 @@ public partial class SkiLodge
 			AddChild(new MultiMeshInstance3D { Name = "FrozenIcicles", Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 		}
 		// a glaze of ice over everything in the two rooms
-		foreach (var name in new[] { "DiningFurniture", "DiningShell", "LobbyFurniture", "LobbyShell", "Balcony" })
+		foreach (var name in new[] { "DiningFurniture", "DiningShell", "LobbyFurniture", "LobbyShell", "Balcony", "Christmas", "ChristmasTree" })
 			if (GetNodeOrNull(name) is Node n) Glaze(n);
 		for (int t = 0; t < 6; t++)
 		{
@@ -175,7 +175,7 @@ public partial class SkiLodge
 	/// <summary>A glaze of ice over every mesh under <paramref name="n"/> (a thin glassy shell drawn over it).</summary>
 	private static void Glaze(Node n)
 	{
-		if (n is GeometryInstance3D g && g.MaterialOverlay == null && g is not GpuParticles3D) g.MaterialOverlay = LodgeTextures.FrostOverlay;
+		if (n is GeometryInstance3D g && (g.MaterialOverlay == null || Weathering.IsDust(g.MaterialOverlay)) && g is not GpuParticles3D) g.MaterialOverlay = LodgeTextures.FrostOverlay;
 		foreach (var c in n.GetChildren()) Glaze(c);
 	}
 

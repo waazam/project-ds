@@ -81,4 +81,15 @@ for name, (asset, diff, contrast, relief) in SURFACES.items():
     flat = np.array([0.5, 0.5, 1.0], np.float32)
     nor = flat + (nor - flat) * relief
     write(os.path.join(OUT, f"{name}_normal.png"), nor)
+    # its roughness (the optimization and look pass, 2026-10-02): the photo's own, scaled so its mean is 1 and clipped,
+    # so the material keeps the roughness it was tuned to and only gains the variation: the worn, handled places
+    # smoother and catching the light, the rest as it was
+    rough_src = os.path.join(SRC, f"{asset}_rough.jpg")
+    try:
+        fetch(asset, "rough", rough_src)
+        rough = read(rough_src).mean(axis=2, keepdims=True)
+        rough = np.clip(rough / max(rough.mean(), 1e-3), 0, 1)
+        write(os.path.join(OUT, f"{name}_rough.png"), np.repeat(rough, 3, axis=2))
+    except Exception as e:
+        print(f"  (no roughness map for {asset}: {e})")
     print(f"{name:16s} <- {asset:28s} mean {col.mean():.3f}")

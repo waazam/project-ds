@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -324,46 +325,114 @@ public partial class RoundRoom : Node3D
 		Dais.AddChild(_daisBody);
 	}
 
-	/// <summary>Old web over the whole dais: sheets slung between the posts, a tent of it drawn up to a
-	/// point over the middle, and a grey mat of it on the stone. It can't be pushed through.</summary>
+	/// <summary>The render layer the webs are on (layer 11), which the ring's red light skips.</summary>
+	public const uint WebLayer = 1u << 10;
+
+	private Node3D _floorWebs;
+	private readonly Dictionary<Texture2D, ShaderMaterial> _burnMats = new();
+
+	/// <summary>A web card's material that can burn (<c>web_burn.gdshader</c>): the photographed web, and a burn front.</summary>
+	private ShaderMaterial BurnMat(StandardMaterial3D src)
+	{
+		var tex = src.AlbedoTexture;
+		if (_burnMats.TryGetValue(tex, out var m)) return m;
+		m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/web_burn.gdshader"), RenderPriority = 2 };
+		m.SetShaderParameter("web_tex", tex);
+		m.SetShaderParameter("tint", src.AlbedoColor);
+		_burnMats[tex] = m;
+		return m;
+	}
+
+	/// <summary>A dimmer copy of a web's burning material (fainter, greyer), kept with the others so it burns too.</summary>
+	private ShaderMaterial DimMat(ShaderMaterial src)
+	{
+		var m = (ShaderMaterial)src.Duplicate();
+		m.SetShaderParameter("tint", new Color(0.55f, 0.54f, 0.52f, 0.55f));
+		_dimMats.Add(m);
+		return m;
+	}
+	private readonly List<ShaderMaterial> _dimMats = new();
+
+	/// <summary>Old web everywhere (the owner: not a shape over the dais, all over the floor, so it burns all round the
+	/// room): a grey film of it across the floor from the dais to the walls, banked up where the floor meets the wall,
+	/// hanging on the lower walls, and thick over the dais itself, sheets slung low between its posts and a mat over
+	/// the top. The dais's web can't be pushed through. Every card its own photographed web.</summary>
 	private void BuildWebs()
 	{
+		var wr = new RandomNumberGenerator { Seed = 2020 };
+		// ---- the dais (it rises: its web is its own)
 		_webs = new Node3D { Name = "Webs" };
 		Dais.AddChild(_webs);
 		var k = new MeshKit();
 		k.Color = Colors.White;
-		var wr = new RandomNumberGenerator { Seed = 2020 };
-		// every card its own photographed web (the owner: the old radial texture looked geometric)
-		void W(WebKit.Kind kind) => k.Mat(WebKit.Pick(kind, wr));
+		void W(MeshKit kit, WebKit.Kind kind) => kit.Mat(BurnMat(WebKit.Pick(kind, wr)));
 		var anchors = new List<Vector3>();
 		for (int i = 0; i < 8; i++)
 		{
 			float a = Mathf.Tau * (i + 0.5f) / 8f;
 			anchors.Add(new Vector3(Mathf.Sin(a) * (DaisR - 0.12f), DaisTop + 1.05f, Mathf.Cos(a) * (DaisR - 0.12f)));
 		}
-		Vector3 peak = new(0, DaisTop + 2.4f, 0);
 		for (int i = 0; i < 8; i++)
 		{
 			Vector3 a = anchors[i], b = anchors[(i + 1) % 8];
 			Vector3 fa = a with { Y = DaisTop + 0.02f }, fb = b with { Y = DaisTop + 0.02f };
 			Vector3 outward = (((a + b) * 0.5f) with { Y = 0 }).Normalized();
-			// the side sheet, sagging, and the tent up to the peak
-			Vector3 sag = (a + b) * 0.5f + Vector3.Down * 0.25f + outward * 0.1f;
-			W(i % 3 == 0 ? WebKit.Kind.Corner : WebKit.Kind.Tangle);
-			k.Card(fa, fb, b, a, outward, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
-			W(i % 2 == 0 ? WebKit.Kind.Sheet : WebKit.Kind.Tangle);
-			k.Card(a, sag, peak, peak, outward, new Vector2(0, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 0), new Vector2(0.5f, 0));
-			k.Card(sag, b, peak, peak, outward, new Vector2(0.5f, 1), new Vector2(1, 1), new Vector2(0.5f, 0), new Vector2(0.5f, 0));
-			// strands off to the floor
-			Vector3 foot = outward * (DaisFoot + 0.4f + _rng.Randf() * 0.5f) + Vector3.Up * 0.01f;
-			W(WebKit.Kind.Tangle);
+			// a sheet slung between two posts, sagging (low: no tent over it any more)
+			Vector3 sagTop = (a + b) * 0.5f + Vector3.Down * (0.3f + wr.Randf() * 0.2f) + outward * 0.08f;
+			W(k, i % 3 == 0 ? WebKit.Kind.Corner : WebKit.Kind.Tangle);
+			k.Card(fa, fb, b, sagTop, outward, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0.5f, 0.1f));
+			k.Card(fa, sagTop, a, a, outward, new Vector2(0, 1), new Vector2(0.5f, 0.1f), new Vector2(0, 0), new Vector2(0, 0));
+			// strands from the post's top down to the floor
+			Vector3 foot = outward * (DaisFoot + 0.4f + wr.Randf() * 0.5f) + Vector3.Up * 0.02f;
+			W(k, WebKit.Kind.Tangle);
 			k.Card(a, a + Vector3.Up * 0.05f, foot + Vector3.Up * 0.05f, foot, outward.Cross(Vector3.Up), new Vector2(0, 0), new Vector2(0, 0.1f), new Vector2(1, 0.1f), new Vector2(1, 0));
 		}
-		// the mat over the top
-		W(WebKit.Kind.Tangle);
-		k.Card(new Vector3(-1.6f, DaisTop + 0.01f, -1.6f), new Vector3(-1.6f, DaisTop + 0.01f, 1.6f), new Vector3(1.6f, DaisTop + 0.01f, 1.6f), new Vector3(1.6f, DaisTop + 0.01f, -1.6f), Vector3.Up,
-			new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
-		_webMeshes.Add(k.CommitTo(_webs, "Web", false));
+		// the mat over the top (one layer, dimmed: under the bulbs a full white one glared)
+		k.Mat(DimMat(BurnMat(WebKit.Pick(WebKit.Kind.Tangle, wr))));
+		FlatCard(k, new Vector3(0, DaisTop + 0.015f, 0), 3.4f, 0.8f);
+		var web = k.CommitTo(_webs, "Web", false);
+		if (web != null) web.Layers = WebLayer;
+		_webMeshes.Add(web);
+
+		// ---- the floor, the wall's foot, the lower walls
+		_floorWebs = new Node3D { Name = "FloorWebs" };
+		AddChild(_floorWebs);
+		var f = new MeshKit();
+		f.Color = Colors.White;
+		// a film across the floor: overlapping cards from the dais's foot out to the wall, at all angles
+		for (int i = 0; i < 38; i++)
+		{
+			float a = Mathf.Tau * i / 38f + wr.RandfRange(-0.08f, 0.08f);
+			float r = Mathf.Lerp(DaisFoot + 0.9f, Radius - 1.1f, (i * 0.618f) % 1f) + wr.RandfRange(-0.3f, 0.3f);
+			W(f, i % 4 == 0 ? WebKit.Kind.Sheet : WebKit.Kind.Tangle);
+			FlatCard(f, new Vector3(Mathf.Sin(a) * r, 0.02f + (i % 5) * 0.003f, Mathf.Cos(a) * r), wr.RandfRange(2.0f, 3.2f), wr.RandfRange(0f, Mathf.Tau));
+		}
+		// banked up where the floor meets the wall: a card leaning from the floor to the wall all the way round
+		for (int i = 0; i < 20; i++)
+		{
+			float a0 = Mathf.Tau * i / 20f + wr.RandfRange(-0.05f, 0.05f), a1 = a0 + Mathf.Tau / 20f * wr.RandfRange(1.1f, 1.5f);
+			float rin = Radius - wr.RandfRange(0.8f, 1.3f), h = wr.RandfRange(0.7f, 1.4f), rw = Radius - 0.08f;
+			Vector3 da = new(Mathf.Sin(a0), 0, Mathf.Cos(a0)), db = new(Mathf.Sin(a1), 0, Mathf.Cos(a1));
+			W(f, WebKit.Kind.Corner);
+			f.Card(da * rin + Vector3.Up * 0.03f, db * rin + Vector3.Up * 0.03f, db * rw + Vector3.Up * h, da * rw + Vector3.Up * h, -(da + db).Normalized(),
+				new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+		}
+		// hanging on the lower walls (not over the way in, nor the switches on the side walls)
+		for (int i = 0; i < 12; i++)
+		{
+			float a = Mathf.Tau * (i + 0.5f) / 12f;
+			if (Mathf.Abs(Mathf.AngleDifference(a, Mathf.Pi)) < 0.6f || Mathf.Abs(Mathf.AngleDifference(a, Mathf.Pi * 0.5f)) < 0.55f || Mathf.Abs(Mathf.AngleDifference(a, -Mathf.Pi * 0.5f)) < 0.55f) continue;
+			Vector3 d = new(Mathf.Sin(a), 0, Mathf.Cos(a));
+			Vector3 side = d.Cross(Vector3.Up);
+			float w = wr.RandfRange(1.4f, 2.2f), y0 = wr.RandfRange(0.6f, 1.0f), y1 = y0 + wr.RandfRange(1.3f, 2.0f), rw = Radius - 0.07f;
+			W(f, i % 2 == 0 ? WebKit.Kind.Corner : WebKit.Kind.Sheet);
+			f.Card(d * rw - side * w * 0.5f + Vector3.Up * y0, d * rw + side * w * 0.5f + Vector3.Up * y0, d * rw + side * w * 0.5f + Vector3.Up * y1, d * rw - side * w * 0.5f + Vector3.Up * y1, -d,
+				new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+		}
+		var floor = f.CommitTo(_floorWebs, "FloorWeb", false);
+		if (floor != null) floor.Layers = WebLayer;
+		_webMeshes.Add(floor);
+		SetBurn(Vector3.Zero, -100f);
 		_barrier = new StaticBody3D { Name = "WebBarrier", CollisionLayer = 1, CollisionMask = 0 };
 		_barrier.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.2f, 0), Shape = new CylinderShape3D { Radius = DaisFoot - 0.1f, Height = 2.4f } });
 		AddChild(_barrier);
@@ -463,55 +532,92 @@ public partial class RoundRoom : Node3D
 		_ = Cutscene.Run(this, ct => BurnWebs(player, ct), lockInput: true);
 	}
 
+	/// <summary>How long the burn takes to run from the lighter's touch out to the far wall.</summary>
+	public const float BurnSeconds = 8f;
+	/// <summary>For tests: how far the burn has spread (metres; negative before it's lit).</summary>
+	public float BurnRadius { get; private set; } = -100f;
+
+	/// <summary>The burn front's place in every web material: where it caught (world) and how far it has run.</summary>
+	private void SetBurn(Vector3 centreWorld, float radius)
+	{
+		BurnRadius = radius;
+		foreach (var m in _burnMats.Values.Concat(_dimMats))
+		{
+			m.SetShaderParameter("burn_centre", centreWorld);
+			m.SetShaderParameter("burn_radius", radius);
+		}
+	}
+
+	/// <summary>A flat web card lying at <paramref name="c"/> (a floor or the dais's top), <paramref name="size"/> across.</summary>
+	private static void FlatCard(MeshKit k, Vector3 c, float size, float spin)
+	{
+		var b = new Basis(Vector3.Up, spin);
+		Vector3 x = b.X * size * 0.5f, z = b.Z * size * 0.5f;
+		k.Card(c - x - z, c - x + z, c + x + z, c + x - z, Vector3.Up, new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
+	}
+
+	/// <summary>It catches where the flame touches the dais's web and the burn runs out from there in every direction:
+	/// over the dais, down onto the floor and across it to the walls, up the web banked against them. A ragged, slowly
+	/// glowing edge eats the web as it goes (<c>web_burn.gdshader</c>); a few low fires ride the front outward, each
+	/// guttering out when it reaches the wall. Slow and steady: no flash.</summary>
 	private async Task BurnWebs(PlayerController player, CancellationToken ct)
 	{
 		Vector3 near = ToLocal(player.GlobalPosition) with { Y = 0 };
-		Vector3 spot = near.LengthSquared() > 0.01f ? near.Normalized() * (DaisFoot - 0.3f) + Vector3.Up * 0.9f : new Vector3(0, 0.9f, -DaisFoot);
+		Vector3 spot = near.LengthSquared() > 0.01f ? near.Normalized() * (DaisFoot - 0.3f) + Vector3.Up * 0.5f : new Vector3(0, 0.5f, -DaisFoot);
 		Sfx("lighter_flick", ToGlobal(spot), 0f, 1f);
 		await Cutscene.Wait(this, 0.6, ct);
-		// it catches where the flame touches, and runs round both ways and up the tent
-		var fires = new List<(FireVfx fx, float delay)>();
+		Vector3 centre = ToGlobal(spot);
+		// the fires: spread round from where it caught, each running out along its own line
+		var fires = new List<(FireVfx fx, Vector3 dir, float wall)>();
 		float a0 = Mathf.Atan2(spot.X, spot.Z);
-		for (int i = 0; i < 11; i++)
+		Vector3 flat = spot with { Y = 0 };
+		for (int i = 0; i < 7; i++)
 		{
-			// round the rim both ways from where it caught, then up the tent to the peak
-			float off = i == 0 ? 0f : ((i + 1) / 2) * (Mathf.Pi / 4.5f) * (i % 2 == 0 ? 1f : -1f);
-			float a = a0 + off;
-			bool tent = i >= 9;
-			Vector3 at = tent ? new Vector3(Mathf.Sin(a0 + i) * 0.5f, DaisTop + 1.3f + (i - 9) * 0.5f, Mathf.Cos(a0 + i) * 0.5f)
-				: new Vector3(Mathf.Sin(a) * (DaisR - 0.15f), DaisTop + 0.35f, Mathf.Cos(a) * (DaisR - 0.15f));
-			var fx = new FireVfx { Name = $"WebFire{i}", Extent = new Vector3(0.45f, 0.75f, 0.45f), FlameScale = 0.32f, Smoke = i % 3 == 0, SmokeAmount = 0.35f, LightRange = 8f, LightEnergy = 2.2f, LightShadows = false, EmitLight = i == 0 || i == 9, Seed = 30 + i, Position = at };
+			float a = a0 + Mathf.Pi + (i - 3) * (Mathf.Tau / 7f);
+			var dir = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+			// how far along it the wall is: |flat + dir s| = Radius - 0.5
+			float bq = flat.Dot(dir), cq = flat.LengthSquared() - (Radius - 0.5f) * (Radius - 0.5f);
+			float wall = -bq + Mathf.Sqrt(Mathf.Max(0f, bq * bq - cq));
+			var fx = new FireVfx { Name = $"WebFire{i}", Extent = new Vector3(0.5f, 0.35f, 0.5f), FlameScale = 0.26f, Smoke = false, Embers = false, LightRange = 6f, LightEnergy = 1.6f, LightShadows = false, EmitLight = i == 0 || i == 4, Seed = 30 + i, Position = flat };
 			AddChild(fx);
 			fx.Intensity = 0f;
-			fires.Add((fx, tent ? 1.0f + (i - 9) * 0.5f : Mathf.Abs(off) * 0.55f));
+			fires.Add((fx, dir, wall));
 		}
-		Sfx("web_burn", ToGlobal(spot), 3f, 0.9f);
+		Sfx("web_burn", centre, 3f, 0.9f);
+		float reach = DaisFoot + Radius + 1.2f;   // (the farthest the web goes from where it caught, and a little)
 		double t = 0;
-		const double seconds = 4.2;
-		while (t < seconds)
+		while (t < BurnSeconds)
 		{
 			await Cutscene.Frame(this, ct);
 			t += GetProcessDeltaTime();
-			foreach (var (fx, delay) in fires)
+			float u = Mathf.Clamp((float)(t / BurnSeconds), 0f, 1f);
+			float r = reach * (u < 0.15f ? u * u / 0.3f : u - 0.075f) / 0.925f;   // (a slow catch, then a steady spread)
+			SetBurn(centre, r);
+			foreach (var (fx, dir, wall) in fires)
 			{
-				float u = Mathf.Clamp(((float)t - delay) / 2.4f, 0f, 1f);
-				fx.Intensity = Mathf.Sin(u * Mathf.Pi) * 0.9f;
+				float along = Mathf.Min(r - 0.3f, wall);
+				if (along < 0f) continue;
+				var at = flat + dir * along;
+				float fromMiddle = new Vector2(at.X, at.Z).Length();
+				at.Y = fromMiddle < DaisR ? DaisTop + 0.05f : 0.05f;
+				fx.Position = at;
+				// up as it catches, steady while it runs, guttering out once it's at the wall
+				float up = Mathf.Clamp(along / 0.8f, 0f, 1f), dying = Mathf.Clamp((r - 0.3f - wall) / 1.6f, 0f, 1f);
+				fx.Intensity = 0.75f * up * (1f - dying);
 			}
-			float w = Mathf.Clamp((float)(t / seconds), 0f, 1f);
-			foreach (var g in _webMeshes) g.Transparency = Mathf.Clamp(w * 1.25f, 0f, 1f);
-			_webs.Scale = new Vector3(1f - 0.25f * w, 1f - 0.7f * w, 1f - 0.25f * w);
 		}
-		foreach (var (fx, _) in fires) fx.QueueFree();
+		foreach (var (fx, _, _) in fires) fx.QueueFree();
 		ClearWebs();
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.RoundRoomWebBurned);
 		await Cutscene.Wait(this, 0.4, ct);
-		GD.Print("[story] Act 20: the webs burn away - the dais is clear");
+		GD.Print("[story] Act 20: the webs burn away, all round the room - the dais is clear");
 	}
 
 	private void ClearWebs()
 	{
 		WebsBurned = true;
 		_webs.Visible = false;
+		if (_floorWebs != null) _floorWebs.Visible = false;
 		if (WebUse != null) WebUse.Enabled = false;
 		if (_barrier != null) { _barrier.QueueFree(); _barrier = null; }
 	}

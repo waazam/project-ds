@@ -74,7 +74,9 @@ public static class Cutscene
 	{
 		Bind(p);
 		if (input && _inputLocks++ == 0) p.PlayerInput.SetEnabled(false);
-		if (body && _bodyLocks++ == 0) p.SetPhysicsProcess(false);
+		// (and stand it still: its last walking speed would otherwise stay on it the whole time, and the footsteps and
+		// the head's bob, which go by it, would walk on while it rides a lift or a glide)
+		if (body && _bodyLocks++ == 0) { p.SetPhysicsProcess(false); p.Velocity = Vector3.Zero; }
 	}
 
 	/// <summary>Releases one reference. Input is re-enabled only when the last lock lets go.</summary>

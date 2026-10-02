@@ -115,11 +115,17 @@ public partial class StalkerBody : Node3D
 	/// <summary>A mesh pivot at design point <paramref name="pivot"/>; geometry is authored in design (Body) space.</summary>
 	private MeshInstance3D Part(Node3D parent, Vector3 pivot, Vector3 parentPivot, string name, Action<MeshKit> build)
 	{
-		var k = new MeshKit();
-		k.Mat(Skin);
-		k.Xf = new Transform3D(Basis.FromScale(Vector3.One * Size), -pivot * Size);
-		build(k);
-		var mesh = k.Commit();
+		// the remodelled part where there is one (tools/Blender/creatures.py: the same part, dense and sculpted, its
+		// tones carried over), else built here
+		var mesh = Engine.IsEditorHint() ? null : CreatureModels.Get("stalker", name, Size);
+		if (mesh == null)
+		{
+			var k = new MeshKit();
+			k.Mat(Skin);
+			k.Xf = new Transform3D(Basis.FromScale(Vector3.One * Size), -pivot * Size);
+			build(k);
+			mesh = k.Commit();
+		}
 		var mi = new MeshInstance3D
 		{
 			Name = name,

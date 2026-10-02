@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bb6rqp0bnu6up"
-path="res://.godot/imported/snowplow_plow_paint.png-a1a06aa1511fa5dbcb9942e1e8d2cdeb.ctex"
+path.s3tc="res://.godot/imported/snowplow_plow_paint.png-a1a06aa1511fa5dbcb9942e1e8d2cdeb.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "3fe12a7e300c7454bb6959ba43754f8d"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/winter/snowplow_plow_paint.png"
-dest_files=["res://.godot/imported/snowplow_plow_paint.png-a1a06aa1511fa5dbcb9942e1e8d2cdeb.ctex"]
+dest_files=["res://.godot/imported/snowplow_plow_paint.png-a1a06aa1511fa5dbcb9942e1e8d2cdeb.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

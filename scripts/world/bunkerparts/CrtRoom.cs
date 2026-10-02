@@ -308,7 +308,8 @@ public partial class CrtRoom : Node3D
 		k.Color = new Color(0.55f, 0.52f, 0.45f);
 		k.Box(new Vector3(-0.05f, ConsoleTop + 0.015f, ConsoleZ + 0.28f), new Vector3(0.46f, 0.03f, 0.16f), 1f, Basis.FromEuler(new Vector3(0, 0.08f, 0)));
 		k.Color = new Color(0.25f, 0.3f, 0.35f);
-		k.Cylinder(new Vector3(0.55f, ConsoleTop, ConsoleZ + 0.2f), new Vector3(0.55f, ConsoleTop + 0.1f, ConsoleZ + 0.2f), 0.04f, 0.04f, 8);
+		if (!FurnitureKit.Add(k, "mug", new Vector3(0.55f, ConsoleTop, ConsoleZ + 0.2f), 2.6f, Roles))
+			k.Cylinder(new Vector3(0.55f, ConsoleTop, ConsoleZ + 0.2f), new Vector3(0.55f, ConsoleTop + 0.1f, ConsoleZ + 0.2f), 0.04f, 0.04f, 8);
 		k.CommitTo(this, "Console");
 		AddBox(new Vector3(0, ConsoleTop * 0.5f, ConsoleZ), new Vector3(1.6f, ConsoleTop, 0.8f));
 
@@ -350,32 +351,51 @@ public partial class CrtRoom : Node3D
 		near.BodyExited += b => { if (b is PlayerController) PlayerAtTarget = false; };
 	}
 
+	/// <summary>The bunker's materials for the modelled pieces' roles (the fidelity pass, 2026-10-01).</summary>
+	private static System.Collections.Generic.Dictionary<string, Material> Roles => new()
+	{
+		["steel"] = BunkerTextures.PaintedMetalMat, ["plastic"] = BunkerTextures.PlasticMat, ["rubber"] = BunkerTextures.RubberMat,
+		["paper"] = new StandardMaterial3D { ResourceName = "bk_paper", AlbedoColor = new Color(0.62f, 0.56f, 0.4f), Roughness = 0.95f },
+		["brass"] = ProcTextures.MetalMat, ["metal"] = ProcTextures.MetalMat, ["iron"] = ProcTextures.MetalMat, ["wood"] = BuildingTextures.BoardsMat,
+		["ceramic"] = new StandardMaterial3D { ResourceName = "bk_mug", AlbedoColor = new Color(0.25f, 0.3f, 0.35f), Roughness = 0.4f },
+	};
+
 	private void BuildDressing()
 	{
 		var rng = new RandomNumberGenerator { Seed = 9102 };
 		var k = new MeshKit();
-		// A toppled office chair near the console.
-		k.Mat(ProcTextures.MetalMat);
-		k.Color = new Color(0.4f, 0.4f, 0.38f);
+		// A toppled office chair near the console (the modelled one: five casters, the column, the padded seat and back).
 		var chair = new Transform3D(Basis.FromEuler(new Vector3(0, 0.6f, Mathf.Pi * 0.5f)), new Vector3(-1.4f, 0.26f, ConsoleZ + 1.6f));
-		var oldXf = k.Xf;
-		k.Xf = chair;
-		k.Cylinder(new Vector3(0, 0, 0), new Vector3(0, 0.42f, 0), 0.025f, 0.025f, 6);
-		for (int i = 0; i < 5; i++)
+		if (!FurnitureKit.Add(k, "office_chair", chair, Roles))
 		{
-			float a = Mathf.Tau * i / 5f;
-			k.Beam(Vector3.Zero, new Vector3(Mathf.Cos(a) * 0.3f, -0.04f, Mathf.Sin(a) * 0.3f), 0.04f, 0.03f);
+			k.Mat(ProcTextures.MetalMat);
+			k.Color = new Color(0.4f, 0.4f, 0.38f);
+			var oldXf = k.Xf;
+			k.Xf = chair;
+			k.Cylinder(new Vector3(0, 0, 0), new Vector3(0, 0.42f, 0), 0.025f, 0.025f, 6);
+			for (int i = 0; i < 5; i++)
+			{
+				float a = Mathf.Tau * i / 5f;
+				k.Beam(Vector3.Zero, new Vector3(Mathf.Cos(a) * 0.3f, -0.04f, Mathf.Sin(a) * 0.3f), 0.04f, 0.03f);
+			}
+			k.Mat(BunkerTextures.PlasticMat);
+			k.Color = new Color(0.12f, 0.12f, 0.13f);
+			k.Box(new Vector3(0, 0.46f, 0), new Vector3(0.46f, 0.07f, 0.44f));
+			k.Box(new Vector3(0, 0.78f, -0.21f), new Vector3(0.42f, 0.55f, 0.06f));
+			k.Xf = oldXf;
 		}
-		k.Mat(BunkerTextures.PlasticMat);
-		k.Color = new Color(0.12f, 0.12f, 0.13f);
-		k.Box(new Vector3(0, 0.46f, 0), new Vector3(0.46f, 0.07f, 0.44f));
-		k.Box(new Vector3(0, 0.78f, -0.21f), new Vector3(0.42f, 0.55f, 0.06f));
-		k.Xf = oldXf;
 		// Filing cabinets by the door, one drawer hanging open.
 		k.Mat(BunkerTextures.PaintedMetalMat);
 		for (int i = 0; i < 2; i++)
 		{
 			var c = new Vector3(-CrtRoomHalfWidth + 0.35f, 0.66f, CrtRoomFrontZ - 2f - i * 0.52f);
+			// the modelled cabinets (pressed steel, recessed handles, card labels; the second's drawer pulled out on its
+			// runners with the files in it), their fronts to the room (+X)
+			if (FurnitureKit.Add(k, i == 1 ? "filing_cabinet_open" : "filing_cabinet", c with { Y = 0f }, -Mathf.Pi * 0.5f, Roles))
+			{
+				AddBox(c, new Vector3(0.6f, 1.32f, 0.5f));
+				continue;
+			}
 			k.Color = new Color(0.8f, 0.82f, 0.78f) * rng.RandfRange(0.8f, 1f);
 			k.Box(c, new Vector3(0.6f, 1.32f, 0.5f));
 			for (int d = 0; d < 4; d++)

@@ -75,7 +75,7 @@ public partial class SkiLodge
 		// what only comes later
 		foreach (var m in new Material[]
 		{
-			WinterWoods.IceOverlay, WinterWoods.IceMat, WinterWoods.SoftSnow, LodgeTextures.SilverMat, LodgeTextures.LinenMat, LodgeTextures.SheetLinenMat,
+			WinterWoods.IceOverlay, WinterWoods.IceMat, WinterWoods.SoftSnow, LodgeTextures.SilverMat, LodgeTextures.LinenMat, LodgeTextures.SheetLinenMat, LodgeTextures.TableclothMat,
 			StationParts.StationTextures.BloodPoolMat, LodgeTextures.CopperMat, LodgeTextures.LeakMat,
 		}) mats.Add(m);
 		int i = 0;

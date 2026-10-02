@@ -251,6 +251,8 @@ public static class UiKit
 		AddToggle(box, "Invert Y", s.InvertY, on => s.InvertY = on);
 		AddToggle(box, "Reduce flashing", s.ReduceFlashing, on => s.ReduceFlashing = on);
 		AddToggle(box, "Head motion", s.HeadMotion, on => s.HeadMotion = on);
+		AddSlider(box, "Brightness", GameSettings.BrightnessMin, GameSettings.BrightnessMax, s.Brightness, v => s.Brightness = (float)v, 0.05,
+			v => $"{Mathf.RoundToInt((float)v * 100f)}%");
 		AddToggle(box, "Cinematic bars", s.CinemaBars, on => s.CinemaBars = on);
 		// the window: fullscreen at the screen's own resolution, or a window of a chosen size
 		AddToggle(box, "Windowed", s.Windowed, on => s.Windowed = on);

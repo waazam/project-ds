@@ -41,6 +41,9 @@ public partial class WinterWoods
 	public static Vector2 RoadDir(int i) { EnsurePath(); return _tan[Mathf.Clamp(i, 0, _tan.Count - 1)]; }
 	public static Vector2 RoadPoint(int i) { EnsurePath(); return _pts[Mathf.Clamp(i, 0, _pts.Count - 1)]; }
 
+	/// <summary>Where the road's halfway save is (arc length): passing it saves (<see cref="StoryManager.Flag.Act22Midway"/>).</summary>
+	public static float MidwayS { get { EnsurePath(); return Length * 0.5f; } }
+
 	/// <summary>The road at arc length <paramref name="s"/> (church-local, on its surface).</summary>
 	public static Vector3 RoadAt(float s, out Vector2 dir)
 	{

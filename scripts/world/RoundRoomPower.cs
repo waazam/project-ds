@@ -302,7 +302,7 @@ public partial class RoundRoom
 			h.SetUV(new Vector2(u0, 1)); h.AddVertex(d);
 		}
 		AddChild(new MeshInstance3D { Name = "RingGlow", Mesh = h.Commit(), MaterialOverride = _haloMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-		_ringLight = new OmniLight3D { Name = "RingLight", Position = new Vector3(0, 0.3f, 0), LightColor = Red, LightEnergy = 1.6f, OmniRange = 6.5f, OmniAttenuation = 1.4f, ShadowEnabled = false };
+		_ringLight = new OmniLight3D { Name = "RingLight", Position = new Vector3(0, 0.3f, 0), LightColor = Red, LightEnergy = 1.6f, OmniRange = 6.5f, OmniAttenuation = 1.4f, ShadowEnabled = false, LightCullMask = ~WebLayer };
 		Dais.AddChild(_ringLight);
 		SetRing(0f, 0f, 1f);
 	}

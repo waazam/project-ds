@@ -50,6 +50,9 @@ public partial class CreaturePreview : Node3D
 		await Frames(10);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lodge") >= 0) { await LodgeShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--prints") >= 0) { await PrintShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bench") >= 0) { await Bench(); GetTree().Quit(); return; }
 		// the crawler (Act 14), on a floor, walking a few metres so its gait shows
 		var floor = new StaticBody3D { Name = "Floor" };
 		floor.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(40, 1, 40) }, Position = new Vector3(0, -0.5f, 0) });
@@ -151,6 +154,129 @@ public partial class CreaturePreview : Node3D
 	}
 
 	/// <summary>The wendigo (Act 22): standing in snow at dusk, lit low and cold, front, side, three-quarter, the head close.</summary>
+	/// <summary>A controlled measurement of the optimization pass in the lodge (frame time at fixed views, vsync off, every
+	/// variant in the one process so they're compared like for like): the dusty furniture against plain, occlusion
+	/// culling on and off.</summary>
+	private async Task Bench()
+	{
+		env.BackgroundColor = new Color(0.3f, 0.32f, 0.36f);
+		env.AmbientLightColor = new Color(0.78f, 0.68f, 0.56f);
+		env.AmbientLightEnergy = 0.42f;
+		World.FurnitureKit.Dusty = true;
+		var dusty = new World.SkiLodge { Name = "LodgeDusty" };
+		AddChild(dusty);
+		await Seconds(2.0);
+		World.FurnitureKit.Dusty = false;
+		var plain = new World.SkiLodge { Name = "LodgePlain" };
+		AddChild(plain);
+		await Seconds(2.0);
+		DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+		_cam.Fov = 75f;
+		var views = new (string, Vector3, Vector3)[]
+		{
+			("lobby_from_door", new Vector3(0, 1.7f, 8.8f), new Vector3(0, 2.5f, -6f)),
+			("lobby_seating", new Vector3(1.0f, 1.7f, 1.0f), new Vector3(7f, 1.2f, -5f)),
+			("dining", new Vector3(14f, 1.7f, 0f), new Vector3(40f, 1.2f, 0f)),
+			("corridor", new Vector3(-12.2f, 5.9f, 0f), new Vector3(-28f, 5.5f, 0f)),
+			("bar", new Vector3(-14f, 1.7f, 4f), new Vector3(-24f, 1.4f, 4f)),
+		};
+		async Task<double> Ms()
+		{
+			await Frames(30);
+			ulong t0 = Time.GetTicksUsec();
+			const int n = 240;
+			await Frames(n);
+			return (Time.GetTicksUsec() - t0) / 1000.0 / n;
+		}
+		var vp = GetViewport();
+		var totals = new System.Collections.Generic.Dictionary<string, double>();
+		foreach (var (name, eye, at) in views)
+		{
+			_cam.GlobalTransform = new Transform3D(Basis.LookingAt(at - eye, Vector3.Up), eye);
+			var line = new System.Text.StringBuilder($"[bench] {name,-16}");
+			foreach (var (label, useDusty, occ) in new[] { ("dusty+occ", true, true), ("dusty", true, false), ("plain+occ", false, true), ("plain", false, false) })
+			{
+				dusty.Visible = useDusty; plain.Visible = !useDusty;
+				vp.UseOcclusionCulling = occ;
+				double ms = await Ms();
+				totals[label] = (totals.TryGetValue(label, out var tv) ? tv : 0) + ms;
+				line.Append($"  {label} {ms:0.00} ms");
+			}
+			GD.Print(line.ToString());
+		}
+		var sum = new System.Text.StringBuilder("[bench] mean          ");
+		foreach (var kv in totals) sum.Append($"  {kv.Key} {kv.Value / views.Length:0.00} ms");
+		GD.Print(sum.ToString());
+	}
+
+	/// <summary>The creatures' bodies as built, written out for the Blender pass (tools/Blender/creatures.py): each part's
+	/// mesh in its own pivot's space, with its tone colours, one PLY per part and material (build/bodies).</summary>
+	private async Task ExportBodies()
+	{
+		string dir = ProjectSettings.GlobalizePath("res://build/bodies");
+		System.IO.Directory.CreateDirectory(dir);
+		CreatureModels.Disabled = true;
+		var body = new StalkerBody { Name = "StalkerExport", Size = 1f, Idle = false };
+		AddChild(body);
+		var crawler = new Crawler { Name = "CrawlerExport" };
+		AddChild(crawler);
+		await Seconds(0.3);
+		int n = 0;
+		foreach (var c in body.FindChildren("*", "MeshInstance3D", true, false))
+			if (c is MeshInstance3D mi && mi.HasMeta("stalker_generated")) n += WritePly(dir, "stalker_" + mi.Name, mi.Mesh);
+		foreach (var name in new[] { "Torso", "Skull", "Hand", "Foot" })
+			if (crawler.FindChild(name, true, false) is MeshInstance3D mi) n += WritePly(dir, "crawler_" + name, mi.Mesh);
+		GD.Print($"[export] {n} body meshes written to {dir}");
+	}
+
+	private static int WritePly(string dir, string name, Mesh mesh)
+	{
+		int written = 0;
+		for (int s = 0; s < mesh.GetSurfaceCount(); s++)
+		{
+			var arr = mesh.SurfaceGetArrays(s);
+			var v = arr[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+			var nrm = arr[(int)Mesh.ArrayType.Normal].AsVector3Array();
+			var col = arr[(int)Mesh.ArrayType.Color].VariantType == Variant.Type.Nil ? null : arr[(int)Mesh.ArrayType.Color].AsColorArray();
+			var idx = arr[(int)Mesh.ArrayType.Index].VariantType == Variant.Type.Nil ? null : arr[(int)Mesh.ArrayType.Index].AsInt32Array();
+			int tris = idx != null ? idx.Length / 3 : v.Length / 3;
+			var sb = new System.Text.StringBuilder();
+			foreach (var h in new[] { $"ply", $"format ascii 1.0", $"element vertex {v.Length}", $"property float x", $"property float y", $"property float z", $"property float nx", $"property float ny", $"property float nz", $"property uchar red", $"property uchar green", $"property uchar blue", $"property uchar alpha", $"element face {tris}", $"property list uchar int vertex_indices", $"end_header" }) sb.Append(h).Append('\n');
+			var ci = System.Globalization.CultureInfo.InvariantCulture;
+			for (int i = 0; i < v.Length; i++)
+			{
+				var c = col != null && i < col.Length ? col[i] : Colors.White;
+				var nn = i < nrm.Length ? nrm[i] : Vector3.Up;
+				sb.Append(string.Format(ci, "{0} {1} {2} {3} {4} {5} {6} {7} {8} {9}\n", v[i].X, v[i].Y, v[i].Z, nn.X, nn.Y, nn.Z,
+					(int)Mathf.Clamp(c.R * 255f, 0, 255), (int)Mathf.Clamp(c.G * 255f, 0, 255), (int)Mathf.Clamp(c.B * 255f, 0, 255), (int)Mathf.Clamp(c.A * 255f, 0, 255)));
+			}
+			for (int t = 0; t < tris; t++)
+			{
+				int a = idx != null ? idx[t * 3] : t * 3, b = idx != null ? idx[t * 3 + 1] : t * 3 + 1, cc = idx != null ? idx[t * 3 + 2] : t * 3 + 2;
+				sb.Append($"3 {a} {b} {cc}\n");
+			}
+			System.IO.File.WriteAllText(System.IO.Path.Combine(dir, $"{name}_s{s}.ply"), sb.ToString());
+			written++;
+		}
+		return written;
+	}
+
+	/// <summary>The snow prints (SnowPrints) on the snow: a boot trail and the wendigo's, by lantern light.</summary>
+	private async Task PrintShots()
+	{
+		var ground = new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(30, 30) }, MaterialOverride = World.WinterWoods.GroundMat() };
+		AddChild(ground);
+		var prints = new World.SnowPrints { Name = "Prints" };
+		AddChild(prints);
+		for (int i = 0; i < 8; i++)
+			prints.Lay(new Vector3((i % 2 == 0 ? -0.11f : 0.11f), 0, -i * 0.65f), Vector3.Up, Vector3.Forward, i % 2 == 0, false, 0.5f);
+		for (int i = 0; i < 5; i++)
+			prints.Lay(new Vector3(1.4f + (i % 2 == 0 ? -0.2f : 0.2f), 0, -i * 1.25f), Vector3.Up, Vector3.Forward, i % 2 == 0, true, 0.7f);
+		AddChild(new OmniLight3D { LightColor = new Color(1f, 0.7f, 0.4f), LightEnergy = 1.6f, OmniRange = 9f, Position = new Vector3(0.6f, 1.6f, 1.2f) });
+		await Seconds(0.5);
+		await Shot("prints_trail", new Vector3(0.6f, 1.65f, 1.6f), new Vector3(0.6f, 0f, -2.5f));
+	}
+
 	private async Task WendigoShots()
 	{
 		env.BackgroundColor = new Color(0.1f, 0.11f, 0.14f);
@@ -182,6 +308,16 @@ public partial class CreaturePreview : Node3D
 		w.ProcessMode = ProcessModeEnum.Disabled;
 		await Shot("wendigo_pouncing", new Vector3(6f, 2.6f, -2f), w.GlobalPosition + new Vector3(0, 2.4f, 0));
 		w.ProcessMode = ProcessModeEnum.Inherit;
+		// its held poses: crouched (on a wall's top), and clinging to a trunk mid-climb
+		w.StandAt(Vector3.Zero, new Vector3(0, 0, -10));
+		w.Hold("crouch", 1f);
+		await Seconds(0.5);
+		await Shot("wendigo_crouched", new Vector3(5f, 2.2f, -4f), new Vector3(0, 1.6f, 0));
+		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.25f, BottomRadius = 0.4f, Height = 12f }, Position = new Vector3(0, 6f, -3f), MaterialOverride = World.WinterWoods.PropSnow });
+		w.StandAt(new Vector3(0, 3.5f, -2.25f), new Vector3(0, 3.5f, -3f));
+		w.Hold("air", 0.45f);
+		await Seconds(0.5);
+		await Shot("wendigo_climbing", new Vector3(6f, 3.5f, 5f), new Vector3(0, 5f, -2.6f));
 	}
 
 	/// <summary>The ski lodge's interior (Act 23), standing alone: the lobby, the bar, the pantry, the corridor, the rooms, the dining hall.</summary>
@@ -209,6 +345,10 @@ public partial class CreaturePreview : Node3D
 		await Shot("lodge_service_corridor", new Vector3(-31f, 1.6f, -0.7f), new Vector3(-22f, 1.4f, -0.7f));
 		await Shot("lodge_pantry", new Vector3(-9.3f, 1.6f, -6.4f), new Vector3(-22f, 1.2f, -6.4f));
 		await Shot("lodge_corridor", new Vector3(-12.2f, 5.9f, 0f), new Vector3(-28f, 5.5f, 0f));
+		// the doorway from the gallery into the corridor, looking into its corners (the gaps the owner found)
+		await Shot("lodge_corridor_door_n", new Vector3(-10.6f, 5.9f, -0.6f), new Vector3(-12.8f, 5.6f, 1.6f));
+		await Shot("lodge_corridor_door_s", new Vector3(-10.6f, 5.9f, 0.6f), new Vector3(-12.8f, 5.6f, -1.6f));
+		await Shot("lodge_corridor_door_up", new Vector3(-12.2f, 5.4f, 0f), new Vector3(-11.6f, 7.2f, 0f));
 		await Shot("lodge_room202", new Vector3(-13.2f, 5.9f, 1.6f), new Vector3(-17f, 5f, 6.5f));
 		await Shot("lodge_room202_bath", new Vector3(-17f, 5.9f, 2.7f), new Vector3(-19.5f, 5f, 3.6f));
 		await Shot("lodge_room203", new Vector3(-13.2f, 5.9f, -1.6f), new Vector3(-15f, 5f, -7f));

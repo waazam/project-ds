@@ -24,6 +24,14 @@ namespace ProjectDS.World;
 public partial class WinterWoods
 {
 	public enum StalkState { Hidden, Watching }
+	/// <summary>How it shows itself behind them (the detail pass: more of its moments): standing by a tree; crouched
+	/// on top of a plowed wall looking down; dropped off a wall onto the road behind them (they hear it land); caught
+	/// halfway up a trunk, clinging to it.</summary>
+	public enum StalkMove { Road, Tree, WallCrouch, Drop, Climb }
+	public StalkMove LastMove { get; private set; } = StalkMove.Road;
+	/// <summary>Tests: while set, it isn't put off by being looked at (for a picture of it).</summary>
+	public bool DebugHoldStill { get; set; }
+	public int Drops { get; private set; }
 	public Wendigo Wendigo { get; private set; }
 	public StalkState Stalk { get; private set; } = StalkState.Hidden;
 	/// <summary>For tests: how often it has shown itself, been seen (and leapt), and spoken.</summary>
@@ -127,12 +135,21 @@ public partial class WinterWoods
 		}
 		// behind: a tree 16-40 m back (a little closer each time it gets away unseen), off the road, in a clear line
 		float near = Mathf.Max(12f, 16f - _closer), far = Mathf.Max(near + 8f, 28f - _closer);
+		// which of its moves, in turn (by a tree, up on a wall, dropping onto the road, halfway up a trunk); one that
+		// can't be done here falls through to the next
+		var want = _forceMove ?? (StalkMove)(1 + (Appearances - 1) % 4);
+		_forceMove = null;
+		if (want == StalkMove.Drop && TryDrop(player, cam, s, fwd, near, far)) return true;
+		if (want == StalkMove.WallCrouch && TryWall(player, cam, s, fwd, near, far)) return true;
+		bool climb = want == StalkMove.Climb;
 		var pxz = new Vector2(pl.X, pl.Z);
 		(Vector2 at, float height, bool fir) best = default; float bestScore = float.MaxValue; bool found = false;
 		foreach (var t in TreeSpots)
 		{
 			float d = t.at.DistanceTo(pxz);
-			if (d < near || d > far) continue;
+			// (climbing: a bare trunk, tall enough, and nearer than the others: past ~15 m the haze swallows it whole
+			// against the trees, where by a tree or on a wall it stands out dark against the sky)
+			if (climb ? (t.fir || t.height < 11f || d < 10f || d > 14.5f) : (d < near || d > far)) continue;
 			if (WinterGlade.OutsideChurch(t.at.X, t.at.Y) < 20f) continue;   // never in or against the church
 			var w = ToGlobal(new Vector3(t.at.X, Height(t.at.X, t.at.Y), t.at.Y));
 			var to = (w - cam.GlobalPosition) with { Y = 0 };
@@ -140,6 +157,52 @@ public partial class WinterWoods
 			float score = Mathf.Abs(d - (near + far) * 0.5f) + _rng.RandfRange(0f, 8f);
 			if (score < bestScore) { bestScore = score; best = t; found = true; }
 		}
+		if (found && climb)
+		{
+			// halfway up the trunk on the player's side of it, clinging to it, its back to them (caught mid-climb)
+			var trunk = new Vector3(best.at.X, 0, best.at.Y);
+			var toward = (new Vector3(pl.X, 0, pl.Z) - trunk).Normalized();
+			var cling = trunk + toward * 0.75f;
+			// (on the bare trunk below the first boughs: higher up, among the branches, it can't be made out at all)
+			cling.Y = Height(trunk.X, trunk.Z) + Mathf.Clamp(best.height * 0.22f, 2.4f, 3.4f);
+			var cw = ToGlobal(cling);
+			if (Clear(cam.GlobalPosition, cw + Vector3.Up * 1.2f) && Clear(cam.GlobalPosition, cw + Vector3.Up * 2.6f) && !TreeInTheWay(pxz, best.at))
+			{
+				Place(cw, ToGlobal(trunk with { Y = cling.Y }), StalkMove.Climb);
+				Wendigo.Hold("air", 0.45f);
+				_perchTree = best;
+				return true;
+			}
+		}
+		if (TryTree(player, cam, best, found, pl)) return true;
+		if (TryWall(player, cam, s, fwd, near, far)) return true;
+		if (TryDrop(player, cam, s, fwd, near, far)) return true;
+		_nextAppear = _stalkClock + 2;
+		return false;
+	}
+
+	private StalkMove? _forceMove;
+
+	/// <summary>Whether another tree stands near the line from <paramref name="from"/> to the tree at <paramref name="to"/>
+	/// (church-local, flat): a fir's boughs (which have no collision) would hide what's on the trunk behind it.</summary>
+	private static bool TreeInTheWay(Vector2 from, Vector2 to)
+	{
+		var seg = to - from;
+		float len2 = seg.LengthSquared();
+		foreach (var t in TreeSpots)
+		{
+			if (t.at.DistanceSquaredTo(to) < 0.01f) continue;   // (itself)
+			// (a fir right beside it hides it as well as one in front)
+			if (t.fir && t.at.DistanceTo(to) < 3.2f) return true;
+			float u = Mathf.Clamp((t.at - from).Dot(seg) / len2, 0f, 1f);
+			if (u > 0.05f && u < 0.95f && (from + seg * u).DistanceTo(t.at) < (t.fir ? 2.6f : 0.9f)) return true;
+		}
+		return false;
+	}
+
+	/// <summary>Beside a tree's trunk, standing.</summary>
+	private bool TryTree(PlayerController player, Camera3D cam, (Vector2 at, float height, bool fir) best, bool found, Vector3 pl)
+	{
 		if (found)
 		{
 			// beside the trunk, on the player's side of it, half hidden
@@ -150,12 +213,18 @@ public partial class WinterWoods
 			var sw = ToGlobal(stand);
 			if (Clear(cam.GlobalPosition, sw + Vector3.Up * 2.4f))
 			{
-				Place(sw, player.GlobalPosition);
+				Place(sw, player.GlobalPosition, StalkMove.Tree);
 				_perchTree = best;
 				return true;
 			}
 		}
-		// the walls the plow cut hide the trees from the road: then up on top of one, back the way they came, looking down
+		return false;
+	}
+
+	/// <summary>Up on top of a plowed wall, back the way they came, crouched low, looking down at them (the walls
+	/// the plow cut hide the trees from the road).</summary>
+	private bool TryWall(PlayerController player, Camera3D cam, float s, Vector3 fwd, float near, float far)
+	{
 		for (int i = 0; i < 6; i++)
 		{
 			float back = _rng.RandfRange(near, far);
@@ -166,30 +235,67 @@ public partial class WinterWoods
 			var tw = ToGlobal(top);
 			var to = (tw - cam.GlobalPosition) with { Y = 0 };
 			if (fwd.AngleTo(to.Normalized()) < Mathf.DegToRad(115f)) continue;
-			if (!Clear(cam.GlobalPosition, tw + Vector3.Up * 2.4f)) continue;
-			Place(tw, player.GlobalPosition);
+			if (!Clear(cam.GlobalPosition, tw + Vector3.Up * 1.6f)) continue;
+			Place(tw, player.GlobalPosition, StalkMove.WallCrouch);
+			Wendigo.Hold("crouch", 1f);
 			_perchTree = (new Vector2(top.X, top.Z), 12f, false);
 			return true;
 		}
-		_nextAppear = _stalkClock + 2;
+		return false;
+	}
+
+	/// <summary>Off the top of a wall behind them, down onto the road (the pounce): they hear it land, the snow
+	/// bursting up, and it rises out of its crouch there, in the middle of the road, 12-20 m back, and waits to be
+	/// seen. It never comes nearer.</summary>
+	private bool TryDrop(PlayerController player, Camera3D cam, float s, Vector3 fwd, float near, float far)
+	{
+		for (int i = 0; i < 6; i++)
+		{
+			float back = _rng.RandfRange(Mathf.Max(near, 13f), Mathf.Min(far, 20f));
+			var q = RoadAt(Mathf.Max(s - back, 8f), out var dir);
+			float sd = _rng.Randf() < 0.5f ? 1f : -1f;
+			var top = new Vector3(q.X - dir.Y * sd * (WallTop + 0.4f), 0, q.Z + dir.X * sd * (WallTop + 0.4f));
+			top.Y = Height(top.X, top.Z) - 0.05f;
+			var tw = ToGlobal(top);
+			var land = ToGlobal(q with { Y = Height(q.X, q.Z) - 0.03f });
+			if (land.DistanceTo(player.GlobalPosition) < 11f) continue;
+			var to = (land - cam.GlobalPosition) with { Y = 0 };
+			if (fwd.AngleTo(to.Normalized()) < Mathf.DegToRad(115f)) continue;
+			if (!Clear(cam.GlobalPosition, land + Vector3.Up * 1.6f)) continue;
+			Place(tw, player.GlobalPosition, StalkMove.Drop);
+			_watchUntil = _stalkClock + 16;
+			LayClaws(tw, (land - tw) with { Y = 0 }, 1f);
+			Wendigo.Leap(land, 0.42f, () =>
+			{
+				_snowDump.GlobalPosition = land + Vector3.Up * 1.2f;
+				_snowDump.Restart();
+				AudioDirector.OneShot(this, "snow_whump", 3, land, -2f, "Events", 8f, 0.06f);
+				LayClaws(land, (player.GlobalPosition - land) with { Y = 0 }, 1f);
+			}, stay: true);
+			Drops++;
+			GD.Print($"[story] Act 22: the wendigo drops onto the road behind them ({land.DistanceTo(player.GlobalPosition):0} m)");
+			return true;
+		}
 		return false;
 	}
 
 	private (Vector2 at, float height, bool fir) _perchTree;
 
-	private void Place(Vector3 ground, Vector3 face)
+	private void Place(Vector3 ground, Vector3 face, StalkMove move = StalkMove.Road)
 	{
+		LastMove = move;
 		Wendigo.StandAt(ground, face);
+		LayClaws(ground, (face - ground) with { Y = 0 }, 0.7f);
 		Stalk = StalkState.Watching;
 		Appearances++;
 		_seenAt = -1;
 		_watchUntil = _stalkClock + (Appearances == 1 ? 60 : 22);
-		GD.Print($"[story] Act 22: the wendigo takes its place ({(Appearances == 1 ? "on the road ahead" : "behind, by a tree")}, {Wendigo.GlobalPosition.DistanceTo(StoryBeat.Player(this)?.GlobalPosition ?? Vector3.Zero):0} m)");
+		GD.Print($"[story] Act 22: the wendigo takes its place ({(Appearances == 1 ? "on the road ahead" : move.ToString())}, {Wendigo.GlobalPosition.DistanceTo(StoryBeat.Player(this)?.GlobalPosition ?? Vector3.Zero):0} m)");
 	}
 
 	private void Watch(PlayerController player, Camera3D cam)
 	{
-		if (Wendigo.Leaping) return;
+		if (Wendigo.Leaping || DebugHoldStill) return;
 		if (_seenAt < 0)
 		{
 			// anywhere near it: the chest or the head inside a wide cone, with nothing in the way
@@ -217,6 +323,8 @@ public partial class WinterWoods
 		}
 		var perch = new Vector3(bestXZ.X, Height(bestXZ.X, bestXZ.Y) + Mathf.Clamp(h * 0.62f, 7f, 14f), bestXZ.Y);
 		var perchW = ToGlobal(perch);
+		// the push-off: its feet driven deep
+		LayClaws(Wendigo.GlobalPosition, (perchW - Wendigo.GlobalPosition) with { Y = 0 }, 1f);
 		Wendigo.Leap(perchW, 0.17f, () =>
 		{
 			_snowDump.GlobalPosition = perchW;
@@ -282,8 +390,9 @@ public partial class WinterWoods
 	}
 
 	/// <summary>For tests: make it appear behind the player now (as the director would).</summary>
-	public bool DebugAppearBehind()
+	public bool DebugAppearBehind(StalkMove? move = null)
 	{
+		_forceMove = move;
 		var player = StoryBeat.Player(this);
 		var cam = GetViewport()?.GetCamera3D();
 		if (player == null || cam == null) return false;

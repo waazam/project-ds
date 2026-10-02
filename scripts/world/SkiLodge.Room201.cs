@@ -42,7 +42,10 @@ public partial class SkiLodge
 		};
 		// the room: lit (the only room whose lights are on), and perfect
 		if (RoomSwitches.TryGetValue(201, out var sw)) sw.Set(true);
-		BuildPerfect201();
+		// (201 is kept perfect: not a speck of dust in it)
+		FurnitureKit.Dusty = false;
+		try { BuildPerfect201(); }
+		finally { FurnitureKit.Dusty = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-dust") < 0; }
 		BuildHole201();
 		if (Has(LodgeFlag.Room201Jammed)) { Room201Jammed = true; d.SlamAndJam(instant: true); }
 		else if (Has(LodgeFlag.Room201Open)) d.Open(null, instant: true);

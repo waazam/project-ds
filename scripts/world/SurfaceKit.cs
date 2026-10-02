@@ -102,5 +102,13 @@ public static class SurfaceKit
 		m.NormalEnabled = true;
 		m.NormalTexture = n;
 		m.NormalScale = strength;
+		// and its roughness, where there is one (scaled to a mean of 1: the material keeps its own roughness, and gains
+		// the photo's variation, its worn places smoother)
+		var path = $"res://assets/textures/surfaces/{name}_rough.png";
+		if (ResourceLoader.Exists(path))
+		{
+			m.RoughnessTexture = GD.Load<Texture2D>(path);
+			m.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red;
+		}
 	}
 }

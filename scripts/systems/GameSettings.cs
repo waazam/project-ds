@@ -35,6 +35,10 @@ public partial class GameSettings : Node
 	// Display (the owner, from the teaser): a cinematic frame and an old TV's look
 	/// <summary>2.2:1 letterbox bars over the game (not the HUD; they slide away while the camera is raised).</summary>
 	public bool CinemaBars = true;
+	/// <summary>The picture's brightness: a gamma over the finished image (1 as designed, 0.7 darker to 1.5 lighter;
+	/// it lifts the dark and the mids, not the whites). For a dark monitor or a bright room.</summary>
+	public float Brightness = 1f;
+	public const float BrightnessMin = 0.7f, BrightnessMax = 1.5f;
 
 	/// <summary>Fullscreen (borderless, the screen's own resolution: the default) or a window.</summary>
 	public bool Windowed
@@ -192,6 +196,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("accessibility", "reduce_flashing", ReduceFlashing);
 		cfg.SetValue("accessibility", "head_motion", HeadMotion);
 		cfg.SetValue("display", "cinema_bars", CinemaBars);
+		cfg.SetValue("display", "brightness", Brightness);
 		cfg.SetValue("display", "crt_filter", _crtFilter);
 		cfg.SetValue("display", "shadows", _shadows);
 		cfg.SetValue("display", "windowed", _windowed);
@@ -215,6 +220,7 @@ public partial class GameSettings : Node
 		ReduceFlashing = (bool)cfg.GetValue("accessibility", "reduce_flashing", ReduceFlashing);
 		HeadMotion = (bool)cfg.GetValue("accessibility", "head_motion", HeadMotion);
 		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
+		Brightness = Mathf.Clamp((float)cfg.GetValue("display", "brightness", Brightness), BrightnessMin, BrightnessMax);
 		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
 		_shadows = Mathf.Clamp((int)cfg.GetValue("display", "shadows", _shadows), 0, 2);
 		_windowed = (bool)cfg.GetValue("display", "windowed", _windowed);

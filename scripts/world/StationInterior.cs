@@ -125,6 +125,9 @@ public partial class StationInterior : Node3D
 		// Act 21's end (Act 22's start): outside the great door, on the plowed road, facing away down it
 		var step = WinterWoods.RoadAt(5f, out _);
 		Marker("Act21EndMarker", ToGlobal(church + step + new Vector3(0, 0.1f, 0)), Rotation.Y, "respawn_Act21Finished");
+		// Act 22's halfway save: on the road at its midpoint, facing on down it
+		var mid = WinterWoods.RoadAt(WinterWoods.MidwayS, out var midDir);
+		Marker("Act22MidMarker", ToGlobal(church + mid + new Vector3(0, 0.1f, 0)), Rotation.Y + Mathf.Atan2(-midDir.X, -midDir.Y), "respawn_Act22Midway");
 		// Act 22's end (Act 23's start): in the ski lodge's mudroom, just in from the back door, facing the inner door
 		Marker("Act22EndMarker", ToGlobal(church + SkiLodge.OriginLocal + new Vector3(SkiLodge.BackDoorX, 0.1f, -SkiLodge.WingHalfZ + 3.2f)), Rotation.Y + Mathf.Pi, "respawn_Act22Finished");
 		// Act 23's saves: in the upstairs corridor (after 202, after 203), and in the dining hall by the bowl
@@ -180,18 +183,29 @@ public partial class StationInterior : Node3D
 		var desk = new Node3D { Name = "Desk", Position = DeskAt };
 		AddChild(desk);
 		var k = new MeshKit();
+		// the modelled pedestal desk (a moulded top, drawers with brass pulls and label frames, a panelled back; the
+		// fidelity pass, 2026-10-01), its top at the old one's height; a mug and loose papers on it
+		bool modelled = World.FurnitureKit.Add(k, "station_desk", Vector3.Zero, 0f, StationParts.LobbyDecor.Roles, new Vector3(1f, 0.79f / 0.76f, 1f));
+		if (modelled)
+		{
+			World.FurnitureKit.Add(k, "mug", new Vector3(-0.78f, 0.79f, -0.05f), 0.8f, StationParts.LobbyDecor.Roles);
+			World.FurnitureKit.Add(k, "papers", new Vector3(0.1f, 0.801f, 0.12f), 0.4f, StationParts.LobbyDecor.Roles);
+		}
 		k.Mat(PropTextures.DeckMat);
 		k.Color = new Color(0.46f, 0.32f, 0.2f);
-		BuildKit.Box(k, new Vector3(0, 0.76f, 0), new Vector3(1.9f, 0.06f, 0.8f), 1.2f);
+		if (!modelled) BuildKit.Box(k, new Vector3(0, 0.76f, 0), new Vector3(1.9f, 0.06f, 0.8f), 1.2f);
 		k.Mat(BuildingTextures.BoardsMat);
 		k.Color = new Color(0.36f, 0.25f, 0.16f);
-		BuildKit.Box(k, new Vector3(0, 0.38f, -0.3f), new Vector3(1.85f, 0.72f, 0.05f), 1.2f);   // the modesty panel, facing the room
-		foreach (int s in new[] { -1, 1 })
-			BuildKit.Box(k, new Vector3(s * 0.62f, 0.38f, 0.02f), new Vector3(0.55f, 0.72f, 0.7f), 1.2f);   // drawer pedestals
-		k.Color = new Color(0.25f, 0.2f, 0.14f);
-		foreach (int s in new[] { -1, 1 })
-			for (int d = 0; d < 3; d++)
-				BuildKit.Box(k, new Vector3(s * 0.62f, 0.15f + d * 0.22f, -0.335f), new Vector3(0.45f, 0.17f, 0.02f), 2f);
+		if (!modelled)
+		{
+			BuildKit.Box(k, new Vector3(0, 0.38f, -0.3f), new Vector3(1.85f, 0.72f, 0.05f), 1.2f);   // the modesty panel, facing the room
+			foreach (int s in new[] { -1, 1 })
+				BuildKit.Box(k, new Vector3(s * 0.62f, 0.38f, 0.02f), new Vector3(0.55f, 0.72f, 0.7f), 1.2f);   // drawer pedestals
+			k.Color = new Color(0.25f, 0.2f, 0.14f);
+			foreach (int s in new[] { -1, 1 })
+				for (int d = 0; d < 3; d++)
+					BuildKit.Box(k, new Vector3(s * 0.62f, 0.15f + d * 0.22f, -0.335f), new Vector3(0.45f, 0.17f, 0.02f), 2f);
+		}
 		// a blotter, a brass bell, a logbook
 		k.Mat(StationTextures.Flat("st_blotter", new Color(0.18f, 0.24f, 0.18f), 0.9f, 0.1f));
 		k.Color = Colors.White;

@@ -51,6 +51,8 @@ public partial class GameFlow : Node
 		// Deferred: every stateful system restores itself deferred from its own _Ready first
 		// (they sit earlier in the tree), then the player is placed into that restored world.
 		Callable.From(Begin).CallDeferred();
+		// every shader the level will draw, built while the screen's still black (no first-sight hitches)
+		AddChild(new ShaderWarmup { Name = "ShaderWarmup" });
 		if (GameSettings.Instance.Trailer) AddChild(new TrailerDirector());
 		else if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
 		else if (GameSettings.Instance.AutoTest) AddChild(new StoryTest());
@@ -104,6 +106,7 @@ public partial class GameFlow : Node
 		}
 		_ = Cutscene.Run(this, async ct =>
 		{
+			await ShaderWarmup.WaitReady(this, ct);
 			Cutscene.Unlock(_player, input: true);
 			Started = true;
 			await _fader.Fade(0f, quick ? 0.2f : 1.2f, ct);
@@ -139,6 +142,7 @@ public partial class GameFlow : Node
 		try
 		{
 			await Cutscene.Wait(this, quick ? 0.2f : WakeBlackSeconds, ct);
+			await ShaderWarmup.WaitReady(this, ct);
 			if (!quick)
 			{
 				await _fader.Fade(0.55f, 1.4f, ct);

@@ -108,6 +108,10 @@ public partial class Lake : Node3D
 		float dt = (float)delta;
 		// the storm's swell runs a little quicker than the sunrise ripple
 		_waves.Time += dt * (1f + 0.08f * _waves.Intensity);
+		// (nothing to ride the waves for from across the world: the lake's dressing was a millisecond of every frame
+		// underground and in the winter woods)
+		var cam = GetViewport()?.GetCamera3D();
+		if (cam != null && cam.GlobalPosition.DistanceSquaredTo(GlobalPosition) > 700f * 700f) { GateEmitters(); return; }
 		LakeShape.Apply(_waves, WaterMaterial);
 		Dressing?.RideWaves(_waves);
 		GateEmitters();

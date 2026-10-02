@@ -34,8 +34,12 @@ public class MeshKit
 	/// <summary>Transform applied to everything added.</summary>
 	public Transform3D Xf = Transform3D.Identity;
 
+	/// <summary>The material being drawn with (null before the first <see cref="Mat"/>).</summary>
+	public Material CurrentMaterial { get; private set; }
+
 	public MeshKit Mat(Material m)
 	{
+		CurrentMaterial = m;
 		if (!_surfs.TryGetValue(m, out _cur))
 		{
 			_cur = new Surf();
@@ -472,12 +476,36 @@ public class MeshKit
 		return mesh;
 	}
 
-	/// <summary>Commit into a new MeshInstance3D added under parent.</summary>
+	// ------------------------------------------------------------------ occluders
+
+	private List<Vector3> _occV;
+	private List<int> _occI;
+
+	/// <summary>A solid, opaque panel (a wall's span) that hides what's behind it: committed with the mesh as an
+	/// occluder (occlusion culling, the optimization pass 2026-10-02: walls hid rooms from the eye, not from the
+	/// renderer). Four corners in order, in the kit's current space.</summary>
+	public void Occlude(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+	{
+		_occV ??= new List<Vector3>();
+		_occI ??= new List<int>();
+		int o = _occV.Count;
+		_occV.Add(Xf * a); _occV.Add(Xf * b); _occV.Add(Xf * c); _occV.Add(Xf * d);
+		_occI.AddRange(new[] { o, o + 1, o + 2, o, o + 2, o + 3 });
+	}
+
+	/// <summary>Commit into a new MeshInstance3D added under parent (and its occluders beside it, if it has any).</summary>
 	public MeshInstance3D CommitTo(Node parent, string name = "Mesh", bool castShadows = true)
 	{
 		var mi = new MeshInstance3D { Name = name, Mesh = Commit() };
 		mi.CastShadow = castShadows ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off;
 		parent.AddChild(mi);
+		if (_occV is { Count: > 0 })
+		{
+			var occ = new ArrayOccluder3D();
+			occ.SetArrays(_occV.ToArray(), _occI.ToArray());
+			parent.AddChild(new OccluderInstance3D { Name = name + "Occluder", Occluder = occ });
+			_occV.Clear(); _occI.Clear();
+		}
 		return mi;
 	}
 }

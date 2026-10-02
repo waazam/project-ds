@@ -141,6 +141,10 @@ public partial class StoryManager : Node
 		public const string ChurchChalicePlaced = "church_chalice_placed";
 		/// <summary>Act 22: the ski lodge's front door tried (locked): the compass moves round to the back door.</summary>
 		public const string LodgeFrontTried = "lodge_front_tried";
+		/// <summary>Act 22: halfway down the plowed road. A save within Act 22's checkpoint (the checkpoints are
+		/// compared by order everywhere, so a new one can't go between 22 and 23): Continue puts them back here, on the
+		/// road, rather than at the church door.</summary>
+		public const string Act22Midway = "act22_midway";
 		/// <summary>Act 22: the lodge's iced-in back door forced open (the act's end).</summary>
 		public const string LodgeBackDoorOpen = "lodge_back_door_open";
 	}
