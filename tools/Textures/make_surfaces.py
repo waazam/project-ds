@@ -46,6 +46,9 @@ SURFACES = {
     "vault_plaster": ("plaster_grey_04", "diff", 0.8, 0.4),
     "oak": ("wood_table_001", "diff", 0.85, 0.5),
     "old_planks": ("brown_planks_07", "diff", 0.85, 0.7),
+    # the woods (the fidelity pass, 2026-10-02): the trunks' bark, deep-furrowed, and the forest floor near the feet
+    "bark": ("bark_brown_02", "diff", 0.9, 0.9),
+    "forest_floor": ("brown_mud_leaves_01", "diff", 0.85, 0.7),
 }
 
 

@@ -28,6 +28,13 @@ public partial class SkiLodge
 	public static readonly Vector3 Hole201 = new(CorrX0, UpperY, 1.95f);
 
 	private Node3D _envFlap, _envLetter;
+
+	/// <summary>Inside room 201 or its bathroom (the cleanest room in the lodge: no stain is laid in it).</summary>
+	public bool InRoom201(Vector3 world)
+	{
+		Vector3 l = ToLocal(world);
+		return l.X >= CorrX0 - 0.3f && l.X <= RoomSplitX + 0.3f && l.Z > CorrHalf - 0.1f && l.Y > UpperY - 0.6f;
+	}
 	private bool _letterOpen;
 
 	private void BuildRoom201()

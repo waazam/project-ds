@@ -494,7 +494,18 @@ public static class ProcTextures
 		m.SetShaderParameter("albedo_tex", tex);
 		return m;
 	});
-	public static ShaderMaterial TreeBarkMat => TreeSolid("tree_bark", Bark());
+	/// <summary>The trunks' bark (the fidelity pass, 2026-10-02): Poly Haven's furrowed brown bark (bark_brown_02) (tools/Textures/make_surfaces.py, 256 px,
+	/// its contrast pulled in) and its relief as a normal map, in place of the 32 px drawn bark.</summary>
+	public static ShaderMaterial TreeBarkMat => (ShaderMaterial)Cached("tree_bark_photo", () =>
+	{
+		var m = (ShaderMaterial)TreeSolid("tree_bark", Bark()).Duplicate();
+		m.SetShaderParameter("albedo_tex", GD.Load<Texture2D>("res://assets/textures/surfaces/bark_albedo.png"));
+		m.SetShaderParameter("normal_tex", GD.Load<Texture2D>("res://assets/textures/surfaces/bark_normal.png"));
+		m.SetShaderParameter("use_normal", true);
+		m.SetShaderParameter("uv_scale", new Vector2(1.5f, 1.2f));
+		m.SetShaderParameter("tint", new Color(1.05f, 1.0f, 0.95f));
+		return m;
+	});
 	public static ShaderMaterial TreeEndGrainMat => TreeSolid("tree_endgrain", EndGrain());
 	public static ShaderMaterial TreeLeafMat => TreeSolid("tree_leaves", Leaves());
 	public static StandardMaterial3D NeedleMat => Std("needles", Needles(), vertexColor: true);

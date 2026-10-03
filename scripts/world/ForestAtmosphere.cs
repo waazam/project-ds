@@ -310,6 +310,15 @@ public partial class ForestAtmosphere : Node
 			_env.SsaoHorizon = 0.06f;
 			_env.SsaoSharpness = 0.98f;
 			_env.SsaoLightAffect = 0.15f;
+			// light in the fog (ApplyVolumetric sets its density by place): lit only by lights, never by the sky or
+			// the ambient (that would grey the whole view), reaching 48 m
+			_env.VolumetricFogEmission = Colors.Black;
+			_env.VolumetricFogAnisotropy = 0.25f;
+			_env.VolumetricFogLength = 48f;
+			_env.VolumetricFogDetailSpread = 2f;
+			_env.VolumetricFogGIInject = 0f;
+			_env.VolumetricFogAmbientInject = 0f;
+			_env.VolumetricFogSkyAffect = 0f;
 			_ambientBaseColor = _env.AmbientLightColor;
 			_bgEnergyBase = _env.BackgroundEnergyMultiplier;
 			_exposureBase = _env.TonemapExposure;
@@ -560,6 +569,32 @@ public partial class ForestAtmosphere : Node
 		_shafts.LightDir = -_sun.GlobalBasis.Z;
 	}
 
+	[ExportGroup("Light in the fog")]
+	/// <summary>Volumetric fog's density by place (the fidelity pass, 2026-10-02): thin, so only what's lit shows in it
+	/// (the lantern's beam, the lamps' haloes, the sun's shafts between the trunks). Kept low: never a glare.</summary>
+	[Export] public float VolumetricOpen = 0.011f;
+	[Export] public float VolumetricUnderground = 0.022f;
+	[Export] public float VolumetricInterior = 0.014f;
+	[Export] public float VolumetricWinter = 0.009f;
+	/// <summary>How much the sun lights the fog (the rest of its light stays on the ground).</summary>
+	[Export] public float SunInFog = 0.22f;
+
+	/// <summary>The volumetric fog, by place, its colour from the scene's fog (a pale grey of its hue: it only shows where
+	/// light passes through it).</summary>
+	private void ApplyVolumetric(Color fog, float under, float inside, float lodge, float winter, float storm)
+	{
+		bool on = ProjectDS.Systems.GameSettings.Instance?.FogLighting ?? true;
+		if (_env.VolumetricFogEnabled != on) _env.VolumetricFogEnabled = on;
+		if (!on) return;
+		float d = Mathf.Lerp(VolumetricOpen, VolumetricWinter, winter);
+		d = Mathf.Lerp(d, VolumetricInterior, Mathf.Max(inside, lodge));
+		d = Mathf.Lerp(d, VolumetricUnderground, under);
+		_env.VolumetricFogDensity = d * (1f + 0.4f * storm);
+		Color hue = Lum(fog) > 0.001f ? fog * (0.6f / Mathf.Max(Lum(fog), 0.001f)) : new Color(0.6f, 0.6f, 0.6f);
+		_env.VolumetricFogAlbedo = new Color(0.6f, 0.6f, 0.6f).Lerp(hue.Clamp(), 0.35f);
+		if (_sun != null) _sun.LightVolumetricFogEnergy = SunInFog;
+	}
+
 	/// <summary>Storm, wetness, ambient floor and lightning, layered over the base every frame.</summary>
 	private void ApplyLayers()
 	{
@@ -680,6 +715,7 @@ public partial class ForestAtmosphere : Node
 			_env.FogMode = _levelFogMode;
 			_env.FogDepthBegin = _levelDepthBegin; _env.FogDepthEnd = _levelDepthEnd; _env.FogDepthCurve = _levelDepthCurve;
 		}
+		ApplyVolumetric(fog, under, inside, lodge, Mathf.Max(winter, dusk), storm);
 		_env.AmbientLightColor = ambColor;
 		_env.AmbientLightEnergy = ambient;
 		_env.TonemapExposure = _exposureBase + OpenExposureBoost * _open;

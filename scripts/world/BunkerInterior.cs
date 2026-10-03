@@ -90,6 +90,9 @@ public partial class BunkerInterior : Node3D
 		Flow.Setup(this, Hallway, VineDoor, Crt, Rooms);
 		AddChild(Flow);
 		Flow.Restore();
+		// its stains, its rot and its old blood (the fidelity pass): the hall and the CRT room (the looping rooms change)
+		DecalDresser.Dress(Hallway, DecalDresser.Theme.Bunker, 801);
+		DecalDresser.Dress(Crt, DecalDresser.Theme.Bunker, 802);
 		GD.Print($"[bunker] interior built in {watch.ElapsedMilliseconds} ms");
 	}
 

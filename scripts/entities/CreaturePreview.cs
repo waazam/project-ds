@@ -49,6 +49,8 @@ public partial class CreaturePreview : Node3D
 	{
 		await Frames(10);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lodge") >= 0) { await LodgeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--prints") >= 0) { await PrintShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
@@ -275,6 +277,139 @@ public partial class CreaturePreview : Node3D
 		AddChild(new OmniLight3D { LightColor = new Color(1f, 0.7f, 0.4f), LightEnergy = 1.6f, OmniRange = 9f, Position = new Vector3(0.6f, 1.6f, 1.2f) });
 		await Seconds(0.5);
 		await Shot("prints_trail", new Vector3(0.6f, 1.65f, 1.6f), new Vector3(0.6f, 0f, -2.5f));
+	}
+
+	/// <summary>The remodelled stalker (2026-10-02): its clips, its grip on a trunk, the edge light up close, the
+	/// eyeshine, against a dim grey so its black shape reads.</summary>
+	private async Task StalkerShots()
+	{
+		env.BackgroundColor = new Color(0.16f, 0.17f, 0.18f);
+		env.AmbientLightEnergy = 0.4f;
+		var ground = new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(30, 30) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.24f, 0.22f) } };
+		AddChild(ground);
+		var skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/stalker_skin.gdshader") };
+		skin.SetShaderParameter("albedo", new Color(0.026f, 0.028f, 0.034f));
+		skin.SetShaderParameter("face_tint", new Color(0.21f, 0.215f, 0.22f));
+		var b = new StalkerBody { Name = "Stalker", Size = 1.1f, Skin = skin };
+		AddChild(b);
+		await Frames(3);
+		GD.Print($"[creature-preview] stalker rigged {b.Rigged} triangles {b.TriangleCount} clip {b.Clip}");
+		var skel = b.FindChildren("*", "Skeleton3D", true, false)[0] as Skeleton3D;
+		// the bones' length runs along their +Y? (the rags and the reach rely on it)
+		for (int i = 0; i < skel.GetBoneCount(); i++)
+		{
+			string n = skel.GetBoneName(i);
+			if (n is not ("upper_R" or "shin_L" or "rag3_0" or "neck")) continue;
+			int child = -1;
+			foreach (int c in skel.GetBoneChildren(i)) { child = c; break; }
+			if (child < 0) continue;
+			var g = skel.GetBoneGlobalRest(i);
+			Vector3 to = (skel.GetBoneGlobalRest(child).Origin - g.Origin).Normalized();
+			GD.Print($"[creature-preview] bone {n}: +Y . to-child = {g.Basis.Y.Normalized().Dot(to):0.000}");
+		}
+		GD.Print($"[creature-preview] eyes at {b.EyesWorld}");
+		await Seconds(1.0);
+		await Shot("stalker_idle_front", new Vector3(0, 1.6f, 4.2f), new Vector3(0, 1.3f, 0));
+		await Shot("stalker_idle_side", new Vector3(4.2f, 1.6f, 0.5f), new Vector3(0, 1.3f, 0));
+		await Shot("stalker_face_close", new Vector3(0.15f, 2.05f, 1.5f), b.EyesWorld);
+		await Shot("stalker_far", new Vector3(1, 1.6f, 12f), new Vector3(0, 1.3f, 0));
+		// the lantern's answer: a light at the camera, and the eyeshine set as the game would
+		skin.SetShaderParameter("eyeshine", 1.8f);
+		await Shot("stalker_eyeshine", new Vector3(0, 1.8f, 6f), new Vector3(0, 1.7f, 0));
+		skin.SetShaderParameter("eyeshine", 0f);
+		// peeking round a trunk with a hand on its edge
+		var trunk = new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.35f, BottomRadius = 0.42f, Height = 6f }, Position = new Vector3(-0.25f, 3f, 0.95f),
+			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 0.24f, 0.2f) } };
+		AddChild(trunk);
+		Vector3 side = Vector3.Right;
+		Vector3 grip = new Vector3(-0.25f + 0.36f + 0.035f, 1.85f, 0.95f);
+		b.Peek(side, grip);
+		await Seconds(0.6);
+		await Shot("stalker_peek_front", new Vector3(-0.6f, 1.7f, 6.5f), new Vector3(0, 1.6f, 0.5f));
+		await Shot("stalker_peek_close", new Vector3(0.3f, 1.9f, 3.0f), grip);
+		GD.Print($"[creature-preview] grip hand {b.GripHandWorld} target {grip} off {b.GripHandWorld.DistanceTo(grip):0.000}");
+		b.Duck();
+		await Seconds(0.25);
+		await Shot("stalker_duck", new Vector3(-0.6f, 1.7f, 6.5f), new Vector3(0, 1.4f, 0.5f));
+		trunk.QueueFree();
+		b.Rest();
+		// walking
+		float ph = 0f;
+		for (int i = 0; i < 70; i++)
+		{
+			ph += Mathf.Pi * 1.6f / 60f;
+			b.WalkPhase = ph;
+			b.Position += new Vector3(0, 0, 1) * b.StepLength * 1.6f / 60f;
+			await Frames(1);
+		}
+		await Shot("stalker_walk_side", b.Position + new Vector3(4.2f, 0.4f, 0), b.Position + new Vector3(0, 1.1f, 0));
+		await Shot("stalker_walk_front", b.Position + new Vector3(0.5f, 1.6f, 4f), b.Position + new Vector3(0, 1.2f, 0));
+		b.WalkPhase = -1f;
+		b.Play("shove", 0.1f);
+		await Seconds(0.3);
+		await Shot("stalker_shove", b.Position + new Vector3(2.5f, 1.5f, 2.5f), b.Position + new Vector3(0, 1.4f, 0.3f));
+		await Seconds(1.2);
+		b.Snap("loom");
+		b.GlowEyes(new Color(1f, 0.16f, 0.05f), 8f);
+		env.AmbientLightEnergy = 0.05f;
+		await Seconds(0.3);
+		await Shot("stalker_loom_dark", b.Position + new Vector3(0.1f, 1.7f, 1.8f), b.EyesWorld);
+		env.AmbientLightEnergy = 0.4f;
+		b.LookTarget = b.Position + new Vector3(0, 6f, 3f);
+		b.Play("stare", 0.3f);
+		await Seconds(2.0);
+		await Shot("stalker_stare_up", b.Position + new Vector3(2.5f, 1.2f, 2.5f), b.Position + new Vector3(0, 1.6f, 0));
+	}
+
+	/// <summary>The lantern's cage on the walls of a dark room, and its beam in the fog (the fidelity pass).</summary>
+	private async Task LanternShots()
+	{
+		foreach (var n in GetChildren()) if (n is DirectionalLight3D d) d.Visible = false;
+		env.AmbientLightEnergy = 0.02f;
+		env.BackgroundColor = Colors.Black;
+		var wall = new StandardMaterial3D { AlbedoColor = new Color(0.5f, 0.48f, 0.45f), Roughness = 0.9f };
+		void Box(Vector3 c, Vector3 size) => AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = size }, Position = c, MaterialOverride = wall });
+		Box(new Vector3(0, -0.05f, 0), new Vector3(8, 0.1f, 8));
+		Box(new Vector3(0, 3.05f, 0), new Vector3(8, 0.1f, 8));
+		Box(new Vector3(0, 1.5f, -4), new Vector3(8, 3, 0.1f));
+		Box(new Vector3(0, 1.5f, 4), new Vector3(8, 3, 0.1f));
+		Box(new Vector3(-4, 1.5f, 0), new Vector3(0.1f, 3, 8));
+		Box(new Vector3(4, 1.5f, 0), new Vector3(0.1f, 3, 8));
+		var rig = new Node3D { Position = new Vector3(0, 1.6f, 1.5f) };
+		AddChild(rig);
+		var glow = new OmniLight3D { LightColor = new Color(1f, 0.72f, 0.42f), OmniRange = 14f, OmniAttenuation = 1.3f, LightEnergy = 1.35f, ShadowEnabled = true,
+			Position = new Vector3(0.18f, -0.25f, -0.25f), LightVolumetricFogEnergy = 0.05f, LightSize = 0.08f, ShadowBlur = 1.5f };
+		rig.AddChild(glow);
+		var cage = ProjectDS.Player.Lantern.BuildCage(glow);
+		_cam.Reparent(rig, false);
+		_cam.Transform = Transform3D.Identity;
+		await Seconds(0.5);
+		async Task Look(string name, float yaw, float pitch)
+		{
+			rig.Rotation = new Vector3(Mathf.DegToRad(pitch), Mathf.DegToRad(yaw), 0);
+			await Frames(6);
+			GetViewport().GetTexture().GetImage().SavePng($"{_out}/{name}.png");
+			GD.Print($"[creature-preview] {name}");
+		}
+		await Look("lantern_ahead", 0, -5);
+		await Look("lantern_left", 50, 0);
+		await Look("lantern_up", 0, 50);
+		await Look("lantern_down", 20, -55);
+		cage.Visible = false;
+		await Look("lantern_plain_left", 50, 0);
+		cage.Visible = true;
+		await Look("lantern_near_wall", 90, 0);
+		rig.Position = new Vector3(-3f, 1.6f, 1.5f);
+		await Look("lantern_near_wall_close", 90, 0);
+		rig.Position = new Vector3(0, 1.6f, 1.5f);
+		env.VolumetricFogEnabled = true;
+		env.VolumetricFogDensity = 0.022f;
+		env.VolumetricFogLength = 48f;
+		env.VolumetricFogAmbientInject = 0f;
+		var beam = new SpotLight3D { LightColor = new Color(1f, 0.72f, 0.42f), SpotRange = 24f, SpotAngle = 35f, SpotAngleAttenuation = 0.6f, LightEnergy = 2.5f, ShadowEnabled = true, LightVolumetricFogEnergy = 0.45f };
+		rig.AddChild(beam);
+		AddChild(new OmniLight3D { Position = new Vector3(-2.5f, 2.6f, -3f), LightColor = new Color(1f, 0.85f, 0.6f), LightEnergy = 1.2f, OmniRange = 5f });
+		await Look("lantern_fog_beam", 10, -3);
 	}
 
 	private async Task WendigoShots()

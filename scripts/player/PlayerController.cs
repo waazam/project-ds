@@ -87,6 +87,7 @@ public partial class PlayerController : CharacterBody3D
 	public override void _Ready()
 	{
 		AddToGroup("player");
+		AddChild(new AirParticles { Name = "Air" });   // dust, spores, breath (the fidelity pass)
 		PlayerInput = GetNode<PlayerInput>(InputPath);
 		CameraRig = GetNode<PlayerCameraRig>(CameraRigPath);
 		Visual = GetNode<Node3D>(VisualPath);

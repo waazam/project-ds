@@ -57,12 +57,14 @@ public partial class ShaderWarmup : Node
 			g.Scale = Vector3.One * 0.0004f;
 			n++;
 		}
-		void Walk(Node node)
+		// (things hidden at the start that will be seen later, the stalker among them: group "warm_up")
+		void Walk(Node node, bool force = false)
 		{
 			if (node == _held) return;
+			force |= node.IsInGroup("warm_up");
 			switch (node)
 			{
-				case MeshInstance3D mi when mi.Mesh != null && mi.IsVisibleInTree():
+				case MeshInstance3D mi when mi.Mesh != null && (mi.IsVisibleInTree() || force):
 				{
 					bool fresh = false;
 					for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
@@ -104,16 +106,28 @@ public partial class ShaderWarmup : Node
 					}
 					break;
 			}
-			foreach (var c in node.GetChildren()) Walk(c);
+			foreach (var c in node.GetChildren()) Walk(c, force);
 		}
 		Walk(root);
+		// the skinned ones drawn as themselves (their skinning set up too), each for those few frames
+		var placed = new List<IWarmUp>();
+		foreach (var w in tree.GetNodesInGroup("warm_up_self"))
+			if (w is IWarmUp wu) { wu.WarmUp(cam, true); placed.Add(wu); n++; }
 		Warmed = n;
 		GD.Print($"[perf] shader warm-up: {n} things drawn once, tiny, before the fade-in");
 		// a few frames before the eyes (the pipelines are built on the first; the shadows' on the next)
 		for (int f = 0; f < 4; f++) await ToSignal(tree, SceneTree.SignalName.ProcessFrame);
 		_held.QueueFree();
 		_held = null;
+		foreach (var wu in placed) if (wu is Node node && IsInstanceValid(node)) wu.WarmUp(cam, false);
 		Ready = true;
+	}
+
+	/// <summary>Something hidden at the start whose first sight must not stutter: put in front of the camera (unseen,
+	/// e.g. fully dissolved) for the warm-up's frames, then put back.</summary>
+	public interface IWarmUp
+	{
+		void WarmUp(Camera3D cam, bool on);
 	}
 
 	/// <summary>Waits (at most <paramref name="maxSeconds"/>) for the level's warm-up to finish.</summary>

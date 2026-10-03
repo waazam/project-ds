@@ -85,7 +85,7 @@ public partial class StalkerBody : Node3D
 
 	public override void _Ready()
 	{
-		Build();
+		if (!LoadModel()) Build();
 		_idleRng.Randomize();
 		_t = _idleRng.RandfRange(0f, 100f);
 		ApplyPose();
@@ -571,6 +571,7 @@ public partial class StalkerBody : Node3D
 	{
 		get
 		{
+			if (_skel != null) return ModelEyesWorld();
 			if (_head == null) return GlobalPosition + Vector3.Up * 1.9f * Size;
 			Vector3 mid = (HeadPose * new Vector3(0f, 0.008f, 0.092f) - NeckBase) * Size;
 			return _head.ToGlobal(mid);
@@ -584,6 +585,7 @@ public partial class StalkerBody : Node3D
 	/// </summary>
 	public void GlowEyes(Color colour, float energy = 6f)
 	{
+		if (_skel != null) { GlowModelEyes(colour, energy); return; }
 		if (_head == null || _head.GetNodeOrNull("EyeGlow") != null) return;
 		var pose = new Transform3D(
 			new Basis(Vector3.Forward, Mathf.DegToRad(16f)) * new Basis(Vector3.Right, Mathf.DegToRad(10f)),
@@ -642,7 +644,8 @@ public partial class StalkerBody : Node3D
 		}
 		else _twitch = _twitch.Lerp(Vector3.Zero, 1f - Mathf.Exp(-1.3f * dt));
 
-		ApplyPose();
+		if (_skel != null) ModelProcess(dt);
+		else ApplyPose();
 	}
 
 	private void ApplyPose()

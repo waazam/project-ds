@@ -116,8 +116,12 @@ public partial class Lantern : Node3D
 			ShadowEnabled = true,
 			Position = new Vector3(0.18f, -0.25f, -0.25f),   // held low and to the right
 			Visible = false,
+			// barely in the fog: at the eye, its glow in the fog would be a haze over everything (no glare)
+			LightVolumetricFogEnergy = 0.05f,
+			LightSize = 0.08f, ShadowBlur = 1.5f,   // the flame's size: its cage's shadows soft-edged
 		};
 		AddChild(_glow);
+		BuildCage(_glow);
 		_beam = new SpotLight3D
 		{
 			LightColor = LightColor,
@@ -127,8 +131,41 @@ public partial class Lantern : Node3D
 			LightEnergy = 0f,
 			ShadowEnabled = true,
 			Visible = false,
+			LightVolumetricFogEnergy = 0.45f,   // the gathered beam shows in the fog as a shaft
 		};
 		AddChild(_beam);
+	}
+
+	/// <summary>The lantern's cage round its flame (the fidelity pass, 2026-10-02): four thin struts, a wire ring above
+	/// and below the glass, the hood over it and the base under it, drawn only into the shadows (never seen
+	/// themselves). The glow casts them round the walls as soft dark bands (its flame has a size, so their edges are
+	/// soft), turning with the lantern. The struts stand either side of the view, so straight ahead stays clear glass.</summary>
+	public static Node3D BuildCage(Node3D light)
+	{
+		var cage = new Node3D { Name = "Cage" };
+		light.AddChild(cage);
+		var k = new World.MeshKit();
+		k.Mat(new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, AlbedoColor = Colors.Black });
+		const float R = 0.07f;
+		foreach (float deg in new[] { 40f, -40f, 140f, -140f })
+		{
+			float a = Mathf.DegToRad(deg);
+			Vector3 at = new(-Mathf.Sin(a) * R, 0, -Mathf.Cos(a) * R);
+			k.Cylinder(at + Vector3.Down * 0.075f, at + Vector3.Up * 0.075f, 0.0022f, 0.0022f, 5, false);
+		}
+		// the wire rings just inside the hood and the base
+		foreach (float y in new[] { 0.062f, -0.066f })
+			for (int i = 0; i < 16; i++)
+			{
+				float a0 = Mathf.Tau * i / 16f, a1 = Mathf.Tau * (i + 1) / 16f;
+				k.Cylinder(new Vector3(Mathf.Cos(a0) * R, y, Mathf.Sin(a0) * R), new Vector3(Mathf.Cos(a1) * R, y, Mathf.Sin(a1) * R), 0.002f, 0.002f, 4, false);
+			}
+		// the hood (a shallow cone) and the base (a disc a little under the flame)
+		k.Cylinder(new Vector3(0, 0.075f, 0), new Vector3(0, 0.11f, 0), R * 1.05f, 0.02f, 12, true);
+		k.Cylinder(new Vector3(0, -0.085f, 0), new Vector3(0, -0.075f, 0), R * 0.9f, R * 0.9f, 12, true);
+		var mi = new MeshInstance3D { Name = "Shadow", Mesh = k.Commit(), CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly };
+		cage.AddChild(mi);
+		return cage;
 	}
 
 	/// <summary>The blacklight's beam, for the ink's shader (globals) and for code (<see cref="Uv"/>).</summary>

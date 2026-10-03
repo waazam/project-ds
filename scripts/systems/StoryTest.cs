@@ -542,6 +542,13 @@ public partial class StoryTest : Node
 		Check("the compass shows", FirstOf<Compass>() is { ShowingCompass: true });
 		CheckObjective("the compass points at the cabin", "cabin");
 		Screenshot("camp");
+		{
+			var env = GetViewport().World3D?.Environment ?? FirstOf<WorldEnvironment>()?.Environment;
+			Check("light in the fog (volumetric fog) in the Hollow", env is { VolumetricFogEnabled: true } && env.VolumetricFogDensity > 0.003f, $"on {env?.VolumetricFogEnabled}, density {env?.VolumetricFogDensity:0.000}");
+			Check("the lantern's cage throws its shadows", _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern")?.FindChild("Cage", true, false) != null);
+			var air = _player.GetNodeOrNull<Node3D>("Air");
+			Check("spores drift in the woods' air", air?.GetNodeOrNull<GpuParticles3D>("Spores") is { Emitting: true }, $"{air?.GetNodeOrNull<GpuParticles3D>("Spores")?.Emitting}");
+		}
 		// Out of the safe zone along the path (walked, not jumped: the key and the giant are further on). The rain
 		// has been falling since the wake; past the camp the forest goes dead quiet under it.
 		await WalkTrailFor(30f, ct);
@@ -576,6 +583,8 @@ public partial class StoryTest : Node
 			Check("it stalks the Hollow path walk (intro pacing)", st.Intro);
 			await WaitUntil(() => st.PeekCount >= 1, 16, ct);
 			Check("it appears on the storm walk", st.PeekCount >= 1, $"peeks {st.PeekCount}");
+			Check("it is the remodel: a skinned figure on a skeleton, peeking out on its clip", st.Body is { Rigged: true } b0 && b0.Clip.StartsWith("peek") || st.Body?.Clip.StartsWith("duck") == true,
+				$"rigged {st.Body?.Rigged}, clip '{st.Body?.Clip}', {st.Body?.TriangleCount} triangles");
 			// Walk on toward the cabin so the spells and the relocations have something to follow.
 			await WalkAlongTrail(cabin.GlobalPosition, 40f, ct, stopWhen: () => st.ShadowSpells >= 1 && st.DirectionsUsed >= 3 && st.ShadowStepsHeard >= 6);
 			Check("its steps follow", st.ShadowSpells >= 1, $"spells {st.ShadowSpells}");
@@ -586,6 +595,9 @@ public partial class StoryTest : Node
 				$"heard {st.ShadowStepsHeard}, answered {st.ShadowStepsAnswered}");
 			Check("it comes from at least three directions", st.DirectionsUsed >= 3, $"{st.DirectionsUsed} sectors, peeks {st.PeekCount}");
 			Check("no snarl ever", st.SnarlCount == 0);
+			Check("its long fingers go round the bark at a trunk's edge", st.Body is { GripCount: >= 1 } bg && bg.LastGripError is >= 0f and < 0.06f,
+				$"{st.Body?.GripCount} grips of {st.PeekCount} peeks, the hand {st.Body?.LastGripError:0.000} m off");
+			Check("its rags hang and swing", st.Body is { RagSwingDegrees: > 2f }, $"{st.Body?.RagSwingDegrees:0.0} degrees");
 			// Less rattle than steps (Dan, 2026-09-22): the spells of steps are most of what is heard on the walk.
 			Check("rattle comes in episodes, not all the time", st.RattleAudibleFraction < 0.35f, $"audible {st.RattleAudibleFraction:0.00} of the walk, episodes {st.RattleEpisodes}, bursts {st.RattleBursts}, spells {st.ShadowSpells}");
 		}
@@ -1159,6 +1171,11 @@ public partial class StoryTest : Node
 		}
 		await WaitUntil(() => bunker.IsOpen, 5, ct);
 		Check("the notes' code opens the bunker door", bunker.IsOpen);
+		{
+			var dressed = AllOf<DecalDresser>().Where(d => d.GetParent()?.GetParent() is BunkerInterior).ToList();
+			Check("the bunker's hall and CRT room are stained (mould, old blood, standing water)", dressed.Count == 2 && dressed.All(d => d.Finished) && dressed.Sum(d => d.Placed) >= 8,
+				string.Join(", ", dressed.Select(d => $"{d.GetParent().Name} {d.Placed}{(d.Finished ? "" : " (laying)")}")));
+		}
 		Check("the code is saved (the door stays open on Continue)", StoryManager.Instance.HasFlag(StoryManager.Flag.BunkerUnlocked));
 		Check("the dial is put down and control is back", CodeLockOverlay.Instance is not { IsOpen: true } && !_input.Modal);
 		Screenshot("bunker_open");
@@ -1298,6 +1315,7 @@ public partial class StoryTest : Node
 		if (act11.Pursuer is { } chaser)
 		{
 			Check("it kept to their trail all the way to the stairs, never far behind", chaser.DistanceToPlayer < 30f, $"{chaser.DistanceToPlayer:0.0} m behind");
+			Check("it walks on its legs (the remodel's walk)", chaser.Body is { Rigged: true } && (chaser.Body.Clip == "walk" || chaser.Body.Clip == "idle" || chaser.Body.Clip == "shove" || chaser.Body.Clip == "stare"), $"clip '{chaser.Body?.Clip}', shoves {chaser.Shoves}");
 			var facing = _player.CameraRig.Yaw;
 			await Aim(chaser.GlobalPosition + Vector3.Up * 1.6f, ct);
 			await Frames(3, ct);
@@ -1328,6 +1346,8 @@ public partial class StoryTest : Node
 		{
 			await WaitUntil(() => stuck.StuckAtFoot, 20, ct);
 			Check("it can't climb: stuck at the foot of the stairs, staring up after them", stuck.StuckAtFoot, $"{stuck.GlobalPosition.DistanceTo(stuck.FootWorld):0.0} m from the foot, {stuck.Shoves} shoves");
+			await WaitUntil(() => stuck.Body?.Clip == "stare", 4, ct);
+			Check("drawn up at the foot, staring", stuck.Body?.Clip == "stare", $"clip '{stuck.Body?.Clip}'");
 			await Aim(stuck.GlobalPosition + Vector3.Up * 1.8f, ct);
 			Screenshot("it_stares_up_from_the_foot");
 		}
@@ -1497,6 +1517,14 @@ public partial class StoryTest : Node
 			Check("inside the lobby", station.InLobby(_player.GlobalPosition), $"{_player.GlobalPosition}");
 			Check("the lobby starts kept (decay stage 0)", station.Stage == 0, $"stage {station.Stage}");
 			Screenshot("station_lobby_kept");
+			{
+				await WaitUntil(() => AllOf<DecalDresser>().Any(d => d.GetParent() == station && d.Finished), 20, ct);
+				var dd = AllOf<DecalDresser>().FirstOrDefault(d => d.GetParent() == station);
+				var lobbyDecals = dd?.GetNodeOrNull<Node3D>("Lobby");
+				Check("the station's walls and floors are stained", dd is { Finished: true, Placed: >= 10 }, $"{dd?.Placed} laid");
+				Check("not the lobby's yet: it's kept (stage 0)", lobbyDecals == null || !lobbyDecals.Visible, $"lobby stains {lobbyDecals?.GetChildCount()}, shown {lobbyDecals?.Visible}");
+				Check("dust hangs in the air underground (seen where the light falls)", _player.GetNodeOrNull<Node3D>("Air")?.GetNodeOrNull<GpuParticles3D>("Dust") is { Emitting: true });
+			}
 			// a look round the lobby's doorways: frames, the shut front door, no wall fighting another
 			await Inside(station.ToGlobal(new Vector3(-1.5f, 0, 1.5f)), station.ToGlobal(new Vector3(StationInterior.HalfWidth, 1.3f, 0)), ct);
 			Screenshot("tour_room1_door");

@@ -95,6 +95,7 @@ public partial class ForestScatter : Node3D
 		_meshes["branch"] = BranchMesh();
 		_meshes["fern"] = FernMesh();
 		_meshes["grass"] = GrassMesh();
+		_meshes["litter"] = LitterMesh();
 	}
 
 	/// <summary>
@@ -131,7 +132,8 @@ public partial class ForestScatter : Node3D
 			float y = topY * fy;
 			rings.Add((Axis(y), trunkR * Mathf.Lerp(1.02f, 0.08f, y / topY), new Color(0.62f, 0.6f, 0.58f).Lerp(new Color(0.8f, 0.78f, 0.74f), fy)));
 		}
-		TrunkLoft(k, rings, 8, 1f);
+		TrunkLoft(k, rings, 12, 1f);
+		Roots(k, trunkR * 1.42f, seed, rings[1].col);
 		// dead stubs on the bare trunk
 		int stubs = Mathf.RoundToInt(crownStart * height * 0.55f);
 		k.Color = new Color(0.5f, 0.48f, 0.46f);
@@ -218,6 +220,34 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
+	/// <summary>The root flare (the fidelity pass, 2026-10-02): four to six roots spreading from the trunk's foot, each
+	/// a tapering tube that rises out of the trunk a little above the ground and dives back into it a metre or so out,
+	/// so the trees stand gripping the slope instead of planted in it like posts.</summary>
+	internal static void Roots(MeshKit k, float r, int seed, Color col)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 6007 + 17) };
+		int n = rng.RandiRange(4, 6);
+		float a0 = rng.RandfRange(0f, Mathf.Tau);
+		Color dark = col * 0.85f;
+		dark.A = 1f;
+		for (int i = 0; i < n; i++)
+		{
+			float a = a0 + Mathf.Tau * i / n + rng.RandfRange(-0.3f, 0.3f);
+			Vector3 d = new(Mathf.Cos(a), 0, Mathf.Sin(a));
+			Vector3 side = new(-d.Z, 0, d.X);
+			float reach = r * rng.RandfRange(2.2f, 3.4f) + 0.3f;
+			float bend = rng.RandfRange(-0.25f, 0.25f);
+			float rr = r * rng.RandfRange(0.32f, 0.45f);
+			TrunkLoft(k, new System.Collections.Generic.List<(Vector3, float, Color)>
+			{
+				(d * r * 0.55f + Vector3.Up * 0.42f, rr * 0.9f, col),
+				(d * r * 1.05f + Vector3.Up * 0.16f, rr, col),
+				(d * reach * 0.55f + side * bend * reach * 0.3f + Vector3.Up * 0.02f, rr * 0.65f, dark),
+				(d * reach + side * bend * reach * 0.6f + Vector3.Down * 0.14f, rr * 0.25f, dark),
+			}, 6, 1f);
+		}
+	}
+
 	/// <summary>A trunk as one smooth tube through <paramref name="rings"/> (bottom to top): per-vertex
 	/// normals round and along it, bark UVs running on unbroken, vertex colours blended ring to ring.</summary>
 	internal static void TrunkLoft(MeshKit k, System.Collections.Generic.List<(Vector3 c, float r, Color col)> rings, int sides, float uvScale)
@@ -271,7 +301,8 @@ public partial class ForestScatter : Node3D
 		{
 			(new Vector3(0, -0.4f, 0), 0.34f, k.Color), (new Vector3(0, 0.0f, 0), 0.29f, k.Color), (new Vector3(0, 0.35f, 0), 0.245f, k.Color),
 			(top * 0.35f + new Vector3(0, 0.1f, 0), 0.2f, k.Color), (top, 0.13f, k.Color),
-		}, 7, 1f);
+		}, 10, 1f);
+		Roots(k, 0.29f, seed, k.Color);
 		for (int b = 0; b < 3; b++)
 		{
 			float a = rng.RandfRange(0, Mathf.Tau);
@@ -308,7 +339,8 @@ public partial class ForestScatter : Node3D
 			(new Vector3(0, -0.4f, 0), r * 1.5f, new Color(0.7f, 0.7f, 0.7f)), (new Vector3(0, 0.0f, 0), r * 1.3f, new Color(0.72f, 0.72f, 0.72f)),
 			(new Vector3(0, 0.4f, 0), r * 1.1f, new Color(0.72f, 0.72f, 0.72f)), (top * 0.5f, r * 0.7f, new Color(0.8f, 0.8f, 0.78f)),
 			(top, r * 0.25f, new Color(0.9f, 0.9f, 0.88f)),
-		}, 7, 1f);
+		}, 10, 1f);
+		Roots(k, r * 1.3f, seed, new Color(0.7f, 0.7f, 0.7f));
 		k.Color = new Color(0.62f, 0.6f, 0.56f);
 		k.Mat(ProcTextures.TreeEndGrainMat).Cylinder(top, top + new Vector3(0.05f, 0.08f, 0), r * 0.25f, 0.02f, 6, false, 1f);   // broken top
 		k.Mat(ProcTextures.TreeBarkMat);
@@ -397,6 +429,33 @@ public partial class ForestScatter : Node3D
 			k.Quad(mid - side, mid + side, tip + side * 0.3f, tip - side * 0.3f, Vector3.Up,
 				new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0), new Vector2(0, 0));
 		}
+		return k.Commit();
+	}
+
+	/// <summary>A patch of leaf litter and mud (the fidelity pass, 2026-10-02): a flat soft-edged square, a little
+	/// domed so its middle never sinks under a bump, drawn with ground_litter.gdshader.</summary>
+	internal static Mesh LitterMesh()
+	{
+		var k = new MeshKit();
+		k.Mat(ProcTextures.Cached("litter_mat", () =>
+		{
+			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ground_litter.gdshader") };
+			m.SetShaderParameter("albedo_tex", GD.Load<Texture2D>("res://assets/textures/surfaces/forest_floor_albedo.png"));
+			return m;
+		}));
+		const int N = 4;
+		const float S = 1.6f;
+		Vector3 P(int i, int j)
+		{
+			float u = (float)i / N * 2f - 1f, v = (float)j / N * 2f - 1f;
+			return new Vector3(u * S * 0.5f, 0.05f * (1f - 0.5f * (u * u + v * v)), v * S * 0.5f);
+		}
+		k.Color = Colors.White;
+		for (int i = 0; i < N; i++)
+			for (int j = 0; j < N; j++)
+				k.Quad(P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1), Vector3.Up,
+					new Vector2((float)i / N, (float)j / N), new Vector2((float)(i + 1) / N, (float)j / N),
+					new Vector2((float)(i + 1) / N, (float)(j + 1) / N), new Vector2((float)i / N, (float)(j + 1) / N));
 		return k.Commit();
 	}
 
@@ -735,6 +794,9 @@ public partial class ForestScatter : Node3D
 			}
 	}
 
+	/// <summary>The litter's own dice (so adding it moved none of the ferns and the grass).</summary>
+	private readonly RandomNumberGenerator _litterRng = new() { Seed = 7331 };
+
 	private void ScatterFoliage()
 	{
 		Vector2 min = _terrain.MinXZ, max = _terrain.MaxXZ;
@@ -777,6 +839,18 @@ public partial class ForestScatter : Node3D
 						p = (0.12f + 0.55f * band) * (0.3f + 1.1f * clump) * (1f - 0.35f * Deep(sT));
 					}
 				}
+				// leaf litter and mud under the trees (the fidelity pass): patches of their own, wherever the ferns grow
+				if (mesh == "fern" && _litterRng.Randf() < 0.16f + 0.2f * clump)
+				{
+					Vector3 nUp = _terrain.NormalAt(px, pz);
+					if (nUp.Y > 0.8f)
+					{
+						float ls = _litterRng.RandfRange(0.8f, 1.5f);
+						var lb = new Basis(new Quaternion(Vector3.Up, nUp.Normalized())) * Basis.FromEuler(new Vector3(0, _litterRng.RandfRange(0, Mathf.Tau), 0)).Scaled(new Vector3(ls, 1f, ls));
+						float lt = _litterRng.RandfRange(0.7f, 1.0f);
+						Add("litter", FoliageChunk, new Vector3(px, _terrain.HeightAt(px, pz) - 0.012f, pz), lb, new Color(lt, lt * 0.97f, lt * 0.93f));
+					}
+				}
 				if (roll > p) continue;
 				// too steep for plants to look right
 				if (_terrain.NormalAt(px, pz).Y < 0.72f) continue;
@@ -817,7 +891,7 @@ public partial class ForestScatter : Node3D
 		AddChild(root);
 		foreach (var (meshKey, byChunk) in inst)
 		{
-			bool foliage = meshKey is "fern" or "grass";
+			bool foliage = meshKey is "fern" or "grass" or "litter";
 			bool small = foliage || meshKey is "branch" or "stump";
 			float chunk = foliage ? FoliageChunk : TreeChunk;
 			foreach (var (key, list) in byChunk)

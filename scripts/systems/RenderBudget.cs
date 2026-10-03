@@ -162,10 +162,30 @@ public partial class RenderBudget : Node
 		for (int j = 0; j < _areas.Count; j++)
 		{
 			bool on = at == null ? j == 0 : Mathf.Abs(j - i) <= 1;
-			if (on) drawn++;
+			if (on) { drawn++; DressArea(_areas[j], j); }
 			Set(_areas[j], on);
 		}
 		AreasDrawn = drawn;
+	}
+
+	/// <summary>Its stains and rot (DecalDresser), laid the first time it's drawn (the fidelity pass, 2026-10-02).</summary>
+	private static void DressArea(Area a, int index)
+	{
+		if (!a.HasBounds || !IsInstanceValid(a.Root)) return;
+		DecalDresser.Theme? theme = a.Name switch
+		{
+			"station" => DecalDresser.Theme.Station,
+			"stairwell" or "long stair" => DecalDresser.Theme.Stair,
+			"hallway" => DecalDresser.Theme.Hallway,
+			"sewer" => DecalDresser.Theme.Sewer,
+			"library" => DecalDresser.Theme.Library,
+			"church" => DecalDresser.Theme.Church,
+			"lodge" => DecalDresser.Theme.Lodge,
+			_ => null,   // the pit, the round room (its webs), the woods: left as they are
+		};
+		// (room 201 is kept perfect: none in it)
+		System.Func<Vector3, bool> skip = a.Root is SkiLodge lodge ? lodge.InRoom201 : null;
+		if (theme is { } t) DecalDresser.Dress(a.Root, t, 101 + index, a.Bounds, skip);
 	}
 
 	private readonly List<DirectionalLight3D> _suns = new();

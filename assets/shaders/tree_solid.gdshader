@@ -10,6 +10,12 @@ uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_enable
 uniform sampler2D detail_tex : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform float detail_tile = 3.0;
 uniform vec3 tint : source_color = vec3(1.0);
+// The bark's relief (the fidelity pass): a normal map on geometry built without tangents, so its frame is worked out
+// per pixel from the surface's own slopes.
+uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_enable;
+uniform bool use_normal = false;
+uniform float normal_strength = 1.0;
+uniform vec2 uv_scale = vec2(1.0);
 uniform float roughness = 1.0;
 uniform float specular = 0.25;
 uniform bool sway = true;
@@ -22,7 +28,20 @@ void vertex() {
 }
 
 void fragment() {
-	ALBEDO = texture(albedo_tex, UV).rgb * tint * COLOR.rgb * texture(detail_tex, UV * detail_tile).r;
+	vec2 uv = UV * uv_scale;
+	ALBEDO = texture(albedo_tex, uv).rgb * tint * COLOR.rgb * texture(detail_tex, UV * detail_tile).r;
+	if (use_normal) {
+		vec3 dp1 = dFdx(VERTEX), dp2 = dFdy(VERTEX);
+		vec2 du1 = dFdx(uv), du2 = dFdy(uv);
+		vec3 n = normalize(NORMAL);
+		vec3 p2 = cross(dp2, n), p1 = cross(n, dp1);
+		vec3 t = p2 * du1.x + p1 * du2.x;
+		vec3 b = p2 * du1.y + p1 * du2.y;
+		float inv = inversesqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+		vec3 nm = texture(normal_tex, uv).xyz * 2.0 - 1.0;
+		nm.xy *= normal_strength;
+		NORMAL = normalize(t * inv * nm.x - b * inv * nm.y + n * nm.z);
+	}
 	if (winter > 0.001) {
 		// Act 21 on, it is winter: snow on every upward face, a grey hoarfrost over the bark
 		vec3 wn = (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz;

@@ -262,6 +262,7 @@ public static class UiKit
 		AddSlider(box, "Window size", 0, res.Length - 1, cur, v => s.WindowSize = res[Mathf.Clamp(Mathf.RoundToInt(v), 0, res.Length - 1)], 1,
 			v => { var r = res[Mathf.Clamp(Mathf.RoundToInt(v), 0, res.Length - 1)]; return $"{r.X}x{r.Y}"; });
 		AddToggle(box, "CRT filter", s.CrtFilter, on => s.CrtFilter = on);
+		AddToggle(box, "Light in the fog", s.FogLighting, on => s.FogLighting = on);
 		AddSlider(box, "Shadows", 0, 2, s.Shadows, v => s.Shadows = Mathf.RoundToInt(v), 1, v => GameSettings.ShadowNames[Mathf.Clamp(Mathf.RoundToInt(v), 0, 2)]);
 	}
 

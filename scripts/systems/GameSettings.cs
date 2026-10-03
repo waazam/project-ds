@@ -35,6 +35,9 @@ public partial class GameSettings : Node
 	// Display (the owner, from the teaser): a cinematic frame and an old TV's look
 	/// <summary>2.2:1 letterbox bars over the game (not the HUD; they slide away while the camera is raised).</summary>
 	public bool CinemaBars = true;
+	/// <summary>Light in the fog (volumetric fog: the lantern's beam, the lamps' haloes, shafts through the trees).
+	/// The heaviest effect there is; off for a slower machine. `--no-volfog` turns it off for a run.</summary>
+	public bool FogLighting = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-volfog") < 0;
 	/// <summary>The picture's brightness: a gamma over the finished image (1 as designed, 0.7 darker to 1.5 lighter;
 	/// it lifts the dark and the mids, not the whites). For a dark monitor or a bright room.</summary>
 	public float Brightness = 1f;
@@ -196,6 +199,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("accessibility", "reduce_flashing", ReduceFlashing);
 		cfg.SetValue("accessibility", "head_motion", HeadMotion);
 		cfg.SetValue("display", "cinema_bars", CinemaBars);
+		cfg.SetValue("display", "fog_lighting", FogLighting);
 		cfg.SetValue("display", "brightness", Brightness);
 		cfg.SetValue("display", "crt_filter", _crtFilter);
 		cfg.SetValue("display", "shadows", _shadows);
@@ -220,6 +224,7 @@ public partial class GameSettings : Node
 		ReduceFlashing = (bool)cfg.GetValue("accessibility", "reduce_flashing", ReduceFlashing);
 		HeadMotion = (bool)cfg.GetValue("accessibility", "head_motion", HeadMotion);
 		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-volfog") < 0) FogLighting = (bool)cfg.GetValue("display", "fog_lighting", FogLighting);
 		Brightness = Mathf.Clamp((float)cfg.GetValue("display", "brightness", Brightness), BrightnessMin, BrightnessMax);
 		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
 		_shadows = Mathf.Clamp((int)cfg.GetValue("display", "shadows", _shadows), 0, 2);

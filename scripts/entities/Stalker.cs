@@ -36,7 +36,7 @@ namespace ProjectDS.Entities;
 ///   staircase, and it withdraws entirely while the player is indoors (the
 ///   cabin, the bunker), where there are no trees to hide behind.
 /// </summary>
-public partial class Stalker : Node3D
+public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 {
 	public enum State { Dormant, Hidden, Peeking, Vanishing }
 
@@ -153,6 +153,30 @@ public partial class Stalker : Node3D
 
 	private PlayerController _player;
 	private Node3D _body;
+	private Vector3 _warmFrom;
+	private bool _warmVisible;
+
+	/// <summary>The shader warm-up: drawn once, fully dissolved, in front of the camera (its skinning and shader made
+	/// ready, so its first sight never stutters), then put back as it was.</summary>
+	public void WarmUp(Camera3D cam, bool on)
+	{
+		if (on)
+		{
+			_warmFrom = GlobalPosition; _warmVisible = Visible;
+			GlobalPosition = cam.GlobalPosition - cam.GlobalBasis.Z * 4f - Vector3.Up * 1.5f;
+			foreach (var m in _skins) m.SetShaderParameter("visibility", 0.001f);
+			Visible = true;
+		}
+		else
+		{
+			GlobalPosition = _warmFrom;
+			SetVisibility(_visibility);
+			Visible = _warmVisible && _visibility > 0f;
+		}
+	}
+
+	/// <summary>Its body (the remodel: StalkerBody's skeleton and clips).</summary>
+	public StalkerBody Body => _body as StalkerBody;
 	private bool _awake;
 	private readonly List<ShaderMaterial> _skins = new();
 	private readonly RandomNumberGenerator _rng = new();
@@ -211,6 +235,7 @@ public partial class Stalker : Node3D
 	public override void _Ready()
 	{
 		AddToGroup("stalker");
+		AddToGroup("warm_up_self");
 		World.PhotoSubject.Attach(this, "stalker", new Vector3(0, 1.5f, 0), 1.5f, 70f, 12f, true, new Vector3(0, 2.2f, 0));
 		ProjectDS.Player.CameraTool.PhotoTaken += OnPhotoTaken;
 		_body = GetNode<Node3D>("Body");
@@ -480,6 +505,7 @@ public partial class Stalker : Node3D
 	private void StartVanishing()
 	{
 		Current = State.Vanishing;
+		(_body as StalkerBody)?.Duck();   // snatched back behind its trunk as it goes (the remodel's clip)
 		_episodeRequested = true;   // it ducked away from your eyes: a short rattle episode follows
 	}
 
@@ -670,6 +696,8 @@ public partial class Stalker : Node3D
 			_ahead = ahead;
 			_lastSector = ahead ? AheadSector : _trySector;
 			_sectorsUsed.Add(_lastSector);
+			// the remodel: it leans out on that side, and its near hand goes onto the bark at the trunk's edge
+			if (_body is StalkerBody sb && sb.Rigged) sb.Peek(lateral, FindGrip(lateral, sb.Size));
 			Current = State.Peeking;
 			PeekCount++;
 			if (ahead) DistantCount++;
@@ -684,6 +712,25 @@ public partial class Stalker : Node3D
 			return true;
 		}
 		return false;
+	}
+
+	/// <summary>Where on its trunk the near hand goes: the trunk's edge on the side that shows, at the hand's height.
+	/// Rays from beside it toward the player, stepping out along <paramref name="side"/>: the last that still meets
+	/// bark marks the edge. Null if there's no bark there to hold.</summary>
+	private Vector3? FindGrip(Vector3 side, float size)
+	{
+		Vector3 fwd = GlobalBasis.Z; fwd.Y = 0; fwd = fwd.Normalized();
+		side.Y = 0; side = side.Normalized();
+		Vector3 basePos = GlobalPosition + Vector3.Up * 1.72f * size;
+		Vector3? edge = null;
+		for (float x = -0.3f; x <= 0.8f; x += 0.04f)
+		{
+			Vector3 from = basePos + side * x + fwd * 0.05f;
+			var hit = Ray(from, from + fwd * 1.5f);
+			if (hit.Count == 0) { if (edge.HasValue) break; continue; }
+			edge = (Vector3)hit["position"];
+		}
+		return edge.HasValue ? edge.Value + side * 0.035f - fwd * 0.02f : null;
 	}
 
 	/// <summary>One world-layer ray (excluding the player) through the shared query object.</summary>

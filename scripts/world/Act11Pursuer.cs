@@ -115,13 +115,19 @@ public partial class Act11Pursuer : Node3D
 			Vector3 np = GlobalPosition + step;
 			np.Y = Ground(np);
 			GlobalPosition = np;
-			_phase += speed * dt / 1.3f * Mathf.Pi;
+			_phase += speed * dt / (Body.Rigged ? Body.StepLength : 1.3f) * Mathf.Pi;
 			Body.WalkPhase = _phase;
 			Body.WalkAmount = Mathf.Clamp(speed / 2.2f, 0.4f, 1f);
 			_stepT -= speed * dt;
 			if (_stepT <= 0f) { _stepT = 1.3f; Sfx("step_dirt", 4, -14f); }
 		}
-		else Body.WalkPhase = -1f;
+		else
+		{
+			Body.WalkPhase = -1f;
+			// at the foot of the flight, drawn up and staring after them
+			if (climbing && StuckAtFoot && Body.Clip != "stare") Body.Play("stare", 0.5f);
+			else if (!climbing && Body.Clip == "stare") Body.Rest();
+		}
 		// face where it's going, or them when it has stopped
 		Vector3 face = climbing && StuckAtFoot || DistanceToPlayer < 3f ? flat : to;
 		if (face.LengthSquared() > 0.001f) Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, Mathf.Atan2(face.X, face.Z), Mathf.Min(1f, dt * 4f)), 0);
@@ -163,6 +169,8 @@ public partial class Act11Pursuer : Node3D
 		_shoving = true;
 		Shoves++;
 		GD.Print($"[story] Act 11: it caught them up - a shove toward the stairs ({Shoves})");
+		Body.WalkPhase = -1f;
+		Body.Play("shove", 0.08f);   // both arms flung at them
 		Sfx("creature_snarl", 3, -2f);
 		Sfx("body_thump", 2, -4f);
 		Vector3 toStairs = FootWorld - player.GlobalPosition;
