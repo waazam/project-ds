@@ -162,7 +162,8 @@ public static class BunkerKit
 		{
 			0 => (0.46f, 0.4f, 0.42f),
 			1 => (0.58f, 0.5f, 0.52f),
-			_ => (0.72f, 0.6f, 0.6f),
+			2 => (0.72f, 0.6f, 0.6f),
+			_ => (0.9f, 0.74f, 0.7f),   // 3: the big consoles (the CRT room's walls)
 		};
 		float jitter = rng.RandfRange(0.94f, 1.06f);
 		return new CrtSpec

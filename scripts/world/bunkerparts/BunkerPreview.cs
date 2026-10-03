@@ -223,11 +223,30 @@ public partial class BunkerPreview : Node3D
 		await Take(new Shot("int_04_hall_ceiling", new(1500f, -78.38f, -3030f), new(1501.4f, -76.8f, -3034f)));
 		await Take(new Shot("hall_cap_lookback_nolantern", new(1500.5f, -78.38f, -3003f), new(1500f, -78.2f, -3000f), "bunker", false));
 		await Take(new Shot("hall_mid_nolantern", new(1498.8f, -78.38f, -3040f), new(1500f, -78.1f, -3060f), "bunker", false));
+		// the tunnel's dressing (2026-10-03): the marks, a side door, the telephone, the boots, the far end
+		{
+			var oh = interior.GlobalPosition;
+			Vector3 H(float x, float y, float z) => oh + new Vector3(x, y, z);
+			await Take(new Shot("hall_marks_10m", H(0.6f, 1.62f, -8.2f), H(-2.2f, 1.6f, -10f), "bunker"));
+			await Take(new Shot("hall_door_chained", H(0.1f, 1.62f, -62.5f), H(2.2f, 1.2f, -62.5f), "bunker"));
+			await Take(new Shot("hall_phone", H(0.4f, 1.62f, -51f), H(-2.1f, 1.1f, -52.6f), "bunker"));
+			await Take(new Shot("hall_boots_crates", H(0f, 1.62f, -53.5f), H(1.2f, 0.4f, -57f), "bunker"));
+			await Take(new Shot("hall_far_end", H(0.3f, 1.62f, -78f), H(0f, 1.3f, -88f), "bunker"));
+			await Take(new Shot("hall_spall", H(0.6f, 1.62f, -20f), H(-1.4f, 3f, -22.5f), "bunker"));
+		}
 		interior.Hallway.ForceDepth(83f);
 		await Frames(10);
 		await Take(new Shot("int_05_hall_red_forward", new(1500f, -78.38f, -3080f), new(1500f, -78.38f, -3090f)));
 		await Take(new Shot("int_06_hall_red_back", new(1500f, -78.38f, -3080f), new(1500f, -78.38f, -3060f)));
 		await Take(new Shot("int_07_vine_door_2m", new(1500.4f, -78.38f, -3087.5f), new(1500f, -78.4f, -3090f)));
+		{
+			var ov = interior.GlobalPosition;
+			await Take(new Shot("vine_door_1m", ov + new Vector3(0.35f, 1.62f, -88.9f), ov + new Vector3(0.1f, 1.5f, -90f), "bunker"));
+			await Take(new Shot("vine_door_trunk", ov + new Vector3(-0.3f, 1.62f, -89.2f), ov + new Vector3(-1f, 1.1f, -90f), "bunker"));
+			await Take(new Shot("vine_tunnel_16m", ov + new Vector3(0.4f, 1.62f, -73.5f), ov + new Vector3(0f, 1.5f, -90f), "bunker"));
+			await Take(new Shot("vine_tunnel_vault", ov + new Vector3(0.2f, 1.5f, -83f), ov + new Vector3(-1.2f, 3f, -87f), "bunker"));
+			await Take(new Shot("vine_door_6m", ov + new Vector3(0.2f, 1.62f, -84f), ov + new Vector3(0f, 1.5f, -90f), "bunker"));
+		}
 		await Take(new Shot("vine_door_4m_nolantern", new(1500.2f, -78.38f, -3086f), new(1500f, -78.6f, -3090f), "bunker", false));
 		interior.VineDoor.Open();
 		await Seconds(1.6);
@@ -236,9 +255,11 @@ public partial class BunkerPreview : Node3D
 		// ---------------------------------------------------------------- the CRT room
 		await Take(new Shot("int_08_crt_room_entry", new(1500f, -78.38f, -3092f), new(1500f, -78.4f, -3122f)));
 		await Take(new Shot("int_09_crt_side_wall", new(1501.5f, -78.38f, -3104f), new(1494f, -78.2f, -3108f)));
-		await Take(new Shot("int_10_crt_target_close", new(1500.4f, -78.38f, -3119f), new(1500f, -79.1f, -3121.7f)));
+		var oc = interior.GlobalPosition;
+		Vector3 L(float x, float y, float z) => oc + new Vector3(x, y, z);
+		await Take(new Shot("int_10_crt_target_close", L(0.4f, 1.62f, -104.9f), L(0f, 1.25f, -106.7f)));
 		await Take(new Shot("crt_room_nolantern", new(1500f, -78.38f, -3094f), new(1500f, -78.6f, -3122f), "bunker", false));
-		await Take(new Shot("crt_target_nolantern", new(1500.3f, -78.38f, -3118.8f), new(1500f, -78.9f, -3121.6f), "bunker", false));
+		await Take(new Shot("crt_target_nolantern", L(0.3f, 1.62f, -105f), L(0f, 1.25f, -106.7f), "bunker", false));
 		// The papers in the CRT room: the station log on the console; the open filing drawer (no papers in it).
 		var o2 = interior.GlobalPosition;
 		float backZ = BunkerLayout.CrtRoomBackZ;
@@ -246,15 +267,25 @@ public partial class BunkerPreview : Node3D
 		await Take(new Shot("paper_console_log_context", o2 + new Vector3(0.1f, 1.62f, backZ + 3.2f), o2 + new Vector3(-0.2f, 1.0f, backZ + 1.5f), "bunker"));
 		await Take(new Shot("drawer_open",o2 + new Vector3(-4.35f, 1.62f, BunkerLayout.CrtRoomFrontZ - 2.3f), o2 + new Vector3(-5.14f, 0.915f, BunkerLayout.CrtRoomFrontZ - 2.52f), "bunker"));
 		await Take(new Shot("paper_drawer_context", o2 + new Vector3(-3.6f, 1.62f, BunkerLayout.CrtRoomFrontZ - 1.6f), o2 + new Vector3(-5.4f, 0.9f, BunkerLayout.CrtRoomFrontZ - 2.5f), "bunker"));
+		// the feeds up close (the CRT room pass, 2026-10-03): a side wall's sets at arm's length, the back wall's, the atlas itself
+		await Take(new Shot("crt_feeds_side", L(-3.9f, 1.62f, -100f), L(-5.6f, 1.3f, -100.2f), "bunker"));
+		await Take(new Shot("crt_feeds_side_high", L(3.8f, 1.62f, -103.5f), L(5.6f, 2.2f, -104f), "bunker"));
+		await Take(new Shot("crt_feeds_back", L(-2.2f, 1.62f, -105.6f), L(-2.3f, 1.3f, -107.6f), "bunker"));
+		if (_only == "" || "crt_feeds".StartsWith(_only) || _only.StartsWith("crt_feeds"))
+		{
+			string bd = ProjectSettings.GlobalizePath("res://test-output/bunker");
+			BunkerTextures.SurveillanceAtlas().GetImage().SavePng($"{bd}/surv_atlas.png");
+			BunkerTextures.IvyLeafAtlas().GetImage().SavePng($"{bd}/ivy_atlas.png");
+		}
 		interior.Crt.TurnAllOff();
 		await Seconds(0.8);
 		await Take(new Shot("crt_screens_off", new(1500f, -78.38f, -3100f), new(1500f, -78.4f, -3122f), "bunker", false));
 		interior.Crt.TurnOnStairs(3.5f);
 		await Seconds(1.2);
-		await Take(new Shot("crt_stairs_fuzzy", new(1500.3f, -78.38f, -3118.8f), new(1500f, -78.9f, -3121.6f), "bunker", false));
+		await Take(new Shot("crt_stairs_fuzzy", L(0.3f, 1.62f, -105f), L(0f, 1.25f, -106.7f), "bunker", false));
 		await Seconds(4.0);
 		await Take(new Shot("int_11_crt_showing_stairs", new(1500f, -78.38f, -3100f), new(1500f, -78.4f, -3122f)));
-		await Take(new Shot("crt_stairs_close", new(1500.3f, -78.38f, -3118.8f), new(1500f, -78.9f, -3121.6f), "bunker", false));
+		await Take(new Shot("crt_stairs_close", L(0.3f, 1.62f, -105f), L(0f, 1.25f, -106.7f), "bunker", false));
 		// main-menu candidates: the room in its later-act state, every screen on the stairs, no lantern
 		await Take(new Shot("menu_a_wall_straight", new(1500f, -78.38f, -3110f), new(1500f, -78.0f, -3122f), "menu", false));
 		await Take(new Shot("menu_b_wall_angled", new(1497.5f, -78.6f, -3113f), new(1501f, -78.2f, -3121f), "menu", false));

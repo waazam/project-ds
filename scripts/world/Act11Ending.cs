@@ -21,10 +21,11 @@ namespace ProjectDS.World;
 /// come back down (<see cref="OneWayFlight"/>); the hum rises with them. On the
 /// top landing the broken newel post is right there: the cap they have carried
 /// since the cabin goes back on it (E), grinds home in a purple flash, the flight
-/// is whole, and the giant (Act 7's) is standing in front of them; the view is
-/// driven up its body to its eyes, which open red in silence; they tremble as
-/// it leans in, and blink out into black looking it in the eyes (the pass-out).
-/// Over black, the radio's last "Did you see them?", then the credits, and the menu.
+/// is whole, and the giant (Act 7's) rises out of the woods beyond the landing,
+/// all wrong and stop-start, the view following its head up; its eyes open red;
+/// then it grabs them in juddering haste and the screen cuts to black
+/// (<see cref="GiantRise"/>, 2026-10-03). Over black, the radio's last "Did you see
+/// them?", and they wake at the lake (Act 12).
 ///
 /// Restore: once the radio exchange is done (<see cref="StoryManager.Flag.Act11DialogueDone"/>)
 /// the stairs are tall on load (the one length rule is <see cref="StairsState"/>) and the flight
@@ -38,24 +39,15 @@ namespace ProjectDS.World;
 public partial class Act11Ending : Node3D
 {
 	[Export] public NodePath OriginalStairsPath = "..";
+	/// <summary>Unused since 2026-10-03 (it's sized so its eyes stand well above the landing: GiantRise.SizeFor).</summary>
 	[Export] public float BodyScale = 24f;
-	/// <summary>How far in front of the player it stands when the cap seats (metres): far enough back that its eyes
-	/// (about 47 m up at BodyScale 24) sit in front of and above them, a 45-55 degree look-up, not overhead.</summary>
-	[Export] public float GiantDistance = 44f;
-	/// <summary>How much closer it leans in over them during the trembling (metres; modest, so it stays in front).</summary>
-	[Export] public float GiantLeanIn = 6f;
-	/// <summary>Seconds the view takes to climb its body from its shins to its eyes.</summary>
-	[Export] public float LookUpSeconds = 4.5f;
-	/// <summary>Seconds the trembling builds while it leans in.</summary>
-	[Export] public float TrembleSeconds = 4.5f;
+	/// <summary>How far beyond the landing it rises (metres, level): its size is then set so its eyes stand well
+	/// above the player's (about a 38 degree look-up), whatever the drop to the woods' floor.</summary>
+	[Export] public float GiantDistance = 40f;
 	/// <summary>Peak shiver of the view, radians per frame, at the end of the trembling.</summary>
 	[Export] public float TrembleRadians = 0.006f;
-	/// <summary>Seconds of blinking into black (the pass-out), as Act 1's collapse.</summary>
-	[Export] public float PassOutSeconds = 4.5f;
-	/// <summary>Seconds the hum takes to die to silence once the screen is black, before the last radio line.</summary>
+	/// <summary>The silence over black after the grab is 0.6 of this (seconds), before the last radio line.</summary>
 	[Export] public float HumOutSeconds = 4f;
-	[Export] public float BlinkSeconds = 1.4f;
-	[Export] public float BlinkVignette = 2.4f;
 	[Export] public float FogRampRadius = 70f;
 	/// <summary>Silence priority: above the storm's, so the climb is silent whatever else is going on.</summary>
 	[Export] public int SilencePriority = 100;
@@ -113,6 +105,8 @@ public partial class Act11Ending : Node3D
 	public bool Trembled { get; private set; }
 	/// <summary>For tests: they blinked out into black looking at it.</summary>
 	public bool PassedOut { get; private set; }
+	/// <summary>For tests: its hand reached them (the grab's last pose).</summary>
+	public bool Grabbed { get; private set; }
 	/// <summary>For tests: the hum has been sent to silence over black (before the last line).</summary>
 	public bool HumOut { get; private set; }
 
@@ -588,14 +582,12 @@ public partial class Act11Ending : Node3D
 	}
 
 	/// <summary>
-	/// The flight whole, the giant is standing on the landing in front of the player, close, its head far
-	/// above. Control is taken. The view is driven up its body to its head (Dan, 2026-09-22: they have to
-	/// look up at it); the radio asks once more; its eyes open red, in silence, the view on them. The hum
-	/// is the whole sound: it rises to its maximum through the beat, holds, and hums out over black.
-	/// Then the trembling: the view shakes, harder and harder, the hum as loud as it gets, as it leans in
-	/// over them. Then their eyes fall shut, blink by blink, each deeper than the last (Act 1's collapse),
-	/// looking it in the eyes the whole way down, into black. Over black: the last question, the seated cap
-	/// and checkpoint 9 saved together, then the credits and the menu. Control never comes back.
+	/// The flight whole (the owner, 2026-10-03): the giant rises out of the woods beyond the landing, slowly and all
+	/// wrong (<see cref="GiantRise"/>: held, lurching, bent double, its head upside down and snapping upright a quarter
+	/// at a time), the view following its head up; the radio asks once more; it stands still and its eyes open red, the
+	/// view trembling; then it grabs, in juddering stop-motion poses, its hand filling the view, and the screen cuts to
+	/// black. The hum is the sound throughout, rising to its maximum, cut dead with the grab. Over black: the last
+	/// question, the seated cap and checkpoint 9 saved together, and they wake at the lake (Act 12).
 	/// </summary>
 	private async Task Encounter(PlayerController player, CancellationToken ct)
 	{
@@ -604,7 +596,13 @@ public partial class Act11Ending : Node3D
 		var rig = player.CameraRig;
 		Vector3 fwd = -_original.GlobalTransform.Basis.Z; fwd.Y = 0;
 		if (fwd.LengthSquared() < 0.01f) fwd = Vector3.Forward; else fwd = fwd.Normalized();
-		Vector3 giantStart = player.GlobalPosition + fwd * GiantDistance;
+		Vector3 eye0 = rig.Camera?.GlobalPosition ?? player.GlobalPosition + Vector3.Up * 1.6f;
+		// the woods' floor beyond the landing, where it comes up from
+		Vector3 spot = player.GlobalPosition + fwd * GiantDistance;
+		float groundY = player.GlobalPosition.Y - 40f;
+		var hit = player.GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(spot + Vector3.Up * 300f, spot + Vector3.Down * 600f, 1));
+		if (hit.Count > 0) groundY = ((Vector3)hit["position"]).Y;
+		float size = GiantRise.SizeFor(eye0.Y, groundY, GiantDistance);
 
 		var skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/stalker_skin.gdshader") };
 		skin.SetShaderParameter("albedo", new Color(0.0f, 0.0f, 0.0f));
@@ -613,102 +611,47 @@ public partial class Act11Ending : Node3D
 		skin.SetShaderParameter("wetness", 0f);
 		skin.SetShaderParameter("eye_color", new Color(1f, 0.04f, 0.02f));
 		skin.SetShaderParameter("eye_glow", 0f);
-		var body = new StalkerBody { Name = "Act11Giant", Skin = skin, Size = BodyScale, SwaySeconds = 26f, SwayDegrees = 0.5f, HeadDriftDegrees = 0.8f };
-		// Must be in the tree before GlobalPosition/LookAt, or Godot can't resolve the transform.
+		var body = new StalkerBody { Name = "Act11Giant", Skin = skin, Size = size, SwaySeconds = 26f, SwayDegrees = 0.5f, HeadDriftDegrees = 0.8f };
 		Cutscene.SceneRoot(this).AddChild(body);
 		var fader = StoryBeat.Fader(this);
 		var postMat = StoryBeat.PostMaterial(this);
 		float baseVignette = postMat != null ? (float)postMat.GetShaderParameter("vignette") : 0f;
-		// Its eyes are far above the mode's pitch ceiling: the view is allowed all the way up for this beat.
 		rig.MaxPitchOverride = 60f;   // never near the zenith: past ~85 degrees the yaw toward a point overhead whips round
 		bool auto = GameSettings.Instance.AutoTest;
-		float tremble = 0f;
+		var stage = new GiantRise.Stage
+		{
+			Eye = () => rig.Camera?.GlobalPosition ?? player.GlobalPosition + Vector3.Up * 1.6f,
+			Forward = fwd,
+			GroundY = groundY,
+			Distance = GiantDistance,
+			Speed = auto ? 0.5f : 1f,
+			Look = target => DriveView(player, target, 0.09f, 0.05f),
+			Tremble = u => { Trembled = true; Shiver(player, u * TrembleRadians); },
+			Sound = (path, at, db, pitch) => StoryBeat.PlayAt(this, path, "Unnatural", ToLocal(at), db, 12f, 400f, pitch),
+			Beat = beat =>
+			{
+				if (beat == "rising" && hum != null)
+				{
+					var rise = CreateTween();
+					rise.TweenMethod(Callable.From<float>(db => hum.SetOverrideDb(db)), hum.LevelDb, hum.MaxDb, auto ? 7f : 13f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+				}
+				else if (beat == "risen")
+				{
+					LookedUp = rig.Pitch > Mathf.DegToRad(20f);
+					GD.Print($"[story] Act 11: it has risen out of the woods (pitch {Mathf.RadToDeg(rig.Pitch):0} deg, size {size:0})");
+					_ = Ask("\"Do you see him now?\"", ct);
+				}
+				else if (beat == "grabbed") Grabbed = true;
+			},
+		};
 		try
 		{
-			body.GlobalPosition = giantStart;
-			// The figure faces +Z (StalkerBody's contract), so it is yawed to the player, not LookAt-ed (that would
-			// turn its back). Its head is driven each frame to look down at the player's eyes.
-			Vector3 toP = player.GlobalPosition - giantStart;
-			body.Rotation = new Vector3(0, Mathf.Atan2(toP.X, toP.Z), 0);
-			body.LookTarget = rig.Camera?.GlobalPosition ?? player.GlobalPosition + Vector3.Up * 1.6f;
-			// The drone is the whole soundtrack of the end: from the cap's surge it rises steadily through the
-			// look-up and the trembling to the hum's maximum, holds through the pass-out, then hums out.
-			float riseSeconds = (auto ? LookUpSeconds * 0.6f : LookUpSeconds) + 1.0f + (auto ? TrembleSeconds * 0.5f : TrembleSeconds);
-			if (hum != null)
-			{
-				var rise = CreateTween();
-				rise.TweenMethod(Callable.From<float>(db => hum.SetOverrideDb(db)), hum.LevelDb, hum.MaxDb, riseSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-			}
-			await Cutscene.Frame(this, ct);
-
-			// 1. Up its body to its eyes: the view climbs from its shins to its face over a few seconds, the
-			//    radio asking half way. The look never snaps: a bounded step each frame, like a head turning.
-			float lookSeconds = auto ? LookUpSeconds * 0.6f : LookUpSeconds;
-			double t = 0;
-			bool asked = false;
-			while (t < lookSeconds)
-			{
-				await Cutscene.Frame(this, ct);
-				t += GetProcessDeltaTime();
-				float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, (float)(t / lookSeconds)));
-				Vector3 shins = body.GlobalPosition + Vector3.Up * BodyScale * 0.25f;
-				DriveView(player, shins.Lerp(body.EyesWorld, u), 0.09f, 0.05f);
-				if (!asked && t > lookSeconds * 0.45f) { asked = true; _ = Ask("\"Do you see him now?\"", ct); }
-			}
-			LookedUp = rig.Pitch > Mathf.DegToRad(30f);
-			GD.Print($"[story] Act 11: looking up at it (pitch {Mathf.RadToDeg(rig.Pitch):0} deg)");
-
-			// 2. The eyes open, in silence (Dan, 2026-09-22: no growl at the end; the drone is the whole sound).
-			var eyeTween = body.CreateTween();
-			eyeTween.TweenMethod(Callable.From<float>(v => skin.SetShaderParameter("eye_glow", v)), 0f, 7.5f, 2.4f);
-			body.GlowEyes(new Color(1f, 0.06f, 0.02f), 9f);   // two lit points looking down through the fog
-			t = 0;
-			while (t < 1.0)
-			{
-				await Cutscene.Frame(this, ct);
-				t += GetProcessDeltaTime();
-				DriveView(player, body.EyesWorld, 0.09f, 0.05f);
-			}
-
-			// 3. Trembling: a small shiver comes up from nothing over the beat (pitch and yaw jitter only, no
-			//    roll, no drift: the drive re-centres on its eyes every frame) while it leans in over them.
-			Trembled = true;
-			float trembleSeconds = auto ? TrembleSeconds * 0.5f : TrembleSeconds;
-			Vector3 toPlayer = player.GlobalPosition - body.GlobalPosition; toPlayer.Y = 0;
-			Vector3 closeSpot = body.GlobalPosition + toPlayer.Normalized() * Mathf.Max(0f, toPlayer.Length() - GiantLeanIn);
-			var lean = body.CreateTween();
-			lean.TweenProperty(body, "global_position", closeSpot, trembleSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-			t = 0;
-			while (t < trembleSeconds)
-			{
-				await Cutscene.Frame(this, ct);
-				t += GetProcessDeltaTime();
-				tremble = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, (float)(t / trembleSeconds)));
-				DriveView(player, body.EyesWorld, 0.09f, 0.05f);
-				Shiver(player, tremble * TrembleRadians);
-			}
-
-			// 4. Passing out: vision falls shut and drifts open again, each blink deeper than the last, the
-			//    shiver dying away, its eyes the last thing seen. Then black.
-			float outSeconds = auto ? PassOutSeconds * 0.6f : PassOutSeconds;
-			t = 0;
-			while (t < outSeconds)
-			{
-				await Cutscene.Frame(this, ct);
-				t += GetProcessDeltaTime();
-				float u = Mathf.Min(1f, (float)(t / outSeconds));
-				float phase = (float)(t / Mathf.Max(BlinkSeconds, 0.1f)) * Mathf.Tau;
-				float closed = Mathf.Sin(phase - Mathf.Pi / 2f) * 0.5f + 0.5f;   // 0 = open .. 1 = closed
-				float floor = Mathf.SmoothStep(0.3f, 1f, u);                       // each blink closes further; the last never open
-				float shut = Mathf.Max(closed, floor);
-				postMat?.SetShaderParameter("vignette", Mathf.Lerp(baseVignette, BlinkVignette, shut));
-				if (fader != null) fader.BlackAlpha = shut * Mathf.SmoothStep(0.15f, 0.9f, u);
-				DriveView(player, body.EyesWorld, 0.09f, 0.05f);
-				Shiver(player, Mathf.Lerp(TrembleRadians, TrembleRadians * 0.2f, u));
-			}
+			await GiantRise.Run(this, body, skin, stage, ct);
+			// the grab: cut to black, and the hum cut dead with it
+			if (fader != null) fader.BlackAlpha = 1f;
+			hum?.SetOverrideDb(-80f);
 			PassedOut = true;
 			EndingStarted = true;
-			if (fader != null) fader.BlackAlpha = 1f;
 		}
 		finally
 		{
@@ -716,17 +659,9 @@ public partial class Act11Ending : Node3D
 			if (IsInstanceValid(rig)) rig.MaxPitchOverride = null;
 			postMat?.SetShaderParameter("vignette", baseVignette);
 		}
-		// Black. The hum, held at its maximum through the pass-out, hums out: a slow fall to silence, and
-		// it never comes back (the override stays at silence; proximity would raise it again up here).
-		GD.Print("[story] Act 11: passed out looking it in the eyes");
+		GD.Print("[story] Act 11: grabbed, into black");
 		HumOut = true;
-		if (hum != null)
-		{
-			var outTween = CreateTween();
-			outTween.TweenMethod(Callable.From<float>(db => hum.SetOverrideDb(db)), hum.LevelDb, -80f, HumOutSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-			await Cutscene.Tween(this, outTween, ct);
-		}
-		else await Cutscene.Wait(this, HumOutSeconds, ct);
+		await Cutscene.Wait(this, HumOutSeconds * 0.6f, ct);   // silence over black
 		ForestAmbienceManager.Instance?.ReleaseSilence(this);
 		await Cutscene.Wait(this, 0.6, ct);
 
@@ -736,10 +671,10 @@ public partial class Act11Ending : Node3D
 		s?.SetFlag(StoryManager.Flag.NewelSeated);
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act11GiantEncounter);
 		await Cutscene.Wait(this, 1.0, ct);
-		// Act 12 picks up from here: the lake, at sunrise. Credits roll once LakeCrossingEvent
-		// carries the player across and reaches checkpoint 10 (see Lake.cs / LakeCrossingEvent.cs).
+		// Act 12 picks up from here: the lake, at sunrise.
 		await WakeAtLake(player, fader, ct);
 	}
+
 
 	/// <summary>
 	/// Still black from the pass-out: the player is carried (unseen) to the lake's near shore and

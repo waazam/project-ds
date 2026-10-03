@@ -53,6 +53,7 @@ public partial class BunkerHallway : Node3D
 		BuildLamps();
 		BuildStains();
 		BuildCollision();
+		BuildDressing();
 	}
 
 	// ------------------------------------------------------------------ light sequence (story: unchanged)

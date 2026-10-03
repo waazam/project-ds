@@ -50,6 +50,8 @@ public partial class CreaturePreview : Node3D
 		await Frames(10);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--giant-grab") >= 0) { await GiantGrabShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler") >= 0) { await CrawlerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--weather") >= 0) { await WeatherShots(); GetTree().Quit(); return; }
@@ -285,6 +287,102 @@ public partial class CreaturePreview : Node3D
 
 	/// <summary>The remodelled stalker (2026-10-02): its clips, its grip on a trunk, the edge light up close, the
 	/// eyeshine, against a dim grey so its black shape reads.</summary>
+	/// <summary>The last staircase's giant (2026-10-03): rising out of the woods 40 m beyond a landing 40 m up, then the
+	/// grab; frames saved through it (giant_*.png), the camera turned toward it as the ending's view is.</summary>
+	private async Task GiantGrabShots()
+	{
+		env.BackgroundColor = new Color(0.2f, 0.21f, 0.23f);
+		env.AmbientLightEnergy = 0.5f;
+		env.FogEnabled = true;
+		env.FogLightColor = new Color(0.22f, 0.23f, 0.25f);
+		env.FogDensity = 0.004f;
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(900, 900) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.13f, 0.11f) } });
+		var bark = new StandardMaterial3D { AlbedoColor = new Color(0.1f, 0.09f, 0.08f) };
+		var rng = new RandomNumberGenerator { Seed = 7 };
+		for (int i = 0; i < 140; i++)
+		{
+			var at = new Vector3(rng.RandfRange(-90f, 90f), 0f, -rng.RandfRange(8f, 120f));
+			float h = rng.RandfRange(22f, 34f);
+			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.2f, BottomRadius = 0.5f, Height = h }, Position = at + Vector3.Up * h * 0.5f, MaterialOverride = bark });
+			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0f, BottomRadius = 3.5f, Height = h * 0.6f }, Position = at + Vector3.Up * h * 0.75f,
+				MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.06f, 0.09f, 0.06f) } });
+		}
+		var eye = new Vector3(0, 41.6f, 0);
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(Vector3.Forward, Vector3.Up), eye);
+		var skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/stalker_skin.gdshader") };
+		skin.SetShaderParameter("albedo", new Color(0.0f, 0.0f, 0.0f));
+		skin.SetShaderParameter("face_tint", new Color(0.05f, 0.05f, 0.055f));
+		skin.SetShaderParameter("visibility", 1f);
+		skin.SetShaderParameter("eye_color", new Color(1f, 0.04f, 0.02f));
+		float size = GiantRise.SizeFor(eye.Y, 0f, 40f);
+		var body = new StalkerBody { Name = "Giant", Skin = skin, Size = size, SwaySeconds = 26f, SwayDegrees = 0.5f, HeadDriftDegrees = 0.8f };
+		AddChild(body);
+		string beat = "";
+		int frame = 0;
+		var stage = new GiantRise.Stage
+		{
+			Eye = () => _cam.GlobalPosition, Forward = Vector3.Forward, GroundY = 0f, Distance = 40f,
+			Look = target =>
+			{
+				Vector3 d = target - _cam.GlobalPosition;
+				if (frame < 3 || !d.IsFinite()) GD.Print($"[creature-preview] giant look at {target}");
+				if (!d.IsFinite() || d.LengthSquared() < 1e-4f || Mathf.Abs(d.Normalized().Y) > 0.995f) return;
+				var want = Basis.LookingAt(target - _cam.GlobalPosition, Vector3.Up);
+				_cam.GlobalBasis = _cam.GlobalBasis.Orthonormalized().Slerp(want.Orthonormalized(), 0.08f);
+			},
+			Beat = b => { beat = b; GD.Print($"[creature-preview] giant: {b} at frame {frame}"); },
+		};
+		var cts = new System.Threading.CancellationTokenSource();
+		var run = GiantRise.Run(this, body, skin, stage, cts.Token);
+		double clock = 0, nextShot = 0.5;
+		int shot = 0;
+		while (!run.IsCompleted)
+		{
+			await Frames(1);
+			frame++;
+			clock += GetProcessDeltaTime();
+			bool grabbing = beat is "grab" or "grabbed";
+			if (grabbing ? frame % 3 == 0 : clock >= nextShot)
+			{
+				nextShot = clock + 1.1;
+				GetViewport().GetTexture().GetImage().SavePng($"{_out}/giant_{shot++:00}_{beat}.png");
+			}
+		}
+		if (run.IsFaulted) GD.PrintErr($"[creature-preview] giant: {run.Exception}");
+		GD.Print($"[creature-preview] giant size {size:0.0}, {shot} frames");
+	}
+
+	/// <summary>The stalker alive (2026-10-03): its face and its whole figure, a frame every quarter second for six
+	/// seconds each (stalker_motion_face_*, stalker_motion_body_*), the head turned now and then, to see the jaw swing,
+	/// chatter and twist, the breath and the rags in the gusts.</summary>
+	private async Task StalkerMotion()
+	{
+		env.BackgroundColor = new Color(0.16f, 0.17f, 0.18f);
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(30, 30) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.24f, 0.22f) } });
+		var skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/stalker_skin.gdshader") };
+		skin.SetShaderParameter("albedo", new Color(0.026f, 0.028f, 0.034f));
+		skin.SetShaderParameter("face_tint", new Color(0.21f, 0.215f, 0.22f));
+		var b = new StalkerBody { Name = "Stalker", Size = 1.1f, Skin = skin };
+		AddChild(b);
+		await Seconds(1.0);
+		Vector3 eyes = b.EyesWorld, front = b.GlobalBasis.Z.Normalized();
+		for (int i = 0; i < 24; i++)
+		{
+			// the head turned this way and that (it follows a point that jumps): the jaw lags and swings
+			b.TrackTarget = eyes + front * 2f + Vector3.Right * ((i / 6) % 2 == 0 ? 1.2f : -1.2f);
+			_cam.GlobalTransform = new Transform3D(Basis.LookingAt(Vector3.Down * 0.07f - front * 0.42f, Vector3.Up), eyes + front * 0.42f + Vector3.Down * 0.0f);
+			await Seconds(0.25);
+			GetViewport().GetTexture().GetImage().SavePng($"{_out}/stalker_motion_face_{i:00}.png");
+		}
+		b.TrackTarget = null;
+		for (int i = 0; i < 24; i++)
+		{
+			_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(-0.3f, 1.2f, 0) - new Vector3(2.6f, 1.5f, 3.2f), Vector3.Up), new Vector3(2.6f, 1.5f, 3.2f));
+			await Seconds(0.25);
+			GetViewport().GetTexture().GetImage().SavePng($"{_out}/stalker_motion_body_{i:00}.png");
+		}
+	}
+
 	private async Task StalkerShots()
 	{
 		env.BackgroundColor = new Color(0.16f, 0.17f, 0.18f);
@@ -316,6 +414,19 @@ public partial class CreaturePreview : Node3D
 		await Shot("stalker_idle_front", new Vector3(0, 1.6f, 4.2f), new Vector3(0, 1.3f, 0));
 		await Shot("stalker_idle_side", new Vector3(4.2f, 1.6f, 0.5f), new Vector3(0, 1.3f, 0));
 		await Shot("stalker_face_close", new Vector3(0.15f, 2.05f, 1.5f), b.EyesWorld);
+		// the face up close, square on (the face pass): the jaw unhung, hung, and hung far (to see it move)
+		Vector3 eyes = b.EyesWorld, front = b.GlobalBasis.Z.Normalized();
+		foreach (var (name, hang) in new[] { ("stalker_face_front_nohang", 0f), ("stalker_face_front", b.JawHang), ("stalker_face_front_far", 1.0f) })
+		{
+			float keep = b.JawHang;
+			b.JawHang = hang;
+			await Frames(3);
+			await Shot(name, eyes + front * 0.42f + Vector3.Down * 0.06f + Vector3.Right * 0.05f, eyes + Vector3.Down * 0.07f);
+			b.JawHang = keep;
+		}
+		skin.SetShaderParameter("eye_glow", 6f);
+		await Shot("stalker_face_front_glow", eyes + front * 0.42f + Vector3.Down * 0.06f, eyes + Vector3.Down * 0.07f);
+		skin.SetShaderParameter("eye_glow", 0f);
 		await Shot("stalker_far", new Vector3(1, 1.6f, 12f), new Vector3(0, 1.3f, 0));
 		// the lantern's answer: a light at the camera, and the eyeshine set as the game would
 		skin.SetShaderParameter("eyeshine", 1.8f);

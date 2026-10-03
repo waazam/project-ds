@@ -45,6 +45,9 @@ public partial class CrtRoom : Node3D
 	public bool ShowingStairs { get; private set; }
 	/// <summary>The player is within reach of the marked screen (the autotest reads this).</summary>
 	public bool PlayerAtTarget { get; private set; }
+	/// <summary>How many sets stand on the shelving, and the faces they cover (m², the tests: the walls covered).</summary>
+	public int ScreenCount { get; private set; }
+	public float ScreenArea { get; private set; }
 	/// <summary>The marked set (group "crt_target_marker": the compass points here).</summary>
 	public Node3D Target => _target;
 	/// <summary>Where the E pick volume sits on the marked screen (aim here to use it).</summary>
@@ -55,7 +58,8 @@ public partial class CrtRoom : Node3D
 
 	public override void _Ready()
 	{
-		_normalMat = BunkerTextures.NewCrtMat(BunkerTextures.SurveillanceAtlas(), true, 0.93f, 0f);
+		_normalMat = BunkerTextures.NewCrtMat(BunkerTextures.SurveillanceAtlas(), true, 0.97f, 0f);
+		_normalMat.SetShaderParameter("atlas_grid", (float)BunkerTextures.SurvGrid);
 		_normalMat.SetShaderParameter("tint", new Color(0.72f, 0.78f, 0.74f));
 		_targetMat = BunkerTextures.NewCrtMat(BunkerTextures.CabinPicture(), false, 0.9f, 1f);
 		_body = new StaticBody3D { Name = "CrtRoomBody", CollisionLayer = 1, CollisionMask = 0 };
@@ -194,7 +198,10 @@ public partial class CrtRoom : Node3D
 				Vector3.Up, Vector3.Forward, new Vector2(2f, 2f), 0.3f, new Color(1, 1, 1, 0.7f));
 	}
 
-	/// <summary>Steel shelving along the back and side walls, stacked unevenly with CRTs.</summary>
+	/// <summary>Steel shelving along the back and side walls, stacked unevenly with CRTs. (The CRT room pass,
+	/// 2026-10-03, the owner: "make the tvs larger and have more of them to cover the walls more": the units are
+	/// taller, wall to wall along the back and bay to bay down the sides between the pilasters, their shelves spaced
+	/// for the big sets.)</summary>
 	private void BuildShelving()
 	{
 		var rng = new RandomNumberGenerator { Seed = 9101 };
@@ -204,54 +211,62 @@ public partial class CrtRoom : Node3D
 		screens.Mat(_normalMat);
 		var cables = new MeshKit();
 		int screenCount = 0;
+		const float ud = 0.72f, postH = 2.84f;
+		float[] shelves = { 0.1f, 0.98f, 1.86f, 2.74f };
 
-		void Unit(Transform3D xf)
+		// stackTop: what may go on the top shelf's sets (the back wall's, clear of the beams: the small ones only)
+		void Unit(Transform3D xf, float uw, bool stackTop)
 		{
-			const float uw = 1.9f, ud = 0.6f;
-			float[] shelves = { 0.1f, 0.8f, 1.5f, 2.2f };
 			frame.Mat(BunkerTextures.PaintedMetalMat);
 			frame.Color = new Color(0.9f, 0.92f, 0.9f) * rng.RandfRange(0.8f, 1f);
 			var oldXf = frame.Xf;
 			frame.Xf = xf;
 			foreach (float sx in new[] { -uw * 0.5f + 0.02f, uw * 0.5f - 0.02f })
 				foreach (float sz in new[] { -ud * 0.5f + 0.02f, ud * 0.5f - 0.02f })
-					frame.Box(new Vector3(sx, 1.2f, sz), new Vector3(0.04f, 2.4f, 0.04f));
+					frame.Box(new Vector3(sx, postH * 0.5f, sz), new Vector3(0.04f, postH, 0.04f));
 			foreach (float y in shelves)
 				frame.Box(new Vector3(0, y, 0), new Vector3(uw, 0.03f, ud));
 			frame.Xf = oldXf;
-			AddBox(xf * new Vector3(0, 1.2f, 0), new Vector3(uw, 2.4f, ud), xf.Basis);
+			AddBox(xf * new Vector3(0, postH * 0.5f, 0), new Vector3(uw, postH, ud), xf.Basis);
 
 			for (int s = 0; s < shelves.Length; s++)
 			{
+				bool top = s == shelves.Length - 1;
 				float y = shelves[s] + 0.015f;
-				float x = -uw * 0.5f + 0.05f;
+				float x = -uw * 0.5f + 0.04f;
 				while (true)
 				{
-					int size = s == shelves.Length - 1 ? rng.RandiRange(0, 2) : rng.RandiRange(0, 1);
+					// the big sets low and in the middle rows; the top shelf's no taller than a mid one (the beams)
+					int size = top ? rng.RandiRange(1, 2) : rng.RandiRange(1, 3);
 					var spec = BunkerKit.RandomCrt(rng, size);
-					if (x + spec.W > uw * 0.5f - 0.03f) break;
-					if (rng.Randf() < 0.08f) { x += spec.W * 0.7f; continue; }   // a gap where one's gone
-					float cx = x + spec.W * 0.5f;
-					var local = new Transform3D(Basis.FromEuler(new Vector3(0, rng.RandfRange(-0.09f, 0.09f), 0)),
-						new Vector3(cx, y, ud * 0.5f - spec.D * 0.5f + rng.RandfRange(-0.05f, 0.03f)));
-					PlaceCrt(xf * local, spec);
-					// Stack another on top of the upper shelf now and then, a little askew.
-					if (s == shelves.Length - 1 && rng.Randf() < 0.6f)
+					if (x + spec.W > uw * 0.5f - 0.03f)
 					{
-						var top = BunkerKit.RandomCrt(rng, rng.RandiRange(0, 1));
-						var up = new Transform3D(Basis.FromEuler(new Vector3(0, rng.RandfRange(-0.15f, 0.15f), 0)),
-							new Vector3(cx + rng.RandfRange(-0.06f, 0.06f), y + spec.H, local.Origin.Z + rng.RandfRange(-0.05f, 0.02f)));
-						PlaceCrt(xf * up, top);
+						// the end of the shelf: a small one if it fits
+						spec = BunkerKit.RandomCrt(rng, 0);
+						if (x + spec.W > uw * 0.5f - 0.03f) break;
 					}
-					x += spec.W + rng.RandfRange(0.01f, 0.06f);
+					if (rng.Randf() < 0.04f) { x += spec.W * 0.7f; continue; }   // a gap where one's gone
+					float cx = x + spec.W * 0.5f;
+					// pushed to the back of the shelf (the big ones stand out over its front edge)
+					var local = new Transform3D(Basis.FromEuler(new Vector3(0, rng.RandfRange(-0.07f, 0.07f), 0)),
+						new Vector3(cx, y, -ud * 0.5f + spec.D * 0.5f + rng.RandfRange(0.02f, 0.06f)));
+					PlaceCrt(xf * local, spec);
+					if (top && stackTop && rng.Randf() < 0.55f)
+					{
+						var up = BunkerKit.RandomCrt(rng, 0);
+						var upXf = new Transform3D(Basis.FromEuler(new Vector3(0, rng.RandfRange(-0.15f, 0.15f), 0)),
+							new Vector3(cx + rng.RandfRange(-0.06f, 0.06f), y + spec.H, local.Origin.Z + rng.RandfRange(-0.04f, 0.02f)));
+						PlaceCrt(xf * upXf, up);
+					}
+					x += spec.W + rng.RandfRange(0.01f, 0.04f);
 				}
 			}
 			// A bundle of cables down the back of the unit and across the floor toward the console.
 			cables.Mat(BunkerTextures.RubberMat);
 			cables.Color = Colors.White;
-			for (int c = 0; c < 4; c++)
+			for (int c = 0; c < 5; c++)
 			{
-				Vector3 a = xf * new Vector3(rng.RandfRange(-0.8f, 0.8f), 2.25f, -ud * 0.5f + 0.05f);
+				Vector3 a = xf * new Vector3(rng.RandfRange(-uw * 0.42f, uw * 0.42f), postH - 0.1f, -ud * 0.5f + 0.05f);
 				Vector3 b = xf * new Vector3(rng.RandfRange(-0.3f, 0.3f), 0.02f, ud * 0.5f + 0.1f);
 				BunkerKit.Cable(cables, a, a.Lerp(b, 0.5f) + Vector3.Down * 0.6f, 0.2f, 0.012f, 4);
 				BunkerKit.Cable(cables, a.Lerp(b, 0.5f) + Vector3.Down * 0.6f, b, 0.1f, 0.012f, 4);
@@ -271,25 +286,32 @@ public partial class CrtRoom : Node3D
 
 		void PlaceCrt(Transform3D xf, BunkerKit.CrtSpec spec)
 		{
-			var tint = new Color(rng.Randf(), (rng.RandiRange(0, 3) + 0.5f) / 4f, 0f, 1f);
+			// the seed, and the camera it shows (one of the atlas's nine)
+			int cams = BunkerTextures.SurvGrid * BunkerTextures.SurvGrid;
+			var tint = new Color(rng.Randf(), (rng.RandiRange(0, cams - 1) + 0.5f) / cams, 0f, 1f);
 			BunkerKit.Crt(bodies, screens, xf, spec, tint);
 			screenCount++;
+			ScreenArea += spec.W * spec.H;
 		}
 
-		float backZ = CrtRoomBackZ + 0.35f;
+		// The back wall: five units shoulder to shoulder, wall to wall but for the corners.
+		float backZ = CrtRoomBackZ + ud * 0.5f + 0.03f;
 		foreach (float x in new[] { -4.2f, -2.1f, 0f, 2.1f, 4.2f })
-			Unit(new Transform3D(Basis.Identity, new Vector3(x, 0, backZ)));
-		// Three per side in the 18 m room, clear of the front clutter (z -92..-95) and the back wall units.
-		foreach (float z in new[] { -98f, -101.5f, -105f })
+			Unit(new Transform3D(Basis.Identity, new Vector3(x, 0, backZ)), 2.06f, true);
+		// The sides: one unit filling each bay between the pilasters (every 4 m from the front: the front bay's clutter
+		// by the door stays clear), and a narrow one in the back corner bay.
+		float sideX = CrtRoomHalfWidth - ud * 0.5f - 0.03f;
+		foreach (var (z, uw) in new[] { (-96f, 3.45f), (-100f, 3.45f), (-104f, 3.45f), (-106.7f, 0.95f) })
 		{
-			Unit(new Transform3D(Basis.FromEuler(new Vector3(0, Mathf.Pi * 0.5f, 0)), new Vector3(-CrtRoomHalfWidth + 0.58f, 0, z)));
-			Unit(new Transform3D(Basis.FromEuler(new Vector3(0, -Mathf.Pi * 0.5f, 0)), new Vector3(CrtRoomHalfWidth - 0.58f, 0, z)));
+			Unit(new Transform3D(Basis.FromEuler(new Vector3(0, Mathf.Pi * 0.5f, 0)), new Vector3(-sideX, 0, z)), uw, false);
+			Unit(new Transform3D(Basis.FromEuler(new Vector3(0, -Mathf.Pi * 0.5f, 0)), new Vector3(sideX, 0, z)), uw, false);
 		}
 		frame.CommitTo(this, "Shelving");
 		bodies.CommitTo(this, "CrtBodies");
 		screens.CommitTo(this, "CrtScreens", false);
 		cables.CommitTo(this, "Cables");
-		GD.Print($"[bunker] CRT room: {screenCount} screens");
+		ScreenCount = screenCount;
+		GD.Print($"[bunker] CRT room: {screenCount} screens, {ScreenArea:0.0} m² of sets");
 	}
 
 	private void BuildConsoleAndTarget()
@@ -326,10 +348,12 @@ public partial class CrtRoom : Node3D
 		var body = new MeshKit();
 		var screen = new MeshKit();
 		screen.Mat(_targetMat);
-		var spec = new BunkerKit.CrtSpec { W = 0.72f, H = 0.6f, D = 0.6f, KnobsRight = true, Body = new Color(0.44f, 0.4f, 0.32f) };
+		var spec = new BunkerKit.CrtSpec { W = 0.84f, H = 0.7f, D = 0.66f, KnobsRight = true, Body = new Color(0.44f, 0.4f, 0.32f) };
 		_targetTubeLocal = BunkerKit.Crt(body, screen, Transform3D.Identity, spec, new Color(0.37f, 0f, 0f, 1f));
 		body.CommitTo(_target, "Body");
 		screen.CommitTo(_target, "Screen", false);
+		// solid (the big set: the clip audit's walk-through rule); the switch's pick sphere stands proud of its screen
+		AddBox(_target.Position + new Vector3(0, spec.H * 0.5f, 0.02f), new Vector3(spec.W, spec.H, spec.D + 0.04f));   // (over its bulged glass too)
 
 		_switch = new Interactable
 		{

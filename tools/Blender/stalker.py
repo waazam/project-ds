@@ -332,7 +332,13 @@ def head_local(p):
     return (Matrix.Translation(HC) @ HEAD_ROT @ p.to_4d()).to_3d()
 
 
-SOCKETS = [V((-0.03, 0.088, 0.008)), V((0.03, 0.088, 0.008))]
+# the sockets (the face pass, 2026-10-03, the owner: "creepier eyes and facial features"): not a pair. Its left (-x)
+# small, high and narrow; its right wide, deep and dropped lower, its eye bulging in it, too big for it
+SOCKETS = [V((-0.029, 0.088, 0.013)), V((0.032, 0.088, 0.001))]
+SOCKET_R = [(0.015, 0.02, 0.04), (0.021, 0.029, 0.052)]      # (across, up-down, depth)
+# the jaw torn loose on its left: there the face below the slit is the jaw's alone (a clean tear), and a few sinews
+# still span the tear; the right hinge holds (the game hangs it from there)
+TORN_SIDE = -1
 MOUTH_Z = -0.112
 
 
@@ -364,10 +370,29 @@ def build_head(m):
         if p.y < 0.03:
             continue
         push = 0.0
-        for c in SOCKETS:
-            d = ((p.x - c.x) / 0.017) ** 2 + ((p.z - c.z + 0.004) / 0.023) ** 2
+        for c, (rx, rz, depth) in zip(SOCKETS, SOCKET_R):
+            d = ((p.x - c.x) / rx) ** 2 + ((p.z - c.z + 0.004) / rz) ** 2
             if d < 1.0:
-                push = max(push, 0.045 * (1 - d) ** 0.45)
+                push = max(push, depth * (1 - d) ** 0.45)
+            # creases radiating from the socket, the skin drawn into it
+            dx, dz = p.x - c.x, p.z - c.z
+            r = math.hypot(dx / rx, dz / rz)
+            if 1.0 < r < 1.9:
+                a = math.atan2(dz, dx) * 7.0 / (2 * math.pi) + (0.3 if c.x > 0 else 0.0)
+                f = abs(a - round(a))
+                if f < 0.07:
+                    push = max(push, 0.0028 * (1 - f / 0.07) * (1 - (r - 1.0) / 0.9))
+        # the cheeks hollow under the bone
+        for sx in (-1, 1):
+            d = ((p.x - sx * 0.042) / 0.02) ** 2 + ((p.z + 0.05) / 0.028) ** 2
+            if d < 1.0:
+                push = max(push, 0.008 * (1 - d) ** 1.5)
+        # the nose gone: a cavity, narrowing to its foot
+        nz = (p.z + 0.052) / 0.016
+        if -1.0 < nz < 1.0:
+            half = 0.009 * (0.55 + 0.45 * (nz + 1.0) / 2.0)
+            if abs(p.x) < half:
+                push = max(push, 0.016 * (1 - (p.x / half) ** 2) * (1 - nz * nz) ** 0.5)
         # the slit straight across, its corners dragged down (from below it would read as a smile)
         mz = (p.z - (MOUTH_Z - 0.014 * (p.x / 0.052) ** 2)) / 0.0042
         mx = abs(p.x) / 0.054
@@ -380,7 +405,8 @@ def build_head(m):
         if push > 0:
             v.co = p - V((0, push, 0))
         for i, c in enumerate(SOCKETS):
-            if ((p.x - c.x) / 0.006) ** 2 + ((p.z - c.z) / 0.005) ** 2 < 1.0 and p.y > 0.03:
+            # (every vertex here was on the face's front before the carve: the deep socket's floor is pushed far back)
+            if ((p.x - c.x) / (SOCKET_R[i][0] * 0.35)) ** 2 + ((p.z - c.z) / (SOCKET_R[i][1] * 0.25)) ** 2 < 1.0:
                 floor[i] = min(floor[i], v.co.y)
     bm.to_mesh(head.data)
     bm.free()
@@ -431,11 +457,35 @@ def build_head(m):
     head.data.materials.clear()
     head.data.materials.append(m["face"])
     eyes = []
+    pupils = []
     for i, c in enumerate(SOCKETS):
-        # far back in the socket, a little proud of its floor
-        e = lumpy_sphere("Eye", head_local(V((c.x, floor[i] + 0.003, c.z))), (0.0068, 0.0055, 0.006), m["eye"], 60, amp=0.0, subdiv=2)
+        big = i == 1
+        r = (0.0098, 0.0085, 0.0092) if big else (0.0062, 0.005, 0.0056)
+        # the small one far back in its socket; the big one swollen half out of its own
+        cy = floor[i] + (0.016 if big else 0.003)
+        e = lumpy_sphere("Eye", head_local(V((c.x, cy, c.z))), r, m["eye"], 60, amp=0.0, subdiv=2)
         eyes.append(e)
-    return head, eyes, mouth
+        look = V((0.32, 1.0, 0.38)).normalized() if big else V((-0.05, 1.0, -0.05)).normalized()
+        pc = V((c.x, cy, c.z)) + V((look.x * r[0], look.y * r[1], look.z * r[2])) * 1.02
+        pu = lumpy_sphere("Pupil", (0, 0, 0), (0.0016 if big else 0.0013, 0.0005, 0.0016 if big else 0.0013), m["mouth"], 20, amp=0.0, subdiv=2)
+        # flat against the eye, facing out along its look
+        rotq = V((0, 1, 0)).rotation_difference(look)
+        for v in pu.data.vertices:
+            v.co = head_local(pc + rotq @ V(v.co))
+        pupils.append(pu)
+    # the sinews still spanning the tear on its left, from the face above the slit to the jaw below it
+    sin_rnd = random.Random(47)
+    for k in range(6):
+        x = TORN_SIDE * (0.012 + 0.04 * (k + sin_rnd.uniform(-0.3, 0.3)) / 5)
+        y = (lip(x, True) or 0.05) - 0.004
+        top = V((x + sin_rnd.uniform(-0.002, 0.002), y, slit_z(x) + 0.006))
+        bot = V((x + sin_rnd.uniform(-0.004, 0.004), y - sin_rnd.uniform(0.0, 0.004), slit_z(x) - 0.006))
+        sn = cylinder(f"Sinew{k}", top, bot, sin_rnd.uniform(0.0008, 0.0014), sin_rnd.uniform(0.0006, 0.001), 5, m["mouth"])
+        lower = [v.index for v in sn.data.vertices if v.co.z < slit_z(x)]
+        for v in sn.data.vertices:
+            v.co = head_local(V(v.co))
+        mouth.append((sn, ("sinew", lower), "sinew"))
+    return head, eyes + pupils, mouth
 
 
 # ------------------------------------------------------------------ the parts that aren't hide
@@ -658,6 +708,9 @@ def face_colour(co, nrm):
     for c in SOCKETS:
         if abs(hl.x - c.x) < 0.01 + 0.004 * n and hl.z < c.z and hl.y > 0.06:
             run = max(run, 0.7 * (1 - (c.z - hl.z) / 0.12))
+    # the tear on its left: raw and dark along the slit's lower edge
+    if TORN_SIDE * hl.x > 0.008 and -0.016 < hl.z - (MOUTH_Z - 0.014 * (hl.x / 0.052) ** 2) < 0.0:
+        run = 1.0
     if abs(hl.z - (MOUTH_Z - 0.014 * (hl.x / 0.052) ** 2)) < 0.006 and abs(hl.x) < 0.054:
         run = 1.0
     base = V(hide_colour(co, nrm))
@@ -685,8 +738,8 @@ def tone_face(co, nrm):
     hn = HEAD_ROT.to_3x3().inverted() @ nrm
     front = min(max((hn.y - 0.55) / 0.4, 0.0), 1.0)
     dark = 1.0
-    for c in SOCKETS:
-        d = math.hypot((hl.x - c.x) / 0.02, (hl.z - c.z + 0.004) / 0.026)
+    for c, (rx, rz, _) in zip(SOCKETS, SOCKET_R):
+        d = math.hypot((hl.x - c.x) / (rx * 1.2), (hl.z - c.z + 0.004) / (rz * 1.15))
         if d < 1.0 and hl.y > 0.03:
             dark = min(dark, 0.3 + 0.7 * d)
             front *= d
@@ -898,8 +951,10 @@ def skin_weights(ob, arm_obj, bones):
                 # the jaw: the face below the mouth's slit (its corners dragged down), forward of the hinge
                 hl = (HEAD_ROT.inverted() @ (Matrix.Translation(-HC) @ V(P[v.index]).to_4d())).to_3d()
                 sz = MOUTH_Z - 0.014 * (min(abs(hl.x), 0.06) / 0.052) ** 2
-                if hl.z < sz - 0.002 and hl.y > -0.03:
+                torn = min(max((TORN_SIDE * hl.x - 0.006) / 0.012, 0.0), 1.0)   # 0 the held side .. 1 the torn
+                if hl.z < sz - 0.002 + 0.0015 * torn and hl.y > -0.03:
                     k = min(1.0, (sz - 0.002 - hl.z) / 0.01)
+                    k = k + (1.0 - k) * torn
                     w = {"head": 1 - k, "jaw": k}
         for n, x in w.items():
             if x > 0:
@@ -1180,9 +1235,14 @@ def main():
     paint4(head, tone_face)
     W.tag(head, "flesh")
     for e in eyes:
-        W.paint(e, flat((0.9, 0.8, 0.45)))
-        W.detail_attr(e, 0.0)
-        paint4(e, tone_eye)
+        if e.name.startswith("Pupil"):
+            W.paint(e, flat((0.01, 0.008, 0.006)))
+            W.detail_attr(e, 0.0)
+            paint4(e, lambda co, n: (0.0, 0.05, 0.0, 1.0))
+        else:
+            W.paint(e, flat((0.9, 0.8, 0.45)))
+            W.detail_attr(e, 0.0)
+            paint4(e, tone_eye)
         W.tag(e, "head")
     for ob, bone in crowns:
         W.paint(ob, bark_colour)
@@ -1195,10 +1255,16 @@ def main():
         paint4(ob, tone_bark)
         W.tag(ob, bone)
     for ob, bone, kind in mouth:
-        W.paint(ob, flat((0.55, 0.5, 0.4) if kind == "tooth" else (0.02, 0.006, 0.006)))
+        W.paint(ob, flat((0.55, 0.5, 0.4) if kind == "tooth" else (0.09, 0.03, 0.025) if kind == "sinew" else (0.02, 0.006, 0.006)))
         W.detail_attr(ob, 0.2)
-        paint4(ob, (lambda co, n: (0.55, 1.0, 0.3, 1.0)) if kind == "tooth" else (lambda co, n: (0.0, 0.12, 0.0, 1.0)))
-        W.tag(ob, bone)
+        paint4(ob, (lambda co, n: (0.55, 1.0, 0.3, 1.0)) if kind == "tooth" else (lambda co, n: (0.35, 0.45, 0.3, 1.0)) if kind == "sinew" else (lambda co, n: (0.0, 0.12, 0.0, 1.0)))
+        if kind == "sinew":
+            # stretched between the two: the top ring the face's, the bottom ring the jaw's
+            W.tag(ob, "head")
+            ob.vertex_groups["P_head"].remove(bone[1])
+            ob.vertex_groups.new(name="P_jaw").add(bone[1], 1.0, "REPLACE")
+        else:
+            W.tag(ob, bone)
     W.paint(rags, lambda co, n: tuple(V((0.03, 0.027, 0.025)) * (0.7 + 0.6 * fbm(co.x * 9, co.y * 9, co.z * 9, 3))))
     W.detail_attr(rags, 0.5)
     paint4(rags, tone_rag)
@@ -1271,7 +1337,8 @@ def main():
                                   ("stalker_low", "peek_low_R", 22, ((0, 0, 0.8), 3.4, 0.3, 20)), ("stalker_cling", "cling", 16, ((0, 0, 1.3), 3.6, 0.2, 200)),
                                   ("stalker_gape", "loom", 12, (tuple(HC), 0.7, -0.05, 10)),
                                   ("stalker_mouth", "idle", 0, (tuple(head_local(V((0, 0.06, MOUTH_Z)))), 0.3, 0.0, 0)),
-                                  ("stalker_mouth_open", "loom", 12, (tuple(head_local(V((0, 0.06, MOUTH_Z)))), 0.35, -0.02, 0))):
+                                  ("stalker_mouth_open", "loom", 12, (tuple(head_local(V((0, 0.06, MOUTH_Z)))), 0.35, -0.02, 0)),
+                                  ("stalker_face_side", "idle", 0, (tuple(HC), 0.75, 0.0, 55))):
         arm_obj.animation_data.action = bpy.data.actions[act]
         bpy.context.scene.frame_set(frame)
         preview(name, *cam)

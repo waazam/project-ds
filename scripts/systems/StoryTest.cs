@@ -1214,6 +1214,8 @@ public partial class StoryTest : Node
 		Check("the lights have gone red", bi.RedTriggered);
 		Check("the stalker stepped out in the flickering hallway", bi.JumpscareFired);
 		Check("the lamps died for the scare, and came back", bi.Hallway is { BlackoutCount: >= 1, BlackedOut: false }, $"{bi.Hallway?.BlackoutCount}");
+		Check("the tunnel is dressed (distance marks, side doors, the vault spalling, the boots)",
+			bi.Hallway?.GetNodeOrNull<MeshInstance3D>("Dressing") is { Mesh: not null } && bi.Hallway.Stencils >= 12, $"{bi.Hallway?.Stencils} stencils");
 		Screenshot("hallway");
 		await Aim(bi.VineDoorInteractWorld, ct);
 		await Press(ct);
@@ -1224,6 +1226,10 @@ public partial class StoryTest : Node
 		Check("the door is locked before the screens and the walkie", bi.Flow is { VineDoorUnlocked: false });
 
 		// Act 9: the screens.
+		var survAtlas = ProjectDS.World.BunkerParts.BunkerTextures.SurveillanceAtlas();
+		Check("the CRT room's walls are covered in big sets, nine cameras on them at the new size",
+			bi.Crt is { ScreenCount: >= 80, ScreenArea: >= 30f } && survAtlas.GetWidth() == 768,
+			$"{bi.Crt?.ScreenCount} sets, {bi.Crt?.ScreenArea:0.0} m², atlas {survAtlas.GetWidth()} px");
 		await WalkTo(bi.CrtTargetApproachWorld, 1.0f, ct);
 		await Aim(bi.CrtSwitchWorld, ct);
 		await Press(ct);
@@ -1378,9 +1384,9 @@ public partial class StoryTest : Node
 		Check("checkpoint 9: the giant's touch", StoryManager.Instance.Current >= Checkpoint.Act11GiantEncounter);
 		Check("the seated cap is saved with it", StoryManager.Instance.HasFlag(StoryManager.Flag.NewelSeated));
 		Check("the ending is running", act11.EndingStarted);
-		Check("they looked up into its eyes", act11.LookedUp);
-		Check("trembling, then passed out looking at it", act11.Trembled && act11.PassedOut);
-		Check("the hum hummed out over black", act11.HumOut);
+		Check("it rose out of the woods and they looked up into its eyes", act11.LookedUp);
+		Check("trembling under its stare, then its hand reached them and the screen cut to black", act11.Trembled && act11.Grabbed && act11.PassedOut);
+		Check("the hum cut dead with the grab", act11.HumOut);
 		Check("the view never flipped during the ending (up-vector and pitch watched every driven frame)", !act11.ViewFlipped);
 		Engine.TimeScale = 1.0;
 		// Act 12 picks up from here: they wake at the lake instead of the credits rolling straight away.

@@ -102,7 +102,7 @@ public partial class EquippedItemHud : CanvasLayer
 		int i = System.Array.FindIndex(_items, it => it.Kind == _held);
 		if (i < 0) return;
 		var size = _draw.Size;
-		_draw.DrawRect(new Rect2(size.X * 0.45f, 0, size.X * 0.55f, 1f), new Color(UiKit.Fog, 0.4f));
+		// (no rule above it any more: the owner, 2026-10-03, "it serves no purpose")
 		var font = UiKit.Serif;
 		// the item in hand
 		var pos = new Vector2(0, 15f);

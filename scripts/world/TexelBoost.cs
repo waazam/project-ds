@@ -27,8 +27,9 @@ public static class TexelBoost
 	/// <summary>Off for tests that compare exact generated pixels (none do yet).</summary>
 	public static bool Enabled = true;
 
-	/// <summary>Keys left at their native size: data textures read by position (masks, lookup maps).</summary>
-	private static readonly string[] Skip = { "trailmap", "waternoise", "uv_", "grime_detail" };
+	/// <summary>Keys left at their native size: data textures read by position (masks, lookup maps), and the CRTs'
+	/// pictures (drawn at full size, and an atlas whose cells mustn't bleed).</summary>
+	private static readonly string[] Skip = { "trailmap", "waternoise", "uv_", "grime_detail", "bk_pic" };
 
 	public static Image Apply(string key, Image src)
 	{

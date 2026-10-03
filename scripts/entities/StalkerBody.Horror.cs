@@ -53,6 +53,8 @@ public partial class StalkerBody
 	private void Horror(float dt)
 	{
 		if (_bHead < 0) return;
+		Breathe();
+		GiantPre();
 		Vector3 up = (_skel.GlobalBasis.Inverse() * Vector3.Up).Normalized();
 		// the owl: the head right round on the twisted neck (a third of the turn at each bone)
 		if (Kind == PeekKind.Owl && Peeking)
@@ -112,6 +114,7 @@ public partial class StalkerBody
 		}
 		// the jaw (its clip's opening and this): about the figure's side axis, opening down
 		if (_bJaw >= 0 && _gape > 0.001f) TurnBone(_bJaw, Vector3.Right, -_gape);
+		GiantPost(dt);
 	}
 
 	/// <summary>A hand on the bark drums its fingers on it, unwatched: each finger lifting and coming down in turn.

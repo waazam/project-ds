@@ -143,6 +143,7 @@ public partial class StalkerBody
 			_anim.Play("idle");
 			_anim.Seek(_idleRng.RandfRange(0f, 5.5f), true);
 		}
+		FindJawHinge();
 		return true;
 	}
 
@@ -193,7 +194,7 @@ public partial class StalkerBody
 		{
 			var k = new World.MeshKit();
 			k.Mat(mat);
-			k.Blob(e, new Vector3(0.0075f, 0.006f, 0.0065f), 6, 0f, false);
+			k.Blob(e, new Vector3(0.0045f, 0.0038f, 0.004f), 6, 0f, false);   // (inside the eye: its own glow is the skin's, and the pupil stays)
 			k.CommitTo(att, "Eye", false);
 		}
 		att.AddChild(new OmniLight3D
@@ -280,6 +281,12 @@ public partial class StalkerBody
 
 	private void ModelProcess(float dt)
 	{
+		// stop-motion (the giant's grab): frozen where it is but for the frames let through
+		if (Hold)
+		{
+			if (!_step) return;
+			_step = false;
+		}
 		if (_anim != null)
 		{
 			// walking: the clip's feet locked to the walker's phase (a footfall at every pi)
@@ -310,6 +317,9 @@ public partial class StalkerBody
 			else
 			{
 				if (_hold == "shove" && !_anim.IsPlaying()) Play("idle", 0.4f);
+				// from rest each frame: a channel the clip doesn't key (the head's and the jaw's positions) would
+				// otherwise keep last frame's overlays and compound them (the neck drawn out, the jaw hung)
+				_skel.ResetBonePoses();
 				_anim.Advance(dt);
 				Capture();
 			}
@@ -440,9 +450,13 @@ public partial class StalkerBody
 			}
 			rag.LastRoot = root;
 			// the effective pull (gravity less the root's acceleration), in the skeleton's space, per unit of size
-			Vector3 pull = basisInv * (new Vector3(0, -9.8f, 0) - acc.LimitLength(30f) / scale * 0.35f);
-			float wind = 0.6f + 0.4f * Mathf.Sin(_t * 0.7f + rag.Bones[0]);
-			pull += (basisInv * new Vector3(Mathf.Sin(_t * 0.9f + rag.Bones[0] * 1.3f), 0, Mathf.Cos(_t * 0.6f + rag.Bones[0]))) * wind * 0.9f;
+			Vector3 pull = basisInv * (new Vector3(0, -9.8f, 0) - acc.LimitLength(30f) / scale * 0.6f);
+			// the air: a slow drift, and gusts rolling through that lift the strips and let them fall (the owner,
+			// 2026-10-03: the shreds of cloth moving around); each chain catches them a little after the last
+			float ph = _t + rag.Bones[0] * 0.37f;
+			float gust = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(ph * 0.45f) * 0.6f + Mathf.Sin(ph * 1.1f + 2f) * 0.4f), 2f);
+			float wind = 1.2f + 3.6f * gust;
+			pull += (basisInv * new Vector3(Mathf.Sin(ph * 0.9f + rag.Bones[0] * 1.3f), 0.25f * gust, Mathf.Cos(ph * 0.6f + rag.Bones[0]))) * wind;
 			Vector3 pullDir = pull.Normalized();
 			for (int j = 0; j < 3; j++)
 			{
@@ -453,8 +467,10 @@ public partial class StalkerBody
 				float k = Mathf.Clamp(rag.Hang + 0.15f * j, 0f, 0.95f);
 				Vector3 rest = clipDir + (down - clipDir) * k;
 				Vector3 target = (rest + (pullDir - down) * (0.6f + 0.25f * j)).Normalized();
+				// the torn ends flutter
+				if (j == 2) target = (target + new Vector3(Mathf.Sin(_t * 7.3f + b), Mathf.Sin(_t * 5.1f + b * 2f), Mathf.Cos(_t * 6.7f + b)) * (0.05f + 0.12f * (wind - 1.2f) / 3.6f)).Normalized();
 				if (!rag.Started) { rag.Dir[j] = target; rag.Vel[j] = Vector3.Zero; }
-				float stiff = 26f - 7f * j, damp = 4.5f;
+				float stiff = 20f - 5f * j, damp = 3.4f;
 				rag.Vel[j] += (target - rag.Dir[j]) * stiff * dt;
 				rag.Vel[j] *= Mathf.Exp(-damp * dt);
 				rag.Dir[j] = (rag.Dir[j] + rag.Vel[j] * dt).Normalized();

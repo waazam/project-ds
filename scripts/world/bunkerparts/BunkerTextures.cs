@@ -8,12 +8,12 @@ namespace ProjectDS.World.BunkerParts;
 /// <summary>
 /// Low-res procedural textures and shared materials for the bunker (outside
 /// and in): board-formed concrete, floor concrete, stains/cracks/moss decals,
-/// ivy leaves, plastics and paint, and the pictures the CRTs show (the woods
-/// on surveillance, the smouldering cabin, the stairs receding into fog).
+/// ivy leaves, plastics and paint (the pictures the CRTs show are in
+/// BunkerPictures.cs).
 /// Everything is generated from fixed seeds, linear-filtered with mipmaps
 /// (the PS2 look), and cached for the lifetime of the process.
 /// </summary>
-public static class BunkerTextures
+public static partial class BunkerTextures
 {
 	private static readonly Dictionary<string, Texture2D> _tex = new();
 	private static readonly Dictionary<string, Material> _mat = new();
@@ -102,13 +102,44 @@ public static class BunkerTextures
 				for (int x = ax; x <= bx; x++)
 					Px[y * W + x] = c;
 		}
+		/// <summary>A soft-edged line, tapering from radius r0 to r1 (a pixel of antialiasing).</summary>
+		public void Line(float x0, float y0, float x1, float y1, float r0, float r1, Color c)
+		{
+			float r = Mathf.Max(r0, r1) + 1f;
+			int ax = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(x0, x1) - r)), bx = Mathf.Min(W - 1, Mathf.CeilToInt(Mathf.Max(x0, x1) + r));
+			int ay = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(y0, y1) - r)), by = Mathf.Min(H - 1, Mathf.CeilToInt(Mathf.Max(y0, y1) + r));
+			var a = new Vector2(x0, y0);
+			var ba = new Vector2(x1 - x0, y1 - y0);
+			float bb = Mathf.Max(ba.LengthSquared(), 1e-5f);
+			for (int y = ay; y <= by; y++)
+				for (int x = ax; x <= bx; x++)
+				{
+					var p = new Vector2(x + 0.5f, y + 0.5f) - a;
+					float h = Mathf.Clamp(p.Dot(ba) / bb, 0f, 1f);
+					float cover = Mathf.Clamp(Mathf.Lerp(r0, r1, h) - (p - ba * h).Length() + 0.5f, 0f, 1f);
+					if (cover > 0f) Blend(x, y, c, cover);
+				}
+		}
+		public void Disc(float cx, float cy, float r, Color c) => Line(cx, cy, cx, cy, r, r, c);
+		/// <summary>Copies another canvas in at (ox, oy).</summary>
+		public void Blit(Canvas src, int ox, int oy)
+		{
+			for (int y = 0; y < src.H; y++)
+				for (int x = 0; x < src.W; x++)
+					Set(ox + x, oy + y, src.Px[y * src.W + x]);
+		}
 		public Image ToImage()
 		{
-			var img = Image.CreateEmpty(W, H, false, Image.Format.Rgba8);
-			for (int y = 0; y < H; y++)
-				for (int x = 0; x < W; x++)
-					img.SetPixel(x, y, Px[y * W + x]);
-			return img;
+			var data = new byte[W * H * 4];
+			for (int i = 0; i < Px.Length; i++)
+			{
+				var c = Px[i];
+				data[i * 4] = (byte)(Mathf.Clamp(c.R, 0f, 1f) * 255f + 0.5f);
+				data[i * 4 + 1] = (byte)(Mathf.Clamp(c.G, 0f, 1f) * 255f + 0.5f);
+				data[i * 4 + 2] = (byte)(Mathf.Clamp(c.B, 0f, 1f) * 255f + 0.5f);
+				data[i * 4 + 3] = (byte)(Mathf.Clamp(c.A, 0f, 1f) * 255f + 0.5f);
+			}
+			return Image.CreateFromData(W, H, false, Image.Format.Rgba8, data);
 		}
 	}
 
@@ -265,276 +296,79 @@ public static class BunkerTextures
 		return new Color(0.16f, 0.03f, 0.02f, Mathf.Clamp(a * 0.9f, 0f, 1f));
 	});
 
-	/// <summary>A cluster of three ivy leaves (alpha cut-out card).</summary>
-	public static Texture2D IvyLeaves() => Make("bk_ivy", 32, 32, (x, y) =>
-	{
-		(float cx, float cy, float s, float rot)[] leaves = { (11f, 12f, 8.5f, 0.4f), (22f, 15f, 7.5f, -0.5f), (15f, 23f, 7f, 2.6f) };
-		for (int i = 0; i < leaves.Length; i++)
-		{
-			var (cx, cy, s, rot) = leaves[i];
-			float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
-			float u = (dx * Mathf.Cos(rot) - dy * Mathf.Sin(rot)) / s;
-			float v = (dx * Mathf.Sin(rot) + dy * Mathf.Cos(rot)) / s;
-			// Heart-ish ivy leaf: two lobes and a point.
-			float r = Mathf.Sqrt(u * u + v * v);
-			float ang = Mathf.Atan2(v, u);
-			float lobe = 0.75f + 0.25f * Mathf.Cos(ang * 3f);
-			if (r < lobe)
-			{
-				float n = Fbm(x, y, 32, 32, 4, 2, 421 + i);
-				var c = Mix(new Color(0.12f, 0.2f, 0.07f), new Color(0.2f, 0.3f, 0.1f), n);
-				if (Mathf.Abs(v) < 0.08f || Mathf.Abs(u) < 0.06f) c *= 0.75f;   // veins
-				c *= 0.85f + 0.3f * (1f - r / lobe);
-				return new Color(c.R, c.G, c.B, 1f);
-			}
-		}
-		return new Color(0.14f, 0.22f, 0.08f, 0f);
-	});
-
-	// ------------------------------------------------------------------ CRT pictures (96x72, 4:3)
-
-	private const int PicW = 96, PicH = 72;
-
 	/// <summary>
-	/// The stairs in the woods: a long stone flight rising straight away from the camera between
-	/// dark trunks, each step greyer than the last until the top dissolves into fog.
+	/// Ivy leaves (the vine door, 2026-10-03): a 2 x 2 atlas, one leaf a cell, its stalk at the bottom of the cell
+	/// and its blade above: 0 the five-lobed leaf, 1 three-lobed, 2 an old one going brown and holed, 3 the unlobed
+	/// heart of a mature stem. Dark, waxy green, pale veins fanning from the stalk to each lobe's point.
 	/// </summary>
-	public static Texture2D StairsPicture()
+	public static Texture2D IvyLeafAtlas()
 	{
-		if (_tex.TryGetValue("bk_pic_stairs", out var t)) return t;
-		var cv = new Canvas(PicW, PicH, Colors.Black);
-		var fog = new Color(0.6f, 0.63f, 0.64f);
-		float horizon = PicH * 0.42f;
-		DrawWoods(cv, 0, 0, PicW, PicH, horizon, fog, new Color(0.16f, 0.16f, 0.15f), 26, 501, clearingHalf: 14f);
-
-		const float f = 64f, eye = 1.55f, z0 = 3.0f, run = 0.34f, rise = 0.2f, halfW = 1.0f;
-		const int steps = 64;
-		float Sx(float x, float z) => PicW * 0.5f + f * x / z;
-		float Sy(float y, float z) => horizon - f * (y - eye) / z;
-		Color Fogged(Color c, float z) => Mix(c, fog, 1f - Mathf.Exp(-z * 0.075f));
-		for (int i = steps - 1; i >= 0; i--)
+		if (_tex.TryGetValue("bk_pic_ivy", out var t)) return t;
+		const int cell = 128;
+		var cv = new Canvas(cell * 2, cell * 2, new Color(0.1f, 0.16f, 0.06f, 0f));
+		// the lobes of each kind: (angle from straight up, length, width), lengths in cells
+		var kinds = new (float a, float len, float w)[][]
 		{
-			float zf = z0 + i * run, zb = zf + run;
-			float yb = i * rise, yt = (i + 1) * rise;
-			float shade = 0.92f + 0.16f * Hash(i, 0, 502);
-			// Cheek walls either side, a little higher than the tread.
-			var cheek = Fogged(new Color(0.3f, 0.31f, 0.3f) * shade, zf);
-			cv.Rect(Sx(-halfW - 0.28f, zf), Sx(-halfW, zf), Sy(yt + 0.4f, zf), Sy(yb, zf), cheek);
-			cv.Rect(Sx(halfW, zf), Sx(halfW + 0.28f, zf), Sy(yt + 0.4f, zf), Sy(yb, zf), cheek);
-			// Tread (seen from above while below eye height) then riser in front of it.
-			var tread = Fogged(new Color(0.58f, 0.58f, 0.55f) * shade, zb);
-			if (yt < eye) cv.Rect(Sx(-halfW, zb), Sx(halfW, zb), Sy(yt, zb), Sy(yt, zf), tread);
-			var riser = Fogged(new Color(0.33f, 0.34f, 0.33f) * shade, zf);
-			cv.Rect(Sx(-halfW, zf), Sx(halfW, zf), Sy(yt, zf), Sy(yb, zf), riser);
-			// Nosing highlight.
-			var nose = Fogged(new Color(0.7f, 0.7f, 0.67f), zf);
-			float ny = Sy(yt, zf);
-			cv.Rect(Sx(-halfW, zf), Sx(halfW, zf), ny, ny + Mathf.Max(0.6f, 0.03f * f / zf), nose);
-		}
-		Grain(cv, 503, 0.05f);
-		return Store("bk_pic_stairs", cv.ToImage());
-	}
-
-	/// <summary>
-	/// The cabin, at night, smouldering: flames licking the roof and pouring from the windows,
-	/// smoke billowing above. Alpha carries the flame mask (the shader flickers it).
-	/// </summary>
-	public static Texture2D CabinPicture()
-	{
-		if (_tex.TryGetValue("bk_pic_cabin", out var t)) return t;
-		var cv = new Canvas(PicW, PicH, new Color(0, 0, 0, 0));
-		float horizon = 48f;
-		for (int y = 0; y < PicH; y++)
-			for (int x = 0; x < PicW; x++)
-			{
-				float glow = Mathf.Exp(-(Mathf.Pow((x - 48f) / 30f, 2f) + Mathf.Pow((y - 34f) / 22f, 2f)));
-				Color c = y < horizon
-					? Mix(new Color(0.02f, 0.025f, 0.04f), new Color(0.08f, 0.06f, 0.06f), y / horizon)
-					: Mix(new Color(0.06f, 0.045f, 0.03f), new Color(0.02f, 0.018f, 0.015f), (y - horizon) / (PicH - horizon));
-				c += new Color(0.42f, 0.16f, 0.04f) * glow * 0.8f;
-				cv.Set(x, y, new Color(c.R, c.G, c.B, 0f));
-			}
-		// Smoke column rising and leaning, lit orange from below.
-		for (int y = 0; y < 34; y++)
-			for (int x = 0; x < PicW; x++)
-			{
-				float cx = 48f + (34 - y) * 0.45f;
-				float wdt = 9f + (34 - y) * 0.5f;
-				float d = Mathf.Abs(x - cx) / wdt;
-				float n = Fbm(x, y * 1.4f, PicW, PicH, 6, 3, 511);
-				float a = Mathf.SmoothStep(1f, 0.3f, d + (0.5f - n) * 0.8f) * 0.85f;
-				if (a <= 0f) continue;
-				var sm = Mix(new Color(0.2f, 0.16f, 0.13f), new Color(0.1f, 0.09f, 0.09f), (34 - y) / 34f);
-				cv.Blend(x, y, sm, a);
-			}
-		// Tree silhouettes behind, rim-lit.
-		var rng = new RandomNumberGenerator { Seed = 512 };
-		for (int i = 0; i < 16; i++)
+			new[] { (0f, 0.6f, 0.62f), (0.98f, 0.46f, 0.6f), (-0.98f, 0.46f, 0.6f), (1.95f, 0.3f, 0.6f), (-1.95f, 0.3f, 0.6f) },
+			new[] { (0f, 0.6f, 0.75f), (1.1f, 0.44f, 0.7f), (-1.1f, 0.44f, 0.7f) },
+			new[] { (0.08f, 0.55f, 0.62f), (1.0f, 0.44f, 0.6f), (-0.92f, 0.4f, 0.6f), (2.0f, 0.27f, 0.6f), (-1.9f, 0.25f, 0.6f) },
+			new[] { (0f, 0.6f, 1.1f) },
+		};
+		for (int k = 0; k < 4; k++)
 		{
-			float tx = rng.RandfRange(0, PicW), th = rng.RandfRange(14, 30), tw = rng.RandfRange(6, 11);
-			if (Mathf.Abs(tx - 48f) < 20f) continue;
-			for (int y = (int)(horizon - th); y < horizon + 2; y++)
-			{
-				float frac = (y - (horizon - th)) / th;
-				float half = tw * 0.5f * frac;
-				for (int x = (int)(tx - half); x <= (int)(tx + half); x++)
-					cv.Set(x, y, new Color(0.015f, 0.015f, 0.02f, 0f) + new Color(0.08f, 0.03f, 0.01f, 0f) * Mathf.Exp(-Mathf.Abs(x - 48f) / 16f));
-			}
-		}
-		// The cabin: log walls, gable roof, glowing windows, the doorway.
-		float wallL = 30f, wallR = 66f, wallT = 37f, wallB = 55f, apexY = 23f;
-		for (int y = (int)apexY; y < wallB; y++)
-			for (int x = (int)wallL - 4; x < wallR + 4; x++)
-			{
-				float roofY = apexY + Mathf.Abs(x - 48f) * (wallT - apexY) / 22f;
-				if (y < roofY) continue;
-				if (y < wallT)
+			int ox = (k % 2) * cell, oy = (k / 2) * cell;
+			var lobes = kinds[k];
+			const float px = 0.5f, py = 0.74f;   // where the stalk meets the blade (the veins fan from here)
+			for (int y = 0; y < cell; y++)
+				for (int x = 0; x < cell; x++)
 				{
-					var roof = new Color(0.06f, 0.045f, 0.04f) * (0.8f + 0.4f * Hash(x, y, 513));
-					cv.Set(x, y, new Color(roof.R, roof.G, roof.B, 0f));
-				}
-				else if (x >= wallL && x < wallR)
-				{
-					bool log = (y - (int)wallT) % 3 == 0;
-					var wall = new Color(0.16f, 0.08f, 0.04f) * (log ? 0.6f : 1f) * (0.8f + 0.3f * Hash(x, y, 514));
-					cv.Set(x, y, new Color(wall.R, wall.G, wall.B, 0f));
-				}
-			}
-		void Window(float x0, float x1, float y0, float y1)
-		{
-			for (int y = (int)y0; y < y1; y++)
-				for (int x = (int)x0; x < x1; x++)
-				{
-					float f = 0.7f + 0.3f * Hash(x, y, 515);
-					cv.Set(x, y, new Color(1f * f, 0.62f * f, 0.16f * f, 0.9f));
+					float u = (x + 0.5f) / cell - px, v = py - (y + 0.5f) / cell;   // v up
+					float r = Mathf.Sqrt(u * u + v * v), th = Mathf.Atan2(u, v);       // 0 straight up
+					// the outline: a smooth max of the lobes (pointed: each falls off linearly to its sides) and a
+					// round core, notched at the bottom where the stalk comes in
+					float sum = Mathf.Exp(14f * 0.27f), best = 0f;
+					foreach (var (a, len, w) in lobes)
+					{
+						float d = Mathf.Abs(Mathf.Wrap(th - a, -Mathf.Pi, Mathf.Pi));
+						float rl = len * Mathf.Pow(Mathf.Max(0f, 1f - d / w), k == 3 ? 0.6f : 0.85f);
+						sum += Mathf.Exp(14f * rl);
+						best = Mathf.Max(best, rl);
+					}
+					float R = Mathf.Log(sum) / 14f;
+					R *= Mathf.SmoothStep(Mathf.Pi, Mathf.Pi - 0.5f, Mathf.Abs(th)) * 0.85f + 0.15f;
+					if (k == 3) R = Mathf.Max(R, 0.42f * Mathf.SmoothStep(Mathf.Pi, Mathf.Pi - 0.7f, Mathf.Abs(th)) * (1f - 0.25f * Mathf.Abs(th) / Mathf.Pi));
+					float blade = Mathf.Clamp((R - r) * cell + 0.5f, 0f, 1f);
+					// the stalk, down from the blade to the cell's foot
+					float sv = Mathf.Clamp(-v / 0.24f, 0f, 1f);
+					float stalk = v < 0.03f && v > -0.25f ? Mathf.Clamp((Mathf.Lerp(0.012f, 0.008f, sv) - Mathf.Abs(u - 0.03f * sv * sv)) * cell + 0.5f, 0f, 1f) : 0f;
+					if (blade <= 0f && stalk <= 0f) continue;
+					var c = Mix(new Color(0.07f, 0.14f, 0.045f), new Color(0.15f, 0.26f, 0.08f), Fbm(x, y, cell, cell, 6, 3, 431 + k));
+					c *= 0.85f + 0.3f * Mathf.Clamp(1f - r / Mathf.Max(R, 0.01f), 0f, 1f);       // a little lighter in the middle
+					c = c.Lerp(new Color(0.05f, 0.1f, 0.035f), Mathf.SmoothStep(0.75f, 1f, r / Mathf.Max(R, 0.01f)) * 0.5f);   // the rim darker
+					// the veins: to each lobe's point, and finer ones off them
+					float vein = 0f;
+					foreach (var (a, len, w) in lobes)
+					{
+						float d = Mathf.Abs(Mathf.Wrap(th - a, -Mathf.Pi, Mathf.Pi)) * r;
+						float width = Mathf.Lerp(0.011f, 0.003f, Mathf.Clamp(r / len, 0f, 1f));
+						if (r < len * 0.92f) vein = Mathf.Max(vein, Mathf.Clamp((width - d) * cell + 0.5f, 0f, 1f));
+					}
+					float fine = Mathf.Abs(Mathf.Sin(th * 9f + r * 30f));
+					if (fine < 0.05f && r > 0.06f) vein = Mathf.Max(vein, 0.25f);
+					c = c.Lerp(new Color(0.3f, 0.38f, 0.2f), vein * 0.45f);
+					if (k == 2)
+					{
+						// going over: brown from the edges in, a hole or two eaten through
+						float rot = Fbm(x, y, cell, cell, 5, 3, 441) + r / Mathf.Max(R, 0.01f) * 0.5f;
+						c = c.Lerp(new Color(0.24f, 0.15f, 0.06f), Mathf.SmoothStep(0.7f, 0.95f, rot));
+						if (Fbm(x, y, cell, cell, 9, 2, 442) > 0.72f) blade = 0f;
+					}
+					if (stalk > blade) c = new Color(0.2f, 0.2f, 0.09f);
+					c *= 0.92f + 0.16f * Hash(x, y, 450 + k);
+					cv.Set(ox + x, oy + y, new Color(c.R, c.G, c.B, Mathf.Max(blade, stalk)));
 				}
 		}
-		Window(35, 41, 41, 47);
-		Window(55, 61, 41, 47);
-		cv.Rect(45, 51, 43, 55, new Color(0.35f, 0.12f, 0.03f, 0.6f));
-		// Flames: licking up from the roof line and out of the window heads.
-		for (int y = 4; y < 47; y++)
-			for (int x = 24; x < 72; x++)
-			{
-				float roofY = apexY + Mathf.Abs(x - 48f) * (wallT - apexY) / 22f;
-				float above = roofY - y;
-				bool winHead = (x >= 34 && x < 42 || x >= 54 && x < 62) && y >= 33 && y < 42;
-				if (above < -2f && !winHead) continue;
-				float n = Fbm(x * 1.6f, y * 1.1f, PicW, PicH, 8, 3, 516);
-				float reach = winHead ? 0.55f : 0.9f;
-				float heat = n * 1.25f - Mathf.Max(above, 0f) / (14f * reach) - (Mathf.Abs(x - 48f) > 20f ? 0.25f : 0f);
-				if (winHead) heat = n * 1.2f - (41f - y) / 9f;
-				if (heat < 0.32f) continue;
-				float k = Mathf.Clamp((heat - 0.32f) / 0.5f, 0f, 1f);
-				var fire = k < 0.5f ? Mix(new Color(0.55f, 0.08f, 0.02f), new Color(1f, 0.42f, 0.06f), k * 2f)
-					: Mix(new Color(1f, 0.42f, 0.06f), new Color(1f, 0.85f, 0.45f), (k - 0.5f) * 2f);
-				cv.Set(x, y, new Color(fire.R, fire.G, fire.B, 0.35f + 0.65f * k));
-			}
-		// Embers.
-		for (int i = 0; i < 26; i++)
-			cv.Set(rng.RandiRange(26, 72), rng.RandiRange(2, 26), new Color(1f, 0.55f, 0.15f, 1f));
-		Grain(cv, 517, 0.04f);
-		return Store("bk_pic_cabin", cv.ToImage());
-	}
-
-	/// <summary>
-	/// Surveillance of the woods: a 2x2 atlas of night-camera views (a trail between trunks, the
-	/// footbridge over the stream, dense trunks in fog, a trail sign at a fork), grey-green and
-	/// grainy, each with a small recording mark and a time bar.
-	/// </summary>
-	public static Texture2D SurveillanceAtlas()
-	{
-		if (_tex.TryGetValue("bk_pic_surv", out var t)) return t;
-		var cv = new Canvas(PicW * 2, PicH * 2, Colors.Black);
-		var fog = new Color(0.44f, 0.5f, 0.45f);
-		var ground = new Color(0.13f, 0.15f, 0.13f);
-
-		// 0: a trail running away between trunks.
-		DrawWoods(cv, 0, 0, PicW, PicH, 30f, fog, ground, 24, 601, clearingHalf: 10f);
-		for (int y = 31; y < PicH; y++)
-		{
-			float k = (y - 30f) / (PicH - 30f);
-			float half = 1.5f + k * 26f, cx = PicW * 0.5f + (1f - k) * 6f;
-			for (int x = (int)(cx - half); x <= (int)(cx + half); x++)
-				cv.Set(x, y, Mix(new Color(0.3f, 0.34f, 0.3f), fog, (1f - k) * 0.7f) * (0.85f + 0.2f * Hash(x, y, 602)));
-		}
-		// 1: the footbridge: deck receding, rails, dark water band under it.
-		DrawWoods(cv, PicW, 0, PicW, PicH, 26f, fog, ground, 18, 611, clearingHalf: 0f);
-		for (int y = 40; y < 56; y++)
-			for (int x = PicW; x < PicW * 2; x++)
-				cv.Set(x, y, new Color(0.08f, 0.1f, 0.09f) * (0.8f + 0.4f * Hash(x, y, 612)));
-		for (int y = 30; y < PicH; y++)
-		{
-			float k = (y - 30f) / (PicH - 30f);
-			float half = 3f + k * 22f, cx = PicW * 1.5f;
-			var deck = Mix(new Color(0.34f, 0.36f, 0.32f), fog, (1f - k) * 0.6f) * (((int)(y * (1.5f + k * 2f))) % 3 == 0 ? 0.7f : 1f);
-			for (int x = (int)(cx - half); x <= (int)(cx + half); x++) cv.Set(x, y, deck);
-			cv.Set((int)(cx - half - 2), y - (int)(k * 10f), new Color(0.5f, 0.55f, 0.5f));
-			cv.Set((int)(cx + half + 2), y - (int)(k * 10f), new Color(0.5f, 0.55f, 0.5f));
-		}
-		// 2: dense trunks close to the lens, fog behind.
-		DrawWoods(cv, 0, PicH, PicW, PicH, 34f, fog, ground, 34, 621, clearingHalf: 0f, near: true);
-		// 3: a trail sign at a fork.
-		DrawWoods(cv, PicW, PicH, PicW, PicH, 32f, fog, ground, 20, 631, clearingHalf: 6f);
-		cv.Rect(PicW + 44, PicW + 46, PicH + 26, PicH + 58, new Color(0.22f, 0.24f, 0.21f));
-		cv.Rect(PicW + 34, PicW + 58, PicH + 26, PicH + 33, new Color(0.46f, 0.5f, 0.44f));
-		cv.Rect(PicW + 38, PicW + 56, PicH + 35, PicH + 41, new Color(0.4f, 0.44f, 0.38f));
-
-		// Overlay marks per cell: a bright recording dot top-left and a time bar bottom-right.
-		for (int cell = 0; cell < 4; cell++)
-		{
-			int ox = (cell % 2) * PicW, oy = (cell / 2) * PicH;
-			cv.Rect(ox + 5, ox + 8, oy + 5, oy + 8, new Color(0.85f, 0.9f, 0.85f));
-			for (int i = 0; i < 7; i++)
-				if (Hash(i, cell, 641) > 0.3f) cv.Rect(ox + 60 + i * 4, ox + 63 + i * 4, oy + 63, oy + 66, new Color(0.75f, 0.8f, 0.75f));
-		}
-		Grain(cv, 642, 0.07f);
-		return Store("bk_pic_surv", cv.ToImage());
-	}
-
-	/// <summary>Night woods into a cv rectangle: fogged sky/ground gradient and a stand of trunks
-	/// sorted far to near (darker and wider when near). clearingHalf keeps the centre open.</summary>
-	private static void DrawWoods(Canvas cv, int ox, int oy, int w, int h, float horizon, Color fog, Color ground,
-		int trunks, int seed, float clearingHalf, bool near = false)
-	{
-		for (int y = 0; y < h; y++)
-			for (int x = 0; x < w; x++)
-			{
-				Color c = y < horizon
-					? Mix(fog * 0.55f, fog, y / horizon)
-					: Mix(fog * 0.8f, ground, (y - horizon) / (h - horizon));
-				float n = Fbm(x, y, w, h, 6, 2, seed + 1);
-				cv.Set(ox + x, oy + y, c * (0.93f + n * 0.14f));
-			}
-		var rng = new RandomNumberGenerator { Seed = (ulong)seed };
-		var list = new List<(float x, float d)>();
-		for (int i = 0; i < trunks; i++)
-		{
-			float x = rng.RandfRange(0, w);
-			if (clearingHalf > 0 && Mathf.Abs(x - w * 0.5f) < clearingHalf) x += Mathf.Sign(x - w * 0.5f + 0.01f) * clearingHalf;
-			list.Add((x, rng.RandfRange(near ? 0.3f : 0.05f, 1f)));
-		}
-		list.Sort((a, b) => a.d.CompareTo(b.d));
-		foreach (var (x, d) in list)
-		{
-			float wdt = Mathf.Lerp(1f, near ? 9f : 5f, d * d);
-			float baseY = horizon + d * (h - horizon) * 0.75f;
-			var col = Mix(fog * 0.9f, new Color(0.05f, 0.055f, 0.05f), 0.25f + d * 0.75f);
-			for (int y = 0; y < baseY; y++)
-				for (int xx = (int)(x - wdt * 0.5f); xx <= (int)(x + wdt * 0.5f); xx++)
-					if (xx >= 0 && xx < w) cv.Set(ox + xx, oy + y, col * (0.9f + 0.2f * Hash(xx, y, seed + 2)));
-		}
-	}
-
-	private static void Grain(Canvas cv, int seed, float amount)
-	{
-		for (int y = 0; y < cv.H; y++)
-			for (int x = 0; x < cv.W; x++)
-			{
-				var c = cv.Get(x, y);
-				float n = (Hash(x, y, seed) - 0.5f) * amount;
-				cv.Set(x, y, new Color(Mathf.Clamp(c.R + n, 0, 1), Mathf.Clamp(c.G + n, 0, 1), Mathf.Clamp(c.B + n, 0, 1), c.A));
-			}
+		return Store("bk_pic_ivy", cv.ToImage());
 	}
 
 	// ------------------------------------------------------------------ materials
@@ -607,19 +441,11 @@ public static class BunkerTextures
 		AlbedoColor = new Color(0.005f, 0.005f, 0.006f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 	});
 
-	/// <summary>Ivy leaf cards: the foliage shader (alpha-scissor, a hint of sway).</summary>
+	/// <summary>Ivy leaves: the ivy shader (folded cards out of <see cref="IvyLeafAtlas"/>, waxy, trembling).</summary>
 	public static ShaderMaterial IvyMat => (ShaderMaterial)Cached("bk_m_ivy", () =>
 	{
-		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
-		DetailKit.Hook(m, DetailKit.Kind.Foliage);
-		m.SetShaderParameter("albedo_tex", IvyLeaves());
-		m.SetShaderParameter("tint", new Color(1f, 1f, 1f));
-		m.SetShaderParameter("sway", 0.008f);
-		m.SetShaderParameter("sway_speed", 0.6f);
-		m.SetShaderParameter("normal_up", 0.2f);
-		m.SetShaderParameter("alpha_cut", 0.5f);
-		m.SetShaderParameter("tex_size", new Vector2(32, 32));
-		m.SetShaderParameter("back_shade", 0.3f);
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ivy_leaf.gdshader") };
+		m.SetShaderParameter("albedo_tex", IvyLeafAtlas());
 		return m;
 	});
 
