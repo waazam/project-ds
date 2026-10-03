@@ -557,6 +557,7 @@ public partial class BunkerRooms : Node3D
 			AddBox(new Vector3(-hw + 0.45f, 0.68f, -0.85f), new Vector3(0.66f, 1.36f, 0.66f));
 			AddBox(new Vector3(hw - 1.1f, 0.2f, -RoomD + 0.35f), new Vector3(0.84f, 0.4f, 0.46f));
 		}
+		BuildRoomTrim();
 	}
 
 	/// <summary>A plank door in a frame set into a wall. <paramref name="inward"/> is the wall's inward normal (into the room).

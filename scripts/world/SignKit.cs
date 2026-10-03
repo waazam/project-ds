@@ -12,6 +12,8 @@ public static class SignKit
 {
 	/// <summary>Pale "fresh wood" colour of routed letters.</summary>
 	public static readonly Color Carve = new(0.66f, 0.61f, 0.50f);
+	/// <summary>The white the park's painted signs fill their routed letters with (2026-10-03).</summary>
+	public static readonly Color Paint = new(0.8f, 0.79f, 0.74f);
 	/// <summary>Colour of the groove shadow drawn just under the letters.</summary>
 	public static readonly Color CarveShadow = new(0.05f, 0.04f, 0.03f);
 
@@ -101,6 +103,36 @@ public static class SignKit
 		if (capH < 0f) capH = w * 0.45f;
 		k.Box(p + new Vector3(0, height * 0.5f, 0), new Vector3(w, height, w), uv);
 		k.Cylinder(p + new Vector3(0, height, 0), p + new Vector3(0, height + capH, 0), w * 0.5f * Mathf.Sqrt2, 0f, 4, true, uv, Mathf.Pi / 4f);
+	}
+
+	/// <summary>A painted square post with a flat top, its edge eased by a thin chamfer (the park's style).</summary>
+	public static void FlatPost(MeshKit k, Vector3 p, float height, float w, float uv = 1.6f)
+	{
+		k.Box(p + new Vector3(0, height * 0.5f, 0), new Vector3(w, height, w), uv);
+		k.Box(p + new Vector3(0, height + 0.01f, 0), new Vector3(w - 0.03f, 0.02f, w - 0.03f), uv);
+	}
+
+	/// <summary>
+	/// A header beam across the tops of two posts, its ends run out past them and cut away underneath in a curve (a
+	/// rafter tail, stepped as a router-and-saw job would leave it): the park's gateway style. <paramref name="c"/> is
+	/// the beam's middle; it runs along <paramref name="b"/>.X, its face along b.Z.
+	/// </summary>
+	public static void Header(MeshKit k, Vector3 c, Basis b, float span, float overhang, float h, float d, float uv = 1.6f)
+	{
+		float inner = span * 0.5f;
+		k.Box(c, new Vector3(span, h, d), uv, b);
+		foreach (float s in new[] { -1f, 1f })
+		{
+			// the tail: full depth by the post, cut up toward its end in steps (a curve from below)
+			float[] fr = { 0.0f, 0.35f, 0.6f, 0.8f, 1.0f };
+			float[] keep = { 1.0f, 0.88f, 0.72f, 0.56f, 0.45f };
+			for (int i = 0; i < fr.Length - 1; i++)
+			{
+				float x0 = inner + overhang * fr[i], x1 = inner + overhang * fr[i + 1];
+				float hh = h * keep[i];
+				k.Box(c + b * new Vector3(s * (x0 + x1) * 0.5f, (h - hh) * 0.5f, 0), new Vector3(x1 - x0 + 0.002f, hh, d), uv, b);
+			}
+		}
 	}
 
 	/// <summary>

@@ -120,7 +120,8 @@ public static class LodgeTextures
 	/// <summary>Cream wallpaper, a fine gold pinstripe and a wider soft band (rooms, the corridor).</summary>
 	public static Texture2D Wallpaper => Make("lodge_wallpaper", 128, 128, (u, v) =>
 	{
-		Color cream = new(0.78f, 0.72f, 0.6f), band = new(0.72f, 0.64f, 0.5f), gold = new(0.66f, 0.52f, 0.28f);
+		// (aged and smoke-yellowed: the interiors pass, 2026-10-03; the cream read as a glare round the lamps)
+		Color cream = new(0.6f, 0.54f, 0.43f), band = new(0.54f, 0.47f, 0.35f), gold = new(0.56f, 0.43f, 0.22f);
 		float x = u * 4f % 1f;
 		Color c = x < 0.34f ? band : cream;
 		if (Mathf.Abs(x - 0.34f) < 0.012f || Mathf.Abs(x - 0.02f) < 0.01f) c = gold;
@@ -375,7 +376,7 @@ public static class LodgeTextures
 	/// <summary>Daylight through a window's snow-dusted glass (inside faces): pale and grey-blue, dimmed by the storm.</summary>
 	public static StandardMaterial3D DayGlass => _day ??= new StandardMaterial3D
 	{
-		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.5f, 0.56f, 0.62f), EmissionEnabled = true, Emission = new Color(0.56f, 0.62f, 0.7f), EmissionEnergyMultiplier = 0.7f, Roughness = 0.1f,
+		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.36f, 0.41f, 0.47f), EmissionEnabled = true, Emission = new Color(0.5f, 0.56f, 0.64f), EmissionEnergyMultiplier = 0.38f, Roughness = 0.1f,
 	};
 	private static StandardMaterial3D _day, _blue, _ice;
 
@@ -390,6 +391,6 @@ public static class LodgeTextures
 	public static StandardMaterial3D IceGlass => _ice ??= new StandardMaterial3D
 	{
 		ResourceName = "lodge_iceglass", AlbedoTexture = WinterWoods.SnowStd("y", 1f, 1f).AlbedoTexture, AlbedoColor = new Color(0.7f, 0.78f, 0.86f),
-		EmissionEnabled = true, Emission = new Color(0.55f, 0.62f, 0.72f), EmissionEnergyMultiplier = 0.7f, Roughness = 0.2f,
+		EmissionEnabled = true, Emission = new Color(0.5f, 0.57f, 0.66f), EmissionEnergyMultiplier = 0.42f, Roughness = 0.2f,
 	};
 }

@@ -3,9 +3,10 @@ using Godot;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Routed wooden trail sign. Directional: a thick square post with arrow
-/// boards stacked on it. Low: a short two-post board leaning a little, like
-/// the ones left at forks and bridges.
+/// Routed wooden trail sign, painted the park's chocolate brown, its routed letters and arrows filled white (the
+/// owner's photo of a state park's sign, 2026-10-03). Directional: a thick square post with arrow boards stacked on
+/// it. Low: a short two-post board under a header beam with cut tails, leaning a little, like the ones left at forks
+/// and bridges.
 /// Each entry in Boards is one board; end it with " &gt;" or " &lt;" to point
 /// the board (and its routed arrow) right or left. Front faces +Z.
 /// </summary>
@@ -82,8 +83,8 @@ public partial class SignPost : Node3D
 		const float postW = 0.17f, postH = 2.25f;
 		const float len = 1.55f, h = 0.27f, t = 0.05f, pitch = 0.32f;
 		_k.Color = new Color(0.9f, 0.88f, 0.85f);
-		_k.Mat(PropTextures.PostMat);
-		SignKit.Post(_k, new Vector3(0, -0.4f, 0), postH + 0.4f, postW, 1.5f);
+		_k.Mat(PropTextures.PaintedPostMat);
+		SignKit.FlatPost(_k, new Vector3(0, -0.4f, 0), postH + 0.4f, postW, 1.5f);
 		Col(new Vector3(0, postH * 0.5f, 0), new Vector3(postW + 0.02f, postH, postW + 0.02f));
 
 		int n = Boards?.Length ?? 0;
@@ -99,7 +100,7 @@ public partial class SignPost : Node3D
 			var c = new Vector3(x, y, z);
 			float shade = Rand(i + 20, 0.8f, 1.05f);
 			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
-			_k.Mat(PropTextures.SignPlankMat);
+			_k.Mat(PropTextures.PaintedPlankMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, dir);
 			Col(c, new Vector3(len, h, t + 0.02f));
 			// bolt heads on the post
@@ -115,11 +116,11 @@ public partial class SignPost : Node3D
 			if (dir != 0)
 			{
 				float ax = dir * (len * 0.5f - 0.22f - arrowLen * 0.5f);
-				_k.Mat(PropTextures.RoutedMat);
+				_k.Mat(PropTextures.WhitePaintMat);
 				SignKit.RoutedArrow(_k, c + b * new Vector3(ax, 0, face), b, arrowLen, h * 0.42f, dir);
 			}
 			float em = Mathf.Min(0.135f, usable / Mathf.Max(4, Longest()) * 1.75f);
-			SignKit.Text(_gen, text, c + b * new Vector3(textCx, -em * 0.04f, face), b, em);
+			SignKit.Text(_gen, text, c + b * new Vector3(textCx, -em * 0.04f, face), b, em, SignKit.Paint);
 		}
 		_k.Color = Colors.White;
 	}
@@ -129,12 +130,14 @@ public partial class SignPost : Node3D
 		const float postW = 0.11f, postH = 0.95f;
 		const float len = 1.3f, h = 0.28f, t = 0.05f;
 		_k.Color = new Color(0.88f, 0.86f, 0.83f);
-		_k.Mat(PropTextures.PostMat);
+		_k.Mat(PropTextures.PaintedPostMat);
 		foreach (float px in new[] { -0.48f, 0.48f })
 		{
-			SignKit.Post(_k, new Vector3(px, -0.35f, 0), postH + 0.35f, postW, 1.8f, 0.03f);
+			SignKit.FlatPost(_k, new Vector3(px, -0.35f, 0), postH + 0.35f, postW, 1.8f);
 			Col(new Vector3(px, postH * 0.5f, 0), new Vector3(postW + 0.02f, postH, postW + 0.02f));
 		}
+		// the header across the posts' tops, its tails cut away underneath
+		SignKit.Header(_k, new Vector3(0, postH + 0.065f, 0), Basis.Identity, 0.96f + postW, 0.2f, 0.11f, postW + 0.03f, 1.8f);
 		int n = Mathf.Max(1, Boards?.Length ?? 0);
 		for (int i = 0; i < n; i++)
 		{
@@ -143,7 +146,7 @@ public partial class SignPost : Node3D
 			var b = Basis.FromEuler(new Vector3(0, 0, Mathf.DegToRad(Rand(i, -3f, 3f))));
 			var c = new Vector3(0, y, postW * 0.5f + t * 0.5f + 0.003f);
 			_k.Color = new Color(0.95f, 0.93f, 0.9f);
-			_k.Mat(PropTextures.SignPlankMat);
+			_k.Mat(PropTextures.PaintedPlankMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, 0);
 			Col(c, new Vector3(len, h, t + 0.02f));
 			// the long crack down one board
@@ -159,11 +162,11 @@ public partial class SignPost : Node3D
 			if (dir != 0)
 			{
 				float ax = dir * (len * 0.5f - 0.1f - arrowLen * 0.5f);
-				_k.Mat(PropTextures.RoutedMat);
+				_k.Mat(PropTextures.WhitePaintMat);
 				SignKit.RoutedArrow(_k, c + b * new Vector3(ax, 0, face), b, arrowLen, h * 0.34f, dir);
 			}
 			float tx = dir == 0 ? 0f : -dir * (arrowLen + 0.08f) * 0.5f;
-			SignKit.Text(_gen, text, c + b * new Vector3(tx, -em * 0.04f, face), b, em);
+			SignKit.Text(_gen, text, c + b * new Vector3(tx, -em * 0.04f, face), b, em, SignKit.Paint);
 		}
 	}
 }

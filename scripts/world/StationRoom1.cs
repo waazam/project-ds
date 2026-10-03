@@ -91,10 +91,10 @@ public partial class StationRoom1 : Node3D
 		k.Color = new Color(0.85f, 0.8f, 0.75f);
 		// the wall shared with the lobby: a thin skin just inside the lobby's own wall (never in the same
 		// plane, or the two wallpapers fight), no collision of its own (the lobby's wall has it)
-		StationKit.WallAlongZ(k, null, -Half + 0.085f, -Half, Half, Height, 0, (0f, 2.2f), 2.2f, 0.02f);
-		StationKit.WallAlongX(k, body, Half, -Half, Half, Height, 0, null);
-		StationKit.WallAlongX(k, body, -Half, -Half, Half, Height, 0, null);
-		StationKit.WallAlongZ(k, body, Half, -Half, Half, Height, 0, null);
+		StationKit.WallAlongZ(k, null, -Half + 0.085f, -Half, Half, Height, 0, (0f, 2.2f), 2.2f, 0.02f, trimSide: 1);
+		StationKit.WallAlongX(k, body, Half, -Half, Half, Height, 0, null, trimSide: -1);
+		StationKit.WallAlongX(k, body, -Half, -Half, Half, Height, 0, null, trimSide: 1);
+		StationKit.WallAlongZ(k, body, Half, -Half, Half, Height, 0, null, trimSide: -1);
 		floorK.Mat(BuildingTextures.FloorMat);
 		floorK.Color = new Color(0.45f, 0.4f, 0.34f);
 		ceilK.Mat(BuildingTextures.BoardsMat);
@@ -102,6 +102,10 @@ public partial class StationRoom1 : Node3D
 		StationKit.FloorAndCeiling(floorK, ceilK, body, Half, Half, Height, 0);
 		k.Color = Colors.White;
 		k.CommitTo(this, "Walls");
+		// webs up in its corners (the interiors pass, 2026-10-03)
+		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1311 }, -Half + 0.1f, Half - 0.07f, -Half + 0.07f, Half - 0.07f, 0f, Height, 0.9f, 0.75f);
+		DebrisKit.Scatter(this, new RandomNumberGenerator { Seed = 1312 }, -Half + 0.1f, Half - 0.07f, -Half + 0.07f, Half - 0.07f, 0f, new Color(0.62f, 0.58f, 0.5f), 50, 3,
+			new[] { (new Vector3(-Half, 0, 0), 1.1f), (Vector3.Zero, 1.3f) });
 		floorK.Color = Colors.White;
 		floorK.CommitTo(this, "Floor");
 		ceilK.Color = Colors.White;

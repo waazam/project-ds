@@ -281,10 +281,14 @@ public partial class StationBasement : Node3D
 		float cx = (MinX + MaxX) * 0.5f, cz = (MinZ + StairBottom) * 0.5f, hx = (MaxX - MinX) * 0.5f, hz = (StairBottom - MinZ) * 0.5f;
 		float top = Floor + RoomHeight;
 		// the +Z wall with the stairwell's opening (x in [-0.95, 0.95])
-		StationKit.WallAlongX(k, body, StairBottom, MinX, MaxX, RoomHeight, Floor, (0f, 1.9f), 2.3f, 0.3f);
-		StationKit.WallAlongX(k, body, MinZ, MinX, MaxX, RoomHeight, Floor, null, 2.2f, 0.3f);
-		StationKit.WallAlongZ(k, body, MinX, MinZ, StairBottom, RoomHeight, Floor, null, 2.2f, 0.3f);
-		StationKit.WallAlongZ(k, body, MaxX, MinZ, StairBottom, RoomHeight, Floor, null, 2.2f, 0.3f);
+		StationKit.WallAlongX(k, body, StairBottom, MinX, MaxX, RoomHeight, Floor, (0f, 1.9f), 2.3f, 0.3f, crown: false);
+		StationKit.WallAlongX(k, body, MinZ, MinX, MaxX, RoomHeight, Floor, null, 2.2f, 0.3f, crown: false);
+		StationKit.WallAlongZ(k, body, MinX, MinZ, StairBottom, RoomHeight, Floor, null, 2.2f, 0.3f, crown: false);
+		StationKit.WallAlongZ(k, body, MaxX, MinZ, StairBottom, RoomHeight, Floor, null, 2.2f, 0.3f, crown: false);
+		// webs thick in its corners, low ones too (the interiors pass, 2026-10-03)
+		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1331 }, MinX + 0.15f, MaxX - 0.15f, MinZ + 0.15f, StairBottom - 0.15f, Floor, top, 1.0f, 0.95f);
+		DebrisKit.Scatter(this, new RandomNumberGenerator { Seed = 1332 }, MinX + 0.15f, MaxX - 0.15f, MinZ + 0.15f, StairBottom - 0.15f, Floor, new Color(0.34f, 0.2f, 0.15f), 70, 0,
+			new[] { (new Vector3(0, Floor, StairBottom), 1.3f) });
 		k.Mat(ProcTextures.ConcreteMat);
 		k.Color = new Color(0.3f, 0.3f, 0.28f);
 		BuildKit.Box(k, new Vector3(cx, Floor - 0.05f, cz), new Vector3(hx * 2f, 0.1f, hz * 2f), 2f);

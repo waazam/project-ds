@@ -105,8 +105,8 @@ public partial class StationRoom2 : Node3D
 		k.Color = Colors.White;
 		// the wall shared with the lobby: a thin skin just inside the lobby's own wall (never in the same
 		// plane, or the two wallpapers fight), no collision of its own (the lobby's wall has it)
-		StationKit.WallAlongZ(k, null, Half - 0.085f, -Half, Half, Height, 0, (0f, 2.2f), 2.2f, 0.02f);
-		StationKit.WallAlongX(k, body, Half, -Half, Half, Height, 0, null);
+		StationKit.WallAlongZ(k, null, Half - 0.085f, -Half, Half, Height, 0, (0f, 2.2f), 2.2f, 0.02f, trimSide: -1);
+		StationKit.WallAlongX(k, body, Half, -Half, Half, Height, 0, null, trimSide: -1);
 		// the window wall: solid round a 1.6 x 1.4 opening
 		float wx0 = -1.2f, wx1 = 0.4f, wy0 = 1.0f, wy1 = 2.4f;
 		k.Box(new Vector3((-Half + wx0) * 0.5f, Height * 0.5f, -Half), new Vector3(wx0 + Half, Height, 0.14f), 1.1f);
@@ -114,8 +114,12 @@ public partial class StationRoom2 : Node3D
 		k.Box(new Vector3((wx0 + wx1) * 0.5f, wy0 * 0.5f, -Half), new Vector3(wx1 - wx0, wy0, 0.14f), 1.1f);
 		k.Box(new Vector3((wx0 + wx1) * 0.5f, (wy1 + Height) * 0.5f, -Half), new Vector3(wx1 - wx0, Height - wy1, 0.14f), 1.1f);
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, Height * 0.5f, -Half), Shape = new BoxShape3D { Size = new Vector3(Half * 2f, Height, 0.14f) } });
-		StationKit.WallAlongZ(k, body, -Half, -Half, Half, Height, 0, null);
+		StationKit.WallAlongZ(k, body, -Half, -Half, Half, Height, 0, null, trimSide: 1);
 		k.CommitTo(this, "Walls", true);
+		// webs up in its corners (the interiors pass, 2026-10-03)
+		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1321 }, -Half + 0.07f, Half - 0.1f, -Half + 0.07f, Half - 0.07f, 0f, Height, 0.9f, 0.75f);
+		DebrisKit.Scatter(this, new RandomNumberGenerator { Seed = 1322 }, -Half + 0.07f, Half - 0.1f, -Half + 0.07f, Half - 0.07f, 0f, new Color(0.62f, 0.58f, 0.5f), 50, 3,
+			new[] { (new Vector3(Half, 0, 0), 1.1f), (Vector3.Zero, 1.3f) });
 		// the floor: black and white marble, on the diagonal
 		var f = new MeshKit();
 		f.Mat(StationTextures.MarbleMat);

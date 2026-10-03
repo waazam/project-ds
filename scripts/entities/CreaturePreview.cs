@@ -51,6 +51,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--growth") >= 0) { await GrowthShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--giant-grab") >= 0) { await GiantGrabShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler") >= 0) { await CrawlerShots(); GetTree().Quit(); return; }
@@ -381,6 +382,27 @@ public partial class CreaturePreview : Node3D
 			await Seconds(0.25);
 			GetViewport().GetTexture().GetImage().SavePng($"{_out}/stalker_motion_body_{i:00}.png");
 		}
+	}
+
+	/// <summary>The undergrowth pass's pieces (2026-10-03): a moss-hung fir and snag, the saplings, the vine mounds.</summary>
+	private async Task GrowthShots()
+	{
+		env.BackgroundColor = new Color(0.45f, 0.48f, 0.5f);
+		env.AmbientLightEnergy = 0.7f;
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(60, 60) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.17f, 0.12f) } });
+		void Put(Mesh m, Vector3 at) => AddChild(new MeshInstance3D { Mesh = m, Position = at });
+		Put(World.ForestScatter.FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f, 0.55f), new Vector3(-4f, 0, -2f));
+		Put(World.ForestScatter.SnagMesh(16, 19f, 0.6f), new Vector3(5f, 0, -3f));
+		Put(World.ForestScatter.SaplingMesh(1, 5.5f), new Vector3(-1f, 0, 2f));
+		Put(World.ForestScatter.SaplingMesh(2, 7f), new Vector3(1.5f, 0, 1f));
+		Put(World.ForestScatter.VineMoundMesh(2, new Vector3(2.2f, 2.1f, 1.8f)), new Vector3(1f, 0, 6f));
+		Put(World.ForestScatter.VineMoundMesh(1, new Vector3(1.6f, 1.5f, 1.4f)), new Vector3(-3f, 0, 7f));
+		await Seconds(0.5);
+		await Shot("growth_overview", new Vector3(0, 2.2f, 16f), new Vector3(0, 2.5f, 0));
+		await Shot("growth_moss_fir", new Vector3(-1f, 4f, 3f), new Vector3(-4f, 8f, -2f));
+		await Shot("growth_moss_snag", new Vector3(2f, 7f, 4f), new Vector3(5f, 10f, -3f));
+		await Shot("growth_mound", new Vector3(3f, 1.7f, 11f), new Vector3(1f, 1f, 6f));
+		await Shot("growth_saplings", new Vector3(0f, 1.8f, 6f), new Vector3(0, 3f, 1.5f));
 	}
 
 	private async Task StalkerShots()

@@ -787,7 +787,7 @@ public partial class StoryTest : Node
 		if (act6 != null && FirstOf<ForestScatter>() is { } scatter)
 		{
 			// Genuinely clear (Dan, 2026-09-22): no scatter trees inside the ring, through the flights.
-			int trees = scatter.CountInstancesWithin(new Vector2(act6.GlobalPosition.X, act6.GlobalPosition.Z), act6.FenceRadius, key => key.StartsWith("fir") || key.StartsWith("decid") || key.StartsWith("snag"));
+			int trees = scatter.CountInstancesWithin(new Vector2(act6.GlobalPosition.X, act6.GlobalPosition.Z), act6.FenceRadius, key => key.StartsWith("fir") || key.StartsWith("decid") || key.StartsWith("snag") || key.StartsWith("sapling") || key.StartsWith("vinemound"));
 			Check("no trees inside the clearing", trees == 0, $"{trees} trunks within {act6.FenceRadius:0} m");
 		}
 		Check("the clearing is closed", act6 is { Fenced: true });

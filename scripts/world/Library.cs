@@ -117,6 +117,10 @@ public partial class Library : Node3D
 		var beams = new MeshKit();
 		beams.Mat(_wood);
 		for (float z = 1.2f; z < Depth; z += 2.2f) Slab(beams, new Vector3(0, Height - 0.12f, z), new Vector3(HalfW * 2f, 0.24f, 0.22f), false);
+		// and two along the room, the ceiling coffered between them (the interiors pass, 2026-10-03: a flat lid of a
+		// ceiling over all that shelving); a hair under the ceiling, out of its plane
+		foreach (float x in new[] { -HalfW / 3f, HalfW / 3f })
+			Slab(beams, new Vector3(x, Height - 0.1f - 0.003f, Depth * 0.5f), new Vector3(0.18f, 0.2f, Depth - 0.3f), false);
 		beams.CommitTo(this, "Beams", true);
 		// a big rug
 		var rug = new MeshKit();

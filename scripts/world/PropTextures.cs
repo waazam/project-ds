@@ -142,6 +142,38 @@ public static class PropTextures
 	public static StandardMaterial3D WetPostMat => Std("p_wetpost", PostWood(), 0.7f, 0.33f);
 	public static StandardMaterial3D RoutedMat => Std("p_routed", Routed(), 0.95f, 0.2f);
 
+	// ---- the park's painted signs (2026-10-03, after the owner's photo of a state park's sign: chocolate-brown painted
+	// timber, the routed letters and arrows filled white, a green plaque over them)
+
+	/// <summary>Paint over wood: the grain still showing through it, worn through to grey wood at the edges and in
+	/// patches, a few chips. <paramref name="along"/>: the grain runs along U (a plank) or V (a post).</summary>
+	private static Color Painted(int x, int y, int w, int h, int seed, Color paint, bool alongU)
+	{
+		var wood = alongU ? Board(x, y, w, h, seed, new Color(0.14f, 0.12f, 0.1f), new Color(0.34f, 0.31f, 0.27f))
+			: Board(y, x, h, w, seed, new Color(0.14f, 0.12f, 0.1f), new Color(0.34f, 0.31f, 0.27f));
+		float lum = (wood.R + wood.G + wood.B) / 3f;
+		var c = paint * (0.86f + 0.5f * (lum - 0.22f));                       // the grain under the paint
+		float wear = Fbm(x, y, w, h, 3, 3, 2, seed + 61);
+		float edge = alongU ? Mathf.Min(y, h - 1 - y) : Mathf.Min(x, w - 1 - x);
+		if (wear > 0.68f || edge < 1 && Hash(x, y, seed + 62) > 0.5f) c = Mix(c, new Color(0.3f, 0.29f, 0.26f) * (0.8f + lum), 0.8f);
+		if (Hash(x, y, seed + 63) > 0.985f) c *= 0.6f;                          // a chip
+		return c;
+	}
+
+	public static Texture2D PaintedPlank() => Make("p_paintplank", 64, 32, (x, y) => Painted(x, y, 64, 32, 351, new Color(0.25f, 0.18f, 0.12f), true));
+	public static Texture2D PaintedPost() => Make("p_paintpost", 32, 64, (x, y) => Painted(x, y, 32, 64, 352, new Color(0.25f, 0.18f, 0.12f), false));
+	public static Texture2D PaintedGreen() => Make("p_paintgreen", 64, 32, (x, y) => Painted(x, y, 64, 32, 353, new Color(0.07f, 0.2f, 0.13f), true));
+	/// <summary>The white the routed grooves are filled with (arrows), a little worn.</summary>
+	public static Texture2D WhitePaint() => Make("p_whitepaint", 16, 16, (x, y) =>
+	{
+		float n = Hash(x, y, 354) * 0.08f + Noise(x * 0.25f, y * 0.25f, 4, 4, 355) * 0.08f;
+		return new Color(0.74f + n, 0.73f + n, 0.68f + n);
+	});
+	public static StandardMaterial3D PaintedPlankMat => Std("p_paintplank", PaintedPlank(), 0.75f, 0.35f);
+	public static StandardMaterial3D PaintedPostMat => Std("p_paintpost", PaintedPost(), 0.75f, 0.35f);
+	public static StandardMaterial3D PaintedGreenMat => Std("p_paintgreen", PaintedGreen(), 0.7f, 0.35f);
+	public static StandardMaterial3D WhitePaintMat => Std("p_whitepaint", WhitePaint(), 0.7f, 0.3f);
+
 	/// <summary>Short-hair hide: near-white with soft darker flecks, so vertex colour does the markings.</summary>
 	public static Texture2D Fur() => Make("p_fur", 32, 32, (x, y) =>
 	{

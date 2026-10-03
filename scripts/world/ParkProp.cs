@@ -112,15 +112,17 @@ public partial class ParkProp : Node3D
 
 	private void TrailheadSign()
 	{
-		// Park entrance sign: three routed planks between two heavy square posts.
-		var post = PropTextures.PostMat;
-		var plank = PropTextures.SignPlankMat;
+		// Park entrance sign (the owner's photo of a state park's, 2026-10-03): two heavy square posts painted brown, a
+		// header beam across their tops with its tails cut away, a green plaque over two brown planks, the routed letters
+		// filled white.
+		var post = PropTextures.PaintedPostMat;
+		var plank = PropTextures.PaintedPlankMat;
 		const float postW = 0.2f, postH = 2.35f, bw = 2.2f, pt = 0.06f;
 		_k.Color = new Color(0.9f, 0.88f, 0.85f);
 		foreach (float x in new[] { -1.02f, 1.02f })
 		{
 			_k.Mat(post);
-			SignKit.Post(_k, new Vector3(x, -0.4f, 0), postH + 0.4f, postW, 1.5f);
+			SignKit.FlatPost(_k, new Vector3(x, -0.4f, 0), postH + 0.4f, postW, 1.5f);
 			Col(new Vector3(x, postH * 0.5f, 0), new Vector3(postW + 0.02f, postH, postW + 0.02f));
 		}
 		// planks, top to bottom
@@ -133,21 +135,21 @@ public partial class ParkProp : Node3D
 			centers[i] = cy;
 			float shade = 0.86f + 0.1f * Mathf.Abs(Mathf.Sin(i * 7.1f + Seed));
 			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
-			_k.Mat(plank).Box(new Vector3(0, cy, z), new Vector3(bw, ph[i] - 0.014f, pt), 1.1f);
+			_k.Mat(i == 0 ? PropTextures.PaintedGreenMat : plank).Box(new Vector3(0, cy, z), new Vector3(bw, ph[i] - 0.014f, pt), 1.1f);
 			y -= ph[i];
 		}
 		Col(new Vector3(0, 2.1f - 0.48f, z), new Vector3(bw, 0.96f, pt + 0.02f));
-		// cap board keeping the rain off
-		_k.Color = new Color(0.8f, 0.78f, 0.75f);
-		_k.Mat(post).Box(new Vector3(0, 2.14f, z - 0.01f), new Vector3(bw + 0.36f, 0.07f, 0.2f), 1.5f);
+		// the header across the posts' tops, its tails run out past them and cut away underneath
+		_k.Color = new Color(0.86f, 0.84f, 0.8f);
+		_k.Mat(post);
+		SignKit.Header(_k, new Vector3(0, postH + 0.09f, 0.02f), Basis.Identity, 2.04f + postW, 0.38f, 0.18f, postW + 0.06f, 1.5f);
 		_k.Color = Colors.White;
 
 		float face = z + pt * 0.5f;
 		var fb = Basis.Identity;
-		SignKit.Text(_gen, "OVERLOOK", new Vector3(0, centers[0] - 0.005f, face), fb, 0.23f);
-		SignKit.Text(_gen, "PARK", new Vector3(0, centers[1] + 0.02f, face), fb, 0.17f);
-		SignKit.Text(_gen, "Blackfern Trail   2.1 mi", new Vector3(0, centers[2] + 0.055f, face), fb, 0.12f);
-		SignKit.Text(_gen, "Clearwater Loop   CLOSED", new Vector3(0, centers[2] - 0.065f, face), fb, 0.1f, SignKit.Carve * 0.8f);
+		SignKit.Text(_gen, "OVERLOOK PARK", new Vector3(0, centers[0] - 0.005f, face), fb, 0.2f, SignKit.Paint);
+		SignKit.Text(_gen, "Blackfern Trail   2.1 mi", new Vector3(0, centers[1] - 0.005f, face), fb, 0.14f, SignKit.Paint);
+		SignKit.Text(_gen, "Clearwater Loop   CLOSED", new Vector3(0, centers[2] - 0.005f, face), fb, 0.13f, SignKit.Paint * 0.85f);
 
 		// The directional post where the trail leaves the lot. Placed by trail
 		// distance so it follows edits to the trail curve.

@@ -66,6 +66,7 @@ public partial class ForestScatter : Node3D
 
 		BuildMeshes();
 		ScatterTrees();
+		ScatterUnderstory();
 		ScatterRocksAndLogs();
 		ScatterBoulders();
 		ScatterFoliage();
@@ -96,6 +97,16 @@ public partial class ForestScatter : Node3D
 		_meshes["fern"] = FernMesh();
 		_meshes["grass"] = GrassMesh();
 		_meshes["litter"] = LitterMesh();
+		// the undergrowth pass (2026-10-03): moss-hung variants, saplings, vine mounds
+		_meshes["fir_giant_moss"] = FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f, 0.55f);
+		_meshes["fir_tall_moss"] = FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f, 0.55f);
+		_meshes["snag_moss"] = SnagMesh(6, 9.5f, 0.6f);
+		_meshes["snag_tall_moss"] = SnagMesh(16, 19f, 0.6f);
+		_meshes["sapling_a"] = SaplingMesh(1, 5.5f);
+		_meshes["sapling_b"] = SaplingMesh(2, 7f);
+		_meshes["sapling_c"] = SaplingMesh(3, 4.2f);
+		_meshes["vinemound_a"] = VineMoundMesh(1, new Vector3(1.6f, 1.5f, 1.4f));
+		_meshes["vinemound_b"] = VineMoundMesh(2, new Vector3(2.2f, 2.1f, 1.8f));
 	}
 
 	/// <summary>
@@ -105,7 +116,7 @@ public partial class ForestScatter : Node3D
 	/// crownStart = fraction of the height where live branches begin; ragged =
 	/// chance a bough is missing (irregular silhouette).
 	/// </summary>
-	internal static Mesh FirMesh(int seed, float height, float trunkR, float crownStart, int tiers, float maxR, float ragged)
+	internal static Mesh FirMesh(int seed, float height, float trunkR, float crownStart, int tiers, float maxR, float ragged, float moss = 0f)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7919) };
 		var k = new MeshKit();
@@ -135,6 +146,7 @@ public partial class ForestScatter : Node3D
 		TrunkLoft(k, rings, 12, 1f);
 		Roots(k, trunkR * 1.42f, seed, rings[1].col);
 		// dead stubs on the bare trunk
+		var mossRng = new RandomNumberGenerator { Seed = (ulong)(seed * 977 + 13) };
 		int stubs = Mathf.RoundToInt(crownStart * height * 0.55f);
 		k.Color = new Color(0.5f, 0.48f, 0.46f);
 		for (int i = 0; i < stubs; i++)
@@ -145,6 +157,9 @@ public partial class ForestScatter : Node3D
 			float len = rng.RandfRange(0.35f, 1.1f) * Mathf.Clamp(trunkR * 2.5f, 0.5f, 1.3f);
 			Vector3 from = Axis(y);
 			k.Cylinder(from, from + dir.Normalized() * len, 0.045f, 0.01f, 3, false, 2f);
+			// moss hanging off it (its own random stream: the tree's shape is the same with or without)
+			if (moss > 0f && mossRng.Randf() < moss)
+				MossCard(k, from + dir.Normalized() * len * mossRng.RandfRange(0.5f, 0.95f), mossRng.RandfRange(0.5f, 1.3f), mossRng.RandfRange(0.25f, 0.45f), mossRng);
 		}
 
 		// ---- bough tiers
@@ -325,7 +340,7 @@ public partial class ForestScatter : Node3D
 		return k.Commit();
 	}
 
-	internal static Mesh SnagMesh(int seed, float h)
+	internal static Mesh SnagMesh(int seed, float h, float moss = 0f)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 31337) };
 		var k = new MeshKit();
@@ -344,6 +359,7 @@ public partial class ForestScatter : Node3D
 		k.Color = new Color(0.62f, 0.6f, 0.56f);
 		k.Mat(ProcTextures.TreeEndGrainMat).Cylinder(top, top + new Vector3(0.05f, 0.08f, 0), r * 0.25f, 0.02f, 6, false, 1f);   // broken top
 		k.Mat(ProcTextures.TreeBarkMat);
+		var mossRng = new RandomNumberGenerator { Seed = (ulong)(seed * 977 + 29) };
 		int nb = Mathf.RoundToInt(h * 0.7f);
 		for (int b = 0; b < nb; b++)
 		{
@@ -351,7 +367,10 @@ public partial class ForestScatter : Node3D
 			float a = rng.RandfRange(0, Mathf.Tau);
 			float len = rng.RandfRange(0.5f, 1.8f) * (1.25f - y / h);
 			Vector3 from = top * (y / h);
-			k.Cylinder(from, from + new Vector3(Mathf.Cos(a) * len, rng.RandfRange(-0.5f, 0.2f) * len, Mathf.Sin(a) * len), 0.055f, 0.01f, 4, false);
+			Vector3 end = from + new Vector3(Mathf.Cos(a) * len, rng.RandfRange(-0.5f, 0.2f) * len, Mathf.Sin(a) * len);
+			k.Cylinder(from, end, 0.055f, 0.01f, 4, false);
+			if (moss > 0f && mossRng.Randf() < moss)
+				MossCard(k, from.Lerp(end, mossRng.RandfRange(0.4f, 0.9f)), mossRng.RandfRange(0.6f, 1.6f), mossRng.RandfRange(0.3f, 0.5f), mossRng);
 		}
 		return k.Commit();
 	}
@@ -634,6 +653,8 @@ public partial class ForestScatter : Node3D
 					else if (r3 < 0.9f || dT < 7f || Cleared(p2, 2.6f, false)) { mesh = "fir_mid"; trunkR = 0.31f; }
 					else { mesh = "fir_young"; trunkR = 0.17f; }
 				}
+				// moss hanging from the dead branches of a share of them, more deep in
+				if (mesh is "fir_giant" or "fir_tall" or "snag" or "snag_tall" && _rng.Randf() < 0.3f + 0.35f * deep) mesh += "_moss";
 				// the hidden test route keeps a thin lane: trunk surface >= 1.2 m from its centre
 				if (dA < 1.25f + trunkR * scale * 1.45f) continue;
 				var basis = Basis.FromEuler(tilt).Scaled(Vector3.One * scale);
@@ -893,6 +914,7 @@ public partial class ForestScatter : Node3D
 		{
 			bool foliage = meshKey is "fern" or "grass" or "litter";
 			bool small = foliage || meshKey is "branch" or "stump";
+			bool under = meshKey.StartsWith("sapling") || meshKey.StartsWith("vinemound");
 			float chunk = foliage ? FoliageChunk : TreeChunk;
 			foreach (var (key, list) in byChunk)
 			{
@@ -912,10 +934,10 @@ public partial class ForestScatter : Node3D
 				{
 					Name = $"{meshKey}_{key.X}_{key.Y}",
 					Multimesh = mm,
-					VisibilityRangeEnd = (foliage ? FoliageViewDistance : (small ? 70f : TreeViewDistance)) + chunk * 0.7f,
+					VisibilityRangeEnd = (foliage ? FoliageViewDistance : (small ? 70f : under ? 85f : TreeViewDistance)) + chunk * 0.7f,
 					// only the trees throw shadows: the branches, stumps and ground cover were half the shadow pass
 					// for shadows no one could see under the canopy's (performance pass, 2026-09-27)
-					CastShadow = small ? GeometryInstance3D.ShadowCastingSetting.Off : GeometryInstance3D.ShadowCastingSetting.On,
+					CastShadow = small || meshKey.StartsWith("sapling") ? GeometryInstance3D.ShadowCastingSetting.Off : GeometryInstance3D.ShadowCastingSetting.On,
 				};
 				root.AddChild(mmi);
 			}

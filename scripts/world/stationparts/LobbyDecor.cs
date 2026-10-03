@@ -102,11 +102,12 @@ public partial class LobbyDecor : Node3D
 		AddChild(body);
 		void Walls(MeshKit k, StaticBody3D b)
 		{
-			StationKit.WallAlongX(k, b, -D, -W, 0.2f, H, 0, (StationInterior.EntryGapX, 2.2f));
-			StationKit.WallAlongX(k, b, -D, 0.2f, W, H, 0, (StationInterior.BasementGapX, 2.2f));
-			StationKit.WallAlongX(k, b, D, -W, W, H, 0, (0f, 2.4f), 2.5f);
-			StationKit.WallAlongZ(k, b, W, -D, D, H, 0, (0f, 2.2f));
-			StationKit.WallAlongZ(k, b, -W, -D, D, H, 0, (0f, 2.2f));
+			// (the lobby has its own wainscot: the crown only)
+			StationKit.WallAlongX(k, b, -D, -W, 0.2f, H, 0, (StationInterior.EntryGapX, 2.2f), trimSide: 1, panels: false);
+			StationKit.WallAlongX(k, b, -D, 0.2f, W, H, 0, (StationInterior.BasementGapX, 2.2f), trimSide: 1, panels: false);
+			StationKit.WallAlongX(k, b, D, -W, W, H, 0, (0f, 2.4f), 2.5f, trimSide: -1, panels: false);
+			StationKit.WallAlongZ(k, b, W, -D, D, H, 0, (0f, 2.2f), trimSide: -1, panels: false);
+			StationKit.WallAlongZ(k, b, -W, -D, D, H, 0, (0f, 2.2f), trimSide: 1, panels: false);
 		}
 		var clean = new MeshKit();
 		clean.Mat(StationTextures.WallpaperMat);
@@ -516,7 +517,17 @@ public partial class LobbyDecor : Node3D
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.7f, 0.58f, 0.36f);
 		k.Cylinder(new Vector3(0, H, 0), new Vector3(0, H - 0.5f, 0), 0.012f, 0.012f, 5, false);
+		k.Cylinder(new Vector3(0, H - 0.04f, 0), new Vector3(0, H - 0.1f, 0), 0.06f, 0.03f, 10);   // the canopy where the rod hangs
 		k.CommitTo(this, "LampRod", false);
+		// a plaster rose round it on the ceiling, in rings (the interiors pass, 2026-10-03); a hair under the ceiling
+		var rose = new MeshKit();
+		rose.Mat(new StandardMaterial3D { ResourceName = "st_rose", AlbedoColor = new Color(0.66f, 0.62f, 0.54f), Roughness = 0.9f, VertexColorUseAsAlbedo = true });
+		foreach (var (r, top, bottom) in new[] { (0.36f, 0.002f, 0.018f), (0.29f, 0.018f, 0.03f), (0.2f, 0.03f, 0.044f), (0.1f, 0.044f, 0.058f) })
+		{
+			rose.Color = Colors.White * (1f - top * 2f);
+			rose.Cylinder(new Vector3(0, H - top, 0), new Vector3(0, H - bottom, 0), r, r - 0.012f, 28);
+		}
+		rose.CommitTo(this, "CeilingRose", false);
 		_globe = new MeshInstance3D
 		{
 			Name = "LampGlobe",

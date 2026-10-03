@@ -151,9 +151,13 @@ public static class StationTextures
 		int col = (x + off) / 16;
 		bool mortar = y % 8 == 0 || (x + off) % 16 == 0;
 		float n = Fbm(x, y, 64, 8, 3, 31);
-		if (mortar) return new Color(0.2f, 0.18f, 0.16f) * (0.8f + 0.3f * n);
+		if (mortar) return new Color(0.15f, 0.14f, 0.125f) * (0.8f + 0.3f * n);
+		// old, damp, sooted brick (the interiors pass, 2026-10-03: it was a bright, even orange-red); a burnt one here and there
 		float tone = Hash(col, row, 32);
-		Color c = new Color(0.46f, 0.14f, 0.09f).Lerp(new Color(0.58f, 0.25f, 0.16f), tone);
+		Color c = new Color(0.27f, 0.12f, 0.085f).Lerp(new Color(0.36f, 0.2f, 0.14f), tone);
+		if (Hash(col, row, 33) > 0.82f) c *= 0.55f;
+		float soot = Fbm(x, y, 64, 2, 2, 34);
+		c = c.Lerp(new Color(0.12f, 0.11f, 0.1f), Mathf.Clamp((soot - 0.45f) * 1.6f, 0f, 0.6f));
 		return c * (0.78f + 0.35f * n);
 	}), 0.92f, 0.18f);
 
