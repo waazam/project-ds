@@ -98,6 +98,11 @@ public partial class SkiLodge : Node3D
 
 	public override void _Ready()
 	{
+		// no snow indoors whatever the weather (Weather's): the two wings, and the hexagonal hall (the square inside its
+		// apothem; the roof collider has the rest)
+		foreach (float side in new[] { -1f, 1f })
+			Weather.RegisterShelter(this, new Aabb(new Vector3(side > 0 ? WingX0 : -WingX1, -1f, -WingHalfZ), new Vector3(WingX1 - WingX0, 13f, WingHalfZ * 2f)));
+		Weather.RegisterShelter(this, new Aabb(new Vector3(-Apothem * 0.7f, -1f, -Apothem * 0.7f), new Vector3(Apothem * 1.4f, 14f, Apothem * 1.4f)));
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		_body.SetMeta("surface", "stone");
 		AddChild(_body);

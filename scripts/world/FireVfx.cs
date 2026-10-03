@@ -94,18 +94,16 @@ public partial class FireVfx : Node3D
 				TurbulenceNoiseStrength = 1.6f,
 				TurbulenceNoiseScale = 2.2f,
 				TurbulenceInfluenceMin = 0.05f, TurbulenceInfluenceMax = 0.15f,
-				ScaleMin = 0.5f, ScaleMax = 1.2f,
+				ScaleMin = 0.02f, ScaleMax = 0.045f,
 				ColorRamp = Ramp(new Color(1f, 0.85f, 0.5f, 1f), new Color(1f, 0.4f, 0.08f, 0.9f), new Color(0.6f, 0.1f, 0.02f, 0f)),
 			};
-			var mat = new StandardMaterial3D
-			{
-				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-				BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
-				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-				BlendMode = BaseMaterial3D.BlendModeEnum.Add,
-				VertexColorUseAsAlbedo = true,
-				AlbedoColor = new Color(2.2f, 1.6f, 1.2f),
-			};
+			// (the weather pass: a spark's short streak along its flight, not a square: weather_spark.gdshader)
+			pm.ParticleFlagAlignY = true;
+			var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/weather_spark.gdshader") };
+			mat.SetShaderParameter("atlas", Weather.Atlas);
+			mat.SetShaderParameter("box_half", new Vector3(1000f, 1000f, 1000f));
+			mat.SetShaderParameter("near_fade", 0.05f);
+			mat.SetShaderParameter("stretch", 0.025f);
 			_embers = new GpuParticles3D
 			{
 				Name = "Embers",
@@ -113,7 +111,7 @@ public partial class FireVfx : Node3D
 				Lifetime = 2.4f,
 				Randomness = 0.6f,
 				ProcessMaterial = pm,
-				DrawPass1 = new QuadMesh { Size = new Vector2(0.045f, 0.045f), Material = mat },
+				DrawPass1 = new QuadMesh { Size = new Vector2(1f, 1f), Material = mat },
 				Position = new Vector3(0, Extent.Y * 0.35f, 0),
 				VisibilityAabb = new Aabb(new Vector3(-4, -1, -4), new Vector3(8, 12, 8)),
 				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
@@ -146,13 +144,18 @@ public partial class FireVfx : Node3D
 				TurbulenceNoiseStrength = 0.8f,
 				TurbulenceNoiseScale = 4f,
 				TurbulenceInfluenceMin = 0.02f, TurbulenceInfluenceMax = 0.06f,
+				// (the weather pass: a puff's whole life from the flipbook, billowing from a dense knot to a thin wisp)
+				AnimSpeedMin = 1f, AnimSpeedMax = 1f, AnimOffsetMin = 0f, AnimOffsetMax = 0.12f,
 			};
+			_smokePm = pm;
+			_smokeGravity = pm.Gravity;
 			var mat = new StandardMaterial3D
 			{
 				BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
 				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 				VertexColorUseAsAlbedo = true,
-				AlbedoTexture = PuffAlpha(),
+				AlbedoTexture = SmokeSheet,
+				ParticlesAnimHFrames = 4, ParticlesAnimVFrames = 4, ParticlesAnimLoop = false,
 				TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 				Roughness = 1f,
 				MetallicSpecular = 0f,
@@ -196,6 +199,11 @@ public partial class FireVfx : Node3D
 		_built = true;
 		Apply();
 	}
+
+	private ParticleProcessMaterial _smokePm;
+	private Vector3 _smokeGravity;
+	private static Texture2D _smokeSheet;
+	private static Texture2D SmokeSheet => _smokeSheet ??= GD.Load<Texture2D>("res://assets/textures/weather/smoke_sheet.png");
 
 	private static Texture2D _puffAlpha;
 	private static Texture2D PuffAlpha()
@@ -241,6 +249,12 @@ public partial class FireVfx : Node3D
 
 	public override void _Process(double delta)
 	{
+		// the smoke drifts off with the wind (Weather's: the same air the snow and the trees are in)
+		if (_smokePm != null && _smoke != null && _smoke.Emitting)
+		{
+			Vector3 w = Weather.Wind;   // (world space: the smoke is LocalCoords = false)
+			_smokePm.Gravity = _smokeGravity + new Vector3(w.X, 0f, w.Z) * 0.45f;
+		}
 		if (_light == null || !_light.Visible) return;
 		_clock += delta;
 		float t = (float)_clock;

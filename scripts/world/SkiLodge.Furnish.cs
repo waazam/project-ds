@@ -680,11 +680,13 @@ public partial class SkiLodge
 			Name = "Blowing203", Amount = 120, Lifetime = 3f, Position = new Vector3(wx, 4.95f, zOut - s * 0.1f),
 			ProcessMaterial = new ParticleProcessMaterial
 			{
+				// (the owner's snowflakes: a frame of the atlas each, turned at random)
+				AnimOffsetMin = 0f, AnimOffsetMax = 0.99f, AngleMin = -180f, AngleMax = 180f,
 				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.5f, 0.25f, 0.05f),
 				Direction = new Vector3(0, -0.3f, -s), Spread = 30f, InitialVelocityMin = 0.4f, InitialVelocityMax = 1.2f, Gravity = new Vector3(0, -0.4f, 0),
 				TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.6f, ScaleMin = 0.6f, ScaleMax = 1.3f,
 			},
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.03f, 0.03f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.85f, 0.88f, 0.95f, 0.8f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.03f, 0.03f), Material = Weather.FlakeMaterial(0.8f) },
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
 		AddChild(blow);
@@ -741,11 +743,13 @@ public partial class SkiLodge
 			Name = "DiningDraught", Amount = 60, Lifetime = 4f, Position = new Vector3(DiningX1 - 0.1f, 2f, 2f),
 			ProcessMaterial = new ParticleProcessMaterial
 			{
+				// (the owner's snowflakes: a frame of the atlas each, turned at random)
+				AnimOffsetMin = 0f, AnimOffsetMax = 0.99f, AngleMin = -180f, AngleMax = 180f,
 				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.05f, 0.3f, 0.4f),
 				Direction = new Vector3(-1, -0.2f, 0), Spread = 25f, InitialVelocityMin = 0.3f, InitialVelocityMax = 0.8f, Gravity = new Vector3(0, -0.2f, 0),
 				TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.5f,
 			},
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.03f, 0.03f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.85f, 0.88f, 0.95f, 0.8f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.03f, 0.03f), Material = Weather.FlakeMaterial(0.8f) },
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
 		AddChild(_diningCold);

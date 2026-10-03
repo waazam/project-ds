@@ -6,7 +6,7 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// The storm's visuals, driven by StormController:
-/// - <see cref="Intensity"/> 0..1: rain streaks falling around the camera, small
+/// - <see cref="Intensity"/> 0..1: rain streaks falling around the camera (Weather's, since the weather pass), small
 ///   splashes on the ground near it, the ground and buildings darkening as they get
 ///   wet (a camera-following decal), and ForestAtmosphere's overcast/storm layer.
 ///   Wetness lags behind: it soaks in over ~20 s and dries over ~90 s after the rain.
@@ -24,14 +24,6 @@ public partial class RainVfx : Node3D
 	public static RainVfx Instance { get; private set; }
 
 	[Export] public NodePath AtmospherePath = "../Atmosphere";
-	[Export] public int MaxDrops = 1400;
-	/// <summary>Streaks in the thin layer right around the eye (it sells the rain against the fog; keep it sparse).</summary>
-	[Export] public int NearDrops = 90;
-	/// <summary>Streak opacity. Low: the rain should be seen through, never a curtain.</summary>
-	[Export] public float StreakAlpha = 0.11f;
-	[Export] public float Radius = 11f;
-	[Export] public float FallSpeed = 15f;
-	[Export] public Vector2 Wind = new(0.9f, 0.4f);
 	[Export] public float WetInSeconds = 20f;
 	[Export] public float DryOutSeconds = 90f;
 	/// <summary>Peak energy of the lightning directional light at strength 1.</summary>
@@ -44,7 +36,7 @@ public partial class RainVfx : Node3D
 	/// <summary>0..1, lags Intensity (read-only for others).</summary>
 	public float Wetness { get; private set; }
 
-	private GpuParticles3D _rain, _rainNear, _splash;
+	private GpuParticles3D _splash;
 	private ParticleProcessMaterial _splashPm;
 	private Image _splashPoints;
 	private ImageTexture _splashPointsTex;
@@ -64,9 +56,10 @@ public partial class RainVfx : Node3D
 	/// <summary>Registers a local-space box of <paramref name="owner"/> as a roofed interior: no rain drawn while the camera is in it.</summary>
 	public static void RegisterShelter(Node3D owner, Aabb localBox)
 	{
-		_shelters.RemoveAll(s => s.owner == owner);
+		_shelters.RemoveAll(s => s.owner == owner);   // (the streaks' own shelter is Weather's roof collider; this keeps them off indoors at once)
 		_shelters.Add((owner, localBox));
 		owner.TreeExiting += () => _shelters.RemoveAll(s => s.owner == owner);
+		Weather.RegisterShelter(owner, localBox);   // (and no streak shows inside it, wherever the camera is)
 	}
 
 	public override void _EnterTree()
@@ -83,7 +76,6 @@ public partial class RainVfx : Node3D
 		_atmo = GetNodeOrNull<ForestAtmosphere>(AtmospherePath) ?? GetTree().GetFirstNodeInGroup("atmosphere") as ForestAtmosphere;
 		_terrain = GroundSnap.FindTerrain(this);
 		TopLevel = true;
-		BuildRain();
 		BuildSplashes();
 		BuildWetDecal();
 		_bolt = new DirectionalLight3D
@@ -97,68 +89,6 @@ public partial class RainVfx : Node3D
 			Visible = false,
 		};
 		AddChild(_bolt);
-	}
-
-	private void BuildRain()
-	{
-		var pm = new ParticleProcessMaterial
-		{
-			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
-			EmissionBoxExtents = new Vector3(Radius, 0.5f, Radius),
-			Direction = new Vector3(Wind.X, -FallSpeed, Wind.Y).Normalized(),
-			Spread = 2f,
-			InitialVelocityMin = FallSpeed * 0.92f,
-			InitialVelocityMax = FallSpeed * 1.08f,
-			Gravity = Vector3.Zero,
-			ScaleMin = 0.7f,
-			ScaleMax = 1.2f,
-			ParticleFlagAlignY = true,
-		};
-		var mat = new StandardMaterial3D
-		{
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			AlbedoColor = new Color(0.58f, 0.61f, 0.68f, StreakAlpha),
-			AlbedoTexture = StreakTexture(),
-			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.FixedY,
-			BillboardKeepScale = true,
-			CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-			DisableReceiveShadows = true,
-		};
-		_rain = new GpuParticles3D
-		{
-			Name = "Rain",
-			Amount = MaxDrops,
-			Lifetime = 1.15f,
-			Preprocess = 1.2f,
-			ProcessMaterial = pm,
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.018f, 0.6f), Material = mat },
-			LocalCoords = false,
-			VisibilityAabb = new Aabb(new Vector3(-Radius - 2, -20, -Radius - 2), new Vector3(Radius * 2 + 4, 32, Radius * 2 + 4)),
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-			Emitting = false,
-			AmountRatio = 0f,
-		};
-		AddChild(_rain);
-		// a sparse near layer right around the eye, so the rain reads against the fog
-		var npm = (ParticleProcessMaterial)pm.Duplicate();
-		npm.EmissionBoxExtents = new Vector3(3.5f, 0.3f, 3.5f);
-		_rainNear = new GpuParticles3D
-		{
-			Name = "RainNear",
-			Amount = NearDrops,
-			Lifetime = 0.55f,
-			Preprocess = 0.6f,
-			ProcessMaterial = npm,
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.01f, 0.38f), Material = mat },
-			LocalCoords = false,
-			VisibilityAabb = new Aabb(new Vector3(-6, -10, -6), new Vector3(12, 14, 12)),
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-			Emitting = false,
-			AmountRatio = 0f,
-		};
-		AddChild(_rainNear);
 	}
 
 	/// <summary>Vertical streak, soft at both ends.</summary>
@@ -316,13 +246,9 @@ public partial class RainVfx : Node3D
 			if (IsInstanceValid(owner) && box.HasPoint(owner.GlobalTransform.AffineInverse() * cp)) { sheltered = true; break; }
 
 		float shown = sheltered ? 0f : _intensity;
-		_rain.Emitting = shown > 0.01f;
-		_rain.AmountRatio = shown * 0.85f;   // a touch fewer drops (Dan, 2026-09-22)
-		_rainNear.Emitting = shown > 0.01f;
-		_rainNear.AmountRatio = shown * 0.85f;
-		_rainNear.GlobalPosition = cp + new Vector3(0, 4.5f, 0) + (cam.GlobalBasis * new Vector3(0, 0, -1.5f)) with { Y = 0 };
-		// lead the camera a little so walking forward doesn't outrun the rain
-		_rain.GlobalPosition = cp + new Vector3(0, 9.5f, 0) + (cam.GlobalBasis * new Vector3(0, 0, -3f)) with { Y = 0 };
+		// the streaks are Weather's now (the weather pass): wrapping round the camera, slanting with the shared wind,
+		// never under a roof or the trees; a touch fewer than full (Dan, 2026-09-22)
+		Weather.Get(this).Rain = shown * 0.85f;
 
 		_splash.Emitting = shown > 0.05f;
 		_splash.AmountRatio = Mathf.Clamp(shown, 0f, 1f);

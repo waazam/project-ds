@@ -560,6 +560,8 @@ public partial class StoryTest : Node
 		// has been falling since the wake; past the camp the forest goes dead quiet under it.
 		await WalkTrailFor(30f, ct);
 		Check("the rain keeps falling past the camp", StormController.Instance is { Active: true });
+		Check("its streaks are the weather's: wrapping round the camera, slanting with the wind", Weather.Instance is { Rain: > 0.3f } && Weather.Wind.Length() > 0.3f,
+			$"rain {Weather.Instance?.Rain:0.00}, wind {Weather.Wind}");
 		await WaitUntil(() => (ForestAmbienceManager.Instance?.Silence ?? 0f) > 0.8f, 8, ct);   // it hushes over a few seconds
 		Check("the storm silences the forest", (ForestAmbienceManager.Instance?.Silence ?? 0f) > 0.8f, $"silence {ForestAmbienceManager.Instance?.Silence:0.00}");
 	}
@@ -3010,6 +3012,24 @@ public partial class StoryTest : Node
 		var atmo = StoryBeat.Atmosphere(_player);
 		Check("dusk under a snow sky, and it's snowing", atmo != null && atmo.WinterDusk > 0.1f && woods.SnowRatio > 0.8f, $"dusk {atmo?.WinterDusk:0.00}, snow {woods.SnowRatio:0.00}");
 		Screenshot("act22_the_plowed_road");
+		{
+			// the weather pass: the snow in its three layers, the roofs and boughs keeping it off; then the blizzard, the
+			// fog closing the view in, and back
+			var weather = Weather.Instance;
+			var layers = weather?.FindChildren("Snow*", "GPUParticles3D", false, false);
+			Check("the snow falls in layers round the camera (near flakes, the many beyond, the far curtain), sheltered by roofs and boughs",
+				weather is { Snow: > 0.6f } && layers?.Count == 2 && layers.All(l => ((GpuParticles3D)l).Emitting) && weather.FindChild("Shelter", false, false) != null && weather.FindChild("Curtain0", false, false) is MeshInstance3D { Visible: true },
+				$"snow {weather?.Snow:0.00}, layers {layers?.Count}");
+			float clear = weather?.VisibilityMetres ?? 0f;
+			weather?.SetBlizzard(1f, 0.01f);
+			await Seconds(2.5, ct);
+			Check("a blizzard closes the view in like the fog (the story's to use)", weather is { Blizzard: > 0.99f } && weather.VisibilityMetres < 30f && weather.VisibilityMetres < clear * 0.6f,
+				$"sight {clear:0} m -> {weather?.VisibilityMetres:0} m, wind {Weather.Wind}");
+			Screenshot("act22_blizzard");
+			weather?.SetBlizzard(0f, 0.01f);
+			await Seconds(2.0, ct);
+			Check("and it passes: the view opens again", weather is { Blizzard: < 0.01f } && weather.VisibilityMetres > clear * 0.9f, $"sight {weather?.VisibilityMetres:0} m");
+		}
 		// down the road a way on foot: the road holds (ruts, windrows), the trees keep off it
 		float along = 20f;
 		for (; along < 150f; along += 15f)

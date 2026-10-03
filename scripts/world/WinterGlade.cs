@@ -39,16 +39,16 @@ public partial class WinterGlade : Node3D
 		// (the snow on the ground is WinterWoods': one ground from the church's walls to the ski lodge)
 		WinterWoods.TreeSpots.Clear();   // the glade is built first: it starts the list
 		BuildTrees();
-		BuildSnowfall();
 	}
 
-	private readonly System.Collections.Generic.List<GpuParticles3D> _snow = new();
 	/// <summary>The trailer's church shots want snow whatever the save says.</summary>
 	public static bool ForceSnow;
 	private double _check;
+	/// <summary>How heavily it snows round the church (Weather's 0..1).</summary>
+	public const float GladeSnow = 0.85f;
 
-	/// <summary>The snowfall only runs while the camera is near enough to see it (the optimization pass:
-	/// fourteen thousand flakes were falling all game, underground and in the summer woods).</summary>
+	/// <summary>The snow round the church (the weather pass: Weather's, wrapping round the camera; its roof and the trees
+	/// keep it off, so from inside it falls past the windows), while the camera's near enough to see it.</summary>
 	public override void _Process(double delta)
 	{
 		_check -= delta;
@@ -57,14 +57,13 @@ public partial class WinterGlade : Node3D
 		var cam = GetViewport()?.GetCamera3D();
 		bool near = cam != null && cam.GlobalPosition.DistanceTo(ToGlobal(new Vector3(Centre.X, 0, Centre.Y))) < Radius + 120f
 			&& (ForceSnow || (Systems.StoryManager.Instance?.Current ?? Systems.Checkpoint.None) >= Systems.Checkpoint.Act20Finished);
-		foreach (var p in _snow)
-			if (p.Emitting != near)
-			{
-				p.Emitting = near;
-				p.Visible = near;
-				if (near) p.Restart();   // already falling (its preprocess), not starting from the sky
-			}
+		if (near != _snowing || near)
+		{
+			_snowing = near;
+			Weather.Get(this).RequestSnow(this, near ? GladeSnow : 0f, 3f);
+		}
 	}
+	private bool _snowing;
 
 	private void BuildTrees()
 	{
@@ -105,40 +104,4 @@ public partial class WinterGlade : Node3D
 	/// <summary>A leafless broadleaf (now <see cref="WinterTreeKit"/>'s).</summary>
 	public static Mesh BareTreeMesh(int seed, float height) => WinterTreeKit.BareTree(seed, height, seed % 2);
 
-	/// <summary>Snow falling round the church in four great sheets, one to each side, never over its roof.</summary>
-	private void BuildSnowfall()
-	{
-		var flake = new QuadMesh { Size = new Vector2(0.05f, 0.05f) };
-		flake.Material = new StandardMaterial3D
-		{
-			AlbedoColor = new Color(0.95f, 0.97f, 1f, 0.85f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-		};
-		var boxes = new[]
-		{
-			(new Vector3(Church.VestryX1 - 32f, 0, 44f), new Vector3(60f, 1f, 170f)),
-			(new Vector3(Church.TransHalf + 32f, 0, 44f), new Vector3(60f, 1f, 170f)),
-			(new Vector3(-4f, 0, -32f), new Vector3(66f, 1f, 56f)),
-			(new Vector3(-4f, 0, Church.ChancelEnd + Church.ApseR + 30f), new Vector3(66f, 1f, 56f)),
-		};
-		int i = 0;
-		foreach (var (c, size) in boxes)
-		{
-			var mat = new ParticleProcessMaterial
-			{
-				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = size * 0.5f,
-				Direction = new Vector3(0.15f, -1f, 0.05f), Spread = 12f, InitialVelocityMin = 1.1f, InitialVelocityMax = 1.8f,
-				Gravity = new Vector3(0.1f, -0.25f, 0), TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.6f, TurbulenceNoiseScale = 6f,
-				ScaleMin = 0.6f, ScaleMax = 1.4f,
-			};
-			var p = new GpuParticles3D
-			{
-				Name = $"Snow{i++}", Amount = 3500, Lifetime = 26f, Preprocess = 26f, ProcessMaterial = mat, DrawPass1 = flake,
-				Position = c + Vector3.Up * 34f, VisibilityAabb = new Aabb(new Vector3(-size.X * 0.5f - 4f, -40f, -size.Z * 0.5f - 4f), new Vector3(size.X + 8f, 44f, size.Z + 8f)),
-				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-			};
-			AddChild(p);
-			_snow.Add(p);
-		}
-	}
 }

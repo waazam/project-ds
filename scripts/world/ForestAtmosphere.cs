@@ -569,6 +569,17 @@ public partial class ForestAtmosphere : Node
 		_shafts.LightDir = -_sun.GlobalBasis.Z;
 	}
 
+	[ExportGroup("Blizzard")]
+	/// <summary>0..1, Weather's: the blizzard's snow-fog over whatever the place's fog is.</summary>
+	public float Blizzard { get; set; }
+	/// <summary>How far the eye reaches in a full blizzard (metres): the fog's end.</summary>
+	[Export] public float BlizzardSightMetres = 24f;
+	/// <summary>The snow-fog's colour: a cold mid grey (a whiteout, but never a white glare).</summary>
+	[Export] public Color BlizzardFogColor = new(0.33f, 0.35f, 0.39f);
+	[Export] public float BlizzardAmbient = 0.45f;
+	/// <summary>How far the eye reaches now (metres, from the fog): tests and the story.</summary>
+	public float VisibilityMetres { get; private set; } = 999f;
+
 	[ExportGroup("Light in the fog")]
 	/// <summary>Volumetric fog's density by place (the fidelity pass, 2026-10-02): thin, so only what's lit shows in it
 	/// (the lantern's beam, the lamps' haloes, the sun's shafts between the trunks). Kept low: never a glare.</summary>
@@ -589,7 +600,7 @@ public partial class ForestAtmosphere : Node
 		float d = Mathf.Lerp(VolumetricOpen, VolumetricWinter, winter);
 		d = Mathf.Lerp(d, VolumetricInterior, Mathf.Max(inside, lodge));
 		d = Mathf.Lerp(d, VolumetricUnderground, under);
-		_env.VolumetricFogDensity = d * (1f + 0.4f * storm);
+		_env.VolumetricFogDensity = d * (1f + 0.4f * storm) + 0.02f * Mathf.Clamp(Blizzard, 0f, 1f);
 		Color hue = Lum(fog) > 0.001f ? fog * (0.6f / Mathf.Max(Lum(fog), 0.001f)) : new Color(0.6f, 0.6f, 0.6f);
 		_env.VolumetricFogAlbedo = new Color(0.6f, 0.6f, 0.6f).Lerp(hue.Clamp(), 0.35f);
 		if (_sun != null) _sun.LightVolumetricFogEnergy = SunInFog;
@@ -715,6 +726,33 @@ public partial class ForestAtmosphere : Node
 			_env.FogMode = _levelFogMode;
 			_env.FogDepthBegin = _levelDepthBegin; _env.FogDepthEnd = _levelDepthEnd; _env.FogDepthCurve = _levelDepthCurve;
 		}
+		// the blizzard (Weather's): the snow-fog closes the view in, whatever the place's own fog was
+		float bliz = Mathf.Clamp(Blizzard, 0f, 1f) * (1f - under) * (1f - inside);
+		if (bliz > 0.001f)
+		{
+			float e = bliz * bliz * (3f - 2f * bliz);
+			fog = fog.Lerp(BlizzardFogColor, e);
+			ambColor = ambColor.Lerp(BlizzardFogColor * (Lum(ambColor) / Mathf.Max(Lum(BlizzardFogColor), 0.001f)), e * 0.6f);
+			ambient = Mathf.Lerp(ambient, Mathf.Max(ambient, BlizzardAmbient), e);
+			if (_env.FogMode == Environment.FogModeEnum.Depth)
+			{
+				_env.FogDepthBegin = Mathf.Lerp(_env.FogDepthBegin, 0.5f, e);
+				_env.FogDepthEnd = Mathf.Lerp(_env.FogDepthEnd, BlizzardSightMetres, e);
+				_env.FogDepthCurve = Mathf.Lerp(_env.FogDepthCurve, 0.7f, e);
+				_env.FogDensity = Mathf.Lerp(_env.FogDensity, 1f, e);
+				_env.FogLightColor = _env.FogLightColor.Lerp(BlizzardFogColor, e);
+			}
+			else
+			{
+				// exponential: about 3/density metres to all but gone
+				density = Mathf.Lerp(density, 3f / BlizzardSightMetres, e);
+				_env.FogDensity = density;
+				_env.FogLightColor = fog;
+			}
+			_env.FogSkyAffect = Mathf.Lerp(_env.FogSkyAffect, 1f, e);
+			sunEnergy *= 1f - 0.6f * e;
+		}
+		VisibilityMetres = _env.FogMode == Environment.FogModeEnum.Depth ? _env.FogDepthEnd : 3f / Mathf.Max(_env.FogDensity, 0.0001f);
 		ApplyVolumetric(fog, under, inside, lodge, Mathf.Max(winter, dusk), storm);
 		_env.AmbientLightColor = ambColor;
 		_env.AmbientLightEnergy = ambient;

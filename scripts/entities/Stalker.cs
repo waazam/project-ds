@@ -684,8 +684,11 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 			{
 				// A different side each time (Dan, 2026-09-22: it moves around, so its sounds come from all round you):
 				// behind, behind-left, behind-right, off to the left, off to the right; never the same sector twice running.
+				// (and the sides it hasn't come from lately first: it works its way round you)
 				int sector;
-				do sector = _rng.RandiRange(0, SectorDegrees.Length - 1); while (sector == _lastSector && SectorDegrees.Length > 1);
+				int tries = 0;
+				do sector = _rng.RandiRange(0, SectorDegrees.Length - 1);
+				while ((sector == _lastSector || (_recentSectors.Contains(sector) && tries < 6)) && SectorDegrees.Length > 1 && tries++ < 12);
 				_trySector = sector;
 				dir = (-look).Rotated(Vector3.Up, Mathf.DegToRad(SectorDegrees[sector] + _rng.RandfRange(-22f, 22f)));
 			}
@@ -746,6 +749,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 			_hideDir = -lateral;
 			_ahead = ahead;
 			_lastSector = ahead ? AheadSector : _trySector;
+			if (!ahead) { _recentSectors.Enqueue(_trySector); while (_recentSectors.Count > Mathf.Min(3, SectorDegrees.Length - 2)) _recentSectors.Dequeue(); }
 			_sectorsUsed.Add(_lastSector);
 			if (rig) KindsUsed.Add(kind);
 			Current = State.Peeking;
@@ -856,6 +860,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		Rotation = new Vector3(0, Mathf.Atan2(to.X, to.Z) + (_owl ? Mathf.Pi : 0f), 0);
 	}
 	private bool _owl;
+	private readonly Queue<int> _recentSectors = new();
 
 	/// <summary>The ways it has been found so far (tests).</summary>
 	public readonly HashSet<StalkerBody.PeekKind> KindsUsed = new();

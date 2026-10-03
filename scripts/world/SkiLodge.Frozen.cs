@@ -108,11 +108,13 @@ public partial class SkiLodge
 				Name = "WindowSnow", Amount = low ? 20 : 14, Lifetime = 3f, Position = c + inward * 0.08f,
 				ProcessMaterial = new ParticleProcessMaterial
 				{
+				// (the owner's snowflakes: a frame of the atlas each, turned at random)
+				AnimOffsetMin = 0f, AnimOffsetMax = 0.99f, AngleMin = -180f, AngleMax = 180f,
 					EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(w * 0.4f, h * 0.4f, 0.05f),
 					Direction = inward + Vector3.Down * 0.4f, Spread = 25f, InitialVelocityMin = 0.4f, InitialVelocityMax = 1.2f, Gravity = new Vector3(0, -0.5f, 0),
 					TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.5f, ScaleMin = 0.6f, ScaleMax = 1.3f,
 				},
-				DrawPass1 = new QuadMesh { Size = new Vector2(0.025f, 0.025f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.86f, 0.92f, 0.8f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
+				DrawPass1 = new QuadMesh { Size = new Vector2(0.025f, 0.025f), Material = Weather.FlakeMaterial(0.8f) },
 				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 			};
 			// (its box turned to the window's plane)

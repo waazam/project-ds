@@ -63,6 +63,12 @@ public partial class Church : Node3D
 
 	private void Build()
 	{
+		// no snow indoors (Weather's: the vault's surfaces face in, so the roof collider can't see them from above): the
+		// nave and its aisles to the apse, the transepts and the vestry
+		float top = Spring + NaveR + 3f;
+		Weather.RegisterShelter(this, new Aabb(new Vector3(-AisleOuter - WallT, CryptFloor - 1f, -2f), new Vector3((AisleOuter + WallT) * 2f, top - CryptFloor + 1f, ChancelEnd + ApseR + 3f)));
+		Weather.RegisterShelter(this, new Aabb(new Vector3(-TransHalf - WallT, CryptFloor - 1f, NaveEnd - 1f), new Vector3((TransHalf + WallT) * 2f, top - CryptFloor + 1f, CrossEnd - NaveEnd + 2f)));
+		Weather.RegisterShelter(this, new Aabb(new Vector3(VestryX1 - 0.5f, -1f, VestryZ0 - 0.5f), new Vector3(VestryX0 - VestryX1 + 1f, VestryH + 2f, VestryZ1 - VestryZ0 + 1f)));
 		_stone = Body("Stone", "stone");
 		_marbleBody = Body("Marble", "stone");
 		_wood = Body("Wood", "wood");

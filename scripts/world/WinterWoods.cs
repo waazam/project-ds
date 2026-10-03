@@ -360,47 +360,24 @@ public partial class WinterWoods : Node3D
 
 	// ------------------------------------------------------------------ the weather, the light, the sound
 
-	private GpuParticles3D _snowfall, _diamondDust;
+	private GpuParticles3D _diamondDust;
+	private bool _roadSnowing;
+	/// <summary>How heavily it snows on the road out of the church (Weather's 0..1), thinning to nothing by the lodge.</summary>
+	public const float RoadSnow = 0.85f;
 	private AudioStreamPlayer _wind;
 	private bool _silenced;
 	private double _clock, _nextTinkle = 8;
 	/// <summary>For tests: where the player is along the road (0 at the church, 1 at the lodge), and whether they're out in the woods.</summary>
 	public float PlayerProgress { get; private set; }
 	public bool PlayerOutside { get; private set; }
-	public float SnowRatio => _snowfall?.AmountRatio ?? 0f;
+	public float SnowRatio => Mathf.Clamp((Weather.Instance?.Snow ?? 0f) / RoadSnow, 0f, 1f);
 
 	private void BuildWeather()
 	{
-		var flake = new QuadMesh { Size = new Vector2(0.045f, 0.045f) };
-		flake.Material = new StandardMaterial3D
-		{
-			// lit (in the dark the flakes show in the lantern's light, faint past it; unshaded they were a static of white dots)
-			AlbedoColor = new Color(0.82f, 0.85f, 0.92f, 0.8f), ShadingMode = BaseMaterial3D.ShadingModeEnum.PerVertex, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-			EmissionEnabled = true, Emission = new Color(0.2f, 0.2f, 0.23f),
-		};
-		// soft snow round the player (world space: the flakes don't follow them, only the cloud they fall from)
-		_snowfall = new GpuParticles3D
-		{
-			Name = "Snowfall", Amount = 5000, Lifetime = 14f, Preprocess = 14f, LocalCoords = false, DrawPass1 = flake, Emitting = false,
-			ProcessMaterial = new ParticleProcessMaterial
-			{
-				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(34f, 1f, 34f),
-				Direction = new Vector3(0.1f, -1f, 0.04f), Spread = 10f, InitialVelocityMin = 0.9f, InitialVelocityMax = 1.5f,
-				Gravity = new Vector3(0.06f, -0.2f, 0), TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.5f, TurbulenceNoiseScale = 5f,
-				ScaleMin = 0.6f, ScaleMax = 1.3f,
-			},
-			VisibilityAabb = new Aabb(new Vector3(-40f, -30f, -40f), new Vector3(80f, 36f, 80f)),
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-		};
-		AddChild(_snowfall);
+		// (the snowfall itself is Weather's now: RequestSnow below)
 		// near the lodge the snow stops and the air freezes: a few ice crystals hang and drift, glinting faintly (slow, never a flicker)
-		var glint = new QuadMesh { Size = new Vector2(0.025f, 0.025f) };
-		glint.Material = new StandardMaterial3D
-		{
-			AlbedoColor = new Color(0.75f, 0.85f, 1f, 0.55f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
-		};
+		// (tiny crystals out of the owner's snowflake image, lit: they glint only where the light is)
+		var glint = new QuadMesh { Size = new Vector2(0.03f, 0.03f), Material = Weather.FlakeMaterial(0.6f) };
 		_diamondDust = new GpuParticles3D
 		{
 			Name = "DiamondDust", Amount = 500, Lifetime = 18f, Preprocess = 18f, LocalCoords = false, DrawPass1 = glint, Emitting = false,
@@ -413,6 +390,7 @@ public partial class WinterWoods : Node3D
 			VisibilityAabb = new Aabb(new Vector3(-25f, -10f, -25f), new Vector3(50f, 20f, 50f)),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
+		Weather.FlakeFrames((ParticleProcessMaterial)_diamondDust.ProcessMaterial, 0, 8);
 		AddChild(_diamondDust);
 		_wind = new AudioStreamPlayer { Name = "WinterWind", Stream = GD.Load<AudioStream>("res://assets/audio/ambient/winter_wind_loop.wav"), Bus = "Weather", VolumeDb = -60f };
 		if (_wind.Stream is AudioStreamWav wav) wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
@@ -449,16 +427,12 @@ public partial class WinterWoods : Node3D
 			atmo.WinterDusk = Mathf.MoveToward(atmo.WinterDusk, outside ? 1f : (act ? 0.35f : 0f), dt * 0.25f);
 			atmo.Frost = Mathf.MoveToward(atmo.Frost, outside ? frozen : 0f, dt * 0.2f);
 		}
-		// the snow: soft round the church, thinning, gone by the lodge
-		if (_snowfall != null)
+		// the snow: heavy round the church, thinning down the road, gone by the lodge (Weather's: from inside the church
+		// the glade asks for it; out here the road does)
+		if (outside != _roadSnowing || outside)
 		{
-			// (never over the church: its roof keeps the snow off, and the clearing's own sheets fall round it)
-			float offChurch = 0f;
-			if (player != null) { var pl = ToLocal(player.GlobalPosition); offChurch = WinterGlade.OutsideChurch(pl.X, pl.Z); }
-			bool snow = outside && frozen < 0.97f && offChurch > 40f;
-			if (_snowfall.Emitting != snow) { _snowfall.Emitting = snow; if (snow) _snowfall.Restart(); }
-			_snowfall.AmountRatio = Mathf.Clamp(1f - frozen * 1.05f, 0.02f, 1f);
-			if (cam != null) _snowfall.GlobalPosition = cam.GlobalPosition + Vector3.Up * 14f;
+			_roadSnowing = outside;
+			Weather.Get(this).RequestSnow(this, outside ? RoadSnow * Mathf.Clamp(1f - frozen * 1.05f, 0f, 1f) : 0f, 2.5f);
 		}
 		if (_diamondDust != null)
 		{

@@ -52,6 +52,8 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler") >= 0) { await CrawlerShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--weather") >= 0) { await WeatherShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--shelter") >= 0) { await ShelterTest(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lodge") >= 0) { await LodgeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--prints") >= 0) { await PrintShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
@@ -471,6 +473,106 @@ public partial class CreaturePreview : Node3D
 		var head = crawler.FindChild("Head", true, false) as Node3D;
 		Vector3 h = head?.GlobalPosition ?? crawler.GlobalPosition;
 		await Shot("crawler_face_close", h + new Vector3(0.15f, -0.25f, -0.75f), h);
+	}
+
+	/// <summary>The weather (the weather pass): snow light and heavy, a blizzard, the shelter of a roof and the firs, rain;
+	/// by dusk light and by a lantern at night.</summary>
+	private async Task WeatherShots()
+	{
+		foreach (var n in GetChildren()) if (n is DirectionalLight3D d) { d.LightEnergy = 0.35f; d.LightColor = new Color(0.7f, 0.76f, 0.9f); }
+		env.BackgroundColor = new Color(0.2f, 0.22f, 0.26f);
+		env.AmbientLightColor = new Color(0.5f, 0.55f, 0.65f);
+		env.AmbientLightEnergy = 0.5f;
+		env.FogEnabled = true;
+		env.FogMode = Environment.FogModeEnum.Depth;
+		env.FogLightColor = new Color(0.25f, 0.27f, 0.31f);
+		env.FogDepthBegin = 8f; env.FogDepthEnd = 70f; env.FogDensity = 1f;
+		var ground = new StaticBody3D { Name = "Ground" };
+		ground.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(200, 1, 200) }, Position = new Vector3(0, -0.5f, 0) });
+		ground.AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(200, 200) }, MaterialOverride = World.WinterWoods.PropSnow });
+		AddChild(ground);
+		// a lean-to: a roof on four posts (nothing should fall under it)
+		var wood = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.2f, 0.16f) };
+		AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(5, 0.2f, 4) }, Position = new Vector3(-3, 2.6f, -6), MaterialOverride = wood });
+		foreach (var (x, z) in new[] { (-5.3f, -7.8f), (-0.7f, -7.8f), (-5.3f, -4.2f), (-0.7f, -4.2f) })
+			AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.15f, 2.6f, 0.15f) }, Position = new Vector3(x, 1.3f, z), MaterialOverride = wood });
+		var rng = new RandomNumberGenerator { Seed = 3 };
+		for (int i = 0; i < 40; i++)
+		{
+			var fir = new MeshInstance3D { Mesh = World.ForestScatter.FirMesh(i, rng.RandfRange(9, 16), 0.3f, 0.3f, 7, 2.2f, 0.2f), Position = new Vector3(rng.RandfRange(-40, 40), 0, rng.RandfRange(-60, -12)) };
+			if (Mathf.Abs(fir.Position.X) < 4 && fir.Position.Z > -20) continue;
+			AddChild(fir);
+		}
+		var w = World.Weather.Get(this);
+		var eye = new Vector3(0, 1.65f, 2f);
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(-0.5f, 1.4f, -10f) - eye, Vector3.Up), eye);
+		async Task Snap(string name, double settle)
+		{
+			await Seconds(settle);
+			GetViewport().GetTexture().GetImage().SavePng($"{_out}/{name}.png");
+			GD.Print($"[creature-preview] {name}: snow {w.Snow:0.00} blizzard {w.Blizzard:0.00} wind {World.Weather.Wind}");
+		}
+		w.SetSnow(0.35f, 0.01f);
+		await Snap("weather_light", 3);
+		w.SetSnow(1f, 0.01f);
+		await Snap("weather_heavy", 3);
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(-3f, 1.2f, -6f) - eye, Vector3.Up), eye);
+		await Snap("weather_under_the_roof", 2);
+		w.SetBlizzard(1f, 0.01f);
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(-0.5f, 1.4f, -10f) - eye, Vector3.Up), eye);
+		await Snap("weather_blizzard", 4);
+		w.SetBlizzard(0f, 0.01f);
+		w.SetSnow(0.8f, 0.01f);
+		// night, a lantern
+		foreach (var n in GetChildren()) if (n is DirectionalLight3D d) d.LightEnergy = 0.02f;
+		env.AmbientLightEnergy = 0.05f;
+		env.BackgroundColor = new Color(0.02f, 0.02f, 0.03f);
+		env.FogLightColor = new Color(0.02f, 0.02f, 0.03f);
+		var lamp = new OmniLight3D { LightColor = new Color(1f, 0.72f, 0.42f), OmniRange = 14f, LightEnergy = 1.35f, OmniAttenuation = 1.3f };
+		_cam.AddChild(lamp);
+		lamp.Position = new Vector3(0.18f, -0.25f, -0.25f);
+		await Snap("weather_night_lantern", 3);
+		lamp.QueueFree();
+		w.SetSnow(0f, 0.01f);
+		foreach (var n in GetChildren()) if (n is DirectionalLight3D d) d.LightEnergy = 0.35f;
+		env.AmbientLightEnergy = 0.5f;
+		env.BackgroundColor = new Color(0.2f, 0.22f, 0.26f);
+		w.Rain = 1f;
+		await Snap("weather_rain", 3);
+		w.Rain = 0f;
+		// a fire: its smoke's flipbook drifting off with the wind, its sparks streaking up
+		var fire = new World.FireVfx { Extent = new Vector3(1.2f, 1.1f, 1.2f), Position = new Vector3(2f, 0, -5f) };
+		AddChild(fire);
+		foreach (var n in GetChildren()) if (n is DirectionalLight3D d) d.LightEnergy = 0.05f;
+		env.AmbientLightEnergy = 0.1f;
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(2f, 2.2f, -5f) - eye, Vector3.Up), eye);
+		await Snap("weather_fire_smoke", 6);
+	}
+
+	/// <summary>Does the roof collider keep the snow off? Under a big slab roof, looking along under it.</summary>
+	private async Task ShelterTest()
+	{
+		env.BackgroundColor = new Color(0.2f, 0.22f, 0.26f);
+		var ground = new StaticBody3D();
+		ground.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(200, 1, 200) }, Position = new Vector3(0, -0.5f, 0) });
+		ground.AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(200, 200) } });
+		AddChild(ground);
+		AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(30, 0.5f, 30) }, Position = new Vector3(0, 6f, 0) });
+		var w = World.Weather.Get(this);
+		w.SetSnow(1f, 0.01f);
+		var eye = new Vector3(0, 1.6f, 0);
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(0, 1.4f, -10f) - eye, Vector3.Up), eye);
+		// a plain emitter, hide-on-contact, beside: does the heightfield reach particles at all?
+		var plain = new GpuParticles3D { Amount = 4000, Lifetime = 8, Preprocess = 8, Position = new Vector3(0, 12f, -6f), LocalCoords = false,
+			ProcessMaterial = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(6, 1, 6), Gravity = new Vector3(0, -2f, 0),
+				CollisionMode = ParticleProcessMaterial.CollisionModeEnum.HideOnContact },
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.06f, 0.06f), Material = new StandardMaterial3D { AlbedoColor = new Color(1, 0.3f, 0.2f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
+			VisibilityAabb = new Aabb(new Vector3(-20, -20, -20), new Vector3(40, 40, 40)), CollisionBaseSize = 0.02f };
+		AddChild(plain);
+		await Seconds(4);
+		GetViewport().GetTexture().GetImage().SavePng($"{_out}/shelter_under_roof.png");
+		var sh = w.FindChild("Shelter", false, false) as GpuParticlesCollisionHeightField3D;
+		GD.Print($"[creature-preview] shelter {sh != null} at {sh?.GlobalPosition} size {sh?.Size} follow {sh?.FollowCameraEnabled}");
 	}
 
 	private async Task WendigoShots()

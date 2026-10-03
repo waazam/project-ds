@@ -14,6 +14,8 @@ namespace ProjectDS.Player;
 public partial class AirParticles : Node3D
 {
 	private GpuParticles3D _dust, _spores, _breath;
+	private ShaderMaterial _dustPm, _sporePm;
+	private bool _dustOn, _sporesOn;
 	private PlayerController _player;
 	private double _check, _nextBreath = 2.0, _t;
 	private bool _cold;
@@ -22,42 +24,33 @@ public partial class AirParticles : Node3D
 	{
 		_player = GetParent<PlayerController>();
 		TopLevel = true;
-		_dust = Specks("Dust", 140, 9f, new Vector3(2.2f, 1.4f, 2.2f), 0.012f, new Color(0.72f, 0.68f, 0.6f, 0.55f), 0.025f);
-		_spores = Specks("Spores", 70, 12f, new Vector3(5f, 2.2f, 5f), 0.02f, new Color(0.7f, 0.72f, 0.66f, 0.45f), 0.05f);
+		// (the weather pass: Weather's wrapping layers, so the air is as thick wherever you walk; they ignore the roofs)
+		_dust = World.Weather.MakeLayer(this, "Dust", 220, new Vector3(2.6f, 1.6f, 2.6f), out _dustPm, out var dd);
+		_dustPm.SetShaderParameter("settle", 0f);
+		_dustPm.SetShaderParameter("wind_carry", 0f);
+		_dustPm.SetShaderParameter("fall", new Vector2(-0.015f, 0.02f));
+		_dustPm.SetShaderParameter("flutter", 0.035f);
+		_dustPm.SetShaderParameter("flutter_rate", 0.35f);
+		_dustPm.SetShaderParameter("spin", 0.3f);
+		_dustPm.SetShaderParameter("size_range", new Vector2(0.01f, 0.022f));
+		_dustPm.SetShaderParameter("frames", new Vector2(14f, 2f));
+		dd.SetShaderParameter("near_fade", 0.15f);
+		dd.SetShaderParameter("opacity", 0.6f);
+		dd.SetShaderParameter("glow", 0f);
+		dd.SetShaderParameter("tint", new Color(0.72f, 0.68f, 0.6f));
+		_spores = World.Weather.MakeLayer(this, "Spores", 160, new Vector3(6f, 3f, 6f), out _sporePm, out var sd);
+		_sporePm.SetShaderParameter("settle", 0f);
+		_sporePm.SetShaderParameter("wind_carry", 0.5f);
+		_sporePm.SetShaderParameter("fall", new Vector2(0.02f, 0.12f));
+		_sporePm.SetShaderParameter("flutter", 0.12f);
+		_sporePm.SetShaderParameter("flutter_rate", 0.4f);
+		_sporePm.SetShaderParameter("size_range", new Vector2(0.016f, 0.03f));
+		_sporePm.SetShaderParameter("frames", new Vector2(12f, 4f));
+		sd.SetShaderParameter("near_fade", 0.25f);
+		sd.SetShaderParameter("opacity", 0.5f);
+		sd.SetShaderParameter("glow", 0f);
+		sd.SetShaderParameter("tint", new Color(0.7f, 0.72f, 0.66f));
 		_breath = Breath();
-	}
-
-	/// <summary>Slow specks in a box round the view (world-space, so walking moves through them).</summary>
-	private GpuParticles3D Specks(string name, int amount, float life, Vector3 box, float size, Color colour, float drift)
-	{
-		var p = new GpuParticles3D
-		{
-			Name = name, Amount = amount, Lifetime = life, Emitting = false, LocalCoords = false, Preprocess = life,
-			VisibilityAabb = new Aabb(-box * 1.5f, box * 3f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-			ProcessMaterial = new ParticleProcessMaterial
-			{
-				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = box,
-				Direction = Vector3.Up, Spread = 180f, InitialVelocityMin = drift * 0.2f, InitialVelocityMax = drift,
-				Gravity = new Vector3(0, -drift * 0.15f, 0),
-				TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.15f, TurbulenceNoiseScale = 3f, TurbulenceNoiseSpeedRandom = 0.2f,
-				ScaleMin = 0.5f, ScaleMax = 1.3f,
-				// in and out softly over its life (never a pop)
-				AlphaCurve = new CurveTexture { Curve = Fade() },
-			},
-			DrawPass1 = new QuadMesh
-			{
-				Size = new Vector2(size, size),
-				Material = new StandardMaterial3D
-				{
-					AlbedoColor = colour, AlbedoTexture = Dot(), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-					BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, VertexColorUseAsAlbedo = true,
-					// lit: a speck shows only where light falls on it
-					ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel, Roughness = 1f, MetallicSpecular = 0f,
-				},
-			},
-		};
-		AddChild(p);
-		return p;
 	}
 
 	private GpuParticles3D Breath()
@@ -74,13 +67,16 @@ public partial class AirParticles : Node3D
 				ScaleMin = 0.8f, ScaleMax = 1.4f,
 				ScaleCurve = new CurveTexture { Curve = Grow() },
 				AlphaCurve = new CurveTexture { Curve = Fade() },
+				// (the weather pass: a puff of vapour out of the smoke's flipbook, billowing and thinning as it goes)
+				AnimSpeedMin = 1f, AnimSpeedMax = 1f, AngleMin = -180f, AngleMax = 180f,
 			},
 			DrawPass1 = new QuadMesh
 			{
-				Size = new Vector2(0.22f, 0.22f),
+				Size = new Vector2(0.24f, 0.24f),
 				Material = new StandardMaterial3D
 				{
-					AlbedoColor = new Color(0.75f, 0.77f, 0.8f, 0.09f), AlbedoTexture = Dot(), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+					ParticlesAnimHFrames = 4, ParticlesAnimVFrames = 4, ParticlesAnimLoop = false,
+					AlbedoColor = new Color(0.75f, 0.77f, 0.8f, 0.12f), AlbedoTexture = GD.Load<Texture2D>("res://assets/textures/weather/smoke_sheet.png"), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 					BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, VertexColorUseAsAlbedo = true,
 					ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel, Roughness = 1f, MetallicSpecular = 0f,
 				},
@@ -121,6 +117,8 @@ public partial class AirParticles : Node3D
 		if (cam == null) return;
 		_t += delta;
 		GlobalPosition = cam.GlobalPosition;
+		World.Weather.Follow(_dust, _dustPm, cam.GlobalPosition, _dustOn);
+		World.Weather.Follow(_spores, _sporePm, cam.GlobalPosition, _sporesOn);
 		if ((_check -= delta) <= 0)
 		{
 			_check = 0.5;
@@ -134,8 +132,8 @@ public partial class AirParticles : Node3D
 				if (space.IntersectRay(q).Count > 0 || World.DecalDresser.WalledIn(space, cam.GlobalPosition, 8f, _player.GetRid()) >= 3) inside = 1f;
 			}
 			float cold = atmo == null ? 0f : Mathf.Max(Mathf.Max(atmo.Winter, atmo.WinterDusk) * (1f - atmo.Underground), atmo.Lodge * atmo.LodgeCold);
-			_dust.Emitting = inside > 0.5f;
-			_spores.Emitting = inside < 0.5f && cold < 0.5f && atmo != null;
+			_dustOn = inside > 0.5f;
+			_sporesOn = inside < 0.5f && cold < 0.5f && atmo != null;
 			_cold = cold > 0.5f;
 		}
 		if (_cold && _t >= _nextBreath)

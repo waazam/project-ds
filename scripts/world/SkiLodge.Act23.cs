@@ -182,10 +182,12 @@ public partial class SkiLodge
 			Name = "Spray", Amount = 200, Lifetime = 1.8f, OneShot = true, Explosiveness = 0.8f, Position = new Vector3(BackDoorX, 1.2f, -WingHalfZ + 0.3f),
 			ProcessMaterial = new ParticleProcessMaterial
 			{
+				// (the owner's snowflakes: a frame of the atlas each, turned at random)
+				AnimOffsetMin = 0f, AnimOffsetMax = 0.99f, AngleMin = -180f, AngleMax = 180f,
 				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.5f, 1f, 0.1f),
 				Direction = new Vector3(0, 0.1f, 1f), Spread = 40f, InitialVelocityMin = 1f, InitialVelocityMax = 3f, Gravity = new Vector3(0, -2f, 0), ScaleMin = 0.6f, ScaleMax = 1.4f,
 			},
-			DrawPass1 = new QuadMesh { Size = new Vector2(0.05f, 0.05f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.85f, 0.88f, 0.94f, 0.85f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.05f, 0.05f), Material = Weather.FlakeMaterial(0.85f) },
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
 		AddChild(spray);

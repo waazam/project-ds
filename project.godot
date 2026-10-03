@@ -94,6 +94,14 @@ winter={
 "type": "float",
 "value": 0.0
 }
+wind={
+"type": "vec3",
+"value": Vector3(0.8, 0, 0.6)
+}
+wind_gust={
+"type": "float",
+"value": 0.0
+}
 
 [editor]
 

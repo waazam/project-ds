@@ -59,6 +59,8 @@ public partial class WinterWoods
 			Name = "SnowDump", Amount = 160, Lifetime = 2.6f, OneShot = true, Emitting = false, Explosiveness = 0.85f, LocalCoords = false,
 			ProcessMaterial = new ParticleProcessMaterial
 			{
+				// (the owner's snowflakes: a frame of the atlas each, turned at random)
+				AnimOffsetMin = 0.5f, AnimOffsetMax = 0.99f, AngleMin = -180f, AngleMax = 180f,
 				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 1.6f,
 				Direction = Vector3.Down, Spread = 40f, InitialVelocityMin = 0.4f, InitialVelocityMax = 2.2f, Gravity = new Vector3(0, -5f, 0),
 				ScaleMin = 1f, ScaleMax = 3f, TurbulenceEnabled = true, TurbulenceNoiseStrength = 0.4f,
@@ -66,7 +68,7 @@ public partial class WinterWoods
 			DrawPass1 = new QuadMesh
 			{
 				Size = new Vector2(0.09f, 0.09f),
-				Material = new StandardMaterial3D { AlbedoColor = new Color(0.8f, 0.83f, 0.9f, 0.85f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles },
+				Material = Weather.FlakeMaterial(0.85f),
 			},
 			VisibilityAabb = new Aabb(new Vector3(-6, -20, -6), new Vector3(12, 24, 12)),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
