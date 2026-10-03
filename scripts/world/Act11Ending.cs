@@ -88,8 +88,6 @@ public partial class Act11Ending : Node3D
 	public const string ClosingLine = "\"Did you see them?\"";
 	public const string CreditStudio = "GLHFDD";
 	public const string CreditThanks = "Thanks for playing.";
-	/// <summary>The snowflakes (the weather pass): their licence asks for the credit.</summary>
-	public const string CreditSnowflakes = "Snowflakes designed by Kjpargeter / Freepik";
 
 	/// <summary>For tests: 0..1, how far up the flight the player stands (0 off it).</summary>
 	public float Progress { get; private set; }
@@ -852,7 +850,6 @@ public partial class Act11Ending : Node3D
 					await fader.ShowCaption($"{log.SubjectsFound} of {PhotoCatalog.Total}", $"{log.TotalScore} points", 1.2f, CreditHoldSeconds, 1.2f, ct);
 				}
 				await fader.ShowCaption(CreditStudio, "", 1.2f, CreditHoldSeconds, 1.2f, ct);
-				await fader.ShowCaption("", CreditSnowflakes, 1.0f, CreditHoldSeconds * 0.8f, 1.0f, ct);
 				await fader.ShowCaption("", CreditThanks, 1.2f, CreditHoldSeconds, 1.2f, ct);
 			}
 			ct.ThrowIfCancellationRequested();

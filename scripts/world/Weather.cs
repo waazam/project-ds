@@ -4,7 +4,7 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// The weather (the weather pass, 2026-10-03: the owner, "the snow and other particle effects in the game need to be
-/// drastically improved"; their snowflake image, "Designed by Kjpargeter / Freepik"). One per level, made on demand
+/// drastically improved"; the flakes our own, baked from snowflake_generator.gdshader). One per level, made on demand
 /// (<see cref="Get"/>): the wind every effect shares, and the snow, the blizzard and the rain.
 ///
 /// - <b>The wind:</b> a direction and a speed (m/s), and its gusts, slow swells that roll through; published as the
@@ -12,7 +12,7 @@ namespace ProjectDS.World;
 ///   the same air. <see cref="Wind"/> for code (the fires' smoke).
 /// - <b>The snow,</b> in three layers by distance (weather_particles.gdshader: each in a box that wraps round the
 ///   camera, so it's equally thick wherever you are):
-///   - near: a few hundred big flakes, the crystals out of the owner's image, tumbling and fluttering, faded out at
+///   - near: a few hundred big flakes, the generator's crystals, tumbling and fluttering, faded out at
 ///     the eye;
 ///   - middle: tens of thousands of smaller ones out to fifteen metres;
 ///   - far: a moving curtain of them on rings round the camera (snow_curtain.gdshader), sinking into the fog.

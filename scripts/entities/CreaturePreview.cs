@@ -54,6 +54,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler") >= 0) { await CrawlerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--weather") >= 0) { await WeatherShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--shelter") >= 0) { await ShelterTest(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bake-snow") >= 0) { await BakeSnow(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lodge") >= 0) { await LodgeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--prints") >= 0) { await PrintShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
@@ -547,6 +548,81 @@ public partial class CreaturePreview : Node3D
 		env.AmbientLightEnergy = 0.1f;
 		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(2f, 2.2f, -5f) - eye, Vector3.Up), eye);
 		await Snap("weather_fire_smoke", 6);
+	}
+
+	/// <summary>The snow's textures baked from our own generator (snowflake_generator.gdshader): the 4 x 4 atlas (eight
+	/// sharp crystals of five kinds, four defocused, two wet clumps, two specks) and the far curtain's tileable scatter of
+	/// hundreds of tiny ones. Written to assets/textures/weather/.</summary>
+	private async Task BakeSnow()
+	{
+		var gen = GD.Load<Shader>("res://assets/shaders/snowflake_generator.gdshader");
+		ShaderMaterial Flake(float seed, int kind, float blur = 0f, bool round = false, float strength = 1f)
+		{
+			var m = new ShaderMaterial { Shader = gen };
+			m.SetShaderParameter("seed", seed);
+			m.SetShaderParameter("kind", kind);
+			m.SetShaderParameter("blur", blur);
+			m.SetShaderParameter("round_clump", round ? 1f : 0f);
+			m.SetShaderParameter("strength", strength);
+			return m;
+		}
+		async Task<Image> Render(int size, System.Action<SubViewport> fill)
+		{
+			var vp = new SubViewport { Size = new Vector2I(size, size), TransparentBg = true, Disable3D = true, RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
+			AddChild(vp);
+			fill(vp);
+			await Frames(4);
+			var img = vp.GetTexture().GetImage();
+			vp.QueueFree();
+			return img;
+		}
+		string dir = ProjectSettings.GlobalizePath("res://assets/textures/weather");
+		// the atlas
+		var atlas = await Render(512, vp =>
+		{
+			int[] kinds = { 0, 1, 4, 0, 3, 1, 5, 0 };   // (no plain plate: a hexagon with spokes and a ring reads as a spider's web)
+			for (int i = 0; i < 16; i++)
+			{
+				var cell = new Vector2((i % 4) * 128, (i / 4) * 128);
+				ShaderMaterial m;
+				float scale = 1f;
+				if (i < 8) m = Flake(11f + i * 7.3f, kinds[i]);
+				else if (i < 12) m = Flake(91f + i * 5.1f, new[] { 0, 1, 3, 4 }[i - 8], 0.45f, false, 0.9f);
+				else if (i < 14) m = Flake(200f + i, 0, 0.35f, true);
+				else { m = Flake(300f + i, 0, i == 14 ? 0.6f : 0.4f, true); scale = i == 14 ? 0.55f : 0.32f; }
+				float sz = 128f * scale;
+				vp.AddChild(new ColorRect { Position = cell + Vector2.One * (128f - sz) * 0.5f, Size = Vector2.One * sz, Material = m });
+			}
+		});
+		// white, the coverage in alpha (the canvas blended over a clear background leaves the colour premultiplied)
+		for (int y = 0; y < atlas.GetHeight(); y++)
+			for (int x = 0; x < atlas.GetWidth(); x++)
+				atlas.SetPixel(x, y, new Color(1, 1, 1, atlas.GetPixel(x, y).A));
+		atlas.SavePng($"{dir}/snow_atlas.png");
+		// the curtain: tileable (a flake over an edge stamped again across it)
+		var rng = new RandomNumberGenerator { Seed = 2026 };
+		var curtain = await Render(512, vp =>
+		{
+			for (int k = 0; k < 900; k++)
+			{
+				float u = rng.Randf();
+				float sz = u < 0.4f ? rng.RandfRange(3f, 5f) : u < 0.8f ? rng.RandfRange(5f, 9f) : rng.RandfRange(9f, 14f);
+				var at = new Vector2(rng.RandfRange(0, 512), rng.RandfRange(0, 512));
+				bool round = rng.Randf() < 0.45f || sz < 5f;
+				var m = Flake(rng.RandfRange(0f, 1000f), rng.RandiRange(0, 5), sz < 7f ? 0.5f : 0.2f, round, rng.RandfRange(0.45f, 1f));
+				foreach (var off in new[] { Vector2.Zero, new Vector2(512, 0), new Vector2(-512, 0), new Vector2(0, 512), new Vector2(0, -512), new Vector2(512, 512), new Vector2(-512, -512), new Vector2(512, -512), new Vector2(-512, 512) })
+				{
+					var pos = at + off - Vector2.One * sz * 0.5f;
+					if (pos.X > 512 || pos.Y > 512 || pos.X + sz < 0 || pos.Y + sz < 0) continue;
+					vp.AddChild(new ColorRect { Position = pos, Size = Vector2.One * sz, Material = m });
+				}
+			}
+		});
+		for (int y = 0; y < curtain.GetHeight(); y++)
+			for (int x = 0; x < curtain.GetWidth(); x++)
+				curtain.SetPixel(x, y, new Color(1, 1, 1, curtain.GetPixel(x, y).A));
+		curtain.SavePng($"{dir}/snow_curtain.png");
+		GD.Print("[creature-preview] baked the snow's atlas and curtain from our own generator");
 	}
 
 	/// <summary>Does the roof collider keep the snow off? Under a big slab roof, looking along under it.</summary>
