@@ -65,6 +65,9 @@ public partial class ClipAudit : Node
 		"stairwell/door/door", "wheel/spokes", "noticeboard", "wallclock", "exitnight", "bollards",
 		// Acts 21-23: a mop leaning (it falls), ski poles stuck in the snow, the vestment hanging, the font's lid on the font
 		"skilodge/mop", "ski_tracks/poles", "church/alb", "church/fontlid",
+		// room 201's way into the wall cavity, walked through on purpose (the hacked doorway, the connector, the broken
+		// brick round both ends, the light leaking out), and the turned-down bed's cover lying on the bed
+		"skilodge/hole201", "skilodge/crawlconnector", "crawlentry/brick", "crawlexit/brick", "crawlexit/leaks", "skilodge/perfect201",
 	};
 
 	public override void _Ready() => Run();

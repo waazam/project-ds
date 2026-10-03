@@ -51,6 +51,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler") >= 0) { await CrawlerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lodge") >= 0) { await LodgeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--prints") >= 0) { await PrintShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
@@ -328,6 +329,40 @@ public partial class CreaturePreview : Node3D
 		await Shot("stalker_peek_front", new Vector3(-0.6f, 1.7f, 6.5f), new Vector3(0, 1.6f, 0.5f));
 		await Shot("stalker_peek_close", new Vector3(0.3f, 1.9f, 3.0f), grip);
 		GD.Print($"[creature-preview] grip hand {b.GripHandWorld} target {grip} off {b.GripHandWorld.DistanceTo(grip):0.000}");
+		// unwatched it creeps (the neck drawn out, the head tipping); watched, its mouth opens
+		Vector3 eyeAt = new(-0.6f, 1.7f, 6.5f);
+		b.TrackTarget = eyeAt;
+		b.Watched = false;
+		await Seconds(9.5);
+		await Shot("stalker_creep", eyeAt, new Vector3(0, 1.8f, 0.5f));
+		await Shot("stalker_creep_close", new Vector3(0.25f, 2.0f, 2.6f), b.EyesWorld);
+		b.TrackTarget = new Vector3(0.25f, 2.0f, 2.6f);
+		b.Watched = true;
+		await Seconds(3.0);
+		await Shot("stalker_gape_close", new Vector3(0.25f, 2.0f, 2.6f), b.EyesWorld);
+		GD.Print($"[creature-preview] creep {b.Creep:0.00} gape {b.Gape:0.00}");
+		b.Watched = false;
+		// low, at the trunk's foot
+		b.Peek(side, new Vector3(-0.25f + 0.4f + 0.035f, 0.95f, 0.95f), StalkerBody.PeekKind.Low);
+		b.TrackTarget = eyeAt;
+		await Seconds(1.0);
+		await Shot("stalker_low_peek", eyeAt, new Vector3(0, 0.8f, 0.5f));
+		// clinging up the trunk, a hand on either edge
+		b.Position = new Vector3(0, 1.45f, 0.25f);
+		b.Peek(side, new Vector3(-0.25f + 0.36f + 0.035f, 1.45f + 2.1f, 0.95f), StalkerBody.PeekKind.Cling, new Vector3(-0.25f - 0.36f - 0.035f, 1.45f + 2.1f, 0.95f));
+		await Seconds(1.0);
+		await Shot("stalker_cling", new Vector3(-0.5f, 1.7f, 6.5f), new Vector3(-0.2f, 3.0f, 0.5f));
+		// the owl: turned away, its head right round
+		b.Position = new Vector3(0, 0, 0);
+		b.Rotation = new Vector3(0, Mathf.Pi, 0);
+		b.Peek(-side, null, StalkerBody.PeekKind.Owl);
+		trunk.Visible = false;
+		await Seconds(1.5);
+		await Shot("stalker_owl", new Vector3(0.3f, 1.8f, 4.0f), new Vector3(0, 1.7f, 0));
+		trunk.Visible = true;
+		b.Rotation = Vector3.Zero;
+		b.TrackTarget = null;
+		b.Peek(side, grip);
 		b.Duck();
 		await Seconds(0.25);
 		await Shot("stalker_duck", new Vector3(-0.6f, 1.7f, 6.5f), new Vector3(0, 1.4f, 0.5f));
@@ -410,6 +445,32 @@ public partial class CreaturePreview : Node3D
 		rig.AddChild(beam);
 		AddChild(new OmniLight3D { Position = new Vector3(-2.5f, 2.6f, -3f), LightColor = new Color(1f, 0.85f, 0.6f), LightEnergy = 1.2f, OmniRange = 5f });
 		await Look("lantern_fog_beam", 10, -3);
+	}
+
+	/// <summary>The remodelled crawler walking a stair-like slope, and close on its head (the horror pass).</summary>
+	private async Task CrawlerShots()
+	{
+		env.BackgroundColor = new Color(0.12f, 0.12f, 0.13f);
+		var floor = new StaticBody3D { Name = "Floor" };
+		floor.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(40, 1, 40) }, Position = new Vector3(0, -0.5f, 0) });
+		floor.AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(40, 40) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.24f, 0.23f) } });
+		AddChild(floor);
+		var crawler = new Crawler { Name = "Crawler" };
+		AddChild(crawler);
+		GD.Print($"[creature-preview] crawler rigged {crawler.Rigged}");
+		for (int i = 0; i < 120; i++)
+		{
+			crawler.Hurry = i > 60 ? 0.8f : 0.2f;
+			crawler.Place(new Vector3(0, 0, 3f - i * 0.03f), Vector3.Forward);
+			await Frames(1);
+			if (i == 50) await Shot("crawler_walk_side", new Vector3(3.0f, 1.0f, crawler.GlobalPosition.Z), crawler.GlobalPosition + new Vector3(0, -0.2f, 0));
+		}
+		await Shot("crawler_side", new Vector3(3.2f, 1.1f, crawler.GlobalPosition.Z + 0.3f), crawler.GlobalPosition + new Vector3(0, -0.2f, 0));
+		await Shot("crawler_front", crawler.GlobalPosition + new Vector3(0.5f, 0.6f, -2.4f), crawler.GlobalPosition + new Vector3(0, -0.25f, 0));
+		await Shot("crawler_above", crawler.GlobalPosition + new Vector3(1.6f, 2.6f, 1.6f), crawler.GlobalPosition);
+		var head = crawler.FindChild("Head", true, false) as Node3D;
+		Vector3 h = head?.GlobalPosition ?? crawler.GlobalPosition;
+		await Shot("crawler_face_close", h + new Vector3(0.15f, -0.25f, -0.75f), h);
 	}
 
 	private async Task WendigoShots()

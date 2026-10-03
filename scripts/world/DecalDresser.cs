@@ -147,14 +147,16 @@ public partial class DecalDresser : Node3D
 			}
 			Vector3 p = (Vector3)hit["position"], n = (Vector3)hit["normal"];
 			y = p.Y - 0.3f;
-			if (n.Y < 0.85f) { _why[1]++; continue; }
+			// a ramp or a flight (steeper than a floor, still underfoot): no stain on it, but the walls beside it count
+			bool stair = n.Y < 0.85f && n.Y > 0.5f;
+			if (n.Y < 0.85f && !stair) { _why[1]++; continue; }
 			if (!Fixed(hit) || (_skipAt?.Invoke(p) ?? false)) { _why[2]++; continue; }
 			// under a ceiling (within 6 m): indoors
 			// (or walled in on most sides: some ceilings are drawn without colliders, the station's among them)
 			var up = Ray(space, p + Vector3.Up * 0.2f, p + Vector3.Up * 6f);
 			float ceiling;
 			if (up.Count > 0) ceiling = ((Vector3)up["position"]).Y;
-			else if (WalledIn(space, p + Vector3.Up * 1.1f, 7f) >= 3) ceiling = p.Y + 2.8f;
+			else if (WalledIn(space, p + Vector3.Up * 1.1f, 7f) >= 3 || Corridor(space, p + Vector3.Up * 1.1f)) ceiling = p.Y + 2.8f;
 			else
 			{
 				_why[3]++;
@@ -162,7 +164,7 @@ public partial class DecalDresser : Node3D
 			}
 			if (ceiling - p.Y < 1.8f) { _why[4]++; continue; }   // (under a table, a stair: not a room's floor)
 			_why[5]++;
-			if (_rng.Randf() < set.Floor) FloorDecal(p, set);
+			if (!stair && _rng.Randf() < set.Floor) FloorDecal(p, set);
 			// the walls round it
 			float a0 = _rng.RandfRange(0f, Mathf.Tau);
 			for (int k = 0; k < 4; k++)
@@ -194,6 +196,21 @@ public partial class DecalDresser : Node3D
 			if (h.Count > 0 && Mathf.Abs(((Vector3)h["normal"]).Y) < 0.4f) n++;
 		}
 		return n;
+	}
+
+	/// <summary>A corridor or a stairwell's flight: walls close on both sides, one way or the other (its ceiling may have
+	/// no collider and its ends may be far off).</summary>
+	private static bool Corridor(PhysicsDirectSpaceState3D space, Vector3 at)
+	{
+		var q = new PhysicsRayQueryParameters3D { CollisionMask = 1 };
+		bool Hit(Vector3 d)
+		{
+			q.From = at;
+			q.To = at + d * 3.5f;
+			var h = space.IntersectRay(q);
+			return h.Count > 0 && Mathf.Abs(((Vector3)h["normal"]).Y) < 0.4f;
+		}
+		return (Hit(Vector3.Right) && Hit(Vector3.Left)) || (Hit(Vector3.Forward) && Hit(Vector3.Back));
 	}
 
 	private string Choose(Pick[] picks)

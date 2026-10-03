@@ -41,7 +41,60 @@ public partial class Crawler : Node3D
 		public float T = 1f;
 		public bool Front;
 		public MeshInstance3D Upper, Lower, Knuckle, Paw;
+		// the remodel's bones (-1 for the old pieces)
+		public int BUpper = -1, BLower = -1, BHand = -1;
+		public int[] BFingers;
 	}
+
+	// ------------------------------------------------------------------ the remodel (tools/Blender/crawler.py)
+
+	public const string RigPath = "res://assets/models/crawler/crawler_rig.glb";
+	/// <summary>True when it's the remodel (one skinned hide on a skeleton), false for the old pieces.</summary>
+	public bool Rigged => _skel != null;
+	private Skeleton3D _skel;
+	private int _bHead = -1, _bJaw = -1, _bHips = -1, _bChest = -1, _bNeck = -1;
+	private Dictionary<string, int> _boneIx;
+
+	private bool LoadRig()
+	{
+		if (CreatureModels.Disabled || !ResourceLoader.Exists(RigPath) || System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--old-crawler") >= 0) return false;
+		var model = GD.Load<PackedScene>(RigPath).Instantiate<Node3D>();
+		model.Name = "Model";
+		var sk = model.FindChildren("*", "Skeleton3D", true, false);
+		if (sk.Count == 0) { model.QueueFree(); return false; }
+		AddChild(model);
+		_skel = (Skeleton3D)sk[0];
+		_boneIx = new();
+		for (int i = 0; i < _skel.GetBoneCount(); i++) _boneIx[_skel.GetBoneName(i)] = i;
+		_bHead = B("head"); _bJaw = B("jaw"); _bHips = B("hips"); _bChest = B("chest"); _bNeck = B("neck");
+		foreach (var n in model.FindChildren("*", "MeshInstance3D", true, false))
+		{
+			var mi = (MeshInstance3D)n;
+			mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+			for (int s = 0; s < (mi.Mesh?.GetSurfaceCount() ?? 0); s++)
+			{
+				if (mi.Mesh.SurfaceGetMaterial(s) is not StandardMaterial3D m) continue;
+				// its own baked colours, and the blacklight's glow over them; a cold rim so it reads against the dark
+				var t = (StandardMaterial3D)m.Duplicate();
+				string mn = m.ResourceName ?? "";
+				t.Roughness = mn.StartsWith("c_tooth") ? 0.35f : 0.62f;
+				t.RimEnabled = true; t.Rim = 0.22f; t.RimTint = 0.3f;
+				t.NextPass = _uvGlow;
+				if (mn.StartsWith("c_hair")) { t.CullMode = BaseMaterial3D.CullModeEnum.Disabled; t.Roughness = 0.3f; t.MetallicSpecular = 0.6f; }
+				t.SetMeta("detail_kind", -1);
+				mi.SetSurfaceOverrideMaterial(s, t);
+			}
+		}
+		// the old code's body and head nodes (the voice rides the head bone)
+		_body = new Node3D { Name = "Body" };
+		AddChild(_body);
+		var att = new BoneAttachment3D { Name = "Head", BoneName = "head" };
+		_skel.AddChild(att);
+		_head = att;
+		return true;
+	}
+
+	private int B(string name) => _boneIx != null && _boneIx.TryGetValue(name, out int i) ? i : -1;
 
 	private readonly List<Limb> _limbs = new();
 	private readonly int[] _order = { 0, 3, 1, 2 };   // left hand, right foot, right hand, left foot
@@ -88,8 +141,9 @@ public partial class Crawler : Node3D
 		_limbSkin = new StandardMaterial3D { AlbedoColor = new Color(0.52f, 0.5f, 0.46f), Roughness = 0.7f, RimEnabled = true, Rim = 0.3f, RimTint = 0.2f, NextPass = _uvGlow };
 		_voice = new AudioStreamPlayer3D { Name = "Voice", Bus = "Events", UnitSize = 3.5f, MaxDistance = 30f };
 		AddChild(_voice);
-		BuildBody();
-		BuildLimbs();
+		bool rig = LoadRig();
+		if (!rig) BuildBody();
+		BuildLimbs(rig);
 		_twitchAt = 1.0;
 		_breathAt = 0.5;
 	}
@@ -150,7 +204,7 @@ public partial class Crawler : Node3D
 		return mi;
 	}
 
-	private void BuildLimbs()
+	private void BuildLimbs(bool rig = false)
 	{
 		// shoulders and hips in body space; the rests far out to the sides (the splayed, bridged crouch)
 		(Vector3 root, Vector3 rest, float l1, float l2, bool front)[] defs =
@@ -164,6 +218,14 @@ public partial class Crawler : Node3D
 		foreach (var (root, rest, l1, l2, front) in defs)
 		{
 			var l = new Limb { Root = root, Rest = rest, L1 = l1, L2 = l2, Front = front };
+			if (rig)
+			{
+				string k = front ? "arm" : "leg", sx = root.X > 0 ? "R" : "L";
+				l.BUpper = B($"{k}_upper_{sx}"); l.BLower = B($"{k}_lower_{sx}"); l.BHand = B($"{k}_hand_{sx}");
+				l.BFingers = new[] { B($"{k}_f0_{sx}"), B($"{k}_f1_{sx}"), B($"{k}_f2_{sx}"), B($"{k}_f3_{sx}") };
+				_limbs.Add(l);
+				continue;
+			}
 			l.Upper = Bone(0.045f, 0.03f);
 			l.Lower = Bone(0.03f, 0.018f);
 			l.Knuckle = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.04f, Height = 0.08f, RadialSegments = 8, Rings = 4 }, MaterialOverride = _limbSkin, TopLevel = true };
@@ -275,9 +337,13 @@ public partial class Crawler : Node3D
 			_twitchAt = _time + _rng.RandfRange(0.4f, 2.2f) * Mathf.Lerp(1f, 0.5f, Hurry);
 		}
 		_twitch = _twitch.Lerp(_twitchGoal, 1f - Mathf.Exp(-22f * dt));
-		_head.Rotation = new Vector3(0.5f, 0, 0) + _twitch;
-		// the body, heaving a little with the breath
-		_body.Position = new Vector3(0, Mathf.Sin((float)_time * 2.2f) * 0.012f, 0);
+		if (_skel != null) { PoseBody(); PoseLimbs(); }
+		else
+		{
+			_head.Rotation = new Vector3(0.5f, 0, 0) + _twitch;
+			// the body, heaving a little with the breath
+			_body.Position = new Vector3(0, Mathf.Sin((float)_time * 2.2f) * 0.012f, 0);
+		}
 		// one voice: a breath, and the next only once it's done (a pause between, shorter when it hurries)
 		_voice.GlobalPosition = _head.GlobalPosition;
 		if (!_voice.Playing && _time >= _breathAt)
@@ -323,8 +389,75 @@ public partial class Crawler : Node3D
 		p.Play();
 	}
 
+	/// <summary>The remodel's body from its rest each frame: the spine heaving with the breath and rolling with its gait,
+	/// the head hung and snapping to its twitches, the jaw hanging and working (wider as it hurries).</summary>
+	private void PoseBody()
+	{
+		for (int i = 0; i < _skel.GetBoneCount(); i++)
+		{
+			var rest = _skel.GetBoneRest(i);
+			_skel.SetBonePoseRotation(i, rest.Basis.GetRotationQuaternion());
+			_skel.SetBonePosePosition(i, rest.Origin);
+		}
+		float t = (float)_time;
+		float breath = Mathf.Sin(t * 2.2f);
+		if (_bHips >= 0) _skel.SetBonePosePosition(_bHips, _skel.GetBoneRest(_bHips).Origin + new Vector3(0, breath * 0.012f, 0));
+		BonePose.Turn(_skel, _bChest, Vector3.Right, breath * 0.04f);
+		BonePose.Turn(_skel, _bChest, Vector3.Back, Mathf.Sin(t * 3.1f) * 0.05f * (0.3f + Hurry));
+		// the head: hung low and twisted to its twitch
+		if (_bHead >= 0) _skel.SetBonePoseRotation(_bHead, (_skel.GetBonePoseRotation(_bHead) * Quaternion.FromEuler(_twitch)).Normalized());
+		BonePose.Turn(_skel, _bNeck, Vector3.Right, -0.15f + _twitch.X * 0.3f);
+		// the jaw: hanging, working, gaping wider when it hurries
+		float jaw = 0.12f + 0.08f * Mathf.Max(0f, Mathf.Sin(t * 1.7f)) + 0.25f * Hurry;
+		BonePose.Turn(_skel, _bJaw, Vector3.Right, -jaw);
+	}
+
+	/// <summary>The remodel's limbs: the same two-bone solve as the old pieces (the elbow or knee thrown up and out), the
+	/// bones turned to it; the hand or foot laid flat toward where it's going; the long fingers curling while it's lifted
+	/// and splaying as it lands.</summary>
+	private void PoseLimbs()
+	{
+		var inv = _skel.GlobalTransform.AffineInverse();
+		var invB = _skel.GlobalBasis.Inverse();
+		foreach (var l in _limbs)
+		{
+			if (l.BUpper < 0 || l.BLower < 0) continue;
+			Vector3 S = _skel.GetBoneGlobalPose(l.BUpper).Origin;
+			Vector3 E = _skel.GetBoneGlobalPose(l.BLower).Origin;
+			Vector3 Wr = l.BHand >= 0 ? _skel.GetBoneGlobalPose(l.BHand).Origin : E;
+			Vector3 T = inv * l.Plant;
+			float l1 = S.DistanceTo(E), l2 = E.DistanceTo(Wr);
+			Vector3 to = T - S;
+			float d = Mathf.Clamp(to.Length(), 0.05f, (l1 + l2) * 0.98f);
+			Vector3 dir = to.Normalized();
+			float a = (l1 * l1 - l2 * l2 + d * d) / (2f * d);
+			float b = Mathf.Sqrt(Mathf.Max(0f, l1 * l1 - a * a));
+			Vector3 outward = invB * (GlobalBasis * new Vector3(Mathf.Sign(l.Root.X), 0, 0));
+			Vector3 pole = ((invB * Vector3.Up).Normalized() * 2.2f + outward.Normalized()).Normalized();
+			pole = (pole - dir * pole.Dot(dir)).Normalized();
+			Vector3 K = S + dir * a + pole * b;
+			BonePose.AimFrom(_skel, l.BUpper, E - S, K - S);
+			Vector3 E2 = _skel.GetBoneGlobalPose(l.BLower).Origin;
+			Vector3 W2 = l.BHand >= 0 ? _skel.GetBoneGlobalPose(l.BHand).Origin : E2;
+			BonePose.AimFrom(_skel, l.BLower, W2 - E2, S + dir * d - E2);
+			if (l.BHand >= 0)
+			{
+				// laid flat, toward where the body is heading (lifted: hanging, the fingers curling)
+				Vector3 flatW = _heading with { Y = 0 };
+				if (flatW.LengthSquared() < 1e-4f) flatW = -GlobalBasis.Z;
+				float lifted = l.T < 1f ? Mathf.Sin(l.T * Mathf.Pi) : 0f;
+				Vector3 want = invB * (flatW.Normalized() + Vector3.Down * (0.15f + 0.8f * lifted));
+				BonePose.Aim(_skel, l.BHand, want);
+				if (l.BFingers != null)
+					foreach (int f in l.BFingers)
+						if (f >= 0) BonePose.Turn(_skel, f, _skel.GetBoneGlobalPose(f).Basis.X.Normalized(), 0.5f * lifted - 0.15f);
+			}
+		}
+	}
+
 	private void Solve(Limb l)
 	{
+		if (l.Upper == null) return;   // (the remodel's: PoseLimbs)
 		Vector3 root = GlobalTransform * l.Root;
 		Vector3 to = l.Plant - root;
 		float d = Mathf.Clamp(to.Length(), 0.05f, (l.L1 + l.L2) * 0.98f);

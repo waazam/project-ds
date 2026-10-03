@@ -30,6 +30,8 @@ public partial class Act11Pursuer : Node3D
 
 	public StaircaseBuilder Stairs { get; set; }
 	public StalkerBody Body { get; private set; }
+	/// <summary>For tests: seconds it has stood frozen under the player's eyes.</summary>
+	public float FrozenSeconds { get; private set; }
 	/// <summary>For tests: how many times it has shoved them.</summary>
 	public int Shoves { get; private set; }
 	/// <summary>For tests: it has reached the foot of the stairs and stopped there (the player is climbing).</summary>
@@ -105,6 +107,13 @@ public partial class Act11Pursuer : Node3D
 		// it never falls far behind: out of sight back there, it closes the gap
 		if (DistanceToPlayer > 16f) speed = Mathf.Max(speed, Mathf.Max(playerSpeed * 1.15f, 3.6f));
 		if (_pause > 0f) { _pause -= dt; speed = 0f; }
+		// (the horror pass) looked at, near, it stops dead where it is, its head following you, tipping over, its mouth
+		// opening; looked away from, it comes on quicker than it walked
+		bool watched = !climbing && DistanceToPlayer < 26f && Seen(player);
+		Body.Watched = watched;
+		Body.TrackTarget = player.CameraRig?.Camera?.GlobalPosition;
+		if (watched && DistanceToPlayer > ShoveRange + 0.4f) { speed = 0f; FrozenSeconds += dt; }
+		else if (!climbing) speed *= 1.35f;
 
 		Vector3 to = new(goal.X - GlobalPosition.X, 0, goal.Z - GlobalPosition.Z);
 		float dist = to.Length();
@@ -119,7 +128,7 @@ public partial class Act11Pursuer : Node3D
 			Body.WalkPhase = _phase;
 			Body.WalkAmount = Mathf.Clamp(speed / 2.2f, 0.4f, 1f);
 			_stepT -= speed * dt;
-			if (_stepT <= 0f) { _stepT = 1.3f; Sfx("step_dirt", 4, -14f); }
+			if (_stepT <= 0f) { _stepT = Body.Rigged ? Body.StepLength : 1.3f; Sfx("step_dirt", 4, -14f); if (_rng.Randf() < 0.5f) Sfx("cloth", 4, -24f); }
 		}
 		else
 		{

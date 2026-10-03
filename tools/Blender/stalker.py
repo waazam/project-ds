@@ -6,7 +6,7 @@ face; up close it has to hold up).
 
 Writes:
   assets/models/stalker/stalker.glb   the whole figure skinned to its skeleton, with its animations (idle, peek_R,
-                                      peek_L, duck_R, duck_L, walk, shove, loom, stare); its tones in its vertex
+                                      peek_L, duck_R, duck_L, walk, shove, loom, stare, peek_low_R/L, cling); its tones in its vertex
                                       colours (the game's convention: r the face's paleness, g brightness, a 0 the eyes)
                                       and its baked albedo and normal maps on its material
   build/blender/stalker_*.png         previews
@@ -194,7 +194,8 @@ def toe_chains(s, L):
 def materials():
     return dict(hide=mat("s_hide", (0.06, 0.055, 0.05), 0.9), face=mat("s_face", (0.3, 0.29, 0.27), 0.8),
                 rag=mat("s_rag", (0.03, 0.028, 0.026), 1.0), bark=mat("s_bark", (0.07, 0.055, 0.045), 1.0),
-                nail=mat("s_nail", (0.015, 0.014, 0.013), 0.4), eye=mat("s_eye", (0.9, 0.8, 0.45), 0.2))
+                nail=mat("s_nail", (0.015, 0.014, 0.013), 0.4), eye=mat("s_eye", (0.9, 0.8, 0.45), 0.2),
+                tooth=mat("s_tooth", (0.55, 0.5, 0.4), 0.4), mouth=mat("s_mouth", (0.02, 0.006, 0.006), 0.6))
 
 
 # ------------------------------------------------------------------ the flesh
@@ -344,8 +345,9 @@ def build_head(m):
     def squash(t, a):
         # the face a flat mask: its front pressed flat
         s = math.sin(a)
-        bell = math.sin(math.pi * min(max((t - 0.02) / 0.8, 0.0), 1.0))
-        return 1.0 - 0.22 * bell * max(0.0, s - 0.5) / 0.5
+        # (down over the jaw too: a jaw left full stood out under the flat mask like a beak)
+        bell = math.sin(math.pi * min(max((t + 0.18) / 0.98, 0.0), 1.0))
+        return 1.0 - 0.24 * bell * max(0.0, s - 0.45) / 0.55
     skull = W.loft_path("Skull", pts, [w for _, w, _ in rings], [d for _, _, d in rings], up=V((0, 1, 0)), sides=28, squash=squash)
     parts = [skull]
     for sx in (-1, 1):
@@ -384,6 +386,45 @@ def build_head(m):
     bm.free()
     add_mod(head, "SMOOTH", factor=0.4, iterations=1)
     apply_mods(head)
+    # the mouth (the horror pass): behind the slit a dark throat, and in it needle teeth, two crowded rows of them,
+    # their tips just showing through the closed slit; the lower row rides the jaw, so they bare as it opens
+    co = [V(v.co) for v in head.data.vertices]
+
+    def slit_z(x):
+        return MOUTH_Z - 0.014 * (x / 0.052) ** 2
+
+    def lip(x, above):
+        best = None
+        for q in co:
+            if abs(q.x - x) > 0.004 or q.y < 0.02:
+                continue
+            dz = q.z - slit_z(x)
+            if (0.004 < dz < 0.011) if above else (-0.011 < dz < -0.004):
+                best = q.y if best is None else max(best, q.y)
+        return best
+    mouth = []
+    teeth_rnd = random.Random(31)
+    for row, above in (("upper", True), ("lower", False)):
+        n = 15 if above else 13
+        for i in range(n):
+            x = -0.046 + 0.092 * (i + teeth_rnd.uniform(-0.25, 0.25)) / (n - 1)
+            y = lip(x, above)
+            if y is None:
+                continue
+            z0 = slit_z(x) + (0.0055 if above else -0.0055)
+            ln = teeth_rnd.uniform(0.012, 0.02) * (1.0 - 0.35 * abs(x) / 0.05)
+            root = V((x, y - 0.006, z0))
+            tip = root + V((teeth_rnd.uniform(-0.0015, 0.0015), teeth_rnd.uniform(-0.002, 0.001), -ln if above else ln))
+            t = cylinder(f"Tooth{row}{i}", root, tip, teeth_rnd.uniform(0.0015, 0.0022), 0.0002, 5, m["tooth"])
+            for v in t.data.vertices:
+                v.co = head_local(V(v.co))
+            mouth.append((t, "head" if above else "jaw", "tooth"))
+    yc = lip(0.0, True) or 0.06
+    # (well inside: any nearer the slit and it bulged through it like lips)
+    throat = lumpy_sphere("Throat", (0, 0, 0), (0.044, 0.016, 0.028), m["mouth"], 70, amp=0.05, subdiv=3)
+    for v in throat.data.vertices:
+        v.co = head_local(V(v.co) + V((0, yc - 0.042, slit_z(0) - 0.006)))
+    mouth.append((throat, "head", "throat"))
     # into the figure's frame
     for v in head.data.vertices:
         v.co = head_local(V(v.co))
@@ -394,7 +435,7 @@ def build_head(m):
         # far back in the socket, a little proud of its floor
         e = lumpy_sphere("Eye", head_local(V((c.x, floor[i] + 0.003, c.z))), (0.0068, 0.0055, 0.006), m["eye"], 60, amp=0.0, subdiv=2)
         eyes.append(e)
-    return head, eyes
+    return head, eyes, mouth
 
 
 # ------------------------------------------------------------------ the parts that aren't hide
@@ -839,6 +880,7 @@ def skin_weights(ob, arm_obj, bones):
             for g in v.groups:
                 if g.group in forced and g.weight > 0.5:
                     w = {forced[g.group]: 1.0}
+            rigid = w is not None
             if w is None:
                 i = near[v.index]
                 n = body[i]
@@ -852,11 +894,12 @@ def skin_weights(ob, arm_obj, bones):
                     ch = min(children[n], key=lambda c: (info[c][1] - V(P[v.index])).length)
                     k = 0.5 * (t - 0.78) / 0.22
                     w = {n: 1 - k, ch: k}
-            if "head" in w and len(w) == 1:
-                # the jaw: the face below the mouth's slit, forward of the hinge
+            if "head" in w and len(w) == 1 and not rigid:
+                # the jaw: the face below the mouth's slit (its corners dragged down), forward of the hinge
                 hl = (HEAD_ROT.inverted() @ (Matrix.Translation(-HC) @ V(P[v.index]).to_4d())).to_3d()
-                if hl.z < MOUTH_Z - 0.002 and hl.y > -0.03:
-                    k = min(1.0, (MOUTH_Z - 0.002 - hl.z) / 0.012)
+                sz = MOUTH_Z - 0.014 * (min(abs(hl.x), 0.06) / 0.052) ** 2
+                if hl.z < sz - 0.002 and hl.y > -0.03:
+                    k = min(1.0, (sz - 0.002 - hl.z) / 0.01)
                     w = {"head": 1 - k, "jaw": k}
         for n, x in w.items():
             if x > 0:
@@ -1040,8 +1083,40 @@ def animate(arm_obj, bones):
         for s, sx, J in ((1, "R", Ar), (-1, "L", Al)):
             w = J["wrist"].lerp(J["shoulder"] + D(0.38 * s, -0.12, 0.62), u)
             arms[sx] = dict(wrist=w, hand=V((s * 0.15, 0.8, 0.1)) * u + V((0, 0, -1)) * (1 - u), curl=0.35 - 0.5 * u, pole=V((s, -0.4, -0.6)))
-        return dict(hip=V((0, 0.02 * u, 0.06 * u)), bow=-0.18 * u, neck=0.18 * u, head_pitch=-0.12 * u, jaw=0.55 * u, arms=arms)
+        return dict(hip=V((0, 0.02 * u, 0.06 * u)), bow=-0.18 * u, neck=0.18 * u, head_pitch=-0.12 * u, jaw=0.85 * u, arms=arms)
     action("loom", [(0, loom(0.0)), (6, loom(0.75)), (12, loom(1.0))])
+
+    # ---- peek low (the horror pass): folded down at the foot of the trunk, the knees up by its shoulders, the near hand
+    # on the bark low, its head round the trunk at a child's height, tipped right over
+    def peek_low(s, u):
+        sx = "R" if s > 0 else "L"
+        J = arm_joints(s)
+        grip = D(0.3 * s, 0.85, 0.42)
+        arms = {sx: dict(wrist=J["wrist"].lerp(grip, u), hand=V((-s * 0.25, 1, -0.1)).normalized(), curl=0.35 + 0.95 * u, pole=V((s, -0.2, 0.4)))}
+        other = "L" if s > 0 else "R"
+        Jo = arm_joints(-s)
+        arms[other] = dict(wrist=D(-0.25 * s, 0.25, 0.25), hand=V((0, 0.4, -1)).normalized(), curl=0.9, pole=V((-s, -0.5, 0.2)))
+        legs = {}
+        for t, tx, L in ((1, "R", Lr), (-1, "L", Ll)):
+            legs[tx] = dict(ankle=L["ankle"] + V((t * 0.08, -0.05, 0)), pole=V((t * 0.6, 1, 0.3)))
+        return dict(hip=V((s * 0.03, -0.06, -0.62)) * u, bow=0.75 * u, lean=s * 0.25 * u, neck=-0.35 * u, head_roll=s * 0.9 * u,
+                    head_yaw=-s * 0.2 * u, arms=arms, legs=legs)
+    for s, sx in ((1, "R"), (-1, "L")):
+        action(f"peek_low_{sx}", [(0, peek_low(s, 0.0)), (14, peek_low(s, 0.85)), (22, peek_low(s, 1.0))])
+
+    # ---- cling (the horror pass): up a trunk, pressed against the far side of it, both arms round it, the hands on
+    # either edge, the knees drawn up and the feet braced on the bark; the game lifts it, the hands go onto the bark
+    def cling(u):
+        arms = {}
+        for t, tx, J in ((1, "R", Ar), (-1, "L", Al)):
+            arms[tx] = dict(wrist=J["wrist"].lerp(D(0.34 * t, 1.92, 0.42), u), hand=V((-t * 0.4, 1, 0.2)).normalized() * u + V((0, 0, -1)) * (1 - u),
+                            curl=0.35 + 0.9 * u, pole=V((t, -0.6, -0.3)))
+        legs = {}
+        for t, tx, L in ((1, "R", Lr), (-1, "L", Ll)):
+            legs[tx] = dict(ankle=L["ankle"].lerp(D(0.24 * t, 0.62, 0.3), u), foot=V((0, 0.2, -1)).normalized() * u + (L["ball"] - L["ankle"]).normalized() * (1 - u),
+                            pole=V((t * 0.7, 1, 0)))
+        return dict(hip=V((0, -0.08, 0.05)) * u, bow=-0.12 * u, neck=0.1 * u, head_roll=0.5 * u, arms=arms, legs=legs)
+    action("cling", [(0, cling(0.0)), (16, cling(1.0))])
 
     # ---- stare: drawn up straight at the foot of the stairs, dead still, the arms hanging; the head's look is the game's
     def stare(u):
@@ -1089,7 +1164,7 @@ def main():
     body = build_body(m)
     hands = [build_hand(m, s) for s in (1, -1)]
     feet = [build_foot(m, s) for s in (1, -1)]
-    head, eyes = build_head(m)
+    head, eyes, mouth = build_head(m)
     crowns = build_crowns(m)
     nails = build_nails(m)
     rags = build_rags(m)
@@ -1119,10 +1194,15 @@ def main():
         W.detail_attr(ob, 0.1)
         paint4(ob, tone_bark)
         W.tag(ob, bone)
+    for ob, bone, kind in mouth:
+        W.paint(ob, flat((0.55, 0.5, 0.4) if kind == "tooth" else (0.02, 0.006, 0.006)))
+        W.detail_attr(ob, 0.2)
+        paint4(ob, (lambda co, n: (0.55, 1.0, 0.3, 1.0)) if kind == "tooth" else (lambda co, n: (0.0, 0.12, 0.0, 1.0)))
+        W.tag(ob, bone)
     W.paint(rags, lambda co, n: tuple(V((0.03, 0.027, 0.025)) * (0.7 + 0.6 * fbm(co.x * 9, co.y * 9, co.z * 9, 3))))
     W.detail_attr(rags, 0.5)
     paint4(rags, tone_rag)
-    rigid = [o for o, _ in crowns] + [o for o, _ in nails] + eyes
+    rigid = [o for o, _ in crowns] + [o for o, _ in nails] + eyes + [o for o, _, _ in mouth]
 
     # the high copy for the bake; the export copy decimated
     def copy(o):
@@ -1187,7 +1267,11 @@ def main():
                                   ("stalker_back", "idle", 0, ((0, 0, 1.3), 4.2, 0.4, 200)), ("stalker_face", "idle", 0, (tuple(HC), 0.75, 0.0, 15)),
                                   ("stalker_peek", "peek_R", 20, ((0, 0, 1.4), 3.6, 0.2, 20)), ("stalker_walk", "walk", 8, ((0, 0, 1.2), 4.2, 0.2, 80)),
                                   ("stalker_shove", "shove", 10, ((0, 0, 1.3), 4.2, 0.2, 50)), ("stalker_loom", "loom", 12, ((0, 0, 1.4), 4.0, 0.2, 15)),
-                                  ("stalker_hand", "idle", 0, (tuple(arm_joints(1)["palm"]), 0.7, 0.0, 70))):
+                                  ("stalker_hand", "idle", 0, (tuple(arm_joints(1)["palm"]), 0.7, 0.0, 70)),
+                                  ("stalker_low", "peek_low_R", 22, ((0, 0, 0.8), 3.4, 0.3, 20)), ("stalker_cling", "cling", 16, ((0, 0, 1.3), 3.6, 0.2, 200)),
+                                  ("stalker_gape", "loom", 12, (tuple(HC), 0.7, -0.05, 10)),
+                                  ("stalker_mouth", "idle", 0, (tuple(head_local(V((0, 0.06, MOUTH_Z)))), 0.3, 0.0, 0)),
+                                  ("stalker_mouth_open", "loom", 12, (tuple(head_local(V((0, 0.06, MOUTH_Z)))), 0.35, -0.02, 0))):
         arm_obj.animation_data.action = bpy.data.actions[act]
         bpy.context.scene.frame_set(frame)
         preview(name, *cam)

@@ -2,17 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c6q8ojk61qw07"
-path.s3tc="res://.godot/imported/seep.png-2773a3869308b244ab3459f05c7a8959.s3tc.ctex"
+uid="uid://c62ie2eonxjyf"
+path.s3tc="res://.godot/imported/crawler_rig_crawler_albedo.png-d87a031e93748bb31cf20720f6c53561.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
+generator_parameters={
+"md5": "47389a351ba3c06c7a7f94f48d8324db"
+}
 
 [deps]
 
-source_file="res://assets/textures/decals/seep.png"
-dest_files=["res://.godot/imported/seep.png-2773a3869308b244ab3459f05c7a8959.s3tc.ctex"]
+source_file="res://assets/models/crawler/crawler_rig_crawler_albedo.png"
+dest_files=["res://.godot/imported/crawler_rig_crawler_albedo.png-d87a031e93748bb31cf20720f6c53561.s3tc.ctex"]
 
 [params]
 

@@ -29,9 +29,9 @@ public partial class StalkerBody
 	/// <summary>A step of the walk clip (metres at this size): walkers advance <see cref="WalkPhase"/> by pi per step.</summary>
 	public float StepLength => 0.6f * Size;
 	/// <summary>World point the near hand is on (null: not gripping).</summary>
-	public Vector3? GripPoint => _gripOn ? _gripTarget : null;
+	public Vector3? GripPoint => _grips.Count > 0 && _grips[0].On ? _grips[0].Target : null;
 	/// <summary>Where the gripping hand's wrist is now (tests).</summary>
-	public Vector3 GripHandWorld => _skel != null && _gripHand >= 0 ? _skel.GlobalTransform * _skel.GetBoneGlobalPose(_gripHand).Origin : GlobalPosition;
+	public Vector3 GripHandWorld => _skel != null && _grips.Count > 0 ? _skel.GlobalTransform * _skel.GetBoneGlobalPose(_grips[0].Hand).Origin : GlobalPosition;
 	/// <summary>Peeks with a hand on the bark, and how far the hand was off its grip when last held there (tests).</summary>
 	public int GripCount { get; private set; }
 	public float LastGripError { get; private set; } = -1f;
@@ -60,11 +60,24 @@ public partial class StalkerBody
 	}
 	private readonly List<RagChain> _rags = new();
 
-	private bool _gripOn;
-	private Vector3 _gripTarget;
-	private int _gripUpper = -1, _gripFore = -1, _gripHand = -1;
-	private float _gripW;
-	private Vector3 _gripWrap = Vector3.Forward;
+	/// <summary>A hand on the bark: its arm's bones, where it holds, which way its fingers lie, and (the horror pass)
+	/// whether its elbow bends the wrong way.</summary>
+	private sealed class Grip
+	{
+		public int Upper, Fore, Hand;
+		public int[] Fingers;
+		public Vector3 Target, Wrap;
+		public bool On, Wrong;
+		public float W;
+	}
+	private readonly List<Grip> _grips = new();
+
+	private Grip MakeGrip(string side, Vector3 target, Vector3 wrap, bool wrong)
+	{
+		var g = new Grip { Upper = Bone("upper_" + side), Fore = Bone("fore_" + side), Hand = Bone("hand_" + side), Target = target, Wrap = wrap, Wrong = wrong, On = true, W = 1f };
+		g.Fingers = new[] { Bone($"f0_1_{side}"), Bone($"f1_1_{side}"), Bone($"f2_1_{side}"), Bone($"f3_1_{side}") };
+		return g.Upper < 0 || g.Fore < 0 || g.Hand < 0 ? null : g;
+	}
 
 	private bool LoadModel()
 	{
@@ -214,35 +227,45 @@ public partial class StalkerBody
 		_hold = clip is "idle" or "walk" ? null : clip;
 		_anim.Play(clip, 0.0);
 		_anim.Seek(_anim.GetAnimation(clip).Length, true);
+		_anim.Advance(0.0);
+		Capture();
 		foreach (var r in _rags) r.Started = false;
 	}
 
+	/// <summary>How it's found (the horror pass): round the side of a trunk; folded low at its foot; its body turned away
+	/// and its head right round on its neck to look at you; or up the trunk, clinging, a hand on either edge.</summary>
+	public enum PeekKind { Side, Low, Owl, Cling }
+	public PeekKind Kind { get; private set; }
+
 	/// <summary>Peeking out from behind a trunk: <paramref name="sideWorld"/> points out past the trunk's edge (the side
-	/// that shows); <paramref name="grip"/> is where on the bark the near hand goes (null: no hand on it).</summary>
-	public void Peek(Vector3 sideWorld, Vector3? grip)
+	/// that shows); <paramref name="grip"/> is where on the bark the near hand goes (null: no hand on it), and for a
+	/// cling <paramref name="farGrip"/> the other hand, on the trunk's other edge. <paramref name="wrongElbow"/>: the
+	/// near arm reaches round with its elbow bent the wrong way.</summary>
+	public void Peek(Vector3 sideWorld, Vector3? grip, PeekKind kind = PeekKind.Side, Vector3? farGrip = null, bool wrongElbow = false)
 	{
 		if (_skel == null) return;
-		string side = SideOf(sideWorld);
-		Snap("peek_" + side);
-		_gripUpper = Bone("upper_" + side); _gripFore = Bone("fore_" + side); _gripHand = Bone("hand_" + side);
-		_gripOn = grip.HasValue && _gripHand >= 0;
-		if (_gripOn) { _gripTarget = grip.Value; GripCount++; }
+		string side = SideOf(sideWorld), other = side == "R" ? "L" : "R";
+		Kind = kind;
+		Snap(kind switch { PeekKind.Low => "peek_low_" + side, PeekKind.Cling => "cling", _ => "peek_" + side });
+		_grips.Clear();
 		// the fingers lie forward round the bark toward whoever is looking, curling in across its face
-		_gripWrap = (GlobalBasis.Z.Normalized() * 1f - sideWorld.Normalized() * 0.7f + Vector3.Down * 0.15f).Normalized();
-		_gripW = _gripOn ? 1f : 0f;
+		Vector3 fwd = GlobalBasis.Z.Normalized() * (kind == PeekKind.Owl ? -1f : 1f);
+		if (grip.HasValue && MakeGrip(side, grip.Value, (fwd - sideWorld.Normalized() * 0.7f + Vector3.Down * 0.15f).Normalized(), wrongElbow) is { } g) { _grips.Add(g); GripCount++; }
+		if (farGrip.HasValue && MakeGrip(other, farGrip.Value, (fwd + sideWorld.Normalized() * 0.7f + Vector3.Down * 0.15f).Normalized(), false) is { } g2) _grips.Add(g2);
 		_peekSide = side;
+		BeginPeek();
 	}
 	private string _peekSide = "R";
 
 	/// <summary>Caught looking: it snatches itself back behind the trunk (the side it peeked from).</summary>
 	public void Duck()
 	{
-		_gripOn = false;
-		Play("duck_" + _peekSide, 0.03f, 1.6f);
+		foreach (var g in _grips) g.On = false;
+		Play(Kind == PeekKind.Cling ? "cling" : "duck_" + _peekSide, 0.03f, 1.6f);
 	}
 
 	/// <summary>Back to standing (its idle).</summary>
-	public void Rest() { _gripOn = false; Play("idle", 0.35f); }
+	public void Rest() { foreach (var g in _grips) g.On = false; Kind = PeekKind.Side; Play("idle", 0.35f); }
 
 	/// <summary>"R" or "L": which of its hands is on the side <paramref name="sideWorld"/> points to.</summary>
 	private string SideOf(Vector3 sideWorld)
@@ -280,14 +303,16 @@ public partial class StalkerBody
 				if (_anim.CurrentAnimation == "walk") _anim.Play("idle", 0.4);
 			}
 			_lastPhase = WalkPhase;
-			// a clip that's run its course holds its last frame (re-applied every frame: the overlays below start from it);
+			// a clip that's run its course holds its last frame: the player stops writing the bones then, so its pose is
+			// kept and put back every frame (the overlays below must start from it, never from last frame's result);
 			// the shove goes back to standing
-			if (_hold != null && !_anim.IsPlaying())
+			if (_hold != null && !_anim.IsPlaying() && _hold != "shove") Restore();
+			else
 			{
-				if (_hold == "shove") Play("idle", 0.4f);
-				else { _anim.Play(_hold, 0.0); _anim.Seek(_anim.GetAnimation(_hold).Length, true); }
+				if (_hold == "shove" && !_anim.IsPlaying()) Play("idle", 0.4f);
+				_anim.Advance(dt);
+				Capture();
 			}
-			_anim.Advance(dt);
 		}
 		// the head: drift, twitch, the look
 		float drift = Mathf.DegToRad(HeadDriftDegrees);
@@ -303,7 +328,7 @@ public partial class StalkerBody
 			wantLook = Mathf.Clamp(Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length()), Mathf.DegToRad(-70f), Mathf.DegToRad(35f));
 		}
 		_lookPitch = Mathf.Lerp(_lookPitch, wantLook, 1f - Mathf.Exp(-2.5f * dt));
-		if (Mathf.Abs(_lookPitch) > 1e-4f)
+		if (Mathf.Abs(_lookPitch) > 1e-4f && TrackTarget == null)
 		{
 			// pitched about the body's own side axis: the neck takes some, the head the rest, the chest bows a little
 			Vector3 side = _skel.GlobalBasis.Inverse() * GlobalBasis.X;
@@ -311,11 +336,30 @@ public partial class StalkerBody
 			if (_bNeck2 >= 0) TurnBone(_bNeck2, side, -_lookPitch * 0.35f);
 			TurnBone(_bHead, side, -_lookPitch * (0.65f - LookBow * 0.5f));
 		}
-		if (_gripOn || _gripW > 0f) Reach(dt);
+		Horror(dt);
+		foreach (var g in _grips) Reach(g, dt);
+		Fingers(dt);
 		Rags(dt);
 		Shine(dt);
 	}
 	private float _lastPhase = -1f;
+	private Vector3[] _basePos;
+	private Quaternion[] _baseRot;
+	private Vector3[] _baseScale;
+
+	/// <summary>The clip's pose, as the player last wrote it.</summary>
+	private void Capture()
+	{
+		int n = _skel.GetBoneCount();
+		if (_basePos == null || _basePos.Length != n) { _basePos = new Vector3[n]; _baseRot = new Quaternion[n]; _baseScale = new Vector3[n]; }
+		for (int i = 0; i < n; i++) { _basePos[i] = _skel.GetBonePosePosition(i); _baseRot[i] = _skel.GetBonePoseRotation(i); _baseScale[i] = _skel.GetBonePoseScale(i); }
+	}
+
+	private void Restore()
+	{
+		if (_basePos == null) { Capture(); return; }
+		for (int i = 0; i < _basePos.Length; i++) { _skel.SetBonePosePosition(i, _basePos[i]); _skel.SetBonePoseRotation(i, _baseRot[i]); _skel.SetBonePoseScale(i, _baseScale[i]); }
+	}
 
 	/// <summary>Turns a bone about an axis given in the skeleton's space (its pose after the clip), carrying its children.</summary>
 	private void TurnBone(int bone, Vector3 axisSkel, float angle)
@@ -338,34 +382,33 @@ public partial class StalkerBody
 		TurnBone(bone, axis / s, angle);
 	}
 
-	/// <summary>The near hand onto the bark: the upper arm and forearm turned (keeping the elbow's own side) so the
-	/// wrist reaches the grip point.</summary>
-	private void Reach(float dt)
+	/// <summary>A hand onto the bark: the upper arm and forearm turned (keeping the elbow's own side, or, the wrong
+	/// way, flipping it) so the wrist reaches the grip point.</summary>
+	private void Reach(Grip g, float dt)
 	{
-		if (_gripUpper < 0 || _gripFore < 0 || _gripHand < 0) return;
-		_gripW = Mathf.MoveToward(_gripW, _gripOn ? 1f : 0f, dt * 4f);
-		if (_gripW <= 0f) return;
+		g.W = Mathf.MoveToward(g.W, g.On ? 1f : 0f, dt * 4f);
+		if (g.W <= 0f) return;
 		var inv = _skel.GlobalTransform.AffineInverse();
-		Vector3 S = _skel.GetBoneGlobalPose(_gripUpper).Origin;
-		Vector3 E = _skel.GetBoneGlobalPose(_gripFore).Origin;
-		Vector3 Wr = _skel.GetBoneGlobalPose(_gripHand).Origin;
-		Vector3 T = Wr.Lerp(inv * _gripTarget, _gripW);
+		Vector3 S = _skel.GetBoneGlobalPose(g.Upper).Origin;
+		Vector3 E = _skel.GetBoneGlobalPose(g.Fore).Origin;
+		Vector3 Wr = _skel.GetBoneGlobalPose(g.Hand).Origin;
+		Vector3 T = Wr.Lerp(inv * g.Target, g.W);
 		float l1 = S.DistanceTo(E), l2 = E.DistanceTo(Wr);
 		Vector3 toT = T - S;
 		float d = Mathf.Clamp(toT.Length(), Mathf.Abs(l1 - l2) + 1e-3f, l1 + l2 - 1e-3f);
 		Vector3 dir = toT.Normalized();
-		// the elbow stays on its side of the line from shoulder to target
+		// the elbow stays on its side of the line from shoulder to target (or goes over to the wrong one)
 		Vector3 pole = (E - S) - dir * (E - S).Dot(dir);
 		if (pole.LengthSquared() < 1e-6f) pole = Vector3.Down;
-		pole = pole.Normalized();
+		pole = pole.Normalized() * (g.Wrong ? -1f : 1f);
 		float a = Mathf.Acos(Mathf.Clamp((l1 * l1 + d * d - l2 * l2) / (2f * l1 * d), -1f, 1f));
 		Vector3 E2 = S + dir * (l1 * Mathf.Cos(a)) + pole * (l1 * Mathf.Sin(a));
-		AimBoneFrom(_gripUpper, E - S, E2 - S);
-		Vector3 Enew = _skel.GetBoneGlobalPose(_gripFore).Origin;
-		Vector3 Wnow = _skel.GetBoneGlobalPose(_gripHand).Origin;
-		AimBoneFrom(_gripFore, Wnow - Enew, S + dir * d - Enew);
-		AimBone(_gripHand, (_skel.GlobalBasis.Inverse() * _gripWrap).Normalized(), _gripW);
-		if (_gripW >= 1f) LastGripError = (_skel.GlobalTransform * _skel.GetBoneGlobalPose(_gripHand).Origin).DistanceTo(_gripTarget);
+		AimBoneFrom(g.Upper, E - S, E2 - S);
+		Vector3 Enew = _skel.GetBoneGlobalPose(g.Fore).Origin;
+		Vector3 Wnow = _skel.GetBoneGlobalPose(g.Hand).Origin;
+		AimBoneFrom(g.Fore, Wnow - Enew, S + dir * d - Enew);
+		AimBone(g.Hand, (_skel.GlobalBasis.Inverse() * g.Wrap).Normalized(), g.W);
+		if (g.W >= 1f && g == _grips[0]) LastGripError = (_skel.GlobalTransform * _skel.GetBoneGlobalPose(g.Hand).Origin).DistanceTo(g.Target);
 	}
 
 	private void AimBoneFrom(int bone, Vector3 from, Vector3 to)
@@ -416,7 +459,7 @@ public partial class StalkerBody
 				rag.Vel[j] *= Mathf.Exp(-damp * dt);
 				rag.Dir[j] = (rag.Dir[j] + rag.Vel[j] * dt).Normalized();
 				// never folded back up through the body: no more than 75 degrees off the clip's way
-				if (rag.Dir[j].Dot(clipDir) < 0.26f) rag.Dir[j] = clipDir.Slerp(rag.Dir[j], 0.75f).Normalized();
+				if (rag.Dir[j].Dot(clipDir) < 0.26f) rag.Dir[j] = Turn(clipDir, rag.Dir[j], 0.75f);
 				if (rag.Started) RagSwingDegrees = Mathf.Max(RagSwingDegrees * (1f - dt * 0.2f), Mathf.RadToDeg(rag.Dir[j].AngleTo(clipDir)));
 				AimBone(b, rag.Dir[j]);
 			}

@@ -233,11 +233,24 @@ public partial class Deer : Node3D
 
 	private static Color C(float r, float g, float b) => new Color(r, g, b).SrgbToLinear();
 
+	private static StandardMaterial3D _furTri;
+	private static StandardMaterial3D TriFur()
+	{
+		var m = (StandardMaterial3D)PropTextures.FurMat.Duplicate();
+		m.Uv1Triplanar = true;
+		m.Uv1WorldTriplanar = false;
+		m.Uv1Scale = Vector3.One * 2.2f;
+		m.Uv1TriplanarSharpness = 2f;
+		return m;
+	}
+
 	private void BuildModel()
 	{
 		_model = new Node3D { Name = "Model", Scale = Vector3.One * ModelScale };
 		AddChild(_model);
-		var mat = PropTextures.FurMat;
+		// (the fur projected from the deer's own three axes: the blobs' sphere-wrapped UVs stretched it 49x from the
+		// flattened belly to the back; object space, so the pattern rides with it as it moves)
+		var mat = _furTri ??= TriFur();
 		Color hide = C(0.5f, 0.39f, 0.29f), back = C(0.4f, 0.31f, 0.23f), belly = C(0.84f, 0.78f, 0.66f);
 		Color dark = C(0.12f, 0.1f, 0.09f), muzzle = C(0.36f, 0.28f, 0.21f), inner = C(0.72f, 0.6f, 0.52f);
 

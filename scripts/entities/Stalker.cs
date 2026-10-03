@@ -441,6 +441,12 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	{
 		float dist = Flat(GlobalPosition).DistanceTo(Flat(_player.GlobalPosition));
 		float seen = VisibleFraction(cam);
+		if (_body is StalkerBody sbw)
+		{
+			sbw.TrackTarget = cam.GlobalPosition;
+			sbw.Watched = seen > 0f;
+			Creaks(sbw, dist, seen > 0f, dt);
+		}
 		if (seen > 0f)
 		{
 			if (!_seenThisPeek) { _seenThisPeek = true; SeenCount++; Tension = 0.1f; }
@@ -628,8 +634,27 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	/// <summary>For tests: 0..1, the share of its awake time with the rattle audible.</summary>
 	public float RattleAudibleFraction => _rattleClock > 1 ? (float)(_rattleAudible / _rattleClock) : 0f;
 
+	/// <summary>Its hand on the bark, heard (the horror pass): now and then, unwatched and near, the bark creaks under
+	/// its weight or its nails drag on it, from where the hand is. Never a voice (Dan, 2026-09-22); never as it goes.</summary>
+	private void Creaks(StalkerBody sb, float dist, bool seen, float dt)
+	{
+		if (seen || sb.GripPoint is not { } at || dist > 18f) return;
+		if ((_creakIn -= dt) > 0f) return;
+		_creakIn = _rng.RandfRange(5f, 12f);
+		_creaks ??= new[] { "trunk_creak_01", "trunk_creak_02", "trunk_creak_03", "claw_scrape_01", "claw_scrape_02" };
+		string path = $"res://assets/audio/sfx/{_creaks[_rng.RandiRange(0, _creaks.Length - 1)]}.wav";
+		if (!ResourceLoader.Exists(path)) return;
+		Play(GD.Load<AudioStream>(path), at, -19f + 6f * (1f - dist / 18f), _rng.RandfRange(0.8f, 0.95f));
+		CreakCount++;
+	}
+	private float _creakIn = 3f;
+	private static string[] _creaks;
+	/// <summary>For tests: creaks and scrapes from its hand on the bark.</summary>
+	public int CreakCount { get; private set; }
+
 	private void Hide(float cooldown)
 	{
+		if (_body is StalkerBody sbh) { sbh.Watched = false; sbh.TrackTarget = null; }
 		Current = State.Hidden;
 		_cooldown = cooldown;
 		SetVisibility(0f);
@@ -679,14 +704,40 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 
 			float lean = _rng.Randf() < 0.5f ? -1f : 1f;
 			Vector3 lateral = dir.Cross(Vector3.Up).Normalized() * lean;
-			Vector3 spot = farSide + flatDir * 0.45f + lateral * _rng.RandfRange(ExposeOffset.X, ExposeOffset.Y);
+			// how it's found this time (the horror pass): round the side, folded low at the foot, turned away with its
+			// head right round, or up the trunk clinging to it (its introduction always round the side)
+			var sb = _body as StalkerBody;
+			bool rig = sb is { Rigged: true };
+			var kind = rig ? PickKind() : StalkerBody.PeekKind.Side;
+			float size = sb?.Size ?? 1.1f;
+			// (a cling needs a trunk tall enough to hold at its height: checked first, else round the side)
+			if (kind == StalkerBody.PeekKind.Cling)
+			{
+				Vector3 high = farSide + flatDir * 0.3f + Vector3.Up * (GroundAt(farSide) - farSide.Y + (1.35f + 1.92f) * size);
+				var up = Ray(high - flatDir * 1.6f, high + flatDir * 0.2f);
+				if (up.Count == 0) kind = StalkerBody.PeekKind.Side;
+			}
+			Vector3 spot = kind == StalkerBody.PeekKind.Cling
+				? farSide + flatDir * 0.3f + lateral * 0.04f
+				: farSide + flatDir * 0.45f + lateral * _rng.RandfRange(ExposeOffset.X, ExposeOffset.Y);
 			spot.Y = GroundAt(spot);
-			if (float.IsNaN(spot.Y) || SilenceAt(spot) > AvoidSilenceAbove || Overlaps(spot)) continue;
+			if (float.IsNaN(spot.Y) || SilenceAt(spot) > AvoidSilenceAbove || (kind != StalkerBody.PeekKind.Cling && Overlaps(spot))) continue;
 
-			GlobalPosition = spot;
+			_owl = kind == StalkerBody.PeekKind.Owl;
+			GlobalPosition = spot + Vector3.Up * (kind == StalkerBody.PeekKind.Cling ? 1.35f * size : 0f);
 			FacePlayer();
 			// Lean out from behind the trunk toward the exposed side.
 			_body.Rotation = new Vector3(0, 0, Mathf.DegToRad(LeanDegrees) * -lean);
+			if (rig)
+			{
+				// its hands on the bark: the near one at the trunk's edge (round both edges, clinging); the elbow now and
+				// then bent the wrong way
+				float h = kind switch { StalkerBody.PeekKind.Low => 0.86f, StalkerBody.PeekKind.Cling => 1.92f, _ => 1.72f };
+				Vector3? grip = kind == StalkerBody.PeekKind.Owl ? null : FindGrip(lateral, size, h);
+				Vector3? far = kind == StalkerBody.PeekKind.Cling ? FindGrip(-lateral, size, h) : null;
+				if (kind == StalkerBody.PeekKind.Cling && (grip == null || far == null)) { far = null; kind = StalkerBody.PeekKind.Side; grip = FindGrip(lateral, size, 1.72f); GlobalPosition = spot; }
+				sb.Peek(lateral, grip, kind, far, kind == StalkerBody.PeekKind.Side && _rng.Randf() < 0.3f);
+			}
 			if (AnyPointInFrustum(cam)) continue;   // never pop in on screen
 			// Only part of it may show from where you stand: at least a sliver, never more than a few points.
 			int exposed = ExposedPoints(cam.GlobalPosition);
@@ -696,8 +747,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 			_ahead = ahead;
 			_lastSector = ahead ? AheadSector : _trySector;
 			_sectorsUsed.Add(_lastSector);
-			// the remodel: it leans out on that side, and its near hand goes onto the bark at the trunk's edge
-			if (_body is StalkerBody sb && sb.Rigged) sb.Peek(lateral, FindGrip(lateral, sb.Size));
+			if (rig) KindsUsed.Add(kind);
 			Current = State.Peeking;
 			PeekCount++;
 			if (ahead) DistantCount++;
@@ -717,11 +767,11 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	/// <summary>Where on its trunk the near hand goes: the trunk's edge on the side that shows, at the hand's height.
 	/// Rays from beside it toward the player, stepping out along <paramref name="side"/>: the last that still meets
 	/// bark marks the edge. Null if there's no bark there to hold.</summary>
-	private Vector3? FindGrip(Vector3 side, float size)
+	private Vector3? FindGrip(Vector3 side, float size, float height = 1.72f)
 	{
-		Vector3 fwd = GlobalBasis.Z; fwd.Y = 0; fwd = fwd.Normalized();
+		Vector3 fwd = (GetViewport()?.GetCamera3D()?.GlobalPosition ?? GlobalPosition) - GlobalPosition; fwd.Y = 0; fwd = fwd.Normalized();
 		side.Y = 0; side = side.Normalized();
-		Vector3 basePos = GlobalPosition + Vector3.Up * 1.72f * size;
+		Vector3 basePos = GlobalPosition + Vector3.Up * height * size;
 		Vector3? edge = null;
 		for (float x = -0.3f; x <= 0.8f; x += 0.04f)
 		{
@@ -745,9 +795,18 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	public bool IsPresent => Current is State.Peeking or State.Vanishing;
 
 	/// <summary>World positions of its sample points (head, shoulders, knees...), for debug display.</summary>
-	public IEnumerable<Vector3> WorldSamplePoints()
+	public IEnumerable<Vector3> WorldSamplePoints() => Points();
+
+	/// <summary>Its sample points in the world: the remodel's bones as it stands now (a low peek, a cling, a turned
+	/// body all put them elsewhere), else the old figure's fixed points.</summary>
+	private Vector3[] Points()
 	{
-		foreach (var local in SamplePoints) yield return _body.GlobalTransform * local;
+		// (round the side, the tuned fixed points, as its rules were set with; low, clinging or turned, its bones)
+		if (_body is StalkerBody { Rigged: true } sb && sb.Kind != StalkerBody.PeekKind.Side && sb.SamplePointsWorld() is { } pts) return pts;
+		var xf = _body.GlobalTransform;
+		var list = new Vector3[SamplePoints.Length];
+		for (int i = 0; i < list.Length; i++) list[i] = xf * SamplePoints[i];
+		return list;
 	}
 
 	/// <summary>True if a body standing at <paramref name="feet"/> would be inside a trunk, rock or log.</summary>
@@ -763,9 +822,8 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	{
 		if (_ray == null) return 0;
 		int n = 0;
-		var xf = _body.GlobalTransform;
-		foreach (var local in SamplePoints)
-			if (Ray(from, xf * local).Count == 0) n++;
+		foreach (var p in Points())
+			if (Ray(from, p).Count == 0) n++;
 		return n;
 	}
 
@@ -775,28 +833,39 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		Vector3 from = cam.GlobalPosition;
 		if (from.DistanceTo(GlobalPosition) > 60f) return 0f;
 		int visible = 0;
-		var xf = _body.GlobalTransform;
-		foreach (var local in SamplePoints)
+		var pts = Points();
+		foreach (var p in pts)
 		{
-			Vector3 p = xf * local;
 			if (!cam.IsPositionInFrustum(p)) continue;
 			if (Ray(from, p).Count == 0) visible++;
 		}
-		return visible / (float)SamplePoints.Length;
+		return visible / (float)pts.Length;
 	}
 
 	private bool AnyPointInFrustum(Camera3D cam)
 	{
-		var xf = _body.GlobalTransform;
-		foreach (var local in SamplePoints)
-			if (cam.IsPositionInFrustum(xf * local)) return true;
+		foreach (var p in Points())
+			if (cam.IsPositionInFrustum(p)) return true;
 		return false;
 	}
 
 	private void FacePlayer()
 	{
 		Vector3 to = _player.GlobalPosition - GlobalPosition;
-		Rotation = new Vector3(0, Mathf.Atan2(to.X, to.Z), 0);
+		// (turned away, the owl: its head does the looking)
+		Rotation = new Vector3(0, Mathf.Atan2(to.X, to.Z) + (_owl ? Mathf.Pi : 0f), 0);
+	}
+	private bool _owl;
+
+	/// <summary>The ways it has been found so far (tests).</summary>
+	public readonly HashSet<StalkerBody.PeekKind> KindsUsed = new();
+
+	private StalkerBody.PeekKind PickKind()
+	{
+		// its introduction (the storm walk, until the footbridge) is plain: round the side of a trunk; the rest comes after
+		if (Intro) return StalkerBody.PeekKind.Side;
+		float r = _rng.Randf();
+		return r < 0.5f ? StalkerBody.PeekKind.Side : r < 0.68f ? StalkerBody.PeekKind.Low : r < 0.84f ? StalkerBody.PeekKind.Cling : StalkerBody.PeekKind.Owl;
 	}
 
 	private void SetVisibility(float v)

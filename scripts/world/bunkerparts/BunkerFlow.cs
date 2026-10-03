@@ -158,6 +158,8 @@ public partial class BunkerFlow : Node
 		body.Rotation = new Vector3(0, Mathf.Atan2(local.X - at.X, local.Z - at.Z), 0);
 		body.GlowEyes(new Color(1f, 0.16f, 0.05f), 8f);
 		body.Snap("loom");   // drawn up over them, the arms out, the mouth's slit open
+		body.TrackTarget = player.CameraRig?.Camera?.GlobalPosition;   // its face straight at theirs
+		body.Watched = true;
 		_hallway.Blackout(true);
 		BunkerRooms.ScareVoice(_interior, at + Vector3.Up * 1.7f);
 		GD.Print("[story] Act 8: it is in the hallway");

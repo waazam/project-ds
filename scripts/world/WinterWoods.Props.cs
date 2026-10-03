@@ -169,6 +169,7 @@ public partial class WinterWoods
 		var gear = Model(n, "ski_gear");
 		gear.Position = new Vector3(0, gy, len - 0.3f);
 		PhotoSubject.Attach(n, "ski_tracks", new Vector3(0, gy + 0.6f, len - 0.3f), 2f, 30f, 16f, false);
+		Solidify(n, new Vector3(0, gy + 0.8f, len - 0.3f), new Vector3(0.4f, 1.6f, 0.35f), "wood");   // (the gear: not walked through)
 		Solidify(n, endLocal + new Vector3(0, gy + 2f, 0), new Vector3(0.8f, 4f, 0.8f), "wood");
 	}
 

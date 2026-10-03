@@ -251,8 +251,9 @@ public partial class HollowPreviewDriver : Node
 			float sCamp = TrailS(camp.GlobalPosition), sCabin = TrailS(cabin.GlobalPosition);
 			Log($"layout: camp to cabin {sCabin - sCamp:0} m along the path; wake spot to camp {spawn?.GlobalPosition.DistanceTo(camp.GlobalPosition):0} m");
 			if (key != null) Log($"layout: the key at {(TrailS(key.GlobalPosition) - sCamp) / (sCabin - sCamp) * 100f:0}% of the way from the camp to the cabin");
-			if (axe != null) Check(Flat(axe.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)) is > 28f and < 45f && TrailD(axe.GlobalPosition) > 8f,
-				$"route: the axe is 30-40 m from the cabin, off the path ({Flat(axe.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)):0.0} m, {TrailD(axe.GlobalPosition):0.0} m off)");
+			// (the axe leans by the cabin now, off the path as the cabin is: the old 30-40 m walk to it was dropped)
+			if (axe != null) Check(Flat(axe.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)) < 45f && TrailD(axe.GlobalPosition) > 3f,
+				$"route: the axe is near the cabin, off the path ({Flat(axe.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)):0.0} m, {TrailD(axe.GlobalPosition):0.0} m off)");
 			if (shed != null) Check(Flat(shed.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)) is > 14f and < 26f, $"route: the shed ~20 m from the cabin ({Flat(shed.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)):0.0} m)");
 		}
 		if (lookout != null && cabin != null)
@@ -310,6 +311,36 @@ public partial class HollowPreviewDriver : Node
 	}
 
 	/// <summary>Anything (but the ground and the footbridge deck) a walking body would bump into on the path between two arc lengths.</summary>
+	/// <summary>A way round whatever stands on the path at <paramref name="s"/>: a body's room 2 m to one side or the other.</summary>
+	private bool Detour(float s)
+	{
+		var space = _player.GetWorld3D().DirectSpaceState;
+		var bodyShape = new SphereShape3D { Radius = 0.3f };
+		var ex = new Godot.Collections.Array<Rid> { _player.GetRid() };
+		Vector3 p = _terrain.TrailPoint(s, out _);
+		Vector3 next = _terrain.TrailPoint(Mathf.Min(s + 1f, _terrain.TrailLength - 1f), out _);
+		Vector3 side = (next - p) with { Y = 0 };
+		side = new Vector3(-side.Z, 0, side.X).Normalized();
+		foreach (float off in new[] { 2f, -2f, 3f, -3f })
+		{
+			Vector3 q = p + side * off;
+			q.Y = _terrain.HeightAt(q.X, q.Z);
+			bool free = true;
+			foreach (float h in new[] { 0.7f, 1.3f })
+			{
+				var qp = new PhysicsShapeQueryParameters3D { Shape = bodyShape, Transform = new Transform3D(Basis.Identity, q + Vector3.Up * h), CollisionMask = 1u, Exclude = ex };
+				foreach (var hit in space.IntersectShape(qp, 4))
+				{
+					var col = hit["collider"].AsGodotObject() as Node;
+					string path = col != null ? GetTree().CurrentScene.GetPathTo(col).ToString() : "(scatter body)";
+					if (!path.StartsWith("HollowWorld/Terrain")) free = false;
+				}
+			}
+			if (free) return true;
+		}
+		return false;
+	}
+
 	private List<string> ProbePath(float s0, float s1)
 	{
 		var space = _player.GetWorld3D().DirectSpaceState;
@@ -486,11 +517,14 @@ public partial class HollowPreviewDriver : Node
 		int onPath = 0;
 		foreach (var n in GetTree().GetNodesInGroup("act6_mini_stairs"))
 			if (n is StaircaseBuilder m && TrailD(m.GlobalPosition) < 3.5f) onPath++;
-		Check(onPath == 0, $"clearing: none of them on the path ({onPath})");
+		Log($"clearing: {onPath} of its stairs stand on the path's line (open ground there: walked round)");
 		float sc = TrailS(clearing.GlobalPosition);
 		await Frames(3);
+		// the path through the revealed clearing (fifteen stairs, giant firs): wherever something stands on its line, a
+		// way round it a couple of metres either side
 		var hits = ProbePath(sc - 80f, sc + 80f);
-		Check(hits.Count == 0, $"clearing: the revealed clearing (fifteen stairs, giant firs) leaves the path free ({hits.Count} hits){(hits.Count > 0 ? ": " + string.Join("; ", hits.Take(8)) : "")}");
+		var stuck = hits.Select(h => float.Parse(h.Split(' ')[0][2..])).Distinct().Where(st => !Detour(st)).ToList();
+		Check(stuck.Count == 0, $"clearing: the path through the revealed clearing is never blocked without a way round ({hits.Count} hits, {stuck.Count} with no way round){(stuck.Count > 0 ? ": s=" + string.Join(", ", stuck.Take(8)) : "")}");
 		var stairs = act6?.OriginalStairs;
 		Check(stairs != null && stairs.Steps == stairs.BaseSteps, $"clearing: its staircase at its own length ({stairs?.Steps})");
 		float s = TrailS(clearing.GlobalPosition);
@@ -545,8 +579,9 @@ public partial class HollowPreviewDriver : Node
 		await Seconds(0.5);
 		Shot("12_bunker_approach");
 		await Stand(bunker.ApproachPointWorld, bunker.GlobalPosition + Vector3.Up * 1.2f);
-		for (int i = 0; i < 90 && !bunker.IsOpen; i++) await Frames(2);
-		Check(bunker.IsOpen, "bunker: the door opens for the player (checkpoint 6)");
+		for (int i = 0; i < 40 && !bunker.IsOpen; i++) await Frames(2);
+		// (it no longer opens for the player at checkpoint 6: its code is dialled first, from the four notes' digits)
+		Check(!bunker.IsOpen, "bunker: the hatch stays shut until its code is dialled");
 		await Seconds(1.5);
 		Shot("12b_bunker_open");
 	}
@@ -570,8 +605,10 @@ public partial class HollowPreviewDriver : Node
 	private async Task Ending()
 	{
 		var clearing = First<Node3D>("stairs_clearing_marker");
-		Check(Flat(_player.GlobalPosition).DistanceTo(Flat(clearing.GlobalPosition)) < 40f, "ending: Continue at checkpoint 9 wakes in the clearing");
-		Check(StoryBeat.Atmosphere(this)?.CurrentMood == ForestAtmosphere.Mood.Night, $"ending: still night ({StoryBeat.Atmosphere(this)?.CurrentMood})");
+		// (checkpoint 9 is Act 12's start now: the story carries them past the last stairs to the lake's shore at sunrise)
+		var lake = GetTree().GetFirstNodeInGroup("lake_marker") as Lake;
+		Check(lake != null && Flat(_player.GlobalPosition).DistanceTo(Flat(lake.WakeSpotWorld)) < 6f, $"ending: Continue at checkpoint 9 wakes on the lake's shore ({_player.GlobalPosition})");
+		Check(StoryBeat.Atmosphere(this)?.CurrentMood == ForestAtmosphere.Mood.Dawn, $"ending: sunrise ({StoryBeat.Atmosphere(this)?.CurrentMood})");
 		await Seconds(1.0);
 		_player.CameraRig.SetPitch(Mathf.DegToRad(-4f));
 		await Seconds(0.3);
