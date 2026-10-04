@@ -86,6 +86,50 @@ public partial class StationRoom3 : Node3D
 		Floor(-HallHalf, HallHalf, hz1, HallEnd);
 		f.CommitTo(this, "Floor", true);
 
+		// the trim (the interiors pass, 2026-10-03): a riveted steel kick plate round the walls' feet, and an angle-iron
+		// cornice where they meet the ceiling, in the hall and down the corridor; never over the stairwell's hole
+		{
+			var tk = new MeshKit();
+			tk.Mat(StairwellTextures.SteelMat);
+			void Run(Vector3 a, Vector3 b, Vector3 n, float ceil, bool foot)
+			{
+				float len = a.DistanceTo(b);
+				if (len < 0.2f) return;
+				Vector3 along = (b - a) / len;
+				var basis = new Basis(along, Vector3.Up, along.Cross(Vector3.Up).Normalized());
+				if (basis.Z.Dot(n) < 0) basis = new Basis(-along, Vector3.Up, -along.Cross(Vector3.Up).Normalized());
+				Vector3 mid = (a + b) * 0.5f - n * 0.002f;
+				if (foot)
+				{
+					tk.Color = new Color(0.55f, 0.57f, 0.6f);
+					tk.Box(mid + n * 0.011f + Vector3.Up * 0.152f, new Vector3(len - 0.006f, 0.3f, 0.022f), 1f, basis);
+					tk.Color = new Color(0.42f, 0.44f, 0.46f);
+					for (float u = 0.12f; u < len - 0.06f; u += 0.3f)
+						foreach (float y in new[] { 0.06f, 0.24f })
+							tk.Cylinder(a + along * u + n * 0.02f + Vector3.Up * y, a + along * u + n * 0.03f + Vector3.Up * y, 0.012f, 0.009f, 6);
+				}
+				// the cornice: an angle iron, its flange along the wall and its leg along the ceiling
+				tk.Color = new Color(0.5f, 0.52f, 0.55f);
+				tk.Box(mid + n * 0.007f + Vector3.Up * (ceil - 0.002f - 0.11f), new Vector3(len - 0.006f, 0.22f, 0.014f), 1f, basis);
+				tk.Box(mid + n * 0.08f + Vector3.Up * (ceil - 0.002f - 0.008f), new Vector3(len - 0.006f, 0.016f, 0.16f), 1f, basis);
+			}
+			float hi = HallHalf - 0.15f;
+			Run(new Vector3(-hi, 0, CorridorEnd + 0.15f), new Vector3(-hi, 0, HallEnd - 0.15f), Vector3.Right, HallHeight, true);
+			Run(new Vector3(hi, 0, CorridorEnd + 0.15f), new Vector3(hi, 0, HallEnd - 0.15f), Vector3.Left, HallHeight, true);
+			// the back wall: its foot only either side of the hole
+			Run(new Vector3(-hi, 0, HallEnd - 0.15f), new Vector3(hx0 - 0.05f, 0, HallEnd - 0.15f), Vector3.Forward, HallHeight, true);
+			Run(new Vector3(hx1 + 0.05f, 0, HallEnd - 0.15f), new Vector3(hi, 0, HallEnd - 0.15f), Vector3.Forward, HallHeight, true);
+			Run(new Vector3(hx0 - 0.05f, 0, HallEnd - 0.15f), new Vector3(hx1 + 0.05f, 0, HallEnd - 0.15f), Vector3.Forward, HallHeight, false);
+			// the front wall, either side of the corridor's mouth
+			Run(new Vector3(-hi, 0, CorridorEnd + 0.15f), new Vector3(-1.3f, 0, CorridorEnd + 0.15f), Vector3.Back, HallHeight, true);
+			Run(new Vector3(1.3f, 0, CorridorEnd + 0.15f), new Vector3(hi, 0, CorridorEnd + 0.15f), Vector3.Back, HallHeight, true);
+			Run(new Vector3(-1.3f, 0, CorridorEnd + 0.15f), new Vector3(1.3f, 0, CorridorEnd + 0.15f), Vector3.Back, HallHeight, false);
+			// the corridor
+			Run(new Vector3(-1.2f, 0, 0.3f), new Vector3(-1.2f, 0, CorridorEnd - 0.15f), Vector3.Right, 2.6f, true);
+			Run(new Vector3(1.2f, 0, 0.3f), new Vector3(1.2f, 0, CorridorEnd - 0.15f), Vector3.Left, 2.6f, true);
+			tk.CommitTo(this, "Trim", false);
+		}
+
 		// hazard paint round the hole, and two bollards with a chain sagging between them
 		var hz_ = new MeshKit();
 		hz_.Mat(StationParts.StationTextures.Flat("r3_hazard", new Color(0.75f, 0.6f, 0.08f), 0.7f, 0.2f));

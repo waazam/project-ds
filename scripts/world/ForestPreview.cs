@@ -52,6 +52,12 @@ public partial class ForestPreview : Node3D
 			GetViewport().GetTexture().GetImage().SavePng($"{_out}/fall_fir_{i:00}.png");
 		}
 		Log($"fir fallen {fir.Fallen}");
+		{
+			var we = GetTree().Root.FindChild("WorldEnvironment", true, false) as WorldEnvironment;
+			var e = we?.Environment ?? GetViewport().World3D?.Environment;
+			if (e != null) Log($"env fog {e.FogEnabled} density {e.FogDensity:0.0000} height {e.FogHeightDensity:0.000} at {e.FogHeight:0.0} light {e.FogLightColor} vol {e.VolumetricFogEnabled} {e.VolumetricFogDensity:0.0000} albedo {e.VolumetricFogAlbedo} sky {e.FogSkyAffect:0.00} aerial {e.FogAerialPerspective:0.00} mode {e.FogMode} depth {e.FogDepthBegin}-{e.FogDepthEnd}");
+			foreach (var n in GetTree().Root.FindChildren("*", "FogVolume", true, false)) Log($"fog volume {n.GetPath()} at {((Node3D)n).GlobalPosition}");
+		}
 		// a tree beside the way
 		var tree = falls?.GetChildren().OfType<FallingTree>().FirstOrDefault(t => t.Name.ToString().StartsWith("Side"));
 		if (tree == null) return;

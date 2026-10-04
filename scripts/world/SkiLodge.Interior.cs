@@ -461,6 +461,18 @@ public partial class SkiLodge
 		foreach (var (num, x0, x1, front) in new[] { (202, RoomSplitX, CorrX1, true), (201, CorrX0, RoomSplitX, true), (203, RoomSplitX, CorrX1, false), (204, CorrX0, RoomSplitX, false) })
 			RoomShell(k, num, x0, x1, front);
 		k.CommitTo(this, "WestUpper", true);
+		// webs up in the rooms' and the corridor's ceiling corners (the interiors pass, 2026-10-03: years after the party,
+		// nobody has been up here)
+		var wr = new RandomNumberGenerator { Seed = 2301 };
+		foreach (var (x0, x1, front) in new[] { (RoomSplitX, CorrX1, true), (CorrX0, RoomSplitX, true), (RoomSplitX, CorrX1, false), (CorrX0, RoomSplitX, false) })
+		{
+			float s = front ? 1f : -1f, zi = s * (CorrHalf + 0.12f), zo = s * (InnerZ - 0.1f);
+			foreach (var (x, ax) in new[] { (x0 + 0.1f, 1f), (x1 - 0.1f, -1f) })
+				foreach (var (z, az) in new[] { (zi, s), (zo, -s) })
+					if (wr.Randf() < 0.8f) WebKit.Corner(this, wr, new Vector3(x, RoomTop - 0.02f, z), Vector3.Right * ax, Vector3.Back * az, wr.RandfRange(0.6f, 0.95f));
+		}
+		foreach (var (z, az) in new[] { (CorrHalf - 0.06f, -1f), (-CorrHalf + 0.06f, 1f) })
+			WebKit.Corner(this, wr, new Vector3(CorrX0 + 0.06f, RoomTop - 0.02f, z), Vector3.Right, Vector3.Back * az, 0.7f);
 		// the doors
 		foreach (var (num, x, front) in new[] { (202, -14.2f, true), (201, -21.8f, true), (203, -13.2f, false), (204, -20.8f, false) })
 		{

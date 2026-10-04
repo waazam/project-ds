@@ -34,7 +34,7 @@ public partial class WinterWoods
 			(WinterTreeKit.WinterFir(601, 20f, 3.6f), 0.7f, 20f, 3.6f, 0.2f, true, true),
 			(WinterTreeKit.WinterFir(602, 14f, 2.8f), 0.6f, 14f, 2.8f, 0.2f, true, true),
 			(WinterTreeKit.WinterFir(603, 26f, 4.2f), 0.35f, 26f, 4.2f, 0.2f, true, true),
-			(ForestScatter.SnagMesh(224, 15f), 0.8f, 15f, 0.5f, 0.9f, false, false),
+			(ForestScatter.SnagMesh(224, 15f, 0.6f), 0.8f, 15f, 0.5f, 0.9f, false, false),   // frosted moss off its limbs (2026-10-03)
 		};
 	}
 

@@ -1433,6 +1433,16 @@ public partial class StoryTest : Node
 			Check("after drowning: back at the lake's shore, at the Act 12 checkpoint", StoryManager.Instance.Current == Checkpoint.Act11GiantEncounter
 				&& _player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 3f && PlayerDeath.Deaths >= 1, $"{StoryManager.Instance.Current} at {_player.GlobalPosition}");
 		Screenshot("lake_wake");
+		if (lake.Dressing is { } dress)
+		{
+			Check("the lake's shore has its character: cypresses, reed beds, the wrack", dress.CypressSpots.Count >= 25 && dress.ReedBedCount > 200 && dress.WrackCount > 200,
+				$"{dress.CypressSpots.Count} cypresses, {dress.ReedBedCount} reed stands, {dress.WrackCount} wrack");
+			// the nearest cypress, from where they woke
+			var near = dress.CypressSpots.OrderBy(c => c.DistanceTo(_player.GlobalPosition)).FirstOrDefault();
+			await Aim(near + Vector3.Up * 2.5f, ct);
+			Screenshot("lake_cypress");
+			await Aim(lake.WakeSpotWorld + (lake.WakeSpotWorld - near).Normalized() * -1f + Vector3.Down * 0.5f, ct);
+		}
 
 		Check("the boat can be boarded", crossing.BoardPrompt != null);
 		if (crossing.BoardPrompt == null) return;

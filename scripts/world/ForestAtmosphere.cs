@@ -94,8 +94,10 @@ public partial class ForestAtmosphere : Node
 	/// past it the fog is a wall. Depth fog: clear up to the begin distance, fully thick by the end one.</summary>
 	[Export] public bool Act1Fog = true;
 	[Export] public float Act1FarBegin = 70f, Act1FarEnd = 650f;
-	[Export] public float Act1NearBegin = 3.5f, Act1NearEnd = 15f;
-	[Export] public Color Act1FogColor = new(0.44f, 0.45f, 0.47f);
+	// (the bubble at the trail's end widened and the fog darkened, 2026-10-03: the trees coming down there 15-22 m off were
+	// lost in a pale grey wall; now they read against a darker one)
+	[Export] public float Act1NearBegin = 6f, Act1NearEnd = 32f;
+	[Export] public Color Act1FogColor = new(0.3f, 0.31f, 0.33f);
 	/// <summary>0..1 how far the Act 1 fog has closed in (0 at the trailhead, 1 at the fallen tree); -1 when it isn't Act 1.</summary>
 	public float Act1FogAmount => _act1On ? _act1 : -1f;
 	/// <summary>The trailer holds the Act 1 fog where it wants it (null: the fog follows the camera along the trail).</summary>

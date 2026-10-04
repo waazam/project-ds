@@ -218,8 +218,15 @@ public static class LodgeTextures
 		float fu = bu - b;
 		if (fu < 0.035f || fu > 0.975f) return new Color(0.03f, 0.025f, 0.02f);
 		float off = Hash(b, 7, 301) * 0.8f;
-		Color c = SurfaceKit.Tinted("old_planks", v * 0.5f + off, (b + fu) * 0.19f, new Color(1.15f, 0.86f, 0.6f), 0.36f, 0.55f);
-		c *= 0.82f + 0.3f * Hash(b, 3, 302);
+		// (old, unfinished pine gone grey-brown in the dark, grimy: the interiors pass, 2026-10-03, the owner: the crawlspace's
+		// textures mismatched; it was a bright, clean orange beside a red varnish and a grey floor)
+		Color c = SurfaceKit.Tinted("old_planks", v * 0.5f + off, (b + fu) * 0.19f, new Color(0.86f, 0.7f, 0.52f), 0.3f, 0.5f);
+		c *= 0.78f + 0.3f * Hash(b, 3, 302);
+		float grime = Fbm(u * 0.7f, v * 1.3f, 306);
+		c = c.Lerp(new Color(0.12f, 0.1f, 0.085f), Mathf.Clamp((grime - 0.42f) * 1.3f, 0f, 0.45f));
+		// water stains: tide lines running down a board
+		float tide = Mathf.Abs(Mathf.Sin((v + Hash(b, 9, 307)) * 9f + Fbm(u, v, 308) * 3f));
+		if (Hash(b, 11, 309) > 0.6f && tide < 0.06f) c *= 0.7f;
 		// dark spots and knots (nail holes, rot, the owner's pictures)
 		for (int k = 0; k < 3; k++)
 		{
@@ -233,24 +240,32 @@ public static class LodgeTextures
 	/// <summary>Old red brick with smears of plaster over it (a stretch of the cavity's other side).</summary>
 	public static Texture2D CrawlBrick => Make("lodge_crawl_brick", 256, 256, (u, v) =>
 	{
-		Color c = SurfaceKit.Tinted("crypt_brick", u, v, new Color(1f, 0.9f, 0.85f), 0.34f, 0.7f);
+		Color c = SurfaceKit.Tinted("crypt_brick", u, v, new Color(0.72f, 0.6f, 0.55f), 0.28f, 0.6f);
+		// sooted and damp, like the boards round it
+		float soot = Fbm(u * 0.8f, v * 0.8f, 312);
+		c = c.Lerp(new Color(0.1f, 0.09f, 0.08f), Mathf.Clamp((soot - 0.4f) * 1.4f, 0f, 0.5f));
 		float plaster = Fbm(u, v, 311, 4, 3);
-		if (plaster > 0.6f) c = c.Lerp(new Color(0.42f, 0.4f, 0.36f) * SurfaceKit.Grain("plaster", u, v, 0.6f), Mathf.Clamp((plaster - 0.6f) * 5f, 0f, 0.85f));
+		if (plaster > 0.6f) c = c.Lerp(new Color(0.32f, 0.3f, 0.27f) * SurfaceKit.Grain("plaster", u, v, 0.6f), Mathf.Clamp((plaster - 0.6f) * 5f, 0f, 0.85f));
 		return c;
 	});
 
 	/// <summary>The cavity's floor: rough planks, grey with dust.</summary>
 	public static Texture2D CrawlFloor => Make("lodge_crawl_floor", 256, 256, (u, v) =>
 	{
-		Color c = SurfaceKit.Tinted("old_planks", u, v, new Color(1.05f, 0.9f, 0.75f), 0.24f, 0.5f);
+		// the same pine as the walls, walked on, dust lying in its grain
+		Color c = SurfaceKit.Tinted("old_planks", u, v, new Color(0.8f, 0.66f, 0.5f), 0.26f, 0.5f);
 		float dust = Fbm(u, v, 321);
-		return c.Lerp(new Color(0.32f, 0.3f, 0.27f), Mathf.Clamp((dust - 0.45f) * 1.6f, 0f, 0.5f));
+		return c.Lerp(new Color(0.26f, 0.23f, 0.2f), Mathf.Clamp((dust - 0.45f) * 1.6f, 0f, 0.45f));
 	});
 
 	public static StandardMaterial3D CrawlBoardsMat => Std("lodge_m_crawl_boards", CrawlBoards, 0.9f, 0.2f, null, DetailKit.Kind.Wood, null, 0.5f, 1f);
 	public static StandardMaterial3D CrawlBrickMat => Std("lodge_m_crawl_brick", CrawlBrick, 0.95f, 0.15f, null, DetailKit.Kind.Stone, null, 0.5f, 1f);
 	public static StandardMaterial3D CrawlFloorMat => Std("lodge_m_crawl_floor", CrawlFloor, 0.95f, 0.15f, null, DetailKit.Kind.Wood, null, 0.5f, 1f);
-	public static StandardMaterial3D CrawlCeilingMat => Std("lodge_m_crawl_ceiling", CrawlFloor, 0.95f, 0.1f, new Color(0.55f, 0.5f, 0.45f), DetailKit.Kind.Wood, null, 0.5f, 1f);
+	public static StandardMaterial3D CrawlCeilingMat => Std("lodge_m_crawl_ceiling", CrawlBoards, 0.95f, 0.1f, new Color(0.55f, 0.52f, 0.48f), DetailKit.Kind.Wood, null, 0.5f, 1f);
+	/// <summary>The cavity's studs and joists: the same pine as its boards, darker (it was the rooms' red varnish).</summary>
+	public static StandardMaterial3D CrawlStudMat => Std("lodge_m_crawl_stud", CrawlBoards, 0.95f, 0.1f, new Color(0.62f, 0.56f, 0.5f), DetailKit.Kind.Wood, null, 0.5f, 1f);
+	/// <summary>The cavity's pipes: old iron, rusted and matte (the rooms' iron caught the light in a blue line along the top).</summary>
+	public static StandardMaterial3D CrawlPipeMat => _plain("lodge_m_crawl_pipe", new Color(0.2f, 0.13f, 0.09f), 0.85f, 0.15f, 0.3f);
 	public static StandardMaterial3D CopperMat => _plain("lodge_m_copper", new Color(0.42f, 0.26f, 0.16f), 0.45f, 0.6f, 0.6f);
 	/// <summary>The frozen lodge's rime (Act 23): a matte, patchy frost over the rooms' surfaces (the snow's grain, world
 	/// mapped, faint and rough: a glassy glaze over everything read as a grey mirror with the lamps glaring in it).</summary>

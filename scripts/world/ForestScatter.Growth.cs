@@ -201,6 +201,89 @@ public partial class ForestScatter
 		return k.Commit();
 	}
 
+	private static StandardMaterial3D _palmMat;
+
+	/// <summary>A saw palmetto (the owner's photo of the woods off the trail): a low clump of stems, each holding up a
+	/// fan of stiff, narrow leaflets, the old ones gone brown and drooping.</summary>
+	internal static Mesh PalmettoMesh(int seed)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 4421) };
+		var k = new MeshKit();
+		_palmMat ??= new StandardMaterial3D
+		{
+			ResourceName = "palmetto", AlbedoColor = new Color(0.3f, 0.38f, 0.2f), VertexColorUseAsAlbedo = true, Roughness = 0.7f,
+			CullMode = BaseMaterial3D.CullModeEnum.Disabled, MetallicSpecular = 0.35f,
+		};
+		int fans = rng.RandiRange(6, 10);
+		for (int f = 0; f < fans; f++)
+		{
+			float a = rng.RandfRange(0, Mathf.Tau), tilt = rng.RandfRange(0.25f, 0.95f);
+			var o = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+			bool dead = rng.Randf() < 0.2f;
+			float stem = rng.RandfRange(0.5f, 1.0f) * (dead ? 0.8f : 1f);
+			var top = o * Mathf.Sin(tilt) * stem + Vector3.Up * Mathf.Cos(tilt) * stem * (dead ? 0.6f : 1f);
+			k.Mat(ProcTextures.BarkMat);
+			k.Color = new Color(0.5f, 0.45f, 0.35f);
+			k.Cylinder(Vector3.Zero, top, 0.02f, 0.012f, 4, false);
+			// the fan: facing out and up from the stem's end, its leaflets radiating
+			var n = (o * 0.6f + Vector3.Up * (dead ? -0.2f : 0.8f)).Normalized();
+			var u = n.Cross(Vector3.Up).Normalized();
+			if (u.LengthSquared() < 0.1f) u = Vector3.Right;
+			var v = n.Cross(u).Normalized();
+			k.Mat(_palmMat);
+			var col = dead ? new Color(1.5f, 1.05f, 0.6f) : new Color(1f, 1f, 1f) * rng.RandfRange(0.85f, 1.2f);
+			int leaflets = 15;
+			float r = rng.RandfRange(0.45f, 0.65f);
+			for (int i = 0; i < leaflets; i++)
+			{
+				float t = Mathf.Lerp(-1.45f, 1.45f, i / (leaflets - 1f));
+				var dir = (u * Mathf.Sin(t) + v * Mathf.Cos(t)).Normalized();
+				var side = n.Cross(dir).Normalized() * 0.022f;
+				var tip = top + dir * r - n * r * 0.18f * Mathf.Abs(Mathf.Sin(t)) - Vector3.Up * (dead ? r * 0.4f : 0f);
+				k.Color = col * (0.85f + 0.3f * ((i * 7) % 5) / 4f);
+				k.Quad(top - side * 0.4f, top + side * 0.4f, tip + side * 0.3f, tip - side * 0.3f, n);
+			}
+		}
+		return k.Commit();
+	}
+
+	/// <summary>A heap of old boards someone dumped in the woods (the owner's photo): weathered planks lying askew, a
+	/// couple of rusted sheets of tin among them.</summary>
+	internal static Mesh BoardPileMesh(int seed)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 3331) };
+		var k = new MeshKit();
+		float y = 0.03f;
+		for (int i = 0; i < 9; i++)
+		{
+			bool tin = i % 4 == 3;
+			k.Mat(tin ? ProcTextures.MetalMat : ProcTextures.WoodMat);
+			k.Color = tin ? new Color(0.42f, 0.26f, 0.16f) : new Color(0.62f, 0.58f, 0.52f) * rng.RandfRange(0.7f, 1.05f);
+			var size = tin ? new Vector3(1.6f, 0.01f, 0.7f) : new Vector3(rng.RandfRange(1.6f, 2.6f), 0.04f, rng.RandfRange(0.14f, 0.25f));
+			var b = Basis.FromEuler(new Vector3(rng.RandfRange(-0.12f, 0.12f), rng.RandfRange(-0.5f, 0.5f), rng.RandfRange(-0.1f, 0.1f)));
+			k.Box(new Vector3(rng.RandfRange(-0.3f, 0.3f), y, rng.RandfRange(-0.3f, 0.3f)), size, 1f, b);
+			y += tin ? 0.02f : rng.RandfRange(0.03f, 0.06f);
+		}
+		return k.Commit();
+	}
+
+	/// <summary>Three heaps of dumped boards a few metres off the trail's open stretch (solid).</summary>
+	private void PlaceBoardPiles()
+	{
+		if (_terrain.TrailLength < 200f) return;
+		foreach (var (sAt, off) in new[] { (62f, 7.5f), (104f, -8.5f), (151f, 9f) })
+		{
+			var p = _terrain.TrailPoint(sAt, out var tan);
+			var right = tan.Cross(Vector3.Up).Normalized();
+			var at = p + right * off;
+			if (_terrain.RouteDistance(at.X, at.Z) < 4f || Cleared(new Vector2(at.X, at.Z), 1.5f, false)) continue;
+			at.Y = _terrain.HeightAt(at.X, at.Z) - 0.02f;
+			var b = new Basis(Vector3.Up, Mathf.Atan2(tan.X, tan.Z) + 0.4f);
+			Add("boardpile", TreeChunk, at, b, Colors.White);
+			AddCollider(at, BoxShape(new Vector3(1.2f, 0.25f, 0.5f)), new Transform3D(b, at + Vector3.Up * 0.2f));
+		}
+	}
+
 	/// <summary>The understory: saplings between the trees, vine mounds along the woods' edges.</summary>
 	private void ScatterUnderstory()
 	{
@@ -229,6 +312,14 @@ public partial class ForestScatter
 				float yaw = rng.RandfRange(0, Mathf.Tau);
 				// the mounds: on the woods' edge by the trail and round a clearing, where the light gets in
 				float edge = Mathf.Max(1f - Mathf.SmoothStep(4f, 11f, dT), 1f - Mathf.SmoothStep(1f, 8f, cd));
+				// the open woods (before the deep): saw palmettos in clumps under the trees, as the owner's photo
+				if (deep < 0.5f && kind > 0.92f && roll < 0.3f + 0.4f * clump)
+				{
+					float ps = rng.RandfRange(0.8f, 1.3f);
+					Add(rng.Randf() < 0.5f ? "palmetto_a" : "palmetto_b", FoliageChunk, new Vector3(px, h - 0.05f, pz),
+						Basis.FromEuler(new Vector3(0, yaw, 0)).Scaled(Vector3.One * ps), Colors.White * rng.RandfRange(0.85f, 1.1f));
+					continue;
+				}
 				if (kind < 0.22f)
 				{
 					if (dT < 4.2f || dA < 3.6f || roll > 0.12f + 0.32f * edge * clump) continue;

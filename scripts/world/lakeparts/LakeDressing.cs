@@ -25,15 +25,15 @@ public partial class LakeDressing : Node3D
 	public void Build(int seed)
 	{
 		_rng = new RandomNumberGenerator { Seed = (ulong)seed };
-		_meshes["fir_giant"] = ForestScatter.FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f);
-		_meshes["fir_tall"] = ForestScatter.FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f);
+		_meshes["fir_giant"] = ForestScatter.FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f, 0.6f);   // moss hanging off its dead limbs (2026-10-03, the owner's photo)
+		_meshes["fir_tall"] = ForestScatter.FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f, 0.45f);
 		_meshes["fir_mid"] = ForestScatter.FirMesh(13, 18f, 0.31f, 0.26f, 11, 3.0f, 0.15f);
 		_meshes["fir_spire"] = ForestScatter.FirMesh(14, 22f, 0.34f, 0.30f, 15, 2.4f, 0.08f);
 		_meshes["fir_young"] = ForestScatter.FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f);
 		_meshes["decid_a"] = ForestScatter.DeciduousMesh(4);
 		_meshes["decid_b"] = ForestScatter.DeciduousMesh(5);
-		_meshes["snag"] = ForestScatter.SnagMesh(6, 9.5f);
-		_meshes["snag_tall"] = ForestScatter.SnagMesh(16, 19f);
+		_meshes["snag"] = ForestScatter.SnagMesh(6, 9.5f, 0.7f);
+		_meshes["snag_tall"] = ForestScatter.SnagMesh(16, 19f, 0.7f);
 		_meshes["rock_a"] = ForestScatter.RockMesh(7);
 		_meshes["rock_b"] = ForestScatter.RockMesh(8);
 		_meshes["boulder"] = ForestScatter.BoulderMesh(21);
@@ -43,6 +43,7 @@ public partial class LakeDressing : Node3D
 
 		ScatterTrees();
 		ScatterShoreline();
+		BuildShoreCharacter();
 		LeaningSnags();
 		BuildPads();
 		Commit();
@@ -257,7 +258,7 @@ public partial class LakeDressing : Node3D
 	{
 		foreach (var (meshKey, byChunk) in _inst)
 		{
-			bool small = meshKey is "grass" or "reed";
+			bool small = meshKey is "grass" or "reed" or "wrack" or "marsh_mat" or "drift" or "rootwad";
 			foreach (var (key, list) in byChunk)
 			{
 				var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = _meshes[meshKey], InstanceCount = list.Count };

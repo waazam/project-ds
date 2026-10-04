@@ -245,9 +245,9 @@ public partial class SkiLodge
 		var brick = new MeshKit(); brick.Mat(LodgeTextures.CrawlBrickMat); brick.Color = Colors.White;
 		var floor = new MeshKit(); floor.Mat(LodgeTextures.CrawlFloorMat); floor.Color = Colors.White;
 		var ceil = new MeshKit(); ceil.Mat(LodgeTextures.CrawlCeilingMat); ceil.Color = Colors.White;
-		var trim = new MeshKit(); trim.Mat(LodgeTextures.DarkWoodMat); trim.Color = new Color(0.8f, 0.7f, 0.6f);
+		var trim = new MeshKit(); trim.Mat(LodgeTextures.CrawlStudMat); trim.Color = Colors.White;
 		var leak = new MeshKit(); leak.Mat(LodgeTextures.LeakMat); leak.Color = Colors.White;
-		var pipe = new MeshKit(); pipe.Mat(LodgeTextures.IronMat); pipe.Color = Colors.White;
+		var pipe = new MeshKit(); pipe.Mat(LodgeTextures.CrawlPipeMat); pipe.Color = Colors.White;
 		var faces = new List<Vector3>();
 		Vector2I[] sides = { new(1, 0), new(-1, 0), new(0, 1), new(0, -1) };
 		foreach (var (at, cell) in cells)
@@ -357,7 +357,7 @@ public partial class SkiLodge
 		bool alongX = Opens(_maze, at, new Vector2I(1, 0)) || Opens(_maze, at, new Vector2I(-1, 0));
 		Vector3 span = alongX ? new Vector3(0, 0, 0.46f) : new Vector3(0.46f, 0, 0);
 		var k = new MeshKit();
-		k.Mat(CellHash(at, 31) < 0.5f ? LodgeTextures.IronMat : LodgeTextures.CopperMat);
+		k.Mat(CellHash(at, 31) < 0.5f ? LodgeTextures.CrawlPipeMat : LodgeTextures.CopperMat);
 		k.Color = Colors.White;
 		k.Cylinder(new Vector3(c.X, y, c.Z) - span, new Vector3(c.X, y, c.Z) + span, 0.06f, 0.06f, 8, false);
 		k.Cylinder(new Vector3(c.X, y, c.Z) - span * 0.5f, new Vector3(c.X, y, c.Z) - span * 0.43f, 0.075f, 0.075f, 8, true);

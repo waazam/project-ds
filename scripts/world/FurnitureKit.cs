@@ -30,8 +30,41 @@ public static class FurnitureKit
 			scene.Free();
 		}
 		var tex = ResourceLoader.Exists($"res://assets/models/furniture/{name}_cavity.png") ? GD.Load<Texture2D>($"res://assets/models/furniture/{name}_cavity.png") : null;
-		return _models[name] = (mesh, tex);
+		return _models[name] = (mesh, Lifted(tex));
 	}
+
+	/// <summary>The cavity map, lifted where its bake came out too dark (the owner, 2026-10-03: the lodge's Christmas tree
+	/// read black, "textures missing"): a dense piece (a tree, a garland, tinsel, a wreath) occludes itself nearly
+	/// everywhere, and the map, multiplied into its colour and its light both, took most of its brightness. Below an
+	/// average of <see cref="CavityFloor"/> the map is raised toward white until it averages that, keeping its contrast's
+	/// shape (the creases still darkest).</summary>
+	private static Texture2D Lifted(Texture2D tex)
+	{
+		if (tex == null) return null;
+		var img = tex.GetImage();
+		if (img == null) return tex;
+		if (img.IsCompressed()) img.Decompress();
+		img.ClearMipmaps();
+		img.Convert(Image.Format.Rgba8);
+		var small = (Image)img.Duplicate();
+		small.Resize(64, 64, Image.Interpolation.Bilinear);
+		float sum = 0f;
+		for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++) sum += small.GetPixel(x, y).R;
+		float mean = sum / 4096f;
+		if (mean >= CavityFloor) return tex;
+		float k = (1f - CavityFloor) / Mathf.Max(1f - mean, 0.01f);
+		var data = img.GetData();
+		for (int i = 0; i < data.Length; i += 4)
+			for (int c = 0; c < 3; c++)
+				data[i + c] = (byte)Mathf.Clamp(255f - (255f - data[i + c]) * k, 0f, 255f);
+		var lifted = Image.CreateFromData(img.GetWidth(), img.GetHeight(), false, Image.Format.Rgba8, data);
+		lifted.GenerateMipmaps();
+		GD.Print($"[furniture] cavity lifted: {tex.ResourcePath.GetFile()} (average {mean:0.00} -> {CavityFloor:0.00})");
+		return ImageTexture.CreateFromImage(lifted);
+	}
+
+	/// <summary>The darkest a piece's cavity map may average.</summary>
+	public const float CavityFloor = 0.62f;
 
 	private static MeshInstance3D Find(Node n)
 	{
@@ -120,6 +153,17 @@ public static class FurnitureKit
 	/// <summary>A heavy piece as its own instance under <paramref name="parent"/> (not merged into the room's mesh): it
 	/// keeps the import's levels of detail, so from across the room it's drawn with a fraction of its triangles (the
 	/// optimization pass, 2026-10-02: the lodge's Christmas tree is 90k triangles up close). Null if it isn't there.</summary>
+	private static readonly HashSet<string> _unmapped = new();
+	/// <summary>A surface whose role the caller gave no material for: it keeps the model's plain placeholder (the owner saw
+	/// these as missing textures). Said once per model and role, so the previews and tests show it.</summary>
+	private static void Unmapped(string model, string role)
+	{
+		if (_unmapped.Add(model + "/" + role)) GD.Print($"[furniture] {model}: no material for its '{role}' surfaces");
+	}
+
+	/// <summary>Every unmapped model/role met so far (tests).</summary>
+	public static IReadOnlyCollection<string> UnmappedRoles => _unmapped;
+
 	public static MeshInstance3D Place(Node parent, string model, Transform3D xf, Dictionary<string, Material> roles, string name = null)
 	{
 		var (mesh, cavity) = Load(model);
@@ -133,6 +177,7 @@ public static class FurnitureKit
 			int dot = role.IndexOf('.');
 			if (dot > 0) role = role[..dot];
 			if (!roles.TryGetValue(role, out var room)) room = roles.TryGetValue("*", out var any) ? any : null;
+			if (room == null) Unmapped(model, role);
 			if (room != null) mi.SetSurfaceOverrideMaterial(s, Dressed(room, model, cavity));
 		}
 		parent.AddChild(mi);
@@ -154,6 +199,7 @@ public static class FurnitureKit
 			int dot = role.IndexOf('.');
 			if (dot > 0) role = role[..dot];
 			if (!roles.TryGetValue(role, out var room)) room = roles.TryGetValue("*", out var any) ? any : null;
+			if (room == null) Unmapped(model, role);
 			if (room != null) map[src] = Dressed(room, model, cavity);
 		}
 		k.AddMesh(mesh, xf, map);

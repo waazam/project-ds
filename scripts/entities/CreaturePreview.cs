@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using ProjectDS.World.HallwayParts;
@@ -52,6 +53,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--growth") >= 0) { await GrowthShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lake") >= 0) { await LakeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--giant-grab") >= 0) { await GiantGrabShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler") >= 0) { await CrawlerShots(); GetTree().Quit(); return; }
@@ -403,6 +405,37 @@ public partial class CreaturePreview : Node3D
 		await Shot("growth_moss_snag", new Vector3(2f, 7f, 4f), new Vector3(5f, 10f, -3f));
 		await Shot("growth_mound", new Vector3(3f, 1.7f, 11f), new Vector3(1f, 1f, 6f));
 		await Shot("growth_saplings", new Vector3(0f, 1.8f, 6f), new Vector3(0, 3f, 1.5f));
+	}
+
+	/// <summary>The lake's shore (2026-10-03): its cypresses, the wrack, the reed beds and marsh grass, the birdhouse and the
+	/// pipeline sign, in even light (lake_*.png).</summary>
+	private async Task LakeShots()
+	{
+		env.BackgroundColor = new Color(0.5f, 0.52f, 0.55f);
+		env.AmbientLightEnergy = 0.8f;
+		var lake = new World.Lake { Name = "Lake" };
+		AddChild(lake);
+		await Seconds(2.0);
+		var d = lake.Dressing;
+		Vector3 G(float x, float z) => new(x, World.LakeParts.LakeShape.Ground(x, z), z);
+		var spots = d.CypressSpots.OrderBy(c => c.DistanceTo(new Vector3(0, 0, 9f))).Take(3).ToList();
+		int n = 0;
+		foreach (var c in spots)
+		{
+			var toC = (c - new Vector3(0, c.Y, World.LakeParts.LakeShape.CenterZ)).Normalized();
+			var eye = c + toC * 7f + Vector3.Up * 1.7f;
+			eye.Y = Mathf.Max(eye.Y, World.LakeParts.LakeShape.Ground(eye.X, eye.Z) + 1.6f);
+			await Shot($"lake_cypress_{n++}", eye, c + Vector3.Up * 3f);
+			var far = c + toC * 22f;
+			far.Y = Mathf.Max(World.LakeParts.LakeShape.Ground(far.X, far.Z), 0f) + 1.7f;
+			await Shot($"lake_cypress_whole_{n}", far, c + Vector3.Up * 7f);
+		}
+		await Shot("lake_shore_wide", G(-6f, 6f) + Vector3.Up * 1.7f, G(-20f, -6f) + Vector3.Up * 1f);
+		await Shot("lake_wrack_close", G(-3f, 4.5f) + Vector3.Up * 1.4f, G(-6f, 1.5f));
+		var sign = lake.FindChild("PipelineSign", true, false) as Node3D;
+		if (sign != null) await Shot("lake_pipeline_sign", sign.GlobalPosition + sign.GlobalBasis.Z * 9f + Vector3.Up * 1.8f, sign.GlobalPosition + Vector3.Up * 1.8f);
+		var bird = lake.FindChild("Birdhouse", true, false) as Node3D;
+		await Shot("lake_birdhouse", new Vector3(0, 1.7f, 9f), spots.Count > 0 ? spots[0] + Vector3.Up * 3f : new Vector3(0, 2, 0));
 	}
 
 	private async Task StalkerShots()
@@ -839,6 +872,12 @@ public partial class CreaturePreview : Node3D
 		await Seconds(2.0);
 		_cam.Fov = 75f;
 		await Shot("lodge_lobby_from_door", new Vector3(0, 1.7f, 8.8f), new Vector3(0, 2.5f, -6f));
+		// the Christmas pieces up close (the owner saw textures missing on them)
+		{
+			var t = World.SkiLodge.TreeAt;
+			await Shot("lodge_xmas_tree", t + new Vector3(3.2f, 1.8f, 3.2f), t + new Vector3(0, 2.2f, 0));
+			await Shot("lodge_xmas_presents", t + new Vector3(1.6f, 1.2f, 1.2f), t + new Vector3(0, 0.3f, -0.6f));
+		}
 		await Shot("lodge_lobby_fireplace", new Vector3(-2f, 1.7f, 2f), new Vector3(8f, 2.5f, -4.6f));
 		await Shot("lodge_lobby_stairs", new Vector3(4f, 1.7f, 2f), new Vector3(-3f, 2.8f, -9f));
 		await Shot("lodge_lobby_from_balcony", new Vector3(-8.5f, 5.9f, -1.5f), new Vector3(6f, 3f, 0f));

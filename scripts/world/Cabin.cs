@@ -223,6 +223,17 @@ public partial class Cabin : Node3D
 		if (IsOpen) BuildDebris();
 		RefreshWindowBoards();
 		BuildPapers();
+		if (!Engine.IsEditorHint())
+		{
+			// webs in the top corners and bark, dirt and leaves blown in along the walls' feet (the interiors pass, 2026-10-03)
+			float wx = Hw - LogT, wz = Hd - LogT;
+			var wr = new RandomNumberGenerator { Seed = 5051 };
+			foreach (float sx in new[] { -1f, 1f })
+				foreach (float sz in new[] { -1f, 1f })
+					WebKit.Corner(_gen, wr, new Vector3(sx * wx, WallHeight - 0.04f, sz * wz), Vector3.Right * -sx, Vector3.Back * -sz, wr.RandfRange(0.55f, 0.8f));
+			DebrisKit.Scatter(_gen, new RandomNumberGenerator { Seed = 5052 }, -wx, wx, -wz, wz, 0f, new Color(0.3f, 0.24f, 0.17f), 45, 0,
+				new[] { (new Vector3(0, 0, Hd), 1.0f) });
+		}
 		ApplyChar();
 		UpdateLamp();
 		UpdatePapers();

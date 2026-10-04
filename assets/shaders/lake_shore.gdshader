@@ -37,9 +37,13 @@ void fragment() {
 	c = mix(c, texture(tex_moss, uv * 0.9).rgb, smoothstep(0.6, 0.8, n_mid + (1.0 - COLOR.g) * 0.3) * 0.8);
 
 	// the shore band: mud right at the water, gravel on the beaches, fading up into the grass
-	float band = 1.0 - smoothstep(0.35, 0.9 + n_fine * 0.4, y);
+	float band = 1.0 - smoothstep(0.55, 1.4 + n_fine * 0.5, y);
 	vec3 mud = mud_color * (0.75 + 0.5 * texture(tex_dirt, uv * 2.0).r);
 	vec3 shore = mix(mud, texture(tex_gravel, uv * 1.8).rgb * 0.95, COLOR.r);
+	// pale sand washed up above the mud in drifts (the owner's photos of a lake, 2026-10-03), muted, never a glare
+	float sand = smoothstep(0.05, 0.35, y) * smoothstep(0.42, 0.62, n_mid + 0.15 * n_fine) * (1.0 - COLOR.r);
+	vec3 sandc = vec3(0.4, 0.36, 0.3) * (0.85 + 0.3 * texture(tex_dirt, uv * 3.0).r);
+	shore = mix(shore, sandc, sand);
 	c = mix(c, shore, band);
 
 	float slope = 1.0 - clamp(wnrm.y, 0.0, 1.0);

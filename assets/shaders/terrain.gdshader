@@ -21,10 +21,14 @@ uniform vec2 mask_origin = vec2(-120.0, -360.0);
 uniform vec2 mask_size = vec2(240.0, 420.0);
 uniform float tile = 0.42;
 uniform float litter_tile = 0.6;
+uniform vec3 litter_tint = vec3(1.0);
 uniform vec3 mud_color : source_color = vec3(0.10, 0.08, 0.065);
 uniform float moss_amount = 0.5;
 uniform float trail_leaf_cover = 0.55;
 uniform float trail_bright = 1.3;
+/// North of this (world z, more negative) the trail is bare dirt; south of it, gravel.
+uniform float gravel_trail_z = -125.0;
+uniform float puddles = 1.0;
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -43,7 +47,7 @@ void fragment() {
 	float canopy = 1.0 - COLOR.r;   // 0 open .. ~0.45 deep under the trees
 
 	// base: autumn leaf litter, darker needle duff in patches, moss where it's shaded
-	vec3 litter = texture(tex_litter, wpos.xz * litter_tile).rgb;
+	vec3 litter = texture(tex_litter, wpos.xz * litter_tile).rgb * litter_tint;
 	vec3 duff = texture(tex_floor, uv).rgb;
 	vec3 c = mix(litter, duff, smoothstep(0.42, 0.68, n_big) * 0.75);
 	float moss = smoothstep(0.62, 0.78, n_mid * 0.65 + n_big * 0.35 + canopy * 0.35 + (moss_amount - 0.5) * 0.3);
@@ -59,7 +63,15 @@ void fragment() {
 	// trail: packed dirt, mostly buried under fallen leaves; the worn centre line shows through
 	float cover = smoothstep(0.3, 0.7, n_fine * 0.8 + (1.0 - m.r) * 0.6 + (trail_leaf_cover - 0.5));
 	vec3 trail = mix(texture(tex_dirt, uv * 1.25).rgb, litter * 1.1, cover) * trail_bright;
+	// the open first stretch (the owner's photo of a trail, 2026-10-03): pea gravel laid on it, leaves over it, giving
+	// way to the bare dirt as the woods get deep
+	float gravelly = smoothstep(gravel_trail_z - 45.0, gravel_trail_z, wpos.z);
+	vec3 pea = texture(tex_gravel, uv * 2.6).rgb * vec3(1.02, 0.98, 0.9) * trail_bright;
+	trail = mix(trail, mix(pea, litter * 1.05, cover * 0.6), gravelly);
 	c = mix(c, trail, m.r);
+	// puddles standing in the trail's dips: dark, still, glossy
+	float pud = smoothstep(0.69, 0.73, n_mid * 0.75 + n_fine * 0.25) * smoothstep(0.55, 0.9, m.r) * puddles;
+	c = mix(c, c * 0.3 + vec3(0.025, 0.03, 0.035), pud);
 
 	// canopy shade is baked into the vertex colour, but open ground (trail, gravel, grass) stays lighter
 	float open_ground = max(max(m.r, m.g), m.b);
@@ -71,5 +83,6 @@ void fragment() {
 	c *= mix(1.0, (0.88 + 0.2 * grit) * (1.0 - 0.18 * pocket), near);
 	c *= mix(1.0, texture(detail_tex, wpos.xz * detail_tile).r, near);
 	ALBEDO = c * shade;
-	ROUGHNESS = 1.0;
+	ROUGHNESS = mix(1.0, 0.06, pud);
+	SPECULAR = mix(0.5, 0.75, pud);
 }

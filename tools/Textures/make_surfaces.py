@@ -49,7 +49,12 @@ SURFACES = {
     # the woods (the fidelity pass, 2026-10-02): the trunks' bark, deep-furrowed, and the forest floor near the feet
     "bark": ("bark_brown_02", "diff", 0.9, 0.9),
     "forest_floor": ("brown_mud_leaves_01", "diff", 0.85, 0.7),
+    # the quality pass (2026-10-03): the open woods' ground, fallen leaves over the floor (the terrain's litter)
+    "leaf_litter": ("forest_leaves_02", "diff", 0.85, 0.7),
 }
+
+# the ones seen most (every trunk, the ground underfoot) at twice the size: still area-downscaled from 1k, so soft
+SIZES = {"bark": 512, "forest_floor": 512, "leaf_litter": 512}
 
 
 def fetch(asset, kind, dest):
@@ -60,27 +65,29 @@ def fetch(asset, kind, dest):
     urllib.request.urlretrieve(url, dest)
 
 
-def read(path):
-    raw = subprocess.run([FF, "-v", "error", "-i", path, "-vf", f"scale={N}:{N}:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+def read(path, n=N):
+    raw = subprocess.run([FF, "-v", "error", "-i", path, "-vf", f"scale={n}:{n}:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                          capture_output=True, check=True).stdout
-    return np.frombuffer(raw, np.uint8).reshape(N, N, 3).astype(np.float32) / 255.0
+    return np.frombuffer(raw, np.uint8).reshape(n, n, 3).astype(np.float32) / 255.0
 
 
 def write(path, arr):
+    n = arr.shape[0]
     data = (np.clip(arr, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes()
-    subprocess.run([FF, "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{N}x{N}", "-i", "-", path], input=data, check=True)
+    subprocess.run([FF, "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{n}x{n}", "-i", "-", path], input=data, check=True)
 
 
 for name, (asset, diff, contrast, relief) in SURFACES.items():
     col_src = os.path.join(SRC, f"{asset}_col.jpg")
     nor_src = os.path.join(SRC, f"{asset}_nor.jpg")
+    n = SIZES.get(name, N)
     fetch(asset, diff, col_src)
     fetch(asset, "nor_gl", nor_src)
-    col = read(col_src)
+    col = read(col_src, n)
     m = col.mean(axis=(0, 1), keepdims=True)
     col = m + (col - m) * contrast
     write(os.path.join(OUT, f"{name}_albedo.png"), col)
-    nor = read(nor_src)
+    nor = read(nor_src, n)
     flat = np.array([0.5, 0.5, 1.0], np.float32)
     nor = flat + (nor - flat) * relief
     write(os.path.join(OUT, f"{name}_normal.png"), nor)
@@ -89,8 +96,9 @@ for name, (asset, diff, contrast, relief) in SURFACES.items():
     # smoother and catching the light, the rest as it was
     rough_src = os.path.join(SRC, f"{asset}_rough.jpg")
     try:
-        fetch(asset, "rough", rough_src)
-        rough = read(rough_src).mean(axis=2, keepdims=True)
+        if not os.path.exists(rough_src):
+            raise FileNotFoundError("not in build/polyhaven")
+        rough = read(rough_src, n).mean(axis=2, keepdims=True)
         rough = np.clip(rough / max(rough.mean(), 1e-3), 0, 1)
         write(os.path.join(OUT, f"{name}_rough.png"), np.repeat(rough, 3, axis=2))
     except Exception as e:

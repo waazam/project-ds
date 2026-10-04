@@ -56,6 +56,8 @@ public partial class ForestTerrain : Node3D
 	/// cross-country leg only; at runtime it is rewritten as trail → branch AutotestBranch →
 	/// those points, at ground height. Trees/rocks keep clear of the cross-country leg.
 	/// </summary>
+	/// <summary>Pea gravel on the trail south of this (local z; the trailhead's open stretch, 2026-10-03). Off by default.</summary>
+	[Export] public float GravelTrailZ = 99999f;
 	[Export] public NodePath AutotestRoutePath = "AutotestRoute";
 	[Export] public int AutotestBranch = -1;
 
@@ -552,7 +554,11 @@ public partial class ForestTerrain : Node3D
 	{
 		var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/terrain.gdshader") };
 		DetailKit.Hook(mat, DetailKit.Kind.Ground);
-		mat.SetShaderParameter("tex_litter", ProcTextures.LeafLitter());
+		// the ground's fallen leaves from a photo (the quality pass, 2026-10-03, after the owner's photos of the woods:
+		// oak leaves, pine needles, twigs and moss; tools/Textures/make_surfaces.py, 512 px), darkened to the woods' light
+		mat.SetShaderParameter("tex_litter", GD.Load<Texture2D>("res://assets/textures/surfaces/leaf_litter_albedo.png"));
+		mat.SetShaderParameter("litter_tint", new Color(0.5f, 0.5f, 0.6f));
+		mat.SetShaderParameter("litter_tile", 0.48f);
 		mat.SetShaderParameter("tex_floor", ProcTextures.ForestFloor());
 		mat.SetShaderParameter("tex_moss", ProcTextures.Moss());
 		mat.SetShaderParameter("tex_noise", ProcTextures.WaterNoise());
@@ -560,6 +566,7 @@ public partial class ForestTerrain : Node3D
 		mat.SetShaderParameter("tex_dirt", ProcTextures.Dirt());
 		mat.SetShaderParameter("tex_gravel", ProcTextures.Gravel());
 		mat.SetShaderParameter("tex_rock", ProcTextures.Rock());
+		mat.SetShaderParameter("gravel_trail_z", GravelTrailZ + GlobalPosition.Z);
 		mat.SetShaderParameter("mask", BuildMask(out Vector2 mOrigin, out Vector2 mSize));
 		mat.SetShaderParameter("mask_origin", mOrigin + new Vector2(GlobalPosition.X, GlobalPosition.Z));
 		mat.SetShaderParameter("mask_size", mSize);

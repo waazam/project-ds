@@ -67,6 +67,7 @@ public partial class ForestScatter : Node3D
 		BuildMeshes();
 		ScatterTrees();
 		ScatterUnderstory();
+		PlaceBoardPiles();
 		ScatterRocksAndLogs();
 		ScatterBoulders();
 		ScatterFoliage();
@@ -107,6 +108,9 @@ public partial class ForestScatter : Node3D
 		_meshes["sapling_c"] = SaplingMesh(3, 4.2f);
 		_meshes["vinemound_a"] = VineMoundMesh(1, new Vector3(1.6f, 1.5f, 1.4f));
 		_meshes["vinemound_b"] = VineMoundMesh(2, new Vector3(2.2f, 2.1f, 1.8f));
+		_meshes["palmetto_a"] = PalmettoMesh(1);
+		_meshes["palmetto_b"] = PalmettoMesh(2);
+		_meshes["boardpile"] = BoardPileMesh(1);
 	}
 
 	/// <summary>
@@ -912,7 +916,7 @@ public partial class ForestScatter : Node3D
 		AddChild(root);
 		foreach (var (meshKey, byChunk) in inst)
 		{
-			bool foliage = meshKey is "fern" or "grass" or "litter";
+			bool foliage = meshKey is "fern" or "grass" or "litter" || meshKey.StartsWith("palmetto");
 			bool small = foliage || meshKey is "branch" or "stump";
 			bool under = meshKey.StartsWith("sapling") || meshKey.StartsWith("vinemound");
 			float chunk = foliage ? FoliageChunk : TreeChunk;

@@ -520,6 +520,9 @@ public partial class BossRoom
 
 	// ------------------------------------------------------------------ the end
 
+	/// <summary>The death's eye pops: the first gap and the last (seconds).</summary>
+	[Export] public float EyePopFirstGap = 0.75f, EyePopLastGap = 0.012f;
+
 	/// <summary>The last valve: the pit empties, every eye it has bursts in turn from the crown down, it
 	/// shrieks and dies; then the far door opens on a lit room.</summary>
 	private async Task Finale(PlayerController player, CancellationToken ct)
@@ -543,13 +546,24 @@ public partial class BossRoom
 		await Look(player, Beast.GlobalPosition + Vector3.Up * 10f, 2.0f, ct);
 		await Cutscene.Wait(this, 3.2, ct);   // the last of the blood going
 		Sfx("creature_giant_rattle_loop", 1, Beast.GlobalPosition + Vector3.Up * 10f, 2f, 30f);
-		// the eyes, one after another
+		// the eyes, one after another: slow at first, each pop on its own, then faster and faster until they go in a
+		// rush (the owner, 2026-10-03: "they should start off popping slow then progressively get faster"); the gap
+		// shrinks geometrically from most of a second to a few hundredths, and past a frame's worth several go at once
 		var eyes = Beast.EyesInBurstOrder();
-		for (int i = 0; i < eyes.Count; i++)
+		int n = eyes.Count;
+		for (int i = 0; i < n; )
 		{
-			Beast.Burst(eyes[i]);
-			if (i % 3 == 0) Sfx(i % 2 == 0 ? "squelch_open" : "squelch_close", 2, eyes[i].GlobalPosition, 2f, 12f);
-			await Cutscene.Wait(this, Mathf.Lerp(0.11f, 0.035f, i / (float)eyes.Count), ct);
+			float u = i / (float)Mathf.Max(n - 1, 1);
+			float gap = Mathf.Exp(Mathf.Lerp(Mathf.Log(EyePopFirstGap), Mathf.Log(EyePopLastGap), Mathf.Pow(u, 0.55f)));
+			int together = Mathf.Max(1, Mathf.RoundToInt(0.03f / gap));
+			for (int j = 0; j < together && i < n; j++, i++)
+			{
+				Beast.Burst(eyes[i]);
+				// every pop heard while they're slow; fewer as they rush, or it's a single smear of noise
+				if (gap > 0.25f || i % (gap > 0.08f ? 2 : 4) == 0)
+					Sfx(i % 2 == 0 ? "squelch_open" : "squelch_close", 2, eyes[i].GlobalPosition, gap > 0.25f ? 4f : 2f, 12f);
+			}
+			await Cutscene.Wait(this, Mathf.Max(gap, 0.016f), ct);
 		}
 		await Cutscene.Wait(this, 0.4, ct);
 		// it shrieks, and dies

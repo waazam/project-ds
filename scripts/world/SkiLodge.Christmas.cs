@@ -38,7 +38,8 @@ public partial class SkiLodge
 	};
 	private static StandardMaterial3D Matte(string name, Color c, float rough = 0.85f) => new() { ResourceName = name, AlbedoColor = c, Roughness = rough };
 
-	/// <summary>The Christmas pieces' roles: dried needles (the forest firs' spray photo, alpha-cut, faded to olive),
+	/// <summary>The Christmas pieces' roles (the baubles and tinsel brightened 2026-10-03: in the hall's low light they read
+	/// black): dried needles (the forest firs' spray photo, alpha-cut, faded to olive),
 	/// old glass, faded papers, a steady warm glow for the few bulbs still alight.</summary>
 	private static Dictionary<string, Material> Xmas => _xmas ??= new Dictionary<string, Material>
 	{
@@ -49,15 +50,15 @@ public partial class SkiLodge
 			CullMode = BaseMaterial3D.CullModeEnum.Disabled, Roughness = 1f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		},
 		["bark"] = LodgeTextures.DarkWoodMat,
-		["needles_core"] = Matte("xmas_needles_core", new Color(0.06f, 0.075f, 0.04f), 1f),
-		["bauble_red"] = Glossy("xmas_red", new Color(0.36f, 0.04f, 0.04f)),
-		["bauble_gold"] = Glossy("xmas_gold", new Color(0.5f, 0.37f, 0.13f), 0.3f, 0.75f),
-		["bauble_green"] = Glossy("xmas_green", new Color(0.05f, 0.18f, 0.09f)),
-		["bauble_blue"] = Glossy("xmas_blue", new Color(0.06f, 0.09f, 0.26f)),
-		["bauble_silver"] = Glossy("xmas_silver", new Color(0.42f, 0.42f, 0.4f), 0.35f, 0.8f),
+		["needles_core"] = Matte("xmas_needles_core", new Color(0.09f, 0.12f, 0.06f), 1f),
+		["bauble_red"] = Glossy("xmas_red", new Color(0.55f, 0.06f, 0.05f)),
+		["bauble_gold"] = Glossy("xmas_gold", new Color(0.7f, 0.52f, 0.2f), 0.3f, 0.75f),
+		["bauble_green"] = Glossy("xmas_green", new Color(0.08f, 0.3f, 0.13f)),
+		["bauble_blue"] = Glossy("xmas_blue", new Color(0.1f, 0.15f, 0.42f)),
+		["bauble_silver"] = Glossy("xmas_silver", new Color(0.62f, 0.62f, 0.6f), 0.35f, 0.8f),
 		["bulb_dead"] = Glossy("xmas_bulb_dead", new Color(0.12f, 0.11f, 0.1f), 0.3f, 0.1f),
 		["bulb_lit"] = new StandardMaterial3D { ResourceName = "xmas_bulb_lit", AlbedoColor = new Color(1f, 0.8f, 0.5f), EmissionEnabled = true, Emission = new Color(1f, 0.62f, 0.3f), EmissionEnergyMultiplier = 1.4f },
-		["tinsel"] = Glossy("xmas_tinsel", new Color(0.42f, 0.33f, 0.14f), 0.45f, 0.8f),
+		["tinsel"] = Glossy("xmas_tinsel", new Color(0.6f, 0.48f, 0.2f), 0.45f, 0.8f),
 		["star"] = LodgeTextures.GoldMat,
 		["paper_red"] = Matte("xmas_paper_red", new Color(0.36f, 0.06f, 0.05f), 0.6f),
 		["paper_green"] = Matte("xmas_paper_green", new Color(0.06f, 0.16f, 0.08f), 0.6f),
