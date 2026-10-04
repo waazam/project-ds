@@ -68,6 +68,11 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"steel_door_slam_{i:00}", sfx, false, Lo
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_in_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, true, (k - 1) / 4.0))); }
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_out_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, false, (k - 1) / 4.0))); }
 jobs.Add(("stalker_seen_01", sfx, false, Lo, (r, sr) => Sfx.StalkerSeen(r, sr)));
+// Act 1's falling trees (2026-10-03): the creak, the crack, the rush of the crown, the impact.
+for (int i = 1; i <= 3; i++) jobs.Add(($"tree_fall_creak_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Creak(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"tree_fall_crack_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Crack(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"tree_fall_rush_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Rush(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"tree_fall_impact_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Impact(r, sr)));
 // Creature candidates (not wired into the game yet): growls, roars (near / far), screeches, snarls.
 for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_near_{i:00}", sfx, false, Lo, (r, sr) => Creature.Roar(r, sr, false)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_far_{i:00}", sfx, false, Lo, (r, sr) => Creature.Roar(r, sr, true)));

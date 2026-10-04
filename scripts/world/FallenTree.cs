@@ -15,6 +15,12 @@ namespace ProjectDS.World;
 /// Built in world space from <see cref="Root"/>/<see cref="Tip"/> (world XZ) at
 /// runtime; solid (trunk, plate and crown all collide) and keeps the scatter clear
 /// around itself (ClearZones, created in _Ready before ForestScatter's deferred build).
+///
+/// It stands at first (the owner, 2026-10-03: "I would like that tree to originally be standing upright normally,
+/// but then it falls down blocking the players path when they start getting close"): a dead fir at the trail's end,
+/// its root plate under the ground. When the player comes within <see cref="FallTriggerDistance"/> it creaks, cracks
+/// and comes down across the trail (<see cref="TreeFallMotion"/>), tearing its root plate up out of the ground, and
+/// lies as it always did. Act1TreeFalls then brings the others down along the way to the stairs.
 /// </summary>
 [GlobalClass]
 public partial class FallenTree : Node3D
@@ -27,6 +33,18 @@ public partial class FallenTree : Node3D
 	[Export] public int Seed = 19;
 
 	private ForestTerrain _terrain;
+	/// <summary>How near the player comes (m, level, to its foot) before it falls.</summary>
+	[Export] public float FallTriggerDistance = 22f;   // (within sight in the trail end's fog: at 34 m it fell unseen)
+	/// <summary>False: it lies as before, from the start (a preview, an older scene).</summary>
+	[Export] public bool StartsStanding = true;
+	private readonly TreeFallMotion _motion = new();
+	private Node3D _fall, _crater;
+	private StaticBody3D _standBody, _lieBody;
+	private Vector3 _pivot, _rotAxis;
+	/// <summary>For the story and the tests: it has come down.</summary>
+	public bool Fallen => _motion.State == TreeFallMotion.Phase.Down;
+	public bool Falling => _motion.State is TreeFallMotion.Phase.Creak or TreeFallMotion.Phase.Fall or TreeFallMotion.Phase.Settle;
+	public event System.Action Landed;
 
 	public override void _Ready()
 	{
@@ -38,17 +56,95 @@ public partial class FallenTree : Node3D
 
 		var rng = new RandomNumberGenerator { Seed = (ulong)Seed };
 		var axis = Trunk(out Vector3 dir, out Vector3 side);
+		// everything that comes down with it hangs off one node, laid out as it lies; standing, that node is turned
+		// up about the foot of the trunk
+		_fall = new Node3D { Name = "Fall" };
+		AddChild(_fall);
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		AddChild(body);
+		_lieBody = body;
 
 		var k = new MeshKit();
+		var craterK = new MeshKit();
 		BuildTrunk(k, axis, body);
-		BuildRootPlate(k, axis[0], dir, side, rng, body);
+		BuildRootPlate(k, axis[0], dir, side, rng, body, craterK);
 		BuildCrown(k, axis, dir, side, rng, body);
 		k.Color = Colors.White;
-		k.CommitTo(this, "Mesh");
+		k.CommitTo(_fall, "Mesh");
+		_crater = new Node3D { Name = "Crater" };
+		AddChild(_crater);
+		craterK.CommitTo(_crater, "Mesh");
 		BuildClearZones(axis);
 		if (LeftBarrierLength > 0f) BuildLeftBarrier(axis[0], dir, side);
+
+		// the hinge: on the ground at its foot; standing, the trunk straight up from it
+		_pivot = new Vector3(Root.X, Ground(Root.X, Root.Y), Root.Y);
+		_rotAxis = Vector3.Up.Cross(dir).Normalized();
+		var trunkDir = (axis[^1] - _pivot).Normalized();
+		_motion.End = Mathf.Acos(Mathf.Clamp(trunkDir.Dot(Vector3.Up), -1f, 1f));
+		_motion.Length = axis[0].DistanceTo(axis[^1]);
+		_motion.CreakSeconds = 2.8f;
+		_standBody = new StaticBody3D { Name = "Standing", CollisionLayer = 0, CollisionMask = 0 };
+		// (the butt lies propped on its plate, so standing, the trunk rises a little behind the hinge on the ground)
+		var stood = new Transform3D(Basis.Identity, _pivot) * new Transform3D(new Basis(_rotAxis, -_motion.End), Vector3.Zero) * new Transform3D(Basis.Identity, -_pivot);
+		Vector3 standFoot = stood * axis[0];
+		_standBody.AddChild(new CollisionShape3D { Position = new Vector3(standFoot.X, Ground(standFoot.X, standFoot.Z) + 4f, standFoot.Z), Shape = new CylinderShape3D { Radius = TrunkRadius + 0.1f, Height = 8f } });
+		AddChild(_standBody);
+		_motion.Event = ev =>
+		{
+			Vector3 mid = _pivot + Vector3.Up * _motion.Length * 0.5f, land = axis[axis.Count / 2];
+			TreeFallMotion.Sound(this, ev, _pivot, mid, land, Seed);
+			if (ev == "crack") _crater.Visible = true;
+			if (ev == "impact")
+			{
+				_standBody.CollisionLayer = 0;
+				_lieBody.CollisionLayer = 1;
+				Landed?.Invoke();
+				GD.Print("[story] Act 1: the dead fir came down across the trail");
+			}
+		};
+		if (StartsStanding)
+		{
+			_lieBody.CollisionLayer = 0;
+			_standBody.CollisionLayer = 1;
+			_crater.Visible = false;
+			PoseFall();
+			SetProcess(true);
+		}
+		else _motion.SetDown();
+	}
+
+	/// <summary>Down at once (no creak, no sound): a restore, a preview.</summary>
+	public void SetFallen()
+	{
+		_motion.SetDown();
+		_standBody.CollisionLayer = 0;
+		_lieBody.CollisionLayer = 1;
+		_crater.Visible = true;
+		PoseFall();
+	}
+
+	/// <summary>Brings it down now (the story, a preview).</summary>
+	public void Fall() => _motion.Start();
+
+	private void PoseFall()
+	{
+		var to = new Transform3D(Basis.Identity, _pivot);
+		_fall.Transform = to * new Transform3D(new Basis(_rotAxis, _motion.Angle - _motion.End), Vector3.Zero) * to.AffineInverse();
+	}
+
+	public override void _Process(double delta)
+	{
+		if (_motion.State == TreeFallMotion.Phase.Down) { SetProcess(false); return; }
+		if (_motion.State == TreeFallMotion.Phase.Standing)
+		{
+			if (GetTree().GetFirstNodeInGroup("player") is Node3D p
+				&& new Vector2(p.GlobalPosition.X - Root.X, p.GlobalPosition.Z - Root.Y).Length() < FallTriggerDistance)
+				_motion.Start();
+			return;
+		}
+		_motion.Step((float)delta);
+		PoseFall();
 	}
 
 	/// <summary>
@@ -240,7 +336,7 @@ public partial class FallenTree : Node3D
 
 	/// <summary>The upturned root plate: a disc of earth and roots standing on edge at the butt,
 	/// facing along the trunk, with the crater it tore out of the ground just behind it.</summary>
-	private void BuildRootPlate(MeshKit k, Vector3 butt, Vector3 dir, Vector3 side, RandomNumberGenerator rng, StaticBody3D body)
+	private void BuildRootPlate(MeshKit k, Vector3 butt, Vector3 dir, Vector3 side, RandomNumberGenerator rng, StaticBody3D body, MeshKit craterK)
 	{
 		Vector3 c = butt - dir * 0.4f + Vector3.Up * 0.6f;
 		// Blob radii are in the kit's space: build it in a frame whose X is the trunk axis.
@@ -261,14 +357,14 @@ public partial class FallenTree : Node3D
 		}
 		k.Xf = Transform3D.Identity;
 
-		// the crater: a dark, shallow scoop of torn earth behind the plate
+		// the crater: a dark, shallow scoop of torn earth behind the plate (it stays put: the plate comes up out of it)
 		Vector3 hole = butt - dir * 1.6f;
 		hole.Y = Ground(hole.X, hole.Z) - 0.25f;
-		k.Mat(BunkerTextures.EarthMat);
-		k.Color = new Color(0.45f, 0.4f, 0.37f);
-		k.Xf = new Transform3D(frame, hole);
-		k.Blob(Vector3.Zero, new Vector3(1.3f, 0.32f, 1.9f), Seed + 9, 0.2f, true);
-		k.Xf = Transform3D.Identity;
+		craterK.Mat(BunkerTextures.EarthMat);
+		craterK.Color = new Color(0.45f, 0.4f, 0.37f);
+		craterK.Xf = new Transform3D(frame, hole);
+		craterK.Blob(Vector3.Zero, new Vector3(1.3f, 0.32f, 1.9f), Seed + 9, 0.2f, true);
+		craterK.Xf = Transform3D.Identity;
 
 		body.AddChild(new CollisionShape3D
 		{

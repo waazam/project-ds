@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Godot;
@@ -29,6 +30,43 @@ public partial class ForestPreview : Node3D
 		_out = ProjectSettings.GlobalizePath("res://test-output/forest");
 		DirAccess.MakeDirRecursiveAbsolute(_out);
 		Run();
+	}
+
+	/// <summary>Act 1's falling trees (2026-10-03): the dead fir coming down across the trail's end, and one of the trees
+	/// beside the way, frames every 0.35 s (test-output/forest/fall_*.png).</summary>
+	private async Task FallShots()
+	{
+		await Frames(30);
+		var fir = GetTree().Root.FindChild("FallenTree", true, false) as FallenTree;
+		var falls = GetTree().Root.FindChild("TreeFalls", true, false) as Act1TreeFalls;
+		if (fir == null) { Log("no fir"); return; }
+		Vector3 G(float x, float z) => new(x, _terrain.HeightAt(x, z), z);
+		// the fir, from up the trail
+		Vector3 eye = G(fir.Root.X + 6f, fir.Root.Y + 21f) + Vector3.Up * 1.6f;
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(G(fir.Root.X + 3f, fir.Root.Y - 3f) + Vector3.Up * 6f - eye, Vector3.Up), eye);
+		await Frames(10);
+		if (OS.GetCmdlineUserArgs().Contains("--side-only")) fir.SetFallen(); else fir.Fall();
+		for (int i = 0; i < (OS.GetCmdlineUserArgs().Contains("--side-only") ? 0 : 22); i++)
+		{
+			await ToSignal(GetTree().CreateTimer(0.35), SceneTreeTimer.SignalName.Timeout);
+			GetViewport().GetTexture().GetImage().SavePng($"{_out}/fall_fir_{i:00}.png");
+		}
+		Log($"fir fallen {fir.Fallen}");
+		// a tree beside the way
+		var tree = falls?.GetChildren().OfType<FallingTree>().FirstOrDefault(t => t.Name.ToString().StartsWith("Side"));
+		if (tree == null) return;
+		Vector3 side = Vector3.Up.Cross(tree.FallDir).Normalized();
+		Vector3 e2 = tree.GlobalPosition - tree.FallDir * 9f + side * 3f;
+		e2.Y = _terrain.HeightAt(e2.X, e2.Z) + 1.6f;
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(tree.GlobalPosition + tree.FallDir * 8f + Vector3.Up * 4f - e2, Vector3.Up), e2);
+		await Frames(10);
+		tree.Fall();
+		for (int i = 0; i < 20; i++)
+		{
+			await ToSignal(GetTree().CreateTimer(0.35), SceneTreeTimer.SignalName.Timeout);
+			GetViewport().GetTexture().GetImage().SavePng($"{_out}/fall_side_{i:00}.png");
+		}
+		Log($"side tree down {tree.Down}");
 	}
 
 	private async Task Frames(int n)
@@ -64,6 +102,7 @@ public partial class ForestPreview : Node3D
 		foreach (var n in GetTree().GetNodesInGroup("trail"))
 			if (n is Path3D p) Log($"trail path points {p.Curve.PointCount}, first {p.GlobalTransform * p.Curve.GetPointPosition(0)} last {p.GlobalTransform * p.Curve.GetPointPosition(p.Curve.PointCount - 1)}");
 
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--falls") >= 0) { await FallShots(); GetTree().Quit(); return; }
 		if (TakeShots)
 		{
 			await Frames(20);

@@ -426,11 +426,30 @@ public partial class StoryTest : Node
 		var climb = AllOf<FirstClimbEvent>().FirstOrDefault();
 		Check("the first staircase is in the trailhead level", climb != null);
 		if (terrain == null || climb == null) return;
-		// Jump to 25 m before the trail's end (the fallen fir), then walk the rest along the
-		// test route: around the fir's crown and along the pavers to the foot of the stairs.
+		// Jump to 25 m before the trail's end, where the dead fir stands: it comes down across the trail as they near
+		// (2026-10-03), then the walk round its crown and along the old path's line to the foot of the stairs, the trees
+		// coming down beside the way ahead and across it behind.
+		var fir = AllOf<FallenTree>().FirstOrDefault();
+		var falls = AllOf<Act1TreeFalls>().FirstOrDefault();
+		Check("the dead fir stands at the trail's end at first", fir is { StartsStanding: true, Fallen: false, Falling: false });
 		float s = Mathf.Max(0f, terrain.TrailLength - 25f);
 		var start = terrain.TrailPoint(s, out var tangent);
 		await Teleport(start, start + tangent * 10f, ct);
+		if (fir != null)
+		{
+			// walk on toward it, looking at it, until it goes
+			var firFoot = new Vector3(fir.Root.X, terrain.HeightAt(fir.Root.X, fir.Root.Y), fir.Root.Y);
+			_ = WalkTo(start + tangent * 6f, 1f, ct);
+			await Aim(firFoot + Vector3.Up * 7f, ct);
+			await WaitUntil(() => fir.Falling, 6, ct);
+			Check("it creaks and starts to come down as they near", fir.Falling || fir.Fallen);
+			await Seconds(3.6, ct);
+			await Aim(firFoot + Vector3.Up * 4f, ct);
+			Screenshot("fir_falling");
+			await WaitUntil(() => fir.Fallen, 12, ct);
+			Check("the dead fir came down across the trail, and lies there", fir.Fallen);
+			Screenshot("fir_down");
+		}
 		var route = RouteFrom(_player.GlobalPosition);
 		bool ok = true;
 		foreach (var p in route)
@@ -439,6 +458,11 @@ public partial class StoryTest : Node
 			if (!await WalkTo(p, 2.2f, ct)) { ok = false; break; }
 		}
 		Check("walked from the fallen fir to the stairs", ok, $"{_player.GlobalPosition}");
+		if (falls != null)
+		{
+			Check("trees came down beside the way, left and right, as they went", falls.SideStarted >= 5, $"{falls.SideStarted} of {falls.SideCount}");
+			Check("and across it behind them", falls.BehindStarted >= 2, $"{falls.BehindStarted}");
+		}
 		Screenshot("stairs_found");
 		Check("the forest falls silent by the stairs", (ForestAmbienceManager.Instance?.Silence ?? 0f) > 0.8f, $"silence {ForestAmbienceManager.Instance?.Silence:0.00}");
 	}

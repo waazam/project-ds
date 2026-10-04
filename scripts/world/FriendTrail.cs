@@ -30,6 +30,9 @@ public partial class FriendTrail : Node3D
 	/// <summary>Keep the edge stones this far from any point of these world XZ points (the autotest route).</summary>
 	[Export] public NodePath AvoidPath = "";
 	[Export] public int Seed = 71;
+	/// <summary>The old path's stones (off since 2026-10-03, the owner: "Let's remove the stone pathway": the falling
+	/// trees show the way now, <see cref="Act1TreeFalls"/>; the line itself is still the way).</summary>
+	[Export] public bool Stones = false;
 
 	private ForestTerrain _terrain;
 	private readonly List<Vector2> _pts = new();
@@ -52,7 +55,7 @@ public partial class FriendTrail : Node3D
 		TopLevel = true;
 		GlobalTransform = Transform3D.Identity;
 		BuildCorridor();
-		BuildStonework();
+		if (Stones) BuildStonework();
 		BuildLineTrigger();
 	}
 

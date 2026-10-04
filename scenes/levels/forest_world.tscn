@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://scripts/world/RainVfx.cs" id="26_rainvfx"]
 [ext_resource type="Script" path="res://scripts/world/FriendTrail.cs" id="27_friendtrail"]
 [ext_resource type="Script" path="res://scripts/world/FallenTree.cs" id="28_fallentree"]
+[ext_resource type="Script" path="res://scripts/world/Act1TreeFalls.cs" id="41_treefalls"]
 [ext_resource type="Script" path="res://scripts/world/PhotoSubject.cs" id="29_photo"]
 [ext_resource type="Script" path="res://scripts/world/SignPost.cs" id="30_signpost"]
 [ext_resource type="Script" path="res://scripts/entities/Deer.cs" id="31_deer"]
@@ -679,6 +680,9 @@ script = ExtResource("27_friendtrail")
 Waypoints = PackedVector2Array(-1.5, -462.2, 4, -461.8, 9.5, -462.6, 12.8, -465.5, 13.5, -471, 18, -486, 24, -502, 29, -516, 31, -527)
 ItemAt = PackedFloat32Array()
 AvoidPath = NodePath("../Terrain/AutotestRoute")
+
+[node name="TreeFalls" type="Node3D" parent="."]
+script = ExtResource("41_treefalls")
 
 [node name="Clearing" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 9.5, -540)
