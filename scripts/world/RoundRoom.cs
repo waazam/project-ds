@@ -242,7 +242,7 @@ public partial class RoundRoom : Node3D
 		var k = new MeshKit();
 		k.Mat(ItemTextures.BrassMat);
 		var wax = new MeshKit();
-		wax.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.88f, 0.78f), Roughness = 0.7f });
+		wax.Mat(WaxMaterial.Make(new Color(0.92f, 0.88f, 0.78f), 0.7f, "roundroom_wax"));
 		var flameMat = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.8f, 0.45f), EmissionEnabled = true, Emission = new Color(1f, 0.65f, 0.3f), EmissionEnergyMultiplier = 3f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
 		foreach (var (y, count, energy, shadows) in new[] { (2.3f, 8, 1.1f, false), (13f, 4, 1.6f, false), (23f, 4, 1.6f, false), (30f, 4, 1.4f, false) })
 			for (int i = 0; i < count; i++)

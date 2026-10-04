@@ -209,7 +209,24 @@ public partial class WinterWoods
 
 	/// <summary>Soft, fresh snow blown in indoors (the lodge's drifts): the same snow at a broader grain, a touch
 	/// cooler and smoother (at the props' grain, heaped on carpet under lamplight, it read as grey granite).</summary>
-	public static StandardMaterial3D SoftSnow
+	public static Material SoftSnow => _freshSnow ??= FreshSnow();
+	private static ShaderMaterial _freshSnow;
+	private static NoiseTexture2D _snowNoise;
+
+	/// <summary>Snow with body, its grain and a glisten (fresh_snow.gdshader; 2026-10-04, the owner: the snow "looks flat and
+	/// two dimensional"): bright on top and cold blue down its sides, crisp grain over a coarser crust, a crystal here and
+	/// there catching the eye as it moves.</summary>
+	private static ShaderMaterial FreshSnow()
+	{
+		_snowNoise ??= new NoiseTexture2D { Width = 128, Height = 128, Seamless = true, Noise = new FastNoiseLite { Frequency = 0.05f, FractalOctaves = 3, Seed = 6161 } };
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/fresh_snow.gdshader"), ResourceName = "winter_fresh_snow" };
+		m.SetShaderParameter("normal_tex", GD.Load<Texture2D>("res://assets/textures/snow/snow_normal.png"));
+		m.SetShaderParameter("noise_tex", _snowNoise);
+		return m;
+	}
+
+	/// <summary>The old soft snow (a plain material), kept for anything that needs a StandardMaterial3D.</summary>
+	public static StandardMaterial3D SoftSnowStd
 	{
 		get
 		{

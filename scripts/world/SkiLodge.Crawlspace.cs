@@ -14,7 +14,7 @@ namespace ProjectDS.World;
 /// Act 23, the crawlspace (the owner's document and references: the cavity between a house's walls, Evil Dead II's):
 /// through the hole hacked in 201's bathroom wall and into the dark between the rooms. Rough pine boards on both
 /// hands, studs, old brick in places, pipes along the top and now and then across at the height of a head (duck
-/// under); light slipping between the boards from rooms on the other side; dust sifting down, flaking off the walls
+/// under); dust sifting down, flaking off the walls
 /// as they brush past. A maze: turns, a narrow flight of stairs down between the floors, dead ends. It howls,
 /// somewhere in the walls, the whole way. About halfway, its arm comes through the boards ahead of them, reaching and
 /// grabbing, and the only way on is under it; four times, louder and bloodier each time. At the end, the back of a
@@ -184,6 +184,7 @@ public partial class SkiLodge
 		// the maze's own business: the pipes across (duck), the arms (waiting in the walls), the dust, the echo
 		var maze = GetNode<Node3D>("CrawlMaze");
 		foreach (var p in CrouchPipes) CrossPipe(maze, p);
+		DressCrawlspace(maze);   // (the posters and papers on its walls, and the lights along its ceiling)
 		for (int a = 0; a < ArmSpots.Length; a++)
 		{
 			var (cell, side) = ArmSpots[a];
@@ -236,7 +237,7 @@ public partial class SkiLodge
 	}
 
 	/// <summary>A run of cells: floors (or a flight of steps), ceilings, walls wherever a cell doesn't open onto its
-	/// neighbour, studs, light between the boards, pipes along the top; one body for their floors and walls.</summary>
+	/// neighbour, studs, pipes along the top; one body for their floors and walls.</summary>
 	private void BuildCells(Dictionary<Vector2I, CCell> cells, Vector3 offset, HashSet<(Vector2I, Vector2I)> open, string name, bool hidden)
 	{
 		var node = new Node3D { Name = name };
@@ -246,7 +247,6 @@ public partial class SkiLodge
 		var floor = new MeshKit(); floor.Mat(LodgeTextures.CrawlFloorMat); floor.Color = Colors.White;
 		var ceil = new MeshKit(); ceil.Mat(LodgeTextures.CrawlCeilingMat); ceil.Color = Colors.White;
 		var trim = new MeshKit(); trim.Mat(LodgeTextures.CrawlStudMat); trim.Color = Colors.White;
-		var leak = new MeshKit(); leak.Mat(LodgeTextures.LeakMat); leak.Color = Colors.White;
 		var pipe = new MeshKit(); pipe.Mat(LodgeTextures.CrawlPipeMat); pipe.Color = Colors.White;
 		var faces = new List<Vector3>();
 		Vector2I[] sides = { new(1, 0), new(-1, 0), new(0, 1), new(0, -1) };
@@ -316,14 +316,9 @@ public partial class SkiLodge
 					// a stud at the middle of the panel, standing proud of the boards
 					var mid = (w0 + w1) * 0.5f;
 					trim.Box(mid + Vector3.Up * CrawlH * 0.5f + inward * 0.015f, new Vector3(Mathf.Abs(across.X) > 0 ? 0.06f : 0.035f, CrawlH, Mathf.Abs(across.Y) > 0 ? 0.06f : 0.035f), 1f);
-					// light from a room beyond, slipping between two boards
-					if (CellHash(at, side.X * 3 + side.Y * 7 + 17) < 0.07f)
-					{
-						float off = (CellHash(at, 23) - 0.5f) * 0.6f;
-						Vector3 l0 = mid + new Vector3(across.X, 0, across.Y) * off + inward * 0.004f;
-						Vector3 dx = new Vector3(across.X, 0, across.Y) * 0.008f;
-						leak.Quad(l0 - dx + Vector3.Up * 0.35f, l0 + dx + Vector3.Up * 0.35f, l0 + dx + Vector3.Up * 1.75f, l0 - dx + Vector3.Up * 1.75f, inward);
-					}
+					// (no light slipping between the boards any more: the thin bright strips, a few millimetres off the boards,
+					// read as seams in the walls with the daylight through them, and broke up into dashes at a distance; the
+					// owner saw them)
 				}
 				// the pipes along the top, on the walls facing +x or +z (so they run on unbroken down a straight)
 				if (side.X + side.Y > 0)
@@ -338,7 +333,6 @@ public partial class SkiLodge
 		floor.CommitTo(node, "Floor", false);
 		ceil.CommitTo(node, "Ceiling", false);
 		trim.CommitTo(node, "Studs", false);
-		if (!leak.IsEmpty) leak.CommitTo(node, "Leaks", false);
 		pipe.CommitTo(node, "Pipes", false);
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");

@@ -282,7 +282,7 @@ public partial class Church
 	private void BuildCandles()
 	{
 		var brass = ItemTextures.BrassMat;
-		var wax = new StandardMaterial3D { AlbedoColor = new Color(0.94f, 0.91f, 0.82f), Roughness = 0.55f };
+		var wax = WaxMaterial.Make(new Color(0.94f, 0.91f, 0.82f), 0.55f, "church_candle_wax");
 		for (int i = 0; i < CandleLocal.Length; i++)
 		{
 			var at = CandleLocal[i];

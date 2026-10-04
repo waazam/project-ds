@@ -35,6 +35,11 @@ public partial class FireVfx : Node3D
 	[Export] public float LightEnergy = 3.2f;
 	[Export] public bool LightShadows = true;
 	[Export] public int Seed = 1;
+	/// <summary>The air shimmering over it (heat_haze.gdshader; 2026-10-04).</summary>
+	[Export] public bool Haze = true;
+	private MeshInstance3D _haze;
+	private ShaderMaterial _hazeMat;
+	private static NoiseTexture2D _hazeNoise;
 
 	private MultiMeshInstance3D _cards;
 	private ShaderMaterial _flameMat;
@@ -196,6 +201,7 @@ public partial class FireVfx : Node3D
 			_light.SetMeta("firevfx", true);
 			AddChild(_light);
 		}
+		BuildHaze();
 		_built = true;
 		Apply();
 	}
@@ -245,6 +251,25 @@ public partial class FireVfx : Node3D
 		if (_embers != null) { _embers.Emitting = k > 0.05f; _embers.AmountRatio = Mathf.Clamp(k, 0.05f, 1f); }
 		if (_smoke != null) { _smoke.Emitting = k > 0.02f; _smoke.AmountRatio = Mathf.Clamp(0.3f + k * 0.7f, 0.05f, 1f); }
 		if (_light != null) _light.Visible = k > 0.01f;
+		if (_haze != null) { _haze.Visible = k > 0.05f; _hazeMat.SetShaderParameter("intensity", k); }
+	}
+
+	/// <summary>The shimmer card: from the flames' tips up (the screen it bends is from before the flames are drawn: over
+	/// them, it would have rubbed them out), as wide as them and twice their height.</summary>
+	private void BuildHaze()
+	{
+		if (!Haze || FlameScale <= 0f) return;
+		_hazeNoise ??= new NoiseTexture2D { Width = 64, Height = 64, Seamless = true, Noise = new FastNoiseLite { Frequency = 0.08f, Seed = 911 } };
+		_hazeMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/heat_haze.gdshader"), RenderPriority = -1 };   // (drawn before the smoke and the flames, so it never rubs them out)
+		_hazeMat.SetShaderParameter("noise_tex", _hazeNoise);
+		float w = Mathf.Max(Extent.X, Extent.Z) * 1.4f, h = Extent.Y * 2.2f;
+		_haze = new MeshInstance3D
+		{
+			Name = "Haze", Mesh = new QuadMesh { Size = new Vector2(w, h), CenterOffset = new Vector3(0, h * 0.5f + Extent.Y * 0.95f, 0) },
+			MaterialOverride = _hazeMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		};
+		_haze.SetMeta("firevfx", true);
+		AddChild(_haze);
 	}
 
 	public override void _Process(double delta)

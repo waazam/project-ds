@@ -474,6 +474,23 @@ public static class ProcTextures
 	/// key (<see cref="DetailKit"/>): the grain of its surface with the game's grime baked in.</summary>
 	public static void AddGrime(StandardMaterial3D m, string key = null) => DetailKit.ApplyByKey(m, key);
 
+	private static NoiseTexture2D _damp;
+	/// <summary>Damp (2026-10-04, the owner: "make everything stand out more"): stone and brick wet in patches, a roughness
+	/// map of soft blotches (the material's roughness times it), so a lamp or the lantern catches a glint off the wet and
+	/// none off the dry. <paramref name="dry"/> is the dry roughness; the wettest goes to about a quarter of it.</summary>
+	public static void Damp(StandardMaterial3D m, float dry = 0.95f)
+	{
+		_damp ??= new NoiseTexture2D
+		{
+			Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true,
+			Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.012f, FractalOctaves = 3, Seed = 5150 },
+			ColorRamp = new Gradient { Offsets = new[] { 0f, 0.45f, 0.62f, 1f }, Colors = new[] { new Color(1f, 1f, 1f), new Color(1f, 1f, 1f), new Color(0.3f, 0.3f, 0.3f), new Color(0.24f, 0.24f, 0.24f) } },
+		};
+		m.Roughness = dry;
+		m.RoughnessTexture = _damp;
+		m.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red;
+	}
+
 	public static Material Cached(string key, Func<Material> make)
 	{
 		if (_mat.TryGetValue(key, out var m)) return m;

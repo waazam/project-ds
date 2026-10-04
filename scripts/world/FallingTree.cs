@@ -83,14 +83,18 @@ public sealed class TreeFallMotion
 	/// meets the ground, given the terrain and the trunk's clearance along it.</summary>
 	public static float RestAngle(ForestTerrain terrain, Vector3 foot, Vector3 dir, float length, float footClear, float tipClear)
 	{
-		for (float a = 0.7f; a < 1.75f; a += 0.01f)
-			for (float s = 2f; s <= length * 0.97f; s += 0.75f)
-			{
-				float u = s / length;
-				Vector3 p = foot + dir * (s * Mathf.Sin(a)) + Vector3.Up * (s * Mathf.Cos(a));
-				if (p.Y - Mathf.Lerp(footClear, tipClear, u) <= terrain.HeightAt(p.X, p.Z)) return a;
-			}
-		return 1.75f;
+		// (past level, for one falling down a slope: it lies along the ground going away below it)
+		// (its top decides where it rests, coming down on the ground at nine tenths of its height: the trunk, the crown and
+		// the very tip may press into a rise rather than prop the whole tree up off it, the owner: "skillfully clipped through
+		// the map so they look like they fall flat". With the upper half, the crown or the last tenth deciding, a rise under
+		// them held the top up: 3.1 m, 0.99, 0.55)
+		for (float a = 0.7f; a < 2.25f; a += 0.003f)   // (fine: a hundredth of a radian is 20 cm at a tall tip)
+		{
+			float s = length * 0.9f;
+			Vector3 p = foot + dir * (s * Mathf.Sin(a)) + Vector3.Up * (s * Mathf.Cos(a));
+			if (p.Y - Mathf.Lerp(footClear, tipClear, 0.9f) <= terrain.HeightAt(p.X, p.Z)) return a;
+		}
+		return 2.25f;
 	}
 
 	/// <summary>The heavy fall's sounds and the ground's shudder, played for a tree (sounds at its foot, mid-trunk, and
@@ -185,6 +189,8 @@ public partial class FallingTree : Node3D
 	private readonly TreeFallMotion _m = new();
 	private Node3D _pivot;
 	private StaticBody3D _stand, _lie;
+	/// <summary>For tests: how high over the ground the trunk lies, nine tenths of the way to its tip, once down.</summary>
+	public float RestTipHeight { get; private set; }
 	private ForestTerrain _terrain;
 
 	/// <summary>Keeps the scatter's trees out of its foot and its lie (call before the scatter builds).</summary>
@@ -204,7 +210,14 @@ public partial class FallingTree : Node3D
 		_terrain = GroundSnap.FindTerrain(this);
 		FallDir = new Vector3(FallDir.X, 0, FallDir.Z).Normalized();
 		_m.Length = Height;
-		_m.End = _terrain != null ? TreeFallMotion.RestAngle(_terrain, GlobalPosition, FallDir, Height, TrunkR + 0.6f, 0.9f) : Mathf.Pi * 0.5f;
+		// (down until the trunk itself lies on the ground, the boughs under it pressed into the earth: with room left for them it
+		// came to rest a metre up, propped on its own branches; the owner saw it)
+		_m.End = _terrain != null ? TreeFallMotion.RestAngle(_terrain, GlobalPosition, FallDir, Height, TrunkR + 0.04f, 0.12f) : Mathf.Pi * 0.5f;
+		if (_terrain != null)
+		{
+			var tip = GlobalPosition + FallDir * (Height * 0.9f * Mathf.Sin(_m.End)) + Vector3.Up * (Height * 0.9f * Mathf.Cos(_m.End));
+			RestTipHeight = tip.Y - _terrain.HeightAt(tip.X, tip.Z);
+		}
 		_pivot = new Node3D { Name = "Pivot" };
 		AddChild(_pivot);
 		_pivot.AddChild(new MeshInstance3D { Name = "Tree", Mesh = Mesh, Rotation = new Vector3(0, Seed * 1.3f, 0) });

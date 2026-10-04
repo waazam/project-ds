@@ -57,6 +57,7 @@ public partial class WendigoArm : Node3D
 
 	public override void _Ready()
 	{
+		CreatureRim.Apply(this);
 		_rng.Seed = (ulong)GetInstanceId();
 		// corpse-grey, bluer than the body's (the cold in it), a wet sheen, a pale rim catching the lantern
 		var skin = new StandardMaterial3D { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, AlbedoColor = new Color(0.8f, 0.86f, 1f), Roughness = 0.5f, MetallicSpecular = 0.55f, AlbedoTexture = ProcTextures.Grime(), RimEnabled = true, Rim = 0.45f, RimTint = 0.2f };
@@ -185,9 +186,9 @@ public partial class WendigoArm : Node3D
 				}
 				break;
 		}
-		// what it's reaching for: the prey's head if it's anywhere near, else clawing along the cavity. Frantic (the owner:
-		// desperate to get at them, starved): its aim jerks to a new spot every few hundredths of a second, it trembles, it
-		// lunges out at them with the hand splayed and snaps it shut, and drags it back to lunge again
+		// what it's reaching for: the prey's head if it's anywhere near, else clawing along the cavity. Starved and meaning it
+		// (the owner): its aim shifts to a new spot a few times a second, it trembles, it reaches out at them with the hand
+		// splayed and snaps it shut, and drags it back to reach again
 		Vector3 want;
 		var prey = Prey?.Invoke();
 		bool near = prey is { } head && head.DistanceTo(GlobalPosition) < 2.8f;
@@ -201,31 +202,34 @@ public partial class WendigoArm : Node3D
 		bool lunging = _clock < _lungeUntil, recoiling = !lunging && _clock < _recoilUntil;
 		if (Phase == State.Reach && near && !lunging && !recoiling && _clock >= _nextLunge)
 		{
-			_lungeUntil = _clock + _rng.RandfRange(0.14f, 0.22f);
-			_recoilUntil = _lungeUntil + _rng.RandfRange(0.18f, 0.3f);
-			_nextLunge = _recoilUntil + _rng.RandfRange(0.25f, 0.9f);
+			// (deliberate, 2026-10-04, the owner: "it is a little too fast when his hand is grabbing around for the player and will
+			// look scarier if he is intentionally trying to grab you and not just flailing as fast as he can": about half the
+			// pace it had, each reach meant)
+			_lungeUntil = _clock + _rng.RandfRange(0.26f, 0.36f);
+			_recoilUntil = _lungeUntil + _rng.RandfRange(0.38f, 0.58f);
+			_nextLunge = _recoilUntil + _rng.RandfRange(0.6f, 1.3f);
 			lunging = true;
 			if (_rng.Randf() < 0.6f) AudioDirector.OneShot(this, "claw_scrape", 2, GlobalPosition + GlobalBasis.X * 0.6f, -4f, "Events", 3f, 0.12f);
 		}
 		if (_clock >= _twitchAt)
 		{
-			_twitchAt = _clock + _rng.RandfRange(0.04f, 0.16f);
-			float j = near ? 0.16f : 0.1f;
+			_twitchAt = _clock + _rng.RandfRange(0.14f, 0.42f);
+			float j = near ? 0.09f : 0.07f;
 			_aim = want + new Vector3(_rng.RandfRange(-j, j) * 0.8f, _rng.RandfRange(-j, j * 1.4f), _rng.RandfRange(-j * 1.6f, j * 1.6f));
 		}
 		Vector3 aim = _aim;
-		float rate = 18f;
-		if (lunging) { aim = want; rate = 34f; }   // straight at them
-		else if (recoiling) { aim = want with { X = want.X * 0.55f }; rate = 16f; }   // dragged back toward the wall
+		float rate = 9f;
+		if (lunging) { aim = want; rate = 20f; }   // straight at them
+		else if (recoiling) { aim = want with { X = want.X * 0.55f }; rate = 8f; }   // dragged back toward the wall
 		_target = _target.Lerp(aim, 1f - Mathf.Exp(-dt * rate));
 		// a tremble through it, always
 		float tr = near ? 0.018f : 0.01f;
-		_target += new Vector3(Mathf.Sin((float)_clock * 41f) * tr * 0.5f, Mathf.Sin((float)_clock * 37f + 1.3f) * tr, Mathf.Sin((float)_clock * 29f + 2.1f) * tr);
+		_target += new Vector3(Mathf.Sin((float)_clock * 19f) * tr * 0.5f, Mathf.Sin((float)_clock * 17f + 1.3f) * tr, Mathf.Sin((float)_clock * 13f + 2.1f) * tr);
 		_target.Y = Mathf.Max(_target.Y, Floor);
 		// the hand: clawing open and shut fast; splayed wide on the lunge, snapped shut at its end
-		float claw = 0.5f + 0.5f * Mathf.Sin((float)_clock * 16f + Mathf.Sin((float)_clock * 5.3f) * 2.5f);
+		float claw = 0.5f + 0.5f * Mathf.Sin((float)_clock * 8f + Mathf.Sin((float)_clock * 2.7f) * 2.5f);
 		float wantClench = lunging ? -0.35f : recoiling ? 1f : claw;
-		_clench = Mathf.MoveToward(_clench, wantClench, dt * (lunging || recoiling ? 14f : 8f));
+		_clench = Mathf.MoveToward(_clench, wantClench, dt * (lunging || recoiling ? 9f : 5f));
 		Pose(_out);
 		// the grab: someone standing within its reach
 		if (Phase == State.Reach && _grabCool <= 0f && prey is { } h2)

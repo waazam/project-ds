@@ -41,6 +41,9 @@ public partial class Act1TreeFalls : Node3D
 	public int SideCount => SideAt.Length;
 	/// <summary>For the tests: how many have started to come down, beside the way and behind.</summary>
 	public int SideStarted { get; private set; }
+	/// <summary>For tests: the highest any of them lies off the ground (they lie flat on it: the owner saw them propped on
+	/// their branches).</summary>
+	public float MaxRestTip { get { float m = 0f; foreach (var (t, _, _) in _trees) m = Mathf.Max(m, t.RestTipHeight); return m; } }
 	public int BehindStarted { get; private set; }
 
 	public override void _Ready()

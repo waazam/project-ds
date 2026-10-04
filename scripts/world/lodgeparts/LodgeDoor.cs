@@ -18,6 +18,13 @@ public partial class LodgeDoor : Node3D
 	public enum State { Locked, Open, Closed, Jammed }
 	public float Width = 1.0f, Height = 2.2f, OpenAngle = 1.6f;
 	public string Number = "";
+	/// <summary>One of a pair of doors meeting at their latch sides (the dining room's): no jamb on that side, and the
+	/// head stops there, meeting the other's (the two casings had overlapped flush there, flickering).</summary>
+	public bool Paired;
+	/// <summary>Half the thickness of the wall it's hung in: the casing stands just proud of each face. (The lobby's walls
+	/// are 0.8 m of log and stone; a casing sized for the 14 cm partitions sat buried in them, showing only inside the
+	/// opening, flush with its soffit and reveals, and flickered light and dark there; the owner saw it.)</summary>
+	public float WallHalf = 0.07f;
 	public bool HasReader;
 	/// <summary>What opens it (None: it just opens).</summary>
 	public ToolKind Needs = ToolKind.None;
@@ -48,7 +55,9 @@ public partial class LodgeDoor : Node3D
 		var k = new MeshKit();
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
-		k.Box(new Vector3(Width * 0.5f, Height * 0.5f, 0), new Vector3(Width - 0.02f, Height - 0.01f, 0.05f), 1f);
+		// (a hair narrower than its opening, no more: a centimetre's gap each side showed the lit room through it, a dotted line
+		// of light down each edge when seen along a corridor)
+		k.Box(new Vector3(Width * 0.5f, Height * 0.5f - 0.002f, 0), new Vector3(Width - 0.012f, Height - 0.008f, 0.05f), 1f);
 		// raised panels, both faces
 		foreach (float s in new[] { -1f, 1f })
 		{
@@ -75,13 +84,32 @@ public partial class LodgeDoor : Node3D
 		c.Color = Colors.White;
 		foreach (float s in new[] { -1f, 1f })
 		{
-			c.Box(new Vector3(-0.06f, Height * 0.5f + 0.03f, s * 0.1f), new Vector3(0.12f, Height + 0.06f, 0.04f), 1f);
-			c.Box(new Vector3(Width + 0.06f, Height * 0.5f + 0.03f, s * 0.1f), new Vector3(0.12f, Height + 0.06f, 0.04f), 1f);
-			c.Box(new Vector3(Width * 0.5f, Height + 0.07f, s * 0.1f), new Vector3(Width + 0.26f, 0.14f, 0.04f), 1f);
+			// (the jambs' tops tucked up inside the head, and the head a few millimetres prouder than them: where they overlapped
+			// flush, two faces in one plane, differently mapped, flickered light and dark; the owner saw it. Their tops at the
+			// door's height had lain in the plane of the wall's own face over the opening, too)
+			// (slim, and only 2.5 cm proud of the wall: at 5 cm, seen straight down a corridor, each pair of casings stood out as
+			// two dark posts either side of the middle of the screen, wherever one looked; the owner took them for a glitch)
+			float zc = s * (WallHalf + 0.0145f);
+			// (and a few millimetres clear of the opening's own edges and the floor: a lining with its own hole for the door,
+			// the dining room's, had its soffit and reveals in the casing's planes)
+			// (their feet a few millimetres up: the corridor's carpet lies 2 mm over the floor, and they had stood in its plane)
+			c.Box(new Vector3(-0.054f, (Height + 0.036f) * 0.5f, zc), new Vector3(0.1f, Height + 0.024f, 0.025f), 1f);
+			if (!Paired) c.Box(new Vector3(Width + 0.054f, (Height + 0.036f) * 0.5f, zc), new Vector3(0.1f, Height + 0.024f, 0.025f), 1f);
+			float h0 = -0.114f, h1 = Paired ? Width : Width + 0.114f;
+			c.Box(new Vector3((h0 + h1) * 0.5f, Height + 0.064f, zc + s * 0.003f), new Vector3(h1 - h0, 0.12f, 0.031f), 1f);
 		}
+		// the opening lined, through the wall's thickness, a few millimetres proud of its own edges (with none, the gap
+		// between the casing and the leaf looked into the wall's hollow and through to the lit room beyond: a dotted line of
+		// light down the door's edge)
+		float d = WallHalf * 2f + 0.004f;
+		// (clear of the floor by a few millimetres; a pair's heads stop at their meeting, not overlapping)
+		c.Box(new Vector3(0f, (Height + 0.008f) * 0.5f, 0), new Vector3(0.008f, Height - 0.008f, d), 1f);
+		if (!Paired) c.Box(new Vector3(Width, (Height + 0.008f) * 0.5f, 0), new Vector3(0.008f, Height - 0.008f, d), 1f);
+		float l0 = -0.004f, l1 = Paired ? Width - 0.001f : Width + 0.004f;
+		c.Box(new Vector3((l0 + l1) * 0.5f, Height, 0), new Vector3(l1 - l0, 0.008f, d), 1f);
 		if (HasReader)
 		{
-			_readerPos = new Vector3(Width + 0.26f, 1.2f, FrontSign * 0.13f);
+			_readerPos = new Vector3(Width + 0.26f, 1.2f, FrontSign * (WallHalf + 0.017f));   // (on the wall: it had floated 4 cm off it)
 			c.Mat(LodgeTextures.BrassMat);
 			c.Box(_readerPos, new Vector3(0.08f, 0.14f, 0.03f), 1f);
 			c.Mat(LodgeTextures.BlackMat);

@@ -141,6 +141,8 @@ public partial class StationInterior : Node3D
 		Marker("Act23CrawlMarker", ToGlobal(lodge + SkiLodge.CellCentre(SkiLodge.CrawlSave) + SkiLodge.CrawlDown + new Vector3(0, 0.1f, 0)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act23Crawlspace");
 		Marker("Act23FrozenMarker", ToGlobal(lodge + new Vector3(32.05f, 0.1f, -2.6f)), Rotation.Y, "respawn_Act23Frozen");
 		Marker("Act23EndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_Act23Finished");
+		// the end of the story (GameEnding: for now, where Act 23 ends), facing out of the splintered doorway
+		Marker("GameEndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_GameFinished");
 
 		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
 		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });

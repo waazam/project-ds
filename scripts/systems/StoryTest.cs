@@ -64,6 +64,10 @@ public partial class StoryTest : Node
 		/// <summary>Act 18 is run twice: once standing under a slam (crushed, reloaded), then fought properly.</summary>
 		public bool Act18DeathDone;
 		public int Act18Attempts;
+		/// <summary>The failed checks when the act now running began, and the step last started over from its own save
+		/// (an act that fails doesn't take the rest of the run down with it).</summary>
+		public int FailsAtActStart;
+		public int ReseededAt = -1;
 	}
 
 	private static Session _s;
@@ -196,6 +200,22 @@ public partial class StoryTest : Node
 					Finish();
 					return;
 				}
+				// a new act after one that failed: start it from its own save, as a run from the start would have left it
+				// (one flaky act, Act 18's slams, had cascaded through every act after it)
+				if (_s.Step > 0 && ActOf(step) != ActOf(_steps[_s.Step - 1]))
+				{
+					int fails = _s.Checks.Count(c => !c.ok);
+					bool failed = fails > _s.FailsAtActStart;
+					_s.FailsAtActStart = fails;
+					if (failed && ActOf(step) >= 3 && _s.ReseededAt != _s.Step)
+					{
+						_s.ReseededAt = _s.Step;
+						var (cp, flags, inventory) = StateFor(ActOf(step));
+						GD.Print($"[storytest] '{_steps[_s.Step - 1].Act}' failed: '{step.Act}' starts over from its own save ({cp})");
+						SaveSystem.Save(new SaveData { Checkpoint = cp, Flags = flags, Inventory = inventory });
+						if (StoryManager.Instance?.ContinueGame() == true) return;
+					}
+				}
 				_s.CurrentAct = step.Act;
 				GD.Print($"[storytest] ---- {step.Act}");
 				var t0 = Time.GetTicksMsec();
@@ -293,6 +313,8 @@ public partial class StoryTest : Node
 			new("Act 21: the church", hollow, Act21Church),
 			new("Act 22: the winter woods", hollow, Act22Woods),
 			new("Act 23: the ski lodge", hollow, Act23Lodge),
+			// (after the last act, whichever it is: GameEnding)
+			new("The end: the credits", hollow, TheEnd),
 		};
 	}
 
@@ -393,6 +415,16 @@ public partial class StoryTest : Node
 		Check("the bird's picture is scored: clarity, focus, framing, zoom, and stars", last is { Scored: true, Stars: >= 1 } && last.Focus > 50,
 			last == null ? "none" : $"{last.SubjectId}: clarity {last.Clarity} focus {last.Focus} framing {last.Framing} zoom {last.Zoom}, {last.Stars} stars");
 		Check("sixty-nine pictures on the list (the winter woods added nine)", PhotoCatalog.All.Count == PhotoCatalog.Total && PhotoCatalog.Total == 69, $"{PhotoCatalog.All.Count}");
+		// it flies off: up and away through the trees, its wings beating, and goes only far off and out of sight
+		var flown = AllOf<Bird>().Where(b => b.Photographed && !b.IsOmen && (b.Flying || b.GoneAtDistance > 0f))
+			.OrderBy(b => b.GlobalPosition.DistanceTo(_player.GlobalPosition)).FirstOrDefault();
+		Check("the bird flies off (not just gone)", flown is { Flying: true }, flown == null ? "none" : $"flying {flown.Flying}");
+		if (flown != null)
+		{
+			for (int i = 0; i < 90 && flown.Flying; i++) await Seconds(0.2, ct);
+			Check("and is gone only far off, behind the trees or out of view", !flown.Flying && flown.GoneAtDistance > 20f && (flown.GoneBehind || flown.GoneAtDistance > 50f),
+				$"gone at {flown.GoneAtDistance:0} m, out of sight {flown.GoneBehind}");
+		}
 		await Seconds(0.5, ct);
 	}
 
@@ -462,8 +494,14 @@ public partial class StoryTest : Node
 		{
 			Check("trees came down beside the way, left and right, as they went", falls.SideStarted >= 5, $"{falls.SideStarted} of {falls.SideCount}");
 			Check("and across it behind them", falls.BehindStarted >= 2, $"{falls.BehindStarted}");
+			Check("they come down flat on the ground, not propped on their branches", falls.MaxRestTip < 0.5f, $"highest {falls.MaxRestTip:0.00} m");
 		}
 		Screenshot("stairs_found");
+		if (StoryBeat.Atmosphere(this) is { } atm)
+			Check("the fog thickest by the stairs: a third denser again than at the fallen fir", atm.Act1StairsFog > 0.6f && atm.VisibilityMetres < atm.Act1NearEnd * 0.85f,
+				$"stairs {atm.Act1StairsFog:0.00}, seeing {atm.VisibilityMetres:0.0} m");
+		if (StoryBeat.Atmosphere(this) is { } atm2 && (GameSettings.Instance?.FogLighting ?? true))
+			Check("fog banks drift through the woods by the stairs", atm2.FogBanksOn);
 		Check("the forest falls silent by the stairs", (ForestAmbienceManager.Instance?.Silence ?? 0f) > 0.8f, $"silence {ForestAmbienceManager.Instance?.Silence:0.00}");
 	}
 
@@ -2156,9 +2194,24 @@ public partial class StoryTest : Node
 			ulong t1 = Time.GetTicksMsec();
 			bool redShot = false, turnedShot = false, frontShot = false, frontOk = true, doorClear = true;
 			var game = HallWalk(hw, Act15Hallway.End - 1.2f, true, ct, 900f);
+			var turnShots = new HashSet<Act15Hallway.Turn>();
+			int seenRed = -1;
+			double redAt = 0;
 			while (!game.IsCompleted)
 			{
 				await Frames(1, ct);
+				// each of his turns in front of them, seen once, part way into its red (the owner: 6-12 of them)
+				if (hw.State == ProjectDS.World.Act15Hallway.Phase.Red && hw.Reds != seenRed) { seenRed = hw.Reds; redAt = Time.GetTicksMsec() / 1000.0 * Engine.TimeScale; }
+				if (hw.State == ProjectDS.World.Act15Hallway.Phase.Red && hw.FrontReds > 0 && hw.TurnsSeen.Contains(hw.CurrentTurn) && !turnShots.Contains(hw.CurrentTurn)
+					&& Time.GetTicksMsec() / 1000.0 * Engine.TimeScale - redAt > 3.2 && (hw.InFront || hw.CurrentTurn == Act15Hallway.Turn.SideToSide))
+				{
+					turnShots.Add(hw.CurrentTurn);
+					float ts = (float)Engine.TimeScale;
+					Engine.TimeScale = 1.0;
+					await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.4f, ct);
+					Screenshot($"red_turn_{hw.CurrentTurn}");
+					Engine.TimeScale = ts;
+				}
 				if (hw.State == ProjectDS.World.Act15Hallway.Phase.Red)
 				{
 					float sz = hw.ToLocal(hw.Shadow.GlobalPosition).Z;
@@ -2199,6 +2252,7 @@ public partial class StoryTest : Node
 			Check("looked round at him in the red and lived", turnedShot);
 			Check("from halfway down the hall, the reds put him in front of you: stand still, then go round him", hw.FrontReds >= 1 && frontOk && frontShot, $"{hw.FrontReds} reds in front");
 			Check("he never stands in front of the door", doorClear);
+			Check("his turns in the red vary (each run of the test takes them in order)", hw.TurnsSeen.Count >= 3, string.Join(", ", hw.TurnsSeen));
 		}
 		finally { Engine.TimeScale = 1.0; }
 
@@ -2396,7 +2450,9 @@ public partial class StoryTest : Node
 				if (left < before && Flat(w - world).Length() < r + margin) return true;
 			return false;
 		}
-		if (Inside(_player.GlobalPosition, 0.7f, 99f))
+		// (margins a little wider than a slam's own circle: at the last valves the slams come quick, and a bot that waited
+		// for the edge got caught by one, once in a dozen full runs; that one failure had cascaded through the acts after)
+		if (Inside(_player.GlobalPosition, 0.95f, 99f))
 		{
 			// plan: the nearest spot along the catwalk that's clear when we get there, by a path that
 			// never crosses a circle as it lands
@@ -2406,7 +2462,7 @@ public partial class StoryTest : Node
 			{
 				if (Mathf.Abs(off) < 0.1f) continue;
 				Vector3 dest = boss.ToGlobal(boss.RingLocal(sp + off));
-				if (Inside(dest, 0.8f, 99f)) continue;
+				if (Inside(dest, 1.05f, 99f)) continue;
 				bool pathOk = true;
 				for (float k = 0.5f; k < Mathf.Abs(off); k += 0.5f)
 				{
@@ -2492,7 +2548,7 @@ public partial class StoryTest : Node
 			return;
 		}
 		Check("after being crushed: back on the catwalk at Act 18's start, the fight starting over", PlayerDeath.Deaths >= 1 && boss.ValvesTurned == 0);
-		if (++_s.Act18Attempts > 5) { Check("the fight", "won within five tries", false, "crushed every time"); return; }
+		if (++_s.Act18Attempts > 8) { Check("the fight", "won within eight tries", false, "crushed every time"); return; }
 
 		// the fight, played
 		ulong t0 = Time.GetTicksMsec();
@@ -2525,7 +2581,7 @@ public partial class StoryTest : Node
 			}
 		}
 		finally { Engine.TimeScale = 1.0; _input.ScriptedMove = Vector2.Zero; _input.ScriptedInteract = false; _input.ScriptedRun = false; }
-		if (PlayerDeath.Dying && _s.Act18Attempts < 5)
+		if (PlayerDeath.Dying && _s.Act18Attempts < 8)
 		{
 			// crushed partway (a bot's reflexes): it goes round again, like a player would, up to three tries
 			GD.Print($"[storytest] Act 18: crushed on try {_s.Act18Attempts} at valve {boss.ValvesTurned} - trying again");
@@ -3482,6 +3538,7 @@ public partial class StoryTest : Node
 			}
 			Screenshot($"act23_table_{i + 1}_{want[i]}");
 			if (i == 2) Check("the storm gets up outside", lodge.Storm > 0.2f, $"{lodge.Storm:0.00}");
+			if (i == 2) Check("flies over the skeleton once its sheet is off", lodge.FliesBuzzing != null && lodge.FliesBuzzing.Emitting);
 			if (i == 3) Check("a wendigo's skull on a platter", lodge.PlatterSkull != null && lodge.PlatterSkull.Visible);
 			if (i == 4) Check("the table breaks and comes down", lodge.Collapsed == t);
 		}
@@ -3552,6 +3609,16 @@ public partial class StoryTest : Node
 			fastestIn = Mathf.Max(fastestIn, _player.GroundSpeed);
 			if (i == 5 && !crossedIn) { crossedIn = lodge.InMaze; Check("round 201's first turn, carried into the walls seamlessly (no jump)", lodge.InMaze && lodge.CrawlShifts == 1, $"in maze {lodge.InMaze}, shifts {lodge.CrawlShifts}"); }
 			if (i == 12) { Screenshot("act23_crawlspace"); Check("in there, the lodge freezes over", lodge.Frozen && s.HasFlag(LodgeFlag.Frozen)); }
+			if (i == path.Count / 3 + 8)
+			{
+				// (looking on along the way, and up at the strings over it)
+				var on = Cell(path[Mathf.Min(i + 2, path.Count - 1)], true) - _player.GlobalPosition;
+				_player.CameraRig.SnapBehind(Mathf.Atan2(-on.X, -on.Z));
+				_player.CameraRig.SetPitch(0.3f);
+				await Frames(4, ct);
+				Screenshot("act23_crawl_lights");
+				Check("missing posters and newspapers on the walls; Christmas lights along the ceiling from a third of the way in", lodge.CrawlPosters >= 12 && lodge.CrawlBulbs > 600 && lodge.CrawlLights >= 12, $"{lodge.CrawlPosters} posters and papers, {lodge.CrawlBulbs} bulbs, {lodge.CrawlLights} lights");
+			}
 			if (c == SkiLodge.CrawlSave) { await Seconds(0.3, ct); Check("halfway: a save in the crawlspace", s.Current == Checkpoint.Act23Crawlspace, $"{s.Current}"); }
 			if (c == SkiLodge.ArmSpots[0].cell)
 			{
@@ -3593,15 +3660,48 @@ public partial class StoryTest : Node
 		await WaitUntil(() => lodge.FinaleWendigo != null && lodge.FinaleWendigo.Visible, 12, ct);
 		await Seconds(3.0, ct);   // (turned round to it, looking up)
 		Screenshot("act23_on_the_balcony");
-		await WaitUntil(() => lodge.FrontBroken, 20, ct);
-		Check("it leaps off the balcony at them; they dive; it goes out through the doors", lodge.FrontBroken && lodge.FinaleWendigo.Leaps == 1);
-		await Seconds(0.9, ct);
+		await WaitUntil(() => lodge.FinaleWendigo.Leaping, 20, ct);
+		await Seconds(0.55, ct);
+		Screenshot("act23_off_the_rail");
+		await WaitUntil(() => lodge.FinaleLanded, 10, ct);
+		float near = lodge.FinaleWendigo.GlobalPosition.DistanceTo(_player.GlobalPosition);
+		Check("it comes off the balcony's rail at them; they dive; it lands in the hall a few steps from them, the doors still shut",
+			lodge.FinaleLanded && !lodge.FrontBroken && near > 2.2f && near < 5.5f && lodge.FinaleWendigo.Visible, $"{near:0.0} m from them");
+		await Seconds(0.6, ct);
+		Screenshot("act23_it_lands");
+		await Seconds(2.0, ct);
+		Screenshot("act23_it_looks_at_them");
+		await WaitUntil(() => lodge.FinaleLeanedIn, 10, ct);
+		await Seconds(0.5, ct);
+		Screenshot("act23_in_their_face");
+		Check("it rises over them, comes at them, and leans into their face before it turns to the doors", lodge.FinaleLeanedIn && !lodge.FrontBroken
+			&& lodge.FinaleWendigo.GlobalPosition.DistanceTo(_player.GlobalPosition) < near, $"{lodge.FinaleWendigo.GlobalPosition.DistanceTo(_player.GlobalPosition):0.0} m");
+		await WaitUntil(() => lodge.FinaleRams >= 1, 15, ct);
+		await Seconds(0.15, ct);
+		Screenshot("act23_first_blow");
+		Check("it strikes the doors, and they hold", lodge.FinaleRams == 1 && !lodge.FrontBroken);
+		await WaitUntil(() => lodge.FrontBroken, 15, ct);
+		await Seconds(0.2, ct);
+		Screenshot("act23_the_doors_burst");
+		Check("it strikes again, and goes through them", lodge.FrontBroken && lodge.FinaleRams == 2);
+		await Seconds(0.7, ct);
 		Screenshot("act23_the_doors_gone");
+		Check("one leaf hanging off its hinge, the other thrown out across the porch", lodge.FrontLeafR.Position.Z > SkiLodge.Apothem + 1f && lodge.FrontLeafL.Visible && lodge.FrontLeafL.Rotation.Y < -1.0f, $"{lodge.FrontLeafR.Position}, {lodge.FrontLeafL.Rotation}");
+		await WaitUntil(() => !lodge.FinaleWendigo.Visible, 10, ct);
+		Check("across the porch, and gone into the storm", !lodge.FinaleWendigo.Visible && lodge.FinaleWendigo.Leaps == 2, $"{lodge.FinaleWendigo.Leaps} leaps");
 		Check("the woods back in view through the doorway", !lodge.OutdoorHidden);
 		await WaitUntil(() => lodge.FinaleDone, 30, ct);
-		Check("at the splintered doorway, left, and right: the end of Act 23 (a save)", lodge.FinaleDone && s.Current == Checkpoint.Act23Finished, $"{s.Current}");
+		Check("at the splintered doorway, left, and right: the end of Act 23 (a save)", lodge.FinaleDone && s.Current >= Checkpoint.Act23Finished, $"{s.Current}");   // (and the end of the story right after it: GameEnding)
 		Screenshot("act23_the_doorway");
-		// the credits (for now)
+	}
+
+	/// <summary>The end of the story, after the last act (GameEnding): the save that says it's done, the end card, the
+	/// pictures played back as polaroids.</summary>
+	private async Task TheEnd(CancellationToken ct)
+	{
+		var s = StoryManager.Instance;
+		await WaitUntil(() => GameEnding.Played && s.Current == Checkpoint.GameFinished, 20, ct);
+		Check("the last act's end hands over to the end of the story: its save, the credits", GameEnding.Played && s.Current == Checkpoint.GameFinished, $"{s.Current}");
 		int wantShots = Math.Min(2, PhotoLog.Instance?.RecordedCount ?? 0);
 		if (wantShots == 0) { GD.Print("[storytest] no pictures taken this run (started mid-story): the polaroid check is skipped"); return; }
 		await WaitUntil(() => FirstOf<PolaroidMontage>() is { } m && m.Shown >= wantShots, 60, ct);

@@ -14,10 +14,17 @@ public partial class PostGuard : Node
 	/// <summary>The finish's resting vignette (ps2_post.gdshader's default).</summary>
 	public const float RestVignette = 0.38f;
 
-	public override void _Ready() => ProcessMode = ProcessModeEnum.Always;
+	public override void _Ready()
+	{
+		ProcessMode = ProcessModeEnum.Always;
+		AreaGrade.Snap();
+	}
 
 	public override void _Process(double delta)
 	{
+		// each place's own colour (eased; cutscenes included)
+		if (StoryManager.Instance is { } story && StoryBeat.PostMaterial(this) is { } graded)
+			AreaGrade.Apply(graded, story.Current, (float)delta);
 		// not during a cutscene, or while the player is held (a wake-up's eyelids are this vignette)
 		if (Cutscene.ActiveCount > 0 || StoryBeat.Player(this) is not { } player || !player.PlayerInput.Enabled) return;
 		var post = StoryBeat.PostMaterial(this);

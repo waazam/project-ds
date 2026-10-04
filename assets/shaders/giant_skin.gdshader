@@ -9,6 +9,15 @@ render_mode cull_disabled, diffuse_lambert, specular_schlick_ggx, fog_disabled;
 uniform vec3 albedo : source_color = vec3(0.026, 0.028, 0.034);
 uniform vec3 face_tint : source_color = vec3(0.21, 0.215, 0.22);
 uniform float visibility : hint_range(0.0, 1.0) = 1.0;
+// the cold rim (2026-10-04: its outline standing out of the dark; see rim_fresnel.gdshader), faded close up and far off
+uniform float rim = 0.09;
+uniform vec3 rim_color : source_color = vec3(0.55, 0.62, 0.75);
+uniform float rim_far = 40.0;
+float rim_term(vec3 n, vec3 v, vec3 vtx) {
+	float f = pow(1.0 - clamp(abs(dot(normalize(n), normalize(v))), 0.0, 1.0), 3.0);
+	float d = length(vtx);
+	return f * rim * smoothstep(0.6, 2.4, d) * (1.0 - smoothstep(rim_far * 0.5, rim_far, d));
+}
 uniform float wetness : hint_range(0.0, 1.0) = 0.6;
 uniform vec3 eye_color : source_color = vec3(1.0, 0.78, 0.22);
 uniform float eye_glow : hint_range(0.0, 8.0) = 0.3;
@@ -38,4 +47,5 @@ void fragment() {
 	SPECULAR = 0.5 * wet;
 	float eye = 1.0 - COLOR.a;
 	EMISSION = eye_color * eye_glow * eye * (1.0 - haze) + haze_color * haze * (0.35 + 0.35 * contrast);
+	EMISSION += rim_color * rim_term(NORMAL, VIEW, VERTEX);
 }

@@ -261,6 +261,8 @@ public partial class ClipAudit : Node
 			Vector3 size = aabb.Size;
 			// props only: a whole room's shell is hollow in the middle, which a box test there reads as walk-through
 			if (size.Y < 0.45f || Mathf.Max(size.X, size.Z) < 0.3f || Mathf.Max(size.X, size.Z) > 3.5f || size.Y > 12f) continue;
+			// (and not a sheet flat on a wall: a poster or a page has no inside to walk into)
+			if (Mathf.Min(size.X, size.Z) < 0.01f) continue;
 			// only what stands at body height over something walkable
 			var down = PhysicsRayQueryParameters3D.Create(aabb.GetCenter() with { Y = aabb.Position.Y + 0.05f }, aabb.GetCenter() with { Y = aabb.Position.Y - 3f }, 1u);
 			var hit = space.IntersectRay(down);

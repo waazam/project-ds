@@ -73,6 +73,14 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"tree_fall_creak_{i:00}", sfx, false, Lo
 for (int i = 1; i <= 2; i++) jobs.Add(($"tree_fall_crack_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Crack(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"tree_fall_rush_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Rush(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"tree_fall_impact_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Impact(r, sr)));
+// Act 23's end (2026-10-04): the wendigo on the balcony's rail, landing on the floor, ramming and clawing the doors.
+for (int i = 1; i <= 2; i++) jobs.Add(($"lodge_rail_groan_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.RailGroan(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"wendigo_land_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Land(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"door_ram_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Ram(r, sr, false)));
+jobs.Add(("door_ram_burst", sfx, false, Lo, (r, sr) => LodgeDoor.Ram(r, sr, true)));
+jobs.Add(("fly_buzz_loop", ambient, true, Lo, (r, sr) => LodgeDoor.FlyBuzz(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"wing_flutter_{i:00}", sfx, false, Lo, (r, sr) => Forest.WingFlutter(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"claw_rake_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Rake(r, sr)));
 // Creature candidates (not wired into the game yet): growls, roars (near / far), screeches, snarls.
 for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_near_{i:00}", sfx, false, Lo, (r, sr) => Creature.Roar(r, sr, false)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_far_{i:00}", sfx, false, Lo, (r, sr) => Creature.Roar(r, sr, true)));

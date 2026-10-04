@@ -71,6 +71,7 @@ public partial class Leviathan : Node3D
 
 	public override void _Ready()
 	{
+		CreatureRim.Apply(this, far: true);
 		World.PhotoSubject.Attach(this, "pit_beast", new Vector3(0, 3f, 0), 4f, 90f, 18f, false, new Vector3(0, 6f, 0));
 		// gooey, grimy octopus flesh that rots as the fight goes on (octopus_flesh.gdshader); the body's
 		// back is its top, the limbs' is away from their suckers

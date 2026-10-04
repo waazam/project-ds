@@ -84,6 +84,7 @@ public partial class LakeCreature : Node3D
 
 	public override void _Ready()
 	{
+		CreatureRim.Apply(this, far: true);
 		_rng = new RandomNumberGenerator { Seed = (ulong)Seed };
 		Visible = false;
 	}

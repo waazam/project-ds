@@ -131,7 +131,7 @@ public static class FurnitureKit
 	/// no triplanar mapping, no passes of its own): everything else keeps its own material, and no dust.</summary>
 	private static bool DustyFits(StandardMaterial3D sm) =>
 		sm.Transparency == BaseMaterial3D.TransparencyEnum.Disabled && !sm.EmissionEnabled && sm.ShadingMode != BaseMaterial3D.ShadingModeEnum.Unshaded
-		&& !sm.Uv1Triplanar && sm.NextPass == null && !sm.RefractionEnabled && !sm.RimEnabled && !sm.ClearcoatEnabled && sm.CullMode == BaseMaterial3D.CullModeEnum.Back;
+		&& !sm.Uv1Triplanar && !sm.SubsurfScatterEnabled && sm.NextPass == null && !sm.RefractionEnabled && !sm.RimEnabled && !sm.ClearcoatEnabled && sm.CullMode == BaseMaterial3D.CullModeEnum.Back;
 
 	/// <summary>Whether a piece exists (built and imported).</summary>
 	public static bool Has(string model) => Load(model).mesh != null;

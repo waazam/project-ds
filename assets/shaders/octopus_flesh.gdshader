@@ -27,6 +27,12 @@ uniform vec4 rotten : source_color = vec4(0.33, 0.36, 0.24, 1.0);
 uniform vec4 dead : source_color = vec4(0.13, 0.11, 0.09, 1.0);
 uniform vec4 sore : source_color = vec4(0.42, 0.04, 0.04, 1.0);
 uniform vec4 bone : source_color = vec4(0.78, 0.74, 0.62, 1.0);
+/// (2026-10-04, the owner: the bosses should look imposing) the slime sliding slowly down it, always, so the whole hide
+/// glistens and moves like something alive; and the veins throbbing, a slow double beat, dark and swelling, a deep red
+/// warmth just showing through the thin flesh over them on the beat (faint: never a glow, never a flash).
+uniform float slime_flow = 0.035;
+uniform float beat_rate = 0.62;    // beats a second
+uniform float throb = 1.0;
 
 varying vec3 v_obj;
 varying vec3 v_nrm;
@@ -56,9 +62,14 @@ void fragment() {
 
 	// underside flesh: maroon, darker in blotches, veined
 	vec3 col = mix(flesh.rgb, flesh_dark.rgb, smoothstep(0.35, 0.85, n1) * 0.7) * (0.85 + 0.3 * n4);
-	float vein = 1.0 - smoothstep(0.0, 0.03, abs(n2 - 0.5));
-	float vein2 = 1.0 - smoothstep(0.0, 0.02, abs(n3 - 0.45));
-	col = mix(col, flesh_dark.rgb * 0.45, max(vein, vein2 * 0.7) * 0.85);
+	// the heartbeat: lub-dub, then rest
+	float ph = fract(TIME * beat_rate);
+	float beat = (exp(-pow((ph - 0.08) / 0.05, 2.0)) + 0.6 * exp(-pow((ph - 0.24) / 0.05, 2.0))) * throb;
+	float vw = 0.03 * (1.0 + 0.6 * beat);
+	float vein = 1.0 - smoothstep(0.0, vw, abs(n2 - 0.5));
+	float vein2 = 1.0 - smoothstep(0.0, vw * 0.66, abs(n3 - 0.45));
+	float veins = max(vein, vein2 * 0.7);
+	col = mix(col, flesh_dark.rgb * 0.45, veins * 0.85);
 	// pale, raw-looking patches where the skin is stretched thin
 	col = mix(col, flesh.rgb * vec3(1.6, 1.25, 1.2), smoothstep(0.66, 0.8, n4) * 0.35);
 	// the back: slick green-teal, shading into the red down the flanks
@@ -80,7 +91,10 @@ void fragment() {
 	col = mix(col, bone.rgb * (0.8 + 0.3 * n2), slough);
 
 	// slime: wet patches glossy, the rest duller; the rot dries it out
-	float slime = smoothstep(0.35, 0.7, n3 * 0.6 + n4 * 0.4) * (1.0 - r1 * 0.7);
+	float sf = TIME * slime_flow;
+	float s3 = tri(p + vec3(0.0, sf, 0.0), w, scale * 4.1, vec2(0.13, 0.5));
+	float s4 = tri(p + vec3(0.0, sf * 1.7, 0.0), w, scale * 9.0, vec2(0.57, 0.21));
+	float slime = smoothstep(0.35, 0.7, s3 * 0.6 + s4 * 0.4) * (1.0 - r1 * 0.7);
 
 	// bumps: push the normal about by the noise's slope (object space, carried into view space)
 	float e = 0.04;
@@ -98,4 +112,5 @@ void fragment() {
 	RIM_TINT = 0.6;
 	// thin flesh: a little light comes through, red
 	BACKLIGHT = flesh.rgb * 0.45 * (1.0 - dorsal) * (1.0 - r1 * 0.6);
+	EMISSION = vec3(0.35, 0.03, 0.03) * veins * beat * 0.05 * (1.0 - dorsal * 0.7) * (1.0 - r1 * 0.5);
 }

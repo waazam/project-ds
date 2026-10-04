@@ -98,6 +98,7 @@ public static class SewerTextures
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		};
 		ProcTextures.AddGrime(s as StandardMaterial3D, key);
+		if (key == "sw_brick_m") ProcTextures.Damp(s, 0.85f);   // (the sewer's brick wet in patches above the water)
 		_mat[key] = s;
 		return s;
 	}

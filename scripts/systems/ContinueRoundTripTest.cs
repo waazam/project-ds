@@ -109,6 +109,9 @@ public partial class ContinueRoundTripTest : Node
 		new("act23_letter201", Checkpoint.Act23Letter201, F23d, "lantern,compass,radio;tools=Lighter+Keycard201"),
 		new("act23_crawlspace", Checkpoint.Act23Crawlspace, F23e, "lantern,compass,radio;tools=Lighter+Keycard201"),
 		new("act23_frozen", Checkpoint.Act23Frozen, F23f, "lantern,compass,radio;tools=Lighter+Keycard201"),
+		// Act 23's end (the front doors gone), and the end of the story after the credits (the same place, for now)
+		new("act23_finished", Checkpoint.Act23Finished, F23f.Append(LodgeFlag.FrontBroken).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201"),
+		new("game_finished", Checkpoint.GameFinished, F23f.Append(LodgeFlag.FrontBroken).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -276,6 +279,9 @@ public partial class ContinueRoundTripTest : Node
 				Check("Act 23's letter save: in 201 by its bathroom, the door jammed behind, the envelope gone, the lodge not yet frozen", lb.Y > SkiLodge.UpperY - 0.3f && lb.X < -20f && lodge23.Room201Jammed && lodge23.Envelope201 == null && !lodge23.Frozen, $"{lb}");
 			if (sc.Cp == Checkpoint.Act23Crawlspace)
 				Check("Act 23's crawlspace save: in the walls (the maze, below), the lodge frozen, the arms still to come", lb.Y < -40f && lodge23.Frozen && lodge23.ArmsBurst == 0, $"{lb}");
+			if (sc.Cp is Checkpoint.Act23Finished or Checkpoint.GameFinished)
+				Check($"{sc.Cp}: at the splintered front doorway, the doors gone (one leaf hanging, one out on the porch), the lodge frozen", Mathf.Abs(lb.X) < 1.5f && lb.Z > SkiLodge.HexIn - 2f && lodge23.FrontBroken && lodge23.Frozen
+					&& lodge23.FrontLeafR.Position.Z > SkiLodge.Apothem + 1f, $"{lb}");
 			if (sc.Cp == Checkpoint.Act23Frozen)
 				Check("Act 23's frozen save: in the dining hall, the wardrobe over, the windows broken, the front door ajar", lb.X > 25f && lb.Y < 2f && lodge23.WardrobeDown && lodge23.WindowsBroken > 10 && lodge23.Frozen && !lodge23.FrontBroken, $"{lb}, windows {lodge23.WindowsBroken}");
 		}

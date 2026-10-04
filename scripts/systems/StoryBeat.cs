@@ -144,6 +144,29 @@ public static class StoryBeat
 		}
 	}
 
+	/// <summary>Keeps the player's view on a moving thing until <paramref name="stop"/> says so: yaw and pitch eased
+	/// toward it (a share of the way each frame, by <paramref name="rate"/>; never more than <paramref name="maxStep"/>
+	/// radians a frame, so a quick mover drags the view round smoothly rather than snapping it: the owner's comfort).</summary>
+	public static async Task Follow(Node owner, PlayerController player, Func<Vector3> target, Func<bool> stop, CancellationToken ct, float rate = 4f, float maxStep = 0.045f)
+	{
+		while (!stop())
+		{
+			float dt = (float)owner.GetProcessDeltaTime();
+			if (player.CameraRig.Camera is { } cam)
+			{
+				var d = target() - cam.GlobalPosition;
+				if (new Vector2(d.X, d.Z).LengthSquared() > 0.04f)
+				{
+					float k = 1f - Mathf.Exp(-rate * Mathf.Max(dt, 0.001f));
+					float yaw = Mathf.AngleDifference(player.CameraRig.Yaw, Mathf.Atan2(-d.X, -d.Z));
+					float pitch = Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length()) - player.CameraRig.Pitch;
+					player.PlayerInput.AddCutsceneLook(new Vector2(Mathf.Clamp(yaw * k, -maxStep, maxStep), Mathf.Clamp(pitch * k, -maxStep, maxStep)));
+				}
+			}
+			await Cutscene.Frame(owner, ct);
+		}
+	}
+
 	/// <summary>Plays a one-shot 2D/3D sound under <paramref name="parent"/> on an explicit bus; frees itself.</summary>
 	public static AudioStreamPlayer3D PlayAt(Node3D parent, string path, string bus, Vector3 localPos,
 		float volumeDb = 0f, float unitSize = 4f, float maxDistance = 50f, float pitch = 1f)

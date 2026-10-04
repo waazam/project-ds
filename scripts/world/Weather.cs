@@ -1,4 +1,5 @@
 using Godot;
+using ProjectDS.Systems;
 
 namespace ProjectDS.World;
 
@@ -302,8 +303,13 @@ public partial class Weather : Node3D
 		if ((_roofCheck -= delta) <= 0)
 		{
 			_roofCheck = 0.25;
-			var q = PhysicsRayQueryParameters3D.Create(cp + Vector3.Up * 0.3f, cp + Vector3.Up * 40f, 1);
-			UnderRoof = GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
+			var q = PhysicsRayQueryParameters3D.Create(cp + Vector3.Up * 0.3f, cp + Vector3.Up * 90f, 1);
+			// (or inside by the atmosphere's word: the church's vault, 36 m up, has nothing for the ray to hit, and the far
+			// curtain's rings, drawn on round the camera in there, stood in the nave as a grey wall round the player; the owner
+			// saw it)
+			var air = StoryBeat.Atmosphere(this);
+			bool inside = air != null && (air.Interior > 0.3f || air.Lodge > 0.3f || air.Underground > 0.3f);
+			UnderRoof = inside || GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
 		}
 		_outdoors = Mathf.MoveToward(_outdoors, UnderRoof ? 0f : 1f, dt * 2f);
 		// the snow

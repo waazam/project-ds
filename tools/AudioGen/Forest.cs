@@ -262,4 +262,31 @@ public static class Forest
 			ev[s0 + i] += amp * (Math.Sin(ph) * Perc(tt, 0.012, tau) + lp.P(r.W()) * Perc(tt, 0.008, tau * 0.7) * 1.5);
 		}
 	}
+
+	/// <summary>A small bird taking off: a quick flurry of wingbeats (soft feathered whirrs, ~16 a second, slowing and
+	/// fading as it gets away), with the rush of air under them.</summary>
+	public static double[] WingFlutter(Rng r, int sr)
+	{
+		double len = r.R(1.1, 1.5);
+		int n = (int)(len * sr);
+		var x = new double[n];
+		var bp = Biquad.Bp(sr, r.R(1400, 1900), 0.9);
+		var lp = Biquad.Lp(sr, 5200);
+		double t = r.R(0.0, 0.02), rate = r.R(15, 18);
+		while (t < len - 0.1)
+		{
+			double u = t / len;
+			double amp = Math.Pow(1 - u, 1.6) * (0.75 + 0.25 * r.U());
+			int st = (int)(t * sr), ln = (int)(0.045 * sr);
+			Dsp.AddEvent(x, st, ln, k =>
+			{
+				double tt = (double)k / sr;
+				double e = Math.Sin(Math.PI * Math.Min(1, tt / 0.045)) * Math.Exp(-tt * 30);
+				return r.W() * e * amp;
+			});
+			t += 1.0 / (rate * (1 - 0.35 * u)) * r.R(0.92, 1.08);
+		}
+		for (int i = 0; i < n; i++) x[i] = lp.P(bp.P(x[i]) * 0.8 + x[i] * 0.2);
+		return Dsp.FinishOneShot(x, sr, -3, 60);
+	}
 }

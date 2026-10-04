@@ -35,6 +35,7 @@ public partial class ShadowMan : Node3D
 
 	public override void _Ready()
 	{
+		ProjectDS.Entities.CreatureRim.Apply(this);
 		PhotoSubject.Attach(this, "shadowman", new Vector3(0, 1.6f, 0), 1f, 45f, 12f, true, new Vector3(0, 1.0f, 0));
 		_ink = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ink_shadow.gdshader") };
 		_ink.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
@@ -259,6 +260,38 @@ public partial class ShadowMan : Node3D
 		}
 		_headTilt = _headTilt.Lerp(_headTarget, Mathf.Min(1f, dt * 14f));
 		if (_head != null) _head.Rotation = _headTilt;
+	}
+
+	private GpuParticles3D[] _drips;
+	private StandardMaterial3D _dripMat;
+
+	/// <summary>His eyes' light (white, as he is; the melting red-light turn changes it, slowly).</summary>
+	public void EyeColor(Color c) => _eyeMat.Emission = c;
+
+	/// <summary>His eyes running: a slow drip of their own light down his face (the melting red-light turn).</summary>
+	public void EyeDrips(bool on, Color c)
+	{
+		if (_drips == null)
+		{
+			if (!on) return;
+			_dripMat = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoColor = c };
+			_drips = new GpuParticles3D[2];
+			int i = 0;
+			foreach (float sx in new[] { -1f, 1f })
+			{
+				var g = new GpuParticles3D
+				{
+					Name = "EyeDrip", Amount = 10, Lifetime = 1.4f, Position = new Vector3(sx * 0.03f, 0.11f, -0.125f), LocalCoords = false,
+					ProcessMaterial = new ParticleProcessMaterial { Gravity = new Vector3(0, -0.12f, 0), InitialVelocityMin = 0f, InitialVelocityMax = 0.01f, ScaleMin = 0.6f, ScaleMax = 1f },
+					DrawPass1 = new QuadMesh { Size = new Vector2(0.006f, 0.014f), Material = _dripMat },
+					CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+				};
+				_head.AddChild(g);
+				_drips[i++] = g;
+			}
+		}
+		_dripMat.AlbedoColor = c;
+		foreach (var g in _drips) g.Emitting = on;
 	}
 
 	/// <summary>Puts him at <paramref name="at"/> (feet), facing <paramref name="toward"/>.</summary>

@@ -255,7 +255,15 @@ public static class BuildingTextures
 	public static StandardMaterial3D LogMat => Std("b_log", Log());
 	public static StandardMaterial3D LogEndMat => Std("b_logend", LogEnd());
 	public static StandardMaterial3D ShingleMat => Std("b_shingle", Shingles(), 0.85f, 0.3f);
-	public static StandardMaterial3D StoneMat => Std("b_stone", Stone(), 0.95f, 0.2f);
+	public static StandardMaterial3D StoneMat => _stoneDamp ??= DampStone();
+	private static StandardMaterial3D _stoneDamp;
+	/// <summary>(the Hollow's stone, the stairs' above all: damp in patches)</summary>
+	private static StandardMaterial3D DampStone()
+	{
+		var m = Std("b_stone", Stone(), 0.95f, 0.2f);
+		ProcTextures.Damp(m, 0.95f);
+		return m;
+	}
 	public static StandardMaterial3D BoardsMat => Std("b_boards", Boards());
 	public static StandardMaterial3D FloorMat => Std("b_floor", Floor(), 0.8f, 0.3f);
 	public static StandardMaterial3D FreshPlankMat => Std("b_fresh", FreshPlank(), 0.9f, 0.25f);

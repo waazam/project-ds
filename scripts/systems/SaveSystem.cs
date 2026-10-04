@@ -62,6 +62,10 @@ public enum Checkpoint
 	Act23Frozen = 29,
 	/// <summary>Act 23's end: the front door, the wendigo off the balcony and out through it; at the splintered doorway.</summary>
 	Act23Finished = 30,
+	/// <summary>The end of the story: the last act done, the credits rolled (GameEnding). Continue puts them back where it
+	/// ended, free to look round. Held far above the acts' own numbers, so the acts still to come number in before it
+	/// and every "at least this far" test stays in story order.</summary>
+	GameFinished = 1000,
 }
 
 public class SaveData

@@ -43,7 +43,7 @@ public partial class Church
 	}
 
 	private static StandardMaterial3D _wax;
-	private static StandardMaterial3D Wax => _wax ??= new StandardMaterial3D { AlbedoColor = new Color(0.88f, 0.84f, 0.74f), Roughness = 0.6f };
+	private static StandardMaterial3D Wax => _wax ??= WaxMaterial.Make(new Color(0.88f, 0.84f, 0.74f), 0.6f, "church_wax");
 
 	/// <summary>A candle standing at <paramref name="at"/> (its foot), lit.</summary>
 	private void Candle(MeshKit wax, Vector3 at, float h, float r)

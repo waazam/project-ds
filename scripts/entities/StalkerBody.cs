@@ -86,6 +86,8 @@ public partial class StalkerBody : Node3D
 	public override void _Ready()
 	{
 		if (!LoadModel()) Build();
+		// (its cold rim is its skin's own, rim_term, so it fades with it: an overlay would have shown it while unseen)
+		if (Size > 3f) Skin?.SetShaderParameter("rim_far", 180f);
 		_idleRng.Randomize();
 		_t = _idleRng.RandfRange(0f, 100f);
 		ApplyPose();

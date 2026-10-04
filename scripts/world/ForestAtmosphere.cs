@@ -104,6 +104,15 @@ public partial class ForestAtmosphere : Node
 	public float? Act1FogOverride { get; set; }
 	private float _act1, _act1Target;
 	private bool _act1On, _act1Applied;
+	/// <summary>Past the fallen fir the fog keeps thickening the nearer the staircase (the owner, 2026-10-04: "more dense the
+	/// closer you get to the staircase, it needs like a 35% increase"): denser by this share at the stairs' foot, from
+	/// <see cref="StairsFogFrom"/> metres out (the way's end, <see cref="FriendTrail"/>).</summary>
+	[Export] public float StairsFogExtra = 0.35f, StairsFogFrom = 60f, StairsFogFull = 6f;
+	private float _stairs, _stairsTarget;
+	private FriendTrail _way;
+	private bool _waySearched;
+	/// <summary>0..1 how near the staircase the Act 1 fog has thickened (tests).</summary>
+	public float Act1StairsFog => _act1On ? _stairs : 0f;
 	private Environment.FogModeEnum _levelFogMode;
 	private float _levelDepthBegin, _levelDepthEnd, _levelDepthCurve;
 
@@ -443,10 +452,19 @@ public partial class ForestAtmosphere : Node
 				float end = _terrain != null && IsInstanceValid(_terrain) ? _terrain.TrailLength : 480f;
 				_act1Target = Mathf.SmoothStep(OpenHoldMeters * 0.5f, Mathf.Max(end - 15f, OpenHoldMeters + 20f), along);
 				if (Act1FogOverride is float f) _act1Target = f;
+				if (!_waySearched) { _waySearched = true; _way = GetTree().CurrentScene?.FindChild("FriendTrail", true, false) as FriendTrail; }
+				_stairsTarget = 0f;
+				if (_way != null && IsInstanceValid(_way) && _way.Length > 1f && Act1FogOverride == null)
+				{
+					var foot = _way.At(_way.Length, out _);
+					float d = new Vector2(cam.GlobalPosition.X, cam.GlobalPosition.Z).DistanceTo(foot);
+					_stairsTarget = 1f - Mathf.SmoothStep(StairsFogFull, StairsFogFrom, d);
+				}
 			}
 		}
 		_open = Mathf.Lerp(_open, _openTarget, 1f - Mathf.Exp(-dt / Mathf.Max(OpenSmoothing, 0.01f)));
 		_act1 = Mathf.Lerp(_act1, _act1Target, 1f - Mathf.Exp(-dt / 1.5f));
+		_stairs = Mathf.Lerp(_stairs, _stairsTarget, 1f - Mathf.Exp(-dt / 1.5f));
 	}
 
 	/// <summary>Act 1's walk in (before the first climb), in the woods' own mood, no storm, not underground.</summary>
@@ -606,7 +624,23 @@ public partial class ForestAtmosphere : Node
 		Color hue = Lum(fog) > 0.001f ? fog * (0.6f / Mathf.Max(Lum(fog), 0.001f)) : new Color(0.6f, 0.6f, 0.6f);
 		_env.VolumetricFogAlbedo = new Color(0.6f, 0.6f, 0.6f).Lerp(hue.Clamp(), 0.35f);
 		if (_sun != null) _sun.LightVolumetricFogEnergy = SunInFog;
+		// the banks drifting through it: outdoors only, thicker as Act 1's fog closes in and by the stairs, thinner in the
+		// winter woods' colder, drier air
+		if (DriftingFog)
+		{
+			if (_banks == null) { _banks = new FogBanks { Name = "FogBanks" }; AddChild(_banks); }
+			float act1 = _act1On ? Mathf.Clamp(_act1, 0f, 1f) * (1f + 0.35f * _stairs) : 0f;
+			float s = (1f - under) * (1f - inside) * (1f - lodge) * (1f - 0.4f * winter) * (0.7f + 0.6f * act1);
+			_banks.Follow(GetViewport().GetCamera3D(), s);
+			_banks.Tint(_env.VolumetricFogAlbedo);
+		}
 	}
+
+	/// <summary>Fog banks drifting through the volumetric fog outdoors (FogBanks).</summary>
+	[Export] public bool DriftingFog = true;
+	private FogBanks _banks;
+	/// <summary>For tests: the fog banks drifting here now.</summary>
+	public bool FogBanksOn => _banks != null && _banks.Visible;
 
 	/// <summary>Storm, wetness, ambient floor and lightning, layered over the base every frame.</summary>
 	private void ApplyLayers()
@@ -703,8 +737,10 @@ public partial class ForestAtmosphere : Node
 			{
 				float f = Mathf.Clamp(_act1, 0f, 1f);
 				float e = f * f * (3f - 2f * f);
-				_env.FogDepthBegin = Mathf.Lerp(Act1FarBegin, Act1NearBegin, e);
-				_env.FogDepthEnd = Mathf.Lerp(Act1FarEnd, Act1NearEnd, Mathf.Sqrt(e));
+				// (nearing the stairs: the same fog, its distances drawn in by the extra density)
+				float k = 1f + StairsFogExtra * Mathf.Clamp(_stairs, 0f, 1f) * e;
+				_env.FogDepthBegin = Mathf.Lerp(Act1FarBegin, Act1NearBegin, e) / k;
+				_env.FogDepthEnd = Mathf.Lerp(Act1FarEnd, Act1NearEnd, Mathf.Sqrt(e)) / k;
 				_env.FogDepthCurve = Mathf.Lerp(1.4f, 0.75f, e);
 				_env.FogDensity = Mathf.Lerp(0.35f, 1f, e);
 				_env.FogLightColor = fog.Lerp(Act1FogColor, e);

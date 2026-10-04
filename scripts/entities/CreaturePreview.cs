@@ -890,6 +890,12 @@ public partial class CreaturePreview : Node3D
 		await Shot("lodge_bar_counter", new Vector3(-15f, 1.6f, 6.8f), new Vector3(-19.4f, 1f, 2.5f));
 		await Shot("lodge_service_corridor", new Vector3(-31f, 1.6f, -0.7f), new Vector3(-22f, 1.4f, -0.7f));
 		await Shot("lodge_pantry", new Vector3(-9.3f, 1.6f, -6.4f), new Vector3(-22f, 1.2f, -6.4f));
+		// close up: the pantry's stock, the stair runner (mirrored halves), a door's casing, the dining doors' pair
+		await Shot("lodge_pantry_shelf", new Vector3(-14f, 1.7f, -6.1f), new Vector3(-14.6f, 1.4f, -7.5f));
+		await Shot("lodge_pantry_floor", new Vector3(-12f, 1.2f, -6.0f), new Vector3(-13.5f, 0.3f, -7.4f));
+		await Shot("lodge_stair_runner", new Vector3(4.6f, 2.0f, -9.07f), new Vector3(0.5f, 2.2f, -9.07f));
+		await Shot("lodge_door_casing", new Vector3(-14.2f + 0.5f, 5.9f, -0.2f), new Vector3(-14.2f + 0.5f, 6.4f, 1f));
+		await Shot("lodge_dining_doors", new Vector3(5.5f, 1.7f, 2.5f), new Vector3(9.5f, 2.2f, 4.1f));
 		await Shot("lodge_corridor", new Vector3(-12.2f, 5.9f, 0f), new Vector3(-28f, 5.5f, 0f));
 		// the doorway from the gallery into the corridor, looking into its corners (the gaps the owner found)
 		await Shot("lodge_corridor_door_n", new Vector3(-10.6f, 5.9f, -0.6f), new Vector3(-12.8f, 5.6f, 1.6f));

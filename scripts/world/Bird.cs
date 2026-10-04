@@ -38,6 +38,8 @@ public partial class Bird : Node3D
 
 	private Node3D _model;
 	private Node3D _head;
+	private MeshInstance3D _folded;
+	private Node3D _wingL, _wingR;
 	private readonly RandomNumberGenerator _rng = new();
 	private float _headYaw, _headYawTarget, _headTilt, _headTiltTarget;
 	private float _bodyYaw, _bodyYawTarget;
@@ -156,14 +158,38 @@ public partial class Bird : Node3D
 		ItemMeshes.Loft(k, rings, 8, true, false, Vector3.Right, 30f, null,
 			(r, a) => a < 0 ? pal.Tail : Mathf.Sin(a) > 0.35f ? pal.Belly : pal.Body);
 
-		// Folded wings: tips reach past the rump over the tail.
-		k.Color = pal.Wing;
+		// Folded wings: tips reach past the rump over the tail (their own mesh: in flight they open, and between wingbeats
+		// fold shut again).
+		var fw = new MeshKit();
+		fw.Mat(mat);
+		fw.Color = pal.Wing;
 		foreach (float s in new[] { -1f, 1f })
 		{
 			Vector3 sh = new(s * 0.031f, 0.101f, 0.03f), lo = new(s * 0.037f, 0.074f, 0.012f);
 			Vector3 tip = new(s * 0.017f, 0.079f, -0.078f), up = new(s * 0.024f, 0.107f, -0.012f);
 			Vector3 n = new Vector3(s, 0.35f, 0).Normalized();
-			k.Card(sh, lo, tip, up, n, new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
+			fw.Card(sh, lo, tip, up, n, new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
+		}
+		_folded = fw.CommitTo(_model, "FoldedWings", false);
+		TriangleCount += ItemMeshes.CountTriangles(_folded.Mesh);
+		// Open wings, for flight: the arm out to the wrist, the long primaries past it swept back a little; each on its
+		// shoulder's pivot, beating about the body's long axis. Hidden until it flies.
+		foreach (float s in new[] { -1f, 1f })
+		{
+			var pivot = new Node3D { Name = s < 0 ? "WingR" : "WingL", Position = new Vector3(s * 0.028f, 0.1f, 0.02f), Visible = false };
+			_model.AddChild(pivot);
+			var w = new MeshKit();
+			w.Mat(mat);
+			w.Color = pal.Wing;
+			Vector3 rl = new(0, 0, 0.012f), rt = new(0, 0, -0.032f);
+			Vector3 wl = new(s * 0.07f, 0.004f, 0.008f), wt = new(s * 0.066f, 0f, -0.046f);
+			Vector3 tip = new(s * 0.135f, 0.002f, -0.026f), pt = new(s * 0.112f, -0.002f, -0.064f);
+			w.Card(rl, wl, wt, rt, Vector3.Up, new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 1), new Vector2(0, 1));
+			w.Color = pal.Wing.Darkened(0.25f);   // (the flight feathers a shade darker)
+			w.Card(wl, tip, pt, wt, Vector3.Up, new Vector2(0.5f, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0.5f, 1));
+			var wm = w.CommitTo(pivot, "WingMesh", false);
+			TriangleCount += ItemMeshes.CountTriangles(wm.Mesh);
+			if (s < 0) _wingR = pivot; else _wingL = pivot;
 		}
 		// Long tail, a shallow V.
 		k.Color = pal.Tail;
@@ -306,8 +332,10 @@ public partial class Bird : Node3D
 
 	public override void _Process(double delta)
 	{
-		if (Engine.IsEditorHint() || Photographed || _model == null || !IsInstanceValid(_model)) return;
+		if (Engine.IsEditorHint() || _model == null || !IsInstanceValid(_model)) return;
 		float dt = (float)delta;
+		if (Flying) { Fly(dt); return; }
+		if (Photographed) return;
 
 		_headTimer -= dt;
 		if (_headTimer <= 0f)
@@ -399,9 +427,118 @@ public partial class Bird : Node3D
 		}
 		else
 		{
-			tween.TweenProperty(model, "position", model.Position + Vector3.Back * 2.2f + Vector3.Up * 1.6f, 0.55f)
-				.SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+			tween.Kill();
+			TakeOff();
+			return;
 		}
 		tween.TweenCallback(Callable.From(() => { if (IsInstanceValid(model)) model.QueueFree(); }));
+	}
+
+	// ───────────────────────────── flight ─────────────────────────────
+
+	/// <summary>In the air (after its picture), until it's away behind the trees; then it's gone.</summary>
+	public bool Flying { get; private set; }
+	/// <summary>For tests: how far from the eye it was when it went, and whether it was out of sight then.</summary>
+	public float GoneAtDistance { get; private set; } = -1f;
+	public bool GoneBehind { get; private set; }
+
+	private Vector3 _vel, _away;
+	private float _flyT, _flapPhase, _burst, _weave, _checkT, _cruiseY;
+	private bool _gliding;
+	private ForestTerrain _terrain;
+
+	/// <summary>
+	/// Off, the way small birds go (the owner: "better flight animations ... disappear by flying away further behind the
+	/// trees out of view, right now they just disappear in the air"): a spring up and away from whoever is there with a
+	/// flurry of wingbeats; then out through the trees in bounding flight (a burst of beats, rising; a moment with the wings
+	/// shut, dropping), weaving a little, climbing to treetop height; gone only once it is far off and behind a trunk (or
+	/// out of view, or lost in the fog), never in plain sight close by.
+	/// </summary>
+	private void TakeOff()
+	{
+		Flying = true;
+		_terrain = GroundSnap.FindTerrain(this);
+		var from = _model.GlobalPosition;
+		var player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+		var away = player != null ? (from - player.GlobalPosition) with { Y = 0 } : Vector3.Zero;
+		if (away.LengthSquared() < 0.01f) away = new Vector3(_rng.RandfRange(-1f, 1f), 0, _rng.RandfRange(-1f, 1f));
+		_away = away.Normalized().Rotated(Vector3.Up, _rng.RandfRange(-0.7f, 0.7f));
+		_vel = _away * 2.2f + Vector3.Up * 3.2f;
+		_weave = _rng.RandfRange(0f, 6.28f);
+		float ground = _terrain?.HeightAt(from.X, from.Z) ?? from.Y;
+		_cruiseY = ground + _rng.RandfRange(7f, 11f);
+		_burst = 0.9f;   // (the first burst long: it has to get up)
+		_model.TopLevel = true;   // (it keeps where it is, and leaves its perch)
+		_model.GlobalPosition = from;
+		_head.Rotation = Vector3.Zero;
+		_folded.Visible = false;
+		_wingL.Visible = _wingR.Visible = true;
+		string fl = $"res://assets/audio/sfx/wing_flutter_0{_rng.RandiRange(1, 3)}.wav";
+		if (ResourceLoader.Exists(fl))
+		{
+			var a = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(fl), Bus = "Birds", UnitSize = 3f, MaxDistance = 40f, VolumeDb = -4f, PitchScale = _rng.RandfRange(0.92f, 1.1f) };
+			AddChild(a);
+			a.GlobalPosition = from;
+			a.Finished += a.QueueFree;
+			a.Play();
+		}
+	}
+
+	private void Fly(float dt)
+	{
+		_flyT += dt;
+		var pos = _model.GlobalPosition;
+		// bounding: a burst of beats (rising), then the wings shut a moment (falling); flapping hard all the way at first
+		_burst -= dt;
+		if (_burst <= 0f)
+		{
+			_gliding = !_gliding && _flyT > 1.2f;
+			_burst = _gliding ? _rng.RandfRange(0.14f, 0.26f) : _rng.RandfRange(0.3f, 0.5f);
+		}
+		float speed = Mathf.Lerp(3.5f, 9f, Mathf.Clamp(_flyT / 1.4f, 0f, 1f));
+		// weaving a little as it goes; climbing to its height, then bounding along it
+		_weave += dt * 1.3f;
+		var dir = _away.Rotated(Vector3.Up, Mathf.Sin(_weave) * 0.35f);
+		float climb = _flyT < 1f ? 3.4f : Mathf.Clamp((_cruiseY - pos.Y) * 0.8f, -1.5f, 2.5f) + (_gliding ? -1.6f : 1.0f);
+		var want = dir * speed + Vector3.Up * climb;
+		_vel = _vel.Lerp(want, 1f - Mathf.Exp(-3.5f * dt));
+		pos += _vel * dt;
+		if (_terrain != null) pos.Y = Mathf.Max(pos.Y, _terrain.HeightAt(pos.X, pos.Z) + 1.2f);
+		// facing along its way (the beak is +Z), its nose following the climb
+		var fwd = _vel.LengthSquared() > 0.01f ? _vel.Normalized() : _away;
+		var basis = Basis.LookingAt(-fwd, Vector3.Up).Scaled(Vector3.One * ModelScale);
+		_model.GlobalTransform = new Transform3D(basis, pos);
+		// the wings: beating fast (faster getting up), or shut tight along the body
+		_folded.Visible = _gliding;
+		_wingL.Visible = _wingR.Visible = !_gliding;
+		if (!_gliding)
+		{
+			_flapPhase += dt * Mathf.Tau * (_flyT < 1f ? 17f : 13f);
+			float up = 0.25f + 0.95f * Mathf.Sin(_flapPhase);   // (up past level, and down below it)
+			_wingL.Rotation = new Vector3(0, 0, up);
+			_wingR.Rotation = new Vector3(0, 0, -up);
+		}
+		// gone: only far off and out of sight behind something (or out of view, or lost in the fog, or long since away)
+		_checkT -= dt;
+		if (_checkT > 0f) return;
+		_checkT = 0.15f;
+		var cam = GetViewport()?.GetCamera3D();
+		if (cam == null) return;
+		float d = cam.GlobalPosition.DistanceTo(pos);
+		bool behind = false;
+		if (d > 22f)
+		{
+			var q = PhysicsRayQueryParameters3D.Create(cam.GlobalPosition, pos, 1);
+			behind = GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
+		}
+		bool unseen = !cam.IsPositionInFrustum(pos);
+		if ((d > 22f && (behind || unseen)) || d > 55f || _flyT > 16f)
+		{
+			GoneAtDistance = d;
+			GoneBehind = behind || unseen;
+			Flying = false;
+			_model.QueueFree();
+			_model = null;
+		}
 	}
 }

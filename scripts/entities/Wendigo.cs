@@ -52,7 +52,9 @@ public partial class Wendigo : Node3D
 	private Vector3 _headRest = new(0.1f, 0f, 0.25f);
 	private float _leapT = -1f, _leapDur, _speakUntil = -1f;
 	private const float Crouch = 0.07f;
-	private string _leapClip = "air";
+	private string _leapClip = "air", _landClip;
+	private float _arc = 1.2f, _landSeconds = 1f;
+	private bool _ballistic;
 	private Vector3 _leapFrom, _leapTo;
 	private System.Action _landed;
 	private bool _stayOnLanding;
@@ -67,6 +69,7 @@ public partial class Wendigo : Node3D
 
 	public override void _Ready()
 	{
+		CreatureRim.Apply(this);
 		_body = new Node3D { Name = "Body" };
 		AddChild(_body);
 		_model = GD.Load<PackedScene>("res://assets/models/wendigo/wendigo.glb").Instantiate<Node3D>();
@@ -130,9 +133,8 @@ public partial class Wendigo : Node3D
 					}
 					else if (name.StartsWith("w_skin"))
 					{
-						m.RimEnabled = true;
-						m.Rim = 0.25f;
-						m.RimTint = 0.5f;
+						// its hide: hard light, hoarfrost, frostbite (wendigo_skin.gdshader; the owner: the bosses should look imposing)
+						mi.SetSurfaceOverrideMaterial(s, SkinMaterial(m));
 					}
 					else if (name.StartsWith("w_eye"))
 					{
@@ -145,12 +147,39 @@ public partial class Wendigo : Node3D
 						m.EmissionEnabled = true;
 						m.Emission = new Color(0.35f, 0.62f, 1f);
 						m.EmissionEnergyMultiplier = 0.6f;
+						_heart = m;
 					}
 				}
 				mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
 			}
 			Tune(c);
 		}
+	}
+
+	private static ShaderMaterial _skinMat;
+	private static StandardMaterial3D _heart;
+	private static NoiseTexture2D _skinNoise;
+
+	/// <summary>The hide's shader, over the baked maps of the imported skin material (one for every wendigo).</summary>
+	private static ShaderMaterial SkinMaterial(StandardMaterial3D baked)
+	{
+		if (_skinMat != null) return _skinMat;
+		_skinNoise ??= new NoiseTexture2D { Width = 256, Height = 256, Seamless = true, Noise = new FastNoiseLite { Frequency = 0.02f, FractalOctaves = 4, Seed = 7337 } };
+		_skinMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/wendigo_skin.gdshader"), ResourceName = "wendigo_skin" };
+		_skinMat.SetShaderParameter("albedo_tex", baked.AlbedoTexture);
+		_skinMat.SetShaderParameter("normal_tex", baked.NormalTexture);
+		_skinMat.SetShaderParameter("noise_tex", _skinNoise);
+		_skinMat.SetShaderParameter("roughness", baked.Roughness);
+		return _skinMat;
+	}
+
+	/// <summary>The heart of ice beating, slow and faint: a long swell and a fade, once every three seconds or so.</summary>
+	private void PulseHeart()
+	{
+		if (_heart == null) return;
+		float t = (float)_time;
+		float beat = Mathf.Pow(Mathf.Max(0f, Mathf.Sin(t * Mathf.Tau / 3.2f)), 3f);
+		_heart.EmissionEnergyMultiplier = 0.45f + 0.35f * beat;
 	}
 
 	private void BuildBreath()
@@ -220,33 +249,46 @@ public partial class Wendigo : Node3D
 
 	/// <summary>Holds a pose: <paramref name="clip"/> stopped at <paramref name="at"/> (0..1) of its length (crouched low
 	/// on a wall's top, clinging to a trunk mid-climb). The head's twitch goes on over it.</summary>
-	public void Hold(string clip, float at)
+	public void Hold(string clip, float at, double blend = 0.0)
 	{
 		if (_anim == null || _headOnly || !_anim.HasAnimation(clip)) return;
-		_anim.Play(clip, 0.0, 0f);
+		_leapT = -1f;
+		_anim.Play(clip, blend, 0f);
 		_anim.Seek(_anim.GetAnimation(clip).Length * Mathf.Clamp(at, 0f, 1f), true);
 	}
 
 	/// <summary>Up into the trees (or down at its prey): a crouch of a few hundredths of a second, the legs folding to
 	/// spring; then gone along an arc to <paramref name="perch"/> in <paramref name="seconds"/>, the legs tucking under
 	/// it and the arms reaching (or, leaping down, flung flat at it, arms and claws thrown forward). <paramref name="landed"/>
-	/// runs when it's there (the snow falls, it vanishes).</summary>
-	public void Leap(Vector3 perch, float seconds, System.Action landed, bool stay = false)
+	/// runs when it's there (the snow falls, it vanishes). <paramref name="ballistic"/>: a true throw (steady across, a
+	/// parabola of <paramref name="arc"/> metres over the straight line: off a height it falls, faster and faster), and
+	/// staying, it lands in <paramref name="landClip"/> (else rising straight into its idle).</summary>
+	public void Leap(Vector3 perch, float seconds, System.Action landed, bool stay = false, float arc = 1.2f, bool ballistic = false, string landClip = null, float landSeconds = 1f)
 	{
 		Leaps++;
 		_stayOnLanding = stay;
+		_arc = arc;
+		_ballistic = ballistic;
+		_landClip = landClip;
+		_landSeconds = landSeconds;
 		_leapFrom = GlobalPosition;
 		_leapTo = perch;
 		_leapDur = seconds;
 		_leapT = 0f;
 		_landed = landed;
 		_leapClip = perch.Y < GlobalPosition.Y - 1f ? "pounce" : "air";
-		Play("crouch", Crouch, 0.03);
+		PlayClip("crouch", Crouch, 0.03);
 		AudioDirector.OneShot(this, "wendigo_leap", 3, GlobalPosition + Vector3.Up * 2f, -3f, "Events", 7f, 0.05f);
 	}
 
-	/// <summary>Plays an animation stretched to last <paramref name="seconds"/>.</summary>
-	private void Play(string name, float seconds, double blend)
+	/// <summary>Plays an animation stretched to last <paramref name="seconds"/> (it stops on its last frame, but the idle).</summary>
+	public void Play(string name, float seconds, double blend)
+	{
+		_leapT = -1f;
+		PlayClip(name, seconds, blend);
+	}
+
+	private void PlayClip(string name, float seconds, double blend)
 	{
 		if (_anim == null || _headOnly || !_anim.HasAnimation(name)) return;
 		float len = (float)_anim.GetAnimation(name).Length;
@@ -263,22 +305,29 @@ public partial class Wendigo : Node3D
 			bool wasCrouching = _leapT < Crouch;
 			_leapT += dt;
 			if (_leapT < Crouch) { Animate(dt); return; }
-			if (wasCrouching) Play(_leapClip, _leapDur, 0.03);
+			if (wasCrouching) PlayClip(_leapClip, _leapDur, 0.03);
 			float u = Mathf.Clamp((_leapT - Crouch) / _leapDur, 0f, 1f);
-			float e = 1f - Mathf.Pow(1f - u, 2.2f);
-			GlobalPosition = _leapFrom.Lerp(_leapTo, e) + Vector3.Up * Mathf.Sin(u * Mathf.Pi) * 1.2f;
+			GlobalPosition = _ballistic
+				? _leapFrom.Lerp(_leapTo, u) + Vector3.Up * (4f * u * (1f - u) * _arc)
+				: _leapFrom.Lerp(_leapTo, 1f - Mathf.Pow(1f - u, 2.2f)) + Vector3.Up * Mathf.Sin(u * Mathf.Pi) * _arc;
 			Animate(dt);
 			if (u >= 1f)
 			{
 				_leapT = -1f;
 				// (dropped down onto the road: it stays, landed in a crouch and rising out of it; up into the trees: gone)
-				if (_stayOnLanding) { GlobalPosition = _leapTo; if (_anim != null && !_headOnly) _anim.Play("idle", 0.6); }
+				if (_stayOnLanding)
+				{
+					GlobalPosition = _leapTo;
+					if (_landClip != null) PlayClip(_landClip, _landSeconds, 0.05);
+					else if (_anim != null && !_headOnly) _anim.Play("idle", 0.6);
+				}
 				else Visible = false;
 				var cb = _landed; _landed = null;
 				cb?.Invoke();
 			}
 			return;
 		}
+		PulseHeart();
 		// standing: breathing (the idle), the head hanging to one side and now and then snapping to a new angle
 		if (_time >= _twitchAt)
 		{

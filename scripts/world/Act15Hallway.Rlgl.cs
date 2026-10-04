@@ -71,8 +71,9 @@ public partial class Act15Hallway
 				break;
 			case Phase.Red:
 				_redT += dt;
-				// he closes in, a jump at a time, until he is at their back
-				if (_step < ApproachAt.Length && _redT >= ApproachAt[_step] * _timer) { StepCloser(player); _step++; }
+				// he closes in, a jump at a time, until he is at their back (in front of them: one of the turns, Variants)
+				if (_turnActive) UpdateTurn(player, dt);
+				else if (_step < ApproachAt.Length && _redT >= ApproachAt[_step] * _timer) { StepCloser(player); _step++; }
 				// moving means the keys (WASD), a jump, or still sliding: looking round with the mouse is fine
 				bool moving = new Vector2(player.Velocity.X, player.Velocity.Z).Length() > MoveThreshold || !player.IsOnFloor()
 					|| player.PlayerInput.Move.LengthSquared() > 0.04f;
@@ -99,7 +100,8 @@ public partial class Act15Hallway
 		_redBack = new Vector3(Mathf.Sin(yaw), 0, Mathf.Cos(yaw));   // the camera looks along -Z of its yaw: behind is +Z
 		_inFront = InFrontZone(PlayerZ);
 		_step = 0;
-		StepCloser(player);
+		if (_inFront) BeginTurn(player);
+		else { ResetPose(); StepCloser(player); }
 		_step = 1;
 		_shadow.Glare = 0.35f;
 		if (_inFront) FrontReds++;
@@ -149,6 +151,7 @@ public partial class Act15Hallway
 
 	private void GoGreen(PlayerController player)
 	{
+		if (_turnActive) { EndTurn(player); _turnActive = false; }
 		State = Phase.Green;
 		_firstRed = false;
 		_timer = _rng.RandfRange(GreenSeconds.X, GreenSeconds.Y);

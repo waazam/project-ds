@@ -347,8 +347,13 @@ public partial class SkiLodge
 			k.Color = Colors.White;
 			k.Box(new Vector3((xa + xb) * 0.5f, y - rise * 0.5f, (z0 + z1) * 0.5f), new Vector3(xa - xb, rise, z1 - z0), 1f);
 			k.Mat(LodgeTextures.CorridorCarpetMat);
-			k.Quad(new Vector3(xa, y + 0.004f, z1 - 0.35f), new Vector3(xb, y + 0.004f, z1 - 0.35f), new Vector3(xb, y + 0.004f, z0 + 0.35f), new Vector3(xa, y + 0.004f, z0 + 0.35f), Vector3.Up,
-				new Vector2(0, 0), new Vector2(0.4f, 0), new Vector2(0.4f, 1), new Vector2(0, 1));
+			// (in two halves, the far one mirrored: the pattern's two rows of arches across the runner put a black ground
+			// line down its middle and only one at an edge; the owner: flip the one side so both lines run down the outsides)
+			float zm = (z1 - 0.35f + z0 + 0.35f) * 0.5f;
+			k.Quad(new Vector3(xa, y + 0.004f, z1 - 0.35f), new Vector3(xb, y + 0.004f, z1 - 0.35f), new Vector3(xb, y + 0.004f, zm), new Vector3(xa, y + 0.004f, zm), Vector3.Up,
+				new Vector2(0, 0), new Vector2(0.4f, 0), new Vector2(0.4f, 0.5f), new Vector2(0, 0.5f));
+			k.Quad(new Vector3(xa, y + 0.004f, zm), new Vector3(xb, y + 0.004f, zm), new Vector3(xb, y + 0.004f, z0 + 0.35f), new Vector3(xa, y + 0.004f, z0 + 0.35f), Vector3.Up,
+				new Vector2(0, 0.5f), new Vector2(0.4f, 0.5f), new Vector2(0.4f, 0), new Vector2(0, 0));
 		}
 		// the underside: a sloped soffit, boarded, and the log stringer on the open side
 		k.Mat(LodgeTextures.DarkWoodMat);
@@ -419,7 +424,7 @@ public partial class SkiLodge
 		Vector3 pa = HexVert(3), pb = HexVert(4), palong = (pb - pa).Normalized(), pout = ((pa + pb) * 0.5f).Normalized();
 		PantryDoor = new LodgeDoor
 		{
-			Name = "PantryDoor", Position = pa + palong * 3.3f, Width = 1.1f, Height = 2.25f, Needs = ToolKind.PantryKey, OpenAngle = -1.5f, FrontSign = -1f,
+			Name = "PantryDoor", WallHalf = 0.4f, Position = pa + palong * 3.3f, Width = 1.1f, Height = 2.25f, Needs = ToolKind.PantryKey, OpenAngle = -1.5f, FrontSign = -1f,
 			LockedPrompt = "\"STAFF ONLY - PANTRY\". Locked.",
 		};
 		PantryDoor.Basis = new Basis(palong, Vector3.Up, pout);
@@ -553,6 +558,9 @@ public partial class SkiLodge
 
 	// ------------------------------------------------------------------ the east wing: the dining hall
 
+	private ShaderMaterial _diningShafts;
+	private const float DiningShaftStrength = 0.035f;
+
 	private void BuildDiningShell()
 	{
 		var k = new MeshKit();
@@ -575,6 +583,15 @@ public partial class SkiLodge
 		// the walls: wainscot to 1.3 m, damask-free cream paper above (it's a dining room: pale, grand); both window rows
 		Lining(k, fx, DiningX1, InnerZ, FloorY, RoomTop, LodgeTextures.DarkWoodMat, LodgeTextures.WallpaperMat, 1.3f, false);
 		Lining(k, fx, DiningX1, -InnerZ, FloorY, RoomTop, LodgeTextures.DarkWoodMat, LodgeTextures.WallpaperMat, 1.3f, false);
+		// the noon light through the south row's high windows, slanting down across the tables, the dust in it
+		_diningShafts = WindowShafts.Material(new Color(0.86f, 0.84f, 0.78f), DiningShaftStrength);
+		float wy = StoneTop + (WingWall - StoneTop) * 0.52f;
+		int si = 0;
+		foreach (float wx in WingWindows(1f, false))
+		{
+			if (wx < fx + 0.6f || wx > DiningX1 - 0.6f) continue;
+			WindowShafts.Add(this, _diningShafts, new Vector3(wx, wy, InnerZ - 0.05f), Vector3.Right, Vector3.Up, 1.0f, 1.6f, new Vector3(0.18f, -0.62f, -0.76f), 9f, si++ % 2 == 0 ? 18 : 0);
+		}
 		// the near end: the hall's two east sides, a V pointing into the room; lined as the room is (their outside's stone
 		// and dark boards had shown in here as a black end wall), the lobby's doors through the one
 		foreach (int side in new[] { 0, 1 })
@@ -613,11 +630,11 @@ public partial class SkiLodge
 		// the double doors from the lobby (the dining hall's key)
 		Vector3 da = HexVert(0), db = HexVert(1), dalong = (db - da).Normalized(), dout = ((da + db) * 0.5f).Normalized();
 		var basis = new Basis(dalong, Vector3.Up, dout);
-		DiningDoorL = new LodgeDoor { Name = "DiningDoorL", Width = 1.2f, Height = 2.8f, Needs = ToolKind.DiningKey, OpenAngle = -1.4f, FrontSign = -1f, LockedPrompt = "\"DINING ROOM\". Locked." };
+		DiningDoorL = new LodgeDoor { Name = "DiningDoorL", Paired = true, WallHalf = 0.4f, Width = 1.2f, Height = 2.8f, Needs = ToolKind.DiningKey, OpenAngle = -1.4f, FrontSign = -1f, LockedPrompt = "\"DINING ROOM\". Locked." };
 		DiningDoorL.Position = da + dalong * 5.6f;
 		DiningDoorL.Basis = basis;
 		AddChild(DiningDoorL);
-		DiningDoorR = new LodgeDoor { Name = "DiningDoorR", Width = 1.2f, Height = 2.8f, Needs = ToolKind.DiningKey, OpenAngle = 1.4f, FrontSign = 1f, LockedPrompt = "\"DINING ROOM\". Locked." };
+		DiningDoorR = new LodgeDoor { Name = "DiningDoorR", Paired = true, WallHalf = 0.4f, Width = 1.2f, Height = 2.8f, Needs = ToolKind.DiningKey, OpenAngle = 1.4f, FrontSign = 1f, LockedPrompt = "\"DINING ROOM\". Locked." };
 		DiningDoorR.Position = da + dalong * 8.0f;
 		DiningDoorR.Basis = basis * new Basis(Vector3.Up, Mathf.Pi);
 		AddChild(DiningDoorR);

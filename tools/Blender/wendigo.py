@@ -6,7 +6,7 @@ leaps and lunges; real hands and clawed fingers to grab through the wall).
 
 Writes:
   assets/models/wendigo/wendigo.glb       the whole creature, skinned to a skeleton, with its animations
-                                          (idle, crouch, air, pounce)
+                                          (idle, crouch, air, pounce, land, smash)
   assets/models/wendigo/wendigo_head.glb  the head alone, unrigged (the dining hall's platter, Act 23)
   assets/models/wendigo/wendigo_arm.glb   the arm that comes through the crawlspace's wall (Act 23), skinned to its own
                                           bones: upper, fore, hand, and every joint of every finger
@@ -948,12 +948,15 @@ class Poser:
         return new
 
 
-def body_pose(poser, hip_off=V((0, 0, 0)), bow=0.0, neck_bow=0.0, head_pitch=0.0, leg=None, arm=None, curl=0.3, jaw=0.0):
+def body_pose(poser, hip_off=V((0, 0, 0)), bow=0.0, neck_bow=0.0, head_pitch=0.0, leg=None, arm=None, curl=0.3, jaw=0.0, twist=0.0):
     """A pose from a few settings: the hips' offset and how far it bows; per side, where each foot's ball is and how its
-    foot angles (leg), where each wrist is reaching (arm); how far the fingers curl. The limbs are solved from where the
+    foot angles (leg), where each wrist is reaching (arm: "wrist", or "reach" from where the shoulder really is); how far
+    the fingers curl; the chest's twist (positive: its right shoulder forward). The limbs are solved from where the
     bowed torso really puts the hips and the shoulders."""
     dirs, spins = {}, {}
     rest = poser.info
+    if twist:
+        spins["chest"] = ((rest["chest"][2] - rest["chest"][1]).normalized(), twist)
     for n, a in (("hips", bow * 0.5), ("spine", bow * 0.8), ("chest", bow)):
         h, t = rest[n][1], rest[n][2]
         dirs[n] = (rot_x(a) @ (t - h).to_4d()).to_3d()
@@ -962,7 +965,7 @@ def body_pose(poser, hip_off=V((0, 0, 0)), bow=0.0, neck_bow=0.0, head_pitch=0.0
         dirs[n] = (rot_x(a) @ (t - h).to_4d()).to_3d()
     h, t = rest["jaw"][1], rest["jaw"][2]
     dirs["jaw"] = (rot_x(bow + neck_bow + head_pitch + jaw) @ (t - h).to_4d()).to_3d()
-    torso = poser.solve(hip_off, dirs, {})
+    torso = poser.solve(hip_off, dirs, dict(spins))
     for s, sx in ((1, "R"), (-1, "L")):
         L = leg_joints(s)
         lg = (leg or {}).get(sx, {})
@@ -980,7 +983,7 @@ def body_pose(poser, hip_off=V((0, 0, 0)), bow=0.0, neck_bow=0.0, head_pitch=0.0
         J = arm_joints(s)
         ag = (arm or {}).get(sx, {})
         sh = torso[f"upper_{sx}"][0]
-        wrist = ag.get("wrist", J["wrist"] + hip_off)
+        wrist = ag["wrist"] if "wrist" in ag else sh + ag["reach"] if "reach" in ag else J["wrist"] + hip_off
         l1, l2 = (J["elbow"] - J["shoulder"]).length, (J["wrist"] - J["elbow"]).length
         elbow, wrist = two_bone(sh, wrist, l1, l2, ag.get("pole", V((s * 0.4, -1, 0))))
         dirs[f"upper_{sx}"] = elbow - sh
@@ -1075,6 +1078,48 @@ def animate(arm_obj, bones):
             arms[sx] = dict(wrist=A["shoulder"] + V((s * (0.9 - 0.3 * u), 1.7, -0.2 - 0.4 * u)), curl=0.05 + 0.5 * u, pole=V((s, 0, 1)))
         return (V((0, 0, 0)), dict(bow=0.9, neck_bow=-0.35, head_pitch=-0.3, leg=legs, arm=arms, jaw=0.5))
     action("pounce", [(0, *pounce_pose(0)), (9, *pounce_pose(0.6)), (18, *pounce_pose(1.0))])
+
+    # ---- land: down off a height onto a floor (Act 23's end, off the lodge's balcony): touching down with the legs
+    # reaching and the arms out for the boards; then the weight taken, deep, the hands slammed flat in front of it and
+    # the claws dug in, the head up and on its prey; holding there, breathing
+    def land_pose(u, breathe=0.0):
+        drop = 0.95 * u - 0.08 * breathe
+        legs = {}
+        for sx, L in (("R", Lr), ("L", Ll)):
+            legs[sx] = dict(ball=L["ball"] + V((0, 0.05 * u, 0)), foot=(L["ball"] - L["hock"]).normalized().lerp(V((0, 0.5, -0.86)), u))
+        arms = {}
+        for sx, A, s in (("R", Ar, 1), ("L", Al, -1)):
+            reach = A["shoulder"] + V((s * 0.5, 1.1, -0.6))
+            floor = V((s * 0.8, 1.35, 0.2))
+            arms[sx] = dict(wrist=reach.lerp(floor, u), curl=0.15 + 0.5 * u, pole=V((s * 0.6, -0.3, 0.6)))
+        return (V((0, -0.08 * u, -drop)), dict(bow=hang + 0.6 * u, neck_bow=0.1 - 0.6 * u, head_pitch=-0.15 * u, curl=0.5,
+                leg=legs, arm=arms, jaw=0.15 + 0.2 * u))
+    action("land", [(0, *land_pose(0.0)), (4, *land_pose(1.0)), (10, *land_pose(0.92)), (20, *land_pose(0.95, 1.0)), (30, *land_pose(0.93))])
+
+    # ---- smash: into a door, shoulder first (its right). Drawn back, the right shoulder turned away, the arms cocked;
+    # driven forward, the shoulder and both hands into the wood, the claws spread on it; then the claws dragged down and
+    # apart through the boards, tearing
+    def smash_pose(phase):
+        legs = {}
+        if phase == 0:
+            hip, bw, tw, jw, cl = V((0, -0.25, -0.35)), 0.4, -0.3, 0.2, 0.25
+            reach = {"R": V((0.45, -0.25, 0.75)), "L": V((-0.35, 0.8, 0.35))}
+            feet = {"R": V((0, -0.55, 0)), "L": V((0, 0.45, 0))}
+        elif phase == 1:
+            hip, bw, tw, jw, cl = V((0, 0.4, -0.25)), 0.75, 0.38, 0.55, 0.1
+            reach = {"R": V((0.25, 1.45, -0.5)), "L": V((-0.35, 1.4, -0.25))}
+            feet = {"R": V((0, -0.85, 0.05)), "L": V((0, 0.55, 0))}
+        else:
+            hip, bw, tw, jw, cl = V((0, 0.35, -0.4)), 0.85, 0.12, 0.35, 0.8
+            reach = {"R": V((0.75, 1.0, -1.45)), "L": V((-0.75, 0.95, -1.35))}
+            feet = {"R": V((0, -0.75, 0)), "L": V((0, 0.5, 0))}
+        arms = {}
+        for sx, L in (("R", Lr), ("L", Ll)):
+            legs[sx] = dict(ball=L["ball"] + feet[sx])
+        for sx, s in (("R", 1), ("L", -1)):
+            arms[sx] = dict(reach=reach[sx], curl=cl, pole=V((s * 0.7, -0.2, -0.6)))
+        return (hip, dict(bow=bw, neck_bow=-0.25, head_pitch=-0.25, curl=cl, leg=legs, arm=arms, jaw=jw, twist=tw))
+    action("smash", [(0, *smash_pose(0)), (7, *smash_pose(1)), (11, *smash_pose(1)), (20, *smash_pose(2))])
     # the rest pose for export (and the previews): the idle's first frame
     arm_obj.animation_data.action = actions["idle"]
     sc.frame_set(0)
@@ -1178,10 +1223,10 @@ def build_body():
             hc = hb @ V((0, 0.2, 0))
             cam = (tuple(hc), 1.5, -0.1, 20)
         preview(name, *cam)
-    for act, frame in (("crouch", 8), ("air", 12), ("pounce", 12)):
+    for act, frame in (("crouch", 8), ("air", 12), ("pounce", 12), ("land", 10), ("smash", 0), ("smash", 9), ("smash", 20)):
         arm_obj.animation_data.action = bpy.data.actions[act]
         bpy.context.scene.frame_set(frame)
-        preview(f"wendigo_{act}", (0, 0.3, 2.0), 8.0, 0.3, 70)
+        preview(f"wendigo_{act}" + (f"_{frame}" if act == "smash" else ""), (0, 0.3, 2.0), 8.0, 0.3, 70)
 
 
 # ------------------------------------------------------------------ the arm through the wall

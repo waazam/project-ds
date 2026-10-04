@@ -184,7 +184,7 @@ public partial class SkiLodge
 	private static StandardMaterial3D BottleGlass => _bottleGlass ??= new StandardMaterial3D { ResourceName = "lodge_bottle_glass", AlbedoColor = new Color(0.16f, 0.2f, 0.12f), Roughness = 0.12f, MetallicSpecular = 0.7f, RimEnabled = true, Rim = 0.25f };
 	private static StandardMaterial3D Paper => _paper ??= new StandardMaterial3D { ResourceName = "lodge_paper", AlbedoColor = new Color(0.62f, 0.58f, 0.48f), Roughness = 0.95f };
 	private static StandardMaterial3D Wool => _wool ??= new StandardMaterial3D { ResourceName = "lodge_wool", AlbedoColor = new Color(0.2f, 0.16f, 0.13f), Roughness = 1f, AlbedoTexture = LodgeTextures.LinenMat.AlbedoTexture, Uv1Scale = Vector3.One * 2f };
-	private static StandardMaterial3D Wax => _wax ??= new StandardMaterial3D { ResourceName = "lodge_wax", AlbedoColor = new Color(0.8f, 0.76f, 0.64f), Roughness = 0.5f };
+	private static StandardMaterial3D Wax => _wax ??= WaxMaterial.Make(new Color(0.8f, 0.76f, 0.64f), 0.5f, "lodge_wax");
 
 	/// <summary>The lobby's clutter (the owner, 2026-09-30: more clutter, more environmental detail): logs by the hearth, a
 	/// clock and candlesticks on the mantel, books and magazines and glasses on the low table, a forgotten tumbler and an
@@ -357,7 +357,17 @@ public partial class SkiLodge
 		k.Mat(LodgeTextures.DarkWoodMat);
 		foreach (float y in new[] { 0.9f, 1.45f, 2.0f, 2.55f })
 			k.Box(new Vector3((px0 + px1) * 0.5f - 0.6f, y, -InnerZ + 0.2f), new Vector3(px1 - px0 - 1.2f, 0.03f, 0.35f), 1f);
+		// iron brackets under them
+		k.Mat(LodgeTextures.IronMat);
+		for (float bx = px0 + 0.1f; bx < px1 - 1.2f; bx += 1.1f)
+			foreach (float y in new[] { 0.9f, 1.45f, 2.0f, 2.55f })
+			{
+				k.Box(new Vector3(bx, y - 0.1f, -InnerZ + 0.06f), new Vector3(0.025f, 0.18f, 0.02f), 1f);
+				k.Box(new Vector3(bx, y - 0.025f, -InnerZ + 0.2f), new Vector3(0.025f, 0.02f, 0.3f), 1f);
+				k.Box(new Vector3(bx, y - 0.09f, -InnerZ + 0.14f), new Vector3(0.02f, 0.02f, 0.2f), 1f, new Basis(Vector3.Right, -0.8f));
+			}
 		var rng = new RandomNumberGenerator { Seed = 3131 };
+		if (!StockPantry(k, px0 + 0.15f, px1 - 1.3f, -InnerZ + 0.2f, new[] { 0.915f, 1.465f, 2.015f, 2.565f }))
 		for (float x = px0 + 0.2f; x < px1 - 1.4f; x += rng.RandfRange(0.15f, 0.26f))
 			foreach (float y in new[] { 0.92f, 1.47f, 2.02f, 2.57f })
 			{

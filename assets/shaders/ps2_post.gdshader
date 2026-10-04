@@ -36,6 +36,13 @@ uniform float crt_fringe = 0.67;        // in game pixels: red a touch left, blu
 /// The brightness setting: a gamma on the graded image (1 = as designed; up lifts the shadows and mids, not the
 /// whites, so a dark monitor can see into the dark without the brights glaring).
 uniform float gamma = 1.0;
+/// Local contrast (2026-10-04, the owner: "make everything stand out more"): the fine detail in the brightness (a
+/// texture's grain, a model's creases) drawn out a little before the softness and the dither eat it. Brightness only, so
+/// it never shifts a colour; small, and clamped, so there's no halo round an edge.
+uniform float clarity = 0.55;
+/// The red that matters (blood, the beasts' eyes, the lodge's carpet, a warning sign): kept at its colour and a little
+/// richer while everything else is pulled back toward grey.
+uniform float key_red = 0.6;
 
 const float BAYER[16] = float[16](
 	0.0, 8.0, 2.0, 10.0,
@@ -63,6 +70,9 @@ void fragment() {
 	// the lens goes soft toward the edges (a small tap blur: the screen has no mip levels to borrow)
 	vec3 soft1 = (texture(screen_soft, uv + px * vec2(1.5, 0.5)).rgb + texture(screen_soft, uv + px * vec2(-1.5, -0.5)).rgb
 		+ texture(screen_soft, uv + px * vec2(-0.5, 1.5)).rgb + texture(screen_soft, uv + px * vec2(0.5, -1.5)).rgb) * 0.25;
+	// local contrast: the detail (this pixel against the small blur round it) drawn out, before the edges go soft
+	float detail = dot(c - soft1, vec3(0.299, 0.587, 0.114));
+	c += vec3(clamp(detail * clarity, -0.06, 0.06)) * (1.0 - clamp(edge * 0.8, 0.0, 0.8));
 	c = mix(c, soft1, clamp(edge * edge_soft, 0.0, 0.6));
 
 	// halation: the brights, blurred wide (a ring of taps), bleed back over the image (warm)
@@ -78,7 +88,8 @@ void fragment() {
 
 	// grade: pull saturation, add contrast, split-tone, and lift blacks toward a cool blue-violet
 	float luma = dot(c, vec3(0.299, 0.587, 0.114));
-	c = mix(vec3(luma), c, saturation);
+	float redness = clamp((c.r - max(c.g, c.b)) * 4.0, 0.0, 1.0) * smoothstep(0.03, 0.12, c.r);
+	c = mix(vec3(luma), c, mix(saturation, max(saturation, 1.08), redness * key_red));
 	c = (c - 0.5) * contrast + 0.5;
 	c *= mix(shadow_tone, highlight_tone, smoothstep(0.1, 0.7, luma));
 	c = max(c, vec3(0.0)) + shadow_tint * (1.0 - luma);

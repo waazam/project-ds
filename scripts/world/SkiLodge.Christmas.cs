@@ -39,18 +39,20 @@ public partial class SkiLodge
 	private static StandardMaterial3D Matte(string name, Color c, float rough = 0.85f) => new() { ResourceName = name, AlbedoColor = c, Roughness = rough };
 
 	/// <summary>The Christmas pieces' roles (the baubles and tinsel brightened 2026-10-03: in the hall's low light they read
-	/// black): dried needles (the forest firs' spray photo, alpha-cut, faded to olive),
+	/// black): the needles (the forest firs' spray photo, alpha-cut, a deep fir green),
 	/// old glass, faded papers, a steady warm glow for the few bulbs still alight.</summary>
 	private static Dictionary<string, Material> Xmas => _xmas ??= new Dictionary<string, Material>
 	{
 		["needles"] = new StandardMaterial3D
 		{
 			ResourceName = "xmas_needles", AlbedoTexture = GD.Load<Texture2D>("res://assets/textures/winter/fir_bough.png"),
-			AlbedoColor = new Color(1.45f, 1.3f, 0.85f), Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 0.4f,
+			// (green: the spray photo is a very dark teal, and faded to olive it read grey in the lobby; the owner, 2026-10-04:
+			// "the christmas tree in the lobby still looks pretty gray to me, i see some green poking out")
+			AlbedoColor = new Color(1.5f, 2.6f, 1.45f), Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 0.4f,
 			CullMode = BaseMaterial3D.CullModeEnum.Disabled, Roughness = 1f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		},
 		["bark"] = LodgeTextures.DarkWoodMat,
-		["needles_core"] = Matte("xmas_needles_core", new Color(0.09f, 0.12f, 0.06f), 1f),
+		["needles_core"] = Matte("xmas_needles_core", new Color(0.05f, 0.15f, 0.06f), 1f),
 		["bauble_red"] = Glossy("xmas_red", new Color(0.55f, 0.06f, 0.05f)),
 		["bauble_gold"] = Glossy("xmas_gold", new Color(0.7f, 0.52f, 0.2f), 0.3f, 0.75f),
 		["bauble_green"] = Glossy("xmas_green", new Color(0.08f, 0.3f, 0.13f)),

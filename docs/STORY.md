@@ -8,6 +8,8 @@ The authoritative outline of the game's story, act by act. Implementation follow
 
 **Two levels.** The trailhead level holds Act 1 and the first climb. The Hollow level holds everything after. The climb's blackout carries the player from one to the other.
 
+**Revision 3 (2026-10-04): the story to Act 23.** The story no longer ends at Act 11. The giant takes the player at the top of the last staircase, and they wake at a lake: from there it runs on through the forester station, down under the world, up into a winter church, through the winter woods and into a ski lodge. Every place after the Hollow's woods is part of the Hollow level (pockets of it, far from the woods). Acts 24 and 25 are still to come, and the credits play after the last act (see *The end*).
+
 ---
 
 **Voices.** Every voice in the game (the clearing's voice, the whispers, the choir, the radio) is deep, never high-pitched.
@@ -34,7 +36,7 @@ The real horror and scares only start happening after the player finds the stair
 
 **The stalker** does not appear on the Blackfern Trail at all. The feeling of being watched in Act 1 comes from the audio and atmosphere only. It starts following the player in the Hollow.
 
-**Finding the stairs.** The trail ends at a fallen fir. Past it, old stone pavers set into the ground mark the way to the stairs, close enough together to follow. At the top of the stairs stands a stone newel post, the thick pier that ends the stair wall, made of the same stone as the staircase. Its round cap has been broken off; only a jagged stump is left. The ground to the left of the fallen tree is blocked, so nobody tries to go around that side. Where the stones start, the player thinks: (nothing is said) (The register's last entries, R.H.'s "the old steps" and "the steps", are the same way.)
+**Finding the stairs.** The trail ends at a fallen fir. At the top of the stairs stands a stone newel post, the thick pier that ends the stair wall, made of the same stone as the staircase. Its round cap has been broken off; only a jagged stump is left. There is no path past the fir: the woods make one. Once the dead fir is down across the trail, the trees either side of the old way come down as the player nears them, creaking and then landing with a heavy thud, a wall on the left and then the right, and behind them, once they are past, more come down across the way they came. None comes down within reach of the player. The way on is the only way, and it leads to the stairs. (The register's last entries, R.H.'s "the old steps" and "the steps", are the same way.)
 
 ## Act 2: Stare
 Triggered when the player finds the stairs for the first time.
@@ -150,10 +152,65 @@ The compass points onward, deeper into the woods beyond the bunker, to the stair
 
 **The top.** On the top landing the broken newel post is right there, in reach at last, and the cap the player has carried since the cabin goes back on it (E, "Put the cap back"; empty-handed the stump only reads "The broken post."). It leaves their hands, turns, and grinds down onto the stump, stone on stone, with a purple flash at the joint. The hum surges, Only this staircase is ever made whole. From here the player has no control again.
 1. The treetops are covered in thick fog. The player has no control from here.
-2. The giant monster that crossed the far trees in Act 7 is standing on the landing in front of the player, so close and so tall that they have to look up, and up, its body to its head.
-3. The radio asks *"Do you see him now?"* The player doesn't recognise it until it opens its eyes: the giant's great glowing red eyes stare down at the player, piercing with their gaze. It makes no sound: the hum swells and swells.
-4. The hum is so loud now. The player is trembling, looking it in the eyes, and it leans in over them.
-5. Their eyes fall shut and drift open again, each blink deeper than the last, its eyes the last thing they see, until it is all black. They pass out looking it in the eyes.
+2. The radio asks *"Do you see him now?"*
 
-**The end.** Black. The hum, at its loudest, dies away to silence. Over black the radio asks one last time: *"Did you see them?"* Then the credits: the end card, "GLHFDD", "Thanks for playing.", and the main menu. There is no waking.
+**The giant.** The hum swells, and forty metres beyond the landing the giant (the one that crossed the far trees in Act 7) rises out of the woods: head first, never smoothly. It holds, lurches up metres in a tenth of a second, sinks back, oozes; stooped, listing, its head upside down on a drawn-out neck. Its great glowing red eyes find the player. Then it reaches for them with a janky haste, and grabs them. Black.
+
+**Waking.** There is no credits roll here any more. The player comes to on the shore of a lake at sunrise (Act 12).
+
+## Act 12: The Lake
+**Checkpoint 9**, on the lake shore by the dock.
+
+A rowboat waits at the dock. Rowing is alternating strokes, left and right (A and D). Halfway across, limbs covered in bloodshot eyes breach the water, a foghorn blast under them, and the lake turns white-capped. From then on a limb hunts the boat: row steadily and it falls behind; dawdle and it takes the boat, drags the player under, and "The lake took you." reloads the shore. The far shore holds a dilapidated forest rescue station.
+
+## Act 13: The Forester Station
+**Checkpoint 10**, at the station's door.
+
+A puzzle stretch through a station that starts kept and tidy and is left more wrecked with every room solved. A knife stuck in the lobby desk; the duct-taped basement door cut open; the flooded basement drained with a valve wheel, a dead eye swirling into the grate; the grandfather clock's drowned chime and the key it spits out. Room 1's red writing (DO NOT LOOK AT THEM / DO NOT TOUCH THEM / NEVER GO UP THEM) and its taped cigar box; Room 2's code, and its room flooding to the ceiling if it's got wrong; Room 3 behind an iron door, its webs burned away with the lighter, the eye, the hand and the step set in their places.
+
+## Act 14: The Stairwell
+**Checkpoint 13**, through the iron door into Room 3: riveted steel, 42 portraits with their faces burnt out.
+
+A trench in the floor leads down into the longest descent in the game: square steel stairs round an open well, 256 flights, nearly black, the lantern the only light. The walls go from clean concrete to oily grime as it goes. Running on the stairs puts the player back up the shaft without a seam; only the numbers on the landings give it away. The compass dies here and hunts on its own until the church. At the bottom, a chamber under the stairwell (**Checkpoint 14**).
+
+## Act 15: The Long Hallway
+A red-lit concrete corridor a body's width across and lost in the dark overhead, then a taller hall with green lamps on long cables. The shadow man (a flat-black figure in a coat and brimmed hat, two points of white light for eyes, shards turning above him) stands in it. Red light, green light: when the lamps go red he is right behind the player, and moving in the red means being taken ("You moved."). At the end, a janitor's closet; the door swings shut behind them (**Checkpoint 15**).
+
+## Act 16: The Closet
+Pitch black: the switch by the door brings the light up through red and green to an ordinary white, and the door they came in by opens on black where the hallway was.
+
+## Act 17: The Sewer
+**Checkpoint 16**, inside a steel door. A long round brick pipe, ankle-deep and dragging at every step, opens into a vast flooded cistern of brick vaults. In the middle, a platform with a square black hole, smoke rising out of it. "Drop down into the hole?" It takes two yeses. Every no brings the whispers ("come and see") from the pipe mouths round the room, faster and more of them, the air going a hazy teal.
+
+## Act 18: The Pit
+**Checkpoint 17**, on landing. A great square pit ringed by a catwalk, a sea of blood five feet below it, and the thing from the lake in it. A teal spotlight picks ten of sixteen valves one at a time: turn them and the blood drains and the beast rots, from glossy hide to a zombified ruin. Its limbs slam the catwalk under red circles (more of them, faster, wider, and in barrages as it goes); a hit is death. With the last valve the pit empties and its 94 eyes burst, slowly at first and faster and faster. A steel door rises onto a small, clean, lit room (**Checkpoint 18**).
+
+## Act 19: The Library
+The calmest place in the game: a warm library, a real fire, a ticking clock. A sheet over a side table hides a bamboo puzzle box; solved, it burns away and leaves a red silk bookmark. Slid into the one book that sticks out, it opens the bookcase on a candle-lit stone passage.
+
+## Act 20: The Round Room
+**Checkpoint 19**, stepping in. A tall round stone room, its windows bricked up, a web-tented dais in the middle. The lighter burns the web away; the dais rises up a shaft into a small room above (**Checkpoint 20**). "Up. Always up, from here."
+
+## Act 21: The Church
+A long straight stair to the surface, concrete giving way to old timber, and a hatch into a church's crypt (**Checkpoint 21**). It is winter everywhere now. The church is a Gothic cathedral standing alone in a snowy glade: four candles to light, the vestry's key, the font opened, the chalice set in the great door's niche. The door opens on the snow (**Checkpoint 22**).
+
+## Act 22: The Winter Woods
+The compass lives again and points down a plowed road through the winter woods to a ski lodge. The wendigo stalks the woods: glimpsed only when the player turns round, and gone up into the trees the instant they look near it, the boughs dumping their snow behind it. It speaks in voices it has copied. The lodge's front doors are chained from inside; the back door is iced into its frame and forced open on the mudroom (**Checkpoint 23**).
+
+## Act 23: The Ski Lodge
+Behind them the roof lets its snow go and buries the back door: snowed in. Every lamp lit, Christmas up, nobody here.
+- **The bar:** room 202's keycard taped under the counter's lip, found only by the blacklight; the closing staff's note on its back.
+- **Room 202:** a key in a note in one of its drawers (a different one each game): the servants' pantry. Leaving, 202's door slams and jams; behind it something says it's cold. Starving.
+- **The pantry:** a mop falls across the door as it opens; 203's card in a drawer.
+- **Room 203:** the window open, the room full of snow, the dining room's key on the sill; through a hole in the bathroom wall, 204 and a smudged note ("If you can hear it, it already knows you are here."). 203 slams and jams too.
+- **The dining hall:** six long tables under white sheets. Under them, in the order they're pulled: dishes left for weeks; a smear of blood end to end, and laughter outside; a headless frozen skeleton, and the storm gets up; roaches pouring off a wendigo's skull on a silver platter, bleeding, and the laughter all round the room; the fifth table breaks and comes down; always last, 201's keycard standing in a bowl of snow, which melts into blood as it's taken.
+- **Room 201:** the one perfect room. An envelope: "Welcome Back. We missed you as a valued guest." The door slams for good, and in the bathroom a red light shows a hole hacked through into the walls.
+- **The crawlspace:** a maze between the walls, pine boards and old brick, pipes across at head height to duck under. Something howls in the walls the whole way. Its arm comes through the boards four times, reaching and grabbing, and the only way on is under it. At the end, the back of a wardrobe: pushed over, it's the dining hall, and while they were in the walls the lodge has frozen over (**Checkpoint 29**, Act23Frozen).
+- **The front doors:** chained ("Requires Master Key.", though there is no master key) until the freeze; now they stand ajar, and give a little at a time against the snow. A howl behind: it's on the balcony across the hall. "STARVING..... FREEZING..... FOREVER...." It climbs onto the rail and crouches there, then comes off it at them; they throw themselves aside and it lands where they stood, down on its hands on the boards, a few steps away. It turns and looks at them. Then it turns to the doors, strikes them once (they bow and hold, and its claws rake down through them), draws back, and goes through them: one leaf wrenched off its hinge, the other flung out across the porch. It crosses the porch and is gone into the storm. They get up, walk to the splintered doorway, and look out, left, and right (**Checkpoint 30**, Act23Finished).
+
+## Acts 24 and 25
+To come.
+
+## The end
+After the last act: the save that marks the story done (**GameFinished**), the fade, the end card, the player's pictures played back as polaroids, "GLHFDD", "Thanks for playing.", and the main menu. A Continue afterwards finds the player where the story ended.
 

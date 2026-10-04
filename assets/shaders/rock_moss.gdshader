@@ -9,6 +9,7 @@ uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform float moss_amount = 0.5;   // 0 bare .. 1 carpeted
 uniform float moss_tile = 0.9;
 uniform vec3 rock_tint : source_color = vec3(0.85, 0.85, 0.85);
+uniform float wetness = 0.8;
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -27,6 +28,12 @@ void fragment() {
 	vec3 c = mix(rock, moss, m);
 	// dark, damp base where the rock meets the ground
 	c *= mix(0.55, 1.0, smoothstep(-0.6, 0.2, wnrm.y));
+	// damp (2026-10-04): the bare stone wet in patches and down its lower faces, darker there and catching the light
+	// (a glint from the lantern or the sky; the moss stays dry and matte)
+	float w = texture(noise_tex, wpos.xz * 0.37 + vec2(wpos.y * 0.21, 0.5)).r;
+	float wet = smoothstep(0.5, 0.75, w + (0.2 - wnrm.y * 0.25)) * (1.0 - m) * wetness;
+	c *= 1.0 - 0.18 * wet;
 	ALBEDO = c * COLOR.rgb;
-	ROUGHNESS = 1.0;
+	ROUGHNESS = mix(1.0, 0.32, wet);
+	SPECULAR = mix(0.5, 0.65, wet);
 }

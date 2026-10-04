@@ -23,6 +23,15 @@ render_mode cull_disabled, unshaded;
 uniform vec3 albedo : source_color = vec3(0.0, 0.0, 0.0);
 uniform vec3 face_tint : source_color = vec3(0.05, 0.052, 0.055);
 uniform float visibility : hint_range(0.0, 1.0) = 1.0;
+// the cold rim (2026-10-04: its outline standing out of the dark; see rim_fresnel.gdshader), faded close up and far off
+uniform float rim = 0.0;   // (the stalker is true darkness, a hole in the scene: no rim; the giant sets its own)
+uniform vec3 rim_color : source_color = vec3(0.55, 0.62, 0.75);
+uniform float rim_far = 40.0;
+float rim_term(vec3 n, vec3 v, vec3 vtx) {
+	float f = pow(1.0 - clamp(abs(dot(normalize(n), normalize(v))), 0.0, 1.0), 3.0);
+	float d = length(vtx);
+	return f * rim * smoothstep(0.6, 2.4, d) * (1.0 - smoothstep(rim_far * 0.5, rim_far, d));
+}
 uniform float wetness : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 eye_color : source_color = vec3(1.0, 0.78, 0.22);
 // Kept low on purpose: at 15-30 m in fog the eyes should be barely there.
@@ -65,6 +74,7 @@ void fragment() {
 		}
 	}
 	ALBEDO = col + eye_color * (eye_glow + eyeshine * pow(facing, 3.0)) * eye;
+	ALBEDO += rim_color * rim_term(NORMAL, VIEW, VERTEX);
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }

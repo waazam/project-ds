@@ -119,6 +119,7 @@ public partial class Crawler : Node3D
 
 	public override void _Ready()
 	{
+		CreatureRim.Apply(this);
 		_skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/rot_skin.gdshader") };
 		_skin.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
 		// pale, starved, faintly grey-green, bruised dark here and there (no red: it isn't bleeding)

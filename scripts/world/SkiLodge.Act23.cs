@@ -379,9 +379,12 @@ public partial class SkiLodge
 	{
 		var n = new Node3D { Name = $"Table{t}", Position = TableCentre(t) with { Y = FloorY } };
 		AddChild(n);
-		var k = new MeshKit();
-		LodgeKit.Table(k, Vector3.Zero, 0f, new Vector2(TableLen, TableW), TableH, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat);
-		k.CommitTo(n, "Mesh", true);
+		if (FurnitureKit.Place(n, "dining_table", Transform3D.Identity, Dining, "Mesh") == null)
+		{
+			var k = new MeshKit();
+			LodgeKit.Table(k, Vector3.Zero, 0f, new Vector2(TableLen, TableW), TableH, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat);
+			k.CommitTo(n, "Mesh", true);
+		}
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, TableH * 0.5f, 0), Shape = new BoxShape3D { Size = new Vector3(TableLen, TableH, TableW) } });
@@ -512,7 +515,7 @@ public partial class SkiLodge
 		{
 			case 1: Dishes(k); break;
 			case 2: BloodStreak(k); break;
-			case 3: Skeleton(k); break;
+			case 3: Skeleton(k); Flies(holder); break;
 			case 4: Platter(k, holder, instant); break;
 			case 5: if (instant) { _tables[t].Visible = false; Wreckage(k); } break;
 			case 6: SnowBowl(k, holder, instant); break;
@@ -569,6 +572,23 @@ public partial class SkiLodge
 
 	private static void Dishes(MeshKit k)
 	{
+		if (FurnitureKit.Has("setting_meat"))
+		{
+			// a place laid at every seat and left for weeks, alternately the joint and the soup; the candelabra, burnt
+			// down; the picked carcass of the roast in the middle
+			var r = new RandomNumberGenerator { Seed = 5101 };
+			int n = 0;
+			for (float x = -3f; x <= 3.01f; x += 0.85f)
+				foreach (float z in new[] { -0.36f, 0.36f })
+				{
+					if (r.Randf() < 0.12f) continue;
+					float yaw = (z < 0 ? 0f : Mathf.Pi) + r.RandfRange(-0.25f, 0.25f);
+					FurnitureKit.Add(k, n++ % 2 == 0 ? "setting_meat" : "setting_soup", new Vector3(x + r.RandfRange(-0.06f, 0.06f), 0.002f, z + r.RandfRange(-0.04f, 0.04f)), yaw, Dining);
+				}
+			foreach (float x in new[] { -1.7f, 1.7f }) FurnitureKit.Add(k, "candelabrum", new Vector3(x, 0.002f, 0), r.RandfRange(0f, 3f), Dining);
+			FurnitureKit.Add(k, "carcass_dish", new Vector3(0, 0.002f, 0), 0.2f, Dining);
+			return;
+		}
 		var rng = new RandomNumberGenerator { Seed = 5101 };
 		for (float x = -3f; x <= 3f; x += 0.85f)
 			foreach (float z in new[] { -0.35f, 0.35f })
@@ -616,6 +636,20 @@ public partial class SkiLodge
 	/// and snow clinging to it, a glaze of ice.</summary>
 	private static void Skeleton(MeshKit k)
 	{
+		if (FurnitureKit.Has("skeleton_headless"))
+		{
+			FurnitureKit.Add(k, "skeleton_headless", new Vector3(-0.9f, 0.002f, 0), 0f, Dining);
+			// snow drifted in and caught in it (heaped, not a sheet: the frost is on the bones themselves now)
+			var sr = new RandomNumberGenerator { Seed = 5360 };
+			k.Mat(WinterWoods.SoftSnow);
+			k.Color = Colors.White;
+			for (int i = 0; i < 11; i++)
+			{
+				float sz = sr.RandfRange(0.03f, 0.07f);
+				k.Blob(new Vector3(sr.RandfRange(-0.85f, 0.75f), sz * 0.35f, sr.RandfRange(-0.32f, 0.32f)), new Vector3(sz, sz * 0.55f, sz * 0.85f), 5360 + i, 0.35f, true, 1f);
+			}
+			return;
+		}
 		k.Mat(WinterWoods.Bone);
 		k.Color = new Color(0.8f, 0.76f, 0.66f);
 		for (int v = 0; v < 18; v++) k.Blob(new Vector3(-0.9f + v * 0.075f, 0.04f, 0), new Vector3(0.03f, 0.025f, 0.03f), 5300 + v, 0.2f, false, 1f);
@@ -657,14 +691,62 @@ public partial class SkiLodge
 		k.Blob(new Vector3(0.1f, 0.01f, 0), new Vector3(1.3f, 0.02f, 0.4f), 5380, 0.3f, true, 1f);
 	}
 
+	/// <summary>Flies about the skeleton, once its sheet is off (the owner, 2026-10-04: "even having some little flies buzz
+	/// around him after the cloth comes off would be an excellent touch"): a dozen, darting and circling over the ribs and
+	/// the hips, and their buzz, low, close.</summary>
+	private void Flies(Node3D holder)
+	{
+		var flies = new GpuParticles3D
+		{
+			Name = "Flies", Amount = 12, Lifetime = 2.6f, Preprocess = 3f, Emitting = true, Position = new Vector3(-0.35f, 0.18f, 0f),
+			ProcessMaterial = new ParticleProcessMaterial
+			{
+				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.55f, 0.1f, 0.25f),
+				Direction = Vector3.Up, Spread = 180f, InitialVelocityMin = 0.25f, InitialVelocityMax = 0.6f, Gravity = Vector3.Zero,
+				TurbulenceEnabled = true, TurbulenceNoiseStrength = 2.2f, TurbulenceNoiseScale = 1.4f, TurbulenceNoiseSpeed = new Vector3(0.6f, 0.4f, 0.6f),
+				TurbulenceInfluenceMin = 0.4f, TurbulenceInfluenceMax = 0.8f, DampingMin = 0.6f, DampingMax = 1.2f,
+				ScaleMin = 0.8f, ScaleMax = 1.2f,
+			},
+			DrawPass1 = new QuadMesh { Size = new Vector2(0.008f, 0.006f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.03f, 0.03f, 0.035f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles } },
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			VisibilityAabb = new Aabb(new Vector3(-1.5f, -0.5f, -1.2f), new Vector3(3f, 2f, 2.4f)),
+		};
+		holder.AddChild(flies);
+		FliesBuzzing = flies;
+		const string path = "res://assets/audio/ambient/fly_buzz_loop.wav";
+		if (!ResourceLoader.Exists(path)) return;
+		var wav = (AudioStreamWav)GD.Load<AudioStreamWav>(path).Duplicate();
+		wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
+		wav.LoopBegin = 0;
+		wav.LoopEnd = Mathf.RoundToInt(wav.GetLength() * wav.MixRate);
+		var buzz = new AudioStreamPlayer3D { Name = "Buzz", Stream = wav, Bus = "Events", VolumeDb = -12f, UnitSize = 1.2f, MaxDistance = 14f, Position = flies.Position };
+		holder.AddChild(buzz);
+		buzz.Play((float)GD.RandRange(0.0, 19.0));
+	}
+
+	/// <summary>For tests: the flies over the skeleton.</summary>
+	public GpuParticles3D FliesBuzzing { get; private set; }
+
 	/// <summary>A silver platter, and on it the head of a wendigo (its elk skull, its man's jaw, one antler snapped),
 	/// blood pouring from its mouth and spreading over the plate and the linen.</summary>
 	private void Platter(MeshKit k, Node3D holder, bool instant)
 	{
-		k.Mat(LodgeTextures.SilverMat);   // (a mirror finish reflected the dark room: a black disc)
-		k.Cylinder(Vector3.Zero, new Vector3(0, 0.025f, 0), 0.5f, 0.45f, 20, true);
-		k.Mat(StationParts.StationTextures.BloodPoolMat);
-		k.Cylinder(new Vector3(0.05f, 0.026f, -0.1f), new Vector3(0.05f, 0.028f, -0.1f), instant ? 0.42f : 0.2f, instant ? 0.42f : 0.2f, 14, true);
+		if (FurnitureKit.Has("silver_platter"))
+		{
+			// the platter, and its cover lifted off and lying tipped on its side by it
+			FurnitureKit.Add(k, "silver_platter", Vector3.Zero, 0f, Dining);
+			FurnitureKit.Add(k, "cloche", new Transform3D(new Basis(Vector3.Up, -0.4f) * new Basis(Vector3.Back, Mathf.Pi * 0.5f), new Vector3(1.0f, 0.3f, -0.25f)), Dining);
+			k.Mat(StationParts.StationTextures.BloodPoolMat);
+			k.Color = Colors.White;
+			k.Cylinder(new Vector3(0.05f, 0.017f, -0.03f), new Vector3(0.05f, 0.019f, -0.03f), instant ? 0.3f : 0.16f, instant ? 0.3f : 0.16f, 20, true);
+		}
+		else
+		{
+			k.Mat(LodgeTextures.SilverMat);   // (a mirror finish reflected the dark room: a black disc)
+			k.Cylinder(Vector3.Zero, new Vector3(0, 0.025f, 0), 0.5f, 0.45f, 20, true);
+			k.Mat(StationParts.StationTextures.BloodPoolMat);
+			k.Cylinder(new Vector3(0.05f, 0.026f, -0.1f), new Vector3(0.05f, 0.028f, -0.1f), instant ? 0.42f : 0.2f, instant ? 0.42f : 0.2f, 14, true);
+		}
 		PlatterSkull = new Wendigo { Name = "Skull", Position = new Vector3(0, 0.12f, 0.05f), Scale = Vector3.One * 0.5f };   // (the new skull, its rack, is far bigger)
 		holder.AddChild(PlatterSkull);
 		PlatterSkull.ShowOnlyHead();
@@ -740,11 +822,14 @@ public partial class SkiLodge
 		{
 			var half = new Node3D { Position = new Vector3(0, TableH, 0) };
 			pieces.AddChild(half);
-			var k = new MeshKit();
-			k.Mat(LodgeTextures.DarkWoodMat);
-			k.Color = Colors.White;
-			k.Box(new Vector3(s * TableLen * 0.25f, -0.03f, 0), new Vector3(TableLen * 0.5f - 0.02f, 0.06f, TableW), 1f);
-			k.CommitTo(half, "Top", true);
+			if (FurnitureKit.Place(half, "dining_top_half", new Transform3D(new Basis(Vector3.Up, s > 0 ? 0f : Mathf.Pi), Vector3.Zero), Dining, "Top") == null)
+			{
+				var k = new MeshKit();
+				k.Mat(LodgeTextures.DarkWoodMat);
+				k.Color = Colors.White;
+				k.Box(new Vector3(s * TableLen * 0.25f, -0.03f, 0), new Vector3(TableLen * 0.5f - 0.02f, 0.06f, TableW), 1f);
+				k.CommitTo(half, "Top", true);
+			}
 			var tw = CreateTween();
 			// the crack: the middle drops and the halves tip in
 			tw.TweenProperty(half, "position:y", TableH - 0.16f, 0.16f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
@@ -759,11 +844,14 @@ public partial class SkiLodge
 			{
 				var leg = new Node3D { Position = LegFoot(s, sz) };
 				pieces.AddChild(leg);
-				var lk = new MeshKit();
-				lk.Mat(LodgeTextures.DarkWoodMat);
-				lk.Color = Colors.White;
-				lk.Box(new Vector3(0, (TableH - 0.06f) * 0.5f, 0), new Vector3(0.07f, TableH - 0.06f, 0.07f), 1f);
-				lk.CommitTo(leg, "Leg", false);
+				if (FurnitureKit.Place(leg, "dining_leg", Transform3D.Identity, Dining, "Leg") == null)
+				{
+					var lk = new MeshKit();
+					lk.Mat(LodgeTextures.DarkWoodMat);
+					lk.Color = Colors.White;
+					lk.Box(new Vector3(0, (TableH - 0.06f) * 0.5f, 0), new Vector3(0.07f, TableH - 0.06f, 0.07f), 1f);
+					lk.CommitTo(leg, "Leg", false);
+				}
 				var lt = CreateTween();
 				lt.TweenInterval(0.1f);
 				lt.TweenProperty(leg, "rotation:z", -s * LegFallen, 0.36f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
@@ -789,7 +877,9 @@ public partial class SkiLodge
 	public int Collapsed { get; private set; } = -1;
 
 	/// <summary>The fallen table's rest: the top's halves' centre height and tilt, and how far the legs fell.</summary>
-	private const float CollapsedTopY = 0.1f, CollapsedTilt = 0.03f, LegFallen = 1.45f;
+	// (the modelled top lands on its apron, 0.2 m deep under it)
+	private static float CollapsedTopY => FurnitureKit.Has("dining_top_half") ? 0.205f : 0.1f;
+	private const float CollapsedTilt = 0.03f, LegFallen = 1.45f;
 
 	private static Vector3 LegFoot(float s, float sz) => new(s * (TableLen * 0.5f - 0.08f), 0, sz * (TableW * 0.5f - 0.08f));
 
@@ -800,9 +890,17 @@ public partial class SkiLodge
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
 		var down = new Vector3(0, -TableH, 0);   // the floor (the pieces' base), from the table top
+		bool model = FurnitureKit.Has("dining_top_half");
 		foreach (float s in new[] { -1f, 1f })
 		{
 			var tilt = new Basis(Vector3.Back, s * CollapsedTilt);
+			if (model)
+			{
+				FurnitureKit.Add(k, "dining_top_half", new Transform3D(tilt * new Basis(Vector3.Up, s > 0 ? 0f : Mathf.Pi), down + new Vector3(0, CollapsedTopY, 0)), Dining);
+				foreach (float sz in new[] { -1f, 1f })
+					FurnitureKit.Add(k, "dining_leg", new Transform3D(new Basis(Vector3.Back, -s * LegFallen), down + LegFoot(s, sz)), Dining);
+				continue;
+			}
 			k.Box(down + new Vector3(0, CollapsedTopY, 0) + tilt * new Vector3(s * TableLen * 0.25f, -0.03f, 0), new Vector3(TableLen * 0.5f - 0.02f, 0.06f, TableW), 1f, tilt);
 			foreach (float sz in new[] { -1f, 1f })
 			{
@@ -817,17 +915,20 @@ public partial class SkiLodge
 	/// <summary>A porcelain bowl heaped with snow, and standing up out of the snow, 201's keycard.</summary>
 	private void SnowBowl(MeshKit k, Node3D holder, bool instant)
 	{
-		k.Mat(LodgeTextures.PorcelainMat);
-		k.Cylinder(Vector3.Zero, new Vector3(0, 0.1f, 0), 0.1f, 0.17f, 16, false);
-		k.Cylinder(Vector3.Zero, new Vector3(0, 0.005f, 0), 0.1f, 0.1f, 16, true);
+		if (!FurnitureKit.Add(k, "soup_tureen_bowl", Vector3.Zero, 0f, Dining))
+		{
+			k.Mat(LodgeTextures.PorcelainMat);
+			k.Cylinder(Vector3.Zero, new Vector3(0, 0.1f, 0), 0.1f, 0.17f, 16, false);
+			k.Cylinder(Vector3.Zero, new Vector3(0, 0.005f, 0), 0.1f, 0.1f, 16, true);
+		}
 		_bowlSnow = new Node3D { Name = "BowlSnow" };
 		holder.AddChild(_bowlSnow);
 		var s = new MeshKit();
 		bool melted = Taken(LodgeFlag.Card201);
 		s.Mat(melted ? StationParts.StationTextures.BloodPoolMat : WinterWoods.SoftSnow);
 		s.Color = Colors.White;
-		if (melted) s.Cylinder(new Vector3(0, 0.06f, 0), new Vector3(0, 0.065f, 0), 0.14f, 0.14f, 14, true);
-		else s.Blob(new Vector3(0, 0.08f, 0), new Vector3(0.15f, 0.09f, 0.15f), 5600, 0.2f, true, 1f);
+		if (melted) s.Cylinder(new Vector3(0, 0.08f, 0), new Vector3(0, 0.085f, 0), 0.135f, 0.135f, 20, true);
+		else s.Blob(new Vector3(0, 0.1f, 0), new Vector3(0.14f, 0.07f, 0.14f), 5600, 0.2f, true, 1f);
 		s.CommitTo(_bowlSnow, "Snow", false);
 		if (melted) return;
 		Card201Pickup = new Pickup { Name = "Card201", Kind = ToolKind.Keycard201, TakenId = LodgeFlag.Card201, UseSpot = false, SnapToSurface = false, Position = new Vector3(0, 0.16f, 0), Rotation = new Vector3(Mathf.Pi * 0.5f, 0.3f, 0) };
@@ -842,7 +943,7 @@ public partial class SkiLodge
 		var snow = _bowlSnow.GetNodeOrNull<MeshInstance3D>("Snow");
 		var blood = new MeshInstance3D
 		{
-			Name = "Blood", Mesh = new CylinderMesh { TopRadius = 0.14f, BottomRadius = 0.1f, Height = 0.06f, RadialSegments = 16 }, Position = new Vector3(0, 0.035f, 0),
+			Name = "Blood", Mesh = new CylinderMesh { TopRadius = 0.135f, BottomRadius = 0.09f, Height = 0.05f, RadialSegments = 20 }, Position = new Vector3(0, 0.06f, 0),
 			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 0.02f, 0.02f), Roughness = 0.08f, MetallicSpecular = 0.9f }, Scale = new Vector3(1f, 0.05f, 1f),
 		};
 		_bowlSnow.AddChild(blood);
@@ -933,6 +1034,8 @@ public partial class SkiLodge
 		}
 		// the storm
 		Storm = Mathf.MoveToward(Storm, _stormTarget, dt * 0.2f);
+		// the daylight through the dining hall's windows goes as the storm comes up (and with the freeze)
+		_diningShafts?.SetShaderParameter("strength", DiningShaftStrength * (1f - Storm) * (Frozen ? 0f : 1f));
 		var day = LodgeTextures.DayGlass;
 		if (!Frozen)
 		{

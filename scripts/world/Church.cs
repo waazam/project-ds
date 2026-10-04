@@ -85,6 +85,7 @@ public partial class Church : Node3D
 		BuildCrypt();
 		BuildLights();
 		BuildGothic();
+		BuildShafts();
 		BuildSound();
 		AddChild(new WinterGlade { Name = "WinterGlade" });
 		// Act 22: the winter woods beyond the great door, the plowed road, the ski lodge (it lays all the snow round here)
