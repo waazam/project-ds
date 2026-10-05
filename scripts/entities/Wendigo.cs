@@ -294,9 +294,23 @@ public partial class Wendigo : Node3D
 		PlayClip(name, seconds, blend);
 	}
 
+	/// <summary>A looping gait (walk, run, idle) at its natural rate times <paramref name="rate"/>: the hunt in Act 24 sets the
+	/// rate from how fast it's really going, each frame, so its feet keep to the ground.</summary>
+	public void Gait(string name, float rate, double blend)
+	{
+		if (_anim == null || _headOnly || !_anim.HasAnimation(name)) return;
+		_leapT = -1f;
+		if (_anim.CurrentAnimation != name) _anim.Play(name, blend, 1f);
+		_anim.SpeedScale = Mathf.Clamp(rate, 0.05f, 3f);
+	}
+
+	/// <summary>A clip's length in seconds (0 if it isn't there).</summary>
+	public float ClipLength(string name) => _anim != null && _anim.HasAnimation(name) ? (float)_anim.GetAnimation(name).Length : 0f;
+
 	private void PlayClip(string name, float seconds, double blend)
 	{
 		if (_anim == null || _headOnly || !_anim.HasAnimation(name)) return;
+		_anim.SpeedScale = 1f;   // (a gait's rate off: this clip's own timing)
 		float len = (float)_anim.GetAnimation(name).Length;
 		_anim.Play(name, blend, Mathf.Max(len, 0.01f) / Mathf.Max(seconds, 0.01f));
 	}

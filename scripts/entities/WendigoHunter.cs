@@ -101,6 +101,8 @@ public partial class WendigoHunter : Node3D
 		Senses(dt);
 		Burnt(dt);
 		if (!HoldStill) Act(dt);
+		else _vel = Vector3.Zero;
+		UpdateGait(dt);
 		Sound(dt);
 	}
 
@@ -260,12 +262,14 @@ public partial class WendigoHunter : Node3D
 	private void Pick(Mode m)
 	{
 		if (State == m && _modeT < 0.2f) return;
+		_prevMode = State;
 		State = m;
 		_modeT = 0f;
 		float speed = m switch { Mode.Chase or Mode.Ambush => ChaseSpeed, Mode.Flee => FleeSpeed, Mode.Investigate or Mode.Search => HuntSpeed, _ => WalkSpeed };
 		if (m is Mode.Burning or Mode.Kill) return;
-		if (m is Mode.Hide) { Body.Hold("crouch", 0.7f, 0.4); return; }
-		Body.Play(speed > 3.5f ? "run" : "walk", speed > 3.5f ? 0.75f : 1.5f * (1.7f / Mathf.Max(speed, 0.5f)), 0.25);
+		if (m is Mode.Hide) { Body.Hold("crouch", 0.7f, 0.4); _gait = null; _vel = Vector3.Zero; return; }
+		// spotting them: it stops dead, rears and screams, and then it comes (the gait follows its real speed)
+		if (m is Mode.Chase or Mode.Ambush && _prevMode is not (Mode.Chase or Mode.Ambush)) _rearT = m == Mode.Ambush ? 0.35f : 0.65f;
 	}
 
 	private void RouteTo(Vector3 target)
@@ -375,24 +379,72 @@ public partial class WendigoHunter : Node3D
 	}
 
 	/// <summary>Along its route at <paramref name="speed"/>, turning toward where it's going.</summary>
+	/// <summary>Along its route: steering, not snapping (it speeds up and slows, swings wide round the junctions' corners,
+	/// turns its body after its way), so its walk reads as a body's.</summary>
 	private void Walk(float speed, float dt)
 	{
-		if (_route.Count == 0) return;
 		var pos = Pos;
-		var to = (_route[0] - pos) with { Y = 0 };
-		float d = to.Length();
-		if (d < 0.6f) { _route.RemoveAt(0); return; }
-		var dir = to / d;
-		var np = pos + dir * Mathf.Min(speed * dt, d);
+		if (_rearT > 0f) { _rearT -= dt; speed = 0f; Face(PlayerLocal - pos, dt, 8f); }
+		Vector3 want = Vector3.Zero;
+		if (_route.Count > 0)
+		{
+			var to = (_route[0] - pos) with { Y = 0 };
+			float d = to.Length();
+			// a waypoint short of the last is passed once it's near: it rounds the corner rather than touching it
+			float pass = _route.Count > 1 ? Mathf.Lerp(0.9f, 1.8f, Mathf.Clamp(speed / ChaseSpeed, 0f, 1f)) : 0.5f;
+			if (d < pass) { _route.RemoveAt(0); return; }
+			// slowing for the end of its way
+			float sp = _route.Count == 1 ? Mathf.Min(speed, d * 1.6f) : speed;
+			want = to / d * sp;
+		}
+		float accel = speed > 3.5f ? 9f : 4.5f;
+		_vel = _vel.MoveToward(want, accel * dt);
+		var np = pos + _vel * dt;
 		Body.GlobalPosition = _cave.ToGlobal(np with { Y = 0f });
-		var want = Basis.LookingAt(_cave.GlobalBasis * dir, Vector3.Up);
-		Body.GlobalBasis = new Basis(Body.GlobalBasis.GetRotationQuaternion().Slerp(want.GetRotationQuaternion(), 1f - Mathf.Exp(-dt * 5f)));
-		_stepT -= dt * speed;
+		if (_rearT <= 0f && _vel.LengthSquared() > 0.04f) Face(_vel, dt, speed > 3.5f ? 7f : 4f);
+		_stepT -= dt * _vel.Length();
 		if (_stepT <= 0f)
 		{
-			_stepT = 1.15f;
-			AudioDirector.OneShot(this, "wendigo_step", 6, Body.GlobalPosition, speed > 3.5f ? -4f : -12f, "Events", 4f, 0.08f);
+			_stepT = 1.15f * HunterScale;
+			AudioDirector.OneShot(this, "wendigo_step", 6, Body.GlobalPosition, _vel.Length() > 3.5f ? -4f : -12f, "Events", 4f, 0.08f);
 		}
+	}
+
+	private void Face(Vector3 dirLocal, float dt, float rate)
+	{
+		dirLocal.Y = 0f;
+		if (dirLocal.LengthSquared() < 1e-4f) return;
+		var want = Basis.LookingAt(_cave.GlobalBasis * dirLocal.Normalized(), Vector3.Up);
+		Body.GlobalBasis = new Basis(Body.GlobalBasis.GetRotationQuaternion().Slerp(want.GetRotationQuaternion(), 1f - Mathf.Exp(-dt * rate)));
+	}
+
+	private const float HunterScale = BodyScale;
+	private Vector3 _vel;
+	private float _rearT;
+	private Mode _prevMode = Mode.Off;
+	private string _gait;
+
+	/// <summary>Its legs at the pace it's really going: still, the idle (breathing, its head turning); slow, the walk; fast,
+	/// the run, each played at the rate its stride covers that ground (its full-size strides, 2.55 m a walk cycle, 3.5 m a
+	/// run's, scaled with it); changing over with a blend, never a snap, and with a margin so it doesn't flicker between.</summary>
+	private void UpdateGait(float dt)
+	{
+		if (State is Mode.Hide or Mode.Burning or Mode.Kill or Mode.Off || Body == null) return;
+		float s = State is Mode.Hide ? 0f : _vel.Length();
+		string clip = _gait switch
+		{
+			"run" => s < 2.9f ? (s < 0.25f ? "idle" : "walk") : "run",
+			"walk" => s > 3.3f ? "run" : s < 0.2f ? "idle" : "walk",
+			_ => s > 3.3f ? "run" : s > 0.35f ? "walk" : "idle",
+		};
+		float rate = clip switch
+		{
+			"walk" => s / (2.55f * BodyScale) * Body.ClipLength("walk"),
+			"run" => s / (3.5f * BodyScale) * Body.ClipLength("run"),
+			_ => 1f,
+		};
+		Body.Gait(clip, rate, clip == _gait ? 0.0 : 0.35);
+		_gait = clip;
 	}
 
 	private void Sound(float dt)

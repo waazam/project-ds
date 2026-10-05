@@ -13,13 +13,10 @@ public static class SnowMazeLook
 	{
 		if (_cave != null) return _cave;
 		_cave = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ice_cave.gdshader"), ResourceName = "snow_cave" };
-		_cave.SetShaderParameter("cell_tex", new NoiseTexture2D
-		{
-			Width = 256, Height = 256, Seamless = true,
-			Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular, Frequency = 0.035f, CellularReturnType = FastNoiseLite.CellularReturnTypeEnum.Distance, Seed = 7701 },
-		});
-		_cave.SetShaderParameter("noise_tex", new NoiseTexture2D { Width = 256, Height = 256, Seamless = true, Noise = new FastNoiseLite { Frequency = 0.02f, FractalOctaves = 4, Seed = 7702 } });
-		_cave.SetShaderParameter("snow_normal", GD.Load<Texture2D>("res://assets/textures/snow/snow_normal.png"));
+		// the baked sets (tools/textures/ice_maze.py, 1024 px, mipmapped and compressed on import)
+		foreach (var t in new[] { "ice_albedo", "ice_normal", "ice_rough", "snow_albedo", "snow_normal" })
+			_cave.SetShaderParameter(t, GD.Load<Texture2D>($"res://assets/textures/ice/{t}.png"));
+		_cave.SetShaderParameter("noise_tex", new NoiseTexture2D { Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true, Noise = new FastNoiseLite { Frequency = 0.02f, FractalOctaves = 4, Seed = 7702 } });
 		return _cave;
 	}
 

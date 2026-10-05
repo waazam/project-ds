@@ -1,24 +1,31 @@
 // The snow cave (Act 24; the owner's references: blue ice tunnels, scalloped like the inside of a shell, the light coming
-// through the ice blue, trodden snow underfoot; "it needs its own shaders to make it really pop"):
-// - the walls and the roof: ice, deep blue where it's thick and in its hollows, paler and greener-blue where it bulges
-//   toward the eye, scalloped all over (a cellular dimpling, carried into the normal), glossy and a little see-into
-//   (a cold light from inside it, faint: the caves are never pitch black, never bright);
-// - the floor: snow, trodden and packed, white going blue into the walls' feet, a crystal glinting here and there as the
-//   eye moves (nothing twinkles on its own);
-// - between them, a soft band where the snow banks up the walls.
-// Everything world-projected three ways (the cave's mesh has no UVs).
+// through the ice blue, trodden snow underfoot; then, 2026-10-04: "Increase the texel density on the ice walls ... bake way
+// higher-res texture sets for the ice maze, we should make the tunnel more icy ... use that ice texture you created for the
+// back door of the ski lodge"):
+// - the walls and the roof: glacial ice from a baked 1024 set (tools/textures/ice_maze.py: deep blue, banded, cloudy
+//   patches, strings of bubbles, faint fractures; scallops and cracks in its normal map; glassy where it's clear and
+//   frosted where it's cloudy), about 400 texels a metre, a second, broad sample over it so the repeat never shows; glassy
+//   like the lodge's iced back door (a sharp sheen, a cold rim at its edges) but never glaring: the sheen is clamped, the
+//   ice is dark;
+// - a faint cold light from inside the ice, more where it's thin (the caves are never pitch black, never bright);
+// - the floor: packed snow from its own baked set, bluish in its hollows, banked up the walls' feet;
+// - a crystal glinting in the snow here and there as the eye moves (nothing twinkles on its own).
+// Everything world-projected three ways (the cave's mesh has no UVs), the normals blended so the three agree.
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back;
 
-uniform sampler2D cell_tex : filter_linear_mipmap, repeat_enable;   // cellular noise: the scallops
-uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;  // smooth noise: the blotches
-uniform sampler2D snow_normal : hint_normal, filter_linear_mipmap, repeat_enable;
-uniform vec3 ice_deep : source_color = vec3(0.05, 0.13, 0.25);
-uniform vec3 ice_pale : source_color = vec3(0.3, 0.45, 0.6);
-uniform vec3 snow_col : source_color = vec3(0.6, 0.66, 0.75);
-uniform vec3 snow_shadow : source_color = vec3(0.43, 0.51, 0.64);
-uniform float scallop_scale = 0.3;
-uniform float glow = 0.055;
+uniform sampler2D ice_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D ice_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D ice_rough : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D snow_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D snow_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D noise_tex : filter_linear_mipmap_anisotropic, repeat_enable;  // broad, smooth: breaks the repeat
+uniform float ice_scale = 0.4;      // tiles a metre: 2.5 m a tile, ~410 texels a metre
+uniform float snow_scale = 0.55;
+uniform vec3 ice_tint : source_color = vec3(0.62, 0.7, 0.82);
+uniform vec3 snow_tint : source_color = vec3(0.8, 0.84, 0.9);
+uniform float normal_strength = 1.0;
+uniform float glow = 0.05;
 uniform float glisten = 0.35;
 
 varying vec3 w_pos;
@@ -35,47 +42,54 @@ float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758
 
 vec3 tri_w(vec3 n) { vec3 w = pow(abs(n), vec3(4.0)); return w / (w.x + w.y + w.z + 1e-4); }
 
-float tri(sampler2D t, vec3 p, vec3 w, float s) {
-	return texture(t, p.zy * s).r * w.x + texture(t, p.xz * s).r * w.y + texture(t, p.xy * s).r * w.z;
+// (two of each: Godot wants every texture handed to one function sampled alike, and colour maps are sRGB, data maps not)
+vec4 tri(sampler2D t, vec3 p, vec3 w, float s) {
+	return texture(t, p.zy * s) * w.x + texture(t, p.xz * s) * w.y + texture(t, p.xy * s) * w.z;
+}
+vec4 tri_c(sampler2D t, vec3 p, vec3 w, float s) {
+	return texture(t, p.zy * s) * w.x + texture(t, p.xz * s) * w.y + texture(t, p.xy * s) * w.z;
+}
+
+// three normal maps, one per projection, blended into one world normal ("whiteout")
+vec3 tri_normal(sampler2D t, vec3 p, vec3 n, vec3 w, float s, float k) {
+	vec3 nx = texture(t, p.zy * s).xyz * 2.0 - 1.0;
+	vec3 ny = texture(t, p.xz * s).xyz * 2.0 - 1.0;
+	vec3 nz = texture(t, p.xy * s).xyz * 2.0 - 1.0;
+	nx.xy *= k; ny.xy *= k; nz.xy *= k;
+	vec3 tx = vec3(nx.xy + n.zy, abs(nx.z) * n.x);
+	vec3 ty = vec3(ny.xy + n.xz, abs(ny.z) * n.y);
+	vec3 tz = vec3(nz.xy + n.xy, abs(nz.z) * n.z);
+	return normalize(tx.zyx * w.x + ty.xzy * w.y + tz.xyz * w.z);
 }
 
 void fragment() {
 	vec3 w = tri_w(w_nrm);
 	float floorness = smoothstep(0.55, 0.85, w_nrm.y);
-	// the scallops: the cellular noise's distance, a dimple in each cell
-	float cell = tri(cell_tex, w_pos, w, scallop_scale);
-	float cell2 = tri(cell_tex, w_pos, w, scallop_scale * 2.3);
-	float blot = tri(noise_tex, w_pos, w, 0.09);
-	// the ice: deep blue in the dimples and the thick of it, paler on the ridges between them
-	float ridge = smoothstep(0.15, 0.75, cell * 0.7 + cell2 * 0.3);
-	// (gently: at full strength the scallops and blotches read as camouflage, busy and glaring)
-	vec3 ice = mix(ice_deep, ice_pale, 0.3 + ridge * 0.35 + (blot - 0.5) * 0.25);
-	ice *= 0.92 + 0.12 * blot;
-	// the snow: packed white, blue in its hollows and toward the walls
-	float trod = tri(noise_tex, w_pos, w, 0.25);
-	vec3 snow = mix(snow_shadow, snow_col, (0.45 + (trod - 0.5) * 0.35) * floorness + 0.1 * floorness);
+	float broad = tri(noise_tex, w_pos, w, 0.07).r;
+	// the ice: the baked set, and the same set again broad and turned (its repeat lost under the second)
+	vec3 ice_a = tri_c(ice_albedo, w_pos, w, ice_scale).rgb;
+	vec3 ice_b = tri_c(ice_albedo, w_pos.zxy + 17.0, w, ice_scale * 0.31).rgb;
+	vec3 ice = mix(ice_a, ice_b, 0.35) * ice_tint * (0.8 + 0.35 * broad);
+	float rough_i = tri(ice_rough, w_pos, w, ice_scale).r;
+	// the snow
+	vec3 snow = tri_c(snow_albedo, w_pos, w, snow_scale).rgb * snow_tint * (0.88 + 0.2 * broad);
 	// snow banked up the walls' feet
-	float bank = max(floorness, smoothstep(0.8, 0.15, l_y) * 0.85);
-	vec3 col = mix(ice, snow, clamp(bank, 0.0, 1.0));
-	ALBEDO = col;
-	// the scallops carried into the normal (from the cellular field's slope), the snow's own grain on the floor
-	vec3 e = vec3(0.04, 0.0, 0.0);
-	float cx = tri(cell_tex, w_pos + e.xyy, w, scallop_scale) - cell;
-	float cy = tri(cell_tex, w_pos + e.yxy, w, scallop_scale) - cell;
-	float cz = tri(cell_tex, w_pos + e.yyx, w, scallop_scale) - cell;
-	vec3 g = vec3(cx, cy, cz) / 0.04;
-	vec3 vn = normalize((VIEW_MATRIX * vec4(normalize(w_nrm - g * 0.09 * (1.0 - floorness)), 0.0)).xyz);
-	NORMAL = vn;
-	// (satin, not glass: glossy, every dimple threw back the lantern as a glint, all over)
-	ROUGHNESS = mix(mix(0.42, 0.55, ridge), 0.9, floorness);
-	SPECULAR = mix(0.4, 0.25, floorness);
-	// light from inside the ice: faint, cold, more in the thin bulges
-	EMISSION = ice * glow * (0.5 + ridge) * (1.0 - floorness);
-	// a cold light at the ice's edge (the rim, toward the eye)
-	RIM = 0.12 * (1.0 - floorness);
-	RIM_TINT = 0.7;
+	float bank = clamp(max(floorness, smoothstep(0.8, 0.15, l_y) * 0.85), 0.0, 1.0);
+	ALBEDO = mix(ice, snow, bank);
+	vec3 n_ice = tri_normal(ice_normal, w_pos, w_nrm, w, ice_scale, normal_strength);
+	vec3 n_snow = tri_normal(snow_normal, w_pos, w_nrm, w, snow_scale, normal_strength * 0.8);
+	vec3 wn = normalize(mix(n_ice, n_snow, bank));
+	NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
+	// glassy where the ice is clear, frosted where it's cloudy (never a mirror: no glare off every dimple)
+	ROUGHNESS = mix(clamp(rough_i * 0.9 + 0.12, 0.2, 0.75), 0.88, bank);
+	SPECULAR = mix(0.55, 0.25, bank);
+	// light from inside the ice: faint, cold, more where it's thin and clear
+	EMISSION = ice * glow * (1.2 - rough_i) * (1.0 - bank);
+	// the cold rim at its edges, as on the lodge's iced door
+	RIM = 0.22 * (1.0 - bank);
+	RIM_TINT = 0.65;
 	// the snow's crystals catching the eye
-	if (floorness > 0.4) {
+	if (bank > 0.4) {
 		vec3 c = floor(w_pos * 60.0);
 		if (hash3(c) > 0.995) {
 			vec3 facet = normalize(vec3(hash3(c + 1.3), hash3(c + 4.7), hash3(c + 9.1)) * 2.0 - 1.0 + vec3(0.0, 1.2, 0.0));

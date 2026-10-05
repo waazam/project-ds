@@ -9,8 +9,9 @@ namespace ProjectDS.World;
 /// The red lights in the hall's second half, when he is in front of them (the owner, 2026-10-04: "I love how you have the
 /// shadowman inch towards the player before the light turns green again. Can we vary this so it is more interesting ...
 /// make 6 - 12 unique variations ... the goal is that a typical playthrough of the game won't trigger every variation
-/// unless the player dies a lot"). Each red picks one, weighted, never the same twice running; the plain inch is the
-/// commonest, the strangest the rarest. Every one keeps him in front of them and short of the door, and ends with him
+/// unless the player dies a lot"). Each red picks one, weighted, never the same twice running; the plain inch is by far the
+/// commonest (after playing them the owner found the strangest goofy: from the floor, from above, the face-down slither,
+/// side to side and the zigzag are no longer picked). Every one keeps him in front of them and short of the door, and ends with him
 /// standing in the hall, frozen, to be walked round in the green.
 /// <list type="number">
 /// <item><b>Inch</b>: a jump at a time closer, as it was.</item>
@@ -36,8 +37,11 @@ public partial class Act15Hallway
 	/// <summary>How often each turns up (out of their sum): the plain inch the commonest, the strangest the rarest.</summary>
 	private static readonly (Turn turn, int weight)[] TurnWeights =
 	{
-		(Turn.Inch, 26), (Turn.FarLunges, 12), (Turn.FromWall, 11), (Turn.FromFloor, 10), (Turn.Stillness, 9), (Turn.Looming, 8),
-		(Turn.Zigzag, 6), (Turn.MeltingEyes, 6), (Turn.FromAbove, 6), (Turn.Many, 5), (Turn.Slither, 4), (Turn.SideToSide, 3),
+		// (the owner, 2026-10-04, after playing them: "having him face down on the ground and coming in from the ceiling looked
+		// goofy, we should go closer to what we had before the change and make it as scary as possible": the floor, the
+		// ceiling, the face-down crawl and the hopping about are out; the inch, as it was, is most of them again, and the
+		// rest stay close to it, all of him standing, all of him coming)
+		(Turn.Inch, 44), (Turn.FarLunges, 12), (Turn.Stillness, 11), (Turn.Looming, 11), (Turn.MeltingEyes, 9), (Turn.FromWall, 7), (Turn.Many, 6),
 	};
 
 	/// <summary>The turn this red (for tests); and every turn seen this session.</summary>
@@ -65,7 +69,7 @@ public partial class Act15Hallway
 				foreach (var a in OS.GetCmdlineUserArgs())
 					if (a.StartsWith("--act15-turn=") && int.TryParse(a["--act15-turn=".Length..], out int n)) _testTurn = n;
 			}
-			return (Turn)(_testTurn++ % TurnWeights.Length);
+			return TurnWeights[_testTurn++ % TurnWeights.Length].turn;
 		}
 		int sum = 0;
 		foreach (var (_, w) in TurnWeights) sum += w;
@@ -159,7 +163,9 @@ public partial class Act15Hallway
 			case Turn.Looming:
 				Stand(Ahead(FrontDist[i]), player);
 				if (CurrentTurn == Turn.Looming) _shadow.Scale = Vector3.One * (1f + 0.2f * i);
-				Breath(i == 3 ? -4f : -12f);
+				// (each jump closer, his eyes burn a little brighter and his breath is louder: the last one right on them)
+				_shadow.Glare = Mathf.Lerp(0.3f, 0.85f, i / 3f);
+				Breath(i == 3 ? -2f : -14f + 3f * i);
 				break;
 			case Turn.FarLunges:
 				if (i == 0) { Stand(Ahead(30f), player); Breath(-18f); break; }
@@ -297,5 +303,6 @@ public partial class Act15Hallway
 		foreach (var c in _copies) c.Visible = false;
 		_shadow.EyeColor(new Color(0.95f, 0.95f, 1f));
 		_shadow.EyeDrips(false, Colors.White);
+		_shadow.Glare = 0.3f;
 	}
 }
