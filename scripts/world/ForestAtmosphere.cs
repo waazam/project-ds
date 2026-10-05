@@ -470,6 +470,7 @@ public partial class ForestAtmosphere : Node
 	/// <summary>Act 1's walk in (before the first climb), in the woods' own mood, no storm, not underground.</summary>
 	private bool Act1FogActive()
 	{
+		if (Act1FogOverride != null && Systems.StoryManager.Instance is { Current: >= Systems.Checkpoint.Act24Finished }) return true;   // (Act 25's fog)
 		if (!Act1Fog || _mood != Mood.Auto || Storm > 0.01f || Underground > 0.01f) return false;
 		if (Systems.StoryManager.Instance is not { } story) return false;
 		return story.Current < Systems.Checkpoint.Act2StairsClimbed;

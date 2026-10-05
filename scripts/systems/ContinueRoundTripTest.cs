@@ -111,7 +111,13 @@ public partial class ContinueRoundTripTest : Node
 		new("act23_frozen", Checkpoint.Act23Frozen, F23f, "lantern,compass,radio;tools=Lighter+Keycard201"),
 		// Act 23's end (the front doors gone), and the end of the story after the credits (the same place, for now)
 		new("act23_finished", Checkpoint.Act23Finished, F23f.Append(LodgeFlag.FrontBroken).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201"),
-		new("game_finished", Checkpoint.GameFinished, F23f.Append(LodgeFlag.FrontBroken).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201"),
+		// Act 24's saves: in the maze's way in, at the cavern, the flamethrower in hand
+		new("act24_maze", Checkpoint.Act24Maze, F23f.Append(LodgeFlag.FrontBroken).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201"),
+		new("act24_trenches", Checkpoint.Act24Trenches, F23f.Append(LodgeFlag.FrontBroken).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201"),
+		new("act24_flamethrower", Checkpoint.Act24Flamethrower, F23f.Concat(new[] { LodgeFlag.FrontBroken, World.SnowMaze.Act24Maze.FlagCrowbar, World.SnowMaze.Act24Maze.FlagCrate }).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201+Crowbar+Flamethrower"),
+		// Act 25 (the trailhead): out of the snow at the trail's far end; and after the end, at the car
+		new("act24_finished", Checkpoint.Act24Finished, F23f.Concat(new[] { LodgeFlag.FrontBroken, "ending_1" }).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201+Crowbar+Flamethrower"),
+		new("game_finished", Checkpoint.GameFinished, F23f.Concat(new[] { LodgeFlag.FrontBroken, "ending_1" }).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201+Crowbar+Flamethrower"),
 	};
 
 	// Survive the scene reloads between scenarios.
@@ -155,8 +161,12 @@ public partial class ContinueRoundTripTest : Node
 
 		if (_index < 0 || StoryManager.Instance is not { LoadedFromSave: true })
 		{
-			// First pass: a fresh game just to have the level; start the round trips.
+			// First pass: a fresh game just to have the level; start the round trips (from `--continue-from=NAME`, for a
+			// quick look at the last few)
 			_index = 0;
+			foreach (var arg in OS.GetCmdlineUserArgs())
+				if (arg.StartsWith("--continue-from="))
+					_index = Mathf.Max(0, System.Array.FindIndex(Scenarios, x => x.Name == arg["--continue-from=".Length..]));
 			_startMsec = Time.GetTicksMsec();
 			ContinueInto(_index);
 			return;
@@ -279,11 +289,26 @@ public partial class ContinueRoundTripTest : Node
 				Check("Act 23's letter save: in 201 by its bathroom, the door jammed behind, the envelope gone, the lodge not yet frozen", lb.Y > SkiLodge.UpperY - 0.3f && lb.X < -20f && lodge23.Room201Jammed && lodge23.Envelope201 == null && !lodge23.Frozen, $"{lb}");
 			if (sc.Cp == Checkpoint.Act23Crawlspace)
 				Check("Act 23's crawlspace save: in the walls (the maze, below), the lodge frozen, the arms still to come", lb.Y < -40f && lodge23.Frozen && lodge23.ArmsBurst == 0, $"{lb}");
-			if (sc.Cp is Checkpoint.Act23Finished or Checkpoint.GameFinished)
+			if (sc.Cp == Checkpoint.Act23Finished)
 				Check($"{sc.Cp}: at the splintered front doorway, the doors gone (one leaf hanging, one out on the porch), the lodge frozen", Mathf.Abs(lb.X) < 1.5f && lb.Z > SkiLodge.HexIn - 2f && lodge23.FrontBroken && lodge23.Frozen
 					&& lodge23.FrontLeafR.Position.Z > SkiLodge.Apothem + 1f, $"{lb}");
 			if (sc.Cp == Checkpoint.Act23Frozen)
 				Check("Act 23's frozen save: in the dining hall, the wardrobe over, the windows broken, the front door ajar", lb.X > 25f && lb.Y < 2f && lodge23.WardrobeDown && lodge23.WindowsBroken > 10 && lodge23.Frozen && !lodge23.FrontBroken, $"{lb}, windows {lodge23.WindowsBroken}");
+		}
+		if (sc.Cp is >= Checkpoint.Act24Maze and <= Checkpoint.Act24Flamethrower)
+		{
+			var maze = World.SnowMaze.Act24Maze.Instance;
+			var ml = maze?.Cave != null ? maze.Cave.ToLocal(before) : Vector3.Zero;
+			Check($"{sc.Cp}: in the snow maze, where the save was", maze != null && maze.InMaze
+				&& (sc.Cp != Checkpoint.Act24Trenches || World.SnowMaze.SnowMazeLayout.InCavern(ml) || ml.DistanceTo(World.SnowMaze.SnowMazeLayout.CavernCentre) < 22f), $"{ml}");
+			if (sc.Cp == Checkpoint.Act24Flamethrower)
+				Check("the flamethrower's save: it's in their hands", _player.Inventory.HasTool(ToolKind.Flamethrower) && _player.GetNodeOrNull<Flamethrower>("Flamethrower") != null);
+		}
+		if (sc.Cp >= Checkpoint.Act24Finished)
+		{
+			var ed = World.SnowMaze.EndingDirector.Instance;
+			Check($"{sc.Cp}: Act 25 in the trailhead ({(sc.Cp == Checkpoint.GameFinished ? "by the car" : "at the snow's edge")})", ed != null
+				&& (sc.Cp == Checkpoint.GameFinished ? before.DistanceTo(ed.CarAt) < 8f : before.DistanceTo(ed.Start) < 4f), $"{before}");
 		}
 		if (sc.Cp == Checkpoint.Act11GiantEncounter && GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			Check("checkpoint 9 (Act 12's start) respawns on the lake shore", before.DistanceTo(lake.WakeSpotWorld) < 4f, $"{before} vs {lake.WakeSpotWorld}");

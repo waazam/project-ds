@@ -94,6 +94,7 @@ public partial class SkiLodge
 		BuildCrawlspace();
 		if (Has(LodgeFlag.Frozen)) Freeze(instant: true);
 		if (Has(LodgeFlag.FrontBroken)) ExplodeFrontDoor(instant: true);
+		if (StoryManager.Instance is { Current: >= Checkpoint.Act23Finished }) Callable.From(EnsureAct24).CallDeferred();
 		_whisper202 = Voice("Whisper202", new Vector3(-14.4f, UpperY + 1.3f, 3.2f), -13f, 1.2f, 6.5f);
 		_mumble203 = Voice("Mumble203", new Vector3(-14.31f, UpperY + 1.2f, -InnerZ - 1.2f), -7f, 2.6f, 16f);
 		_snow203 = Voice("Snow203", new Vector3(-15.5f, UpperY + 1.2f, -3.5f), -18f, 1.2f, 5.5f);

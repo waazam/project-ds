@@ -223,6 +223,7 @@ public static class ItemMeshes
 			case ToolKind.Keycard202: case ToolKind.Keycard203: case ToolKind.Keycard201: Keycard(k, ref b, kind); break;
 			case ToolKind.PantryKey: PantryKey(k, ref b); break;
 			case ToolKind.DiningKey: DiningKey(k, ref b); break;
+			case ToolKind.Crowbar: FurnitureKit.Add(k, "crowbar", Vector3.Zero, 0f, World.SnowMaze.SnowMazeDressing.Roles); b.PickRadius = 0.45f; break;
 		}
 		if (!k.IsEmpty)
 		{

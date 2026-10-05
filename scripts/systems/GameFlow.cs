@@ -53,6 +53,9 @@ public partial class GameFlow : Node
 		Callable.From(Begin).CallDeferred();
 		// every shader the level will draw, built while the screen's still black (no first-sight hitches)
 		AddChild(new ShaderWarmup { Name = "ShaderWarmup" });
+		// Act 25: back in the trailhead after the maze (and after the end)
+		if (StoryManager.Instance is { Current: >= Checkpoint.Act24Finished } && GetTree().CurrentScene?.SceneFilePath == StoryManager.TrailheadScene)
+			AddChild(new World.SnowMaze.EndingDirector { Name = "EndingDirector" });
 		if (GameSettings.Instance.Trailer) AddChild(new TrailerDirector());
 		else if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
 		else if (GameSettings.Instance.AutoTest) AddChild(new StoryTest());

@@ -6,7 +6,7 @@ leaps and lunges; real hands and clawed fingers to grab through the wall).
 
 Writes:
   assets/models/wendigo/wendigo.glb       the whole creature, skinned to a skeleton, with its animations
-                                          (idle, crouch, air, pounce, land, smash)
+                                          (idle, crouch, air, pounce, land, smash, walk, run)
   assets/models/wendigo/wendigo_head.glb  the head alone, unrigged (the dining hall's platter, Act 23)
   assets/models/wendigo/wendigo_arm.glb   the arm that comes through the crawlspace's wall (Act 23), skinned to its own
                                           bones: upper, fore, hand, and every joint of every finger
@@ -1120,6 +1120,31 @@ def animate(arm_obj, bones):
             arms[sx] = dict(reach=reach[sx], curl=cl, pole=V((s * 0.7, -0.2, -0.6)))
         return (hip, dict(bow=bw, neck_bow=-0.25, head_pitch=-0.25, curl=cl, leg=legs, arm=arms, jaw=jw, twist=tw))
     action("smash", [(0, *smash_pose(0)), (7, *smash_pose(1)), (11, *smash_pose(1)), (20, *smash_pose(2))])
+
+    # ---- walk and run (Act 24, stalking the snow maze): the digitigrade legs stepping, each foot planted for three fifths
+    # of the stride and swung through for the rest; the long arms swinging low against the legs; the body bobbing. The run
+    # a long lope, hunched far over, the arms reaching
+    def gait(phase, stride, lift, bow, arm_swing, bob, reach_down):
+        legs = {}
+        for sx, L, off in (("R", Lr, 0.0), ("L", Ll, 0.5)):
+            p = (phase + off) % 1.0
+            if p < 0.6:
+                u = p / 0.6
+                y, z = stride * (0.5 - u), 0.0
+            else:
+                u = (p - 0.6) / 0.4
+                y, z = stride * (-0.5 + u), lift * math.sin(u * math.pi)
+            foot = (L["ball"] - L["hock"]).normalized().lerp(V((0, -0.2, -1)).normalized(), 0.6 if p >= 0.6 else 0.0)
+            legs[sx] = dict(ball=L["ball"] + V((0, y, z)), foot=foot)
+        arms = {}
+        for sx, s_, off in (("R", 1, 0.5), ("L", -1, 0.0)):
+            p = (phase + off) % 1.0
+            sw = math.sin(p * math.tau) * arm_swing
+            arms[sx] = dict(reach=V((s_ * 0.2, 0.3 + sw, -reach_down + 0.1 * abs(sw))), curl=0.45, pole=V((s_ * 0.4, -1, 0)))
+        hip = V((0, 0, -bob * (0.5 + 0.5 * math.cos(phase * 2 * math.tau))))
+        return (hip, dict(bow=bow, neck_bow=0.05, head_pitch=-0.05, curl=0.45, leg=legs, arm=arms))
+    action("walk", [(f, *gait(f / 32, 0.9, 0.22, hang + 0.08, 0.28, 0.06, 1.9)) for f in range(0, 33, 4)])
+    action("run", [(f, *gait(f / 20, 1.6, 0.45, hang + 0.4, 0.65, 0.12, 1.5)) for f in range(0, 21, 2)])
     # the rest pose for export (and the previews): the idle's first frame
     arm_obj.animation_data.action = actions["idle"]
     sc.frame_set(0)
@@ -1223,10 +1248,10 @@ def build_body():
             hc = hb @ V((0, 0.2, 0))
             cam = (tuple(hc), 1.5, -0.1, 20)
         preview(name, *cam)
-    for act, frame in (("crouch", 8), ("air", 12), ("pounce", 12), ("land", 10), ("smash", 0), ("smash", 9), ("smash", 20)):
+    for act, frame in (("crouch", 8), ("air", 12), ("pounce", 12), ("land", 10), ("smash", 0), ("smash", 9), ("smash", 20), ("walk", 8), ("run", 5)):
         arm_obj.animation_data.action = bpy.data.actions[act]
         bpy.context.scene.frame_set(frame)
-        preview(f"wendigo_{act}" + (f"_{frame}" if act == "smash" else ""), (0, 0.3, 2.0), 8.0, 0.3, 70)
+        preview(f"wendigo_{act}" + (f"_{frame}" if act in ("smash", "walk", "run") else ""), (0, 0.3, 2.0), 8.0, 0.3, 70)
 
 
 # ------------------------------------------------------------------ the arm through the wall

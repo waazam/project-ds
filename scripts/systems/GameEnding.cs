@@ -15,7 +15,7 @@ namespace ProjectDS.Systems;
 public static class GameEnding
 {
 	/// <summary>The last act's own end: the act whose end is the game's (Acts 24 and 25 move it on).</summary>
-	public const Checkpoint LastAct = Checkpoint.Act23Finished;
+	public const Checkpoint LastAct = Checkpoint.Act24Finished;
 
 	public static bool Played { get; private set; }
 

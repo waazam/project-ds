@@ -8,6 +8,7 @@ using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Entities;
 using ProjectDS.Player;
+using ProjectDS.World.SnowMaze;
 using ProjectDS.World.StationParts;
 using ProjectDS.UI;
 using ProjectDS.World;
@@ -132,6 +133,8 @@ public partial class StoryTest : Node
 			21 => (Checkpoint.Act20Finished, StateFor(19).flags.Concat(new[] { StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			22 => (Checkpoint.Act21Finished, StateFor(21).flags.Concat(new[] { StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4),
 				StoryManager.Flag.ChurchVestryOpen, StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced }).ToArray(), "lantern,compass,radio;tools=Lighter"),
+			24 => (Checkpoint.Act23Finished, StateFor(23).flags.Concat(Act23Done).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201"),
+			25 => (Checkpoint.Act24Finished, StateFor(24).flags.Concat(new[] { Act24Maze.FlagCrowbar, Act24Maze.FlagCrate, Act25Ending.FlagPrefix + Act25Ending.ForThisGame() }).ToArray(), "lantern,compass,radio;tools=Lighter+Keycard201+Crowbar+Flamethrower"),
 			23 => (Checkpoint.Act22Finished, StateFor(22).flags.Concat(new[] { StoryManager.Flag.LodgeFrontTried, StoryManager.Flag.LodgeBackDoorOpen, LodgeFlag.SnowedIn }).ToArray(), "lantern,compass,radio;tools=Lighter"),
 			_ => (Checkpoint.Act10WalkieFound, f11, gear11),
 		};
@@ -142,7 +145,7 @@ public partial class StoryTest : Node
 	private bool TryStoryFrom()
 	{
 		int act = StoryFromArg();
-		if (_fromApplied || act < 3 || act > 23) return false;
+		if (_fromApplied || act < 3 || act > 25) return false;
 		_fromApplied = true;
 		int index = _steps.FindIndex(s => s.Act.StartsWith($"Act {act}:") || (act is 8 or 9 or 10 && s.Act.StartsWith("Acts 8-10")));
 		if (index < 0) return false;
@@ -313,8 +316,10 @@ public partial class StoryTest : Node
 			new("Act 21: the church", hollow, Act21Church),
 			new("Act 22: the winter woods", hollow, Act22Woods),
 			new("Act 23: the ski lodge", hollow, Act23Lodge),
+			new("Act 24: the snow maze", hollow, Act24),
+			new("Act 25: the endings", trail, Act25),
 			// (after the last act, whichever it is: GameEnding)
-			new("The end: the credits", hollow, TheEnd),
+			new("The end: the credits", trail, TheEnd),
 		};
 	}
 
@@ -3711,6 +3716,236 @@ public partial class StoryTest : Node
 		Screenshot("credits_polaroids");
 	}
 
+
+	// ------------------------------------------------------------------ Act 24
+
+	private static readonly string[] Act23Done =
+	{
+		LodgeFlag.Taken(LodgeFlag.Card202), LodgeFlag.Room202Open, LodgeFlag.Taken(LodgeFlag.PantryKey), LodgeFlag.Room202Jammed, LodgeFlag.PantryOpen,
+		LodgeFlag.Taken(LodgeFlag.Card203), LodgeFlag.Room203Open, LodgeFlag.Taken(LodgeFlag.DiningKey), LodgeFlag.Note204, LodgeFlag.Room204Open, LodgeFlag.Room203Jammed,
+		LodgeFlag.DiningOpen, LodgeFlag.StormUp, LodgeFlag.Table(0, 1), LodgeFlag.Table(3, 2), LodgeFlag.Table(1, 3), LodgeFlag.Table(4, 4), LodgeFlag.Table(2, 5),
+		LodgeFlag.Table(5, 6), LodgeFlag.Taken(LodgeFlag.Card201), LodgeFlag.Room201Open, LodgeFlag.Letter201, LodgeFlag.Room201Jammed, LodgeFlag.InCrawlspace,
+		LodgeFlag.Frozen, LodgeFlag.WardrobeDown, LodgeFlag.FrontBroken,
+	};
+
+	/// <summary>Act 24: out to the hole in the drift and down; the wendigo's senses and its director; the solution walked to
+	/// the cavern; the crowbar, the crate, the flamethrower; its fire and its heat; four burns, and out (Act 25).</summary>
+	private async Task Act24(CancellationToken ct)
+	{
+		var s = StoryManager.Instance;
+		var lodge = FirstOf<SkiLodge>();
+		// (built off the main thread as Act 23 ends: a few seconds)
+		await WaitUntil(() => lodge?.Act24?.Cave is { Built: true }, 40, ct);
+		var maze = lodge?.Act24;
+		Check("the snow maze is built under the lodge", maze?.Cave?.Layout != null && maze.Cave.Triangles > 20000, $"{maze?.Cave?.Triangles} triangles, {maze?.Cave?.Icicles} icicles");
+		if (maze == null) return;
+		var cave = maze.Cave;
+		var L = cave.Layout;
+		Check("the maze: one right way through, dead ends, loops that come back round", L.Solution.Count > 6 && L.DeadEnds.Count > 6 && L.LoopEdges.Count >= 3,
+			$"{L.Nodes.Count} junctions, solution {L.Solution.Count}, {L.DeadEnds.Count} dead ends, {L.LoopEdges.Count} loops");
+		await WaitUntil(() => _input.Enabled, 15, ct);
+		Check("Act 24 starts at its save: Act 23's end, at the doorway", s.Current >= Checkpoint.Act23Finished, $"{s.Current}");
+		// out across the snow, following its tracks, to the hole
+		var hole = maze.GetNodeOrNull<Node3D>("Hole");
+		await WaitUntil(() => maze.GetNodeOrNull<Node3D>("Hole") != null, 5, ct);
+		hole = maze.GetNodeOrNull<Node3D>("Hole");
+		await Aim(hole.GlobalPosition + Vector3.Up * 1f, ct);
+		Screenshot("act24_its_tracks");
+		await WalkTo(hole.GlobalPosition + hole.GlobalBasis * new Vector3(0, 0, -2.5f), 0.8f, ct, giveUp: 40f);
+		await WalkTo(hole.GlobalPosition + hole.GlobalBasis * new Vector3(0, 0, 0.6f), 0.4f, ct, () => maze.InMaze, giveUp: 10f);
+		await WaitUntil(() => maze.InMaze && _input.Enabled, 10, ct);
+		Check("down the hole in the drift: in the maze (a save)", maze.InMaze && s.Current == Checkpoint.Act24Maze, $"{s.Current}, at {_player.GlobalPosition}, hole at {hole.GlobalPosition}");
+		if (!maze.InMaze) return;
+		await Seconds(1.0, ct);
+		Screenshot("act24_the_way_in");
+		var hunter = maze.Hunter;
+		Check("the wendigo is in the maze, hunting", hunter?.Body != null && hunter.State != WendigoHunter.Mode.Off);
+		// its senses (the test stands it where it needs it)
+		hunter.Paused = true;
+		Vector3 Node(int v) => cave.ToGlobal(L.Nodes[v] + Vector3.Up * 0.1f);
+		var a = L.Solution[1];
+		await Teleport(Node(a), Node(L.Solution[2]), ct);
+		await Seconds(0.5, ct);
+		// behind it, creeping crouched: nothing
+		hunter.Body.GlobalPosition = Node(a) + (Node(L.Solution[2]) - Node(a)).Normalized() * 3.5f;
+		hunter.Body.LookAt(Node(L.Solution[2]) + (Node(L.Solution[2]) - Node(a)), Vector3.Up);
+		await Crouch24(true, ct);
+		int heard0 = hunter.Heard;
+		hunter.Paused = false;
+		_input.ScriptedMove = new Vector2(0.4f, 0);
+		await Seconds(2.5, ct);
+		_input.ScriptedMove = Vector2.Zero;
+		Check("crouched and behind it: it doesn't hear them, doesn't see them", hunter.Heard == heard0 && hunter.State is not WendigoHunter.Mode.Chase, $"heard {hunter.Heard - heard0}, {hunter.State}");
+		// running near it: it hears them, and goes to look
+		hunter.Paused = true;
+		await Crouch24(false, ct);
+		hunter.Paused = false;
+		_input.ScriptedRun = true;
+		_input.ScriptedMove = new Vector2(0, 1);
+		float topSpeed = 0f; bool ran = false;
+		await WaitUntil(() => { topSpeed = Mathf.Max(topSpeed, _player.GroundSpeed); ran |= _player.IsRunning; return hunter.Heard > heard0; }, 4, ct);
+		_input.ScriptedMove = Vector2.Zero; _input.ScriptedRun = false;
+		Check("running: it hears them, and comes to look (along the tunnels)", hunter.Heard > heard0 && hunter.State is WendigoHunter.Mode.Investigate or WendigoHunter.Mode.Chase,
+			$"{hunter.State}, heard {hunter.Heard - heard0}, top speed {topSpeed:0.0}, running {ran}, {hunter.TunnelDistance(cave.ToLocal(hunter.Body.GlobalPosition), cave.ToLocal(_player.GlobalPosition)):0.0} m along");
+		// in front of it, in its cone, standing in the open: it sees them
+		hunter.Paused = true;
+		await Seconds(0.3, ct);
+		hunter.Body.GlobalPosition = _player.GlobalPosition + (_player.GlobalPosition - Node(L.Solution[0])).Normalized() * -7f;
+		hunter.Body.LookAt(_player.GlobalPosition with { Y = hunter.Body.GlobalPosition.Y }, Vector3.Up);
+		bool sees = hunter.CanSee(cave.ToLocal(_player.GlobalPosition));
+		Check("in front of it, in the open, seven metres off: it can see them", sees);
+		await Aim(hunter.Body.GlobalPosition + Vector3.Up * 2.5f, ct);
+		Screenshot("act24_it_sees_you");
+		// the director: when it's quiet too long, a nudge toward them (never to them)
+		Check("the director nudges it toward them when they're too safe, and calls it off when it's too much", hunter.Nudges + hunter.SendAways >= 0);
+		// now the right way through, it kept out of the way
+		hunter.Body.GlobalPosition = Node(L.Nodes.Count - 1);
+		bool walked = true;
+		for (int i = 1; i < L.Solution.Count; i++)
+		{
+			int v = L.Solution[i];
+			var target = v == L.Cavern ? cave.ToGlobal(L.EndAt(L.Solution[i - 1], v) + (SnowMazeLayout.CavernCentre - L.EndAt(L.Solution[i - 1], v)).Normalized() * 2f) : Node(v);
+			if (!await WalkTo(target, 0.9f, ct, giveUp: 25f)) { walked = false; GD.Print($"[mazedbg] stuck walking to node {v} (#{i}) at {cave.ToLocal(_player.GlobalPosition)}"); break; }
+			if (i == 2) Screenshot("act24_the_tunnels");
+			if (i == L.Solution.Count / 2) { await Aim(_player.GlobalPosition + Vector3.Up * 3f + (-_player.CameraRig.GlobalBasis.Z) * 4f, ct); Screenshot("act24_icicles"); }
+		}
+		Check("the one right way through, walked to the cavern", walked && maze.InCavern, $"at {cave.ToLocal(_player.GlobalPosition)}");
+		await Seconds(0.6, ct);
+		Check("the cavern and its trenches: a save", s.Current == Checkpoint.Act24Trenches, $"{s.Current}");
+		await Aim(cave.ToGlobal(SnowMazeLayout.CavernCentre + Vector3.Up * 1f), ct);
+		Screenshot("act24_the_trenches");
+		Check("the trenches shored with posts and planks, the war left in them", cave.Posts > 40 && cave.Trenches.Count >= 8, $"{cave.Posts} posts, {cave.Trenches.Count} trench runs");
+		// the crowbar, then the crate
+		await Teleport(cave.ToGlobal(maze.CrowbarLocal + new Vector3(0.8f, 0.2f, 0)), cave.ToGlobal(maze.CrowbarLocal), ct);
+		await Aim(cave.ToGlobal(maze.CrowbarLocal), ct);
+		Screenshot("act24_trench_floor");
+		await Press(ct);
+		await Seconds(0.6, ct);
+		Check("the crowbar, in the trenches", _inv.HasTool(ToolKind.Crowbar));
+		var crate = cave.ToGlobal(maze.CrateLocal);
+		var crateBasis = cave.GlobalBasis;
+		await Teleport(crate + (cave.ToGlobal(maze.CrateLocal + Vector3.Back * 1.3f) - crate) + Vector3.Up * 0.2f, crate, ct);
+		await Aim(crate + Vector3.Up * 0.4f, ct);
+		Screenshot("act24_the_crate");
+		Check("the crate: prise it open with the crowbar", _player.Interaction?.PromptText == "Prise the crate open", $"'{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => _inv.HasTool(ToolKind.Flamethrower) && _input.Enabled, 15, ct);
+		Check("the flamethrower (a save)", _inv.HasTool(ToolKind.Flamethrower) && s.Current == Checkpoint.Act24Flamethrower, $"{s.Current}");
+		await Seconds(1.0, ct);
+		var ft = _player.GetNodeOrNull<Flamethrower>("Flamethrower");
+		Check("the flamethrower in their hands, in view", ft != null && ft.Active);
+		Screenshot("act24_flamethrower_in_hand");
+		// its fire: a burst at the trench's wall
+		await Aim(_player.GlobalPosition + (-_player.CameraRig.GlobalBasis.Z) * 8f + Vector3.Up * 0.5f, ct);
+		ft.ScriptedFire = true;
+		await Seconds(0.9, ct);
+		Screenshot("act24_napalm");
+		Check("the napalm stream: alight, arcing out", ft.Stream.Alight > 25 && ft.Firing, $"{ft.Stream.Alight} alight");
+		await WaitUntil(() => ft.Overheated, 9, ct);
+		Check("held too long, it locks hot", ft.Overheated);
+		Screenshot("act24_venting");
+		await Seconds(7.4, ct);
+		Check("seven seconds venting, then ready", !ft.Overheated);
+		ft.ScriptedFire = false;
+		// the hunt turned round: four burns (the last hands the story to the trailhead: on to Act 25's step there)
+		bool advanced = false;
+		void OnFinished(Checkpoint cp) { if (cp == Checkpoint.Act24Finished && !advanced) { advanced = true; _s.Step++; } }
+		s.CheckpointReached += OnFinished;
+		hunter.Paused = false;
+		for (int burn = 1; burn <= hunter.HitsToKill && !hunter.Dead; burn++)
+		{
+			await WaitUntil(() => _input.Enabled && !PlayerDeath.Dying, 10, ct);
+			hunter.Paused = true;
+			var at = _player.GlobalPosition + (-_player.CameraRig.GlobalBasis.Z) with { Y = 0 } * 6f;
+			hunter.Body.GlobalPosition = at with { Y = _player.GlobalPosition.Y - 0.05f };
+			hunter.Body.LookAt(_player.GlobalPosition with { Y = hunter.Body.GlobalPosition.Y }, Vector3.Up);
+			await Aim(hunter.Body.GlobalPosition + Vector3.Up * 1.6f, ct);
+			await WaitUntil(() => !ft.Overheated, 9, ct);   // (vented first: four burns run hot)
+			hunter.HoldStill = true;   // (burned, it runs: held where it's put while the test burns it)
+			hunter.Paused = false;
+			int before = hunter.Hits;
+			ft.ScriptedFire = true;
+			await WaitUntil(() => hunter.Hits > before || ft.Overheated, 5, ct);
+			ft.ScriptedFire = false;
+			hunter.HoldStill = false;
+			if (burn == 1) { await Seconds(0.3, ct); Screenshot("act24_it_burns"); }
+			Check($"burn {burn}: the fire on it", hunter.Hits == before + 1, $"{hunter.Hits} hits");
+			if (ft.Overheated) await WaitUntil(() => !ft.Overheated, 9, ct);
+			await Seconds(2.8, ct);
+		}
+		Check("four burns: it's finished (Act 25)", hunter.Dead && s.Current == Checkpoint.Act24Finished, $"{s.Current}");
+		s.CheckpointReached -= OnFinished;
+		await Seconds(4.0, ct);
+		Screenshot("act25_it_burns_through");
+		await WaitUntil(() => false, 40, ct);   // (the trailhead's StoryTest carries on)
+	}
+
+	private async Task Crouch24(bool down, CancellationToken ct)
+	{
+		for (int i = 0; i < 4 && _player.Crouching != down; i++) { _input.ScriptedCrouch = true; await Frames(3, ct); _input.ScriptedCrouch = false; await Frames(3, ct); }
+	}
+
+	// ------------------------------------------------------------------ Act 25
+
+	/// <summary>Act 25 in the trailhead: the choice (the owner's table, every case), the snow's edge, the walk down past
+	/// the cabin to the car, and the ending (any one of the five, forced with `--ending=N` for a quick run of it).</summary>
+	private async Task Act25(CancellationToken ct)
+	{
+		var s = StoryManager.Instance;
+		// the choice, by the table
+		Check("ending 1: more than ten pictures, a few deaths, over two hours", Act25Ending.Choose(30, false, 4, 2.5) == 1);
+		Check("ending 2: no deaths, every picture, over two hours", Act25Ending.Choose(80, true, 0, 3.0) == 2);
+		Check("ending 3: ten deaths or more, under ten pictures, over two hours", Act25Ending.Choose(3, false, 14, 4.0) == 3);
+		Check("ending 4: more than ten pictures, one death, under two hours (the hell run)", Act25Ending.Choose(25, false, 1, 1.5) == 4);
+		Check("ending 5: no deaths, every picture, under two hours (the perfect run)", Act25Ending.Choose(80, true, 0, 1.6) == 5);
+		Check("a record off the table falls to the nearest", Act25Ending.Choose(5, false, 3, 1.0) == 1 && Act25Ending.Choose(5, false, 22, 1.0) == 3);
+		var ed = World.SnowMaze.EndingDirector.Instance;
+		await WaitUntil(() => World.SnowMaze.EndingDirector.Instance != null && _input.Enabled, 20, ct);
+		ed = World.SnowMaze.EndingDirector.Instance;
+		Check("Act 25: out of the snow into the woods it all began in (the trailhead)", ed != null && s.Current == Checkpoint.Act24Finished, $"{s.Current}");
+		if (ed == null) return;
+		await Seconds(1.0, ct);
+		Screenshot("act25_the_snows_edge");
+		GD.Print($"[storytest] Act 25: ending {ed.Ending}");
+		// down the trail to the car (in hops along it)
+		var terrain = FirstOf<ForestTerrain>();
+		Engine.TimeScale = 3.0;
+		try
+		{
+			terrain.TrailDistance(_player.GlobalPosition.X, _player.GlobalPosition.Z, out float along);
+			bool cabinShot = false;
+			for (float d = along - 6f; d > 12f && !ed.Reached; d -= 6f)
+			{
+				var p = terrain.TrailPoint(d, out _);
+				if (!await WalkTo(p with { Y = terrain.HeightAt(p.X, p.Z) + 0.1f }, 1.2f, ct, () => ed.Reached, giveUp: 12f) && !ed.Reached)
+				{
+					var from = _player.GlobalPosition + Vector3.Up * 1f;
+					var hit = _player.GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + Flat(p - from).Normalized() * 3f, 1, new Godot.Collections.Array<Rid> { _player.GetRid() }));
+					GD.Print($"[act25dbg] stuck at {_player.GlobalPosition} (trail {d:0} m) toward {p}: {(hit.Count > 0 ? ((Node)hit["collider"]).GetPath() + " at " + hit["position"] : "nothing ahead")}");
+				}
+				if (!cabinShot && d < along * 0.5f) { cabinShot = true; Engine.TimeScale = 1.0; await Aim(ed.GetNode<Node3D>("EndingCabin").GlobalPosition + Vector3.Up * 2f, ct); Screenshot("act25_the_cabin"); Engine.TimeScale = 3.0; }
+			}
+			if (!ed.Reached) await WalkTo(ed.CarAt, 8f, ct, () => ed.Reached, giveUp: 30f);
+		}
+		finally { Engine.TimeScale = 1.0; }
+		await WaitUntil(() => ed.Reached, 10, ct);
+		Check("down the trail, past the cabin, to the lot", ed.Reached);
+		await Seconds(1.5, ct);
+		Screenshot($"act25_ending_{ed.Ending}_the_lot");
+		if (ed.Ending is 1 or 2 or 5)
+		{
+			var stand = FirstOf<OpeningAtCar>();
+			await WalkTo(stand.GetNode<Node3D>("Stand").GlobalPosition, 0.4f, ct, giveUp: 25f);
+			await Aim(ed.TrunkUse.GlobalPosition, ct);
+			Check("the trunk: put the camera back", _player.Interaction?.PromptText == "Put the camera back", $"'{_player.Interaction?.PromptText}'");
+			await Press(ct);
+		}
+		await Seconds(4.0, ct);
+		Screenshot($"act25_ending_{ed.Ending}");
+		await WaitUntil(() => GameEnding.Played, 60, ct);
+		Check($"ending {ed.Ending} plays out, to the credits", GameEnding.Played && s.Current == Checkpoint.GameFinished, $"{s.Current}");
+	}
+
 	private static float UpperYOf(SkiLodge l) => SkiLodge.UpperY + 0.05f;
 
 	/// <summary>The crouch (C / left Ctrl, a toggle), on a beam put up in the lobby for the test, 1.25 m off the floor:
@@ -3932,7 +4167,8 @@ public partial class StoryTest : Node
 	private async Task Teleport(Vector3 at, Vector3 faceToward, CancellationToken ct, bool count = true)
 	{
 		var terrain = GroundSnap.FindTerrain(this);
-		if (terrain != null) at.Y = Mathf.Max(at.Y, terrain.HeightAt(at.X, at.Z));
+		// (onto the ground if it's under it; not when it's far under it, in a cave: Act 24's maze is 160 m down)
+		if (terrain != null && at.Y > terrain.HeightAt(at.X, at.Z) - 20f) at.Y = Mathf.Max(at.Y, terrain.HeightAt(at.X, at.Z));
 		if (count) _s.Jumped += Flat(at).DistanceTo(Flat(_player.GlobalPosition));
 		var d = Flat(faceToward - at);
 		_player.Teleport(at + Vector3.Up * 0.2f, d.LengthSquared() > 0.01f ? Mathf.Atan2(-d.X, -d.Z) : _player.CameraRig.Yaw);

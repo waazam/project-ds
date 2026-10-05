@@ -30,6 +30,7 @@ public partial class EquippedItemHud : CanvasLayer
 
 	public override void _Ready()
 	{
+		AddToGroup("equipped_item_hud");
 		Layer = 13;
 		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.BottomRight);

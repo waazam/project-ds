@@ -23,6 +23,8 @@ uniform vec3 bite_color : source_color = vec3(0.035, 0.03, 0.04);
 /// How hard the light's edge is (0 soft as usual .. 1 a sharp terminator).
 uniform float hard_light = 0.75;
 uniform float glint = 0.35;
+/// Burned (Act 24, the flamethrower): charred black in blotches, embers glowing faintly in the cracks.
+uniform float char_amount = 0.0;
 
 varying vec3 v_model;
 varying vec3 v_world_n;
@@ -43,6 +45,9 @@ void fragment() {
 	float up = clamp(v_world_n.y, 0.0, 1.0);
 	float crust = smoothstep(0.35, 0.75, up + (n2 - 0.5) * 0.45) * frost * (1.0 - bite * 0.7);
 	col = mix(col, frost_color * (0.85 + 0.25 * n2), crust * 0.75);
+	float ch = smoothstep(1.0 - char_amount, 1.0 - char_amount + 0.25, n * 0.6 + n2 * 0.4 + char_amount * 0.3) * step(0.001, char_amount);
+	col = mix(col, vec3(0.025, 0.02, 0.018), ch);
+	EMISSION = vec3(0.9, 0.25, 0.05) * smoothstep(0.75, 0.95, n2) * ch * 0.25;
 	ALBEDO = col;
 	NORMAL_MAP = texture(normal_tex, UV).rgb;
 	NORMAL_MAP_DEPTH = 1.2;

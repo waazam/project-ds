@@ -32,7 +32,8 @@ public partial class StoryManager : Node
 	public const string LevelScene = TrailheadScene;
 
 	/// <summary>The level a checkpoint belongs to: everything from the first climb on happens in the hollow.</summary>
-	public static string LevelFor(Checkpoint cp) => cp >= Checkpoint.Act2StairsClimbed ? HollowScene : TrailheadScene;
+	// (Act 25 goes back to where it began: out of the snow into the trailhead's woods, and the car)
+	public static string LevelFor(Checkpoint cp) => cp >= Checkpoint.Act24Finished ? TrailheadScene : cp >= Checkpoint.Act2StairsClimbed ? HollowScene : TrailheadScene;
 
 	/// <summary>True for one level load: the player got here by the stairs letting go of them (Act 2),
 	/// not by Continue. GameFlow plays the slow wake instead of the usual fade-in.</summary>
@@ -237,9 +238,28 @@ public partial class StoryManager : Node
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
 
+	/// <summary>The game's record (Act 25's endings): deaths in all, and seconds played, carried in the save.</summary>
+	public int TotalDeaths { get; private set; }
+	public double PlaySeconds { get; private set; }
+
+	/// <summary>A death: counted, and saved at once (the reload that follows reads the save).</summary>
+	public void NoteDeath()
+	{
+		TotalDeaths++;
+		Save();
+	}
+
+	public override void _Process(double delta)
+	{
+		// the time played: in a level, not paused
+		if (GameFlow.Instance is { Started: true } && !GetTree().Paused) PlaySeconds += delta;
+	}
+
 	public void StartNewGame()
 	{
 		Current = Checkpoint.None;
+		TotalDeaths = 0;
+		PlaySeconds = 0;
 		_flags.Clear();
 		LoadedFromSave = false;
 		PendingInventory = null;
@@ -255,6 +275,8 @@ public partial class StoryManager : Node
 		if (data == null) return false;
 		_continueData = data;
 		Current = data.Checkpoint;
+		TotalDeaths = data.Deaths;
+		PlaySeconds = data.PlaySeconds;
 		_flags.Clear();
 		foreach (var f in data.Flags) _flags.Add(f);
 		if (data.Checkpoint >= Checkpoint.Act2StairsClimbed) _flags.Add(Flag.StairsClimbed);
@@ -349,6 +371,8 @@ public partial class StoryManager : Node
 			PosX = _lastPos.X, PosY = _lastPos.Y, PosZ = _lastPos.Z, Yaw = _lastYaw,
 			Flags = _flags.ToArray(),
 			Inventory = inv?.Serialize() ?? PendingInventory ?? "",
+			Deaths = TotalDeaths,
+			PlaySeconds = PlaySeconds,
 		});
 		Saved?.Invoke();
 	}

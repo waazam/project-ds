@@ -259,8 +259,9 @@ public partial class SkiLodge
 		FinaleDone = true;
 		GD.Print("[story] Act 23: at the splintered doorway, looking left, and right - the end of Act 23");
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act23Finished);
-		// the story's last act, for now: its end is the game's (GameEnding.LastAct)
-		if (GameEnding.LastAct == Checkpoint.Act23Finished) await GameEnding.Play(this, player, ct);
+		// on into Act 24: its tracks go off across the snow, to a hole in a drift (the maze is built, if it wasn't)
+		EnsureAct24();
+		_ = StoryBeat.Caption(this, "Its tracks go off across the snow.", 0.6f, 2.8f, 1f);
 	}
 
 	// (the finale's marks, lodge-local: the walk over the hall's west-back side (the west-front's was behind the
@@ -278,6 +279,10 @@ public partial class SkiLodge
 	private const float Pace = 0.8f;
 
 	public bool FinaleLanded { get; private set; }
+	/// <summary>Act 24's maze and the hole down to it (built once the front doors are gone).</summary>
+	public World.SnowMaze.Act24Maze Act24 { get; private set; }
+	public void EnsureAct24() { if (Act24 == null || !IsInstanceValid(Act24)) Act24 = World.SnowMaze.Act24Maze.Build(this); }
+
 	/// <summary>For tests: it came at them and leaned down into their face before it turned to the doors.</summary>
 	public bool FinaleLeanedIn { get; private set; }
 	public int FinaleRams { get; private set; }

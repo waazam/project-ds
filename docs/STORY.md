@@ -208,8 +208,28 @@ Behind them the roof lets its snow go and buries the back door: snowed in. Every
 - **The crawlspace:** a maze between the walls, pine boards and old brick, pipes across at head height to duck under. Something howls in the walls the whole way. Its arm comes through the boards four times, reaching and grabbing, and the only way on is under it. At the end, the back of a wardrobe: pushed over, it's the dining hall, and while they were in the walls the lodge has frozen over (**Checkpoint 29**, Act23Frozen).
 - **The front doors:** chained ("Requires Master Key.", though there is no master key) until the freeze; now they stand ajar, and give a little at a time against the snow. A howl behind: it's on the balcony across the hall. "STARVING..... FREEZING..... FOREVER...." It climbs onto the rail and crouches there, then comes off it at them; they throw themselves aside and it lands where they stood, down on its hands on the boards, a few steps away. It turns and looks at them. Then it turns to the doors, strikes them once (they bow and hold, and its claws rake down through them), draws back, and goes through them: one leaf wrenched off its hinge, the other flung out across the porch. It crosses the porch and is gone into the storm. They get up, walk to the splintered doorway, and look out, left, and right (**Checkpoint 30**, Act23Finished).
 
-## Acts 24 and 25
-To come.
+## Act 24: The Snow Maze
+Its tracks lead off the porch across the snow to a drift in front of the lodge with a black hole in it. Down the hole, and it's a maze of tunnels in the snow far below: blue ice, scalloped like the inside of a shell, icicles in curtains, a pale shaft of daylight here and there down a hole in the roof, and very quiet (**Checkpoint 31**, Act24Maze). Dead ends, loops that bring them back round, and one right way through.
+
+The wendigo is down here, hunting.
+- **It hears:** running carries far along the tunnels, walking less, crouching hardly at all, and standing still not at all. Behind it, it hears half as well.
+- **It sees** in a cone ahead of it, out into the dark, but not through the snow; crouching and a dark lantern keep them harder to see.
+- **A director** above it always knows where they are and never tells it. If they've been safe too long it nudges the wendigo their way. If it has been on them too long, it calls it off somewhere else.
+
+At the maze's middle is a great cavern, and in it trenches from a war eighty years gone: shored with posts and planks, sandbags, helmets and rifles, soldiers still in their gear, crates (**Checkpoint 32**, Act24Trenches). One crate is stencilled "FLAME THROWER, PORTABLE" and nailed shut. A crowbar lies somewhere in the trenches. Prised open, the crate holds a flamethrower, and it still works (**Checkpoint 33**, Act24Flamethrower). Far off in the tunnels, it screams: it heard.
+- **The flamethrower** is their only weapon. Its fuel never runs out, but it overheats: held too long, it locks and vents for seven seconds. Its fire is a rope of burning napalm that arcs out, splashes and clings where it lands, and rolls up into black smoke.
+- **The hunt turns round:** burned once, the wendigo becomes the prey. It flees and hides, stalks them from behind and comes at them from ambush, and it can still kill.
+- **Four burns** and it's finished (**Checkpoint 34**, Act24Finished).
+
+## Act 25: The Endings
+Burning, the wendigo falls against the maze's wall and burns through it: a way out. Out of the snow and into the woods it all began in, down the trail past an old cabin to the trailhead's lot and the car. Which of five endings they see is decided by how many pictures they took, how many times they died, and how long they took:
+- **1** (more than ten pictures, a few deaths, over two hours): the camera back in the trunk. Black. The credits.
+- **2** (every picture, no deaths, over two hours): the camera back in the trunk. Black, held five seconds; far off, it howls. The credits.
+- **3** (ten deaths or more, fewer than ten pictures, over two hours): the wendigo crashes down on the car and comes at them burning. They turn, and the stalker is there. Black.
+- **4** (more than ten pictures, one death, under two hours): fog. Where the car should be are the stairs, blood running down them a step at a time. They climb, not by choice, faster and faster. Black. The credits.
+- **5** (every picture, no deaths, under two hours): fog, but the car really is there. The camera in the trunk; black, five seconds; then they're in the driver's seat, and the engine turns over.
+
+A record off the table falls to the nearest ending.
 
 ## The end
 After the last act: the save that marks the story done (**GameFinished**), the fade, the end card, the player's pictures played back as polaroids, "GLHFDD", "Thanks for playing.", and the main menu. A Continue afterwards finds the player where the story ended.

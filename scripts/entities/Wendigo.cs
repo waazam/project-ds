@@ -92,8 +92,8 @@ public partial class Wendigo : Node3D
 		if (_anim != null)
 		{
 			_anim.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual;
-			var idle = _anim.GetAnimation("idle");
-			if (idle != null) idle.LoopMode = Animation.LoopModeEnum.Linear;
+			foreach (var loop in new[] { "idle", "walk", "run" })
+				if (_anim.GetAnimation(loop) is { } a) a.LoopMode = Animation.LoopModeEnum.Linear;
 			_anim.Play("idle");
 		}
 		Tune(_model);
@@ -173,6 +173,9 @@ public partial class Wendigo : Node3D
 		return _skinMat;
 	}
 
+	/// <summary>Burned (Act 24): its hide charred black by the fire, 0 .. 1 (the skin's char).</summary>
+	public void Char(float amount) => _skinMat?.SetShaderParameter("char_amount", Mathf.Clamp(amount, 0f, 1f));
+
 	/// <summary>The heart of ice beating, slow and faint: a long swell and a fade, once every three seconds or so.</summary>
 	private void PulseHeart()
 	{
@@ -232,6 +235,9 @@ public partial class Wendigo : Node3D
 	// ------------------------------------------------------------------ life
 
 	/// <summary>Stand at <paramref name="ground"/> facing <paramref name="look"/>, visible.</summary>
+	/// <summary>Its size (1: its full 4.7 m). In Act 24's snow tunnels, cramped and stooping, it is drawn smaller.</summary>
+	public void SetSize(float s) { if (_body != null) _body.Scale = Vector3.One * s; }
+
 	public void StandAt(Vector3 ground, Vector3 look)
 	{
 		_leapT = -1f;

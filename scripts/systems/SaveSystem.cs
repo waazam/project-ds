@@ -62,6 +62,14 @@ public enum Checkpoint
 	Act23Frozen = 29,
 	/// <summary>Act 23's end: the front door, the wendigo off the balcony and out through it; at the splintered doorway.</summary>
 	Act23Finished = 30,
+	/// <summary>Act 24: down the hole in the drift in front of the lodge, into the snow maze.</summary>
+	Act24Maze = 31,
+	/// <summary>Act 24: through the maze to its heart, the cavern and its trenches.</summary>
+	Act24Trenches = 32,
+	/// <summary>Act 24: the crate prised open, the flamethrower in hand.</summary>
+	Act24Flamethrower = 33,
+	/// <summary>Act 24's end: the fourth burn, the wendigo finished; Act 25 (out, and the ending) in the trailhead level.</summary>
+	Act24Finished = 34,
 	/// <summary>The end of the story: the last act done, the credits rolled (GameEnding). Continue puts them back where it
 	/// ended, free to look round. Held far above the acts' own numbers, so the acts still to come number in before it
 	/// and every "at least this far" test stays in story order.</summary>
@@ -77,6 +85,9 @@ public class SaveData
 	public float PosX, PosY, PosZ, Yaw;
 	public string[] Flags = System.Array.Empty<string>();
 	public string Inventory = "";
+	/// <summary>The game's record, for the endings (Act 25): deaths in all, and seconds played.</summary>
+	public int Deaths;
+	public double PlaySeconds;
 }
 
 /// <summary>
@@ -105,6 +116,8 @@ public static class SaveSystem
 		cfg.SetValue("save", "yaw", data.Yaw);
 		cfg.SetValue("save", "flags", string.Join(",", data.Flags));
 		cfg.SetValue("save", "inventory", data.Inventory ?? "");
+		cfg.SetValue("save", "deaths", data.Deaths);
+		cfg.SetValue("save", "play_seconds", data.PlaySeconds);
 		cfg.SetValue("save", "saved_at", Time.GetUnixTimeFromSystem());
 		var err = cfg.Save(target);
 		if (err != Error.Ok) GD.PushError($"SaveSystem: failed to write {target}: {err}");
@@ -145,6 +158,8 @@ public static class SaveSystem
 			Yaw = (float)cfg.GetValue("save", "yaw", 0f),
 			Flags = ((string)cfg.GetValue("save", "flags", "")).Split(',', System.StringSplitOptions.RemoveEmptyEntries),
 			Inventory = (string)cfg.GetValue("save", "inventory", ""),
+			Deaths = (int)cfg.GetValue("save", "deaths", 0),
+			PlaySeconds = (double)cfg.GetValue("save", "play_seconds", 0.0),
 		};
 	}
 }

@@ -79,6 +79,14 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"wendigo_land_{i:00}", sfx, false, Lo, (
 for (int i = 1; i <= 2; i++) jobs.Add(($"door_ram_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Ram(r, sr, false)));
 jobs.Add(("door_ram_burst", sfx, false, Lo, (r, sr) => LodgeDoor.Ram(r, sr, true)));
 jobs.Add(("fly_buzz_loop", ambient, true, Lo, (r, sr) => LodgeDoor.FlyBuzz(r, sr)));
+// Acts 24-25 (2026-10-04): the flamethrower, the snow cave, the car.
+for (int i = 1; i <= 2; i++) jobs.Add(($"flame_ignite_{i:00}", sfx, false, Lo, (r, sr) => Act24Sounds.Ignite(r, sr)));
+jobs.Add(("flame_roar_loop", ambient, true, Lo, (r, sr) => Act24Sounds.Roar(r, sr, 20)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"flame_stop_{i:00}", sfx, false, Lo, (r, sr) => Act24Sounds.Stop(r, sr)));
+jobs.Add(("flame_overheat", sfx, false, Lo, (r, sr) => Act24Sounds.Overheat(r, sr)));
+jobs.Add(("flame_ready", sfx, false, Lo, (r, sr) => Act24Sounds.Ready(r, sr)));
+jobs.Add(("snow_cave_loop", ambient, true, Lo, (r, sr) => Act24Sounds.Cave(r, sr, 30)));
+jobs.Add(("car_start", sfx, false, Lo, (r, sr) => Act24Sounds.CarStart(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"wing_flutter_{i:00}", sfx, false, Lo, (r, sr) => Forest.WingFlutter(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"claw_rake_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Rake(r, sr)));
 // Creature candidates (not wired into the game yet): growls, roars (near / far), screeches, snarls.

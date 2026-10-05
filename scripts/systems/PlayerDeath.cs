@@ -20,7 +20,7 @@ public static class PlayerDeath
 	public static int Deaths { get; private set; }
 
 	/// <summary>Marks a death as begun (so other beats can stand down); call before the death animation.</summary>
-	public static void Begin() { Dying = true; Deaths++; }
+	public static void Begin() { Dying = true; Deaths++; StoryManager.Instance?.NoteDeath(); }
 
 	/// <summary>Black, the line, and back to the last checkpoint.</summary>
 	public static async Task Reload(Node owner, string line, CancellationToken ct)

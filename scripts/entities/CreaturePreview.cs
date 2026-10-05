@@ -61,6 +61,8 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--shelter") >= 0) { await ShelterTest(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bake-snow") >= 0) { await BakeSnow(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lodge") >= 0) { await LodgeShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--maze") >= 0) { await MazeShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--flame") >= 0) { await FlameShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--prints") >= 0) { await PrintShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bench") >= 0) { await Bench(); GetTree().Quit(); return; }
@@ -944,5 +946,77 @@ public partial class CreaturePreview : Node3D
 		await Shot("frozen_dining_window", new Vector3(24f, 1.7f, 3f), new Vector3(24f, 2f, -7.6f));
 		await Shot("frozen_lobby", new Vector3(0, 1.7f, -2f), new Vector3(0f, 3f, 10f));
 		await Shot("lodge_mudroom", new Vector3(-28f, 1.6f, -5.5f), new Vector3(-30f, 1.2f, -1.7f));
+	}
+
+	/// <summary>Act 24's snow maze, standing alone: its way in, its tunnels and alcoves, a skylight, the cavern and the
+	/// trenches; lit as in the game (the cave's own faint light, a lantern at the eye).</summary>
+	private async Task MazeShots()
+	{
+		env.BackgroundColor = new Color(0.01f, 0.012f, 0.02f);
+		env.AmbientLightColor = new Color(0.3f, 0.4f, 0.55f);
+		env.AmbientLightEnergy = 0.12f;
+		foreach (var c in GetChildren()) if (c is DirectionalLight3D d) d.Visible = false;
+		var cave = new World.SnowMaze.SnowMazeCave { Name = "Cave" };
+		AddChild(cave);
+		await Seconds(0.5);
+		cave.DressTrenches(out var crow, out var crate, out var yaw);
+		var lamp = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.55f), LightEnergy = 1.1f, OmniRange = 9f };
+		AddChild(lamp);
+		var L = cave.Layout;
+		async Task Lit(string n, Vector3 eye, Vector3 at) { lamp.Position = eye; await Shot(n, eye, at); }
+		_cam.Fov = 75f;
+		await Lit("maze_way_in", cave.ArriveAt + new Vector3(0, 1.6f, 0), L.Nodes[L.Entrance] + Vector3.Up * 1.4f);
+		var a = L.Nodes[L.Solution[2]];
+		var b = L.Nodes[L.Solution[3]];
+		await Lit("maze_tunnel", a + Vector3.Up * 1.6f, b + Vector3.Up * 1.3f);
+		await Lit("maze_tunnel_back", b + Vector3.Up * 1.6f, a + Vector3.Up * 1.6f);
+		if (cave.Alcoves.Count > 0)
+		{
+			var (al, outw) = cave.Alcoves[0];
+			await Lit("maze_alcove", al - outw * 3.5f + Vector3.Up * 1.5f, al + Vector3.Up * 0.8f);
+		}
+		if (cave.Skylights.Count > 0) await Lit("maze_skylight", cave.Skylights[0] + new Vector3(3f, 1.6f, 0.5f), cave.Skylights[0] + Vector3.Up * 4f);
+		var cc = World.SnowMaze.SnowMazeLayout.CavernCentre;
+		await Lit("maze_cavern", cc + new Vector3(-12f, 2.2f, -9f), cc);
+		await Lit("maze_trench", cave.Trenches[0].a + new Vector3(0.2f, -0.4f, 0.2f), cave.Trenches[0].b + Vector3.Down * 1.0f);
+		await Lit("maze_trench_props", crow + new Vector3(1.2f, 1.2f, 1.2f), crow);
+		await Lit("maze_crate", crate + new Vector3(0f, 1.4f, -1.6f), crate);
+		await Lit("maze_cavern_roof", cc + new Vector3(0, 1.6f, 0), cc + new Vector3(4f, 8f, 3f));
+		GD.Print($"[creature-preview] maze: {cave.Triangles} triangles, {cave.Icicles} icicles, {cave.Posts} posts");
+	}
+
+	/// <summary>The flamethrower's stream: fired at a snow wall across a dark room, watched from beside the nozzle and from
+	/// the side, while it flies and where it splashes.</summary>
+	private async Task FlameShots()
+	{
+		env.BackgroundColor = new Color(0.01f, 0.012f, 0.02f);
+		env.AmbientLightEnergy = 0.08f;
+		foreach (var c in GetChildren()) if (c is DirectionalLight3D d) d.Visible = false;
+		var room = new StaticBody3D { CollisionLayer = 1 };
+		AddChild(room);
+		var k = new World.MeshKit();
+		k.Mat(World.WinterWoods.SoftSnow);
+		k.Color = Colors.White;
+		k.Box(new Vector3(0, -0.1f, 8f), new Vector3(12f, 0.2f, 24f), 1f);
+		k.Box(new Vector3(0, 2f, 18f), new Vector3(12f, 4f, 0.4f), 1f);
+		k.CommitTo(room, "Room", false);
+		room.AddChild(new CollisionShape3D { Position = new Vector3(0, -0.1f, 8f), Shape = new BoxShape3D { Size = new Vector3(12f, 0.2f, 24f) } });
+		room.AddChild(new CollisionShape3D { Position = new Vector3(0, 2f, 18f), Shape = new BoxShape3D { Size = new Vector3(12f, 4f, 0.4f) } });
+		var stream = new World.NapalmStream { Name = "Napalm" };
+		AddChild(stream);
+		var nozzle = new Vector3(0.2f, 1.3f, 0f);
+		var dir = (new Vector3(0, 1.6f, 18f) - nozzle).Normalized() + Vector3.Up * 0.04f;
+		_cam.Fov = 70f;
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(0, 1.4f, 10f) - new Vector3(-0.2f, 1.55f, -0.4f), Vector3.Up), new Vector3(-0.2f, 1.55f, -0.4f));
+		for (int f = 0; f < 140; f++)
+		{
+			stream.Emit(f < 110, nozzle, dir.Normalized(), Vector3.Zero, 1f / 60f);
+			await Frames(1);
+			if (f == 40) GetViewport().GetTexture().GetImage().SavePng($"{_out}/flame_pov.png");
+			if (f == 100) { _cam.GlobalTransform = new Transform3D(Basis.LookingAt(new Vector3(0, 1.2f, 9f) - new Vector3(-7f, 2.2f, 5f), Vector3.Up), new Vector3(-7f, 2.2f, 5f)); }
+			if (f == 105) GetViewport().GetTexture().GetImage().SavePng($"{_out}/flame_side.png");
+			if (f == 125) GetViewport().GetTexture().GetImage().SavePng($"{_out}/flame_splash.png");
+		}
+		GD.Print($"[creature-preview] flame: {stream.Alight} alight at the end");
 	}
 }

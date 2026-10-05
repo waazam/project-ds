@@ -18,6 +18,16 @@ public static class FurnitureKit
 	/// <summary>Whether the pieces put in now are dusty (every interior is long abandoned; room 201, kept perfect, isn't).</summary>
 	public static bool Dusty = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-dust") < 0;
 
+	/// <summary>Pieces placed without the dust (somewhere dust doesn't settle: room 201, kept perfect; Act 24's ice, where it
+	/// lay on the crates and the flamethrower like pale paint).</summary>
+	public static T Clean<T>(System.Func<T> place)
+	{
+		bool was = Dusty;
+		Dusty = false;
+		try { return place(); }
+		finally { Dusty = was; }
+	}
+
 	private static (Mesh mesh, Texture2D cavity) Load(string name)
 	{
 		if (_models.TryGetValue(name, out var m)) return m;
