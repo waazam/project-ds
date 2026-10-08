@@ -73,6 +73,7 @@ public partial class StationRoom2 : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("StationRoom2");
 		var s = StoryManager.Instance;
 		BuildShell();
 		BuildWindow();

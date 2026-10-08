@@ -292,6 +292,15 @@ public partial class Stairwell
 		rig.RollSwim = 0.9f;
 		rig.SetPitch(Mathf.DegToRad(-5f));
 		Landed = true;
+		// (in this black, out cold on the floor: the winter woods and the lodge, left unbuilt by the load from Act 1, are
+		// built now, and their shaders warmed, before the eyes open)
+		if (WinterWoods.Instance is { Built: false } woods)
+		{
+			await Cutscene.Frame(this, ct);
+			woods.EnsureBuilt();
+			ulong t0 = Time.GetTicksMsec();
+			while (!ShaderWarmup.Ready && Time.GetTicksMsec() - t0 < 8000) await Cutscene.Frame(this, ct);
+		}
 		await Cutscene.Wait(this, 2.2, ct);
 		Sfx("breath_in", 5, lie, -6f, 3f);
 		if (fader != null) await fader.Fade(0f, 3.0f, ct);
@@ -386,6 +395,14 @@ public partial class Stairwell
 		if (fader != null) fader.SetBlack(true);
 		player.GlobalPosition = land;
 		Landed = true;
+		// (the winter, unbuilt by the load from Act 1, built in this black: see the other fall)
+		if (WinterWoods.Instance is { Built: false } woods)
+		{
+			await Cutscene.Frame(this, ct);
+			woods.EnsureBuilt();
+			ulong t0 = Time.GetTicksMsec();
+			while (!ShaderWarmup.Ready && Time.GetTicksMsec() - t0 < 8000) await Cutscene.Frame(this, ct);
+		}
 		Sfx("body_thump", 2, land, -2f, 4f);
 		Sfx("step_stone", 6, land, 2f, 4f);
 		// on their feet: a hard bend at the knees, straight up again, looking at the way on

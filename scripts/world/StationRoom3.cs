@@ -38,6 +38,7 @@ public partial class StationRoom3 : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("StationRoom3");
 		var rng = new RandomNumberGenerator { Seed = 1313 };
 		var body = new StaticBody3D { Name = "Shell", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "metal");

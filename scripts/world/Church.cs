@@ -63,6 +63,7 @@ public partial class Church : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("Church");
 		// no snow indoors (Weather's: the vault's surfaces face in, so the roof collider can't see them from above): the
 		// nave and its aisles to the apse, the transepts and the vestry
 		float top = Spring + NaveR + 3f;

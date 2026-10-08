@@ -5,8 +5,8 @@ namespace ProjectDS.Entities;
 /// <summary>
 /// The horror pass (the owner, 2026-10-02: "make things as horrific as possible for the stalker"), on top of the clips:
 /// - its head follows you: the eyes (and the eyeshine) stay on you as you move;
-/// - unwatched, it creeps: the neck lengthens, the head sliding out further round the trunk than any neck should
-///   let it, and tips over onto its shoulder; the needle teeth bare a little;
+/// - unwatched, its head leans over a little toward its shoulder and the needle teeth bare a little (its neck drawing out
+///   round the trunk is gone: the owner, 2026-10-07, found it looked bad);
 /// - watched, it doesn't move, except its mouth: the slit opens, slowly, the longer you look, and the head goes on
 ///   tipping;
 /// - a hand on the bark drums its long fingers on it, one after another, and stops dead when you look;
@@ -71,7 +71,7 @@ public partial class StalkerBody
 			else _creep = Mathf.MoveToward(_creep, 1f, dt / 9f);
 			float stare = Mathf.SmoothStep(0f, 2.6f, _watchedFor);
 			_gape = 0.18f * _creep + 0.55f * stare;
-			_tip = Mathf.MoveToward(_tip, 0.55f * _creep + 0.45f * stare, dt * 0.35f);
+			_tip = Mathf.MoveToward(_tip, 0.2f * _creep + 0.25f * stare, dt * 0.25f);
 		}
 		else if (Watched || WalkPhase < 0f && TrackTarget != null)
 		{
@@ -79,7 +79,7 @@ public partial class StalkerBody
 			_watchedFor = Watched ? _watchedFor + dt : Mathf.Max(0f, _watchedFor - dt * 0.5f);
 			float stare = Mathf.SmoothStep(0f, 3f, _watchedFor);
 			_gape = Mathf.MoveToward(_gape, 0.45f * stare, dt * 0.4f);
-			_tip = Mathf.MoveToward(_tip, 0.5f * stare, dt * 0.3f);
+			_tip = Mathf.MoveToward(_tip, 0.25f * stare, dt * 0.25f);
 			_creep = Mathf.MoveToward(_creep, 0f, dt);
 		}
 		else
@@ -89,12 +89,8 @@ public partial class StalkerBody
 			_creep = Mathf.MoveToward(_creep, 0f, dt);
 			_watchedFor = 0f;
 		}
-		// the neck drawn out: each of its bones pushed on along the one before (a quarter of a metre at full stretch)
-		if (_creep > 0.001f)
-		{
-			if (_bNeck2 >= 0) _skel.SetBonePosePosition(_bNeck2, _skel.GetBonePosePosition(_bNeck2) * (1f + 0.6f * _creep));
-			_skel.SetBonePosePosition(_bHead, _skel.GetBonePosePosition(_bHead) * (1f + 1.6f * _creep));
-		}
+		// (its neck no longer draws out unwatched: the owner, 2026-10-07, "the creature following the player is like extending
+		// his head ... it looks really bad whatever he is doing". Unwatched, it only leans its head over, a little)
 		// the head follows you
 		if (TrackTarget is { } target)
 		{

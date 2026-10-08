@@ -71,6 +71,7 @@ public partial class StationBasement : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("StationBasement");
 		var s = StoryManager.Instance;
 		BuildDoor();
 		BuildStairwell();

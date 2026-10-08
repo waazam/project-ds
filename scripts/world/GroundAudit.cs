@@ -94,6 +94,7 @@ public partial class GroundAudit : Node
 
 	public override void _Ready()
 	{
+		StationInterior.NeverDefer = WinterWoods.NeverDefer = true;   // (the whole level)
 		ProcessMode = ProcessModeEnum.Always;
 		_out = ProjectSettings.GlobalizePath("res://test-output/grounding");
 		DirAccess.MakeDirRecursiveAbsolute(_out);

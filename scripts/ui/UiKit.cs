@@ -251,7 +251,11 @@ public static class UiKit
 		AddToggle(box, "Invert Y", s.InvertY, on => s.InvertY = on);
 		AddToggle(box, "Reduce flashing", s.ReduceFlashing, on => s.ReduceFlashing = on);
 		AddToggle(box, "Head motion", s.HeadMotion, on => s.HeadMotion = on);
-		AddSlider(box, "Brightness", GameSettings.BrightnessMin, GameSettings.BrightnessMax, s.Brightness, v => s.Brightness = (float)v, 0.05,
+		var strip = new BrightnessStrip { Gamma = s.Brightness };
+		AddSlider(box, "Brightness", GameSettings.BrightnessMin, GameSettings.BrightnessMax, s.Brightness, v => { s.Brightness = (float)v; strip.Gamma = (float)v; strip.QueueRedraw(); }, 0.05,
+			v => $"{Mathf.RoundToInt((float)v * 100f)}%");
+		box.AddChild(strip);
+		AddSlider(box, "Lantern", GameSettings.LanternMin, GameSettings.LanternMax, s.LanternBrightness, v => s.LanternBrightness = (float)v, 0.05,
 			v => $"{Mathf.RoundToInt((float)v * 100f)}%");
 		AddToggle(box, "Cinematic bars", s.CinemaBars, on => s.CinemaBars = on);
 		// the window: fullscreen at the screen's own resolution, or a window of a chosen size
@@ -291,4 +295,25 @@ public static class UiKit
 		SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
 		MouseFilter = Control.MouseFilterEnum.Ignore,
 	};
+}
+
+/// <summary>Under the brightness slider: six squares from black up through the darkest greys, drawn through the same gamma as
+/// the picture, and a line saying how to set it ("the second square just visible"). For a dark monitor (2026-10-07).</summary>
+public partial class BrightnessStrip : Control
+{
+	public float Gamma = 1f;
+	private static readonly float[] Levels = { 0.0f, 0.02f, 0.045f, 0.08f, 0.14f, 0.24f };
+
+	public BrightnessStrip() { CustomMinimumSize = new Vector2(0, 30); MouseFilter = MouseFilterEnum.Ignore; }
+
+	public override void _Draw()
+	{
+		float sz = 14f, gap = 4f, x = 122f;
+		for (int i = 0; i < Levels.Length; i++)
+		{
+			float v = Mathf.Pow(Levels[i], 1f / Mathf.Max(Gamma, 0.1f));
+			DrawRect(new Rect2(x + i * (sz + gap), 1f, sz, sz), new Color(v, v, v));
+		}
+		DrawString(ThemeDB.FallbackFont, new Vector2(x, 28f), "set it so the second square is only just visible", HorizontalAlignment.Left, -1, 9, new Color(0.6f, 0.6f, 0.62f));
+	}
 }

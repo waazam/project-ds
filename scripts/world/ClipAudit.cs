@@ -70,7 +70,7 @@ public partial class ClipAudit : Node
 		"skilodge/hole201", "skilodge/crawlconnector", "crawlentry/brick", "crawlexit/brick", "crawlexit/leaks", "skilodge/perfect201",
 	};
 
-	public override void _Ready() => Run();
+	public override void _Ready() { StationInterior.NeverDefer = WinterWoods.NeverDefer = true; Run(); }
 
 	private async Task Frames(int n) { for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }
 	private async Task PhysicsFrames(int n) { for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame); }
@@ -122,7 +122,12 @@ public partial class ClipAudit : Node
 		_ => true,
 	};
 
-	private Task AuditLevel(string level, string path) => AuditWorld(level, () => GD.Load<PackedScene>(path).Instantiate<Node3D>());
+	private Task AuditLevel(string level, string path)
+	{
+		// (the whole level, built at load: a new game leaves the station and the winter for later, 2026-10-07)
+		StationInterior.NeverDefer = WinterWoods.NeverDefer = true;
+		return AuditWorld(level, () => GD.Load<PackedScene>(path).Instantiate<Node3D>());
+	}
 
 	private async Task AuditWorld(string level, Func<Node3D> make)
 	{

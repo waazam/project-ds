@@ -59,7 +59,7 @@ public partial class RenderBudget : Node
 		for (int i = 0; i < 300; i++)
 		{
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-			if (StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.FontKeyPickup != null) break;
+			if (StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.FontKeyPickup != null || StationInterior.Instance is { Built: false }) break;
 		}
 		for (int i = 0; i < 3; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		if (StationInterior.Instance is Node3D st)

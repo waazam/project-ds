@@ -56,6 +56,7 @@ public partial class ForestScatter : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("ForestScatter");
 		_terrain = GetTree().GetFirstNodeInGroup("terrain") as ForestTerrain;
 		if (_terrain == null) { GD.PushWarning("ForestScatter: no terrain in group 'terrain'"); return; }
 		_rng = new RandomNumberGenerator { Seed = (ulong)Seed };

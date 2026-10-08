@@ -55,6 +55,10 @@ public partial class PlayerFootsteps : Node
 		_sets["metal"] = LoadSet("res://assets/audio/sfx/step_metal_{0:00}.wav", 6);
 		_sets["gravel"] = LoadSet("res://assets/audio/sfx/step_gravel_{0:00}.wav", 6);
 		_sets["rock"] = _sets["stone"];
+		// the wet forest floor in the storm (2026-10-07): mud, sodden leaves, roots underfoot
+		_sets["mud"] = LoadSet("res://assets/audio/sfx/step_mud_{0:00}.wav", 6);
+		_sets["leaves"] = LoadSet("res://assets/audio/sfx/step_leaves_{0:00}.wav", 6);
+		_sets["root"] = LoadSet("res://assets/audio/sfx/step_root_{0:00}.wav", 4);
 		// Act 21 on: snow (soft, the owner: softer steps for the winter)
 		_sets["snow"] = LoadSet("res://assets/audio/sfx/step_snow_{0:00}.wav", 6);
 		// in deep snow: muffled, the leg dragged through (the detail pass)
@@ -157,7 +161,22 @@ public partial class PlayerFootsteps : Node
 			}
 			// the forest floor is dirt; anything else without a surface of its own is a gap in the sweep
 			if (!IsGround(n)) Audio.AudioDirector.Instance?.NoteSilentSurface(n.GetPath().ToString());
+			else return ForestFloorAt(_player.GlobalPosition);
 		}
 		return "dirt";
+	}
+
+	private static FastNoiseLite _patch, _roots;
+
+	/// <summary>What the forest floor is at a point: in the rain, patches of mud and of sodden leaves, a root here and there
+	/// (fixed by place, so the same ground always sounds the same); dry, it's dirt. Shared with what follows them through
+	/// the woods, so its steps answer theirs in kind.</summary>
+	public static string ForestFloorAt(Vector3 p)
+	{
+		if ((ProjectDS.World.Weather.Instance?.Rain ?? 0f) < 0.15f) return "dirt";
+		_patch ??= new FastNoiseLite { Frequency = 0.09f, Seed = 717 };
+		_roots ??= new FastNoiseLite { Frequency = 0.8f, Seed = 718 };
+		if (_roots.GetNoise2D(p.X, p.Z) > 0.5f) return "root";
+		return _patch.GetNoise2D(p.X, p.Z) > 0.1f ? "leaves" : "mud";
 	}
 }

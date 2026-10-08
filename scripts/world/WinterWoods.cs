@@ -33,9 +33,50 @@ public partial class WinterWoods : Node3D
 	private ShaderMaterial _groundMat;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 2222 };
 
+	/// <summary>Built (the woods, the road, the lodge). A new game, or a save before the stairwell's fall (Act 14), leaves
+	/// them unbuilt at load, to be built in the black after the fall: they were eight of the 25 seconds the load from Act 1
+	/// to the Hollow took (the owner, 2026-10-07: "the loading time between act 1 and 2 took a very long time").</summary>
+	public bool Built { get; private set; }
+	public static bool DeferAtLoad => Systems.StoryManager.Instance is { } st && st.Current < Systems.Checkpoint.Act14Finished
+		&& System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-defer") < 0 && !NeverDefer;
+	/// <summary>Everything built at load, always (the audits: they look at the whole level).</summary>
+	public static bool NeverDefer;
+
 	public override void _Ready()
 	{
 		Instance = this;
+		if (DeferAtLoad)
+		{
+			SetProcess(false);
+			// (a safety: reached some other way than the fall, it's built then)
+			if (Systems.StoryManager.Instance is { } st) st.CheckpointReached += OnCheckpointBuild;
+			GD.Print("[story] Act 22: the winter woods and the lodge wait to be built (after the stairwell's fall)");
+			return;
+		}
+		Build();
+	}
+
+	private void OnCheckpointBuild(Systems.Checkpoint cp) { if (IsInstanceValid(this) && IsInsideTree() && cp >= Systems.Checkpoint.Act14Finished && !Built) EnsureBuilt(); }
+
+	/// <summary>Builds them now if they wait (in a blackout: it takes seconds), and brings the render budget and the shader
+	/// warm-up up to date with them. Returns at once if they're built.</summary>
+	public void EnsureBuilt()
+	{
+		if (Built) return;
+		if (Systems.StoryManager.Instance is { } st) st.CheckpointReached -= OnCheckpointBuild;
+		Build();
+		// the render budget's ranges over the new rooms (it walked the level once, before they were there), and their
+		// shaders built while it's still black
+		var root = Systems.Cutscene.SceneRoot(this);
+		if (root.GetNodeOrNull("RenderBudget") is { } old) { root.RemoveChild(old); old.QueueFree(); }
+		root.AddChild(new Systems.RenderBudget { Name = "RenderBudget" });
+		root.AddChild(new Systems.ShaderWarmup { Name = "ShaderWarmupWinter" });
+	}
+
+	private void Build()
+	{
+		using var __timer = Systems.BuildTimer.Time("WinterWoods");
+		Built = true;
 		EnsurePath();
 		Lodge = new SkiLodge { Name = "SkiLodge", Position = SkiLodge.OriginLocal };
 		AddChild(Lodge);
@@ -55,6 +96,7 @@ public partial class WinterWoods : Node3D
 	public override void _ExitTree()
 	{
 		if (Instance == this) Instance = null;
+		if (Systems.StoryManager.Instance is { } sm) sm.CheckpointReached -= OnCheckpointBuild;   // (the story outlives the level)
 		if (_silenced) ForestAmbienceManager.Instance?.ReleaseSilence(this);
 	}
 

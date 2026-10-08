@@ -118,6 +118,7 @@ public partial class ForestTerrain : Node3D
 
 	public override void _Ready()
 	{
+		using var __timer = Systems.BuildTimer.Time("ForestTerrain");
 		EnsureData();
 		BuildMesh();
 		BuildCollision();

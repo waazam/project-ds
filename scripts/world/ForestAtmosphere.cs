@@ -130,10 +130,12 @@ public partial class ForestAtmosphere : Node
 	[Export] public float SunEnergyMenacing = 0.22f;
 
 	/// <summary>Night fog is a deep blue-grey, not black: trees read as dark shapes against it.</summary>
-	[Export] public Color FogColorNight = new(0.06f, 0.07f, 0.1f);
-	[Export] public float FogDensityNight = 0.032f;
-	[Export] public float AmbientNight = 0.2f;
-	[Export] public float SunEnergyNight = 0.1f;
+	// (lifted, 2026-10-07: the owner, in the storm walk, "it is so dark even with the lantern i cant see": a little more
+	// of the night's own light and a cold moon on the trunks, so the woods keep their shapes past the lantern; still night)
+	[Export] public Color FogColorNight = new(0.075f, 0.087f, 0.12f);
+	[Export] public float FogDensityNight = 0.027f;
+	[Export] public float AmbientNight = 0.3f;
+	[Export] public float SunEnergyNight = 0.19f;
 	/// <summary>At night the sun becomes a weak, cold moon.</summary>
 	[Export] public Color MoonColor = new(0.55f, 0.64f, 0.9f);
 
@@ -638,7 +640,7 @@ public partial class ForestAtmosphere : Node
 	}
 
 	/// <summary>Fog banks drifting through the volumetric fog outdoors (FogBanks).</summary>
-	[Export] public bool DriftingFog = true;
+	[Export] public bool DriftingFog = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-fogbanks") < 0;
 	private FogBanks _banks;
 	/// <summary>For tests: the fog banks drifting here now.</summary>
 	public bool FogBanksOn => _banks != null && _banks.Visible;
@@ -714,7 +716,9 @@ public partial class ForestAtmosphere : Node
 		{
 			fog = fog.Lerp(UndergroundFogColor, under);
 			density = Mathf.Lerp(density, UndergroundFogDensity, under);
-			ambient *= 1f - 0.97f * under;
+			// (a little more of it kept, 2026-10-07's brightness audit: the sewer's vaults and the stairwell read as pure black
+			// round their torches; still near-black, the blacklight still what you see by)
+			ambient *= 1f - 0.92f * under;
 			sunEnergy *= 1f - under;
 		}
 		_env.FogLightColor = fog;

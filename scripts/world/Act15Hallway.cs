@@ -93,6 +93,7 @@ public partial class Act15Hallway : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("Act15Hallway");
 		_rng.Seed = 1515;
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "stone");

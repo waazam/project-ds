@@ -126,6 +126,10 @@ jobs.Add(("lantern_off_01", sfx, false, Lo, (r, sr) => Foley.LanternOff(r, sr)))
 jobs.Add(("uv_hum_01", sfx, false, Lo, (r, sr) => Foley.UvHum(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"door_locked_{i:00}", sfx, false, Lo, (r, sr) => Foley.DoorLocked(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_gravel_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepGravel(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_mud_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepMud(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_leaves_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepLeaves(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"step_root_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepRoot(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"canopy_drip_{i:00}", sfx, false, Lo, (r, sr) => Foley.CanopyDrip(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_boards_{i:00}", sfx, false, Lo, (r, sr) => Foley.BoardsOverhead(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_moan_{i:00}", sfx, false, Lo, (r, sr) => Foley.WindMoan(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_drip_{i:00}", sfx, false, Lo, (r, sr) => Foley.DripEcho(r, sr)));

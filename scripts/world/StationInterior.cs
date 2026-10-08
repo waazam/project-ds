@@ -69,18 +69,80 @@ public partial class StationInterior : Node3D
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
 
-	public override void _Ready() => Callable.From(Build).CallDeferred();
+	/// <summary>Built (the station and everything under it: the rooms, the stairwell, the hallway, the sewer, the pit, the
+	/// library, the round room, the long stair, the church). A new game, or a save before the lake's crossing, leaves it
+	/// unbuilt at load and builds it in the black of the crossing's end (the owner, 2026-10-07: the load from Act 1 to the
+	/// Hollow took too long; this was six of its seconds). The overlays and the Hollow-wide passes are set up either way.</summary>
+	public bool Built { get; private set; }
+	public static bool DeferAtLoad => StoryManager.Instance is { } st && st.Current < Checkpoint.Act12LakeCrossed
+		&& System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-defer") < 0 && !NeverDefer;
+	/// <summary>Everything built at load, always (the audits: they look at the whole level).</summary>
+	public static bool NeverDefer;
+
+	public override void _Ready()
+	{
+		if (DeferAtLoad)
+		{
+			AddToGroup("station_marker");
+			Callable.From(AddHollowPasses).CallDeferred();
+			GD.Print("[story] the forester station and all below it wait to be built (until the lake's crossing)");
+			return;
+		}
+		Callable.From(Build).CallDeferred();
+	}
+
+	/// <summary>Builds it now if it waits (call it in a blackout: it takes seconds, and its parts build over the frames
+	/// after; <see cref="WhenBuilt"/> waits for the last of them). Hangs the station's own blacklight writing and photo
+	/// subjects, and brings the render budget and the shader warm-up up to date.</summary>
+	public void EnsureBuilt()
+	{
+		if (Built) return;
+		Build();
+	}
+
+	/// <summary>Waits until everything under it has built (the church's font key is the last), at most a few seconds;
+	/// then the late passes for it.</summary>
+	public async System.Threading.Tasks.Task WhenBuilt(System.Threading.CancellationToken ct)
+	{
+		ulong t0 = Time.GetTicksMsec();
+		while (Boss?.Library?.Round?.Stair?.Church?.FontKeyPickup == null && Time.GetTicksMsec() - t0 < 15000) await Cutscene.Frame(this, ct);
+		var root = Cutscene.SceneRoot(this);
+		(root.GetNodeOrNull("BlacklightSecrets") as BlacklightSecrets)?.PlaceStation();
+		(root.GetNodeOrNull("PhotoSubjects") as PhotoSubjects)?.AttachLater(this);
+		if (root.GetNodeOrNull("RenderBudget") is { } old) { root.RemoveChild(old); old.QueueFree(); }
+		root.AddChild(new RenderBudget { Name = "RenderBudget" });
+		root.AddChild(new ShaderWarmup { Name = "ShaderWarmupStation" });
+		await Cutscene.Frame(this, ct);
+		t0 = Time.GetTicksMsec();
+		while (!ShaderWarmup.Ready && Time.GetTicksMsec() - t0 < 8000) await Cutscene.Frame(this, ct);
+	}
+
+	/// <summary>The overlays and the passes over the whole Hollow (the blacklight's writing, the render budget, the photo
+	/// subjects), which wait for the level to have built.</summary>
+	private void AddHollowPasses()
+	{
+		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
+		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });
+		if (Cutscene.SceneRoot(this).GetNodeOrNull("BlacklightSecrets") == null) Cutscene.SceneRoot(this).CallDeferred(Node.MethodName.AddChild, new BlacklightSecrets { Name = "BlacklightSecrets" });
+		if (Cutscene.SceneRoot(this).GetNodeOrNull("RenderBudget") == null) Cutscene.SceneRoot(this).CallDeferred(Node.MethodName.AddChild, new RenderBudget { Name = "RenderBudget" });
+		if (Cutscene.SceneRoot(this).GetNodeOrNull("PhotoSubjects") == null) Cutscene.SceneRoot(this).CallDeferred(Node.MethodName.AddChild, new PhotoSubjects { Name = "PhotoSubjects" });
+	}
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("StationInterior");
+		Built = true;
 		AddToGroup("station_marker");
 		var s = StoryManager.Instance;
 
+		var sw = System.Diagnostics.Stopwatch.StartNew();
+		void T(string what) { GD.Print($"[perf-tmp] {what}: {sw.ElapsedMilliseconds} ms"); sw.Restart(); }
 		Decor = new LobbyDecor { Name = "Decor" };
 		AddChild(Decor);
 		Decor.Build(this);
 		BuildDesk();
 		BuildRoomDoors();
+		T("lobby");
 
 		Basement = new StationBasement { Name = "Basement", Position = new Vector3(BasementGapX, 0, -HalfDepth) };
 		AddChild(Basement);
@@ -92,10 +154,13 @@ public partial class StationInterior : Node3D
 		AddChild(Door3);
 		Room3 = new StationRoom3 { Name = "Room3", Position = new Vector3(0, 0, HalfDepth) };
 		AddChild(Room3);
+		T("rooms");
 		Sewer = new Sewer { Name = "Sewer", Position = SewerAt };
 		AddChild(Sewer);
+		T("sewer");
 		Boss = new BossRoom { Name = "BossRoom", Position = BossAt };
 		AddChild(Boss);
+		T("boss+beyond");
 
 		EntranceMarkerWorld = ToGlobal(new Vector3(EntryGapX, 0.05f, -HalfDepth + 1.2f));
 		EntranceYaw = Rotation.Y + Mathf.Pi;   // facing local +Z: into the lobby, toward the desk
@@ -144,12 +209,9 @@ public partial class StationInterior : Node3D
 		// the end of the story (GameEnding: for now, where Act 23 ends), facing out of the splintered doorway
 		Marker("GameEndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_GameFinished");
 
-		if (CryptexOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new CryptexOverlay { Name = "CryptexOverlay" });
-		if (PuzzleOverlay.Instance == null) Cutscene.SceneRoot(this).AddChild(new PuzzleOverlay { Name = "PuzzleOverlay" });
-		// the blacklight's secrets round the whole Hollow (placed once everything is built)
-		if (Cutscene.SceneRoot(this).GetNodeOrNull("BlacklightSecrets") == null) Cutscene.SceneRoot(this).CallDeferred(Node.MethodName.AddChild, new BlacklightSecrets { Name = "BlacklightSecrets" });
-		if (Cutscene.SceneRoot(this).GetNodeOrNull("RenderBudget") == null) Cutscene.SceneRoot(this).CallDeferred(Node.MethodName.AddChild, new RenderBudget { Name = "RenderBudget" });
-		if (Cutscene.SceneRoot(this).GetNodeOrNull("PhotoSubjects") == null) Cutscene.SceneRoot(this).CallDeferred(Node.MethodName.AddChild, new PhotoSubjects { Name = "PhotoSubjects" });
+		// the overlays; the blacklight's secrets, the render budget and the photo subjects round the whole Hollow (placed once
+		// everything is built)
+		AddHollowPasses();
 		// the scavenger hunt's breadcrumbs: a bloody hand on Room 1's door, a staircase scrawled on Room 2's
 		_handMark = new Node3D { Name = "HandMark", Visible = false };
 		_room1Door.AddChild(_handMark);

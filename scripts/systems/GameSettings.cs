@@ -42,6 +42,9 @@ public partial class GameSettings : Node
 	/// it lifts the dark and the mids, not the whites). For a dark monitor or a bright room.</summary>
 	public float Brightness = 1f;
 	public const float BrightnessMin = 0.7f, BrightnessMax = 1.5f;
+	/// <summary>The lantern's strength (1 as designed): its glow and its beam, for a dark monitor (2026-10-07).</summary>
+	public float LanternBrightness = 1f;
+	public const float LanternMin = 0.7f, LanternMax = 1.6f;
 
 	/// <summary>Fullscreen (borderless, the screen's own resolution: the default) or a window.</summary>
 	public bool Windowed
@@ -201,6 +204,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("display", "cinema_bars", CinemaBars);
 		cfg.SetValue("display", "fog_lighting", FogLighting);
 		cfg.SetValue("display", "brightness", Brightness);
+		cfg.SetValue("display", "lantern_brightness", LanternBrightness);
 		cfg.SetValue("display", "crt_filter", _crtFilter);
 		cfg.SetValue("display", "shadows", _shadows);
 		cfg.SetValue("display", "windowed", _windowed);
@@ -226,6 +230,7 @@ public partial class GameSettings : Node
 		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-volfog") < 0) FogLighting = (bool)cfg.GetValue("display", "fog_lighting", FogLighting);
 		Brightness = Mathf.Clamp((float)cfg.GetValue("display", "brightness", Brightness), BrightnessMin, BrightnessMax);
+		LanternBrightness = Mathf.Clamp((float)cfg.GetValue("display", "lantern_brightness", LanternBrightness), LanternMin, LanternMax);
 		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
 		_shadows = Mathf.Clamp((int)cfg.GetValue("display", "shadows", _shadows), 0, 2);
 		_windowed = (bool)cfg.GetValue("display", "windowed", _windowed);

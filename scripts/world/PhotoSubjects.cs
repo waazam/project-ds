@@ -27,11 +27,35 @@ public partial class PhotoSubjects : Node
 		for (int i = 0; i < 240; i++)
 		{
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-			if (StationInterior.Instance?.Boss?.Library?.Round?.Dais != null) break;
+			if (StationInterior.Instance?.Boss?.Library?.Round?.Dais != null || StationInterior.Instance is { Built: false }) break;
 		}
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		var found = new List<Node>();
 		Walk(GetTree().CurrentScene, found);
+		AttachFound(found);
+		if (BunkerInterior.Instance is { } bi)
+		{
+			A(bi, "crt_room", bi.ToLocal(bi.CrtTargetApproachWorld), 1f, 14f, 18f, false);
+			A(bi, "vine_door", bi.ToLocal(bi.VineDoorInteractWorld), 1f, 16f, 16f, false);
+		}
+		if (StationInterior.Instance is { Built: true } st) AttachStation(st);
+		Done = true;
+		GD.Print($"[photo] {Attached} subjects hung round the Hollow");
+	}
+
+	/// <summary>A part of the level built after the rest (the station, left until the lake's crossing; the winter, until
+	/// the stairwell's fall: the load from Act 1 made faster, 2026-10-07): its subjects hung now.</summary>
+	public void AttachLater(Node root)
+	{
+		var found = new List<Node>();
+		Walk(root, found);
+		AttachFound(found);
+		if (root is StationInterior st) AttachStation(st);
+		GD.Print($"[photo] {Attached} subjects hung (with {root.Name}'s)");
+	}
+
+	private void AttachFound(List<Node> found)
+	{
 		foreach (var n in found)
 		{
 			switch (n)
@@ -54,12 +78,10 @@ public partial class PhotoSubjects : Node
 					break;
 			}
 		}
-		if (BunkerInterior.Instance is { } bi)
-		{
-			A(bi, "crt_room", bi.ToLocal(bi.CrtTargetApproachWorld), 1f, 14f, 18f, false);
-			A(bi, "vine_door", bi.ToLocal(bi.VineDoorInteractWorld), 1f, 16f, 16f, false);
-		}
-		if (StationInterior.Instance is { } st)
+	}
+
+	private void AttachStation(StationInterior st)
+	{
 		{
 			A(st, "lobby", new Vector3(0, 1.6f, 0), 1f, 14f, 22f, false);
 			if (st.Room1 is { } r1) A(r1, "writing_on_wall", new Vector3(0, 1.5f, 0), 0.5f, 9f, 24f, false);
@@ -122,8 +144,6 @@ public partial class PhotoSubjects : Node
 				}
 			}
 		}
-		Done = true;
-		GD.Print($"[photo] {Attached} subjects hung round the Hollow");
 	}
 
 	private void A(Node3D host, string id, Vector3 local, float min, float max, float cone = 14f, bool los = true, params Vector3[] more)

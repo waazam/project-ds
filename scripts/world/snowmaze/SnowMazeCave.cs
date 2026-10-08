@@ -231,6 +231,94 @@ public partial class SnowMazeCave : Node3D
 	/// <summary>The heavy part (no nodes touched): the field meshed, cut into chunks, the icicles placed.</summary>
 	private void Compute()
 	{
+		if (LoadCache()) return;
+		ComputeFresh();
+		SaveCache();
+	}
+
+	// ---- the cache: the meshed cave kept on disk after the first build (it takes seconds; loaded, a fraction of one).
+	// Keyed by this build of the game (any change to the code can change the cave) and the cave's own sizes.
+
+	private static string CachePath => ProjectSettings.GlobalizePath("user://snowmaze_cache.bin");
+	private static string CacheKey => $"v1|{typeof(SnowMazeCave).Assembly.ManifestModule.ModuleVersionId}|{Step}|{TunnelRH}|{TunnelRV}|{TunnelY}|{TrenchDepth}|{SnowMazeLayout.N}|{SnowMazeLayout.Spacing}";
+	public bool FromCache { get; private set; }
+
+	private bool LoadCache()
+	{
+		try
+		{
+			if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-maze-cache") >= 0 || !System.IO.File.Exists(CachePath)) return false;
+			ulong t0 = Time.GetTicksMsec();
+			using var r = new System.IO.BinaryReader(System.IO.File.OpenRead(CachePath));
+			if (r.ReadString() != CacheKey) return false;
+			Triangles = r.ReadInt32();
+			int chunks = r.ReadInt32();
+			var list = new List<Chunk>(chunks);
+			for (int c = 0; c < chunks; c++)
+			{
+				var key = new Vector2I(r.ReadInt32(), r.ReadInt32());
+				var v = ReadV(r); var nrm = ReadV(r);
+				var idx = new int[r.ReadInt32()];
+				for (int i = 0; i < idx.Length; i++) idx[i] = r.ReadInt32();
+				var faces = ReadV(r);
+				list.Add(new Chunk(key, v, nrm, idx, faces));
+			}
+			var ice = new List<Transform3D>(r.ReadInt32());
+			for (int i = ice.Capacity; i > 0; i--)
+			{
+				var b = new Basis(new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle()), new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle()), new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle()));
+				ice.Add(new Transform3D(b, new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle())));
+			}
+			_pending.Clear();
+			foreach (var c in list) _pending.Enqueue(c);
+			_icicles = ice;
+			FromCache = true;
+			GD.Print($"[snowmaze] from the cache: {Triangles} triangles in {chunks} chunks, {ice.Count} icicles in {Time.GetTicksMsec() - t0} ms");
+			return true;
+		}
+		catch (System.Exception e) { GD.Print($"[snowmaze] cache unreadable ({e.Message}): building it"); return false; }
+	}
+
+	private void SaveCache()
+	{
+		try
+		{
+			using var w = new System.IO.BinaryWriter(System.IO.File.Create(CachePath));
+			w.Write(CacheKey);
+			w.Write(Triangles);
+			w.Write(_pending.Count);
+			foreach (var c in _pending)
+			{
+				w.Write(c.Key.X); w.Write(c.Key.Y);
+				WriteV(w, c.V); WriteV(w, c.N);
+				w.Write(c.I.Length);
+				foreach (int i in c.I) w.Write(i);
+				WriteV(w, c.Faces);
+			}
+			w.Write(_icicles.Count);
+			foreach (var t in _icicles)
+			{
+				foreach (var col in new[] { t.Basis.Column0, t.Basis.Column1, t.Basis.Column2, t.Origin }) { w.Write(col.X); w.Write(col.Y); w.Write(col.Z); }
+			}
+		}
+		catch (System.Exception e) { GD.Print($"[snowmaze] couldn't keep the cache ({e.Message})"); }
+	}
+
+	private static Vector3[] ReadV(System.IO.BinaryReader r)
+	{
+		var a = new Vector3[r.ReadInt32()];
+		for (int i = 0; i < a.Length; i++) a[i] = new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
+		return a;
+	}
+
+	private static void WriteV(System.IO.BinaryWriter w, Vector3[] a)
+	{
+		w.Write(a.Length);
+		foreach (var v in a) { w.Write(v.X); w.Write(v.Y); w.Write(v.Z); }
+	}
+
+	private void ComputeFresh()
+	{
 		Vector3 min = new(-6f, -TrenchDepth - 0.6f, -18f);
 		Vector3 max = new((SnowMazeLayout.N - 1) * SnowMazeLayout.Spacing + 6f, 12.4f, (SnowMazeLayout.N - 1) * SnowMazeLayout.Spacing + 6f);
 		var n = new Vector3I(Mathf.CeilToInt((max.X - min.X) / Step), Mathf.CeilToInt((max.Y - min.Y) / Step), Mathf.CeilToInt((max.Z - min.Z) / Step));

@@ -268,8 +268,10 @@ public partial class EndingDirector : Node3D
 		w.AddChild(fire);
 		await Cutscene.Wait(this, 1.2, ct);
 		// down off the car and at them, slow, burning, dragging itself
-		w.Play("walk", 2.2f, 0.3);
 		var to = player.GlobalPosition + (CarAt - player.GlobalPosition).Normalized() * 3.5f;
+		// (its walk cycle at the pace it really covers the ground: a cycle is 2.55 m of its full stride)
+		float pace = Mathf.Max(w.GlobalPosition.DistanceTo(to) / 3.6f, 0.3f);
+		w.Play("walk", Mathf.Clamp(2.55f / pace, 0.9f, 3.5f), 0.3);
 		var tw = CreateTween();
 		tw.TweenProperty(w, "global_position", to with { Y = player.GlobalPosition.Y }, 3.6f);
 		await StoryBeat.PanTowards(this, player, to + Vector3.Up * 2.5f, 2.5f, ct, pitch: true);

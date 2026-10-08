@@ -17,7 +17,7 @@ public partial class SignAudit : Node3D
 	/// <summary>Extra clearance wanted beyond the path's edge.</summary>
 	[Export] public float Margin = 0.35f;
 
-	public override void _Ready() => _ = Run();
+	public override void _Ready() { StationInterior.NeverDefer = WinterWoods.NeverDefer = true; _ = Run(); }
 
 	private async Task Run()
 	{

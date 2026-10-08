@@ -1193,6 +1193,12 @@ public partial class LakeCrossingEvent : Node3D
 			_heart?.Stop();
 			if (_rough != null) _rough.Stop();
 			var station = StationInterior.Instance;
+			// (a new game left the station unbuilt at load: built now, in this black, with its shaders warmed)
+			if (station is { Built: false })
+			{
+				station.EnsureBuilt();
+				await station.WhenBuilt(ct);
+			}
 			if (station != null) player.Teleport(station.EntranceMarkerWorld, station.EntranceYaw);
 			if (fader != null) await fader.Fade(0f, 0.9f, ct);
 			GD.Print("[story] Act 13: into the forester station");

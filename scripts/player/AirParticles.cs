@@ -134,7 +134,8 @@ public partial class AirParticles : Node3D
 			float cold = atmo == null ? 0f : Mathf.Max(Mathf.Max(atmo.Winter, atmo.WinterDusk) * (1f - atmo.Underground), atmo.Lodge * atmo.LodgeCold);
 			_dustOn = inside > 0.5f;
 			_sporesOn = inside < 0.5f && cold < 0.5f && atmo != null;
-			_cold = cold > 0.5f;
+			// (and down in Act 24's ice, where it's colder than anywhere: their breath in the lantern light, 2026-10-07)
+			_cold = cold > 0.5f || World.SnowMaze.Act24Maze.Instance is { InMaze: true };
 		}
 		if (_cold && _t >= _nextBreath)
 		{

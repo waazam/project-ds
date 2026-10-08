@@ -31,7 +31,8 @@ public partial class NapalmStream : Node3D
 	private readonly Glob[] _s = new Glob[MaxSmoke];
 	private MultiMesh _flameMM, _smokeMM;
 	private MultiMeshInstance3D _flameMI, _smokeMI;
-	private OmniLight3D _light;
+	private OmniLight3D _light, _splashLight;
+	private float _splashLevel;
 	private float _emitAcc, _lightLevel, _smokeAcc;
 	private int _rayCursor;
 	private readonly RandomNumberGenerator _rng = new();
@@ -58,6 +59,10 @@ public partial class NapalmStream : Node3D
 		AddChild(_flameMI);
 		_light = new OmniLight3D { Name = "FireLight", LightColor = new Color(1f, 0.55f, 0.22f), OmniRange = 11f, LightEnergy = 0f, ShadowEnabled = false, Visible = false };
 		AddChild(_light);
+		// a second light where it has splashed and clings: the ice round it lit orange, the glow wavering slowly with the
+		// burning (2026-10-07; eased, never strobing)
+		_splashLight = new OmniLight3D { Name = "SplashLight", LightColor = new Color(1f, 0.5f, 0.18f), OmniRange = 7f, LightEnergy = 0f, ShadowEnabled = false, Visible = false };
+		AddChild(_splashLight);
 		for (int i = 0; i < MaxGlobs; i++) _flameMM.SetInstanceTransform(i, new Transform3D(Basis.FromScale(Vector3.Zero), Vector3.Zero));
 		for (int i = 0; i < MaxSmoke; i++) _smokeMM.SetInstanceTransform(i, new Transform3D(Basis.FromScale(Vector3.Zero), Vector3.Zero));
 	}
@@ -95,7 +100,8 @@ public partial class NapalmStream : Node3D
 		var space = GetWorld3D().DirectSpaceState;
 		var cam = GetViewport()?.GetCamera3D();
 		Vector3 eye = cam?.GlobalPosition ?? Vector3.Zero;
-		int rays = 0, alight = 0;
+		int rays = 0, alight = 0, stuck = 0;
+		Vector3 stuckSum = Vector3.Zero;
 		Vector3 sum = Vector3.Zero;
 		Vector3 lo = new(float.MaxValue, float.MaxValue, float.MaxValue), hi = -lo;
 		for (int i = 0; i < MaxGlobs; i++)
@@ -148,6 +154,7 @@ public partial class NapalmStream : Node3D
 			_flameMM.SetInstanceCustomData(i, new Color(u, heat, g.Seed, g.Stuck ? 0.85f : 0.8f));
 			alight++;
 			sum += at;
+			if (g.Stuck) { stuck++; stuckSum += at; }
 			lo = lo.Min(at); hi = hi.Max(at);
 			// clinging fire smokes as it burns
 			if (g.Stuck && _rng.Randf() < dt * 3f) Smoke(g.P + Vector3.Up * 0.4f, size * 0.7f);
@@ -176,6 +183,11 @@ public partial class NapalmStream : Node3D
 			_flameMI.CustomAabb = box;
 			_smokeMI.CustomAabb = box;
 		}
+		_splashLevel = Mathf.Lerp(_splashLevel, Mathf.Clamp(stuck / 20f, 0f, 1f), 1f - Mathf.Exp(-dt * 3f));
+		_splashLight.Visible = _splashLevel > 0.02f;
+		if (stuck > 0) _splashLight.GlobalPosition = _splashLight.GlobalPosition.Lerp(stuckSum / stuck + Vector3.Up * 0.5f, 1f - Mathf.Exp(-dt * 6f));
+		float ms = Time.GetTicksMsec() * 0.001f;
+		_splashLight.LightEnergy = _splashLevel * (1.8f + 0.3f * Mathf.Sin(ms * 5.3f) * Mathf.Sin(ms * 3.1f + 1f));
 		// the light: in the middle of what's burning, as strong as the fire is big (eased, never flickering on and off)
 		float want = Mathf.Clamp(alight / 45f, 0f, 1f);
 		_lightLevel = Mathf.Lerp(_lightLevel, want, 1f - Mathf.Exp(-dt * 6f));

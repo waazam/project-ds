@@ -77,6 +77,7 @@ public partial class Sewer : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("Sewer");
 		_stone = new StaticBody3D { Name = "Stone", CollisionLayer = 1, CollisionMask = 0 };
 		_stone.SetMeta("surface", "stone");
 		AddChild(_stone);

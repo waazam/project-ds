@@ -98,6 +98,7 @@ public partial class SkiLodge : Node3D
 
 	public override void _Ready()
 	{
+		using var __timer = Systems.BuildTimer.Time("SkiLodge");
 		// no snow indoors whatever the weather (Weather's): the two wings, and the hexagonal hall (the square inside its
 		// apothem; the roof collider has the rest)
 		foreach (float side in new[] { -1f, 1f })

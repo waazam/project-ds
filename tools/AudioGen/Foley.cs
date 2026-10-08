@@ -108,6 +108,57 @@ public static class Foley
 		return FinishOneShot(Wet(x, sr, 1.0, 0.06, 0.3, 0.5, 0.3), sr, -3, 60);
 	}
 
+	/// <summary>A step in wet mud (the storm walk): the heel's soft slap, a suck as it sinks, and the wet pull out of it.</summary>
+	public static double[] StepMud(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.55);
+		Slap(x, r, sr, 0.0, 0.75, 60, 380, 0.05, 0.006);
+		// the suck: a short, falling, wet tone burst
+		double f0 = r.R(170, 240);
+		AddTone(x, sr, r.R(0.05, 0.08), r.R(0.08, 0.12), u => f0 * (1.0 - 0.45 * u), u => 0.28 * Env(u, 0.15, 0.6), new[] { 1.0, 0.35, 0.12 });
+		// the pull out: wet crackle
+		Crinkle(x, r, sr, r.R(0.16, 0.22), r.R(0.3, 0.38), 140, 500, 2600, 0.35);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.06, 0.3, 0.5, 0.3), sr, -3, 60);
+	}
+
+	/// <summary>A step on wet fallen leaves: a soft pat and a damp, matted rustle (not the dry crackle of autumn).</summary>
+	public static double[] StepLeaves(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.5);
+		Slap(x, r, sr, 0.0, 0.5, 80, 500, 0.04, 0.004);
+		Crinkle(x, r, sr, 0.0, r.R(0.16, 0.24), 320, 900, 4200, 0.55);
+		Crinkle(x, r, sr, 0.05, r.R(0.25, 0.32), 120, 400, 1800, 0.3);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.06, 0.3, 0.5, 0.3), sr, -3, 60);
+	}
+
+	/// <summary>A step onto a root: a hollow wooden knock under the sole, a scuff of bark.</summary>
+	public static double[] StepRoot(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.45);
+		Knock(x, r, sr, 0.0, 0.7, r.R(160, 230), 6, 0.05);
+		Knock(x, r, sr, 0.004, 0.35, r.R(480, 640), 9, 0.025);
+		Crinkle(x, r, sr, 0.01, r.R(0.08, 0.13), 200, 700, 3000, 0.3);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.06, 0.3, 0.5, 0.3), sr, -3, 60);
+	}
+
+	/// <summary>Rain gathering on the boughs and falling off in fat drops onto the leaves below: two or three heavy taps,
+	/// spaced, with their small splash.</summary>
+	public static double[] CanopyDrip(Rng r, int sr)
+	{
+		var x = Buf(sr, 1.4);
+		double t = 0.0;
+		int n = r.I(2, 4);
+		for (int k = 0; k < n; k++)
+		{
+			double a = r.R(0.5, 1.0);
+			Slap(x, r, sr, t, a * 0.7, 300, 1600, r.R(0.008, 0.014), 0.0008);
+			Knock(x, r, sr, t, a * 0.25, r.R(900, 1500), 12, 0.012);
+			Crinkle(x, r, sr, t + 0.004, t + 0.05, 400, 2000, 6000, a * 0.15);
+			t += r.R(0.18, 0.45);
+		}
+		return FinishOneShot(Wet(x, sr, 1.0, 0.1, 0.45, 0.5, 0.4), sr, -3, 80);
+	}
+
 	/// <summary>The lantern's blacklight coming on: a switch click and the tube's electric buzz swelling in (tonal).</summary>
 	public static double[] UvHum(Rng r, int sr)
 	{

@@ -20,8 +20,8 @@ public partial class Lantern : Node3D
 {
 	[ExportGroup("Radial glow")]
 	[Export] public float GlowRange = 14f;   // the owner: further, so more can be seen (was 9.5; the energy is eased to keep the near light as it was)
-	[Export] public float GlowEnergy = 1.35f;   // was 1.5 at the shorter range
-	[Export] public float GlowAttenuation = 1.3f;
+	[Export] public float GlowEnergy = 2.3f;   // was 1.5 at the shorter range, then 1.35 (2026-10-07: the storm walk too dark to see)
+	[Export] public float GlowAttenuation = 1.0f;   // (was 1.3: it falls off more gently, lighting the ground and trunks further out)
 	/// <summary>How much of the glow remains while the beam is focused.</summary>
 	[Export] public float GlowWhileFocused = 0.55f;
 	[Export] public Color LightColor = new(1.0f, 0.72f, 0.42f);
@@ -160,9 +160,8 @@ public partial class Lantern : Node3D
 				float a0 = Mathf.Tau * i / 16f, a1 = Mathf.Tau * (i + 1) / 16f;
 				k.Cylinder(new Vector3(Mathf.Cos(a0) * R, y, Mathf.Sin(a0) * R), new Vector3(Mathf.Cos(a1) * R, y, Mathf.Sin(a1) * R), 0.002f, 0.002f, 4, false);
 			}
-		// the hood (a shallow cone) and the base (a disc a little under the flame)
-		k.Cylinder(new Vector3(0, 0.075f, 0), new Vector3(0, 0.11f, 0), R * 1.05f, 0.02f, 12, true);
-		k.Cylinder(new Vector3(0, -0.085f, 0), new Vector3(0, -0.075f, 0), R * 0.9f, R * 0.9f, 12, true);
+		// (no hood or base in its shadows any more, 2026-10-07: the base's disc under the flame shadowed the ground for a
+		// metre all round them, and the storm walk was too dark to see; the struts' soft bands stay)
 		var mi = new MeshInstance3D { Name = "Shadow", Mesh = k.Commit(), CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly };
 		cage.AddChild(mi);
 		return cage;
@@ -281,8 +280,9 @@ public partial class Lantern : Node3D
 
 		float s = 1f - Mathf.Exp(-Sharpness * dt);
 		_focus = Mathf.Lerp(_focus, _player.PlayerInput.Focus ? 1f : 0f, s);
-		_glow.LightEnergy = GlowEnergy * Mathf.Lerp(1f, GlowWhileFocused, _focus) * k;
+		float pref = Systems.GameSettings.Instance?.LanternBrightness ?? 1f;   // (the player's own setting)
+		_glow.LightEnergy = GlowEnergy * Mathf.Lerp(1f, GlowWhileFocused, _focus) * k * pref;
 		_beam.Visible = _focus > 0.01f;
-		_beam.LightEnergy = BeamEnergy * _focus * k;
+		_beam.LightEnergy = BeamEnergy * _focus * k * pref;
 	}
 }

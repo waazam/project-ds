@@ -80,7 +80,9 @@ public static class Act25Ending
 		var wallN = hit.Count > 0 ? (Vector3)hit["normal"] : -away;
 		var stop = (wall - away * 0.9f) with { Y = from.Y };
 		AudioDirector.OneShot(owner, "wendigo_howl_04", 1, from + Vector3.Up * 3f, 8f, "Unnatural", 12f, 0.02f);
-		body.Play("walk", 0.9f, 0.2);
+		// (its stride matched to the ground it covers, at its size in the tunnels)
+		float pace = Mathf.Max(from.DistanceTo(stop) / 1.6f, 0.3f);
+		body.Play("walk", Mathf.Clamp(2.55f * WendigoHunter.BodyScale / pace, 0.5f, 3f), 0.2);
 		var look = Watch(owner, player, body, 9.5f, ct);
 		var tw = owner.CreateTween();
 		tw.TweenProperty(body, "global_position", stop, 1.6f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);

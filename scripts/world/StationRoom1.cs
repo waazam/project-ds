@@ -80,6 +80,7 @@ public partial class StationRoom1 : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("StationRoom1");
 		var s = StoryManager.Instance;
 		var k = new MeshKit();
 		var floorK = new MeshKit();

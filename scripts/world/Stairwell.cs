@@ -117,6 +117,7 @@ public partial class Stairwell : Node3D
 
 	private void Build()
 	{
+		using var __timer = Systems.BuildTimer.Time("Stairwell");
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		_body.SetMeta("surface", "metal");
 		AddChild(_body);

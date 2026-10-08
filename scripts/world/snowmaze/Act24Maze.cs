@@ -38,6 +38,7 @@ public partial class Act24Maze : Node3D
 	public SnowMazeCave Cave { get; private set; }
 	public WendigoHunter Hunter { get; private set; }
 	public bool InMaze { get; private set; }
+	private UI.FrostEdge _frost;
 	public bool InCavern { get; private set; }
 	public Pickup Crowbar { get; private set; }
 	public PickupInteractable CrateUse { get; private set; }
@@ -204,6 +205,15 @@ public partial class Act24Maze : Node3D
 				atmo.UndergroundFogColor = atmo.UndergroundFogColor.Lerp(new Color(0.03f, 0.05f, 0.08f), Mathf.Min(1f, dt * 2f));
 				atmo.UndergroundFogDensity = Mathf.MoveToward(atmo.UndergroundFogDensity, 0.035f, dt * 0.05f);
 			}
+		}
+		// frost at the screen's edges as it comes near (and as the hunt's menace rises); thawing as it goes
+		if (inside && _frost == null) { _frost = new UI.FrostEdge { Name = "FrostEdge" }; AddChild(_frost); }
+		if (_frost != null)
+		{
+			float near = 0f;
+			if (inside && Hunter is { Body: not null, Dead: false } h)
+				near = Mathf.Clamp(1f - h.Body.GlobalPosition.DistanceTo(player.GlobalPosition) / 16f, 0f, 1f) * 0.85f + h.Menace / 100f * 0.25f;
+			_frost.Target = near;
 		}
 		// the cave's quiet: a low moan of air far off down the tunnels, the ice ticking (the snow muffles the rest)
 		if (_air == null && ResourceLoader.Exists("res://assets/audio/ambient/snow_cave_loop.wav"))

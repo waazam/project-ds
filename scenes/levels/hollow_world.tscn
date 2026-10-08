@@ -121,11 +121,11 @@ FogColorMenacing = Color(0.09, 0.06, 0.075, 1)
 FogDensityMenacing = 0.06
 AmbientMenacing = 0.28
 SunEnergyMenacing = 0.18
-FogColorNight = Color(0.048, 0.06, 0.09, 1)
-FogDensityNight = 0.024
-AmbientNight = 0.19
-SunEnergyNight = 0.1
-AmbientFloorLuminance = 0.27
+FogColorNight = Color(0.082, 0.094, 0.128, 1)
+FogDensityNight = 0.02
+AmbientNight = 0.3
+SunEnergyNight = 0.2
+AmbientFloorLuminance = 0.55
 
 [node name="RainVfx" type="Node3D" parent="." groups=["rain_vfx"]]
 script = ExtResource("26_rainvfx")

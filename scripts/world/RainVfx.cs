@@ -36,6 +36,7 @@ public partial class RainVfx : Node3D
 	/// <summary>0..1, lags Intensity (read-only for others).</summary>
 	public float Wetness { get; private set; }
 
+	private float _dripT = 2f;
 	private GpuParticles3D _splash;
 	private ParticleProcessMaterial _splashPm;
 	private Image _splashPoints;
@@ -246,6 +247,16 @@ public partial class RainVfx : Node3D
 			if (IsInstanceValid(owner) && box.HasPoint(owner.GlobalTransform.AffineInverse() * cp)) { sheltered = true; break; }
 
 		float shown = sheltered ? 0f : _intensity;
+		// the boughs dripping: in the rain, out in the woods, fat drops off the branches onto the leaves round them, now
+		// near, now a few metres off (2026-10-07: the storm walk's sound, less the same all the way)
+		_dripT -= dt;
+		if (!sheltered && _intensity > 0.3f && _dripT <= 0f)
+		{
+			_dripT = (float)GD.RandRange(1.2, 3.6) / Mathf.Max(_intensity, 0.3f);
+			float a = (float)GD.RandRange(0.0, Mathf.Tau), r = (float)GD.RandRange(1.5, 7.0);
+			var at = cp + new Vector3(Mathf.Cos(a) * r, (float)GD.RandRange(-1.0, 1.5), Mathf.Sin(a) * r);
+			Audio.AudioDirector.OneShot(this, "canopy_drip", 6, at, -14f + 4f * _intensity, "Weather", 3f, 0.08f);
+		}
 		// the streaks are Weather's now (the weather pass): wrapping round the camera, slanting with the shared wind,
 		// never under a roof or the trees; a touch fewer than full (Dan, 2026-09-22)
 		Weather.Get(this).Rain = shown * 0.85f;

@@ -56,6 +56,7 @@ public partial class Lake : Node3D
 
 	public override void _Ready()
 	{
+		using var __timer = Systems.BuildTimer.Time("Lake");
 		if (Engine.IsEditorHint()) return;
 		AddToGroup("lake_marker");
 		var rng = new RandomNumberGenerator { Seed = (ulong)Seed };

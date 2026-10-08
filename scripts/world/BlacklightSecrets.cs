@@ -39,7 +39,7 @@ public partial class BlacklightSecrets : Node
 		for (int i = 0; i < 240; i++)
 		{
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-			if (StationInterior.Instance?.Boss?.Library?.Round?.Dais != null) break;
+			if (StationInterior.Instance?.Boss?.Library?.Round?.Dais != null || StationInterior.Instance is { Built: false }) break;
 		}
 		var scene = GetTree().CurrentScene;
 		var terrain = GroundSnap.FindTerrain(this);
@@ -74,8 +74,16 @@ public partial class BlacklightSecrets : Node
 		// the lake
 		if (GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			W(lake, new Vector3(0, LakeShape.DockDeck + 0.02f, LakeShape.DockEndZ + 1.3f), Vector3.Up, "ROW. DON'T STOP.", 1.5f, C, Mathf.Pi);
-		// the station
-		if (StationInterior.Instance is { } st)
+		// the station (built later, at the lake's crossing, in a new game: then from PlaceStation)
+		if (StationInterior.Instance is { Built: true } st) Station(st);
+	}
+
+	/// <summary>The station's writing, for a station built after the rest (see <see cref="StationInterior.EnsureBuilt"/>).</summary>
+	public void PlaceStation() { if (StationInterior.Instance is { } st) Station(st); }
+
+	private void Station(StationInterior st)
+	{
+		Color C = UvInk.Cyan, G = UvInk.Green, P = UvInk.Pale;
 		{
 			W(st, new Vector3(-3f, 2.1f, StationInterior.HalfDepth - 0.1f), Vector3.Forward, "IT WAS ALWAYS STAIRS", 2f, C);
 			if (st.Room2 is { } r2) W(r2, new Vector3(0, StationRoom2.Height - 0.03f, 0.2f), Vector3.Down, "S  T  A  I  R  S", 1.6f, G, Mathf.Pi * 0.5f);

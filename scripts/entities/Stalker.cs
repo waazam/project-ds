@@ -118,6 +118,12 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	[Export] public Vector2 RattlePitch = new(0.72f, 1f);
 
 	public State Current { get; private set; } = State.Dormant;
+
+	/// <summary>How this glimpse goes: gone in a blink when caught (most); a held stare, then a slow slide back behind its
+	/// trunk; or, far ahead, standing watching for a few seconds.</summary>
+	public enum GlimpseKind { Flick, Stare, Watching }
+	public GlimpseKind Glimpse { get; private set; }
+	public readonly HashSet<GlimpseKind> GlimpsesSeen = new();
 	public int PeekCount { get; private set; }
 	public int DistantCount { get; private set; }
 	public bool IsDistant => _ahead;
@@ -129,6 +135,26 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	public int SnarlCount => 0;
 	/// <summary>The Hollow path walk, from the wake to the footbridge: its introduction, when it stalks hardest.</summary>
 	public bool Intro => StoryManager.Instance is { } s && s.Current < Checkpoint.Act6BridgeCrossed;
+
+	/// <summary>The storm walk's first stretch: it is only heard (its rattle from its tree, its steps answering theirs), never
+	/// seen, until they're well on toward the cabin (the owner, 2026-10-07: "he should be hidden until much later"). Its body
+	/// is drawn only from <see cref="SeenFromShare"/> of the way there on.</summary>
+	public bool SoundOnly
+	{
+		get
+		{
+			if (StoryManager.Instance is not { } s || s.Current >= Checkpoint.Act5CabinEntered || _player == null) return false;
+			_cabin ??= GetTree().GetFirstNodeInGroup("cabin") as Node3D;
+			if (_cabin == null) return false;
+			float d = Flat(_player.GlobalPosition).DistanceTo(Flat(_cabin.GlobalPosition));
+			if (_walkStartDist < 0f) _walkStartDist = Mathf.Max(d, 1f);
+			return d > _walkStartDist * (1f - SeenFromShare);
+		}
+	}
+	/// <summary>The share of the storm walk (camp to cabin) before it may be seen.</summary>
+	[Export] public float SeenFromShare = 0.6f;
+	private Node3D _cabin;
+	private float _walkStartDist = -1f;
 	/// <summary>0..1 how loud the rattle is right now (for the debug readout and tests).</summary>
 	public float RattleLevel { get; private set; }
 	/// <summary>0..1, set by the story (the survey lot: a quarter per digit found): the rattle reaches
@@ -248,6 +274,9 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		_stepSets["dirt"] = LoadSet("res://assets/audio/sfx/step_dirt_{0:00}.wav", 6);
 		_stepSets["wood"] = LoadSet("res://assets/audio/sfx/step_wood_{0:00}.wav", 4);
 		_stepSets["stone"] = LoadSet("res://assets/audio/sfx/step_stone_{0:00}.wav", 6);
+		_stepSets["mud"] = LoadSet("res://assets/audio/sfx/step_mud_{0:00}.wav", 6);
+		_stepSets["leaves"] = LoadSet("res://assets/audio/sfx/step_leaves_{0:00}.wav", 6);
+		_stepSets["root"] = LoadSet("res://assets/audio/sfx/step_root_{0:00}.wav", 4);
 		// No twig snaps from it (Dan, 2026-09-22: a dry snap reads as a distant gunshot; the rattle is its sound now).
 		if (ResourceLoader.Exists("res://assets/audio/sfx/stalker_seen_01.wav"))
 			_sting = GD.Load<AudioStream>("res://assets/audio/sfx/stalker_seen_01.wav");
@@ -297,7 +326,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		if (_ray == null) return "dirt";
 		var hit = Ray(GlobalPosition + Vector3.Up * 0.5f, GlobalPosition + Vector3.Down * 1.5f);
 		if (hit.Count > 0 && hit["collider"].AsGodotObject() is Node n && n.HasMeta("surface")) return n.GetMeta("surface").AsString();
-		return "dirt";
+		return PlayerFootsteps.ForestFloorAt(GlobalPosition);   // (the wet floor in the storm, as under theirs)
 	}
 
 	private AudioStream PickStep()
@@ -427,9 +456,11 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 				UpdatePeeking(cam, dt, withdraw);
 				break;
 			case State.Vanishing:
-				// Gone the instant it is caught: a 0.1 s dissolve, no sound of any kind.
-				SetVisibility(_visibility - dt * MaxVisibility / VanishSeconds);
-				GlobalPosition += _hideDir * DuckSpeed * dt;
+				// Gone the instant it is caught: a 0.1 s dissolve, no sound of any kind (a held glimpse goes slowly: it slides
+				// back behind its trunk over most of a second, and is gone)
+				bool slow = Glimpse != GlimpseKind.Flick;
+				SetVisibility(_visibility - dt * MaxVisibility / (slow ? 0.7f : VanishSeconds));
+				GlobalPosition += _hideDir * DuckSpeed * (slow ? 0.35f : 1f) * dt;
 				if (_visibility <= 0f) Hide(_rng.RandfRange(CooldownNow.X, CooldownNow.Y));
 				break;
 		}
@@ -449,7 +480,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		}
 		if (seen > 0f)
 		{
-			if (!_seenThisPeek) { _seenThisPeek = true; SeenCount++; Tension = 0.1f; }
+			if (!_seenThisPeek) { _seenThisPeek = true; SeenCount++; Tension = 0.1f; GlimpsesSeen.Add(Glimpse); }
 			LastSeenFraction = seen;
 			_seenTime += dt;
 			bool tooClose = _ahead && dist < AheadBreakDistance;
@@ -762,7 +793,14 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 			// Give it a moment at its new tree before its steps start answering yours.
 			_nextShadow = _clock + (Intro ? _rng.RandfRange(0.8f, 3f) : _rng.RandfRange(3f, 10f));
 			_linger = _rng.Randf() < LongLingerChance ? LongLingerSeconds : _rng.RandfRange(LingerSeconds.X, LingerSeconds.Y);
-			SetVisibility(MaxVisibility);
+			// now and then, a glimpse that's held (rare, so a run sees one or two): it stares back a moment and then slides
+			// behind its trunk, deliberately; or far ahead at the fog's edge it just stands, watching, and doesn't go until
+			// they come on
+			float g = _rng.Randf();
+			Glimpse = ahead && g < 0.35f ? GlimpseKind.Watching : g < 0.12f ? GlimpseKind.Stare : GlimpseKind.Flick;
+			if (Glimpse == GlimpseKind.Stare) _linger = _rng.RandfRange(1.2f, 2.0f);
+			else if (Glimpse == GlimpseKind.Watching) _linger = _rng.RandfRange(2.5f, 4f);
+			SetVisibility(SoundOnly ? 0f : MaxVisibility);
 			return true;
 		}
 		return false;
@@ -833,7 +871,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 
 	private float VisibleFraction(Camera3D cam)
 	{
-		if (_ray == null) return 0f;
+		if (_ray == null || !Visible) return 0f;   // (heard, not drawn: nothing to see)
 		Vector3 from = cam.GlobalPosition;
 		if (from.DistanceTo(GlobalPosition) > 60f) return 0f;
 		int visible = 0;
