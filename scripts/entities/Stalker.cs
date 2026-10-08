@@ -262,6 +262,8 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	{
 		AddToGroup("stalker");
 		AddToGroup("warm_up_self");
+		// the storm walk's rare noises in the dark (beside it, not of it: it makes no sounds but its own)
+		Callable.From(() => { var root = GetTree().CurrentScene; if (root != null && root.GetNodeOrNull("StormSurprises") == null) root.AddChild(new World.StormSurprises { Name = "StormSurprises" }); }).CallDeferred();
 		World.PhotoSubject.Attach(this, "stalker", new Vector3(0, 1.5f, 0), 1.5f, 70f, 12f, true, new Vector3(0, 2.2f, 0));
 		ProjectDS.Player.CameraTool.PhotoTaken += OnPhotoTaken;
 		_body = GetNode<Node3D>("Body");
@@ -277,6 +279,8 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		_stepSets["mud"] = LoadSet("res://assets/audio/sfx/step_mud_{0:00}.wav", 6);
 		_stepSets["leaves"] = LoadSet("res://assets/audio/sfx/step_leaves_{0:00}.wav", 6);
 		_stepSets["root"] = LoadSet("res://assets/audio/sfx/step_root_{0:00}.wav", 4);
+		_stepSets["leaves_dry"] = LoadSet("res://assets/audio/sfx/step_dryleaves_{0:00}.wav", 6);
+		_stepSets["twig"] = LoadSet("res://assets/audio/sfx/step_twig_{0:00}.wav", 4);
 		// No twig snaps from it (Dan, 2026-09-22: a dry snap reads as a distant gunshot; the rattle is its sound now).
 		if (ResourceLoader.Exists("res://assets/audio/sfx/stalker_seen_01.wav"))
 			_sting = GD.Load<AudioStream>("res://assets/audio/sfx/stalker_seen_01.wav");

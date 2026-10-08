@@ -418,7 +418,7 @@ public partial class StalkerBody
 		Vector3 Wnow = _skel.GetBoneGlobalPose(g.Hand).Origin;
 		AimBoneFrom(g.Fore, Wnow - Enew, S + dir * d - Enew);
 		AimBone(g.Hand, (_skel.GlobalBasis.Inverse() * g.Wrap).Normalized(), g.W);
-		if (g.W >= 1f && g == _grips[0]) LastGripError = (_skel.GlobalTransform * _skel.GetBoneGlobalPose(g.Hand).Origin).DistanceTo(g.Target);
+		if (g.W >= 1f && g == _grips[0] && IsVisibleInTree()) LastGripError = (_skel.GlobalTransform * _skel.GetBoneGlobalPose(g.Hand).Origin).DistanceTo(g.Target);
 	}
 
 	private void AimBoneFrom(int bone, Vector3 from, Vector3 to)

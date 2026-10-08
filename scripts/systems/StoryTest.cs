@@ -671,8 +671,9 @@ public partial class StoryTest : Node
 				$"heard {st.ShadowStepsHeard}, answered {st.ShadowStepsAnswered}");
 			Check("it comes from at least three directions", st.DirectionsUsed >= 3, $"{st.DirectionsUsed} sectors, peeks {st.PeekCount}");
 			Check("no snarl ever", st.SnarlCount == 0);
-			Check("its long fingers go round the bark at a trunk's edge", st.Body is { GripCount: >= 1 } bg && bg.LastGripError is >= 0f and < 0.06f,
-				$"{st.Body?.GripCount} grips of {st.PeekCount} peeks, the hand {st.Body?.LastGripError:0.000} m off");
+			// (in the walk's first stretch it's only heard, not drawn, so its hands aren't posed: then no grip is measured yet)
+			Check("its long fingers go round the bark at a trunk's edge", st.Body is { GripCount: >= 1 } bg && (bg.LastGripError is >= 0f and < 0.06f || st.SoundOnly && bg.LastGripError < 0f),
+				$"{st.Body?.GripCount} grips of {st.PeekCount} peeks, the hand {st.Body?.LastGripError:0.000} m off, heard only {st.SoundOnly}");
 			Check("its rags hang and swing", st.Body is { RagSwingDegrees: > 2f }, $"{st.Body?.RagSwingDegrees:0.0} degrees");
 			// Less rattle than steps (Dan, 2026-09-22): the spells of steps are most of what is heard on the walk.
 			Check("rattle comes in episodes, not all the time", st.RattleAudibleFraction < 0.35f, $"audible {st.RattleAudibleFraction:0.00} of the walk, episodes {st.RattleEpisodes}, bursts {st.RattleBursts}, spells {st.ShadowSpells}");

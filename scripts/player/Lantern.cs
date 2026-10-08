@@ -67,6 +67,11 @@ public partial class Lantern : Node3D
 
 	private double _dyingUntil = -1;
 	/// <summary>For tests: any light is coming from it right now (flame or blacklight).</summary>
+	/// <summary>Where its flame is while it's held up in view (<see cref="HeldLantern"/>): its light comes from there; null,
+	/// from where it's carried low beside the view.</summary>
+	public Vector3? HeldFlameAt { get; set; }
+	private static readonly Vector3 GlowCarried = new(0.18f, -0.25f, -0.25f);
+
 	public bool Shining => _glow != null && _glow.Visible && _glow.LightEnergy > 0.01f;
 	/// <summary>For tests: the flame is guttering out right now.</summary>
 	public bool Dying => _t < _dyingUntil;
@@ -121,7 +126,10 @@ public partial class Lantern : Node3D
 			LightSize = 0.08f, ShadowBlur = 1.5f,   // the flame's size: its cage's shadows soft-edged
 		};
 		AddChild(_glow);
+		_glow.LightCullMask &= ~HeldItem.HeldLayer;   // (not on the lantern in the hand, an inch from it: see HeldLantern)
 		BuildCage(_glow);
+		// the lantern in the hand, seen (once the camera's there)
+		Callable.From(() => { if (GetParent() is PlayerController p && p.CameraRig?.Camera != null) HeldItem.Attach<HeldLantern>(p); }).CallDeferred();
 		_beam = new SpotLight3D
 		{
 			LightColor = LightColor,
@@ -133,6 +141,7 @@ public partial class Lantern : Node3D
 			Visible = false,
 			LightVolumetricFogEnergy = 0.45f,   // the gathered beam shows in the fog as a shaft
 		};
+		_beam.LightCullMask &= ~HeldItem.HeldLayer;
 		AddChild(_beam);
 	}
 
@@ -205,6 +214,8 @@ public partial class Lantern : Node3D
 		var cam = _player.CameraRig?.Camera;
 		if (cam == null) return;
 		GlobalTransform = cam.GlobalTransform;
+		if (HeldFlameAt is { } flame) _glow.GlobalPosition = flame;
+		else _glow.Position = GlowCarried;
 		// (its clock runs whatever it's showing: it had only run while the flame was lit, so a flame that died with the
 		// blacklight on stayed "dying" for ever, and lit again the moment the blacklight went off)
 		_t += delta;

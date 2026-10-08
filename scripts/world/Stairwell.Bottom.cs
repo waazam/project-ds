@@ -294,13 +294,7 @@ public partial class Stairwell
 		Landed = true;
 		// (in this black, out cold on the floor: the winter woods and the lodge, left unbuilt by the load from Act 1, are
 		// built now, and their shaders warmed, before the eyes open)
-		if (WinterWoods.Instance is { Built: false } woods)
-		{
-			await Cutscene.Frame(this, ct);
-			woods.EnsureBuilt();
-			ulong t0 = Time.GetTicksMsec();
-			while (!ShaderWarmup.Ready && Time.GetTicksMsec() - t0 < 8000) await Cutscene.Frame(this, ct);
-		}
+		await BuildWinterInTheBlack(ct);
 		await Cutscene.Wait(this, 2.2, ct);
 		Sfx("breath_in", 5, lie, -6f, 3f);
 		if (fader != null) await fader.Fade(0f, 3.0f, ct);
@@ -396,13 +390,7 @@ public partial class Stairwell
 		player.GlobalPosition = land;
 		Landed = true;
 		// (the winter, unbuilt by the load from Act 1, built in this black: see the other fall)
-		if (WinterWoods.Instance is { Built: false } woods)
-		{
-			await Cutscene.Frame(this, ct);
-			woods.EnsureBuilt();
-			ulong t0 = Time.GetTicksMsec();
-			while (!ShaderWarmup.Ready && Time.GetTicksMsec() - t0 < 8000) await Cutscene.Frame(this, ct);
-		}
+		await BuildWinterInTheBlack(ct);
 		Sfx("body_thump", 2, land, -2f, 4f);
 		Sfx("step_stone", 6, land, 2f, 4f);
 		// on their feet: a hard bend at the knees, straight up again, looking at the way on
@@ -428,5 +416,36 @@ public partial class Stairwell
 		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.Underground = 1f;
 		await Cutscene.Wait(this, 0.1, ct);
 		// control back: the passage out of the chamber is Act 15's hallway (Act15Hallway)
+	}
+
+	/// <summary>The winter woods and the lodge (left unbuilt by the load from Act 1) built in the black after the fall,
+	/// their shaders warmed: seconds of it, so it's filled: a slow heart, loud in the ears, and a shuddering breath now and
+	/// then, as if they lie out cold (2026-10-07). The heartbeat plays on through the build (the sound runs on its own).</summary>
+	private async Task BuildWinterInTheBlack(CancellationToken ct)
+	{
+		if (WinterWoods.Instance is not { Built: false } woods) return;
+		AudioStreamPlayer heart = null;
+		if (ResourceLoader.Exists("res://assets/audio/ambient/heartbeat_loop.wav"))
+		{
+			var wav = (AudioStreamWav)GD.Load<AudioStreamWav>("res://assets/audio/ambient/heartbeat_loop.wav").Duplicate();
+			wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
+			wav.LoopEnd = Mathf.RoundToInt(wav.GetLength() * wav.MixRate);
+			heart = new AudioStreamPlayer { Name = "OutColdHeart", Stream = wav, Bus = "Player", VolumeDb = -9f, PitchScale = 0.82f };
+			AddChild(heart);
+			heart.Play();
+		}
+		Audio.AudioDirector.OneShot(this, "breath_out", 3, null, -8f, "Player", 3f, 0.05f);
+		await Cutscene.Wait(this, 0.6, ct);
+		woods.EnsureBuilt();
+		ulong t0 = Time.GetTicksMsec();
+		while (!ShaderWarmup.Ready && Time.GetTicksMsec() - t0 < 8000) await Cutscene.Frame(this, ct);
+		Audio.AudioDirector.OneShot(this, "breath_in", 5, null, -7f, "Player", 3f, 0.05f);
+		await Cutscene.Wait(this, 1.2, ct);
+		if (heart != null)
+		{
+			var tw = CreateTween();
+			tw.TweenProperty(heart, "volume_db", -40f, 2.0f);
+			tw.TweenCallback(Callable.From(heart.QueueFree));
+		}
 	}
 }

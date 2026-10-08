@@ -110,7 +110,39 @@ public partial class CameraTool : Node
 			// The readback in Shoot returns the last rendered frame: draw one without the marks first.
 			_pendingShot = true;
 			_viewfinder.HideMarks = true;
+			// in the dark, the flash: a burst of light from the camera that lights the frame it takes, then fades (one
+			// soft flash, never a strobe; dimmer with "reduce flashing")
+			if (InTheDark()) Flash();
 		}
+	}
+
+	private OmniLight3D _flashLight;
+	/// <summary>For tests: flashes fired.</summary>
+	public int Flashes { get; private set; }
+
+	/// <summary>Night, the menacing woods, or underground: dark enough to want the flash.</summary>
+	private bool InTheDark()
+	{
+		var atmo = GetTree().GetFirstNodeInGroup("atmosphere") as World.ForestAtmosphere;
+		if (atmo == null) return false;
+		return atmo.CurrentMood is World.ForestAtmosphere.Mood.Night or World.ForestAtmosphere.Mood.Menacing || atmo.Underground > 0.5f;
+	}
+
+	private void Flash()
+	{
+		var cam = _player.CameraRig?.Camera;
+		if (cam == null) return;
+		bool reduce = Systems.GameSettings.Instance?.ReduceFlashing ?? false;
+		_flashLight ??= new OmniLight3D { Name = "Flash", LightColor = new Color(1f, 0.96f, 0.9f), OmniRange = 16f, OmniAttenuation = 1.2f, ShadowEnabled = false, LightCullMask = ~HeldItem.HeldLayer };
+		if (_flashLight.GetParent() == null) cam.AddChild(_flashLight);
+		_flashLight.Position = new Vector3(0.05f, 0.05f, -0.2f);
+		_flashLight.LightEnergy = reduce ? 1.6f : 3.2f;
+		_flashLight.Visible = true;
+		Flashes++;
+		var tw = CreateTween();
+		tw.TweenInterval(0.08);   // (held through the frame the photo takes)
+		tw.TweenProperty(_flashLight, "light_energy", 0f, reduce ? 0.6f : 0.35f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+		tw.TweenCallback(Callable.From(() => _flashLight.Visible = false));
 	}
 
 	/// <summary>The unphotographed bird closest to the centre of the frame, within range and the cone, or null.</summary>

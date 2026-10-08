@@ -131,6 +131,28 @@ public static class Foley
 		return FinishOneShot(Wet(x, sr, 1.0, 0.06, 0.3, 0.5, 0.3), sr, -3, 60);
 	}
 
+	/// <summary>A step in dry fallen leaves: a crisp, papery crackle that runs on a moment after the foot lands.</summary>
+	public static double[] StepDryLeaves(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.5);
+		Slap(x, r, sr, 0.0, 0.35, 90, 600, 0.03, 0.004);
+		Crinkle(x, r, sr, 0.0, r.R(0.2, 0.3), 520, 1500, 7500, 0.7);
+		Crinkle(x, r, sr, 0.06, r.R(0.28, 0.38), 220, 1000, 5000, 0.35);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.05, 0.25, 0.5, 0.25), sr, -3, 60);
+	}
+
+	/// <summary>A step that breaks a small dry twig underfoot among the leaves: a sharp crack in it, not loud.</summary>
+	public static double[] StepTwig(Rng r, int sr)
+	{
+		var x = Buf(sr, 0.5);
+		Slap(x, r, sr, 0.0, 0.35, 90, 600, 0.03, 0.004);
+		Crinkle(x, r, sr, 0.0, r.R(0.14, 0.2), 380, 1400, 7000, 0.45);
+		double t = r.R(0.02, 0.06);
+		Knock(x, r, sr, t, 0.8, r.R(1800, 2600), 4, 0.008);
+		Slap(x, r, sr, t, 0.7, 1500, 9000, 0.006, 0.0003);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.05, 0.25, 0.5, 0.25), sr, -3, 60);
+	}
+
 	/// <summary>A step onto a root: a hollow wooden knock under the sole, a scuff of bark.</summary>
 	public static double[] StepRoot(Rng r, int sr)
 	{

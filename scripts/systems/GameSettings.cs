@@ -217,6 +217,11 @@ public partial class GameSettings : Node
 	private void Load()
 	{
 		if (AutoTest) return; // tests always run on defaults
+		LoadFile();
+	}
+
+	private void LoadFile()
+	{
 		var cfg = new ConfigFile();
 		if (cfg.Load(SavePath) != Error.Ok) return;
 		MouseSensitivity = (float)cfg.GetValue("camera", "mouse_sensitivity", MouseSensitivity);
@@ -300,10 +305,59 @@ public partial class GameSettings : Node
 
 	public override void _Ready()
 	{
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--settings-test") >= 0) Callable.From(RunSettingsTest).CallDeferred();
 		GetTree().NodeAdded += OnNodeAdded;
 		ApplyShadows();
 		GetTree().Root.SizeChanged += OnRootSizeChanged;
 		ApplyDisplay();
+	}
+
+	// ------------------------------------------------------------------ the settings' round trip (a test)
+
+	/// <summary>Every setting the menus save, as it is now (name: value), for the round trip.</summary>
+	private System.Collections.Generic.Dictionary<string, string> Snapshot() => new()
+	{
+		["mouse"] = MouseSensitivity.ToString("0.00000"), ["stick"] = StickSensitivity.ToString("0.000"), ["invert_y"] = InvertY.ToString(),
+		["distance"] = CameraDistance.ToString("0.000"), ["camera"] = Camera.ToString(), ["volume"] = _masterVolume.ToString("0.000"),
+		["reduce_flashing"] = ReduceFlashing.ToString(), ["head_motion"] = HeadMotion.ToString(), ["bars"] = CinemaBars.ToString(),
+		["fog_lighting"] = FogLighting.ToString(), ["brightness"] = Brightness.ToString("0.000"), ["lantern"] = LanternBrightness.ToString("0.000"),
+		["crt"] = _crtFilter.ToString(), ["shadows"] = _shadows.ToString(), ["windowed"] = _windowed.ToString(), ["window"] = _windowSize.ToString(),
+	};
+
+	private void SetFields(float mouse, float stick, bool inv, float dist, float vol, bool flash, bool head, bool bars, bool fog, float bright, float lantern, bool crt, int shadows, bool windowed, Vector2I size)
+	{
+		MouseSensitivity = mouse; StickSensitivity = stick; InvertY = inv; CameraDistance = dist; _masterVolume = vol; ReduceFlashing = flash;
+		HeadMotion = head; CinemaBars = bars; FogLighting = fog; Brightness = bright; LanternBrightness = lantern; _crtFilter = crt; _shadows = shadows;
+		_windowed = windowed; _windowSize = size;
+	}
+
+	/// <summary>`--settings-test` (on the built game too, 2026-10-07): every setting set to something other than its
+	/// default, saved, scrambled, and read back from the file as a restart would; each compared. The player's own file
+	/// is put back afterwards. Prints PASS or FAIL per setting, and quits (exit code 0 if all came back).</summary>
+	public void RunSettingsTest()
+	{
+		string backup = Godot.FileAccess.FileExists(SavePath) ? Godot.FileAccess.GetFileAsString(SavePath) : null;
+		var before = Snapshot();
+		var keep = (MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera);
+		SetFields(0.0042f, 3.3f, !InvertY, 3.1f, 0.63f, !ReduceFlashing, !HeadMotion, !CinemaBars, !FogLighting, 1.25f, 1.35f, !_crtFilter, (_shadows + 1) % 3, !_windowed, new Vector2I(1280, 720));
+		var want = Snapshot();
+		Save();
+		SetFields(0.001f, 1f, false, 2f, 1f, false, true, true, true, 1f, 1f, true, 1, false, new Vector2I(1600, 900));
+		LoadFile();
+		var got = Snapshot();
+		int bad = 0;
+		foreach (var (k, v) in want)
+		{
+			bool ok = got.TryGetValue(k, out var g) && g == v;
+			if (!ok) bad++;
+			GD.Print($"[settings-test] {(ok ? "PASS" : "FAIL")} {k}: saved {v}, read back {g}");
+		}
+		// the player's own settings back, and their file
+		(MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera) = keep;
+		if (backup != null) { using var f = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Write); f?.StoreString(backup); }
+		else DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
+		GD.Print($"[settings-test] {want.Count - bad}/{want.Count} settings survive a restart; the player's own put back ({(Snapshot()["brightness"] == before["brightness"] ? "unchanged" : "CHANGED")})");
+		GetTree().Quit(bad == 0 ? 0 : 1);
 	}
 
 	private static void RegisterInputActions()
