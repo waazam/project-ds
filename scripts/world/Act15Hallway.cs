@@ -99,9 +99,11 @@ public partial class Act15Hallway : Node3D
 		body.SetMeta("surface", "stone");
 		AddChild(body);
 		var wall = new MeshKit();
-		wall.Mat(Concrete("hw_wall", StairwellTextures.StainedConcrete, 0.28f));
+		// (the walls in concrete that doesn't repeat down its kilometre: two baked sets blended, pours of different tones,
+		// water down from the top, grime at the foot; 2026-10-09)
+		wall.Mat(SurfaceSets.VariedConcrete("hw_wall", 0.3f, GlobalPosition.Y + H1, GlobalPosition.Y, null, 0.8f, 20f));
 		var dark = new MeshKit();
-		dark.Mat(Concrete("hw_floor", StairwellTextures.GrimeConcrete, 0.4f));
+		dark.Mat(SurfaceSets.Apply(Concrete("hw_floor", StairwellTextures.GrimeConcrete, 0.4f), "concrete_b", 0.8f));
 		var black = new MeshKit();
 		black.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.01f, 0.01f, 0.01f), Roughness = 1f });
 		void Box(MeshKit k, Vector3 c, Vector3 s, Basis? rot = null, bool collide = true, float tint = 1f)
@@ -317,7 +319,7 @@ public partial class Act15Hallway : Node3D
 	{
 		float z0 = End + 0.2f, z1 = End + 0.2f + ClosetDepth, h = 2.6f;
 		var k = new MeshKit();
-		k.Mat(Concrete("hw_closet", StairwellTextures.CleanConcrete, 0.6f));
+		k.Mat(SurfaceSets.Apply(Concrete("hw_closet", StairwellTextures.CleanConcrete, 0.6f), "concrete_clean"));
 		k.Color = new Color(0.75f, 0.73f, 0.68f);
 		void Slab(Vector3 c, Vector3 s)
 		{

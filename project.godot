@@ -94,6 +94,10 @@ winter={
 "type": "float",
 "value": 0.0
 }
+wet={
+"type": "float",
+"value": 0.0
+}
 wind={
 "type": "vec3",
 "value": Vector3(0.8, 0, 0.6)

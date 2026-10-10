@@ -106,6 +106,7 @@ public static class PaperKit
 			_ => new Color(0.82f, 0.78f, 0.68f),
 		};
 		Color ink = new(0.22f, 0.20f, 0.24f);
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		var px = new Color[w, h];
 		for (int y = 0; y < h; y++)
@@ -148,5 +149,6 @@ public static class PaperKit
 			for (int x = 0; x < w; x++) img.SetPixel(x, y, px[x, y]);
 		img.GenerateMipmaps();
 		return ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 }

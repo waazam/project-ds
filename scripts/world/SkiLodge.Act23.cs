@@ -92,6 +92,7 @@ public partial class SkiLodge
 		BuildDiningStory();
 		BuildRoom201();
 		BuildCrawlspace();
+		BuildLoose();
 		if (Has(LodgeFlag.Frozen)) Freeze(instant: true);
 		if (Has(LodgeFlag.FrontBroken)) ExplodeFrontDoor(instant: true);
 		if (StoryManager.Instance is { Current: >= Checkpoint.Act23Finished }) Callable.From(EnsureAct24).CallDeferred();
@@ -247,6 +248,7 @@ public partial class SkiLodge
 	public override void _ExitTree()
 	{
 		if (StoryManager.Instance is { } s) s.FlagSet -= OnFlag;
+		Lures.Heard -= OnLooseNoise;
 	}
 
 	// ------------------------------------------------------------------ 3. room 202

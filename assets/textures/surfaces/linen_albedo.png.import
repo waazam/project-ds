@@ -2,20 +2,21 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5spu3fx6sgsm"
-path="res://.godot/imported/linen_albedo.png-3f228783fb90b4562b8e8cfe44f3b79d.ctex"
+uid="uid://bn7bd54nihp1a"
+path.s3tc="res://.godot/imported/linen_albedo.png-3f228783fb90b4562b8e8cfe44f3b79d.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/surfaces/linen_albedo.png"
-dest_files=["res://.godot/imported/linen_albedo.png-3f228783fb90b4562b8e8cfe44f3b79d.ctex"]
+dest_files=["res://.godot/imported/linen_albedo.png-3f228783fb90b4562b8e8cfe44f3b79d.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -37,4 +38,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

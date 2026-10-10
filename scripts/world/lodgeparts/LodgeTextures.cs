@@ -56,6 +56,8 @@ public static class LodgeTextures
 	private static Texture2D Make(string key, int w, int h, Func<float, float, Color> f)
 	{
 		if (_tex.TryGetValue(key, out var t)) return t;
+		var __tg = Systems.TexGen.Start();
+		if (Systems.TexCache.Load("LodgeTextures_" + key) is { } __cached) { t = ImageTexture.CreateFromImage(__cached); _tex[key] = t; return t; }
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		for (int y = 0; y < h; y++)
 			for (int x = 0; x < w; x++)
@@ -65,7 +67,9 @@ public static class LodgeTextures
 				img.SetPixel(x, y, c);
 			}
 		img.GenerateMipmaps();
+		Systems.TexCache.Save("LodgeTextures_" + key, img);
 		t = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 		_tex[key] = t;
 		return t;
 	}
@@ -310,8 +314,10 @@ public static class LodgeTextures
 	public static StandardMaterial3D ParquetMat => Std("lodge_m_parquet", Parquet, 0.5f, 0.45f, null, DetailKit.Kind.Wood, "parquet", 0.5f);
 	public static StandardMaterial3D CheckerMat => Std("lodge_m_checker", Checker, 0.45f, 0.4f);
 	public static StandardMaterial3D RugMat => Std("lodge_m_rug", Rug, 1f, 0.1f, null, DetailKit.Kind.Fabric);
-	public static StandardMaterial3D DarkWoodMat => Std("lodge_m_darkwood", DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f);
-	public static StandardMaterial3D LogWallMat => Std("lodge_m_logwall", LogWall, 0.8f, 0.25f, null, DetailKit.Kind.Wood);
+	// (baked at 1024 px since 2026-10-09: the owner, "the wood in ... the ski lodge looks pretty bad")
+	public static StandardMaterial3D DarkWoodMat => _darkM ??= World.SurfaceSets.Apply(Std("lodge_m_darkwood", World.SurfaceSets.Albedo("wood_dark") ?? DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f), "wood_dark", 0.7f);
+	public static StandardMaterial3D LogWallMat => _logwallM ??= World.SurfaceSets.Apply(Std("lodge_m_logwall", World.SurfaceSets.Albedo("wood_pine") ?? LogWall, 0.8f, 0.25f, null, DetailKit.Kind.Wood), "wood_pine");
+	private static StandardMaterial3D _darkM, _logwallM;
 
 	private static StandardMaterial3D _plain(string key, Color c, float rough, float spec, float metal = 0f)
 	{

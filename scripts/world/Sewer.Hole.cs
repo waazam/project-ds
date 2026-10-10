@@ -167,6 +167,7 @@ public partial class Sewer
 		fader?.SetBlack(true);
 		GD.Print("[story] Act 17 done: down the hole - Act 18 starts below");
 		await Cutscene.Wait(this, 1.0, ct);
+		await WinterWoods.BuildInTheBlack(this, ct);   // (the winter, left unbuilt: built in this black, a heart in the ears)
 		// out of the black: dropping out of the ceiling of the boss room (Act 18's save is on landing)
 		if (StationInterior.Instance?.Boss is { } boss) await boss.Arrive(player, ct);
 		else StoryBeat.ReachCheckpoint(player, Checkpoint.Act17Finished);

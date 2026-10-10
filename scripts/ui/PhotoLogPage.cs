@@ -35,7 +35,11 @@ public partial class PhotoLogPage : CanvasLayer
 	public bool IsOpen { get; private set; }
 	/// <summary>The page on show (0-based), for tests.</summary>
 	public int Page { get; private set; }
-	public int PageCount => Mathf.Max(1, (int)Mathf.Ceil((_log?.RecordedCount ?? 0) / (float)PerPage));
+	public int PhotoPages => Mathf.Max(1, (int)Mathf.Ceil((_log?.RecordedCount ?? 0) / (float)PerPage));
+	/// <summary>(2026-10-10) The pages: the prints, and after them the notes, once there's a line to read.</summary>
+	public int PageCount => PhotoPages + (NotesFound > 0 ? 1 : 0);
+	public bool OnNotes => NotesFound > 0 && Page == PhotoPages;
+	public int NotesFound => _log == null ? 0 : System.Linq.Enumerable.Count(PhotoCatalog.All, e => _log.Has(e.Id) && PhotoCatalog.NoteFor(e.Id) != null);
 
 	private static readonly Color PageColor = new(0.1f, 0.095f, 0.09f, 0.94f);
 	private static readonly Color PrintPaper = new(0.94f, 0.93f, 0.89f);
@@ -65,7 +69,7 @@ public partial class PhotoLogPage : CanvasLayer
 		if (_log != null && IsInstanceValid(_log)) _log.Taken -= OnTaken;
 	}
 
-	private void OnTaken(PhotoLog.Photo p) { if (IsOpen) { Page = PageCount - 1; _draw.QueueRedraw(); } }
+	private void OnTaken(PhotoLog.Photo p) { if (IsOpen) { Page = PhotoPages - 1; _draw.QueueRedraw(); } }
 
 	public override void _Process(double delta)
 	{
@@ -108,7 +112,7 @@ public partial class PhotoLogPage : CanvasLayer
 	private void Open()
 	{
 		IsOpen = true;
-		Page = PageCount - 1;   // the newest pictures
+		Page = PhotoPages - 1;   // the newest pictures (the notes are the page after)
 		Rustle();
 	}
 
@@ -148,6 +152,7 @@ public partial class PhotoLogPage : CanvasLayer
 		var photos = _log?.Photos;
 		int count = photos?.Count ?? 0;
 		var italic = UiKit.SerifItalic;
+		if (OnNotes) { DrawNotes(); return; }
 		var footer = new Color(0.62f, 0.6f, 0.56f, 0.8f);
 		if (count == 0)
 			_draw.DrawString(italic, new Vector2(0, PageH * 0.5f + 4f), EmptyLine, HorizontalAlignment.Center, PageW, 11, footer);
@@ -169,6 +174,25 @@ public partial class PhotoLogPage : CanvasLayer
 			_draw.DrawString(UiKit.Mono, new Vector2(0f, PageH - 9f), $"{_log.SubjectsFound}/{PhotoCatalog.Total} found   {_log.TotalScore} pts", HorizontalAlignment.Center, PageW, 9, footer);
 		if (PageCount > 1)
 			_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{Page + 1} / {PageCount}", HorizontalAlignment.Right, PageW - 24f, 9, footer);
+	}
+
+	/// <summary>The notes page: ruled lines, a pencil line for each thing found, the newest at the bottom (the earliest
+	/// drop off the top once the page is full).</summary>
+	private void DrawNotes()
+	{
+		var footer = new Color(0.62f, 0.6f, 0.56f, 0.8f);
+		var lines = new System.Collections.Generic.List<string>();
+		foreach (var e in PhotoCatalog.All)
+			if (_log.Has(e.Id) && PhotoCatalog.NoteFor(e.Id) is { } n) lines.Add(n);
+		const float top = 34f, step = 12f;
+		int fit = (int)((PageH - top - 18f) / step);
+		_draw.DrawString(UiKit.SerifItalic, new Vector2(14f, 22f), "Notes", HorizontalAlignment.Left, -1, 12, new Color(UiKit.Bone, 0.9f));
+		for (int i = 0; i < fit; i++)
+			_draw.DrawLine(new Vector2(12f, top + i * step + 3f), new Vector2(PageW - 12f, top + i * step + 3f), new Color(0.45f, 0.42f, 0.4f, 0.18f), 1f);
+		int first = Mathf.Max(0, lines.Count - fit);
+		for (int i = first; i < lines.Count; i++)
+			_draw.DrawString(UiKit.SerifItalic, new Vector2(16f, top + (i - first) * step), lines[i], HorizontalAlignment.Left, PageW - 32f, 9, new Color(UiKit.Bone, 0.8f));
+		_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{Page + 1} / {PageCount}", HorizontalAlignment.Right, PageW - 24f, 9, footer);
 	}
 
 	private void DrawPrint(PhotoLog.Photo p, Vector2 centre)

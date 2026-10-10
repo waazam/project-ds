@@ -394,9 +394,21 @@ public partial class RoundRoom
 	{
 		if (Powered || Surging) return;
 		sw.Pos = sw.Pos switch { Lever.Down => Lever.Middle, Lever.Middle => Lever.Up, _ => Lever.Down };
+		// (2026-10-10) it's heavy: a stiff first inch under the hand, then it gives and snaps over into its notch with a clack;
+		// the view leans in to it and back
+		float from = sw.Pivot.Rotation.X, to = LeverAngle(sw.Pos);
 		var tw = CreateTween();
-		tw.TweenProperty(sw.Pivot, "rotation:x", LeverAngle(sw.Pos), 0.22f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+		tw.TweenProperty(sw.Pivot, "rotation:x", from + (to - from) * 0.12f, 0.16f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		tw.TweenProperty(sw.Pivot, "rotation:x", to, 0.2f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+		tw.TweenCallback(Callable.From(() => AudioDirector.OneShot(this, "radio_tick", 4, sw.Pivot.GlobalPosition, -6f, "Events", 2f, 0.05f)));
 		AudioDirector.OneShot(this, "lever_throw", 3, sw.Pivot.GlobalPosition, -2f);
+		if (player?.CameraRig is { } rig)
+		{
+			var lean = CreateTween();
+			lean.TweenMethod(Callable.From<float>(v => rig.LeanIn = v), rig.LeanIn, 0.7f, 0.18f).SetTrans(Tween.TransitionType.Sine);
+			lean.TweenInterval(0.15f);
+			lean.TweenMethod(Callable.From<float>(v => rig.LeanIn = v), 0.7f, 0f, 0.6f).SetTrans(Tween.TransitionType.Sine);
+		}
 		GD.Print($"[story] Act 20: switch {sw.Index + 1} ({(sw.OnPlusX ? "left wall" : "right wall")}, {(sw.Slot < 0 ? "left" : sw.Slot == 0 ? "middle" : "right")}) thrown {sw.Pos}");
 		if (AllSwitchesRight) { Surging = true; _ = Cutscene.Run(this, ct => Surge(player, ct), lockInput: true); }
 		else

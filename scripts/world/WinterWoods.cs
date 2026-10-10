@@ -33,11 +33,12 @@ public partial class WinterWoods : Node3D
 	private ShaderMaterial _groundMat;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 2222 };
 
-	/// <summary>Built (the woods, the road, the lodge). A new game, or a save before the stairwell's fall (Act 14), leaves
-	/// them unbuilt at load, to be built in the black after the fall: they were eight of the 25 seconds the load from Act 1
+	/// <summary>Built (the woods, the road, the lodge). A new game, or a save before the drop into the pit (Act 17), leaves
+	/// them unbuilt at load, to be built in the black of the drop (it had been the stairwell's fall; moved later, 2026-10-09,
+	/// so a death or a Continue in Acts 14 to 17 doesn't build them either): they were eight of the 25 seconds the load from Act 1
 	/// to the Hollow took (the owner, 2026-10-07: "the loading time between act 1 and 2 took a very long time").</summary>
 	public bool Built { get; private set; }
-	public static bool DeferAtLoad => Systems.StoryManager.Instance is { } st && st.Current < Systems.Checkpoint.Act14Finished
+	public static bool DeferAtLoad => Systems.StoryManager.Instance is { } st && st.Current < Systems.Checkpoint.Act17Finished
 		&& System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-defer") < 0 && !NeverDefer;
 	/// <summary>Everything built at load, always (the audits: they look at the whole level).</summary>
 	public static bool NeverDefer;
@@ -50,13 +51,13 @@ public partial class WinterWoods : Node3D
 			SetProcess(false);
 			// (a safety: reached some other way than the fall, it's built then)
 			if (Systems.StoryManager.Instance is { } st) st.CheckpointReached += OnCheckpointBuild;
-			GD.Print("[story] Act 22: the winter woods and the lodge wait to be built (after the stairwell's fall)");
+			GD.Print("[story] Act 22: the winter woods and the lodge wait to be built (in the drop into the pit)");
 			return;
 		}
 		Build();
 	}
 
-	private void OnCheckpointBuild(Systems.Checkpoint cp) { if (IsInstanceValid(this) && IsInsideTree() && cp >= Systems.Checkpoint.Act14Finished && !Built) EnsureBuilt(); }
+	private void OnCheckpointBuild(Systems.Checkpoint cp) { if (IsInstanceValid(this) && IsInsideTree() && cp >= Systems.Checkpoint.Act17Finished && !Built) EnsureBuilt(); }
 
 	/// <summary>Builds them now if they wait (in a blackout: it takes seconds), and brings the render budget and the shader
 	/// warm-up up to date with them. Returns at once if they're built.</summary>
@@ -73,22 +74,53 @@ public partial class WinterWoods : Node3D
 		root.AddChild(new Systems.ShaderWarmup { Name = "ShaderWarmupWinter" });
 	}
 
+	/// <summary>The winter woods and the lodge (left unbuilt by the load from Act 1) built in a blackout the story already has (the drop into the pit, Act 17 to 18),
+	/// their shaders warmed: seconds of it, so it's filled: a slow heart, loud in the ears, and a shuddering breath now and
+	/// then, as if they lie out cold (2026-10-07). The heartbeat plays on through the build (the sound runs on its own).</summary>
+	public static async System.Threading.Tasks.Task BuildInTheBlack(Node host, System.Threading.CancellationToken ct)
+	{
+		if (Instance is not { Built: false } woods) return;
+		AudioStreamPlayer heart = null;
+		if (ResourceLoader.Exists("res://assets/audio/ambient/heartbeat_loop.wav"))
+		{
+			var wav = (AudioStreamWav)GD.Load<AudioStreamWav>("res://assets/audio/ambient/heartbeat_loop.wav").Duplicate();
+			wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
+			wav.LoopEnd = Mathf.RoundToInt(wav.GetLength() * wav.MixRate);
+			heart = new AudioStreamPlayer { Name = "OutColdHeart", Stream = wav, Bus = "Player", VolumeDb = -9f, PitchScale = 0.82f };
+			host.AddChild(heart);
+			heart.Play();
+		}
+		Audio.AudioDirector.OneShot(host, "breath_out", 3, null, -8f, "Player", 3f, 0.05f);
+		await Systems.Cutscene.Wait(host, 0.6, ct);
+		woods.EnsureBuilt();
+		ulong t0 = Time.GetTicksMsec();
+		while (!Systems.ShaderWarmup.Ready && Time.GetTicksMsec() - t0 < 8000) await Systems.Cutscene.Frame(host, ct);
+		Audio.AudioDirector.OneShot(host, "breath_in", 5, null, -7f, "Player", 3f, 0.05f);
+		await Systems.Cutscene.Wait(host, 1.2, ct);
+		if (heart != null)
+		{
+			var tw = host.CreateTween();
+			tw.TweenProperty(heart, "volume_db", -40f, 2.0f);
+			tw.TweenCallback(Callable.From(heart.QueueFree));
+		}
+	}
+
 	private void Build()
 	{
 		using var __timer = Systems.BuildTimer.Time("WinterWoods");
 		Built = true;
 		EnsurePath();
 		Lodge = new SkiLodge { Name = "SkiLodge", Position = SkiLodge.OriginLocal };
-		AddChild(Lodge);
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.Lodge"); AddChild(Lodge); }
 		_groundMat = GroundMat();
-		BuildGround();
-		BuildRibbon();
-		BuildTrees();
-		BuildProps();
-		BuildWeather();
-		BuildStalker();
-		BuildPrints();
-		BuildWallWind();
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildGround"); BuildGround(); }
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildRibbon"); BuildRibbon(); }
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildTrees"); BuildTrees(); }
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildProps"); BuildProps(); }
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildWeather"); BuildWeather(); }
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildStalker"); BuildStalker(); }
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildPrints"); BuildPrints(); }
+		{ using var __t = Systems.BuildTimer.Time("WinterWoods.BuildWallWind"); BuildWallWind(); }
 		SetProcess(true);
 		GD.Print($"[story] Act 22: the winter woods - {Length:0} m of plowed road to the lodge, {Chunks} ground chunks, {TreeCount} trees");
 	}
@@ -164,30 +196,41 @@ public partial class WinterWoods : Node3D
 		minX = Mathf.Floor(minX / Cell) * Cell; minZ = Mathf.Floor(minZ / Cell) * Cell;
 		float chunk = Cell * ChunkCells;
 		int nx = Mathf.CeilToInt((maxX - minX) / chunk), nz = Mathf.CeilToInt((maxZ - minZ) / chunk);
-		for (int cx = 0; cx < nx; cx++)
-			for (int cz = 0; cz < nz; cz++)
-				BuildChunk(minX + cx * chunk, minZ + cz * chunk);
+		// (the heights, colours and normals at every chunk's corners worked out on all the cores at once, each corner once:
+		// they're pure arithmetic over the road, and were three of the eight seconds the winter took to build; the meshes
+		// and their collision made after, here)
+		EnsurePath();
+		var data = new ChunkData[nx * nz];
+		System.Threading.Tasks.Parallel.For(0, nx * nz, idx => data[idx] = Corners(minX + (idx / nz) * chunk, minZ + (idx % nz) * chunk));
+		for (int idx = 0; idx < data.Length; idx++)
+			if (data[idx] != null) BuildChunk(minX + (idx / nz) * chunk, minZ + (idx % nz) * chunk, data[idx]);
 	}
 
-	private void BuildChunk(float x0, float z0)
+	private sealed class ChunkData { public float[,] H; public Color[,] Col; public bool[,] Inside; public Vector3[,] N; }
+
+	private static ChunkData Corners(float x0, float z0)
 	{
 		int n = (int)ChunkCells;
-		// heights and colours at the grid's corners, once each
-		var h = new float[n + 1, n + 1];
-		var col = new Color[n + 1, n + 1];
-		var inside = new bool[n + 1, n + 1];
+		var d = new ChunkData { H = new float[n + 1, n + 1], Col = new Color[n + 1, n + 1], Inside = new bool[n + 1, n + 1], N = new Vector3[n + 1, n + 1] };
 		bool any = false;
 		for (int i = 0; i <= n; i++)
 			for (int j = 0; j <= n; j++)
 			{
 				float x = x0 + i * Cell, z = z0 + j * Cell;
-				inside[i, j] = Covered(x, z);
-				if (!inside[i, j]) continue;
+				d.Inside[i, j] = Covered(x, z);
+				if (!d.Inside[i, j]) continue;
 				any = true;
-				h[i, j] = GridHeight(x, z);
-				col[i, j] = GroundColor(x, z);
+				d.H[i, j] = GridHeight(x, z);
+				d.Col[i, j] = GroundColor(x, z);
+				d.N[i, j] = GridNormal(x, z);
 			}
-		if (!any) return;
+		return any ? d : null;
+	}
+
+	private void BuildChunk(float x0, float z0, ChunkData data)
+	{
+		int n = (int)ChunkCells;
+		var h = data.H; var col = data.Col; var inside = data.Inside; var nrm = data.N;
 		var k = new MeshKit();
 		k.Mat(_groundMat);
 		var faces = new List<Vector3>();
@@ -200,7 +243,7 @@ public partial class WinterWoods : Node3D
 				if (WinterGlade.OutsideChurch(x, z) <= 0f && WinterGlade.OutsideChurch(x + Cell, z + Cell) <= 0f
 					&& WinterGlade.OutsideChurch(x + Cell, z) <= 0f && WinterGlade.OutsideChurch(x, z + Cell) <= 0f) continue;
 				Vector3 a = new(x, h[i, j], z), b = new(x + Cell, h[i + 1, j], z), c = new(x + Cell, h[i + 1, j + 1], z + Cell), d = new(x, h[i, j + 1], z + Cell);
-				Vector3 na = GridNormal(x, z), nb = GridNormal(x + Cell, z), nc = GridNormal(x + Cell, z + Cell), nd = GridNormal(x, z + Cell);
+				Vector3 na = nrm[i, j], nb = nrm[i + 1, j], nc = nrm[i + 1, j + 1], nd = nrm[i, j + 1];
 				k.Color = col[i, j];
 				// per-corner colours: two triangles, each corner its own
 				TriC(k, a, b, c, na, nb, nc, col[i, j], col[i + 1, j], col[i + 1, j + 1]);

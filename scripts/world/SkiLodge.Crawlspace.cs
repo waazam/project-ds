@@ -587,6 +587,7 @@ public partial class SkiLodge
 			{
 				arm.Burst();
 				ArmsBurst++;
+				PlayerBreathing.Startle(1f);
 				ArmHole(a);
 				AudioDirector.OneShot(this, "wall_burst", 3, arm.GlobalPosition, 2.5f + a * 1.5f, "Events", 5f, 0.05f);
 				AudioDirector.OneShot(this, $"wendigo_howl_{a + 1:00}", 1, arm.GlobalPosition + arm.GlobalBasis.X * -1.5f, -2f + a * 3f, "Unnatural", 7f, 0.02f);   // (each worse)

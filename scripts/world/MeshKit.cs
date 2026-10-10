@@ -202,10 +202,10 @@ public class MeshKit
 		}
 	}
 
-	/// <summary>Jittered low-poly blob (icosphere, 1 subdivision) with flat-ish shading.</summary>
-	public void Blob(Vector3 c, Vector3 radii, int seed, float jitter = 0.18f, bool flat = true, float uvScale = 1f, float shadeBottom = 0f)
+	/// <summary>Jittered low-poly blob (icosphere, 1 subdivision unless asked for more) with flat-ish shading.</summary>
+	public void Blob(Vector3 c, Vector3 radii, int seed, float jitter = 0.18f, bool flat = true, float uvScale = 1f, float shadeBottom = 0f, int subdiv = 1)
 	{
-		var (verts, tris) = Icosphere(1);
+		var (verts, tris) = Icosphere(subdiv);
 		var rng = new RandomNumberGenerator { Seed = (ulong)seed };
 		var disp = new Vector3[verts.Count];
 		for (int i = 0; i < verts.Count; i++)
@@ -453,9 +453,24 @@ public class MeshKit
 		}
 	}
 
+	/// <summary>For the load's log: time spent separating coplanar faces, and committing meshes, so far.</summary>
+	public static double CoplanarMs, CommitMs;
+	public static int Commits;
+
 	public ArrayMesh Commit()
 	{
+		ulong t0 = Time.GetTicksUsec();
 		SeparateCoplanar();
+		ulong t1 = Time.GetTicksUsec();
+		CoplanarMs += (t1 - t0) / 1000.0;
+		var mesh = CommitArrays();
+		CommitMs += (Time.GetTicksUsec() - t1) / 1000.0;
+		Commits++;
+		return mesh;
+	}
+
+	private ArrayMesh CommitArrays()
+	{
 		var mesh = new ArrayMesh();
 		foreach (var m in _order)
 		{

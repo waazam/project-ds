@@ -2432,7 +2432,7 @@ public partial class StoryTest : Node
 		await WaitUntil(() => sewer.Dropped, 3, ct);
 		await Seconds(1.2, ct);
 		Screenshot("dropping");
-		await WaitUntil(() => s.Current == Checkpoint.Act17Finished, 12, ct);
+		await WaitUntil(() => s.Current == Checkpoint.Act17Finished, 30, ct);   // (the winter is built in this black: up to ~10 s on a cold start)
 		var boss = StationInterior.Instance?.Boss;
 		Check("yes and yes: down the hole, out of a ceiling, onto a catwalk (Act 18's save)", sewer.Dropped && s.Current == Checkpoint.Act17Finished
 			&& boss != null && _player.GlobalPosition.DistanceTo(boss.LandingWorld) < 1.5f, $"{s.Current} at {_player.GlobalPosition}");
@@ -3626,11 +3626,28 @@ public partial class StoryTest : Node
 				Check("missing posters and newspapers on the walls; Christmas lights along the ceiling from a third of the way in", lodge.CrawlPosters >= 12 && lodge.CrawlBulbs > 600 && lodge.CrawlLights >= 12, $"{lodge.CrawlPosters} posters and papers, {lodge.CrawlBulbs} bulbs, {lodge.CrawlLights} lights");
 			}
 			if (c == SkiLodge.CrawlSave) { await Seconds(0.3, ct); Check("halfway: a save in the crawlspace", s.Current == Checkpoint.Act23Crawlspace, $"{s.Current}"); }
+			// (2026-10-10) the tin on the boards before the first arm: taken, and thrown on past the arm, it claws after the noise
+			int armAt = path.IndexOf(SkiLodge.ArmSpots[0].cell);
+			if (armAt > 3 && i == armAt - 3 && lodge.CrawlTins.Count > 0 && IsInstanceValid(lodge.CrawlTins[0]))
+			{
+				lodge.CrawlTins[0].GetNode<Interactable>("Take").Interact(_player);
+				await Frames(2, ct);
+				Check("a tin on the boards before the arm: picked up to throw", HeldProp.For(_player) is { Has: true });
+			}
 			if (c == SkiLodge.ArmSpots[0].cell)
 			{
 				await Aim(lodge.Arms[0].HandWorld, ct);
 				await Seconds(0.2, ct);
 				Screenshot("act23_arm_through_the_wall");
+				if (HeldProp.For(_player) is { Has: true } tin)
+				{
+					await Aim(Cell(path[Mathf.Min(i + 3, path.Count - 1)], true) + Vector3.Up * 0.8f, ct);
+					await Seconds(0.6, ct);
+					int d0 = lodge.Arms[0].Distractions;
+					tin.Throw();
+					await WaitUntil(() => lodge.Arms[0].Distractions > d0, 2.5, ct);
+					Check("the tin thrown on past it: the arm claws after the noise", lodge.Arms[0].Distractions > d0, $"distractions {lodge.Arms[0].Distractions - d0}");
+				}
 			}
 		}
 		await Crouch(false);
@@ -3729,6 +3746,79 @@ public partial class StoryTest : Node
 		LodgeFlag.Frozen, LodgeFlag.WardrobeDown, LodgeFlag.FrontBroken,
 	};
 
+	/// <summary>(2026-10-10) The green flares: along the way, lit; one taken burns four-fifths of the walk to the next; thrown,
+	/// it draws the wendigo, which stays sniffing at it. A hollow: crouched in it, it can't see them; holding the breath, it
+	/// sniffs at the mouth and moves on.</summary>
+	private async Task FlaresAndHollows24(Act24Maze maze, SnowMazeCave cave, WendigoHunter hunter, CancellationToken ct)
+	{
+		var back = _player.GlobalPosition;
+		var backLook = back + (-_player.CameraRig.GlobalBasis.Z) * 5f;
+		var flares = MazeExtras.Flares;
+		Check("green flares along the way through, far apart, burning", flares.Count >= 2 && flares.TrueForAll(f => IsInstanceValid(f) && !f.Out),
+			$"{flares.Count} flares, burns {string.Join(",", flares.ConvertAll(f => f.BurnWhenTaken.ToString("0.0")))} s");
+		if (flares.Count < 2) return;
+		float expect = 0.8f * MazeExtras.FlareSpacing / _player.WalkSpeed;
+		Check("a flare taken burns about four-fifths of the walk to the next", Mathf.Abs(flares[0].BurnWhenTaken - expect) < 1.5f, $"{flares[0].BurnWhenTaken:0.0} s (the walk {MazeExtras.FlareSpacing / _player.WalkSpeed:0.0} s)");
+		hunter.Paused = true;
+		var f0 = flares[0];
+		await Teleport(f0.GlobalPosition + (back - f0.GlobalPosition).Normalized() * 1.5f + Vector3.Up * 0.1f, f0.GlobalPosition, ct);
+		await Seconds(0.4, ct);
+		await Aim(f0.GlobalPosition + Vector3.Up * 0.2f, ct);
+		Screenshot("act24_a_green_flare");
+		f0.GetNode<Interactable>("Take").Interact(_player);
+		await Seconds(1.2, ct);
+		var held = HeldFlare.For(_player);
+		Check("taken: burning green in the hand, on its timer", held is { Lit: true } && held.BurnLeft > expect - 3f, $"{held?.BurnLeft:0.0} s left");
+		await Aim(_player.GlobalPosition + Vector3.Up * 1.2f + (-_player.CameraRig.GlobalBasis.Z) * 6f, ct);
+		Screenshot("act24_the_flare_in_hand");
+		// thrown down the tunnel: it goes to it, and sniffs at it while it burns
+		var L = cave.Layout;
+		int pn = L.NearestConnected(cave.ToLocal(_player.GlobalPosition));
+		int nb = L.Adj[pn][0];
+		var toward = cave.ToGlobal(L.Nodes[nb] + Vector3.Up * 1.2f);
+		await Aim(toward + Vector3.Up * 0.6f, ct);
+		int lured0 = hunter.Lured;
+		hunter.Body.GlobalPosition = cave.ToGlobal(L.Nodes[L.Adj[nb].Find(x => x != pn) is int far && far != 0 ? far : nb]);
+		hunter.Paused = false;
+		held.Throw();
+		await WaitUntil(() => hunter.Lured > lured0, 4, ct);
+		Check("thrown: it lands burning, and the wendigo goes to it", hunter.Lured > lured0 && hunter.State == WendigoHunter.Mode.Investigate && !held.Lit, $"{hunter.State}, lured {hunter.Lured - lured0}");
+		await Seconds(3.5, ct);
+		Screenshot("act24_it_goes_to_the_flare");
+		// a hollow: crouched in it, unseen; breath held, it sniffs at the mouth and goes
+		if (MazeExtras.Hollows.Count > 0)
+		{
+			hunter.Paused = true;
+			hunter.Calm();
+			var (lintel, mouth, dir) = MazeExtras.Hollows[0];
+			await Teleport(cave.ToGlobal(lintel + dir * 1.9f + Vector3.Up * 0.1f), cave.ToGlobal(mouth), ct);
+			await Crouch24(true, ct);
+			await Seconds(0.6, ct);
+			await Aim(cave.ToGlobal(mouth + Vector3.Up * 1.0f), ct);
+			bool hidden = MazeExtras.PlayerHidden(cave, _player);
+			hunter.Body.GlobalPosition = cave.ToGlobal(mouth - dir * 2.5f);
+			hunter.Body.LookAt(cave.ToGlobal(lintel + dir * 2f) with { Y = hunter.Body.GlobalPosition.Y }, Vector3.Up);
+			bool seen = hunter.CanSee(cave.ToLocal(_player.GlobalPosition));
+			Check("crouched in a hollow under the drift: it can't see them", hidden && !seen, $"hidden {hidden}, seen {seen}");
+			int sniffed0 = hunter.SniffedHollows;
+			hunter.Paused = false;
+			hunter.Lure(cave.ToGlobal(mouth), 99f, 0.5f, "the test");
+			_input.ScriptedBreath = true;
+			await WaitUntil(() => hunter.SniffedHollows > sniffed0, 6, ct);
+			await Seconds(1.5, ct);
+			Screenshot("act24_holding_your_breath");
+			await WaitUntil(() => hunter.State != WendigoHunter.Mode.Investigate || PlayerDeath.Dying, 7, ct);
+			_input.ScriptedBreath = false;
+			Check("breath held: it sniffs at the mouth, and moves on", hunter.SniffedHollows > sniffed0 && !PlayerDeath.Dying, $"sniffed {hunter.SniffedHollows - sniffed0}, {hunter.State}");
+			await Seconds(0.5, ct);
+			await Crouch24(false, ct);
+		}
+		hunter.Paused = true;   // (as it was: the walk through goes with it held off out of the way)
+		hunter.Calm();
+		hunter.Body.GlobalPosition = cave.ToGlobal(L.Nodes[L.Nodes.Count - 1]);
+		await Teleport(back, backLook, ct);
+	}
+
 	/// <summary>Act 24: out to the hole in the drift and down; the wendigo's senses and its director; the solution walked to
 	/// the cavern; the crowbar, the crate, the flamethrower; its fire and its heat; four burns, and out (Act 25).</summary>
 	private async Task Act24(CancellationToken ct)
@@ -3746,6 +3836,20 @@ public partial class StoryTest : Node
 			$"{L.Nodes.Count} junctions, solution {L.Solution.Count}, {L.DeadEnds.Count} dead ends, {L.LoopEdges.Count} loops");
 		await WaitUntil(() => _input.Enabled, 15, ct);
 		Check("Act 24 starts at its save: Act 23's end, at the doorway", s.Current >= Checkpoint.Act23Finished, $"{s.Current}");
+		// (2026-10-10) the loose things upstairs: walked into, a bottle goes over, and clinks
+		if (lodge.Loose.Count > 0 && IsInstanceValid(lodge.Loose[0]))
+		{
+			var back = _player.GlobalPosition;
+			var b = lodge.Loose[0];
+			var along = lodge.GlobalBasis.X.Normalized();
+			await Teleport(b.GlobalPosition - along * 1.6f + Vector3.Up * 0.1f, b.GlobalPosition + along * 3f, ct);
+			await Seconds(0.4, ct);
+			var startAt = b.GlobalPosition;
+			await WalkTo(b.GlobalPosition + along * 1.5f, 0.4f, ct, giveUp: 4f);
+			await Seconds(0.8, ct);
+			Check("a bottle on the corridor floor, walked into: it goes over (and clinks)", b.Knocks > 0 && b.GlobalPosition.DistanceTo(startAt) > 0.05f, $"knocks {b.Knocks}, moved {b.GlobalPosition.DistanceTo(startAt):0.00} m");
+			await Teleport(back, back + Vector3.Forward * 3f, ct);
+		}
 		// out across the snow, following its tracks, to the hole
 		var hole = maze.GetNodeOrNull<Node3D>("Hole");
 		await WaitUntil(() => maze.GetNodeOrNull<Node3D>("Hole") != null, 5, ct);
@@ -3799,6 +3903,7 @@ public partial class StoryTest : Node
 		Screenshot("act24_it_sees_you");
 		// the director: when it's quiet too long, a nudge toward them (never to them)
 		Check("the director nudges it toward them when they're too safe, and calls it off when it's too much", hunter.Nudges + hunter.SendAways >= 0);
+		await FlaresAndHollows24(maze, cave, hunter, ct);
 		// now the right way through, it kept out of the way
 		hunter.Body.GlobalPosition = Node(L.Nodes.Count - 1);
 		bool walked = true;

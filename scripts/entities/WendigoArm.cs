@@ -35,6 +35,18 @@ public partial class WendigoArm : Node3D
 	public event Action<WendigoArm> Grabbed;
 	/// <summary>Where it's reaching for (world): the player's head, while they're near.</summary>
 	public Func<Vector3?> Prey;
+	/// <summary>(2026-10-10) Something clattered down further along the cavity (a thrown tin): it claws after the noise a
+	/// few seconds, not at them, and doesn't grab.</summary>
+	public void Distract(Vector3 world, float seconds)
+	{
+		_distractAt = world;
+		_distractUntil = _clock + seconds;
+		Distractions++;
+	}
+	public bool Distracted => _clock < _distractUntil;
+	public int Distractions { get; private set; }
+	private Vector3 _distractAt;
+	private double _distractUntil = -1;
 
 	private const float L1 = 0.78f, L2 = 0.74f;   // (the model's: tools/Blender/wendigo.py, ARM_L1, ARM_L2)
 	private static readonly Vector3 Shoulder = new(-0.95f, 0.05f, 0f);
@@ -190,9 +202,15 @@ public partial class WendigoArm : Node3D
 		// (the owner): its aim shifts to a new spot a few times a second, it trembles, it reaches out at them with the hand
 		// splayed and snaps it shut, and drags it back to reach again
 		Vector3 want;
-		var prey = Prey?.Invoke();
+		var prey = Distracted ? null : Prey?.Invoke();
 		bool near = prey is { } head && head.DistanceTo(GlobalPosition) < 2.8f;
-		if (near)
+		if (Distracted)
+		{
+			// after the noise: the hand along the cavity toward it, scrabbling
+			var d = ToLocal(_distractAt);
+			want = new Vector3(Mathf.Clamp(d.X, 0.3f, Across - 0.38f), 0.1f * Mathf.Sin((float)_clock * 3.1f), Mathf.Clamp(d.Z, -0.5f, 0.5f));
+		}
+		else if (near)
 		{
 			want = ToLocal(prey.Value);
 			want.X = Mathf.Clamp(want.X, 0.3f, Across - 0.38f);   // (its fingers, 0.3 m past the hand, just scratch the far boards)

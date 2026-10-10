@@ -107,16 +107,16 @@ public partial class SkiLodge : Node3D
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		_body.SetMeta("surface", "stone");
 		AddChild(_body);
-		BuildHall();
-		BuildWings();
-		BuildPorch();
-		BuildBackDoor();
-		BuildMudroom();
-		BuildInterior();
-		BuildFurnishings();
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildHall"); BuildHall(); }
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildWings"); BuildWings(); }
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildPorch"); BuildPorch(); }
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildBackDoor"); BuildBackDoor(); }
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildMudroom"); BuildMudroom(); }
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildInterior"); BuildInterior(); }
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildFurnishings"); BuildFurnishings(); }
 		StartAct23();
-		BuildIcicles();
-		BuildDrifts();
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildIcicles"); BuildIcicles(); }
+		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildDrifts"); BuildDrifts(); }
 		_frontMarker = new Node3D { Name = "FrontMarker", Position = new Vector3(0, 1.4f, Apothem + 1.2f) };
 		AddChild(_frontMarker);
 		_frontMarker.AddToGroup("lodge_front_marker");

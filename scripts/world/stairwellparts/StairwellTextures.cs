@@ -63,13 +63,17 @@ public static class StairwellTextures
 	private static Texture2D Make(string key, int w, int h, Func<int, int, Color> f)
 	{
 		if (_tex.TryGetValue(key, out var t)) return t;
+		var __tg = Systems.TexGen.Start();
+		if (Systems.TexCache.Load("StairwellTextures_" + key) is { } __cached) { t = ImageTexture.CreateFromImage(__cached); _tex[key] = t; return t; }
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		for (int y = 0; y < h; y++)
 			for (int x = 0; x < w; x++)
 				img.SetPixel(x, y, f(x, y));
 		img = TexelBoost.Apply(key, img);
 		img.GenerateMipmaps();
+		Systems.TexCache.Save("StairwellTextures_" + key, img);
 		t = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 		_tex[key] = t;
 		return t;
 	}
@@ -91,7 +95,13 @@ public static class StairwellTextures
 
 	/// <summary>Clean poured concrete: pale grey, a fine dark-and-light speckle, small pits, faint
 	/// horizontal formwork seams every half tile.</summary>
-	public static Texture2D CleanConcrete => Make("sw_clean", 128, 128, (x, y) =>
+	// (the baked 1024 px sets since 2026-10-09: the owner, "the texture for all the concrete needs to be drastically
+	// upscaled to look more real"; the procedural 128 px ones below are only fallbacks now)
+	public static Texture2D CleanConcrete => World.SurfaceSets.Albedo("concrete_clean") ?? CleanConcreteOld;
+	public static Texture2D StainedConcrete => World.SurfaceSets.Albedo("concrete_b") ?? StainedConcreteOld;
+	public static Texture2D GrimeConcrete => World.SurfaceSets.Albedo("concrete_grime") ?? GrimeConcreteOld;
+
+	private static Texture2D CleanConcreteOld => Make("sw_clean", 128, 128, (x, y) =>
 	{
 		float n = Fbm(x, y, 128, 4, 4, 201);
 		float g = 0.6f + 0.14f * (n - 0.5f) * 2f;
@@ -106,7 +116,7 @@ public static class StairwellTextures
 
 	/// <summary>Stained concrete: hairline cracks, grey-brown drips running down from the upper ones,
 	/// rust-coloured blooms, pits pulled into vertical streaks.</summary>
-	public static Texture2D StainedConcrete => Make("sw_stained", 128, 128, (x, y) =>
+	private static Texture2D StainedConcreteOld => Make("sw_stained", 128, 128, (x, y) =>
 	{
 		float n = Fbm(x, y, 128, 4, 4, 211);
 		float g = 0.52f + 0.16f * (n - 0.5f) * 2f;
@@ -132,7 +142,7 @@ public static class StairwellTextures
 
 	/// <summary>Grimy concrete: dark and blotched, oil soaked into it, a web of cracks, and here and
 	/// there a blue-black oily sheen.</summary>
-	public static Texture2D GrimeConcrete => Make("sw_grime", 128, 128, (x, y) =>
+	private static Texture2D GrimeConcreteOld => Make("sw_grime", 128, 128, (x, y) =>
 	{
 		float n = Fbm(x, y, 128, 3, 5, 221);
 		float m = Fbm(x, y, 128, 6, 3, 222);
@@ -167,9 +177,10 @@ public static class StairwellTextures
 	}), 0.95f, 0.2f);
 
 	/// <summary>Plain clean concrete as an ordinary material (Room 3's hole, the landing at the top).</summary>
-	public static StandardMaterial3D CleanMat => Std("sw_clean_m", CleanConcrete, 0.92f, 0.25f);
-	public static StandardMaterial3D GrimeMat => Std("sw_grime_m", GrimeConcrete, 0.6f, 0.5f);
-	public static StandardMaterial3D StainedMat => Std("sw_stained_m", StainedConcrete, 0.85f, 0.3f);
+	public static StandardMaterial3D CleanMat => _cleanM ??= World.SurfaceSets.Apply(Std("sw_clean_m", CleanConcrete, 0.92f, 0.25f), "concrete_clean");
+	public static StandardMaterial3D GrimeMat => _grimeM ??= World.SurfaceSets.Apply(Std("sw_grime_m", GrimeConcrete, 0.6f, 0.5f), "concrete_grime");
+	public static StandardMaterial3D StainedMat => _stainedM ??= World.SurfaceSets.Apply(Std("sw_stained_m", StainedConcrete, 0.85f, 0.3f), "concrete_b");
+	private static StandardMaterial3D _cleanM, _grimeM, _stainedM;
 
 	// ------------------------------------------------------------------ steel
 

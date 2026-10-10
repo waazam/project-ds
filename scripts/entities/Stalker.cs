@@ -167,6 +167,9 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	public double LastSeenDuration { get; private set; }
 	/// <summary>0 = just seen, keeping back .. 1 = long unseen, as close as it gets.</summary>
 	public float Tension { get; private set; }
+	/// <summary>How long the lantern has been off (the woods, at night: it comes closer in the dark).</summary>
+	public float DarkFor => _darkFor;
+	private float _darkFor;
 	/// <summary>True once it has started following (from the first climb on, or a dev key).</summary>
 	public bool Awake => _awake;
 
@@ -260,6 +263,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 
 	public override void _Ready()
 	{
+		AddToGroup(Audio.DreadDrone.Group);   // (2026-10-10: the dread, while it's out at its tree, unseen)
 		AddToGroup("stalker");
 		AddToGroup("warm_up_self");
 		// the storm walk's rare noises in the dark (beside it, not of it: it makes no sounds but its own)
@@ -442,8 +446,13 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 			_cooldown = _rng.RandfRange(IntroFirstAppearance.X, IntroFirstAppearance.Y);
 		}
 		if (Current == State.Dormant) Current = State.Hidden;
-		// Unseen, it grows bolder: its trees creep closer over time.
-		Tension = Mathf.Min(1f, Tension + dt / CloseInNow);
+		// Unseen, it grows bolder: its trees creep closer over time. (2026-10-10) And in the dark: the lantern left off out
+		// here more than half a minute, it comes on three times as fast, and sooner to its next tree.
+		bool lit = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern") is { IsOn: true };
+		_darkFor = lit ? 0f : _darkFor + dt;
+		float dark = Mathf.Clamp((_darkFor - 30f) / 20f, 0f, 1f);
+		Tension = Mathf.Min(1f, Tension + dt / CloseInNow * (1f + 2f * dark));
+		if (dark > 0f && Current == State.Hidden) _cooldown -= dt * 0.8f * dark;
 
 		bool withdraw = SilenceAt(_player.GlobalPosition) > RetreatAtSilence;
 		switch (Current)
@@ -805,6 +814,8 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 			if (Glimpse == GlimpseKind.Stare) _linger = _rng.RandfRange(1.2f, 2.0f);
 			else if (Glimpse == GlimpseKind.Watching) _linger = _rng.RandfRange(2.5f, 4f);
 			SetVisibility(SoundOnly ? 0f : MaxVisibility);
+			// (2026-10-10) now and then, birds go up out of the trees over where it's come to
+			if (!Intro && GlobalPosition.DistanceTo(_player.GlobalPosition) < 32f) World.AmbientLife.MaybeBirds(this, GlobalPosition, 0.3f);
 			return true;
 		}
 		return false;

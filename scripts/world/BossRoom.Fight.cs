@@ -377,6 +377,7 @@ public partial class BossRoom
 	{
 		if (_ring != null) return _ring;
 		const int n = 64;
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(n, n, false, Image.Format.Rgba8);
 		for (int y = 0; y < n; y++)
 			for (int x = 0; x < n; x++)
@@ -387,6 +388,7 @@ public partial class BossRoom
 			}
 		img.GenerateMipmaps();
 		return _ring = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 
 	/// <summary>A run of slams stepping along the catwalk from near the player, a limb at a time.</summary>
@@ -445,10 +447,12 @@ public partial class BossRoom
 		Slams++;
 		Sfx("catwalk_slam", 3, at, 6f, 10f);
 		Splash(at);
+		Damage(at);
 		var player = StoryBeat.Player(this);
 		if (player == null || _dying || State is Phase.Finale or Phase.Open or Phase.Done) return;
 		float d = new Vector2(player.GlobalPosition.X - at.X, player.GlobalPosition.Z - at.Z).Length();
 		if (d < 7f) _ = Shake(player, Mathf.Lerp(0.03f, 0.008f, d / 7f));
+		if (d < 7f) PlayerBreathing.Startle(Mathf.Lerp(0.7f, 0.3f, d / 7f));
 		bool demo = false;
 		foreach (var (tt, m, _) in _telegraphs) if (tt == t && (bool)m.GetMeta("demo")) demo = true;
 		// only what the red circle showed: it has to be fair

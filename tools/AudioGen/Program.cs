@@ -87,6 +87,16 @@ jobs.Add(("flame_overheat", sfx, false, Lo, (r, sr) => Act24Sounds.Overheat(r, s
 jobs.Add(("flame_ready", sfx, false, Lo, (r, sr) => Act24Sounds.Ready(r, sr)));
 jobs.Add(("snow_cave_loop", ambient, true, Lo, (r, sr) => Act24Sounds.Cave(r, sr, 30)));
 jobs.Add(("car_start", sfx, false, Lo, (r, sr) => Act24Sounds.CarStart(r, sr)));
+// 2026-10-10: the flares, things thrown and knocked, the dread, the frogs
+for (int i = 1; i <= 2; i++) jobs.Add(($"flare_strike_{i:00}", sfx, false, Lo, (r, sr) => Tonight.FlareStrike(r, sr)));
+jobs.Add(("flare_burn_loop", ambient, true, Lo, (r, sr) => Tonight.FlareBurn(r, sr, 20)));
+jobs.Add(("flare_out", sfx, false, Lo, (r, sr) => Tonight.FlareOut(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"can_clatter_{i:00}", sfx, false, Lo, (r, sr) => Tonight.CanClatter(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"bottle_clink_{i:00}", sfx, false, Lo, (r, sr) => Tonight.BottleClink(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"chair_scrape_{i:00}", sfx, false, Lo, (r, sr) => Tonight.ChairScrape(r, sr)));
+jobs.Add(("dread_drone_loop", ambient, true, Lo, (r, sr) => Tonight.DreadDrone(r, sr, 30)));
+jobs.Add(("save_hum_loop", ambient, true, Lo, (r, sr) => Tonight.SaveHum(r, sr, 20)));
+jobs.Add(("frogs_loop", ambient, true, Lo, (r, sr) => Tonight.Frogs(r, sr, 30)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"wing_flutter_{i:00}", sfx, false, Lo, (r, sr) => Forest.WingFlutter(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"claw_rake_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Rake(r, sr)));
 // Creature candidates (not wired into the game yet): growls, roars (near / far), screeches, snarls.

@@ -87,6 +87,8 @@ public static class UvInk
 	private static Texture2D Strokes(string key, int w, int h, List<List<Vector2>> strokes, float radius, int seed, Func<Vector2, float> extra = null)
 	{
 		if (_tex.TryGetValue(key, out var t)) return t;
+		var __tg = Systems.TexGen.Start();
+		if (Systems.TexCache.Load("UvInk_" + key) is { } __cached) { t = ImageTexture.CreateFromImage(__cached); _tex[key] = t; return t; }
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		for (int y = 0; y < h; y++)
 			for (int x = 0; x < w; x++)
@@ -105,7 +107,9 @@ public static class UvInk
 				img.SetPixel(x, y, new Color(1, 1, 1, Mathf.Clamp(a, 0f, 1f)));
 			}
 		img.GenerateMipmaps();
+		Systems.TexCache.Save("UvInk_" + key, img);
 		t = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 		_tex[key] = t;
 		return t;
 	}
@@ -175,6 +179,7 @@ public static class UvInk
 	private static Texture2D Grain()
 	{
 		if (_grain != null) return _grain;
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(64, 64, false, Image.Format.Rgba8);
 		for (int y = 0; y < 64; y++)
 			for (int x = 0; x < 64; x++)
@@ -184,6 +189,7 @@ public static class UvInk
 			}
 		img.GenerateMipmaps();
 		return _grain = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 
 	public static ShaderMaterial Mat(Texture2D mask, Color ink, float strength = 1.6f)

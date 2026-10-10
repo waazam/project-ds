@@ -82,6 +82,9 @@ public partial class WendigoHunter : Node3D
 		Body.SetSize(BodyScale);
 		Body.StandAt(cave.ToGlobal(startLocal), cave.ToGlobal(startLocal + Vector3.Back));
 		Body.Play("walk", 1.4f, 0.2);
+		var tag = new WendigoHunterBodyTag { Name = "DreadTag", Hunter = this };
+		Body.AddChild(tag);
+		tag.AddToGroup(DreadDrone.Group);   // (2026-10-10: the dread, when it's near and unseen)
 		Pick(Mode.Patrol);
 	}
 
@@ -99,6 +102,7 @@ public partial class WendigoHunter : Node3D
 		_hitCool -= dt;
 		Director(dt);
 		Senses(dt);
+		CheckHollows(dt);
 		Burnt(dt);
 		if (!HoldStill) Act(dt);
 		else _vel = Vector3.Zero;
@@ -163,6 +167,9 @@ public partial class WendigoHunter : Node3D
 	private float Noise()
 	{
 		if (Flamethrower.Instance is { Firing: true }) return HearFlame;
+		// a gasp for air, held too long: it carries
+		if (PlayerBreathing.Of(_player) is { Gasped: true }) return HearWalk * 1.3f;
+		if (PlayerHidden && PlayerBreathing.Of(_player) is { Holding: true }) return 0f;
 		float sp = _player.GroundSpeed;
 		if (sp < 0.3f) return 0f;
 		if (_player.Crouching) return HearCrouch;
@@ -180,7 +187,7 @@ public partial class WendigoHunter : Node3D
 		var p = PlayerLocal;
 		// sight: a cone ahead, out to the dark; nothing through a mound or a wall
 		bool sees = CanSee(p);
-		float range = SightRange * (_player.Crouching ? 0.7f : 1f) * (LanternLit() ? 1.3f : 1f);   // (the same reach CanSee used)
+		float range = SightRange * (_player.Crouching ? 0.7f : 1f) * (LanternLit() || HeldFlare.AnyLit ? 1.3f : 1f);   // (the same reach CanSee used)
 		float dist = Pos.DistanceTo(p);
 		if (sees)
 		{
@@ -246,8 +253,10 @@ public partial class WendigoHunter : Node3D
 		var eye = Pos + Vector3.Up * EyeHeight;   // (under the roof: an eye up in the snow saw nothing)
 		var chest = p + Vector3.Up * (_player.Crouching ? 0.7f : 1.25f);
 		float d = eye.DistanceTo(chest);
-		float range = SightRange * (_player.Crouching ? 0.7f : 1f) * (LanternLit() ? 1.3f : 1f);
+		float range = SightRange * (_player.Crouching ? 0.7f : 1f) * (LanternLit() || HeldFlare.AnyLit ? 1.3f : 1f);
 		if (d > range) return false;
+		// (in a hollow, crouched, it can't make them out, unless it's right on them)
+		if (PlayerHidden && d > 1.4f) return false;
 		var to = (chest - eye) with { Y = 0 };
 		if (to.LengthSquared() > 0.25f && Fwd.Normalized().Dot(to.Normalized()) < Mathf.Cos(Mathf.DegToRad(SightHalfAngle))) return false;
 		var q = PhysicsRayQueryParameters3D.Create(_cave.ToGlobal(eye), _cave.ToGlobal(chest), 1);
@@ -274,6 +283,7 @@ public partial class WendigoHunter : Node3D
 
 	private void RouteTo(Vector3 target)
 	{
+		target = MazeExtras.KeepOut(target);   // (it doesn't fit under the hollows' drifts: it stops at the mouth)
 		_route.Clear();
 		_goal = target;
 		int a = L.NearestConnected(Pos), b = L.NearestConnected(target);
@@ -306,6 +316,7 @@ public partial class WendigoHunter : Node3D
 				break;
 			case Mode.Investigate:
 				Walk(HuntSpeed, dt);
+				if (_route.Count == 0 && Sniff(dt)) break;
 				if (_route.Count == 0) { Pick(Mode.Search); _searchLeft = _rng.RandfRange(10f, 18f); _searchStops = 0; }
 				break;
 			case Mode.Search:
@@ -460,7 +471,11 @@ public partial class WendigoHunter : Node3D
 		else AudioDirector.OneShot(this, "wendigo_howl_far", 3, Body.GlobalPosition + Vector3.Up * 3f, -6f, "Unnatural", 12f, 0.03f);
 	}
 
-	private void Shriek() => AudioDirector.OneShot(this, "wendigo_howl_03", 1, Body.GlobalPosition + Vector3.Up * 3f, 4f, "Unnatural", 10f, 0.03f);
+	private void Shriek()
+	{
+		AudioDirector.OneShot(this, "wendigo_howl_03", 1, Body.GlobalPosition + Vector3.Up * 3f, 4f, "Unnatural", 10f, 0.03f);
+		PlayerBreathing.Startle(1f);
+	}
 
 	// ------------------------------------------------------------------ the fire
 

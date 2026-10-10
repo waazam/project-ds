@@ -81,6 +81,7 @@ public partial class RenderBudget : Node
 			Walk(st, _byRoot.GetValueOrDefault(st));
 		}
 		Done = true;
+		StoryManager.LoadStage("the deferred builds done (render budget walked)");
 		GD.Print($"[render] budget: {Meshes} meshes ranged, {Lights} lights faded under the station; {_areas.Count} areas gated");
 	}
 

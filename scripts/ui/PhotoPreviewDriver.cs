@@ -580,12 +580,21 @@ public partial class PhotoPreviewDriver : Node
 		await Seconds(2.5);
 		await PulseTab();
 		Check(_page.IsOpen, "Tab opens the album");
-		Check(_page.PageCount == 2 && _page.Page == 1, $"the album opens on its last page ({_page.Page + 1} / {_page.PageCount})");
+		Check(_page.PhotoPages == 2 && _page.Page == 1, $"the album opens on its last page of prints ({_page.Page + 1} / {_page.PageCount}, the notes after)");
 		Shot("album_last_page");
 		await Press(v => _pin.ScriptedItemPrev = v);
 		await Seconds(0.2);
 		Check(_page.Page == 0, "the wheel turns back a page");
 		Shot("album_first_page");
+		if (_page.NotesFound > 0)
+		{
+			await Press(v => _pin.ScriptedItemNext = v);
+			await Seconds(0.15);
+			await Press(v => _pin.ScriptedItemNext = v);
+			await Seconds(0.2);
+			Check(_page.OnNotes, $"after the prints, the notes: a line for each thing found ({_page.NotesFound})");
+			Shot("album_notes");
+		}
 		await Raise(true);
 		Check(!_page.IsOpen, "raising the camera puts the album away");
 		await Raise(false);

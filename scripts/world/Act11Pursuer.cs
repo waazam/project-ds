@@ -52,6 +52,7 @@ public partial class Act11Pursuer : Node3D
 		PhotoSubject.Attach(this, "bunker_creature", new Vector3(0, 1.5f, 0), 1f, 45f, 12f, true, new Vector3(0, 2.1f, 0));
 		_terrain = GroundSnap.FindTerrain(this);
 		Body = new StalkerBody { Name = "Body", Seed = 2077, Size = 1.08f, Idle = true };
+		Body.AddToGroup(Audio.DreadDrone.Group);   // (2026-10-10: the dread)
 		AddChild(Body);
 		Body.GlowEyes(new Color(1f, 0.16f, 0.05f), 6f);
 		var p = StoryBeat.Player(this);

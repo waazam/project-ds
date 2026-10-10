@@ -22,7 +22,7 @@ public abstract partial class HeldItem : Node3D
 	protected abstract void Animate(float dt);
 	protected virtual void OnHidden() { }
 
-	private float _stride, _lagYaw, _lagPitch, _prevYaw, _prevPitch;
+	private float _stride, _lagYaw, _lagPitch, _prevYaw, _prevPitch, _shakeT;
 	private bool _built;
 
 	/// <summary>The camera's viewfinder up to the eye (the hands are busy with it).</summary>
@@ -35,7 +35,23 @@ public abstract partial class HeldItem : Node3D
 		var item = new T { Name = typeof(T).Name };
 		item.Player = player;
 		cam.AddChild(item);
+		KeepLightsOff(player.GetTree());
 		return item;
+	}
+
+	private static SceneTree _watched;
+
+	/// <summary>(2026-10-10) The world's lamps (omni and spot) kept off the held layer: right up against one (the pit's red
+	/// lamps by the catwalk's rail) the lantern and the glove lit up solid red. The held things are lit by their own soft
+	/// fills and the sky; every lamp put in the world from now on is kept off them too.</summary>
+	private static void KeepLightsOff(SceneTree tree)
+	{
+		if (tree == null || _watched == tree) return;
+		_watched = tree;
+		static void Off(Node n) { if (n is OmniLight3D or SpotLight3D && n is Light3D l && l.LightCullMask != HeldLayer) l.LightCullMask &= ~HeldLayer; }
+		static void Sweep(Node n) { Off(n); foreach (var c in n.GetChildren()) Sweep(c); }
+		Sweep(tree.Root);
+		tree.NodeAdded += Off;
 	}
 
 	public override void _Process(double delta)
@@ -62,8 +78,12 @@ public abstract partial class HeldItem : Node3D
 		_lagPitch = Mathf.Lerp(_lagPitch + (_prevPitch - pitch) * 0.6f, 0f, 1f - Mathf.Exp(-dt * 9f));
 		_prevYaw = yaw; _prevPitch = pitch;
 		_lagYaw = Mathf.Clamp(_lagYaw, -0.08f, 0.08f); _lagPitch = Mathf.Clamp(_lagPitch, -0.06f, 0.06f);
-		Position = Lowered.Lerp(Hold, r) + bob + new Vector3(_lagYaw * 0.35f, _lagPitch * 0.3f, 0f);
-		Rotation = new Vector3(_lagPitch * 0.5f, _lagYaw * 0.6f, 0f);
+		// (2026-10-10) after a fright the hand shakes a little, settling over a few seconds (slow, small: never a jitter)
+		_shakeT += dt;
+		float tr = PlayerBreathing.Tremble;
+		var shake = tr > 0.001f ? new Vector3(Mathf.Sin(_shakeT * 13.1f) + 0.6f * Mathf.Sin(_shakeT * 21.7f), Mathf.Sin(_shakeT * 15.3f + 1f) + 0.5f * Mathf.Sin(_shakeT * 24.1f), 0f) * 0.0025f * tr : Vector3.Zero;
+		Position = Lowered.Lerp(Hold, r) + bob + shake + new Vector3(_lagYaw * 0.35f, _lagPitch * 0.3f, 0f);
+		Rotation = new Vector3(_lagPitch * 0.5f + shake.Y * 3f, _lagYaw * 0.6f, shake.X * 3f);
 	}
 
 	/// <summary>The render layer the held things are on (out of the lantern's own light: see <see cref="SetLayer"/>).</summary>

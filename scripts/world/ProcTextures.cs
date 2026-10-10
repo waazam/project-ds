@@ -72,6 +72,8 @@ public static class ProcTextures
 	private static Texture2D Make(string key, int w, int h, Func<int, int, Color> f, bool alpha = false)
 	{
 		if (_tex.TryGetValue(key, out var t)) return t;
+		var __tg = Systems.TexGen.Start();
+		if (Systems.TexCache.Load("ProcTextures_" + key) is { } __cached) { t = ImageTexture.CreateFromImage(__cached); _tex[key] = t; return t; }
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		for (int y = 0; y < h; y++)
 			for (int x = 0; x < w; x++)
@@ -79,7 +81,9 @@ public static class ProcTextures
 		if (alpha) FixAlphaBorder(img);
 		img = TexelBoost.Apply(key, img);
 		img.GenerateMipmaps();
+		Systems.TexCache.Save("ProcTextures_" + key, img);
 		t = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 		_tex[key] = t;
 		return t;
 	}

@@ -42,6 +42,9 @@ public partial class PlayerCameraRig : Node3D
 	/// <summary>A positional jolt added to the first-person camera (metres, camera-local): Act 12's
 	/// breach and slams. 0 normally.</summary>
 	public Vector3 Shake;
+	/// <summary>(2026-10-10) Leaning in over something in the hands (the bunker's dial, a switch thrown): 0..1, the view
+	/// narrowing a little toward it. Eased by whoever sets it.</summary>
+	public float LeanIn;
 	[Export] public float FirstPersonMinPitch = -80f;
 	[Export] public float FirstPersonMaxPitch = 80f;
 	[Export] public float EyeVerticalSharpness = 18f;   // smooths stairs without feeling floaty
@@ -164,7 +167,7 @@ public partial class PlayerCameraRig : Node3D
 		ApplyMode(GameSettings.Instance.Camera);
 
 		// Focus: ease the field of view in, and slow the aim to match so it stays steady.
-		float fovGoal = _baseFov * (_target.PlayerInput.Focus ? FocusFovScale / Mathf.Max(1f, PhotoZoom) : 1f) + FovSwim;
+		float fovGoal = _baseFov * (_target.PlayerInput.Focus ? FocusFovScale / Mathf.Max(1f, PhotoZoom) : 1f) * (1f - 0.16f * Mathf.Clamp(LeanIn, 0f, 1f)) + FovSwim;
 		Camera.Fov = Mathf.Lerp(Camera.Fov, fovGoal, 1f - Mathf.Exp(-FocusSharpness * dt));
 
 		Vector2 look = _target.PlayerInput.ConsumeLook() * (Camera.Fov / _baseFov);

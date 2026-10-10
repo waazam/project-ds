@@ -69,7 +69,7 @@ public partial class RainVfx : Node3D
 		AddToGroup("rain_vfx");
 	}
 
-	public override void _ExitTree() { if (Instance == this) Instance = null; }
+	public override void _ExitTree() { if (Instance == this) { Instance = null; RenderingServer.GlobalShaderParameterSet("wet", 0f); } }
 
 	public override void _Ready()
 	{
@@ -163,6 +163,7 @@ public partial class RainVfx : Node3D
 	private void BuildWetDecal()
 	{
 		// Dark, uneven film (puddly patches a little darker): blends over everything it projects on.
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(64, 64, false, Image.Format.Rgba8);
 		var noise = new FastNoiseLite { Seed = 77, Frequency = 0.08f, FractalOctaves = 3 };
 		for (int y = 0; y < 64; y++)
@@ -250,9 +251,11 @@ public partial class RainVfx : Node3D
 		// the boughs dripping: in the rain, out in the woods, fat drops off the branches onto the leaves round them, now
 		// near, now a few metres off (2026-10-07: the storm walk's sound, less the same all the way)
 		_dripT -= dt;
-		if (!sheltered && _intensity > 0.3f && _dripT <= 0f)
+		// (2026-10-10: and after it, slower, while the woods are still wet)
+		float dripping = Mathf.Max(_intensity, Mathf.Clamp((Wetness - 0.2f) * 1.2f, 0f, 0.6f));
+		if (!sheltered && dripping > 0.3f && _dripT <= 0f)
 		{
-			_dripT = (float)GD.RandRange(1.2, 3.6) / Mathf.Max(_intensity, 0.3f);
+			_dripT = (float)GD.RandRange(1.2, 3.6) / Mathf.Max(dripping, 0.3f) * (_intensity > 0.3f ? 1f : 1.8f);
 			float a = (float)GD.RandRange(0.0, Mathf.Tau), r = (float)GD.RandRange(1.5, 7.0);
 			var at = cp + new Vector3(Mathf.Cos(a) * r, (float)GD.RandRange(-1.0, 1.5), Mathf.Sin(a) * r);
 			Audio.AudioDirector.OneShot(this, "canopy_drip", 6, at, -14f + 4f * _intensity, "Weather", 3f, 0.08f);
@@ -266,6 +269,9 @@ public partial class RainVfx : Node3D
 		_splashRefresh -= delta;
 		if (_splash.Emitting && _splashRefresh <= 0) { _splashRefresh = 0.2; RefreshSplashPoints(cp); }
 
+		RenderingServer.GlobalShaderParameterSet("wet", Wetness);
+		Puddles(cp, dt);
+		Eaves(dt);
 		_wet.Visible = Wetness > 0.01f;
 		_wet.AlbedoMix = Wetness * 0.42f;
 		_wet.GlobalPosition = new Vector3(Mathf.Snapped(cp.X, 2f), cp.Y, Mathf.Snapped(cp.Z, 2f));

@@ -90,6 +90,7 @@ public partial class SnowPrints : Node3D
 	/// pushed-up snow round it), the alpha following the depth so its edge feathers into the snow.</summary>
 	private static ImageTexture Draw(int w, int h, System.Func<float, float, float> shape)
 	{
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(w, h, true, Image.Format.Rgba8);
 		var m = new float[w, h];
 		for (int y = 0; y < h; y++)
@@ -127,6 +128,7 @@ public partial class SnowPrints : Node3D
 			}
 		img.GenerateMipmaps();
 		return ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 
 	private static ImageTexture _boot, _claw;

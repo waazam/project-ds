@@ -136,7 +136,7 @@ public partial class EndingDirector : Node3D
 		cabin.GlobalPosition = at;
 		cabin.GlobalBasis = Basis.LookingAt(-side, Vector3.Up);
 		var k = new MeshKit();
-		k.Mat(BuildingTextures.LogMat);
+		k.Mat(BuildingTextures.RoundLogMat);
 		k.Color = Colors.White;
 		// log walls, a door, a pitched roof sagging, a chimney
 		for (int i = 0; i < 9; i++)

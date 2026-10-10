@@ -73,7 +73,7 @@ public partial class SkiLodge
 		k.Box(fc - fout * 0.12f + Vector3.Up * 1.95f, new Vector3(3.8f, 0.24f, 0.36f), 0.5f, fbasis);              // the mantel, a split log
 		LodgeKit.Solid(_inBody, fc + fout * 0.2f + Vector3.Up * 1.5f, new Vector3(4.2f, 3f, 1.4f), Mathf.Atan2(-falong.Z, falong.X));
 		// the fire: a low one, burning in an empty lodge (logs, embers; its light moves slowly, never flickers hard)
-		k.Mat(BuildingTextures.LogMat);
+		k.Mat(BuildingTextures.RoundLogMat);
 		k.Cylinder(fc - fout * 0.3f + falong * -0.5f + Vector3.Up * 0.38f, fc - fout * 0.3f + falong * 0.5f + Vector3.Up * 0.4f, 0.09f, 0.09f, 7, true);
 		k.Cylinder(fc - fout * 0.45f + falong * -0.4f + Vector3.Up * 0.36f, fc - fout * 0.2f + falong * 0.45f + Vector3.Up * 0.5f, 0.08f, 0.08f, 7, true);
 		k.Mat(LodgeTextures.Glow("lodge_embers", new Color(1f, 0.42f, 0.12f), 1.6f));

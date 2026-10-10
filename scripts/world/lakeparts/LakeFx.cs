@@ -20,6 +20,7 @@ public static class LakeFx
 	{
 		if (_soft != null) return _soft;
 		const int n = 32;
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(n, n, false, Image.Format.Rgba8);
 		for (int y = 0; y < n; y++)
 			for (int x = 0; x < n; x++)
@@ -30,6 +31,7 @@ public static class LakeFx
 			}
 		img.GenerateMipmaps();
 		return _soft = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 
 	/// <summary>A burst of spray thrown up and out. <paramref name="size"/> 1 = an oar stroke.</summary>
@@ -141,6 +143,7 @@ public static class LakeFx
 	{
 		if (_ring != null) return _ring;
 		const int n = 64;
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(n, n, false, Image.Format.Rgba8);
 		for (int y = 0; y < n; y++)
 			for (int x = 0; x < n; x++)
@@ -152,5 +155,6 @@ public static class LakeFx
 			}
 		img.GenerateMipmaps();
 		return _ring = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 }

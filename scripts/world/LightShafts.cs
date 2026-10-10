@@ -80,6 +80,7 @@ public partial class LightShafts : Node3D
 	private static Texture2D ShaftTexture()
 	{
 		const int w = 32, h = 128;
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		var rng = new RandomNumberGenerator { Seed = 91 };
 		float[] streak = new float[w];
@@ -97,6 +98,7 @@ public partial class LightShafts : Node3D
 			}
 		}
 		return ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 
 	private void Roll(int i)

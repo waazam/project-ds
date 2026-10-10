@@ -2,20 +2,21 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dympccem0x5n6"
-path="res://.godot/imported/fireplace_stone_albedo.png-ef9368b9df8757d17ba8598d20a8332a.ctex"
+uid="uid://3c5p8tv3ck5e"
+path.s3tc="res://.godot/imported/fireplace_stone_albedo.png-ef9368b9df8757d17ba8598d20a8332a.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/surfaces/fireplace_stone_albedo.png"
-dest_files=["res://.godot/imported/fireplace_stone_albedo.png-ef9368b9df8757d17ba8598d20a8332a.ctex"]
+dest_files=["res://.godot/imported/fireplace_stone_albedo.png-ef9368b9df8757d17ba8598d20a8332a.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -37,4 +38,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

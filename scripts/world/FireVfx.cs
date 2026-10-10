@@ -216,12 +216,14 @@ public partial class FireVfx : Node3D
 	{
 		if (_puffAlpha != null) return _puffAlpha;
 		var src = BuildingTextures.Puff().GetImage();
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(src.GetWidth(), src.GetHeight(), false, Image.Format.Rgba8);
 		for (int y = 0; y < src.GetHeight(); y++)
 			for (int x = 0; x < src.GetWidth(); x++)
 				img.SetPixel(x, y, new Color(1, 1, 1, src.GetPixel(x, y).R));
 		img.GenerateMipmaps();
 		_puffAlpha = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 		return _puffAlpha;
 	}
 

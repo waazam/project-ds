@@ -88,6 +88,8 @@ public partial class PlayerController : CharacterBody3D
 	{
 		AddToGroup("player");
 		AddChild(new AirParticles { Name = "Air" });   // dust, spores, breath (the fidelity pass)
+		AddChild(new Audio.DreadDrone { Name = "Dread" });   // the dread: something near, unseen (2026-10-10)
+		AddChild(new World.LanternMoths { Name = "Moths" });   // moths at the lantern, summer nights in the woods (2026-10-10)
 		PlayerInput = GetNode<PlayerInput>(InputPath);
 		CameraRig = GetNode<PlayerCameraRig>(CameraRigPath);
 		Visual = GetNode<Node3D>(VisualPath);

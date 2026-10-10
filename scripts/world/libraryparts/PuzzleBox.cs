@@ -181,6 +181,7 @@ public partial class PuzzleBox : Node3D
 	{
 		ref Texture2D t = ref (dark ? ref _dark : ref _light);
 		if (t != null) return t;
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(32, 32, false, Image.Format.Rgba8);
 		var rng = new RandomNumberGenerator { Seed = dark ? 77u : 66u };
 		Color baseC = dark ? new Color(0.55f, 0.34f, 0.18f) : new Color(0.86f, 0.68f, 0.44f);
@@ -194,6 +195,7 @@ public partial class PuzzleBox : Node3D
 			}
 		img.GenerateMipmaps();
 		t = ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 		return t;
 	}
 

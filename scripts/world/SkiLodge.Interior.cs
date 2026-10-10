@@ -228,14 +228,14 @@ public partial class SkiLodge
 			if (n.Y > 0) n = -n;
 			k.Mat(LodgeTextures.DarkWoodMat);
 			k.Quad(a, b, c, d, n, new Vector2(0, 0), new Vector2(a.DistanceTo(b) * 0.5f, 0), new Vector2(a.DistanceTo(b) * 0.5f, 6f), new Vector2(0, 6f));
-			k.Mat(BuildingTextures.LogMat);
+			k.Mat(BuildingTextures.RoundLogMat);
 			k.Cylinder(p * 0.98f + Vector3.Up * (HexWall - 0.3f), pt + Vector3.Up * (top - 0.1f), 0.22f, 0.16f, 8, false, 0.5f);
 		}
 		// a ring beam round the top of the walls, and a lantern's light well at the peak
 		for (int i = 0; i < 6; i++)
 		{
 			Vector3 p = HexVert(i) * ((HexIn - 0.2f) / Apothem), q = HexVert(i + 1) * ((HexIn - 0.2f) / Apothem);
-			k.Mat(BuildingTextures.LogMat);
+			k.Mat(BuildingTextures.RoundLogMat);
 			k.Cylinder(p + Vector3.Up * (HexWall - 0.25f), q + Vector3.Up * (HexWall - 0.25f), 0.2f, 0.2f, 8, false, 0.5f);
 		}
 		k.Mat(LodgeTextures.DayGlass);
@@ -277,7 +277,7 @@ public partial class SkiLodge
 		for (int i = 0; i < edge.Count - 1; i++)
 		{
 			Vector3 a = edge[i] + Vector3.Up * (UpperY - 0.15f), b = edge[i + 1] + Vector3.Up * (UpperY - 0.15f);
-			k.Mat(BuildingTextures.LogMat);
+			k.Mat(BuildingTextures.RoundLogMat);
 			k.Cylinder(a, b, 0.16f, 0.16f, 8, true, 0.5f);
 			Railing(k, edge[i] + Vector3.Up * UpperY, edge[i + 1] + Vector3.Up * UpperY);
 			// posts down to the floor at the corners
@@ -311,7 +311,7 @@ public partial class SkiLodge
 			k.Box(p + Vector3.Up * 0.5f, new Vector3(0.022f, 0.92f, 0.022f), 1f);
 		}
 		k.Cylinder(a + Vector3.Up * 0.08f, b + Vector3.Up * 0.08f, 0.018f, 0.018f, 4, false);
-		k.Mat(BuildingTextures.LogMat);
+		k.Mat(BuildingTextures.RoundLogMat);
 		k.Cylinder(a + Vector3.Up * 1.0f, b + Vector3.Up * 1.0f, 0.07f, 0.07f, 7, true, 0.5f);
 		var mid = (a + b) * 0.5f;
 		float yaw = Mathf.Atan2(-along.Z, along.X);
@@ -326,7 +326,7 @@ public partial class SkiLodge
 
 	private void Post(MeshKit k, Vector3 at)
 	{
-		k.Mat(BuildingTextures.LogMat);
+		k.Mat(BuildingTextures.RoundLogMat);
 		k.Color = Colors.White;
 		k.Cylinder(at + Vector3.Up * FloorY, at + Vector3.Up * (UpperY + 1.05f), 0.2f, 0.18f, 10, true, 0.5f);
 		LodgeKit.Solid(_inBody, at + Vector3.Up * (UpperY * 0.5f), new Vector3(0.36f, UpperY, 0.36f));
@@ -358,7 +358,7 @@ public partial class SkiLodge
 		// the underside: a sloped soffit, boarded, and the log stringer on the open side
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Quad(new Vector3(x0, 0.02f, z1), new Vector3(x1, UpperY - 0.3f, z1), new Vector3(x1, UpperY - 0.3f, z0), new Vector3(x0, 0.02f, z0), new Vector3(-rise, -run, 0).Normalized());
-		k.Mat(BuildingTextures.LogMat);
+		k.Mat(BuildingTextures.RoundLogMat);
 		k.Cylinder(new Vector3(x0 + 0.2f, 0.1f, z1 + 0.05f), new Vector3(x1, UpperY - 0.1f, z1 + 0.05f), 0.12f, 0.12f, 8, true, 0.5f);
 		Railing(k, new Vector3(x0, rise, z1 + 0.05f), new Vector3(x1, UpperY, z1 + 0.05f));
 		Post(k, new Vector3(x0 + 0.1f, 0, z1 + 0.1f));

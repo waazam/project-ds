@@ -44,6 +44,7 @@ public partial class LakeDressing : Node3D
 		ScatterTrees();
 		ScatterShoreline();
 		BuildShoreCharacter();
+		PlaceFrogs();
 		LeaningSnags();
 		BuildPads();
 		Commit();
@@ -285,6 +286,21 @@ public partial class LakeDressing : Node3D
 			var p2 = new Vector2(pos.X, pos.Z);
 			if (p2.DistanceTo(LakeShape.NearClearing) > 26f && p2.DistanceTo(LakeShape.StationSite) > 30f) continue;
 			body.AddChild(new CollisionShape3D { Position = pos + Vector3.Up * h * 0.5f, Shape = new CylinderShape3D { Radius = r, Height = h } });
+		}
+	}
+
+	/// <summary>(2026-10-10) Frogs along the near shore, either side of the beach (see <see cref="FrogChorus"/>).</summary>
+	private void PlaceFrogs()
+	{
+		foreach (float x in new[] { -34f, -15f, 13f, 31f })
+		{
+			// down from the land to the water's edge
+			float z = 30f;
+			while (z > -40f && LakeShape.ShoreDist(x, z) > 0.6f) z -= 0.5f;
+			if (z <= -40f) continue;
+			var f = new FrogChorus { Name = $"Frogs{x:0}", Db = -11f };
+			AddChild(f);
+			f.Position = new Vector3(x, LakeShape.Ground(x, z) + 0.3f, z);
 		}
 	}
 }

@@ -135,14 +135,11 @@ public partial class StationInterior : Node3D
 		AddToGroup("station_marker");
 		var s = StoryManager.Instance;
 
-		var sw = System.Diagnostics.Stopwatch.StartNew();
-		void T(string what) { GD.Print($"[perf-tmp] {what}: {sw.ElapsedMilliseconds} ms"); sw.Restart(); }
 		Decor = new LobbyDecor { Name = "Decor" };
 		AddChild(Decor);
 		Decor.Build(this);
 		BuildDesk();
 		BuildRoomDoors();
-		T("lobby");
 
 		Basement = new StationBasement { Name = "Basement", Position = new Vector3(BasementGapX, 0, -HalfDepth) };
 		AddChild(Basement);
@@ -154,13 +151,10 @@ public partial class StationInterior : Node3D
 		AddChild(Door3);
 		Room3 = new StationRoom3 { Name = "Room3", Position = new Vector3(0, 0, HalfDepth) };
 		AddChild(Room3);
-		T("rooms");
 		Sewer = new Sewer { Name = "Sewer", Position = SewerAt };
 		AddChild(Sewer);
-		T("sewer");
 		Boss = new BossRoom { Name = "BossRoom", Position = BossAt };
 		AddChild(Boss);
-		T("boss+beyond");
 
 		EntranceMarkerWorld = ToGlobal(new Vector3(EntryGapX, 0.05f, -HalfDepth + 1.2f));
 		EntranceYaw = Rotation.Y + Mathf.Pi;   // facing local +Z: into the lobby, toward the desk
@@ -208,6 +202,7 @@ public partial class StationInterior : Node3D
 		Marker("Act23EndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_Act23Finished");
 		// the end of the story (GameEnding: for now, where Act 23 ends), facing out of the splintered doorway
 		Marker("GameEndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_GameFinished");
+		SaveLamps.Place(this);   // (2026-10-10: the safe lights at a few of the saves)
 
 		// the overlays; the blacklight's secrets, the render budget and the photo subjects round the whole Hollow (placed once
 		// everything is built)

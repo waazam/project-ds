@@ -141,12 +141,24 @@ public partial class CodeLockOverlay : CanvasLayer
 		_tween = CreateTween();
 		_tween.TweenProperty(_root, "modulate:a", 1f, 0.15f);
 		Paint();
+		Lean(1f, 0.45f);
 	}
+
+	/// <summary>(2026-10-10) The view leans in over the dial while it's held up, and back after.</summary>
+	private void Lean(float to, float seconds)
+	{
+		if (_player?.CameraRig is not { } rig) return;
+		_lean?.Kill();
+		_lean = CreateTween();
+		_lean.TweenMethod(Callable.From<float>(v => rig.LeanIn = v), rig.LeanIn, to, seconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+	}
+	private Tween _lean;
 
 	public void Close()
 	{
 		if (!IsOpen) return;
 		_closing = true;
+		Lean(0f, 0.35f);
 		_player?.PlayerInput.EndModal();
 		_player = null;
 		_tween?.Kill();
@@ -231,6 +243,12 @@ public partial class CodeLockOverlay : CanvasLayer
 	{
 		_digits[_cursor] = (char)('0' + ((_digits[_cursor] - '0' + by + 10) % 10));
 		Click(1.15f);
+		// (2026-10-10) the wheel rolls round under the thumb to the next number, and seats with a click
+		var cell = _cells[_cursor];
+		cell.PivotOffset = cell.Size * 0.5f;
+		cell.Scale = new Vector2(1f, 0.45f);
+		var tw = cell.CreateTween();
+		tw.TweenProperty(cell, "scale", Vector2.One, 0.12f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
 	}
 
 	/// <summary>"STATION 3   4 _ 2 _": shown once the first digit is found, until the door is open.</summary>

@@ -185,6 +185,7 @@ public partial class StationRoom3 : Node3D
 
 		// the portraits: salon-hung, crowding the side walls and the back, all their faces burnt out
 		HangPortraits(rng);
+		SecondLook.PortraitEyes(this);
 
 		// the stairwell under the hole
 		AudioDirector.Zone(this, new Vector3(0, 1.3f, CorridorEnd * 0.5f), new Vector3(2.6f, 2.6f, CorridorEnd), AudioDirector.Space.Tunnel, "CorridorVerb");

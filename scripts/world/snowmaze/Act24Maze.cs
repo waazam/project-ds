@@ -249,6 +249,9 @@ public partial class Act24Maze : Node3D
 		Vector3 crowbarAt = default, crateAt = default; float crateYaw = 0f;
 		FurnitureKit.Clean(() => { Cave.DressTrenches(out crowbarAt, out crateAt, out crateYaw); return 0; });
 		CrowbarLocal = crowbarAt;
+		// (2026-10-10) the green flares along the way through; the hollows in the dead ends
+		MazeExtras.BuildHollows(Cave);
+		if (S == null || S.Current < Checkpoint.Act24Trenches) MazeExtras.PlaceFlares(Cave);
 		CrateLocal = crateAt;
 		bool crateOpen = S != null && (S.HasFlag(FlagCrate) || S.Current >= Checkpoint.Act24Flamethrower);
 		// the crowbar

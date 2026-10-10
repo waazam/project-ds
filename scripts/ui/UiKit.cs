@@ -152,6 +152,7 @@ public static class UiKit
 
 	private static ImageTexture Box(bool filled, Color c)
 	{
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(9, 9, false, Image.Format.Rgba8);
 		img.Fill(Colors.Transparent);
 		var edge = filled ? new Color(Bone, 0.7f) : c;
@@ -162,13 +163,16 @@ public static class UiKit
 		}
 		if (filled) img.FillRect(new Rect2I(3, 3, 3, 3), c);
 		return ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 
 	private static ImageTexture Tick(Color c)
 	{
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(3, 9, false, Image.Format.Rgba8);
 		img.Fill(c);
 		return ImageTexture.CreateFromImage(img);
+		Systems.TexGen.Stop(__tg);
 	}
 
 	// ---- Builders shared by the main menu and the pause menu ----

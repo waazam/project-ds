@@ -46,6 +46,27 @@ public partial class CreaturePreview : Node3D
 		GD.Print($"[creature-preview] {name}");
 	}
 
+	private async Task LeviathanShots()
+	{
+		// the pit's leviathan (its local y=0 is the pit floor; the body sits ~5 m up)
+		var lev = new Leviathan { Name = "Leviathan", Position = new Vector3(0, 0, 0), Level = 12f };
+		AddChild(lev);
+		await Seconds(1.5);
+		await Shot("leviathan_whole", new Vector3(0, 18f, 55f), new Vector3(0, 12f, 0));
+		await Shot("leviathan_body", new Vector3(8f, 12f, 20f), new Vector3(0, 7f, 0));
+		await Shot("leviathan_limb_root", new Vector3(12f, 10f, 14f), new Vector3(8f, 8f, 5f));
+		lev.Slam(new Vector3(0, 20f, 16f), 1.2f);
+		await Seconds(0.9);
+		await Shot("leviathan_rear", new Vector3(14f, 22f, 34f), new Vector3(0, 20f, 10f));
+		await Seconds(0.8);
+		await Shot("leviathan_slam", new Vector3(14f, 22f, 34f), new Vector3(0, 18f, 12f));
+		lev.Rot = 0.6f;
+		await Shot("leviathan_rot_mid", new Vector3(8f, 12f, 20f), new Vector3(0, 7f, 0));
+		lev.Rot = 1f;
+		await Shot("leviathan_rot_full", new Vector3(8f, 12f, 20f), new Vector3(0, 7f, 0));
+		lev.QueueFree();
+	}
+
 	private async void Run()
 	{
 		await Frames(10);
@@ -65,6 +86,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--flame") >= 0) { await FlameShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--prints") >= 0) { await PrintShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--leviathan") >= 0) { await LeviathanShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bench") >= 0) { await Bench(); GetTree().Quit(); return; }
 		// the crawler (Act 14), on a floor, walking a few metres so its gait shows
 		var floor = new StaticBody3D { Name = "Floor" };
@@ -83,18 +105,7 @@ public partial class CreaturePreview : Node3D
 		await Shot("crawler_above", new Vector3(1.8f, 3.2f, 1.8f), new Vector3(0, 0.3f, 0.3f));
 		crawler.QueueFree();
 		floor.QueueFree();
-		// the pit's leviathan (its local y=0 is the pit floor; the body sits ~5 m up)
-		var lev = new Leviathan { Name = "Leviathan", Position = new Vector3(0, 0, 0) };
-		AddChild(lev);
-		await Seconds(1.5);
-		await Shot("leviathan_whole", new Vector3(0, 18f, 55f), new Vector3(0, 12f, 0));
-		await Shot("leviathan_body", new Vector3(8f, 12f, 20f), new Vector3(0, 7f, 0));
-		await Shot("leviathan_limb_root", new Vector3(12f, 10f, 14f), new Vector3(8f, 8f, 5f));
-		lev.Rot = 0.6f;
-		await Shot("leviathan_rot_mid", new Vector3(8f, 12f, 20f), new Vector3(0, 7f, 0));
-		lev.Rot = 1f;
-		await Shot("leviathan_rot_full", new Vector3(8f, 12f, 20f), new Vector3(0, 7f, 0));
-		lev.QueueFree();
+		await LeviathanShots();
 
 		// the lake's limbs
 		var lake = new LakeCreature { Name = "LakeCreature", Position = new Vector3(300, 0, 0) };

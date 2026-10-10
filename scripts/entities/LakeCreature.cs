@@ -283,6 +283,7 @@ public partial class LakeCreature : Node3D
 	/// compatibility; the crossing decides when to <see cref="Release"/>.</summary>
 	public void Breach(Vector3 center, Vector3 boat, double holdSeconds = 0)
 	{
+		World.FrogChorus.Hush(120f);   // (2026-10-10: every frog on the shore goes still)
 		GlobalPosition = center;
 		Vector3 toBoat = boat - center; toBoat.Y = 0;
 		float baseAng = Mathf.Atan2(toBoat.X, toBoat.Z);

@@ -329,13 +329,29 @@ public partial class StoryManager : Node
 	}
 
 	/// <summary>Every scene change goes through here: the pause menu's pause must never survive it.</summary>
+	/// <summary>When the last level change was asked for (msec), and of what: GameFlow logs how long until play.</summary>
+	public static ulong LoadAskedMsec { get; private set; }
+	public static string LoadAskedFor { get; private set; } = "";
+	/// <summary>A stage of the load, logged with the time since it was asked for.</summary>
+	public static void LoadStage(string what) { if (LoadAskedMsec > 0) GD.Print($"[load-stage] {Time.GetTicksMsec() - LoadAskedMsec,6} ms  {what}"); }
+
 	private void ChangeScene(string path)
 	{
+		LoadAskedMsec = Time.GetTicksMsec();
+		LoadAskedFor = path;
 		GetTree().Paused = false;
 		_markers.Clear();
-		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller.
-		GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, path);
+		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller. The levels' packed
+		// scenes are kept once loaded (a death's reload, or Act 25's way back, needn't read them from disk again).
+		Callable.From(() =>
+		{
+			if (!_packed.TryGetValue(path, out var ps) || ps == null) { ps = GD.Load<PackedScene>(path); if (path != MenuScene) _packed[path] = ps; }
+			LoadStage($"{System.IO.Path.GetFileName(path)} read");
+			GetTree().ChangeSceneToPacked(ps);
+		}).CallDeferred();
 	}
+
+	private static readonly System.Collections.Generic.Dictionary<string, PackedScene> _packed = new();
 
 	/// <summary>Advances the story and checkpoint-saves. Never moves the checkpoint backwards.</summary>
 	public void ReachCheckpoint(Checkpoint cp, Vector3 pos, float yaw)

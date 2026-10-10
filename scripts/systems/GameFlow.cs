@@ -33,11 +33,12 @@ public partial class GameFlow : Node
 	private ScreenFader _fader;
 	private PauseMenu _pause;
 
-	public override void _EnterTree() => Instance = this;
+	public override void _EnterTree() { Instance = this; StoryManager.LoadStage("the level loaded and in the tree"); }
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
 
 	public override void _Ready()
 	{
+		StoryManager.LoadStage("the level's nodes ready (their own builds done)");
 		_player = GetNode<PlayerController>(PlayerPath);
 		_fader = GetNode<ScreenFader>(FaderPath);
 		_pause = GetNode<PauseMenu>(PauseMenuPath);
@@ -110,6 +111,7 @@ public partial class GameFlow : Node
 		_ = Cutscene.Run(this, async ct =>
 		{
 			await ShaderWarmup.WaitReady(this, ct);
+			LogLoad();
 			Cutscene.Unlock(_player, input: true);
 			Started = true;
 			await _fader.Fade(0f, quick ? 0.2f : 1.2f, ct);
@@ -131,6 +133,13 @@ public partial class GameFlow : Node
 	/// slowly while their head lifts. Input stays locked throughout (the reference GameFlow took in
 	/// _Ready is released only once they are up), then the one line plays.
 	/// </summary>
+	/// <summary>How long the level took, from being asked for to ready to fade in (the load overhaul, 2026-10-09).</summary>
+	private void LogLoad()
+	{
+		if (StoryManager.LoadAskedMsec == 0) return;
+		GD.Print($"[load] {System.IO.Path.GetFileNameWithoutExtension(StoryManager.LoadAskedFor)} at {StoryManager.Instance?.Current}: {Time.GetTicksMsec() - StoryManager.LoadAskedMsec} ms to play (textures drawn so far: {TexGen.Count}, {TexGen.Ms:0} ms; meshes committed: {World.MeshKit.Commits}, coplanar {World.MeshKit.CoplanarMs:0} ms, commit {World.MeshKit.CommitMs:0} ms)");
+	}
+
 	private async Task WakeUp(bool quick, CancellationToken ct)
 	{
 		var rig = _player.CameraRig;
@@ -146,6 +155,7 @@ public partial class GameFlow : Node
 		{
 			await Cutscene.Wait(this, quick ? 0.2f : WakeBlackSeconds, ct);
 			await ShaderWarmup.WaitReady(this, ct);
+			LogLoad();
 			if (!quick)
 			{
 				await _fader.Fade(0.55f, 1.4f, ct);

@@ -37,6 +37,9 @@ public partial class PlayerInput : Node
 	public bool LanternModePressed => Live && Edge(LanternMode);
 	/// <summary>C / left Ctrl / right stick click: crouch, a toggle (down, and up again if there's room).</summary>
 	public bool CrouchPressed => Live && Edge(Crouch);
+	/// <summary>(2026-10-10) throwing what's in the off hand (a flare, a can); holding the breath (hidden, it can't hear you).</summary>
+	public bool ThrowPressed => Live && Edge(Throw);
+	public bool BreathHeld => Live && _held[Breath];
 
 	/// <summary>When true, the fields below replace real input.</summary>
 	public bool Scripted;
@@ -44,20 +47,20 @@ public partial class PlayerInput : Node
 	public bool ScriptedRun;
 	public bool ScriptedFocus;
 	/// <summary>Scripted buttons are "held" while true; the Pressed edge fires on the frame they turn true.</summary>
-	public bool ScriptedInteract, ScriptedLight, ScriptedPhoto, ScriptedItemNext, ScriptedItemPrev, ScriptedPhotoLog, ScriptedLanternMode, ScriptedCrouch;
+	public bool ScriptedInteract, ScriptedLight, ScriptedPhoto, ScriptedItemNext, ScriptedItemPrev, ScriptedPhotoLog, ScriptedLanternMode, ScriptedCrouch, ScriptedThrow, ScriptedBreath;
 
 	public bool Enabled => _enabled;
 
-	private const int Interact = 0, Light = 1, Photo = 2, ItemNext = 3, ItemPrev = 4, PhotoLog = 5, LanternMode = 6, Crouch = 7;
-	private static readonly string[] Actions = { "interact", "flashlight_toggle", "photo", "item_next", "item_prev", "photo_log", "lantern_mode", "crouch" };
-	private readonly bool[] _held = new bool[8];
-	private readonly bool[] _wasHeld = new bool[8];
-	private readonly bool[] _pressed = new bool[8];
+	private const int Interact = 0, Light = 1, Photo = 2, ItemNext = 3, ItemPrev = 4, PhotoLog = 5, LanternMode = 6, Crouch = 7, Throw = 8, Breath = 9;
+	private static readonly string[] Actions = { "interact", "flashlight_toggle", "photo", "item_next", "item_prev", "photo_log", "lantern_mode", "crouch", "throw", "hold_breath" };
+	private readonly bool[] _held = new bool[10];
+	private readonly bool[] _wasHeld = new bool[10];
+	private readonly bool[] _pressed = new bool[10];
 	// Physics-frame view of the edges: every press since the last physics tick, so a reader in
 	// _PhysicsProcess (PlayerInteraction) never misses a one-frame press when the render rate
 	// is higher than the physics rate.
-	private readonly bool[] _pendingPhysics = new bool[8];
-	private readonly bool[] _pressedPhysics = new bool[8];
+	private readonly bool[] _pendingPhysics = new bool[10];
+	private readonly bool[] _pressedPhysics = new bool[10];
 
 	private bool Edge(int i) => Engine.IsInPhysicsFrame() ? _pressedPhysics[i] : _pressed[i];
 
@@ -206,6 +209,8 @@ public partial class PlayerInput : Node
 		ItemPrev => ScriptedItemPrev,
 		PhotoLog => ScriptedPhotoLog,
 		LanternMode => ScriptedLanternMode,
+		Throw => ScriptedThrow,
+		Breath => ScriptedBreath,
 		_ => ScriptedCrouch,
 	};
 }

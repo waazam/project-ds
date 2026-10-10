@@ -42,6 +42,7 @@ public partial class ShaderWarmup : Node
 			if (tree.CurrentScene?.GetNodeOrNull<RenderBudget>("RenderBudget") is { Done: true }) break;
 			if (Time.GetTicksMsec() - t0 > 1500 && tree.CurrentScene?.GetNodeOrNull("RenderBudget") == null) break;   // (no underground in this level)
 		}
+		StoryManager.LoadStage("shader warm-up starting");
 		var cam = GetViewport()?.GetCamera3D();
 		var root = tree.CurrentScene;
 		if (cam == null || root == null) { Ready = true; return; }

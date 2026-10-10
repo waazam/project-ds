@@ -223,8 +223,18 @@ public partial class BossRoom : Node3D
 		for (int i = 0; i < 4; i++)
 		{
 			Vector3 a = corners[i], b = corners[(i + 1) % 4];
-			rail.Cylinder(a + Vector3.Up * 1.1f, b + Vector3.Up * 1.1f, 0.03f, 0.03f, 8, false);
-			rail.Cylinder(a + Vector3.Up * 0.55f, b + Vector3.Up * 0.55f, 0.022f, 0.022f, 6, false);
+			// the top and mid rails a span to each pair of posts, each its own piece, so a slam can bend one (BossRoom.Damage.cs)
+			for (int sp = 0; sp < 16; sp++)
+			{
+				Vector3 pa = a.Lerp(b, sp / 16f), pb = a.Lerp(b, (sp + 1) / 16f);
+				var span = new MeshKit();
+				span.Mat(BossTextures.GalvanizedMat);
+				span.Color = Colors.White;
+				span.Cylinder(pa + Vector3.Up * 1.1f, pb + Vector3.Up * 1.1f, 0.03f, 0.03f, 8, false);
+				span.Cylinder(pa + Vector3.Up * 0.55f, pb + Vector3.Up * 0.55f, 0.022f, 0.022f, 6, false);
+				var mi = span.CommitTo(this, $"RailSpan{i}_{sp}", true);
+				_spans.Add((mi, pa, pb));
+			}
 			Vector3 mid = (a + b) * 0.5f, along = (b - a).Normalized(), outw = mid.Normalized() * 0f + new Vector3(mid.X, 0, mid.Z).Normalized();
 			BuildKit.Box(rail, mid + Vector3.Up * 0.06f, new Vector3(Mathf.Abs(along.X) * CatIn * 2f + 0.02f, 0.12f, Mathf.Abs(along.Z) * CatIn * 2f + 0.02f));
 			for (float s = 0; s <= 1.001f; s += 1f / 16f)

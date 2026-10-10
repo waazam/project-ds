@@ -25,6 +25,7 @@ public partial class ForestScatter
 	private static ShaderMaterial MakeMossMat()
 	{
 		const int w = 64, h = 128;
+		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		var bg = new Color(0.42f, 0.46f, 0.37f, 0f);
 		img.Fill(bg);
@@ -61,6 +62,7 @@ public partial class ForestScatter
 		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
 		DetailKit.Hook(m, DetailKit.Kind.Foliage);
 		m.SetShaderParameter("albedo_tex", ImageTexture.CreateFromImage(img));
+		Systems.TexGen.Stop(__tg);
 		m.SetShaderParameter("tint", new Color(0.95f, 1f, 0.92f));
 		m.SetShaderParameter("sway", 0.05f);
 		m.SetShaderParameter("sway_speed", 0.7f);

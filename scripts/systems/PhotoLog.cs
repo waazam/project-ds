@@ -144,6 +144,7 @@ public partial class PhotoLog : Node
 			string id = _shotSubject ?? "";
 			if (WrongPhotos && id == "bird_black") DarkenWithEyes(img, _shotEyes);
 			else if (WrongPhotos && id == "stairs") Multiply(img, 0.3f);
+			else World.SecondLook.MaybeFigure(img, id);
 			var photo = new Photo { Number = _photos.Count + 1, SubjectId = id, Texture = ImageTexture.CreateFromImage(img), Wrong = IsWrong(id),
 				Clarity = _shotScore.Clarity, Focus = _shotScore.Focus, Framing = _shotScore.Framing, Zoom = _shotScore.Zoom };
 			_photos.Add(photo);

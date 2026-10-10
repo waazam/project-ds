@@ -20,6 +20,8 @@ uniform float roughness = 1.0;
 uniform float specular = 0.25;
 uniform bool sway = true;
 global uniform float winter;
+// (2026-10-10) the rain soaked in (RainVfx's wetness): the bark darker and glossier, wettest down the trunk's lee
+global uniform float wet;
 
 float frost_noise(vec3 p) { return fract(sin(dot(floor(p * 7.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 
@@ -54,4 +56,12 @@ void fragment() {
 	}
 	ROUGHNESS = roughness;
 	SPECULAR = specular;
+	if (wet > 0.001) {
+		vec3 wp2 = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float runs = 0.75 + 0.25 * sin(wp2.y * 3.1 + wp2.x * 7.0 + wp2.z * 5.0);
+		float k = wet * runs;
+		ALBEDO *= 1.0 - 0.42 * k;
+		ROUGHNESS = mix(roughness, 0.32, k);
+		SPECULAR = mix(specular, 0.5, k);
+	}
 }

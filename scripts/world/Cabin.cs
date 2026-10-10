@@ -783,7 +783,7 @@ public partial class Cabin : Node3D
 			["ceramic"] = BuildingTextures.Plain("b_enamel", new Color(0.7f, 0.7f, 0.66f), 0.4f),
 		};
 		bool modelled = !IsBurnt && FurnitureKit.Add(k, "log_pile", new Vector3(sx + 0.05f, 0f, sz + 0.78f), 0f, roles);
-		k.Mat(BuildingTextures.LogMat);
+		k.Mat(BuildingTextures.RoundLogMat);
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 31 + 3) };
 		for (int i = 0; i < (modelled ? 0 : 6); i++)
 		{
@@ -843,6 +843,16 @@ public partial class Cabin : Node3D
 			FurnitureKit.Add(k, "mug", new Vector3(sx + 0.12f, 0.76f, sz + 0.18f), 2.2f, roles);
 			FurnitureKit.Add(k, "boots", new Vector3(ix - 0.45f, 0.0f, iz - 0.4f), 2.6f, roles);
 			FurnitureKit.Add(k, "coat_on_hook", new Vector3(-ix + 0.02f, 1.8f, iz - 0.95f), -Mathf.Pi * 0.5f, roles);   // (on the side wall: the front one is all door and window)
+			// (2026-10-10) loose on the floor, to be knocked over: a tin under the shelf, a bottle by the boots
+			if (!IsBurnt)
+			{
+				var r = roles;
+				Callable.From(() =>
+				{
+					Knockable.Put(this, "tin", r, Knockable.Sound.Tin, new Vector3(shx - 0.3f, 0.03f, shz1 + 0.15f), 0.3f);
+					Knockable.Put(this, "bottle_whiskey", r, Knockable.Sound.Glass, new Vector3(ix - 0.75f, 0.03f, iz - 0.3f), 1.1f);
+				}).CallDeferred();
+			}
 		}
 		for (int i = 0; i < (modelled ? 0 : 4); i++)
 		{

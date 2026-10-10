@@ -379,6 +379,8 @@ public partial class GameSettings : Node
 		AddKeys("lean_left", Key.Q);
 		AddKeys("lean_right", Key.R);
 		AddKeys("crouch", Key.C, Key.Ctrl);   // a toggle (either Ctrl answers, the left one included)
+		AddKeys("throw", Key.G);
+		AddKeys("hold_breath", Key.V);
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);
@@ -400,6 +402,8 @@ public partial class GameSettings : Node
 		AddButton("lean_left", JoyButton.DpadLeft);
 		AddButton("lean_right", JoyButton.DpadRight);
 		AddButton("crouch", JoyButton.RightStick);
+		AddButton("throw", JoyButton.B);
+		AddButton("hold_breath", JoyButton.DpadUp);
 		AddButton("item_next", JoyButton.LeftShoulder);   // the item in hand (the HUD), the camera's zoom, the album's pages
 	}
 

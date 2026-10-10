@@ -34,12 +34,16 @@ uniform float slime_flow = 0.035;
 uniform float beat_rate = 0.62;    // beats a second
 uniform float throb = 1.0;
 
+/// (2026-10-10) a skinned limb (the pit beast's, one smooth tube on a chain of bones): its pattern is read from the
+/// limb's rest pose (CUSTOM0 position, CUSTOM1 normal), so it stays on the flesh as the limb bends instead of swimming.
+uniform bool rest_space = false;
+
 varying vec3 v_obj;
 varying vec3 v_nrm;
 
 void vertex() {
-	v_obj = VERTEX;
-	v_nrm = NORMAL;
+	v_obj = rest_space ? CUSTOM0.xyz : VERTEX;
+	v_nrm = rest_space ? CUSTOM1.xyz : NORMAL;
 }
 
 // noise projected three ways and blended by the surface's facing (no stripes on any side)
@@ -100,8 +104,18 @@ void fragment() {
 	float e = 0.04;
 	float f0 = field(p, w);
 	vec3 grad = vec3(field(p + vec3(e, 0.0, 0.0), w) - f0, field(p + vec3(0.0, e, 0.0), w) - f0, field(p + vec3(0.0, 0.0, e), w) - f0) / e;
-	vec3 gv = (VIEW_MATRIX * (MODEL_MATRIX * vec4(grad, 0.0))).xyz;
-	NORMAL = normalize(NORMAL - gv * bump * 0.06);
+	if (rest_space) {
+		// (a skinned limb: its rest space isn't its model space, so the bumps from the noise's screen-space slope instead)
+		vec3 dpx = dFdx(VERTEX), dpy = dFdy(VERTEX);
+		vec3 r1v = cross(dpy, NORMAL), r2v = cross(NORMAL, dpx);
+		float det = dot(dpx, r1v);
+		float h = f0 * bump * 0.06;
+		vec3 sg = sign(det) * (dFdx(h) * r1v + dFdy(h) * r2v);
+		NORMAL = normalize(abs(det) * NORMAL - sg);
+	} else {
+		vec3 gv = (VIEW_MATRIX * (MODEL_MATRIX * vec4(grad, 0.0))).xyz;
+		NORMAL = normalize(NORMAL - gv * bump * 0.06);
+	}
 
 	ALBEDO = col;
 	ROUGHNESS = mix(0.42, 0.06, slime) + r1 * 0.3;
