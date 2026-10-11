@@ -11,7 +11,10 @@ namespace ProjectDS.World.BunkerParts;
 /// </summary>
 public partial class BunkerLockedHatch : Interactable
 {
-	private static bool DialReady => StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning };
+	// (2026-10-11, playtest: the whole code found and the dial still "Locked", the cabin fire not reached yet) usable from
+	// the cabin fire on, or as soon as every digit of the code has been found
+	private bool DialReady => StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning }
+		|| (GetTree().GetFirstNodeInGroup("survey_lot") is SurveyLot lot && lot.Known.Length >= 4 && !lot.Known.Contains('_'));
 
 	public override bool CanInteract(PlayerController player) => base.CanInteract(player) && DialReady;
 
