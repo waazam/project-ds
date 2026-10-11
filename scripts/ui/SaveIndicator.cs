@@ -33,11 +33,10 @@ public partial class SaveIndicator : CanvasLayer
 		ProcessMode = ProcessModeEnum.Always;
 		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-		// small, grey and faint (the owner: it was too big and too bright): about half the size it was, up in
-		// the top bar's corner, where it sits on the black
+		// small, up in the top bar's corner, where it sits on the black (a touch larger than it was: it's drawn finely now)
 		_draw.Size = new Vector2(60, 44);
-		_draw.Scale = Vector2.One * 0.5f;
-		_draw.Position = new Vector2(-44, 6);
+		_draw.Scale = Vector2.One * 0.62f;
+		_draw.Position = new Vector2(-50, 4);
 		_draw.Draw += Paint;
 		AddChild(_draw);
 		Callable.From(() => { if (StoryManager.Instance != null) StoryManager.Instance.Saved += Play; }).CallDeferred();
@@ -62,53 +61,72 @@ public partial class SaveIndicator : CanvasLayer
 	private void Paint()
 	{
 		if (_t < 0f) return;
-		// in and out softly; between, a slow swell of contrast (about one and a half breaths: never a flicker)
+		// (2026-10-10c, the owner: "we need the saving animated icon to not be gray and be more realistic") a real 35mm
+		// canister now: brushed metal shaded round its curve, a printed label (a film stock's yellow and black, no maker),
+		// the knob and the lip catching the light, and the film's leader, amber and translucent, its sprocket holes,
+		// winding in while the save runs. In and out softly; a slow glint travels down the metal (never a flicker).
 		float fade = Mathf.Min(Mathf.Clamp(_t / 0.35f, 0f, 1f), Mathf.Clamp((Seconds - _t) / 0.5f, 0f, 1f));
-		float breath = 0.5f - 0.5f * Mathf.Cos(_t * Mathf.Tau * 0.6f);   // 0 dark .. 1 bright
-		float light = Mathf.Lerp(0.42f, 0.66f, breath), dark = Mathf.Lerp(0.26f, 0.16f, breath);
-		float a = fade * 0.42f;
-		Color body = new(light, light, light * 0.98f, a);
-		Color ink = new(dark, dark, dark, a);
-		Color rim = new(light * 0.8f, light * 0.8f, light * 0.78f, a);
+		float a = fade * 0.92f;
 		var c = _draw;
-		// the leader strip, out of the right side of the canister: film grey, a row of holes top and bottom. It winds
-		// in as the save runs (the owner): the holes run steadily into the canister and the leader shortens, as if
-		// the spool were being turned
 		float wind = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_t / (Seconds - 0.3f), 0f, 1f));
 		float len = Mathf.Lerp(30f, 12f, wind);
-		float travel = _t * 12f + wind * 18f;   // how far the film has moved in (px): the holes keep pace with the leader
+		float travel = _t * 12f + wind * 18f;
+		// the leader: amber-brown base, darker at its edges, the holes punched through (they show the black behind)
 		var strip = new Rect2(24, 12, len, 20);
-		Color film = new(light * 0.78f, light * 0.78f, light * 0.76f, a * 0.85f);
-		c.DrawRect(strip, film);
+		var amber = new Color(0.55f, 0.27f, 0.08f, a * 0.85f);
+		c.DrawRect(strip, amber);
+		c.DrawRect(new Rect2(strip.Position, new Vector2(strip.Size.X, 2)), new Color(0.32f, 0.14f, 0.04f, a));
+		c.DrawRect(new Rect2(strip.Position + new Vector2(0, strip.Size.Y - 2), new Vector2(strip.Size.X, 2)), new Color(0.32f, 0.14f, 0.04f, a));
+		c.DrawRect(new Rect2(strip.Position + new Vector2(0, 7), new Vector2(strip.Size.X, 1)), new Color(0.85f, 0.5f, 0.2f, a * 0.35f));   // a sheen across it
 		const float pitch = 6.5f;
 		float first = strip.Position.X + 5f - Mathf.PosMod(travel, pitch) - pitch;
 		for (float x = first; x < strip.End.X; x += pitch)
 		{
-			// only whole holes, clear of the canister's mouth and the cut end
 			if (x < strip.Position.X + 1.5f || x + 3.2f > strip.End.X - 1f) continue;
-			c.DrawRect(new Rect2(x, strip.Position.Y + 2, 3.2f, 3.2f), ink);
-			c.DrawRect(new Rect2(x, strip.End.Y - 5.2f, 3.2f, 3.2f), ink);
+			c.DrawRect(new Rect2(x, strip.Position.Y + 2.4f, 3.2f, 2.8f), new Color(0.02f, 0.015f, 0.01f, a));
+			c.DrawRect(new Rect2(x, strip.End.Y - 5.2f, 3.2f, 2.8f), new Color(0.02f, 0.015f, 0.01f, a));
 		}
-		// the cut end of the leader, angled
-		c.DrawColoredPolygon(new[] { new Vector2(strip.End.X, strip.Position.Y), new Vector2(strip.End.X + 5, strip.Position.Y + 6), new Vector2(strip.End.X + 5, strip.End.Y), new Vector2(strip.End.X, strip.End.Y) }, film);
-		// the canister: a rounded body, a darker lip top and bottom, the spool's knob on top
-		c.DrawRect(new Rect2(12, 3, 7, 5), ink);                 // the knob
-		c.DrawRect(new Rect2(13.5f, 1, 4, 3), ink);
-		// the knob turning with the spool: a notch going round (a slow turn, about one a second)
+		c.DrawColoredPolygon(new[] { new Vector2(strip.End.X, strip.Position.Y), new Vector2(strip.End.X + 5, strip.Position.Y + 6), new Vector2(strip.End.X + 5, strip.End.Y), new Vector2(strip.End.X, strip.End.Y) }, amber);
+		// the body: metal shaded across its curve, column by column (dark at the edges, a highlight a third in)
+		void Cyl(float x0, float y0, float w, float h, Color tint, float glint)
+		{
+			int n = Mathf.Max(4, Mathf.RoundToInt(w));
+			for (int k = 0; k < n; k++)
+			{
+				float u = (k + 0.5f) / n;
+				float shade = 0.45f + 0.55f * Mathf.Sin(u * Mathf.Pi);
+				float hl = Mathf.Exp(-Mathf.Pow((u - 0.32f) / 0.08f, 2f)) * 0.55f;
+				var col = new Color(tint.R * shade + hl, tint.G * shade + hl, tint.B * shade + hl, a);
+				c.DrawRect(new Rect2(x0 + w * k / n, y0, w / n + 0.05f, h), col);
+			}
+			// the slow glint running down it
+			float gy = y0 + Mathf.PosMod(_t * 14f, h + 10f) - 5f;
+			if (glint > 0f && gy > y0 && gy < y0 + h) c.DrawRect(new Rect2(x0 + w * 0.22f, gy, w * 0.2f, 2.5f), new Color(1, 1, 1, a * 0.25f * glint));
+		}
+		var metal = new Color(0.62f, 0.62f, 0.6f);
+		// the knob, turning with the spool (a notch going round)
+		Cyl(12, 2.5f, 7, 5, new Color(0.32f, 0.31f, 0.3f), 0f);
+		Cyl(13.5f, 0.5f, 4, 3, new Color(0.38f, 0.37f, 0.35f), 0f);
 		float turn = travel / 18f * Mathf.Tau;
 		float nx = 15.5f + 2.6f * Mathf.Sin(turn);
-		if (Mathf.Cos(turn) > -0.2f) c.DrawRect(new Rect2(nx - 0.6f, 3.5f, 1.2f, 4f), new Color(light * 0.9f, light * 0.9f, light * 0.88f, a * 0.8f));
-		c.DrawRect(new Rect2(5, 7, 21, 3), rim);                   // the top lip
-		c.DrawRect(new Rect2(6, 10, 19, 26), body);                // the body
-		c.DrawRect(new Rect2(5, 36, 21, 3), rim);                  // the bottom lip
-		// its label: a band, and a few marks like print
-		c.DrawRect(new Rect2(6, 15, 19, 14), new Color(dark, dark, dark, a * 0.55f));
-		c.DrawRect(new Rect2(9, 18, 10, 2), body);
-		c.DrawRect(new Rect2(9, 22, 13, 1.5f), body);
-		c.DrawRect(new Rect2(9, 25, 7, 1.5f), body);
-		// the mouth the film runs into: the felt light-trap, a dark slot down the body's right edge
-		c.DrawRect(new Rect2(23.5f, 11, 1.8f, 22), new Color(dark * 0.7f, dark * 0.7f, dark * 0.7f, a));
-		// a glint down the body's edge
-		c.DrawRect(new Rect2(8, 10, 1.5f, 26), new Color(1, 1, 1, a * 0.35f * breath));
+		if (Mathf.Cos(turn) > -0.2f) c.DrawRect(new Rect2(nx - 0.6f, 3f, 1.2f, 4f), new Color(0.1f, 0.1f, 0.1f, a));
+		Cyl(5, 7, 21, 3, metal, 0f);                                // the top lip
+		Cyl(6, 10, 19, 26, metal, 1f);                              // the body
+		Cyl(5, 36, 21, 3, metal, 0f);                               // the bottom lip
+		// the label: a film stock's yellow, a black band, a red stripe, a few marks like the print on it
+		Cyl(6, 13, 19, 20, new Color(0.95f, 0.72f, 0.12f), 0.6f);
+		Cyl(6, 20, 19, 6, new Color(0.08f, 0.07f, 0.06f), 0f);
+		Cyl(6, 27, 19, 2, new Color(0.75f, 0.12f, 0.08f), 0f);
+		var print = new Color(0.95f, 0.85f, 0.6f, a);
+		c.DrawRect(new Rect2(9, 22, 9, 1.2f), print);      // the stock's name, a line of small print
+		c.DrawRect(new Rect2(9, 24, 6, 0.9f), print);
+		c.DrawRect(new Rect2(19, 21.5f, 3, 3.5f), new Color(0.95f, 0.72f, 0.12f, a));   // a little yellow box: its speed
+		c.DrawRect(new Rect2(9, 16, 12, 1.5f), new Color(0.2f, 0.12f, 0.04f, a * 0.8f));
+		// the light-trap the film runs into: black felt down its right edge
+		c.DrawRect(new Rect2(23.5f, 11, 1.8f, 22), new Color(0.03f, 0.03f, 0.03f, a));
+		// outlined in the HUD's neon (the inventory's and the compass's colour), breathing with the save
+		float glow = fade * (0.55f + 0.25f * Mathf.Sin(_t * 4f));
+		NeonKit.Line(c, NeonKit.Box(new Vector2(4.2f, 6.2f), new Vector2(22.6f, 33.6f), 1.5f), 0.7f, glow, true);
+		NeonKit.Line(c, new[] { new Vector2(12, 6.2f), new Vector2(12, 2), new Vector2(19, 2), new Vector2(19, 6.2f) }, 0.6f, glow * 0.8f);
 	}
 }

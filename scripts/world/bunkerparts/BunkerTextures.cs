@@ -401,13 +401,16 @@ public static partial class BunkerTextures
 			return m;
 		});
 
-	public static ShaderMaterial HallWallMat => Concrete("bk_m_hallwall", WallConcrete(), 0.5f, 0.05f, 0.5f, 0.35f, new Color(1f, 1f, 1f));
-	public static ShaderMaterial HallFloorMat => Concrete("bk_m_hallfloor", FloorConcrete(), 0.45f, 0.04f, 0.4f, 0f, new Color(0.95f, 0.95f, 0.95f));
-	public static ShaderMaterial RoomWallMat => Concrete("bk_m_roomwall", WallConcrete(), 0.5f, 0.06f, 0.65f, 0.45f, new Color(0.78f, 0.78f, 0.8f));
-	public static ShaderMaterial RoomFloorMat => Concrete("bk_m_roomfloor", FloorConcrete(), 0.45f, 0.05f, 0.6f, 0f, new Color(0.7f, 0.7f, 0.72f));
-	public static ShaderMaterial MazeWallMat => Concrete("bk_m_mazewall", WallConcrete(), 0.5f, 0.09f, 0.6f, 0.4f, new Color(0.85f, 0.83f, 0.8f), 0.035f);
-	public static ShaderMaterial MazeFloorMat => Concrete("bk_m_mazefloor", FloorConcrete(), 0.45f, 0.08f, 0.55f, 0f, new Color(0.8f, 0.79f, 0.77f));
-	public static ShaderMaterial ExteriorConcreteMat => Concrete("bk_m_ext", WallConcrete(), 0.5f, 0f, 0.75f, 0.55f, new Color(0.6f, 0.61f, 0.57f));
+	/// <summary>(2026-10-10c) A Poly Haven scan's albedo for the concrete shader, if it's there; else the drawn one.</summary>
+	private static Texture2D ScanOr(string id, Texture2D drawn) => SurfaceSets.Tex("ph_" + id) ?? drawn;
+
+	public static ShaderMaterial HallWallMat => Concrete("bk_m_hallwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.05f, 0.5f, 0.35f, new Color(1f, 1f, 1f));
+	public static ShaderMaterial HallFloorMat => Concrete("bk_m_hallfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.04f, 0.4f, 0f, new Color(0.95f, 0.95f, 0.95f));
+	public static ShaderMaterial RoomWallMat => Concrete("bk_m_roomwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.06f, 0.65f, 0.45f, new Color(0.78f, 0.78f, 0.8f));
+	public static ShaderMaterial RoomFloorMat => Concrete("bk_m_roomfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.05f, 0.6f, 0f, new Color(0.7f, 0.7f, 0.72f));
+	public static ShaderMaterial MazeWallMat => Concrete("bk_m_mazewall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.09f, 0.6f, 0.4f, new Color(0.85f, 0.83f, 0.8f), 0.035f);
+	public static ShaderMaterial MazeFloorMat => Concrete("bk_m_mazefloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.08f, 0.55f, 0f, new Color(0.8f, 0.79f, 0.77f));
+	public static ShaderMaterial ExteriorConcreteMat => Concrete("bk_m_ext", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0f, 0.75f, 0.55f, new Color(0.6f, 0.61f, 0.57f));
 
 	/// <summary>The earth mound: forest-floor textures in world space (matches the terrain around it).</summary>
 	public static ShaderMaterial EarthMat => (ShaderMaterial)Cached("bk_m_earth", () =>

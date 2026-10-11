@@ -4,15 +4,17 @@ using ProjectDS.Player;
 namespace ProjectDS.UI;
 
 /// <summary>
-/// A thin translucent stamina line, bottom-left, in the same understated
-/// style as the compass. Stays hidden at rest with a full tank and only
-/// fades in while running or recovering, so it never sits on screen nagging
-/// during ordinary walking. Bone on a fog hairline; a dull rust when spent.
+/// The stamina, bottom-left, shown only while running or getting its breath back. (2026-10-10c, the owner: "the stamina
+/// bar also needs to match the other ui color, we should give that more flare and a better animation too") A neon tube
+/// in the HUD's colour (NeonKit) in a thin bracket: its lit length the breath left, the drained part a dim ghost of the
+/// tube. The fill eases down to its value (the tube "burning down") with a bright head where it ends; a soft pulse runs
+/// along it while running; it flickers low and dims to a deep red-dark when spent, until there's enough to run again;
+/// filling, a ripple of light runs up it.
 /// </summary>
 public partial class StaminaBar : CanvasLayer
 {
-	[Export] public float BarWidth = 90f;
-	[Export] public float BarHeight = 2f;
+	[Export] public float BarWidth = 96f;
+	[Export] public float BarHeight = 8f;
 
 	private static readonly Color Track = new(UiKit.Fog, 0.35f);
 	private static readonly Color Fill = new(UiKit.Bone, 0.6f);
@@ -21,7 +23,10 @@ public partial class StaminaBar : CanvasLayer
 	private Control _draw;
 	private PlayerController _player;
 	private PlayerStamina _stamina;
-	private float _alpha;
+	private float _alpha, _shown = 1f, _ghost = 1f;
+	/// <summary>For the UI preview: shown at this value, as if running.</summary>
+	public static float? Preview;
+	private double _clock;
 
 	public override void _Ready()
 	{
@@ -44,10 +49,14 @@ public partial class StaminaBar : CanvasLayer
 		}
 		if (_stamina == null || !IsInstanceValid(_stamina)) { _draw.Visible = false; return; }
 
-		bool relevant = _player.IsRunning || _stamina.Value < 0.97f;
+		bool relevant = _player.IsRunning || _stamina.Value < 0.97f || Preview != null;
 		_alpha = Mathf.MoveToward(_alpha, relevant ? 1f : 0f, (float)delta * 2f);
 		_draw.Modulate = new Color(1, 1, 1, _alpha);
 		_draw.Visible = _alpha > 0.01f;
+		_clock += delta;
+		float v = Mathf.Clamp(Preview ?? _stamina.Value, 0f, 1f), dt = (float)delta;
+		_shown = Mathf.Lerp(_shown, v, 1f - Mathf.Exp(-dt * 10f));
+		_ghost = v < _ghost ? Mathf.MoveToward(_ghost, v, dt * 0.35f) : v;   // (the drained part lingers a moment, fading)
 		if (_draw.Visible) _draw.QueueRedraw();
 	}
 
@@ -55,8 +64,42 @@ public partial class StaminaBar : CanvasLayer
 	{
 		if (_stamina == null || !IsInstanceValid(_stamina)) return;   // the first draw can come before the player exists
 		var size = _draw.Size;
-		_draw.DrawRect(new Rect2(0, size.Y - 1f, size.X, 1f), Track);
-		float w = Mathf.Round(size.X * Mathf.Clamp(_stamina.Value, 0f, 1f));
-		if (w >= 1f) _draw.DrawRect(new Rect2(0, 0, w, size.Y), _stamina.CanRun ? Fill : Spent);
+		float t = (float)_clock, cy = size.Y * 0.5f, x0 = 4f, x1 = size.X - 4f, len = x1 - x0;
+		bool spent = !_stamina.CanRun;
+		bool running = _player.IsRunning || Preview != null;
+		float breath = 0.85f + 0.15f * Mathf.Sin(t * (running ? 5.5f : 1.8f));
+		// the bracket
+		float bl = 3f;
+		foreach (float sx in new[] { -1f, 1f })
+		{
+			float ex = sx < 0 ? 0.5f : size.X - 0.5f;
+			NeonKit.Line(_draw, new[] { new Vector2(ex - sx * bl, 0.5f), new Vector2(ex, 0.5f), new Vector2(ex, size.Y - 0.5f), new Vector2(ex - sx * bl, size.Y - 0.5f) }, 0.5f, 0.45f);
+		}
+		// the ghost of the whole tube, and what's just drained lingering
+		NeonKit.Seg(_draw, new Vector2(x0, cy), new Vector2(x1, cy), 0.8f, 0.12f);
+		if (_ghost > _shown + 0.005f) NeonKit.Seg(_draw, new Vector2(x0 + len * _shown, cy), new Vector2(x0 + len * _ghost, cy), 1.0f, 0.3f);
+		float end = x0 + len * _shown;
+		if (end <= x0 + 0.3f) return;
+		if (spent)
+		{
+			// spent: low, dim, a slow flicker (never a flash), toward a dark red whatever the colour
+			float lo = 0.35f + 0.15f * Mathf.Sin(t * 4.2f) * Mathf.Sin(t * 2.3f + 1f);
+			_draw.DrawLine(new Vector2(x0, cy), new Vector2(end, cy), new Color(0.6f, 0.08f, 0.06f, 0.35f * lo), 4f, true);
+			_draw.DrawLine(new Vector2(x0, cy), new Vector2(end, cy), new Color(1f, 0.45f, 0.4f, 0.8f * lo), 1.2f, true);
+			return;
+		}
+		NeonKit.Seg(_draw, new Vector2(x0, cy), new Vector2(end, cy), 1.3f, breath);
+		// a pulse running along it while running; a ripple up it while it fills
+		bool filling = !running && _stamina.Value < 0.999f;
+		if (running || filling)
+		{
+			float u = Mathf.PosMod(t * (filling ? 0.9f : 1.6f), 1f);
+			float px = filling ? x0 + (end - x0) * u : end - (end - x0) * u;
+			_draw.DrawCircle(new Vector2(px, cy), 2.6f, new Color(NeonKit.Glow, 0.22f * breath));
+			_draw.DrawCircle(new Vector2(px, cy), 1.1f, new Color(NeonKit.Core, 0.7f * breath));
+		}
+		// the bright head where it ends
+		_draw.DrawCircle(new Vector2(end, cy), 2.4f, new Color(NeonKit.Glow, 0.3f * breath));
+		_draw.DrawCircle(new Vector2(end, cy), 1.0f, new Color(NeonKit.Core, 0.95f * breath));
 	}
 }

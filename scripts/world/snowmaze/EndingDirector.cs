@@ -68,6 +68,7 @@ public partial class EndingDirector : Node3D
 		BuildCabin();
 		BuildTrunkUse();
 		GD.Print($"[story] Act 25: the trailhead - ending {Ending}, walking from {_startS:0} m up the trail");
+		UI.ChapterCard.Show(this, 8, 3.0f);
 	}
 
 	/// <summary>Where the story puts the player here: at the snow's edge (Act24Finished), or by the car after the end.</summary>

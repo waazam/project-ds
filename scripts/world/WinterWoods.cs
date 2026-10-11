@@ -527,11 +527,13 @@ public partial class WinterWoods : Node3D
 			if (cam != null) _diamondDust.GlobalPosition = cam.GlobalPosition;
 		}
 		// the sound: the summer forest has no place here: a thin wind that drops away to a frozen hush by the lodge
+		// (in the lodge too: stepping in released the hush and the summer's insects came back in with them; 2026-10-10c)
 		var amb = ForestAmbienceManager.Instance;
-		if (amb != null && outside != _silenced)
+		bool hush = outside || (act && player != null && (Lodge?.Inside(player.GlobalPosition) ?? false));
+		if (amb != null && hush != _silenced)
 		{
-			_silenced = outside;
-			if (outside) amb.RequestSilence(this, 1f, 4); else amb.ReleaseSilence(this);
+			_silenced = hush;
+			if (hush) amb.RequestSilence(this, 1f, 4); else amb.ReleaseSilence(this);
 		}
 		if (_wind != null)
 		{

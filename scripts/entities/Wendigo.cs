@@ -51,7 +51,16 @@ public partial class Wendigo : Node3D
 	private Vector3 _twitch, _twitchGoal;
 	private Vector3 _headRest = new(0.1f, 0f, 0.25f);
 	private float _leapT = -1f, _leapDur, _speakUntil = -1f;
-	private const float Crouch = 0.07f;
+	// (2026-10-10c, the owner: "this whole animation sequence needs to be worked on a ton, it is so janky and not fluid at
+	// all ... making the wendigo move fluidly"): a real gather before a spring (it was 0.07 s: no crouch at all, a pop)
+	private const float Crouch = 0.24f;
+	/// <summary>The shortest blend between two of its clips: under it, pose to pose was a pop.</summary>
+	private const double MinBlend = 0.22;
+	// the visible body follows the creature's place and facing on a spring (below)
+	private Vector3 _visPos, _visVel;
+	private Quaternion _visRot = Quaternion.Identity;
+	private bool _visSet;
+	private float _size = 1f;
 	private string _leapClip = "air", _landClip;
 	private float _arc = 1.2f, _landSeconds = 1f;
 	private bool _ballistic;
@@ -120,6 +129,7 @@ public partial class Wendigo : Node3D
 		{
 			if (c is MeshInstance3D mi && mi.Mesh != null)
 			{
+				RestSpace(mi);
 				for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
 				{
 					if (mi.Mesh.SurfaceGetMaterial(s) is not StandardMaterial3D m) continue;
@@ -127,9 +137,9 @@ public partial class Wendigo : Node3D
 					m.SetMeta("detail_kind", -1);
 					if (name.StartsWith("w_bone"))
 					{
-						m.EmissionEnabled = true;
-						m.Emission = new Color(0.55f, 0.58f, 0.62f);
-						m.EmissionEnergyMultiplier = 0.12f;
+						// (2026-10-10c) the skull and the rack: old bone, yellowed and stained, split, blood dried round the
+						// jaw; a faint pallor of its own still, so it shows in the murk
+						mi.SetSurfaceOverrideMaterial(s, BoneMaterial(m));
 					}
 					else if (name.StartsWith("w_skin"))
 					{
@@ -156,6 +166,49 @@ public partial class Wendigo : Node3D
 		}
 	}
 
+	private static readonly System.Collections.Generic.Dictionary<Mesh, ArrayMesh> _restMeshes = new();
+
+	/// <summary>(2026-10-10c) The mesh again with its rest pose in CUSTOM0 (position) and CUSTOM1 (normal), so the hide's
+	/// drawn detail (wendigo_skin.gdshader) rides the flesh as it moves, and doesn't swim across it. Done once per mesh
+	/// (every wendigo shares it); the skin, the blend shapes and the surfaces' materials kept.</summary>
+	private static void RestSpace(MeshInstance3D mi)
+	{
+		if (mi.Mesh is not ArrayMesh src) return;
+		if (!_restMeshes.TryGetValue(src, out var rest))
+		{
+			bool hasSkin = false;
+			for (int s = 0; s < src.GetSurfaceCount(); s++)
+				if (src.SurfaceGetMaterial(s) is StandardMaterial3D m && ((m.ResourceName ?? "").StartsWith("w_skin") || (m.ResourceName ?? "").StartsWith("w_bone"))) hasSkin = true;
+			if (!hasSkin) { _restMeshes[src] = null; return; }
+			rest = new ArrayMesh { BlendShapeMode = src.BlendShapeMode, ResourceName = src.ResourceName + "_rest" };
+			for (int b = 0; b < src.GetBlendShapeCount(); b++) rest.AddBlendShape(src.GetBlendShapeName(b));
+			for (int s = 0; s < src.GetSurfaceCount(); s++)
+			{
+				var arr = src.SurfaceGetArrays(s);
+				var verts = arr[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+				var norms = arr[(int)Mesh.ArrayType.Normal].AsVector3Array();
+				var c0 = new float[verts.Length * 4];
+				var c1 = new float[verts.Length * 4];
+				for (int v = 0; v < verts.Length; v++)
+				{
+					c0[v * 4] = verts[v].X; c0[v * 4 + 1] = verts[v].Y; c0[v * 4 + 2] = verts[v].Z; c0[v * 4 + 3] = 1f;
+					var nn = v < norms.Length ? norms[v] : Vector3.Up;
+					c1[v * 4] = nn.X; c1[v * 4 + 1] = nn.Y; c1[v * 4 + 2] = nn.Z; c1[v * 4 + 3] = 0f;
+				}
+				arr[(int)Mesh.ArrayType.Custom0] = c0;
+				arr[(int)Mesh.ArrayType.Custom1] = c1;
+				var flags = (Mesh.ArrayFormat)(((long)Mesh.ArrayCustomFormat.RgbaFloat << (int)Mesh.ArrayFormat.FormatCustom0Shift)
+					| ((long)Mesh.ArrayCustomFormat.RgbaFloat << (int)Mesh.ArrayFormat.FormatCustom1Shift));
+				var blends = src.SurfaceGetBlendShapeArrays(s);
+				rest.AddSurfaceFromArrays(src.SurfaceGetPrimitiveType(s), arr, blends, null, flags);
+				rest.SurfaceSetMaterial(s, src.SurfaceGetMaterial(s));
+			}
+			_restMeshes[src] = rest;
+			GD.Print($"[wendigo] rest-space mesh {src.ResourceName}: {src.GetAabb()}");
+		}
+		if (rest != null) mi.Mesh = rest;
+	}
+
 	private static ShaderMaterial _skinMat;
 	private static StandardMaterial3D _heart;
 	private static NoiseTexture2D _skinNoise;
@@ -171,6 +224,31 @@ public partial class Wendigo : Node3D
 		_skinMat.SetShaderParameter("noise_tex", _skinNoise);
 		_skinMat.SetShaderParameter("roughness", baked.Roughness);
 		return _skinMat;
+	}
+
+	private static ShaderMaterial _boneMat;
+
+	private static ShaderMaterial BoneMaterial(StandardMaterial3D baked)
+	{
+		if (_boneMat != null) return _boneMat;
+		_skinNoise ??= new NoiseTexture2D { Width = 256, Height = 256, Seamless = true, Noise = new FastNoiseLite { Frequency = 0.02f, FractalOctaves = 4, Seed = 7337 } };
+		_boneMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/wendigo_skin.gdshader"), ResourceName = "wendigo_bone" };
+		_boneMat.SetShaderParameter("albedo_tex", baked.AlbedoTexture);
+		_boneMat.SetShaderParameter("normal_tex", baked.NormalTexture);
+		_boneMat.SetShaderParameter("noise_tex", _skinNoise);
+		_boneMat.SetShaderParameter("roughness", 0.8f);
+		_boneMat.SetShaderParameter("base_a", new Color(0.6f, 0.56f, 0.46f));
+		_boneMat.SetShaderParameter("base_b", new Color(0.48f, 0.4f, 0.26f));
+		_boneMat.SetShaderParameter("base_c", new Color(0.3f, 0.25f, 0.2f));
+		_boneMat.SetShaderParameter("vein_amt", 0f);
+		_boneMat.SetShaderParameter("crack_amt", 1.3f);
+		_boneMat.SetShaderParameter("frost", 0.12f);
+		_boneMat.SetShaderParameter("glint", 0.25f);
+		_boneMat.SetShaderParameter("bite_low", -5f);
+		_boneMat.SetShaderParameter("bite_high", -4f);
+		_boneMat.SetShaderParameter("baked", 0.25f);
+		_boneMat.SetShaderParameter("pallor", 0.06f);
+		return _boneMat;
 	}
 
 	/// <summary>Burned (Act 24): its hide charred black by the fire, 0 .. 1 (the skin's char).</summary>
@@ -236,7 +314,33 @@ public partial class Wendigo : Node3D
 
 	/// <summary>Stand at <paramref name="ground"/> facing <paramref name="look"/>, visible.</summary>
 	/// <summary>Its size (1: its full 4.7 m). In Act 24's snow tunnels, cramped and stooping, it is drawn smaller.</summary>
-	public void SetSize(float s) { if (_body != null) _body.Scale = Vector3.One * s; }
+	public void SetSize(float s) { _size = s; if (_body != null) _body.Scale = Vector3.One * s; }
+
+	/// <summary>(2026-10-10c) The body seen follows where the creature is and which way it faces on a critically damped
+	/// spring: whatever moves it (a tween's straight run, a turn, a snap to a mark), the body seen eases into it, carries
+	/// its momentum through a change of direction, and settles, never jerks. Tight while it leaps (it must stay on its
+	/// arc), looser on the ground. A jump of more than 8 m is a teleport, taken at once.</summary>
+	private void FollowBody(float dt)
+	{
+		if (_body == null || _headOnly) return;
+		var target = GlobalTransform;
+		var tq = target.Basis.Orthonormalized().GetRotationQuaternion();
+		if (!_visSet || _visPos.DistanceTo(target.Origin) > 8f)
+		{
+			_visPos = target.Origin; _visVel = Vector3.Zero; _visRot = tq; _visSet = true;
+		}
+		else
+		{
+			float w = _leapT >= 0f ? 26f : 11f;
+			_visVel += ((target.Origin - _visPos) * w * w - _visVel * 2f * w) * dt;
+			_visPos += _visVel * dt;
+			_visRot = _visRot.Normalized().Slerp(tq.Normalized(), 1f - Mathf.Exp(-dt * (_leapT >= 0f ? 14f : 7f))).Normalized();
+		}
+		_body.GlobalTransform = new Transform3D(new Basis(_visRot).Scaled(Vector3.One * _size * target.Basis.Scale.X), _visPos);
+	}
+
+	/// <summary>The body seen snapped to where the creature is (a cut, a fresh placement).</summary>
+	public void SnapBody() => _visSet = false;
 
 	public void StandAt(Vector3 ground, Vector3 look)
 	{
@@ -245,6 +349,7 @@ public partial class Wendigo : Node3D
 		var d = (look - ground) with { Y = 0 };
 		if (d.LengthSquared() > 0.01f) GlobalBasis = Basis.LookingAt(d, Vector3.Up);
 		_body.Position = Vector3.Zero;
+		_visSet = false;
 		if (_anim != null && !_headOnly)
 		{
 			_anim.Play("idle", 0.0);
@@ -259,7 +364,7 @@ public partial class Wendigo : Node3D
 	{
 		if (_anim == null || _headOnly || !_anim.HasAnimation(clip)) return;
 		_leapT = -1f;
-		_anim.Play(clip, blend, 0f);
+		_anim.Play(clip, Mathf.Max(blend, MinBlend), 0f);
 		_anim.Seek(_anim.GetAnimation(clip).Length * Mathf.Clamp(at, 0f, 1f), true);
 	}
 
@@ -283,7 +388,7 @@ public partial class Wendigo : Node3D
 		_leapT = 0f;
 		_landed = landed;
 		_leapClip = perch.Y < GlobalPosition.Y - 1f ? "pounce" : "air";
-		PlayClip("crouch", Crouch, 0.03);
+		PlayClip("crouch", Crouch, 0.18);
 		AudioDirector.OneShot(this, "wendigo_leap", 3, GlobalPosition + Vector3.Up * 2f, -3f, "Events", 7f, 0.05f);
 	}
 
@@ -300,7 +405,7 @@ public partial class Wendigo : Node3D
 	{
 		if (_anim == null || _headOnly || !_anim.HasAnimation(name)) return;
 		_leapT = -1f;
-		if (_anim.CurrentAnimation != name) _anim.Play(name, blend, 1f);
+		if (_anim.CurrentAnimation != name) _anim.Play(name, Mathf.Max(blend, 0.3), 1f);
 		_anim.SpeedScale = Mathf.Clamp(rate, 0.05f, 3f);
 	}
 
@@ -312,7 +417,7 @@ public partial class Wendigo : Node3D
 		if (_anim == null || _headOnly || !_anim.HasAnimation(name)) return;
 		_anim.SpeedScale = 1f;   // (a gait's rate off: this clip's own timing)
 		float len = (float)_anim.GetAnimation(name).Length;
-		_anim.Play(name, blend, Mathf.Max(len, 0.01f) / Mathf.Max(seconds, 0.01f));
+		_anim.Play(name, Mathf.Max(blend, Mathf.Min(MinBlend, seconds * 0.4)), Mathf.Max(len, 0.01f) / Mathf.Max(seconds, 0.01f));
 	}
 
 	public override void _Process(double delta)
@@ -325,7 +430,7 @@ public partial class Wendigo : Node3D
 			bool wasCrouching = _leapT < Crouch;
 			_leapT += dt;
 			if (_leapT < Crouch) { Animate(dt); return; }
-			if (wasCrouching) PlayClip(_leapClip, _leapDur, 0.03);
+			if (wasCrouching) PlayClip(_leapClip, _leapDur, 0.12);
 			float u = Mathf.Clamp((_leapT - Crouch) / _leapDur, 0f, 1f);
 			GlobalPosition = _ballistic
 				? _leapFrom.Lerp(_leapTo, u) + Vector3.Up * (4f * u * (1f - u) * _arc)
@@ -363,9 +468,40 @@ public partial class Wendigo : Node3D
 		Animate(dt);
 	}
 
+	/// <summary>(2026-10-10c, the animation pass: "really add some flare and smooth all their animations out") Its head
+	/// turns to follow them: eased, up to about 55 degrees off where the clip has it, the twitch still in it. 0 lets
+	/// the clip have it; a hunter sets it only while it can see them (it doesn't know where they are otherwise).</summary>
+	public float LookWeight = 1f;
+	public Vector3? LookAtWorld;
+	private Quaternion _look = Quaternion.Identity;
+
+	private void TrackHead(float dt)
+	{
+		if (_headBone < 0 || _skel == null) return;
+		Quaternion want = Quaternion.Identity;
+		var at = LookAtWorld ?? GetViewport()?.GetCamera3D()?.GlobalPosition;
+		if (at is { } target && LookWeight > 0.001f && GlobalPosition.DistanceTo(target) < 40f)
+		{
+			var headG = _skel.GetBoneGlobalPose(_headBone);
+			Vector3 cur = (headG.Basis * _mouthLocal).Normalized();
+			Vector3 to = (_skel.GlobalTransform.AffineInverse() * target - headG.Origin).Normalized();
+			float ang = Mathf.Min(cur.AngleTo(to), 0.95f) * LookWeight;
+			var axis = cur.Cross(to);
+			if (axis.LengthSquared() > 1e-6f && ang > 0.001f) want = new Quaternion(axis.Normalized(), ang);
+		}
+		_look = _look.Normalized().Slerp(want.Normalized(), 1f - Mathf.Exp(-dt * 3.2f)).Normalized();
+		if (_look.IsEqualApprox(Quaternion.Identity)) return;
+		int parent = _skel.GetBoneParent(_headBone);
+		var g = _skel.GetBoneGlobalPose(_headBone);
+		var pg = parent >= 0 ? _skel.GetBoneGlobalPose(parent) : Transform3D.Identity;
+		var turned = new Basis(_look) * g.Basis;
+		_skel.SetBonePoseRotation(_headBone, (pg.Basis.Inverse() * turned).Orthonormalized().GetRotationQuaternion());
+	}
+
 	/// <summary>The skeleton: the animation, then the head's twitch and the jaw's speech on top.</summary>
 	private void Animate(float dt)
 	{
+		FollowBody(dt);
 		if (_headOnly)
 		{
 			_head.Rotation = _headRest + _twitch * 0.6f;
@@ -374,7 +510,10 @@ public partial class Wendigo : Node3D
 		if (_anim == null || _skel == null) return;
 		_anim.Advance(dt);
 		if (_headBone >= 0 && _leapT < 0f)
-			_skel.SetBonePoseRotation(_headBone, _skel.GetBonePoseRotation(_headBone) * Quaternion.FromEuler(_twitch));
+		{
+			_skel.SetBonePoseRotation(_headBone, _skel.GetBonePoseRotation(_headBone) * Quaternion.FromEuler(_twitch * Mathf.Lerp(1f, 0.45f, LookWeight)));
+			TrackHead(dt);
+		}
 		if (_jawBone >= 0 && _time < _speakUntil)
 		{
 			float open = 0.12f + 0.2f * Mathf.Abs(Mathf.Sin((float)_time * 7.3f) * Mathf.Sin((float)_time * 2.9f + 1f));

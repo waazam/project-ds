@@ -11,7 +11,7 @@ namespace ProjectDS.Player;
 /// </summary>
 public partial class PlayerStamina : Node
 {
-	[Export] public float DrainPerSecond = 0.11f;
+	[Export] public float DrainPerSecond = 0.0825f;   // (25% slower, the owner 2026-10-10c: was 0.11)
 	[Export] public float RegenPerSecondMoving = 0.16f;
 	[Export] public float RegenPerSecondResting = 0.22f;
 	[Export] public float MinToResumeRun = 0.16f;

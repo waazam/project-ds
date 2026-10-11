@@ -45,10 +45,12 @@ public partial class SkiLodge
 	{
 		["needles"] = new StandardMaterial3D
 		{
-			ResourceName = "xmas_needles", AlbedoTexture = GD.Load<Texture2D>("res://assets/textures/winter/fir_bough.png"),
+			// (2026-10-10c: its own needles, tools/textures/make_fir_needles.py: the woods' bough photo was snow-laden, and the
+			// tree read grey under the lamps whatever green it was tinted)
+			ResourceName = "xmas_needles", AlbedoTexture = GD.Load<Texture2D>(ResourceLoader.Exists("res://assets/textures/lodge/xmas_needles.png") ? "res://assets/textures/lodge/xmas_needles.png" : "res://assets/textures/winter/fir_bough.png"),
 			// (green: the spray photo is a very dark teal, and faded to olive it read grey in the lobby; the owner, 2026-10-04:
 			// "the christmas tree in the lobby still looks pretty gray to me, i see some green poking out")
-			AlbedoColor = new Color(1.5f, 2.6f, 1.45f), Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 0.4f,
+			AlbedoColor = new Color(1.1f, 1.2f, 1.05f), Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 0.4f,
 			CullMode = BaseMaterial3D.CullModeEnum.Disabled, Roughness = 1f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		},
 		["bark"] = LodgeTextures.DarkWoodMat,
@@ -120,7 +122,7 @@ public partial class SkiLodge
 		for (int i = 0; i < 4; i++)
 			FurnitureKit.Add(k, "stocking", fc - fout * 0.34f + falong * (-1.2f + i * 0.8f) + Vector3.Up * 1.78f, fy + (i % 2 == 0 ? 0.08f : -0.06f), x);
 		// ---- wreaths either side of the front doors, and the banner over them, come loose at one end
-		foreach (float wx in new[] { -2.7f, 2.7f })
+		foreach (float wx in new[] { -1.8f, 1.8f })   // (between the doors' casing and the tall windows either side)
 			FurnitureKit.Add(k, "wreath", new Vector3(wx, 2.55f, HexIn - 0.03f), 0f, x);
 		k.Mat(LodgeTextures.LinenMat);
 		var banner = new Basis(Vector3.Back, -0.28f);

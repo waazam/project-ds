@@ -27,3 +27,24 @@ Poly Haven textures (https://polyhaven.com), all **CC0** (public domain; credite
 | vault_plaster | Plaster Grey 04 (`plaster_grey_04`) | the church's vault webs |
 | oak | Wood Table 001 (`wood_table_001`) | the pews and doors |
 | old_planks | Brown Planks 07 (`brown_planks_07`) | the old wooden stair |
+
+## Full-size scans (`ph_*`, `tools/textures/polyhaven_sets.py`, 1k, CC0, 2026-10-10c)
+
+| set | Poly Haven source | used for |
+| --- | --- | --- |
+| ph_rustic_stone_wall | Rustic Stone Wall (`rustic_stone_wall`) | the lobby's chimney breast, the stair's pier and knee wall |
+| ph_wood_floor | Wood Floor (`wood_floor`) | the lobby's floor |
+| ph_weathered_brown_planks | Weathered Brown Planks (`weathered_brown_planks`) | the crawlspace's older reaches |
+| ph_lodge_roof_blue | Box Profile Metal Sheet (`box_profile_metal_sheet`), repainted faded blue | the lodge's roofs |
+| ph_red_brick_03 | Red Brick 03 | the forester station's brick |
+| ph_marble_01 | Marble 01 | the station's marble |
+| ph_rusty_metal_02 | Rusty Metal 02 | the station's rusted plate |
+| ph_mossy_brick | Mossy Brick | the sewer's brick |
+| ph_rusty_metal_03 | Rusty Metal 03 | the sewer's pipes |
+| ph_metal_plate_02 | Metal Plate 02 | the pit's steel |
+| ph_concrete_wall_004 | Concrete Wall 004 | the stairwell's concrete |
+| ph_concrete_block_wall_02 | Concrete Block Wall 02 | the stairwell's block walls |
+| ph_concrete_wall_006 | Concrete Wall 006 | the bunker's walls |
+| ph_concrete_floor_worn_001 | Concrete Floor Worn 001 | the bunker's floors |
+
+Drawn for the game (no licence to carry): the lodge's wallpapers `wp_*` (`tools/textures/make_wallpapers.py`).

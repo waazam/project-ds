@@ -76,7 +76,7 @@ public partial class WendigoHunter : Node3D
 	{
 		_cave = cave;
 		_rng.Randomize();
-		Body = new Wendigo { Name = "MazeWendigo" };
+		Body = new Wendigo { Name = "MazeWendigo", LookWeight = 0f };
 		cave.AddChild(Body);
 		// (the tunnels' roofs are three metres up: at its full height it stood through them)
 		Body.SetSize(BodyScale);
@@ -187,6 +187,8 @@ public partial class WendigoHunter : Node3D
 		var p = PlayerLocal;
 		// sight: a cone ahead, out to the dark; nothing through a mound or a wall
 		bool sees = CanSee(p);
+		// its head follows them only while it can see them (it doesn't know where they are otherwise)
+		if (Body != null) Body.LookWeight = Mathf.MoveToward(Body.LookWeight, sees ? 1f : 0f, dt * 2f);
 		float range = SightRange * (_player.Crouching ? 0.7f : 1f) * (LanternLit() || HeldFlare.AnyLit ? 1.3f : 1f);   // (the same reach CanSee used)
 		float dist = Pos.DistanceTo(p);
 		if (sees)

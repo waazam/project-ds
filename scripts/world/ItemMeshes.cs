@@ -678,41 +678,69 @@ public static class ItemMeshes
 
 	private static void Lantern(MeshKit k, Node3D parent, ref Built b)
 	{
-		// Hurricane lantern: painted font, wire guards, glass globe, vented cap, bail.
+		// Hurricane lantern: painted font, wire guards, glass globe, vented cap, bail. (2026-10-10c, finer: twice as round,
+		// six guards and their hoops, the burner and its wick knob, the soot clouding the top of the glass)
+		const int sides = 16;
 		k.Color = new Color(0.42f, 0.08f, 0.05f);
 		k.Mat(ItemTextures.PaintMat);
-		Lathe(k, new[] { V(0.07f, 0f), V(0.078f, 0.01f), V(0.078f, 0.045f), V(0.06f, 0.06f), V(0.034f, 0.066f) }, 8, true, false, 1f, 1f, 6f);
+		Lathe(k, new[] { V(0.07f, 0f), V(0.078f, 0.008f), V(0.079f, 0.02f), V(0.078f, 0.045f), V(0.068f, 0.056f), V(0.06f, 0.06f), V(0.034f, 0.066f) }, sides, true, false, 1f, 1f, 6f);
+		// the font's rolled seam and its filler cap
 		k.Color = new Color(0.9f, 0.76f, 0.46f);
 		k.Mat(ItemTextures.BrassMat);
-		Lathe(k, new[] { V(0.032f, 0.064f), V(0.03f, 0.08f) }, 8, false, false);
-		// wire guards
+		Lathe(k, new[] { V(0.0795f, 0.026f), V(0.081f, 0.03f), V(0.0795f, 0.034f) }, sides, false, false);
+		k.Cylinder(new Vector3(0.045f, 0.058f, 0.02f), new Vector3(0.048f, 0.07f, 0.022f), 0.011f, 0.009f, 10, true);
+		// the burner: a brass collar under the globe, and the wick knob out of its side
+		Lathe(k, new[] { V(0.034f, 0.064f), V(0.036f, 0.07f), V(0.032f, 0.08f), V(0.03f, 0.084f) }, sides, false, false);
+		k.Cylinder(new Vector3(0.034f, 0.072f, 0), new Vector3(0.058f, 0.072f, 0), 0.0025f, 0.0025f, 6, false);
+		k.Cylinder(new Vector3(0.058f, 0.072f, 0), new Vector3(0.062f, 0.072f, 0), 0.008f, 0.008f, 10, true);
+		// wire guards: six, and three hoops round them
 		k.Color = new Color(0.4f, 0.4f, 0.42f);
 		k.Mat(ItemTextures.SteelMat);
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 6; i++)
 		{
-			float a = Mathf.Tau * (i + 0.5f) / 4f;
+			float a = Mathf.Tau * (i + 0.5f) / 6f;
 			Vector3 d = new(Mathf.Cos(a), 0, Mathf.Sin(a));
-			Vector3 p0 = d * 0.066f + Vector3.Up * 0.05f, p1 = d * 0.074f + Vector3.Up * 0.14f, p2 = d * 0.064f + Vector3.Up * 0.222f;
-			k.Cylinder(p0, p1, 0.0035f, 0.0035f, 4, false);
-			k.Cylinder(p1, p2, 0.0035f, 0.0035f, 4, false);
+			Vector3 p0 = d * 0.066f + Vector3.Up * 0.05f, p1 = d * 0.075f + Vector3.Up * 0.14f, p2 = d * 0.064f + Vector3.Up * 0.222f;
+			k.Cylinder(p0, p1, 0.003f, 0.003f, 5, false);
+			k.Cylinder(p1, p2, 0.003f, 0.003f, 5, false);
 		}
-		// globe (lit from inside)
+		foreach (var (y, r) in new[] { (0.09f, 0.069f), (0.14f, 0.075f), (0.19f, 0.07f) })
+		{
+			Vector3 prevH = new(r, y, 0);
+			for (int i = 1; i <= 18; i++)
+			{
+				float a = Mathf.Tau * i / 18f;
+				Vector3 p = new(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
+				k.Cylinder(prevH, p, 0.0022f, 0.0022f, 4, false);
+				prevH = p;
+			}
+		}
+		// globe (lit from inside); its top clouded with soot
 		k.Color = Colors.White;
 		k.Mat(ItemTextures.LampGlassMat);
-		Lathe(k, new[] { V(0.028f, 0.078f), V(0.05f, 0.108f), V(0.058f, 0.15f), V(0.05f, 0.19f), V(0.03f, 0.216f) }, 8, false, false);
-		// cap with a chimney
+		Lathe(k, new[] { V(0.028f, 0.078f), V(0.042f, 0.092f), V(0.05f, 0.108f), V(0.057f, 0.13f), V(0.058f, 0.15f), V(0.054f, 0.172f), V(0.05f, 0.19f) }, sides, false, false);
+		k.Color = new Color(0.35f, 0.3f, 0.26f);
+		Lathe(k, new[] { V(0.05f, 0.19f), V(0.042f, 0.204f), V(0.03f, 0.216f) }, sides, false, false);
+		// cap with a chimney, its vent holes a dark ring
 		k.Color = new Color(0.4f, 0.075f, 0.05f);
 		k.Mat(ItemTextures.PaintMat);
-		Lathe(k, new[] { V(0.064f, 0.214f), V(0.068f, 0.222f), V(0.045f, 0.246f), V(0.021f, 0.26f), V(0.021f, 0.278f) }, 8, true, true, 1f, 1f, 6f);
-		// bail handle
+		Lathe(k, new[] { V(0.064f, 0.214f), V(0.068f, 0.222f), V(0.058f, 0.232f), V(0.045f, 0.246f), V(0.021f, 0.26f), V(0.021f, 0.278f), V(0.026f, 0.282f) }, sides, true, true, 1f, 1f, 6f);
+		k.Color = new Color(0.05f, 0.04f, 0.035f);
+		for (int i = 0; i < 10; i++)
+		{
+			float a = Mathf.Tau * i / 10f;
+			var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+			k.Box(d * 0.054f + Vector3.Up * 0.238f, new Vector3(0.008f, 0.004f, 0.004f), 1f, new Basis(Vector3.Up, -a));
+		}
+		// bail handle, smoother
 		k.Color = new Color(0.38f, 0.38f, 0.4f);
 		k.Mat(ItemTextures.SteelMat);
 		Vector3 prev = default;
-		for (int i = 0; i <= 6; i++)
+		for (int i = 0; i <= 12; i++)
 		{
-			float a = Mathf.Pi * i / 6f;
+			float a = Mathf.Pi * i / 12f;
 			Vector3 p = new(Mathf.Cos(a) * 0.07f, 0.232f + Mathf.Sin(a) * 0.1f, 0);
-			if (i > 0) k.Cylinder(prev, p, 0.003f, 0.003f, 4, false);
+			if (i > 0) k.Cylinder(prev, p, 0.003f, 0.003f, 5, false);
 			prev = p;
 		}
 		// flame

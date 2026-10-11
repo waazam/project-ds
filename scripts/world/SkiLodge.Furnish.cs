@@ -34,6 +34,7 @@ public partial class SkiLodge
 		BuildServiceAndPantry();
 		BuildRooms();
 		BuildDiningFurniture();
+		BuildOverhaul();   // (2026-10-10b: the paintings, rugs, gear, books, clutter, the fire's embers, Christmas in the dining hall)
 	}
 
 	private OmniLight3D Light(Vector3 at, Color c, float energy, float range, string name = "Light")
@@ -108,8 +109,11 @@ public partial class SkiLodge
 		LodgeKit.Table(k, (sit + fout * 0.1f) with { Y = FloorY }, fyaw, new Vector2(1.4f, 0.8f), 0.42f, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat);
 		foreach (var (p, sz) in new[] { (sit - fout * 1.4f, new Vector3(2.4f, 0.9f, 0.9f)), (sit + falong * 2.3f, new Vector3(0.9f, 0.9f, 2.1f)), (sit + fout * 0.1f, new Vector3(1.4f, 0.45f, 0.8f)) })
 			LodgeKit.Solid(_inBody, p with { Y = FloorY + sz.Y * 0.5f }, sz, Mathf.Atan2(-falong.Z, falong.X));
-		foreach (var fl in new[] { sit - falong * 3f - fout * 1.8f, sit + falong * 3.2f - fout * 1.6f })
+		foreach (var fl0 in new[] { sit - falong * 3f - fout * 1.8f, sit + falong * 3.2f - fout * 1.6f })
 		{
+			// (clear of the stair's lower flight, which comes down by this side of the seating now)
+			var fl = fl0;
+			if (fl.X > StairXL - 0.5f && fl.X < StairXL + StairW + 0.5f && fl.Z < StairZBot + 0.5f) fl.X = StairXL + StairW + 0.55f;
 			var bulb = LodgeKit.Lamp(k, fl with { Y = FloorY }, 1.6f, Shade, true);
 			Light(bulb, Warm, 0.7f, 5f);
 		}
@@ -143,13 +147,21 @@ public partial class SkiLodge
 		// ---- the chandelier: iron and antler, three rings of candle bulbs, hanging over the middle of it all
 		var bulbs = LodgeKit.Chandelier(k, new Vector3(0, 18f, 0), 8.2f, 2.8f, 14, Bulb);
 		Light(new Vector3(0, 8.8f, 0), Warm, 2.4f, 18f, "Chandelier");
-		// ---- sconces along the upper walls and under the balcony
+		// ---- sconces along the walls: on each side the first stretch of plain wall from a few places along it (the owner,
+		// 2026-10-10c: "there are lamps in weird place like on a window ... make sure lamps are in normal places")
 		for (int i = 0; i < 6; i++)
 		{
-			Vector3 a = HexVert(i), b = HexVert(i + 1), mid = (a + b) * 0.5f, inw = -mid.Normalized();
+			Vector3 a = HexVert(i), b = HexVert(i + 1), mid = (a + b) * 0.5f, inw = -mid.Normalized(), along = (b - a).Normalized();
 			if (i == 1) continue;   // the fireplace's wall
-			var s1 = LodgeKit.Sconce(k, mid + inw * 0.4f + Vector3.Up * (i >= 3 && i <= 4 ? 2.4f : i == 2 ? 5.6f : 3.0f) + (b - a).Normalized() * 2.4f, inw, Shade);
-			Light(s1, Warm, 0.55f, 5f);
+			float y = i >= 3 && i <= 4 ? 2.4f : i == 2 ? 5.6f : 2.2f;
+			foreach (float off in new[] { 2.4f, -2.4f, 3.6f, -3.6f, 1.2f, -1.2f, 4.6f, -4.6f })
+			{
+				var at = mid + inw * 0.4f + Vector3.Up * y + along * off;
+				if (!ClearOfHallOpenings(at - inw * 0.4f, 0.25f, 0.35f)) continue;
+				var s1 = LodgeKit.Sconce(k, at, inw, Shade);
+				Light(s1, Warm, 0.55f, 5f, "Sconce");
+				break;
+			}
 		}
 		// ---- daylight: the high windows (noon behind the snow): soft cool fill
 		foreach (var p in new[] { new Vector3(0, 7f, -7.5f), new Vector3(0, 7f, 7.5f) })
@@ -226,29 +238,18 @@ public partial class SkiLodge
 	}
 
 	/// <summary>A low fire's flames: a few soft orange billboards rising slowly (no flicker: they drift).</summary>
+	/// <summary>The fire left in the grate: low, a few tongues over the embers (the fire's 3D volumes, FireVfx; its light is
+	/// the hearth's own, FireLight). 2026-10-10c: it was flat sprites.</summary>
 	private void AddFlames(Vector3 at, Vector3 along)
 	{
-		var p = new GpuParticles3D
+		var fx = new FireVfx
 		{
-			Name = "Flames", Amount = 40, Lifetime = 0.9f, Position = at,
-			ProcessMaterial = new ParticleProcessMaterial
-			{
-				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.45f, 0.05f, 0.15f),
-				Direction = Vector3.Up, Spread = 8f, InitialVelocityMin = 0.25f, InitialVelocityMax = 0.5f, Gravity = Vector3.Zero,
-				ScaleMin = 0.6f, ScaleMax = 1.3f, Color = new Color(1f, 0.55f, 0.2f, 0.7f),
-			},
-			DrawPass1 = new QuadMesh
-			{
-				Size = new Vector2(0.18f, 0.26f),
-				Material = new StandardMaterial3D
-				{
-					AlbedoTexture = LakeParts.LakeFx.SoftDot(), VertexColorUseAsAlbedo = true, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add,
-					ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
-				},
-			},
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			Name = "Flames", Extent = new Vector3(0.9f, 0.42f, 0.32f), FlameScale = 0.75f, Smoke = false, EmitLight = false, Haze = false, Seed = 901,
 		};
-		AddChild(p);
+		fx.Position = at + Vector3.Down * 0.08f;
+		fx.Basis = new Basis(Vector3.Up, Mathf.Atan2(along.X, along.Z) - Mathf.Pi * 0.5f);
+		AddChild(fx);
+		fx.Intensity = 0.55f;
 	}
 
 	// ------------------------------------------------------------------ the bar

@@ -56,6 +56,10 @@ public partial class Compass : CanvasLayer
 	private float _falseBearing;
 	private double _nextFalseBearing;
 	private double _clock;
+	private float _presence = 1f;
+	private double _wantedUntil;
+	private bool _wasShown;
+	private Vector3? _lastObjective;
 
 	public override void _Ready()
 	{
@@ -95,10 +99,38 @@ public partial class Compass : CanvasLayer
 		_jitter = distortion > 0.15f ? (distortion - 0.15f) / 0.85f : 0f;
 
 		_glitchPhase += (float)delta;
+		// shown when wanted (HudPresence): standing still a moment, a new objective, its first few seconds, or going wrong
+		var obj = Systems.StoryManager.Instance?.ObjectivePosition;
+		if (obj is { } o && (_lastObjective == null || _lastObjective.Value.DistanceTo(o) > 3f)) _wantedUntil = _clock + 6.0;
+		_lastObjective = obj;
+		if (!_wasShown) _wantedUntil = _clock + 6.0;
+		_wasShown = true;
+		bool wanted = !HudPresence.Contextual || HudPresence.StillFor(this, delta) > 1.3f || _clock < _wantedUntil || _jitter > 0.1f || Dead;
+		_presence = HudPresence.Ease(_presence, wanted, delta);
+		_draw.Modulate = new Color(1, 1, 1, _presence);
 		Dead = Systems.StoryManager.Instance?.CompassDead ?? false;
 		if (Dead) UpdateDead((float)delta);
 		UpdateShownBearing((float)delta);
 		_draw.QueueRedraw();
+	}
+
+	// (2026-10-10c, the owner: "the ui for the compass needs to match the colors of the other ui elements ... the animation
+	// for the compass needs to be smoothed out when the player is turning, it looks very janky") The ribbon in the HUD's
+	// neon (NeonKit, the colour chosen in the settings). Its heading follows the view on a critically damped spring (fast
+	// enough never to lag a turn, smooth enough that a flick of the mouse doesn't stutter it across), and nothing is snapped
+	// to whole pixels any more (at the game's 640 px every tick stepped a pixel at a time as you turned).
+	private float _shownYaw, _yawVel;
+	private bool _yawSet;
+
+	private float SmoothYaw(float want, float dt)
+	{
+		if (!_yawSet) { _shownYaw = want; _yawVel = 0f; _yawSet = true; return want; }
+		float diff = Mathf.Wrap(want - _shownYaw, -180f, 180f);
+		if (Mathf.Abs(diff) > 90f) { _shownYaw = want; _yawVel = 0f; return want; }   // (a teleport, a cut: no long sweep round)
+		const float w = 22f;
+		_yawVel += (diff * w * w - _yawVel * 2f * w) * dt;
+		_shownYaw = Mathf.Wrap(_shownYaw + _yawVel * dt, -180f, 180f);
+		return _shownYaw;
 	}
 
 	private void OnDraw()
@@ -106,65 +138,72 @@ public partial class Compass : CanvasLayer
 		if (_player == null || !IsInstanceValid(_player) || _player.CameraRig == null) return;
 		var size = _draw.Size;
 		float cx = size.X * 0.5f, cy = size.Y * 0.5f;
-		float yawDeg = Dead ? _deadYaw : Mathf.RadToDeg(_player.CameraRig.Yaw);
+		float rawYaw = Dead ? _deadYaw : Mathf.RadToDeg(_player.CameraRig.Yaw);
+		float yawDeg = SmoothYaw(rawYaw, (float)GetProcessDeltaTime());
 		float jitter = Dead ? 0.35f : _jitter;
+		float t = (float)_clock;
+		float breath = 0.82f + 0.12f * Mathf.Sin(t * 1.7f) - (Dead ? 0.25f * Mathf.Abs(Mathf.Sin(t * 0.8f)) : 0f);
 
-		// A thin baseline, Skyrim-style but fainter — no backing bar, just the line and its ticks,
-		// fading out at both ends.
-		const int segments = 8;
+		// the baseline: a neon tube fading out at both ends
+		const int segments = 14;
 		for (int i = 0; i < segments; i++)
 		{
 			float x0 = size.X * i / segments, x1 = size.X * (i + 1) / segments;
 			float mid = (i + 0.5f) / segments;
 			float fade = 1f - Mathf.Pow(Mathf.Abs(mid - 0.5f) * 2f, 2f);
-			_draw.DrawLine(new Vector2(x0, cy), new Vector2(x1, cy), new Color(LineColor, LineColor.A * fade), 1f);
+			NeonKit.Seg(_draw, new Vector2(x0, cy), new Vector2(x1, cy), 0.5f, 0.32f * fade * breath);
 		}
+		// the centre mark, a small notch over the line
+		NeonKit.Line(_draw, new[] { new Vector2(cx - 2.5f, cy - 6.5f), new Vector2(cx, cy - 4f), new Vector2(cx + 2.5f, cy - 6.5f) }, 0.6f, 0.55f * breath);
 
 		float PxFor(float deg) => cx + OffsetPx(deg, yawDeg);
-
-		var font = UiKit.Serif;
-		foreach (var (label, deg) in Ticks)
+		var font = _font ??= new FontVariation { BaseFont = ChapterCard.Anton ?? UiKit.Serif, SpacingGlyph = 1 };
+		// every 15 degrees a tick; the cardinals and the half-winds named
+		for (int d = 0; d < 360; d += 15)
 		{
-			float shown = deg;
+			float shown = d;
 			if (jitter > 0.5f && _rng.Randf() < 0.02f) shown += _rng.RandfRange(-40f, 40f);   // a tick briefly lies
 			float delta = Mathf.Wrap(yawDeg - shown, -180f, 180f);
 			if (Mathf.Abs(delta) > VisibleDegrees * 0.5f) continue;
 			float x = cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f) + JitterPx(jitter, 2f);
 			if (x < 0 || x > size.X) continue;
+			string label = null;
+			foreach (var (l, deg) in Ticks) if (Mathf.IsEqualApprox(deg, d)) label = l;
 			bool major = label is "N" or "S" or "E" or "W";
-			float edge = 1f - Mathf.Pow(Mathf.Abs(x - cx) / cx, 3f);   // fade toward the ends
-			var col = label == "N" ? NorthColor : new Color(UiKit.Bone, major ? 0.7f : 0.38f);
-			col.A *= edge;
-			float half = major ? 3.5f : 2f;
-			_draw.DrawLine(new Vector2(Mathf.Round(x) + 0.5f, cy - half), new Vector2(Mathf.Round(x) + 0.5f, cy + half), col, 1f);
+			float edge = 1f - Mathf.Pow(Mathf.Abs(x - cx) / cx, 3f);
+			float lit = (label == "N" ? 1f : major ? 0.8f : label != null ? 0.5f : 0.28f) * edge * breath;
+			float half = major ? 3.5f : label != null ? 2.5f : 1.5f;
+			NeonKit.Seg(_draw, new Vector2(x, cy - half), new Vector2(x, cy + half), 0.55f, lit);
 			if (major)
-			{
-				var p = new Vector2(Mathf.Round(x) - 10f, cy - half - 1.5f);
-				_draw.DrawString(font, p + new Vector2(1, 1), label, HorizontalAlignment.Center, 21, 8, new Color(0, 0, 0, 0.5f * edge));
-				_draw.DrawString(font, p, label, HorizontalAlignment.Center, 21, 8, col);
-			}
+				NeonKit.Text(_draw, font, new Vector2(x - 10.5f, cy - half - 1.8f), label, HorizontalAlignment.Center, 21, 8, lit);
 		}
 
-		// Objective marker: a small eye-yellow diamond riding the line, or an arrow pinned to the edge if it's behind us.
+		// the objective: a neon diamond riding the line (its core filled, breathing a little brighter), or an arrow at
+		// the edge when it's behind
 		if (!_hasBearing) return;
 		float bearing = _shownBearing;
 		if (jitter > 0.05f)
 		{
 			if (_clock >= _nextFalseBearing) { _falseBearing = _rng.RandfRange(0f, 360f); _nextFalseBearing = _clock + Mathf.Lerp(3.0, 0.4, jitter); }
-			bearing = Mathf.LerpAngle(Mathf.DegToRad(bearing), Mathf.DegToRad(_falseBearing), jitter);
-			bearing = Mathf.RadToDeg(bearing);
+			bearing = Mathf.RadToDeg(Mathf.LerpAngle(Mathf.DegToRad(bearing), Mathf.DegToRad(_falseBearing), jitter));
 		}
 		float bx = PxFor(bearing) + JitterPx(jitter, 6f);
-		var markColor = new Color(UiKit.Eye, Mathf.Lerp(0.9f, 0.4f, jitter));
+		float mlit = Mathf.Lerp(1f, 0.45f, jitter) * (0.88f + 0.12f * Mathf.Sin(t * 3.1f));
 		if (bx >= 4 && bx <= size.X - 4)
-			_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 4f), new Vector2(bx + 3f, cy), new Vector2(bx, cy + 4f), new Vector2(bx - 3f, cy) }, markColor);
+		{
+			var dia = new[] { new Vector2(bx, cy - 4.2f), new Vector2(bx + 3.2f, cy), new Vector2(bx, cy + 4.2f), new Vector2(bx - 3.2f, cy) };
+			NeonKit.Line(_draw, dia, 0.7f, mlit, true);
+			_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 2f), new Vector2(bx + 1.5f, cy), new Vector2(bx, cy + 2f), new Vector2(bx - 1.5f, cy) }, new Color(NeonKit.Core, 0.85f * mlit));
+		}
 		else
 		{
 			float ex = Mathf.Clamp(bx, 4, size.X - 4);
 			float dir = bx < 4 ? -1f : 1f;
-			_draw.DrawColoredPolygon(new[] { new Vector2(ex, cy - 3.5f), new Vector2(ex + dir * 4.5f, cy), new Vector2(ex, cy + 3.5f) }, markColor);
+			NeonKit.Line(_draw, new[] { new Vector2(ex, cy - 3.5f), new Vector2(ex + dir * 4.5f, cy), new Vector2(ex, cy + 3.5f) }, 0.7f, mlit, true);
 		}
 	}
+
+	private static FontVariation _font;
 
 	/// <summary>The dead compass: it drifts, hunts back and forth, and now and then swings round to somewhere new
 	/// and settles there, as if something else were pulling it; turning the player does nothing to it.</summary>

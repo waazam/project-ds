@@ -23,6 +23,11 @@ public partial class HeldLantern : HeldItem
 	protected override Vector3 Lowered => new(-0.3f, -0.75f, -0.5f);
 	/// <summary>The beam gathered: lifted, in toward the middle, out ahead.</summary>
 	private static readonly Vector3 Gathered = new(-0.16f, -0.04f, -0.66f);
+	/// <summary>Thrust up at something in front of them (Act 23's end: held up into the wendigo's face): high, in the middle,
+	/// at arm's length.</summary>
+	private static readonly Vector3 ThrustPose = new(-0.03f, 0.1f, -0.5f);
+	/// <summary>0..1: how far it's thrust up (set by a cutscene, eased by it).</summary>
+	public float Thrust { get; set; }
 
 	private Lantern _lantern;
 	private OmniLight3D _fill;
@@ -86,6 +91,9 @@ public partial class HeldLantern : HeldItem
 		// where it's held: at rest, or lifted in toward the middle with the beam gathered
 		float gather = _lantern.Blacklight ? 0f : _lantern.FocusAmount;
 		Hold = Rest.Lerp(Gathered, Mathf.SmoothStep(0f, 1f, gather));
+		if (Thrust > 0f) Hold = Hold.Lerp(ThrustPose, Mathf.SmoothStep(0f, 1f, Thrust));
+		// knocked from the hand: gone at once (it's flying across the hall, the world's own lantern now)
+		_model.Visible = !Lantern.Snuffed;
 		// the pendulum, pushed by the body's acceleration (in the view's frame) and the turning
 		var vel = Player.Velocity;
 		var acc = (vel - _lastVel) / Mathf.Max(dt, 1e-4f);

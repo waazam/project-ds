@@ -323,6 +323,28 @@ public partial class ForestAtmosphere : Node
 			_env.SsaoHorizon = 0.06f;
 			_env.SsaoSharpness = 0.98f;
 			_env.SsaoLightAffect = 0.15f;
+			// (2026-10-10c, the lighting pass: "we also probably need a huge lighting overhaul to really start making this
+			// game look good") light that bounces: a lamp's warmth on the wall beside it and the floor under it, the fire's
+			// orange round a room, the flares' green down a tunnel (screen-space indirect light); and a soft bloom off what
+			// truly shines (lamps, fire, flares, lit glass): wide and faint, only above full white, never a glare
+			bool rich = (Systems.GameSettings.Instance?.Shadows ?? 2) >= 2;   // (only at High: it cost the round room its 60 fps)
+			_env.SsilEnabled = rich;
+			_env.SsilRadius = 3.5f;
+			_env.SsilIntensity = 0.9f;
+			_env.SsilSharpness = 0.9f;
+			_env.SsilNormalRejection = 1f;
+			_env.GlowEnabled = true;
+			_env.GlowIntensity = 0.35f;
+			_env.GlowStrength = 0.9f;
+			_env.GlowBloom = 0.0f;
+			_env.GlowBlendMode = Environment.GlowBlendModeEnum.Softlight;
+			_env.GlowHdrThreshold = 1.05f;
+			_env.GlowHdrScale = 1.6f;
+			_env.SetGlowLevel(0, 0f);
+			_env.SetGlowLevel(1, 0.6f);
+			_env.SetGlowLevel(2, 0.8f);
+			_env.SetGlowLevel(3, 0.5f);
+			_env.SetGlowLevel(4, 0.25f);
 			// light in the fog (ApplyVolumetric sets its density by place): lit only by lights, never by the sky or
 			// the ambient (that would grey the whole view), reaching 48 m
 			_env.VolumetricFogEmission = Colors.Black;

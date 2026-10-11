@@ -36,6 +36,20 @@ public static class SurfaceSets
 		return m;
 	}
 
+	/// <summary>(2026-10-10c, the retexture pass: "go through https://polyhaven.com/textures and make sure EVERYTHING looks good")
+	/// A Poly Haven scan (tools/textures/polyhaven_sets.py: ph_&lt;id&gt;) laid over a material that was drawn in code: its
+	/// albedo, normal and roughness, at <paramref name="uvScale"/> times the material's own repeat. Once per material (it's
+	/// marked), and the material is left as it was if the scan isn't there.</summary>
+	public static T Scan<T>(T m, string id, float uvScale = 1f, float normal = 1f, Color? tint = null) where T : StandardMaterial3D
+	{
+		if (m == null || m.HasMeta("scan") || Tex("ph_" + id) == null) return m;
+		Apply(m, "ph_" + id, normal);
+		m.Uv1Scale *= uvScale;
+		if (tint is { } t) m.AlbedoColor = t;
+		m.SetMeta("scan", id);
+		return m;
+	}
+
 	/// <summary>(2026-10-10b, the owner: "replace all the wood for the lodge and the church and the cabins ... retexture them
 	/// with [Poly Haven's Hinoki Planks] it all needs to pop") All the buildings' wood is one wood now: the scanned planks
 	/// (hinoki, 2k, CC0), each place with its own tone of it. Plank surfaces (walls of boards, floors, the woodwork) take it

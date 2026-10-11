@@ -55,6 +55,28 @@ public partial class Leviathan : Node3D
 		public Vector3 Tip, Ctrl;     // local, current
 		public Vector3 FromTip, FromCtrl;
 		public bool Hit;
+		/// <summary>(2026-10-10c) How it comes down (<see cref="Style"/>); a double's second blow still to come.</summary>
+		public Style How;
+		public bool Second;
+		public float Side = 1f;
+	}
+
+	/// <summary>(2026-10-10c, the owner: "there should be different attack styles for the lovecraftian monster boss fight
+	/// for the tentacles slamming so it all doesn't look the same") Overhead: reared straight up over the spot and
+	/// smashed down. Sweep: coiled low off to one side and lashed across the catwalk in an arc onto the spot. Corkscrew:
+	/// reared high, its tip coiling round and round, then down in a spiral. Double: a short rear and two blows hammered
+	/// onto the spot one after the other. Whip: drawn far back and up, then cracked down, the tip trailing the body so it
+	/// snaps. Every one lands on the spot it was aimed at, when the telegraph says.</summary>
+	public enum Style { Overhead, Sweep, Corkscrew, Double, Whip }
+	private readonly RandomNumberGenerator _styleRng = new() { Seed = 1818 };
+
+	/// <summary>A style for the next slam: the plain ones while it's fresh, all of them as it rots and rages.</summary>
+	private Style PickStyle(Tentacle t)
+	{
+		float r = _styleRng.Randf();
+		if (t.Skinny) return r < 0.6f ? Style.Whip : Style.Sweep;
+		if (_rot < 0.25f) return r < 0.55f ? Style.Overhead : r < 0.8f ? Style.Sweep : Style.Whip;
+		return r < 0.24f ? Style.Overhead : r < 0.44f ? Style.Sweep : r < 0.64f ? Style.Corkscrew : r < 0.84f ? Style.Double : Style.Whip;
 	}
 
 	/// <summary>Fires when a slam lands (world position on the catwalk).</summary>
@@ -354,6 +376,9 @@ public partial class Leviathan : Node3D
 		best.FromTip = best.Tip;
 		best.FromCtrl = best.Ctrl;
 		best.Hit = false;
+		best.Second = false;
+		best.How = PickStyle(best);
+		best.Side = _styleRng.Randf() < 0.5f ? -1f : 1f;
 		return best;
 	}
 
@@ -416,8 +441,33 @@ public partial class Leviathan : Node3D
 	private void Step(Tentacle t, float dt)
 	{
 		t.T += dt;
-		Vector3 above = t.Target + Vector3.Up * 10f + new Vector3(-t.Target.X, 0, -t.Target.Z).Normalized() * 2.5f;
-		Vector3 aboveCtrl = (t.RootLocal).Lerp(above, 0.5f) + Vector3.Up * 14f;
+		Vector3 radial = new Vector3(t.Target.X, 0, t.Target.Z).Normalized();   // out from its body to the spot
+		Vector3 across = new Vector3(-radial.Z, 0, radial.X) * t.Side;          // along the catwalk, its chosen side
+		// where it rears to before it comes down, by its style
+		Vector3 above, aboveCtrl;
+		switch (t.How)
+		{
+			case Style.Sweep:
+				above = t.Target + across * 8f + Vector3.Up * 2.6f - radial * 1.5f;
+				aboveCtrl = t.RootLocal.Lerp(above, 0.5f) + Vector3.Up * 7f;
+				break;
+			case Style.Corkscrew:
+				above = t.Target + Vector3.Up * 13f - radial * 1.5f;
+				aboveCtrl = t.RootLocal.Lerp(above, 0.5f) + Vector3.Up * 16f;
+				break;
+			case Style.Double:
+				above = t.Target + Vector3.Up * 6.5f - radial * 2f;
+				aboveCtrl = t.RootLocal.Lerp(above, 0.5f) + Vector3.Up * 10f;
+				break;
+			case Style.Whip:
+				above = t.Target + Vector3.Up * 12f - radial * 7f;
+				aboveCtrl = t.RootLocal.Lerp(above, 0.4f) + Vector3.Up * 18f;
+				break;
+			default:
+				above = t.Target + Vector3.Up * 10f - radial * 2.5f;
+				aboveCtrl = t.RootLocal.Lerp(above, 0.5f) + Vector3.Up * 14f;
+				break;
+		}
 		switch (t.State)
 		{
 			case Tentacle.S.Idle:
@@ -430,25 +480,84 @@ public partial class Leviathan : Node3D
 			case Tentacle.S.Raise:
 			{
 				float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, t.T / Mathf.Max(0.05f, t.RaiseTime)));
-				t.Tip = t.FromTip.Lerp(above, u);
+				// (an arc up to it, not a straight line: the tip swings round over its own body's side)
+				var mid = t.FromTip.Lerp(above, 0.5f) + Vector3.Up * 2.5f + across * (t.How == Style.Sweep ? 2f : 0.6f);
+				var a1 = t.FromTip.Lerp(mid, u);
+				t.Tip = a1.Lerp(mid.Lerp(above, u), u);
 				t.Ctrl = t.FromCtrl.Lerp(aboveCtrl, u);
 				if (t.T >= t.RaiseTime) { t.State = Tentacle.S.Hold; t.T = 0f; }
 				break;
 			}
 			case Tentacle.S.Hold:
-				// rearing back, trembling
-				t.Tip = above + Vector3.Up * (0.6f * Mathf.SmoothStep(0f, 1f, t.T / Mathf.Max(0.05f, t.HoldTime))) + new Vector3(Mathf.Sin(_time * 30f), 0, Mathf.Cos(_time * 27f)) * 0.05f;
+			{
+				float h = Mathf.SmoothStep(0f, 1f, t.T / Mathf.Max(0.05f, t.HoldTime));
+				switch (t.How)
+				{
+					case Style.Corkscrew:
+						// the tip coiling round faster and tighter as it winds up
+						float ang = t.T * (6f + 10f * h);
+						t.Tip = above + new Vector3(Mathf.Cos(ang), 0, Mathf.Sin(ang)) * (1.6f - 0.7f * h) + Vector3.Up * 0.8f * h;
+						break;
+					case Style.Sweep:
+						// drawn back further along the catwalk, low, the tip curling
+						t.Tip = above + across * 1.6f * h + Vector3.Up * 0.5f * Mathf.Sin(t.T * 5f);
+						break;
+					case Style.Whip:
+						// cocked back, quivering
+						t.Tip = above - radial * 1.5f * h + Vector3.Up * 1.2f * h + new Vector3(Mathf.Sin(_time * 22f), 0, Mathf.Cos(_time * 19f)) * 0.08f;
+						break;
+					default:
+						t.Tip = above + Vector3.Up * (0.6f * h) + new Vector3(Mathf.Sin(_time * 30f), 0, Mathf.Cos(_time * 27f)) * 0.05f;
+						break;
+				}
 				t.Ctrl = aboveCtrl;
 				if (t.T >= t.HoldTime) { t.State = Tentacle.S.Strike; t.T = 0f; t.FromTip = t.Tip; t.FromCtrl = t.Ctrl; }
 				break;
+			}
 			case Tentacle.S.Strike:
 			{
-				const float strike = StrikeSeconds;
+				float strike = t.How == Style.Double && t.Second ? StrikeSeconds * 0.8f : StrikeSeconds;
 				float u = Mathf.Min(1f, t.T / strike);
-				u *= u;
-				Vector3 downCtrl = (t.RootLocal).Lerp(t.Target, 0.55f) + Vector3.Up * 16f;
-				t.Tip = t.FromTip.Lerp(t.Target + Vector3.Up * 0.4f, u);
-				t.Ctrl = t.FromCtrl.Lerp(downCtrl, u);
+				Vector3 land = t.Target + Vector3.Up * 0.4f;
+				Vector3 downCtrl = t.RootLocal.Lerp(t.Target, 0.55f) + Vector3.Up * 16f;
+				switch (t.How)
+				{
+					case Style.Sweep:
+					{
+						// lashed across in an arc round its root, low, onto the spot
+						float e = u * u * (3f - 2f * u);
+						Vector3 from = t.FromTip - t.RootLocal, to = land - t.RootLocal;
+						float a0 = Mathf.Atan2(from.Z, from.X), a1 = Mathf.Atan2(to.Z, to.X);
+						float ang = Mathf.LerpAngle(a0, a1, e);
+						float rad = Mathf.Lerp(new Vector2(from.X, from.Z).Length(), new Vector2(to.X, to.Z).Length(), e);
+						t.Tip = t.RootLocal + new Vector3(Mathf.Cos(ang) * rad, Mathf.Lerp(from.Y, to.Y, e), Mathf.Sin(ang) * rad);
+						t.Ctrl = t.RootLocal.Lerp(t.Tip, 0.5f) + Vector3.Up * Mathf.Lerp(7f, 5f, e);
+						break;
+					}
+					case Style.Corkscrew:
+					{
+						float e = u * u;
+						float ang = e * 14f;
+						t.Tip = t.FromTip.Lerp(land, e) + new Vector3(Mathf.Cos(ang), 0, Mathf.Sin(ang)) * 1.4f * (1f - e);
+						t.Ctrl = t.FromCtrl.Lerp(downCtrl, e);
+						break;
+					}
+					case Style.Whip:
+					{
+						// the body comes first and the tip trails it, then snaps down past it
+						float body = Mathf.Sqrt(u), tip = u * u * u;
+						t.Ctrl = t.FromCtrl.Lerp(downCtrl + radial * 3f, body);
+						t.Tip = t.FromTip.Lerp(land, tip) + Vector3.Up * 2f * Mathf.Sin(u * Mathf.Pi) * (1f - u);
+						break;
+					}
+					default:
+					{
+						float e = u * u;
+						t.Tip = t.FromTip.Lerp(land, e);
+						t.Ctrl = t.FromCtrl.Lerp(downCtrl, e);
+						break;
+					}
+				}
 				if (t.T >= strike && !t.Hit)
 				{
 					t.Hit = true;
@@ -459,13 +568,25 @@ public partial class Leviathan : Node3D
 				break;
 			}
 			case Tentacle.S.Down:
+				// a double: up off the boards and down again at once, onto the same spot
+				if (t.How == Style.Double && !t.Second && t.T >= 0.18f)
+				{
+					t.Second = true;
+					t.Hit = false;
+					t.State = Tentacle.S.Hold;
+					t.HoldTime = 0.32f;
+					t.T = 0f;
+					break;
+				}
 				if (t.T >= 1.0f / Mathf.Sqrt(Rage)) { t.State = Tentacle.S.Recover; t.T = 0f; t.FromTip = t.Tip; t.FromCtrl = t.Ctrl; }
 				break;
 			case Tentacle.S.Recover:
 			{
+				// dragged back off the catwalk, slow, then up into its writhing again
 				float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, t.T / 1.2f));
 				Vector3 tip = IdleTip(t);
-				t.Tip = t.FromTip.Lerp(tip, u);
+				var drag = t.FromTip - radial * 3f * Mathf.Sin(Mathf.Min(u * 2f, 1f) * Mathf.Pi * 0.5f);
+				t.Tip = drag.Lerp(tip, u);
 				t.Ctrl = t.FromCtrl.Lerp(IdleCtrl(t, tip), u);
 				if (t.T >= 1.2f) t.State = Tentacle.S.Idle;
 				break;

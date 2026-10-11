@@ -170,8 +170,7 @@ public partial class SkiLodge
 		dive.TweenProperty(player, "global_position", diveTo, 0.45f * Pace).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
 		player.SetCrouch(true);
 		AudioDirector.OneShot(this, "body_dive", 1, diveTo + Vector3.Up * 0.3f, -2f, "Player", 3f, 0.04f);
-		// (2026-10-10b) the lantern knocked out of the hand in the dive: out, and it won't light again down there
-		player.GetNodeOrNull<Lantern>("Lantern")?.Snuff();
+		// (the lantern stays lit through the dive now: it's knocked from their hand later, into the tree, 2026-10-10c)
 		for (int w = 0; w < 80 && !landed; w++) await Cutscene.Wait(this, 0.05, ct);
 		FinaleWendigo.GlobalPosition = land;
 		FinaleLanded = true;
@@ -204,8 +203,12 @@ public partial class SkiLodge
 		FinaleWendigo.Hold("crouch", 0.6f, 0.5 * Pace);   // (its head brought down to theirs)
 		AudioDirector.OneShot(this, "wendigo_mimic", 14, FinaleWendigo.MouthWorld, -1f, "Voice", 4f, 0f);
 		FinaleWendigo.Speak(1.8f);
-		await Cutscene.Wait(this, 2.0 * Pace, ct);
-		// then away from them, to the doors: up off the boards, drawn back, the arms cocked
+		await Cutscene.Wait(this, 1.4 * Pace, ct);
+		// (2026-10-10c, the owner: "The player raises his lantern towards the wendigo in this cutscene and it smacks it away
+		// causing the ski lodge to go up in flames") they thrust the lantern up into its face; the light on it, it flinches
+		// back from the flame with a hiss, and then it strikes: the lantern torn out of the hand and flung across the hall
+		await LanternInItsFace(player, ct);
+		// then away from them and from the fire, to the doors: up off the boards, drawn back, the arms cocked
 		GD.Print("[story] Act 23: it turns from them to the doors");
 		await TurnWendigo(ToGlobal(FrontDoorInside), 0.7f * Pace, ct);
 		FinaleWendigo.Hold("smash", 0f, 0.6 * Pace);
@@ -243,15 +246,19 @@ public partial class SkiLodge
 		await Cutscene.Wait(this, 1.4, ct);
 		AudioDirector.OneShot(this, "wendigo_howl_far", 3, ToGlobal(new Vector3(-10f, 6f, Apothem + 60f)), 4f, "Unnatural", 30f, 0.03f);
 		await Cutscene.Wait(this, 1.2, ct);
-		// up off the floor
+		// up off the floor; and behind them the hall is going up: a look back at it (the tree a column of fire, the gallery's
+		// rail catching), a cough, and out after it, quickly
 		player.SetCrouch(false);
-		await Cutscene.Wait(this, 0.8, ct);
+		await StoryBeat.PanTowards(this, player, ToGlobal(TreeAt + Vector3.Up * 2.2f), 1.0f, ct);
+		PlayerBreathing.Startle(0.6f);
+		AudioDirector.OneShot(this, "breath_in", 5, null, -2f, "Player", 3f, 0.05f);
+		await Cutscene.Wait(this, 1.3, ct);
 		// to the doorway, through it, and out onto the step: left, and right (from inside the doorway's depth a look to
 		// the side only met its jamb)
 		var at = ToGlobal(new Vector3(0, FloorY + 0.12f, Apothem + 0.95f));
 		var go = player.CreateTween();
-		go.TweenProperty(player, "global_position", at, 3.2f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-		await StoryBeat.PanTowards(this, player, ToGlobal(new Vector3(0, 1.5f, Apothem + 9f)), 1.2f, ct);
+		go.TweenProperty(player, "global_position", at, 2.0f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		await StoryBeat.PanTowards(this, player, ToGlobal(new Vector3(0, 1.5f, Apothem + 9f)), 0.8f, ct);
 		await Cutscene.Tween(this, go, ct);
 		await Cutscene.Wait(this, 0.6, ct);
 		await StoryBeat.PanTowards(this, player, ToGlobal(new Vector3(-9f, 1.4f, Apothem + 3.2f)), 1.5f, ct);
@@ -261,9 +268,78 @@ public partial class SkiLodge
 		FinaleDone = true;
 		GD.Print("[story] Act 23: at the splintered doorway, looking left, and right - the end of Act 23");
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act23Finished);
+		BuildHeatWall();   // (no going back into the fire)
 		// on into Act 24: its tracks go off across the snow, to a hole in a drift (the maze is built, if it wasn't)
 		EnsureAct24();
 		_ = StoryBeat.Caption(this, "Its tracks go off across the snow.", 0.6f, 2.8f, 1f);
+	}
+
+	/// <summary>For the tests: the lantern was thrust up into its face, struck from the hand, and burst against the tree.</summary>
+	public bool LanternThrust { get; private set; }
+	public bool LanternStruck { get; private set; }
+
+	/// <summary>The lantern up into its face; it flinches from the flame, then strikes it out of their hand; it flies across
+	/// the hall turning over and bursts against the foot of the Christmas tree; the fire takes.</summary>
+	private async System.Threading.Tasks.Task LanternInItsFace(PlayerController player, CancellationToken ct)
+	{
+		var held = player.CameraRig?.Camera?.GetNodeOrNull<HeldLantern>("HeldLantern");
+		// up, into its face (eased; the light swells on it)
+		LanternThrust = true;
+		GD.Print("[story] Act 23: they thrust the lantern up into its face");
+		if (held != null)
+		{
+			var up = CreateTween();
+			up.TweenMethod(Callable.From<float>(v => { if (IsInstanceValid(held)) held.Thrust = v; }), 0f, 1f, 0.45f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		}
+		AudioDirector.OneShot(this, "glass_clink", 2, null, -10f, "Player", 3f, 0.05f);
+		AudioDirector.OneShot(this, "breath_in", 5, null, -4f, "Player", 3f, 0.03f);
+		await Cutscene.Wait(this, 0.4, ct);
+		// it flinches from the flame: its head snapped back and away, a hiss, a half step back
+		var wp = FinaleWendigo.GlobalPosition;
+		var away = ((wp - player.GlobalPosition) with { Y = 0 }).Normalized();
+		FinaleWendigo.Hold("idle", 4f, 0.25);
+		AudioDirector.OneShot(this, "creature_snarl", 8, FinaleWendigo.MouthWorld, 3f, "Unnatural", 7f, 0.05f);
+		var flinch = CreateTween();
+		flinch.TweenProperty(FinaleWendigo, "global_position", wp + away * 0.5f, 0.3f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+		await Cutscene.Tween(this, flinch, ct);
+		await Cutscene.Wait(this, 0.45, ct);
+		// and strikes: the arm across, the lantern torn from the hand
+		FinaleWendigo.Play("smash", 2.2f, 0.05);
+		AudioDirector.OneShot(this, "body_dive", 1, player.GlobalPosition + Vector3.Up * 1.4f, 0f, "Events", 4f, 0.05f);
+		await Cutscene.Wait(this, 0.18, ct);
+		LanternStruck = true;
+		var from = held?.FlameWorld ?? player.GlobalPosition + Vector3.Up * 1.4f;
+		player.GetNodeOrNull<Lantern>("Lantern")?.Snuff();
+		if (held != null) held.Thrust = 0f;
+		GD.Print("[story] Act 23: it strikes the lantern out of their hand");
+		// the lantern flies: a real one now, in the world, turning over as it goes, its flame streaming
+		var thrown = new Node3D { Name = "ThrownLantern" };
+		AddChild(thrown);
+		thrown.GlobalPosition = from;
+		ItemMeshes.Build(ToolKind.Lantern, thrown);
+		var flame = new OmniLight3D { LightColor = new Color(1f, 0.6f, 0.3f), LightEnergy = 1.6f, OmniRange = 5f, ShadowEnabled = false };
+		thrown.AddChild(flame);
+		var to = ToGlobal(TreeAt + new Vector3(0.55f, 0.35f, -0.75f));
+		float flight = 0.75f;
+		var fly = CreateTween();
+		fly.TweenMethod(Callable.From<float>(u =>
+		{
+			if (!IsInstanceValid(thrown)) return;
+			thrown.GlobalPosition = from.Lerp(to, u) + Vector3.Up * Mathf.Sin(u * Mathf.Pi) * 0.9f;
+			thrown.Rotation = new Vector3(u * 7f, u * 2.5f, u * 4f);
+		}), 0f, 1f, flight).SetTrans(Tween.TransitionType.Linear);
+		await StoryBeat.PanTowards(this, player, to, flight * 0.9f, ct);
+		await Cutscene.Tween(this, fly, ct);
+		// it bursts: glass, the oil thrown across the boards and up the tree, and the fire takes
+		AudioDirector.OneShot(this, "ice_tinkle", 3, to, 4f, "Events", 6f, 0.05f);
+		AudioDirector.OneShot(this, "bottle_clink", 3, to, 2f, "Events", 6f, 0.05f);
+		if (IsInstanceValid(thrown)) thrown.QueueFree();
+		Ignite(ToLocal(to) with { Y = FloorY });
+		await Cutscene.Wait(this, 1.3, ct);
+		// it shrieks at the fire and backs from it, toward the doors
+		AudioDirector.OneShot(this, "wendigo_howl_03", 1, FinaleWendigo.MouthWorld, 5f, "Unnatural", 10f, 0.02f);
+		await StoryBeat.PanTowards(this, player, FinaleWendigo.ChestWorld, 0.7f, ct);
+		await Cutscene.Wait(this, 0.6, ct);
 	}
 
 	// (the finale's marks, lodge-local: the walk over the hall's west-back side (the west-front's was behind the

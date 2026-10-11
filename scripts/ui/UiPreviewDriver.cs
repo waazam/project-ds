@@ -63,6 +63,36 @@ public partial class UiPreviewDriver : Node
 		await Frames(20);
 
 		var inv = player.GetNode<PlayerInventory>("Inventory");
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--neon") >= 0)
+		{
+			// (2026-10-10c) the neon inventory in every colour, and the film canister saving
+			inv.TryPickup(ToolKind.Compass);
+			inv.TryPickup(ToolKind.Camera);
+			inv.TryPickup(ToolKind.Lantern);
+			await Seconds(1.2);
+			for (int c = 0; c < NeonKit.Names.Length; c++)
+			{
+				GameSettings.Instance.HudColor = c;
+				await Seconds(0.4);
+				Shot($"neon_{c}_{NeonKit.Names[c].ToLowerInvariant()}");
+			}
+			GameSettings.Instance.HudColor = 0;
+			// the stamina bar: a run
+			StaminaBar.Preview = 1f;
+			await Seconds(0.5);
+			StaminaBar.Preview = 0.62f;
+			await Seconds(0.25);
+			Shot("neon_stamina_running");
+			StaminaBar.Preview = null;
+			inv.TryPickup(ToolKind.Keycard202);
+			await Seconds(0.3);
+			Shot("neon_pickup_ring");
+			SaveIndicator.Instance?.Play();
+			await Seconds(1.0);
+			Shot("save_canister");
+			GetTree().Quit(0);
+			return;
+		}
 		inv.TryPickup(ToolKind.Compass);
 		inv.TryPickup(ToolKind.Lantern);
 		await Seconds(1.0);

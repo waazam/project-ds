@@ -444,7 +444,7 @@ public partial class BossRoom
 
 	private void OnImpact(Vector3 at, Leviathan.Tentacle t)
 	{
-		Slams++;
+		if (!t.Second) Slams++;
 		Sfx("catwalk_slam", 3, at, 6f, 10f);
 		Splash(at);
 		Damage(at);
@@ -453,6 +453,8 @@ public partial class BossRoom
 		float d = new Vector2(player.GlobalPosition.X - at.X, player.GlobalPosition.Z - at.Z).Length();
 		if (d < 7f) _ = Shake(player, Mathf.Lerp(0.03f, 0.008f, d / 7f));
 		if (d < 7f) PlayerBreathing.Startle(Mathf.Lerp(0.7f, 0.3f, d / 7f));
+		// (a double's second blow: on the spot the first already hit, after its circle's gone: it shakes, it can't crush)
+		if (t.Second) return;
 		bool demo = false;
 		foreach (var (tt, m, _) in _telegraphs) if (tt == t && (bool)m.GetMeta("demo")) demo = true;
 		// only what the red circle showed: it has to be fair
@@ -594,6 +596,7 @@ public partial class BossRoom
 		Finished = true;
 		State = Phase.Done;
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act18Finished);
+		UI.ChapterCard.Show(this, 5, 2.0f);
 		GD.Print("[story] Act 18 done: into the library - Act 19 starts here");
 	}
 

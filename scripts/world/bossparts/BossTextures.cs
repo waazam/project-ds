@@ -88,10 +88,11 @@ public static class BossTextures
 	});
 
 	/// <summary>Galvanized tube: dull silver, a little mottled.</summary>
-	public static StandardMaterial3D GalvanizedMat => Std("bt_galv", () => new StandardMaterial3D
+	public static StandardMaterial3D GalvanizedMat => SurfaceSets.Scan(Std("bt_galv", () => new StandardMaterial3D
 	{
 		AlbedoColor = new Color(0.62f, 0.64f, 0.66f), Roughness = 0.45f, Metallic = 0.7f, MetallicSpecular = 0.6f,
-	});
+		Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f,
+	}), "metal_plate_02", 1f, 0.8f, new Color(0.8f, 0.82f, 0.84f));
 
 	/// <summary>Canvas-wrapped insulation, cream to tan, a band every half metre.</summary>
 	public static StandardMaterial3D WrapMat(Color tint) => Std($"bt_wrap{tint.ToHtml()}", () => new StandardMaterial3D

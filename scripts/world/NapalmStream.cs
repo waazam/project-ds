@@ -49,12 +49,15 @@ public partial class NapalmStream : Node3D
 		GlobalTransform = Transform3D.Identity;
 		_rng.Randomize();
 		_mat ??= MakeMaterial();
-		_flameMM = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new QuadMesh { Size = Vector2.One }, InstanceCount = MaxGlobs };
+		// (2026-10-10c: the globs are volumes now, napalm_volume.gdshader: a sphere each, stretched along its flight and
+		// boiling; the smoke stays soft puffs turned to the eye)
+		_volMat ??= MakeVolumeMaterial();
+		_flameMM = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 10, Rings = 6 }, InstanceCount = MaxGlobs };
 		_smokeMM = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new QuadMesh { Size = Vector2.One }, InstanceCount = MaxSmoke };
 		// (the smoke drawn first, the flames over it; their bounds follow the fire, each frame: a fixed box about the
 		// world's origin culled the whole stream away in the maze, far from it)
 		_smokeMI = new MultiMeshInstance3D { Name = "Smoke", Multimesh = _smokeMM, MaterialOverride = _mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, SortingOffset = -1f };
-		_flameMI = new MultiMeshInstance3D { Name = "Flames", Multimesh = _flameMM, MaterialOverride = _mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+		_flameMI = new MultiMeshInstance3D { Name = "Flames", Multimesh = _flameMM, MaterialOverride = _volMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
 		AddChild(_smokeMI);
 		AddChild(_flameMI);
 		_light = new OmniLight3D { Name = "FireLight", LightColor = new Color(1f, 0.55f, 0.22f), OmniRange = 11f, LightEnergy = 0f, ShadowEnabled = false, Visible = false };
@@ -65,6 +68,20 @@ public partial class NapalmStream : Node3D
 		AddChild(_splashLight);
 		for (int i = 0; i < MaxGlobs; i++) _flameMM.SetInstanceTransform(i, new Transform3D(Basis.FromScale(Vector3.Zero), Vector3.Zero));
 		for (int i = 0; i < MaxSmoke; i++) _smokeMM.SetInstanceTransform(i, new Transform3D(Basis.FromScale(Vector3.Zero), Vector3.Zero));
+	}
+
+	private static ShaderMaterial _volMat;
+	private static ShaderMaterial MakeVolumeMaterial() => new() { Shader = GD.Load<Shader>("res://assets/shaders/napalm_volume.gdshader"), ResourceName = "napalm_volume" };
+
+	/// <summary>A glob's basis as a volume: its length along its flight, up as near world up as that allows, its width across.</summary>
+	private static Basis Volume(Vector3 along, float length, float width)
+	{
+		if (along.LengthSquared() < 1e-6f) along = Vector3.Forward;
+		var x = along.Normalized();
+		if (Mathf.Abs(x.Y) > 0.97f) x = (x + new Vector3(0.1f, 0, 0.1f)).Normalized();
+		var z = x.Cross(Vector3.Up).Normalized();
+		var y = z.Cross(x).Normalized();
+		return new Basis(x * length, y * width, z * width);
 	}
 
 	private static ShaderMaterial MakeMaterial()
@@ -150,7 +167,7 @@ public partial class NapalmStream : Node3D
 			// turned to the eye and drawn out along its flight (a streak where it's fast, round where it's slowed or
 			// clinging): overlapping, the streaks read as one rope of fire, not a string of balls
 			float stretch = g.Stuck ? 1f : 1f + Mathf.Min(g.V.Length() * 0.075f, 1.6f);
-			_flameMM.SetInstanceTransform(i, new Transform3D(Facing(eye, at, g.Stuck ? Vector3.Up : g.V, size * stretch, size), at));
+			_flameMM.SetInstanceTransform(i, new Transform3D(g.Stuck ? Basis.FromScale(new Vector3(size, size * 1.15f, size)) : Volume(g.V, size * stretch, size * 0.85f), at));
 			_flameMM.SetInstanceCustomData(i, new Color(u, heat, g.Seed, g.Stuck ? 0.85f : 0.8f));
 			alight++;
 			sum += at;

@@ -161,7 +161,7 @@ public partial class SkiLodge : Node3D
 	}
 
 	/// <summary>A window: black glass with a faint frost, a white-painted frame and mullions.</summary>
-	private void Window(MeshKit k, Vector3 c, Vector3 along, Vector3 outward, float w, float h)
+	private void Window(MeshKit k, Vector3 c, Vector3 along, Vector3 outward, float w, float h, int cols = 2, int rows = 2)
 	{
 		k.Mat(WindowGlass);
 		k.Color = Colors.White;
@@ -173,11 +173,20 @@ public partial class SkiLodge : Node3D
 		k.Box(c + o - Vector3.Up * h * 0.5f, new Vector3(w + 0.22f, 0.12f, 0.12f), 1f, basis);
 		k.Box(c + o - along * w * 0.5f, new Vector3(0.08f, h, 0.08f), 1f, basis);
 		k.Box(c + o + along * w * 0.5f, new Vector3(0.08f, h, 0.08f), 1f, basis);
-		k.Box(c + o, new Vector3(0.04f, h, 0.04f), 1f, basis);
-		k.Box(c + o, new Vector3(w, 0.04f, 0.04f), 1f, basis);
-		// snow on the sill
+		for (int i = 1; i < cols; i++) k.Box(c + o + along * (w / cols * i - w * 0.5f), new Vector3(0.04f, h, 0.04f), 1f, basis);
+		for (int j = 1; j < rows; j++) k.Box(c + o + Vector3.Up * (h / rows * j - h * 0.5f), new Vector3(w, 0.04f, 0.04f), 1f, basis);
+		// snow on the sill, and a line of it on every glazing bar across
 		k.Mat(RoofSnow);
 		k.Box(c + o * 1.5f - Vector3.Up * (h * 0.5f - 0.08f), new Vector3(w + 0.1f, 0.06f, 0.14f), 1f, basis);
+		for (int j = 1; j < rows; j++) k.Box(c + o * 1.4f + Vector3.Up * (h / rows * j - h * 0.5f + 0.03f), new Vector3(w - 0.04f, 0.025f, 0.06f), 1f, basis);
+		// a low window: the snow drifted up against it outside, to a little under halfway up its bottom panes
+		float bottom = c.Y - h * 0.5f;
+		if (bottom < 1.6f)
+		{
+			float top = bottom + h / rows * 0.55f;
+			for (int s = 0; s < 3; s++)
+				k.Blob(c + outward * (0.22f + s * 0.06f) + along * ((s - 1) * w * 0.32f) + Vector3.Up * (bottom - c.Y - 0.1f), new Vector3(w * 0.26f, (top - bottom) * 0.8f + 0.1f, 0.32f), 4100 + s + (int)(c.X * 7f), 0.12f, true, 1f, 0f, 2);
+		}
 	}
 
 	private static Vector3 HexVert(int i) { float a = Mathf.DegToRad(30f + 60f * i); return new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * HexR; }
@@ -196,7 +205,7 @@ public partial class SkiLodge : Node3D
 			Vector3 ta = HexVert(i) * (lanternR / HexR) + Vector3.Up * HexPeak, tb = HexVert(i + 1) * (lanternR / HexR) + Vector3.Up * HexPeak;
 			var n = (tb - a).Cross(b - a).Normalized();
 			if (n.Y < 0) n = -n;
-			k.Mat(RoofSnow);
+			k.Mat(RoofBlue);
 			k.Quad(a, b, tb, ta, n, new Vector2(0, 0), new Vector2(a.DistanceTo(b) * 0.25f, 0), new Vector2(a.DistanceTo(b) * 0.25f * 0.2f, 4f), new Vector2(0, 4f));
 			// underside: the shingles' dark
 			k.Mat(BuildingTextures.ShingleMat);
@@ -288,7 +297,7 @@ public partial class SkiLodge : Node3D
 			Vector3 fa = new(FacetX(eaveZ), WingWall - 0.4f, eaveZ), fb = new(ex, WingWall - 0.4f, eaveZ);
 			Vector3 ra = new(s * HexR, WingRidge, 0), rb = new(ex, WingRidge, 0);
 			Vector3 ba = new(FacetX(eaveZ), WingWall - 0.4f, -eaveZ), bb = new(ex, WingWall - 0.4f, -eaveZ);
-			k.Mat(RoofSnow);
+			k.Mat(RoofBlue);
 			k.Color = Colors.White;
 			var nf = new Vector3(0, WingHalfZ + over, WingRidge - WingWall + 0.4f).Normalized();
 			var nb = new Vector3(0, WingHalfZ + over, -(WingRidge - WingWall + 0.4f)).Normalized();
@@ -758,6 +767,28 @@ public partial class SkiLodge : Node3D
 	};
 	/// <summary>Snow lying on the roofs (the fresh-snow texture, a touch brighter than the ground's, still never glaring).</summary>
 	public static StandardMaterial3D RoofSnow => _roofSnow ??= WinterWoods.SnowStd("lodge_roof_snow", 0.3f, 0.95f);
+
+	/// <summary>The roofs themselves (2026-10-10c, the owner: "a rustic royal blue thats been faded"): faded blue
+	/// standing-seam sheet under drifts of snow, heavy at the eaves, patchy toward the peak (roof_snow.gdshader).</summary>
+	public static Material RoofBlue => _roofBlue ??= MakeRoofBlue();
+	private static Material _roofBlue;
+
+	private static Material MakeRoofBlue()
+	{
+		if (SurfaceSets.Tex("ph_lodge_roof_blue") == null) return RoofSnow;
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/roof_snow.gdshader"), ResourceName = "lodge_roof_blue" };
+		m.SetShaderParameter("roof_albedo", SurfaceSets.Tex("ph_lodge_roof_blue"));
+		m.SetShaderParameter("roof_normal", SurfaceSets.Tex("ph_lodge_roof_blue", "normal"));
+		m.SetShaderParameter("roof_rough", SurfaceSets.Tex("ph_lodge_roof_blue", "rough"));
+		m.SetShaderParameter("snow_albedo", GD.Load<Texture2D>("res://assets/textures/snow/snow_albedo.png"));
+		m.SetShaderParameter("snow_normal", GD.Load<Texture2D>("res://assets/textures/snow/snow_normal.png"));
+		m.SetShaderParameter("noise_tex", new NoiseTexture2D { Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true, Noise = new FastNoiseLite { Frequency = 0.012f, FractalOctaves = 4, Seed = 77 } });
+		m.SetShaderParameter("eave_y", WingWall - 0.6f);
+		m.SetShaderParameter("peak_y", HexPeak);
+		m.SetShaderParameter("cover", 0.5f);
+		m.SetMeta("detail_kind", -1);
+		return m;
+	}
 
 	private static StandardMaterial3D Tinted(StandardMaterial3D src, Color c, string name)
 	{

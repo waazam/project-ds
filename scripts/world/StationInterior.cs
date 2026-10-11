@@ -199,7 +199,8 @@ public partial class StationInterior : Node3D
 		Marker("Act23Letter201Marker", ToGlobal(lodge + new Vector3(-24.6f, SkiLodge.UpperY + 0.1f, 2.6f)), Rotation.Y - Mathf.Pi * 0.5f, "respawn_Act23Letter201");
 		Marker("Act23CrawlMarker", ToGlobal(lodge + SkiLodge.CellCentre(SkiLodge.CrawlSave) + SkiLodge.CrawlDown + new Vector3(0, 0.1f, 0)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act23Crawlspace");
 		Marker("Act23FrozenMarker", ToGlobal(lodge + new Vector3(32.05f, 0.1f, -2.6f)), Rotation.Y, "respawn_Act23Frozen");
-		Marker("Act23EndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_Act23Finished");
+		// (outside on the landing now: the hall behind is burning, 2026-10-10c)
+		Marker("Act23EndMarker", ToGlobal(lodge + new Vector3(0f, 0.15f, SkiLodge.Apothem + 0.95f)), Rotation.Y, "respawn_Act23Finished");
 		// the end of the story (GameEnding: for now, where Act 23 ends), facing out of the splintered doorway
 		Marker("GameEndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_GameFinished");
 		SaveLamps.Place(this);   // (2026-10-10: the safe lights at a few of the saves)

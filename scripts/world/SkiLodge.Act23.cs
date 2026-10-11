@@ -95,6 +95,7 @@ public partial class SkiLodge
 		BuildLoose();
 		if (Has(LodgeFlag.Frozen)) Freeze(instant: true);
 		if (Has(LodgeFlag.FrontBroken)) ExplodeFrontDoor(instant: true);
+		FireForStory();
 		if (StoryManager.Instance is { Current: >= Checkpoint.Act23Finished }) Callable.From(EnsureAct24).CallDeferred();
 		_whisper202 = Voice("Whisper202", new Vector3(-14.4f, UpperY + 1.3f, 3.2f), -13f, 1.2f, 6.5f);
 		_mumble203 = Voice("Mumble203", new Vector3(-14.31f, UpperY + 1.2f, -InnerZ - 1.2f), -7f, 2.6f, 16f);
@@ -199,6 +200,7 @@ public partial class SkiLodge
 		GD.Print("[story] Act 23: the snow comes off the roof and buries the back door - snowed in");
 		await Cutscene.Wait(this, 1.2, ct);
 		_ = StoryBeat.Caption(this, "Snowed in.", 0.4f, 2.2f, 1f);
+		UI.ChapterCard.Show(this, 7, 4.5f);
 	}
 
 	// ------------------------------------------------------------------ 2. the bar: 202's card, under the counter
@@ -1028,6 +1030,8 @@ public partial class SkiLodge
 		l = ToLocal(player.GlobalPosition);
 		FrozenProcess(dt);
 		SheetTick(player);
+		FireTick(delta);
+		HauntTick(player, ToLocal(player.GlobalPosition));
 		AjarTick(player, ToLocal(player.GlobalPosition));
 		SoundsProcess(l, inside);
 		// the light in here: clean and warm (noon, every lamp lit), not the woods' murk; cold once it's frozen over
@@ -1047,7 +1051,7 @@ public partial class SkiLodge
 			day.EmissionEnergyMultiplier = Mathf.Lerp(0.9f, 0.28f, Storm);
 			day.Emission = new Color(0.62f, 0.68f, 0.76f).Lerp(new Color(0.34f, 0.38f, 0.45f), Storm);
 		}
-		foreach (var dl in _dayLights) dl.LightEnergy = Mathf.Lerp(0.9f, 0.25f, Storm);
+		foreach (var dl in _dayLights) dl.LightEnergy = (float)dl.GetMeta("base", 0.9f) * Mathf.Lerp(1f, 0.28f, Storm);
 		if (_stormWind != null)
 		{
 			float want = inside && !InMaze ? Mathf.Lerp(-40f, Frozen ? -4f : -9f, Storm) : InMaze ? -30f : -60f;

@@ -343,15 +343,49 @@ public partial class StoryManager : Node
 		_markers.Clear();
 		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller. The levels' packed
 		// scenes are kept once loaded (a death's reload, or Act 25's way back, needn't read them from disk again).
-		Callable.From(() =>
+		Callable.From(() => _ = ChangeSceneWhenRead(path)).CallDeferred();
+	}
+
+	/// <summary>The change itself, once the level's read: a background read still running is waited on a frame at a time
+	/// (never by blocking the main thread on it: the loader can need the main thread, and the two would wait for each other
+	/// forever).</summary>
+	private async System.Threading.Tasks.Task ChangeSceneWhenRead(string path)
+	{
+		if ((!_packed.TryGetValue(path, out var ps) || ps == null) && _preloading.Contains(path))
 		{
-			if (!_packed.TryGetValue(path, out var ps) || ps == null) { ps = GD.Load<PackedScene>(path); if (path != MenuScene) _packed[path] = ps; }
+			for (int i = 0; i < 1800; i++)
+			{
+				var st = ResourceLoader.LoadThreadedGetStatus(path);
+				if (st != ResourceLoader.ThreadLoadStatus.InProgress) break;
+				await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			}
+			if (ResourceLoader.LoadThreadedGetStatus(path) == ResourceLoader.ThreadLoadStatus.Loaded)
+			{
+				ps = ResourceLoader.LoadThreadedGet(path) as PackedScene;
+				if (ps != null && path != MenuScene) _packed[path] = ps;
+			}
+			_preloading.Remove(path);
+		}
+		{
+			if (!_packed.TryGetValue(path, out ps) || ps == null) { ps = GD.Load<PackedScene>(path); if (path != MenuScene) _packed[path] = ps; }
 			LoadStage($"{System.IO.Path.GetFileName(path)} read");
 			GetTree().ChangeSceneToPacked(ps);
-		}).CallDeferred();
+		}
 	}
 
 	private static readonly System.Collections.Generic.Dictionary<string, PackedScene> _packed = new();
+	private static readonly System.Collections.Generic.HashSet<string> _preloading = new();
+
+	/// <summary>(2026-10-10c, "make sure the transitions between each act have minimal loading screens and transition
+	/// smoothly") The next level read from disk on a background thread while this one is played, so the change to it is
+	/// only its own building, not the reading too: the hollow from Act 1's start, the trailhead again once the
+	/// flamethrower's in hand.</summary>
+	public void PreloadLevel(string path)
+	{
+		if (string.IsNullOrEmpty(path) || _packed.ContainsKey(path) || _preloading.Contains(path)) return;
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-preload") >= 0) return;
+		if (ResourceLoader.LoadThreadedRequest(path, "PackedScene", false) == Error.Ok) { _preloading.Add(path); GD.Print($"[load] reading {System.IO.Path.GetFileName(path)} in the background"); }
+	}
 
 	/// <summary>Advances the story and checkpoint-saves. Never moves the checkpoint backwards.</summary>
 	public void ReachCheckpoint(Checkpoint cp, Vector3 pos, float yaw)

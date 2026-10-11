@@ -34,7 +34,20 @@ public partial class GameFlow : Node
 	private PauseMenu _pause;
 
 	public override void _EnterTree() { Instance = this; StoryManager.LoadStage("the level loaded and in the tree"); }
-	public override void _ExitTree() { if (Instance == this) Instance = null; }
+	public override void _ExitTree()
+	{
+		if (Instance == this) Instance = null;
+		if (StoryManager.Instance is { } sm) sm.CheckpointReached -= LoadAhead;
+	}
+
+	private void LoadAhead(Checkpoint _)
+	{
+		var sm = StoryManager.Instance;
+		if (sm == null || !IsInsideTree()) return;
+		string here = GetTree().CurrentScene?.SceneFilePath ?? "";
+		if (here == StoryManager.TrailheadScene && sm.Current < Checkpoint.Act2StairsClimbed) sm.PreloadLevel(StoryManager.HollowScene);
+		else if (here == StoryManager.HollowScene && sm.Current >= Checkpoint.Act24Flamethrower && sm.Current < Checkpoint.Act24Finished) sm.PreloadLevel(StoryManager.TrailheadScene);
+	}
 
 	public override void _Ready()
 	{
@@ -60,6 +73,13 @@ public partial class GameFlow : Node
 		if (GameSettings.Instance.Trailer) AddChild(new TrailerDirector());
 		else if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
 		else if (GameSettings.Instance.AutoTest) AddChild(new StoryTest());
+		// the next level read in the background while this one's played (StoryManager.PreloadLevel): the hollow from the
+		// trailhead before the stairs; the trailhead from the hollow once the flamethrower's in hand (Act 25 is there)
+		if (StoryManager.Instance is { } sm)
+		{
+			GetTree().CreateTimer(8.0).Timeout += () => { if (IsInstanceValid(this) && IsInsideTree()) LoadAhead(Checkpoint.None); };   // (once the level's own load is done)
+			sm.CheckpointReached += LoadAhead;
+		}
 	}
 
 	private void Begin()
@@ -105,6 +125,7 @@ public partial class GameFlow : Node
 				if (!IsInstanceValid(_player) || !_player.IsInsideTree()) return;
 				StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act1Start, _player.GlobalPosition, _player.CameraRig.Yaw);
 				await opening.ShowHowTo(ct);
+				UI.ChapterCard.Show(this, 1, 1.0f);
 			});
 			return;
 		}
@@ -116,7 +137,9 @@ public partial class GameFlow : Node
 			Started = true;
 			await _fader.Fade(0f, quick ? 0.2f : 1.2f, ct);
 			if (!IsInstanceValid(_player) || !_player.IsInsideTree()) return;   // the level is already being left
+			bool fresh = StoryManager.Instance is { Current: Checkpoint.None };
 			StoryManager.Instance?.ReachCheckpoint(Checkpoint.Act1Start, _player.GlobalPosition, _player.CameraRig.Yaw);
+			if (fresh) UI.ChapterCard.Show(this, 1, 2.5f);
 		});
 	}
 

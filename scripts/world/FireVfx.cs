@@ -60,9 +60,12 @@ public partial class FireVfx : Node3D
 		int count = FlameScale <= 0f ? 0 : Mathf.Clamp(Mathf.RoundToInt(Extent.X * Extent.Z * 9f * FlameScale + 4f), 4, 32);
 		if (count > 0)
 		{
-			_flameMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/flame_card.gdshader") };
-			var quad = new QuadMesh { Size = new Vector2(1f, 1f), CenterOffset = new Vector3(0, 0.5f, 0), Material = _flameMat };
-			var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = quad, InstanceCount = count };
+			// (2026-10-10c, the owner: "fix the flames for the flamethrower and burning things to look more 3d and less 2d")
+			// each tongue a small sphere drawn up into a writhing teardrop by flame_volume.gdshader: a shape from every side,
+			// thick and hot through its middle, thin and red at its rim; no more flat cards turned to the eye
+			_flameMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/flame_volume.gdshader") };
+			var tongue = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 12, Rings = 10, Material = _flameMat };
+			var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = tongue, InstanceCount = count };
 			for (int i = 0; i < count; i++)
 			{
 				float fx = rng.RandfRange(-0.5f, 0.5f), fz = rng.RandfRange(-0.5f, 0.5f);
@@ -70,7 +73,7 @@ public partial class FireVfx : Node3D
 				float centre = 1f - Mathf.Clamp(new Vector2(fx, fz).Length() * 1.6f, 0f, 1f);
 				float h = Extent.Y * rng.RandfRange(0.75f, 1.25f) * (0.7f + 0.6f * centre) * Mathf.Max(0.5f, FlameScale);
 				float w = Mathf.Clamp(Mathf.Min(Extent.X, Extent.Z) * rng.RandfRange(0.5f, 0.85f), 0.35f, 1.6f) * (0.75f + 0.4f * centre);
-				var basis = Basis.Identity.Scaled(new Vector3(w, h, 1f));
+				var basis = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau) * Basis.FromScale(new Vector3(w, h, w * rng.RandfRange(0.8f, 1.1f)));
 				var pos = new Vector3(fx * Extent.X, rng.RandfRange(-0.05f, 0.1f) * Extent.Y, fz * Extent.Z);
 				mm.SetInstanceTransform(i, new Transform3D(basis, pos));
 				mm.SetInstanceCustomData(i, new Color(rng.Randf(), rng.RandfRange(0f, 0.6f), rng.RandfRange(0.02f, 0.08f), 0));
@@ -286,7 +289,8 @@ public partial class FireVfx : Node3D
 		_clock += delta;
 		float t = (float)_clock;
 		// layered sines + an occasional gust: unstable, never strobing
-		float flick = 0.78f + 0.12f * Mathf.Sin(t * 7.3f) + 0.08f * Mathf.Sin(t * 13.1f + 1.3f) + 0.06f * Mathf.Sin(t * 23.7f + 0.4f);
+		// (slower than it was: a fire's light breathes; nothing strobes: the owner's comfort)
+		float flick = 0.84f + 0.08f * Mathf.Sin(t * 2.3f) + 0.05f * Mathf.Sin(t * 3.7f + 1.3f) + 0.03f * Mathf.Sin(t * 6.1f + 0.4f);
 		flick += 0.1f * Mathf.Max(0f, Mathf.Sin(t * 0.9f + Seed));
 		_light.LightEnergy = LightEnergy * _intensity * flick;
 		_light.Position = new Vector3(Mathf.Sin(t * 3.1f) * 0.08f * Extent.X, Mathf.Max(0.4f, Extent.Y * 0.55f) + Mathf.Sin(t * 5.3f) * 0.06f, Mathf.Cos(t * 2.7f) * 0.08f * Extent.Z);

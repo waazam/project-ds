@@ -44,6 +44,14 @@ public partial class GameSettings : Node
 	public const float BrightnessMin = 0.7f, BrightnessMax = 1.5f;
 	/// <summary>The lantern's strength (1 as designed): its glow and its beam, for a dark monitor (2026-10-07).</summary>
 	public float LanternBrightness = 1f;
+	/// <summary>The HUD's neon (UI.NeonKit.Names): 0 white (the default), green, red, purple, blue, yellow, orange.</summary>
+	public int HudColor = 0;
+	/// <summary>(2026-10-10c, the cinematic brief: "a contextual HUD that fades out completely during exploration") The
+	/// compass and the inventory only while they're wanted (standing still, a new objective, a switch, a pickup), else
+	/// faded out. Off: always shown.</summary>
+	public bool ContextualHud = true;
+	/// <summary>The camera's focus pulled to what's looked at (a soft depth of field).</summary>
+	public bool FocusPull = true;
 	public const float LanternMin = 0.7f, LanternMax = 1.6f;
 
 	/// <summary>Fullscreen (borderless, the screen's own resolution: the default) or a window.</summary>
@@ -205,6 +213,9 @@ public partial class GameSettings : Node
 		cfg.SetValue("display", "fog_lighting", FogLighting);
 		cfg.SetValue("display", "brightness", Brightness);
 		cfg.SetValue("display", "lantern_brightness", LanternBrightness);
+		cfg.SetValue("display", "hud_neon", HudColor);
+		cfg.SetValue("display", "hud_contextual", ContextualHud);
+		cfg.SetValue("display", "focus_pull", FocusPull);
 		cfg.SetValue("display", "crt_filter", _crtFilter);
 		cfg.SetValue("display", "shadows", _shadows);
 		cfg.SetValue("display", "windowed", _windowed);
@@ -236,6 +247,9 @@ public partial class GameSettings : Node
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-volfog") < 0) FogLighting = (bool)cfg.GetValue("display", "fog_lighting", FogLighting);
 		Brightness = Mathf.Clamp((float)cfg.GetValue("display", "brightness", Brightness), BrightnessMin, BrightnessMax);
 		LanternBrightness = Mathf.Clamp((float)cfg.GetValue("display", "lantern_brightness", LanternBrightness), LanternMin, LanternMax);
+		HudColor = Mathf.Clamp((int)cfg.GetValue("display", "hud_neon", HudColor), 0, 6);
+		ContextualHud = (bool)cfg.GetValue("display", "hud_contextual", ContextualHud);
+		FocusPull = (bool)cfg.GetValue("display", "focus_pull", FocusPull);   // (a new key: green was 0 before white became the default)
 		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
 		_shadows = Mathf.Clamp((int)cfg.GetValue("display", "shadows", _shadows), 0, 2);
 		_windowed = (bool)cfg.GetValue("display", "windowed", _windowed);
@@ -322,6 +336,7 @@ public partial class GameSettings : Node
 		["reduce_flashing"] = ReduceFlashing.ToString(), ["head_motion"] = HeadMotion.ToString(), ["bars"] = CinemaBars.ToString(),
 		["fog_lighting"] = FogLighting.ToString(), ["brightness"] = Brightness.ToString("0.000"), ["lantern"] = LanternBrightness.ToString("0.000"),
 		["crt"] = _crtFilter.ToString(), ["shadows"] = _shadows.ToString(), ["windowed"] = _windowed.ToString(), ["window"] = _windowSize.ToString(),
+		["hud_color"] = HudColor.ToString(), ["hud_contextual"] = ContextualHud.ToString(), ["focus_pull"] = FocusPull.ToString(),
 	};
 
 	private void SetFields(float mouse, float stick, bool inv, float dist, float vol, bool flash, bool head, bool bars, bool fog, float bright, float lantern, bool crt, int shadows, bool windowed, Vector2I size)
@@ -339,10 +354,13 @@ public partial class GameSettings : Node
 		string backup = Godot.FileAccess.FileExists(SavePath) ? Godot.FileAccess.GetFileAsString(SavePath) : null;
 		var before = Snapshot();
 		var keep = (MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera);
+		int keepHud = HudColor; bool keepCtx = ContextualHud, keepFocus = FocusPull;
 		SetFields(0.0042f, 3.3f, !InvertY, 3.1f, 0.63f, !ReduceFlashing, !HeadMotion, !CinemaBars, !FogLighting, 1.25f, 1.35f, !_crtFilter, (_shadows + 1) % 3, !_windowed, new Vector2I(1280, 720));
+		HudColor = (keepHud + 3) % 7; ContextualHud = !keepCtx; FocusPull = !keepFocus;
 		var want = Snapshot();
 		Save();
 		SetFields(0.001f, 1f, false, 2f, 1f, false, true, true, true, 1f, 1f, true, 1, false, new Vector2I(1600, 900));
+		HudColor = 0; ContextualHud = keepCtx; FocusPull = keepFocus;
 		LoadFile();
 		var got = Snapshot();
 		int bad = 0;
@@ -354,6 +372,7 @@ public partial class GameSettings : Node
 		}
 		// the player's own settings back, and their file
 		(MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera) = keep;
+		HudColor = keepHud; ContextualHud = keepCtx; FocusPull = keepFocus;
 		if (backup != null) { using var f = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Write); f?.StoreString(backup); }
 		else DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
 		GD.Print($"[settings-test] {want.Count - bad}/{want.Count} settings survive a restart; the player's own put back ({(Snapshot()["brightness"] == before["brightness"] ? "unchanged" : "CHANGED")})");

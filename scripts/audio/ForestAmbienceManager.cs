@@ -48,7 +48,11 @@ public partial class ForestAmbienceManager : Node
 	[ExportGroup("Indoors")]
 	/// <summary>Low-pass on the Nature and Weather buses when fully indoors.</summary>
 	[Export] public float IndoorCutoffHz = 700f;
-	[Export] public float IndoorNatureDuckDb = -9f;
+	/// <summary>(2026-10-10c, the owner: "all inside every building in the game and underground in the tunnels you can hear
+	/// the forest noises of bugs and stuff ... we shouldnt be able to hear that at all") Shut out, not muffled.</summary>
+	[Export] public float IndoorNatureDuckDb = -60f;
+	/// <summary>Underground (deeper than 3 m under the terrain): the weather shut out as well.</summary>
+	[Export] public float UndergroundWeatherDuckDb = -60f;
 	[Export] public float IndoorWeatherDuckDb = -7f;
 	/// <summary>Seconds for the indoor muffling to cover ~63% of a change.</summary>
 	[Export] public float IndoorSmoothingTime = 0.35f;
@@ -59,6 +63,10 @@ public partial class ForestAmbienceManager : Node
 	public float TargetSilence { get; private set; }
 	/// <summary>0 = outdoors .. 1 = fully indoors (smoothed).</summary>
 	public float Indoor { get; private set; }
+	/// <summary>0 = at the surface .. 1 = underground (smoothed).</summary>
+	public float Underground { get; private set; }
+	private World.ForestTerrain _terrain;
+	private double _terrainLook;
 	/// <summary>True while any live owner says the listener is inside.</summary>
 	public bool IsIndoor { get { PurgeDead(); return _indoorOwners.Count > 0; } }
 
@@ -173,7 +181,22 @@ public partial class ForestAmbienceManager : Node
 		float k = 1f - Mathf.Exp(-dt / Mathf.Max(SmoothingTime, 0.01f));
 		Silence = Mathf.Lerp(Silence, TargetSilence, k);
 		float ki = 1f - Mathf.Exp(-dt / Mathf.Max(IndoorSmoothingTime, 0.01f));
-		Indoor = Mathf.Lerp(Indoor, _indoorOwners.Count > 0 ? 1f : 0f, ki);
+		// indoors: anyone saying so (an IndoorZone, the bunker), or the listener inside any building's or tunnel's reverb
+		// space (every interior has one), or underground
+		bool under = false;
+		if (_listener != null)
+		{
+			_terrainLook -= delta;
+			if ((_terrain == null || !IsInstanceValid(_terrain)) && _terrainLook <= 0) { _terrainLook = 2.0; _terrain = World.GroundSnap.FindTerrain(this); }
+			if (_terrain != null && IsInstanceValid(_terrain))
+			{
+				var p = _listener.GlobalPosition;
+				under = p.Y < _terrain.HeightAt(p.X, p.Z) - 3f;
+			}
+		}
+		bool inside = _indoorOwners.Count > 0 || AudioDirector.CurrentSpace != null || under;
+		Indoor = Mathf.Lerp(Indoor, inside ? 1f : 0f, ki);
+		Underground = Mathf.Lerp(Underground, under ? 1f : 0f, ki);
 		Apply();
 	}
 
@@ -207,7 +230,7 @@ public partial class ForestAmbienceManager : Node
 		if (_weatherBus >= 0)
 		{
 			if (_weatherLowPass != null) _weatherLowPass.CutoffHz = indoorCutoff;
-			AudioServer.SetBusVolumeDb(_weatherBus, _weatherBaseDb + IndoorWeatherDuckDb * Indoor);
+			AudioServer.SetBusVolumeDb(_weatherBus, _weatherBaseDb + IndoorWeatherDuckDb * Indoor + UndergroundWeatherDuckDb * Underground);
 		}
 	}
 

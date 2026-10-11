@@ -102,6 +102,7 @@ public partial class PlayerCameraRig : Node3D
 		_target = GetNode<PlayerController>(TargetPath);
 		_arm = GetNode<SpringArm3D>(SpringArmPath);
 		Camera = GetNode<Camera3D>(CameraPath);
+		FocusPull.Attach(Camera);
 		_arm.AddExcludedObject(_target.GetRid());
 		_currentLength = GameSettings.Instance.CameraDistance;
 		// Mode (and body visibility) is applied on the first frame: the body isn't ready yet.

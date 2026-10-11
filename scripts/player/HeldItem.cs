@@ -57,7 +57,17 @@ public abstract partial class HeldItem : Node3D
 	public override void _Process(double delta)
 	{
 		if (Player == null) return;
-		if (!_built) { _built = true; Build(); Hold = Rest; Visible = false; }
+		if (!_built)
+		{
+			_built = true;
+			Build();
+			// (2026-10-10c, the owner: "make the things the player is holding look way better") a faint cool rim from behind
+			// and above on the held layer: the thing's edges and its metal read against the dark (it went to a black
+			// silhouette, lit only by its own warm fill)
+			AddChild(new OmniLight3D { Name = "HeldRim", Position = new Vector3(0.28f, 0.32f, 0.22f), LightColor = new Color(0.58f, 0.66f, 0.82f), LightEnergy = 0.45f, OmniRange = 1.1f, OmniAttenuation = 1.2f, ShadowEnabled = false, LightCullMask = HeldLayer, LightSpecular = 0.6f });
+			Hold = Rest;
+			Visible = false;
+		}
 		float dt = Mathf.Min((float)delta, 0.05f);
 		bool want = Wanted;
 		Raise = Mathf.MoveToward(Raise, want ? 1f : 0f, dt / 0.5f);

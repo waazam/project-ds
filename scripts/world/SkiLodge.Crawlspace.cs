@@ -242,23 +242,45 @@ public partial class SkiLodge
 	{
 		var node = new Node3D { Name = name };
 		AddChild(node);
-		var boards = new MeshKit(); boards.Mat(LodgeTextures.CrawlBoardsMat); boards.Color = Colors.White;
+		// (2026-10-10c, the owner: "the further you get it gets moldier and darker and grimier to show aging") three ages
+		// of wood by how far in a cell lies: the first third the lodge's boards; then old grey planks gone soft; the last
+		// third black with rot and furred with mould; and within each, darker cell by cell, so no line shows between them
+		var boardsT = new[] { new MeshKit(), new MeshKit(), new MeshKit() };
+		var floorT = new[] { new MeshKit(), new MeshKit(), new MeshKit() };
+		var ceilT = new[] { new MeshKit(), new MeshKit(), new MeshKit() };
+		var trimT = new[] { new MeshKit(), new MeshKit(), new MeshKit() };
+		for (int t = 0; t < 3; t++)
+		{
+			boardsT[t].Mat(LodgeTextures.CrawlAged("boards", t));
+			floorT[t].Mat(LodgeTextures.CrawlAged("floor", t));
+			ceilT[t].Mat(LodgeTextures.CrawlAged("ceiling", t));
+			trimT[t].Mat(LodgeTextures.CrawlAged("stud", t));
+		}
+		MeshKit boards = boardsT[0], floor = floorT[0], ceil = ceilT[0], trim = trimT[0];
 		var brick = new MeshKit(); brick.Mat(LodgeTextures.CrawlBrickMat); brick.Color = Colors.White;
-		var floor = new MeshKit(); floor.Mat(LodgeTextures.CrawlFloorMat); floor.Color = Colors.White;
-		var ceil = new MeshKit(); ceil.Mat(LodgeTextures.CrawlCeilingMat); ceil.Color = Colors.White;
-		var trim = new MeshKit(); trim.Mat(LodgeTextures.CrawlStudMat); trim.Color = Colors.White;
 		var pipe = new MeshKit(); pipe.Mat(LodgeTextures.CrawlPipeMat); pipe.Color = Colors.White;
 		var faces = new List<Vector3>();
 		Vector2I[] sides = { new(1, 0), new(-1, 0), new(0, 1), new(0, -1) };
+		var webRng = new RandomNumberGenerator { Seed = 2399 };
 		foreach (var (at, cell) in cells)
 		{
+			// how old here: by how far along (the maze runs from 201's wall at x = 0 to the chase at 64)
+			float age = hidden ? Mathf.Clamp((at.X + 3f) / 66f, 0f, 1f) : (at.X > 30 ? 1f : 0f);
+			int tier = age < 0.34f ? 0 : age < 0.67f ? 1 : 2;
+			float within = (age - tier / 3f) * 3f;
+			var shade = Colors.White.Lerp(new Color(0.72f, 0.7f, 0.64f), Mathf.Clamp(within, 0f, 1f));
+			boards = boardsT[tier]; floor = floorT[tier]; ceil = ceilT[tier]; trim = trimT[tier];
+			boards.Color = floor.Color = ceil.Color = trim.Color = shade;
+			brick.Color = Colors.White.Lerp(new Color(0.5f, 0.48f, 0.42f), age);
 			var c = CellCentre(at) + offset;
 			float oy = offset.Y;
 			Vector3 P(float lx, float lz, float up) => new(c.X + lx, FloorAt(cell, lx, lz) + oy + up, c.Z + lz);
-			// the floor
+			// the floor (the real ends' a little higher: the exit's cells lie over the dining hall's parquet, and 4 mm above it
+			// the two fought as they came out through the wardrobe, flickering; the owner saw it)
+			float lift = hidden ? 0.004f : 0.03f;
 			if (!cell.Stair)
 			{
-				floor.Quad(P(-0.5f, 0.5f, 0.004f), P(0.5f, 0.5f, 0.004f), P(0.5f, -0.5f, 0.004f), P(-0.5f, -0.5f, 0.004f), Vector3.Up,
+				floor.Quad(P(-0.5f, 0.5f, lift), P(0.5f, 0.5f, lift), P(0.5f, -0.5f, lift), P(-0.5f, -0.5f, lift), Vector3.Up,
 					new Vector2(c.X, c.Z + 0.5f) * 0.5f, new Vector2(c.X + 1f, c.Z + 0.5f) * 0.5f, new Vector2(c.X + 1f, c.Z - 0.5f) * 0.5f, new Vector2(c.X, c.Z - 0.5f) * 0.5f);
 			}
 			else
@@ -285,6 +307,12 @@ public partial class SkiLodge
 				}
 			}
 			faces.AddRange(new[] { P(-0.5f, -0.5f, 0), P(0.5f, -0.5f, 0), P(0.5f, 0.5f, 0), P(-0.5f, -0.5f, 0), P(0.5f, 0.5f, 0), P(-0.5f, 0.5f, 0) });
+			// cobwebs in the corners, more the older it gets (none in the first third)
+			if (hidden && tier > 0 && webRng.Randf() < 0.18f * tier)
+			{
+				var sx = webRng.Randf() < 0.5f ? 1f : -1f; var sz = webRng.Randf() < 0.5f ? 1f : -1f;
+				WebKit.Corner(node, webRng, new Vector3(c.X + sx * 0.44f, FloorAt(cell, 0, 0) + oy + CrawlH - 0.03f, c.Z + sz * 0.44f), Vector3.Right * -sx, Vector3.Back * -sz, webRng.RandfRange(0.35f, 0.6f + 0.15f * tier));
+			}
 			// the ceiling: boards, and a joist across
 			ceil.Quad(P(-0.5f, -0.5f, CrawlH), P(0.5f, -0.5f, CrawlH), P(0.5f, 0.5f, CrawlH), P(-0.5f, 0.5f, CrawlH), Vector3.Down,
 				new Vector2(c.X, c.Z) * 0.5f, new Vector2(c.X + 1f, c.Z) * 0.5f, new Vector2(c.X + 1f, c.Z + 1f) * 0.5f, new Vector2(c.X, c.Z + 1f) * 0.5f);
@@ -328,11 +356,14 @@ public partial class SkiLodge
 				}
 			}
 		}
-		boards.CommitTo(node, "Boards", false);
+		for (int t = 0; t < 3; t++)
+		{
+			boardsT[t].CommitTo(node, $"Boards{t}", false);
+			floorT[t].CommitTo(node, $"Floor{t}", false);
+			ceilT[t].CommitTo(node, $"Ceiling{t}", false);
+			trimT[t].CommitTo(node, $"Studs{t}", false);
+		}
 		brick.CommitTo(node, "Brick", false);
-		floor.CommitTo(node, "Floor", false);
-		ceil.CommitTo(node, "Ceiling", false);
-		trim.CommitTo(node, "Studs", false);
 		pipe.CommitTo(node, "Pipes", false);
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");
@@ -536,6 +567,18 @@ public partial class SkiLodge
 		{
 			_motes.Emitting = InCrawlspace;
 			if (InCrawlspace) _motes.GlobalPosition = player.GlobalPosition + Vector3.Up * 1.2f;
+		}
+		// (2026-10-10c) the lantern gutters out where the Christmas lights begin, and they're the only light from there; lit
+		// again once they're out of the wall
+		var lantern = player.GetNodeOrNull<Lantern>("Lantern");
+		if (lantern != null)
+		{
+			if (InMaze && !Lantern.Doused && CrawlPath.Count > 0)
+			{
+				int at = CrawlPath.IndexOf(cell);
+				if (at >= CrawlPath.Count / 3) lantern.Douse();
+			}
+			else if (!InCrawlspace && Lantern.Doused) lantern.Relight();
 		}
 		// out of the wall, into the frozen dining hall: a save
 		if (!_frozenSaved && WardrobeDown && !InCrawlspace && l.X > 25f && l.Z > -4.3f && l.Y < 2f && l.Y > -1f)

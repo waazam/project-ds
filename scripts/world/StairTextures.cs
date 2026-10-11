@@ -240,8 +240,8 @@ public static class StairTextures
 		return m;
 	}
 
-	public static StandardMaterial3D ConcreteMat => Mat("stair_concrete", Concrete(), 0.95f, 0.3f, false);
-	public static StandardMaterial3D BlockMat => Mat("stair_blocks", Blocks(), 0.97f, 0.25f, false);
+	public static StandardMaterial3D ConcreteMat => SurfaceSets.Scan(Mat("stair_concrete", Concrete(), 0.95f, 0.3f, false), "concrete_wall_004", 0.5f);
+	public static StandardMaterial3D BlockMat => SurfaceSets.Scan(Mat("stair_blocks", Blocks(), 0.97f, 0.25f, false), "concrete_block_wall_02", 0.5f);
 	public static StandardMaterial3D BreakMat => Mat("stair_break", Break(), 0.98f, 0.2f, false);
 	public static StandardMaterial3D MossMat => Mat("stair_moss", Moss(), 1f, 0.1f, true);
 	public static StandardMaterial3D LeafMat => Mat("stair_leaves", Leaves(), 1f, 0.15f, true);

@@ -41,7 +41,32 @@ public partial class Lantern : Node3D
 	/// <summary>0..1 how far the beam is gathered right now (right mouse held). Survey stakes read only above ~0.5.</summary>
 	public float FocusAmount => _focus;
 	/// <summary>Carried and switched on.</summary>
-	public bool IsOn => _inv != null && _inv.HasLantern && _lit && !Snuffed;
+	public bool IsOn => _inv != null && _inv.HasLantern && _lit && !Snuffed && !Doused;
+
+	/// <summary>(2026-10-10c, the owner: "We should have the lantern go out once you reach the christmas lights so they are
+	/// the only thing illuminating the way") Blown out for a while by a draught (the crawlspace's lights): it sputters and
+	/// dies, and is lit again after (<see cref="Relight"/>). Not saved: the place that douses it does it again.</summary>
+	public static bool Doused { get; private set; }
+	private double _douseAt = -1;
+
+	public void Douse()
+	{
+		if (Doused || _douseAt > 0) return;
+		_douseAt = _t + 1.5;
+		_dyingUntil = _t + 1.5;
+		_dyingLength = 1.5f;
+		Audio.AudioDirector.OneShot(this, "bulb_sputter", 3, null, -10f, "Player");
+		GD.Print("[story] Act 23: a draught in the walls - the lantern gutters out");
+	}
+
+	public void Relight()
+	{
+		_douseAt = -1;
+		if (!Doused) return;
+		Doused = false;
+		Audio.AudioDirector.OneShot(this, "flame_ignite", 1, null, -16f, "Player", 3f, 0.05f);
+		GD.Print("[story] the lantern lit again");
+	}
 
 	[ExportGroup("Blacklight")]
 	[Export] public Color UvColor = new(0.38f, 0.12f, 1.0f);
@@ -237,6 +262,7 @@ public partial class Lantern : Node3D
 		// (its clock runs whatever it's showing: it had only run while the flame was lit, so a flame that died with the
 		// blacklight on stayed "dying" for ever, and lit again the moment the blacklight went off)
 		_t += delta;
+		if (_douseAt > 0 && _t >= _douseAt) { _douseAt = -1; Doused = true; }
 		bool snuffed = Snuffed && !Dying;
 		bool dead = (FlameDead || Snuffed) && !Dying;
 		if (_player.PlayerInput.LightPressed && _inv.HasLantern)
@@ -305,7 +331,8 @@ public partial class Lantern : Node3D
 		_dip = Mathf.MoveToward(_dip, 1f, dt * 1.5f);
 		float k = Mathf.Max(0.8f, flicker * _dip);
 		// A jolt (the cabin door slamming): the flame gutters hard for a moment.
-		if (_t < _joltUntil) k *= _rng.RandfRange(0.15f, 1.0f);
+		// (eased, not random per frame: a random value every frame strobed; the owner's comfort)
+		if (_t < _joltUntil) k *= 0.55f + 0.3f * Mathf.Sin((float)_t * 9f);
 		// dying: sputtering, the dips deeper and longer, fading to nothing
 		if (Dying && !Blacklight)
 		{

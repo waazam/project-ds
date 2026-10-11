@@ -70,6 +70,11 @@ public partial class StairsHum : Node
 		{
 			float prox = _zone.SilenceAt(_listener.GlobalPosition) / Mathf.Max(_zone.Strength, 0.01f);
 			if (prox > 0.001f) target = Mathf.Lerp(EdgeDb, CloseDb, prox);
+			// the first time the forest goes dead silent round them, before they've ever climbed: the game's name, and the
+			// second chapter (UI.ChapterCard)
+			if (prox > 0.3f && Systems.StoryManager.Instance is { Current: < Systems.Checkpoint.Act2StairsClimbed and >= Systems.Checkpoint.Act1Start } s
+				&& !s.HasFlag(UI.ChapterCard.Flag(2)))
+				UI.ChapterCard.TitleThenStairs(this);
 		}
 		float k = 1f - Mathf.Exp(-(float)delta / Mathf.Max(SmoothingTime, 0.01f));
 		LevelDb = Mathf.Lerp(LevelDb, target, k);

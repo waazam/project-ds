@@ -350,5 +350,6 @@ public partial class Bunker : Node3D
 		interior.AdmitPlayer(player);
 		story?.ReachCheckpoint(Checkpoint.Act8BunkerEntered, ApproachPointWorld, ApproachYaw);
 		GD.Print("[story] Act 8: into the bunker");
+		UI.ChapterCard.Show(interior, 3, 2.5f);
 	}
 }

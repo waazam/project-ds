@@ -97,6 +97,8 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"chair_scrape_{i:00}", sfx, false, Lo, (
 jobs.Add(("dread_drone_loop", ambient, true, Lo, (r, sr) => Tonight.DreadDrone(r, sr, 30)));
 jobs.Add(("save_hum_loop", ambient, true, Lo, (r, sr) => Tonight.SaveHum(r, sr, 20)));
 jobs.Add(("frogs_loop", ambient, true, Lo, (r, sr) => Tonight.Frogs(r, sr, 30)));
+jobs.Add(("chapter_hit", sfx, false, Hi, (r, sr) => Chapters.ChapterHit(r, sr)));
+jobs.Add(("title_drop", sfx, false, Hi, (r, sr) => Chapters.TitleDrop(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"wing_flutter_{i:00}", sfx, false, Lo, (r, sr) => Forest.WingFlutter(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"claw_rake_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Rake(r, sr)));
 // Creature candidates (not wired into the game yet): growls, roars (near / far), screeches, snarls.

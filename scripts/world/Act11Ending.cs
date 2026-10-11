@@ -707,6 +707,7 @@ public partial class Act11Ending : Node3D
 		}
 		rig.SetPitch(levelPitch);
 		GD.Print("[story] Act 12: woke at the lake");
+		UI.ChapterCard.Show(this, 4, 1.2f);
 	}
 
 	/// <summary>Hard ceiling on the driven pitch (degrees): well short of the zenith, where yaw is ill-defined.</summary>

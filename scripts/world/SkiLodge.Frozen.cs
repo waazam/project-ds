@@ -27,7 +27,7 @@ public partial class SkiLodge
 	{
 		var c = s.c;
 		bool dining = c.X > 9.5f && c.Y < RoomTop;
-		bool lobby = Mathf.Abs(c.X) < 11.5f && Mathf.Abs(c.Z) < 11.5f && c.Y > 5f;
+		bool lobby = Mathf.Abs(c.X) < 11.5f && Mathf.Abs(c.Z) < 11.5f && c.Y > 3f;
 		bool chase = c.X > 31.2f && c.X < 36.1f && c.Z < -4.4f;
 		return (dining || lobby) && !chase;
 	}
@@ -47,6 +47,7 @@ public partial class SkiLodge
 		{
 			g.AlbedoColor = new Color(0.55f, 0.6f, 0.68f);
 			g.AlbedoTexture = WinterWoods.SnowStd("whiteout", 1f, 1f).AlbedoTexture;
+			g.EmissionTexture = null;
 			g.Emission = new Color(0.52f, 0.57f, 0.65f);
 			g.EmissionEnergyMultiplier = 0.55f;
 			g.Uv1Scale = new Vector3(0.6f, 0.6f, 1f);
@@ -147,7 +148,8 @@ public partial class SkiLodge
 			AddChild(new MultiMeshInstance3D { Name = "FrozenIcicles", Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 		}
 		// a glaze of ice over everything in the two rooms
-		foreach (var name in new[] { "DiningFurniture", "DiningShell", "LobbyFurniture", "LobbyShell", "Balcony", "Christmas", "ChristmasTree" })
+		// (not the Christmas tree nor its garlands: glazed, they went grey; the owner wants them green)
+		foreach (var name in new[] { "DiningFurniture", "DiningShell", "LobbyFurniture", "LobbyShell", "Balcony" })
 			if (GetNodeOrNull(name) is Node n) Glaze(n);
 		for (int t = 0; t < 6; t++)
 		{
@@ -156,7 +158,7 @@ public partial class SkiLodge
 			if (GetNodeOrNull($"Sheet{t}") is Node sn) Glaze(sn);
 		}
 		// the fire dead, the lamps gone cold and low
-		if (GetNodeOrNull<GpuParticles3D>("Flames") is { } flames) flames.Visible = false;
+		if (GetNodeOrNull<Node3D>("Flames") is { } flames) flames.Visible = false;
 		LodgeTextures.Glow("lodge_embers", new Color(1f, 0.42f, 0.12f), 1.6f).EmissionEnergyMultiplier = 0f;
 		if (_fireLight != null) _fireLight.Visible = false;
 		foreach (var ch in GetChildren())

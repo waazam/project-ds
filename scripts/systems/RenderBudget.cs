@@ -153,6 +153,22 @@ public partial class RenderBudget : Node
 			float v = b.Size.X * b.Size.Y * b.Size.Z;
 			if (v < best) { best = v; at = a; }
 		}
+		// (2026-10-10c, the owner: the lodge "completely disappeared then popped back into view" coming down the road. The
+		// woods' bounds are their meshes', and the road runs out of them before the lodge's begin: in that gap no area held
+		// the player and only the station was drawn. Now the gap belongs to the nearest area, so its neighbours stay drawn.)
+		if (at == null)
+		{
+			float near = float.MaxValue;
+			foreach (var a in _areas)
+			{
+				if (!a.HasBounds || !IsInstanceValid(a.Root)) continue;
+				var b = a.Bounds;
+				var q = new Vector3(Mathf.Clamp(p.X, b.Position.X, b.End.X), Mathf.Clamp(p.Y, b.Position.Y, b.End.Y), Mathf.Clamp(p.Z, b.Position.Z, b.End.Z));
+				float d = q.DistanceSquaredTo(p);
+				if (d < near) { near = d; at = a; }
+			}
+			if (near > 90f * 90f) at = null;   // (far from all of them, out on the surface: the station, as before)
+		}
 		if (at == _current && _current != null) return;
 		_current = at;
 		CurrentArea = at?.Name ?? "-";

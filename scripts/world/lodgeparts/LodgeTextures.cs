@@ -273,6 +273,53 @@ public static class LodgeTextures
 	public static StandardMaterial3D CrawlStudMat => _hCrawlStudMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_crawl_stud", CrawlBoards, 0.95f, 0.1f, new Color(0.62f, 0.56f, 0.5f), DetailKit.Kind.Wood, null, 0.5f, 1f), new Color(0.56f, 0.48f, 0.42f));
 	private static StandardMaterial3D _hCrawlStudMat;
 	/// <summary>The cavity's pipes: old iron, rusted and matte (the rooms' iron caught the light in a blue line along the top).</summary>
+	/// <summary>The crawlspace's wood by its age (0 the lodge's own boards; 1 old grey planks gone soft, Poly Haven's
+	/// Weathered Brown Planks; 2 the same black with rot and furred with mould: a mould layer over it as a detail).</summary>
+	public static StandardMaterial3D CrawlAged(string part, int tier)
+	{
+		if (tier <= 0) return part switch { "floor" => CrawlFloorMat, "ceiling" => CrawlCeilingMat, "stud" => CrawlStudMat, _ => CrawlBoardsMat };
+		string key = $"lodge_m_crawl_{part}_age{tier}";
+		if (_mat.TryGetValue(key, out var m)) return m;
+		var tint = tier == 1 ? new Color(0.66f, 0.62f, 0.56f) : new Color(0.38f, 0.37f, 0.32f);
+		if (part == "ceiling") tint *= 0.8f;
+		if (part == "floor") tint *= 0.85f;
+		m = new StandardMaterial3D { ResourceName = key, AlbedoColor = tint, Roughness = 1f, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true,
+			Uv1Scale = Vector3.One * (part == "floor" ? 1f : 0.5f), TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic };
+		World.SurfaceSets.Apply(m, "ph_weathered_brown_planks", 1.1f);
+		if (m.AlbedoTexture == null) m.AlbedoTexture = CrawlBoards;
+		if (tier >= 2)
+		{
+			m.DetailEnabled = true;
+			m.DetailAlbedo = Mould;
+			m.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mix;
+			m.DetailUVLayer = BaseMaterial3D.DetailUV.UV1;
+		}
+		m.SetMeta("detail_kind", -1);
+		_mat[key] = m;
+		return m;
+	}
+
+	private static Texture2D _mould;
+	/// <summary>Mould: black-green blooms with grey fur at their edges, water-dark between; its alpha where it's grown.</summary>
+	private static Texture2D Mould => _mould ??= MakeMould();
+
+	private static Texture2D MakeMould()
+	{
+		var ramp = new Gradient();
+		ramp.SetColor(0, new Color(0.1f, 0.09f, 0.07f, 0f));
+		ramp.SetColor(1, new Color(0.03f, 0.04f, 0.025f, 0.95f));
+		ramp.AddPoint(0.48f, new Color(0.1f, 0.09f, 0.07f, 0f));
+		ramp.AddPoint(0.56f, new Color(0.34f, 0.36f, 0.3f, 0.55f));
+		ramp.AddPoint(0.64f, new Color(0.12f, 0.17f, 0.08f, 0.85f));
+		ramp.AddPoint(0.78f, new Color(0.05f, 0.08f, 0.04f, 0.92f));
+		return new NoiseTexture2D
+		{
+			Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true, ColorRamp = ramp,
+			Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular, Frequency = 0.02f, FractalType = FastNoiseLite.FractalTypeEnum.Fbm, FractalOctaves = 4, Seed = 1408,
+				CellularReturnType = FastNoiseLite.CellularReturnTypeEnum.Distance2Div },
+		};
+	}
+
 	public static StandardMaterial3D CrawlPipeMat => _plain("lodge_m_crawl_pipe", new Color(0.2f, 0.13f, 0.09f), 0.85f, 0.15f, 0.3f);
 	public static StandardMaterial3D CopperMat => _plain("lodge_m_copper", new Color(0.42f, 0.26f, 0.16f), 0.45f, 0.6f, 0.6f);
 	/// <summary>The frozen lodge's rime (Act 23): a matte, patchy frost over the rooms' surfaces (the snow's grain, world
@@ -311,13 +358,31 @@ public static class LodgeTextures
 	// metres, and blown up that much its fine grime showed as metre-wide stains; the photo's grain does its work)
 	public static StandardMaterial3D CorridorCarpetMat => Std("lodge_m_carpet_corr", CorridorCarpet, 1f, 0.1f, null, DetailKit.Kind.Fabric);
 	public static StandardMaterial3D RoomCarpetMat => Std("lodge_m_carpet_room", RoomCarpet, 1f, 0.1f, null, DetailKit.Kind.Fabric);
-	public static StandardMaterial3D WallpaperMat => Std("lodge_m_wallpaper", Wallpaper, 0.9f, 0.2f, null, null);
+	/// <summary>(2026-10-10c, the owner: "that wallpaper of the hotel needs a big tweak") The papers drawn by
+	/// tools/textures/make_wallpapers.py, a metre to the tile with a flocked relief: the damask (the corridor, the dining
+	/// hall) and a paper of its own in each room.</summary>
+	public static StandardMaterial3D WallpaperMat => Paper("damask");
+	public static StandardMaterial3D RoomPaperMat(int room) => Paper(room switch { 201 => "stripe", 202 => "floral", 203 => "trellis", _ => "stripe" });
+
+	private static StandardMaterial3D Paper(string set)
+	{
+		string key = "lodge_m_wp_" + set;
+		if (_mat.TryGetValue(key, out var m)) return m;
+		// (a tile is 0.7 m on the wall: at a metre the corridor's medallions stood half a metre tall)
+		m = new StandardMaterial3D { ResourceName = key, Roughness = 0.88f, MetallicSpecular = 0.2f, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Uv1Scale = Vector3.One * 2.4f, AlbedoColor = new Color(0.86f, 0.84f, 0.8f) };
+		SurfaceSets.Apply(m, "wp_" + set, 0.7f);
+		if (m.AlbedoTexture == null) m.AlbedoTexture = Wallpaper;
+		m.SetMeta("detail_kind", -1);
+		_mat[key] = m;
+		return m;
+	}
 	public static StandardMaterial3D DamaskMat => Std("lodge_m_damask", Damask, 0.8f, 0.25f, null, DetailKit.Kind.Fabric, "jacquard", 0.35f);
 	public static StandardMaterial3D GreenTileMat => Std("lodge_m_greentile", GreenTile, 0.25f, 0.6f);
 	public static StandardMaterial3D FlagstoneMat => Std("lodge_m_flag", Flagstone, 0.8f, 0.25f, null, DetailKit.Kind.Stone, "flagstone", 0.8f);
 	public static StandardMaterial3D ParquetMat => _hParquetMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_parquet", Parquet, 0.5f, 0.45f, null, DetailKit.Kind.Wood, "parquet", 0.5f), new Color(0.7f, 0.52f, 0.38f));
 	private static StandardMaterial3D _hParquetMat;
-	public static StandardMaterial3D CheckerMat => Std("lodge_m_checker", Checker, 0.45f, 0.4f);
+	// (aged and dimmer: the white tiles blew out under the lantern a step away, 2026-10-10c)
+	public static StandardMaterial3D CheckerMat => Std("lodge_m_checker", Checker, 0.7f, 0.3f, new Color(0.68f, 0.64f, 0.56f));
 	public static StandardMaterial3D RugMat => Std("lodge_m_rug", Rug, 1f, 0.1f, null, DetailKit.Kind.Fabric);
 	// (baked at 1024 px since 2026-10-09: the owner, "the wood in ... the ski lodge looks pretty bad")
 	// (2026-10-10b: the hinoki, its woodwork a rich dark-stained tone of it, its walls the honey of the bare wood)
@@ -388,8 +453,23 @@ public static class LodgeTextures
 	/// <summary>The lobby's lower walls inside: Poly Haven's stacked stone, cool and even (the outside's mossy stone
 	/// read as dirt in here).</summary>
 	public static Texture2D LobbyStone => Make("lodge_lobbystone", 256, 256, (u, v) => SurfaceKit.Tinted("lobby_stone", u, v, new Color(0.98f, 0.96f, 0.94f), 0.36f, 0.5f));
-	public static StandardMaterial3D LobbyStoneMat => Std("lodge_m_lobbystone", LobbyStone, 0.9f, 0.2f, null, DetailKit.Kind.Stone, "lobby_stone", 0.9f);
-	public static StandardMaterial3D RiverStoneMat => Std("lodge_m_riverstone", FireStone, 0.9f, 0.2f, null, DetailKit.Kind.Stone, "fireplace_stone", 0.9f, 1.6f);
+	// (2026-10-10c, the owner: "i also hate this grey drab bland stone color of the room lets change that to feel more
+	// modern"): the lobby's lower walls warm honey boards, its chimney breast warm stacked stone (Poly Haven's Rustic Stone
+	// Wall), its floor wide warm planks (Poly Haven's Wood Floor)
+	private static StandardMaterial3D _lobbyWallM, _riverM, _lobbyFloorM;
+	public static StandardMaterial3D LobbyStoneMat => _lobbyWallM ??= World.SurfaceSets.Hinoki(Std("lodge_m_lobbywall", LobbyStone, 0.85f, 0.25f, null, DetailKit.Kind.Wood), new Color(1f, 0.86f, 0.68f), 6f);
+	public static StandardMaterial3D RiverStoneMat => _riverM ??= Scan("lodge_m_riverstone", "ph_rustic_stone_wall", 1.6f, new Color(1f, 0.94f, 0.86f)) ?? Std("lodge_m_riverstone_old", FireStone, 0.9f, 0.2f, null, DetailKit.Kind.Stone, "fireplace_stone", 0.9f, 1.6f);
+	public static StandardMaterial3D LobbyFloorMat => _lobbyFloorM ??= Scan("lodge_m_lobbyfloor", "ph_wood_floor", 0.5f, new Color(0.95f, 0.85f, 0.72f)) ?? FlagstoneMat;
+
+	/// <summary>A scanned set (tools/textures/polyhaven_sets.py) at <paramref name="uvScale"/> repeats per UV unit, tinted.</summary>
+	private static StandardMaterial3D Scan(string key, string set, float uvScale, Color tint)
+	{
+		if (World.SurfaceSets.Tex(set) == null) return null;
+		var m = new StandardMaterial3D { ResourceName = key, AlbedoColor = tint, Roughness = 1f, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Uv1Scale = Vector3.One * uvScale };
+		World.SurfaceSets.Apply(m, set, 0.9f);
+		m.SetMeta("detail_kind", -1);
+		return m;
+	}
 
 	/// <summary>Lit from within (lamp shades, the bar's backlit counter, candle glass): warm, never harsh.</summary>
 	public static StandardMaterial3D Glow(string key, Color c, float energy)
@@ -403,8 +483,11 @@ public static class LodgeTextures
 	/// <summary>Daylight through a window's snow-dusted glass (inside faces): pale and grey-blue, dimmed by the storm.</summary>
 	public static StandardMaterial3D DayGlass => _day ??= new StandardMaterial3D
 	{
-		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.36f, 0.41f, 0.47f), EmissionEnabled = true, Emission = new Color(0.5f, 0.56f, 0.64f), EmissionEnergyMultiplier = 0.38f, Roughness = 0.1f,
+		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.5f, 0.54f, 0.6f), EmissionEnabled = true, Emission = new Color(0.78f, 0.84f, 0.95f), EmissionEnergyMultiplier = 0.24f, Roughness = 0.1f,
+		AlbedoTexture = PaneTex, EmissionTexture = PaneTex, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	};
+	/// <summary>A pane seen from inside: clear (top half) or with the snow drifted up it (bottom half).</summary>
+	public static Texture2D PaneTex => ResourceLoader.Exists("res://assets/textures/lodge/window_pane.png") ? GD.Load<Texture2D>("res://assets/textures/lodge/window_pane.png") : null;
 	private static StandardMaterial3D _day, _blue, _ice;
 
 	/// <summary>Room 202's window: snow banked right up the glass outside; the light through it blue.</summary>

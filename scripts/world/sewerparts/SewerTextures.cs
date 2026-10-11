@@ -89,8 +89,9 @@ public static class SewerTextures
 	});
 
 	/// <summary>Brick, as a world-projected material (any size of wall or vault tiles the same).</summary>
-	public static StandardMaterial3D BrickMat => Tri("sw_brick_m", BrickTex, 0.45f, 0.45f, 0.4f);
-	public static StandardMaterial3D PipeMat => Tri("sw_pipe_m", PipeTex, 0.35f, 0.8f, 0.25f);
+	// (2026-10-10c: Poly Haven's scans over them: old brick furred with moss, and rusted pipe)
+	public static StandardMaterial3D BrickMat => SurfaceSets.Scan(Tri("sw_brick_m", BrickTex, 0.45f, 0.45f, 0.4f), "mossy_brick", 0.9f, 1.2f, new Color(0.78f, 0.8f, 0.74f));
+	public static StandardMaterial3D PipeMat => SurfaceSets.Scan(Tri("sw_pipe_m", PipeTex, 0.35f, 0.8f, 0.25f), "rusty_metal_03", 1.4f);
 
 	private static StandardMaterial3D Tri(string key, Texture2D tex, float scale, float rough, float spec)
 	{

@@ -687,6 +687,7 @@ public partial class RoundRoom : Node3D
 		_checkpointed = true;
 		player.Velocity = Vector3.Zero;
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act20Finished);
+		UI.ChapterCard.Show(this, 6, 3.0f);
 		GD.Print("[story] Act 20 done: up through the ceiling into the room above - the end of the demo");
 		// (Act 21 goes on from here: up the long stair)
 		_ = Cutscene.Run(this, async ct2 =>

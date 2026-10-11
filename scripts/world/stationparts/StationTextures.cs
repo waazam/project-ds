@@ -148,7 +148,7 @@ public static class StationTextures
 	}), 0.95f, 0.1f);
 
 	/// <summary>Old red brick in soot-dark mortar, each brick a slightly different red.</summary>
-	public static StandardMaterial3D BrickMat => Std("st_brick", Make("st_brick", 64, 64, (x, y) =>
+	public static StandardMaterial3D BrickMat => SurfaceSets.Scan(Std("st_brick", Make("st_brick", 64, 64, (x, y) =>
 	{
 		int row = y / 8;
 		int off = row % 2 == 0 ? 0 : 8;
@@ -163,10 +163,10 @@ public static class StationTextures
 		float soot = Fbm(x, y, 64, 2, 2, 34);
 		c = c.Lerp(new Color(0.12f, 0.11f, 0.1f), Mathf.Clamp((soot - 0.45f) * 1.6f, 0f, 0.6f));
 		return c * (0.78f + 0.35f * n);
-	}), 0.92f, 0.18f);
+	}), 0.92f, 0.18f), "red_brick_03", 0.5f);
 
 	/// <summary>Black and white marble set on the diagonal (diamonds), veined, one tile per 0.5 m.</summary>
-	public static StandardMaterial3D MarbleMat => Std("st_marble", Make("st_marble", 128, 128, (x, y) =>
+	public static StandardMaterial3D MarbleMat => SurfaceSets.Scan(Std("st_marble", Make("st_marble", 128, 128, (x, y) =>
 	{
 		// diamonds: checker on the rotated grid
 		float u = (x + y) / 64f, v = (x - y + 128) / 64f;
@@ -178,10 +178,10 @@ public static class StationTextures
 		c = c.Lerp(black ? new Color(0.3f, 0.3f, 0.32f) : new Color(0.55f, 0.55f, 0.56f), vein * 0.8f);
 		if (line < 0.012f) c = new Color(0.18f, 0.17f, 0.16f);
 		return c;
-	}), 0.12f, 0.7f);
+	}), 0.12f, 0.7f), "marble_01", 0.5f);
 
 	/// <summary>Rust-scabbed steel plate, a row of rivets along each seam, weeping orange streaks.</summary>
-	public static StandardMaterial3D RustPlateMat => Std("st_rust", Make("st_rust", 64, 64, (x, y) =>
+	public static StandardMaterial3D RustPlateMat => SurfaceSets.Scan(Std("st_rust", Make("st_rust", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 4, 4, 51);
 		float streak = Fbm(x * 6, y * 0.4f, 64, 2, 2, 52);
@@ -193,7 +193,7 @@ public static class StationTextures
 		if (seam) c *= 0.4f;
 		if (rivet) c = new Color(0.5f, 0.35f, 0.25f);
 		return c * (0.85f + 0.25f * n);
-	}), 0.75f, 0.45f);
+	}), 0.75f, 0.45f), "rusty_metal_02", 0.5f);
 
 	/// <summary>Raw, wet flesh: dark red marbled with fat and veins.</summary>
 	public static StandardMaterial3D MeatMat => Std("st_meat", Make("st_meat", 64, 64, (x, y) =>

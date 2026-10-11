@@ -49,6 +49,9 @@ public partial class AudioDirector : Node
 
 	private sealed class Zone3D { public Area3D Area; public Vector3 Half; public Space Kind; public int Priority; }
 	private readonly List<Zone3D> _zones = new();
+	/// <summary>The space the listener is in (a building's room, a tunnel, the snow maze), or null out in the open: the
+	/// forest's ambience is shut out of all of them (ForestAmbienceManager).</summary>
+	public static Space? CurrentSpace { get; private set; }
 
 	private sealed class Tracked
 	{
@@ -228,6 +231,7 @@ public partial class AudioDirector : Node
 			// (the zone of the highest priority wins, and among equals the biggest space: a cavern inside the snow tunnels)
 			if (Mathf.Abs(l.X) <= z.Half.X && Mathf.Abs(l.Y) <= z.Half.Y && Mathf.Abs(l.Z) <= z.Half.Z && (here == null || z.Priority > herePri || (z.Priority == herePri && z.Kind > here))) { here = z.Kind; herePri = z.Priority; }
 		}
+		CurrentSpace = here;
 		if (_playerVerb != null)
 		{
 			var (_, room, damp, wet, _, _) = here is { } k ? Spaces[k] : (null, OpenRoom, OpenDamp, OpenWet, 0f, 0f);

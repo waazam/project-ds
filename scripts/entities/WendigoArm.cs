@@ -48,8 +48,19 @@ public partial class WendigoArm : Node3D
 	private Vector3 _distractAt;
 	private double _distractUntil = -1;
 
-	private const float L1 = 0.78f, L2 = 0.74f;   // (the model's: tools/Blender/wendigo.py, ARM_L1, ARM_L2)
-	private static readonly Vector3 Shoulder = new(-0.95f, 0.05f, 0f);
+	/// <summary>(2026-10-10c, the owner: "shrink the size of the hand by 15%? It is just way too large") The whole arm
+	/// drawn at this size; its bones' lengths with it, and its shoulder nearer the hole so it still reaches across.</summary>
+	public const float Size = 0.85f;
+	private const float L1 = 0.78f * Size, L2 = 0.74f * Size;   // (the model's: tools/Blender/wendigo.py, ARM_L1, ARM_L2)
+	private static readonly Vector3 Shoulder = new(-0.72f, 0.05f, 0f);
+	// (the search: what it's doing now, and until when; the hand's motion a damped spring toward its aim, never a snap)
+	private enum Hunt { Feel, Creep, Listen, Snatch, Recover }
+	private Hunt _hunt = Hunt.Feel;
+	private double _huntUntil;
+	private Vector3 _vel, _creepFrom;
+	private float _spread;   // how far its fingers are working, feeling (0 still .. 1 each one moving on its own)
+	private double _patAt;
+	private float _pat;
 	private Skeleton3D _skel;
 	private int _bUpper = -1, _bFore = -1, _bHand = -1;
 	private readonly List<int[]> _fingerBones = new();
@@ -85,6 +96,7 @@ public partial class WendigoArm : Node3D
 		AddChild(_upper); AddChild(_fore); AddChild(_hand);
 		var model = GD.Load<PackedScene>("res://assets/models/wendigo/wendigo_arm.glb").Instantiate<Node3D>();
 		model.Name = "Model";
+		model.Scale = Vector3.One * Size;
 		AddChild(model);
 		_skel = FindSkeleton(model);
 		if (_skel != null)
@@ -110,9 +122,9 @@ public partial class WendigoArm : Node3D
 		}
 		// solid where it is: a standing body can't get past it, a crouched one goes under
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
-		_cUpper = new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.12f, Height = L1 + 0.24f }, Disabled = true };
-		_cFore = new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.1f, Height = L2 + 0.2f }, Disabled = true };
-		_cHand = new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.15f }, Disabled = true };
+		_cUpper = new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.12f * Size, Height = L1 + 0.24f * Size }, Disabled = true };
+		_cFore = new CollisionShape3D { Shape = new CapsuleShape3D { Radius = 0.1f * Size, Height = L2 + 0.2f * Size }, Disabled = true };
+		_cHand = new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.15f * Size }, Disabled = true };
 		_body.AddChild(_cUpper); _body.AddChild(_cFore); _body.AddChild(_cHand);
 		AddChild(_body);
 		// blood running off it (more on each)
@@ -198,56 +210,97 @@ public partial class WendigoArm : Node3D
 				}
 				break;
 		}
-		// what it's reaching for: the prey's head if it's anywhere near, else clawing along the cavity. Starved and meaning it
-		// (the owner): its aim shifts to a new spot a few times a second, it trembles, it reaches out at them with the hand
-		// splayed and snaps it shut, and drags it back to reach again
-		Vector3 want;
+		// (2026-10-10c, the owner: "its animation needs to be smoother and more like it is reaching to try and find you
+		// instead of flailing. Make it feel like it has purpose") It hunts. Nothing near: it feels its way along the
+		// cavity, slow, the open hand patting the far boards and the ceiling, its fingers working. Something near: it turns
+		// its search that way and creeps toward them; stops dead to listen, the fingers curling one after another; then the
+		// reach, deliberate, and at its end the hand snatches shut; it draws back a little, and starts feeling again from
+		// there. Every move is a damped spring toward its aim: it slows into each stop, never jerks.
 		var prey = Distracted ? null : Prey?.Invoke();
 		bool near = prey is { } head && head.DistanceTo(GlobalPosition) < 2.8f;
-		if (Distracted)
+		Vector3 Clamp(Vector3 v) => new(Mathf.Clamp(v.X, 0.3f, Across - 0.38f), Mathf.Max(v.Y, Floor), Mathf.Clamp(v.Z, -0.5f, 0.5f));
+		Vector3 toward = Distracted ? Clamp(ToLocal(_distractAt)) : near ? Clamp(ToLocal(prey.Value)) : Vector3.Zero;
+		bool hunting = near || Distracted;
+		if (Phase == State.Reach && _clock >= _huntUntil)
 		{
-			// after the noise: the hand along the cavity toward it, scrabbling
-			var d = ToLocal(_distractAt);
-			want = new Vector3(Mathf.Clamp(d.X, 0.3f, Across - 0.38f), 0.1f * Mathf.Sin((float)_clock * 3.1f), Mathf.Clamp(d.Z, -0.5f, 0.5f));
+			switch (_hunt)
+			{
+				case Hunt.Feel or Hunt.Recover:
+					if (hunting) { _hunt = Hunt.Creep; _creepFrom = _target; _huntUntil = _clock + _rng.RandfRange(0.7f, 1.3f); }
+					else { _hunt = Hunt.Feel; _huntUntil = _clock + 1.0; }
+					break;
+				case Hunt.Creep:
+					_hunt = hunting ? Hunt.Listen : Hunt.Feel;
+					_huntUntil = _clock + (hunting ? _rng.RandfRange(0.45f, 0.85f) : 1.0f);
+					break;
+				case Hunt.Listen:
+					if (near)
+					{
+						_hunt = Hunt.Snatch;
+						_huntUntil = _clock + 0.32;
+						if (_rng.Randf() < 0.6f) AudioDirector.OneShot(this, "claw_scrape", 2, GlobalPosition + GlobalBasis.X * 0.6f, -4f, "Events", 3f, 0.12f);
+					}
+					else { _hunt = hunting ? Hunt.Creep : Hunt.Feel; _huntUntil = _clock + 0.8; }
+					break;
+				case Hunt.Snatch:
+					_hunt = Hunt.Recover;
+					_huntUntil = _clock + _rng.RandfRange(0.7f, 1.0f);
+					break;
+			}
 		}
-		else if (near)
+		// where it means its hand to be, and how quickly it gets there (the spring's speed)
+		Vector3 aim;
+		float omega;
+		float wantClench;
+		float tc = (float)_clock;
+		switch (_hunt)
 		{
-			want = ToLocal(prey.Value);
-			want.X = Mathf.Clamp(want.X, 0.3f, Across - 0.38f);   // (its fingers, 0.3 m past the hand, just scratch the far boards)
-			want.Z = Mathf.Clamp(want.Z, -0.5f, 0.5f);
+			case Hunt.Creep:
+			{
+				// toward them, a little at a time, its search swinging either side of the line as it comes
+				float u = Mathf.Clamp((float)(1.0 - (_huntUntil - _clock) / 1.0), 0f, 1f);
+				aim = _creepFrom.Lerp(toward with { X = toward.X * 0.85f }, 0.35f + 0.45f * u) + new Vector3(0, 0.05f * Mathf.Sin(tc * 2.1f), 0.12f * Mathf.Sin(tc * 1.7f));
+				omega = 4f; wantClench = 0.15f; _spread = Mathf.MoveToward(_spread, 0.6f, dt * 2f);
+				break;
+			}
+			case Hunt.Listen:
+				// still: the hand held where it stopped, the fingers spread and curling slowly one after another
+				aim = _target; omega = 7f; wantClench = 0.05f + 0.2f * Mathf.Clamp((float)(1.0 - (_huntUntil - _clock) / 0.8), 0f, 1f);
+				_spread = Mathf.MoveToward(_spread, 1f, dt * 2f);
+				break;
+			case Hunt.Snatch:
+				// the reach: straight to them, the hand open until the last, then shut
+				aim = toward == Vector3.Zero ? _target : toward; omega = 16f;
+				wantClench = _huntUntil - _clock < 0.1 ? 1f : -0.3f;
+				_spread = 0f;
+				break;
+			case Hunt.Recover:
+				// drawn back a third of the way to the wall, closed, then opening as it starts to feel again
+				aim = (_target with { X = Mathf.Max(0.3f, _target.X * 0.66f) });
+				omega = 4.5f; wantClench = Mathf.Lerp(1f, 0.25f, Mathf.Clamp((float)(1.0 - (_huntUntil - _clock) / 0.9), 0f, 1f));
+				_spread = Mathf.MoveToward(_spread, 0.4f, dt);
+				break;
+			default:
+			{
+				// feeling its way: a slow sweep over the cavity, and now and then a pat of the open hand against the far boards
+				aim = new Vector3(Across * (0.48f + 0.14f * Mathf.Sin(tc * 0.37f)), 0.12f + 0.22f * Mathf.Sin(tc * 0.53f + 1f), 0.42f * Mathf.Sin(tc * 0.29f));
+				if (_clock >= _patAt) { _patAt = _clock + _rng.RandfRange(1.1f, 2.2f); _pat = 1f; }
+				_pat = Mathf.MoveToward(_pat, 0f, dt * 3.5f);
+				aim.X += 0.14f * Mathf.Sin(_pat * Mathf.Pi);
+				omega = 3f; wantClench = 0.18f + 0.12f * Mathf.Sin(_pat * Mathf.Pi);
+				_spread = Mathf.MoveToward(_spread, 0.7f, dt);
+				break;
+			}
 		}
-		else want = new Vector3(Across * 0.6f, 0.2f * Mathf.Sin((float)_clock * 2.3f), 0.4f * Mathf.Sin((float)_clock * 1.4f));
-		bool lunging = _clock < _lungeUntil, recoiling = !lunging && _clock < _recoilUntil;
-		if (Phase == State.Reach && near && !lunging && !recoiling && _clock >= _nextLunge)
-		{
-			// (deliberate, 2026-10-04, the owner: "it is a little too fast when his hand is grabbing around for the player and will
-			// look scarier if he is intentionally trying to grab you and not just flailing as fast as he can": about half the
-			// pace it had, each reach meant)
-			_lungeUntil = _clock + _rng.RandfRange(0.26f, 0.36f);
-			_recoilUntil = _lungeUntil + _rng.RandfRange(0.38f, 0.58f);
-			_nextLunge = _recoilUntil + _rng.RandfRange(0.6f, 1.3f);
-			lunging = true;
-			if (_rng.Randf() < 0.6f) AudioDirector.OneShot(this, "claw_scrape", 2, GlobalPosition + GlobalBasis.X * 0.6f, -4f, "Events", 3f, 0.12f);
-		}
-		if (_clock >= _twitchAt)
-		{
-			_twitchAt = _clock + _rng.RandfRange(0.14f, 0.42f);
-			float j = near ? 0.09f : 0.07f;
-			_aim = want + new Vector3(_rng.RandfRange(-j, j) * 0.8f, _rng.RandfRange(-j, j * 1.4f), _rng.RandfRange(-j * 1.6f, j * 1.6f));
-		}
-		Vector3 aim = _aim;
-		float rate = 9f;
-		if (lunging) { aim = want; rate = 20f; }   // straight at them
-		else if (recoiling) { aim = want with { X = want.X * 0.55f }; rate = 8f; }   // dragged back toward the wall
-		_target = _target.Lerp(aim, 1f - Mathf.Exp(-dt * rate));
-		// a tremble through it, always
-		float tr = near ? 0.018f : 0.01f;
-		_target += new Vector3(Mathf.Sin((float)_clock * 19f) * tr * 0.5f, Mathf.Sin((float)_clock * 17f + 1.3f) * tr, Mathf.Sin((float)_clock * 13f + 2.1f) * tr);
+		aim = Clamp(aim);
+		// the spring (critically damped): accelerates away, slows into its stop
+		var acc = (aim - _target) * (omega * omega) - _vel * (2f * omega);
+		_vel += acc * dt;
+		_target += _vel * dt;
+		// a faint, slow tremble (it's cold, and it's starving): never a shake
+		_target += new Vector3(Mathf.Sin(tc * 5.1f), Mathf.Sin(tc * 4.3f + 1.3f), Mathf.Sin(tc * 3.7f + 2.1f)) * 0.004f;
 		_target.Y = Mathf.Max(_target.Y, Floor);
-		// the hand: clawing open and shut fast; splayed wide on the lunge, snapped shut at its end
-		float claw = 0.5f + 0.5f * Mathf.Sin((float)_clock * 8f + Mathf.Sin((float)_clock * 2.7f) * 2.5f);
-		float wantClench = lunging ? -0.35f : recoiling ? 1f : claw;
-		_clench = Mathf.MoveToward(_clench, wantClench, dt * (lunging || recoiling ? 9f : 5f));
+		_clench = Mathf.MoveToward(_clench, wantClench, dt * (_hunt == Hunt.Snatch ? 12f : 2.5f));
 		Pose(_out);
 		// the grab: someone standing within its reach
 		if (Phase == State.Reach && _grabCool <= 0f && prey is { } h2)
@@ -335,7 +388,8 @@ public partial class WendigoArm : Node3D
 				Vector3 dir = handB * (j < 2 ? _rest[fb[j + 1]].Origin - _rest[b].Origin : _rest[b].Origin - _rest[fb[j - 1]].Origin);
 				dir = (cum * dir).Normalized();
 				var axis = dir.Cross(palmN).Normalized();
-				float ang = Mathf.Max(0.15f + 0.85f * _clench, -0.2f) * (0.55f + 0.25f * j) * (f == 4 ? 0.6f : 1f);
+				float work = _spread * 0.22f * Mathf.Sin((float)_clock * 1.9f + f * 1.1f + j * 0.4f);   // (each finger feeling on its own)
+				float ang = Mathf.Max(0.15f + 0.85f * _clench + work, -0.2f) * (0.55f + 0.25f * j) * (f == 4 ? 0.6f : 1f);
 				if (axis.LengthSquared() > 0.5f) cum = new Basis(axis, ang) * cum;
 				g[b] = new Transform3D(cum * handB * _rest[b].Basis, at);
 				prevRest = _rest[b].Origin;

@@ -36,6 +36,22 @@ public partial class SkiLodge
 	public const float DiningX1 = 43.63f;
 
 	private StaticBody3D _inBody;
+	/// <summary>The hall's openings (doors, arches, windows), as rectangles on its walls: centre, along, width, height.</summary>
+	private readonly List<(Vector3 c, Vector3 along, float w, float h)> _hallOpenings = new();
+
+	/// <summary>Is a thing <paramref name="half"/> wide either side and <paramref name="halfH"/> high either side, at
+	/// <paramref name="at"/> on one of the hall's walls, clear of its doors and windows (by a hand's width)?</summary>
+	private bool ClearOfHallOpenings(Vector3 at, float half, float halfH)
+	{
+		foreach (var (c, along, w, h) in _hallOpenings)
+		{
+			var d = at - c;
+			var n = along.Cross(Vector3.Up);
+			if (Mathf.Abs(d.Dot(n)) > 1.2f) continue;   // (not on this wall)
+			if (Mathf.Abs(d.Dot(along)) < w * 0.5f + half + 0.2f && Mathf.Abs(d.Y) < h * 0.5f + halfH + 0.15f) return false;
+		}
+		return true;
+	}
 	public LodgeDoor MudroomDoor { get; private set; }
 	public LodgeDoor PantryDoor { get; private set; }
 	public LodgeDoor DiningDoorL { get; private set; }
@@ -85,25 +101,55 @@ public partial class SkiLodge
 			Vector3 a = HexVert(i), b = HexVert(i + 1);
 			Vector3 mid = (a + b) * 0.5f, outward = new Vector3(mid.X, 0, mid.Z).Normalized();
 			var holes = new List<Hole>();
-			var windows = new List<float>();
+			// the windows: (u along the side, bottom, top, width, columns, rows)
+			// (2026-10-10c, the owner: "we need to make it feel more open, we need large windows around the room that let more
+			// light in"; the reference, a modern lodge's hall: tall gridded windows the height of the room, its stone fire
+			// between them) The front: a tall window either side of the doors and a great transom over them (east of the
+			// doors, the reception's pigeonholes stand against the wall, so its window starts above them). The back: a tall
+			// one east of the stair's landing, two high over the stair's upper flight.
+			var windows = new List<(float u, float y0, float y1, float w, int cols, int rows)>();
 			switch (i)
 			{
 				case 0: holes.Add(new Hole(5.6f, 8.0f, 0f, 2.8f)); break;                                   // the dining hall's doors
-				case 2: windows.AddRange(new[] { 3f, 6f, 9f }); break;                                        // the back: high windows
+				case 2: windows.AddRange(new[] { (3.0f, 0.75f, 7.9f, 2.2f, 3, 6), (6.2f, 5.2f, 7.9f, 1.5f, 2, 3), (9.1f, 5.2f, 7.9f, 1.5f, 2, 3) }); break;   // the back
 				case 3: holes.Add(new Hole(3.3f, 4.4f, 0f, 2.25f)); holes.Add(new Hole(10.8f, 12f, UpperY, 6.7f)); break;   // the pantry; the corridor
 				case 4: holes.Add(new Hole(3.0f, 6.0f, 0f, 3.0f)); holes.Add(new Hole(0f, 1.2f, UpperY, 6.7f)); break;       // the bar's arch; the corridor
-				case 5: windows.AddRange(new[] { 3.4f, 8.6f }); holes.Add(new Hole(4.75f, 7.25f, 0f, 3.05f)); break;   // the front: two high windows over the doors; the doorway (inside its casing)
+				case 5:   // the front: the doorway (inside its casing), the tall windows, the transom
+					holes.Add(new Hole(4.75f, 7.25f, 0f, 3.05f));
+					windows.AddRange(new[] { (2.5f, 0.75f, 7.9f, 2.2f, 3, 6), (9.5f, 3.35f, 7.9f, 2.2f, 3, 4), (6.0f, 3.75f, 7.9f, 2.3f, 3, 3) });
+					break;
 			}
-			foreach (float u in windows) holes.Add(new Hole(u - 0.6f, u + 0.6f, 5.4f, 7.2f));
+			foreach (var (u, y0, y1, w, _, _) in windows) holes.Add(new Hole(u - w * 0.5f, u + w * 0.5f, y0, y1));
+			// (every opening in the hall's walls, kept: the sconces and the hangings keep clear of them)
+			foreach (var h in holes)
+				_hallOpenings.Add((a + (b - a).Normalized() * ((h.U0 + h.U1) * 0.5f) + Vector3.Up * ((h.V0 + h.V1) * 0.5f), (b - a).Normalized(), h.U1 - h.U0, h.V1 - h.V0));
 			k.Color = Colors.White;
 			LodgeKit.Wall(k, _body, a, b, 0f, StoneTop, 0.8f, outward, BuildingTextures.StoneMat, LodgeTextures.LobbyStoneMat, LodgeTrim, holes, 0.5f, floorY: 0f, grime: -1);
 			LodgeKit.Wall(k, _body, a, b, StoneTop, HexWall, 0.8f, outward, LodgeTimber, LodgeTextures.LogWallMat, LodgeTrim, holes, 0.5f);
 			Vector3 along = (b - a).Normalized();
-			foreach (float u in windows)
+			foreach (var (u, y0, y1, w, cols, rows) in windows)
 			{
-				Vector3 c = a + along * u + Vector3.Up * 6.3f;
-				Window(k, c + outward * 0.42f, along, outward, 1.2f, 1.8f);
-				InnerWindow(k, c - outward * 0.405f, along, -outward, 1.2f, 1.8f, LodgeTextures.DayGlass);
+				Vector3 c = a + along * u + Vector3.Up * ((y0 + y1) * 0.5f);
+				Window(k, c + outward * 0.42f, along, outward, w, y1 - y0, cols, rows);
+				InnerWindow(k, c - outward * 0.405f, along, -outward, w, y1 - y0, LodgeTextures.DayGlass, cols, rows);
+				// the reveal: the wall's thickness round it lined in the honey boards
+				k.Mat(LodgeTextures.LobbyStoneMat);
+				// (a centimetre inside the opening: on the wall's own cut faces exactly, the two fought; the clip audit)
+				float hh = (y1 - y0) * 0.5f - 0.012f, hw = w * 0.5f - 0.012f;
+				foreach (float sd in new[] { -1f, 1f })
+					k.Quad(c + along * (sd * hw) - Vector3.Up * hh - outward * 0.4f, c + along * (sd * hw) - Vector3.Up * hh + outward * 0.4f,
+						c + along * (sd * hw) + Vector3.Up * hh + outward * 0.4f, c + along * (sd * hw) + Vector3.Up * hh - outward * 0.4f, -along * sd);
+				k.Quad(c - along * hw + Vector3.Up * hh - outward * 0.4f, c - along * hw + Vector3.Up * hh + outward * 0.4f,
+					c + along * hw + Vector3.Up * hh + outward * 0.4f, c + along * hw + Vector3.Up * hh - outward * 0.4f, Vector3.Down);
+				k.Quad(c - along * hw - Vector3.Up * hh + outward * 0.4f, c - along * hw - Vector3.Up * hh - outward * 0.4f,
+					c + along * hw - Vector3.Up * hh - outward * 0.4f, c + along * hw - Vector3.Up * hh + outward * 0.4f, Vector3.Up);
+				// light falling in from it: cool, soft, down onto the floor in front of it
+				if (y0 < 4f)
+				{
+					var wl = Light(c - outward * 1.6f + Vector3.Up * 0.4f, Day, 0.6f, 9f, "WindowLight");
+					wl.SetMeta("base", 0.6f);
+					_dayLights.Add(wl);
+				}
 			}
 			// thresholds through the wall's thickness under the ground-floor openings
 			foreach (var h in holes)
@@ -117,19 +163,37 @@ public partial class SkiLodge
 				}
 		}
 		// the corridor's way through the west corner (both sides meet there): a floor across the corner
-		k.Mat(LodgeTextures.CorridorCarpetMat);
+		// (dark boards, and the corridor's runner carried on across it to the doorway, its pattern running on)
+		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Quad(new Vector3(-12.9f, UpperY, CorrHalf + 0.04f), new Vector3(-11.54f, UpperY, CorrHalf + 0.04f), new Vector3(-11.54f, UpperY, -CorrHalf - 0.04f), new Vector3(-12.9f, UpperY, -CorrHalf - 0.04f), Vector3.Up,
-			new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1));
+			new Vector2(0, 0), new Vector2(1.36f, 0), new Vector2(1.36f, 2.08f), new Vector2(0, 2.08f));
+		k.Mat(LodgeTextures.CorridorCarpetMat);
+		float u0 = (-12.9f - CorrX0) * 1.14f, u1 = (-11.54f - CorrX0) * 1.14f;
+		k.Quad(new Vector3(-12.9f, UpperY + 0.004f, 0.72f), new Vector3(-11.54f, UpperY + 0.004f, 0.72f), new Vector3(-11.54f, UpperY + 0.004f, 0), new Vector3(-12.9f, UpperY + 0.004f, 0), Vector3.Up,
+			new Vector2(u0, 0), new Vector2(u1, 0), new Vector2(u1, 0.5f), new Vector2(u0, 0.5f));
+		k.Quad(new Vector3(-12.9f, UpperY + 0.004f, 0), new Vector3(-11.54f, UpperY + 0.004f, 0), new Vector3(-11.54f, UpperY + 0.004f, -0.72f), new Vector3(-12.9f, UpperY + 0.004f, -0.72f), Vector3.Up,
+			new Vector2(u0, 0.5f), new Vector2(u1, 0.5f), new Vector2(u1, 0), new Vector2(u0, 0));
 		LodgeKit.Solid(_body, new Vector3(-12.2f, UpperY - 0.12f, 0), new Vector3(1.6f, 0.24f, 2.2f));
 	}
 
-	/// <summary>A window's inner face: the daylight glass, a painted frame and a sill.</summary>
-	private void InnerWindow(MeshKit k, Vector3 c, Vector3 along, Vector3 inward, float w, float h, Material glass)
+	/// <summary>A window's inner face: the daylight glass in a grid of panes, a painted frame and a sill. Each pane is its
+	/// own quad on the pane texture (tools/textures/make_window_pane.py): the bottom row's with the snow drifted up the
+	/// glass outside, the rest clear but for the frost in their corners (2026-10-10c, the owner: "the windows should be
+	/// snowed in a little").</summary>
+	private void InnerWindow(MeshKit k, Vector3 c, Vector3 along, Vector3 inward, float w, float h, Material glass, int cols = 2, int rows = 2)
 	{
 		_winSpots.Add((c, along, inward, w, h));   // (Act 23's freeze breaks the lobby's and the dining hall's)
 		k.Mat(glass);
 		k.Color = Colors.White;
-		k.Quad(c - along * w * 0.5f - Vector3.Up * h * 0.5f, c + along * w * 0.5f - Vector3.Up * h * 0.5f, c + along * w * 0.5f + Vector3.Up * h * 0.5f, c - along * w * 0.5f + Vector3.Up * h * 0.5f, inward);
+		Vector3 o0 = c - along * w * 0.5f - Vector3.Up * h * 0.5f;
+		float pw = w / cols, ph = h / rows;
+		for (int j = 0; j < rows; j++)
+			for (int i = 0; i < cols; i++)
+			{
+				Vector3 a = o0 + along * (pw * i) + Vector3.Up * (ph * j), b = a + along * pw, cc = b + Vector3.Up * ph, d = a + Vector3.Up * ph;
+				float vt = j == 0 ? 0.5f : 0f, vb = vt + 0.5f;
+				k.Quad(a, b, cc, d, inward, new Vector2(0, vb), new Vector2(1, vb), new Vector2(1, vt), new Vector2(0, vt));
+			}
 		k.Mat(LodgeTextures.DarkWoodMat);
 		var basis = new Basis(along, Vector3.Up, inward);
 		Vector3 o = inward * 0.03f;
@@ -137,8 +201,10 @@ public partial class SkiLodge
 		k.Box(c + o * 1.5f - Vector3.Up * (h * 0.5f + 0.03f), new Vector3(w + 0.24f, 0.06f, 0.16f), 1f, basis);
 		k.Box(c + o - along * w * 0.5f, new Vector3(0.07f, h, 0.06f), 1f, basis);
 		k.Box(c + o + along * w * 0.5f, new Vector3(0.07f, h, 0.06f), 1f, basis);
-		k.Box(c + o, new Vector3(0.035f, h, 0.035f), 1f, basis);
-		k.Box(c + o, new Vector3(w, 0.035f, 0.035f), 1f, basis);
+		for (int i = 1; i < cols; i++) k.Box(c + o + along * (pw * i - w * 0.5f), new Vector3(0.035f, h, 0.035f), 1f, basis);
+		for (int j = 1; j < rows; j++) k.Box(c + o + Vector3.Up * (ph * j - h * 0.5f), new Vector3(w, 0.035f, 0.035f), 1f, basis);
+		// a heavier transom bar a third of the way down a tall window (the big lodge windows have one)
+		if (rows >= 4) k.Box(c + o * 1.2f + Vector3.Up * (ph * (rows - 1) - h * 0.5f), new Vector3(w + 0.04f, 0.09f, 0.07f), 1f, basis);
 	}
 
 	/// <summary>The x positions of the wing walls' windows (as the outside builds them: evenly along each wall).</summary>
@@ -209,8 +275,8 @@ public partial class SkiLodge
 	private void BuildLobbyShell()
 	{
 		var k = new MeshKit();
-		// the floor: flagstone, a hexagon just under the walls
-		k.Mat(LodgeTextures.FlagstoneMat);
+		// the floor: wide warm planks (it was grey flagstone), a hexagon just under the walls
+		k.Mat(LodgeTextures.LobbyFloorMat);
 		k.Color = Colors.White;
 		for (int i = 0; i < 6; i++)
 		{
@@ -332,45 +398,139 @@ public partial class SkiLodge
 		LodgeKit.Solid(_inBody, at + Vector3.Up * (UpperY * 0.5f), new Vector3(0.36f, UpperY, 0.36f));
 	}
 
-	/// <summary>The grand staircase along the back wall: 24 broad treads rising west to the balcony, a carpet
-	/// runner up the middle, a log stringer, the railing on the open side (collision: a smooth ramp).</summary>
+	/// <summary>The staircase (2026-10-10c, the owner: "Make the stairs have some character and have a bend around the wall
+	/// element to their design so they arent a straight line going up"): a dog-leg round a pier of warm stone. The lower
+	/// flight climbs from the lobby straight toward the back wall (14 treads) to a landing beside the tall back window;
+	/// there it turns west and the upper flight climbs along the back wall (10 treads) to the balcony. The turn wraps a
+	/// stone pier with a lamp on its cap, and under the upper flight a knee wall of the same stone closes the space
+	/// beneath it. Honey treads with their nosings proud, the corridor's runner up the middle (both halves mirrored, as
+	/// before), log handrails on iron balusters, great log newels at the foot. Collision: two smooth ramps and the
+	/// landing's slab.</summary>
+	public const float StairXL = -0.6f, StairW = 1.84f, StairZTop = -8.15f, StairLandY = 2.45f;
+	public const float StairRunA = 0.32f;
+	public static float StairZBot => StairZTop + 14 * StairRunA;
+	/// <summary>Lodge-local: the foot of the lower flight, and the landing (for the tests' walks).</summary>
+	public static Vector3 StairFoot => new(StairXL + StairW * 0.5f, FloorY, StairZBot + 0.7f);
+	public static Vector3 StairLanding => new(StairXL + StairW * 0.5f, StairLandY, (StairZTop - HexIn) * 0.5f);
+
 	private void BuildStairs()
 	{
 		var k = new MeshKit();
-		const int n = 24;
-		float x0 = 5f, x1 = -3.4f, z0 = -HexIn + 0.02f, z1 = -8.15f;
-		float run = (x0 - x1) / n, rise = UpperY / n;
-		for (int s = 0; s < n; s++)
+		float xL = StairXL, xR = StairXL + StairW, zTop = StairZTop, zWall = -HexIn + 0.02f, xEnd = -3.4f;
+		const int nA = 14, nB = 10;
+		float runA = StairRunA, rise = UpperY / (nA + nB), yL = nA * rise;
+		float zBot = zTop + nA * runA;
+		float runB = (xL - xEnd) / nB;
+		var tread = LodgeTextures.LobbyStoneMat;   // (the honey boards)
+		float xm = (xL + xR) * 0.5f;
+		// ---- the lower flight, toward the back wall
+		for (int st = 0; st < nA; st++)
 		{
-			float xa = x0 - s * run, xb = x0 - (s + 1) * run, y = (s + 1) * rise;
+			float za = zBot - st * runA, zb = za - runA, y = (st + 1) * rise;
 			k.Mat(LodgeTextures.DarkWoodMat);
 			k.Color = Colors.White;
-			k.Box(new Vector3((xa + xb) * 0.5f, y - rise * 0.5f, (z0 + z1) * 0.5f), new Vector3(xa - xb, rise, z1 - z0), 1f);
+			k.Box(new Vector3(xm, y - rise * 0.5f, (za + zb) * 0.5f), new Vector3(xR - xL, rise, runA), 1f);
+			k.Mat(tread);
+			k.Box(new Vector3(xm, y - 0.015f, (za + zb) * 0.5f + 0.02f), new Vector3(xR - xL + 0.04f, 0.035f, runA + 0.04f), 1f);   // the tread, its nosing proud
 			k.Mat(LodgeTextures.CorridorCarpetMat);
-			// (in two halves, the far one mirrored: the pattern's two rows of arches across the runner put a black ground
-			// line down its middle and only one at an edge; the owner: flip the one side so both lines run down the outsides)
-			float zm = (z1 - 0.35f + z0 + 0.35f) * 0.5f;
-			k.Quad(new Vector3(xa, y + 0.004f, z1 - 0.35f), new Vector3(xb, y + 0.004f, z1 - 0.35f), new Vector3(xb, y + 0.004f, zm), new Vector3(xa, y + 0.004f, zm), Vector3.Up,
-				new Vector2(0, 0), new Vector2(0.4f, 0), new Vector2(0.4f, 0.5f), new Vector2(0, 0.5f));
-			k.Quad(new Vector3(xa, y + 0.004f, zm), new Vector3(xb, y + 0.004f, zm), new Vector3(xb, y + 0.004f, z0 + 0.35f), new Vector3(xa, y + 0.004f, z0 + 0.35f), Vector3.Up,
-				new Vector2(0, 0.5f), new Vector2(0.4f, 0.5f), new Vector2(0.4f, 0), new Vector2(0, 0));
+			// (the runner: u along the flight, the two halves mirrored so its black lines run down both outsides)
+			k.Quad(new Vector3(xL + 0.32f, y + 0.006f, za), new Vector3(xm, y + 0.006f, za), new Vector3(xm, y + 0.006f, zb), new Vector3(xL + 0.32f, y + 0.006f, zb), Vector3.Up,
+				new Vector2(0, 0), new Vector2(0, 0.5f), new Vector2(0.37f, 0.5f), new Vector2(0.37f, 0));
+			k.Quad(new Vector3(xm, y + 0.006f, za), new Vector3(xR - 0.32f, y + 0.006f, za), new Vector3(xR - 0.32f, y + 0.006f, zb), new Vector3(xm, y + 0.006f, zb), Vector3.Up,
+				new Vector2(0, 0.5f), new Vector2(0, 0), new Vector2(0.37f, 0), new Vector2(0.37f, 0.5f));
 		}
-		// the underside: a sloped soffit, boarded, and the log stringer on the open side
+		// its sides: a closed stringer in the honey boards down to the floor (the space under it is shut in), a log along each
+		foreach (float x in new[] { xL - 0.05f, xR + 0.05f })
+		{
+			var n = x < xL ? Vector3.Left : Vector3.Right;
+			k.Mat(tread);
+			if (n.X < 0)
+				k.Quad(new Vector3(x, 0.02f, zTop), new Vector3(x, 0.02f, zBot), new Vector3(x, rise, zBot), new Vector3(x, yL, zTop), n,
+					new Vector2(0, 0), new Vector2(zBot - zTop, 0), new Vector2(zBot - zTop, rise), new Vector2(0, yL));
+			else
+				k.Quad(new Vector3(x, 0.02f, zBot), new Vector3(x, 0.02f, zTop), new Vector3(x, yL, zTop), new Vector3(x, rise, zBot), n,
+					new Vector2(0, 0), new Vector2(zBot - zTop, 0), new Vector2(zBot - zTop, yL), new Vector2(0, rise));
+			k.Mat(BuildingTextures.RoundLogMat);
+			k.Cylinder(new Vector3(x, rise - 0.05f, zBot + 0.1f), new Vector3(x, yL - 0.05f, zTop), 0.07f, 0.07f, 7, true, 0.5f);
+		}
+		// under the landing, its east face down to the floor
+		k.Mat(tread);
+		k.Quad(new Vector3(xR + 0.05f, 0.02f, zTop), new Vector3(xR + 0.05f, 0.02f, zWall), new Vector3(xR + 0.05f, yL, zWall), new Vector3(xR + 0.05f, yL, zTop), Vector3.Right,
+			new Vector2(0, 0), new Vector2(zTop - zWall, 0), new Vector2(zTop - zWall, yL), new Vector2(0, yL));
+		// ---- the landing, a rug on it
 		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Quad(new Vector3(x0, 0.02f, z1), new Vector3(x1, UpperY - 0.3f, z1), new Vector3(x1, UpperY - 0.3f, z0), new Vector3(x0, 0.02f, z0), new Vector3(-rise, -run, 0).Normalized());
+		k.Box(new Vector3(xm, yL - 0.12f, (zTop + zWall) * 0.5f), new Vector3(xR - xL, 0.24f, zTop - zWall), 1f);
+		k.Mat(tread);
+		k.Box(new Vector3(xm, yL - 0.015f, (zTop + zWall) * 0.5f), new Vector3(xR - xL + 0.04f, 0.03f, zTop - zWall + 0.04f), 1f);
+		k.Mat(LodgeTextures.RugMat);
+		k.Quad(new Vector3(xL + 0.2f, yL + 0.008f, zTop - 0.2f), new Vector3(xR - 0.2f, yL + 0.008f, zTop - 0.2f), new Vector3(xR - 0.2f, yL + 0.008f, zWall + 0.2f), new Vector3(xL + 0.2f, yL + 0.008f, zWall + 0.2f), Vector3.Up,
+			new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1));
+		// ---- the upper flight, along the back wall to the balcony
+		for (int st = 0; st < nB; st++)
+		{
+			float xa = xL - st * runB, xb = xa - runB, y = yL + (st + 1) * rise;
+			k.Mat(LodgeTextures.DarkWoodMat);
+			k.Color = Colors.White;
+			k.Box(new Vector3((xa + xb) * 0.5f, y - rise * 0.5f, (zWall + zTop) * 0.5f), new Vector3(xa - xb, rise, zTop - zWall), 1f);
+			k.Mat(tread);
+			k.Box(new Vector3((xa + xb) * 0.5f - 0.02f, y - 0.015f, (zWall + zTop) * 0.5f), new Vector3(runB + 0.04f, 0.035f, zTop - zWall + 0.04f), 1f);
+			k.Mat(LodgeTextures.CorridorCarpetMat);
+			float zm = (zTop - 0.32f + zWall + 0.32f) * 0.5f;
+			k.Quad(new Vector3(xa, y + 0.006f, zTop - 0.32f), new Vector3(xb, y + 0.006f, zTop - 0.32f), new Vector3(xb, y + 0.006f, zm), new Vector3(xa, y + 0.006f, zm), Vector3.Up,
+				new Vector2(0, 0), new Vector2(0.32f, 0), new Vector2(0.32f, 0.5f), new Vector2(0, 0.5f));
+			k.Quad(new Vector3(xa, y + 0.006f, zm), new Vector3(xb, y + 0.006f, zm), new Vector3(xb, y + 0.006f, zWall + 0.32f), new Vector3(xa, y + 0.006f, zWall + 0.32f), Vector3.Up,
+				new Vector2(0, 0.5f), new Vector2(0.32f, 0.5f), new Vector2(0.32f, 0), new Vector2(0, 0));
+		}
+		// ---- the stone: the knee wall under the upper flight (its top following the flight, a log along it), the pier at the turn
+		var stone = LodgeTextures.RiverStoneMat;
+		float zk = zTop + 0.1f;
+		k.Mat(stone);
+		k.Quad(new Vector3(xL - 0.68f, 0.02f, zk), new Vector3(xEnd, 0.02f, zk), new Vector3(xEnd, UpperY - 0.32f, zk), new Vector3(xL - 0.68f, yL + 0.5f * rise / runB * 0.68f - 0.3f, zk), Vector3.Back,
+			new Vector2(0, 0), new Vector2(xL - 0.68f - xEnd, 0), new Vector2(xL - 0.68f - xEnd, UpperY - 0.32f), new Vector2(0, yL));
 		k.Mat(BuildingTextures.RoundLogMat);
-		k.Cylinder(new Vector3(x0 + 0.2f, 0.1f, z1 + 0.05f), new Vector3(x1, UpperY - 0.1f, z1 + 0.05f), 0.12f, 0.12f, 8, true, 0.5f);
-		Railing(k, new Vector3(x0, rise, z1 + 0.05f), new Vector3(x1, UpperY, z1 + 0.05f));
-		Post(k, new Vector3(x0 + 0.1f, 0, z1 + 0.1f));
+		k.Cylinder(new Vector3(xL - 0.68f, yL + 0.68f * rise / runB - 0.3f, zk), new Vector3(xEnd, UpperY - 0.3f, zk), 0.09f, 0.09f, 7, true, 0.5f);
+		k.Mat(stone);
+		Vector3 pier = new(xL - 0.34f, 0, zTop + 0.34f);
+		float pierH = UpperY + 1.1f;
+		k.Box(pier + Vector3.Up * (pierH * 0.5f), new Vector3(0.68f, pierH, 0.68f), 1f);
+		k.Box(pier + Vector3.Up * (pierH + 0.06f), new Vector3(0.8f, 0.12f, 0.8f), 1f);   // its cap
+		k.Box(pier + Vector3.Up * 0.09f, new Vector3(0.8f, 0.18f, 0.8f), 1f);            // its plinth
+		LodgeKit.Solid(_inBody, pier + Vector3.Up * (pierH * 0.5f), new Vector3(0.7f, pierH, 0.7f));
+		LodgeKit.Solid(_inBody, new Vector3((xL - 0.68f + xEnd) * 0.5f, (UpperY - 0.4f) * 0.5f, zk), new Vector3(xL - 0.68f - xEnd, UpperY - 0.4f, 0.2f));
+		// a lamp on the pier's cap, lit (it marks the turn, warm, from all over the hall)
+		var lampAt = LodgeKit.Lamp(k, pier + Vector3.Up * (pierH + 0.12f), 0.42f, LodgeTextures.Glow("lodge_pier_shade", new Color(0.95f, 0.72f, 0.45f), 0.9f));
+		Light(lampAt, new Color(1f, 0.74f, 0.46f), 0.55f, 5.5f, "Light");
+		// ---- the rails
+		Railing(k, new Vector3(xR + 0.05f, rise, zBot), new Vector3(xR + 0.05f, yL, zTop));                 // the lower flight's open east side
+		Railing(k, new Vector3(xR + 0.05f, yL, zTop), new Vector3(xR + 0.05f, yL, zWall + 0.05f));          // round the landing's east edge
+		float yPier = (zBot - (zTop + 0.68f)) / runA * rise;
+		Railing(k, new Vector3(xL - 0.05f, rise, zBot), new Vector3(xL - 0.05f, yPier, zTop + 0.68f));       // the west side, to the pier
+		Railing(k, new Vector3(xL - 0.68f, yL + 0.68f * rise / runB, zTop + 0.04f), new Vector3(xEnd, UpperY, zTop + 0.04f)); // the upper flight's open side
+		// the newels at the foot: great logs, their tops rounded; one at the landing's corner
+		k.Mat(BuildingTextures.RoundLogMat);
+		foreach (float x in new[] { xL - 0.05f, xR + 0.05f })
+		{
+			k.Cylinder(new Vector3(x, FloorY, zBot + 0.15f), new Vector3(x, 1.35f, zBot + 0.15f), 0.13f, 0.12f, 10, true, 0.5f);
+			k.Blob(new Vector3(x, 1.42f, zBot + 0.15f), Vector3.One * 0.13f, 4300 + (int)(x * 10), 0.05f, false, 0.5f);
+			LodgeKit.Solid(_inBody, new Vector3(x, 0.7f, zBot + 0.15f), new Vector3(0.26f, 1.4f, 0.26f));
+		}
+		k.Cylinder(new Vector3(xR + 0.05f, FloorY, zTop), new Vector3(xR + 0.05f, yL + 1.1f, zTop), 0.11f, 0.1f, 10, true, 0.5f);
 		k.CommitTo(this, "Stairs", true);
-		// the ramp the feet use
-		float len = new Vector2(x0 - x1, UpperY).Length();
-		float ang = Mathf.Atan2(UpperY, x0 - x1);
+		// ---- what the feet use: the two flights' ramps and the landing; the space under them shut in
+		float lenA = new Vector2(zBot - zTop, yL).Length(), angA = Mathf.Atan2(yL, zBot - zTop);
 		_inBody.AddChild(new CollisionShape3D
 		{
-			Name = "StairRamp", Position = new Vector3((x0 + x1) * 0.5f, UpperY * 0.5f - 0.1f, (z0 + z1) * 0.5f), Basis = new Basis(Vector3.Forward, ang),
-			Shape = new BoxShape3D { Size = new Vector3(len, 0.2f, z1 - z0) },
+			Name = "StairRampA", Position = new Vector3(xm, yL * 0.5f - 0.1f, (zBot + zTop) * 0.5f), Basis = new Basis(Vector3.Right, angA),
+			Shape = new BoxShape3D { Size = new Vector3(xR - xL, 0.2f, lenA) },
 		});
+		_inBody.AddChild(new CollisionShape3D { Name = "StairLanding", Position = new Vector3(xm, yL - 0.1f, (zTop + zWall) * 0.5f), Shape = new BoxShape3D { Size = new Vector3(xR - xL, 0.2f, zTop - zWall) } });
+		float lenB = new Vector2(xL - xEnd, UpperY - yL).Length(), angB = Mathf.Atan2(UpperY - yL, xL - xEnd);
+		_inBody.AddChild(new CollisionShape3D
+		{
+			Name = "StairRamp", Position = new Vector3((xL + xEnd) * 0.5f, (yL + UpperY) * 0.5f - 0.1f, (zTop + zWall) * 0.5f), Basis = new Basis(Vector3.Forward, angB),
+			Shape = new BoxShape3D { Size = new Vector3(lenB, 0.2f, zTop - zWall) },
+		});
+		LodgeKit.Solid(_inBody, new Vector3(xm, yL * 0.3f, (zTop + zWall) * 0.5f), new Vector3(xR - xL, yL * 0.6f, zTop - zWall));
 	}
 
 	// ------------------------------------------------------------------ the west wing, ground floor
@@ -443,17 +603,35 @@ public partial class SkiLodge
 		var k = new MeshKit();
 		k.Color = Colors.White;
 		// the corridor: the carpet, a plaster ceiling, wallpaper over a dark wainscot
+		// (2026-10-10c, the owner: "the carpet in the hallway needs to properly aligned like how we have it on the stairs":
+		// it was one sheet wall to wall at its own scale, the pattern's rows of arches running off its edges. Now it's laid
+		// as the stair's runner is: dark boards wall to wall, and the runner down the middle in two halves, the far one
+		// mirrored, so the black ground lines run down both its edges and the arches point in to its middle, at the stair's
+		// scale)
+		float cx1 = CorrX1 - 0.3f, rw = 0.72f, ru = (cx1 - CorrX0) * 1.14f;
+		k.Mat(LodgeTextures.DarkWoodMat);
+		k.Quad(new Vector3(CorrX0, UpperY, CorrHalf), new Vector3(cx1, UpperY, CorrHalf), new Vector3(cx1, UpperY, -CorrHalf), new Vector3(CorrX0, UpperY, -CorrHalf), Vector3.Up,
+			new Vector2(0, 0), new Vector2(cx1 - CorrX0, 0), new Vector2(cx1 - CorrX0, 2f), new Vector2(0, 2f));
 		k.Mat(LodgeTextures.CorridorCarpetMat);
-		k.Quad(new Vector3(CorrX0, UpperY, CorrHalf), new Vector3(CorrX1 - 0.3f, UpperY, CorrHalf), new Vector3(CorrX1 - 0.3f, UpperY, -CorrHalf), new Vector3(CorrX0, UpperY, -CorrHalf), Vector3.Up,
-			new Vector2(0, 0), new Vector2((CorrX1 - 0.3f - CorrX0) / 1.5f, 0), new Vector2((CorrX1 - 0.3f - CorrX0) / 1.5f, 2f / 1.5f), new Vector2(0, 2f / 1.5f));
+		k.Quad(new Vector3(CorrX0, UpperY + 0.004f, rw), new Vector3(cx1, UpperY + 0.004f, rw), new Vector3(cx1, UpperY + 0.004f, 0), new Vector3(CorrX0, UpperY + 0.004f, 0), Vector3.Up,
+			new Vector2(0, 0), new Vector2(ru, 0), new Vector2(ru, 0.5f), new Vector2(0, 0.5f));
+		k.Quad(new Vector3(CorrX0, UpperY + 0.004f, 0), new Vector3(cx1, UpperY + 0.004f, 0), new Vector3(cx1, UpperY + 0.004f, -rw), new Vector3(CorrX0, UpperY + 0.004f, -rw), Vector3.Up,
+			new Vector2(0, 0.5f), new Vector2(ru, 0.5f), new Vector2(ru, 0), new Vector2(0, 0));
 		k.Mat(LodgeTextures.CeilingMat);
 		CeilQuad(k, new Vector3(CorrX0, RoomTop, -CorrHalf), new Vector3(CorrX1 - 0.3f, RoomTop, -CorrHalf), new Vector3(CorrX1 - 0.3f, RoomTop, CorrHalf), new Vector3(CorrX0, RoomTop, CorrHalf));
 		LodgeKit.Solid(_inBody, new Vector3((CorrX0 + CorrX1) * 0.5f, RoomTop + 0.1f, 0), new Vector3(CorrX1 - CorrX0, 0.2f, InnerZ * 2f));
 		// its two walls, the rooms' doors in them (hinges at the doors' west ends on the north wall, east on the south)
 		var north = new List<Hole> { new(-14.2f - CorrX0, -13.2f - CorrX0, UpperY, UpperY + 2.2f), new(-21.8f - CorrX0, -20.8f - CorrX0, UpperY, UpperY + 2.2f) };
 		var south = new List<Hole> { new(-14.2f - CorrX0, -13.2f - CorrX0, UpperY, UpperY + 2.2f), new(-21.8f - CorrX0, -20.8f - CorrX0, UpperY, UpperY + 2.2f) };
-		UpWall(k, new Vector3(CorrX0, 0, CorrHalf), new Vector3(CorrX1, 0, CorrHalf), Vector3.Forward, true, north);
-		UpWall(k, new Vector3(CorrX0, 0, -CorrHalf), new Vector3(CorrX1, 0, -CorrHalf), Vector3.Back, true, south);
+		// (in two lengths each, split at the rooms' party wall, so each room's side takes that room's paper)
+		var lo = new List<Hole>(); var hi = new List<Hole>();
+		foreach (var h in north) (h.U0 < RoomSplitX - CorrX0 ? lo : hi).Add(h.U0 < RoomSplitX - CorrX0 ? h : new Hole(h.U0 - (RoomSplitX - CorrX0), h.U1 - (RoomSplitX - CorrX0), h.V0, h.V1));
+		UpWall(k, new Vector3(CorrX0, 0, CorrHalf), new Vector3(RoomSplitX, 0, CorrHalf), Vector3.Forward, true, lo, matB: LodgeTextures.RoomPaperMat(201));
+		UpWall(k, new Vector3(RoomSplitX, 0, CorrHalf), new Vector3(CorrX1, 0, CorrHalf), Vector3.Forward, true, hi, matB: LodgeTextures.RoomPaperMat(202));
+		lo = new List<Hole>(); hi = new List<Hole>();
+		foreach (var h in south) (h.U0 < RoomSplitX - CorrX0 ? lo : hi).Add(h.U0 < RoomSplitX - CorrX0 ? h : new Hole(h.U0 - (RoomSplitX - CorrX0), h.U1 - (RoomSplitX - CorrX0), h.V0, h.V1));
+		UpWall(k, new Vector3(CorrX0, 0, -CorrHalf), new Vector3(RoomSplitX, 0, -CorrHalf), Vector3.Back, true, lo, matB: LodgeTextures.RoomPaperMat(204));
+		UpWall(k, new Vector3(RoomSplitX, 0, -CorrHalf), new Vector3(CorrX1, 0, -CorrHalf), Vector3.Back, true, hi, matB: LodgeTextures.RoomPaperMat(203));
 		UpWall(k, new Vector3(CorrX0, 0, -CorrHalf), new Vector3(CorrX0, 0, CorrHalf), Vector3.Right, true, null);
 		// the corridor's walls carried on through the hall's corner wall to the doorway (the owner, coming up from the
 		// lobby: the corner is cut at an angle either side of the doorway, and between the corridor's square end and
@@ -494,10 +672,10 @@ public partial class SkiLodge
 	}
 
 	/// <summary>An upstairs partition (floor 4.2 to the ceiling 7.0): wallpaper over a dark wainscot, or green tile in a bathroom.</summary>
-	private void UpWall(MeshKit k, Vector3 a, Vector3 b, Vector3 sideA, bool paperA, List<Hole> holes, bool tileA = false, bool tileB = false)
+	private void UpWall(MeshKit k, Vector3 a, Vector3 b, Vector3 sideA, bool paperA, List<Hole> holes, bool tileA = false, bool tileB = false, Material matA = null, Material matB = null)
 	{
-		var wA = tileA ? LodgeTextures.GreenTileMat : LodgeTextures.WallpaperMat;
-		var wB = tileB ? LodgeTextures.GreenTileMat : LodgeTextures.WallpaperMat;
+		var wA = tileA ? LodgeTextures.GreenTileMat : matA ?? LodgeTextures.WallpaperMat;
+		var wB = tileB ? LodgeTextures.GreenTileMat : matB ?? LodgeTextures.WallpaperMat;
 		var lA = tileA ? LodgeTextures.GreenTileMat : LodgeTextures.DarkWoodMat;
 		var lB = tileB ? LodgeTextures.GreenTileMat : LodgeTextures.DarkWoodMat;
 		LodgeKit.Wall(k, _inBody, a, b, UpperY, UpperY + 1.0f, 0.14f, sideA, lA, lB, LodgeTextures.DarkWoodMat, holes, floorY: UpperY, grime: 2, skirt: true);
@@ -533,12 +711,13 @@ public partial class SkiLodge
 			203 => (_, _) => LodgeTextures.IceGlass,
 			_ => null,
 		};
-		Lining(k, x0, x1, zOut, UpperY, RoomTop, LodgeTextures.DarkWoodMat, LodgeTextures.WallpaperMat, UpperY + 1.0f, true, glass);
+		var paper = LodgeTextures.RoomPaperMat(num);
+		Lining(k, x0, x1, zOut, UpperY, RoomTop, LodgeTextures.DarkWoodMat, paper, UpperY + 1.0f, true, glass);
 		// the side walls: east of 202/203 against the hall's corner, west of 201/204 at the corridor's end, and the split between
-		if (x1 >= CorrX1 - 0.01f) UpWall(k, new Vector3(x1, 0, zIn), new Vector3(x1, 0, zOut), Vector3.Left, true, null);
+		if (x1 >= CorrX1 - 0.01f) UpWall(k, new Vector3(x1, 0, zIn), new Vector3(x1, 0, zOut), Vector3.Left, true, null, matA: paper);
 		// (201's, in its bathroom, is hacked through: the doorway into the wall cavity, SkiLodge.Room201.cs)
 		var west = num == 201 ? new List<Hole> { new(Hole201.Z - 0.45f - zIn, Hole201.Z + 0.45f - zIn, UpperY, UpperY + 2.0f) } : null;
-		if (x0 <= CorrX0 + 0.01f) UpWall(k, new Vector3(x0, 0, zIn), new Vector3(x0, 0, zOut), Vector3.Right, true, west);
+		if (x0 <= CorrX0 + 0.01f) UpWall(k, new Vector3(x0, 0, zIn), new Vector3(x0, 0, zOut), Vector3.Right, true, west, matA: paper);
 		// the bathroom: in the room's west corner by the corridor, 2.7 x 3.1, green tile
 		float bx0 = x0, bx1 = x0 + 2.7f, bz = zIn + s * 3.1f;
 		if (num == 202 || num == 203)
@@ -546,14 +725,14 @@ public partial class SkiLodge
 			// the split wall between the pairs (202|201, 203|204) is built by the east room; 203's has the hole, in its bathroom
 			var holes = num == 203 ? new List<Hole> { new(0.55f, 2.35f, UpperY, UpperY + 2.1f) } : null;   // the hole: within the bathroom's stretch
 			// along z from the corridor outward; the hole is within the bathroom's stretch (0..3.1 from the corridor)
-			UpWall(k, new Vector3(RoomSplitX, 0, zIn), new Vector3(RoomSplitX, 0, zOut), Vector3.Right, true, holes, tileA: false, tileB: false);
+			UpWall(k, new Vector3(RoomSplitX, 0, zIn), new Vector3(RoomSplitX, 0, zOut), Vector3.Right, true, holes, tileA: false, tileB: false, matA: paper, matB: LodgeTextures.RoomPaperMat(num == 202 ? 201 : 204));
 		}
 		k.Mat(LodgeTextures.GreenTileMat);
 		k.Quad(new Vector3(bx0 + 0.07f, UpperY + 0.003f, Mathf.Max(zIn, bz)), new Vector3(bx1, UpperY + 0.003f, Mathf.Max(zIn, bz)), new Vector3(bx1, UpperY + 0.003f, Mathf.Min(zIn, bz)), new Vector3(bx0 + 0.07f, UpperY + 0.003f, Mathf.Min(zIn, bz)), Vector3.Up,
 			new Vector2(0, 0), new Vector2(2.7f / 1.2f, 0), new Vector2(2.7f / 1.2f, 3.1f / 1.2f), new Vector2(0, 3.1f / 1.2f));
 		// its two walls: along the room (x = bx1, a door in it) and across (z = bz)
-		UpWall(k, new Vector3(bx1, 0, zIn), new Vector3(bx1, 0, bz), Vector3.Left, true, new List<Hole> { new(1.2f, 2.1f, UpperY, UpperY + 2.1f) }, tileA: true);
-		UpWall(k, new Vector3(bx0, 0, bz), new Vector3(bx1, 0, bz), new Vector3(0, 0, -s), true, null, tileA: true);
+		UpWall(k, new Vector3(bx1, 0, zIn), new Vector3(bx1, 0, bz), Vector3.Left, true, new List<Hole> { new(1.2f, 2.1f, UpperY, UpperY + 2.1f) }, tileA: true, matB: paper);
+		UpWall(k, new Vector3(bx0, 0, bz), new Vector3(bx1, 0, bz), new Vector3(0, 0, -s), true, null, tileA: true, matB: paper);
 	}
 
 	// ------------------------------------------------------------------ the east wing: the dining hall

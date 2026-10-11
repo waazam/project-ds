@@ -261,6 +261,10 @@ public static class UiKit
 		box.AddChild(strip);
 		AddSlider(box, "Lantern", GameSettings.LanternMin, GameSettings.LanternMax, s.LanternBrightness, v => s.LanternBrightness = (float)v, 0.05,
 			v => $"{Mathf.RoundToInt((float)v * 100f)}%");
+		AddSlider(box, "HUD glow", 0, NeonKit.Names.Length - 1, s.HudColor, v => s.HudColor = Mathf.RoundToInt(v), 1,
+			v => NeonKit.Names[Mathf.Clamp(Mathf.RoundToInt(v), 0, NeonKit.Names.Length - 1)]);
+		AddToggle(box, "HUD only when needed", s.ContextualHud, on => s.ContextualHud = on);
+		AddToggle(box, "Focus pull", s.FocusPull, on => s.FocusPull = on);
 		AddToggle(box, "Cinematic bars", s.CinemaBars, on => s.CinemaBars = on);
 		// the window: fullscreen at the screen's own resolution, or a window of a chosen size
 		AddToggle(box, "Windowed", s.Windowed, on => s.Windowed = on);
