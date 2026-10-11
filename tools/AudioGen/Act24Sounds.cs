@@ -21,18 +21,20 @@ public static class Act24Sounds
 	/// <summary>A burn's body: rushing noise through a few bands, with a slow throb and crackle (shared by the roar and the whoomph).</summary>
 	static void Burn(double[] x, Rng r, int sr, double t0, double t1, System.Func<double, double> env, double amp)
 	{
-		var lo = Biquad.Lp(sr, 260); var lo2 = Biquad.Lp(sr, 380);
-		var mid = Biquad.Bp(sr, 700, 0.8); var hi = Biquad.Bp(sr, 2400, 0.9);
-		var thr = new Smooth(r, t1 + 1, 0.09);
+		// (2026-10-11, the owner: it "sounds like a weed wacker": its burn throbbed ten times a second over a dense rattle of
+		// high crackle, a motor. Now a gas burner's deep whoosh, swelling slowly, the crackle sparse and soft)
+		var lo = Biquad.Lp(sr, 220); var lo2 = Biquad.Lp(sr, 320); var sub = Biquad.Lp(sr, 90);
+		var mid = Biquad.Bp(sr, 520, 0.7); var hi = Biquad.Lp(sr, 1600);
+		var thr = new Smooth(r, t1 + 1, 0.45);
 		for (int i = (int)(t0 * sr); i < x.Length && i < (int)(t1 * sr); i++)
 		{
 			double t = (double)i / sr, u = (t - t0) / (t1 - t0);
 			double e = env(u);
-			double throb = 0.75 + 0.25 * thr.At(t);
-			x[i] += (lo2.P(lo.P(r.W())) * 3.2 + mid.P(r.W()) * 0.9 + hi.P(r.W()) * 0.25) * e * throb * amp;
+			double throb = 0.88 + 0.12 * thr.At(t);
+			x[i] += (lo2.P(lo.P(r.W())) * 3.4 + sub.P(r.W()) * 2.0 + mid.P(r.W()) * 0.45 + hi.P(r.W()) * 0.08) * e * throb * amp;
 		}
-		for (double t = t0 + 0.02; t < t1; t += r.R(0.008, 0.05))
-			Slap(x, r, sr, t, r.R(0.02, 0.07) * amp * env((t - t0) / (t1 - t0)), 900, r.R(3000, 6000), r.R(0.002, 0.005));
+		for (double t = t0 + 0.05; t < t1; t += r.R(0.05, 0.18))
+			Slap(x, r, sr, t, r.R(0.008, 0.025) * amp * env((t - t0) / (t1 - t0)), 600, r.R(1800, 3200), r.R(0.002, 0.004));
 	}
 
 	public static double[] Ignite(Rng r, int sr)
@@ -109,12 +111,10 @@ public static class Act24Sounds
 			double s = System.Math.Max(0, swell.At(t));
 			x[i] += lp.P(b1.P(r.W()) * 1.2 + b2.P(r.W()) * 0.8) * (0.15 + 0.85 * s * s) * 2.5;
 		}
-		// the ice ticking, a drip, now and then
-		for (double t = r.R(1, 3); t < T - 1; t += r.R(2.5, 7))
-		{
-			if (r.Chance(0.5)) Knock(x, r, sr, t, r.R(0.05, 0.12), r.R(1800, 3200), 20, r.R(0.02, 0.05));
-			else Bubble(x, sr, t, r.R(900, 1500), r.R(0.05, 0.1), 0.02);
-		}
+		// a drip now and then, low and soft (2026-10-11, the owner: "some metalic sound that is really bad": the ice's ticks,
+		// clicks at 2-3 kHz under a long reverb, rang like metal; gone)
+		for (double t = r.R(2, 4); t < T - 1; t += r.R(4, 9))
+			Bubble(x, sr, t, r.R(500, 800), r.R(0.03, 0.06), 0.02);
 		var o = MakeLoop(Wet(x, sr, 1.0, 0.5, 3.5, 0.6, 1.6), pre, n, xf);
 		double peak = 0;
 		foreach (var v in o) peak = System.Math.Max(peak, System.Math.Abs(v));

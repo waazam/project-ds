@@ -120,6 +120,7 @@ public partial class IronDoor : Node3D
 		for (int i = 0; i < 3; i++)
 		{
 			if (_set[i] || player?.Inventory is not { } inv || !inv.HasTool(Needs[i])) continue;
+			Player.HeldUse.Do(player, Needs[i], GlobalPosition + Vector3.Up * 1.2f);
 			inv.Consume(Needs[i]);
 			SetPiece(i, true);
 			StoryManager.Instance?.SetFlag(SetFlags[i]);

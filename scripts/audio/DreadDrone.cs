@@ -16,6 +16,8 @@ public partial class DreadDrone : Node
 	/// <summary>How near (metres) something has to be for it to be felt at all.</summary>
 	public const float Reach = 20f;
 	public float Level { get; private set; }
+	/// <summary>(2026-10-11, the owner: "a constant buzzing noise") off in Act 24's maze: the song carries it there.</summary>
+	public static bool Hush;
 	public float Target { get; private set; }
 	private AudioStreamPlayer _p;
 	private float _poll;
@@ -35,7 +37,7 @@ public partial class DreadDrone : Node
 		if (_p == null) return;
 		float dt = (float)delta;
 		_poll -= dt;
-		if (_poll <= 0f) { _poll = 0.25f; Target = Measure(); }
+		if (_poll <= 0f) { _poll = 0.25f; Target = Hush ? 0f : Measure(); }
 		// in over about four seconds, out over about three
 		Level = Mathf.MoveToward(Level, Target, dt * (Target > Level ? 0.25f : 0.33f));
 		_p.VolumeDb = Level < 0.01f ? -80f : Mathf.LinearToDb(Mathf.Pow(Level, 1.5f)) - 8f;

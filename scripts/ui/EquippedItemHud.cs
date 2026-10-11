@@ -126,16 +126,10 @@ public partial class EquippedItemHud : CanvasLayer
 		float u = _strike;
 		float strike = u >= 1f ? 1f : Mathf.SmoothStep(0f, 1f, Mathf.Clamp(u / 0.3f, 0f, 1f)) * (1f - 0.35f * Mathf.Exp(-Mathf.Pow((u - 0.45f) / 0.12f, 2f)));
 		float lit = breath * strike;
-		// the icon, in its bracket, at the right
+		// the icon at the right (no bracket round it, 2026-10-11, the owner: the corners "look bad")
 		float icon = 16f;   // (smaller and quieter, the owner: "shrunk a little to be made more subtle")
 		var ic = new Vector2(size.X - icon * 0.5f - 2f, size.Y * 0.5f - 1f);
 		NeonKit.Icon(_draw, _held, ic, icon * 0.9f, lit, t);
-		float bw = icon * 0.62f, bl = 3.5f, bwid = 0.65f;
-		foreach (var (sx, sy) in new[] { (-1f, -1f), (1f, -1f), (1f, 1f), (-1f, 1f) })
-		{
-			var corner = ic + new Vector2(sx * bw, sy * bw);
-			NeonKit.Line(_draw, new[] { corner + new Vector2(0, -sy * bl), corner, corner + new Vector2(-sx * bl, 0) }, bwid, lit * 0.75f);
-		}
 		// a switch: a short soft glow blooming behind the new item's icon and fading (the owner, 2026-10-10c: no more dot
 		// running round the bracket; "a short little glowing animation when you originally change to a new item")
 		if (_strike < 1f)

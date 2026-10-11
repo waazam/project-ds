@@ -123,7 +123,7 @@ public partial class WendigoHunter : Node3D
 		if (Menace < 15f) _lowMenaceT += dt; else _lowMenaceT = 0f;
 		if (Menace > 70f && State is not (Mode.Chase or Mode.Kill or Mode.Ambush)) _highMenaceT += dt; else _highMenaceT = 0f;
 		// safe too long: nudge it toward their part of the maze (a junction or two off them, never to them)
-		if (_lowMenaceT > (_phase2 ? 30f : 22f) && State is Mode.Patrol or Mode.Hide)
+		if (_lowMenaceT > (_phase2 ? 30f : 22f) && (State is Mode.Patrol || (State is Mode.Hide && !_phase2)))
 		{
 			_lowMenaceT = 0f;
 			int pn = L.NearestConnected(p);
@@ -188,7 +188,7 @@ public partial class WendigoHunter : Node3D
 		// sight: a cone ahead, out to the dark; nothing through a mound or a wall
 		bool sees = CanSee(p);
 		// its head follows them only while it can see them (it doesn't know where they are otherwise)
-		if (Body != null) Body.LookWeight = Mathf.MoveToward(Body.LookWeight, sees ? 1f : 0f, dt * 2f);
+		if (Body != null && Doing == Beat.None) Body.LookWeight = Mathf.MoveToward(Body.LookWeight, sees ? 1f : 0f, dt * 2f);
 		float range = SightRange * (_player.Crouching ? 0.7f : 1f) * (LanternLit() || HeldFlare.AnyLit ? 1.3f : 1f);   // (the same reach CanSee used)
 		float dist = Pos.DistanceTo(p);
 		if (sees)
@@ -274,6 +274,7 @@ public partial class WendigoHunter : Node3D
 	private void Pick(Mode m)
 	{
 		if (State == m && _modeT < 0.2f) return;
+		EndBeat();
 		_prevMode = State;
 		State = m;
 		_modeT = 0f;
@@ -311,10 +312,16 @@ public partial class WendigoHunter : Node3D
 	{
 		var p = PlayerLocal;
 		float dist = Pos.DistanceTo(p);
+		// a beat (it sniffs, crouches over prints, rakes a wall, listens) holds it where it is a few seconds
+		if (State is Mode.Patrol or Mode.Search && RunBeat(dt)) return;
 		switch (State)
 		{
 			case Mode.Patrol:
-				if (_route.Count == 0) RouteTo(L.Nodes[RandomNodeNear(Pos, 4)]);
+				if (_route.Count == 0)
+				{
+					if (MaybeBeat(0.55f)) break;
+					RouteTo(L.Nodes[RandomNodeNear(Pos, 4)]);
+				}
 				Walk(WalkSpeed, dt);
 				break;
 			case Mode.Investigate:
@@ -328,6 +335,7 @@ public partial class WendigoHunter : Node3D
 				{
 					if (_searchLeft <= 0f || _searchStops > 4) { GD.Print("[wendigo] gives up searching"); Pick(Mode.Patrol); break; }
 					_searchStops++;
+					if (MaybeBeat(0.65f)) break;
 					// a look round, then on to somewhere close by (an alcove, the next junction)
 					RouteTo(L.Nodes[RandomNodeNear(_lastKnown == Vector3.Zero ? Pos : _lastKnown, 1)] + new Vector3(_rng.RandfRange(-1.5f, 1.5f), 0, _rng.RandfRange(-1.5f, 1.5f)));
 				}
@@ -351,8 +359,18 @@ public partial class WendigoHunter : Node3D
 				if (_route.Count == 0) { Pick(Mode.Hide); _modeT = 0f; }
 				break;
 			case Mode.Hide:
-				// keeps still a while, then creeps back in toward them
-				if (_modeT > _rng.RandfRange(9f, 16f)) { Pick(Mode.Stalk); RouteTo(L.Nodes[RandomNodeNear(p, 2)]); }
+				// burned, it hides and waits for them: crouched in its dead end, still, its burns smouldering, breathing,
+				// until they come close enough, and then it comes out at them (2026-10-11, the owner); left alone a long
+				// while, it gives up waiting and creeps back in toward them
+				Face(p - Pos, dt, 2f);
+				if (_phase2 && dist < 6.5f && !PlayerDeath.Dying)
+				{
+					GD.Print("[wendigo] out of hiding - it comes at them");
+					HideAmbushes++;
+					Pick(Mode.Ambush);
+					Shriek();
+				}
+				else if (_modeT > (_phase2 ? 70f : _rng.RandfRange(9f, 16f))) { Pick(Mode.Stalk); RouteTo(L.Nodes[RandomNodeNear(p, 2)]); }
 				break;
 			case Mode.Stalk:
 				Walk(WalkSpeed * 1.1f, dt);
@@ -377,6 +395,42 @@ public partial class WendigoHunter : Node3D
 		int v = L.NearestConnected(at);
 		for (int i = 0; i < hops; i++) { var adj = L.Adj[v]; v = adj[_rng.RandiRange(0, adj.Count - 1)]; }
 		return v;
+	}
+
+	/// <summary>(2026-10-11, the owner: "after being hit by the flames, he should be running away to hide for a chance to
+	/// surprise the player and they have to track them down") Off to a hiding place: a dead end of the maze (one way in), far
+	/// from them, out of the way they came; failing one, the farthest place it finds.</summary>
+	private void FleeToHide(Vector3 p)
+	{
+		int best = -1;
+		float bd = 0f;
+		for (int v = 0; v < L.Nodes.Count; v++)
+		{
+			if (L.Adj[v].Count != 1) continue;
+			float d = L.Nodes[v].DistanceTo(p);
+			if (d < 16f) continue;
+			// (far from them, not too far for it to run, and a little luck in which)
+			float score = Mathf.Min(d, 45f) - L.Nodes[v].DistanceTo(Pos) * 0.25f + _rng.RandfRange(0f, 8f);
+			if (score > bd) { bd = score; best = v; }
+		}
+		if (best < 0) { FleeFrom(p); return; }
+		HideNode = best;
+		GD.Print($"[wendigo] burned: off to hide in the dead end at node {best} ({L.Nodes[best].DistanceTo(p):0} m from them)");
+		RouteTo(L.Nodes[best]);
+	}
+
+	/// <summary>For tests: where it last went to hide (a node of the maze), and how often it's come out of hiding at them.</summary>
+	public int HideNode { get; private set; } = -1;
+	public int HideAmbushes { get; private set; }
+
+	/// <summary>For tests: a point (world) <paramref name="metres"/> out from its hiding place, up the one way in.</summary>
+	public Vector3 HideApproach(float metres)
+	{
+		if (HideNode < 0) return Body.GlobalPosition;
+		var a = L.Nodes[HideNode];
+		var b = L.Nodes[L.Adj[HideNode][0]];
+		var d = (b - a) with { Y = 0 };
+		return _cave.ToGlobal(Pos + d.Normalized() * Mathf.Min(metres, d.Length()));
 	}
 
 	private void FleeFrom(Vector3 p)
@@ -447,6 +501,7 @@ public partial class WendigoHunter : Node3D
 	private void UpdateGait(float dt)
 	{
 		if (State is Mode.Hide or Mode.Burning or Mode.Kill or Mode.Off || Body == null) return;
+		if (Doing is Beat.Prints or Beat.Wall) return;   // (its pose is the beat's)
 		float s = State is Mode.Hide ? 0f : _vel.Length();
 		string clip = _gait switch
 		{
@@ -469,9 +524,18 @@ public partial class WendigoHunter : Node3D
 		_breathT -= dt;
 		if (_breathT > 0f) return;
 		_breathT = _rng.RandfRange(4f, 9f);
+		// (2026-10-11, the owner: its sounds "pretty infrequent so you only start hearing them when he is trying to lure
+		// you or you are very close") nothing at all from it unless they're close
+		if (Pos.DistanceTo(PlayerLocal) > 14f) { _breathT = _rng.RandfRange(8f, 14f); return; }
 		// its noises: a click in its throat, a stolen voice muttering, now and then a far howl down the tunnels
 		float r = _rng.Randf();
-		if (State is Mode.Hide) return;
+		if (State is Mode.Hide)
+		{
+			// (hidden, but not silent: its ragged breathing, and a low growl, carried down the tunnels: they track it by ear)
+			_breathT = _rng.RandfRange(3f, 6f);
+			AudioDirector.OneShot(this, r < 0.6f ? "wendigo_mumble" : "wendigo_howl_far", r < 0.6f ? 4 : 3, Body.GlobalPosition + Vector3.Up * 1.6f, r < 0.6f ? -12f : -14f, r < 0.6f ? "Voice" : "Unnatural", 4f, 0.05f);
+			return;
+		}
 		if (r < 0.45f) AudioDirector.OneShot(this, "wendigo_mumble", 4, Body.GlobalPosition + Vector3.Up * 3f, -8f, "Voice", 5f, 0.05f);
 		else if (r < 0.75f) AudioDirector.OneShot(this, "wendigo_mimic", 14, Body.GlobalPosition + Vector3.Up * 3f, -10f, "Voice", 5f, 0f);
 		else AudioDirector.OneShot(this, "wendigo_howl_far", 3, Body.GlobalPosition + Vector3.Up * 3f, -6f, "Unnatural", 12f, 0.03f);
@@ -500,7 +564,7 @@ public partial class WendigoHunter : Node3D
 		Hit?.Invoke(Hits);
 		GD.Print($"[wendigo] burned: hit {Hits} of {HitsToKill}");
 		Body.Char(Mathf.Clamp(Hits / (float)HitsToKill, 0f, 1f));
-		AudioDirector.OneShot(this, "wendigo_howl_04", 1, Body.GlobalPosition + Vector3.Up * 3f, 7f, "Unnatural", 12f, 0.02f);
+		AudioDirector.OneShot(this, "wendigo_howl_01", 1, Body.GlobalPosition + Vector3.Up * 3f, 4f, "Unnatural", 12f, 0.02f);
 		if (_burn == null || !IsInstanceValid(_burn))
 		{
 			_burn = new FireVfx { Name = "Burning", Extent = new Vector3(0.6f, 1.2f, 0.5f), FlameScale = 0.7f, LightRange = 6f, LightEnergy = 1.6f, LightShadows = false, Haze = false, Position = new Vector3(0, 1.4f, 0) };
@@ -511,7 +575,7 @@ public partial class WendigoHunter : Node3D
 		Pick(Mode.Burning);
 		var tw = CreateTween();
 		tw.TweenInterval(1.6f);
-		tw.TweenCallback(Callable.From(() => { if (State == Mode.Burning) { Pick(Mode.Flee); FleeFrom(PlayerLocal); } }));
+		tw.TweenCallback(Callable.From(() => { if (State == Mode.Burning) { Pick(Mode.Flee); FleeToHide(PlayerLocal); } }));
 		tw.TweenInterval(3f);
 		tw.TweenCallback(Callable.From(() => { if (IsInstanceValid(_burn)) _burn.Intensity = 0.25f; }));
 	}

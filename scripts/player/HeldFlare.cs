@@ -40,7 +40,7 @@ public partial class HeldFlare : HeldItem
 		return cam.GetNodeOrNull<HeldFlare>(nameof(HeldFlare)) ?? Attach<HeldFlare>(player);
 	}
 
-	protected override bool Wanted => Lit && !CameraUp;
+	protected override bool Wanted => Lit && !CameraUp && !HeldUse.Busy;
 
 	public override void _EnterTree() => _instance = this;
 	public override void _ExitTree() { if (_instance == this) _instance = null; }
@@ -57,6 +57,7 @@ public partial class HeldFlare : HeldItem
 		_sparks.Position = new Vector3(0, 0.27f, 0);
 		_model.AddChild(_sparks);
 		_light = new OmniLight3D { Name = "FlareLight", LightColor = Flare.Green, LightEnergy = 0f, OmniRange = 11f, OmniAttenuation = 1.1f, ShadowEnabled = true, Position = new Vector3(0, 0.3f, 0) };
+		_light.ShadowCasterMask &= ~HeldLayer;   // (the flare and the hand holding it don't shadow its own light)
 		_model.AddChild(_light);
 		_fill = new OmniLight3D { Name = "HandLight", LightColor = new Color(0.55f, 1f, 0.6f), LightEnergy = 0.5f, OmniRange = 0.6f, ShadowEnabled = false, LightCullMask = HeldLayer, Position = new Vector3(0.03f, 0.3f, 0.08f) };
 		_model.AddChild(_fill);

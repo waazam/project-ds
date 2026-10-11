@@ -196,8 +196,18 @@ public partial class ForestDirector : Node
 		if (_insects != null) _insects.ExtraDb = 2f * (Activity - 1f) + 2.5f * s;
 	}
 
+	/// <summary>(2026-10-11) Set while in Act 24's maze: the ear-ringing and the pressure kept out of it (the owner: "this ear
+	/// ringing sound ... need to go away"; the song and the creature carry it down there).</summary>
+	public static bool Hush;
+
 	private void ApplySilence(float silence, float dt)
 	{
+		if (Hush)
+		{
+			if (_pressure != null) _pressure.Gain = 0f;
+			if (_ringing != null) _ringing.Gain = 0f;
+			return;
+		}
 		float inSilence = Mathf.SmoothStep(0.5f, 1f, silence);
 		UpdateDropout(silence, dt);
 

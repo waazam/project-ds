@@ -47,10 +47,10 @@ public static class NeonKit
 			pts = p;
 		}
 		var g = Glow;
-		c.DrawPolyline(pts, new Color(g, 0.07f * lit), width * 6.5f, true);
-		c.DrawPolyline(pts, new Color(g, 0.14f * lit), width * 3.8f, true);
-		c.DrawPolyline(pts, new Color(g, 0.32f * lit), width * 2.1f, true);
-		c.DrawPolyline(pts, new Color(Core, 0.95f * lit), width, true);
+		// (2026-10-11, the owner: the glow was "almost blurry ... like I have some kind of astigmatism": one faint, close
+		// halo now, the tube itself crisp)
+		c.DrawPolyline(pts, new Color(g, 0.1f * lit), width * 2.2f, true);
+		c.DrawPolyline(pts, new Color(Core, 0.97f * lit), width, true);
 	}
 
 	public static void Seg(CanvasItem c, Vector2 a, Vector2 b, float width, float lit) => Line(c, new[] { a, b }, width, lit);
@@ -85,10 +85,8 @@ public static class NeonKit
 	{
 		if (lit <= 0.001f) return;
 		var g = Glow;
-		c.DrawStringOutline(font, pos, text, align, width, size, 7, new Color(g, 0.06f * lit));
-		c.DrawStringOutline(font, pos, text, align, width, size, 4, new Color(g, 0.13f * lit));
-		c.DrawStringOutline(font, pos, text, align, width, size, 2, new Color(g, 0.3f * lit));
-		c.DrawString(font, pos, text, align, width, size, new Color(Core, 0.95f * lit));
+		c.DrawStringOutline(font, pos, text, align, width, size, 2, new Color(g, 0.12f * lit));
+		c.DrawString(font, pos, text, align, width, size, new Color(Core, 0.97f * lit));
 	}
 
 	/// <summary>The thing's icon, line art in neon, <paramref name="s"/> across, centred on <paramref name="c0"/>;

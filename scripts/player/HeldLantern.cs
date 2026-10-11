@@ -72,8 +72,9 @@ public partial class HeldLantern : HeldItem
 		// the blacklight's glow in the glass: a violet bulb where the flame is
 		_uvGlass = new StandardMaterial3D { AlbedoColor = new Color(0.4f, 0.15f, 1f), EmissionEnabled = true, Emission = new Color(0.45f, 0.18f, 1f), EmissionEnergyMultiplier = 2.2f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
 		_model.AddChild(new MeshInstance3D { Name = "UvBulb", Mesh = new SphereMesh { Radius = 0.022f, Height = 0.05f, RadialSegments = 8, Rings = 4 }, MaterialOverride = _uvGlass, Position = new Vector3(0, 0.12f, 0), Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-		// the hand: a gloved fist round the bail's top, the cuff of a sleeve going down out of view
-		BuildFist(this, new Vector3(0, 0.0f, 0), new Color(0.09f, 0.075f, 0.065f), new Color(0.07f, 0.075f, 0.07f));
+		// the hand: over the bail's top, holding it from above (the owner, 2026-10-11: "the player's hand is holding it from
+		// the top instead of this stick thing it has now")
+		BuildBailGrip(this);
 		// lit by its own soft light only (the lantern's real light, an inch from the glass, blew it all to white): the
 		// held things on their own layer, out of the lantern's light, under a warm fill from the flame's place
 		SetLayer(this);
@@ -84,6 +85,50 @@ public partial class HeldLantern : HeldItem
 	}
 
 	protected override bool Wanted => _lantern != null && _lantern.IsOn && !CameraUp;
+
+	/// <summary>The left hand round the top of the bail, from above (the pivot is the bail's top, its wire along X): the
+	/// back of the gloved hand up, four fingers curled over the wire and under it, the thumb round it from behind; the cuff,
+	/// and the jacket's sleeve reaching back from the wrist toward the body, out of the view's lower left corner.</summary>
+	private static void BuildBailGrip(Node3D parent)
+	{
+		if (BuildArm(parent, "fp_arm_bail_L", Vector3.Zero, 1.1f) != null) return;   // (the modelled one: one skin, no seams)
+		var k = new MeshKit();
+		k.Mat(new StandardMaterial3D { ResourceName = "glove", AlbedoColor = new Color(0.09f, 0.075f, 0.065f), Roughness = 0.85f, MetallicSpecular = 0.15f });
+		k.Color = Colors.White;
+		// the back of the hand, sloping up and back from the knuckles
+		k.Blob(new Vector3(-0.004f, 0.03f, 0.03f), new Vector3(0.036f, 0.016f, 0.036f), 4201, 0.08f, true, 1f);
+		k.Blob(new Vector3(-0.002f, 0.022f, 0.004f), new Vector3(0.038f, 0.017f, 0.016f), 4202, 0.08f, true, 1f);   // the knuckles' ridge
+		// four fingers over the wire: down its front and in under it
+		for (int i = 0; i < 4; i++)
+		{
+			float x = -0.027f + i * 0.018f;
+			float len = i == 0 ? 0.85f : i == 3 ? 0.9f : 1f;   // (the little finger and the first a touch short)
+			var a = new Vector3(x, 0.02f, -0.004f);
+			var b = new Vector3(x, 0.012f, -0.022f * len);
+			var c = new Vector3(x, -0.008f, -0.016f * len);
+			var d = new Vector3(x, -0.012f, 0.002f);
+			k.Cylinder(a, b, 0.0088f, 0.0082f, 7, true);
+			k.Cylinder(b, c, 0.0082f, 0.0076f, 7, true);
+			k.Cylinder(c, d, 0.0076f, 0.007f, 7, true);
+			k.Blob(b, Vector3.One * 0.0084f, 4210 + i, 0.02f, true, 1f);
+			k.Blob(c, Vector3.One * 0.0078f, 4220 + i, 0.02f, true, 1f);
+		}
+		// the thumb, round the wire from behind on the inside
+		k.Cylinder(new Vector3(0.03f, 0.022f, 0.03f), new Vector3(0.034f, 0.006f, 0.012f), 0.0105f, 0.0095f, 7, true);
+		k.Cylinder(new Vector3(0.034f, 0.006f, 0.012f), new Vector3(0.03f, -0.006f, -0.002f), 0.0095f, 0.0085f, 7, true);
+		// the wrist and the glove's cuff
+		k.Cylinder(new Vector3(-0.004f, 0.034f, 0.05f), new Vector3(-0.012f, 0.026f, 0.1f), 0.026f, 0.03f, 10, true);
+		k.Cylinder(new Vector3(-0.012f, 0.026f, 0.092f), new Vector3(-0.016f, 0.022f, 0.12f), 0.033f, 0.034f, 10, true);
+		// the sleeve: the jacket's, reaching back from the cuff to the elbow out of view
+		k.Mat(new StandardMaterial3D { ResourceName = "sleeve", AlbedoColor = JacketSleeve, Roughness = 1f, MetallicSpecular = 0f });
+		// (up from the view's lower left corner to the hand: run straight back, it lay across the view like a log)
+		k.Cylinder(new Vector3(-0.014f, 0.024f, 0.105f), new Vector3(-0.036f, -0.06f, 0.2f), 0.031f, 0.035f, 10, true);
+		k.Cylinder(new Vector3(-0.036f, -0.06f, 0.2f), new Vector3(-0.07f, -0.22f, 0.34f), 0.035f, 0.04f, 10, true);
+		k.Blob(new Vector3(-0.014f, 0.024f, 0.108f), new Vector3(0.037f, 0.036f, 0.012f), 4230, 0.1f, true, 1f);   // (the cuff's gather)
+		var mi = k.CommitTo(parent, "Hand", false);
+		mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		mi.Scale = Vector3.One * 1.15f;   // (a gloved hand: a little fuller than bare)
+	}
 
 	protected override void Animate(float dt)
 	{
@@ -113,6 +158,8 @@ public partial class HeldLantern : HeldItem
 			_ang = _ang.Clamp(new Vector2(-0.45f, -0.5f), new Vector2(0.45f, 0.5f));
 		}
 		_swing.Rotation = new Vector3(_ang.X, 0f, _ang.Y);
+		// the wrist giving a little with the lantern's swing (the hand isn't a clamp: it rides the weight)
+		if (GetNodeOrNull<Node3D>("Arm") is { } arm) arm.Rotation = new Vector3(_ang.X * 0.22f, 0f, _ang.Y * 0.18f);
 		// the flame's light from its glass; the violet bulb with the blacklight
 		if (_model.GetNodeOrNull<MeshInstance3D>("UvBulb") is { } uv) uv.Visible = _lantern.Blacklight;
 		AmberGlass.Emission = _lantern.Blacklight ? new Color(0.4f, 0.15f, 0.9f) : new Color(1f, 0.52f, 0.2f);

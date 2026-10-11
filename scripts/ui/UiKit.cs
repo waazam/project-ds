@@ -243,6 +243,19 @@ public static class UiKit
 		return c;
 	}
 
+	/// <summary>The settings in a scrolling panel <paramref name="height"/> tall (they outgrew the screen: 2026-10-11),
+	/// the wheel and the pad's focus scrolling it. Returns the rows' box.</summary>
+	public static VBoxContainer AddSettingsScroll(Container parent, float height)
+	{
+		var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(270, height), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, FollowFocus = true };
+		var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+		rows.AddThemeConstantOverride("separation", 5);
+		scroll.AddChild(rows);
+		parent.AddChild(scroll);
+		AddSettingsRows(rows);
+		return rows;
+	}
+
 	/// <summary>The settings shared by the main menu and the pause menu. Camera distance only in third person.</summary>
 	public static void AddSettingsRows(Container box)
 	{
@@ -254,6 +267,10 @@ public static class UiKit
 			AddSlider(box, "Camera distance", 1.6, 5.5, s.CameraDistance, v => s.CameraDistance = (float)v);
 		AddToggle(box, "Invert Y", s.InvertY, on => s.InvertY = on);
 		AddToggle(box, "Reduce flashing", s.ReduceFlashing, on => s.ReduceFlashing = on);
+		AddSlider(box, "Screen shake", 0.0, 1.0, s.ScreenShake, v => s.ScreenShake = (float)v, 0.05, v => $"{Mathf.RoundToInt((float)v * 100f)}%");
+		AddToggle(box, "Sound captions", s.SoundCaptions, on => s.SoundCaptions = on);
+		AddToggle(box, "Hold to crouch", s.HoldToCrouch, on => s.HoldToCrouch = on);
+		AddToggle(box, "Body in view", s.BodyInView, on => s.BodyInView = on);
 		AddToggle(box, "Head motion", s.HeadMotion, on => s.HeadMotion = on);
 		var strip = new BrightnessStrip { Gamma = s.Brightness };
 		AddSlider(box, "Brightness", GameSettings.BrightnessMin, GameSettings.BrightnessMax, s.Brightness, v => { s.Brightness = (float)v; strip.Gamma = (float)v; strip.QueueRedraw(); }, 0.05,
@@ -276,6 +293,21 @@ public static class UiKit
 		AddToggle(box, "CRT filter", s.CrtFilter, on => s.CrtFilter = on);
 		AddToggle(box, "Light in the fog", s.FogLighting, on => s.FogLighting = on);
 		AddSlider(box, "Shadows", 0, 2, s.Shadows, v => s.Shadows = Mathf.RoundToInt(v), 1, v => GameSettings.ShadowNames[Mathf.Clamp(Mathf.RoundToInt(v), 0, 2)]);
+		// the keys (2026-10-11): each action's key, pressed to change it
+		box.AddChild(MakeLabel("KEYS", HeadingLabel, HorizontalAlignment.Center));
+		foreach (var (action, label) in KeyRebinds.Actions)
+		{
+			var row = new HBoxContainer();
+			row.AddThemeConstantOverride("separation", 10);
+			var l = MakeLabel(label, DimLabel);
+			l.CustomMinimumSize = new Vector2(112, 0);
+			row.AddChild(l);
+			var b = new RebindButton { Action = action, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(0, 14) };
+			b.AddThemeFontOverride("font", Mono);
+			b.MouseEntered += () => b.GrabFocus();
+			row.AddChild(b);
+			box.AddChild(row);
+		}
 	}
 
 	/// <summary>A hairline rule in fog grey, like the website's section borders.</summary>

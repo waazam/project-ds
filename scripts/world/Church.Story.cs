@@ -138,6 +138,7 @@ public partial class Church
 	private void OnCandle(int i, PlayerController player)
 	{
 		if (CandleLit(i) || player?.Inventory is not { } inv || !inv.HasTool(ToolKind.Lighter)) return;
+		Player.HeldUse.Do(player, ToolKind.Lighter, CandleWorld(i), 1.4f);
 		AudioDirector.OneShot(this, "lighter_flick", 1, CandleWorld(i), -2f);
 		SetCandle(i, true);
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.ChurchCandle(i + 1));
@@ -202,6 +203,7 @@ public partial class Church
 	private void OnFont(PlayerController player)
 	{
 		if (FontOpen || player?.Inventory is not { } inv || !inv.HasTool(ToolKind.FontKey)) return;
+		Player.HeldUse.Do(player, ToolKind.FontKey, FontWorld);
 		inv.Consume(ToolKind.FontKey);
 		FontOpen = true;
 		_fontUse.Enabled = false;
@@ -245,6 +247,7 @@ public partial class Church
 	private void OnNiche(int i, PlayerController player)
 	{
 		if (i != 0 || ChalicePlaced || player?.Inventory is not { } inv || !inv.HasTool(ToolKind.Chalice)) return;
+		Player.HeldUse.Do(player, ToolKind.Chalice, _niches[0].GlobalPosition);
 		inv.Consume(ToolKind.Chalice);
 		ChalicePlaced = true;
 		_niches[0].Enabled = false;

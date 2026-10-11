@@ -98,6 +98,8 @@ public abstract partial class HeldItem : Node3D
 
 	/// <summary>The render layer the held things are on (out of the lantern's own light: see <see cref="SetLayer"/>).</summary>
 	public const uint HeldLayer = 1u << 19;
+	/// <summary>The jacket's sleeve, as the body's (a shade under its hips: the held things are lit close by their own fill).</summary>
+	public static readonly Color JacketSleeve = new(0.085f, 0.1f, 0.07f);
 
 	/// <summary>Puts everything drawn under <paramref name="n"/> on the held layer only.</summary>
 	protected static void SetLayer(Node n)
@@ -106,10 +108,46 @@ public abstract partial class HeldItem : Node3D
 		foreach (var c in n.GetChildren()) SetLayer(c);
 	}
 
-	/// <summary>A gloved fist (knuckles, a thumb round the front) and the cuff of a sleeve going down and back out of
-	/// view, at <paramref name="at"/> (the grip).</summary>
+	/// <summary>(2026-10-11, the owner: "I can see pieces of the player arm not connected to each other ... we need to
+	/// bridge the meshes") A first-person arm modelled in Blender as one fused skin (tools/Blender/fp_arms.py): glove,
+	/// wrist, cuff and sleeve together, its fingers curled round the grip at its origin. Null if the model's missing.</summary>
+	protected static Node3D BuildArm(Node3D parent, string model, Vector3 at, float scale = 1f)
+	{
+		string path = $"res://assets/models/player/{model}.glb";
+		if (!ResourceLoader.Exists(path)) return null;
+		var arm = GD.Load<PackedScene>(path).Instantiate<Node3D>();
+		arm.Name = "Arm";
+		arm.Position = at;
+		arm.Scale = Vector3.One * scale;
+		parent.AddChild(arm);
+		// its own baked maps (skin, nails, the sleeve); the sleeve drawn both sides (its cuff is open), the skin a soft sheen
+		foreach (var n in arm.FindChildren("*", "MeshInstance3D", true, false))
+		{
+			var mi = (MeshInstance3D)n;
+			mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+			for (int si = 0; si < mi.Mesh.GetSurfaceCount(); si++)
+				if (mi.Mesh.SurfaceGetMaterial(si) is StandardMaterial3D sm)
+				{
+					var m = (StandardMaterial3D)sm.Duplicate();
+					bool cloth = sm.ResourceName.StartsWith("fp_sleeve");
+					m.VertexColorUseAsAlbedo = true;   // (coloured by vertex: skin, knuckles, nails, the sleeve)
+					m.AlbedoColor = Colors.White;
+					m.AlbedoTexture = null;
+					m.CullMode = cloth ? BaseMaterial3D.CullModeEnum.Disabled : BaseMaterial3D.CullModeEnum.Back;
+					m.Roughness = cloth ? 0.95f : 0.55f;
+					m.MetallicSpecular = cloth ? 0.15f : 0.42f;   // (the gloves: dark leather, a soft sheen along the knuckles)
+					if (!cloth) { m.RimEnabled = true; m.Rim = 0.2f; m.RimTint = 0.3f; }
+					mi.SetSurfaceOverrideMaterial(si, m);
+				}
+		}
+		return arm;
+	}
+
+	/// <summary>The right hand's fist round a handle at <paramref name="at"/> (the grip), its forearm and sleeve back out
+	/// of view (<see cref="BuildArm"/>; the old built-up fist only if the model's missing).</summary>
 	protected static void BuildFist(Node3D parent, Vector3 at, Color glove, Color sleeve)
 	{
+		if (BuildArm(parent, "fp_arm_fist_R", at) != null) return;
 		var k = new World.MeshKit();
 		// (matte, no sheen: lit from beside, a glossy sleeve showed a pale streak and read as a pole)
 		k.Mat(new StandardMaterial3D { ResourceName = "glove", AlbedoColor = glove, Roughness = 1f, MetallicSpecular = 0f });
@@ -118,7 +156,8 @@ public abstract partial class HeldItem : Node3D
 		for (int i = 0; i < 4; i++)
 			k.Blob(at + new Vector3(-0.024f + i * 0.016f, 0.0f, -0.03f), new Vector3(0.011f, 0.014f, 0.012f), 4110 + i, 0.08f, true, 1f);
 		k.Blob(at + new Vector3(0.03f, 0.012f, -0.018f), new Vector3(0.012f, 0.022f, 0.012f), 4120, 0.08f, true, 1f);
-		k.Mat(new StandardMaterial3D { ResourceName = "sleeve", AlbedoColor = sleeve * 0.6f, Roughness = 1f, MetallicSpecular = 0f });
+		// (2026-10-11) the jacket's own dark olive (PlayerBody's): the sleeve in the hand and the hips below it one coat
+		k.Mat(new StandardMaterial3D { ResourceName = "sleeve", AlbedoColor = JacketSleeve, Roughness = 1f, MetallicSpecular = 0f });
 		// (the wrist and the forearm dropping steeply out of the bottom of the view: a long one, straight back, read as a pole)
 		k.Cylinder(at + new Vector3(-0.004f, 0.012f, 0.022f), at + new Vector3(-0.02f, -0.1f, 0.06f), 0.028f, 0.034f, 8, true);
 		k.Cylinder(at + new Vector3(-0.02f, -0.1f, 0.06f), at + new Vector3(-0.04f, -0.36f, 0.1f), 0.034f, 0.04f, 8, true);

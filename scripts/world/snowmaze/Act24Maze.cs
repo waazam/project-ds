@@ -37,6 +37,7 @@ public partial class Act24Maze : Node3D
 
 	public SnowMazeCave Cave { get; private set; }
 	public WendigoHunter Hunter { get; private set; }
+	public Audio.Act24Score Score { get; private set; }
 	public bool InMaze { get; private set; }
 	private UI.FrostEdge _frost;
 	public bool InCavern { get; private set; }
@@ -74,9 +75,12 @@ public partial class Act24Maze : Node3D
 		AddChild(Cave);
 		Prints = new SnowPrints { Name = "MazePrints" };
 		AddChild(Prints);
+		// the owner's song, through the hunt and the fight (Audio.Act24Score)
+		Score = new Audio.Act24Score { Name = "Score", Hunter = () => Hunter, InCavern = () => InCavern, InMaze = () => InMaze };
+		AddChild(Score);
 		// (2026-10-10b) the tunnels heard as snow: dead and close; the cavern rings
 		AudioDirector.Zone(Cave, new Vector3(45f, 4f, 39f), new Vector3(110f, 20f, 122f), AudioDirector.Space.Snow, "MazeVerb");
-		AudioDirector.Zone(Cave, SnowMazeLayout.CavernCentre + Vector3.Up * 4f, new Vector3(SnowMazeLayout.CavernRX * 2f, 12f, SnowMazeLayout.CavernRZ * 2f), AudioDirector.Space.Cavern, "CavernVerb", 1);
+		AudioDirector.Zone(Cave, SnowMazeLayout.CavernCentre + Vector3.Up * 4f, new Vector3(SnowMazeLayout.CavernRX * 2f, 12f, SnowMazeLayout.CavernRZ * 2f), AudioDirector.Space.IceCavern, "CavernVerb", 1);
 		Callable.From(BuildHole).CallDeferred();
 		if (Cave.Built) CallDeferred(nameof(Furnish));
 		else Cave.OnBuilt += () => CallDeferred(nameof(Furnish));
@@ -85,6 +89,7 @@ public partial class Act24Maze : Node3D
 	public override void _ExitTree()
 	{
 		if (Instance == this) Instance = null;
+		Audio.ForestDirector.Hush = false;
 		if (_feet != null && IsInstanceValid(_feet)) _feet.Stepped -= OnStep;
 	}
 
@@ -352,6 +357,8 @@ public partial class Act24Maze : Node3D
 		bool inside = l.Y > -6f && l.Y < 14f && l.X > -10f && l.X < 100f && l.Z > -22f && l.Z < 100f;
 		if (inside && !InMaze) { InMaze = true; StartHunt(); }
 		InMaze = inside;
+		Audio.ForestDirector.Hush = inside;
+		Audio.DreadDrone.Hush = inside;
 		// the cave's air: underground (no sky, no sun), a cold blue dark, everything muffled
 		if (StoryBeat.Atmosphere(this) is { } atmo)
 		{
@@ -384,7 +391,7 @@ public partial class Act24Maze : Node3D
 		}
 		if (_air != null)
 		{
-			_air.VolumeDb = Mathf.MoveToward(_air.VolumeDb, inside ? -6f : -80f, (float)delta * 20f);
+			_air.VolumeDb = Mathf.MoveToward(_air.VolumeDb, inside ? -13f : -80f, (float)delta * 20f);   // (2026-10-11: under the song, not over it)
 			if (_air.VolumeDb > -79f && !_air.Playing) _air.Play();
 			else if (_air.VolumeDb <= -79f && _air.Playing) _air.Stop();
 		}
@@ -456,6 +463,7 @@ public partial class Act24Maze : Node3D
 	{
 		GD.Print("[story] Act 24: prising the crate open");
 		await StoryBeat.PanTowards(this, player, _crate.GlobalPosition + Vector3.Up * 0.3f, 0.5f, ct, pitch: true);
+		HeldUse.Do(player, ToolKind.Crowbar, _crate.GlobalPosition + Vector3.Up * 0.45f, 2.3f);
 		for (int i = 0; i < 3; i++)
 		{
 			AudioDirector.OneShot(this, "door_strain", 2, _crate.GlobalPosition, -6f + i * 2f, "Events", 3f, 0.08f);

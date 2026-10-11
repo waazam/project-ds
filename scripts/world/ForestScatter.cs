@@ -56,6 +56,13 @@ public partial class ForestScatter : Node3D
 
 	private void Build()
 	{
+		// (2026-10-11, quicker loads: in the hollow, once the story's gone underground for good (past Act 13) the summer
+		// woods are never seen again, nor walked: their trees and rocks aren't built on a Continue there. A second off a load.)
+		if (GetTree().CurrentScene?.SceneFilePath == Systems.StoryManager.HollowScene && Systems.StoryManager.Instance is { Current: >= Systems.Checkpoint.Act13Finished })
+		{
+			GD.Print("[build] ForestScatter: skipped (the story is past the summer woods)");
+			return;
+		}
 		using var __timer = Systems.BuildTimer.Time("ForestScatter");
 		_terrain = GetTree().GetFirstNodeInGroup("terrain") as ForestTerrain;
 		if (_terrain == null) { GD.PushWarning("ForestScatter: no terrain in group 'terrain'"); return; }

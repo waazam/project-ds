@@ -307,8 +307,10 @@ public partial class SkiLodge
 				}
 			}
 			faces.AddRange(new[] { P(-0.5f, -0.5f, 0), P(0.5f, -0.5f, 0), P(0.5f, 0.5f, 0), P(-0.5f, -0.5f, 0), P(0.5f, 0.5f, 0), P(-0.5f, 0.5f, 0) });
-			// cobwebs in the corners, more the older it gets (none in the first third)
-			if (hidden && tier > 0 && webRng.Randf() < 0.18f * tier)
+			// cobwebs in the corners, more the older it gets (2026-10-11, the owner: "more cobwebs": a few in the first third
+			// now, most of the corners by the end, sometimes two to a cell)
+			for (int w = 0; w < 2; w++)
+			if (hidden && webRng.Randf() < (w == 0 ? 0.14f + 0.24f * tier : 0.12f * tier))
 			{
 				var sx = webRng.Randf() < 0.5f ? 1f : -1f; var sz = webRng.Randf() < 0.5f ? 1f : -1f;
 				WebKit.Corner(node, webRng, new Vector3(c.X + sx * 0.44f, FloorAt(cell, 0, 0) + oy + CrawlH - 0.03f, c.Z + sz * 0.44f), Vector3.Right * -sx, Vector3.Back * -sz, webRng.RandfRange(0.35f, 0.6f + 0.15f * tier));

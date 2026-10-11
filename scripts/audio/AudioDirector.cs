@@ -32,7 +32,7 @@ public partial class AudioDirector : Node
 	/// <summary>The physics layer the reverb zones sit on (20: nothing else uses it, so no ray or body sees them).</summary>
 	public const uint ReverbLayer = 1u << 19;
 
-	public enum Space { Room, Hall, Tunnel, Cavern, Snow }
+	public enum Space { Room, Hall, Tunnel, Cavern, Snow, IceCavern }
 
 	private static readonly Dictionary<Space, (string bus, float room, float damp, float wet, float amount, float preDelay)> Spaces = new()
 	{
@@ -42,6 +42,9 @@ public partial class AudioDirector : Node
 		[Space.Cavern] = ("VerbCavern", 0.95f, 0.25f, 0.36f, 0.75f, 0.08f),
 		// (2026-10-10b) packed snow all round: it swallows sound, a short, soft, dead ring and nothing more
 		[Space.Snow] = ("VerbSnow", 0.16f, 0.95f, 0.12f, 0.3f, 0.004f),
+		// (2026-10-11, the owner: "a little too much reverb in the cavern making all the audio suffer for it") Act 24's
+		// cavern under the snow: an ice cave, not a cathedral: a shorter, damped ring, a touch of it
+		[Space.IceCavern] = ("VerbIce", 0.55f, 0.6f, 0.14f, 0.35f, 0.025f),
 	};
 
 	/// <summary>The player's own reverb outdoors (the Player bus's default).</summary>
@@ -313,6 +316,7 @@ public partial class AudioDirector : Node
 		string path = $"res://assets/audio/sfx/{name}_{GD.RandRange(1, Mathf.Max(1, variants)):00}.wav";
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/sfx/{name}.wav";
 		if (!ResourceLoader.Exists(path) || from?.GetTree()?.CurrentScene is not { } root) return;
+		UI.SoundCaption.Heard(from, name, at);
 		float pitch = 1f + (float)GD.RandRange(-pitchJitter, pitchJitter);
 		if (at is { } w)
 		{

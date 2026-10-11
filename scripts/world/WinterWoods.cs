@@ -450,6 +450,7 @@ public partial class WinterWoods : Node3D
 	/// <summary>How heavily it snows on the road out of the church (Weather's 0..1), thinning to nothing by the lodge.</summary>
 	public const float RoadSnow = 0.85f;
 	private AudioStreamPlayer _wind;
+	private float _bellT = 25f;
 	private bool _silenced;
 	private double _clock, _nextTinkle = 8;
 	/// <summary>For tests: where the player is along the road (0 at the church, 1 at the lodge), and whether they're out in the woods.</summary>
@@ -540,6 +541,17 @@ public partial class WinterWoods : Node3D
 			if (outside && !_wind.Playing) _wind.Play();
 			float want = outside ? Mathf.Lerp(-11f, -24f, frozen) : -60f;
 			_wind.VolumeDb = Mathf.MoveToward(_wind.VolumeDb, want, dt * 8f);
+			// (2026-10-11) the church's bell, far behind them on the road, now and then: three tolls across the snow
+			if (outside && Church != null)
+			{
+				_bellT -= dt;
+				if (_bellT <= 0f)
+				{
+					_bellT = (float)GD.RandRange(70.0, 130.0);
+					if (player != null && player.GlobalPosition.DistanceTo(Church.GlobalPosition) > 60f)
+						Audio.AudioDirector.OneShot(this, "church_bell_far", 1, Church.GlobalPosition + Vector3.Up * 30f, 6f, "Events", 60f, 0.01f);
+				}
+			}
 			if (!outside && _wind.Playing && _wind.VolumeDb <= -59f) _wind.Stop();
 		}
 		if (outside && frozen > 0.35f && _clock >= _nextTinkle && player != null)

@@ -11,3 +11,6 @@ Dead Silent is made by GLHFDD. Third-party material used in the game, and what i
 | Anton (typeface) | the chapter title cards and the inventory's lettering (`assets/fonts/Anton-Regular.ttf`) | Vernon Adams, via Google Fonts | SIL Open Font License 1.1 (`assets/fonts/Anton-OFL.txt` ships with it) |
 | Wallpapers, window panes, fir needles, mould | the lodge (`tools/textures/make_wallpapers.py`, `make_window_pane.py`, `make_fir_needles.py`) | our own, drawn in code | ours |
 | The owner's snow textures, tablecloth jacquard, songs and samples | throughout | the owner | the owner's own |
+| "Petty Theft" (the song, cut into loops, impacts and synth stabs) | Act 24's score and the cues for finds and progress (`assets/audio/music/petty_theft/`) | the owner (soundcloud.com/alf452/petty-theft) | the owner's own |
+| The player's body | the first-person body and its shadow (`assets/models/player/player_body.glb`) | our own, modelled in code (`tools/Blender/player_body.py`) | ours |
+| Climb loop, lullaby, church bell | the load after the stairs, the lodge's music box, the winter's bell, the radio | our own, mixed from the game's sounds and synthesised (`tools/audio/make_climb_loop.py`, `tools/AudioGen/Motifs.cs`) | ours |

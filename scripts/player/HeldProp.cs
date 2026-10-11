@@ -14,7 +14,7 @@ public partial class HeldProp : HeldItem
 {
 	protected override Vector3 Rest => new(0.24f, -0.2f, -0.48f);
 	protected override Vector3 Lowered => new(0.3f, -0.75f, -0.45f);
-	protected override bool Wanted => Has && !CameraUp && !HeldFlare.AnyLit;
+	protected override bool Wanted => Has && !CameraUp && !HeldFlare.AnyLit && !HeldUse.Busy;
 
 	public bool Has { get; private set; }
 	public int Thrown { get; private set; }

@@ -87,6 +87,7 @@ public partial class SkiLodge
 		}
 		CrawlPosters = poster + paper;
 		StringLights(maze);
+		CrawlClutter(maze);   // (the wreaths, the holly, the paper and the bows: SkiLodge.CrawlClutter.cs)
 	}
 
 	private static Vector3 ToLocalIn(Node3D n, Vector3 lodgeLocal) => lodgeLocal;   // (the maze node sits at the lodge's origin)

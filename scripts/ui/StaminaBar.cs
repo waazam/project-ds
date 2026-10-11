@@ -68,13 +68,7 @@ public partial class StaminaBar : CanvasLayer
 		bool spent = !_stamina.CanRun;
 		bool running = _player.IsRunning || Preview != null;
 		float breath = 0.85f + 0.15f * Mathf.Sin(t * (running ? 5.5f : 1.8f));
-		// the bracket
-		float bl = 3f;
-		foreach (float sx in new[] { -1f, 1f })
-		{
-			float ex = sx < 0 ? 0.5f : size.X - 0.5f;
-			NeonKit.Line(_draw, new[] { new Vector2(ex - sx * bl, 0.5f), new Vector2(ex, 0.5f), new Vector2(ex, size.Y - 0.5f), new Vector2(ex - sx * bl, size.Y - 0.5f) }, 0.5f, 0.45f);
-		}
+		// (no bracket round it, 2026-10-11, the owner: the little [ ] "look bad")
 		// the ghost of the whole tube, and what's just drained lingering
 		NeonKit.Seg(_draw, new Vector2(x0, cy), new Vector2(x1, cy), 0.8f, 0.12f);
 		if (_ghost > _shown + 0.005f) NeonKit.Seg(_draw, new Vector2(x0 + len * _shown, cy), new Vector2(x0 + len * _ghost, cy), 1.0f, 0.3f);
@@ -95,11 +89,11 @@ public partial class StaminaBar : CanvasLayer
 		{
 			float u = Mathf.PosMod(t * (filling ? 0.9f : 1.6f), 1f);
 			float px = filling ? x0 + (end - x0) * u : end - (end - x0) * u;
-			_draw.DrawCircle(new Vector2(px, cy), 2.6f, new Color(NeonKit.Glow, 0.22f * breath));
+			_draw.DrawCircle(new Vector2(px, cy), 1.9f, new Color(NeonKit.Glow, 0.12f * breath));
 			_draw.DrawCircle(new Vector2(px, cy), 1.1f, new Color(NeonKit.Core, 0.7f * breath));
 		}
 		// the bright head where it ends
-		_draw.DrawCircle(new Vector2(end, cy), 2.4f, new Color(NeonKit.Glow, 0.3f * breath));
+		_draw.DrawCircle(new Vector2(end, cy), 1.8f, new Color(NeonKit.Glow, 0.15f * breath));
 		_draw.DrawCircle(new Vector2(end, cy), 1.0f, new Color(NeonKit.Core, 0.95f * breath));
 	}
 }

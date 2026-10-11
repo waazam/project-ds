@@ -29,7 +29,8 @@ public partial class ChapterCard : CanvasLayer
 	private static readonly string[] Numbers = { "", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT" };
 	/// <summary>(the owner: "dont make the chapter font red make it like that 3rd picture kind of off white topeish") An old
 	/// paper's off-white, a little taupe; the number under it a shade darker.</summary>
-	public static readonly Color Taupe = new(0.74f, 0.71f, 0.65f);
+	// (2026-10-11, the owner: "a little harsh and needs to be warmed up a little": a warmer, softer old-paper cream)
+	public static readonly Color Taupe = new(0.79f, 0.72f, 0.61f);
 
 	/// <summary>The chapters shown this session (for the tests), in order; 0 is the game's title.</summary>
 	public static readonly List<int> Shown = new();
@@ -92,7 +93,7 @@ public partial class ChapterCard : CanvasLayer
 		var grad = new Gradient();
 		grad.SetColor(0, new Color(0, 0, 0, 0));
 		grad.SetColor(1, new Color(0, 0, 0, 0));
-		grad.AddPoint(0.5f, new Color(0, 0, 0, 0.5f));
+		grad.AddPoint(0.5f, new Color(0, 0, 0, 0.32f));
 		_band = new TextureRect
 		{
 			Texture = new GradientTexture2D { Gradient = grad, FillFrom = new Vector2(0, 0), FillTo = new Vector2(0, 1), Width = 4, Height = 64 },
@@ -115,10 +116,12 @@ public partial class ChapterCard : CanvasLayer
 			while (size > 48 && font.GetStringSize(Titles[_n], HorizontalAlignment.Left, -1, size).X > 500) size -= 4;
 		_title.AddThemeFontSizeOverride("font_size", size);
 		_title.AddThemeColorOverride("font_color", col);
-		_title.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.6f));
+		// (the owner, 2026-10-11: "way way less shadow and be more subtle", as Alan Wake 2's: a faint soft lift, no
+		// hard dark rim round the letters)
+		_title.AddThemeColorOverride("font_shadow_color", new Color(0.05f, 0.03f, 0.02f, 0.22f));
 		_title.AddThemeConstantOverride("shadow_offset_x", 0);
-		_title.AddThemeConstantOverride("shadow_offset_y", 2);
-		_title.AddThemeConstantOverride("shadow_outline_size", title ? 6 : 10);
+		_title.AddThemeConstantOverride("shadow_offset_y", 1);
+		_title.AddThemeConstantOverride("shadow_outline_size", 2);
 		_title.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_title.OffsetTop = title ? 0 : -14;
 		_root.AddChild(_title);

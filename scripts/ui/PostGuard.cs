@@ -30,6 +30,8 @@ public partial class PostGuard : Node
 		var post = StoryBeat.PostMaterial(this);
 		if (post == null) return;
 		float v = post.GetShaderParameter("vignette").AsSingle();
-		if (v > RestVignette + 0.001f) post.SetShaderParameter("vignette", Mathf.MoveToward(v, RestVignette, (float)delta * 1.5f));
+		// (rest, plus the body's own: spent, afraid; Player.BodyState)
+		float rest = RestVignette + Player.BodyState.VignetteExtra;
+		if (Mathf.Abs(v - rest) > 0.001f) post.SetShaderParameter("vignette", Mathf.MoveToward(v, rest, (float)delta * (Player.BodyState.VignetteExtra > 0.01f ? 4f : 1.5f)));
 	}
 }

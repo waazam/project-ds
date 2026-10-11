@@ -98,6 +98,10 @@ public partial class SkiLodge
 	{
 		_finaleRunning = true;
 		GD.Print("[story] Act 23: the front door - pushing it open against the snow");
+		// the snow outside the doors, there from the start (2026-10-11, the owner: going out into the tunnel "still isnt
+		// showing up in a clean transition"): built only at the act's end, the porch stood bare in the doorway while they
+		// looked out, and the vault of snow came in after. Now it's what the doors are pushed against, and what it runs into.
+		EnsureAct24();
 		player.Velocity = Vector3.Zero;
 		var stand = ToGlobal(new Vector3(0.35f, FloorY, HexIn - 1.0f));
 		var walk = player.CreateTween();
@@ -239,10 +243,11 @@ public partial class SkiLodge
 		}
 		await Cutscene.Tween(this, outT, ct);
 		bool gone = false;
-		FinaleWendigo.Leap(ToGlobal(new Vector3(3f, 3.5f, Apothem + 22f)), 1.0f * Pace, () => gone = true, arc: 1.6f);
+		// (off down the tunnel: low, under its vault of snow, not up through it)
+		FinaleWendigo.Leap(ToGlobal(new Vector3(0.6f, 0.3f, Apothem + 21f)), 1.0f * Pace, () => gone = true, arc: 0.7f);
 		for (int w = 0; w < 50 && !gone; w++) await Cutscene.Wait(this, 0.05, ct);
 		follow = false;
-		GD.Print("[story] Act 23: through the doors, across the porch, and gone into the storm");
+		GD.Print("[story] Act 23: through the doors, across the porch, and gone down the tunnel of snow");
 		await Cutscene.Wait(this, 1.4, ct);
 		AudioDirector.OneShot(this, "wendigo_howl_far", 3, ToGlobal(new Vector3(-10f, 6f, Apothem + 60f)), 4f, "Unnatural", 30f, 0.03f);
 		await Cutscene.Wait(this, 1.2, ct);
@@ -269,7 +274,7 @@ public partial class SkiLodge
 		GD.Print("[story] Act 23: at the splintered doorway, looking left, and right - the end of Act 23");
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act23Finished);
 		BuildHeatWall();   // (no going back into the fire)
-		// on into Act 24: its tracks go off across the snow, to a hole in a drift (the maze is built, if it wasn't)
+		// on into Act 24: its tracks go off down the snow tunnel, to a hole in a drift (built as the finale began)
 		EnsureAct24();
 		_ = StoryBeat.Caption(this, "Its tracks go off across the snow.", 0.6f, 2.8f, 1f);
 	}

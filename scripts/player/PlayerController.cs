@@ -91,6 +91,8 @@ public partial class PlayerController : CharacterBody3D
 		AddChild(new Audio.DreadDrone { Name = "Dread" });   // the dread: something near, unseen (2026-10-10)
 		AddChild(new Audio.RadioVoices { Name = "RadioVoices" });   // the radio picking things up (2026-10-10b)
 		AddChild(new World.LanternMoths { Name = "Moths" });   // moths at the lantern, summer nights in the woods (2026-10-10)
+		AddChild(new BodyState { Name = "BodyState" });   // spent and afraid, shown on the body (2026-10-11)
+		AddChild(new PlayerBody { Name = "Body" });   // their own body, seen looking down, and its shadow (2026-10-11)
 		PlayerInput = GetNode<PlayerInput>(InputPath);
 		CameraRig = GetNode<PlayerCameraRig>(CameraRigPath);
 		Visual = GetNode<Node3D>(VisualPath);
@@ -175,7 +177,11 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 wish = right * move.X + forward * move.Y;
 
 		// crouch: the toggle; running from a crouch stands up first (if there's room)
-		if (PlayerInput.CrouchPressed) SetCrouch(!Crouching);
+		// (or, with "Hold to crouch", down while the key's held, up once it's let go and there's room)
+		// (a cutscene's crouch is left alone: only while the player's in control)
+		bool hold = Systems.GameSettings.Instance?.HoldToCrouch == true && !PlayerInput.Scripted;
+		if (hold) { if (PlayerInput.IsLive) { if (PlayerInput.CrouchHeld && !Crouching) SetCrouch(true); else if (!PlayerInput.CrouchHeld && Crouching && RoomToStand()) SetCrouch(false); } }
+		else if (PlayerInput.CrouchPressed) SetCrouch(!Crouching);
 		else if (Crouching && PlayerInput.Run && move.Y > 0.3f && _crouchT >= 1f) SetCrouch(false);
 		UpdateCrouch(dt);
 

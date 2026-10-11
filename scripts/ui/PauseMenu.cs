@@ -44,6 +44,8 @@ public partial class PauseMenu : CanvasLayer
 		if (!open) GameSettings.Instance.Save();
 	}
 
+	private Label _time;
+
 	private void Build()
 	{
 		_root = UiKit.Apply(new Control { MouseFilter = Control.MouseFilterEnum.Stop });
@@ -64,16 +66,30 @@ public partial class PauseMenu : CanvasLayer
 		_root.AddChild(box);
 
 		box.AddChild(UiKit.MakeLabel("PAUSED", UiKit.HeadingLabel, HorizontalAlignment.Center));
+		// the time played, here only (2026-10-11, the owner: "we need the timer to either be hidden or only viewable in the
+		// pause menu"), and the chapter they're in
+		_time = UiKit.MakeLabel("", UiKit.DimLabel, HorizontalAlignment.Center);
+		box.AddChild(_time);
 		box.AddChild(UiKit.Rule(150));
 		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
 
-		UiKit.AddSettingsRows(box);
+		UiKit.AddSettingsScroll(box, 160);
 
 		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
 		_resume = UiKit.MakeButton("Resume", () => SetOpen(false), true);
 		box.AddChild(_resume);
 		box.AddChild(UiKit.MakeButton("Quit to Menu", () => { GameSettings.Instance.Save(); StoryManager.Instance.ReturnToMenu(); }, true));
 		box.AddChild(UiKit.MakeButton("Quit", () => GetTree().Quit(), true));
-		_root.VisibilityChanged += () => { if (_root.Visible) _resume.CallDeferred(Control.MethodName.GrabFocus); };
+		_root.VisibilityChanged += () =>
+		{
+			if (!_root.Visible) return;
+			_resume.CallDeferred(Control.MethodName.GrabFocus);
+			var sm = StoryManager.Instance;
+			double t = sm?.PlaySeconds ?? 0;
+			int ch = 0;
+			if (sm != null) for (int n = 1; n < ChapterCard.Titles.Length; n++) if (sm.HasFlag(ChapterCard.Flag(n))) ch = n;
+			string chapter = ch > 0 ? $"Chapter {ch}: {System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(ChapterCard.Titles[ch].ToLowerInvariant())}   ·   " : "";
+			_time.Text = $"{chapter}{(int)(t / 3600)}:{(int)(t / 60) % 60:00}:{(int)t % 60:00} played";
+		};
 	}
 }

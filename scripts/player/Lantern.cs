@@ -170,6 +170,9 @@ public partial class Lantern : Node3D
 		};
 		AddChild(_glow);
 		_glow.LightCullMask &= ~HeldItem.HeldLayer;   // (not on the lantern in the hand, an inch from it: see HeldLantern)
+		// nor its shadows (2026-10-11): the cull mask leaves the held lantern unlit but it still cast, and its wire guards'
+		// rings and struts, right round the flame, threw a heavy grid over everything
+		_glow.ShadowCasterMask &= ~HeldItem.HeldLayer;
 		BuildCage(_glow);
 		// the lantern in the hand, seen (once the camera's there)
 		Callable.From(() => { if (GetParent() is PlayerController p && p.CameraRig?.Camera != null) HeldItem.Attach<HeldLantern>(p); }).CallDeferred();
@@ -185,6 +188,7 @@ public partial class Lantern : Node3D
 			LightVolumetricFogEnergy = 0.45f,   // the gathered beam shows in the fog as a shaft
 		};
 		_beam.LightCullMask &= ~HeldItem.HeldLayer;
+		_beam.ShadowCasterMask &= ~HeldItem.HeldLayer;
 		AddChild(_beam);
 	}
 
@@ -199,19 +203,14 @@ public partial class Lantern : Node3D
 		var k = new World.MeshKit();
 		k.Mat(new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, AlbedoColor = Colors.Black });
 		const float R = 0.07f;
+		// (2026-10-11, the owner: "too many shadows from its cage ... make the shadows thinner and less noticeable": the
+		// wire rings' bands gone, the four struts a third as thick; with the flame's size their shadows are faint soft lines)
 		foreach (float deg in new[] { 40f, -40f, 140f, -140f })
 		{
 			float a = Mathf.DegToRad(deg);
 			Vector3 at = new(-Mathf.Sin(a) * R, 0, -Mathf.Cos(a) * R);
-			k.Cylinder(at + Vector3.Down * 0.075f, at + Vector3.Up * 0.075f, 0.0022f, 0.0022f, 5, false);
+			k.Cylinder(at + Vector3.Down * 0.06f, at + Vector3.Up * 0.06f, 0.0008f, 0.0008f, 4, false);
 		}
-		// the wire rings just inside the hood and the base
-		foreach (float y in new[] { 0.062f, -0.066f })
-			for (int i = 0; i < 16; i++)
-			{
-				float a0 = Mathf.Tau * i / 16f, a1 = Mathf.Tau * (i + 1) / 16f;
-				k.Cylinder(new Vector3(Mathf.Cos(a0) * R, y, Mathf.Sin(a0) * R), new Vector3(Mathf.Cos(a1) * R, y, Mathf.Sin(a1) * R), 0.002f, 0.002f, 4, false);
-			}
 		// (no hood or base in its shadows any more, 2026-10-07: the base's disc under the flame shadowed the ground for a
 		// metre all round them, and the storm walk was too dark to see; the struts' soft bands stay)
 		var mi = new MeshInstance3D { Name = "Shadow", Mesh = k.Commit(), CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly };

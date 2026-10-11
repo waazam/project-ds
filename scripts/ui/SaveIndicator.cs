@@ -62,7 +62,7 @@ public partial class SaveIndicator : CanvasLayer
 	{
 		if (_t < 0f) return;
 		// (2026-10-10c, the owner: "we need the saving animated icon to not be gray and be more realistic") a real 35mm
-		// canister now: brushed metal shaded round its curve, a printed label (a film stock's yellow and black, no maker),
+		// canister now: brushed metal shaded round its curve, a printed label (a film stock's green, no maker),
 		// the knob and the lip catching the light, and the film's leader, amber and translucent, its sprocket holes,
 		// winding in while the save runs. In and out softly; a slow glint travels down the metal (never a flicker).
 		float fade = Mathf.Min(Mathf.Clamp(_t / 0.35f, 0f, 1f), Mathf.Clamp((Seconds - _t) / 0.5f, 0f, 1f));
@@ -110,18 +110,18 @@ public partial class SaveIndicator : CanvasLayer
 		float turn = travel / 18f * Mathf.Tau;
 		float nx = 15.5f + 2.6f * Mathf.Sin(turn);
 		if (Mathf.Cos(turn) > -0.2f) c.DrawRect(new Rect2(nx - 0.6f, 3f, 1.2f, 4f), new Color(0.1f, 0.1f, 0.1f, a));
-		Cyl(5, 7, 21, 3, metal, 0f);                                // the top lip
+		var cap = new Color(0.12f, 0.12f, 0.12f);                    // (the reference's: black caps)
+		Cyl(5, 7, 21, 3, cap, 0f);                                  // the top lip
 		Cyl(6, 10, 19, 26, metal, 1f);                              // the body
-		Cyl(5, 36, 21, 3, metal, 0f);                               // the bottom lip
-		// the label: a film stock's yellow, a black band, a red stripe, a few marks like the print on it
-		Cyl(6, 13, 19, 20, new Color(0.95f, 0.72f, 0.12f), 0.6f);
-		Cyl(6, 20, 19, 6, new Color(0.08f, 0.07f, 0.06f), 0f);
-		Cyl(6, 27, 19, 2, new Color(0.75f, 0.12f, 0.08f), 0f);
-		var print = new Color(0.95f, 0.85f, 0.6f, a);
-		c.DrawRect(new Rect2(9, 22, 9, 1.2f), print);      // the stock's name, a line of small print
-		c.DrawRect(new Rect2(9, 24, 6, 0.9f), print);
-		c.DrawRect(new Rect2(19, 21.5f, 3, 3.5f), new Color(0.95f, 0.72f, 0.12f, a));   // a little yellow box: its speed
-		c.DrawRect(new Rect2(9, 16, 12, 1.5f), new Color(0.2f, 0.12f, 0.04f, a * 0.8f));
+		Cyl(5, 36, 21, 3, cap, 0f);                                 // the bottom lip
+		// the label: all one film stock's green (2026-10-11, the owner's reference: "swap the yellow for a green ... cut the
+		// yellow off the bottom though and make it all that green"), its print in white
+		var green = new Color(0.13f, 0.6f, 0.2f);
+		Cyl(6, 12, 19, 22, green, 0.6f);
+		var print = new Color(0.95f, 0.97f, 0.93f, a);
+		c.DrawRect(new Rect2(9, 16.5f, 11, 1.6f), print);   // the stock's name across it, a line of white
+		c.DrawRect(new Rect2(9, 19.5f, 7, 0.9f), new Color(print, a * 0.75f));
+		c.DrawRect(new Rect2(9, 28, 9, 1.1f), new Color(print, a * 0.6f));
 		// the light-trap the film runs into: black felt down its right edge
 		c.DrawRect(new Rect2(23.5f, 11, 1.8f, 22), new Color(0.03f, 0.03f, 0.03f, a));
 		// outlined in the HUD's neon (the inventory's and the compass's colour), breathing with the save

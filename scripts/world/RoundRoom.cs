@@ -529,6 +529,7 @@ public partial class RoundRoom : Node3D
 	{
 		if (WebsBurned || player?.Inventory is not { } inv || !inv.HasTool(ToolKind.Lighter)) return;
 		WebsBurned = true;
+		Player.HeldUse.Do(player, ToolKind.Lighter, WebUse.GlobalPosition, 2.2f);
 		WebUse.Enabled = false;
 		_ = Cutscene.Run(this, ct => BurnWebs(player, ct), lockInput: true);
 	}

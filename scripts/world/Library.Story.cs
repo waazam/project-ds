@@ -178,6 +178,7 @@ public partial class Library
 	private void OnBook(PlayerController player)
 	{
 		if (BookcaseOpen || player?.Inventory is not { } inv || !inv.HasTool(ToolKind.Bookmark)) return;
+		Player.HeldUse.Do(player, ToolKind.Bookmark, _jutting.GlobalPosition);
 		inv.Consume(ToolKind.Bookmark);
 		BookcaseOpen = true;
 		BookUse.Enabled = false;

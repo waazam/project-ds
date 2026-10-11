@@ -325,7 +325,11 @@ public partial class StoryManager : Node
 			Inventory = PendingInventory,
 		};
 		ArrivedByTravel = true;
-		ChangeScene(LevelFor(Current));
+		// the black filled while the next level builds: the climb going on, up the stairs; the wind, elsewhere
+		string next = LevelFor(Current);
+		BlackBridge.Begin(GetTree(), next == HollowScene ? "res://assets/audio/ambient/climb_dark_loop.wav" : "res://assets/audio/ambient/winter_wind_loop.wav",
+			next == HollowScene ? -5f : -12f);
+		ChangeScene(next);
 	}
 
 	/// <summary>Every scene change goes through here: the pause menu's pause must never survive it.</summary>
@@ -343,7 +347,7 @@ public partial class StoryManager : Node
 		_markers.Clear();
 		// Deferred: this is often called from _Ready(), while the tree is still busy adding the caller. The levels' packed
 		// scenes are kept once loaded (a death's reload, or Act 25's way back, needn't read them from disk again).
-		Callable.From(() => _ = ChangeSceneWhenRead(path)).CallDeferred();
+		Callable.From(() => { _ = ChangeSceneWhenRead(path); }).CallDeferred();
 	}
 
 	/// <summary>The change itself, once the level's read: a background read still running is waited on a frame at a time

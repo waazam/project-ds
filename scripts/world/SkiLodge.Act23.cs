@@ -200,6 +200,8 @@ public partial class SkiLodge
 		GD.Print("[story] Act 23: the snow comes off the roof and buries the back door - snowed in");
 		await Cutscene.Wait(this, 1.2, ct);
 		_ = StoryBeat.Caption(this, "Snowed in.", 0.4f, 2.2f, 1f);
+		// (2026-10-11) somewhere upstairs, very faint, a music box starts, plays its tune, and winds down: the lodge's own
+		AudioDirector.OneShot(this, "musicbox_lullaby", 1, ToGlobal(new Vector3(CorrX0 + 4f, UpperY + 1.2f, 4.5f)), -6f, "Events", 6f, 0f);
 		UI.ChapterCard.Show(this, 7, 4.5f);
 	}
 
@@ -752,7 +754,8 @@ public partial class SkiLodge
 			k.Mat(StationParts.StationTextures.BloodPoolMat);
 			k.Cylinder(new Vector3(0.05f, 0.026f, -0.1f), new Vector3(0.05f, 0.028f, -0.1f), instant ? 0.42f : 0.2f, instant ? 0.42f : 0.2f, 14, true);
 		}
-		PlatterSkull = new Wendigo { Name = "Skull", Position = new Vector3(0, 0.12f, 0.05f), Scale = Vector3.One * 0.5f };   // (the new skull, its rack, is far bigger)
+		// (2026-10-11, the owner: "needs to be larger": three-quarters of its full size, not a half)
+		PlatterSkull = new Wendigo { Name = "Skull", Position = new Vector3(0, 0.12f, 0.05f), Scale = Vector3.One * 0.75f };
 		holder.AddChild(PlatterSkull);
 		PlatterSkull.ShowOnlyHead();
 		PlatterSkull.Rotation = new Vector3(0, 0.6f, 0);
@@ -771,6 +774,44 @@ public partial class SkiLodge
 		holder.AddChild(blood);
 		Callable.From(() => { if (IsInstanceValid(PlatterSkull) && IsInstanceValid(blood)) blood.GlobalPosition = PlatterSkull.MouthWorld; }).CallDeferred();
 		AudioDirector.OneShot(this, "blood_drain", 1, holder.GlobalPosition, -10f, "Events", 3f, 0.05f);
+	}
+
+	private float _skullYaw = 0.6f, _skullPitch, _skullTurnSpeed;
+	private double _skullGrind;
+	/// <summary>For tests: how far (radians) the platter's skull is from facing the player's head.</summary>
+	public float SkullOffLook { get; private set; } = Mathf.Pi;
+
+	/// <summary>(2026-10-11, the owner: "the skull just looking away from the player, we should track it to the players
+	/// head so it looks at us") The head on the platter turns to follow them round the table: slowly, with weight (it
+	/// eases into a turn and settles out of it, a little behind), tipping back to look up at their face as they come
+	/// close; a dry scrape of bone on silver when it starts to move.</summary>
+	private void PlatterTick(PlayerController player, float dt)
+	{
+		if (PlatterSkull == null || !IsInstanceValid(PlatterSkull) || !PlatterSkull.IsVisibleInTree() || Frozen) return;
+		var skull = PlatterSkull.GlobalPosition + Vector3.Up * 0.25f;
+		var to = player.HeadWorld - skull;
+		if (to.Length() > 14f) return;
+		var flat = to with { Y = 0 };
+		// (the holder's own turn taken out: the yaw is the skull's, in its parent's space)
+		var parent = PlatterSkull.GetParent<Node3D>();
+		var local = parent.GlobalBasis.Inverse() * flat;
+		float wantYaw = Mathf.Atan2(-local.X, -local.Z);
+		float wantPitch = Mathf.Clamp(Mathf.Atan2(to.Y, Mathf.Max(flat.Length(), 0.3f)), -0.1f, 0.5f);
+		float diff = Mathf.AngleDifference(_skullYaw, wantYaw);
+		// a slow, heavy turn: speeding up into it, easing off as it comes round (never snapping)
+		float target = Mathf.Clamp(diff * 1.6f, -0.9f, 0.9f);
+		float before = Mathf.Abs(_skullTurnSpeed);
+		_skullTurnSpeed = Mathf.MoveToward(_skullTurnSpeed, target, dt * 1.4f);
+		_skullYaw += _skullTurnSpeed * dt;
+		_skullPitch = Mathf.Lerp(_skullPitch, wantPitch, 1f - Mathf.Exp(-dt * 1.5f));
+		PlatterSkull.Rotation = new Vector3(_skullPitch, _skullYaw, 0);
+		SkullOffLook = Mathf.Abs(Mathf.AngleDifference(_skullYaw, wantYaw));
+		_skullGrind -= dt;
+		if (before < 0.05f && Mathf.Abs(_skullTurnSpeed) >= 0.05f && _skullGrind <= 0)
+		{
+			_skullGrind = 4.0;
+			AudioDirector.OneShot(this, "door_strain", 2, skull, -18f, "Events", 3f, 0.1f);
+		}
 	}
 
 	/// <summary>Little roaches pouring off the table, in every direction, and gone over its edges.</summary>
@@ -1032,6 +1073,8 @@ public partial class SkiLodge
 		SheetTick(player);
 		FireTick(delta);
 		HauntTick(player, ToLocal(player.GlobalPosition));
+		LookBackTick(player, delta);
+		PlatterTick(player, dt);
 		AjarTick(player, ToLocal(player.GlobalPosition));
 		SoundsProcess(l, inside);
 		// the light in here: clean and warm (noon, every lamp lit), not the woods' murk; cold once it's frozen over

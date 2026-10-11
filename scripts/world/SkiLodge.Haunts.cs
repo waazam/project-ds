@@ -34,6 +34,7 @@ public partial class SkiLodge
 	private void LodgeHaunts()
 	{
 		_hauntsBuilt = true;
+		BuildLookBacks();
 		// the room keys, each on its own hook so it can swing (they were part of the desk's mesh)
 		var tagMat = LodgeTextures.BrassMat;
 		foreach (float x in new[] { 5.35f, 5.0f, 4.65f, 4.3f })
@@ -67,6 +68,9 @@ public partial class SkiLodge
 		else if (lobby && new Vector2(l.X - 5.1f, l.Z - 7.3f).Length() < 2.6f && Once("keys")) Keys();
 		else if (stairs && Once("lamps")) Lamps();
 		else if (upstairs && InRoom(204, l) && Once("knock")) Knock();
+		// the music box again, in the room next to theirs (its tune winding down, the last note never coming)
+		else if (upstairs && !corridor && Once("musicbox"))
+			AudioDirector.OneShot(this, "musicbox_lullaby", 1, ToGlobal(new Vector3(l.X < RoomSplitX ? RoomSplitX + 3f : RoomSplitX - 3f, UpperY + 1f, l.Z)), 0f, "Events", 5f, 0f);
 	}
 
 	private bool Once(string what, bool mark = true)

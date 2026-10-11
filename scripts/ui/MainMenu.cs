@@ -164,9 +164,8 @@ public partial class MainMenu : Node
 		box.AddChild(UiKit.MakeLabel("SETTINGS", UiKit.HeadingLabel, HorizontalAlignment.Center));
 		box.AddChild(UiKit.Rule(150));
 		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
-		int before = box.GetChildCount();
-		UiKit.AddSettingsRows(box);
-		_firstSetting = FirstFocusable(box.GetChild(before));
+		var rows = UiKit.AddSettingsScroll(box, 170);
+		_firstSetting = FirstFocusable(rows.GetChild(0));
 
 		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
 		box.AddChild(UiKit.MakeButton("Back", () =>

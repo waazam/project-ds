@@ -31,7 +31,9 @@ public partial class Leviathan : Node3D
 	public const float StrikeSeconds = 0.3f;
 	public const float Length = 30f;
 	/// <summary>The tube's rings (and bones) along a limb: two to a segment.</summary>
-	private const int RingsPer = 2, Rings = Segments * RingsPer + 1, Sides = 18;
+	/// <summary>(2026-10-11, the owner: the tentacles "all segmented and not a concise designed model": four rings to a
+	/// segment now, not two, so a tight bend curves instead of hinging at every ring)</summary>
+	private const int RingsPer = 4, Rings = Segments * RingsPer + 1, Sides = 18;
 
 	public sealed class Tentacle
 	{
@@ -122,26 +124,22 @@ public partial class Leviathan : Node3D
 
 	private void BuildBody()
 	{
-		var k = new MeshKit();
-		k.Mat(_bodySkin);
-		k.Color = Colors.White;
-		// (2026-10-10, the owner: "better connected and less blocky looking") the hide finely rounded now (it was
-		// forty-odd facets across ten metres), lumped and folded, and every limb grown out of it through a swollen collar
-		k.Blob(Vector3.Zero, new Vector3(10.5f, 8f, 10.5f), 18, 0.035f, false, 1f, 0f, 3);
+		// (2026-10-11, the owner: "chunked" pieces, "we need to bridge the meshes") the hide one continuous surface: the
+		// same lobes as before (the mound, its nine lumps, the folds round the waterline, a swollen collar where each limb
+		// leaves it), not drawn as overlapping balls any more but fused, a sphere pushed out to their soft union, so one
+		// lump flows into the next with no crease where they met
+		var lobes = new List<(Vector3 c, Vector3 r)> { (Vector3.Zero, new Vector3(10.5f, 8f, 10.5f)) };
 		for (int i = 0; i < 9; i++)
 		{
 			float a = i / 9f * Mathf.Tau + 0.3f;
 			float lr = _rng.RandfRange(3.8f, 5.4f);
-			k.Blob(new Vector3(Mathf.Cos(a) * 7f, _rng.RandfRange(-2f, 2.5f), Mathf.Sin(a) * 7f), new Vector3(lr * 1.25f, lr * 0.72f, lr * 1.25f), 40 + i, 0.06f, false, 1f, 0f, 2);
+			lobes.Add((new Vector3(Mathf.Cos(a) * 7f, _rng.RandfRange(-2f, 2.5f), Mathf.Sin(a) * 7f), new Vector3(lr * 1.25f, lr * 0.72f, lr * 1.25f)));
 		}
-		// folds between the lumps, low round the waterline
 		for (int i = 0; i < 14; i++)
 		{
 			float a = (i + 0.5f) / 14f * Mathf.Tau;
-			k.Blob(new Vector3(Mathf.Cos(a) * 9.2f, _rng.RandfRange(-3.5f, -1f), Mathf.Sin(a) * 9.2f), new Vector3(2.6f, 1.6f, 2.6f) * _rng.RandfRange(0.8f, 1.2f), 70 + i, 0.08f, false, 1f, 0f, 2);
+			lobes.Add((new Vector3(Mathf.Cos(a) * 9.2f, _rng.RandfRange(-3.5f, -1f), Mathf.Sin(a) * 9.2f), new Vector3(2.6f, 1.6f, 2.6f) * _rng.RandfRange(0.8f, 1.2f)));
 		}
-		// the collars: where each limb leaves the body the flesh swells up round it, so it grows out of the body
-		// rather than being stuck in it
 		for (int ti = 0; ti < _tentacles.Count; ti++)
 		{
 			var t = _tentacles[ti];
@@ -151,22 +149,77 @@ public partial class Leviathan : Node3D
 			Vector3 surf = new(dir.X * 10.3f, dir.Y * 7.9f, dir.Z * 10.3f);
 			Vector3 toward = (rel + Vector3.Up * 3f - surf) * 0.25f;
 			float cr = t.BaseR * 1.9f + 0.4f;
-			k.Blob(surf, new Vector3(cr, cr * 0.8f, cr), 90 + ti, 0.07f, false, 1f, 0f, 2);
-			k.Blob(surf + toward + dir * cr * 0.35f, Vector3.One * cr * 0.7f, 120 + ti, 0.06f, false, 1f, 0f, 2);
+			lobes.Add((surf, new Vector3(cr, cr * 0.8f, cr)));
+			lobes.Add((surf + toward + dir * cr * 0.35f, Vector3.One * cr * 0.7f));
 		}
-		k.CommitTo(_body, "Hide", true);
+		_lobes = lobes;
+		_hideNoise = new FastNoiseLite { Seed = 1818, Frequency = 0.35f, FractalOctaves = 3 };
+		var sphere = new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 160, Rings = 80 }.GetMeshArrays();
+		var src = (Vector3[])sphere[(int)Mesh.ArrayType.Vertex];
+		var v = new Vector3[src.Length];
+		var nrm = new Vector3[src.Length];
+		for (int i = 0; i < src.Length; i++)
+		{
+			var d = src[i].Normalized();
+			v[i] = d * HideRadius(d);
+			// the normal from the surface itself (two nearby rays): no seam where the sphere's own ends meet
+			var tu = d.Cross(Mathf.Abs(d.Y) < 0.99f ? Vector3.Up : Vector3.Right).Normalized();
+			var tv = d.Cross(tu);
+			const float h = 0.004f;
+			var du = (d + tu * h).Normalized();
+			var dv = (d + tv * h).Normalized();
+			var n = (du * HideRadius(du) - v[i]).Cross(dv * HideRadius(dv) - v[i]).Normalized();
+			nrm[i] = n.Dot(d) < 0 ? -n : n;
+		}
+		sphere[(int)Mesh.ArrayType.Vertex] = v;
+		sphere[(int)Mesh.ArrayType.Normal] = nrm;
+		sphere[(int)Mesh.ArrayType.Tangent] = default;
+		var mesh = new ArrayMesh();
+		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, sphere);
+		mesh.SurfaceSetMaterial(0, _bodySkin);
+		_body.AddChild(new MeshInstance3D { Name = "Hide", Mesh = mesh });
 		// eyes all over the upper half, big ones near the crown
 		for (int e = 0; e < 46; e++)
 		{
 			float a = _rng.RandfRange(0, Mathf.Tau), up = Mathf.Lerp(0.15f, 1f, Mathf.Pow(_rng.Randf(), 0.7f));
 			Vector3 dir = new Vector3(Mathf.Cos(a) * Mathf.Sqrt(1 - up * up), up, Mathf.Sin(a) * Mathf.Sqrt(1 - up * up)).Normalized();
-			Vector3 at = new(dir.X * 10.2f, dir.Y * 7.8f, dir.Z * 10.2f);
+			Vector3 ed = new Vector3(dir.X * 10.2f, dir.Y * 7.8f, dir.Z * 10.2f).Normalized();
+			Vector3 at = ed * (HideRadius(ed) - 0.15f);   // (sat in the fused hide's own surface)
 			var socket = new Node3D { Name = $"Eye{e}", Position = at };
 			_body.AddChild(socket);
 			BuildEye(socket);
 			_bodyEyes.Add(socket);
 			_eyeSize.Add(Mathf.Lerp(0.6f, 2.3f, Mathf.Pow(up, 2f)) * _rng.RandfRange(0.7f, 1.1f));
 		}
+	}
+
+	private List<(Vector3 c, Vector3 r)> _lobes;
+	private FastNoiseLite _hideNoise;
+
+	/// <summary>How far out from the body's middle its hide is along <paramref name="d"/>: the far side of each lobe the
+	/// ray passes through, joined in a smooth maximum (so where two lobes meet they blend over a metre or so instead of
+	/// creasing), and a slow ripple of folds over it.</summary>
+	private float HideRadius(Vector3 d)
+	{
+		float r = 0f;
+		bool any = false;
+		const float k = 1.6f;
+		foreach (var (c, rad) in _lobes)
+		{
+			var D = new Vector3(d.X / rad.X, d.Y / rad.Y, d.Z / rad.Z);
+			var C = new Vector3(c.X / rad.X, c.Y / rad.Y, c.Z / rad.Z);
+			float a = D.Dot(D), b = D.Dot(C), cc = C.Dot(C) - 1f;
+			float disc = b * b - a * cc;
+			if (disc < 0f) continue;
+			float t = (b + Mathf.Sqrt(disc)) / a;
+			if (t <= 0f) continue;
+			if (!any) { r = t; any = true; continue; }
+			// the polynomial smooth max
+			float hh = Mathf.Max(k - Mathf.Abs(r - t), 0f) / k;
+			r = Mathf.Max(r, t) + hh * hh * k * 0.25f;
+		}
+		if (!any) r = 8f;
+		return r * (1f + 0.025f * _hideNoise.GetNoise3Dv(d * 6f));
 	}
 
 	private void BuildEye(Node3D socket)
@@ -205,6 +258,7 @@ public partial class Leviathan : Node3D
 		t.Root = new Node3D { Name = $"Tentacle{i}" };
 		AddChild(t.Root);
 		BuildTube(t, i);
+		BuildSuckers(t);
 		float segLen = Length / Segments;
 		for (int s = 0; s < Segments; s++)
 		{
@@ -213,13 +267,7 @@ public partial class Leviathan : Node3D
 			var seg = new Node3D { Name = $"S{s}" };
 			t.Root.AddChild(seg);
 			t.Segs.Add(seg);
-			// the suckers down its underside (the flesh itself is the tube)
-			if (s < Segments - 1 && r1 > 0.12f)
-			{
-				var k = new MeshKit();
-				TentacleKit.Suckers(k, segLen, r0, r1, t.Skinny ? 3 : 2);
-				k.CommitTo(seg, "Seg", !t.Skinny);
-			}
+			// (the suckers are on the tube itself now: BuildSuckers)
 			// eyes the whole way up: big (and two to a segment) where it meets the body, shrinking to the tip; on a
 			// skinny one, a few small ones
 			int perSeg = t.Skinny ? (s % 3 == 1 && s < 13 ? 1 : 0) : s < 4 ? 2 : s % 2 == 0 ? 1 : 0;
@@ -336,6 +384,52 @@ public partial class Leviathan : Node3D
 		mi.Skeleton = mi.GetPathTo(skel);
 		mi.Skin = skel.CreateSkinFromRestTransforms();
 		t.Skel = skel;
+	}
+
+	/// <summary>The suckers down the limb's underside, skinned to the tube's own bones (each vertex blended between the
+	/// two rings either side of it), so they bend with the flesh as one thing. (They were rigid blocks, one to each
+	/// segment, and at every bend the rows broke apart: the limb read as a stack of pieces.)</summary>
+	private void BuildSuckers(Tentacle t)
+	{
+		float segLen = Length / Segments;
+		var k = new MeshKit();
+		for (int s = 0; s < Segments - 1; s++)
+		{
+			float r0 = Radius(t, (float)s / Segments), r1 = Radius(t, (float)(s + 1) / Segments);
+			if (r1 <= 0.12f) continue;
+			k.Xf = new Transform3D(Basis.Identity, new Vector3(0, s * segLen, 0));
+			TentacleKit.Suckers(k, segLen, r0, r1, t.Skinny ? 3 : 2);
+		}
+		if (k.IsEmpty) return;
+		var src = k.Commit();
+		var mesh = new ArrayMesh();
+		for (int si = 0; si < src.GetSurfaceCount(); si++)
+		{
+			var arr = src.SurfaceGetArrays(si);
+			var v = (Vector3[])arr[(int)Mesh.ArrayType.Vertex];
+			var bones = new int[v.Length * 4];
+			var wts = new float[v.Length * 4];
+			for (int i = 0; i < v.Length; i++)
+			{
+				float f = Mathf.Clamp(v[i].Y / Length, 0f, 1f) * (Rings - 1);
+				int i0 = Mathf.Min((int)f, Rings - 2);
+				float w = f - i0;
+				bones[i * 4] = i0; bones[i * 4 + 1] = i0 + 1;
+				wts[i * 4] = 1f - w; wts[i * 4 + 1] = w;
+			}
+			arr[(int)Mesh.ArrayType.Bones] = bones;
+			arr[(int)Mesh.ArrayType.Weights] = wts;
+			mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arr);
+			mesh.SurfaceSetMaterial(si, src.SurfaceGetMaterial(si));
+		}
+		var mi = new MeshInstance3D
+		{
+			Name = "Suckers", Mesh = mesh, CustomAabb = new Aabb(new Vector3(-45, -10, -45), new Vector3(90, 60, 90)),
+			CastShadow = t.Skinny ? GeometryInstance3D.ShadowCastingSetting.Off : GeometryInstance3D.ShadowCastingSetting.On,
+		};
+		t.Skel.AddChild(mi);
+		mi.Skeleton = mi.GetPathTo(t.Skel);
+		mi.Skin = t.Skel.CreateSkinFromRestTransforms();
 	}
 
 	/// <summary>The limb's radius at f (0 root .. 1 tip): swelling out into the body at its root; tapering to its

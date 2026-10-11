@@ -147,6 +147,7 @@ public partial class LodgeDoor : Node3D
 	{
 		if (Current == State.Locked && Needs != ToolKind.None && p?.Inventory is { } inv && inv.HasTool(Needs))
 		{
+			Player.HeldUse.Do(p, Needs, HasReader ? ReaderWorld : CentreWorld);
 			if (ConsumeKey) inv.Consume(Needs);
 			if (HasReader)
 			{

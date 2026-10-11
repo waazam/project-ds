@@ -247,7 +247,7 @@ public partial class PlayerCameraRig : Node3D
 		Camera.Position = new Vector3(
 			sway * BobSway * _bobAmount,
 			-dip * BobHeight * _bobAmount,
-			0f) + local + Shake;
+			0f) + local + Shake * (GameSettings.Instance?.ScreenShake ?? 1f);
 	}
 
 	private void UpdateThirdPerson(float dt)

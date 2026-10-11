@@ -90,6 +90,10 @@ public partial class UiPreviewDriver : Node
 			SaveIndicator.Instance?.Play();
 			await Seconds(1.0);
 			Shot("save_canister");
+			// a chapter's title drop, held (its shadow and its colour)
+			ChapterCard.Show(this, 7, 0.1f);
+			await Seconds(2.2);
+			Shot("chapter_card");
 			GetTree().Quit(0);
 			return;
 		}

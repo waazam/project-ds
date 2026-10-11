@@ -73,6 +73,12 @@ public partial class GameFlow : Node
 		if (GameSettings.Instance.Trailer) AddChild(new TrailerDirector());
 		else if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
 		else if (GameSettings.Instance.AutoTest) AddChild(new StoryTest());
+		// the song's synth as the cues for finds and progress (Audio.SongCues)
+		AddChild(new Audio.SongCues { Name = "SongCues" });
+		// where a play-through stalls, written quietly to user://pacing.txt (nothing on screen)
+		AddChild(new PacingLog { Name = "PacingLog" });
+		AddChild(new UI.SoundCaption { Name = "SoundCaption" });
+		AddChild(new Achievements { Name = "Achievements" });
 		// the next level read in the background while this one's played (StoryManager.PreloadLevel): the hollow from the
 		// trailhead before the stairs; the trailhead from the hollow once the flamethrower's in hand (Act 25 is there)
 		if (StoryManager.Instance is { } sm)

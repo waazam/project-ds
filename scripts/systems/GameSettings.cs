@@ -52,6 +52,14 @@ public partial class GameSettings : Node
 	public bool ContextualHud = true;
 	/// <summary>The camera's focus pulled to what's looked at (a soft depth of field).</summary>
 	public bool FocusPull = true;
+	/// <summary>(2026-10-11, accessibility) How much the camera shakes (0 none .. 1 full).</summary>
+	public float ScreenShake = 1f;
+	/// <summary>(2026-10-11, accessibility) Captions for the sounds that matter: "[knocking]", "[a howl, far off]".</summary>
+	public bool SoundCaptions = false;
+	/// <summary>(2026-10-11, accessibility) Crouch while the key is held, instead of a toggle.</summary>
+	public bool HoldToCrouch = false;
+	/// <summary>(2026-10-11) Their own legs and boots seen when looking down (off: the body's only in the shadow).</summary>
+	public bool BodyInView = true;
 	public const float LanternMin = 0.7f, LanternMax = 1.6f;
 
 	/// <summary>Fullscreen (borderless, the screen's own resolution: the default) or a window.</summary>
@@ -216,6 +224,11 @@ public partial class GameSettings : Node
 		cfg.SetValue("display", "hud_neon", HudColor);
 		cfg.SetValue("display", "hud_contextual", ContextualHud);
 		cfg.SetValue("display", "focus_pull", FocusPull);
+		cfg.SetValue("accessibility", "screen_shake", ScreenShake);
+		cfg.SetValue("accessibility", "sound_captions", SoundCaptions);
+		cfg.SetValue("accessibility", "hold_crouch", HoldToCrouch);
+		cfg.SetValue("display", "body_in_view", BodyInView);
+		KeyRebinds.SaveTo(cfg);
 		cfg.SetValue("display", "crt_filter", _crtFilter);
 		cfg.SetValue("display", "shadows", _shadows);
 		cfg.SetValue("display", "windowed", _windowed);
@@ -249,7 +262,12 @@ public partial class GameSettings : Node
 		LanternBrightness = Mathf.Clamp((float)cfg.GetValue("display", "lantern_brightness", LanternBrightness), LanternMin, LanternMax);
 		HudColor = Mathf.Clamp((int)cfg.GetValue("display", "hud_neon", HudColor), 0, 6);
 		ContextualHud = (bool)cfg.GetValue("display", "hud_contextual", ContextualHud);
-		FocusPull = (bool)cfg.GetValue("display", "focus_pull", FocusPull);   // (a new key: green was 0 before white became the default)
+		FocusPull = (bool)cfg.GetValue("display", "focus_pull", FocusPull);
+		ScreenShake = Mathf.Clamp((float)cfg.GetValue("accessibility", "screen_shake", ScreenShake), 0f, 1f);
+		SoundCaptions = (bool)cfg.GetValue("accessibility", "sound_captions", SoundCaptions);
+		HoldToCrouch = (bool)cfg.GetValue("accessibility", "hold_crouch", HoldToCrouch);
+		BodyInView = (bool)cfg.GetValue("display", "body_in_view", BodyInView);
+		KeyRebinds.LoadFrom(cfg);   // (a new key: green was 0 before white became the default)
 		_crtFilter = (bool)cfg.GetValue("display", "crt_filter", _crtFilter);
 		_shadows = Mathf.Clamp((int)cfg.GetValue("display", "shadows", _shadows), 0, 2);
 		_windowed = (bool)cfg.GetValue("display", "windowed", _windowed);
@@ -336,7 +354,7 @@ public partial class GameSettings : Node
 		["reduce_flashing"] = ReduceFlashing.ToString(), ["head_motion"] = HeadMotion.ToString(), ["bars"] = CinemaBars.ToString(),
 		["fog_lighting"] = FogLighting.ToString(), ["brightness"] = Brightness.ToString("0.000"), ["lantern"] = LanternBrightness.ToString("0.000"),
 		["crt"] = _crtFilter.ToString(), ["shadows"] = _shadows.ToString(), ["windowed"] = _windowed.ToString(), ["window"] = _windowSize.ToString(),
-		["hud_color"] = HudColor.ToString(), ["hud_contextual"] = ContextualHud.ToString(), ["focus_pull"] = FocusPull.ToString(),
+		["hud_color"] = HudColor.ToString(), ["shake"] = ScreenShake.ToString("0.00"), ["captions"] = SoundCaptions.ToString(), ["hold_crouch"] = HoldToCrouch.ToString(), ["body"] = BodyInView.ToString(), ["hud_contextual"] = ContextualHud.ToString(), ["focus_pull"] = FocusPull.ToString(),
 	};
 
 	private void SetFields(float mouse, float stick, bool inv, float dist, float vol, bool flash, bool head, bool bars, bool fog, float bright, float lantern, bool crt, int shadows, bool windowed, Vector2I size)
@@ -354,13 +372,13 @@ public partial class GameSettings : Node
 		string backup = Godot.FileAccess.FileExists(SavePath) ? Godot.FileAccess.GetFileAsString(SavePath) : null;
 		var before = Snapshot();
 		var keep = (MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera);
-		int keepHud = HudColor; bool keepCtx = ContextualHud, keepFocus = FocusPull;
+		int keepHud = HudColor; bool keepCtx = ContextualHud, keepFocus = FocusPull, keepCap = SoundCaptions, keepHold = HoldToCrouch, keepBody = BodyInView; float keepShake = ScreenShake;
 		SetFields(0.0042f, 3.3f, !InvertY, 3.1f, 0.63f, !ReduceFlashing, !HeadMotion, !CinemaBars, !FogLighting, 1.25f, 1.35f, !_crtFilter, (_shadows + 1) % 3, !_windowed, new Vector2I(1280, 720));
-		HudColor = (keepHud + 3) % 7; ContextualHud = !keepCtx; FocusPull = !keepFocus;
+		HudColor = (keepHud + 3) % 7; ContextualHud = !keepCtx; FocusPull = !keepFocus; SoundCaptions = !keepCap; HoldToCrouch = !keepHold; BodyInView = !keepBody; ScreenShake = 0.35f;
 		var want = Snapshot();
 		Save();
 		SetFields(0.001f, 1f, false, 2f, 1f, false, true, true, true, 1f, 1f, true, 1, false, new Vector2I(1600, 900));
-		HudColor = 0; ContextualHud = keepCtx; FocusPull = keepFocus;
+		HudColor = 0; ContextualHud = keepCtx; FocusPull = keepFocus; SoundCaptions = keepCap; HoldToCrouch = keepHold; BodyInView = keepBody; ScreenShake = 1f;
 		LoadFile();
 		var got = Snapshot();
 		int bad = 0;
@@ -372,7 +390,7 @@ public partial class GameSettings : Node
 		}
 		// the player's own settings back, and their file
 		(MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera) = keep;
-		HudColor = keepHud; ContextualHud = keepCtx; FocusPull = keepFocus;
+		HudColor = keepHud; ContextualHud = keepCtx; FocusPull = keepFocus; SoundCaptions = keepCap; HoldToCrouch = keepHold; BodyInView = keepBody; ScreenShake = keepShake;
 		if (backup != null) { using var f = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Write); f?.StoreString(backup); }
 		else DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
 		GD.Print($"[settings-test] {want.Count - bad}/{want.Count} settings survive a restart; the player's own put back ({(Snapshot()["brightness"] == before["brightness"] ? "unchanged" : "CHANGED")})");

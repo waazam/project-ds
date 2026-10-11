@@ -22,6 +22,8 @@ public partial class PolaroidMontage : CanvasLayer
 
 	public int Shown { get; private set; }
 	public bool Playing { get; private set; }
+	/// <summary>How many best shots closed it (for tests).</summary>
+	public int BestShown { get; private set; }
 
 	private sealed class Card
 	{
@@ -50,13 +52,27 @@ public partial class PolaroidMontage : CanvasLayer
 	{
 		if (photos == null || photos.Count == 0) return;
 		Playing = true;
+		// (2026-10-11) the album in the order taken, and to close it, their best: the five best-rated prints (of those a
+		// subject was scored in) brought back together as the last collage
+		var best = new List<PhotoLog.Photo>();
+		foreach (var ph in photos) if (ph.Scored) best.Add(ph);
+		best.Sort((a, b) => b.Total.CompareTo(a.Total));
+		if (best.Count > 5) best.RemoveRange(5, best.Count - 5);
+		if (best.Count >= 3)
+		{
+			var rest = new List<PhotoLog.Photo>(photos);
+			foreach (var b in best) rest.Remove(b);
+			rest.AddRange(best);
+			photos = rest;
+			BestShown = best.Count;
+		}
 		float every = Mathf.Min(Every, (MaxSeconds - Life) / Mathf.Max(1, photos.Count));
 		float life = Mathf.Max(Life * Mathf.Clamp(every / Every, 0.6f, 1f), FadeIn + FadeOut + 1.2f);
 		int next = 0;
 		float nextAt = 0.3f;
 		var size = _draw.Size.X > 1 ? _draw.Size : new Vector2(640, 360);
 		// the last few gather into a collage and stay a little longer
-		int collageFrom = Mathf.Max(0, photos.Count - 7);
+		int collageFrom = BestShown > 0 ? photos.Count - BestShown : Mathf.Max(0, photos.Count - 7);
 		float end = float.MaxValue;
 		while (true)
 		{

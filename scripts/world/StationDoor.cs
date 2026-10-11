@@ -79,6 +79,7 @@ public partial class StationDoor : Node3D
 				Audio.AudioDirector.OneShot(this, "door_locked", 2, ToGlobal(new Vector3(1.8f, 1.0f, 0)), -6f, "Events", 3f);
 				return;
 			}
+			Player.HeldUse.Do(player, RequiredTool, ToGlobal(new Vector3(1.8f, 1.0f, 0)));
 			inv.Consume(RequiredTool);
 			Locked = false;
 		}

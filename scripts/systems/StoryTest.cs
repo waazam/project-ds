@@ -3033,6 +3033,7 @@ public partial class StoryTest : Node
 			await Frames(2, ct);
 			if (i == 0) Check("a tall candle: light it", _player.Interaction?.PromptText == "Light the candle", $"'{_player.Interaction?.PromptText}'");
 			await Press(ct);
+			if (i == 0) { await Seconds(0.75, ct); Screenshot("held_lighter_to_the_candle"); Check("the lighter in the hand, lit to the wick (HeldUse)", HeldUse.Busy && HeldUse.Last == ToolKind.Lighter); }
 			await Seconds(0.8, ct);
 			Check($"candle {i + 1} lit", church.CandleLit(i));
 			if (i == 0) Screenshot("a_candle_lit");
@@ -3344,6 +3345,19 @@ public partial class StoryTest : Node
 		Vector3 L(float x, float y, float z) => lodge.ToGlobal(new Vector3(x, y, z));
 		var atmo = StoryBeat.Atmosphere(_player);
 		async Task Go(params Vector3[] pts) { foreach (var p in pts) await WalkTo(p, 0.45f, ct, giveUp: 14f); }
+		// (2026-10-11, the owner: "you always get stuck here in the dining room while testing") among the dining hall's
+		// tables and chairs: a walk pinned for 5 s is logged and hops the rest of the way, instead of pushing at a chair
+		// for 14 s and going on from wherever it ended up
+		async Task GoHall(params Vector3[] pts)
+		{
+			foreach (var p in pts)
+				if (!await WalkTo(p, 0.45f, ct, giveUp: 5f))
+				{
+					GD.Print($"[walk] pinned {Flat(_player.GlobalPosition).DistanceTo(Flat(p)):0.0} m short of {lodge.ToLocal(p)} at {lodge.ToLocal(_player.GlobalPosition)}: hopped");
+					_player.Teleport(p + Vector3.Up * 0.05f, _player.CameraRig?.Yaw ?? 0f);
+					await Frames(3, ct);
+				}
+		}
 		// the lantern's flame: lit (the blacklight later)
 		var lantern = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern");
 		lantern?.SetBlacklight(false);
@@ -3414,7 +3428,10 @@ public partial class StoryTest : Node
 		await Frames(2, ct);
 		Check("202's reader: use the keycard", _player.Interaction?.PromptText == "Use the keycard", $"'{_player.Interaction?.PromptText}'");
 		await Press(ct);
-		await Seconds(1.2, ct);
+		await Seconds(0.65, ct);
+		Screenshot("held_keycard_swiped");
+		Check("the keycard in the hand, swiped through the reader (HeldUse)", HeldUse.Busy && HeldUse.Last == ToolKind.Keycard202, $"{HeldUse.Last}");
+		await Seconds(0.55, ct);
 		Check("the reader goes green, the door opens", d202.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
 		await Go(L(-13.7f, UpperYOf(lodge), 2.2f), L(-15.5f, UpperYOf(lodge), 4.2f));
 		await Aim(L(-16f, 5.0f, 7f), ct);
@@ -3518,7 +3535,7 @@ public partial class StoryTest : Node
 		await UseIt(lodge.DiningDoorL.Use, ct);
 		await Seconds(1.5, ct);
 		Check("the dining room's doors open", lodge.DiningDoorL.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open && lodge.DiningDoorR.Current == ProjectDS.World.LodgeParts.LodgeDoor.State.Open);
-		await Go(L(8.36f, 0.05f, 3.9f), L(10.6f, 0.05f, 5.2f), L(14f, 0.05f, 3f), L(14f, 0.05f, 0f));
+		await GoHall(L(8.36f, 0.05f, 3.9f), L(10.6f, 0.05f, 5.2f), L(11.6f, 0.05f, 0.4f), L(14f, 0.05f, 0f));   // (in down the middle: (14, 3) was among the chairs)
 		await Aim(L(40f, 1.2f, 0f), ct);
 		Screenshot("act23_the_dining_hall");
 		// the sheets, one table after another
@@ -3529,7 +3546,7 @@ public partial class StoryTest : Node
 			int t = order[i];
 			var c = SkiLodge.TableCentre(t);
 			float side = c.Z > 0 ? -1f : 1f;
-			await Go(L(c.X, 0.05f, c.Z + side * 1.55f));
+			await GoHall(L(c.X, 0.05f, 0f), L(c.X, 0.05f, c.Z + side * 1.55f));   // (down the hall's middle, then across: not through the chairs)
 			await Aim(lodge.ToGlobal(c + new Vector3(0, SkiLodge.TableH + 0.1f, 0)), ct);
 			await Frames(2, ct);
 			if (_player.Interaction?.PromptText != "Pull the sheet off")
@@ -3562,6 +3579,7 @@ public partial class StoryTest : Node
 			if (i == 2) Check("the storm gets up outside", lodge.Storm > 0.2f, $"{lodge.Storm:0.00}");
 			if (i == 2) Check("flies over the skeleton once its sheet is off", lodge.FliesBuzzing != null && lodge.FliesBuzzing.Emitting);
 			if (i == 3) Check("a wendigo's skull on a platter", lodge.PlatterSkull != null && lodge.PlatterSkull.Visible);
+			if (i == 3) Check("the skull turned round on its platter to look at them", lodge.SkullOffLook < 0.35f, $"{lodge.SkullOffLook:0.00} rad off");
 			if (i == 4) Check("the table breaks and comes down", lodge.Collapsed == t);
 		}
 		Check("201's keycard, standing in a bowl of snow", lodge.Card201Pickup != null && IsInstanceValid(lodge.Card201Pickup));
@@ -3570,7 +3588,8 @@ public partial class StoryTest : Node
 		Check("taken: the snow melts into blood (a save)", _inv.HasTool(ToolKind.Keycard201) && lodge.BowlMelted && s.Current == Checkpoint.Act23Keycard201, $"{s.Current}");
 		Screenshot("act23_blood_in_the_bowl");
 		// ---- room 201
-		await Go(L(14f, 0.05f, 0f), L(14f, 0.05f, 3f), L(10.6f, 0.05f, 5.2f), L(8.36f, 0.05f, 3.9f), L(4f, 0.05f, 1f), L(0.32f, 0.05f, -2.4f), L(0.32f, SkiLodge.StairLandY + 0.05f, -9.0f), L(-3.6f, UpperYOf(lodge), -9.0f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-9.4f, UpperYOf(lodge), 0f), L(-12.4f, UpperYOf(lodge), 0f), L(-21.3f, UpperYOf(lodge), 0f));
+		await GoHall(L(14f, 0.05f, 0f), L(11.6f, 0.05f, 0.4f), L(10.6f, 0.05f, 5.2f));
+		await Go( L(8.36f, 0.05f, 3.9f), L(4f, 0.05f, 1f), L(0.32f, 0.05f, -2.4f), L(0.32f, SkiLodge.StairLandY + 0.05f, -9.0f), L(-3.6f, UpperYOf(lodge), -9.0f), L(-5.4f, UpperYOf(lodge), -7.8f), L(-7.6f, UpperYOf(lodge), -3.5f), L(-9.4f, UpperYOf(lodge), 0f), L(-12.4f, UpperYOf(lodge), 0f), L(-21.3f, UpperYOf(lodge), 0f));
 		var d201 = lodge.RoomDoors[201];
 		await Aim(d201.CentreWorld, ct);
 		await Frames(2, ct);
@@ -3738,6 +3757,8 @@ public partial class StoryTest : Node
 		await WaitUntil(() => !lodge.FinaleWendigo.Visible, 10, ct);
 		Check("across the porch, and gone into the storm", !lodge.FinaleWendigo.Visible && lodge.FinaleWendigo.Leaps == 2, $"{lodge.FinaleWendigo.Leaps} leaps");
 		Check("the woods back in view through the doorway", !lodge.OutdoorHidden);
+		Check("the snow tunnel already there past the porch, before they look out (no pop at the act's end)",
+			!lodge.FinaleDone && lodge.Act24 != null && lodge.Act24.GetNodeOrNull<Node3D>("SnowTunnel") != null);
 		await WaitUntil(() => lodge.FinaleDone, 30, ct);
 		Check("at the splintered doorway, left, and right: the end of Act 23 (a save)", lodge.FinaleDone && s.Current >= Checkpoint.Act23Finished, $"{s.Current}");   // (and the end of the story right after it: GameEnding)
 		Screenshot("act23_the_doorway");
@@ -3945,6 +3966,9 @@ public partial class StoryTest : Node
 		Screenshot("act24_the_way_in");
 		var hunter = maze.Hunter;
 		Check("the wendigo is in the maze, hunting", hunter?.Body != null && hunter.State != WendigoHunter.Mode.Off);
+		await Seconds(1.0, ct);
+		Check("the song in the maze: its loops under the hunt (Act24Score)", maze.Score != null && maze.Score.Playing.StartsWith("loop_0"), $"'{maze.Score?.Playing}'");
+		Check("the song's synth as the cues: the echoing three underground (SongCues)", Audio.SongCues.Instance is { Played: > 0 }, $"{Audio.SongCues.Instance?.Played} played, last '{Audio.SongCues.Instance?.Last}'");
 		// its senses (the test stands it where it needs it)
 		hunter.Paused = true;
 		Vector3 Node(int v) => cave.ToGlobal(L.Nodes[v] + Vector3.Up * 0.1f);
@@ -4015,11 +4039,17 @@ public partial class StoryTest : Node
 		Screenshot("act24_the_crate");
 		Check("the crate: prise it open with the crowbar", _player.Interaction?.PromptText == "Prise the crate open", $"'{_player.Interaction?.PromptText}'");
 		await Press(ct);
+		await WaitUntil(() => HeldUse.Busy, 3, ct);
+		await Seconds(0.9, ct);
+		Screenshot("held_crowbar_prising");
+		Check("the crowbar in the hand, levering the lid (HeldUse)", HeldUse.Busy && HeldUse.Last == ToolKind.Crowbar, $"{HeldUse.Last}");
 		await WaitUntil(() => _inv.HasTool(ToolKind.Flamethrower) && _input.Enabled, 15, ct);
 		Check("the flamethrower (a save)", _inv.HasTool(ToolKind.Flamethrower) && s.Current == Checkpoint.Act24Flamethrower, $"{s.Current}");
 		await Seconds(1.0, ct);
 		var ft = _player.GetNodeOrNull<Flamethrower>("Flamethrower");
 		Check("the flamethrower in their hands, in view", ft != null && ft.Active);
+		await WaitUntil(() => maze.Score.Playing.StartsWith("loop_08"), 8, ct);
+		Check("the flamethrower in hand: the song falls into section D", maze.Score.Playing.StartsWith("loop_08"), $"'{maze.Score.Playing}'");
 		Screenshot("act24_flamethrower_in_hand");
 		// its fire: a burst at the trench's wall
 		await Aim(_player.GlobalPosition + (-_player.CameraRig.GlobalBasis.Z) * 8f + Vector3.Up * 0.5f, ct);
@@ -4056,6 +4086,20 @@ public partial class StoryTest : Node
 			hunter.HoldStill = false;
 			if (burn == 1) { await Seconds(0.3, ct); Screenshot("act24_it_burns"); }
 			Check($"burn {burn}: the fire on it", hunter.Hits == before + 1, $"{hunter.Hits} hits");
+			if (burn == 1 && !hunter.Dead)
+			{
+				// burned, it runs to hide; tracked down, it comes out at them
+				await WaitUntil(() => hunter.State == WendigoHunter.Mode.Hide, 30, ct);
+				float away = hunter.Body.GlobalPosition.DistanceTo(_player.GlobalPosition);
+				Check("burned, it runs off to hide in a dead end, far from them", hunter.State == WendigoHunter.Mode.Hide && hunter.HideNode >= 0 && away > 12f, $"{hunter.State}, node {hunter.HideNode}, {away:0} m");
+				Screenshot("act24_hiding");
+				var near = hunter.HideApproach(5.5f);
+				await Teleport(near with { Y = near.Y + 0.1f }, hunter.Body.GlobalPosition, ct);
+				await WaitUntil(() => hunter.HideAmbushes > 0, 5, ct);
+				Check("found, it comes out of hiding at them", hunter.HideAmbushes > 0 && hunter.State == WendigoHunter.Mode.Ambush, $"{hunter.State}");
+				hunter.Paused = true;
+				await Seconds(0.5, ct);
+			}
 			if (ft.Overheated) await WaitUntil(() => !ft.Overheated, 9, ct);
 			await Seconds(2.8, ct);
 		}
@@ -4130,6 +4174,8 @@ public partial class StoryTest : Node
 		Screenshot($"act25_ending_{ed.Ending}");
 		await WaitUntil(() => GameEnding.Played, 60, ct);
 		Check($"ending {ed.Ending} plays out, to the credits", GameEnding.Played && s.Current == Checkpoint.GameFinished, $"{s.Current}");
+		Check($"the achievements: the end of the hunt, ending {ed.Ending}, the story finished (Achievements)",
+			Achievements.Has("ACH_THE_WENDIGO") && Achievements.Has($"ACH_ENDING_{ed.Ending}") && Achievements.Has("ACH_FINISHED"), $"{Achievements.Count} earned");
 	}
 
 	private static float UpperYOf(SkiLodge l) => SkiLodge.UpperY + 0.05f;

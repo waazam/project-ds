@@ -37,6 +37,10 @@ public partial class PlayerInput : Node
 	public bool LanternModePressed => Live && Edge(LanternMode);
 	/// <summary>C / left Ctrl / right stick click: crouch, a toggle (down, and up again if there's room).</summary>
 	public bool CrouchPressed => Live && Edge(Crouch);
+	/// <summary>(2026-10-11) The crouch key down now (for "Hold to crouch").</summary>
+	public bool CrouchHeld => Live && !Scripted && Input.IsActionPressed(Actions[Crouch]);
+	/// <summary>Taking the player's input now (not in a cutscene, a note, the pause menu).</summary>
+	public bool IsLive => Live;
 	/// <summary>(2026-10-10) throwing what's in the off hand (a flare, a can); holding the breath (hidden, it can't hear you).</summary>
 	public bool ThrowPressed => Live && Edge(Throw);
 	public bool BreathHeld => Live && _held[Breath];

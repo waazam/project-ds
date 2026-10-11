@@ -48,6 +48,9 @@ public partial class PlayerBreathing : Node
 	private float _recover;
 	private UI.BreathHoldOverlay _overlay;
 
+	/// <summary>A little more shake (the body spent: BodyState), never past a spent body's own.</summary>
+	public static void AddTremble(float amount) => Tremble = Mathf.Min(Mathf.Max(Tremble, 0.35f), Tremble + amount);
+
 	public static PlayerBreathing Of(PlayerController p) => p?.GetNodeOrNull<PlayerBreathing>("Breathing");
 
 	/// <summary>A fright: the breath catches, the hand shakes a while (gently).</summary>
