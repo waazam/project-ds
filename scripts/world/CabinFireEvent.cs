@@ -84,7 +84,7 @@ public partial class CabinFireEvent : Node
 
 	public override void _ExitTree()
 	{
-		if (StoryManager.Instance is { } s) s.FlagSet -= OnFlag;
+		if (StoryManager.Instance is { } s) { s.FlagSet -= OnFlag; s.CheckpointReached -= OnElsewhere; }
 		// The post material is a shared resource: never leave the heat tint baked into it.
 		_postMat?.SetShaderParameter("shadow_tint", _postBaseTint);
 	}
@@ -103,6 +103,16 @@ public partial class CabinFireEvent : Node
 		if (StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning }) { Ignite(); Struck = true; GD.Print($"[story] Act 7: fire restored as already seen (checkpoint {StoryManager.Instance.Current})"); }
 		// A Continue after the fall but before the strike: armed from the start.
 		else if (StoryManager.Instance is { } sm && sm.HasFlag(StoryManager.Flag.ClearingLoopDone)) Callable.From(ArmAtWake).CallDeferred();
+		// (2026-10-11) Act 7 reached somewhere else (at the bunker, the lookout walked round): the cabin's burning all the same
+		if (StoryManager.Instance is { } st) st.CheckpointReached += OnElsewhere;
+	}
+
+	private void OnElsewhere(Checkpoint cp)
+	{
+		if (Struck || cp < Checkpoint.Act7CabinBurning || !IsInsideTree()) return;
+		Ignite();
+		Struck = true;
+		GD.Print("[story] Act 7: the cabin burning (Act 7 reached away from the lookout)");
 	}
 
 	/// <summary>A tall player trigger at a world point, parented to this beat (top level, so the cabin's transform doesn't matter).</summary>

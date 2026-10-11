@@ -102,11 +102,30 @@ public partial class Bunker : Node3D
 	private static bool StoryAllowsOpening => StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning };
 
 	/// <summary>The player walked up to the locked hatch after the fire: the one line about the dial, once.</summary>
-	private void OnApproach(PlayerController _)
+	private void OnApproach(PlayerController player)
 	{
+		// (2026-10-11, playtest: the bunker reached by another way, the lookout above the burning cabin never stood on, so
+		// Act 7 never came and the dial stayed "Locked") after the stairs' loop, the bunker itself is Act 7's checkpoint
+		// too: the cabin's been burning all along (it's lit as already seen); before the loop, the door stays shut and the
+		// voice across the creek is still calling
+		var s = StoryManager.Instance;
+		if (!IsOpen && s != null && s.Current < Checkpoint.Act7CabinBurning && s.Current >= Checkpoint.Act6BridgeCrossed)
+		{
+			if (s.HasFlag(StoryManager.Flag.ClearingLoopDone))
+			{
+				GD.Print("[story] Act 7: reached at the bunker (the lookout was walked round)");
+				StoryBeat.ReachCheckpoint(player, Checkpoint.Act7CabinBurning);
+			}
+			else if (Time.GetTicksMsec() - _nudgedAt > 20000)
+			{
+				_nudgedAt = Time.GetTicksMsec();
+				_ = StoryBeat.Caption(this, "Not yet. Something is still calling, back across the creek.", 0.4f, 3.2f, 1f);
+			}
+		}
 		if (IsOpen || !StoryAllowsOpening) return;
 		SayDialLine();
 	}
+	private ulong _nudgedAt;
 
 	/// <summary>Checkpoint 6 could conceivably fire with the player already inside the radius: re-check.</summary>
 	private void OnCheckpoint(Checkpoint _)
