@@ -140,10 +140,13 @@ public static class PropTextures
 	}
 
 	public static StandardMaterial3D SignPlankMat => Std("p_signplank", SignPlank(), 0.9f, 0.25f);
-	public static StandardMaterial3D PostMat => Std("p_post", PostWood(), 0.9f, 0.25f);
+	public static StandardMaterial3D PostMat => _hPostMat ??= World.SurfaceSets.Hinoki(Std("p_post", PostWood(), 0.9f, 0.25f), new Color(0.7f, 0.58f, 0.46f));
+	private static StandardMaterial3D _hPostMat;
 	/// <summary>Wet deck: a little glossier so it catches the grey sky.</summary>
-	public static StandardMaterial3D DeckMat => Std("p_deck", DeckWood(), 0.62f, 0.38f);
-	public static StandardMaterial3D WetPostMat => Std("p_wetpost", PostWood(), 0.7f, 0.33f);
+	public static StandardMaterial3D DeckMat => _hDeckMat ??= World.SurfaceSets.Hinoki(Std("p_deck", DeckWood(), 0.62f, 0.38f), new Color(0.75f, 0.62f, 0.5f));
+	private static StandardMaterial3D _hDeckMat;
+	public static StandardMaterial3D WetPostMat => _hWetPostMat ??= World.SurfaceSets.Hinoki(Std("p_wetpost", PostWood(), 0.7f, 0.33f), new Color(0.5f, 0.4f, 0.32f));
+	private static StandardMaterial3D _hWetPostMat;
 	public static StandardMaterial3D RoutedMat => Std("p_routed", Routed(), 0.95f, 0.2f);
 
 	// ---- the park's painted signs (2026-10-03, after the owner's photo of a state park's sign: chocolate-brown painted

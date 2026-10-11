@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using ProjectDS.Systems;
 using ProjectDS.World.BossParts;
 
 namespace ProjectDS.World;
@@ -22,12 +23,36 @@ public partial class BossRoom
 	private readonly HashSet<MeshInstance3D> _bent = new();
 	private static ImageTexture _dentAlbedo, _dentNormal;
 	private const int MaxDents = 22;
+	private int _dentSeq;
+
+	/// <summary>(2026-10-10b) The fight's damage so far, kept across a death: crushed and back on the catwalk, it's as battered as
+	/// it was (it isn't set right between tries). Cleared once the fight is won.</summary>
+	private static readonly List<(Vector3 at, ulong seed)> _scars = new();
+	public static int ScarsKept => _scars.Count;
 
 	private void Damage(Vector3 world)
 	{
 		Vector3 at = ToLocal(world);
 		at.Y = 0f;
-		var dent = new Node3D { Name = "Dent", Position = at };
+		ulong seed = (ulong)_rng.Randi();
+		_scars.Add((at, seed));
+		while (_scars.Count > MaxDents) _scars.RemoveAt(0);
+		DentAt(at, seed, true);
+		Sparks(world);
+	}
+
+	/// <summary>The damage from earlier tries, put back as the room is built (or forgotten, the fight won).</summary>
+	private void RestoreScars()
+	{
+		if (StoryManager.Instance is { } s && s.Current >= Checkpoint.Act18Finished) { _scars.Clear(); return; }
+		foreach (var (at, seed) in _scars) DentAt(at, seed, false);
+		if (_scars.Count > 0) GD.Print($"[story] Act 18: the catwalk as it was left - {_scars.Count} dents");
+	}
+
+	private void DentAt(Vector3 at, ulong seed, bool fresh)
+	{
+		var _rng = new RandomNumberGenerator { Seed = seed };
+		var dent = new Node3D { Name = $"Dent{_dentSeq++}", Position = at };
 		AddChild(dent);
 		float size = _rng.RandfRange(2.0f, 2.8f);
 		MakeDentTextures();
@@ -57,8 +82,7 @@ public partial class BossRoom
 			Strip(k, p1, p2, side, 0.14f);
 		}
 		k.CommitTo(dent, "Torn", false);
-		BendNearestSpan(at);
-		Sparks(world);
+		BendNearestSpan(at, _rng, fresh);
 		_dents.Enqueue(dent);
 		while (_dents.Count > MaxDents) _dents.Dequeue().QueueFree();
 	}
@@ -80,7 +104,7 @@ public partial class BossRoom
 	}
 
 	/// <summary>The railing's span nearest the slam, bent: sagging down in the middle and pushed out over the pit.</summary>
-	private void BendNearestSpan(Vector3 at)
+	private void BendNearestSpan(Vector3 at, RandomNumberGenerator _rng, bool fresh)
 	{
 		MeshInstance3D best = null;
 		Vector3 ba = default, bb = default;
@@ -118,6 +142,7 @@ public partial class BossRoom
 		}
 		var bent = k.CommitTo(this, best.Name + "Bent", true);
 		best.Visible = false;
+		if (!fresh) return;
 		var groan = SfxPlayer("lodge_rail_groan", 2, ToGlobal(mid), -2f, 8f);
 		if (groan != null) { groan.PitchScale = _rng.RandfRange(0.55f, 0.7f); }
 		_ = bent;

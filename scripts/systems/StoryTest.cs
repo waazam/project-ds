@@ -2554,6 +2554,8 @@ public partial class StoryTest : Node
 			return;
 		}
 		Check("after being crushed: back on the catwalk at Act 18's start, the fight starting over", PlayerDeath.Deaths >= 1 && boss.ValvesTurned == 0);
+		Check("the catwalk as it was left: the dents and bent rails from before the death are still there", BossRoom.ScarsKept > 0 && boss.GetChildren().Count(c => c.Name.ToString().Contains("Dent")) >= System.Math.Min(BossRoom.ScarsKept, 22),
+			$"kept {BossRoom.ScarsKept}, dents {boss.GetChildren().Count(c => c.Name.ToString().Contains("Dent"))}");
 		if (++_s.Act18Attempts > 8) { Check("the fight", "won within eight tries", false, "crushed every time"); return; }
 
 		// the fight, played
@@ -3779,6 +3781,8 @@ public partial class StoryTest : Node
 		await Aim(toward + Vector3.Up * 0.6f, ct);
 		int lured0 = hunter.Lured;
 		hunter.Body.GlobalPosition = cave.ToGlobal(L.Nodes[L.Adj[nb].Find(x => x != pn) is int far && far != 0 ? far : nb]);
+		// (facing away: it doesn't see the throw, so it's the flare it goes to; the throw it sees is the next check)
+		hunter.Body.LookAt(hunter.Body.GlobalPosition + (hunter.Body.GlobalPosition - _player.GlobalPosition) with { Y = 0 }, Vector3.Up);
 		hunter.Paused = false;
 		held.Throw();
 		await WaitUntil(() => hunter.Lured > lured0, 4, ct);
@@ -3850,16 +3854,65 @@ public partial class StoryTest : Node
 			Check("a bottle on the corridor floor, walked into: it goes over (and clinks)", b.Knocks > 0 && b.GlobalPosition.DistanceTo(startAt) > 0.05f, $"knocks {b.Knocks}, moved {b.GlobalPosition.DistanceTo(startAt):0.00} m");
 			await Teleport(back, back + Vector3.Forward * 3f, ct);
 		}
+		// (2026-10-10b) a wardrobe to hide in; the standing sheet in the dining hall
+		if (lodge.Hides.Count > 0)
+		{
+			var back = _player.GlobalPosition;
+			var h = lodge.Hides[0];
+			h.Door.Open(null, instant: true);
+			h.StepIn(_player);
+			await Seconds(1.0, ct);
+			Screenshot("act23_through_the_wardrobe_door");
+			bool inside = h.Hidden && _player.GlobalPosition.DistanceTo(lodge.ToGlobal(h.Inside)) < 0.3f;
+			h.StepOut();
+			await Seconds(0.5, ct);
+			Check("a wardrobe to hide in: in, looking out through the crack, and out again", inside && !h.Hidden && _player.IsPhysicsProcessing(), $"inside {inside}, hidden {h.Hidden}");
+			await Teleport(back, back + Vector3.Forward * 3f, ct);
+		}
+		if (lodge.SheetFigure != null)
+		{
+			var back = _player.GlobalPosition;
+			var start = lodge.SheetFigure.GlobalPosition;
+			var stand = lodge.ToGlobal(new Vector3(SkiLodge.WingX0 + 8f, 0.1f, 0f));
+			await Teleport(stand, start, ct);
+			await Seconds(0.5, ct);
+			int moves0 = lodge.SheetMoves;
+			bool moved = lodge.SheetStep(lodge.ToLocal(_player.GlobalPosition));
+			await Aim(lodge.SheetFigure.GlobalPosition + Vector3.Up * 1.2f, ct);
+			Screenshot("act23_the_standing_sheet");
+			Check("the standing sheet in the dining hall: nearer each time the light goes out", moved && lodge.SheetMoves > moves0 && lodge.SheetFigure.GlobalPosition.DistanceTo(start) > 0.3f,
+				$"moved {moved}, {start.DistanceTo(lodge.SheetFigure.GlobalPosition):0.0} m");
+			await Teleport(back, back + Vector3.Forward * 3f, ct);
+		}
 		// out across the snow, following its tracks, to the hole
 		var hole = maze.GetNodeOrNull<Node3D>("Hole");
 		await WaitUntil(() => maze.GetNodeOrNull<Node3D>("Hole") != null, 5, ct);
 		hole = maze.GetNodeOrNull<Node3D>("Hole");
 		await Aim(hole.GlobalPosition + Vector3.Up * 1f, ct);
-		Screenshot("act24_its_tracks");
+		Screenshot("act24_the_drift_from_the_door");
+		// (2026-10-10b) off the porch, it's behind them: out of the trees, and it drives them to the drift
+		var lodgeOut = lodge.ToGlobal(new Vector3(0, 0.1f, SkiLodge.Apothem + 7.5f));
+		await WalkTo(lodgeOut, 0.8f, ct, giveUp: 15f);
+		await WaitUntil(() => maze.Herder != null, 3, ct);
+		Check("off the porch: the wendigo comes out of the trees behind them", maze.Herder != null, $"herder {maze.Herder != null}");
+		if (maze.Herder != null)
+		{
+			await Seconds(0.8, ct);
+			await Aim(maze.Herder.GlobalPosition + Vector3.Up * 2.5f, ct);
+			Screenshot("act24_it_drives_you");
+			await Aim(lodge.ToGlobal(new Vector3(0, 2f, SkiLodge.Apothem)), ct);
+			Screenshot("act24_the_lodge_doorway");
+		}
+		await Aim(hole.GlobalPosition + Vector3.Up * 1f, ct);
 		await WalkTo(hole.GlobalPosition + hole.GlobalBasis * new Vector3(0, 0, -2.5f), 0.8f, ct, giveUp: 40f);
+		await Aim(hole.GlobalPosition + hole.GlobalBasis * new Vector3(0, 0.9f, 0f), ct);
+		Screenshot("act24_the_way_down");
+		Check("kept going, it never caught them: it drives, it doesn't chase", !maze.HerdCaught, $"caught {maze.HerdCaught}");
 		await WalkTo(hole.GlobalPosition + hole.GlobalBasis * new Vector3(0, 0, 0.6f), 0.4f, ct, () => maze.InMaze, giveUp: 10f);
 		await WaitUntil(() => maze.InMaze && _input.Enabled, 10, ct);
 		Check("down the hole in the drift: in the maze (a save)", maze.InMaze && s.Current == Checkpoint.Act24Maze, $"{s.Current}, at {_player.GlobalPosition}, hole at {hole.GlobalPosition}");
+		Check("it comes down after them: in the maze behind them, a while after", maze.FollowedIn, $"followed {maze.FollowedIn}");
+		Check("the lantern knocked out at the end of Act 23: dark down here, the flares the only light", _player.GetNodeOrNull<Lantern>("Lantern") is { IsOn: false, Shining: false }, $"lantern on {_player.GetNodeOrNull<Lantern>("Lantern")?.IsOn}");
 		if (!maze.InMaze) return;
 		await Seconds(1.0, ct);
 		Screenshot("act24_the_way_in");

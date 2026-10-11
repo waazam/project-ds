@@ -446,7 +446,7 @@ public partial class SkiLodge
 		body.Box(new Vector3(0, size.Y + 0.02f, 0), new Vector3(size.X + 0.06f, 0.05f, size.Z + 0.04f), 1f);
 		body.Xf = Transform3D.Identity;
 		body.CommitTo(this, name + "Body", true);
-		LodgeKit.Solid(_inBody, at + facing * new Vector3(0, size.Y * 0.5f, 0), new Vector3(size.X, size.Y, size.Z), facing.GetEuler().Y);
+		var solid = LodgeKit.Solid(_inBody, at + facing * new Vector3(0, size.Y * 0.5f, 0), new Vector3(size.X, size.Y, size.Z), facing.GetEuler().Y);
 		// the door, hinged on its left edge
 		var s = new Searchable { Name = name, Position = at + facing * new Vector3(-size.X * 0.5f, 0, size.Z * 0.5f), Basis = facing, Type = Searchable.Kind.Door, Travel = -1.8f, What = what, Grip = new Vector3(size.X - 0.08f, 1.1f, 0.05f), PickRadius = 0.35f };
 		AddChild(s);
@@ -464,6 +464,8 @@ public partial class SkiLodge
 		db.SetMeta("surface", "wood");
 		db.AddChild(new CollisionShape3D { Position = new Vector3(size.X * 0.5f, size.Y * 0.5f, 0.015f), Shape = new BoxShape3D { Size = new Vector3(size.X - 0.02f, size.Y - 0.02f, 0.04f) } });
 		s.Part.AddChild(db);
+		// (2026-10-10b) a wardrobe big enough to hide in
+		if (what == "wardrobe" && int.TryParse(name.Replace("Room", "").Replace("Wardrobe", ""), out int num)) BuildHides(s, solid, at, facing, size, num);
 		return s;
 	}
 

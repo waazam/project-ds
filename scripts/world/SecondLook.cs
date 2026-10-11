@@ -18,7 +18,9 @@ namespace ProjectDS.World;
 /// </summary>
 public static class SecondLook
 {
-	private static bool _rolled, _eyesRun, _figureRun, _figureUsed;
+	private static bool _rolled, _eyesRun, _figureRun, _figureUsed, _doorRun;
+	/// <summary>(2026-10-10b) This run, the lodge's room 204 door is found ajar.</summary>
+	public static bool DoorRun { get { Roll(); return _doorRun; } }
 
 	private static void Roll()
 	{
@@ -27,6 +29,7 @@ public static class SecondLook
 		bool force = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--second-look") >= 0;
 		_eyesRun = force || GD.Randf() < 0.25f;
 		_figureRun = force || GD.Randf() < 0.25f;
+		_doorRun = force || GD.Randf() < 0.25f;
 	}
 
 	public static bool FigureTaken => _figureUsed;
@@ -71,11 +74,18 @@ public static class SecondLook
 	/// <summary>A dark standing figure, faint, soft-edged, at the frame's edge on the tree line.</summary>
 	private static void DrawFigure(Image img)
 	{
-		if (img.GetFormat() != Image.Format.Rgb8 && img.GetFormat() != Image.Format.Rgba8) img.Convert(Image.Format.Rgba8);
 		int w = img.GetWidth(), h = img.GetHeight();
 		bool left = GD.Randf() < 0.5f;
 		float cx = w * (left ? (float)GD.RandRange(0.1, 0.2) : (float)GD.RandRange(0.8, 0.9));
-		float feet = h * (float)GD.RandRange(0.62, 0.7), tall = h * (float)GD.RandRange(0.2, 0.26);
+		DrawFigureAt(img, cx, h * (float)GD.RandRange(0.62, 0.7), h * (float)GD.RandRange(0.2, 0.26), 0.45f);
+	}
+
+	/// <summary>A dark standing figure on a print: its feet at (<paramref name="cx"/>, <paramref name="feet"/>), <paramref name="tall"/>
+	/// pixels high, darkening the picture by up to <paramref name="strength"/>.</summary>
+	public static void DrawFigureAt(Image img, float cx, float feet, float tall, float strength)
+	{
+		if (img.GetFormat() != Image.Format.Rgb8 && img.GetFormat() != Image.Format.Rgba8) img.Convert(Image.Format.Rgba8);
+		int w = img.GetWidth(), h = img.GetHeight();
 		float head = tall * 0.11f;
 		for (int y = 0; y < h; y++)
 			for (int x = 0; x < w; x++)
@@ -92,7 +102,7 @@ public static class SecondLook
 				float inside = 1f - Mathf.SmoothStep(0.75f, 1.15f, d);
 				if (inside <= 0f) continue;
 				float fadeUp = Mathf.SmoothStep(-0.05f, 0.25f, v);   // (its feet lost in the undergrowth)
-				float k = inside * fadeUp * 0.45f;
+				float k = inside * fadeUp * strength;
 				var c = img.GetPixel(x, y);
 				img.SetPixel(x, y, new Color(c.R * (1f - k), c.G * (1f - k), c.B * (1f - k), c.A));
 			}

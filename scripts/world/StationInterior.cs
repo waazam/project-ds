@@ -203,6 +203,7 @@ public partial class StationInterior : Node3D
 		// the end of the story (GameEnding: for now, where Act 23 ends), facing out of the splintered doorway
 		Marker("GameEndMarker", ToGlobal(lodge + new Vector3(0f, 0.1f, SkiLodge.HexIn - 0.8f)), Rotation.Y, "respawn_GameFinished");
 		SaveLamps.Place(this);   // (2026-10-10: the safe lights at a few of the saves)
+		LorePages.Place(this);   // (2026-10-10b: R.H.'s pages)
 
 		// the overlays; the blacklight's secrets, the render budget and the photo subjects round the whole Hollow (placed once
 		// everything is built)

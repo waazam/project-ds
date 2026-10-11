@@ -262,12 +262,16 @@ public static class LodgeTextures
 		return c.Lerp(new Color(0.26f, 0.23f, 0.2f), Mathf.Clamp((dust - 0.45f) * 1.6f, 0f, 0.45f));
 	});
 
-	public static StandardMaterial3D CrawlBoardsMat => Std("lodge_m_crawl_boards", CrawlBoards, 0.9f, 0.2f, null, DetailKit.Kind.Wood, null, 0.5f, 1f);
+	public static StandardMaterial3D CrawlBoardsMat => _hCrawlBoardsMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_crawl_boards", CrawlBoards, 0.9f, 0.2f, null, DetailKit.Kind.Wood, null, 0.5f, 1f), new Color(0.72f, 0.62f, 0.52f));
+	private static StandardMaterial3D _hCrawlBoardsMat;
 	public static StandardMaterial3D CrawlBrickMat => Std("lodge_m_crawl_brick", CrawlBrick, 0.95f, 0.15f, null, DetailKit.Kind.Stone, null, 0.5f, 1f);
-	public static StandardMaterial3D CrawlFloorMat => Std("lodge_m_crawl_floor", CrawlFloor, 0.95f, 0.15f, null, DetailKit.Kind.Wood, null, 0.5f, 1f);
-	public static StandardMaterial3D CrawlCeilingMat => Std("lodge_m_crawl_ceiling", CrawlBoards, 0.95f, 0.1f, new Color(0.55f, 0.52f, 0.48f), DetailKit.Kind.Wood, null, 0.5f, 1f);
+	public static StandardMaterial3D CrawlFloorMat => _hCrawlFloorMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_crawl_floor", CrawlFloor, 0.95f, 0.15f, null, DetailKit.Kind.Wood, null, 0.5f, 1f), new Color(0.62f, 0.52f, 0.44f));
+	private static StandardMaterial3D _hCrawlFloorMat;
+	public static StandardMaterial3D CrawlCeilingMat => _hCrawlCeilingMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_crawl_ceiling", CrawlBoards, 0.95f, 0.1f, new Color(0.55f, 0.52f, 0.48f), DetailKit.Kind.Wood, null, 0.5f, 1f), new Color(0.48f, 0.43f, 0.38f));
+	private static StandardMaterial3D _hCrawlCeilingMat;
 	/// <summary>The cavity's studs and joists: the same pine as its boards, darker (it was the rooms' red varnish).</summary>
-	public static StandardMaterial3D CrawlStudMat => Std("lodge_m_crawl_stud", CrawlBoards, 0.95f, 0.1f, new Color(0.62f, 0.56f, 0.5f), DetailKit.Kind.Wood, null, 0.5f, 1f);
+	public static StandardMaterial3D CrawlStudMat => _hCrawlStudMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_crawl_stud", CrawlBoards, 0.95f, 0.1f, new Color(0.62f, 0.56f, 0.5f), DetailKit.Kind.Wood, null, 0.5f, 1f), new Color(0.56f, 0.48f, 0.42f));
+	private static StandardMaterial3D _hCrawlStudMat;
 	/// <summary>The cavity's pipes: old iron, rusted and matte (the rooms' iron caught the light in a blue line along the top).</summary>
 	public static StandardMaterial3D CrawlPipeMat => _plain("lodge_m_crawl_pipe", new Color(0.2f, 0.13f, 0.09f), 0.85f, 0.15f, 0.3f);
 	public static StandardMaterial3D CopperMat => _plain("lodge_m_copper", new Color(0.42f, 0.26f, 0.16f), 0.45f, 0.6f, 0.6f);
@@ -311,12 +315,14 @@ public static class LodgeTextures
 	public static StandardMaterial3D DamaskMat => Std("lodge_m_damask", Damask, 0.8f, 0.25f, null, DetailKit.Kind.Fabric, "jacquard", 0.35f);
 	public static StandardMaterial3D GreenTileMat => Std("lodge_m_greentile", GreenTile, 0.25f, 0.6f);
 	public static StandardMaterial3D FlagstoneMat => Std("lodge_m_flag", Flagstone, 0.8f, 0.25f, null, DetailKit.Kind.Stone, "flagstone", 0.8f);
-	public static StandardMaterial3D ParquetMat => Std("lodge_m_parquet", Parquet, 0.5f, 0.45f, null, DetailKit.Kind.Wood, "parquet", 0.5f);
+	public static StandardMaterial3D ParquetMat => _hParquetMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_parquet", Parquet, 0.5f, 0.45f, null, DetailKit.Kind.Wood, "parquet", 0.5f), new Color(0.7f, 0.52f, 0.38f));
+	private static StandardMaterial3D _hParquetMat;
 	public static StandardMaterial3D CheckerMat => Std("lodge_m_checker", Checker, 0.45f, 0.4f);
 	public static StandardMaterial3D RugMat => Std("lodge_m_rug", Rug, 1f, 0.1f, null, DetailKit.Kind.Fabric);
 	// (baked at 1024 px since 2026-10-09: the owner, "the wood in ... the ski lodge looks pretty bad")
-	public static StandardMaterial3D DarkWoodMat => _darkM ??= World.SurfaceSets.Apply(Std("lodge_m_darkwood", World.SurfaceSets.Albedo("wood_dark") ?? DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f), "wood_dark", 0.7f);
-	public static StandardMaterial3D LogWallMat => _logwallM ??= World.SurfaceSets.Apply(Std("lodge_m_logwall", World.SurfaceSets.Albedo("wood_pine") ?? LogWall, 0.8f, 0.25f, null, DetailKit.Kind.Wood), "wood_pine");
+	// (2026-10-10b: the hinoki, its woodwork a rich dark-stained tone of it, its walls the honey of the bare wood)
+	public static StandardMaterial3D DarkWoodMat => _darkM ??= World.SurfaceSets.Hinoki(Std("lodge_m_darkwood", DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f), new Color(0.6f, 0.42f, 0.3f), 8f);
+	public static StandardMaterial3D LogWallMat => _logwallM ??= World.SurfaceSets.Hinoki(Std("lodge_m_logwall", LogWall, 0.8f, 0.25f, null, DetailKit.Kind.Wood), new Color(0.95f, 0.84f, 0.7f), 4f);
 	private static StandardMaterial3D _darkM, _logwallM;
 
 	private static StandardMaterial3D _plain(string key, Color c, float rough, float spec, float metal = 0f)

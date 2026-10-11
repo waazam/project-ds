@@ -193,6 +193,14 @@ public partial class LodgeDoor : Node3D
 		tw.TweenCallback(Callable.From(() => AudioDirector.OneShot(this, "door_slam", 2, CentreWorld, 0f, "Events", 5f, 0.05f)));
 	}
 
+	/// <summary>(2026-10-10b) Only the leaf moved, a little (a door standing ajar that's still locked): its state and its
+	/// collider are left as they are. <paramref name="fraction"/> of its open angle, eased over <paramref name="seconds"/>.</summary>
+	public void Ajar(float fraction, float seconds)
+	{
+		var tw = CreateTween();
+		tw.TweenProperty(_leaf, "rotation:y", OpenAngle * fraction, seconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+	}
+
 	public void SetLocked() { Current = State.Locked; SetCollision(true); _leaf.Rotation = Vector3.Zero; SetLed(1); }
 
 	private void SetCollision(bool on)

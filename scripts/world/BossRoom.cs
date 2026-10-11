@@ -96,6 +96,7 @@ public partial class BossRoom : Node3D
 		AddChild(_body);
 		BuildShell();
 		BuildCatwalk();
+		RestoreScars();
 		BuildPipes();
 		BuildValves();
 		BuildRig();

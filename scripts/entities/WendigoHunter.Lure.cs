@@ -37,7 +37,53 @@ public partial class WendigoHunter
 		Lures.Heard -= OnNoise;
 	}
 
-	private void OnFlareLanded(Vector3 world, float burn) => Lure(world, 34f, burn + 4f, "a flare");
+	/// <summary>(2026-10-10b) Flares it has been drawn by this hunt; when it was last dazzled (game seconds).</summary>
+	public int FlaresSeen { get; private set; }
+	public int NotFooled { get; private set; }
+	public int Dazzles { get; private set; }
+	private double _dazzledUntil;
+	/// <summary>Dazzled by a flare's light: for a few seconds it can't make them out at all.</summary>
+	public bool Dazzled => Time.GetTicksMsec() / 1000.0 < _dazzledUntil;
+
+	private void OnFlareLanded(Vector3 world, float burn)
+	{
+		if (_cave == null || Body == null || Dead || Paused) return;
+		var local = _cave.ToLocal(world);
+		// on them, and a flare comes down near it: the light in its eyes. It recoils from it, hissing, can't see a thing
+		// for a few seconds, and then it's the flare it goes to, not them (the way out of a chase)
+		if (State is Mode.Chase or Mode.Ambush && Pos.DistanceTo(local) < 10f)
+		{
+			Dazzles++;
+			_dazzledUntil = Time.GetTicksMsec() / 1000.0 + 3.2;
+			Awareness = 0f;
+			_rearT = 1.4f;
+			GD.Print("[wendigo] a flare in its face - dazzled");
+			AudioDirector.OneShot(this, "wendigo_mumble", 4, Body.GlobalPosition + Vector3.Up * 2.5f, -2f, "Voice", 5f, 0.1f);
+			Pick(Mode.Investigate);
+			_lureAt = MazeExtras.KeepOut(local);
+			_sniffLeft = burn + 3f;
+			_sniffingHollow = false;
+			RouteTo(_lureAt);
+			return;
+		}
+		// it learns: a throw it saw (they were in its sight as it came down), or one trick too many, and it isn't the flare
+		// it goes to, but where the throw came from
+		if (State is not (Mode.Burning or Mode.Kill or Mode.Flee or Mode.Off) && TunnelDistance(Pos, local) <= 34f)
+		{
+			FlaresSeen++;
+			bool sawThrow = CanSee(PlayerLocal);
+			if (sawThrow || (FlaresSeen > 3 && _rng.Randf() < 0.5f))
+			{
+				NotFooled++;
+				GD.Print($"[wendigo] not fooled by the flare ({(sawThrow ? "it saw the throw" : "it has learned")}) - going for the thrower");
+				Pick(_phase2 ? Mode.Stalk : Mode.Investigate);
+				_sniffLeft = 0f;
+				RouteTo(PlayerLocal);
+				return;
+			}
+		}
+		Lure(world, 34f, burn + 4f, "a flare");
+	}
 	private void OnNoise(Vector3 world, float reach, string what) => Lure(world, reach, 3f, what);
 
 	/// <summary>Something at <paramref name="world"/> it might hear (along the tunnels, within <paramref name="reach"/>):

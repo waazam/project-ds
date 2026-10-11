@@ -42,7 +42,7 @@ public partial class Flare : Node3D
 	private GpuParticles3D _sparks;
 	private AudioStreamPlayer3D _fizz;
 	private Interactable _take;
-	private float _t, _spin;
+	private float _t, _spin, _shadowPoll;
 	private FastNoiseLite _waver;
 
 	public override void _Ready()
@@ -127,6 +127,15 @@ public partial class Flare : Node3D
 			if (BurnLeft <= 0f) { GoOut(); return; }
 		}
 		_light.LightEnergy = 0.85f * k * (0.9f + 0.1f * _waver.GetNoise1D(_t * 1.3f));
+		// (2026-10-10b) its shadows: everything near it throws a long one down the tunnel (the wendigo's round a corner
+		// before it), only for the flares near enough to see them, so a tunnel of them doesn't cost a shadow each
+		_shadowPoll -= dt;
+		if (_shadowPoll <= 0f)
+		{
+			_shadowPoll = 0.5f;
+			var cam = GetViewport()?.GetCamera3D();
+			_light.ShadowEnabled = cam != null && cam.GlobalPosition.DistanceTo(GlobalPosition) < 22f;
+		}
 		if (_fizz != null) _fizz.VolumeDb = -12f + Mathf.LinearToDb(Mathf.Max(k, 0.01f));
 	}
 

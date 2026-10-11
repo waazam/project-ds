@@ -257,6 +257,7 @@ public partial class WendigoHunter : Node3D
 		if (d > range) return false;
 		// (in a hollow, crouched, it can't make them out, unless it's right on them)
 		if (PlayerHidden && d > 1.4f) return false;
+		if (Dazzled) return false;
 		var to = (chest - eye) with { Y = 0 };
 		if (to.LengthSquared() > 0.25f && Fwd.Normalized().Dot(to.Normalized()) < Mathf.Cos(Mathf.DegToRad(SightHalfAngle))) return false;
 		var q = PhysicsRayQueryParameters3D.Create(_cave.ToGlobal(eye), _cave.ToGlobal(chest), 1);
@@ -417,6 +418,8 @@ public partial class WendigoHunter : Node3D
 		if (_stepT <= 0f)
 		{
 			_stepT = 1.15f * HunterScale;
+			_clawLeft = !_clawLeft;
+			if (_vel.LengthSquared() > 0.04f) Act24Maze.Instance?.LayClaw(Body.GlobalPosition, (_cave.GlobalBasis * _vel).Normalized() with { Y = 0 }, _clawLeft);
 			AudioDirector.OneShot(this, "wendigo_step", 6, Body.GlobalPosition, _vel.Length() > 3.5f ? -4f : -12f, "Events", 4f, 0.08f);
 		}
 	}
@@ -432,6 +435,7 @@ public partial class WendigoHunter : Node3D
 	private const float HunterScale = BodyScale;
 	private Vector3 _vel;
 	private float _rearT;
+	private bool _clawLeft;
 	private Mode _prevMode = Mode.Off;
 	private string _gait;
 

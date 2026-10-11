@@ -170,6 +170,8 @@ public partial class SkiLodge
 		dive.TweenProperty(player, "global_position", diveTo, 0.45f * Pace).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
 		player.SetCrouch(true);
 		AudioDirector.OneShot(this, "body_dive", 1, diveTo + Vector3.Up * 0.3f, -2f, "Player", 3f, 0.04f);
+		// (2026-10-10b) the lantern knocked out of the hand in the dive: out, and it won't light again down there
+		player.GetNodeOrNull<Lantern>("Lantern")?.Snuff();
 		for (int w = 0; w < 80 && !landed; w++) await Cutscene.Wait(this, 0.05, ct);
 		FinaleWendigo.GlobalPosition = land;
 		FinaleLanded = true;
@@ -383,6 +385,7 @@ public partial class SkiLodge
 		for (int j = 0; j < 4; j++)
 			k.Box(new Vector3(1.26f - rng.RandfRange(0f, 0.15f), FloorY + 0.3f + j * 0.75f, HexIn - 0.03f), new Vector3(0.12f, rng.RandfRange(0.4f, 0.7f), 0.06f), 1f);
 		k.CommitTo(this, "FrontDoorWreck", false);
+		PorchWreck();
 		if (instant) return;
 		AudioDirector.OneShot(this, "door_explode", 1, ToGlobal(FrontDoorInside), 7.5f, "Events", 10f, 0.02f);
 		AudioDirector.OneShot(this, "door_ram_burst", 1, ToGlobal(FrontDoorInside), 8f, "Events", 10f, 0.02f);

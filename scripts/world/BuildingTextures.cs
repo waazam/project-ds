@@ -258,13 +258,15 @@ public static class BuildingTextures
 
 	// (the cabin's wood baked at 1024 px since 2026-10-09: the owner, "the wood in the cabin ... looks pretty bad"; the
 	// boards' and the floor's sets are twice as many boards to the tile as the old ones, so they're mapped at half)
-	public static StandardMaterial3D LogMat => _logM ??= Weathered(World.SurfaceSets.Apply(Std("b_log", World.SurfaceSets.Albedo("wood_log") ?? Log()), "wood_log"));
+	public static StandardMaterial3D LogMat => _logM ??= World.SurfaceSets.Tex("hinoki_log") != null
+		? World.SurfaceSets.HinokiLog(Std("b_log", Log()), "hinoki_log", new Color(0.88f, 0.82f, 0.76f))
+		: Weathered(World.SurfaceSets.Apply(Std("b_log", World.SurfaceSets.Albedo("wood_log") ?? Log()), "wood_log"));
 	/// <summary>(2026-10-10) The baked logs' grey warmed toward old brown pine (pale, they read white in the dusk).</summary>
 	private static StandardMaterial3D Weathered(StandardMaterial3D m) { m.AlbedoColor = new Color(0.8f, 0.66f, 0.52f); return m; }
 	private static StandardMaterial3D _logM, _boardsM, _floorM, _logTriM;
 	/// <summary>(2026-10-10) Round logs (beams, rails, rafters, the firewood: cylinders, whose UVs run round them and along
 	/// them): the same wood turned so its grain runs along the log, without the chinking (wood_round, cut from wood_log).</summary>
-	public static StandardMaterial3D RoundLogMat => _logTriM ??= Weathered(World.SurfaceSets.Apply(Std("b_roundlog", World.SurfaceSets.Albedo("wood_round") ?? Log()), "wood_round"));
+	public static StandardMaterial3D RoundLogMat => _logTriM ??= World.SurfaceSets.Tex("hinoki_round") != null ? World.SurfaceSets.HinokiLog(Std("b_roundlog", Log()), "hinoki_round", new Color(0.88f, 0.82f, 0.76f)) : Weathered(World.SurfaceSets.Apply(Std("b_roundlog", World.SurfaceSets.Albedo("wood_round") ?? Log()), "wood_round"));
 	public static StandardMaterial3D LogEndMat => Std("b_logend", LogEnd());
 	public static StandardMaterial3D ShingleMat => Std("b_shingle", Shingles(), 0.85f, 0.3f);
 	public static StandardMaterial3D StoneMat => _stoneDamp ??= DampStone();
@@ -276,10 +278,11 @@ public static class BuildingTextures
 		ProcTextures.Damp(m, 0.95f);
 		return m;
 	}
-	public static StandardMaterial3D BoardsMat => _boardsM ??= Halved(World.SurfaceSets.Apply(Std("b_boards", World.SurfaceSets.Albedo("wood_boards") ?? Boards()), "wood_boards"));
-	public static StandardMaterial3D FloorMat => _floorM ??= Halved(World.SurfaceSets.Apply(Std("b_floor", World.SurfaceSets.Albedo("wood_floor") ?? Floor(), 0.8f, 0.3f), "wood_floor"));
+	public static StandardMaterial3D BoardsMat => _boardsM ??= World.SurfaceSets.Hinoki(Std("b_boards", Boards()), new Color(0.95f, 0.86f, 0.76f));
+	public static StandardMaterial3D FloorMat => _floorM ??= World.SurfaceSets.Hinoki(Std("b_floor", Floor(), 0.8f, 0.3f), new Color(0.8f, 0.68f, 0.56f));
 	private static StandardMaterial3D Halved(StandardMaterial3D m) { m.Uv1Scale *= 0.5f; return m; }
-	public static StandardMaterial3D FreshPlankMat => Std("b_fresh", FreshPlank(), 0.9f, 0.25f);
+	public static StandardMaterial3D FreshPlankMat => _freshM ??= World.SurfaceSets.Hinoki(Std("b_fresh", FreshPlank(), 0.9f, 0.25f), new Color(1f, 0.93f, 0.84f));
+	private static StandardMaterial3D _freshM;
 	public static StandardMaterial3D CanvasMat => Std("b_canvas", Canvas(), 1f, 0.15f, cullOff: true);
 
 	/// <summary>Cast iron: near-black, a little sheen.</summary>

@@ -745,9 +745,9 @@ public partial class SkiLodge : Node3D
 	private static StandardMaterial3D _timber, _trim, _door, _glass, _lit, _roofSnow, _ski;
 	private static StandardMaterial3D SkiPaint => _ski ??= new StandardMaterial3D { ResourceName = "lodge_ski", AlbedoColor = new Color(0.42f, 0.12f, 0.1f), Roughness = 0.5f };
 	/// <summary>Dark-stained board-and-batten, the lodge's upper storeys.</summary>
-	public static StandardMaterial3D LodgeTimber => _timber ??= Tinted(BuildingTextures.BoardsMat, new Color(0.36f, 0.3f, 0.27f), "lodge_timber");
-	public static StandardMaterial3D LodgeTrim => _trim ??= Tinted(BuildingTextures.BoardsMat, new Color(0.26f, 0.22f, 0.2f), "lodge_trim");
-	public static StandardMaterial3D LodgeDoor => _door ??= Tinted(ChurchParts.ChurchTextures.OldPlankMat, new Color(0.3f, 0.23f, 0.18f), "lodge_door");
+	public static StandardMaterial3D LodgeTimber => _timber ??= Tinted(BuildingTextures.BoardsMat, new Color(0.62f, 0.48f, 0.38f), "lodge_timber");
+	public static StandardMaterial3D LodgeTrim => _trim ??= Tinted(BuildingTextures.BoardsMat, new Color(0.45f, 0.34f, 0.27f), "lodge_trim");
+	public static StandardMaterial3D LodgeDoor => _door ??= Tinted(ChurchParts.ChurchTextures.OldPlankMat, new Color(0.62f, 0.46f, 0.34f), "lodge_door");
 	public static StandardMaterial3D WindowGlass => _glass ??= new StandardMaterial3D
 	{
 		ResourceName = "lodge_glass", AlbedoColor = new Color(0.04f, 0.05f, 0.07f), Roughness = 0.15f, MetallicSpecular = 0.7f,

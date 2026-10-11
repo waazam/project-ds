@@ -18,6 +18,7 @@ public partial class AirParticles : Node3D
 	private bool _dustOn, _sporesOn;
 	private PlayerController _player;
 	private double _check, _nextBreath = 2.0, _t;
+	private bool _wasHolding;
 	private bool _cold;
 
 	public override void _Ready()
@@ -137,11 +138,15 @@ public partial class AirParticles : Node3D
 			// (and down in Act 24's ice, where it's colder than anywhere: their breath in the lantern light, 2026-10-07)
 			_cold = cold > 0.5f || World.SnowMaze.Act24Maze.Instance is { InMaze: true };
 		}
+		// (2026-10-10b) held, there's no breath to see; let go, a big one; winded, quick ones
+		var breathing = PlayerBreathing.Of(_player);
+		if (breathing is { Holding: true }) { _wasHolding = true; return; }
+		if (_cold && _wasHolding) { _wasHolding = false; _nextBreath = _t; }
 		if (_cold && _t >= _nextBreath)
 		{
 			// a breath: from just under the eye, out ahead
-			float exert = Mathf.Clamp(1f - (_player.Stamina?.Value ?? 1f), 0f, 1f);   // (winded: quicker)
-			_nextBreath = _t + Mathf.Lerp(3.8f, 1.6f, exert) * GD.RandRange(0.85, 1.15);
+			float exert = Mathf.Clamp(Mathf.Max(1f - (_player.Stamina?.Value ?? 1f), breathing?.Exertion ?? 0f), 0f, 1f);   // (winded: quicker)
+			_nextBreath = _t + Mathf.Lerp(3.8f, 1.1f, exert) * GD.RandRange(0.85, 1.15);
 			_breath.GlobalTransform = new Transform3D(cam.GlobalBasis, cam.GlobalPosition + cam.GlobalBasis * new Vector3(0, -0.13f, -0.12f));
 			_breath.Restart();
 		}

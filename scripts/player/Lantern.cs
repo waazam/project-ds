@@ -41,7 +41,7 @@ public partial class Lantern : Node3D
 	/// <summary>0..1 how far the beam is gathered right now (right mouse held). Survey stakes read only above ~0.5.</summary>
 	public float FocusAmount => _focus;
 	/// <summary>Carried and switched on.</summary>
-	public bool IsOn => _inv != null && _inv.HasLantern && _lit;
+	public bool IsOn => _inv != null && _inv.HasLantern && _lit && !Snuffed;
 
 	[ExportGroup("Blacklight")]
 	[Export] public Color UvColor = new(0.38f, 0.12f, 1.0f);
@@ -65,6 +65,24 @@ public partial class Lantern : Node3D
 		&& (s.HasFlag(Systems.StoryManager.Flag.LanternFlameDead) || s.Current >= Systems.Checkpoint.Act14Finished)
 		&& s.Current < Systems.Checkpoint.Act20Finished;
 
+	/// <summary>(2026-10-10b, the owner: "our lantern should go out when the wendigo jumps at us at the end of act 23, we
+	/// should be using the flares in the maze for our light source") Knocked from the hand as they threw themselves aside
+	/// from its leap: the glass cracked, the wick drowned. Out, flame and blacklight both, all through the maze; the green
+	/// flares are the only light there. It takes again after the wendigo is dead (Act 25).</summary>
+	public const string SnuffedFlag = "lantern_snuffed";
+	public static bool Snuffed => Systems.StoryManager.Instance is { } s && s.Current < Systems.Checkpoint.Act24Finished
+		&& (s.HasFlag(SnuffedFlag) || s.Current >= Systems.Checkpoint.Act23Finished);
+
+	public void Snuff()
+	{
+		Systems.StoryManager.Instance?.SetFlag(SnuffedFlag);
+		_dyingUntil = _t + 0.8;
+		_dyingLength = 0.8f;
+		Audio.AudioDirector.OneShot(this, "ice_tinkle", 3, null, -6f, "Player", 3f, 0.1f);
+		Audio.AudioDirector.OneShot(this, "bulb_sputter", 3, null, -8f, "Player");
+		GD.Print("[story] Act 23: the lantern knocked from the hand - out");
+	}
+
 	private double _dyingUntil = -1;
 	/// <summary>For tests: any light is coming from it right now (flame or blacklight).</summary>
 	/// <summary>Where its flame is while it's held up in view (<see cref="HeldLantern"/>): its light comes from there; null,
@@ -87,7 +105,7 @@ public partial class Lantern : Node3D
 		GD.Print("[story] Act 14: the lantern's flame gutters out");
 	}
 	private float _dyingLength = 3.2f;
-	private bool _deadHinted;
+	private bool _deadHinted, _snuffHinted;
 
 	/// <summary>The one-time how-to under the picture, the first time the lantern is taken in play (never on a restore).</summary>
 	[Export] public string HowToLine = "F: lantern on and off.   B: its blacklight.   Right mouse: gather its beam.";
@@ -219,10 +237,16 @@ public partial class Lantern : Node3D
 		// (its clock runs whatever it's showing: it had only run while the flame was lit, so a flame that died with the
 		// blacklight on stayed "dying" for ever, and lit again the moment the blacklight went off)
 		_t += delta;
-		bool dead = FlameDead && !Dying;
+		bool snuffed = Snuffed && !Dying;
+		bool dead = (FlameDead || Snuffed) && !Dying;
 		if (_player.PlayerInput.LightPressed && _inv.HasLantern)
 		{
-			if (dead && !Blacklight)
+			if (snuffed)
+			{
+				Audio.AudioDirector.OneShot(this, "lighter_flick", 1, null, -14f, "Player", 3f, 0.08f);
+				if (!_snuffHinted && UI.Subtitle.Instance != null) { _snuffHinted = true; _ = UI.Subtitle.Instance.Show("The glass is cracked. It won't light.", 0.6f, 3.5f, 1f); }
+			}
+			else if (dead && !Blacklight)
 			{
 				// the flame won't take: the striker clicks, a spark, nothing
 				Audio.AudioDirector.OneShot(this, "lighter_flick", 1, null, -14f, "Player", 3f, 0.08f);
@@ -234,7 +258,7 @@ public partial class Lantern : Node3D
 				Audio.AudioDirector.OneShot(this, _lit ? "lantern_on" : "lantern_off", 1, null, -12f, "Player");
 			}
 		}
-		if (_player.PlayerInput.LanternModePressed && _inv.HasLantern)
+		if (_player.PlayerInput.LanternModePressed && _inv.HasLantern && !snuffed)
 		{
 			Blacklight = !Blacklight;
 			_lit = true;
@@ -249,7 +273,7 @@ public partial class Lantern : Node3D
 			if (!string.IsNullOrEmpty(HowToLine) && UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show(HowToLine, 1.0f, 5.5f, 1.4f);
 		}
 
-		bool on = _inv.HasLantern && _lit && !(dead && !Blacklight);
+		bool on = _inv.HasLantern && _lit && !(dead && !Blacklight) && !snuffed;
 		_glow.Visible = on;
 		bool uv = on && Blacklight;
 		PublishUv(uv, cam);

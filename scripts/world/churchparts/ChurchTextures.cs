@@ -265,7 +265,8 @@ public static class ChurchTextures
 		return c;
 	});
 
-	public static StandardMaterial3D OakMat => Relief(Uv("ch_oak", Oak, 1f, 0.55f, 0.35f), "oak", 0.5f);
+	public static StandardMaterial3D OakMat => _hOakMat ??= World.SurfaceSets.Hinoki(Relief(Uv("ch_oak", Oak, 1f, 0.55f, 0.35f), "oak", 0.5f), new Color(0.5f, 0.36f, 0.26f), 8f);
+	private static StandardMaterial3D _hOakMat;
 
 	/// <summary>Old grey-brown planks, split and weathered, dark gaps between boards, the nail heads rusted.</summary>
 	public static Texture2D OldPlank => Make("ch_oldplank", 128, 256, (x, y) =>
@@ -285,8 +286,10 @@ public static class ChurchTextures
 		return c;
 	});
 
-	public static StandardMaterial3D OldPlankMat => Uv("ch_oldplank", OldPlank, 2f, 0.9f, 0.2f);
-	public static StandardMaterial3D OldPlankTriMat => Tri("ch_oldplank_tri", OldPlank, 2f, 0.9f, 0.2f);
+	public static StandardMaterial3D OldPlankMat => _hOldPlankMat ??= World.SurfaceSets.Hinoki(Uv("ch_oldplank", OldPlank, 2f, 0.9f, 0.2f), new Color(0.62f, 0.5f, 0.4f), 7f);
+	private static StandardMaterial3D _hOldPlankMat;
+	public static StandardMaterial3D OldPlankTriMat => _hOldPlankTriMat ??= World.SurfaceSets.Hinoki(Tri("ch_oldplank_tri", OldPlank, 2f, 0.9f, 0.2f), new Color(0.62f, 0.5f, 0.4f), 7f);
+	private static StandardMaterial3D _hOldPlankTriMat;
 
 	/// <summary>Gilding: warm gold leaf, rubbed through to red bole on the high points, dark in the crevices.</summary>
 	public static Texture2D Gold => Make("ch_gold", 128, 128, (x, y) =>

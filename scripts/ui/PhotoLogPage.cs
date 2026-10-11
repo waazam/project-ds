@@ -37,8 +37,11 @@ public partial class PhotoLogPage : CanvasLayer
 	public int Page { get; private set; }
 	public int PhotoPages => Mathf.Max(1, (int)Mathf.Ceil((_log?.RecordedCount ?? 0) / (float)PerPage));
 	/// <summary>(2026-10-10) The pages: the prints, and after them the notes, once there's a line to read.</summary>
-	public int PageCount => PhotoPages + (NotesFound > 0 ? 1 : 0);
+	public int PageCount => PhotoPages + (NotesFound > 0 ? 1 : 0) + (PagesRead > 0 ? 1 : 0);
 	public bool OnNotes => NotesFound > 0 && Page == PhotoPages;
+	/// <summary>(2026-10-10b) R.H.'s pages, the album's last page once one has been read.</summary>
+	public bool OnPages => PagesRead > 0 && Page == PhotoPages + (NotesFound > 0 ? 1 : 0);
+	public int PagesRead => World.LorePages.Read;
 	public int NotesFound => _log == null ? 0 : System.Linq.Enumerable.Count(PhotoCatalog.All, e => _log.Has(e.Id) && PhotoCatalog.NoteFor(e.Id) != null);
 
 	private static readonly Color PageColor = new(0.1f, 0.095f, 0.09f, 0.94f);
@@ -153,6 +156,7 @@ public partial class PhotoLogPage : CanvasLayer
 		int count = photos?.Count ?? 0;
 		var italic = UiKit.SerifItalic;
 		if (OnNotes) { DrawNotes(); return; }
+		if (OnPages) { DrawPages(); return; }
 		var footer = new Color(0.62f, 0.6f, 0.56f, 0.8f);
 		if (count == 0)
 			_draw.DrawString(italic, new Vector2(0, PageH * 0.5f + 4f), EmptyLine, HorizontalAlignment.Center, PageW, 11, footer);
@@ -174,6 +178,23 @@ public partial class PhotoLogPage : CanvasLayer
 			_draw.DrawString(UiKit.Mono, new Vector2(0f, PageH - 9f), $"{_log.SubjectsFound}/{PhotoCatalog.Total} found   {_log.TotalScore} pts", HorizontalAlignment.Center, PageW, 9, footer);
 		if (PageCount > 1)
 			_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{Page + 1} / {PageCount}", HorizontalAlignment.Right, PageW - 24f, 9, footer);
+	}
+
+	/// <summary>R.H.'s pages, in his order, the ones read so far (the rest a blank line each, where they'd go).</summary>
+	private void DrawPages()
+	{
+		var footer = new Color(0.62f, 0.6f, 0.56f, 0.8f);
+		_draw.DrawString(UiKit.SerifItalic, new Vector2(14f, 22f), $"R.H.'s pages  ({PagesRead} of {World.LorePages.All.Count})", HorizontalAlignment.Left, -1, 12, new Color(UiKit.Bone, 0.9f));
+		float y = 36f;
+		var s = Systems.StoryManager.Instance;
+		foreach (var p in World.LorePages.All)
+		{
+			bool read = s != null && s.HasFlag(World.LorePages.Flag(p.N));
+			string text = read ? p.Text : "...";
+			_draw.DrawMultilineString(UiKit.SerifItalic, new Vector2(16f, y), text, HorizontalAlignment.Left, PageW - 32f, 8, 3, new Color(UiKit.Bone, read ? 0.8f : 0.3f));
+			y += read ? 35f : 12f;
+		}
+		_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{Page + 1} / {PageCount}", HorizontalAlignment.Right, PageW - 24f, 9, footer);
 	}
 
 	/// <summary>The notes page: ruled lines, a pencil line for each thing found, the newest at the bottom (the earliest

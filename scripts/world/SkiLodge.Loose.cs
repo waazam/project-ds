@@ -25,6 +25,13 @@ public partial class SkiLodge
 	private void BuildLoose()
 	{
 		Lures.Heard += OnLooseNoise;
+		BuildSheetFigure();
+		DoorAjarState = SecondLook.DoorRun ? 1 : 0;
+		// (2026-10-10b) the lodge's rooms heard as rooms: the great hexagonal hall rings, the upstairs rooms and corridor are
+		// small and wooden, the dining hall long
+		AudioDirector.Zone(this, new Vector3(0, HexPeak * 0.5f, 0), new Vector3(HexR * 2f, HexPeak, HexR * 2f), AudioDirector.Space.Hall, "LobbyVerb");
+		AudioDirector.Zone(this, new Vector3((CorrX0 + CorrX1) * 0.5f, (UpperY + RoomTop) * 0.5f, 0), new Vector3(CorrX1 - CorrX0, RoomTop - UpperY, InnerZ * 2f), AudioDirector.Space.Room, "RoomsVerb", 1);
+		AudioDirector.Zone(this, new Vector3((WingX0 + WingX1) * 0.5f, WingRidge * 0.5f, 0), new Vector3(WingX1 - WingX0, WingRidge, WingHalfZ * 2f), AudioDirector.Space.Hall, "DiningVerb");
 		var r = LooseRoles;
 		// the upstairs corridor, against its walls
 		foreach (var (x, z, model, kind, yaw) in new[]

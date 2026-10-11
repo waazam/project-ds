@@ -33,7 +33,7 @@ public partial class Act24Maze : Node3D
 	public const string FlagCrowbar = "act24_crowbar", FlagCrate = "act24_crate_open";
 	/// <summary>Where the maze lies, from the lodge (lodge-local), and the hole in the drift at the surface.</summary>
 	public static readonly Vector3 MazeOffset = new(-45f, -160f, 40f);
-	public static readonly Vector3 HoleLocal = new(-7f, 0f, SkiLodge.Apothem + 26f);
+	public static readonly Vector3 HoleLocal = new(0f, 0f, SkiLodge.Apothem + 24f);
 
 	public SnowMazeCave Cave { get; private set; }
 	public WendigoHunter Hunter { get; private set; }
@@ -52,6 +52,11 @@ public partial class Act24Maze : Node3D
 	private Area3D _holeTrigger;
 	private Vector3 _holeWorld;
 	private AudioStreamPlayer _air;
+	/// <summary>(2026-10-10b) Prints in the maze's soft floor: their boots, its claws. They stay (the newest few hundred), so
+	/// a tunnel already walked shows it, and so does one it has been down.</summary>
+	public SnowPrints Prints { get; private set; }
+	private PlayerFootsteps _feet;
+	private bool _leftFoot;
 
 	public static Act24Maze Build(SkiLodge lodge)
 	{
@@ -67,55 +72,174 @@ public partial class Act24Maze : Node3D
 		// built during play (as the finale ends) off the main thread; loaded into, all at once behind the black
 		Cave = new SnowMazeCave { Name = "SnowMaze", Position = MazeOffset, Async = S == null || S.Current < Checkpoint.Act24Maze };
 		AddChild(Cave);
+		Prints = new SnowPrints { Name = "MazePrints" };
+		AddChild(Prints);
+		// (2026-10-10b) the tunnels heard as snow: dead and close; the cavern rings
+		AudioDirector.Zone(Cave, new Vector3(45f, 4f, 39f), new Vector3(110f, 20f, 122f), AudioDirector.Space.Snow, "MazeVerb");
+		AudioDirector.Zone(Cave, SnowMazeLayout.CavernCentre + Vector3.Up * 4f, new Vector3(SnowMazeLayout.CavernRX * 2f, 12f, SnowMazeLayout.CavernRZ * 2f), AudioDirector.Space.Cavern, "CavernVerb", 1);
 		Callable.From(BuildHole).CallDeferred();
 		if (Cave.Built) CallDeferred(nameof(Furnish));
 		else Cave.OnBuilt += () => CallDeferred(nameof(Furnish));
 	}
 
-	public override void _ExitTree() { if (Instance == this) Instance = null; }
+	public override void _ExitTree()
+	{
+		if (Instance == this) Instance = null;
+		if (_feet != null && IsInstanceValid(_feet)) _feet.Stepped -= OnStep;
+	}
+
+	/// <summary>Their step in the maze: a boot print in the soft floor.</summary>
+	private void OnStep()
+	{
+		if (!InMaze || InCavern) return;
+		var player = StoryBeat.Player(this);
+		if (player == null) return;
+		var v = player.Velocity with { Y = 0 };
+		var f = v.LengthSquared() > 0.01f ? v.Normalized() : (-player.CameraRig.Camera.GlobalBasis.Z) with { Y = 0 };
+		var side = f.Cross(Vector3.Up).Normalized() * (_leftFoot ? -0.11f : 0.11f);
+		LayAt(player.GlobalPosition + side, f, _leftFoot, false, player.Crouching ? 0.35f : 0.55f);
+		_leftFoot = !_leftFoot;
+	}
+
+	/// <summary>Its claws where it stepped (WendigoHunter's stride).</summary>
+	public void LayClaw(Vector3 world, Vector3 facing, bool left) => LayAt(world + facing.Cross(Vector3.Up).Normalized() * (left ? -0.25f : 0.25f), facing, left, true, 0.6f);
+
+	private void LayAt(Vector3 world, Vector3 facing, bool left, bool wendigo, float depth)
+	{
+		var from = world + Vector3.Up * 0.8f;
+		var hit = GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 2f, 1));
+		if (hit.Count == 0) return;
+		Prints.Lay((Vector3)hit["position"], (Vector3)hit["normal"], facing, left, wendigo, depth);
+	}
 
 	private static StoryManager S => StoryManager.Instance;
 
 	// ------------------------------------------------------------------ the hole in the drift
 
 	/// <summary>The drift with the hole in it (its tracks going in), on the snow in front of the lodge.</summary>
+	/// <summary>(2026-10-10b, the owner's drawing: "step outside the front door of the ski lodge and you are already incased in a
+	/// snow tunnel and you have to traverse it to the entrance of the real maze") The storm has buried the front of the
+	/// lodge: out of the splintered doorway it's a vault of snow, wide and high over the porch (its piers and roof swallowed
+	/// in it), running straight out twenty-odd metres, the faint cold light of the night coming through its roof; at its end
+	/// a wall of snow, and low in it, black, the way down into the maze. All one solid: walked through, nothing to see
+	/// round.</summary>
+	public const float TunnelZ0 = 0f, TunnelLen = 24f, VaultR = 3.9f;
 	private void BuildHole()
 	{
-		var at = HoleLocal;
-		// the ground there (a ray straight down onto the snow)
-		var from = _lodge.ToGlobal(at + Vector3.Up * 60f);
-		var q = PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 140f, 1);
-		var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
-		_holeWorld = hit.Count > 0 ? (Vector3)hit["position"] : _lodge.ToGlobal(at);
+		float z0 = SkiLodge.Apothem + 0.02f, zEnd = SkiLodge.Apothem + TunnelLen;
+		var space = GetWorld3D().DirectSpaceState;
+		float Ground(float z)
+		{
+			var from = _lodge.ToGlobal(new Vector3(0, 40f, z));
+			var h = space.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 120f, 1));
+			return h.Count > 0 ? _lodge.ToLocal((Vector3)h["position"]).Y : 0f;
+		}
+		var root = new Node3D { Name = "SnowTunnel" };
+		AddChild(root);
+		root.GlobalTransform = _lodge.GlobalTransform;
+		var csg = new CsgCombiner3D { Name = "Snow", UseCollision = true, CollisionLayer = 1, CollisionMask = 0 };
+		root.AddChild(csg);
+		var snow = WinterWoods.SoftSnow;
+		// the snow over it all: the long bank, lumpy on top, and the mass it ends in
+		const float seg = 4f;
+		int n = Mathf.CeilToInt((zEnd - z0) / seg);
+		var gz = new float[n + 1];
+		for (int i = 0; i <= n; i++) gz[i] = Ground(Mathf.Min(z0 + i * seg + seg * 0.5f, zEnd - 0.5f));
+		for (int i = 0; i < n; i++)
+		{
+			float zc = z0 + i * seg + seg * 0.5f;
+			csg.AddChild(new CsgBox3D { Size = new Vector3(11.5f, 9f, seg + 0.2f), Position = new Vector3(0, gz[i] + 3.2f, zc), Material = snow });
+			csg.AddChild(new CsgSphere3D { Radius = 1f, RadialSegments = 18, Rings = 9, Scale = new Vector3(5.6f, 2.4f, 2.8f), Position = new Vector3((i % 2 == 0 ? -0.8f : 0.9f), gz[i] + 7.3f, zc), Material = snow });
+		}
+		float ge = Ground(zEnd + 1f);
+		csg.AddChild(new CsgSphere3D { Radius = 1f, RadialSegments = 24, Rings = 12, Scale = new Vector3(7f, 6f, 5.5f), Position = new Vector3(0, ge + 1.5f, zEnd + 3.5f), Material = snow });
+		// the vault: a segment at a time, its floor the ground there (round the porch, the landing)
+		for (int i = 0; i < n; i++)
+		{
+			float za = z0 + i * seg, zb = Mathf.Min(za + seg, zEnd);
+			float r = Mathf.Lerp(VaultR, VaultR * 0.82f, i / (float)Mathf.Max(1, n - 1));   // (narrowing a little toward its end)
+			csg.AddChild(new CsgCylinder3D
+			{
+				// (the first runs back past the bank's front face, through to the lodge's wall: the door opens straight into it)
+				Operation = CsgShape3D.OperationEnum.Subtraction, Radius = r, Height = zb - za + (i == 0 ? 0.6f : 0.3f), Sides = 22, Material = snow,
+				Position = new Vector3(0, gz[i] + 0.9f, (za + zb) * 0.5f - (i == 0 ? 0.3f : 0f)), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0),
+			});
+			// a rib of packed snow every few metres (the arches in the drawing), the vault scalloped between them
+			if (i > 0) csg.AddChild(new CsgTorus3D { Operation = CsgShape3D.OperationEnum.Union, InnerRadius = r - 0.35f, OuterRadius = r + 0.3f, Sides = 20, RingSides = 6, Position = new Vector3(0, gz[i] + 0.9f, za), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0), Material = snow });
+		}
+		// the way down: low in the end wall, black, going in and down (the maze's own ice inside)
+		var ice = Cave.IceMaterial ?? SnowMazeLook.CaveMaterial();
+		csg.AddChild(new CsgCylinder3D
+		{
+			Name = "Entrance", Operation = CsgShape3D.OperationEnum.Subtraction, Radius = 1.15f, Height = 6.5f, Sides = 20, Material = ice,
+			Position = new Vector3(0, ge + 0.56f, zEnd + 2.7f), Rotation = new Vector3(Mathf.DegToRad(96f), 0, 0),
+		});
+		foreach (var (c, r) in new[] { (new Vector3(0.75f, 1.95f, -0.5f), 0.48f), (new Vector3(-0.85f, 1.75f, -0.45f), 0.42f), (new Vector3(1.0f, 0.55f, -0.55f), 0.36f), (new Vector3(-1.05f, 0.45f, -0.5f), 0.33f) })
+			csg.AddChild(new CsgSphere3D { Operation = CsgShape3D.OperationEnum.Subtraction, Radius = r, RadialSegments = 14, Rings = 8, Position = new Vector3(c.X, ge + c.Y - 0.3f, zEnd + c.Z), Material = ice });
+		// the night's light through the snow overhead: faint, cold, wavering with nothing
+		for (int i = 0; i < 3; i++)
+		{
+			float z = Mathf.Lerp(z0 + 5f, zEnd - 3f, i / 2f);
+			root.AddChild(new OmniLight3D { Name = $"SnowGlow{i}", Position = new Vector3(0, Ground(z) + 3.6f, z), LightColor = new Color(0.55f, 0.65f, 0.85f), LightEnergy = 0.3f, OmniRange = 7f, ShadowEnabled = false });
+		}
+		// the hole's node: at the entrance (its local -Z toward the lodge), for the trigger, the dark, the icicles
 		var hole = new Node3D { Name = "Hole" };
 		AddChild(hole);
-		hole.GlobalPosition = _holeWorld;
-		hole.GlobalRotation = new Vector3(0, _lodge.GlobalRotation.Y, 0);   // (its mouth, local -Z, toward the lodge)
-		var k = new MeshKit();
-		k.Mat(WinterWoods.SoftSnow);
-		k.Color = Colors.White;
-		// the drift: heaped round and over the mouth
-		k.Blob(new Vector3(0, 0.9f, 1.4f), new Vector3(3.6f, 1.9f, 2.6f), 2401, 0.25f, true, 1f);
-		k.Blob(new Vector3(-2.6f, 0.5f, 0.6f), new Vector3(1.8f, 1.1f, 1.8f), 2402, 0.3f, true, 1f);
-		k.Blob(new Vector3(2.5f, 0.6f, 0.8f), new Vector3(1.6f, 1.2f, 1.9f), 2403, 0.3f, true, 1f);
-		k.CommitTo(hole, "Drift", true);
-		// the mouth: black, going down into the snow
-		var mouth = new MeshKit();
-		mouth.Mat(new StandardMaterial3D { ResourceName = "hole_dark", AlbedoColor = Colors.Black, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded });
-		mouth.Color = Colors.White;
-		mouth.Blob(new Vector3(0, 0.75f, -0.2f), new Vector3(1.0f, 0.85f, 0.25f), 2404, 0.15f, false, 1f);
-		mouth.Cylinder(new Vector3(0, 0.75f, -0.15f), new Vector3(0, -0.6f, 3f), 1.0f, 0.8f, 10, false);
-		mouth.CommitTo(hole, "Mouth", false);
-		// walking into it: down to the maze
-		_holeTrigger = StoryBeat.MakeTrigger(hole, new BoxShape3D { Size = new Vector3(1.8f, 2f, 1.4f) }, new Vector3(0, 1f, 0.3f), p => _ = Cutscene.Run(this, ct => GoDown(p, ct), lockInput: true), "HoleTrigger");
-		// the drift solid round the mouth (collision: a ring of boxes, the way in left open)
-		var body = new StaticBody3D { Name = "DriftBody", CollisionLayer = 1, CollisionMask = 0 };
-		body.SetMeta("surface", "snow");
-		foreach (var (c, s) in new[] { (new Vector3(-2.2f, 1f, 1.2f), new Vector3(2.4f, 2f, 3f)), (new Vector3(2.2f, 1f, 1.2f), new Vector3(2.4f, 2f, 3f)), (new Vector3(0, 1.6f, 1.6f), new Vector3(2f, 0.8f, 2.4f)) })
-			body.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
-		hole.AddChild(body);
-		// its tracks: off the porch, round, and in
-		Callable.From(LayTracks).CallDeferred();
+		hole.GlobalTransform = _lodge.GlobalTransform * new Transform3D(Basis.Identity, new Vector3(0, ge, zEnd));
+		_holeWorld = hole.GlobalPosition;
+		for (int i = 1; i <= 3; i++)
+		{
+			float u = i / 4f;
+			hole.AddChild(new MeshInstance3D
+			{
+				Name = $"Dark{i}", Mesh = new QuadMesh { Size = new Vector2(2.3f, 2.3f) },
+				Position = new Vector3(0, Mathf.Lerp(0.9f, 0.4f, u), Mathf.Lerp(0.9f, 5.0f, u)),
+				MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0, 0, 0, 0.42f + 0.15f * i), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled },
+				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			});
+		}
+		var t = GetTree().CreateTimer(0.4);
+		t.Timeout += () => { if (IsInstanceValid(hole)) DressMouth(hole); };
+		_holeTrigger = StoryBeat.MakeTrigger(hole, new BoxShape3D { Size = new Vector3(2.0f, 3f, 2.6f) }, new Vector3(0, 1f, 0.9f), p => _ = Cutscene.Run(this, ct => GoDown(p, ct), lockInput: true), "HoleTrigger");
+		GD.Print($"[story] Act 24: the snow tunnel from the lodge's door to the way down ({zEnd - z0:0} m)");
+	}
+
+	/// <summary>Round the mouth, on the drift's face: a crusted lip of packed snow along the cut's edge (so it reads as a
+	/// hole in the snow, not a disc cut out of it), and icicles hanging off the lip's top, from the snow itself.</summary>
+	private void DressMouth(Node3D hole)
+	{
+		var space = GetWorld3D().DirectSpaceState;
+		var lip = new MeshKit();
+		lip.Mat(WinterWoods.SoftSnow);
+		lip.Color = Colors.White;
+		var ice = new MeshKit();
+		ice.Mat(WinterWoods.IceMat);
+		ice.Color = Colors.White;
+		var rng = new RandomNumberGenerator { Seed = 2440 };
+		const float cy = 1.09f, r = 1.15f;
+		int lips = 0, cicles = 0;
+		// (a ray from in front of the face, straight in, at a point just outside the cut: where it meets the drift is the face)
+		Vector3? Face(float x, float y)
+		{
+			var from = hole.ToGlobal(new Vector3(x, y, -4f));
+			var to = hole.ToGlobal(new Vector3(x, y, 3f));
+			var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(from, to, 1));
+			return hit.Count > 0 ? hole.ToLocal((Vector3)hit["position"]) : null;
+		}
+		// (no lumps round the rim: the owner, "remove that igloo rock ring look": the cut's own scallops are the lip)
+		for (int i = 0; i < 13; i++)
+		{
+			float a = Mathf.Pi * (0.14f + 0.72f * i / 12f);
+			float x = Mathf.Cos(a) * (r + 0.02f), y = cy + Mathf.Sin(a) * (r + 0.02f);
+			if (Face(x, y + 0.04f) is not { } f) continue;
+			var top = f + new Vector3(0, -0.02f, 0.05f);   // (from just inside the face: it grows out of the snow)
+			float len = rng.RandfRange(0.14f, 0.5f) * Mathf.Sin(a);
+			ice.Cylinder(top + Vector3.Up * 0.05f, top + Vector3.Down * len, rng.RandfRange(0.025f, 0.045f), 0.003f, 5, false);
+			cicles++;
+		}
+		ice.CommitTo(hole, "Icicles", false);
+		_ = lip; _ = lips;
+		GD.Print($"[story] Act 24: the drift's mouth dressed ({cicles} icicles off its lip)");
 	}
 
 	private void LayTracks()
@@ -144,13 +268,15 @@ public partial class Act24Maze : Node3D
 	{
 		if (_handing || InMaze) return;
 		_handing = true;
+		HerdAtTheMouth();
 		var fader = StoryBeat.Fader(this);
 		AudioDirector.OneShot(this, "step_snow", 6, player.GlobalPosition, -2f, "Player", 3f, 0.05f);
-		if (fader != null) await fader.Fade(1f, 0.6f, ct);
+		// (2026-10-10b: the black at the hole tightened: a quick slide down into the dark, and out)
+		if (fader != null) await fader.Fade(1f, 0.35f, ct);
 		while (!Cave.Built || Crowbar == null) await Cutscene.Wait(this, 0.1, ct);   // (still building: wait in the black)
 		EnterMaze(player);
-		await Cutscene.Wait(this, 0.3, ct);
-		if (fader != null) await fader.Fade(0f, 1.0f, ct);
+		await Cutscene.Wait(this, 0.1, ct);
+		if (fader != null) await fader.Fade(0f, 0.6f, ct);
 		_handing = false;
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act24Maze);
 		_ = StoryBeat.Caption(this, "So quiet down here.", 0.6f, 2.4f, 1f);
@@ -180,17 +306,48 @@ public partial class Act24Maze : Node3D
 		int far = 0;
 		float fd = 0f;
 		for (int v = 0; v < L.Nodes.Count; v++) { float d = L.Nodes[v].DistanceTo(p); if (d > fd && v != L.Cavern) { fd = d; far = v; } }
+		// (2026-10-10b) it drove them down: it follows them in, down the way they came, after a while (on a load into the maze,
+		// it's off in the far tunnels as before)
 		Hunter.Setup(Cave, L.Nodes[far]);
+		// (2026-10-10b) it drove them down: it comes down the hole after them, once they've gone on into the tunnels (out of
+		// sight of the way in), and they hear it at the top of the entrance tunnel behind them. Not in the autotest, which
+		// places it by hand.
+		if (_followedIn && !(GameSettings.Instance?.AutoTest ?? false))
+		{
+			GD.Print("[story] Act 24: the wendigo will follow them in");
+			_ = FollowIn();
+		}
 		Hunter.Killed += () => _ = Cutscene.Run(this, ct => Defeated(ct), lockInput: true);
 		Hunter.Hit += n => GD.Print($"[story] Act 24: the fire on it - {n} of {Hunter.HitsToKill}");
 		if (S != null && S.Current >= Checkpoint.Act24Flamethrower) Hunter.ArmedPlayer();
 		GD.Print($"[story] Act 24: the wendigo is in the maze (node {far})");
 	}
 
+	private async Task FollowIn()
+	{
+		var start = Cave.ToGlobal(Cave.ArriveAt);
+		double waited = 0;
+		while (IsInstanceValid(Hunter) && !Hunter.Dead && waited < 60)
+		{
+			await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+			waited += 1;
+			var p = StoryBeat.Player(this);
+			if (p == null || waited < 12 || p.GlobalPosition.DistanceTo(start) < 14f) continue;
+			if (Hunter.State is not (WendigoHunter.Mode.Patrol or WendigoHunter.Mode.Search)) return;
+			Hunter.Body.GlobalPosition = Cave.ToGlobal(Cave.ArriveAt + Vector3.Forward * 1.5f);
+			AudioDirector.OneShot(this, "wendigo_howl_far", 3, start + Vector3.Up * 2f, 0f, "Unnatural", 12f, 0.03f);
+			Hunter.Lure(p.GlobalPosition, 999f, 2f, "their trail down the hole");
+			GD.Print("[story] Act 24: it has come down the hole after them");
+			return;
+		}
+	}
+
 	public override void _Process(double delta)
 	{
 		var player = StoryBeat.Player(this);
 		if (player == null || Cave?.Layout == null) return;
+		if (_feet == null && player.Footsteps is { } feet) { _feet = feet; feet.Stepped += OnStep; }
+		HerdProcess(player, (float)delta);
 		var l = Cave.ToLocal(player.GlobalPosition);
 		bool inside = l.Y > -6f && l.Y < 14f && l.X > -10f && l.X < 100f && l.Z > -22f && l.Z < 100f;
 		if (inside && !InMaze) { InMaze = true; StartHunt(); }

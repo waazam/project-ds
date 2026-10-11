@@ -21,6 +21,28 @@ public static class SaveLamps
 	private static int _haunted = -2;
 	public static readonly List<SaveLamp> Lamps = new();
 
+	/// <summary>(2026-10-10b) A picture taken toward where the visitor stood, after it's been: it's in the picture, standing just
+	/// where it was, though there was nothing there to see. Once. True if it drew it.</summary>
+	public static bool InPhoto(Image img, Camera3D cam, Rect2 frame)
+	{
+		if (img == null || cam == null || !GodotObject.IsInstanceValid(cam) || frame.Size.X < 1f) return false;
+		foreach (var lamp in Lamps)
+		{
+			if (!GodotObject.IsInstanceValid(lamp) || lamp.FigureSpot is not { } feet || lamp.Photographed) continue;
+			var head = feet + Vector3.Up * 1.85f;
+			if (cam.GlobalPosition.DistanceTo(feet) > 16f || cam.IsPositionBehind(head) || cam.IsPositionBehind(feet)) continue;
+			Vector2 f = cam.UnprojectPosition(feet) - frame.Position, t = cam.UnprojectPosition(head) - frame.Position;
+			float sx = img.GetWidth() / frame.Size.X, sy = img.GetHeight() / frame.Size.Y;
+			float cx = f.X * sx, fy = f.Y * sy, tall = (f.Y - t.Y) * sy;
+			if (cx < 0 || cx > img.GetWidth() || tall < 4f) continue;
+			SecondLook.DrawFigureAt(img, cx, fy, tall, 0.6f);
+			lamp.Photographed = true;
+			GD.Print("[story] the safe light: it's in the picture");
+			return true;
+		}
+		return false;
+	}
+
 	public static void Place(Node3D host)
 	{
 		if (_haunted == -2) _haunted = GD.Randf() < 0.35f ? (int)(GD.Randi() % At.Length) : -1;
@@ -42,6 +64,9 @@ public partial class SaveLamp : Node3D
 	public bool Haunted;
 	public bool Hung { get; private set; }
 	public bool Watched { get; private set; }
+	/// <summary>Where it stood (once it has); a picture of that spot shows it.</summary>
+	public Vector3? FigureSpot { get; private set; }
+	public bool Photographed { get; set; }
 	private OmniLight3D _light;
 	private Node3D _bulb;
 	private float _under, _t;
@@ -136,6 +161,7 @@ public partial class SaveLamp : Node3D
 		var down = GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(feet + Vector3.Up, feet + Vector3.Down * 3f, 1));
 		if (down.Count > 0) feet = (Vector3)down["position"];
 		_figure.StandAt(feet, player.GlobalPosition);
+		FigureSpot = feet;
 		AudioDirector.OneShot(this, "stair_groan", 3, feet + Vector3.Up * 0.2f, -6f, "Events", 3f, 0.05f);
 		GD.Print($"[story] the safe light: something is standing behind them ({d:0.0} m)");
 	}

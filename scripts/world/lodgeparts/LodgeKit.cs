@@ -151,8 +151,12 @@ public static class LodgeKit
 		else k.Quad(new Vector3(x0, y, z0), new Vector3(x1, y, z0), new Vector3(x1, y, z1), new Vector3(x0, y, z1), Vector3.Down, new Vector2(x0, z0) * uv, new Vector2(x1, z0) * uv, new Vector2(x1, z1) * uv, new Vector2(x0, z1) * uv);
 	}
 
-	public static void Solid(StaticBody3D body, Vector3 c, Vector3 size, float yaw = 0f)
-		=> body.AddChild(new CollisionShape3D { Position = c, Rotation = new Vector3(0, yaw, 0), Shape = new BoxShape3D { Size = size } });
+	public static CollisionShape3D Solid(StaticBody3D body, Vector3 c, Vector3 size, float yaw = 0f)
+	{
+		var cs = new CollisionShape3D { Position = c, Rotation = new Vector3(0, yaw, 0), Shape = new BoxShape3D { Size = size } };
+		body.AddChild(cs);
+		return cs;
+	}
 
 	// ---------------------------------------------------------------- furniture (in the parent's space; c on the floor)
 

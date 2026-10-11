@@ -1027,6 +1027,8 @@ public partial class SkiLodge
 		CrawlProcess(player, l, dt);
 		l = ToLocal(player.GlobalPosition);
 		FrozenProcess(dt);
+		SheetTick(player);
+		AjarTick(player, ToLocal(player.GlobalPosition));
 		SoundsProcess(l, inside);
 		// the light in here: clean and warm (noon, every lamp lit), not the woods' murk; cold once it's frozen over
 		var atmo = StoryBeat.Atmosphere(this);

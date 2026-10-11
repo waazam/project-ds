@@ -32,7 +32,7 @@ public partial class AudioDirector : Node
 	/// <summary>The physics layer the reverb zones sit on (20: nothing else uses it, so no ray or body sees them).</summary>
 	public const uint ReverbLayer = 1u << 19;
 
-	public enum Space { Room, Hall, Tunnel, Cavern }
+	public enum Space { Room, Hall, Tunnel, Cavern, Snow }
 
 	private static readonly Dictionary<Space, (string bus, float room, float damp, float wet, float amount, float preDelay)> Spaces = new()
 	{
@@ -40,12 +40,14 @@ public partial class AudioDirector : Node
 		[Space.Hall] = ("VerbHall", 0.62f, 0.45f, 0.3f, 0.55f, 0.02f),
 		[Space.Tunnel] = ("VerbTunnel", 0.78f, 0.3f, 0.32f, 0.65f, 0.05f),
 		[Space.Cavern] = ("VerbCavern", 0.95f, 0.25f, 0.36f, 0.75f, 0.08f),
+		// (2026-10-10b) packed snow all round: it swallows sound, a short, soft, dead ring and nothing more
+		[Space.Snow] = ("VerbSnow", 0.16f, 0.95f, 0.12f, 0.3f, 0.004f),
 	};
 
 	/// <summary>The player's own reverb outdoors (the Player bus's default).</summary>
 	private const float OpenRoom = 0.35f, OpenDamp = 0.6f, OpenWet = 0.02f;
 
-	private sealed class Zone3D { public Area3D Area; public Vector3 Half; public Space Kind; }
+	private sealed class Zone3D { public Area3D Area; public Vector3 Half; public Space Kind; public int Priority; }
 	private readonly List<Zone3D> _zones = new();
 
 	private sealed class Tracked
@@ -143,18 +145,18 @@ public partial class AudioDirector : Node
 
 	/// <summary>A reverb space round part of a level: <paramref name="center"/> and <paramref name="size"/>
 	/// in <paramref name="parent"/>'s space.</summary>
-	public static Area3D Zone(Node3D parent, Vector3 center, Vector3 size, Space kind, string name = "Reverb")
+	public static Area3D Zone(Node3D parent, Vector3 center, Vector3 size, Space kind, string name = "Reverb", int priority = 0)
 	{
 		var (bus, _, _, _, amount, _) = Spaces[kind];
 		var a = new Area3D
 		{
 			Name = name, CollisionLayer = ReverbLayer, CollisionMask = 0, Monitoring = false, Monitorable = true,
 			ReverbBusEnabled = true, ReverbBusName = bus, ReverbBusAmount = amount, ReverbBusUniformity = 0.35f,
-			Position = center,
+			Position = center, Priority = priority,
 		};
 		a.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
 		parent.AddChild(a);
-		Instance?._zones.Add(new Zone3D { Area = a, Half = size * 0.5f, Kind = kind });
+		Instance?._zones.Add(new Zone3D { Area = a, Half = size * 0.5f, Kind = kind, Priority = priority });
 		a.TreeExiting += () => Instance?._zones.RemoveAll(z => z.Area == a);
 		return a;
 	}
@@ -218,11 +220,13 @@ public partial class AudioDirector : Node
 
 		// the player's own reverb follows the space they're in
 		Space? here = null;
+		int herePri = int.MinValue;
 		foreach (var z in _zones)
 		{
 			if (!IsInstanceValid(z.Area) || !z.Area.IsInsideTree()) continue;
 			Vector3 l = z.Area.ToLocal(ear);
-			if (Mathf.Abs(l.X) <= z.Half.X && Mathf.Abs(l.Y) <= z.Half.Y && Mathf.Abs(l.Z) <= z.Half.Z) { if (here == null || z.Kind > here) here = z.Kind; }
+			// (the zone of the highest priority wins, and among equals the biggest space: a cavern inside the snow tunnels)
+			if (Mathf.Abs(l.X) <= z.Half.X && Mathf.Abs(l.Y) <= z.Half.Y && Mathf.Abs(l.Z) <= z.Half.Z && (here == null || z.Priority > herePri || (z.Priority == herePri && z.Kind > here))) { here = z.Kind; herePri = z.Priority; }
 		}
 		if (_playerVerb != null)
 		{
