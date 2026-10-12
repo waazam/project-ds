@@ -59,7 +59,7 @@ public partial class SkiLodge
 	public readonly List<Vector2I> CrawlPath = new();
 	public static readonly Vector2I[] CrouchPipes =
 	{
-		new(-7, -3), new(-13, -3), new(-3, -5), new(10, -5), new(16, -1), new(22, -3), new(28, 3), new(42, 0), new(50, -1),
+		new(-6, -6), new(-1, -8), new(10, -5), new(16, -1), new(22, -3), new(28, 3), new(42, 0), new(50, -1),
 	};
 	/// <summary>The four arms: the cell, and the wall it comes out of.</summary>
 	public static readonly (Vector2I cell, Vector2I side)[] ArmSpots =
@@ -84,17 +84,18 @@ public partial class SkiLodge
 	// ------------------------------------------------------------------ the layout
 
 	/// <summary>The maze's main line (i, j, level: U upstairs, L downstairs, s the stair to here), then its dead ends.</summary>
+	// (2026-10-12, the owner: "the crawlspace ... needs to be trimmed by 25%") 200 cells to 148: the upstairs zigzag
+	// straightened, and three of the swings downstairs pulled in; its ends, arms, save and pipes where they were
 	private static readonly (int i, int j, char lv)[] CrawlLine =
 	{
-		(0, 0, 'U'), (-2, 0, 'U'), (-2, -3, 'U'), (-10, -3, 'U'), (-10, 2, 'U'), (-13, 2, 'U'), (-13, -8, 'U'), (-6, -8, 'U'),
-		(-6, -5, 'U'), (0, -5, 'U'), (0, -8, 'U'), (4, -8, 'U'), (9, -8, 's'), (10, -8, 'L'), (10, -2, 'L'), (6, -2, 'L'),
-		(6, 3, 'L'), (16, 3, 'L'), (16, -6, 'L'), (22, -6, 'L'), (22, 1, 'L'), (28, 1, 'L'), (28, 5, 'L'), (36, 5, 'L'),
-		(36, -3, 'L'), (42, -3, 'L'), (42, 3, 'L'), (50, 3, 'L'), (50, -6, 'L'), (56, -6, 'L'), (56, 1, 'L'), (59, 1, 'L'),
+		(0, 0, 'U'), (-2, 0, 'U'), (-2, -3, 'U'), (-6, -3, 'U'), (-6, -8, 'U'), (4, -8, 'U'), (9, -8, 's'), (10, -8, 'L'),
+		(10, 1, 'L'), (16, 1, 'L'), (16, -6, 'L'), (22, -6, 'L'), (22, 1, 'L'), (28, 1, 'L'), (28, 3, 'L'), (36, 3, 'L'),
+		(36, -3, 'L'), (42, -3, 'L'), (42, 3, 'L'), (50, 3, 'L'), (50, -6, 'L'), (56, -6, 'L'), (56, -2, 'L'), (59, -2, 'L'),
 		(59, -10, 'L'), (64, -10, 'L'), (64, -8, 'L'), (61, -8, 'L'), (61, -7, 'L'),
 	};
 	private static readonly (int i0, int j0, int i1, int j1, char lv)[] CrawlSpurs =
 	{
-		(-8, -3, -8, 1, 'U'), (-13, -5, -11, -5, 'U'), (13, 3, 13, -1, 'L'), (22, -2, 19, -2, 'L'), (36, 1, 39, 1, 'L'), (50, -2, 47, -2, 'L'), (59, -3, 61, -3, 'L'),
+		(-6, -5, -9, -5, 'U'), (0, -8, 0, -11, 'U'), (13, 1, 13, 4, 'L'), (22, -2, 19, -2, 'L'), (36, 1, 39, 1, 'L'), (50, -2, 47, -2, 'L'), (59, -3, 61, -3, 'L'),
 	};
 	/// <summary>The real ends: behind 201's bathroom (upstairs) and the dining hall's chase (downstairs).</summary>
 	private static readonly Vector2I[] EntryCells = { new(0, 0), new(-1, 0), new(-2, 0), new(-2, -1), new(-2, -2), new(-2, -3), new(-3, -3), new(-4, -3) };

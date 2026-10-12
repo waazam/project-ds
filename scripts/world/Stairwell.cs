@@ -48,6 +48,9 @@ public partial class Stairwell : Node3D
 	[Export] public int Revolutions = DefaultRevolutions;
 	/// <summary>How long a sprint lasts on these stairs before it is taken back.</summary>
 	[Export] public float SprintGrace = 0.7f;
+	/// <summary>(2026-10-12, the owner: "take that teleporting sprint mechanic out of it so the player can run") Off: running
+	/// on the stairs is just running now.</summary>
+	[Export] public bool SprintTakesBack = false;
 	/// <summary>Bulbs (and everything else that repeats) every this many turns; a loop-back is a multiple of it.</summary>
 	public const int Period = 3;
 	private const int ChunkRevs = 4;
@@ -58,7 +61,7 @@ public partial class Stairwell : Node3D
 	public int GapCorner => Flights;
 	public float BottomY => BottomYFor(Revolutions);
 	/// <summary>Turns of the shaft (the owner: 64 was far too long; 40 is about three minutes at a walk).</summary>
-	public const int DefaultRevolutions = 40;
+	public const int DefaultRevolutions = 30;   // (2026-10-12, the owner: a quarter shorter)
 	/// <summary>The descent's events and signs were written for 64 turns; they're placed at the same
 	/// fraction of the way down whatever the length (<see cref="R"/>).</summary>
 	public const int DesignRevolutions = 64;
@@ -499,7 +502,7 @@ public partial class Stairwell : Node3D
 
 		// running: taken back up
 		// (not while the crawler hunts them: then running is the way to live)
-		if (PlayerInShaft && player.IsRunning && player.PlayerInput.Enabled && rev >= Period + 1f && PlayerRev < Revolutions - 2 && !CrawlerHunting)
+		if (SprintTakesBack && PlayerInShaft && player.IsRunning && player.PlayerInput.Enabled && rev >= Period + 1f && PlayerRev < Revolutions - 2 && !CrawlerHunting)
 		{
 			_sprint += dt;
 			if (_sprint > SprintGrace) LoopBack(player, PlayerRev);

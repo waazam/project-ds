@@ -16,6 +16,9 @@ uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform bool use_normal = false;
 uniform float normal_strength = 1.0;
 uniform vec2 uv_scale = vec2(1.0);
+// (2026-10-12, the owner: "the trees look like paper instead of having a good dark bark texture") the bark's furrows
+// pushed darker than its ridges (a curve on the texture: >1 deepens the darks, the contrast the photo had pulled out)
+uniform float tex_gamma = 1.0;
 uniform float roughness = 1.0;
 uniform float specular = 0.25;
 uniform bool sway = true;
@@ -31,7 +34,7 @@ void vertex() {
 
 void fragment() {
 	vec2 uv = UV * uv_scale;
-	ALBEDO = texture(albedo_tex, uv).rgb * tint * COLOR.rgb * texture(detail_tex, UV * detail_tile).r;
+	ALBEDO = pow(texture(albedo_tex, uv).rgb, vec3(tex_gamma)) * tint * COLOR.rgb * texture(detail_tex, UV * detail_tile).r;
 	if (use_normal) {
 		vec3 dp1 = dFdx(VERTEX), dp2 = dFdy(VERTEX);
 		vec2 du1 = dFdx(uv), du2 = dFdy(uv);

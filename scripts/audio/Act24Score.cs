@@ -50,8 +50,9 @@ public partial class Act24Score : Node
 	// audible compared to everything else ... the growls can stay the same") while the song plays, the world's beds are
 	// ducked under it: the wind, the weather, the far sounds and the nature beds well down, the steps and the events a
 	// little; the creature (Unnatural) and the voices left as they are
+	// (2026-10-12: the Music bus's base is -16 now, GameSettings.MusicBaseDb, so +10 here lands where +18 on -24 did)
 	private static readonly (string bus, float db)[] Ducked =
-		{ ("Music", 18f), ("Unnatural", -4f), ("Wind", -9f), ("Weather", -9f), ("Distant", -9f), ("Nature", -9f), ("Water", -6f), ("Events", -3f), ("Player", -3f) };
+		{ ("Music", 10f), ("Unnatural", -4f), ("Wind", -9f), ("Weather", -9f), ("Distant", -9f), ("Nature", -9f), ("Water", -6f), ("Events", -3f), ("Player", -3f) };
 	private readonly System.Collections.Generic.Dictionary<string, float> _baseDb = new();
 	private float _duck;
 

@@ -41,9 +41,9 @@ public partial class LakeCrossingEvent : Node3D
 	[Export] public NodePath LakePath = "../Lake";
 	/// <summary>A stroke's push on the calm leg (m/s added to the boat's way, over the drive): an
 	/// unhurried row, never rushed.</summary>
-	[Export] public float StrokeImpulse = 0.6f;
+	[Export] public float StrokeImpulse = 0.69f;   // (was 0.6)
 	/// <summary>The calm leg's top speed however fast the keys go (m/s).</summary>
-	[Export] public float CalmMaxSpeed = 2.1f;
+	[Export] public float CalmMaxSpeed = 2.415f;   // (2026-10-12, the owner: 15% quicker to the eye; was 2.1)
 	/// <summary>A stroke's push once the creature is up (fear lends strength).</summary>
 	[Export] public float RoughStrokeImpulse = 1.0f;
 	/// <summary>Water drag on the boat's way, per second.</summary>

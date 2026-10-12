@@ -36,7 +36,7 @@ public partial class Act15Hallway
 			atmo.Underground = Mathf.MoveToward(atmo.Underground, 1f, dt);
 			bool red = State == Phase.Red;
 			atmo.UndergroundFogColor = atmo.UndergroundFogColor.Lerp(InCloset ? new Color(0.004f, 0.004f, 0.005f) : red ? FogRed : FogGreen, Mathf.Min(1f, dt * 4f));
-			atmo.UndergroundFogDensity = Mathf.MoveToward(atmo.UndergroundFogDensity, l.Z < Part1 ? 0.032f : 0.022f, dt * 0.05f);
+			atmo.UndergroundFogDensity = Mathf.MoveToward(atmo.UndergroundFogDensity, l.Z < Part1 ? 0.022f : 0.016f, dt * 0.05f);
 		}
 		float hum = inside && !InCloset ? -14f : -80f;
 		if (_hum != null && _hum.Stream != null)
@@ -52,7 +52,13 @@ public partial class Act15Hallway
 		{
 			case Phase.Waiting:
 				// frozen in the green; the game starts once they are past him
-				if (l.Z > ShadowZ + 1.2f) { State = Phase.Green; _timer = _rng.RandfRange(GreenSeconds.X, GreenSeconds.Y); GD.Print("[story] Act 15: past the shadow man - red light, green light"); }
+				if (l.Z > ShadowZ + 1.2f)
+				{
+					// (2026-10-12, the owner) a save the first time past him: taken in the red, it's back to here
+					if (StoryManager.Instance is { Current: Checkpoint.Act14Finished } sm && !sm.HasFlag(StoryManager.Flag.Act15PastShadow))
+						sm.SetFlag(StoryManager.Flag.Act15PastShadow);
+					State = Phase.Green; _timer = _rng.RandfRange(GreenSeconds.X, GreenSeconds.Y); GD.Print("[story] Act 15: past the shadow man - red light, green light");
+				}
 				break;
 			case Phase.Green:
 				_timer -= dt;

@@ -515,7 +515,7 @@ public static class ProcTextures
 		m.SetShaderParameter("albedo_tex", tex);
 		return m;
 	});
-	/// <summary>The trunks' bark (the fidelity pass, 2026-10-02): Poly Haven's furrowed brown bark (bark_brown_02) (tools/Textures/make_surfaces.py, 256 px,
+	/// <summary>The trunks' bark (the fidelity pass, 2026-10-02): Poly Haven's willow bark (bark_willow_02, 2026-10-12; was bark_brown_02) (tools/Textures/make_surfaces.py, 256 px,
 	/// its contrast pulled in) and its relief as a normal map, in place of the 32 px drawn bark.</summary>
 	public static ShaderMaterial TreeBarkMat => (ShaderMaterial)Cached("tree_bark_photo", () =>
 	{
@@ -523,8 +523,11 @@ public static class ProcTextures
 		m.SetShaderParameter("albedo_tex", GD.Load<Texture2D>("res://assets/textures/surfaces/bark_albedo.png"));
 		m.SetShaderParameter("normal_tex", GD.Load<Texture2D>("res://assets/textures/surfaces/bark_normal.png"));
 		m.SetShaderParameter("use_normal", true);
-		m.SetShaderParameter("uv_scale", new Vector2(1.5f, 1.2f));
-		m.SetShaderParameter("tint", new Color(1.05f, 1.0f, 0.95f));
+		m.SetShaderParameter("uv_scale", new Vector2(0.9f, 0.55f));   // (2026-10-12: bigger furrows, readable further off; was 1.5, 1.2)
+		// (2026-10-12: darker and deeper, the furrows near black; was a flat 1.05 tint and the relief at 1)
+		m.SetShaderParameter("tint", new Color(0.6f, 0.53f, 0.47f));
+		m.SetShaderParameter("tex_gamma", 1.5f);
+		m.SetShaderParameter("normal_strength", 1.8f);
 		return m;
 	});
 	public static ShaderMaterial TreeEndGrainMat => TreeSolid("tree_endgrain", EndGrain());

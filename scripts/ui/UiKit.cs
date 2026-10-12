@@ -337,6 +337,24 @@ public static class UiKit
 	};
 }
 
+/// <summary>(2026-10-12) The brightness screen's mark: a hooded figure's outline (the game's own dread) drawn in a grey only just
+/// above black, through the picture's gamma, on black. Set right, it's barely there.</summary>
+public partial class CalibrationMark : Control
+{
+	public float Gamma = 1f;
+	public CalibrationMark() { CustomMinimumSize = new Vector2(0, 120); MouseFilter = MouseFilterEnum.Ignore; }
+
+	public override void _Draw()
+	{
+		float v = Mathf.Pow(0.035f, 1f / Mathf.Max(Gamma, 0.1f));
+		var c = new Color(v, v, v);
+		var mid = new Vector2(Size.X * 0.5f, 8f);
+		// the head and the shoulders, a figure standing in the dark
+		DrawCircle(mid + new Vector2(0, 22f), 15f, c);
+		DrawColoredPolygon(new[] { mid + new Vector2(-12f, 34f), mid + new Vector2(12f, 34f), mid + new Vector2(34f, 66f), mid + new Vector2(40f, 110f), mid + new Vector2(-40f, 110f), mid + new Vector2(-34f, 66f) }, c);
+	}
+}
+
 /// <summary>Under the brightness slider: six squares from black up through the darkest greys, drawn through the same gamma as
 /// the picture, and a line saying how to set it ("the second square just visible"). For a dark monitor (2026-10-07).</summary>
 public partial class BrightnessStrip : Control

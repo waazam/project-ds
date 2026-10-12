@@ -38,6 +38,10 @@ public static class RespawnPoints
 		if (cp == Checkpoint.Act21Finished && System.Array.IndexOf(save.Flags, StoryManager.Flag.Act22Midway) >= 0
 			&& tree.GetFirstNodeInGroup("respawn_Act22Midway") is Node3D mid)
 			return (mid.GlobalPosition + Vector3.Up * 0.1f, YawOf(-mid.GlobalBasis.Z));
+		// Act 15's save past the shadow man (a flag within Act 14's end)
+		if (cp == Checkpoint.Act14Finished && System.Array.IndexOf(save.Flags, StoryManager.Flag.Act15PastShadow) >= 0
+			&& tree.GetFirstNodeInGroup("respawn_Act15PastShadow") is Node3D past)
+			return (past.GlobalPosition + Vector3.Up * 0.1f, YawOf(-past.GlobalBasis.Z));
 		if (cp >= Checkpoint.Act24Finished && World.SnowMaze.EndingDirector.Instance is { } ending) return ending.SpawnFor(cp);
 		if (tree.GetFirstNodeInGroup($"respawn_{cp}") is Node3D marker)
 		{

@@ -31,7 +31,7 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class Act15Hallway : Node3D
 {
-	public const float Part1 = 324f, Taper = 30f, Part2 = 950f;
+	public const float Part1 = 178f, Taper = 30f, Part2 = 523f;   // (2026-10-12, the owner: "way too long", 45% off: was 324 and 950)
 	public const float W1 = 1.6f, H1 = 22f, W2 = 3.8f, H2 = 34f;
 	public const float ShadowZ = Part1 + Taper + 20f;
 	public const float End = Part1 + Taper + Part2;

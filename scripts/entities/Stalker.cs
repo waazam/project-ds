@@ -105,13 +105,13 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	[Export] public Vector2I IntroShadowSteps = new(4, 10);
 	[Export] public float IntroEchoStepChance = 0.8f;
 	[Export] public float IntroEchoStepCooldown = 6f;
-	[Export] public float IntroRattleRange = 34f;
+	[Export] public float IntroRattleRange = 44f;   // (2026-10-12: heard further off, was 34)
 	/// <summary>Seconds after waking before it first stands behind a tree.</summary>
 	[Export] public Vector2 IntroFirstAppearance = new(8f, 13f);
 
 	[ExportGroup("Voice")]
 	/// <summary>The rattle (a dry clicking croak from its tree) is inaudible beyond this and grows as you close in.</summary>
-	[Export] public float RattleRange = 26f;
+	[Export] public float RattleRange = 34f;   // (was 26)
 	/// <summary>Level of the rattle when it is right on you.</summary>
 	[Export] public float RattleMaxDb = 3f;
 	/// <summary>Unused since 2026-09-22 (the rate is lerp(0.55, 1, intensity) in UpdateRattle); kept so scene overrides still load.</summary>
@@ -610,7 +610,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		if (_episodeTimer <= 0f)
 		{
 			if (_episodeOn) EndEpisode();
-			else StartEpisode(_rng.RandfRange(10f, 20f));
+			else StartEpisode(_rng.RandfRange(14f, 26f));   // (2026-10-12: longer, was 10-20 s)
 		}
 		float episodeFrac = _episodeOn ? Mathf.Clamp(1f - _episodeTimer / Mathf.Max(_episodeLength, 0.1f), 0f, 1f) : 0f;
 		if (_episodeOn) _rattle.PitchScale = Mathf.Min(1f, _rattle.PitchScale * Mathf.Lerp(1f, 1.18f, episodeFrac));   // quicker toward the end
@@ -626,12 +626,13 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 				else
 				{
 					_burstOn = !_burstOn;
-					_burstTimer = _burstOn ? _rng.RandfRange(1f, 2.5f) : _rng.RandfRange(0.5f, 1.5f);
+					_burstTimer = _burstOn ? _rng.RandfRange(1.4f, 3.4f) : _rng.RandfRange(0.4f, 1.1f);   // (2026-10-12: more of it, was 1-2.5 on, 0.5-1.5 off)
 					if (_burstOn)
 					{
 						RattleBursts++;
 						float u = _rng.Randf();
-						_burstDb = u < 0.15f ? _rng.RandfRange(1f, 3f) : u < 0.5f ? _rng.RandfRange(-4f, 0f) : _rng.RandfRange(-9f, -4f);
+						// (2026-10-12: louder on the whole: a third of them up front now, the quiet ones less quiet)
+						_burstDb = u < 0.33f ? _rng.RandfRange(1f, 4f) : u < 0.7f ? _rng.RandfRange(-3f, 1f) : _rng.RandfRange(-7f, -3f);
 						_burstDb += 5f * episodeFrac;   // louder toward the end of the episode
 					}
 				}
@@ -662,14 +663,16 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	{
 		_episodeOn = false;
 		_burstOn = false;
-		_episodeTimer = Intro ? _rng.RandfRange(25f, 60f) : _rng.RandfRange(20f, 45f);
+		// (2026-10-12, the owner: "needs to make more of those grudge clocking noises we originally had in older builds")
+		// shorter silences between its episodes (were 25-60 s on the path walk, 20-45 s later)
+		_episodeTimer = Intro ? _rng.RandfRange(12f, 26f) : _rng.RandfRange(9f, 20f);
 		_episodeAllowedAt = _clock + 8f;   // a close or a sighting cannot restart it at once
 	}
 
 	private bool _burstOn = false, _episodeOn = false, _episodeRequested = false;
 	private float _intensity;
 	private float _burstTimer = 0f, _burstDb;
-	private float _episodeTimer = 12f, _episodeLength = 1f;   // the first quiet stretch is short: it is heard early, then goes quiet
+	private float _episodeTimer = 5f, _episodeLength = 1f;   // the first quiet stretch is short: it is heard early, then goes quiet
 	private double _episodeAllowedAt, _rattleClock, _rattleAudible;
 	/// <summary>For tests: how many rattle bursts have started.</summary>
 	public int RattleBursts { get; private set; }

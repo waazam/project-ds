@@ -19,9 +19,9 @@ namespace ProjectDS.Player;
 public partial class Lantern : Node3D
 {
 	[ExportGroup("Radial glow")]
-	[Export] public float GlowRange = 14f;   // the owner: further, so more can be seen (was 9.5; the energy is eased to keep the near light as it was)
-	[Export] public float GlowEnergy = 2.3f;   // was 1.5 at the shorter range, then 1.35 (2026-10-07: the storm walk too dark to see)
-	[Export] public float GlowAttenuation = 1.0f;   // (was 1.3: it falls off more gently, lighting the ground and trunks further out)
+	[Export] public float GlowRange = 16f;   // the owner: further, so more can be seen (was 9.5; the energy is eased to keep the near light as it was)
+	[Export] public float GlowEnergy = 2.9f;   // was 1.5 at the shorter range, then 1.35 (2026-10-07: the storm walk too dark to see)
+	[Export] public float GlowAttenuation = 0.8f;   // (2026-10-12, the owner: "doing a very poor job at actually illuminating the environment": 16 m, 2.9, 0.8 - was 14, 2.3, 1.0)   // (was 1.3: it falls off more gently, lighting the ground and trunks further out)
 	/// <summary>How much of the glow remains while the beam is focused.</summary>
 	[Export] public float GlowWhileFocused = 0.55f;
 	[Export] public Color LightColor = new(1.0f, 0.72f, 0.42f);
@@ -70,11 +70,15 @@ public partial class Lantern : Node3D
 
 	[ExportGroup("Blacklight")]
 	[Export] public Color UvColor = new(0.38f, 0.12f, 1.0f);
-	[Export] public float UvRange = 9f;
-	[Export] public float UvEnergy = 3.2f;   // enough violet on the bark and ground to see where it points (the polish pass: 2.6 left the stairwell black)
+	[Export] public float UvRange = 13f;
+	[Export] public float UvEnergy = 4.2f;   // enough violet on the bark and ground to see where it points (the polish pass: 2.6 left the stairwell black)
 	/// <summary>Half-angle of the violet cone (degrees).</summary>
 	[Export] public float UvAngle = 24f;
-	[Export] public float UvGlowEnergy = 0.55f;   // a little violet round you: with the flame dead (Acts 14-20) it's all there is: enough to see the steps (the polish pass)
+	[Export] public float UvGlowEnergy = 1.1f;   // (2026-10-12: 0.55 lit nothing past arm's reach in Acts 14-20; 1.5 flooded the narrow hallway violet)
+	/// <summary>The glow round you with the blacklight on: a paler violet than the beam (the deep violet, at its brightness, still
+	/// left the walls black).</summary>
+	[Export] public Color UvGlowColor = new(0.62f, 0.5f, 1.0f);
+	[Export] public float UvGlowRange = 10f;   // a little violet round you: with the flame dead (Acts 14-20) it's all there is: enough to see the steps (the polish pass)
 
 	/// <summary>The blacklight is the lantern's mode (on or off, it keeps the mode).</summary>
 	public bool Blacklight { get; private set; }
@@ -130,6 +134,46 @@ public partial class Lantern : Node3D
 		GD.Print("[story] Act 14: the lantern's flame gutters out");
 	}
 	private float _dyingLength = 3.2f;
+
+	/// <summary>(2026-10-12, the owner: "after picking up the lantern make the light go out after you first use it so the player
+	/// intuitively uses the blacklight") Act 2: a few seconds after it's first lit, the flame gutters out, and only the
+	/// blacklight (B) works, until it's been on a while and has shown them what's written round the camp; then the wick takes
+	/// again (B back to the flame). Saved, both halves: it happens once.</summary>
+	public const string FirstGutterFlag = "lantern_first_gutter", FirstRelitFlag = "lantern_first_relit";
+	[Export] public float FirstGutterAfter = 7f, FirstRelightAfter = 5f;
+	public static bool Guttered => Systems.StoryManager.Instance is { } s && s.HasFlag(FirstGutterFlag) && !s.HasFlag(FirstRelitFlag);
+	private float _firstLitT, _uvT;
+	private bool _gutterHinted, _autoUv;
+
+	private void FirstGutter(bool flameOn, bool uvOn, float dt)
+	{
+		if (Systems.StoryManager.Instance is not { } s || s.Current == Systems.Checkpoint.None || s.Current >= Systems.Checkpoint.Act5CabinEntered) return;
+		if (!s.HasFlag(FirstGutterFlag))
+		{
+			if (!flameOn || Dying) return;
+			_firstLitT += dt;
+			if (_firstLitT < FirstGutterAfter) return;
+			s.SetFlag(FirstGutterFlag);
+			_dyingUntil = _t + 2.2;
+			_dyingLength = 2.2f;
+			Blacklight = false;
+			Audio.AudioDirector.OneShot(this, "bulb_sputter", 3, null, -10f, "Player");
+			GD.Print("[story] Act 2: the lantern's flame gutters out - the blacklight's what's left");
+			return;
+		}
+		if (s.HasFlag(FirstRelitFlag)) return;
+		if (!Dying && !_gutterHinted && UI.Subtitle.Instance != null)
+		{
+			_gutterHinted = true;
+			_ = UI.Subtitle.Instance.Show("The flame's gone out.   B: try its blacklight.", 0.6f, 5f, 1f);
+		}
+		if (!uvOn) return;
+		_uvT += dt;
+		if (_uvT < FirstRelightAfter) return;
+		s.SetFlag(FirstRelitFlag);
+		GD.Print("[story] Act 2: the wick's taken again");
+		if (UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show("The wick's caught again.   B: back to the flame.", 0.6f, 3.5f, 1f);
+	}
 	private bool _deadHinted, _snuffHinted;
 
 	/// <summary>The one-time how-to under the picture, the first time the lantern is taken in play (never on a restore).</summary>
@@ -263,7 +307,7 @@ public partial class Lantern : Node3D
 		_t += delta;
 		if (_douseAt > 0 && _t >= _douseAt) { _douseAt = -1; Doused = true; }
 		bool snuffed = Snuffed && !Dying;
-		bool dead = (FlameDead || Snuffed) && !Dying;
+		bool dead = (FlameDead || Snuffed || Guttered) && !Dying;
 		if (_player.PlayerInput.LightPressed && _inv.HasLantern)
 		{
 			if (snuffed)
@@ -275,7 +319,8 @@ public partial class Lantern : Node3D
 			{
 				// the flame won't take: the striker clicks, a spark, nothing
 				Audio.AudioDirector.OneShot(this, "lighter_flick", 1, null, -14f, "Player", 3f, 0.08f);
-				if (!_deadHinted && UI.Subtitle.Instance != null) { _deadHinted = true; _ = UI.Subtitle.Instance.Show("The flame won't take.   B: the blacklight still works.", 0.6f, 4f, 1f); }
+				if (Guttered) { if (UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show("It won't light.   B: its blacklight.", 0.4f, 3f, 0.8f); }
+				else if (!_deadHinted && UI.Subtitle.Instance != null) { _deadHinted = true; _ = UI.Subtitle.Instance.Show("The flame won't take.   B: the blacklight still works.", 0.6f, 4f, 1f); }
 			}
 			else
 			{
@@ -298,7 +343,11 @@ public partial class Lantern : Node3D
 			if (!string.IsNullOrEmpty(HowToLine) && UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show(HowToLine, 1.0f, 5.5f, 1.4f);
 		}
 
+		// (2026-10-12) the flame dead (Acts 14-20) and the lantern on: it goes to its blacklight by itself, once, rather than
+		// carried dark (B still switches it; the flame's dead either way)
+		if (dead && FlameDead && !Blacklight && _lit && _inv.HasLantern && !_autoUv) { _autoUv = true; Blacklight = true; }
 		bool on = _inv.HasLantern && _lit && !(dead && !Blacklight) && !snuffed;
+		FirstGutter(on && !Blacklight, on && Blacklight, (float)delta);
 		_glow.Visible = on;
 		bool uv = on && Blacklight;
 		PublishUv(uv, cam);
@@ -306,9 +355,9 @@ public partial class Lantern : Node3D
 		if (uv)
 		{
 			// the blacklight: a steady (electric, no flame) violet cone, and hardly any glow round the player
-			_glow.LightColor = UvColor;
-			_glow.OmniRange = 6f;
-			_glow.LightEnergy = UvGlowEnergy;
+			_glow.LightColor = UvGlowColor;
+			_glow.OmniRange = UvGlowRange;
+			_glow.LightEnergy = UvGlowEnergy * (Systems.GameSettings.Instance?.LanternBrightness ?? 1f);
 			_beam.Visible = true;
 			_beam.LightColor = UvColor;
 			_beam.SpotRange = UvRange;

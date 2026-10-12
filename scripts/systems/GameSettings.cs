@@ -42,6 +42,9 @@ public partial class GameSettings : Node
 	/// it lifts the dark and the mids, not the whites). For a dark monitor or a bright room.</summary>
 	public float Brightness = 1f;
 	public const float BrightnessMin = 0.7f, BrightnessMax = 1.5f;
+	/// <summary>(2026-10-12, the owner's suggestion B) Whether the brightness has been set on the screen before the first new
+	/// game (shown once).</summary>
+	public bool BrightnessCalibrated;
 	/// <summary>The lantern's strength (1 as designed): its glow and its beam, for a dark monitor (2026-10-07).</summary>
 	public float LanternBrightness = 1f;
 	/// <summary>The HUD's neon (UI.NeonKit.Names): 0 white (the default), green, red, purple, blue, yellow, orange.</summary>
@@ -137,6 +140,17 @@ public partial class GameSettings : Node
 		set { _masterVolume = Mathf.Clamp(value, 0f, 1f); ApplyMasterVolume(); }
 	}
 
+	/// <summary>(2026-10-12, the owner's suggestion D, the mix pass: the music under everything all game: the bus layout held the
+	/// Music bus at -24 dB, under the beds and the steps, so every cue was a murmur) The music's base level, set at start
+	/// over the layout's.</summary>
+	public const float MusicBaseDb = -16f;
+
+	private static void ApplyMix()
+	{
+		int music = AudioServer.GetBusIndex("Music");
+		if (music >= 0) AudioServer.SetBusVolumeDb(music, MusicBaseDb);
+	}
+
 	private static void ApplyMasterVolume()
 	{
 		int bus = AudioServer.GetBusIndex("Master");
@@ -192,6 +206,7 @@ public partial class GameSettings : Node
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
 		ApplyMasterVolume();
+		ApplyMix();
 		if (_windowed) Callable.From(ApplyWindow).CallDeferred();   // (the project opens fullscreen)
 	}
 
@@ -220,6 +235,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("display", "cinema_bars", CinemaBars);
 		cfg.SetValue("display", "fog_lighting", FogLighting);
 		cfg.SetValue("display", "brightness", Brightness);
+		cfg.SetValue("display", "brightness_calibrated", BrightnessCalibrated);
 		cfg.SetValue("display", "lantern_brightness", LanternBrightness);
 		cfg.SetValue("display", "hud_neon", HudColor);
 		cfg.SetValue("display", "hud_contextual", ContextualHud);
@@ -259,6 +275,7 @@ public partial class GameSettings : Node
 		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-volfog") < 0) FogLighting = (bool)cfg.GetValue("display", "fog_lighting", FogLighting);
 		Brightness = Mathf.Clamp((float)cfg.GetValue("display", "brightness", Brightness), BrightnessMin, BrightnessMax);
+		BrightnessCalibrated = (bool)cfg.GetValue("display", "brightness_calibrated", BrightnessCalibrated);
 		LanternBrightness = Mathf.Clamp((float)cfg.GetValue("display", "lantern_brightness", LanternBrightness), LanternMin, LanternMax);
 		HudColor = Mathf.Clamp((int)cfg.GetValue("display", "hud_neon", HudColor), 0, 6);
 		ContextualHud = (bool)cfg.GetValue("display", "hud_contextual", ContextualHud);

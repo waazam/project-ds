@@ -22,7 +22,7 @@ public abstract partial class HeldItem : Node3D
 	protected abstract void Animate(float dt);
 	protected virtual void OnHidden() { }
 
-	private float _stride, _lagYaw, _lagPitch, _prevYaw, _prevPitch, _shakeT;
+	private float _stride, _amp, _run, _lagYaw, _lagPitch, _prevYaw, _prevPitch, _shakeT;
 	private bool _built;
 
 	/// <summary>The camera's viewfinder up to the eye (the hands are busy with it).</summary>
@@ -76,11 +76,31 @@ public abstract partial class HeldItem : Node3D
 		if (!show) return;
 		Animate(dt);
 		float r = Mathf.SmoothStep(0f, 1f, Raise);
-		// the stride: up and down twice a cycle, side to side once; less crouched, none standing still
+		// the stride (2026-10-12, the owner: "the animation of the arm while sprinting ... looks spastic and erratic, it needs to
+		// look smooth"): kept in step with the feet (PlayerFootsteps' phase, as the head's bob is), every curve a smooth one
+		// (a dip that eases in and out of each footfall: the old |cos| bounced off the ground with a kink, twice a cycle,
+		// faster the faster you went), the hand trailing the foot a touch; its size eased, never snapped, and kept small
+		// at a run (the arm held in to the body, swinging gently fore and aft, not bouncing)
 		float speed = Player.IsOnFloor() ? Player.GroundSpeed : 0f;
-		_stride += dt * speed * 1.35f;
-		float amp = Mathf.Clamp(speed / 3.5f, 0f, 1f) * (1f - 0.5f * Player.CrouchAmount);
-		var bob = new Vector3(Mathf.Sin(_stride * Mathf.Pi) * 0.012f, -Mathf.Abs(Mathf.Cos(_stride * Mathf.Pi)) * 0.018f, 0f) * amp;
+		bool running = Player.IsRunning && speed > 3f;
+		_run = Mathf.Lerp(_run, running ? 1f : 0f, 1f - Mathf.Exp(-dt * 3f));
+		float ampGoal = Mathf.Clamp(speed / 3.5f, 0f, 1f) * (1f - 0.5f * Player.CrouchAmount) * (1f - 0.35f * _run);
+		_amp = Mathf.Lerp(_amp, ampGoal, 1f - Mathf.Exp(-dt * 4f));
+		float dip, sway;
+		if (Player.Footsteps is { } steps)
+		{
+			float ph = steps.StepPhase - 0.12f;
+			dip = 0.5f + 0.5f * Mathf.Cos(ph * Mathf.Tau);
+			sway = Mathf.Sin((steps.Steps + ph) * Mathf.Pi);
+		}
+		else
+		{
+			_stride += dt * Mathf.Lerp(1.7f, 2.6f, _run);
+			dip = 0.5f + 0.5f * Mathf.Cos(_stride * Mathf.Tau);
+			sway = Mathf.Sin(_stride * Mathf.Pi);
+		}
+		var bob = new Vector3(sway * 0.01f, -dip * 0.014f, sway * 0.012f * _run) * _amp
+			+ new Vector3(0.025f, -0.03f, 0.04f) * _run;   // (held in closer and lower at a run)
 		// a touch of lag behind the view's turns (it has weight), eased back
 		var rig = Player.CameraRig;
 		float yaw = rig?.Yaw ?? 0f, pitch = rig?.Camera?.Rotation.X ?? 0f;

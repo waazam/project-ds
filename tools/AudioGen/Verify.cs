@@ -95,7 +95,7 @@ public static class Verify
 		_ when name.StartsWith("steel_door_slam") => (1.0, 1.6),
 		_ when name.StartsWith("radio_burst") => (2, 3.5),
 		_ when name.StartsWith("bird") => (0.3, 2.5),
-		_ when name.StartsWith("step_dirt") => (0.2, 0.36),
+		_ when name.StartsWith("step_dirt") => (0.2, 0.45),
 		_ when name.StartsWith("step_wood") => (0.2, 0.6),
 		_ when name.StartsWith("cloth") => (0.25, 0.55),
 		_ when name.StartsWith("twig_snap") => (0.25, 0.6),

@@ -82,6 +82,7 @@ public partial class ContinueRoundTripTest : Node
 		// Act 14's start (Room 3, through the iron door) and end (the chamber under the stairwell)
 		new("act13_finished", Checkpoint.Act13Finished, F13, "lantern,compass,radio;tool=None"),
 		new("act14_finished", Checkpoint.Act14Finished, F13.Append(StoryManager.Flag.Act14JumpedAcross).ToArray(), "lantern,compass,radio;tool=None"),
+		new("act15_past_shadow", Checkpoint.Act14Finished, F13.Append(StoryManager.Flag.Act14JumpedAcross).Append(StoryManager.Flag.Act15PastShadow).ToArray(), "lantern,compass,radio;tool=None"),
 		new("act15_finished", Checkpoint.Act15Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 		new("act16_finished", Checkpoint.Act16Finished, F13.Append(StoryManager.Flag.Act14JumpedDown).ToArray(), "lantern,compass,radio;tool=None"),
 		new("act17_finished", Checkpoint.Act17Finished, F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen }).ToArray(), "lantern,compass,radio;tool=None"),
@@ -247,7 +248,10 @@ public partial class ContinueRoundTripTest : Node
 		Check("player can move", _player.GlobalPosition.DistanceTo(before) > 0.2f, $"{_player.GlobalPosition.DistanceTo(before):0.00} m");
 		if (sc.Cp == Checkpoint.Act13Finished && StationInterior.Instance?.Room3 is { } r3)
 			Check("Act 14's start respawns just inside Room 3", before.DistanceTo(r3.EntryWorld) < 1.5f, $"{before} vs {r3.EntryWorld}");
-		if (sc.Cp == Checkpoint.Act14Finished && StationInterior.Instance?.Room3?.Stairs is { } sw)
+		bool pastShadow = System.Array.IndexOf(sc.Flags, StoryManager.Flag.Act15PastShadow) >= 0;
+		if (pastShadow && StationInterior.Instance?.Room3?.Stairs?.Hallway is { } hw15)
+			Check("Act 15's save past the shadow man respawns just past him in the hall", Mathf.Abs(hw15.ToLocal(before).Z - (Act15Hallway.ShadowZ + 2.5f)) < 1.5f && Mathf.Abs(hw15.ToLocal(before).X) < 1f, $"{hw15.ToLocal(before)}");
+		if (!pastShadow && sc.Cp == Checkpoint.Act14Finished && StationInterior.Instance?.Room3?.Stairs is { } sw)
 			Check("Act 14's end respawns on the chamber floor under the stairwell", before.DistanceTo(sw.LandingSpotWorld) < 1.5f, $"{before} vs {sw.LandingSpotWorld}");
 		if (sc.Cp == Checkpoint.Act15Finished && StationInterior.Instance?.Room3?.Stairs?.Hallway is { } hw)
 			Check("Act 15's end respawns in the janitor's closet, door shut", before.DistanceTo(hw.ClosetWorld) < 1.5f && hw.Finished && !hw.DoorOpen, $"{before} vs {hw.ClosetWorld}");

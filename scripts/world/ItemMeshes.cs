@@ -676,6 +676,10 @@ public static class ItemMeshes
 		b.PickRadius = 0.22f;
 	}
 
+	/// <summary>How far the lantern's bail rises over its cap (0.1: lying about, folded down; the one in the hand is built
+	/// with it standing tall, the way it's carried: see HeldLantern).</summary>
+	public static float LanternBailRise = 0.1f;
+
 	private static void Lantern(MeshKit k, Node3D parent, ref Built b)
 	{
 		// Hurricane lantern: painted font, wire guards, glass globe, vented cap, bail. (2026-10-10c, finer: twice as round,
@@ -739,7 +743,7 @@ public static class ItemMeshes
 		for (int i = 0; i <= 12; i++)
 		{
 			float a = Mathf.Pi * i / 12f;
-			Vector3 p = new(Mathf.Cos(a) * 0.07f, 0.232f + Mathf.Sin(a) * 0.1f, 0);
+			Vector3 p = new(Mathf.Cos(a) * 0.07f, 0.232f + Mathf.Sin(a) * LanternBailRise, 0);
 			if (i > 0) k.Cylinder(prev, p, 0.003f, 0.003f, 5, false);
 			prev = p;
 		}

@@ -52,7 +52,7 @@ rnd = random.Random(1162)
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 
 EYE = V((0, 0.09, 1.62))
-CHEST_CUT = 1.0   # the jacket seen from the eye up to here; above, in the shadow only
+CHEST_CUT = 1.06   # the jacket seen from the eye up to here; above, in the shadow only (2026-10-12: was 1.0)
 
 # ------------------------------------------------------------------ the proportions
 
@@ -93,7 +93,25 @@ def materials():
         strap=mat("pb_strap", (0.02, 0.02, 0.02), 0.9), glove=mat("pb_glove", (0.012, 0.009, 0.007), 0.75),
         skin=mat("pb_skin", (0.45, 0.3, 0.22), 0.6), knit=mat("pb_knit", (0.03, 0.03, 0.03), 1.0),
         plastic=mat("pb_plastic", (0.01, 0.01, 0.01), 0.4), collar=mat("pb_collar", (0.024, 0.03, 0.024), 0.85),
-        welt=mat("pb_welt", (0.09, 0.07, 0.05), 0.7), chest=mat("pb_chest", (0.038, 0.047, 0.034), 0.85))
+        welt=mat("pb_welt", (0.09, 0.07, 0.05), 0.7), chest=mat("pb_chest", (0.038, 0.047, 0.034), 0.85),
+        belt=mat("pb_belt", (0.035, 0.022, 0.014), 0.6))
+
+
+def build_belt(m):
+    """(2026-10-12) The belt round the jeans' waistband, over the tucked shirt: a leather strap, its buckle at the front, a
+    keeper loop beside it."""
+    out = []
+    belt = W.loft_path("Belt", [V((0, -0.005, 0.951)), V((0, -0.005, 0.976))], [0.19, 0.19], [0.13, 0.13], up=V((0, 1, 0)), sides=48)
+    set_mat(belt, m["belt"])
+    out.append(belt)
+    front = 0.13 - 0.005
+    buckle = kit.box("BeltBuckle", V((0, front + 0.006, 0.9635)), (0.052, 0.008, 0.04), None, bevel=0.004, segs=2)
+    set_mat(buckle, m["belt"])
+    out.append(buckle)
+    keeper = kit.box("BeltKeeper", V((0.045, front + 0.004, 0.9635)), (0.012, 0.006, 0.032), None, bevel=0.002)
+    set_mat(keeper, m["belt"])
+    out.append(keeper)
+    return out
 
 
 def remesh(ob, voxel, smooth=4):
@@ -150,10 +168,14 @@ def superellipse(c, hx, hy, a, n=2.5, front=0.0):
 
 # ------------------------------------------------------------------ the jacket
 
+# (2026-10-12, the owner: "you see your feet, pants, then you see your cut off waist, we need to connect it to the torso so
+# it looks like our shirt is tucked into our jeans") the coat's hips gone: its body now starts inside the jeans' waistband,
+# narrower than it, and blouses out over the belt above
 JACKET = [   # (z, half-width, half-depth, the chest's push forward)
-    (0.82, 0.2, 0.148, 0.0),
-    (0.9, 0.195, 0.14, 0.0),
-    (0.98, 0.186, 0.132, 0.0),
+    (0.92, 0.166, 0.108, 0.0),
+    (0.958, 0.17, 0.114, 0.0),
+    (0.995, 0.186, 0.13, 0.0),
+    (1.02, 0.184, 0.13, 0.0),
     (1.06, 0.18, 0.128, 0.02),
     (1.15, 0.184, 0.132, 0.06),
     (1.25, 0.193, 0.136, 0.1),
@@ -214,15 +236,14 @@ def build_jacket(m):
     # the hood, rolled up at the back of the neck
     parts.append(chain("Hood", [V((0.1, -0.04, 1.49)), V((0.08, -0.09, 1.51)), V((0.0, -0.105, 1.52)), V((-0.08, -0.09, 1.51)), V((-0.1, -0.04, 1.49))],
                        [0.03, 0.04, 0.045, 0.04, 0.03]))
-    # the hem's band
-    parts.append(W.loft_path("HemBand", [V((0, 0.0, 0.815)), V((0, 0.0, 0.85))], [0.204, 0.198], [0.152, 0.146], up=V((0, 1, 0)), sides=40))
+    # (no hem's band: tucked in, 2026-10-12)
     jacket = join(parts, "Jacket")
     remesh(jacket, 0.0055, 5)
     # the neck's opening: cut it (it closed in the remesh)
     bm = bmesh.new()
     bm.from_mesh(jacket.data)
     kill = [v for v in bm.verts if v.co.z > 1.535 and V((v.co.x, v.co.y)).length < 0.065]
-    kill += [v for v in bm.verts if v.co.z < 0.83 and V((v.co.x, v.co.y - 0.0)).length < 0.182]
+    kill += [v for v in bm.verts if v.co.z < 0.93]
     bmesh.ops.delete(bm, geom=kill, context="VERTS")
     bm.to_mesh(jacket.data)
     bm.free()
@@ -237,7 +258,7 @@ def build_jacket_details(m):
     # the zip up the front: a raised placket and its teeth, a pull at the top
     pts = []
     for i in range(24):
-        z = 0.825 + i * (1.535 - 0.825) / 23
+        z = 0.985 + i * (1.535 - 0.985) / 23
         hx, hy, f = jacket_section(min(z, 1.5))
         c = spine_at((z - 0.95) / 0.53) if z > 0.95 else V((0, 0, z))
         y = c.y + hy * (1 + f) + 0.002
@@ -314,13 +335,15 @@ def build_jeans(m):
         parts.append(lumpy_sphere(f"KneeBag{s}", kn + V((0, 0.03, -0.01)), (0.06, 0.03, 0.045), None, 60 + s, amp=0.04, subdiv=3))
         # a fold behind the knee
         parts.append(lumpy_sphere(f"KneeBack{s}", kn + V((0, -0.045, 0.01)), (0.05, 0.018, 0.014), None, 64 + s, amp=0.06, subdiv=2))
+    # the waistband (2026-10-12: seen now, the shirt tucked into it): a firm band round the top, a touch proud
+    parts.append(W.loft_path("Waistband", [V((0, -0.005, 0.945)), V((0, -0.005, 0.985))], [0.184, 0.186], [0.124, 0.126], up=V((0, 1, 0)), sides=40))
     jeans = join(parts, "Jeans")
     remesh(jeans, 0.005, 4)
     # open the hems
     bm = bmesh.new()
     bm.from_mesh(jeans.data)
     # (and the waist, all under the jacket: unseen, it only shadowed the jacket in the bake)
-    kill = [v for v in bm.verts if v.co.z < 0.135 or v.co.z > 0.9]
+    kill = [v for v in bm.verts if v.co.z < 0.135 or v.co.z > 0.984]
     bmesh.ops.delete(bm, geom=kill, context="VERTS")
     bm.to_mesh(jeans.data)
     bm.free()
@@ -740,7 +763,7 @@ def weave_material(name, kind):
 
 
 WEAVE = dict(pb_chest="softshell", pb_jacket="softshell", pb_sleeve="softshell", pb_collar="softshell", pb_jeans="twill", pb_leather="leather", pb_sole="lugs", pb_pack="cordura",
-             pb_strap="cordura", pb_knit="knit", pb_glove="leather")
+             pb_strap="cordura", pb_knit="knit", pb_glove="leather", pb_belt="leather")
 
 
 def bake_maps(low, high, size):
@@ -944,6 +967,7 @@ def main():
     set_mat(cap, m["jacket"])
     jdet.append(cap)
     jeans = build_jeans(m)
+    belt = build_belt(m)
     boots = build_boot(m, 1) + build_boot(m, -1)
     hands = [build_hand(m, s) for s in (1, -1)]
     head, hat = build_head(m)
@@ -955,6 +979,8 @@ def main():
         mn = o.data.materials[0].name
         W.paint(o, jacket_colour if mn in ("pb_jacket", "pb_sleeve", "pb_chest") else flat((0.01, 0.01, 0.01)) if mn == "pb_plastic" else flat((0.25, 0.24, 0.22)))
     W.paint(jeans, jeans_colour)
+    for o in belt:
+        W.paint(o, flat((0.2, 0.19, 0.16), 0.1) if o.name == "BeltBuckle" else flat((0.03, 0.019, 0.012), 0.25))
     for o in boots:
         mn = o.data.materials[0].name
         W.paint(o, leather_colour if mn == "pb_leather" else flat((0.018, 0.016, 0.014)) if mn == "pb_sole" else flat((0.22, 0.15, 0.07)) if mn == "pb_lace" else flat((0.25, 0.24, 0.22)))
@@ -985,7 +1011,7 @@ def main():
         c.data = o.data.copy()
         bpy.context.scene.collection.objects.link(c)
         return c
-    everything = [jacket] + jdet + [jeans] + boots + hands + [head, hat] + pack
+    everything = [jacket] + jdet + [jeans] + belt + boots + hands + [head, hat] + pack
     high = join([copy(o) for o in everything], "High")
     # the export copy: the fused cloth decimated to its budget
     for o, target in ((jacket, 9000), (jeans, 6000), (head, 1500), (hat, 600)) + tuple((b, 1600) for b in boots if b.name.startswith("Boot")) + tuple((h, 700) for h in hands):
@@ -1004,6 +1030,8 @@ def main():
     for o in jdet:
         weigh(o, bones, body_bones if not o.name.startswith("Cuff") else allowed["jacket"])
     weigh(jeans, bones, allowed["jeans"])
+    for o in belt:
+        weigh(o, bones, ["hips"])
     for o in boots:
         weigh(o, bones, allowed["boot"])
     for o in hands:
@@ -1044,7 +1072,7 @@ def main():
     # the parts the game treats apart: by material
     groups = dict(Torso=("pb_jacket", "pb_plastic", "pb_metal"), Arms=("pb_sleeve",), Legs=("pb_jeans",),
                   Boots=("pb_leather", "pb_sole", "pb_lace", "pb_welt"), Hands=("pb_glove",), Head=("pb_skin", "pb_knit", "pb_collar"),
-                  Pack=("pb_pack", "pb_strap"), Chest=("pb_chest",))
+                  Pack=("pb_pack", "pb_strap"), Chest=("pb_chest",), Belt=("pb_belt",))
     bpy.ops.object.select_all(action="DESELECT")
     low.select_set(True)
     bpy.context.view_layer.objects.active = low

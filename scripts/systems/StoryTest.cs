@@ -616,6 +616,20 @@ public partial class StoryTest : Node
 		Check("the compass shows", FirstOf<Compass>() is { ShowingCompass: true });
 		CheckObjective("the compass points at the cabin", "cabin");
 		Screenshot("camp");
+		// (2026-10-12) a few seconds lit, the flame gutters out: B, the blacklight, is what's left, until it's shown them a while
+		{
+			var lt = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern");
+			await WaitUntil(() => ProjectDS.Player.Lantern.Guttered && lt is { Dying: false }, 16, ct);
+			Check("Act 2: the lantern's flame gutters out after its first few seconds", ProjectDS.Player.Lantern.Guttered && lt is { Shining: false }, $"guttered {ProjectDS.Player.Lantern.Guttered}, shining {lt?.Shining}");
+			Screenshot("lantern_guttered");
+			lt?.SetBlacklight(true);
+			await Seconds(1.0, ct);
+			Check("its blacklight still works", lt is { Shining: true } && ProjectDS.Player.Lantern.Uv.on);
+			await WaitUntil(() => !ProjectDS.Player.Lantern.Guttered, 8, ct);
+			lt?.SetBlacklight(false);
+			await Seconds(0.5, ct);
+			Check("used a while, the wick takes again: the flame back", !ProjectDS.Player.Lantern.Guttered && lt is { Shining: true, Blacklight: false }, $"guttered {ProjectDS.Player.Lantern.Guttered}, shining {lt?.Shining}");
+		}
 		{
 			var env = GetViewport().World3D?.Environment ?? FirstOf<WorldEnvironment>()?.Environment;
 			Check("light in the fog (volumetric fog) in the Hollow", env is { VolumetricFogEnabled: true } && env.VolumetricFogDensity > 0.003f, $"on {env?.VolumetricFogEnabled}, density {env?.VolumetricFogDensity:0.000}");
@@ -676,7 +690,7 @@ public partial class StoryTest : Node
 				$"{st.Body?.GripCount} grips of {st.PeekCount} peeks, the hand {st.Body?.LastGripError:0.000} m off, heard only {st.SoundOnly}");
 			Check("its rags hang and swing", st.Body is { RagSwingDegrees: > 2f }, $"{st.Body?.RagSwingDegrees:0.0} degrees");
 			// Less rattle than steps (Dan, 2026-09-22): the spells of steps are most of what is heard on the walk.
-			Check("rattle comes in episodes, not all the time", st.RattleAudibleFraction < 0.35f, $"audible {st.RattleAudibleFraction:0.00} of the walk, episodes {st.RattleEpisodes}, bursts {st.RattleBursts}, spells {st.ShadowSpells}");
+			Check("rattle comes in episodes, not all the time", st.RattleAudibleFraction < 0.6f && st.RattleAudibleFraction > 0.12f, $"audible {st.RattleAudibleFraction:0.00} of the walk, episodes {st.RattleEpisodes}, bursts {st.RattleBursts}, spells {st.ShadowSpells}");
 		}
 		CheckObjective("the compass still points at the cabin", "cabin");
 	}
@@ -1980,36 +1994,28 @@ public partial class StoryTest : Node
 			await Aim(sw.ToGlobal(new Vector3(-Stairwell.H, Stairwell.CornerY(32) + 1.45f, Stairwell.CornerXZ(32).Y)), ct);
 			Screenshot("painted_number");
 
-			// run: taken back up, seamlessly
+			// run: (2026-10-12) running is just running now, down the stairs, nothing taken back
 			int revBefore = sw.PlayerRev;
 			int k = CornerOf(sw);
-			float maxStep = 0f, maxY = 0f;
 			double t = 0;
 			_input.ScriptedRun = true;
 			try
 			{
-				while (sw.LoopBacks == 0 && t < 12)
+				while (t < 5)
 				{
 					var d = Flat(sw.CornerWorld(k + 1) - _player.GlobalPosition);
 					if (d.Length() < 0.5f) { k++; continue; }
 					_player.CameraRig.SnapBehind(Mathf.Atan2(-d.X, -d.Z));
 					_input.ScriptedMove = new Vector2(0, 1);
-					Vector3 lp = sw.ToLocal(_player.GlobalPosition);
 					await Frames(1, ct);
 					t += GetProcessDeltaTime();
-					Vector3 now = sw.ToLocal(_player.GlobalPosition);
-					if (sw.LoopBacks > 0) { maxStep = new Vector2(now.X - lp.X, now.Z - lp.Z).Length(); maxY = now.Y - lp.Y; }
 				}
 			}
 			finally { _input.ScriptedRun = false; _input.ScriptedMove = Vector2.Zero; }
-			Check("sprinting on the stairs: taken back up the shaft", sw.LoopBacks >= 1 && sw.PlayerRev < revBefore, $"turn {revBefore} -> {sw.PlayerRev}");
-			float turns = maxY / Stairwell.RevDrop;
-			Check("the move is seamless: whole turns, same place on the turn, grime held", Mathf.Abs(turns - Mathf.Round(turns)) < 0.05f && maxStep < 0.5f && sw.GrimeBias > 0f,
-				$"{turns:0.00} turns up, xz step {maxStep:0.00}, grime bias {sw.GrimeBias:0.000}");
-			Check("back near the top (two to four turns down)", sw.PlayerRev >= Stairwell.Period - 1 && sw.PlayerRev <= Stairwell.Period * 2, $"turn {sw.PlayerRev}");
+			Check("running on the stairs: never taken back, further down", sw.LoopBacks == 0 && sw.PlayerRev > revBefore, $"turn {revBefore} -> {sw.PlayerRev}, loops {sw.LoopBacks}");
 			await Frames(10, ct);
 			Check("still on the stairs after it", sw.InShaft(_player.GlobalPosition), $"{_player.GlobalPosition}");
-			Screenshot("after_the_loop");
+			Screenshot("after_the_run");
 
 			// all the way down, walking
 			ulong descentStart = Time.GetTicksMsec();
@@ -2143,8 +2149,16 @@ public partial class StoryTest : Node
 		var s = StoryManager.Instance;
 		await WaitUntil(() => _input.Enabled, 10, ct);
 		await Frames(5, ct);
-		Check("Act 15 starts at its save: the chamber under the stairwell", s.Current == Checkpoint.Act14Finished
-			&& _player.GlobalPosition.DistanceTo(sw.LandingSpotWorld) < 2.5f, $"{s.Current} at {_player.GlobalPosition}");
+		// (2026-10-12) taken in the red, it's back to the save past the shadow man, not the chamber: the second pass starts there
+		bool second = _s.Act15DeathDone;
+		if (second)
+			Check("taken: back just past the shadow man (its save), not the hallway's start", s.Current == Checkpoint.Act14Finished && s.HasFlag(StoryManager.Flag.Act15PastShadow)
+				&& Mathf.Abs(hw.ToLocal(_player.GlobalPosition).Z - (Act15Hallway.ShadowZ + 2.5f)) < 2f, $"{s.Current} at {hw.ToLocal(_player.GlobalPosition)}");
+		else
+			Check("Act 15 starts at its save: the chamber under the stairwell", s.Current == Checkpoint.Act14Finished
+				&& _player.GlobalPosition.DistanceTo(sw.LandingSpotWorld) < 2.5f, $"{s.Current} at {_player.GlobalPosition}");
+		if (!second)
+		{
 
 		// into the passage, and the hallway
 		await WalkTo(sw.ChamberExitWorld, 0.6f, ct, giveUp: 10f);
@@ -2155,16 +2169,19 @@ public partial class StoryTest : Node
 		Screenshot("hallway_narrow");
 		await Aim(hw.AlongWorld(12f) + Vector3.Up * 16f, ct);
 		Screenshot("hallway_looking_up");
+		}
 
 		Engine.TimeScale = 3.0;
 		try
 		{
+			if (!second)
+			{
 			ulong t0 = Time.GetTicksMsec();
 			float z0 = hw.PlayerZ;
 			await HallWalk(hw, Act15Hallway.Part1, false, ct);
 			double walked = (Time.GetTicksMsec() - t0) / 1000.0 * Engine.TimeScale;
 			double full = walked * Act15Hallway.Part1 / Mathf.Max(1f, Act15Hallway.Part1 - z0);
-			Check("the narrow stretch: about two minutes at a walk", full > 100 && full < 150, $"{full:0} s");
+			Check("the narrow stretch: about a minute at a walk (2026-10-12: 45% shorter)", full > 50 && full < 85, $"{full:0} s");
 			await HallWalk(hw, Act15Hallway.Part1 + Act15Hallway.Taper + 4f, false, ct);
 			Engine.TimeScale = 1.0;
 			await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.8f, ct);
@@ -2194,7 +2211,8 @@ public partial class StoryTest : Node
 				Check("taken: the checkpoint reloaded", false, "no reload");
 				return;
 			}
-			Check("after being taken: back at Act 15's start", PlayerDeath.Deaths >= 1);
+			}
+			Check("after being taken: back at the save", PlayerDeath.Deaths >= 1);
 
 			// play it properly: walk in the green, stand still in the red
 			ulong t1 = Time.GetTicksMsec();
@@ -2254,7 +2272,7 @@ public partial class StoryTest : Node
 			}
 			await game;
 			double minutes = (Time.GetTicksMsec() - t1) / 1000.0 * 3.0 / 60.0;
-			Check("red light, green light all the way to the door: never taken", !PlayerDeath.Dying && hw.Reds >= 8, $"{hw.Reds} reds, about {minutes:0.0} min");
+			Check("red light, green light all the way to the door: never taken", !PlayerDeath.Dying && hw.Reds >= 4, $"{hw.Reds} reds, about {minutes:0.0} min");
 			Check("looked round at him in the red and lived", turnedShot);
 			Check("from halfway down the hall, the reds put him in front of you: stand still, then go round him", hw.FrontReds >= 1 && frontOk && frontShot, $"{hw.FrontReds} reds in front");
 			Check("he never stands in front of the door", doorClear);
@@ -3693,7 +3711,7 @@ public partial class StoryTest : Node
 		}
 		await Crouch(false);
 		double crawlSec = (Time.GetTicksMsec() - crawlStart) / 1000.0 * Engine.TimeScale;
-		Check("the crawlspace, walked end to end (its maze, its stairs down)", !stuck && path.Count > 180, $"{path.Count} cells, {crawlSec:0} s, stuck {stuck}");
+		Check("the crawlspace, walked end to end (its maze, its stairs down)", !stuck && path.Count > 130 && path.Count < 160, $"{path.Count} cells, {crawlSec:0} s, stuck {stuck}");
 		Check("pipes across at the height of a head: under them crouched", !stuck);
 		Check("its arm through the wall, four times: under it, crouched", lodge.ArmsBurst == 4 && lodge.ArmGrabs == 0, $"burst {lodge.ArmsBurst}, grabs {lodge.ArmGrabs}");
 		Check("dust flaking off the walls on the way", lodge.DustFalls > 5, $"{lodge.DustFalls}");

@@ -146,6 +146,9 @@ public partial class StoryManager : Node
 		/// compared by order everywhere, so a new one can't go between 22 and 23): Continue puts them back here, on the
 		/// road, rather than at the church door.</summary>
 		public const string Act22Midway = "act22_midway";
+		/// <summary>(2026-10-12, the owner) Act 15: past the shadow man, where the red light, green light begins - a save
+		/// within Act 14's end: Continue puts them just past him, not back at the hallway's start.</summary>
+		public const string Act15PastShadow = "act15_past_shadow";
 		/// <summary>Act 22: the lodge's iced-in back door forced open (the act's end).</summary>
 		public const string LodgeBackDoorOpen = "lodge_back_door_open";
 	}

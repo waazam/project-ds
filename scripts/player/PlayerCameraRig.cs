@@ -204,7 +204,10 @@ public partial class PlayerCameraRig : Node3D
 		// toward the foot that's down; its size follows the body's actual speed, not the keys.
 		float speed = _target.IsOnFloor() ? _target.GroundSpeed : 0f;
 		float motion = (GameSettings.Instance?.HeadMotion ?? true) ? 1f : 0f;
-		_bobAmount = Mathf.Lerp(_bobAmount, Mathf.Clamp(speed / 2f, 0f, 1.4f) * motion, 1f - Mathf.Exp(-6f * dt));
+		// (2026-10-12, the owner's suggestion E: easier on a sprint: it grew to 1.4x the walk's; now the walk's at most, and a
+		// little under it running, eased in over a moment)
+		float bobGoal = Mathf.Clamp(speed / 2f, 0f, 1f) * (_target.IsRunning ? 0.8f : 1f) * motion;
+		_bobAmount = Mathf.Lerp(_bobAmount, bobGoal, 1f - Mathf.Exp(-4f * dt));
 		float dip, sway;
 		if (_target.Footsteps is { } steps)
 		{

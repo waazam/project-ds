@@ -153,7 +153,7 @@ public partial class ForestScatter : Node3D
 		foreach (float fy in new[] { 0.3f, 0.46f, 0.62f, 0.78f, 1f })
 		{
 			float y = topY * fy;
-			rings.Add((Axis(y), trunkR * Mathf.Lerp(1.02f, 0.08f, y / topY), new Color(0.62f, 0.6f, 0.58f).Lerp(new Color(0.8f, 0.78f, 0.74f), fy)));
+			rings.Add((Axis(y), trunkR * Mathf.Lerp(1.02f, 0.08f, y / topY), new Color(0.62f, 0.6f, 0.58f).Lerp(new Color(0.68f, 0.66f, 0.63f), fy)));   // (was to 0.8 at the top: the pale upper trunks read as paper)
 		}
 		TrunkLoft(k, rings, 12, 1f);
 		Roots(k, trunkR * 1.42f, seed, rings[1].col);

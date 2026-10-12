@@ -19,10 +19,15 @@ namespace ProjectDS.Player;
 /// </summary>
 public partial class HeldLantern : HeldItem
 {
-	protected override Vector3 Rest => new(-0.27f, -0.1f, -0.6f);
-	protected override Vector3 Lowered => new(-0.3f, -0.75f, -0.5f);
+	// (2026-10-12, the owner's reference shots: the arm out ahead, the fist up at the top of a tall wire bail, the lantern
+	// hanging well down under it; was the fist right down on its cap, clamping it)
+	protected override Vector3 Rest => new(-0.23f, -0.02f, -0.64f);
+	protected override Vector3 Lowered => new(-0.3f, -0.85f, -0.5f);
 	/// <summary>The beam gathered: lifted, in toward the middle, out ahead.</summary>
-	private static readonly Vector3 Gathered = new(-0.16f, -0.04f, -0.66f);
+	private static readonly Vector3 Gathered = new(-0.14f, 0.03f, -0.68f);
+	/// <summary>The bail standing up over the cap, and how far under the fist the lantern hangs on it.</summary>
+	private const float BailRise = 0.22f, ModelScale = 0.95f;
+	private static float HangDrop => (0.232f + BailRise) * ModelScale;
 	/// <summary>Thrust up at something in front of them (Act 23's end: held up into the wendigo's face): high, in the middle,
 	/// at arm's length.</summary>
 	private static readonly Vector3 ThrustPose = new(-0.03f, 0.1f, -0.5f);
@@ -41,7 +46,7 @@ public partial class HeldLantern : HeldItem
 	private MeshInstance3D _glass;
 	private StandardMaterial3D _uvGlass;
 	private Vector2 _ang, _angVel;   // the pendulum: x pitch (fore and aft), y roll (side to side)
-	private Vector3 _lastVel;
+	private Vector3 _lastVel, _accSm;
 	private float _lastYaw;
 
 	/// <summary>Where its flame is (the lantern's light comes from here while it's held up).</summary>
@@ -56,9 +61,12 @@ public partial class HeldLantern : HeldItem
 		// the pivot at the fist on the bail; the lantern hangs below it and swings about it
 		_swing = new Node3D { Name = "Swing" };
 		AddChild(_swing);
-		_model = new Node3D { Name = "Model", Position = new Vector3(0, -0.3f, 0), Scale = Vector3.One * 0.95f };
+		_model = new Node3D { Name = "Model", Position = new Vector3(0, -HangDrop, 0), Scale = Vector3.One * ModelScale };
 		_swing.AddChild(_model);
-		var built = ItemMeshes.Build(ToolKind.Lantern, _model);
+		ItemMeshes.LanternBailRise = BailRise;
+		ItemMeshes.Built built;
+		try { built = ItemMeshes.Build(ToolKind.Lantern, _model); }
+		finally { ItemMeshes.LanternBailRise = 0.1f; }
 		if (built.Glow != null) { built.Glow.QueueFree(); }   // (the lantern's own light is the real one)
 		foreach (var c in _model.GetChildren())
 			if (c is MeshInstance3D mi && mi.Mesh != null)
@@ -78,13 +86,17 @@ public partial class HeldLantern : HeldItem
 		// lit by its own soft light only (the lantern's real light, an inch from the glass, blew it all to white): the
 		// held things on their own layer, out of the lantern's light, under a warm fill from the flame's place
 		SetLayer(this);
-		_fill = new OmniLight3D { Name = "HandLight", LightColor = new Color(1f, 0.66f, 0.36f), LightEnergy = 0.55f, OmniRange = 0.6f, ShadowEnabled = false, LightCullMask = HeldLayer };
+		// (2026-10-12, the owner's suggestion A, from the reference shot: the flame's warm light up the underside of the glove
+		// and along the sleeve, the arm lit from below by what it carries; reaching up the longer bail to the fist and on)
+		_fill = new OmniLight3D { Name = "HandLight", LightColor = new Color(1f, 0.62f, 0.32f), LightEnergy = 1.1f, OmniRange = 1.15f, OmniAttenuation = 1.5f, ShadowEnabled = false, LightCullMask = HeldLayer, LightSpecular = 0.3f };
 		_model.AddChild(_fill);
-		_fill.Position = new Vector3(0.04f, 0.12f, 0.1f);
+		_fill.Position = new Vector3(0.02f, 0.14f, 0.03f);
 		_lastYaw = Player.CameraRig?.Yaw ?? 0f;
 	}
 
-	protected override bool Wanted => _lantern != null && _lantern.IsOn && !CameraUp;
+	// (2026-10-12) only while it gives light: with the flame dead and the blacklight off it showed a lit flame in the hand that
+	// lit nothing (the owner, Act 17's pipe: "your lantern literally doesnt light up anything"); dark, it's lowered
+	protected override bool Wanted => _lantern != null && _lantern.IsOn && (_lantern.Shining || _lantern.Dying) && !CameraUp;
 
 	/// <summary>The left hand round the top of the bail, from above (the pivot is the bail's top, its wire along X): the
 	/// back of the gloved hand up, four fingers curled over the wire and under it, the thumb round it from behind; the cuff,
@@ -143,6 +155,10 @@ public partial class HeldLantern : HeldItem
 		var vel = Player.Velocity;
 		var acc = (vel - _lastVel) / Mathf.Max(dt, 1e-4f);
 		_lastVel = vel;
+		// (2026-10-12: smoothed: the frame-to-frame velocity at a sprint (steps, slopes, the stride's own surge) kicked it
+		// into a jitter; it answers to the body's real starts, stops and turns, not its noise)
+		_accSm = _accSm.Lerp(acc.LimitLength(30f), 1f - Mathf.Exp(-dt * 6f));
+		acc = _accSm;
 		var cam = Player.CameraRig?.Camera;
 		if (cam != null)
 		{
@@ -152,7 +168,7 @@ public partial class HeldLantern : HeldItem
 			_lastYaw = yaw;
 			// (gentle: the push is clamped, the swing damped; it never flails)
 			var push = new Vector2(Mathf.Clamp(local.Z * 0.045f, -0.6f, 0.6f), Mathf.Clamp(-local.X * 0.045f + turn * 0.12f, -0.8f, 0.8f));
-			const float k = 22f, c = 3.2f;
+			const float k = 16f, c = 3.6f;   // (a longer bail: a slower, heavier swing)
 			_angVel += (push * 9f - _ang * k - _angVel * c) * dt;
 			_ang += _angVel * dt;
 			_ang = _ang.Clamp(new Vector2(-0.45f, -0.5f), new Vector2(0.45f, 0.5f));

@@ -48,7 +48,7 @@ for (int i = 0; i < 8; i++) { int k = i; jobs.Add(($"crawler_step_{k + 1:00}", s
 jobs.Add(("distant_scream", sfx, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"whisper_voice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WhisperVoice(r, sr)));
 for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"bird_{k:00}", sfx, false, Lo, (r, sr) => Sfx.Bird(k, r, sr))); }
-for (int i = 1; i <= 6; i++) jobs.Add(($"step_dirt_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepDirt(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_dirt_{i:00}", sfx, false, Lo, (r, sr) => Steps.Dirt(r, sr)));
 for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"step_wood_{k:00}", sfx, false, Lo, (r, sr) => Sfx.StepWood(r, sr, k % 2 == 0))); }
 for (int i = 1; i <= 4; i++) jobs.Add(($"cloth_{i:00}", sfx, false, Lo, (r, sr) => Sfx.Cloth(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_stone_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepStone(r, sr)));
@@ -140,12 +140,12 @@ jobs.Add(("lantern_on_01", sfx, false, Lo, (r, sr) => Foley.LanternOn(r, sr)));
 jobs.Add(("lantern_off_01", sfx, false, Lo, (r, sr) => Foley.LanternOff(r, sr)));
 jobs.Add(("uv_hum_01", sfx, false, Lo, (r, sr) => Foley.UvHum(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"door_locked_{i:00}", sfx, false, Lo, (r, sr) => Foley.DoorLocked(r, sr)));
-for (int i = 1; i <= 6; i++) jobs.Add(($"step_gravel_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepGravel(r, sr)));
-for (int i = 1; i <= 6; i++) jobs.Add(($"step_mud_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepMud(r, sr)));
-for (int i = 1; i <= 6; i++) jobs.Add(($"step_leaves_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepLeaves(r, sr)));
-for (int i = 1; i <= 4; i++) jobs.Add(($"step_root_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepRoot(r, sr)));
-for (int i = 1; i <= 6; i++) jobs.Add(($"step_dryleaves_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepDryLeaves(r, sr)));
-for (int i = 1; i <= 4; i++) jobs.Add(($"step_twig_{i:00}", sfx, false, Lo, (r, sr) => Foley.StepTwig(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_gravel_{i:00}", sfx, false, Lo, (r, sr) => Steps.Gravel(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_mud_{i:00}", sfx, false, Lo, (r, sr) => Steps.Mud(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_leaves_{i:00}", sfx, false, Lo, (r, sr) => Steps.Leaves(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"step_root_{i:00}", sfx, false, Lo, (r, sr) => Steps.Root(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_dryleaves_{i:00}", sfx, false, Lo, (r, sr) => Steps.DryLeaves(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"step_twig_{i:00}", sfx, false, Lo, (r, sr) => Steps.Twig(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"canopy_drip_{i:00}", sfx, false, Lo, (r, sr) => Foley.CanopyDrip(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_boards_{i:00}", sfx, false, Lo, (r, sr) => Foley.BoardsOverhead(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"haunt_moan_{i:00}", sfx, false, Lo, (r, sr) => Foley.WindMoan(r, sr)));
@@ -220,7 +220,7 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"lever_throw_{i:00}", sfx, false, Lo, (r
 jobs.Add(("power_surge_01", sfx, false, Lo, (r, sr) => LibrarySounds.PowerSurge(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"candle_ignite_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.CandleIgnite(r, sr)));
 jobs.Add(("ring_charge_01", sfx, false, Lo, (r, sr) => LibrarySounds.RingCharge(r, sr)));
-for (int i = 1; i <= 6; i++) jobs.Add(($"step_snow_{i:00}", sfx, false, Lo, (r, sr) => ChurchSounds.StepSnow(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"step_snow_{i:00}", sfx, false, Lo, (r, sr) => Steps.Snow(r, sr)));
 jobs.Add(("winter_wind_loop", ambient, true, Lo, (r, sr) => ChurchSounds.WinterWind(r, sr, 38)));
 jobs.Add(("church_tone_loop", ambient, true, Lo, (r, sr) => ChurchSounds.ChurchTone(r, sr, 36)));
 

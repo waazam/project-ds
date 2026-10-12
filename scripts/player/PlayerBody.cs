@@ -33,7 +33,7 @@ public partial class PlayerBody : Node3D
 	public const uint BodyLayer = 1u << 17;
 	private double _lightSweep;
 	private bool _inView = true;
-	private static readonly string[] Seen = { "Torso", "Legs", "Boots" };
+	private static readonly string[] Seen = { "Torso", "Legs", "Boots", "Belt" };
 
 	private PlayerController _p;
 	private PlayerFootsteps _steps;
@@ -88,7 +88,7 @@ public partial class PlayerBody : Node3D
 						m.MetallicSpecular = leather ? 0.35f : 0.12f;
 						m.Roughness = leather ? 0.7f : 1f;
 						// (the jacket's hips, seen from just above: one even olive, the bake's colours patchy over its cut)
-						if (g.Name.ToString().StartsWith("Torso")) { m.AlbedoTexture = null; m.AlbedoColor = new Color(0.12f, 0.14f, 0.1f); }
+						if (g.Name.ToString().StartsWith("Torso")) { m.AlbedoTexture = null; m.AlbedoColor = new Color(0.15f, 0.17f, 0.125f); }
 						mi.SetSurfaceOverrideMaterial(si, m);
 					}
 		}

@@ -47,7 +47,9 @@ SURFACES = {
     "oak": ("wood_table_001", "diff", 0.85, 0.5),
     "old_planks": ("brown_planks_07", "diff", 0.85, 0.7),
     # the woods (the fidelity pass, 2026-10-02): the trunks' bark, deep-furrowed, and the forest floor near the feet
-    "bark": ("bark_brown_02", "diff", 0.9, 0.9),
+    # (2026-10-12, the owner: "the trees look like paper") deep vertical furrows (willow), dark, its contrast pushed out, in
+    # place of bark_brown_02's fine grey-brown grain, which averaged out to flat beige at any distance
+    "bark": ("bark_willow_02", "diff", 1.4, 1.0),
     "forest_floor": ("brown_mud_leaves_01", "diff", 0.85, 0.7),
     # the quality pass (2026-10-03): the open woods' ground, fallen leaves over the floor (the terrain's litter)
     "leaf_litter": ("forest_leaves_02", "diff", 0.85, 0.7),
@@ -77,7 +79,11 @@ def write(path, arr):
     subprocess.run([FF, "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{n}x{n}", "-i", "-", path], input=data, check=True)
 
 
+import sys
+ONLY = set(sys.argv[1:])   # (names to make; all of them if none)
 for name, (asset, diff, contrast, relief) in SURFACES.items():
+    if ONLY and name not in ONLY:
+        continue
     col_src = os.path.join(SRC, f"{asset}_col.jpg")
     nor_src = os.path.join(SRC, f"{asset}_nor.jpg")
     n = SIZES.get(name, N)

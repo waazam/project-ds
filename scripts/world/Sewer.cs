@@ -45,6 +45,7 @@ public partial class Sewer : Node3D
 	private ShaderMaterial _waterMat;
 	private readonly List<Node3D> _floaters = new();
 	private readonly List<OmniLight3D> _lamps = new();
+	private bool _ambient;
 	private SpotLight3D _holeLight;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 1717 };
 	private float _t;
@@ -491,8 +492,10 @@ public partial class Sewer : Node3D
 				AddChild(l);
 				_lamps.Add(l);
 			}
-		AddLamp(new Vector3(0, PipeCy + 1.3f, 35f), 0.6f, 7f);
-		AddLamp(new Vector3(0, PipeCy + 1.3f, 72f), 0.6f, 7f);
+		// (2026-10-12, the owner: "that whole next hallway is so dark and your lantern literally doesnt light up anything")
+		// five down the pipe now, brighter and further-reaching (were two, 0.6 at 7 m)
+		foreach (float z in new[] { 10f, 28f, 46f, 64f, 84f })
+			AddLamp(new Vector3(0, PipeCy + 1.3f, z), 1.6f, 13f);
 		AddChild(new OmniLight3D { Name = "FarPipeGlow", Position = new Vector3(0, 3.2f, RoomZ1 - 1f), LightColor = new Color(1f, 0.95f, 0.85f), LightEnergy = 0.8f, OmniRange = 5f, ShadowEnabled = false });
 	}
 
@@ -563,6 +566,16 @@ public partial class Sewer : Node3D
 			atmo.Underground = Mathf.MoveToward(atmo.Underground, 1f, dt * 2f);
 			atmo.UndergroundFogColor = atmo.UndergroundFogColor.Lerp(_teal ? TealFog : new Color(0.03f, 0.028f, 0.024f), Mathf.Min(1f, dt * 0.8f));
 			atmo.UndergroundFogDensity = Mathf.MoveToward(atmo.UndergroundFogDensity, _teal ? 0.07f : 0.018f, dt * 0.03f);
+			// (2026-10-12, the owner: "that whole next hallway is so dark and your lantern literally doesnt light up anything")
+			// the pipe keeps a little of the world's light: its brick and its water read round the lantern, not a black tube
+			bool pipe = ToLocal(player.GlobalPosition).Z < TunnelLen;
+			atmo.UndergroundAmbientKeep = Mathf.MoveToward(atmo.UndergroundAmbientKeep, pipe ? 0.34f : 0.2f, dt * 0.5f);
+			_ambient = true;
+		}
+		else if (_ambient && StoryBeat.Atmosphere(this) is { } away)
+		{
+			_ambient = false;
+			away.UndergroundAmbientKeep = 0.08f;
 		}
 		if (_drip?.Stream != null)
 		{

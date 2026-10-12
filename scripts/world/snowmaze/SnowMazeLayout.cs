@@ -72,6 +72,10 @@ public sealed class SnowMazeLayout
 			Link(cur, next);
 			stack.Push(next);
 		}
+		// (2026-10-12, the owner: "the cave section takes too long ... cut this by 35%") the right way shortened: where it
+		// passes back beside itself further on, the tree's cut there and joined straight across, so the stretch between
+		// is left hanging off the new way as one more side branch (still a tree: still one right way only)
+		Shorten(parent, 0.65f);
 		// the one right way: the tree's path from the entrance to the cavern
 		for (int v = Cavern; ; v = parent[v]) { Solution.Insert(0, v); if (v == Entrance) break; }
 		// each node's branch: the solution node it hangs off (loops may only join nodes of one branch)
@@ -92,6 +96,54 @@ public sealed class SnowMazeLayout
 		for (int k = candidates.Count - 1; k > 0; k--) { int r = rng.RandiRange(0, k); (candidates[k], candidates[r]) = (candidates[r], candidates[k]); }
 		for (int k = 0; k < Mathf.Min(8, candidates.Count); k++) { Link(candidates[k].Item1, candidates[k].Item2); LoopEdges.Add(candidates[k]); }
 		for (int v = 0; v < Nodes.Count; v++) if (Adj[v].Count == 1 && v != Entrance) DeadEnds.Add(v);
+	}
+
+	/// <summary>The tree's way from the entrance to the cavern cut to about <paramref name="keep"/> of its length (see the
+	/// constructor), and the parents worked out again from the entrance.</summary>
+	private void Shorten(Dictionary<int, int> parent, float keep)
+	{
+		List<int> Way()
+		{
+			var w = new List<int>();
+			for (int v = Cavern; ; v = parent[v]) { w.Insert(0, v); if (v == Entrance) break; }
+			return w;
+		}
+		var way = Way();
+		int target = Mathf.RoundToInt(way.Count * keep);
+		for (int pass = 0; pass < 4 && way.Count > target; pass++)
+		{
+			int want = way.Count - target, bi = -1, bj = -1, bestCut = 1;
+			for (int i = 1; i < way.Count - 2; i++)
+				foreach (int m in Neighbours(way[i]))
+				{
+					int j = way.IndexOf(m);
+					int cut = j - i - 1;
+					if (j < 0 || cut <= bestCut || cut > want + 2) continue;
+					bestCut = cut; bi = i; bj = j;
+				}
+			if (bi < 0) break;
+			Unlink(way[bi], way[bi + 1]);
+			Link(way[bi], way[bj]);
+			// parents again, out from the entrance
+			parent.Clear();
+			var q = new Queue<int>();
+			var seen = new HashSet<int> { Entrance };
+			q.Enqueue(Entrance);
+			while (q.Count > 0)
+			{
+				int u = q.Dequeue();
+				foreach (int m in Adj[u]) if (seen.Add(m)) { parent[m] = u; q.Enqueue(m); }
+			}
+			way = Way();
+		}
+	}
+
+	private void Unlink(int a, int b)
+	{
+		Edges.Remove((a, b));
+		Edges.Remove((b, a));
+		Adj[a].Remove(b);
+		Adj[b].Remove(a);
 	}
 
 	private void Link(int a, int b)
