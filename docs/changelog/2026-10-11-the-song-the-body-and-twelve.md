@@ -287,3 +287,19 @@ swing. The fist grips tighter.
 - **The body preview:** shots from the eye of standing, walking, running, backing up, side-stepping, crouching,
   turning and stairs. The body hides from any camera that isn't the eye.
 - **The settings' round trip:** 23 of 23, including the shake slider, captions, hold to crouch and body in view.
+
+## The big debug: the church to the end
+The owner: "can you play through after you leave the church to the end of the game collecting data for bugs so we can
+fix them?" A full run from the church through Act 25, with every screenshot looked over. What it turned up:
+- **The burned wendigo never hid.** Its choice of hiding place began from a score of zero, and every dead end scored
+  below it, so it only ever fled. It picks the best dead end now. It also gives up running after fourteen seconds and
+  hides where it is, if it's far enough from you.
+- **The trenches and the cavern were pitch black** away from the lantern. Underground, the world's light is cut to
+  almost nothing. Act 24's ice now keeps more of it: a cold blue glow you can read the trench walls by.
+- **"Trenches. Down here." sat over the crate's prompt.** It's now just "Trenches.", and shorter on screen.
+- **The crypt's columns** are round all the way up now, with a base, a necking ring and a flared capital under the
+  vault.
+- **A flicker at the hatch** where the long stair's end wall met it: the wall's dropped a hair clear.
+- The test's burns after the hide now walk back out of the dead end first (it was firing into the dead end's wall).
+
+**Tests:** Act 24, 59 of 59 (including the hide and the ambush).

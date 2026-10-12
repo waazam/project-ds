@@ -4095,6 +4095,8 @@ public partial class StoryTest : Node
 			if (burn == 1 && !hunter.Dead)
 			{
 				// burned, it runs to hide; tracked down, it comes out at them
+				var openAt = _player.GlobalPosition;
+				var openLook = openAt + (-_player.CameraRig.GlobalBasis.Z) with { Y = 0 } * 6f;
 				await WaitUntil(() => hunter.State == WendigoHunter.Mode.Hide, 30, ct);
 				float away = hunter.Body.GlobalPosition.DistanceTo(_player.GlobalPosition);
 				Check("burned, it runs off to hide in a dead end, far from them", hunter.State == WendigoHunter.Mode.Hide && hunter.HideNode >= 0 && away > 12f, $"{hunter.State}, node {hunter.HideNode}, {away:0} m");
@@ -4105,6 +4107,8 @@ public partial class StoryTest : Node
 				Check("found, it comes out of hiding at them", hunter.HideAmbushes > 0 && hunter.State == WendigoHunter.Mode.Ambush, $"{hunter.State}");
 				hunter.Paused = true;
 				await Seconds(0.5, ct);
+				// (back out of the dead end to the open trench, for the burns left: in the dead end, the fire hit its wall)
+				await Teleport(openAt, openLook, ct);
 			}
 			if (ft.Overheated) await WaitUntil(() => !ft.Overheated, 9, ct);
 			await Seconds(2.8, ct);

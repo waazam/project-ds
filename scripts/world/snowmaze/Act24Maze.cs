@@ -90,6 +90,8 @@ public partial class Act24Maze : Node3D
 	{
 		if (Instance == this) Instance = null;
 		Audio.ForestDirector.Hush = false;
+		Audio.DreadDrone.Hush = false;
+		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.UndergroundAmbientKeep = 0.08f;
 		if (_feet != null && IsInstanceValid(_feet)) _feet.Stepped -= OnStep;
 	}
 
@@ -369,6 +371,8 @@ public partial class Act24Maze : Node3D
 				atmo.UndergroundFogColor = atmo.UndergroundFogColor.Lerp(new Color(0.03f, 0.05f, 0.08f), Mathf.Min(1f, dt * 2f));
 				atmo.UndergroundFogDensity = Mathf.MoveToward(atmo.UndergroundFogDensity, 0.035f, dt * 0.05f);
 			}
+			// (2026-10-11's playthrough: the trenches and the cavern read as pitch black; the ice keeps a cold glow)
+			atmo.UndergroundAmbientKeep = Mathf.MoveToward(atmo.UndergroundAmbientKeep, inside ? 0.42f : 0.08f, dt * 0.5f);
 		}
 		// frost at the screen's edges as it comes near (and as the hunt's menace rises); thawing as it goes
 		if (inside && _frost == null) { _frost = new UI.FrostEdge { Name = "FrostEdge" }; AddChild(_frost); }
@@ -401,7 +405,7 @@ public partial class Act24Maze : Node3D
 		{
 			GD.Print("[story] Act 24: the cavern, and the trenches");
 			StoryBeat.ReachCheckpoint(player, Checkpoint.Act24Trenches);
-			_ = StoryBeat.Caption(this, "Trenches. Down here.", 0.6f, 2.4f, 1f);
+			_ = StoryBeat.Caption(this, "Trenches.", 0.4f, 1.4f, 0.6f);   // (short: it overlapped the crate's prompt)
 		}
 		InCavern = cav;
 	}

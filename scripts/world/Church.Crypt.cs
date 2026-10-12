@@ -84,10 +84,18 @@ public partial class Church
 		for (float x = -CryptHalf + CryptBay; x < CryptHalf - 0.01f; x += CryptBay)
 			for (float z = CryptZ0 + CryptBay; z < CryptZ1 - 0.01f; z += CryptBay)
 			{
+				// (2026-10-11, the owner: the square base and capital read as an "I", the vault's groins coming down onto it
+				// as spikes; "turn them into cylinders like the pillars so they look more structural") round now from foot to
+				// vault: a moulded round base, the shaft, a capital flaring out round, and above it a round impost widening
+				// up into the vault, so the groins land on stone rather than meeting at a point
 				Vector3 b = new(x, y0, z);
-				BuildKit.Box(k, b + Vector3.Up * 0.15f, new Vector3(0.7f, 0.3f, 0.7f), 1f, BuildKit.Face.NY);
-				k.Cylinder(b + Vector3.Up * 0.3f, new Vector3(x, CryptSpring - 0.35f, z), 0.27f, 0.25f, 12, false);
-				BuildKit.Box(k, new Vector3(x, CryptSpring - 0.175f, z), new Vector3(0.72f, 0.35f, 0.72f), 1f);
+				k.Cylinder(b, b + Vector3.Up * 0.16f, 0.4f, 0.4f, 18, true);
+				k.Cylinder(b + Vector3.Up * 0.16f, b + Vector3.Up * 0.3f, 0.36f, 0.3f, 18, true);
+				k.Cylinder(b + Vector3.Up * 0.3f, new Vector3(x, CryptSpring - 0.5f, z), 0.28f, 0.26f, 18, false);
+				k.Cylinder(new Vector3(x, CryptSpring - 0.56f, z), new Vector3(x, CryptSpring - 0.5f, z), 0.3f, 0.3f, 18, false);   // (the astragal)
+				k.Cylinder(new Vector3(x, CryptSpring - 0.5f, z), new Vector3(x, CryptSpring - 0.1f, z), 0.27f, 0.5f, 18, false);   // (the capital's flare)
+				k.Cylinder(new Vector3(x, CryptSpring - 0.1f, z), new Vector3(x, CryptSpring + 0.02f, z), 0.56f, 0.56f, 18, true);  // (the abacus)
+				k.Cylinder(new Vector3(x, CryptSpring + 0.02f, z), new Vector3(x, CryptSpring + 0.45f, z), 0.5f, 0.66f, 18, false); // (the impost into the vault)
 				_stone.AddChild(new CollisionShape3D { Position = new Vector3(x, (y0 + CryptSpring) * 0.5f, z), Shape = new CylinderShape3D { Radius = 0.36f, Height = CryptSpring - y0 } });
 			}
 		// ---- webs: in the crypt's corners, and slung from the column tops up into the vaults

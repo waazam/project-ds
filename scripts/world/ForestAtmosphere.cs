@@ -214,6 +214,9 @@ public partial class ForestAtmosphere : Node
 	[Export] public float UndergroundFogDensity = 0.085f;
 	/// <summary>The fog's colour fully underground (black in the stairwell; Act 15's hallway tints it).</summary>
 	[Export] public Color UndergroundFogColor = new(0.004f, 0.004f, 0.005f);
+	/// <summary>How much of the ambient light is kept fully underground (0.08: the stairwell's near-black; Act 24's ice
+	/// raises it, the snow and ice catching what light there is).</summary>
+	public float UndergroundAmbientKeep { get; set; } = 0.08f;
 
 	private Environment _env;
 	private DirectionalLight3D _sun;
@@ -740,7 +743,7 @@ public partial class ForestAtmosphere : Node
 			density = Mathf.Lerp(density, UndergroundFogDensity, under);
 			// (a little more of it kept, 2026-10-07's brightness audit: the sewer's vaults and the stairwell read as pure black
 			// round their torches; still near-black, the blacklight still what you see by)
-			ambient *= 1f - 0.92f * under;
+			ambient *= 1f - (1f - UndergroundAmbientKeep) * under;
 			sunEnergy *= 1f - under;
 		}
 		_env.FogLightColor = fog;

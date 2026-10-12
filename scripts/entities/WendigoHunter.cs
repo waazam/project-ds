@@ -356,7 +356,8 @@ public partial class WendigoHunter : Node3D
 				break;
 			case Mode.Flee:
 				Walk(FleeSpeed, dt);
-				if (_route.Count == 0) { Pick(Mode.Hide); _modeT = 0f; }
+				// there, or long enough running (a turn of the tunnels it couldn't make): it hides where it is
+				if (_route.Count == 0 || (_phase2 && _modeT > 14f && dist > 12f)) { _route.Clear(); Pick(Mode.Hide); _modeT = 0f; }
 				break;
 			case Mode.Hide:
 				// burned, it hides and waits for them: crouched in its dead end, still, its burns smouldering, breathing,
@@ -403,14 +404,15 @@ public partial class WendigoHunter : Node3D
 	private void FleeToHide(Vector3 p)
 	{
 		int best = -1;
-		float bd = 0f;
+		float bd = float.MinValue;
 		for (int v = 0; v < L.Nodes.Count; v++)
 		{
 			if (L.Adj[v].Count != 1) continue;
 			float d = L.Nodes[v].DistanceTo(p);
-			if (d < 16f) continue;
-			// (far from them, not too far for it to run, and a little luck in which)
-			float score = Mathf.Min(d, 45f) - L.Nodes[v].DistanceTo(Pos) * 0.25f + _rng.RandfRange(0f, 8f);
+			if (d < 16f || d > 38f) continue;
+			// (far enough from them, near enough to itself that it gets there: 46-63 m off, it was still running when it
+			// should have been waiting; and a little luck in which)
+			float score = -Mathf.Abs(d - 26f) - L.Nodes[v].DistanceTo(Pos) * 0.5f + _rng.RandfRange(0f, 6f);
 			if (score > bd) { bd = score; best = v; }
 		}
 		if (best < 0) { FleeFrom(p); return; }

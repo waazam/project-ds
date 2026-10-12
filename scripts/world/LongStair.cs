@@ -336,7 +336,8 @@ public partial class LongStair : Node3D
 		k.Mat(ChurchTextures.OldPlankMat);
 		k.Color = Colors.White * 0.8f;
 		float zEnd = TopZ0 + TopLanding;
-		Solid(k, _wood, new Vector3(0, TopY + Head * 0.5f, zEnd + 0.15f), new Vector3(HalfW * 2f + WallT * 2f, Head + 0.6f, 0.3f));
+		// (its top 2 cm under the crypt's floor: level with it, its boards flickered through the tiles, an orange strip)
+		Solid(k, _wood, new Vector3(0, TopY + Head * 0.5f - 0.01f, zEnd + 0.15f), new Vector3(HalfW * 2f + WallT * 2f, Head + 0.58f, 0.3f));
 		k.CommitTo(this, "Top", true);
 		BuildLadder();
 		// old webs up in the top landing's corners (nobody has been up here in a long time)
