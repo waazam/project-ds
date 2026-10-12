@@ -2979,11 +2979,17 @@ public partial class StoryTest : Node
 		await WalkTo(church.ToGlobal(new Vector3(2f, Church.CryptFloor + 0.05f, 42f)), 0.5f, ct, giveUp: 10f);
 		await WalkTo(church.CryptStairFootWorld, 0.5f, ct, giveUp: 12f);
 		await WalkTo(church.CryptStairTopWorld, 0.4f, ct, giveUp: 14f);
-		Check("up the crypt's stairs into the nave", Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) < 0.5f, $"church-local {church.ToLocal(_player.GlobalPosition)}");
-		if (Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) >= 0.5f)
+		// (onto the nave's floor itself, past the opening: the old check passed with them stuck under its lip)
+		Check("up the crypt's stairs into the nave", Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) < 0.15f && church.ToLocal(_player.GlobalPosition).Z < Church.StairOpenings[1].z0 - 0.4f, $"church-local {church.ToLocal(_player.GlobalPosition)}");
+		if (Mathf.Abs(_player.GlobalPosition.Y - church.ToGlobal(Vector3.Zero).Y) >= 0.15f)
 		{
 			var space = _player.GetWorld3D().DirectSpaceState;
-			foreach (float h in new[] { 0.2f, 0.9f, 1.6f, 2.2f })
+			for (int ci = 0; ci < _player.GetSlideCollisionCount(); ci++)
+			{
+				var kc = _player.GetSlideCollision(ci);
+				GD.Print($"[storytest] touching: {(kc.GetCollider() as Node)?.GetPath()} shape {kc.GetColliderShapeIndex()} at {church.ToLocal(kc.GetPosition())} normal {kc.GetNormal()}");
+			}
+			foreach (float h in new[] { 0.05f, 0.2f, 0.9f, 1.6f, 2.2f })
 			{
 				var from = _player.GlobalPosition + Vector3.Up * h;
 				var q = PhysicsRayQueryParameters3D.Create(from, from + church.GlobalBasis * Vector3.Forward * 1.5f, 1u);

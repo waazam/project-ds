@@ -116,8 +116,11 @@ public partial class Church
 			}
 			float pitch = Mathf.Atan2(-y0, z1 - z0), len = Mathf.Sqrt((z1 - z0) * (z1 - z0) + y0 * y0);
 			var rb = new Basis(Vector3.Right, pitch);
-			// a ramp under the treads (its top half a riser below the nosings)
-			Collide(_stone, new Vector3((x0 + x1) * 0.5f, y0 * 0.5f - rise * 0.5f, (z0 + z1) * 0.5f) - rb.Y * 0.2f, new Vector3(x1 - x0, 0.4f, len + 0.2f), rb);
+			// a ramp under the treads, its top on the line of the nosings, meeting the nave's floor at the opening's edge (2026-10-11,
+			// playtest: "i cant walk up either staircase in the church": half a riser lower, it ended in a lip under the floor's
+			// edge the body couldn't step over)
+			Collide(_stone, new Vector3((x0 + x1) * 0.5f, y0 * 0.5f, (z0 + z1) * 0.5f) - rb.Y * 0.2f, new Vector3(x1 - x0, 0.4f, len + 0.2f), rb);
+
 			// the stairwell's side walls, from under the steps up to the nave floor's underside
 			foreach (var (x, n) in new[] { (x0, Vector3.Right), (x1, Vector3.Left) })
 			{

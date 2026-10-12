@@ -343,7 +343,7 @@ public partial class LongStair : Node3D
 		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 2101 }, -HalfW, HalfW, TopZ0, zEnd, TopY, TopY + Head, 0.9f, 1f);
 		// the hatch: a square of heavy boards with an iron ring, hinged on its far edge
 		// flush with the crypt's floor above (the slab is 0.3 thick), hinged on its far edge
-		_hatch = new Node3D { Name = "Hatch", Position = HatchLocal + new Vector3(0, 0.25f, 0.5f) };
+		_hatch = new Node3D { Name = "Hatch", Position = HatchLocal + new Vector3(0, 0.256f, 0.5f) };   // (6 mm proud of the floor: flush, the two flickered)
 		AddChild(_hatch);
 		var h = new MeshKit();
 		h.Mat(ChurchTextures.OldPlankMat);
