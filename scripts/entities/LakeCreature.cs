@@ -65,6 +65,9 @@ public partial class LakeCreature : Node3D
 		/// <summary>The one that follows the boat after the breach: placed and raised from outside.</summary>
 		public bool Hunter;
 		public float HuntRise;
+		public Skeleton3D Skel;
+		/// <summary>The follow-through: each joint's bend lagging a little behind the one before (secondary motion).</summary>
+		public Vector3[] Lag;
 	}
 
 	private readonly List<Limb> _limbs = new();
@@ -102,24 +105,33 @@ public partial class LakeCreature : Node3D
 		AddChild(limb.Root);
 		float segLen = length / Segments;
 		Node3D parent = limb.Root;
+		// (2026-10-12, the model overhaul: the owner's "chunked" tentacles) the flesh is one smooth tube skinned to the joints'
+		// chain, not a rigid cylinder to each joint with a knuckle over the seam: it bends as one thing, the suckers with it
+		var k = new MeshKit();
 		for (int i = 0; i < Segments; i++)
 		{
-			float f0 = (float)i / Segments, f1 = (float)(i + 1) / Segments;
-			float r0 = Radius(baseR, f0), r1 = Radius(baseR, f1);
 			var joint = new Node3D { Name = $"J{i}", Position = i == 0 ? Vector3.Zero : Vector3.Up * segLen };
 			parent.AddChild(joint);
-			var k = new MeshKit();
+			k.Xf = Transform3D.Identity;
 			k.Mat(Skin());
 			k.Color = Colors.White;
-			k.Cylinder(Vector3.Zero, Vector3.Up * segLen, r0, r1, 12, false, 1.5f);
-			// a knuckle to hide the seam at the next joint
-			k.Blob(Vector3.Up * segLen, Vector3.One * r1 * 1.04f, i * 7 + 3, 0.05f, false);
+			// four rings to each joint's length, so a bend is spread round the joint, never a crease at it
+			for (int q = 0; q < 4; q++)
+			{
+				float fa = (i + q / 4f) / Segments, fb = (i + (q + 1) / 4f) / Segments;
+				k.Cylinder(Vector3.Up * fa * length, Vector3.Up * fb * length, Radius(baseR, fa), Radius(baseR, fb), 16, false, 1.5f);
+			}
 			// ring suckers in two staggered rows down the inner face (the side it curls toward, +Z)
-			if (i < Segments - 1) TentacleKit.Suckers(k, segLen, r0, r1, i < 3 ? 2 : 3);
-			k.CommitTo(joint, "Seg", true);
+			if (i < Segments - 1)
+			{
+				k.Xf = new Transform3D(Basis.Identity, Vector3.Up * i * segLen);
+				TentacleKit.Suckers(k, segLen, Radius(baseR, (float)i / Segments), Radius(baseR, (float)(i + 1) / Segments), i < 3 ? 2 : 3);
+			}
 			limb.Joints.Add(joint);
 			parent = joint;
 		}
+		k.Xf = Transform3D.Identity;
+		limb.Skel = AnimKit.ChainSkeleton(limb.Root, AnimKit.SkinAlongY(k.Commit(), segLen, Segments), segLen, Segments);
 		// the mouth at the tip (the owner's references): jaws flaring round a toothed throat
 		TentacleKit.Maw(limb.Joints[Segments - 1], Radius(baseR, 1f), baseR * 1.45f, Skin(), limb.Joints.Count * 31 + _limbs.Count).Position = Vector3.Up * segLen;
 		// eyes all the way up it, crowded and huge at the root where it meets the body, shrinking to
@@ -214,7 +226,8 @@ public partial class LakeCreature : Node3D
 		_lidMesh ??= new TorusMesh { InnerRadius = 0.72f, OuterRadius = 1.12f, Rings = 14, RingSegments = 8 };
 		socket.AddChild(new MeshInstance3D
 		{
-			Name = "Lid", Mesh = _lidMesh, MaterialOverride = TentacleKit.Lid, Position = new Vector3(0, 0, -0.18f),
+			// (2026-10-12: sat further forward and fuller, the lid hides the ball's round, so the eye is sunk in the flesh)
+			Name = "Lid", Mesh = _lidMesh, MaterialOverride = TentacleKit.Lid, Position = new Vector3(0, 0, -0.42f), Scale = new Vector3(1.05f, 1.6f, 1.05f),
 			Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
 	}
@@ -247,7 +260,8 @@ public partial class LakeCreature : Node3D
 			for (int x = 0; x < w; x++)
 			{
 				float v = (float)y / h;   // 0 at the pupil pole
-				Color c = new Color(0.86f, 0.8f, 0.66f).Lerp(new Color(0.75f, 0.55f, 0.45f), Mathf.SmoothStep(0.4f, 1f, v));
+				// (2026-10-12, the model overhaul: the eyes read as ping-pong balls) a dull, sickly, bloodshot yellow, never a clean white
+				Color c = new Color(0.58f, 0.5f, 0.37f).Lerp(new Color(0.46f, 0.27f, 0.22f), Mathf.SmoothStep(0.3f, 0.9f, v));
 				c = c.Lerp(new Color(0.62f, 0.04f, 0.04f), veins[x, y] * 0.9f);
 				Color e = c * 0.1f;
 				if (v < 0.13f)
@@ -576,8 +590,20 @@ public partial class LakeCreature : Node3D
 			curl += -0.16f * rear + 0.34f * strike * Mathf.SmoothStep(0.1f, 0.6f, f + 0.2f);
 			// looming: stand up straight, then bend over at the top to hang above the boat
 			curl += loom * (-0.08f + 0.62f * Mathf.SmoothStep(0.25f, 0.75f, f));
-			l.Joints[i].Rotation = new Vector3(curl + wave, 0f, side);
+			// (2026-10-12, secondary motion) each joint eases toward its bend, the further out the looser: the tip trails the
+			// root through a sway and whips on past it, as flesh does, not a stiff rod turned in one piece
+			l.Lag ??= new Vector3[l.Joints.Count];
+			var goal = new Vector3(curl + wave, 0f, side);
+			float follow = Mathf.Lerp(16f, 5f, f);
+			l.Lag[i] = l.Lag[i].Lerp(goal, 1f - Mathf.Exp(-dt * follow));
+			l.Joints[i].Rotation = l.State == State.Rising && l.Rise < 0.05f ? goal : l.Lag[i];
 		}
+		if (l.Skel != null)
+			for (int i = 0; i < l.Joints.Count; i++)
+			{
+				l.Skel.SetBonePoseRotation(i, l.Joints[i].Quaternion);
+				l.Skel.SetBonePosePosition(i, l.Joints[i].Position);
+			}
 		UpdateEyes(l, dt);
 	}
 

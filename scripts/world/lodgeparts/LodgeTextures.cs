@@ -368,9 +368,19 @@ public static class LodgeTextures
 	{
 		string key = "lodge_m_wp_" + set;
 		if (_mat.TryGetValue(key, out var m)) return m;
-		// (a tile is 0.7 m on the wall: at a metre the corridor's medallions stood half a metre tall)
-		m = new StandardMaterial3D { ResourceName = key, Roughness = 0.88f, MetallicSpecular = 0.2f, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Uv1Scale = Vector3.One * 2.4f, AlbedoColor = new Color(0.86f, 0.84f, 0.8f) };
-		SurfaceSets.Apply(m, "wp_" + set, 0.7f);
+		// (2026-10-12, the owner: "throughout the ski lodge there are walls with the greyish wallpapers ... do a more
+		// simplistic design. what we have now looks bad") no pattern any more: plain painted plaster over the wood panelling,
+		// a quiet colour to each part of the lodge (warm cream in the corridor and the dining hall, sage in 201, dusty rose in
+		// 202, ochre in 203), the plaster's own faint texture all the wall shows
+		Color paint = set switch
+		{
+			"stripe" => new Color(0.56f, 0.6f, 0.48f),
+			"floral" => new Color(0.66f, 0.5f, 0.45f),
+			"trellis" => new Color(0.72f, 0.6f, 0.42f),
+			_ => new Color(0.8f, 0.7f, 0.54f),
+		};
+		m = new StandardMaterial3D { ResourceName = key, Roughness = 0.92f, MetallicSpecular = 0.12f, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Uv1Scale = Vector3.One * 0.8f, AlbedoColor = paint };
+		SurfaceSets.Apply(m, "plaster", 0.35f);
 		if (m.AlbedoTexture == null) m.AlbedoTexture = Wallpaper;
 		m.SetMeta("detail_kind", -1);
 		_mat[key] = m;

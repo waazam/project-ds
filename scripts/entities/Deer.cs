@@ -195,6 +195,10 @@ public partial class Deer : Node3D
 			bool fore = i < 2;
 			float swing = (fore ? 0.75f : -0.7f) * s + (i % 2 == 0 ? 0.05f : -0.05f);
 			_legs[i].Rotation = new Vector3(-swing, 0, 0);
+			// (2026-10-12, the animation overhaul) the lower leg folds as the leg comes through (the fore knee forward, the hind
+			// hock back), straightening to land: a gather and a reach, not a stick swung from the hip
+			float through = fore ? Mathf.Max(0f, s) : Mathf.Max(0f, -s);
+			if (_legs[i].GetNodeOrNull<Node3D>("Lower") is { } lower) lower.Rotation = new Vector3((fore ? -1.3f : 0.9f) * through, 0, 0);   // (the fore hoof folds back under, the hind one forward)
 		}
 		_neckPitch = Mathf.Lerp(_neckPitch, -0.15f + 0.15f * s, 1f - Mathf.Exp(-dt * 8f));
 		_neckYaw = Mathf.Lerp(_neckYaw, 0f, 1f - Mathf.Exp(-dt * 6f));
@@ -254,42 +258,49 @@ public partial class Deer : Node3D
 		Color hide = C(0.5f, 0.39f, 0.29f), back = C(0.4f, 0.31f, 0.23f), belly = C(0.84f, 0.78f, 0.66f);
 		Color dark = C(0.12f, 0.1f, 0.09f), muzzle = C(0.36f, 0.28f, 0.21f), inner = C(0.72f, 0.6f, 0.52f);
 
-		// body: torso, chest, haunch, the pale belly and rump patch under and behind
+		// (2026-10-12, the model overhaul) one smooth body, not a cluster of lumps: a barrel lofted from the brisket back to
+		// the rump (deep at the chest and the haunch, the waist between), the pale belly and rump laid over it
 		var k = new MeshKit();
 		k.Mat(mat);
 		k.Color = hide;
-		k.Blob(new Vector3(0, 0.8f, 0.02f), new Vector3(0.18f, 0.2f, 0.5f), Seed + 1, 0.05f, false, 2f, 0.25f);
-		k.Blob(new Vector3(0, 0.8f, -0.33f), new Vector3(0.17f, 0.23f, 0.2f), Seed + 2, 0.05f, false, 2f, 0.25f);
-		k.Blob(new Vector3(0, 0.83f, 0.36f), new Vector3(0.18f, 0.21f, 0.2f), Seed + 3, 0.05f, false, 2f, 0.25f);
+		Loft.Tube(k, new[] { new Vector3(0, 0.86f, -0.52f), new Vector3(0, 0.83f, -0.38f), new Vector3(0, 0.81f, -0.12f), new Vector3(0, 0.83f, 0.14f),
+			new Vector3(0, 0.86f, 0.36f), new Vector3(0, 0.86f, 0.52f), new Vector3(0, 0.84f, 0.6f) },
+			new[] { new Vector2(0.09f, 0.11f), new Vector2(0.155f, 0.2f), new Vector2(0.165f, 0.185f), new Vector2(0.155f, 0.17f),
+				new Vector2(0.165f, 0.2f), new Vector2(0.12f, 0.16f), new Vector2(0.05f, 0.08f) }, 16, 4);
 		k.Color = back;
-		k.Blob(new Vector3(0, 0.93f, 0.02f), new Vector3(0.11f, 0.08f, 0.46f), Seed + 4, 0.04f, false, 2f);
+		Loft.Tube(k, new[] { new Vector3(0, 0.99f, -0.36f), new Vector3(0, 0.97f, 0.0f), new Vector3(0, 1.0f, 0.36f) },
+			new[] { new Vector2(0.08f, 0.03f), new Vector2(0.09f, 0.025f), new Vector2(0.08f, 0.03f) }, 10, 4);   // the darker back
 		k.Color = belly;
-		k.Blob(new Vector3(0, 0.66f, -0.02f), new Vector3(0.13f, 0.09f, 0.4f), Seed + 5, 0.04f, false, 2f);
-		k.Blob(new Vector3(0, 0.84f, 0.52f), new Vector3(0.1f, 0.13f, 0.05f), Seed + 6, 0.04f, false, 2f);
+		k.Blob(new Vector3(0, 0.66f, -0.02f), new Vector3(0.12f, 0.06f, 0.36f), Seed + 5, 0.02f, false, 2f, 0f, 2);
+		k.Blob(new Vector3(0, 0.86f, 0.57f), new Vector3(0.09f, 0.12f, 0.04f), Seed + 6, 0.02f, false, 2f, 0f, 2);
 		k.CommitTo(_model, "Body");
 
-		// neck and head on one pivot at the base of the neck
+		// neck and head on one pivot at the base of the neck: one smooth neck tapering to the skull, the muzzle drawn out
 		_neck = new Node3D { Name = "Neck", Position = new Vector3(0, 0.88f, -0.44f) };
 		_model.AddChild(_neck);
 		k = new MeshKit();
 		k.Mat(mat);
 		k.Color = hide;
-		k.Cylinder(new Vector3(0, -0.04f, 0.04f), new Vector3(0, 0.45f, -0.15f), 0.1f, 0.062f, 7, false, 2f);
+		Loft.Tube(k, new[] { new Vector3(0, -0.06f, 0.06f), new Vector3(0, 0.18f, -0.05f), new Vector3(0, 0.38f, -0.13f), new Vector3(0, 0.5f, -0.2f) },
+			new[] { new Vector2(0.085f, 0.11f), new Vector2(0.06f, 0.08f), new Vector2(0.05f, 0.06f), new Vector2(0.055f, 0.06f) }, 12, 4);
 		k.Color = belly;
-		k.Cylinder(new Vector3(0, 0.0f, -0.03f), new Vector3(0, 0.36f, -0.17f), 0.06f, 0.045f, 5, false, 2f);   // pale throat
+		Loft.Tube(k, new[] { new Vector3(0, 0.0f, -0.05f), new Vector3(0, 0.2f, -0.115f), new Vector3(0, 0.36f, -0.175f) },
+			new[] { new Vector2(0.05f, 0.03f), new Vector2(0.04f, 0.028f), new Vector2(0.032f, 0.022f) }, 8, 3);   // pale throat
 		k.Color = hide;
-		k.Blob(new Vector3(0, 0.49f, -0.2f), new Vector3(0.075f, 0.08f, 0.1f), Seed + 7, 0.04f, false, 2f);      // skull
+		k.Blob(new Vector3(0, 0.5f, -0.2f), new Vector3(0.07f, 0.075f, 0.095f), Seed + 7, 0.02f, false, 2f, 0f, 2);      // skull
 		k.Color = muzzle;
-		k.Cylinder(new Vector3(0, 0.48f, -0.25f), new Vector3(0, 0.43f, -0.41f), 0.055f, 0.03f, 6, true, 2f);
+		Loft.Tube(k, new[] { new Vector3(0, 0.49f, -0.24f), new Vector3(0, 0.465f, -0.33f), new Vector3(0, 0.435f, -0.41f) },
+			new[] { new Vector2(0.05f, 0.055f), new Vector2(0.038f, 0.042f), new Vector2(0.026f, 0.028f) }, 10, 3);
 		k.Color = dark;
-		k.Blob(new Vector3(0, 0.435f, -0.415f), new Vector3(0.027f, 0.022f, 0.02f), Seed + 8, 0.02f, false, 2f); // nose
-		k.Blob(new Vector3(0.062f, 0.51f, -0.25f), new Vector3(0.014f, 0.016f, 0.014f), Seed + 9, 0.02f, false, 2f);
-		k.Blob(new Vector3(-0.062f, 0.51f, -0.25f), new Vector3(0.014f, 0.016f, 0.014f), Seed + 10, 0.02f, false, 2f);
+		k.Blob(new Vector3(0, 0.435f, -0.418f), new Vector3(0.026f, 0.021f, 0.018f), Seed + 8, 0.02f, false, 2f, 0f, 2); // nose
+		k.Blob(new Vector3(0.058f, 0.515f, -0.25f), new Vector3(0.014f, 0.016f, 0.013f), Seed + 9, 0.02f, false, 2f, 0f, 2);
+		k.Blob(new Vector3(-0.058f, 0.515f, -0.25f), new Vector3(0.014f, 0.016f, 0.013f), Seed + 10, 0.02f, false, 2f, 0f, 2);
 		k.CommitTo(_neck, "Head");
 		_earL = Ear(_neck, -1f, mat, hide, inner);
 		_earR = Ear(_neck, 1f, mat, hide, inner);
 
-		// legs: pivots at the shoulder and hip; hind legs bend back at the hock
+		// legs: a pivot at the shoulder or hip, and a second at the knee or hock, so a leg folds as it's lifted (it swung
+		// from the top as one stiff stick); each length one smooth taper, the hind thigh heavy with muscle
 		Vector3[] tops = { new(-0.1f, 0.72f, -0.36f), new(0.1f, 0.72f, -0.36f), new(-0.1f, 0.74f, 0.4f), new(0.1f, 0.74f, 0.4f) };
 		for (int i = 0; i < 4; i++)
 		{
@@ -297,18 +308,27 @@ public partial class Deer : Node3D
 			var leg = new Node3D { Name = $"Leg{i}", Position = tops[i] };
 			_model.AddChild(leg);
 			_legs[i] = leg;
-			var lk = new MeshKit();
-			lk.Mat(mat);
 			float h = tops[i].Y;
 			Vector3 knee = hind ? new Vector3(0, -0.34f, 0.09f) : new Vector3(0, -0.34f, 0.01f);
+			var lk = new MeshKit();
+			lk.Mat(mat);
 			lk.Color = hide;
-			if (hind) lk.Blob(new Vector3(0, -0.08f, 0.0f), new Vector3(0.075f, 0.16f, 0.11f), Seed + 20 + i, 0.04f, false, 2f);
-			lk.Cylinder(Vector3.Zero, knee, hind ? 0.06f : 0.05f, 0.032f, 6, false, 2f);
-			lk.Color = hide * 0.92f;
-			lk.Cylinder(knee, new Vector3(0, -h + 0.04f, 0.0f), 0.026f, 0.019f, 5, false, 2f);
-			lk.Color = dark;
-			lk.Cylinder(new Vector3(0, -h + 0.045f, 0.0f), new Vector3(0, -h, -0.01f), 0.02f, 0.025f, 5, true, 2f);
+			if (hind)
+				Loft.Tube(lk, new[] { new Vector3(0, 0.06f, -0.02f), new Vector3(0, -0.1f, 0.02f), new Vector3(0, -0.24f, 0.07f), knee },
+					new[] { new Vector2(0.075f, 0.11f), new Vector2(0.07f, 0.1f), new Vector2(0.045f, 0.055f), new Vector2(0.03f, 0.035f) }, 10, 3);
+			else
+				Loft.Tube(lk, new[] { new Vector3(0, 0.04f, 0f), new Vector3(0, -0.14f, 0.0f), knee }, new[] { new Vector2(0.055f, 0.07f), new Vector2(0.042f, 0.05f), new Vector2(0.028f, 0.03f) }, 10, 3);
 			lk.CommitTo(leg, "Mesh");
+			var lower = new Node3D { Name = "Lower", Position = knee };
+			leg.AddChild(lower);
+			var lo = new MeshKit();
+			lo.Mat(mat);
+			lo.Color = hide * 0.92f;
+			Vector3 hoofAt = new Vector3(0, -h + 0.045f, 0f) - knee;
+			Loft.Tube(lo, new[] { Vector3.Zero, hoofAt * 0.5f + new Vector3(0, 0, hind ? -0.01f : 0.005f), hoofAt }, new[] { 0.027f, 0.02f, 0.018f }, 8, 3);
+			lo.Color = dark;
+			lo.Cylinder(hoofAt, hoofAt + new Vector3(0, -0.045f, -0.012f), 0.02f, 0.025f, 8, true, 2f);
+			lo.CommitTo(lower, "Mesh");
 		}
 
 		// tail: short, brown on top, white underneath

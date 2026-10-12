@@ -279,6 +279,8 @@ public partial class StalkerBody
 
 	// ─────────────────────────────── every frame ───────────────────────────────
 
+	private AnimKit.BodyDynamics _dyn;
+
 	private void ModelProcess(float dt)
 	{
 		// stop-motion (the giant's grab): frozen where it is but for the frames let through
@@ -323,6 +325,15 @@ public partial class StalkerBody
 				_anim.Advance(dt);
 				Capture();
 			}
+		}
+		// (2026-10-12, the animation overhaul) weight over the clip: the lean into its starts and stops, the long arms swinging
+		// behind them, the feet on the ground under them (off while a clip holds a pose: the clip's own contacts rule)
+		if (_skel != null && !Hold)
+		{
+			_dyn ??= new AnimKit.BodyDynamics(_skel, "hips", new[] { "spine", "chest" }, "head", new[] { "upper_R", "upper_L" },
+				new[] { ("thigh_R", "shin_R", "foot_R", "toe_R"), ("thigh_L", "shin_L", "foot_L", "toe_L") }) { LeanPerAccel = 0.035f };
+			_dyn.Weight = _hold == null ? 1f : 0.3f;
+			_dyn.Apply(this, dt, _hold == null);
 		}
 		// the head: drift, twitch, the look
 		float drift = Mathf.DegToRad(HeadDriftDegrees);

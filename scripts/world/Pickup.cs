@@ -73,8 +73,9 @@ public partial class Pickup : Area3D
 		// The Area3D is only a container now; the Interactable child owns the pick volume.
 		CollisionLayer = 0;
 		CollisionMask = 0;
-		Monitoring = false;
-		Monitorable = false;
+		// (deferred: a pickup made while a trigger's signal is running (Act 20's round room) may not change these then)
+		SetDeferred(Area3D.PropertyName.Monitoring, false);
+		SetDeferred(Area3D.PropertyName.Monitorable, false);
 		BuildVisual();
 		if (Engine.IsEditorHint()) return;
 

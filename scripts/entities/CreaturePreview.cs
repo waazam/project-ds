@@ -46,6 +46,24 @@ public partial class CreaturePreview : Node3D
 		GD.Print($"[creature-preview] {name}");
 	}
 
+	/// <summary>(2026-10-12) Act 1's doe, remodelled: grazing, head up, and mid-bound.</summary>
+	private async Task DeerShots()
+	{
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(60, 60) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.22f, 0.17f) } });
+		var deer = new Deer { Name = "Deer", SpookRadius = 0f, RunSpookRadius = 0f, ShutterSpookRadius = 0f };
+		AddChild(deer);
+		await Seconds(1.0);
+		await Shot("deer_side", new Vector3(3.2f, 1.1f, 0.1f), new Vector3(0, 0.75f, 0));
+		await Shot("deer_three_quarter", new Vector3(2.0f, 1.3f, -2.6f), new Vector3(0, 0.8f, -0.2f));
+		deer.Spook();
+		await Seconds(0.9);
+		var at = deer.GlobalPosition;
+		await Shot("deer_bound", at + new Vector3(3.5f, 1.2f, 0.5f), at + new Vector3(0, 0.8f, 0));
+		await Seconds(0.13);
+		at = deer.GlobalPosition;
+		await Shot("deer_bound_b", at + new Vector3(3.5f, 1.2f, 0.5f), at + new Vector3(0, 0.8f, 0));
+	}
+
 	private async Task LeviathanShots()
 	{
 		// the pit's leviathan (its local y=0 is the pit floor; the body sits ~5 m up)
@@ -70,6 +88,7 @@ public partial class CreaturePreview : Node3D
 	private async void Run()
 	{
 		await Frames(10);
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--deer") >= 0) { await DeerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }

@@ -474,6 +474,9 @@ public partial class Wendigo : Node3D
 	public float LookWeight = 1f;
 	public Vector3? LookAtWorld;
 	private Quaternion _look = Quaternion.Identity;
+	private AnimKit.BodyDynamics _dyn;
+	/// <summary>For tests: its weight over the clips (the lean, the hips lowered to the ground).</summary>
+	public AnimKit.BodyDynamics Dynamics => _dyn;
 
 	private void TrackHead(float dt)
 	{
@@ -509,6 +512,12 @@ public partial class Wendigo : Node3D
 		}
 		if (_anim == null || _skel == null) return;
 		_anim.Advance(dt);
+		// (2026-10-12, the animation overhaul) weight over the clip: leaning into its starts, stops and turns, the long arms
+		// swinging behind, the hooves planted on the ground under them
+		_dyn ??= new AnimKit.BodyDynamics(_skel, "hips", new[] { "spine", "chest" }, "head", new[] { "upper_R", "upper_L" },
+			new[] { ("thigh_R", "shin_R", "foot_R", "toe_R"), ("thigh_L", "shin_L", "foot_L", "toe_L") }) { LeanPerAccel = 0.03f, MaxLean = 0.28f };
+		_dyn.Weight = _leapT >= 0f ? 0f : 1f;
+		_dyn.Apply(_body, dt, _leapT < 0f);
 		if (_headBone >= 0 && _leapT < 0f)
 		{
 			_skel.SetBonePoseRotation(_headBone, _skel.GetBonePoseRotation(_headBone) * Quaternion.FromEuler(_twitch * Mathf.Lerp(1f, 0.45f, LookWeight)));

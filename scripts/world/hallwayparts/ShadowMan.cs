@@ -43,42 +43,55 @@ public partial class ShadowMan : Node3D
 		k.Mat(_ink);
 		k.Color = Colors.White;
 
-		// legs: long and starved, the knees locked a little too far back, feet smeared into the floor
+		// (2026-10-12, the model overhaul) every part of him one smooth length of flesh (Loft: a tube through a curve, its
+		// size swelling and narrowing along it), not a stack of six-sided cylinders creased at every joint: the starved
+		// thigh, the knee's knob, the shin wasting to the ankle; a waist you could close a hand round under a ribcage that
+		// flares and a back that hunches forward; arms that bend twice, each length of them its own taper
 		foreach (float s in new[] { -1f, 1f })
 		{
-			Vector3 hip = new(s * 0.1f, 1.22f, 0.02f), knee = new(s * 0.11f, 0.64f, 0.07f), ankle = new(s * 0.12f, 0.06f, -0.02f);
-			k.Cylinder(hip, knee, 0.075f, 0.05f, 6, true);
-			k.Cylinder(knee, ankle, 0.05f, 0.03f, 6, true);
-			k.Blob(ankle + new Vector3(0, -0.03f, -0.07f), new Vector3(0.05f, 0.03f, 0.13f), 11 + (int)s, 0.25f, false);
+			// legs: long and starved, the knees locked a little too far back, feet smeared into the floor
+			Loft.Tube(k, new[] { new Vector3(s * 0.1f, 1.24f, 0.02f), new Vector3(s * 0.104f, 0.95f, 0.035f), new Vector3(s * 0.11f, 0.64f, 0.07f),
+				new Vector3(s * 0.116f, 0.36f, 0.045f), new Vector3(s * 0.12f, 0.08f, -0.01f) },
+				new[] { 0.085f, 0.064f, 0.05f, 0.04f, 0.028f }, 12, 4);
+			Loft.Tube(k, new[] { new Vector3(s * 0.12f, 0.1f, 0.0f), new Vector3(s * 0.121f, 0.035f, -0.05f), new Vector3(s * 0.124f, 0.014f, -0.13f), new Vector3(s * 0.126f, 0.008f, -0.19f) },
+				new[] { new Vector2(0.03f, 0.03f), new Vector2(0.036f, 0.026f), new Vector2(0.034f, 0.014f), new Vector2(0.02f, 0.008f) }, 10, 3);
+			// the knee's knob, a little proud of the leg
+			k.Blob(new Vector3(s * 0.11f, 0.64f, 0.035f), new Vector3(0.042f, 0.05f, 0.036f), 31 + (int)s, 0.05f, false, 1f, 0f, 2);
 		}
-		// the body: a narrow pelvis, a waist you could close a hand round, ribs, and a hunched back
-		k.Blob(new Vector3(0, 1.24f, 0.02f), new Vector3(0.15f, 0.1f, 0.1f), 21, 0.2f, false);
-		k.Cylinder(new Vector3(0, 1.26f, 0.02f), new Vector3(0, 1.52f, -0.01f), 0.08f, 0.12f, 7, true);
-		k.Cylinder(new Vector3(0, 1.5f, -0.01f), new Vector3(0, 1.84f, -0.08f), 0.13f, 0.18f, 7, true);
-		k.Cylinder(new Vector3(0, 1.8f, -0.08f), new Vector3(0, 1.99f, -0.1f), 0.18f, 0.1f, 7, true);
-		k.Blob(new Vector3(0, 1.9f, 0.06f), new Vector3(0.12f, 0.12f, 0.08f), 25, 0.15f, false);   // the hump of the back
-		// shoulders sloping away, too narrow for the arms that hang from them
-		foreach (float s in new[] { -1f, 1f })
+		// the body: a narrow pelvis, the wasted waist, the ribcage flaring and the back bowed forward over it
+		Loft.Tube(k, new[] { new Vector3(0, 1.14f, 0.02f), new Vector3(0, 1.26f, 0.02f), new Vector3(0, 1.38f, 0.01f), new Vector3(0, 1.52f, -0.01f),
+			new Vector3(0, 1.68f, -0.045f), new Vector3(0, 1.84f, -0.075f), new Vector3(0, 1.96f, -0.095f), new Vector3(0, 2.02f, -0.1f) },
+			new[] { new Vector2(0.13f, 0.09f), new Vector2(0.15f, 0.1f), new Vector2(0.085f, 0.07f), new Vector2(0.11f, 0.085f),
+				new Vector2(0.15f, 0.1f), new Vector2(0.17f, 0.105f), new Vector2(0.13f, 0.09f), new Vector2(0.06f, 0.05f) }, 16, 4);
+		k.Blob(new Vector3(0, 1.88f, 0.03f), new Vector3(0.11f, 0.11f, 0.07f), 25, 0.06f, false, 1f, 0f, 2);   // the hump of the back
+		// the ribs, just showing under the black: thin ridges round the front of the cage
+		for (int r = 0; r < 4; r++)
 		{
-			k.Cylinder(new Vector3(s * 0.03f, 2.0f, -0.1f), new Vector3(s * 0.2f, 1.84f, -0.07f), 0.07f, 0.05f, 5, true);
-			k.Blob(new Vector3(s * 0.1f, 1.93f, -0.06f), new Vector3(0.09f, 0.06f, 0.08f), 27 + (int)s, 0.25f, false);   // a starved trapezius
+			float y = 1.56f + r * 0.07f, z = -0.02f - r * 0.016f;
+			float w = 0.13f + r * 0.01f;
+			Loft.Tube(k, new[] { new Vector3(-w, y + 0.03f, z + 0.04f), new Vector3(-w * 0.6f, y - 0.01f, z - 0.065f), new Vector3(0, y - 0.03f, z - 0.085f),
+				new Vector3(w * 0.6f, y - 0.01f, z - 0.065f), new Vector3(w, y + 0.03f, z + 0.04f) }, new[] { 0.008f, 0.011f, 0.009f, 0.011f, 0.008f }, 6, 3, false);
 		}
-		// arms: they bend twice, and the hands hang past the knees, fingers as long as a forearm, splayed
 		foreach (float s in new[] { -1f, 1f })
 		{
-			Vector3 sh = new(s * 0.21f, 1.83f, -0.06f);
-			Vector3 e1 = new(s * 0.27f, 1.46f, -0.03f), e2 = new(s * 0.26f, 1.02f, -0.09f), wr = new(s * 0.29f, 0.6f, -0.05f);
-			k.Cylinder(sh, e1, 0.042f, 0.034f, 5, true);
-			k.Cylinder(e1, e2, 0.034f, 0.03f, 5, true);
-			k.Cylinder(e2, wr, 0.03f, 0.022f, 5, true);
+			// shoulders sloping away, too narrow for the arms that hang from them
+			Loft.Tube(k, new[] { new Vector3(s * 0.02f, 2.0f, -0.1f), new Vector3(s * 0.12f, 1.96f, -0.085f), new Vector3(s * 0.21f, 1.85f, -0.06f) },
+				new[] { 0.06f, 0.055f, 0.05f }, 12, 4);
+			// arms: they bend twice, and the hands hang past the knees
+			Vector3 sh = new(s * 0.21f, 1.83f, -0.06f), e1 = new(s * 0.27f, 1.46f, -0.03f), e2 = new(s * 0.26f, 1.02f, -0.09f), wr = new(s * 0.29f, 0.6f, -0.05f);
+			Loft.Tube(k, new[] { sh, sh.Lerp(e1, 0.5f) + new Vector3(s * 0.01f, 0, 0), e1, e1.Lerp(e2, 0.5f) + new Vector3(s * 0.008f, 0, 0.01f), e2,
+				e2.Lerp(wr, 0.5f) + new Vector3(s * 0.01f, 0, 0.01f), wr },
+				new[] { 0.046f, 0.04f, 0.03f, 0.033f, 0.026f, 0.027f, 0.019f }, 10, 3);
+			// the hand: a long flat palm, and fingers as long as a forearm, splayed, each with its knuckles
+			Loft.Tube(k, new[] { wr, wr + new Vector3(s * 0.008f, -0.05f, 0f), wr + new Vector3(s * 0.012f, -0.09f, 0f) },
+				new[] { new Vector2(0.02f, 0.02f), new Vector2(0.034f, 0.014f), new Vector2(0.036f, 0.012f) }, 8, 3);
 			for (int f = 0; f < 5; f++)
 			{
 				float spread = (f - 2f) * 0.07f;
-				Vector3 fb = wr + new Vector3(0, -0.02f, spread * 0.3f);
-				Vector3 knuckle = fb + new Vector3(s * (0.02f + Mathf.Abs(spread) * 0.2f), -0.16f, spread * 0.8f);
+				Vector3 fb = wr + new Vector3(s * 0.012f, -0.08f, spread * 0.3f);
+				Vector3 knuckle = fb + new Vector3(s * (0.02f + Mathf.Abs(spread) * 0.2f), -0.13f, spread * 0.8f);
 				Vector3 tip = knuckle + new Vector3(s * 0.03f, -0.15f - 0.03f * (f % 2), spread * 0.6f - 0.03f);
-				k.Cylinder(fb, knuckle, 0.011f, 0.008f, 4, false);
-				k.Cylinder(knuckle, tip, 0.008f, 0.002f, 4, false);
+				Loft.Tube(k, new[] { fb, knuckle, knuckle.Lerp(tip, 0.55f) + new Vector3(0, 0, -0.012f), tip }, new[] { 0.01f, 0.0085f, 0.006f, 0.0025f }, 6, 3);
 			}
 		}
 		// ink running off him in strings, and spattered round his feet
@@ -104,15 +117,15 @@ public partial class ShadowMan : Node3D
 		var neck = new MeshKit();
 		neck.Mat(_ink);
 		neck.Color = Colors.White;
-		neck.Cylinder(new Vector3(0, 1.96f, -0.1f), Neck, 0.045f, 0.035f, 5, false);
+		Loft.Tube(neck, new[] { new Vector3(0, 1.94f, -0.1f), new Vector3(0.012f, 2.01f, -0.135f), Neck }, new[] { 0.05f, 0.04f, 0.034f }, 10, 4, false);
 		neck.CommitTo(this, "Neck", false);
 		_head = new Node3D { Name = "Head", Position = Neck };
 		AddChild(_head);
 		var h = new MeshKit();
 		h.Mat(_ink);
 		h.Color = Colors.White;
-		h.Blob(new Vector3(0, 0.1f, -0.04f), new Vector3(0.075f, 0.13f, 0.09f), 41, 0.18f, false);
-		h.Blob(new Vector3(0, 0.02f, -0.08f), new Vector3(0.05f, 0.06f, 0.05f), 43, 0.2f, false);   // the jaw, hanging
+		h.Blob(new Vector3(0, 0.1f, -0.04f), new Vector3(0.075f, 0.13f, 0.09f), 41, 0.07f, false, 1f, 0f, 2);
+		h.Blob(new Vector3(0, 0.02f, -0.08f), new Vector3(0.05f, 0.06f, 0.05f), 43, 0.08f, false, 1f, 0f, 2);   // the jaw, hanging
 		h.CommitTo(_head, "Skull", false);
 		_eyeMat = new StandardMaterial3D
 		{

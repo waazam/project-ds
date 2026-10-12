@@ -4000,13 +4000,13 @@ public partial class StoryTest : Node
 		await Teleport(Node(a), Node(L.Solution[2]), ct);
 		await Seconds(0.5, ct);
 		// behind it, creeping crouched: nothing
-		hunter.Body.GlobalPosition = Node(a) + (Node(L.Solution[2]) - Node(a)).Normalized() * 3.5f;
+		hunter.Body.GlobalPosition = Node(a) + (Node(L.Solution[2]) - Node(a)).Normalized() * 5.5f;   // (3.5 m: now and then it turned and had them)
 		hunter.Body.LookAt(Node(L.Solution[2]) + (Node(L.Solution[2]) - Node(a)), Vector3.Up);
 		await Crouch24(true, ct);
 		int heard0 = hunter.Heard;
 		hunter.Paused = false;
 		_input.ScriptedMove = new Vector2(0.4f, 0);
-		await Seconds(2.5, ct);
+		await Seconds(1.6, ct);
 		_input.ScriptedMove = Vector2.Zero;
 		Check("crouched and behind it: it doesn't hear them, doesn't see them", hunter.Heard == heard0 && hunter.State is not WendigoHunter.Mode.Chase, $"heard {hunter.Heard - heard0}, {hunter.State}");
 		// running near it: it hears them, and goes to look
