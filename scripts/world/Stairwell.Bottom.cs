@@ -109,7 +109,7 @@ public partial class Stairwell
 		float y = BottomY;
 		const float half = 7f, height = 8f;
 		var k = new MeshKit();
-		k.Mat(StairwellTextures.GrimeMat);
+		k.Mat(StairwellTextures.GrimeProjectedMat);   // (2026-10-14b: projected, so its relief shows)
 		k.Color = new Color(0.55f, 0.55f, 0.55f);
 		void Slab(Vector3 c, Vector3 s, bool collide = true)
 		{

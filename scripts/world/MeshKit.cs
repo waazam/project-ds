@@ -130,6 +130,57 @@ public class MeshKit
 			new Vector2(0, s.Y * u), new Vector2(s.Z * u, s.Y * u), new Vector2(s.Z * u, 0), new Vector2(0, 0));
 	}
 
+	/// <summary>(2026-10-14b, the graphics pass: "not too boxy") A box with its twelve edges chamfered by
+	/// <paramref name="bevel"/> (clamped to under half its smallest side), so an edge catches a line of light instead of
+	/// ending in a knife-cut: six faces, twelve chamfers, eight corner facets. UVs are each facet projected along its
+	/// main axis, <paramref name="uvScale"/> repeats a metre, like <see cref="Box"/>.</summary>
+	public void BevelBox(Vector3 c, Vector3 s, float bevel, float uvScale = 1f, Basis? rot = null)
+	{
+		Basis b = rot ?? Basis.Identity;
+		Vector3 h = s * 0.5f;
+		float e = Mathf.Min(bevel, Mathf.Min(h.X, Mathf.Min(h.Y, h.Z)) * 0.9f);
+		if (e <= 0.0005f) { Box(c, s, uvScale, rot); return; }
+		Vector3 L(int axis, int sx, int sy, int sz)
+		{
+			// the corner (sx, sy, sz)'s point on the face of the given axis
+			return new Vector3(sx * (axis == 0 ? h.X : h.X - e), sy * (axis == 1 ? h.Y : h.Y - e), sz * (axis == 2 ? h.Z : h.Z - e));
+		}
+		Vector2 Uv(Vector3 p, Vector3 n)
+		{
+			Vector3 a = n.Abs();
+			Vector2 q = a.X >= a.Y && a.X >= a.Z ? new Vector2(p.Z, -p.Y) : a.Y >= a.Z ? new Vector2(p.X, p.Z) : new Vector2(p.X, -p.Y);
+			return q * uvScale;
+		}
+		void Q(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 n)
+		{
+			Vector3 wn = (b * n).Normalized();
+			Quad(c + b * p0, c + b * p1, c + b * p2, c + b * p3, wn, Uv(p0, n), Uv(p1, n), Uv(p2, n), Uv(p3, n));
+		}
+		foreach (int sg in new[] { -1, 1 })
+		{
+			// the faces
+			Q(L(0, sg, -1, -1), L(0, sg, 1, -1), L(0, sg, 1, 1), L(0, sg, -1, 1), new Vector3(sg, 0, 0));
+			Q(L(1, -1, sg, -1), L(1, 1, sg, -1), L(1, 1, sg, 1), L(1, -1, sg, 1), new Vector3(0, sg, 0));
+			Q(L(2, -1, -1, sg), L(2, 1, -1, sg), L(2, 1, 1, sg), L(2, -1, 1, sg), new Vector3(0, 0, sg));
+		}
+		foreach (int s1 in new[] { -1, 1 })
+			foreach (int s2 in new[] { -1, 1 })
+			{
+				// the chamfers: X-Y edges run along Z, X-Z along Y, Y-Z along X
+				Q(L(0, s1, s2, -1), L(0, s1, s2, 1), L(1, s1, s2, 1), L(1, s1, s2, -1), new Vector3(s1, s2, 0).Normalized());
+				Q(L(0, s1, -1, s2), L(0, s1, 1, s2), L(2, s1, 1, s2), L(2, s1, -1, s2), new Vector3(s1, 0, s2).Normalized());
+				Q(L(1, -1, s1, s2), L(1, 1, s1, s2), L(2, 1, s1, s2), L(2, -1, s1, s2), new Vector3(0, s1, s2).Normalized());
+			}
+		foreach (int sx in new[] { -1, 1 })
+			foreach (int sy in new[] { -1, 1 })
+				foreach (int sz in new[] { -1, 1 })
+				{
+					Vector3 n = new Vector3(sx, sy, sz).Normalized();
+					Vector3 p0 = L(0, sx, sy, sz), p1 = L(1, sx, sy, sz), p2 = L(2, sx, sy, sz);
+					Tri(c + b * p0, c + b * p1, c + b * p2, (b * n).Normalized(), Uv(p0, n), Uv(p1, n), Uv(p2, n));
+				}
+	}
+
 	/// <summary>Box spanning between two points (a beam), with the given cross-section (width along 'side', height along the rest).</summary>
 	public void Beam(Vector3 from, Vector3 to, float width, float height, float uvScale = 1f, Vector3? upHint = null)
 	{

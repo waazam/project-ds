@@ -285,6 +285,124 @@ public static class BuildingTextures
 	private static StandardMaterial3D _freshM;
 	public static StandardMaterial3D CanvasMat => Std("b_canvas", Canvas(), 1f, 0.15f, cullOff: true);
 
+	// ---------- (2026-10-14a, the early acts' look) the parts that aren't the walls ----------
+	// The owner: "cabin wall and door shouldn't be the same texture". The cabin's door, gables, trim and the shed all drew
+	// the one clean hinoki plank. These give each part its own surface from the scans already in assets/textures/surfaces.
+
+	private static NoiseTexture2D _paintNoise;
+	private static Shader _paintedShader;
+	private static readonly Dictionary<string, ShaderMaterial> _painted = new();
+
+	/// <summary>Old painted boards (painted_planks.gdshader): the weathered brown planks under a faded, chipped coat of
+	/// <paramref name="paint"/> (<paramref name="coat"/> 0 = bare grey wood). Projected in the mesh's own space, so a
+	/// door leaf's boards run up it however it was built. Cached by <paramref name="key"/>; null without the scan.</summary>
+	public static ShaderMaterial PaintedBoards(string key, Color paint, float coat, float chipped, bool vertical = true, float scale = 0.55f,
+		float footY = 0f, float footHeight = 0.45f, Color? woodTint = null, float grime = 0.55f, float across = 1f, bool topAlongZ = false)
+	{
+		if (_painted.TryGetValue(key, out var pm)) return pm;
+		if (World.SurfaceSets.Tex("ph_weathered_brown_planks") == null) return null;
+		_paintedShader ??= GD.Load<Shader>("res://assets/shaders/painted_planks.gdshader");
+		_paintNoise ??= new NoiseTexture2D
+		{
+			Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true,
+			Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.03f, FractalOctaves = 4, Seed = 1414 },
+		};
+		var m = new ShaderMaterial { Shader = _paintedShader, ResourceName = key };
+		m.SetShaderParameter("wood_tex", World.SurfaceSets.Tex("ph_weathered_brown_planks"));
+		m.SetShaderParameter("wood_nor", World.SurfaceSets.Tex("ph_weathered_brown_planks", "normal"));
+		m.SetShaderParameter("wood_rough", World.SurfaceSets.Tex("ph_weathered_brown_planks", "rough"));
+		m.SetShaderParameter("noise_tex", _paintNoise);
+		m.SetShaderParameter("paint", paint);
+		m.SetShaderParameter("coat", coat);
+		m.SetShaderParameter("chipped", chipped);
+		m.SetShaderParameter("vertical", vertical);
+		m.SetShaderParameter("scale", scale);
+		m.SetShaderParameter("foot_y", footY);
+		m.SetShaderParameter("foot_height", footHeight);
+		m.SetShaderParameter("grime", grime);
+		m.SetShaderParameter("across", across);
+		m.SetShaderParameter("top_along_z", topAlongZ);
+		m.SetShaderParameter("wood_tint", woodTint ?? new Color(0.78f, 0.74f, 0.68f));
+		_painted[key] = m;
+		return m;
+	}
+
+	/// <summary>The cabin's door: ledged and braced boards under an old bottle-green paint, worn through at the foot
+	/// and round the latch.</summary>
+	public static Material CabinDoorMat => PaintedBoards("b_door", new Color(0.19f, 0.26f, 0.21f), 0.92f, 0.25f, footHeight: 0.5f) ?? (Material)BoardsMat;
+	/// <summary>The cabin's door and window casings: the same green, thinner and more of it gone.</summary>
+	public static Material CabinTrimMat => PaintedBoards("b_trim", new Color(0.2f, 0.27f, 0.22f), 0.85f, 0.45f, vertical: true, scale: 0.8f, footY: -0.3f, across: 0.15f) ?? (Material)PropTextures.PostMat;
+	/// <summary>The gables' upright boards: bare, grey-brown weathered boards (not the log walls' or the floor's wood).</summary>
+	public static Material GableBoardsMat => PaintedBoards("b_gable", new Color(0.3f, 0.28f, 0.25f), 0f, 1f, vertical: true, scale: 0.42f, footY: 2.2f, footHeight: 0.3f,
+		woodTint: new Color(0.7f, 0.66f, 0.6f), grime: 0.35f) ?? (Material)BoardsMat;
+	/// <summary>The shed's board-and-batten walls: weathered boards, once barn red, almost all of it gone.</summary>
+	public static Material ShedWallMat => PaintedBoards("b_shedwall", new Color(0.44f, 0.18f, 0.13f), 0.55f, 0.72f, vertical: true, scale: 0.45f, footY: -0.1f, footHeight: 0.6f,
+		woodTint: new Color(0.74f, 0.7f, 0.64f)) ?? (Material)BoardsMat;
+	/// <summary>The shed's door: the same red, more of it left (it hung sheltered under the eave).</summary>
+	public static Material ShedDoorMat => PaintedBoards("b_sheddoor", new Color(0.4f, 0.15f, 0.11f), 0.9f, 0.35f, footHeight: 0.5f) ?? (Material)BoardsMat;
+
+	/// <summary>The cabin's and the shed's sawn timber that stands (posts, studs): the weathered wood's grain up the
+	/// member, one board wide, so a post never shows a plank's seam (the hinoki's did).</summary>
+	public static Material TimberUpMat => PaintedBoards("b_timber_up", new Color(0.3f, 0.28f, 0.25f), 0f, 1f, vertical: true, scale: 0.7f, footY: -0.4f,
+		footHeight: 0.5f, woodTint: new Color(0.66f, 0.62f, 0.56f), grime: 0.4f, across: 0.12f) ?? (Material)PropTextures.PostMat;
+	/// <summary>The same timber lying along (rails, beams, rafters, rims, fascia, ledges).</summary>
+	public static Material TimberAlongMat => PaintedBoards("b_timber_along", new Color(0.3f, 0.28f, 0.25f), 0f, 1f, vertical: false, scale: 0.7f, footY: -0.4f,
+		footHeight: 0.4f, woodTint: new Color(0.64f, 0.6f, 0.54f), grime: 0.35f, across: 0.12f) ?? (Material)PropTextures.PostMat;
+	/// <summary>The rafters and the boards under the roof inside: the same wood smoked dark by the stove.</summary>
+	public static Material SmokedTimberMat => PaintedBoards("b_timber_smoked", new Color(0.1f, 0.09f, 0.08f), 0f, 1f, vertical: false, scale: 0.7f, footY: -9f,
+		footHeight: 0.1f, woodTint: new Color(0.42f, 0.37f, 0.32f), grime: 0.2f, across: 0.12f) ?? (Material)PropTextures.PostMat;
+	public static Material SmokedBoardsMat => PaintedBoards("b_boards_smoked", new Color(0.1f, 0.09f, 0.08f), 0f, 1f, vertical: false, scale: 0.5f, footY: -9f,
+		footHeight: 0.1f, woodTint: new Color(0.4f, 0.35f, 0.3f), grime: 0.2f) ?? (Material)BoardsMat;
+	/// <summary>The porch deck, the steps and the bench: grey, weathered boards along the porch, dirtier toward the
+	/// door's foot and the steps.</summary>
+	public static Material PorchDeckMat => PaintedBoards("b_porchdeck", new Color(0.3f, 0.28f, 0.25f), 0f, 1f, vertical: false, scale: 0.5f, footY: -2f,
+		footHeight: 0.1f, woodTint: new Color(0.68f, 0.64f, 0.58f), grime: 0.3f) ?? (Material)PropTextures.DeckMat;
+	/// <summary>The cabin's floor: dark old boards front to back, trodden grey down the middle.</summary>
+	public static Material CabinFloorMat => PaintedBoards("b_cabinfloor", new Color(0.22f, 0.2f, 0.17f), 0.25f, 0.85f, vertical: false, scale: 0.5f, footY: -9f,
+		footHeight: 0.1f, woodTint: new Color(0.52f, 0.46f, 0.4f), grime: 0.2f, topAlongZ: true) ?? (Material)FloorMat;
+	/// <summary>The footbridge over the creek: its planks across the deck (grain along x, one board each), darker and
+	/// damper than the porch's; its stringers and rails along it (grain along z); its posts, black with wet at the foot.</summary>
+	public static Material BridgePlankMat => PaintedBoards("b_bridge_plank", new Color(0.3f, 0.28f, 0.25f), 0f, 1f, vertical: false, scale: 0.7f, footY: -9f,
+		footHeight: 0.1f, woodTint: new Color(0.56f, 0.53f, 0.48f), grime: 0.35f, across: 0.12f) ?? (Material)PropTextures.DeckMat;
+	public static Material BridgeAlongMat => PaintedBoards("b_bridge_along", new Color(0.3f, 0.28f, 0.25f), 0f, 1f, vertical: false, scale: 0.7f, footY: -1.2f,
+		footHeight: 0.9f, woodTint: new Color(0.5f, 0.47f, 0.42f), grime: 0.5f, across: 0.12f, topAlongZ: true) ?? (Material)PropTextures.WetPostMat;
+	public static Material BridgePostMat => PaintedBoards("b_bridge_post", new Color(0.3f, 0.28f, 0.25f), 0f, 1f, vertical: true, scale: 0.7f, footY: -1.5f,
+		footHeight: 1.4f, woodTint: new Color(0.52f, 0.48f, 0.43f), grime: 0.6f, across: 0.12f) ?? (Material)PropTextures.WetPostMat;
+
+	/// <summary>(2026-10-14a) The park's signs (the trailhead sign, the fork's posts): park brown enamel over boards,
+	/// worn at the edges of the flakes, in place of the 64 px painted texture whose flakes were blocky pixels up close.</summary>
+	public static Material SignBrownMat => PaintedBoards("b_sign_brown", new Color(0.27f, 0.19f, 0.13f), 0.95f, 0.14f, vertical: false, scale: 0.8f, footY: -9f,
+		footHeight: 0.1f, grime: 0.25f, across: 0.12f) ?? (Material)PropTextures.PaintedPlankMat;
+	public static Material SignPostBrownMat => PaintedBoards("b_signpost_brown", new Color(0.27f, 0.19f, 0.13f), 0.95f, 0.2f, vertical: true, scale: 0.8f, footY: -0.4f,
+		footHeight: 0.7f, grime: 0.5f, across: 0.12f) ?? (Material)PropTextures.PaintedPostMat;
+	public static Material SignGreenMat => PaintedBoards("b_sign_green", new Color(0.08f, 0.2f, 0.14f), 0.97f, 0.1f, vertical: false, scale: 0.8f, footY: -9f,
+		footHeight: 0.1f, grime: 0.2f, across: 0.12f) ?? (Material)PropTextures.PaintedGreenMat;
+
+	/// <summary>(2026-10-14a) The bark scan (bark_*) on a mesh's own UVs (the camp's stump, the woodpile's logs): the
+	/// procedural bark they had was a flat dark smear under the lantern.</summary>
+	public static StandardMaterial3D BarkScanMat => _barkScan ??= MakeBarkScan();
+	private static StandardMaterial3D _barkScan;
+	private static StandardMaterial3D MakeBarkScan()
+	{
+		var m = new StandardMaterial3D { Roughness = 1f, MetallicSpecular = 0.2f, VertexColorUseAsAlbedo = true };
+		if (World.SurfaceSets.Tex("bark") != null)
+		{
+			// albedo and roughness only: MeshKit writes no tangents, so a normal map on these UVs would light from anywhere
+			World.SurfaceSets.Apply(m, "bark", 1.3f);
+			m.NormalEnabled = false;
+			m.AlbedoColor = new Color(0.72f, 0.66f, 0.6f);
+		}
+		else m.AlbedoTexture = ProcTextures.Bark();
+		return m;
+	}
+
+	/// <summary>(2026-10-14a) The cabin's own logs: the same hewn logs, aged to a grey-brown (the shared log material
+	/// read as new orange pine under the lamp and the lantern).</summary>
+	public static StandardMaterial3D CabinLogMat => _cabinLogM ??= World.SurfaceSets.Tex("hinoki_log") != null
+		? World.SurfaceSets.HinokiLog(Std("b_cabinlog", Log()), "hinoki_log", new Color(0.47f, 0.44f, 0.43f))
+		: LogMat;
+	private static StandardMaterial3D _cabinLogM;
+
 	/// <summary>Cast iron: near-black, a little sheen.</summary>
 	public static StandardMaterial3D IronMat => Std("b_iron", ProcTextures.Metal(), 0.6f, 0.45f);
 

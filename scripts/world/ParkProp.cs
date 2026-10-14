@@ -115,8 +115,8 @@ public partial class ParkProp : Node3D
 		// Park entrance sign (the owner's photo of a state park's, 2026-10-03): two heavy square posts painted brown, a
 		// header beam across their tops with its tails cut away, a green plaque over two brown planks, the routed letters
 		// filled white.
-		var post = PropTextures.PaintedPostMat;
-		var plank = PropTextures.PaintedPlankMat;
+		var post = BuildingTextures.SignPostBrownMat;
+		var plank = BuildingTextures.SignBrownMat;
 		const float postW = 0.2f, postH = 2.35f, bw = 2.2f, pt = 0.06f;
 		_k.Color = new Color(0.9f, 0.88f, 0.85f);
 		foreach (float x in new[] { -1.02f, 1.02f })
@@ -135,7 +135,7 @@ public partial class ParkProp : Node3D
 			centers[i] = cy;
 			float shade = 0.86f + 0.1f * Mathf.Abs(Mathf.Sin(i * 7.1f + Seed));
 			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
-			_k.Mat(i == 0 ? PropTextures.PaintedGreenMat : plank).Box(new Vector3(0, cy, z), new Vector3(bw, ph[i] - 0.014f, pt), 1.1f);
+			_k.Mat(i == 0 ? BuildingTextures.SignGreenMat : plank).Box(new Vector3(0, cy, z), new Vector3(bw, ph[i] - 0.014f, pt), 1.1f);
 			y -= ph[i];
 		}
 		Col(new Vector3(0, 2.1f - 0.48f, z), new Vector3(bw, 0.96f, pt + 0.02f));
@@ -271,29 +271,152 @@ public partial class ParkProp : Node3D
 		return (GlobalTransform.AffineInverse() * new Vector3(w.X, terrain.HeightAt(w.X, w.Z), w.Z)).Y;
 	}
 
+	private static StandardMaterial3D _doorSteelMat;
+
+
+	/// <summary>(2026-10-14a) The steel door: park brown enamel gone chalky, rust bleeding from its edges.</summary>
+	private static StandardMaterial3D DoorSteelMat()
+	{
+		if (_doorSteelMat != null) return _doorSteelMat;
+		var m = new StandardMaterial3D { Roughness = 0.72f, Metallic = 0.25f, MetallicSpecular = 0.4f, VertexColorUseAsAlbedo = true };
+		if (SurfaceSets.Tex("ph_rusty_metal_02") != null)
+		{
+			SurfaceSets.Apply(m, "ph_rusty_metal_02", 0.5f);
+			m.Uv1Triplanar = true;
+			m.Uv1Scale = new Vector3(0.5f, 0.5f, 0.5f);
+			m.AlbedoColor = new Color(0.5f, 0.42f, 0.37f);
+		}
+		else m.AlbedoTexture = ProcTextures.Metal();
+		return _doorSteelMat = m;
+	}
+
 	private void VaultToilet()
 	{
-		var wall = ProcTextures.ConcreteMat;
-		var roof = Tint("toilet_roof", new Color(0.14f, 0.12f, 0.10f));
-		var door = ProcTextures.MetalMat;
-		_k.Color = new Color(0.78f, 0.70f, 0.58f);
-		_k.Mat(wall).Box(new Vector3(0, 1.25f, 0), new Vector3(2.3f, 2.5f, 2.4f), 1f);
+		// (2026-10-14a, the early acts' look: it was one pale concrete cube with a flat lid and a steel slab for a door)
+		// A park vault toilet: a poured-concrete building on a pad, a gable roof of cedar shingles over brown
+		// board gables with fascia and rake boards, a steel door in its frame with a louvre, kick plate and lever, a
+		// screened vent high in each side, and the vault's black vent stack with its cap behind.
+		const float hw = 1.15f, hd = 1.2f, eave = 2.45f, ridge = 3.05f, ov = 0.32f;
+		// poured concrete walls (the varied concrete: pours of different tones, rain streaks from the eave, grime at the foot)
+		Material block = Engine.IsEditorHint() || !IsInsideTree() ? ProcTextures.ConcreteMat
+			: SurfaceSets.VariedConcrete("toilet_concrete", 0.45f, GlobalPosition.Y + eave, GlobalPosition.Y, new Color(0.5f, 0.48f, 0.43f), 1f, 2f);
+		// the pad: poured, its edge chipped into the dirt, the apron out in front
+		_k.Color = new Color(0.62f, 0.6f, 0.56f);
+		_k.Mat(ProcTextures.ConcreteMat);
+		BuildKit.Box(_k, new Vector3(0, -0.26f, 0.25f), new Vector3(hw * 2f + 0.5f, 0.58f, hd * 2f + 1.0f), 1.2f, BuildKit.Face.NY);
+		// walls on a darker splash course
 		_k.Color = Colors.White;
-		_k.Mat(roof).Box(new Vector3(0, 2.62f, 0), new Vector3(2.8f, 0.14f, 2.9f), 1f, Basis.FromEuler(new Vector3(0.12f, 0, 0)));
-		_k.Color = new Color(0.55f, 0.42f, 0.30f);
-		_k.Mat(door).Box(new Vector3(0.25f, 1.02f, 1.22f), new Vector3(0.92f, 2.0f, 0.05f), 1f);
-		_k.Color = new Color(0.5f, 0.5f, 0.5f);
-		_k.Box(new Vector3(-0.1f, 1.0f, 1.26f), new Vector3(0.04f, 0.14f, 0.04f));
+		_k.Mat(block);
+		BuildKit.Box(_k, new Vector3(0, (eave + 0.03f) * 0.5f, 0), new Vector3(hw * 2f, eave - 0.03f, hd * 2f), 1f, BuildKit.Face.NY);
+		_k.Color = new Color(0.5f, 0.48f, 0.44f);
+		_k.Mat(ProcTextures.ConcreteMat);
+		BuildKit.Box(_k, new Vector3(0, 0.12f, 0), new Vector3(hw * 2f + 0.04f, 0.24f, hd * 2f + 0.04f), 1f, BuildKit.Face.NY | BuildKit.Face.PY);
+		// a cap course under the eave
+		_k.Color = new Color(0.72f, 0.69f, 0.64f);
+		BuildKit.Box(_k, new Vector3(0, eave - 0.06f, 0), new Vector3(hw * 2f + 0.05f, 0.12f, hd * 2f + 0.05f), 1f, BuildKit.Face.NY);
+		Col(new Vector3(0, 1.3f, 0), new Vector3(hw * 2f, 2.6f, hd * 2f));
+
+		// the gable roof, the ridge running front to back, shingled, with its thickness at the edges
+		var shingle = BuildingTextures.ShingleMat;
+		var brown = BuildingTextures.PaintedBoards("park_brown", new Color(0.3f, 0.2f, 0.13f), 0.95f, 0.18f, vertical: true, scale: 0.55f, footY: eave, footHeight: 0.2f) ?? (Material)PropTextures.PaintedPostMat;
+		var brownAlong = BuildingTextures.PaintedBoards("park_brown_along", new Color(0.3f, 0.2f, 0.13f), 0.95f, 0.2f, vertical: false, scale: 0.8f, footY: -9f, footHeight: 0.1f, across: 0.12f) ?? (Material)PropTextures.PaintedPostMat;
+		float rx = hw + ov, ex = eave - ov * (ridge - eave) / hw;
+		float rz = hd + ov + 0.05f;
+		foreach (int s in new[] { -1, 1 })
+		{
+			Vector3 n = new Vector3(s * (ridge - eave) / hw, 1f, 0).Normalized();
+			Vector3 lift = n * 0.09f;
+			Vector3 r0 = new(0, ridge, -rz), r1 = new(0, ridge, rz), e0 = new(s * rx, ex, -rz), e1 = new(s * rx, ex, rz);
+			float slope = (e0 - r0).Length();
+			_k.Color = new Color(0.85f, 0.85f, 0.83f);
+			_k.Mat(shingle);
+			_k.Quad(r0 + lift, r1 + lift, e1 + lift, e0 + lift, n, new Vector2(-rz, 0), new Vector2(rz, 0), new Vector2(rz, slope), new Vector2(-rz, slope));
+			_k.Color = new Color(0.55f, 0.5f, 0.45f);
+			_k.Mat(brownAlong);
+			_k.Quad(r0, r1, e1, e0, -n);
+			// fascia along the eave
+			_k.Color = new Color(0.85f, 0.82f, 0.8f);
+			_k.Beam(e0 + new Vector3(s * 0.015f, 0.02f, 0), e1 + new Vector3(s * 0.015f, 0.02f, 0), 0.03f, 0.18f, 1f, n);
+			// rake boards on both gables
+			foreach (int g in new[] { -1, 1 })
+				_k.Beam(new Vector3(0, ridge + 0.06f, g * (rz + 0.015f)), new Vector3(s * rx, ex + 0.06f, g * (rz + 0.015f)), 0.03f, 0.2f, 1f, Vector3.Back);
+		}
+		// ridge cap
+		_k.Color = new Color(0.5f, 0.48f, 0.45f);
+		_k.Mat(shingle);
+		_k.Beam(new Vector3(0, ridge + 0.1f, -rz - 0.02f), new Vector3(0, ridge + 0.1f, rz + 0.02f), 0.17f, 0.17f, 1.2f, new Vector3(1, 1, 0).Normalized());
+		// the gables: brown upright boards
+		_k.Color = new Color(0.9f, 0.88f, 0.85f);
+		_k.Mat(brown);
+		foreach (int g in new[] { -1, 1 })
+			BuildKit.TriPanel(_k, new Vector3(-hw - 0.02f, eave, g * (hd + 0.01f)), new Vector3(hw + 0.02f, eave, g * (hd + 0.01f)), new Vector3(0, ridge - 0.03f, g * (hd + 0.01f)),
+				new Vector3(0, 0, g), Vector3.Right, 1.1f, 0.02f);
+
+		// the door: a steel frame, the leaf set back in it, a louvre near its foot, a kick plate, a lever
+		var steel = DoorSteelMat();
+		const float dx = 0.15f, dwid = 0.92f, dh = 2.04f, fz = hd;
+		_k.Mat(steel);
+		_k.Color = new Color(0.5f, 0.36f, 0.27f);
+		foreach (int s in new[] { -1, 1 })
+			BuildKit.Box(_k, new Vector3(dx + s * (dwid * 0.5f + 0.03f), dh * 0.5f + 0.02f, fz + 0.015f), new Vector3(0.06f, dh + 0.04f, 0.05f), 2f);
+		BuildKit.Box(_k, new Vector3(dx, dh + 0.05f, fz + 0.015f), new Vector3(dwid + 0.12f, 0.06f, 0.05f), 2f);
+		_k.Color = new Color(0.56f, 0.4f, 0.3f);
+		BuildKit.Box(_k, new Vector3(dx, dh * 0.5f + 0.02f, fz + 0.005f), new Vector3(dwid, dh, 0.045f), 1.5f);
+		// the louvre: a dark slot behind slanted blades
+		_k.Color = new Color(0.05f, 0.045f, 0.04f);
+		BuildKit.Box(_k, new Vector3(dx, 0.42f, fz + 0.029f), new Vector3(0.5f, 0.3f, 0.002f), 2f);
+		_k.Color = new Color(0.46f, 0.33f, 0.25f);
+		for (int i = 0; i < 6; i++)
+			BuildKit.Box(_k, new Vector3(dx, 0.3f + i * 0.048f, fz + 0.04f), new Vector3(0.5f, 0.04f, 0.006f), 2f, BuildKit.Face.None, new Basis(Vector3.Right, -0.6f));
+		// kick plate: scuffed bare steel
+		_k.Color = new Color(0.62f, 0.6f, 0.58f);
+		BuildKit.Box(_k, new Vector3(dx, 0.13f, fz + 0.03f), new Vector3(dwid - 0.04f, 0.2f, 0.004f), 2f);
+		// lever and its rose, the deadbolt
+		_k.Mat(BuildingTextures.IronMat);
+		_k.Color = new Color(0.42f, 0.4f, 0.37f);
+		float lx = dx - dwid * 0.5f + 0.1f;
+		_k.Cylinder(new Vector3(lx, 1.0f, fz + 0.027f), new Vector3(lx, 1.0f, fz + 0.04f), 0.032f, 0.032f, 10, true);
+		_k.Cylinder(new Vector3(lx, 1.0f, fz + 0.04f), new Vector3(lx, 1.0f, fz + 0.08f), 0.01f, 0.01f, 6, true);
+		_k.Beam(new Vector3(lx, 1.0f, fz + 0.075f), new Vector3(lx + 0.12f, 0.99f, fz + 0.075f), 0.016f, 0.022f, 2f);
+		_k.Cylinder(new Vector3(lx, 1.2f, fz + 0.027f), new Vector3(lx, 1.2f, fz + 0.04f), 0.026f, 0.026f, 10, true);
+		// the hinges' knuckles on the far jamb
+		foreach (float y in new[] { 0.3f, 1.0f, 1.75f })
+			_k.Cylinder(new Vector3(dx + dwid * 0.5f + 0.005f, y - 0.06f, fz + 0.035f), new Vector3(dx + dwid * 0.5f + 0.005f, y + 0.06f, fz + 0.035f), 0.012f, 0.012f, 8, true);
+
+		// a screened vent high in each side wall
+		foreach (int s in new[] { -1, 1 })
+		{
+			_k.Mat(steel);
+			_k.Color = new Color(0.45f, 0.33f, 0.26f);
+			BuildKit.Box(_k, new Vector3(s * (hw + 0.01f), 2.1f, 0), new Vector3(0.03f, 0.26f, 0.6f), 2f);
+			_k.Color = new Color(0.05f, 0.045f, 0.04f);
+			BuildKit.Box(_k, new Vector3(s * (hw + 0.027f), 2.1f, 0), new Vector3(0.004f, 0.18f, 0.5f), 2f);
+		}
+
+		// the vault's vent stack up the back wall and through the eave, with a cap
+		var pipe = Tint("vent_pipe", new Color(0.08f, 0.08f, 0.08f), 0.6f);
+		_k.Mat(pipe);
 		_k.Color = Colors.White;
-		_k.Mat(Tint("vent_pipe", new Color(0.1f, 0.1f, 0.1f))).Cylinder(new Vector3(-0.8f, 2.3f, -0.8f), new Vector3(-0.8f, 3.9f, -0.8f), 0.1f, 0.1f, 6);
-		Col(new Vector3(0, 1.3f, 0), new Vector3(2.3f, 2.6f, 2.4f));
+		Vector3 vp = new(-0.7f, 0f, -hd - 0.12f);
+		_k.Cylinder(vp + new Vector3(0, 0.2f, 0), vp + new Vector3(0, 3.7f, 0), 0.1f, 0.1f, 12, false);
+		_k.Cylinder(vp + new Vector3(0, 3.7f, 0), vp + new Vector3(0, 3.78f, 0), 0.19f, 0.03f, 12, true);
+		_k.Mat(BuildingTextures.IronMat);
+		foreach (float y in new[] { 0.9f, 2.0f })
+			BuildKit.Box(_k, vp + new Vector3(0, y, 0.06f), new Vector3(0.24f, 0.04f, 0.08f), 2f);
+		Col(vp + new Vector3(0, 1.8f, 0), new Vector3(0.22f, 3.6f, 0.22f));
+
 		// a taped paper on the door
+		float pzz = fz + 0.0285f;
 		_k.Color = new Color(0.9f, 0.88f, 0.8f);
-		_k.Mat(ProcTextures.PaperMat).Quad(new Vector3(0.05f, 1.42f, 1.252f), new Vector3(0.45f, 1.43f, 1.252f),
-			new Vector3(0.45f, 1.72f, 1.252f), new Vector3(0.05f, 1.71f, 1.252f), Vector3.Back);
+		_k.Mat(ProcTextures.PaperMat).Quad(new Vector3(dx - 0.2f, 1.42f, pzz), new Vector3(dx + 0.2f, 1.43f, pzz),
+			new Vector3(dx + 0.2f, 1.72f, pzz), new Vector3(dx - 0.2f, 1.71f, pzz), Vector3.Back);
 		_k.Color = Colors.White;
-		Text("CLOSED\nFOR THE SEASON", new Vector3(0.25f, 1.57f, 1.255f), 16, 0.0026f, new Color(0.1f, 0.1f, 0.1f));
-		Text("RESTROOM", new Vector3(0f, 2.28f, 1.21f), 20, 0.004f, new Color(0.62f, 0.56f, 0.42f));
+		Text("CLOSED\nFOR THE SEASON", new Vector3(dx, 1.57f, pzz + 0.003f), 16, 0.0026f, new Color(0.1f, 0.1f, 0.1f));
+		// the sign on the gable: a routed brown board
+		_k.Mat(brownAlong);
+		_k.Color = new Color(0.8f, 0.78f, 0.74f);
+		BuildKit.Box(_k, new Vector3(0, eave + 0.2f, hd + 0.04f), new Vector3(0.9f, 0.2f, 0.03f), 1f);
+		Text("RESTROOM", new Vector3(0f, eave + 0.2f, hd + 0.057f), 20, 0.0034f, new Color(0.7f, 0.64f, 0.5f));
 	}
 
 	private void Bumper()
@@ -326,19 +449,40 @@ public partial class ParkProp : Node3D
 
 	private void Backpack()
 	{
-		var nylon = Tint("pack_red", new Color(0.42f, 0.13f, 0.09f));
+		var nylon = Tint("pack_red", new Color(0.36f, 0.14f, 0.1f));
 		var dark = Tint("pack_dark", new Color(0.12f, 0.11f, 0.10f));
 		var pad = Tint("pack_pad", new Color(0.30f, 0.32f, 0.20f));
 		// lying on its back, top toward -Z, slightly twisted
 		_k.Xf = new Transform3D(Basis.FromEuler(new Vector3(0, 0.4f, 0.12f)), Vector3.Zero);
-		_k.Mat(nylon).Box(new Vector3(0, 0.11f, 0), new Vector3(0.34f, 0.22f, 0.5f));
-		_k.Box(new Vector3(0, 0.2f, 0.06f), new Vector3(0.26f, 0.1f, 0.24f));          // front pocket
-		_k.Box(new Vector3(0, 0.14f, -0.27f), new Vector3(0.36f, 0.2f, 0.1f));         // lid flap
+		// (2026-10-14a: was three boxes) a stuffed, rounded body, a bulging front pocket, the lid flap slumped over the top
+		_k.Mat(nylon);
+		ItemMeshes.Loft(_k, new[]
+		{
+			new ItemMeshes.Ring(new Vector3(0, 0.1f, -0.25f), 0.12f, 0.07f),
+			new ItemMeshes.Ring(new Vector3(0, 0.11f, -0.21f), 0.16f, 0.1f),
+			new ItemMeshes.Ring(new Vector3(0, 0.115f, -0.05f), 0.175f, 0.112f),
+			new ItemMeshes.Ring(new Vector3(0, 0.11f, 0.13f), 0.17f, 0.105f),
+			new ItemMeshes.Ring(new Vector3(0, 0.1f, 0.22f), 0.145f, 0.085f),
+			new ItemMeshes.Ring(new Vector3(0, 0.09f, 0.25f), 0.09f, 0.05f),
+		}, 14, true, true, Vector3.Right, 4f, null, null, 1f, 0.6f);
+		ItemMeshes.Loft(_k, new[]
+		{
+			new ItemMeshes.Ring(new Vector3(0, 0.19f, -0.04f), 0.08f, 0.03f),
+			new ItemMeshes.Ring(new Vector3(0, 0.205f, 0.02f), 0.12f, 0.05f),
+			new ItemMeshes.Ring(new Vector3(0, 0.205f, 0.13f), 0.12f, 0.05f),
+			new ItemMeshes.Ring(new Vector3(0, 0.19f, 0.18f), 0.08f, 0.03f),
+		}, 12, true, true, Vector3.Right, 4f, null, null, 1f, 0.5f);
+		ItemMeshes.Loft(_k, new[]
+		{
+			new ItemMeshes.Ring(new Vector3(0, 0.17f, -0.3f), 0.15f, 0.03f),
+			new ItemMeshes.Ring(new Vector3(0, 0.2f, -0.23f), 0.17f, 0.035f),
+			new ItemMeshes.Ring(new Vector3(0, 0.215f, -0.15f), 0.16f, 0.03f),
+		}, 12, true, true, Vector3.Right, 4f, null, null, 1f, 0.4f);
 		_k.Mat(dark);
 		_k.Box(new Vector3(-0.1f, 0.235f, -0.02f), new Vector3(0.04f, 0.012f, 0.5f));  // compression straps
 		_k.Box(new Vector3(0.1f, 0.235f, -0.02f), new Vector3(0.04f, 0.012f, 0.5f));
 		_k.Box(new Vector3(0.24f, 0.03f, 0.05f), new Vector3(0.06f, 0.02f, 0.4f), 1f, Basis.FromEuler(new Vector3(0, 0.3f, 0)));  // loose shoulder strap
-		_k.Mat(pad).Cylinder(new Vector3(-0.22f, 0.08f, 0.3f), new Vector3(0.22f, 0.08f, 0.3f), 0.075f, 0.075f, 7);
+		_k.Mat(pad).Cylinder(new Vector3(-0.22f, 0.08f, 0.33f), new Vector3(0.22f, 0.08f, 0.33f), 0.075f, 0.075f, 14);
 		_k.Xf = Transform3D.Identity;
 	}
 
@@ -708,14 +852,58 @@ public partial class ParkProp : Node3D
 		// lower body: solid up to the rear seat; behind it the load space is open above its floor
 		float floorY = sill + 0.3f, zSeat = zR - 1.15f;
 		_k.Color = body;
-		_k.Mat(paint).Box(new Vector3(0, (sill + belt) * 0.5f, (zN + zSeat) * 0.5f + 0.05f), new Vector3(W, belt - sill, zSeat - zN - 0.1f), 1f);
-		_k.Box(new Vector3(0, (sill + floorY) * 0.5f, (zSeat + zR) * 0.5f), new Vector3(W, floorY - sill, zR - zSeat), 1f);
+		_k.Mat(paint);
+		// (2026-10-14a, the early acts' look: it was boxes, the wheels sunk in its flat flanks) Sliced along its length
+		// so it can have a shape: the nose and tail rounded top and bottom, the bonnet falling to the nose, wheel arches
+		// cut round each wheel, and its flanks rolled in at the shoulder and the sill (a narrower skin outside a wider one).
+		const float axleY = 0.31f, archR = 0.385f;
+		float[] wheelZ = { -1.42f, 1.38f };
+		const float rNose = 0.16f, rTail = 0.12f;
+		float Round(float z, float z0, float z1, float rn, float rt)
+		{
+			if (z < z0 + rn) { float d = rn - (z - z0); return rn - Mathf.Sqrt(Mathf.Max(0f, rn * rn - d * d)); }
+			if (z > z1 - rt) { float d = rt - (z1 - z); return rt - Mathf.Sqrt(Mathf.Max(0f, rt * rt - d * d)); }
+			return 0f;
+		}
+		float TopAt(float z) => z < zWs ? Mathf.Lerp(belt - 0.07f, belt, Mathf.SmoothStep(0f, 1f, (z - zN) / (zWs - zN))) : belt;
+		float ArchAt(float z)
+		{
+			foreach (float wz in wheelZ)
+				if (Mathf.Abs(z - wz) < archR) return axleY + Mathf.Sqrt(archR * archR - (z - wz) * (z - wz));
+			return sill;
+		}
+		var zs = new List<float>();
+		for (float z = zN; z < zR - 0.001f; z += 0.06f) zs.Add(z);
+		foreach (float wz in wheelZ) for (int i = 0; i <= 12; i++) zs.Add(wz - archR + i * archR * 2f / 12f);
+		zs.Add(zSeat); zs.Add(zR);
+		zs.Sort();
+		void Slices(float xIn, float xOut, float inset, bool arches, System.Func<float, float> top, float zFrom, float zTo)
+		{
+			for (int i = 0; i + 1 < zs.Count; i++)
+			{
+				float za = zs[i], zb = zs[i + 1];
+				if (zb - za < 0.004f || za < zFrom - 0.001f || zb > zTo + 0.001f) continue;
+				float ra = Round(za, zN, zR, rNose, rTail) + inset, rb = Round(zb, zN, zR, rNose, rTail) + inset;
+				float ba = (arches ? ArchAt(za) : sill) + ra, bb = (arches ? ArchAt(zb) : sill) + rb;
+				float ta = top(za) - ra, tb = top(zb) - rb;
+				if (ta - ba < 0.01f || tb - bb < 0.01f) continue;
+				_k.ExtrudeX(new List<Vector2> { new(za, ba), new(zb, bb), new(zb, tb), new(za, ta) }, xIn, xOut, 1f);
+			}
+		}
+		const float coreX = 0.64f;
+		// the core between the wheels: full height in front of the rear seat, the load floor behind it
+		Slices(-coreX, coreX, 0f, false, TopAt, zN, zSeat);
+		Slices(-coreX, coreX, 0f, false, z => floorY, zSeat, zR);
 		foreach (float side in new[] { -1f, 1f })
-			_k.Box(new Vector3(side * (W * 0.5f - 0.04f), (floorY + belt) * 0.5f, (zSeat + zR) * 0.5f), new Vector3(0.08f, belt - floorY, zR - zSeat), 1f);
-		// bonnet: a shallow slope from the windscreen down to the nose
-		Vector3 bl = new(-W * 0.5f + 0.03f, belt, zWs), br = new(W * 0.5f - 0.03f, belt, zWs);
-		Vector3 nl = new(-W * 0.5f + 0.06f, belt - 0.06f, zN + 0.02f), nr = new(W * 0.5f - 0.06f, belt - 0.06f, zN + 0.02f);
-		_k.Quad(nl, nr, br, bl, Vector3.Up);
+		{
+			float wIn = W * 0.5f - 0.035f;
+			// the flanks (thinner along the load space, so it keeps its width), then the rolled outer skin
+			Slices(side < 0 ? -wIn : coreX, side < 0 ? -coreX : wIn, 0f, true, TopAt, zN, zSeat);
+			Slices(side < 0 ? -wIn : W * 0.5f - 0.1f, side < 0 ? -(W * 0.5f - 0.1f) : wIn, 0f, true, TopAt, zSeat, zR);
+			Slices(side < 0 ? -W * 0.5f : wIn, side < 0 ? -wIn : W * 0.5f, 0.035f, true, TopAt, zN, zR);
+			// under the rear flanks, between the core and the skin, the floor's edge
+			Slices(side < 0 ? -(W * 0.5f - 0.1f) : coreX, side < 0 ? -coreX : W * 0.5f - 0.1f, 0f, true, z => floorY, zSeat, zR);
+		}
 		// greenhouse: glass all round with body-colour pillars and roof
 		float hw0 = W * 0.5f - 0.05f, hw1 = W * 0.5f - 0.13f;
 		Vector3 G(float side, float y, float z) => new(side * (y > belt + 0.01f ? hw1 : hw0), y, z);
@@ -807,11 +995,35 @@ public partial class ParkProp : Node3D
 		foreach (float side in new[] { -1f, 1f })
 			foreach (float z in new[] { -1.42f, 1.38f })
 			{
-				Vector3 c = new(side * (W * 0.5f - 0.1f), 0.31f, z);
-				_k.Mat(tyre).Cylinder(c - new Vector3(0.1f, 0, 0), c + new Vector3(0.1f, 0, 0), 0.31f, 0.31f, 10, true, 1f);
-				_k.Mat(hub).Cylinder(c + new Vector3(side * 0.1f, 0, 0), c + new Vector3(side * 0.106f, 0, 0), 0.19f, 0.19f, 10, true, 1f);
-				// the arch: a dark band over the wheel
-				_k.Mat(trim).Box(c + new Vector3(side * 0.02f, 0.3f, 0), new Vector3(0.2f, 0.06f, 0.78f), 1f);
+				// (2026-10-14a) a round tyre with its sidewalls rolled, a dished steel wheel with a hub cap and its nuts,
+				// the dark liner up inside the arch (was a ten-sided drum and a flat bar over it)
+				Vector3 c = new(side * (W * 0.5f - 0.11f), 0.31f, z);
+				Vector3 ax = new(side, 0, 0);
+				_k.Mat(tyre);
+				_k.Cylinder(c - ax * 0.085f, c + ax * 0.085f, 0.31f, 0.31f, 22, false, 1f);
+				_k.Cylinder(c + ax * 0.085f, c + ax * 0.105f, 0.31f, 0.285f, 22, false, 1f);
+				_k.Cylinder(c - ax * 0.085f, c - ax * 0.105f, 0.31f, 0.285f, 22, false, 1f);
+				_k.Cylinder(c + ax * 0.105f, c + ax * 0.1f, 0.285f, 0.2f, 22, false, 1f);
+				_k.Cylinder(c - ax * 0.105f, c - ax * 0.1f, 0.285f, 0.2f, 22, false, 1f);
+				_k.Mat(CarMat("car_wheel", new Color(0.13f, 0.13f, 0.13f), 0.6f, 0.4f, false));   // painted steel, grimed
+				_k.Cylinder(c + ax * 0.06f, c + ax * 0.098f, 0.2f, 0.19f, 22, true, 1f);
+				_k.Cylinder(c + ax * 0.075f, c + ax * 0.09f, 0.15f, 0.15f, 22, true, 1f);
+				_k.Mat(hub);
+				_k.Cylinder(c + ax * 0.09f, c + ax * 0.11f, 0.065f, 0.05f, 14, true, 1f);
+				for (int nut = 0; nut < 5; nut++)
+				{
+					float a = nut * Mathf.Tau / 5f;
+					Vector3 np = c + new Vector3(0, Mathf.Sin(a) * 0.095f, Mathf.Cos(a) * 0.095f);
+					_k.Cylinder(np + ax * 0.09f, np + ax * 0.102f, 0.012f, 0.012f, 6, true, 1f);
+				}
+				_k.Mat(trim);
+				for (int s = 0; s < 12; s++)
+				{
+					float a0 = Mathf.Pi * s / 12f, a1 = Mathf.Pi * (s + 1) / 12f;
+					Vector3 p0 = new(c.X - side * 0.02f, axleY + Mathf.Sin(a0) * (archR - 0.012f), z + Mathf.Cos(a0) * (archR - 0.012f));
+					Vector3 p1 = new(c.X - side * 0.02f, axleY + Mathf.Sin(a1) * (archR - 0.012f), z + Mathf.Cos(a1) * (archR - 0.012f));
+					_k.Beam(p0, p1, 0.26f, 0.02f, 1f, (p0 + p1) * 0.5f - new Vector3((p0.X + p1.X) * 0.5f, axleY, z));
+				}
 			}
 		_k.Color = Colors.White;
 

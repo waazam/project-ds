@@ -183,6 +183,10 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"far_clang_{i:00}", sfx, false, Lo, (r, 
 jobs.Add(("stair_break_01", sfx, false, Lo, (r, sr) => Stairwell.StairBreak(r, sr)));
 // Act 15: the long hallway
 jobs.Add(("hall_hum_loop", ambient, true, Lo, (r, sr) => Hallway.HallHum(r, sr, 30)));
+// the bunker door's keypad (2026-10-13)
+for (int i = 1; i <= 8; i++) jobs.Add(($"keypad_press_{i:00}", sfx, false, Lo, (r, sr) => Keypad.Press(r, sr)));
+jobs.Add(("keypad_accept_01", sfx, false, Lo, (r, sr) => Keypad.Accept(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"keypad_deny_{i:00}", sfx, false, Lo, (r, sr) => Keypad.Deny(r, sr)));
 jobs.Add(("relay_clunk_01", sfx, false, Lo, (r, sr) => Hallway.RelayClunk(r, sr)));
 jobs.Add(("siren_low_01", sfx, false, Lo, (r, sr) => Hallway.SirenLow(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"shadow_breath_{i:00}", sfx, false, Lo, (r, sr) => Hallway.ShadowBreath(r, sr)));

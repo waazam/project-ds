@@ -18,8 +18,8 @@ namespace ProjectDS.World;
 ///
 /// Tracking: every digit read is saved as <see cref="StoryManager.Flag.CodeDigit"/>(n) at once and
 /// the digit is shown big on screen for a moment. That's all the player gets: (2026-10-13, the owner: "remove the UI
-/// for the bunker code, the player should have to remember themselves") there's no tracker on the HUD and the dial
-/// (<see cref="UI.CodeLockOverlay"/>) starts at nought; <see cref="Known"/> is for tests. Each digit found turns the stalker's
+/// for the bunker code, the player should have to remember themselves") there's no tracker on the HUD and the door's
+/// keypad (<see cref="BunkerParts.BunkerKeypad"/>) starts empty; <see cref="Known"/> is for tests. Each digit found turns the stalker's
 /// clicking up a notch (Urgency) until the door is open. Group "survey_lot" (the name the bunker's
 /// dial and the HUD look up; kept).
 /// </summary>

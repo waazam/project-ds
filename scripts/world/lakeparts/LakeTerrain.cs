@@ -105,6 +105,17 @@ public static class LakeTerrain
 		m.SetShaderParameter("tex_gravel", ProcTextures.Gravel());
 		m.SetShaderParameter("tex_rock", ProcTextures.Rock());
 		m.SetShaderParameter("tex_noise", ProcTextures.WaterNoise());
+		// (2026-10-14b, the graphics pass: a pale, flat print of ground under the dawn sun) the photographed floor and litter
+		// through it, with their relief
+		if (SurfaceSets.Tex("forest_floor") is { } ff && SurfaceSets.Tex("leaf_litter") is { } ll)
+		{
+			m.SetShaderParameter("scan_floor", ff);
+			m.SetShaderParameter("scan_litter", ll);
+			m.SetShaderParameter("scan_floor_nor", SurfaceSets.Tex("forest_floor", "normal"));
+			m.SetShaderParameter("scan_litter_nor", SurfaceSets.Tex("leaf_litter", "normal"));
+			m.SetShaderParameter("scan_amount", 0.55f);
+			m.SetShaderParameter("relief", 0.7f);
+		}
 		return m;
 	});
 

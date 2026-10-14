@@ -12,7 +12,9 @@ namespace ProjectDS.World;
 /// open for good. Walking in through the doorway (a trigger just
 /// inside the hatch) carries them into the bunker's interior (Act 8) and marks
 /// checkpoint 7. A laminated station card bolted beside the door can be read at
-/// any time, locked or not. Group "bunker_marker" so the compass can find it.
+/// any time, locked or not. The code is entered on a keypad on the face right of
+/// the door (<see cref="BunkerKeypad"/>, used in the world, never a screen overlay).
+/// Group "bunker_marker" so the compass can find it.
 ///
 /// Restore: in _Ready the door is open (silently, no caption) if the story is at
 /// Act 8 or later. Entry works every time the open doorway is walked into (a
@@ -26,7 +28,7 @@ public partial class Bunker : Node3D
 	[Export] public float OpenRadius = 14f;
 
 	/// <summary>The station card beside the hatch (story-gaps P10). Its last lines are the lot's clue:
-	/// the door's dial reads the four numbers R.H. nailed to trees along the way, in order (see <see cref="SurveyLot"/>).</summary>
+	/// the door's keypad takes the four numbers R.H. nailed to trees along the way, in order (see <see cref="SurveyLot"/>).</summary>
 	public const string StationCardText =
 		"OVERLOOK PARK\n" +
 		"REMOTE MONITORING STATION 3\n" +
@@ -35,13 +37,19 @@ public partial class Bunker : Node3D
 		"Door code: four numbers, marked on the way in (UV).\n" +
 		"In order.";
 
-	/// <summary>The one line at the locked dial, once.</summary>
-	public const string DialLine = "Locked. A dial. Four numbers.";
+	/// <summary>The one line at the locked door, once (the flag's name is kept from the old dial: saves carry it).</summary>
+	public const string DialLine = "Locked. A keypad. Four numbers.";
 	public const string DialLineFlag = "line_bunker_dial";
 
 	public bool IsOpen { get; private set; }
-	/// <summary>Where the dial sits on the hatch (world): aim here to use it.</summary>
+	/// <summary>The middle of the vault door's face (world).</summary>
 	public Vector3 HatchWorld => ToGlobal(new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ + 0.1f));
+	/// <summary>The code lock beside the door.</summary>
+	public BunkerKeypad Keypad => _keypad;
+	/// <summary>Where the keypad's faceplate is (world): aim here to use it.</summary>
+	public Vector3 KeypadWorld => _keypad?.FaceWorld ?? ToGlobal(KeypadLocal);
+	/// <summary>Where the keypad hangs (local): on the face right of the frame, at hand height, under the station card.</summary>
+	public static Vector3 KeypadLocal => new(1.6f, 1.08f, BunkerExterior.FaceZ);
 
 	/// <summary>A spot on the apron in front of the door, on the ground (the Act 8 checkpoint's respawn point).</summary>
 	public Vector3 ApproachPointWorld
@@ -71,6 +79,7 @@ public partial class Bunker : Node3D
 	private Node3D _doorNode;
 	private CollisionShape3D _closedCollision, _openCollision;
 	private Area3D _openTrigger, _entryTrigger;
+	private BunkerKeypad _keypad;
 	private bool _entryRetrying;
 	/// <summary>Where the apron's ramp meets lower ground in front (top surface, local), or null when the apron is flat.</summary>
 	private Vector3? _rampEndTop;
@@ -98,6 +107,7 @@ public partial class Bunker : Node3D
 		_doorNode = open ? BuildOpenDoor() : BuildClosedDoor();
 		if (_closedCollision != null) _closedCollision.Disabled = open;
 		if (_openCollision != null) _openCollision.Disabled = !open;
+		_keypad?.SetDoorOpen(open);
 	}
 
 	private static bool StoryAllowsOpening => StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning };
@@ -162,18 +172,13 @@ public partial class Bunker : Node3D
 		// No spoken line any more (Dan, 2026-09-22: less self-talk); the flag still marks the first look at the dial.
 	}
 
-	/// <summary>E on the dial (after the fire): the four wheels come up; the lot's code opens the door.</summary>
-	private void OnDialUsed(PlayerController player)
-	{
-		if (IsOpen || !StoryAllowsOpening) return;
-		string code = (GetTree().GetFirstNodeInGroup("survey_lot") as SurveyLot)?.Code ?? "0000";
-		UI.CodeLockOverlay.Instance?.Open(code, player, Unlock);
-	}
+	/// <summary>The code the keypad opens to: the lot's four numbers.</summary>
+	private string Code() => (GetTree()?.GetFirstNodeInGroup("survey_lot") as SurveyLot)?.Code ?? "0000";
 
-	/// <summary>The right code: saved, so the door stays open on Continue, then the door swings.</summary>
+	/// <summary>The right code on the keypad: saved, so the door stays open on Continue, then the door swings.</summary>
 	private void Unlock()
 	{
-		if (IsOpen) return;
+		if (IsOpen || !StoryAllowsOpening) return;
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.BunkerUnlocked);
 		Open();
 	}
@@ -242,6 +247,12 @@ public partial class Bunker : Node3D
 		}
 		BunkerExterior.BuildConcrete(_gen, _gen, _rampEndTop);
 		BuildStationCardPlate();
+		// The keypad: built before it joins the tree (its _Ready only wires it up), in the editor too.
+		_keypad = new BunkerKeypad { Name = "Keypad", Position = KeypadLocal };
+		_keypad.Build();
+		_keypad.CodeSource = Code;
+		_keypad.Unlocked += Unlock;
+		_gen.AddChild(_keypad);
 
 		if (Engine.IsEditorHint()) return;
 		var body = new StaticBody3D { Name = "BunkerBody", CollisionLayer = 1, CollisionMask = 0 };
@@ -339,27 +350,15 @@ public partial class Bunker : Node3D
 	{
 		var dk = new MeshKit();
 		BunkerExterior.VaultDoor(dk, new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ), ProcTextures.MetalMat);
-		// The dial: a small numbered drum lock bolted to the door's face, right of centre at hand height.
-		Vector3 dial = new(0.34f, BunkerExterior.DoorCenterY - 0.12f, BunkerExterior.DoorZ);
-		dk.Mat(ProcTextures.MetalMat);
-		dk.Color = new Color(0.28f, 0.27f, 0.25f);
-		dk.Box(dial + Vector3.Back * 0.02f, new Vector3(0.2f, 0.09f, 0.04f), 1f);
-		dk.Color = new Color(0.62f, 0.6f, 0.55f);
-		for (int i = 0; i < 4; i++)
-		{
-			Vector3 c = dial + new Vector3(-0.06f + i * 0.04f, 0f, 0.04f);
-			dk.Cylinder(c + Vector3.Left * 0.015f, c + Vector3.Right * 0.015f, 0.032f, 0.032f, 10);
-		}
 		var mesh = dk.CommitTo(_gen, "DoorMesh");
 		if (!Engine.IsEditorHint())
 		{
-			// Story: found before the fire, it is locked; after the fire the dial can be tried.
+			// The door itself is never used: it says it's locked (and, once the keypad wakes, where the keypad is).
 			var hatch = new BunkerLockedHatch
 			{
 				Name = "Hatch", Prompt = "Locked", MaxDistance = 3f, PickRadius = 1.0f,
 				Position = new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ), PickOffset = new Vector3(0, 0, -0.4f),
 			};
-			hatch.Interacted += OnDialUsed;
 			mesh.AddChild(hatch);
 		}
 		return mesh;

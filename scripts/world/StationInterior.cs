@@ -321,8 +321,9 @@ public partial class StationInterior : Node3D
 		// frames round every doorway off the lobby (the linings hide the wall's cut ends and close the
 		// slits round a shut leaf)
 		var frames = new MeshKit();
-		frames.Mat(PropTextures.DeckMat);
-		frames.Color = new Color(0.42f, 0.31f, 0.21f);
+		// (2026-10-14b: their own dark stained wood, not the floor's and the walls' boards)
+		frames.Mat(StationTextures.CasingMat);
+		frames.Color = Colors.White;
 		StationKit.DoorFrame(frames, new Vector3(HalfWidth, 0, 0), Vector3.Back, 2.2f, 2.2f);
 		StationKit.DoorFrame(frames, new Vector3(-HalfWidth, 0, 0), Vector3.Back, 2.2f, 2.2f);
 		StationKit.DoorFrame(frames, new Vector3(BasementGapX, 0, -HalfDepth), Vector3.Right, 2.2f, 2.2f);
@@ -338,14 +339,10 @@ public partial class StationInterior : Node3D
 		var front = new Node3D { Name = "FrontDoor", Position = new Vector3(EntryGapX, 0, -HalfDepth) };
 		AddChild(front);
 		var k = new MeshKit();
-		k.Mat(BuildingTextures.BoardsMat);
-		k.Color = new Color(0.34f, 0.25f, 0.17f);
-		BuildKit.Box(k, new Vector3(0, 1.08f, 0), new Vector3(2.12f, 2.16f, 0.06f), 1.2f);
-		// raised panels on the inside face
-		k.Color = new Color(0.3f, 0.22f, 0.15f);
-		foreach (float x in new[] { -0.5f, 0.5f })
-			foreach (var (y, h) in new[] { (0.55f, 0.8f), (1.55f, 0.9f) })
-				BuildKit.Box(k, new Vector3(x, y, 0.035f), new Vector3(0.78f, h, 0.02f), 1.2f);
+		// (2026-10-14b: a panelled door in its own paint; it was a slab of the wall's boards with four boxes on it)
+		k.Mat(StationTextures.DoorPaintMat);
+		k.Color = new Color(0.82f, 0.8f, 0.78f);
+		StationKit.PanelDoor(k, new Vector3(0, 1.08f, 0), 2.12f, 2.16f, 0.06f, Basis.Identity, 2);
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.8f, 0.65f, 0.4f);
 		k.Cylinder(new Vector3(0.85f, 1.02f, 0), new Vector3(0.85f, 1.02f, 0.08f), 0.03f, 0.03f, 8, true);
@@ -367,9 +364,10 @@ public partial class StationInterior : Node3D
 		AddChild(door);
 		door.Setup(new Vector3(1.05f, 1.1f, 0), new Vector3(2.1f, 2.2f, 0.3f), new Vector3(1.05f, 1.1f, 0));
 		var k = new MeshKit();
-		k.Mat(BuildingTextures.BoardsMat);
-		k.Color = new Color(0.38f, 0.28f, 0.18f);
-		BuildKit.Box(k, new Vector3(1.05f, 1.08f, 0), new Vector3(2.08f, 2.16f, 0.05f), 1.2f);
+		// (2026-10-14b: panelled and painted, not a slab of the wall's boards)
+		k.Mat(StationTextures.DoorPaintMat);
+		k.Color = Colors.White;
+		StationKit.PanelDoor(k, new Vector3(1.05f, 1.08f, 0), 2.08f, 2.16f, 0.05f, Basis.Identity, 2);
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.8f, 0.65f, 0.4f);
 		foreach (int s in new[] { -1, 1 })

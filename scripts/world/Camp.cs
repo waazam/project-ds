@@ -149,19 +149,26 @@ public partial class Camp : Node3D
 		_stumpBase = lo;
 		float top = lo + StumpHeight;
 		var k = new MeshKit();
-		k.Mat(ProcTextures.BarkMat);
-		k.Color = new Color(0.66f, 0.6f, 0.54f);
+		// (2026-10-14a, the early acts' look: it was a ten-sided drum in a flat dark bark) the photographed bark, its
+		// roots flaring out in lobes into the ground, a lip of bark curling over the old cut at the top
+		k.Mat(BuildingTextures.BarkScanMat);
+		k.Color = new Color(0.8f, 0.74f, 0.68f);
+		float[] flare = { 0.45f, 0.26f, 0.1f, 0.03f, 0f };
+		float Lobe(int r, float a) => 1f + flare[Mathf.Min(r, flare.Length - 1)] * Mathf.Pow(Mathf.Max(0f, Mathf.Cos(a * 5f + 0.7f + Mathf.Sin(a * 2f) * 0.6f)), 2f)
+			+ 0.035f * Mathf.Sin(a * 9f + r * 1.3f);
 		ItemMeshes.Loft(k, new[]
 		{
-			new ItemMeshes.Ring(s + new Vector3(0, lo - 0.15f, 0), StumpRadius * 1.3f, StumpRadius * 1.22f),
-			new ItemMeshes.Ring(s + new Vector3(0, lo + 0.05f, 0), StumpRadius * 1.12f, StumpRadius * 1.08f),
-			new ItemMeshes.Ring(s + new Vector3(0, lo + 0.2f, 0), StumpRadius * 1.02f, StumpRadius),
-			new ItemMeshes.Ring(s + new Vector3(0, top, 0), StumpRadius, StumpRadius * 0.97f),
-		}, 10, false, false, Vector3.Right, 2.5f);
-		// old cut top, grey and weathered (not fresh like the woodpile's)
+			new ItemMeshes.Ring(s + new Vector3(0, lo - 0.18f, 0), StumpRadius * 1.28f, StumpRadius * 1.22f),
+			new ItemMeshes.Ring(s + new Vector3(0, lo + 0.02f, 0), StumpRadius * 1.16f, StumpRadius * 1.1f),
+			new ItemMeshes.Ring(s + new Vector3(0, lo + 0.14f, 0), StumpRadius * 1.05f, StumpRadius * 1.02f),
+			new ItemMeshes.Ring(s + new Vector3(0, lo + 0.3f, 0), StumpRadius * 1.01f, StumpRadius * 0.99f),
+			new ItemMeshes.Ring(s + new Vector3(0, top - 0.015f, 0), StumpRadius * 1.0f, StumpRadius * 0.97f),
+			new ItemMeshes.Ring(s + new Vector3(0, top + 0.01f, 0), StumpRadius * 0.96f, StumpRadius * 0.93f),
+		}, 22, false, false, Vector3.Right, 1.6f, Lobe, uScale: 2f);
+		// old cut top, grey and weathered (not fresh like the woodpile's), sunk a hair inside the bark's lip
 		k.Mat(ProcTextures.EndGrainMat);
-		k.Color = new Color(0.62f, 0.56f, 0.5f);
-		ItemMeshes.Disc(k, s + new Vector3(0, top, 0), Vector3.Up, StumpRadius * 0.99f, 10);
+		k.Color = new Color(0.56f, 0.52f, 0.47f);
+		ItemMeshes.Disc(k, s + new Vector3(0, top + 0.004f, 0), Vector3.Up, StumpRadius * 0.95f, 22);
 		// the pebble on the note
 		k.Mat(ProcTextures.RockMat);
 		k.Color = new Color(0.72f, 0.71f, 0.68f);
