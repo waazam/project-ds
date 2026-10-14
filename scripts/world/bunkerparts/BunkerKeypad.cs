@@ -141,6 +141,8 @@ public partial class BunkerKeypad : Interactable
 		Entered = "";
 		Selected = 4;
 		player.PlayerInput.BeginModal();
+		// the number keys and the D-pad belong to the pad now, not to the hands (1-9 switch the item, D-pad down the blacklight)
+		PlayerHands.Hold(this);
 		_cam = new Camera3D
 		{
 			Name = "CloseView", TopLevel = true, Fov = eye.Fov, Near = 0.02f, Far = eye.Far,
@@ -161,7 +163,7 @@ public partial class BunkerKeypad : Interactable
 			_hintShown = true;
 			_ = sub.Show(_padLast
 				? "D-pad: choose a key.   A: press it.   X: back a digit.   B: step back."
-				: "0-9, or the arrows and E: press a key.   Backspace: back a digit.   Enter: try it.   Esc: step back.", 0.4f, 4.5f, 1f);
+				: "0-9, or the arrows and E: press.   Backspace: undo.   Enter: try.   Esc: step back.", 0.4f, 4.5f, 1f);
 		}
 	}
 
@@ -187,6 +189,7 @@ public partial class BunkerKeypad : Interactable
 		_cam = null;
 		_eye = null;
 		if (_player != null && IsInstanceValid(_player)) _player.PlayerInput.EndModal();
+		PlayerHands.Release(this);
 		_player = null;
 		SetHighlightKey(-1);
 	}
@@ -197,6 +200,12 @@ public partial class BunkerKeypad : Interactable
 		Vector3 key = KeyCentre(i);
 		var local = new Transform3D(Basis.Identity, new Vector3(key.X, key.Y, Front + ViewDistance));
 		return GlobalTransform * local;
+	}
+
+	public override void _ExitTree()
+	{
+		base._ExitTree();
+		if (!Engine.IsEditorHint() && _cam != null) { Engaged = false; Release(); }
 	}
 
 	public override void _Process(double delta)
@@ -344,19 +353,24 @@ public partial class BunkerKeypad : Interactable
 		PlaySfx($"keypad_deny_{_denyPick.Next(_rng, 3) + 1:00}", -8f, 0.01f);
 		UI.SoundCaption.Heard(this, "keypad_deny", GlobalPosition);
 		string shown = Entered.Length > 0 ? Entered : "----";
+		Denying = true;
 		for (int blink = 0; blink < 3 && Engaged; blink++)
 		{
 			LampState = Lamp.Denied; _override = shown; Paint();
 			await Wait(0.16f);
-			LampState = Lamp.Locked; _override = "    "; Paint();
+			LampState = Lamp.Off; _override = "    "; Paint();
 			await Wait(0.12f);
 		}
 		_override = null;
 		Entered = "";
 		LampState = Powered ? Lamp.Locked : Lamp.Off;
+		Denying = false;
 		_busy = false;
 		Paint();
 	}
+
+	/// <summary>True for the second or so a wrong code buzzes and the red lamp flashes (then it clears).</summary>
+	public bool Denying { get; private set; }
 
 	private async System.Threading.Tasks.Task Wait(float seconds)
 	{
@@ -382,7 +396,7 @@ public partial class BunkerKeypad : Interactable
 	{
 		if (_display == null) return;
 		PaintDisplay();
-		SetLamp(_ledPower, Powered, new Color(1f, 0.62f, 0.12f), 0.55f);
+		SetLamp(_ledPower, Powered, new Color(1f, 0.62f, 0.12f), 1f);
 		SetLamp(_ledRed, LampState is Lamp.Locked or Lamp.Denied, new Color(1f, 0.12f, 0.06f), LampState == Lamp.Denied ? 1.6f : 0.7f);
 		SetLamp(_ledGreen, LampState == Lamp.Open, new Color(0.2f, 1f, 0.3f), 1.2f);
 		if (_glow != null)
@@ -474,7 +488,7 @@ public partial class BunkerKeypad : Interactable
 		_highlighted = i;
 		if (i < 0 || _keyMesh[i] is not { } m) return;
 		_keyGlow ??= new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/interact_highlight.gdshader") };
-		_keyGlow.SetShaderParameter("fill", 0.09f);
+		_keyGlow.SetShaderParameter("fill", 0.14f);
 		_keyGlow.SetShaderParameter("rim", 0.6f);
 		m.MaterialOverlay = _keyGlow;
 	}
@@ -490,17 +504,17 @@ public partial class BunkerKeypad : Interactable
 	};
 	private static StandardMaterial3D GhostSegment => _ghost ??= new StandardMaterial3D
 	{
-		AlbedoColor = new Color(0.16f, 0.035f, 0.03f), Roughness = 0.4f,
+		ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, AlbedoColor = new Color(0.07f, 0.014f, 0.012f),
 	};
 	private static StandardMaterial3D Glass => _glass ??= new StandardMaterial3D
 	{
-		AlbedoColor = new Color(0.07f, 0.02f, 0.02f), Roughness = 0.12f, MetallicSpecular = 0.8f,
+		AlbedoColor = new Color(0.03f, 0.008f, 0.008f), Roughness = 0.12f, MetallicSpecular = 0.8f,
 	};
 	/// <summary>Brushed stainless gone dull: the metal texture under vertex colour, a little shine left.</summary>
 	private static Material Steel => ProcTextures.MetalMat;
 	private static StandardMaterial3D KeyMat => _keyMat ??= new StandardMaterial3D
 	{
-		VertexColorUseAsAlbedo = true, AlbedoTexture = ProcTextures.MetalMat.AlbedoTexture, Roughness = 0.45f, Metallic = 0.55f, MetallicSpecular = 0.6f,
+		VertexColorUseAsAlbedo = true, AlbedoTexture = ProcTextures.MetalMat.AlbedoTexture, Roughness = 0.62f, Metallic = 0.12f, MetallicSpecular = 0.5f,
 		Uv1Scale = new Vector3(0.35f, 0.35f, 0.35f),
 	};
 	private static StandardMaterial3D Rubber => _rubber ??= new StandardMaterial3D
@@ -544,10 +558,15 @@ public partial class BunkerKeypad : Interactable
 			k.Box(new Vector3(0, sy * (BoxH * 0.5f + 0.012f), 0.004f), new Vector3(BoxW * 0.7f, 0.026f, 0.008f));
 		k.Color = Grime(cast, 0.2f);
 		// the hood: a sloped lid out over the face and two cheeks
+		// (no shadows from it: the door lamp sits low to the right, and a cheek's shadow blacked out the whole right column of keys)
+		var hood = new MeshKit();
+		hood.Mat(Steel);
+		hood.Color = k.Color;
 		var hoodTilt = Basis.FromEuler(new Vector3(Mathf.DegToRad(14f), 0, 0));
-		k.Box(new Vector3(0, BoxH * 0.5f + 0.008f, BoxD + 0.012f), new Vector3(BoxW + 0.012f, 0.004f, 0.075f), 1f, hoodTilt);
+		hood.Box(new Vector3(0, BoxH * 0.5f + 0.008f, BoxD + 0.012f), new Vector3(BoxW + 0.012f, 0.004f, 0.075f), 1f, hoodTilt);
 		foreach (float sx in new[] { -1f, 1f })
-			k.Box(new Vector3(sx * (BoxW * 0.5f + 0.004f), BoxH * 0.5f - 0.02f, BoxD + 0.012f), new Vector3(0.004f, 0.05f, 0.06f));
+			hood.Box(new Vector3(sx * (BoxW * 0.5f + 0.004f), BoxH * 0.5f - 0.02f, BoxD + 0.012f), new Vector3(0.004f, 0.05f, 0.06f));
+		hood.CommitTo(this, "KP_Hood", false);
 		k.Color = new Color(0.28f, 0.26f, 0.23f);
 		foreach (float sy in new[] { -1f, 1f })
 			foreach (float sx in new[] { -0.035f, 0.035f })
@@ -625,9 +644,9 @@ public partial class BunkerKeypad : Interactable
 			lk.Cylinder(p + Vector3.Back * 0.0018f, p + Vector3.Back * 0.0042f, 0.0031f, 0.0024f, 10);
 			return lk.CommitTo(this, $"KP_Lamp{i}", false);
 		}
-		_ledPower = Lamp(0, new Color(0.3f, 0.2f, 0.06f));
+		_ledPower = Lamp(0, new Color(0.12f, 0.08f, 0.03f));
 		_ledRed = Lamp(1, new Color(0.3f, 0.06f, 0.05f));
-		_ledGreen = Lamp(2, new Color(0.06f, 0.22f, 0.08f));
+		_ledGreen = Lamp(2, new Color(0.02f, 0.06f, 0.025f));
 		// three tiny legends under the lamps, stamped into the plate
 		string[] legends = { "PWR", "LOCK", "OPEN" };
 		for (int i = 0; i < 3; i++)
@@ -666,8 +685,8 @@ public partial class BunkerKeypad : Interactable
 		// rust weeping from the bottom flange's bolts, and the hood's drip line down the face
 		if (!Engine.IsEditorHint())
 		{
-			BunkerKit.AddDecal(this, BunkerTextures.RustRun(), new Vector3(-0.02f, -0.26f, 0f), Vector3.Back, Vector3.Down, new Vector2(0.07f, 0.24f), 0.05f, new Color(1, 1, 1, 0.85f)).Name = "KP_Rust";
-			BunkerKit.AddDecal(this, BunkerTextures.Streak(), new Vector3(0, 0.02f, Front), Vector3.Back, Vector3.Down, new Vector2(0.14f, 0.26f), 0.03f, new Color(1, 1, 1, 0.55f)).Name = "KP_Grime";
+			BunkerKit.AddDecal(this, BunkerTextures.RustRun(), new Vector3(-0.02f, -0.26f, 0f), Vector3.Back, Vector3.Down, new Vector2(0.06f, 0.2f), 0.05f, new Color(0.7f, 0.6f, 0.55f, 0.55f)).Name = "KP_Rust";
+			BunkerKit.AddDecal(this, BunkerTextures.Streak(), new Vector3(0, 0.02f, Front), Vector3.Back, Vector3.Down, new Vector2(0.14f, 0.26f), 0.03f, new Color(1, 1, 1, 0.28f)).Name = "KP_Grime";
 		}
 		_painted = null;
 		Paint();

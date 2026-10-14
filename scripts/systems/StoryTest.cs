@@ -1293,7 +1293,7 @@ public partial class StoryTest : Node
 			await MoveTo(pad, ProjectDS.World.BunkerParts.BunkerKeypad.Enter, ct);
 			await Key("interact", ct);
 			await Seconds(0.1, ct);
-			Check("a wrong code keeps the hatch shut and lights the red lamp", !bunker.IsOpen && pad.LampState == ProjectDS.World.BunkerParts.BunkerKeypad.Lamp.Denied, $"lamp {pad.LampState}");
+			Check("a wrong code keeps the hatch shut and lights the red lamp", !bunker.IsOpen && pad.Denying, $"lamp {pad.LampState}");
 			await WaitUntil(() => pad.Entered == "" && pad.LampState == ProjectDS.World.BunkerParts.BunkerKeypad.Lamp.Locked, 3, ct);
 			// then the code they remember, key by key through the same keys
 			foreach (char c in lot?.Code ?? "")

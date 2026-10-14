@@ -434,23 +434,32 @@ public partial class Playtest
 			$"camera {GetViewport().GetCamera3D()?.Name}, mouse {Godot.Input.MouseMode} (was {mouse})");
 		Check("the readout starts empty: the code is the player's to remember", pad.Entered == "", $"'{pad.Entered}'");
 		Shot("keypad_close");
+		if (Player.GetNodeOrNull<Lantern>("Lantern") is { } padLantern)
+		{
+			padLantern.SetBlacklight(true);
+			await _bot.Seconds(0.4, ct);
+			Shot("keypad_blacklight");
+			padLantern.SetBlacklight(false);
+		}
 		// the arrows (the D-pad) and E press the highlighted key; the view's centre sits on it
 		await _bot.Key("move_forward", ct);
 		await _bot.Key("interact", ct);
 		Check("up from 5 and E: 2", pad.Entered == "2" && pad.Selected == 1, $"'{pad.Entered}', on {BunkerKeypad.Keys[pad.Selected]}");
 		await TypeKey(Key.Backspace, ct);
 		Check("Backspace takes it back", pad.Entered == "", $"'{pad.Entered}'");
-		// a wrong code, through the number keys and Enter: a buzz, the red lamp, cleared
-		foreach (var k in new[] { Key.Key1, Key.Key3, Key.Key5, Key.Key7 }) await TypeKey(k, ct);
+		// a wrong code, through the numpad and Enter: a buzz, the red lamp, cleared
+		foreach (var k in new[] { Key.Kp1, Key.Kp3, Key.Kp5, Key.Kp7 }) await TypeKey(k, ct);
 		Check("the number keys type", pad.Entered == "1357", $"'{pad.Entered}'");
 		await TypeKey(Key.Enter, ct);
 		await _bot.Seconds(0.1, ct);
-		Check("a wrong code: the red lamp, still shut", pad.LampState == BunkerKeypad.Lamp.Denied && !bunker.IsOpen, $"lamp {pad.LampState}");
+		Check("a wrong code: the red lamp, still shut", pad.Denying && !bunker.IsOpen, $"lamp {pad.LampState}");
 		await _bot.WaitUntil(() => pad.Entered == "" && pad.LampState == BunkerKeypad.Lamp.Locked, 3, ct);
 		Check("...and it clears", pad.Entered == "" && pad.Engaged, $"'{pad.Entered}'");
-		// the code remembered from the four notes, keyed in on the numpad
+		// the code remembered from the four notes, keyed in on the top-row number keys (which also switch the item in hand, elsewhere)
 		string code = lot?.Code ?? "";
-		foreach (char c in code) await TypeKey(Key.Kp0 + (c - '0'), ct);
+		var handBefore = Player.Inventory?.InHand; int switchesBefore = PlayerHands.Instance?.Switches ?? 0;
+		foreach (char c in code) await TypeKey(Key.Key0 + (c - '0'), ct);
+		Check("the number keys go to the pad, not the hands", Player.Inventory?.InHand == handBefore && (PlayerHands.Instance?.Switches ?? 0) == switchesBefore, $"in hand {Player.Inventory?.InHand} (was {handBefore})");
 		Check("the remembered code keyed in", pad.Entered == code, $"{pad.Entered} vs {code}");
 		Shot("keypad_code");
 		await TypeKey(Key.KpEnter, ct);
