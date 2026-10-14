@@ -205,6 +205,9 @@ public partial class TreeNote : Node3D
 	/// <summary>Saved once shown: the nudge after the camp note (the lantern's lesson done), and the one after walking past a number
 	/// in the dark. Each comes once in a game.</summary>
 	public const string HintFirstFlag = "hint_code_blacklight", HintPassedFlag = "hint_code_passed";
+	/// <summary>"Walked past it": within this far (m, flat), then beyond <see cref="PassFar"/>, the blacklight never on.
+	/// (2026-10-13, the skippable-events audit: 9 m let anyone a few steps off the path walk by unnoticed.)</summary>
+	private const float PassNear = 14f, PassFar = 21f;
 	private float _hintWait, _passWait;
 	private bool _near, _nearUv, _passPending;
 
@@ -241,12 +244,12 @@ public partial class TreeNote : Node3D
 		// walked past this one in the dark
 		if (Read || s.HasFlag(HintPassedFlag)) { _near = false; _passPending = false; return; }
 		float flat = new Vector2(_player.GlobalPosition.X - GlobalPosition.X, _player.GlobalPosition.Z - GlobalPosition.Z).Length();
-		if (flat < 9f)
+		if (flat < PassNear)
 		{
 			if (!_near) { _near = true; _nearUv = false; }
 			if (Player.Lantern.Uv.on) _nearUv = true;
 		}
-		else if (_near && flat > 16f)
+		else if (_near && flat > PassFar)
 		{
 			_near = false;
 			if (!_nearUv && hasLantern) { _passPending = true; _passWait = 0f; }
@@ -254,7 +257,7 @@ public partial class TreeNote : Node3D
 		if (_passPending)
 		{
 			_passWait += dt;
-			if (_passWait > 20f || flat < 9f) _passPending = false;   // (too late to mean anything, or they've gone back)
+			if (_passWait > 20f || flat < PassNear) _passPending = false;   // (too late to mean anything, or they've gone back)
 			else if (clear)
 			{
 				_passPending = false;

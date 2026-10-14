@@ -48,6 +48,60 @@ public partial class Footbridge : Node3D
 		}
 		else if (!Engine.IsEditorHint()) _terrain = GroundSnap.FindTerrain(this);
 		Build(rise);
+		if (!Engine.IsEditorHint()) SetUpCrossingLine();
+	}
+
+	// ------------------------------------------------------------------ the creek, however it is crossed
+
+	// (2026-10-13, Dan: "make sure events are still triggered even if character doesnt cross the bridge. for example
+	// the gunshot in the beginning") The deck's own trigger only catches a player who walks the planks; one who wades
+	// the creek beside it, jumps it or goes round never touches it. So the bridge also answers "are they over the
+	// creek yet?" for any point: on the far side of the stream's middle, the side the trail goes on from.
+
+	private Polyline2 _stream;
+	private Vector3 _crossAt, _crossDir;
+	private int _farSide;
+
+	/// <summary>True when the bridge knows its creek (a terrain with a stream the trail crosses).</summary>
+	public bool HasCrossingLine => _farSide != 0;
+
+	private void SetUpCrossingLine()
+	{
+		if (_terrain == null || !_terrain.TryGetStreamCrossing(out _crossAt, out _crossDir, out float s)) return;
+		_stream = _terrain.Stream;
+		if (_stream == null || _stream.Points.Count < 2) return;
+		_crossDir.Y = 0f;
+		_crossDir = _crossDir.Normalized();
+		// the trail a little way on past the water is the far side
+		Vector3 on = _terrain.TrailPoint(s + Mathf.Max(8f, Length), out _);
+		int side = StreamSide(on, out bool sure);
+		_farSide = sure ? side : 0;
+	}
+
+	/// <summary>Which side of the stream's middle line a world point is on (+1 / -1), and whether that can be trusted
+	/// (false past either end of the stream, where its nearest point is an end).</summary>
+	private int StreamSide(Vector3 world, out bool sure)
+	{
+		Vector3 o = _terrain.GlobalPosition;
+		var p = new Vector2(world.X - o.X, world.Z - o.Z);
+		_stream.Closest(p, out float s);
+		Vector2 c = _stream.At(s, out Vector2 t);
+		sure = s > 0.25f && s < _stream.Length - 0.25f;
+		float cross = t.X * (p.Y - c.Y) - t.Y * (p.X - c.X);
+		return cross >= 0f ? 1 : -1;
+	}
+
+	/// <summary>
+	/// Whether <paramref name="world"/> is over the creek from where the trail comes in, by any route: on the far side
+	/// of the stream's middle (wading, jumping the banks, the deck itself: the deck's middle is over the water). Past
+	/// either end of the stream it is the line through the bridge across the trail instead. Without a creek: false.
+	/// </summary>
+	public bool IsAcross(Vector3 world)
+	{
+		if (_farSide == 0) return false;
+		int side = StreamSide(world, out bool sure);
+		if (sure) return side == _farSide;
+		return (world - _crossAt).Dot(_crossDir) > 0f;
 	}
 
 	private float Rand(int i, float lo, float hi)
@@ -164,7 +218,8 @@ public partial class Footbridge : Node3D
 			if (Sign) BuildSign(gen, L);
 		}
 
-		var crossing = new BridgeCrossEvent { CollisionLayer = 0, CollisionMask = 2, Monitorable = false };
+		// The deck's own volume (the planks walked); BridgeCrossEvent also watches IsAcross for any other way over.
+		var crossing = new BridgeCrossEvent { CollisionLayer = 0, CollisionMask = 2, Monitorable = false, Bridge = this };
 		gen.AddChild(crossing);
 		crossing.AddChild(new CollisionShape3D
 		{

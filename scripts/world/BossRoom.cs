@@ -642,6 +642,8 @@ public partial class BossRoom : Node3D
 		AddChild(Library);
 		_tidyLight = new OmniLight3D { Name = "TidyLight", Position = new Vector3(0, 2.6f, z0 + 3f), LightColor = new Color(1f, 0.93f, 0.8f), LightEnergy = 0f, OmniRange = 9f, ShadowEnabled = false };
 		AddChild(_tidyLight);
-		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(4f, 2f, 2f) }, new Vector3(0, 1f, z0 + 2.5f), OnTidyRoom, "TidyRoomTrigger");
+		// the library's whole width (2026-10-13, the skippable-events audit: 4 m let a player step in and slide along the
+		// front shelves round it, and with no Act 18 save a Continue put them back in the pit)
+		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(Library.HalfW * 2f, 2.4f, 2f) }, new Vector3(0, 1.2f, z0 + 2.5f), OnTidyRoom, "TidyRoomTrigger");
 	}
 }

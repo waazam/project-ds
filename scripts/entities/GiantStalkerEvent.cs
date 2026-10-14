@@ -95,6 +95,9 @@ public partial class GiantStalkerEvent : Node
 	private void OnCheckpoint(Checkpoint cp)
 	{
 		if (cp == Checkpoint.Act7CabinBurning) Arm();
+		// Gone on past it (Dan, 2026-10-13: events must not hang on one route): the story moving on (the bunker
+		// entered) releases it too, so it never paces on over Acts 8 to 11.
+		else if (cp > Checkpoint.Act7CabinBurning && _armed) Fire();
 	}
 
 	// ------------------------------------------------------------------ when it crosses
@@ -104,6 +107,8 @@ public partial class GiantStalkerEvent : Node
 	/// <summary>Passing this close to the lookout without stopping starts it anyway after <see cref="PassGraceSeconds"/>.</summary>
 	[Export] public float PassRadius = 30f;
 	[Export] public float PassGraceSeconds = 5f;
+	/// <summary>Coming this close to the bunker (metres) counts as having gone on past the lookout.</summary>
+	[Export] public float BunkerReleaseRadius = 60f;
 	/// <summary>For tests: checkpoint 6 has been reached; the crossing waits for the player at the lookout.</summary>
 	public bool Armed => _armed;
 
@@ -135,7 +140,13 @@ public partial class GiantStalkerEvent : Node
 		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Node3D;
 		if (player == null) return;
 		if (lookout == null) { Fire(); return; }   // no lookout in this level: the old behaviour (at once)
-		float d = new Vector2(player.GlobalPosition.X - lookout.GlobalPosition.X, player.GlobalPosition.Z - lookout.GlobalPosition.Z).Length();
+		// Gone on past it without the lookout (Dan, 2026-10-13): checkpoint 6 usually lands by sight ~60 m short of the
+		// lookout and the compass then leads cross-country to the bunker, never within PassRadius of it. Nearing the
+		// bunker is past the lookout whichever way they came: this pass is its last.
+		if (GetTree().GetFirstNodeInGroup("bunker_marker") is Node3D bunker
+			&& new Vector2(player.GlobalPosition.X - bunker.GlobalPosition.X, player.GlobalPosition.Z - bunker.GlobalPosition.Z).Length() < BunkerReleaseRadius)
+		{ Fire(); return; }
+		float d =new Vector2(player.GlobalPosition.X - lookout.GlobalPosition.X, player.GlobalPosition.Z - lookout.GlobalPosition.Z).Length();
 		if (d > PassRadius) { _nearSince = -1; return; }
 		if (_nearSince < 0) _nearSince = 0;
 		_nearSince += delta;
