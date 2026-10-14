@@ -46,16 +46,24 @@ public partial class StationRoom3 : Node3D
 		var k = new MeshKit();
 		k.Mat(StairwellTextures.PlateMat);
 		k.Color = Colors.White;
-		void Slab(Vector3 c, Vector3 s, bool collide = true)
+		// (2026-10-14b: the corridor's floor and every ceiling were the walls' own riveted plate; the floor is the hall's tread
+		// plate now, the ceilings a darker, sootier rusted plate)
+		var under = new MeshKit();
+		under.Mat(StairwellTextures.TreadMat);
+		under.Color = new Color(0.8f, 0.82f, 0.85f);
+		var over = new MeshKit();
+		over.Mat(StationParts.StationTextures.RustPlateMat);
+		over.Color = new Color(0.24f, 0.23f, 0.22f);
+		void Slab(Vector3 c, Vector3 s, bool collide = true, MeshKit into = null)
 		{
-			BuildKit.Box(k, c, s, 0.5f);
+			BuildKit.Box(into ?? k, c, s, 0.5f);
 			if (collide) body.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
 		}
 		// the corridor
 		Slab(new Vector3(-1.3f, 1.3f, CorridorEnd * 0.5f), new Vector3(0.2f, 2.6f, CorridorEnd));
 		Slab(new Vector3(1.3f, 1.3f, CorridorEnd * 0.5f), new Vector3(0.2f, 2.6f, CorridorEnd));
-		Slab(new Vector3(0, 2.7f, CorridorEnd * 0.5f), new Vector3(2.8f, 0.2f, CorridorEnd), false);
-		Slab(new Vector3(0, -0.05f, CorridorEnd * 0.5f), new Vector3(2.8f, 0.1f, CorridorEnd));
+		Slab(new Vector3(0, 2.7f, CorridorEnd * 0.5f), new Vector3(2.8f, 0.2f, CorridorEnd), false, over);
+		Slab(new Vector3(0, -0.05f, CorridorEnd * 0.5f), new Vector3(2.8f, 0.1f, CorridorEnd), true, under);
 		// the hall
 		float hz = (HallEnd - CorridorEnd) * 0.5f, hc = CorridorEnd + hz;
 		Slab(new Vector3(-HallHalf, HallHeight * 0.5f, hc), new Vector3(0.3f, HallHeight, hz * 2f));
@@ -64,8 +72,10 @@ public partial class StationRoom3 : Node3D
 		Slab(new Vector3(-(HallHalf + 1.3f) * 0.5f, HallHeight * 0.5f, CorridorEnd), new Vector3(HallHalf - 1.3f, HallHeight, 0.3f));
 		Slab(new Vector3((HallHalf + 1.3f) * 0.5f, HallHeight * 0.5f, CorridorEnd), new Vector3(HallHalf - 1.3f, HallHeight, 0.3f));
 		Slab(new Vector3(0, (HallHeight + 2.6f) * 0.5f, CorridorEnd), new Vector3(2.6f, HallHeight - 2.6f, 0.3f));
-		Slab(new Vector3(0, HallHeight + 0.1f, hc), new Vector3(HallHalf * 2f, 0.2f, hz * 2f), false);
+		Slab(new Vector3(0, HallHeight + 0.1f, hc), new Vector3(HallHalf * 2f, 0.2f, hz * 2f), false, over);
 		MeshKit.Nudge(k.CommitTo(this, "Plate", true), Vector3.Left);   // flush on the lobby's wall: a hair proud of it (the clip audit)
+		under.CommitTo(this, "CorridorFloor", true);
+		over.CommitTo(this, "Ceilings", false);
 
 		// the floor: steel plate, with the hole cut out of it
 		var f = new MeshKit();
@@ -206,8 +216,15 @@ public partial class StationRoom3 : Node3D
 		k.Mat(StairwellTextures.RailMat);
 		k.Color = Colors.White;
 		k.Cylinder(at + Vector3.Up * 0.2f, at, 0.012f, 0.012f, 4, false);
-		k.Cylinder(at, at + Vector3.Down * 0.18f, 0.16f, 0.1f, 8, false);
-		k.CommitTo(this, "Lamp", false);
+		// (2026-10-14b: the shade was upside down, wide at the rod, and cast nothing: the bulb hung under it and lit the plate
+		// over it white; a proper enamel shade now, narrow at the rod and flared, that throws the ceiling into its shadow)
+		var enamel = StationParts.StationTextures.Flat("r3_shade", new Color(0.13f, 0.16f, 0.14f), 0.45f, 0.5f);
+		enamel.CullMode = BaseMaterial3D.CullModeEnum.Disabled;   // (its inside seen from under it)
+		k.Mat(enamel);
+		k.Cylinder(at + Vector3.Up * 0.01f, at + Vector3.Down * 0.06f, 0.04f, 0.07f, 10, true);
+		k.Cylinder(at + Vector3.Down * 0.06f, at + Vector3.Down * 0.2f, 0.07f, 0.19f, 14, false);
+		var shade = k.CommitTo(this, "Lamp", true);
+		shade.CastShadow = GeometryInstance3D.ShadowCastingSetting.DoubleSided;
 		AddChild(new MeshInstance3D
 		{
 			Mesh = new SphereMesh { Radius = 0.06f, Height = 0.12f }, Position = at + Vector3.Down * 0.14f,
@@ -216,8 +233,8 @@ public partial class StationRoom3 : Node3D
 		});
 		AddChild(new OmniLight3D
 		{
-			Position = at + Vector3.Down * 0.4f, LightColor = new Color(0.82f, 0.9f, 1f), LightEnergy = energy, OmniRange = 7.5f,
-			OmniAttenuation = 1.2f, ShadowEnabled = energy > 1f,
+			Position = at + Vector3.Down * 0.15f, LightColor = new Color(0.82f, 0.9f, 1f), LightEnergy = energy, OmniRange = 7.5f,
+			OmniAttenuation = 1.2f, ShadowEnabled = true,
 		});
 	}
 

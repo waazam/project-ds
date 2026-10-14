@@ -181,6 +181,21 @@ public static class StairwellTextures
 	public static StandardMaterial3D GrimeMat => _grimeM ??= World.SurfaceSets.Apply(Std("sw_grime_m", GrimeConcrete, 0.6f, 0.5f), "concrete_grime");
 	public static StandardMaterial3D StainedMat => _stainedM ??= World.SurfaceSets.Apply(Std("sw_stained_m", StainedConcrete, 0.85f, 0.3f), "concrete_b");
 	private static StandardMaterial3D _cleanM, _grimeM, _stainedM;
+	/// <summary>(2026-10-14b) The same concrete projected in the object's space for Act 14's own pieces (the trench, the
+	/// shaft's ceiling, the chamber at the bottom): MeshKit's boxes carry no tangents, so on their UVs the scans' relief
+	/// came out flat or lit from the wrong side; a projection needs none.</summary>
+	public static StandardMaterial3D CleanProjectedMat => _cleanP ??= Projected((StandardMaterial3D)CleanMat.Duplicate(), 0.4f);
+	public static StandardMaterial3D GrimeProjectedMat => _grimeP ??= Projected((StandardMaterial3D)GrimeMat.Duplicate(), 0.45f);
+	private static StandardMaterial3D _cleanP, _grimeP;
+	private static StandardMaterial3D Projected(StandardMaterial3D m, float perMetre)
+	{
+		m.Uv1Triplanar = true;
+		m.Uv1WorldTriplanar = false;
+		m.Uv1TriplanarSharpness = 6f;
+		m.Uv1Scale = Vector3.One * perMetre;
+		m.NormalScale = 1.2f;
+		return m;
+	}
 
 	// ------------------------------------------------------------------ steel
 

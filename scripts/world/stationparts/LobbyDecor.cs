@@ -122,14 +122,18 @@ public partial class LobbyDecor : Node3D
 
 		// wainscot and a chair rail round the lower walls (kept and damp stages)
 		var wain = new MeshKit();
-		wain.Mat(PropTextures.DeckMat);
-		wain.Color = new Color(0.36f, 0.28f, 0.21f);   // (2026-10-13g: a step darker and browner, was 0.46, 0.34, 0.24)
+		// (2026-10-14b: its own beaded boards, not the floor's and the doors' wood; 2026-10-13g: a step darker and browner)
+		wain.Mat(StationTextures.WainscotMat);
+		wain.Color = Colors.White;
 		void Strip(Vector3 a, Vector3 b, Vector3 inward)
 		{
 			Vector3 c = (a + b) * 0.5f + inward * 0.09f;
 			Vector3 size = (b - a).Abs() + new Vector3(0.03f, 0f, 0.03f);
 			wain.Box(c + Vector3.Up * 0.5f, new Vector3(Mathf.Max(size.X, 0.03f), 1.0f, Mathf.Max(size.Z, 0.03f)), 1.2f);
-			wain.Box(c + Vector3.Up * 1.02f + inward * 0.02f, new Vector3(Mathf.Max(size.X, 0.06f), 0.06f, Mathf.Max(size.Z, 0.06f)), 1.2f);
+			// the chair rail: the casings' dark wood, its edges eased
+			wain.Mat(StationTextures.CasingMat);
+			wain.BevelBox(c + Vector3.Up * 1.02f + inward * 0.02f, new Vector3(Mathf.Max(size.X, 0.06f), 0.06f, Mathf.Max(size.Z, 0.06f)), 0.012f, 1.2f);
+			wain.Mat(StationTextures.WainscotMat);
 		}
 		Strip(new Vector3(-W, 0, -D), new Vector3(-3.5f, 0, -D), Vector3.Back);
 		Strip(new Vector3(-1.3f, 0, -D), new Vector3(1.5f, 0, -D), Vector3.Back);
@@ -147,10 +151,11 @@ public partial class LobbyDecor : Node3D
 
 		var floorK = new MeshKit();
 		var ceilK = new MeshKit();
-		floorK.Mat(BuildingTextures.FloorMat);
-		floorK.Color = new Color(0.5f, 0.44f, 0.37f);   // (2026-10-13g: worn and greyer, was 0.62, 0.52, 0.4)
-		ceilK.Mat(BuildingTextures.BoardsMat);
-		ceilK.Color = new Color(0.46f, 0.42f, 0.38f);
+		// (2026-10-14b: the floor, the ceiling and the walls' boards were one wood; a plank floor and a plaster ceiling now)
+		floorK.Mat(StationTextures.PlankFloorMat);
+		floorK.Color = Colors.White;
+		ceilK.Mat(StationTextures.CeilingMat);
+		ceilK.Color = Colors.White;
 		StationKit.FloorAndCeiling(floorK, ceilK, body, W, D, H, 0);
 		floorK.Color = Colors.White;
 		floorK.CommitTo(this, "Floor");
@@ -531,10 +536,14 @@ public partial class LobbyDecor : Node3D
 		k.Color = new Color(0.7f, 0.58f, 0.36f);
 		k.Cylinder(new Vector3(0, H, 0), new Vector3(0, H - 0.5f, 0), 0.012f, 0.012f, 5, false);
 		k.Cylinder(new Vector3(0, H - 0.04f, 0), new Vector3(0, H - 0.1f, 0), 0.06f, 0.03f, 10);   // the canopy where the rod hangs
-		k.CommitTo(this, "LampRod", false);
+		// (2026-10-14b) a pressed-brass gallery the globe hangs in: it shades the ceiling right over the lamp (the rose was blown
+		// out) and hides the bare join of rod and glass
+		k.Cylinder(new Vector3(0, H - 0.45f, 0), new Vector3(0, H - 0.49f, 0), 0.03f, 0.17f, 16);
+		k.Cylinder(new Vector3(0, H - 0.49f, 0), new Vector3(0, H - 0.55f, 0), 0.17f, 0.175f, 16, false);
+		k.CommitTo(this, "LampRod", true);
 		// a plaster rose round it on the ceiling, in rings (the interiors pass, 2026-10-03); a hair under the ceiling
 		var rose = new MeshKit();
-		rose.Mat(new StandardMaterial3D { ResourceName = "st_rose", AlbedoColor = new Color(0.66f, 0.62f, 0.54f), Roughness = 0.9f, VertexColorUseAsAlbedo = true });
+		rose.Mat(new StandardMaterial3D { ResourceName = "st_rose", AlbedoColor = new Color(0.42f, 0.4f, 0.35f), Roughness = 0.95f, VertexColorUseAsAlbedo = true });   // (2026-10-14b: a step darker: right over the lamp, it blew out to a white disc)
 		foreach (var (r, top, bottom) in new[] { (0.36f, 0.002f, 0.018f), (0.29f, 0.018f, 0.03f), (0.2f, 0.03f, 0.044f), (0.1f, 0.044f, 0.058f) })
 		{
 			rose.Color = Colors.White * (1f - top * 2f);

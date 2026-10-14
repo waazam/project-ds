@@ -196,13 +196,54 @@ public static class StationKit
 		Piece(new Vector3(-hw + lt * 0.5f, gapH * 0.5f, 0), new Vector3(lt, gapH, depth));
 		Piece(new Vector3(hw - lt * 0.5f, gapH * 0.5f, 0), new Vector3(lt, gapH, depth));
 		Piece(new Vector3(0, gapH - lt * 0.5f, 0), new Vector3(gapW, lt, depth));
+		// the casings, their edges eased (2026-10-14b: they were knife-edged slabs), a plinth block at each foot and the head
+		// a little deeper than the legs, so the three pieces read as joinery instead of one bent board
+		void Eased(Vector3 c, Vector3 size) => k.BevelBox(bottomCenter + b * c, size, 0.012f, 1.2f, b);
 		foreach (int s in new[] { -1, 1 })
 		{
 			float z = s * (depth * 0.5f - 0.005f);
-			Piece(new Vector3(-hw - cw * 0.5f + lt, (gapH + cw) * 0.5f, z), new Vector3(cw, gapH + cw, ct));
-			Piece(new Vector3(hw + cw * 0.5f - lt, (gapH + cw) * 0.5f, z), new Vector3(cw, gapH + cw, ct));
-			Piece(new Vector3(0, gapH + cw * 0.5f, z), new Vector3(gapW + cw * 2f - lt * 2f, cw, ct));
+			Eased(new Vector3(-hw - cw * 0.5f + lt, (gapH + cw) * 0.5f, z), new Vector3(cw, gapH + cw, ct));
+			Eased(new Vector3(hw + cw * 0.5f - lt, (gapH + cw) * 0.5f, z), new Vector3(cw, gapH + cw, ct));
+			Eased(new Vector3(0, gapH + cw * 0.6f, z + s * 0.006f), new Vector3(gapW + cw * 2f - lt * 2f + 0.03f, cw * 1.2f, ct + 0.012f));
+			foreach (int side in new[] { -1, 1 })
+				Eased(new Vector3(side * (hw + cw * 0.5f - lt), 0.11f, z + s * 0.008f), new Vector3(cw + 0.014f, 0.22f, ct + 0.016f));
 		}
+	}
+
+	/// <summary>(2026-10-14b) A panelled door leaf, centred on <paramref name="c"/> (its middle), <paramref name="w"/> by
+	/// <paramref name="h"/> by <paramref name="t"/>, its faces along <paramref name="basis"/>'s Z: stiles, rails, a lock
+	/// rail and a muntin with eased edges round recessed, raised-field panels, the same on both faces. (The station's doors
+	/// were flat slabs of the wall's own boards.) <paramref name="cols"/> panels across, two rows (a short one up top).</summary>
+	public static void PanelDoor(MeshKit k, Vector3 c, float w, float h, float t, Basis basis, int cols = 2)
+	{
+		Vector3 P(float x, float y, float z) => c + basis * new Vector3(x, y, z);
+		void Part(float x, float y, float z, float sx, float sy, float sz, float bev) => k.BevelBox(P(x, y, z), new Vector3(sx, sy, sz), bev, 1.2f, basis);
+		float hw = w * 0.5f, hh = h * 0.5f;
+		const float stile = 0.13f, top = 0.13f, bottom = 0.24f, lockR = 0.18f, mull = 0.11f;
+		float lockY = -hh + h * 0.42f;
+		// the core the panels sit in (thinner: the panels are recessed)
+		var paint = k.Color;
+		k.Color = paint * 0.62f;   // (grime settled in the recesses)
+		BuildKit.Box(k, c, new Vector3(w - 0.02f, h - 0.02f, t * 0.3f), 1.2f, BuildKit.Face.None, basis);
+		k.Color = paint;
+		// the frame
+		Part(-hw + stile * 0.5f, 0, 0, stile, h, t, 0.008f);
+		Part(hw - stile * 0.5f, 0, 0, stile, h, t, 0.008f);
+		Part(0, hh - top * 0.5f, 0, w - stile * 2f + 0.002f, top, t * 0.96f, 0.006f);
+		Part(0, -hh + bottom * 0.5f, 0, w - stile * 2f + 0.002f, bottom, t * 0.96f, 0.006f);
+		Part(0, lockY, 0, w - stile * 2f + 0.002f, lockR, t * 0.96f, 0.006f);
+		float inner = w - stile * 2f;
+		float pw = (inner - mull * (cols - 1)) / cols;
+		for (int i = 1; i < cols; i++)
+			Part(-inner * 0.5f + i * pw + (i - 0.5f) * mull, 0, 0, mull, h - 0.02f, t * 0.92f, 0.006f);
+		// the panels: a raised field on each face, its bevel stepped down to the core at the rim
+		foreach (var (y0, y1) in new[] { (-hh + bottom, lockY - lockR * 0.5f), (lockY + lockR * 0.5f, hh - top) })
+			for (int i = 0; i < cols; i++)
+			{
+				float x0 = -inner * 0.5f + i * (pw + mull), cx = x0 + pw * 0.5f, cy = (y0 + y1) * 0.5f, ph = y1 - y0;
+				Part(cx, cy, 0, pw - 0.02f, ph - 0.02f, t * 0.42f, 0.008f);
+				Part(cx, cy, 0, pw - 0.1f, ph - 0.1f, t * 0.7f, 0.022f);
+			}
 	}
 
 	/// <summary>Flat floor and (optional) ceiling slab spanning the room's footprint, with collision

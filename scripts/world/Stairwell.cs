@@ -132,6 +132,20 @@ public partial class Stairwell : Node3D
 		_wallMat.SetShaderParameter("bottom_y", GlobalPosition.Y + CornerY(GapCorner));
 		_wallMat.SetShaderParameter("shaft_centre", new Vector2(GlobalPosition.X, GlobalPosition.Z));
 		_wallMat.SetShaderParameter("half_width", H);
+		// (2026-10-14b, the graphics pass: the walls had no relief, a flat print of concrete under the lantern) each stage's
+		// relief and roughness, and a large rotated variation over the scans' 2.5 m repeat
+		if (SurfaceSets.Tex("concrete_clean", "normal") is { } cn && SurfaceSets.Tex("concrete_b", "normal") is { } sn && SurfaceSets.Tex("concrete_grime", "normal") is { } gn)
+		{
+			_wallMat.SetShaderParameter("clean_nor", cn);
+			_wallMat.SetShaderParameter("stain_nor", sn);
+			_wallMat.SetShaderParameter("grime_nor", gn);
+			_wallMat.SetShaderParameter("clean_rough", SurfaceSets.Tex("concrete_clean", "rough"));
+			_wallMat.SetShaderParameter("grime_rough", SurfaceSets.Tex("concrete_grime", "rough"));
+			_wallMat.SetShaderParameter("relief", 1.0f);
+		}
+		_wallMat.SetShaderParameter("macro_vary", 0.5f);
+		// (the clean pour at the top went flat and white with the lantern a foot from it: a step darker, old concrete)
+		_wallMat.SetShaderParameter("tint", new Color(0.74f, 0.73f, 0.71f));
 
 		BuildTrench(concrete);
 		for (int c = 0; c * ChunkRevs < Revolutions; c++) BuildChunk(c);
@@ -154,7 +168,7 @@ public partial class Stairwell : Node3D
 	private void BuildTrench(StaticBody3D concrete)
 	{
 		var k = new MeshKit();
-		k.Mat(StairwellTextures.CleanMat);
+		k.Mat(StairwellTextures.CleanProjectedMat);   // (2026-10-14b: projected, so its relief shows)
 		float x0 = -H, x1 = -Inner, cx = (x0 + x1) * 0.5f;
 		for (int i = 0; i < TrenchSteps; i++)
 		{
@@ -418,7 +432,7 @@ public partial class Stairwell : Node3D
 		concrete.AddChild(new CollisionShape3D { Position = new Vector3((H - Inner) * 0.5f, (top + Y0) * 0.5f, -H - 0.1f), Shape = new BoxShape3D { Size = new Vector3(H + Inner, top - Y0, 0.2f) } });
 		// the ceiling over the top turn
 		var ceil = new MeshKit();
-		ceil.Mat(StairwellTextures.CleanMat);
+		ceil.Mat(StairwellTextures.CleanProjectedMat);
 		ceil.Color = new Color(0.8f, 0.8f, 0.8f);
 		BuildKit.Box(ceil, new Vector3(0, top + 0.1f, 0), new Vector3(2f * H, 0.2f, 2f * H), 0.4f);
 		ceil.CommitTo(this, "Ceiling", false);

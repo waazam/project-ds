@@ -24,10 +24,14 @@ public partial class PuzzleBox : Node3D
 		public string Name;
 		public Vector2I[] Shape;
 		public int Rot;
+		/// <summary>How it lies on the table (its turn there; <see cref="Rest"/> is where its first cell sits).</summary>
+		public int RestRot;
 		public Vector2I? At;
 		public Node3D Node;
 		public Vector3 Rest;
 		public readonly List<MeshInstance3D> Cubes = new();
+		/// <summary>One soft shadow under each cube, shown only while the piece is held up off the table.</summary>
+		public readonly List<Decal> Shadows = new();
 	}
 
 	public List<Piece> Pieces { get; } = new();
@@ -48,11 +52,11 @@ public partial class PuzzleBox : Node3D
 	public override void _Ready()
 	{
 		BuildBox();
-		Vector3[] rests = { new(0.33f, 0, -0.16f), new(0.35f, 0, 0.06f), new(0.58f, 0, -0.18f), new(0.57f, 0, 0.02f), new(0.46f, 0, 0.21f) };
+		Vector3[] rests = { new(0.33f, 0, -0.16f), new(0.35f, 0, 0.06f), new(0.58f, 0, -0.18f), new(0.57f, 0, 0.02f), new(0.5f, 0, 0.18f) };
 		int[] rots = { 0, 1, 0, 2, 1 };
 		for (int i = 0; i < Shapes.Length; i++)
 		{
-			var p = new Piece { Name = Shapes[i].name, Shape = Shapes[i].cells, Rot = rots[i], Rest = rests[i] };
+			var p = new Piece { Name = Shapes[i].name, Shape = Shapes[i].cells, Rot = rots[i], RestRot = rots[i], Rest = rests[i] };
 			p.Node = new Node3D { Name = $"Piece_{p.Name}" };
 			AddChild(p.Node);
 			for (int c = 0; c < p.Shape.Length; c++)
@@ -60,6 +64,15 @@ public partial class PuzzleBox : Node3D
 				var cube = new MeshInstance3D { Mesh = new BoxMesh { Size = Vector3.One * (Cell - 0.003f) }, MaterialOverride = Mat((i + c) % 2 == 0) };
 				p.Node.AddChild(cube);
 				p.Cubes.Add(cube);
+				// the held piece's shadow: projected straight down onto whatever is under it (the table, the box's
+				// floor or rim, another piece), fading out the further it falls; only upward faces take it
+				var shadow = new Decal
+				{
+					Name = "Shadow", Size = new Vector3(Cell * 1.25f, 0.2f, Cell * 1.25f), Position = new Vector3(0, -Cell * 0.5f - 0.004f - 0.1f, 0),
+					TextureAlbedo = ShadowTex(), Modulate = new Color(1, 1, 1, 0.6f), UpperFade = 0.05f, LowerFade = 0.3f, NormalFade = 0.4f, Visible = false,
+				};
+				cube.AddChild(shadow);
+				p.Shadows.Add(shadow);
 			}
 			Pieces.Add(p);
 			Layout(p);
@@ -114,6 +127,98 @@ public partial class PuzzleBox : Node3D
 			for (int y = 0; y < N; y++)
 				if (_grid[x, y] == p) _grid[x, y] = null;
 		p.At = null;
+	}
+
+	/// <summary>Takes a piece out of the box (if it's in it) and lays it back on the table as it lay there.</summary>
+	public void ToRest(Piece p)
+	{
+		Lift(p);
+		p.Rot = p.RestRot;
+	}
+
+	// ------------------------------------------------------------------ on the table
+
+	/// <summary>Where a resting piece covers the table (x, z min and size in this node's space), at a turn and a spot.</summary>
+	public static Rect2 RestRect(Vector2I[] shape, int rot, Vector3 rest)
+	{
+		var cells = Rotated(shape, rot);
+		int w = 0, h = 0;
+		foreach (var c in cells) { w = Math.Max(w, c.X + 1); h = Math.Max(h, c.Y + 1); }
+		return new Rect2(rest.X - Cell * 0.5f, rest.Z - Cell * 0.5f, w * Cell, h * Cell);
+	}
+
+	/// <summary>Whether two resting pieces' cubes would overlap on the table.</summary>
+	public static bool RestOverlap(Vector2I[] a, int aRot, Vector3 aRest, Vector2I[] b, int bRot, Vector3 bRest)
+	{
+		const float gap = Cell - 0.004f;
+		foreach (var ca in Rotated(a, aRot))
+			foreach (var cb in Rotated(b, bRot))
+			{
+				float dx = (aRest.X + ca.X * Cell) - (bRest.X + cb.X * Cell), dz = (aRest.Z + ca.Y * Cell) - (bRest.Z + cb.Y * Cell);
+				if (Mathf.Abs(dx) < gap && Mathf.Abs(dz) < gap) return true;
+			}
+		return false;
+	}
+
+	/// <summary>The part of the table the loose pieces may lie on (this node's space: the table runs along +X here).</summary>
+	public static readonly Rect2 TableArea = new(0.2f, -0.3f, 0.72f, 0.6f);
+
+	/// <summary>Turns a piece lying on the table a quarter turn where it lies (about its middle), if it still has room
+	/// there: on the table, clear of where every other piece lies (in the box or not; they can always come back).</summary>
+	public bool TurnAtRest(Piece p, int dir)
+	{
+		if (p.At != null || IsSolved) return false;
+		int rot = ((p.RestRot + dir) % 4 + 4) % 4;
+		Rect2 was = RestRect(p.Shape, p.RestRot, p.Rest);
+		Rect2 size = RestRect(p.Shape, rot, Vector3.Zero);
+		// keep the middle where it was, snapped to a quarter of a cell so turning round and round doesn't drift
+		Vector2 corner = was.GetCenter() - size.Size * 0.5f + new Vector2(Cell * 0.5f, Cell * 0.5f);
+		float q = Cell * 0.25f;
+		var rest = new Vector3(Mathf.Round(corner.X / q) * q, p.Rest.Y, Mathf.Round(corner.Y / q) * q);
+		if (!TableArea.Encloses(RestRect(p.Shape, rot, rest))) return false;
+		foreach (var o in Pieces)
+			if (o != p && RestOverlap(p.Shape, rot, rest, o.Shape, o.RestRot, o.Rest)) return false;
+		p.RestRot = p.Rot = rot;
+		p.Rest = rest;
+		return true;
+	}
+
+	// ------------------------------------------------------------------ the held and ghost looks
+
+	/// <summary>A tint over a piece's bamboo (white = as it is): the held piece goes red where it won't fit.</summary>
+	public static void Tint(Piece p, Color c)
+	{
+		foreach (var cube in p.Cubes)
+			if (cube.MaterialOverride is ShaderMaterial m) m.SetShaderParameter("tint", c);
+	}
+
+	/// <summary>The soft shadow under a piece held up off the table: 0 = none.</summary>
+	public static void Shadow(Piece p, float strength)
+	{
+		foreach (var d in p.Shadows)
+		{
+			d.Visible = strength > 0.01f;
+			d.Modulate = new Color(1, 1, 1, Mathf.Clamp(strength, 0f, 1f) * 0.9f);
+		}
+	}
+
+	private static Texture2D _shadowTex;
+
+	/// <summary>A soft dark rounded square: one cube's shadow from the lamp overhead.</summary>
+	private static Texture2D ShadowTex()
+	{
+		if (_shadowTex != null) return _shadowTex;
+		const int S = 32;
+		var img = Image.CreateEmpty(S, S, false, Image.Format.Rgba8);
+		for (int y = 0; y < S; y++)
+			for (int x = 0; x < S; x++)
+			{
+				float dx = Mathf.Abs(x + 0.5f - S * 0.5f) / (S * 0.5f), dy = Mathf.Abs(y + 0.5f - S * 0.5f) / (S * 0.5f);
+				float d = Mathf.Pow(Mathf.Pow(dx, 4f) + Mathf.Pow(dy, 4f), 0.25f);
+				img.SetPixel(x, y, new Color(0.02f, 0.015f, 0.01f, 1f - Mathf.SmoothStep(0.5f, 1f, d)));
+			}
+		img.GenerateMipmaps();
+		return _shadowTex = ImageTexture.CreateFromImage(img);
 	}
 
 	/// <summary>Grid cell (gx, gy) in this node's space, at the height a piece sits in the box.</summary>

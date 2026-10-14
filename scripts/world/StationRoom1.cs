@@ -96,10 +96,11 @@ public partial class StationRoom1 : Node3D
 		StationKit.WallAlongX(k, body, Half, -Half, Half, Height, 0, null, trimSide: -1);
 		StationKit.WallAlongX(k, body, -Half, -Half, Half, Height, 0, null, trimSide: 1);
 		StationKit.WallAlongZ(k, body, Half, -Half, Half, Height, 0, null, trimSide: -1);
-		floorK.Mat(BuildingTextures.FloorMat);
-		floorK.Color = new Color(0.45f, 0.4f, 0.34f);
-		ceilK.Mat(BuildingTextures.BoardsMat);
-		ceilK.Color = new Color(0.3f, 0.28f, 0.25f);
+		// (2026-10-14b: the lobby's plank floor and plaster ceiling, darker in here; they were the walls' own boards)
+		floorK.Mat(StationTextures.PlankFloorMat);
+		floorK.Color = new Color(0.7f, 0.66f, 0.62f);
+		ceilK.Mat(StationTextures.CeilingMat);
+		ceilK.Color = new Color(0.6f, 0.58f, 0.55f);
 		StationKit.FloorAndCeiling(floorK, ceilK, body, Half, Half, Height, 0);
 		k.Color = Colors.White;
 		k.CommitTo(this, "Walls");

@@ -224,8 +224,21 @@ public partial class LakeCrossingEvent : Node3D
 		Callable.From(Setup).CallDeferred();
 		// the creature's shaders drawn once in the load's black (the lag pass, 2026-10-13: its breach froze the game 1.6 s)
 		if (StoryManager.Instance is { Current: < Checkpoint.Act12LakeCrossed })
+		{
 			ShaderWarmup.Prewarm(this, new LakeCreature { Name = "LakeCreatureWarmUp", WarmUpOnly = true });
+			// (2026-10-14b: a one-off 137-147 ms hitch at the near miss, with no pipeline compiled: its spray and the takes
+			// of its sounds were made and read off the disk on the spot) the spray built and the strike's and the near miss's
+			// sounds read in the load's black, held for the crossing; nothing about when or how they play changes
+			LakeParts.LakeFx.Warm();
+			foreach (var name in new[] { "breach_erupt", "creature_foghorn", "limb_rise", "boat_creak", "underwater_thoom" })
+				for (int take = 1; take <= 3; take++)
+				{
+					string path = $"res://assets/audio/sfx/{name}_{take:00}.wav";
+					if (ResourceLoader.Exists(path)) _heldSounds.Add(GD.Load<AudioStream>(path));
+				}
+		}
 	}
+	private readonly System.Collections.Generic.List<AudioStream> _heldSounds = new();
 
 	private void Setup()
 	{

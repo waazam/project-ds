@@ -21,6 +21,17 @@ uniform float wave_amp = 0.08;
 uniform vec2 shaft_centre = vec2(0.0);
 uniform float half_width = 2.0;
 uniform vec4 tint : source_color = vec4(1.0);
+// (2026-10-14b, the graphics pass: the walls had their scans' colour and nothing else, a flat print of concrete under the
+// lantern; MeshKit's grids carry no tangents, so the frame is made here from the screen-space derivatives of the
+// position and the UV) each stage's relief and roughness, blended the way the colours are
+uniform sampler2D clean_nor : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D stain_nor : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D grime_nor : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D clean_rough : filter_linear_mipmap, repeat_enable;
+uniform sampler2D grime_rough : filter_linear_mipmap, repeat_enable;
+uniform float relief = 0.0;
+// a second, larger, rotated sample of the grime breaks the 2.5 m repeat of the scans
+uniform float macro_vary = 0.0;
 
 varying float v_g;
 
@@ -61,8 +72,33 @@ void fragment() {
 	float g1 = smoothstep(0.0, 0.5, g);
 	float g2 = smoothstep(0.45, 1.0, g);
 	vec3 col = mix(mix(c, s, g1), k, g2);
+	if (macro_vary > 0.0) {
+		vec2 rr = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * UV * 0.17;
+		float m = texture(grime_tex, rr + vec2(0.31, 0.77)).r;
+		col *= mix(1.0, 0.72 + m * 0.6, macro_vary);
+	}
 	ALBEDO = col * tint.rgb;
 	float oily = g2 * (1.0 - smoothstep(0.1, 0.35, k.r));
-	ROUGHNESS = mix(0.93, 0.35, oily);
+	float rough = 0.93;
+	if (relief > 0.0) {
+		vec3 nc = texture(clean_nor, UV).xyz;
+		vec3 ns = texture(stain_nor, UV * 0.9 + vec2(0.37, 0.11)).xyz;
+		vec3 nk = texture(grime_nor, UV * 0.8 + vec2(0.13, 0.52)).xyz;
+		// (the maps are imported as two-channel normal maps: z rebuilt from x and y)
+		vec2 nxy = mix(mix(nc.xy, ns.xy, g1), nk.xy, g2) * 2.0 - 1.0;
+		vec3 nm = vec3(nxy * relief, sqrt(max(1.0 - dot(nxy, nxy), 0.0)));
+		// the cotangent frame (view space)
+		vec3 dp1 = dFdx(VERTEX), dp2 = dFdy(VERTEX);
+		vec2 du1 = dFdx(UV), du2 = dFdy(UV);
+		vec3 nv = normalize(NORMAL);
+		vec3 dp2p = cross(dp2, nv), dp1p = cross(nv, dp1);
+		vec3 t = dp2p * du1.x + dp1p * du2.x;
+		vec3 b = dp2p * du1.y + dp1p * du2.y;
+		float inv = inversesqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+		// (the maps are OpenGL-style, green up; V runs down the wall)
+		NORMAL = normalize(t * inv * nm.x - b * inv * nm.y + nv * nm.z);
+		rough = mix(texture(clean_rough, UV).r, texture(grime_rough, UV * 0.8 + vec2(0.13, 0.52)).r, g2) * 0.25 + 0.72;
+	}
+	ROUGHNESS = mix(rough, 0.35, oily);
 	SPECULAR = mix(0.25, 0.65, oily);
 }

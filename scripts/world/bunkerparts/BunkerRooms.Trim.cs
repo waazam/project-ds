@@ -38,7 +38,7 @@ public partial class BunkerRooms
 				k.Color = new Color(0.22f, 0.24f, 0.21f);
 				k.Box(mid + n * 0.008f + Vector3.Up * (paintTop + 0.025f), new Vector3(l, 0.05f, 0.012f), 1f, basis);
 				k.Color = new Color(0.42f, 0.42f, 0.4f);
-				k.Box(mid + n * 0.02f + Vector3.Up * 0.082f, new Vector3(l, 0.16f, 0.04f), 1f, basis);
+				k.BevelBox(mid + n * 0.02f + Vector3.Up * 0.082f, new Vector3(l, 0.16f, 0.04f), 0.012f, 1f, basis);   // (2026-10-14b: its top edge eased)
 			}
 		}
 		k.CommitTo(this, "RoomTrim");
@@ -62,7 +62,7 @@ public partial class BunkerRooms
 		// the grille: a frame and its slats, high on the far wall left of the door
 		var g = new Vector3(-hw + 1.6f, RoomH - 0.55f, -RoomD + 0.03f);
 		m.Color = new Color(0.36f, 0.37f, 0.34f);
-		m.Box(g, new Vector3(0.62f, 0.38f, 0.04f));
+		m.BevelBox(g, new Vector3(0.62f, 0.38f, 0.04f), 0.01f);
 		m.Color = new Color(0.08f, 0.08f, 0.08f);
 		m.Box(g + Vector3.Back * 0.021f, new Vector3(0.54f, 0.3f, 0.002f));
 		m.Color = new Color(0.32f, 0.33f, 0.3f);
