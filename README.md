@@ -63,6 +63,7 @@ Two hands: the lantern is always the left hand's; the right hand holds one thing
 | Throw (a flare, a tin) | G | B |
 | Hold breath | V | D-pad up |
 | Row (Act 12): row / row hard / steer | W / Shift / A, D (alternating A and D also rows) | Left stick / LT / left stick |
+| Puzzle box (Act 19): pick up and drag a piece / turn it | Left mouse (hold, drag, let go) / right mouse or wheel; or A, D to pick, E to take, WASD to move, E to set in | Left stick or LB / RB to pick, left stick to move, A to take and set in, RT, LB or RB to turn |
 | Fullscreen / window | F11 or Alt+Enter | |
 | Pause / settings | Esc | Start |
 | Dev builds only: debug readout | F3 | |
