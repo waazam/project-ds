@@ -216,8 +216,11 @@ public partial class SkiLodge
 			float yy = y + rng.RandfRange(0.1f, top - 0.1f);
 			bool left = zz < (z0 + z1) * 0.5f;
 			float edge = left ? z0 : z1;
-			// a lath snapped, its end sticking into the opening
-			k.Box(new Vector3(x + 0.02f, yy, edge + (left ? 0.08f : -0.08f)), new Vector3(0.015f, 0.03f, rng.RandfRange(0.1f, 0.22f)), 1f, new Basis(Vector3.Right, rng.RandfRange(-0.4f, 0.4f)));
+			// a lath snapped, its end sticking into the opening (2026-10-13, the joints pass: from 3 cm inside the wall's
+			// broken edge, in the wall's thickness where laths are; centred 8 cm out and 2 cm proud of the bathroom's face,
+			// they stood off the wall and the short ones began in the air)
+			float len = rng.RandfRange(0.1f, 0.22f);
+			k.Box(new Vector3(x - 0.06f, yy, edge + (left ? 1f : -1f) * (len * 0.5f - 0.03f)), new Vector3(0.015f, 0.03f, len), 1f, new Basis(Vector3.Right, rng.RandfRange(-0.4f, 0.4f)));
 		}
 		// debris on the tiles
 		k.Mat(LodgeTextures.PlasterMat);

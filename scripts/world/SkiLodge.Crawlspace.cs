@@ -356,6 +356,11 @@ public partial class SkiLodge
 				{
 					Vector3 a = w0 + Vector3.Up * (CrawlH - 0.2f) + inward * 0.1f, b = w1 + Vector3.Up * (CrawlH - 0.2f) + inward * 0.1f;
 					pipe.Cylinder(a, b, 0.035f, 0.035f, 6, false);
+					// (2026-10-13, the joints pass) a strap off the wall under it at each panel: the pipe ran 6 cm clear of
+					// the wall on nothing at all
+					var m = (a + b) * 0.5f;
+					pipe.Beam(m - inward * 0.1f, m - inward * 0.005f, 0.03f, 0.02f);
+					pipe.Beam(m + Vector3.Down * 0.035f - inward * 0.1f, m + Vector3.Down * 0.035f, 0.03f, 0.012f);
 				}
 			}
 		}

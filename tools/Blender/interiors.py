@@ -115,7 +115,8 @@ def station_desk():
     P.append(block("Inset", (-0.05, 0.02, H + 0.0015), (1.2, 0.5, 0.004), leather, bevel=0.0))
     for s in (-1, 1):
         cx = s * 0.62
-        P.append(block(f"Ped{s}", (cx, 0.02, (H - 0.04) / 2 + 0.04), (0.55, 0.7, H - 0.12), wood, bevel=0.006, segs=1))
+        # (the joints pass) from the plinth's top (0.06) to the top's underside: it stood on nothing, 2 cm over the plinth
+        P.append(block(f"Ped{s}", (cx, 0.02, (H - 0.04 + 0.06) / 2), (0.55, 0.7, H - 0.04 - 0.06), wood, bevel=0.006, segs=1))
         P.append(block(f"Plinth{s}", (cx, 0.02, 0.03), (0.58, 0.72, 0.06), wood, bevel=0.005, segs=1))
         for d in range(3):
             z = 0.17 + d * 0.2
@@ -241,7 +242,10 @@ def footlocker():
         P.append(block(f"Band{z}", (0, -0.212, z), (0.8, 0.006, 0.03), steel, bevel=0.0))
         P.append(block(f"BandB{z}", (0, 0.212, z), (0.8, 0.006, 0.03), steel, bevel=0.0))
     for s in (-1, 1):
-        P.append(piping(f"Handle{s}", [(s * 0.41, -0.06, 0.24), (s * 0.44, -0.04, 0.2), (s * 0.44, 0.04, 0.2), (s * 0.41, 0.06, 0.24)], 0.008, iron))
+        P.append(piping(f"Handle{s}", [(s * 0.406, -0.06, 0.24), (s * 0.44, -0.04, 0.2), (s * 0.44, 0.04, 0.2), (s * 0.406, 0.06, 0.24)], 0.008, iron))
+        # (the joints pass) the handle's two brackets on the box's side: its ends hung 7 mm off the wood
+        for y in (-0.06, 0.06):
+            P.append(block(f"HandleBracket{s}{y}", (s * 0.404, y, 0.24), (0.01, 0.03, 0.04), iron, bevel=0.002, segs=1))
     P.append(block("Hasp", (0, -0.225, 0.32), (0.05, 0.01, 0.1), steel, bevel=0.002, segs=1))
     P.append(block("Lock", (0, -0.24, 0.26), (0.05, 0.02, 0.05), iron, bevel=0.006, segs=2))
     P.append(piping("Shackle", [(-0.015, -0.24, 0.285), (-0.015, -0.24, 0.31), (0.015, -0.24, 0.31), (0.015, -0.24, 0.285)], 0.004, iron))

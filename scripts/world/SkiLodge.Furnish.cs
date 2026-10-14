@@ -332,7 +332,7 @@ public partial class SkiLodge
 		for (float x = -22f; x < -9f; x += 3.2f)
 		{
 			k.Mat(LodgeTextures.Glow("lodge_barceil", new Color(1f, 0.72f, 0.4f), 1.4f));
-			k.Box(new Vector3(x, SlabY - 0.03f, 4f), new Vector3(1.2f, 0.04f, 0.3f), 1f);
+			k.Box(new Vector3(x, SlabY - 0.02f, 4f), new Vector3(1.2f, 0.04f, 0.3f), 1f);   // (the joints pass: up against the ceiling, 1 cm under it)
 			Light(new Vector3(x, SlabY - 0.4f, 4f), new Color(1f, 0.74f, 0.45f), 0.75f, 6.5f);
 		}
 		k.CommitTo(this, "Bar", true);
@@ -347,6 +347,17 @@ public partial class SkiLodge
 		var k = new MeshKit();
 		k.Color = Colors.White;
 		// a bulb in the service corridor, coats on hooks
+		// (2026-10-13, the joints pass) the bare bulbs on a socket and a flex from the ceiling (3 m): they hung 10-15 cm
+		// under it on nothing
+		void Flex(Vector3 at)
+		{
+			k.Mat(LodgeTextures.BrassMat);
+			k.Cylinder(at + Vector3.Up * 0.035f, at + Vector3.Up * 0.09f, 0.022f, 0.018f, 8, true);
+			k.Mat(LodgeTextures.BlackMat);
+			k.Cylinder(at + Vector3.Up * 0.085f, new Vector3(at.X, 3.02f, at.Z), 0.005f, 0.005f, 5, false);
+			k.Cylinder(new Vector3(at.X, 2.985f, at.Z), new Vector3(at.X, 3.02f, at.Z), 0.03f, 0.03f, 8, true);
+		}
+		Flex(new Vector3(-27.6f, 2.8f, -0.7f));
 		k.Mat(Bulb);
 		k.Blob(new Vector3(-27.6f, 2.8f, -0.7f), Vector3.One * 0.05f, 971, 0f, false, 1f);
 		Light(new Vector3(-27.6f, 2.6f, -0.7f), Warm, 0.7f, 6f);
@@ -393,6 +404,7 @@ public partial class SkiLodge
 		}
 		LodgeKit.Solid(_inBody, new Vector3(px0 + 0.45f + 3.5f * 0.95f, 0.47f, cz), new Vector3(8f * 0.95f, 0.94f, 0.55f));
 		// one bare bulb, and the mop leaning by the door (it falls)
+		Flex(new Vector3(-15f, 2.85f, -6.4f));
 		k.Mat(Bulb);
 		k.Blob(new Vector3(-15f, 2.85f, -6.4f), Vector3.One * 0.05f, 973, 0f, false, 1f);
 		Light(new Vector3(-15f, 2.6f, -6.4f), Warm, 0.7f, 7f, "PantryBulb");
@@ -578,7 +590,7 @@ public partial class SkiLodge
 		k.Mat(LodgeTextures.MintPorcelainMat);
 		k.Box(van + new Vector3(0, 0.88f, 0), new Vector3(0.7f, 0.08f, 0.45f), 1f);
 		k.Mat(LodgeTextures.MirrorMat);
-		k.Box(new Vector3(van.X, y + 1.6f, zIn + s * 0.09f), new Vector3(0.6f, 0.7f, 0.02f), 1f);
+		k.Box(new Vector3(van.X, y + 1.6f, zIn + s * 0.08f), new Vector3(0.6f, 0.7f, 0.02f), 1f);   // (the joints pass: flat on the wall, it stood 1 cm off)
 		LodgeKit.Solid(_inBody, van + new Vector3(0, 0.45f, 0), new Vector3(0.9f, 0.9f, 0.5f));
 		foreach (int di in new[] { 0, 1 })
 		{
@@ -672,11 +684,18 @@ public partial class SkiLodge
 			float x = wx - 1f + i * 0.13f;
 			k.Cylinder(new Vector3(x, 6.45f, zOut - s * 0.1f), new Vector3(x, 6.45f - 0.08f - (i * 37 % 9) * 0.04f, zOut - s * 0.1f), 0.012f, 0.002f, 4, false);
 		}
+		// (2026-10-13, the joints pass) the rail they hang off, on its two brackets: there wasn't one, the icicles hung
+		// 4-7 cm under nothing
+		k.Mat(LodgeTextures.IronMat);
+		k.Cylinder(new Vector3(wx - 1.12f, 6.46f, zOut - s * 0.1f), new Vector3(wx + 1.12f, 6.46f, zOut - s * 0.1f), 0.014f, 0.014f, 8, true);
+		foreach (float bx in new[] { wx - 1.05f, wx + 1.05f })
+			k.Beam(new Vector3(bx, 6.46f, zOut), new Vector3(bx, 6.46f, zOut - s * 0.1f), 0.02f, 0.03f);
 		// the hole into 204: plaster rubble on the tile, lath splinters
 		k.Mat(LodgeTextures.PlasterMat);
 		var rng = new RandomNumberGenerator { Seed = 2030 };
+		// (the joints pass: down on the tile, they lay 8 mm over it)
 		for (int i = 0; i < 14; i++)
-			k.Box(new Vector3(RoomSplitX + rng.RandfRange(0.1f, 0.9f), y + 0.03f, zIn + s * rng.RandfRange(0.6f, 2.3f)), new Vector3(rng.RandfRange(0.05f, 0.2f), 0.04f, rng.RandfRange(0.05f, 0.2f)), 1f, new Basis(Vector3.Up, rng.Randf() * 3f));
+			k.Box(new Vector3(RoomSplitX + rng.RandfRange(0.1f, 0.9f), y + 0.02f, zIn + s * rng.RandfRange(0.6f, 2.3f)), new Vector3(rng.RandfRange(0.05f, 0.2f), 0.04f, rng.RandfRange(0.05f, 0.2f)), 1f, new Basis(Vector3.Up, rng.Randf() * 3f));
 		k.Mat(LodgeTextures.DarkWoodMat);
 		for (int i = 0; i < 8; i++)
 		{

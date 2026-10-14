@@ -176,8 +176,8 @@ public partial class StationRoom1 : Node3D
 			BoxOpen = true;
 			BoxCutsDone = 3;
 			foreach (var t in _tapes) t.Visible = false;
-			_lid.Position += Vector3.Up * 0.16f;
-			_lid.Rotation = new Vector3(Mathf.DegToRad(-70f), 0, 0);
+			// (the joints pass) open on its hinge as OpenBox leaves it: it was lifted 16 cm and floated over the box
+			_lid.Rotation = new Vector3(Mathf.DegToRad(-100f), 0, 0);
 			_boxUse.Enabled = false;
 			foreach (var w in _writing) w.Visible = false;
 			// the runs stay on the walls, all the way down to the pools

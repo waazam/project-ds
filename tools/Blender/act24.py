@@ -192,7 +192,8 @@ def rifle():
     P = []
     # the stock: butt, wrist, fore-end (along -Y, muzzle forward)
     P.append(tube("Butt", [(0, 0.55, 0.0), (0, 0.4, 0.02), (0, 0.25, 0.04)], [(0.02, 0.06), (0.018, 0.05), (0.015, 0.03)], wood))
-    P.append(tube("Fore", [(0, 0.25, 0.04), (0, 0.0, 0.05), (0, -0.4, 0.055)], [(0.016, 0.022), (0.016, 0.02), (0.014, 0.016)], wood))
+    # (the joints pass) the fore-end begins inside the butt: end to end, the two skins' caps left a 6 mm slot at the wrist
+    P.append(tube("Fore", [(0, 0.29, 0.035), (0, 0.0, 0.05), (0, -0.4, 0.055)], [(0.016, 0.022), (0.016, 0.02), (0.014, 0.016)], wood))
     P.append(along_y("Barrel", [(0.0, -0.05), (0.01, -0.05), (0.009, 0.7), (0.0, 0.7)], st, 10, 0, 0.075))
     P.append(block("Receiver", (0, 0.12, 0.07), (0.028, 0.16, 0.035), st, bevel=0.004, segs=1))
     P.append(tube("Bolt", [(0.015, 0.1, 0.08), (0.045, 0.1, 0.08)], [0.006, 0.006], st))

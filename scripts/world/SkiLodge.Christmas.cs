@@ -130,7 +130,7 @@ public partial class SkiLodge
 		k.Box(bc, new Vector3(4.6f, 0.5f, 0.012f), 1f, banner);
 		SignKit.Text(this, "MERRY CHRISTMAS", bc - new Vector3(0, 0, 0.012f), banner * new Basis(Vector3.Up, Mathf.Pi), 0.26f, new Color(0.45f, 0.06f, 0.05f), shadow: false);
 		k.Mat(LodgeTextures.IronMat);
-		k.Cylinder(new Vector3(-2.15f, 4.55f, HexIn - 0.05f), new Vector3(-2.15f, 4.55f, HexIn - 0.12f), 0.015f, 0.015f, 5, true);   // its one nail still in
+		k.Cylinder(new Vector3(-2.15f, 4.55f, HexIn + 0.01f), new Vector3(-2.15f, 4.55f, HexIn - 0.12f), 0.015f, 0.015f, 5, true);   // its one nail still in (driven into the wall: it began 5 cm off it)
 		// ---- the party's leavings: the buffet along the front wall
 		var buffet = new Vector3(-4.0f, FloorY, 9.2f);
 		if (FurnitureKit.Add(k, "party_table", buffet, 0f, x))
@@ -190,7 +190,7 @@ public partial class SkiLodge
 			}
 			else FurnitureKit.Add(k, "dining_chair", rt + d * (1.05f + i * 0.12f), a + (i == 1 ? 0.4f : 0f), Woodwork);
 		}
-		float top = 0.785f;
+		float top = 0.775f;   // (the joints pass: on the cloth, its top; they stood 1 cm over it)
 		foreach (var (dx, dz, model, yaw) in new[] { (0.3f, 0.2f, "wine_glass", 0f), (-0.25f, 0.3f, "tumbler", 0f), (0.05f, -0.35f, "bottle_wine", 0.4f), (-0.3f, -0.15f, "wine_glass", 0f), (0.35f, -0.2f, "mug", 1.2f) })
 			FurnitureKit.Add(k, model, rt + new Vector3(dx, top, dz), yaw, Woodwork);
 		FurnitureKit.Add(k, "party_hat", rt + new Vector3(0.1f, top, 0.05f), 2.1f, x);
