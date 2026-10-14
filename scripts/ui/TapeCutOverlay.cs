@@ -15,7 +15,7 @@ namespace ProjectDS.UI;
 /// caller (<see cref="CutSpec"/>) supplies everything about what's actually being cut and reacts
 /// to progress/completion itself (shrinking its own tape mesh, playing its own effects).
 ///
-/// Modelled on CodeLockOverlay's modal pattern (PlayerInput.BeginModal, raw _Input reading), but
+/// Modelled on the old bunker code dial's modal pattern (PlayerInput.BeginModal, raw _Input reading), but
 /// a real close-up 3D view via a second Camera3D instead of a 2D panel — a puzzle the player's
 /// full attention is on deserves to fill the screen, not sit in a corner.
 /// </summary>
