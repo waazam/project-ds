@@ -44,8 +44,6 @@ public partial class CabinFireEvent : Node
 	[Export] public float Radius = 30f;
 	/// <summary>Multiple of <see cref="Radius"/> beyond which the heat tint is zero and processing stops.</summary>
 	[Export] public float HeatReach = 3f;
-	/// <summary>Unused since 2026-09-22 (no self-talk); kept so scene overrides still load.</summary>
-	[Export] public string SightLine = "";
 	[Export] public float LineDelay = 2f;
 	/// <summary>Seconds for night to fall at the lookout if it has not yet.</summary>
 	[Export] public float NightFallSeconds = 6f;
@@ -265,7 +263,8 @@ public partial class CabinFireEvent : Node
 		_nextGroan = _rng.RandfRange(2f, 6f);
 		// Wake-up zone: inside it the groans and the heat tint run every frame; outside, nothing does.
 		_heatZone = StoryBeat.MakeTrigger(_cabin, new CylinderShape3D { Radius = Radius * HeatReach, Height = 120f }, Vector3.Zero, _ => SetProcess(true), "FireHeatZone");
-		_heatZone.BodyExited += b => { if (b is PlayerController) Sleep(); };
+		// (never while the sight beat waits: leaving the heat zone unsighted stopped the clock, and with it the fallback)
+		_heatZone.BodyExited += b => { if (b is PlayerController && !(_armed && !Struck)) Sleep(); };
 		SetProcess(true);   // the first frame measures for itself: the player may already stand inside, or far away
 	}
 

@@ -311,7 +311,6 @@ public partial class BunkerPreview : Node3D
 		// The walkie, as dropped at the exit.
 		var walkie = new WalkiePickup { Name = "WalkiePickup", Dead = false, Position = BunkerRooms.ExitLocal - BunkerLayout.MazeOffset + new Vector3(1.0f, -1f, -1.5f), Rotation = new Vector3(0, 0.5f, 0) };
 		interior.Rooms.AddChild(walkie);
-		walkie.AddChild(new WalkieBeacon { Name = "Beacon", Position = new Vector3(0.022f, 0.158f, 0.024f) });
 		await Frames(10);
 		var wp = walkie.GlobalPosition;
 		Log($"walkie at {wp}");

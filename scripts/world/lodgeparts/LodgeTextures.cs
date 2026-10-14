@@ -459,7 +459,26 @@ public static class LodgeTextures
 	public static StandardMaterial3D SilverMat => _plain("lodge_m_silver", new Color(0.62f, 0.6f, 0.56f), 0.32f, 0.7f, 0.85f);
 	public static StandardMaterial3D MirrorMat => _plain("lodge_m_mirror", new Color(0.4f, 0.42f, 0.45f), 0.02f, 1f, 1f);
 	// (2026-10-13, the look audit: were 0.74, 0.7, 0.62 and 0.62, 0.58, 0.5: by the lantern the back rooms' plaster went flat white)
-	public static StandardMaterial3D PlasterMat => Std("lodge_m_plaster", Plaster, 0.9f, 0.2f, new Color(0.58f, 0.54f, 0.47f), null, null, 0.3f, 1.5f);
+	// (2026-10-13c, the look audit: the mudroom's inner wall, the service corridor's and the pantry's, read as a glowing
+	// white panel: the plaster was a flat, near-even tint with no relief and no roughness of its own, so it took every lamp
+	// and the lantern as one even sheet, a step brighter than the boards round it. Now it's painted plaster as the rooms'
+	// walls are (the plaster scan's relief and roughness under a paint), in a dirtier back-of-house cream a step darker
+	// than the corridor's)
+	public static StandardMaterial3D PlasterMat => _plasterM ??= PaintedPlaster("lodge_m_plaster", new Color(0.5f, 0.45f, 0.36f), 0.55f);
+	private static StandardMaterial3D _plasterM;
+
+	private static StandardMaterial3D PaintedPlaster(string key, Color paint, float relief)
+	{
+		var m = new StandardMaterial3D
+		{
+			ResourceName = key, AlbedoColor = paint, Roughness = 0.95f, MetallicSpecular = 0.1f, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true,
+			Uv1Scale = Vector3.One * 0.8f,
+		};
+		SurfaceSets.Apply(m, "plaster", relief);
+		if (m.AlbedoTexture == null) m.AlbedoTexture = Plaster;
+		m.SetMeta("detail_kind", -1);
+		return m;
+	}
 	public static StandardMaterial3D CeilingMat => Std("lodge_m_ceiling", Plaster, 0.95f, 0.1f, new Color(0.52f, 0.48f, 0.42f), null, null, 0.3f, 2f);
 	/// <summary>The lobby's lower walls inside: Poly Haven's stacked stone, cool and even (the outside's mossy stone
 	/// read as dirt in here).</summary>

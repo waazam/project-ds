@@ -42,7 +42,7 @@ The owner's decisions on four points from the polish pass.
   0.6). The game has no recording of the player's voice, so the line is still text on the subtitle band.
 
 ## Tests
-- **New playtest beat `1b`:** the player stands 11 m from the fir with their back to it, then walks off 30 m down the
+- **New playtest beat `1c`:** the player stands 11 m from the fir with their back to it, then walks off 30 m down the
   trail, never looking. It waits 15 s, then comes down unseen after 25.0 s, and they're free to go on. 7/7.
 - **The Act 12 StoryTest** checks the near miss: it rears behind the stern (3.4 m, rail to rail) and sinks back past
   8 m, with no warning in it and no take. There's a new screenshot looking back at it, `lake_near_miss`. The Act 12

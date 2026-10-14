@@ -103,6 +103,9 @@ public partial class StalkerBody
 		for (int i = 0; i < _skel.GetBoneCount(); i++) _bones[_skel.GetBoneName(i)] = i;
 		_bHead = Bone("head"); _bNeck2 = Bone("neck2"); _bChest = Bone("chest"); _bJaw = Bone("jaw");
 		TriangleCount = 0;
+		// the skin's detail maps (every skin it's drawn with includes creature_detail.gdshaderinc: stalker_skin, giant_skin)
+		if (Skin.GetShaderParameter("cd_normal").VariantType == Variant.Type.Nil) CreatureDetail.Hook(Skin);
+		if (Skin.GetShaderParameter("cd_scale").VariantType == Variant.Type.Nil) Skin.SetShaderParameter("cd_scale", 3.2f);
 		var uniforms = new HashSet<string>();
 		foreach (var u in Skin.Shader.GetShaderUniformList()) uniforms.Add((string)u.AsGodotDictionary()["name"]);
 		foreach (var n in _model.FindChildren("*", "MeshInstance3D", true, false))
@@ -110,6 +113,8 @@ public partial class StalkerBody
 			var mi = (MeshInstance3D)n;
 			if (mi.Mesh == null) continue;
 			mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+			// (2026-10-13i, the owner: "too smooth") its rest pose and creases, for the hide's detail (CreatureDetail)
+			CreatureDetail.Prepare(mi);
 			for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
 			{
 				var arrays = mi.Mesh.SurfaceGetArrays(s);

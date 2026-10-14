@@ -74,6 +74,12 @@ public partial class SkiLodge
 	private float _stormTarget;
 	private bool _act23Set, _was202, _was203;
 
+	/// <summary>In the corridor right by a room's open door (2026-10-13, the skippable-events audit: "been in the room" is
+	/// not saved, so after a Continue with the room's key already taken its slam and save waited for a visit nobody needed
+	/// to make; passing the door, where it can be seen, does it instead).</summary>
+	private bool NearDoor(int room, PlayerController player)
+		=> RoomDoors[room].Current == LodgeParts.LodgeDoor.State.Open && player.GlobalPosition.DistanceTo(RoomDoors[room].CentreWorld) < 4f;
+
 	// ------------------------------------------------------------------ set up
 
 	private void StartAct23()
@@ -1120,7 +1126,8 @@ public partial class SkiLodge
 		// 202: leave with the key and it slams behind you
 		bool in202 = InRoom(202, l);
 		if (in202) _was202 = true;
-		if (!Room202Jammed && _was202 && !in202 && Taken(LodgeFlag.PantryKey) && RoomDoors[202].Current == LodgeParts.LodgeDoor.State.Open && l.Y > UpperY - 0.5f)
+		// (or, with the key taken on a run that was Continued since, simply passing the open door: _was202 is not saved)
+		if (!Room202Jammed && (_was202 || NearDoor(202, player)) && !in202 && Taken(LodgeFlag.PantryKey) && RoomDoors[202].Current == LodgeParts.LodgeDoor.State.Open && l.Y > UpperY - 0.5f)
 		{
 			Room202Jammed = true;
 			s.SetFlag(LodgeFlag.Room202Jammed);
@@ -1149,7 +1156,7 @@ public partial class SkiLodge
 		bool in203or204 = InRoom(203, l) || InRoom(204, l);
 		if (InRoom(204, l) && RoomDoors[204].Current == LodgeParts.LodgeDoor.State.Locked) { RoomDoors[204].Unlock(); RoomDoors[204].OpenPrompt = "Open the door"; }
 		if (in203or204) _was203 = true;
-		if (!Room203Jammed && _was203 && !in203or204 && Taken(LodgeFlag.DiningKey) && Has(LodgeFlag.Note204) && l.Y > UpperY - 0.5f)
+		if (!Room203Jammed && (_was203 || NearDoor(203, player)) && !in203or204 && Taken(LodgeFlag.DiningKey) && Has(LodgeFlag.Note204) && l.Y > UpperY - 0.5f)
 		{
 			Room203Jammed = true;
 			s.SetFlag(LodgeFlag.Room203Jammed);

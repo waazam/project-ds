@@ -103,7 +103,6 @@ public static class Verify
 		_ when name.StartsWith("cricket_chirp") => (0.3, 0.8),
 		_ when name.StartsWith("raven") => (0.8, 1.8),
 		_ when name.StartsWith("rustle") => (0.4, 1.2),
-		_ when name.StartsWith("oar_stroke") => (0.5, 1.0),
 		_ when name.StartsWith("oarlock_creak") => (0.15, 0.7),
 		_ when name.StartsWith("boat_creak") => (0.5, 1.4),
 		_ when name.StartsWith("wave_slap") => (0.4, 1.1),
@@ -119,9 +118,7 @@ public static class Verify
 		if (name == "insects_loop" && b[3] + b[4] < 0.85) yield return "insects not mostly >3k";
 		if (name == "pressure_loop" && b[0] < 0.9) yield return "pressure not mostly <100";
 		if (name == "ringing_loop" && b[3] + b[4] < 0.95) yield return "ringing not high";
-		if (name == "distant_loop" && b[0] + b[1] < 0.9) yield return "distant not low";
 		if (name == "wind_loop" && b[0] + b[1] < 0.8) yield return "wind not low/mid";
-		if (name == "leaves_loop" && b[2] + b[3] + b[4] < 0.6) yield return "leaves not high-band";
 		if (name == "heartbeat_loop" && b[0] < 0.85) yield return "heartbeat not mostly <100";
 		if (name.StartsWith("cricket_chirp") && b[3] + b[4] < 0.85) yield return "cricket not mostly >3k";
 		if (name.StartsWith("trunk_creak") && (b[1] < 0.6 || centroid > 800)) yield return "creak not low/woody";

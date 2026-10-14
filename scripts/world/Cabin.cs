@@ -26,8 +26,7 @@ namespace ProjectDS.World;
 ///
 /// States (all idempotent, safe to call from save-restore in any order):
 /// <see cref="SetBoarded"/>, <see cref="OpenDoor"/>/<see cref="SetOpen"/>,
-/// <see cref="SetBurning"/> (FireVfx at <see cref="FireSpots"/> + progressive char),
-/// <see cref="SetBurnt"/> (charred shell, part of the roof fallen in).
+/// <see cref="SetBurning"/> (FireVfx at <see cref="FireSpots"/> + progressive char).
 /// Pickup spots: child markers "LanternSpot"/"CompassSpot" (cabin.tscn), also
 /// <see cref="PorchSpot"/>.
 /// </summary>
@@ -55,14 +54,13 @@ public partial class Cabin : Node3D
 
 	public bool DoorBoarded { get; private set; }
 	public bool IsOpen { get; private set; }
-	public bool IsBurnt { get; private set; }
 	/// <summary>Porch steps built for the slope in front (0 when the porch is at ground level).</summary>
 	public int StepCount => Mathf.Max(0, _steps - 1);
 	/// <summary>0 = not burning, 1 = fully engulfed.</summary>
 	public float Burning { get; private set; }
 
 	private bool _lightOn = true;
-	/// <summary>The hanging lamp inside (and the lit window). Off automatically while burning/burnt.</summary>
+	/// <summary>The hanging lamp inside (and the lit window). Off automatically while burning.</summary>
 	public bool InteriorLightOn { get => _lightOn; set { _lightOn = value; UpdateLamp(); } }
 
 	/// <summary>World-space centre of the door, for triggers to line up against.</summary>
@@ -325,7 +323,7 @@ public partial class Cabin : Node3D
 		cols.Add((new Vector3(0, (WallHeight + RidgeY) * 0.5f, 0), new Vector3(Width, RidgeY - WallHeight, Depth * 0.6f), Basis.Identity));
 	}
 
-	// ---- roof: two shingled slabs split in three bays (the middle front bay falls in when burnt)
+	// ---- roof: two shingled slabs split in three bays
 
 	private void BuildRoof(MeshKit k)
 	{
@@ -346,28 +344,15 @@ public partial class Cabin : Node3D
 			float slopeLen = Mathf.Sqrt(zE * zE + (RidgeY - yE) * (RidgeY - yE));
 			for (int b = 0; b < 3; b++)
 			{
-				bool fallen = IsBurnt && ((s > 0 && b == 1) || (s < 0 && b == 2));
 				float x0 = bays[b], x1 = bays[b + 1];
-				float zStart = 0f, yStart = RidgeY;
-				if (fallen)
-				{
-					// only a ragged strip survives at the eave; the rest lies inside (see Collapse)
-					zStart = zE * 0.62f; yStart = Mathf.Lerp(RidgeY, yE, 0.62f);
-				}
-				Vector3 r0 = new(x0, yStart, zStart), r1 = new(x1, yStart, zStart), e0 = new(x0, yE, zE), e1 = new(x1, yE, zE);
-				float v0 = fallen ? slopeLen * 0.62f : 0f;
+				Vector3 r0 = new(x0, RidgeY, 0f), r1 = new(x1, RidgeY, 0f), e0 = new(x0, yE, zE), e1 = new(x1, yE, zE);
+				const float v0 = 0f;
 				k.Color = new Color(0.9f, 0.9f, 0.88f);
 				k.Mat(shingle);
 				k.Quad(r0 + lift, r1 + lift, e1 + lift, e0 + lift, n, new Vector2(x0 * 0.9f, v0 * 0.9f), new Vector2(x1 * 0.9f, v0 * 0.9f), new Vector2(x1 * 0.9f, slopeLen * 0.9f), new Vector2(x0 * 0.9f, slopeLen * 0.9f));
 				k.Color = new Color(0.62f, 0.56f, 0.5f);
 				k.Mat(boards);
 				k.Quad(r0, r1, e1, e0, -n, new Vector2(x0, v0), new Vector2(x1, v0), new Vector2(x1, slopeLen), new Vector2(x0, slopeLen));
-				if (fallen)
-				{
-					// broken top edge of the surviving strip
-					k.Mat(BuildingTextures.LogEndMat);
-					k.Quad(r0, r1, r1 + lift, r0 + lift, new Vector3(0, sin, -s * cos), new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 0.2f), new Vector2(0, 0.2f));
-				}
 			}
 			k.Color = new Color(0.7f, 0.64f, 0.56f);
 			k.Mat(trim);
@@ -378,7 +363,6 @@ public partial class Cabin : Node3D
 			foreach (int g in new[] { -1, 1 })
 			{
 				Vector3 a = new(g * (rake + 0.02f), RidgeY + thick * 0.4f, 0), c = new(g * (rake + 0.02f), yE + thick * 0.4f, zE + s * 0.03f);
-				if (IsBurnt && g > 0 && s > 0) c = a.Lerp(c, 0.55f);
 				k.Beam(a, c, 0.04f, 0.24f, 1.4f, new Vector3(0, cos, s * sin));
 			}
 			// the end faces (thickness) of the slabs at the rakes
@@ -392,8 +376,7 @@ public partial class Cabin : Node3D
 		// ridge cap: a square beam turned 45 degrees, riding the ridge
 		k.Color = new Color(0.55f, 0.52f, 0.48f);
 		k.Mat(BuildingTextures.ShingleMat);
-		float rx = IsBurnt ? 0.6f : 0f;
-		k.Beam(new Vector3(-Hw - LogT * 0.5f - 0.32f, RidgeY + 0.12f, 0), new Vector3(Hw + LogT * 0.5f + 0.32f - rx, RidgeY + 0.12f, 0), 0.2f, 0.2f, 1.2f, new Vector3(0, 1, 1).Normalized());
+		k.Beam(new Vector3(-Hw - LogT * 0.5f - 0.32f, RidgeY + 0.12f, 0), new Vector3(Hw + LogT * 0.5f + 0.32f,RidgeY + 0.12f, 0), 0.2f, 0.2f, 1.2f, new Vector3(0, 1, 1).Normalized());
 		k.Color = Colors.White;
 	}
 
@@ -500,8 +483,7 @@ public partial class Cabin : Node3D
 		foreach (float x in postX)
 		{
 			float g = Mathf.Min(GroundLocal(x, postZ), -0.3f) - 0.15f;
-			bool broken = IsBurnt && x > 0 && x < px - 0.1f;
-			float topY = broken ? 1.1f : roofAtPost - 0.18f;
+			float topY = roofAtPost - 0.18f;
 			BuildKit.Box(k, new Vector3(x, (g + topY) * 0.5f, postZ), new Vector3(0.14f, topY - g, 0.14f), 1.3f);
 			cols.Add((new Vector3(x, (0.02f + topY) * 0.5f, postZ), new Vector3(0.16f, topY, 0.16f), Basis.Identity));
 		}
@@ -528,7 +510,7 @@ public partial class Cabin : Node3D
 		}
 		k.Mat(post);
 		Rail(new Vector3(-px + 0.08f, 0, postZ), new Vector3(-sw - 0.08f, 0, postZ));
-		if (!IsBurnt) Rail(new Vector3(sw + 0.08f, 0, postZ), new Vector3(px - 0.08f, 0, postZ));
+		Rail(new Vector3(sw + 0.08f, 0, postZ), new Vector3(px - 0.08f, 0, postZ));
 		Rail(new Vector3(-px + 0.08f, 0, z0 + 0.05f), new Vector3(-px + 0.08f, 0, postZ));
 		Rail(new Vector3(px - 0.08f, 0, z0 + 0.05f), new Vector3(px - 0.08f, 0, postZ));
 
@@ -564,9 +546,7 @@ public partial class Cabin : Node3D
 		for (int b = 0; b < 2; b++)
 		{
 			float x0 = bays[b], x1 = bays[b + 1];
-			// burnt: the right half has dropped at its outer corner where the post burned through
-			float drop = IsBurnt && b == 1 ? 0.75f : 0f;
-			Vector3 a0 = new(x0, yb0, z0), a1 = new(x1, yb0, z0), c1 = new(x1, yb1 - drop, z1), c0 = new(x0, yb1 - (drop > 0 ? 0.15f : 0f), z1);
+			Vector3 a0 = new(x0, yb0, z0), a1 = new(x1, yb0, z0), c1 = new(x1, yb1, z1), c0 = new(x0, yb1, z1);
 			k.Color = new Color(0.9f, 0.9f, 0.88f);
 			k.Mat(BuildingTextures.ShingleMat);
 			k.Quad(a0 + lift, a1 + lift, c1 + lift, c0 + lift, n, new Vector2(x0 * 0.9f, 0), new Vector2(x1 * 0.9f, 0), new Vector2(x1 * 0.9f, len * 0.9f), new Vector2(x0 * 0.9f, len * 0.9f));
@@ -581,10 +561,7 @@ public partial class Cabin : Node3D
 		k.Mat(PropTextures.PostMat);
 		k.Color = new Color(0.66f, 0.6f, 0.52f);
 		for (float x = -xr + 0.25f; x < xr - 0.1f; x += 0.9f)
-		{
-			if (IsBurnt && x > 0.35f) continue;
 			k.Beam(new Vector3(x, yb0 - 0.06f, z0 + 0.05f), new Vector3(x, yb1 - 0.06f, z1 - 0.05f), 0.06f, 0.11f, 1.4f);
-		}
 		k.Color = Colors.White;
 	}
 
@@ -692,7 +669,7 @@ public partial class Cabin : Node3D
 		if (_panes != null && IsInstanceValid(_panes)) _panes.QueueFree();
 		_sashes = _panes = null;
 		_litPane = null;
-		if (Burning > 0f || IsBurnt) return;   // sash burned/blown out, glass gone, so smoke can pour out
+		if (Burning > 0f) return;   // sash burned/blown out, glass gone, so smoke can pour out
 		var ks = new MeshKit();
 		ks.Mat(PropTextures.PostMat);
 		ks.Color = new Color(0.42f, 0.38f, 0.34f);
@@ -744,12 +721,11 @@ public partial class Cabin : Node3D
 		for (float x = -ix + 0.3f; x <= ix - 0.2f; x += 0.75f)
 			foreach (int s in new[] { -1, 1 })
 			{
-				if (IsBurnt && ((s > 0 && x > -0.55f && x < 0.95f) || (s < 0 && x > 0.95f))) continue;
 				float drop = 0.08f / cos;
 				Vector3 a = new(x, RoofBottomAt(iz) - drop, s * iz), b = new(x, RidgeY - drop - 0.02f, 0);
 				k.Beam(a, b, 0.08f, 0.15f, 1.4f, new Vector3(0, 1, s * Pitch));
 			}
-		k.Beam(new Vector3(-ix, RidgeY - 0.14f, 0), new Vector3(IsBurnt ? 0.2f : ix, RidgeY - 0.14f - (IsBurnt ? 0.5f : 0f), 0), 0.14f, 0.2f, 1.4f);
+		k.Beam(new Vector3(-ix, RidgeY - 0.14f, 0), new Vector3(ix, RidgeY - 0.14f, 0), 0.14f, 0.2f, 1.4f);
 		float pz = -0.75f;
 		float py = RoofBottomAt(pz) - 0.26f;
 		k.Beam(new Vector3(-ix, py, pz), new Vector3(ix, py, pz), 0.12f, 0.16f, 1.4f);
@@ -782,7 +758,7 @@ public partial class Cabin : Node3D
 			["rubber"] = BuildingTextures.Plain("b_rubber", new Color(0.05f, 0.05f, 0.05f)), ["cloth"] = BuildingTextures.Plain("b_blanket", new Color(0.3f, 0.12f, 0.09f)),
 			["ceramic"] = BuildingTextures.Plain("b_enamel", new Color(0.7f, 0.7f, 0.66f), 0.4f),
 		};
-		bool modelled = !IsBurnt && FurnitureKit.Add(k, "log_pile", new Vector3(sx + 0.05f, 0f, sz + 0.78f), 0f, roles);
+		bool modelled = FurnitureKit.Add(k, "log_pile", new Vector3(sx + 0.05f, 0f, sz + 0.78f), 0f, roles);
 		k.Mat(BuildingTextures.RoundLogMat);
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 31 + 3) };
 		for (int i = 0; i < (modelled ? 0 : 6); i++)
@@ -844,15 +820,12 @@ public partial class Cabin : Node3D
 			FurnitureKit.Add(k, "boots", new Vector3(ix - 0.45f, 0.0f, iz - 0.4f), 2.6f, roles);
 			FurnitureKit.Add(k, "coat_on_hook", new Vector3(-ix + 0.02f, 1.8f, iz - 0.95f), -Mathf.Pi * 0.5f, roles);   // (on the side wall: the front one is all door and window)
 			// (2026-10-10) loose on the floor, to be knocked over: a tin under the shelf, a bottle by the boots
-			if (!IsBurnt)
+			var r = roles;
+			Callable.From(() =>
 			{
-				var r = roles;
-				Callable.From(() =>
-				{
-					Knockable.Put(this, "tin", r, Knockable.Sound.Tin, new Vector3(shx - 0.3f, 0.03f, shz1 + 0.15f), 0.3f);
-					Knockable.Put(this, "bottle_whiskey", r, Knockable.Sound.Glass, new Vector3(ix - 0.75f, 0.03f, iz - 0.3f), 1.1f);
-				}).CallDeferred();
-			}
+				Knockable.Put(this, "tin", r, Knockable.Sound.Tin, new Vector3(shx - 0.3f, 0.03f, shz1 + 0.15f), 0.3f);
+				Knockable.Put(this, "bottle_whiskey", r, Knockable.Sound.Glass, new Vector3(ix - 0.75f, 0.03f, iz - 0.3f), 1.1f);
+			}).CallDeferred();
 		}
 		for (int i = 0; i < (modelled ? 0 : 4); i++)
 		{
@@ -884,16 +857,6 @@ public partial class Cabin : Node3D
 		k.Color = Colors.White;
 		BuildKit.Box(k, new Vector3(0, 0.006f, iz - 0.75f), new Vector3(1.3f, 0.012f, 0.8f), 1f, BuildKit.Face.NY, new Basis(Vector3.Up, -0.05f));
 
-		// burnt: the collapsed roof bay lies slanted inside, charred
-		if (IsBurnt)
-		{
-			k.Mat(BuildingTextures.BoardsMat);
-			k.Color = new Color(0.3f, 0.28f, 0.26f);
-			BuildKit.Box(k, new Vector3(0.25f, 1.1f, 0.9f), new Vector3(1.6f, 0.1f, 2.1f), 1f, BuildKit.Face.None, Basis.FromEuler(new Vector3(0.75f, 0.1f, 0.12f)));
-			k.Mat(beam);
-			k.Beam(new Vector3(-0.5f, 0.05f, 2.2f), new Vector3(0.6f, 2.0f, 0.3f), 0.08f, 0.15f, 1.4f);
-			k.Beam(new Vector3(0.9f, 0.05f, 1.4f), new Vector3(0.2f, 2.5f, 0.0f), 0.08f, 0.15f, 1.4f);
-		}
 		k.Color = Colors.White;
 	}
 
@@ -952,7 +915,7 @@ public partial class Cabin : Node3D
 
 	private void UpdateLamp()
 	{
-		bool on = _lightOn && Burning <= 0f && !IsBurnt;
+		bool on = _lightOn && Burning <= 0f;
 		if (_lamp != null && IsInstanceValid(_lamp)) _lamp.Visible = on;
 		if (_lampGlass != null && IsInstanceValid(_lampGlass)) _lampGlass.Visible = on;
 		var spill = _gen?.GetNodeOrNull<OmniLight3D>("WindowSpill");
@@ -969,7 +932,6 @@ public partial class Cabin : Node3D
 	{
 		if (_door != null && IsInstanceValid(_door)) { _door.QueueFree(); }
 		_door = null;
-		if (IsBurnt) return;
 		_door = new Node3D { Name = "Door" };
 		_gen.AddChild(_door);
 		// hinge on the left jamb; the leaf is built extending +X from the hinge
@@ -1048,11 +1010,11 @@ public partial class Cabin : Node3D
 		});
 	}
 
-	/// <summary>Paper burns first: every note and print in the cabin (group <see cref="PapersGroup"/>) is gone while it burns or once burnt.</summary>
+	/// <summary>Paper burns first: every note and print in the cabin (group <see cref="PapersGroup"/>) is gone while it burns.</summary>
 	private void UpdatePapers()
 	{
 		if (!IsInsideTree()) return;
-		bool on = Burning <= 0f && !IsBurnt;
+		bool on = Burning <= 0f;
 		foreach (var n in GetTree().GetNodesInGroup(PapersGroup))
 			if (n is Node3D p && IsInstanceValid(p)) p.Visible = on;
 	}
@@ -1223,12 +1185,12 @@ public partial class Cabin : Node3D
 	}
 
 	/// <summary>Boards nailed over both windows, with gaps (the left window's glow shows through).
-	/// Whenever the door is boarded, or broken open after; otherwise the windows are bare glass. While burning / burnt they are gone, so smoke can pour out.</summary>
+	/// Whenever the door is boarded, or broken open after; otherwise the windows are bare glass. While burning they are gone, so smoke can pour out.</summary>
 	private void RefreshWindowBoards()
 	{
 		if (_windowBoards != null && IsInstanceValid(_windowBoards)) _windowBoards.QueueFree();
 		_windowBoards = null;
-		if (Burning > 0f || IsBurnt || !(DoorBoarded || IsOpen)) return;
+		if (Burning > 0f || !(DoorBoarded || IsOpen)) return;
 		var k = new MeshKit();
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 53 + 11) };
 		float z = FrontFace + 0.045f;
@@ -1326,20 +1288,11 @@ public partial class Cabin : Node3D
 		UpdatePapers();
 	}
 
-	/// <summary>The burnt-out shell (black, faint embers, part of the roof and the porch roof fallen in). Unused by the story so far.</summary>
-	public void SetBurnt(bool burnt)
-	{
-		if (IsBurnt == burnt) return;
-		IsBurnt = burnt;
-		if (burnt) { DoorBoarded = false; IsOpen = true; }
-		if (_gen != null) Build();
-	}
-
 	private void ApplyChar()
 	{
 		if (_gen == null) return;
-		float amount = IsBurnt ? 1f : Burning > 0f ? 0.3f + 0.45f * Burning : 0f;
-		float ember = IsBurnt ? 0.35f : Burning;
+		float amount = Burning > 0f ? 0.3f + 0.45f * Burning : 0f;
+		float ember = Burning;
 		if (amount <= 0f)
 		{
 			SetOverlay(_gen, null);

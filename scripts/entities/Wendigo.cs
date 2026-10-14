@@ -166,48 +166,10 @@ public partial class Wendigo : Node3D
 		}
 	}
 
-	private static readonly System.Collections.Generic.Dictionary<Mesh, ArrayMesh> _restMeshes = new();
-
-	/// <summary>(2026-10-10c) The mesh again with its rest pose in CUSTOM0 (position) and CUSTOM1 (normal), so the hide's
-	/// drawn detail (wendigo_skin.gdshader) rides the flesh as it moves, and doesn't swim across it. Done once per mesh
-	/// (every wendigo shares it); the skin, the blend shapes and the surfaces' materials kept.</summary>
-	private static void RestSpace(MeshInstance3D mi)
-	{
-		if (mi.Mesh is not ArrayMesh src) return;
-		if (!_restMeshes.TryGetValue(src, out var rest))
-		{
-			bool hasSkin = false;
-			for (int s = 0; s < src.GetSurfaceCount(); s++)
-				if (src.SurfaceGetMaterial(s) is StandardMaterial3D m && ((m.ResourceName ?? "").StartsWith("w_skin") || (m.ResourceName ?? "").StartsWith("w_bone"))) hasSkin = true;
-			if (!hasSkin) { _restMeshes[src] = null; return; }
-			rest = new ArrayMesh { BlendShapeMode = src.BlendShapeMode, ResourceName = src.ResourceName + "_rest" };
-			for (int b = 0; b < src.GetBlendShapeCount(); b++) rest.AddBlendShape(src.GetBlendShapeName(b));
-			for (int s = 0; s < src.GetSurfaceCount(); s++)
-			{
-				var arr = src.SurfaceGetArrays(s);
-				var verts = arr[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-				var norms = arr[(int)Mesh.ArrayType.Normal].AsVector3Array();
-				var c0 = new float[verts.Length * 4];
-				var c1 = new float[verts.Length * 4];
-				for (int v = 0; v < verts.Length; v++)
-				{
-					c0[v * 4] = verts[v].X; c0[v * 4 + 1] = verts[v].Y; c0[v * 4 + 2] = verts[v].Z; c0[v * 4 + 3] = 1f;
-					var nn = v < norms.Length ? norms[v] : Vector3.Up;
-					c1[v * 4] = nn.X; c1[v * 4 + 1] = nn.Y; c1[v * 4 + 2] = nn.Z; c1[v * 4 + 3] = 0f;
-				}
-				arr[(int)Mesh.ArrayType.Custom0] = c0;
-				arr[(int)Mesh.ArrayType.Custom1] = c1;
-				var flags = (Mesh.ArrayFormat)(((long)Mesh.ArrayCustomFormat.RgbaFloat << (int)Mesh.ArrayFormat.FormatCustom0Shift)
-					| ((long)Mesh.ArrayCustomFormat.RgbaFloat << (int)Mesh.ArrayFormat.FormatCustom1Shift));
-				var blends = src.SurfaceGetBlendShapeArrays(s);
-				rest.AddSurfaceFromArrays(src.SurfaceGetPrimitiveType(s), arr, blends, null, flags);
-				rest.SurfaceSetMaterial(s, src.SurfaceGetMaterial(s));
-			}
-			_restMeshes[src] = rest;
-			GD.Print($"[wendigo] rest-space mesh {src.ResourceName}: {src.GetAabb()}");
-		}
-		if (rest != null) mi.Mesh = rest;
-	}
+	/// <summary>(2026-10-10c) The mesh again with its rest pose in its custom channels, so the hide's drawn detail
+	/// (wendigo_skin.gdshader) rides the flesh as it moves, and doesn't swim across it; (2026-10-13i) with its creases
+	/// and its tangents for the skin's detail maps too (<see cref="CreatureDetail"/>, shared with the other creatures).</summary>
+	private static void RestSpace(MeshInstance3D mi) => CreatureDetail.Prepare(mi, "w_skin", "w_bone");
 
 	private static ShaderMaterial _skinMat;
 	private static StandardMaterial3D _heart;
@@ -223,6 +185,9 @@ public partial class Wendigo : Node3D
 		_skinMat.SetShaderParameter("normal_tex", baked.NormalTexture);
 		_skinMat.SetShaderParameter("noise_tex", _skinNoise);
 		_skinMat.SetShaderParameter("roughness", baked.Roughness);
+		// (2026-10-13i) the skin's detail maps: its wrinkles a centimetre or two apart at its size
+		CreatureDetail.Hook(_skinMat);
+		_skinMat.SetShaderParameter("cd_scale", 1.3f);
 		return _skinMat;
 	}
 
@@ -248,6 +213,11 @@ public partial class Wendigo : Node3D
 		_boneMat.SetShaderParameter("bite_high", -4f);
 		_boneMat.SetShaderParameter("baked", 0.25f);
 		_boneMat.SetShaderParameter("pallor", 0.06f);
+		// (2026-10-13i) the bone's surface: pitted and crazed, not wrinkled (the detail shallower, its cracks kept)
+		CreatureDetail.Hook(_boneMat);
+		_boneMat.SetShaderParameter("cd_scale", 1.6f);
+		_boneMat.SetShaderParameter("cd_strength", 0.4f);
+		_boneMat.SetShaderParameter("cd_fold_strength", 0.35f);
 		return _boneMat;
 	}
 

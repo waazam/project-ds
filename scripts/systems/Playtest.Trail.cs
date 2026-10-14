@@ -193,6 +193,19 @@ public partial class Playtest
 
 	// ------------------------------------------------------------------ Act 1
 
+	/// <summary>Act 1 by the water: the gunshot comes to a player who wades the creek beside the footbridge.</summary>
+	private async Task Act1Creek(CancellationToken ct)
+	{
+		await Control(ct, 40);
+		var shot = _bot.AllOf<SoundEvent>().FirstOrDefault(e => e.Name == "BridgeGunshot");
+		Require("the bridge's gunshot", shot != null);
+		Check("not fired at the trailhead", !shot.Fired);
+		string how = await CrossCreekBesideBridge(_bot.FirstOf<Footbridge>(), () => shot.Fired, ct);
+		await _bot.WaitUntil(() => shot.Fired, 3, ct);
+		Check($"the gunshot over the creek beside the bridge ({how}), not on its deck", shot.Fired && shot.FiredBy == "across", $"fired {shot.Fired} by {shot.FiredBy}");
+		Shot("creek");
+	}
+
 	private async Task Act1(CancellationToken ct)
 	{
 		await Control(ct, 40);

@@ -70,7 +70,8 @@ public partial class Bunker : Node3D
 	private Node3D _gen;
 	private Node3D _doorNode;
 	private CollisionShape3D _closedCollision, _openCollision;
-	private Area3D _openTrigger;
+	private Area3D _openTrigger, _entryTrigger;
+	private bool _entryRetrying;
 	/// <summary>Where the apron's ramp meets lower ground in front (top surface, local), or null when the apron is flat.</summary>
 	private Vector3? _rampEndTop;
 
@@ -124,8 +125,27 @@ public partial class Bunker : Node3D
 		}
 		if (IsOpen || !StoryAllowsOpening) return;
 		SayDialLine();
+		NudgeMissingNumbers();
 	}
-	private ulong _nudgedAt;
+	private ulong _nudgedAt, _numbersNudgedAt;
+
+	/// <summary>
+	/// (2026-10-13, the skippable-events audit) The last two numbers stand by the trail's loop from the lookout, but the
+	/// compass points straight across the woods to the bunker, so a player who follows it can reach the dial without
+	/// ever passing them (nor the "something on a tree back there" nudge, which needs them close). At the door with
+	/// either still unread: one short line under the picture, as the trees' own nudges do (at most once a minute).
+	/// </summary>
+	private void NudgeMissingNumbers()
+	{
+		var s = StoryManager.Instance;
+		if (s == null || s.HasFlag(StoryManager.Flag.BunkerUnlocked)) return;
+		if (s.HasFlag(StoryManager.Flag.CodeDigit(3)) && s.HasFlag(StoryManager.Flag.CodeDigit(4))) return;
+		if (_numbersNudgedAt != 0 && Time.GetTicksMsec() - _numbersNudgedAt < 60000) return;
+		if (UI.Subtitle.Instance is not { } sub) return;
+		_numbersNudgedAt = Time.GetTicksMsec();
+		_ = sub.Show($"His last numbers are on the trees by the path, back toward the lookout.   {UI.KeyHint.Blacklight}: the blacklight.", 0.8f, 5f, 1.2f);
+		GD.Print("[story] Act 7: at the dial with numbers 3-4 unread: the nudge back along the path");
+	}
 
 	/// <summary>Checkpoint 6 could conceivably fire with the player already inside the radius: re-check.</summary>
 	private void OnCheckpoint(Checkpoint _)
@@ -288,7 +308,7 @@ public partial class Bunker : Node3D
 		// Coming within OpenRadius after the fire opens the door (a trigger, not a per-frame poll).
 		_openTrigger = StoryBeat.MakeTrigger(_gen, new CylinderShape3D { Radius = OpenRadius, Height = 30f }, Vector3.Zero, OnApproach, "OpenTrigger");
 		// A proper doorway trigger: just inside the hatch, so only walking in through the door counts.
-		StoryBeat.MakeTrigger(_gen, new BoxShape3D { Size = new Vector3(0.9f, 1.7f, 1.1f) }, new Vector3(0, fy + 0.95f, -1.05f), OnEntered, "EntryTrigger");
+		_entryTrigger = StoryBeat.MakeTrigger(_gen, new BoxShape3D { Size = new Vector3(0.9f, 1.7f, 1.1f) }, new Vector3(0, fy + 0.95f, -1.05f), OnEntered, "EntryTrigger");
 
 		// The station card: laminated, bolted to the face right of the frame, readable while the hatch is still locked.
 		PaperKit.Pinned(_gen, StationCardLocal + Vector3.Back * 0.012f, Vector3.Back, new Vector2(0.16f, 0.11f), PaperKit.Look.Card,
@@ -365,10 +385,28 @@ public partial class Bunker : Node3D
 		// After the walkie the interior has nothing left and no way back out: the doorway stays dark.
 		if (story is { Current: >= Checkpoint.Act10WalkieFound }) return;
 		var interior = BunkerInterior.Instance;
-		if (interior == null || interior.IsAdmitting) return;
+		if (interior == null) return;
+		// (2026-10-13) stepped in while an admission was still running: it used to wait for them to step out and back
+		// in; now it tries again as soon as that's over, as long as they're still in the doorway
+		if (interior.IsAdmitting) { _ = RetryEntry(player); return; }
 		interior.AdmitPlayer(player);
 		story?.ReachCheckpoint(Checkpoint.Act8BunkerEntered, ApproachPointWorld, ApproachYaw);
 		GD.Print("[story] Act 8: into the bunker");
 		UI.ChapterCard.Show(interior, 3, 2.5f);
+	}
+
+	/// <summary>Waits out a running admission, then enters again if the player is still standing in the doorway.</summary>
+	private async System.Threading.Tasks.Task RetryEntry(PlayerController player)
+	{
+		if (_entryRetrying) return;
+		_entryRetrying = true;
+		try
+		{
+			while (IsInstanceValid(this) && IsInstanceValid(player) && BunkerInterior.Instance is { IsAdmitting: true })
+				await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			if (!IsInstanceValid(this) || !IsInstanceValid(player)) return;
+			if (ReferenceEquals(StoryBeat.PlayerInside(_entryTrigger), player)) OnEntered(player);
+		}
+		finally { if (IsInstanceValid(this)) _entryRetrying = false; }
 	}
 }

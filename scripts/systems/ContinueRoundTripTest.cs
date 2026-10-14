@@ -362,8 +362,6 @@ public partial class ContinueRoundTripTest : Node
 
 		// One-shot beats know they already happened.
 		CheckFired<FirstClimbEvent>(story.Current >= Checkpoint.Act2StairsClimbed);
-		// The boarded-door caption is a once-only line now (no checkpoint): done once seen, or once the door is open.
-		CheckFired<CabinReturnEvent>(story.HasFlag(CabinReturnEvent.SeenFlag) || StoryBeat.CabinDoorOpen(story));
 		CheckFired<FriendReveal>(story.Current >= Checkpoint.Act5CabinEntered);
 		CheckFired<CabinExitLine>(story.HasFlag(StoryManager.Flag.DawnBroke));
 		CheckFired<BridgeCrossEvent>(story.Current >= Checkpoint.Act6BridgeCrossed);

@@ -22,9 +22,7 @@ string music = Path.Combine(root, "assets", "audio", "music");
 var jobs = new List<(string name, string dir, bool loop, int sr, Func<Rng, int, double[]> gen)>
 {
 	("wind_loop", ambient, true, Lo, (r, sr) => Ambient.Wind(r, sr, 32)),
-	("leaves_loop", ambient, true, Lo, (r, sr) => Ambient.Leaves(r, sr, 28)),
 	("insects_loop", ambient, true, Hi, (r, sr) => Ambient.Insects(r, sr, 30)),
-	("distant_loop", ambient, true, Lo, (r, sr) => Ambient.Distant(r, sr, 36)),
 	("stream_loop", ambient, true, Lo, (r, sr) => Ambient.Stream(r, sr, 24)),
 	("pressure_loop", ambient, true, Lo, (r, sr) => Ambient.Pressure(r, sr, 40)),
 	("undertone_loop", ambient, true, Lo, (r, sr) => Ambient.Undertone(r, sr, 40)),
@@ -109,14 +107,12 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_near_{i:00}", sfx, false,
 for (int i = 1; i <= 3; i++) jobs.Add(($"creature_roar_far_{i:00}", sfx, false, Lo, (r, sr) => Creature.Roar(r, sr, true)));
 for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"creature_screech_{k:00}", sfx, false, Lo, (r, sr) => Creature.Screech(r, sr, k))); }
 for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"creature_snarl_{k:00}", sfx, false, Lo, (r, sr) => Creature.Snarl(r, sr, k))); }
-// Eight beats of the one rattle voice, 21-30 s each: the game swaps takes between bursts so the rhythm never repeats.
-for (int i = 1; i <= 8; i++) { int k = i; int len = new[] { 24, 28, 22, 26, 30, 25, 21, 29 }[k - 1]; jobs.Add(($"creature_rattle_loop_{k:00}", sfx, true, Lo, (r, sr) => Creature.RattleLoop(r, sr, len, k))); }
+// The one rattle take (Dan, 2026-09-22: the other beats read as hooves; the game varies its rate instead).
+for (int i = 1; i <= 1; i++) { int k = i; int len = new[] { 24, 28, 22, 26, 30, 25, 21, 29 }[k - 1]; jobs.Add(($"creature_rattle_loop_{k:00}", sfx, true, Lo, (r, sr) => Creature.RattleLoop(r, sr, len, k))); }
 jobs.Add(("creature_giant_rattle_loop_01", sfx, true, Lo, (r, sr) => Creature.GiantRattle(r, sr, 26)));
-// Rattle candidates (Dan, 2026-09-22: the click reads as hooves): a..f, not wired in until he picks one.
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_foghorn_{i:00}", sfx, false, Lo, (r, sr) => Creature.Foghorn(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_moan_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantMoan(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_bellow_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantBellow(r, sr)));
-for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"creature_jumpscream_{k:00}", sfx, false, Lo, (r, sr) => Creature.JumpScream(r, sr, k))); }
 for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"creature_jumpscare_{k:00}", sfx, false, Hi, (r, sr) => Creature.Jumpscare(r, sr, k))); }
 for (int i = 1; i <= 4; i++) jobs.Add(($"twig_snap_{i:00}", sfx, false, Lo, (r, sr) => Forest.TwigSnap(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"branch_drop_{i:00}", sfx, false, Lo, (r, sr) => Forest.BranchDrop(r, sr)));
@@ -126,7 +122,6 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"raven_{i:00}", sfx, false, Lo, (r, sr) 
 for (int i = 1; i <= 3; i++) jobs.Add(($"rustle_{i:00}", sfx, false, Lo, (r, sr) => Forest.Rustle(r, sr)));
 jobs.Add(("heartbeat_loop", ambient, true, Lo, (r, sr) => Forest.Heartbeat(r, sr, 20)));
 // Act 12: the lake crossing (the rowboat, the water, the creature, the dawn).
-for (int i = 1; i <= 4; i++) jobs.Add(($"oar_stroke_{i:00}", sfx, false, Lo, (r, sr) => Lake.OarStroke(r, sr)));
 // the audio sweep: Foley that was missing, and the interiors' haunting
 for (int i = 1; i <= 3; i++) jobs.Add(($"paper_rustle_{i:00}", sfx, false, Lo, (r, sr) => Foley.PaperRustle(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"item_take_{i:00}", sfx, false, Lo, (r, sr) => Foley.ItemTake(r, sr)));
@@ -219,7 +214,6 @@ for (int i = 1; i <= 6; i++) jobs.Add(($"step_snow_{i:00}", sfx, false, Lo, (r, 
 jobs.Add(("winter_wind_loop", ambient, true, Lo, (r, sr) => ChurchSounds.WinterWind(r, sr, 38)));
 jobs.Add(("church_tone_loop", ambient, true, Lo, (r, sr) => ChurchSounds.ChurchTone(r, sr, 36)));
 
-jobs.Add(("score_hum_loop", music, true, Lo, (r, sr) => Music.ScoreHumLoop(r, sr, 40)));
 jobs.Add(("score_shimmer_loop", music, true, Lo, (r, sr) => Music.ScoreShimmerLoop(r, sr, 40)));
 jobs.Add(("score_pad_loop", music, true, Lo, (r, sr) => Music.ScorePadLoop(r, sr, 40)));
 
