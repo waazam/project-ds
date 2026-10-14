@@ -54,6 +54,13 @@ public partial class Playtest
 		var held0 = hud?.Held ?? ToolKind.None;
 		await _bot.Tap(on => Input.ScriptedItemNext = on, ct);
 		Check("the inventory: the wheel moves to the next thing carried", hud != null && hud.Held != held0 && Inv.OwnedItems().Count >= 3, $"{held0} -> {hud?.Held}, carrying {string.Join(", ", Inv.OwnedItems().Select(i => i.Label))}");
+		// (2026-10-13j) the right hand really holds it: the lantern put the camera away, the wheel brought it back up
+		await _bot.Seconds(0.7, ct);
+		Check("the hands: the lantern put the camera away, the wheel brought it back to the right hand", held0 == ToolKind.None && Inv.InHand == ToolKind.Camera
+			&& PlayerHands.Instance?.Tool is { Shown: ToolKind.Camera, Raise: > 0.9f },
+			$"{held0} -> {Inv.InHand}, shown {PlayerHands.Instance?.Tool?.Shown}");
+		await _bot.Tap(on => Input.ScriptedItemPrev = on, ct);   // (put away again: right mouse is the lantern's beam below)
+		await _bot.Seconds(0.6, ct);
 		Check("the inventory saves and restores what's carried", Inv.Serialize().StartsWith("lantern,compass,camera"), Inv.Serialize());
 		// the lantern: F, the flame; its first few seconds lit it gutters (the blacklight still works), and takes again
 		var lamp = Player.GetNodeOrNull<Lantern>("Lantern");

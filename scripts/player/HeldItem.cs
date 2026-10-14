@@ -21,6 +21,8 @@ public abstract partial class HeldItem : Node3D
 	protected abstract void Build();
 	protected abstract void Animate(float dt);
 	protected virtual void OnHidden() { }
+	/// <summary>Seconds to raise it into view or lower it out (each way).</summary>
+	protected virtual float RaiseSeconds => 0.5f;
 
 	private float _stride, _amp, _run, _lagYaw, _lagPitch, _prevYaw, _prevPitch, _shakeT;
 	private bool _built;
@@ -70,7 +72,7 @@ public abstract partial class HeldItem : Node3D
 		}
 		float dt = Mathf.Min((float)delta, 0.05f);
 		bool want = Wanted;
-		Raise = Mathf.MoveToward(Raise, want ? 1f : 0f, dt / 0.5f);
+		Raise = Mathf.MoveToward(Raise, want ? 1f : 0f, dt / RaiseSeconds);
 		bool show = Raise > 0.01f;
 		if (Visible != show) { Visible = show; if (!show) OnHidden(); }
 		if (!show) return;
@@ -122,7 +124,7 @@ public abstract partial class HeldItem : Node3D
 	public static readonly Color JacketSleeve = new(0.085f, 0.1f, 0.07f);
 
 	/// <summary>Puts everything drawn under <paramref name="n"/> on the held layer only.</summary>
-	protected static void SetLayer(Node n)
+	internal static void SetLayer(Node n)
 	{
 		if (n is VisualInstance3D v && n is not Light3D) v.Layers = HeldLayer;
 		foreach (var c in n.GetChildren()) SetLayer(c);
@@ -131,7 +133,7 @@ public abstract partial class HeldItem : Node3D
 	/// <summary>(2026-10-11, the owner: "I can see pieces of the player arm not connected to each other ... we need to
 	/// bridge the meshes") A first-person arm modelled in Blender as one fused skin (tools/Blender/fp_arms.py): glove,
 	/// wrist, cuff and sleeve together, its fingers curled round the grip at its origin. Null if the model's missing.</summary>
-	protected static Node3D BuildArm(Node3D parent, string model, Vector3 at, float scale = 1f)
+	internal static Node3D BuildArm(Node3D parent, string model, Vector3 at, float scale = 1f)
 	{
 		string path = $"res://assets/models/player/{model}.glb";
 		if (!ResourceLoader.Exists(path)) return null;

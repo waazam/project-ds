@@ -38,6 +38,8 @@ public partial class Flamethrower : Node3D
 	private Node3D _wand, _nozzle;
 	private bool _active;
 	private float _lock, _kick, _sway, _pilotT;
+	/// <summary>0 lowered out of view .. 1 up in the hands.</summary>
+	public float WandRaise { get; private set; }
 	private AudioStreamPlayer _roar;
 	private OmniLight3D _pilot;
 	private GpuParticles3D _vent;
@@ -75,6 +77,18 @@ public partial class Flamethrower : Node3D
 		var model = FurnitureKit.Clean(() => FurnitureKit.Place(_wand, "flamethrower_wand", new Transform3D(Basis.Identity, Vector3.Zero), WandRoles, "Wand"));
 		if (model == null) BuildFallback(_wand);
 		if (model != null) model.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		// (2026-10-13j) both hands on it: the right round the rear pistol grip, its finger on the trigger; the left round the
+		// front grip under the barrel (the lantern hangs at the belt meanwhile, see PlayerHands)
+		foreach (var (side, at) in new[] { (HandSide.Right, new Vector3(0f, -0.03f, -0.02f)), (HandSide.Left, new Vector3(0f, -0.032f, -0.4f)) })
+		{
+			var hand = FirstPersonHands.Create(side, HandPose.ToolGrip);
+			hand.Root.Position = at;
+			// (turned so the knuckles face along the barrel)
+			hand.Root.RotationDegrees = new Vector3(side == HandSide.Right ? 14f : 10f, side == HandSide.Right ? -47f : 47f, 0f);
+			_wand.AddChild(hand.Root);
+			foreach (var n in hand.Root.FindChildren("*", "GeometryInstance3D", true, false))
+				((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		}
 		// (the wand's model runs along -Z, its nozzle's mouth 0.82 m out)
 		_nozzle = new Node3D { Name = "Nozzle", Position = new Vector3(0f, 0.035f, -0.86f) };
 		_wand.AddChild(_nozzle);
@@ -126,12 +140,15 @@ public partial class Flamethrower : Node3D
 		float dt = (float)delta;
 		var inv = _player.Inventory;
 		bool owned = inv != null && inv.HasTool(ToolKind.Flamethrower);
-		var hud = GetTree().GetFirstNodeInGroup("equipped_item_hud") as UI.EquippedItemHud;
-		bool held = owned && (hud == null || hud.Held == ToolKind.Flamethrower || hud.Held == ToolKind.None);
+		// (2026-10-13j) in both hands when it's the right hand's choice (the lantern hangs at the belt meanwhile): raised once
+		// whatever was in the right hand is down, lowered out of view when something else is chosen
+		bool held = owned && inv.InHand == ToolKind.Flamethrower && (PlayerHands.Instance?.RightFree ?? true);
+		bool clear = PlayerHands.Instance?.Tool is not { } ht || !IsInstanceValid(ht) || ht.Raise < 0.05f;
+		WandRaise = Mathf.MoveToward(WandRaise, held && clear ? 1f : 0f, dt / 0.3f);
 		bool cameraUp = UI.CameraViewfinder.Current is { } vf && IsInstanceValid(vf) && vf.Raise > 0.01f;
-		_active = held && !cameraUp;
+		_active = held && WandRaise > 0.9f && !cameraUp;
 		if (owned && _wand == null) BuildWand();
-		if (_wand != null) _wand.Visible = held;
+		if (_wand != null) _wand.Visible = WandRaise > 0.01f;
 		var input = _player.PlayerInput;
 		bool want = _active && input.Enabled && (ScriptedFire || input.PhotoHeld) && !_player.PlayerInput.Focus;
 		// the heat: up as it fires, down as it rests; all the way up, it locks and vents for seven seconds
@@ -191,8 +208,9 @@ public partial class Flamethrower : Node3D
 			_pilotT += dt;
 			var bob = new Vector3(Mathf.Sin(_sway) * 0.008f, Mathf.Abs(Mathf.Cos(_sway)) * 0.006f, 0f) * Mathf.Clamp(_player.GroundSpeed / 3f, 0f, 1f);
 			var shake = Firing ? new Vector3(Mathf.Sin(_pilotT * 31f), Mathf.Sin(_pilotT * 27f + 1f), 0f) * 0.0018f : Vector3.Zero;
-			_wand.Position = WandRest + bob + shake + new Vector3(0f, 0.004f, 0.025f) * _kick + (cameraUp ? new Vector3(0.05f, -0.3f, 0.1f) : Vector3.Zero);
-			_wand.Rotation = new Vector3(0.03f * _kick, 0.04f, 0f);
+			float up = Mathf.SmoothStep(0f, 1f, WandRaise);
+			_wand.Position = WandRest + bob + shake + new Vector3(0f, 0.004f, 0.025f) * _kick + new Vector3(0.05f, -0.42f, 0.12f) * (1f - up);
+			_wand.Rotation = new Vector3(0.03f * _kick - 0.5f * (1f - up), 0.04f, -0.25f * (1f - up));
 			if (_pilot != null) _pilot.LightEnergy = Firing ? 0.8f : 0.25f;
 		}
 	}

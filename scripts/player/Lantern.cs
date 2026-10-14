@@ -177,7 +177,8 @@ public partial class Lantern : Node3D
 	private bool _deadHinted, _snuffHinted;
 
 	/// <summary>The one-time how-to under the picture, the first time the lantern is taken in play (never on a restore).</summary>
-	[Export] public string HowToLine = "F: lantern on and off.   B: its blacklight.   Right mouse: gather its beam.";
+	// (2026-10-13j: taking it puts the camera away, so the right mouse is the beam's; the wheel brings the camera back)
+	[Export] public string HowToLine = "F: lantern on and off.   B: its blacklight.   Right mouse: gather its beam.   Wheel: the camera.";
 
 	private OmniLight3D _glow;
 	private SpotLight3D _beam;
@@ -410,7 +411,8 @@ public partial class Lantern : Node3D
 		}
 
 		float s = 1f - Mathf.Exp(-Sharpness * dt);
-		_focus = Mathf.Lerp(_focus, _player.PlayerInput.Focus ? 1f : 0f, s);
+		// (2026-10-13j) right mouse is the right hand's: the camera's, when that's in it; the beam's otherwise
+		_focus = Mathf.Lerp(_focus, _player.PlayerInput.Focus && PlayerHands.LanternCanGather(_player) ? 1f : 0f, s);
 		float pref = Systems.GameSettings.Instance?.LanternBrightness ?? 1f;   // (the player's own setting)
 		_glow.LightEnergy = GlowEnergy * Mathf.Lerp(1f, GlowWhileFocused, _focus) * k * pref;
 		_beam.Visible = _focus > 0.01f;

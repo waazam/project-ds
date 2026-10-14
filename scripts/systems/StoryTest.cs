@@ -391,6 +391,7 @@ public partial class StoryTest : Node
 		Vector3 to = Flat(bird.GlobalPosition - _player.GlobalPosition).Normalized();
 		if (to == Vector3.Zero) to = Vector3.Forward;
 		await Teleport(bird.GlobalPosition - to * 6f, bird.GlobalPosition, ct);
+		if (_inv.InHand != ToolKind.Camera) { _inv.Select(ToolKind.Camera); await Seconds(0.6, ct); }   // (2026-10-13j: right mouse raises it only from the hand)
 		_input.ScriptedFocus = true;
 		await Seconds(0.6, ct);
 		await Aim(bird.GlobalPosition + Vector3.Up * 0.05f, ct);
@@ -440,6 +441,7 @@ public partial class StoryTest : Node
 	{
 		var cam = FirstOf<CameraTool>();
 		int before = PhotoLog.Instance?.RecordedCount ?? 0;
+		if (_inv.InHand != ToolKind.Camera) { _inv.Select(ToolKind.Camera); await Seconds(0.6, ct); }   // (2026-10-13j: right mouse raises it only from the hand)
 		_input.ScriptedFocus = true;
 		await Seconds(0.4, ct);
 		cam?.SetZoom(zoom);

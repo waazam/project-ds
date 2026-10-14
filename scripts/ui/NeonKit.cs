@@ -180,6 +180,21 @@ public static class NeonKit
 			case ToolKind.Bookmark:
 				Line(c, new[] { P(-0.14f, -0.38f), P(0.14f, -0.38f), P(0.14f, 0.38f), P(0, 0.24f), P(-0.14f, 0.38f) }, w, lit, true);
 				break;
+			case ToolKind.NewelPost:   // (2026-10-13j) the cap: a ball on a neck, the plinth, the broken spigot under it
+				Circle(c, P(0, -0.14f), s * 0.2f, w, lit);
+				Line(c, new[] { P(-0.07f, 0.06f), P(-0.05f, 0.12f), P(0.05f, 0.12f), P(0.07f, 0.06f) }, w, lit);
+				Line(c, Box(P(-0.24f, 0.12f), new Vector2(0.48f, 0.12f) * s), w, lit, true);
+				Line(c, new[] { P(-0.1f, 0.24f), P(-0.06f, 0.34f), P(0f, 0.28f), P(0.05f, 0.36f), P(0.1f, 0.24f) }, w * 0.8f, lit * 0.8f);
+				break;
+			case ToolKind.None:        // an empty hand: an open palm, four fingers and the thumb
+				Line(c, new[] { P(-0.2f, 0.36f), P(-0.22f, 0.04f), P(-0.36f, -0.1f), P(-0.3f, -0.15f), P(-0.17f, -0.05f) }, w, lit);
+				for (int i = 0; i < 4; i++)
+				{
+					float x = -0.15f + i * 0.1f, top = -0.36f + Mathf.Abs(i - 1.3f) * 0.06f;
+					Line(c, new[] { P(x - 0.03f, 0f), P(x - 0.03f, top), P(x + 0.03f, top), P(x + 0.03f, 0f) }, w * 0.9f, lit);
+				}
+				Line(c, new[] { P(0.2f, 0f), P(0.2f, 0.2f), P(0.12f, 0.36f), P(-0.2f, 0.36f) }, w, lit);
+				break;
 			default:
 				if (n.Contains("Post") || n.Contains("Tread"))
 				{
