@@ -496,7 +496,9 @@ def ottoman():
     P = [cushion("Body", (0, 0, 0.27), (1.5, 0.75, 0.32), up, puff=0.15, tufts=("z", F.diamond_grid(-0.65, 0.65, -0.3, 0.3, 6, 3)), tuft_depth=0.03)]
     for sx in (-1, 1):
         for sy in (-1, 1):
-            P.append(lathe(f"Foot{sx}{sy}", [(0.0, 0.0), (0.035, 0.0), (0.045, 0.05), (0.03, 0.1), (0.0, 0.11)], wood, segs=10, axis_pos=(sx * 0.65, sy * 0.3, 0)))
+            # (the joints pass) a dowel up into the body: the bun ended in a point at 0.11 and the puffed body curved
+            # away above it, 16 mm clear
+            P.append(lathe(f"Foot{sx}{sy}", [(0.0, 0.0), (0.035, 0.0), (0.045, 0.05), (0.03, 0.1), (0.028, 0.15), (0.0, 0.15)], wood, segs=10, axis_pos=(sx * 0.65, sy * 0.3, 0)))
     return P
 
 

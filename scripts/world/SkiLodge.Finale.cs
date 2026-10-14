@@ -64,13 +64,19 @@ public partial class SkiLodge
 		var ck = new MeshKit();
 		ck.Mat(LodgeTextures.IronMat);
 		ck.Color = Colors.White;
+		// (2026-10-13, the joints pass) each link along the sag and overlapping the next (they were level 7 cm bars with 2 cm
+		// of air between each), the padlock hung from the lowest on its shackle (it floated 12 cm under the chain)
+		Vector3 Sag(float u) => new(u * 0.45f, 0.05f - Mathf.Cos(u * 1.2f) * 0.1f + 0.1f, -0.09f);
 		for (int i = 0; i < 11; i++)
 		{
 			float u = (i - 5) / 5f;
-			Vector3 p = new(u * 0.45f, 0.05f - Mathf.Cos(u * 1.2f) * 0.1f + 0.1f, -0.09f);
-			ck.Cylinder(p - new Vector3(0.035f, 0, 0), p + new Vector3(0.035f, 0, 0), 0.02f, 0.02f, 4, true);
+			Vector3 p = Sag(u), t = (Sag(u + 0.1f) - Sag(u - 0.1f)).Normalized();
+			ck.Cylinder(p - t * 0.055f, p + t * 0.055f, 0.02f, 0.02f, 4, true);
 		}
-		ck.Box(new Vector3(0.05f, -0.15f, -0.11f), new Vector3(0.12f, 0.15f, 0.05f), 1f);
+		ck.Box(new Vector3(0.05f, -0.06f, -0.09f), new Vector3(0.12f, 0.15f, 0.05f), 1f);
+		foreach (float sx in new[] { 0.015f, 0.085f })
+			ck.Cylinder(new Vector3(sx, 0.01f, -0.09f), new Vector3(sx, 0.06f, -0.09f), 0.008f, 0.008f, 6, true);
+		ck.Cylinder(new Vector3(0.008f, 0.06f, -0.09f), new Vector3(0.092f, 0.06f, -0.09f), 0.008f, 0.008f, 6, true);
 		ck.CommitTo(FrontChain, "Chain", false);
 		FrontInsideUse = new PickupInteractable
 		{

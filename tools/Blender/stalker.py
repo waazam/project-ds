@@ -322,8 +322,12 @@ def build_foot(m, s):
     parts = [chain(f"Ankle{s}", [an + V((0, 0, 0.05)), an, an.lerp(ball, 0.55) + V((0, 0, 0.0)), ball], [0.03, 0.032, 0.03, 0.024])]
     parts.append(lumpy_sphere(f"Heel{s}", an + V((0, -0.022, -0.045)), (0.024, 0.032, 0.026), None, 30 + s, amp=0.06, subdiv=3))
     parts.append(lumpy_sphere(f"AnkleKnob{s}", an + V((s * 0.018, 0, 0)), (0.012, 0.015, 0.015), None, 31 + s, amp=0.06, subdiv=2))
+    # (2026-10-13, the joints pass) each toe rooted 3 cm back inside the foot: they began at the ball, end to end with the
+    # foot's own end there, and the remesh's smoothing pulled the two flat caps apart (a 5 mm slot between foot and toes
+    # that opened wider as the toes bent)
+    back = (an - ball).normalized() * 0.03
     for k, pts in enumerate(toe_chains(s, L)):
-        parts.append(chain(f"Toe{s}_{k}", pts, [0.012, 0.0095, 0.0075]))
+        parts.append(chain(f"Toe{s}_{k}", [pts[0] + back] + pts, [0.013, 0.012, 0.0095, 0.0075]))
     foot = join(parts, f"Foot{s}")
     remesh(foot, 0.0035, 3)
     foot.data.materials.clear()
@@ -496,7 +500,29 @@ def build_head(m):
 
 # ------------------------------------------------------------------ the parts that aren't hide
 
-def build_crowns(m):
+def sink(body, pts, radii, depth=0.01):
+    """(2026-10-13, the joints pass) The shift that sinks a part into the hide: its deepest-reaching point (each point
+    less its radius) brought <depth> under the hide's surface, along the hide's normal there. Zero if it already is, or
+    with no hide to measure against. The back's shards stood up to 3 cm off the hump and the shoulders' knots up to
+    8 mm off the shoulder: floating, not grown out of it."""
+    if body is None:
+        return V((0, 0, 0))
+    inv = body.matrix_world.inverted()
+    best, best_n = None, None
+    for p, r in zip(pts, radii):
+        ok, loc, nrm, _ = body.closest_point_on_mesh(inv @ p)
+        if not ok:
+            continue
+        loc, nrm = body.matrix_world @ loc, (body.matrix_world.to_3x3() @ nrm).normalized()
+        d = (p - loc).dot(nrm) - r
+        if best is None or d < best:
+            best, best_n = d, nrm
+    if best is None or best <= -depth:
+        return V((0, 0, 0))
+    return -best_n * (best + depth)
+
+
+def build_crowns(m, body=None):
     """The shoulders' knotted root masses (their spikes gone, 2026-10-13) and the bark shards
     along the spine and the elbows."""
     P = []
@@ -509,7 +535,9 @@ def build_crowns(m):
             # (2026-10-13) with the spikes gone the strands no longer stand up out of the shoulder in knobs: they wrap
             # it, low and thick, a knotted mass that reads as the shoulder itself
             to = c + V((math.cos(a + 1.3) * 0.075 * s, math.sin(a + 1.3) * 0.075, 0.015))
-            knots.append(chain(f"Knot{s}{w}", [fr, fr.lerp(to, 0.5) + V((rnd.uniform(-0.01, 0.01), 0, 0.02)), to], [0.042, 0.04, 0.034]))
+            kp, kr = [fr, fr.lerp(to, 0.5) + V((rnd.uniform(-0.01, 0.01), 0, 0.02)), to], [0.042, 0.04, 0.034]
+            off = sink(body, kp, kr)
+            knots.append(chain(f"Knot{s}{w}", [p + off for p in kp], kr))
         spikes = [((0.55 * s, -0.25, 0.9), 0.34), ((0.9 * s, -0.1, 0.45), 0.3), ((0.35 * s, -0.75, 0.8), 0.36), ((0.8 * s, -0.55, 0.15), 0.27),
                   ((0.15 * s, 0.2, 1.0), 0.22), ((0.95 * s, 0.35, 0.6), 0.2), ((0.5 * s, -0.95, 0.3), 0.3)]
         for i, (d0, ln) in enumerate(spikes):
@@ -537,6 +565,8 @@ def build_crowns(m):
         dd = D(*d).normalized()
         side = dd.cross(V((0, 0, 1))).normalized()
         tip = root + dd * ln
+        off = sink(body, [root - dd * 0.02], [0.016])
+        root, tip = root + off, tip + off
         sh = chain(f"Shard{i}", [root - dd * 0.02, root.lerp(tip, 0.45) + side * 0.008, tip], [(0.034, 0.016), (0.022, 0.01), (0.002, 0.002)], subdiv=1)
         sh.data.materials.append(m["bark"])
         P.append((sh, bone))
@@ -1225,7 +1255,7 @@ def main():
     hands = [build_hand(m, s) for s in (1, -1)]
     feet = [build_foot(m, s) for s in (1, -1)]
     head, eyes, mouth = build_head(m)
-    crowns = build_crowns(m)
+    crowns = build_crowns(m, body)
     nails = build_nails(m)
     rags = build_rags(m)
 

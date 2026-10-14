@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-13h — Joints and gaps: the stalker's toes and back shards, the wendigo's fangs, neck, jaw and antlers, the station desk, the footlocker, the rifle, the bed's pillows and the ottoman's feet; the stairwell's wreckage on its floor, the cigar box's lid on its hinge, the lodge's chains, bulbs, mirrors, icicle rail, rubble, laths and pipes; a joints audit for models, posed creatures and levels](2026-10-13h-joints-and-gaps.md)
 - [2026-10-13f — Cleanup, second pass: unused sounds and textures, dead code (Act7Whispers, CabinReturnEvent, the burnt cabin, the trail's stones), old harnesses and stale docs](2026-10-13f-cleanup.md)
 - [2026-10-13e — The story's open points settled (STORY.md Revision 4.1): the rain stops with the cap, inside the cabin; the code trees at their fixed spots, dialled from memory; the fir's 7-9 s stop and 25 s fall; the giant pacing until the fire's been watched, its rattle with it; "Who are you!" the player's own shout; a 32 s Act 11 climb and a 16-flight long stair; the lake's near miss; the stairwell's music timed to the bottom; thought captions and the count of 69 allowed](2026-10-13e-story-decisions.md)
 - [2026-10-13 — Polish pass: the outline (sound, weather, look, the player, story beats and puzzles, performance, bugs, tests, docs, in one page)](2026-10-13-polish-pass-outline.md)

@@ -418,13 +418,19 @@ public partial class SkiLodge : Node3D
 		foreach (float x in new[] { -0.18f, 0.18f })
 			dk.Cylinder(dc + new Vector3(x, 0.05f, 0.08f), dc + new Vector3(x, 0.05f, 0.18f), 0.05f, 0.05f, 6, true);
 		// the chain through the handles, and its padlock
+		// (2026-10-13, the joints pass) the links along the sag, each into the next (they were level bars 1.5 cm apart), the
+		// padlock on its shackle through the lowest (it hung 9 cm under the chain on nothing)
+		Vector3 Sag(float u) => dc + new Vector3(u * 0.3f, 0.05f - Mathf.Cos(u * 1.2f) * 0.06f + 0.06f, 0.2f);
 		for (int i = 0; i < 9; i++)
 		{
 			float u = (i - 4) / 4f;
-			Vector3 p = dc + new Vector3(u * 0.3f, 0.05f - Mathf.Cos(u * 1.2f) * 0.06f + 0.06f, 0.2f);
-			dk.Cylinder(p - new Vector3(0.03f, 0, 0), p + new Vector3(0.03f, 0, 0), 0.02f, 0.02f, 4, true);
+			Vector3 p = Sag(u), t = (Sag(u + 0.1f) - Sag(u - 0.1f)).Normalized();
+			dk.Cylinder(p - t * 0.045f, p + t * 0.045f, 0.02f, 0.02f, 4, true);
 		}
-		dk.Box(dc + new Vector3(0, -0.12f, 0.21f), new Vector3(0.12f, 0.15f, 0.05f), 1f);
+		dk.Box(dc + new Vector3(0, -0.06f, 0.2f), new Vector3(0.12f, 0.15f, 0.05f), 1f);
+		foreach (float sx in new[] { -0.035f, 0.035f })
+			dk.Cylinder(dc + new Vector3(sx, 0.01f, 0.2f), dc + new Vector3(sx, 0.06f, 0.2f), 0.008f, 0.008f, 6, true);
+		dk.Cylinder(dc + new Vector3(-0.043f, 0.06f, 0.2f), dc + new Vector3(0.043f, 0.06f, 0.2f), 0.008f, 0.008f, 6, true);
 		PorchDoors = dk.CommitTo(this, "PorchDoors", true);
 		// the name, carved over the doors: HOLLOW PEAK LODGE
 		k.CommitTo(this, "Porch", true);

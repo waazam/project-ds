@@ -302,7 +302,9 @@ def build_flesh(m):
     """The one skin: everything that's flesh, fused by a voxel remesh."""
     parts = [loft_torso()]
     # the neck, with its cords standing out
-    parts.append(chain("Neck", [V((0, 0.28, 3.66)), V((0, 0.5, 3.84)), H + V((0, -0.02, 0.0))], [0.1, 0.078, 0.07]))
+    # (2026-10-13, the joints pass) on up into the skull's braincase: it ended at the head's joint in a blunt cut, and
+    # with the head hung forward the stump stood out bare behind the skull, 2-3 cm clear of it
+    parts.append(chain("Neck", [V((0, 0.28, 3.66)), V((0, 0.5, 3.84)), H + V((0, -0.02, 0.0)), H + V((0, 0.05, 0.06))], [0.1, 0.078, 0.07, 0.055]))
     for s in (1, -1):
         parts.append(chain(f"Cord{s}", [H + V((s * 0.055, 0.0, -0.02)), V((s * 0.05, 0.36, 3.67))], [0.02, 0.024]))
     for s in (1, -1):
@@ -467,11 +469,16 @@ def build_parts(m):
             base = H + V((s * (0.04 - u * 0.022), 0.24 + u * 0.37, -0.06 - u * 0.21))
             L = rnd.uniform(0.035, 0.08)
             tip = base + V((rnd.uniform(-0.01, 0.01), rnd.uniform(-0.005, 0.015), -L))
-            add(cylinder(f"ToothU{s}{k}", base, tip, 0.008, 0.0015, 6, m["bone"]), "head")
+            # (2026-10-13, the joints pass) rooted up in the snout: the bases lay 1.5-2 cm under its underside from
+            # the cheek to the middle of the face, a row of fangs hanging in the air under the skull
+            add(cylinder(f"ToothU{s}{k}", base + V((0, 0, 0.035)), tip, 0.0085, 0.0015, 6, m["bone"]), "head")
     # a man's jaw hung under it, too big, its teeth long and uneven; torn lips between
-    jaw = chain("Jaw", [H + V((-0.085, 0.08, -0.05)), H + V((-0.072, 0.2, -0.16)), H + V((-0.035, 0.29, -0.21)), H + V((0, 0.31, -0.225)),
-                        H + V((0.035, 0.29, -0.21)), H + V((0.072, 0.2, -0.16)), H + V((0.085, 0.08, -0.05))],
-                [0.02, 0.024, 0.026, 0.028, 0.026, 0.024, 0.02], subdiv=2)
+    # (2026-10-13, the joints pass) its hinges carried on up into the skull's sides: the jaw's ends stopped 2-3 cm under
+    # the skull, the whole jaw hanging in the air below the head
+    jaw = chain("Jaw", [H + V((-0.07, 0.07, 0.03)), H + V((-0.085, 0.08, -0.05)), H + V((-0.072, 0.2, -0.16)), H + V((-0.035, 0.29, -0.21)),
+                        H + V((0, 0.31, -0.225)), H + V((0.035, 0.29, -0.21)), H + V((0.072, 0.2, -0.16)), H + V((0.085, 0.08, -0.05)),
+                        H + V((0.07, 0.07, 0.03))],
+                [0.018, 0.02, 0.024, 0.026, 0.028, 0.026, 0.024, 0.02, 0.018], subdiv=2)
     jaw.data.materials.append(m["bone"])
     add(jaw, "jaw")
     for s in (1, -1):
@@ -480,7 +487,8 @@ def build_parts(m):
             base = H + V((s * (0.072 - u * 0.05), 0.15 + u * 0.15, -0.13 - u * 0.08))
             L = rnd.uniform(0.035, 0.085)
             tip = base + V((rnd.uniform(-0.012, 0.012), rnd.uniform(-0.01, 0.01), L))
-            add(cylinder(f"ToothL{s}{k}", base, tip, 0.009, 0.0015, 6, m["bone"]), "jaw")
+            # (the joints pass) the root sunk into the jaw's bar (some stood 6-8 mm proud of it)
+            add(cylinder(f"ToothL{s}{k}", base - V((0, 0, 0.015)), tip, 0.0095, 0.0015, 6, m["bone"]), "jaw")
     lip = mat("w_lip", (0.12, 0.035, 0.03), 0.4)
     for s in (1, -1):
         for k in range(2):
@@ -490,7 +498,8 @@ def build_parts(m):
             add(chain(f"Lip{s}{k}", [a, mid, b], [0.0045, 0.003, 0.004]), "jaw").data.materials.append(lip)
     # the antlers: a great rack, the left snapped off short
     for sd in (1, -1):
-        root = H + V((sd * 0.08, 0.06, 0.13))
+        # (the joints pass) set 2 cm lower: at the skull's shoulder its burr sat 6 mm off the bone
+        root = H + V((sd * 0.08, 0.06, 0.11))
         ob = antler(f"Antler{sd}", root, (sd * 0.35, -0.35, 1), (sd, -0.25, 0.2), 1.35 if sd > 0 else 0.62, rnd, m["bone"])
         add(ob, "head")
     # ---- the claws: long, hooked, black

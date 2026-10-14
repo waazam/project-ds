@@ -548,7 +548,8 @@ def bed(w):
     # pillows: plump, their corners pulled out
     for s in (-1, 1):
         pw = (w - 0.2) / 2
-        P.append(cushion(f"Pillow{s}", (s * (pw / 2 + 0.03), L / 2 - 0.3, 0.62), (pw, 0.42, 0.14), pillow, puff=0.45))
+        # (the joints pass) 2 cm lower: their puffed-up bellies sat 18 mm clear of the mattress
+        P.append(cushion(f"Pillow{s}", (s * (pw / 2 + 0.03), L / 2 - 0.3, 0.60), (pw, 0.42, 0.14), pillow, puff=0.45))
     # the counterpane: draped over the bed's lower part, turned down at its top, hanging over the sides in folds
     bm = bmesh.new()
     nx, ny = 28, 26

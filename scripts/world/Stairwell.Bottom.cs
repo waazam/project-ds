@@ -151,8 +151,26 @@ public partial class Stairwell
 			Vector3 c = new(Mathf.Cos(ang) * r, y + rng.RandfRange(0.05f, 0.5f), Mathf.Sin(ang) * r);
 			if (c.Z > half - 2.2f && Mathf.Abs(c.X) < 1.6f) continue;   // keep the way out clear
 			var rot = new Basis(new Vector3(rng.RandfRange(-1, 1), rng.RandfRange(-1, 1), rng.RandfRange(-1, 1)).Normalized(), rng.RandfRange(0.2f, 1.2f));
-			if (i % 3 == 0) { junk.Mat(StairwellTextures.TreadMat); BuildKit.Box(junk, c, new Vector3(W, 0.04f, Run), 1.4f, BuildKit.Face.None, rot); junk.Mat(StairwellTextures.SteelMat); }
-			else junk.Beam(c, c + rot * new Vector3(rng.RandfRange(1f, 2.5f), 0, 0), 0.05f, 0.24f, 1f, Vector3.Up);
+			// (2026-10-13, the joints pass) each piece let down onto the floor, its lowest corner a little into it: they
+			// were set at a random height and tumbled, and hung 2-23 cm off the floor
+			if (i % 3 == 0)
+			{
+				var half3 = new Vector3(W, 0.04f, Run) * 0.5f;
+				float low = Mathf.Abs(rot.X.Y) * half3.X + Mathf.Abs(rot.Y.Y) * half3.Y + Mathf.Abs(rot.Z.Y) * half3.Z;
+				c.Y = y + low - 0.01f;
+				junk.Mat(StairwellTextures.TreadMat); BuildKit.Box(junk, c, new Vector3(W, 0.04f, Run), 1.4f, BuildKit.Face.None, rot); junk.Mat(StairwellTextures.SteelMat);
+			}
+			else
+			{
+				var end = rot * new Vector3(rng.RandfRange(1f, 2.5f), 0, 0);
+				// (the beam's section as MeshKit.Beam turns it: 0.05 wide, 0.24 deep, round its length)
+				var bz = end.Normalized();
+				var bx = (Mathf.Abs(bz.Y) > 0.98f ? Vector3.Right : Vector3.Up).Cross(bz).Normalized();
+				var by = bz.Cross(bx).Normalized();
+				float drop = Mathf.Abs(bx.Y) * 0.025f + Mathf.Abs(by.Y) * 0.12f;
+				c.Y = y + drop - 0.01f - Mathf.Min(0f, end.Y);
+				junk.Beam(c, c + end, 0.05f, 0.24f, 1f, Vector3.Up);
+			}
 		}
 		junk.CommitTo(this, "Wreckage", true);
 
