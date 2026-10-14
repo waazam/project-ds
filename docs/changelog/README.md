@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-13c — The look audit's four: the lodge's glowing panel now painted plaster with its relief; the closet's placeholder cans turned from real profiles (rims, lids, bails, dents, rust, aged and torn labels in a font of their own) with a mop bucket, a mop and a spill; Act 24's snow tunnel packed and gouged instead of white plastic; Act 21's room at the top in a darker, rougher stone so the lantern no longer blows it out](2026-10-13c-the-look-audit-four.md)
 - [2026-10-13 — Polish pass: the outline (sound, weather, look, the player, story beats and puzzles, performance, bugs, tests, docs, in one page)](2026-10-13-polish-pass-outline.md)
 - [2026-10-13 — Shorter stairs and halls, and running always gets you there: every long walk timed walking and running; the stairwell 20 turns (was 30) with its sprint loop-back gone from the code; the narrow corridor 120 m and the red-light hall 330 m (red light, green light unchanged); the long stair 16 flights (was 52), the church and everything after it brought down to match](2026-10-13-shorter-stairs-and-halls.md)
 - [2026-10-13 — The lag pass: a meter for every frame (the old logger's 150 ms were the engine's cap; the giant's first step was 3.2 s); the giant, the crawler, the lake thing, the bunker's scare, the pursuer, the clock and the dining tables made or warmed ahead of their moments; a late save no longer fading in mid-build; the sound director's and the body's per-frame garbage gone](2026-10-13-the-lag-pass.md)

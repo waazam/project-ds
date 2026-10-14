@@ -77,6 +77,7 @@ public partial class SkiLodge
 		{
 			WinterWoods.IceOverlay, WinterWoods.IceMat, WinterWoods.SoftSnow, LodgeTextures.SilverMat, LodgeTextures.LinenMat, LodgeTextures.SheetLinenMat, LodgeTextures.TableclothMat,
 			StationParts.StationTextures.BloodPoolMat, LodgeTextures.CopperMat, LodgeTextures.LeakMat,
+			SnowMaze.SnowMazeLook.PackedSnow(),   // (the tunnel out of the doors, built as the finale begins)
 		}) mats.Add(m);
 		int i = 0;
 		foreach (var m in mats)

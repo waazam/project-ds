@@ -20,6 +20,19 @@ public static class SnowMazeLook
 		return _cave;
 	}
 
+	/// <summary>Packed snow, gouged (packed_snow.gdshader): the tunnel out of the lodge's door down to the hole (2026-10-13c:
+	/// in the fresh snow it read as white plastic). The maze's own trodden-snow set for its grain.</summary>
+	public static ShaderMaterial PackedSnow()
+	{
+		if (_packed != null) return _packed;
+		_packed = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/packed_snow.gdshader"), ResourceName = "packed_snow" };
+		_packed.SetShaderParameter("snow_albedo", GD.Load<Texture2D>("res://assets/textures/ice/snow_albedo.png"));
+		_packed.SetShaderParameter("snow_normal", GD.Load<Texture2D>("res://assets/textures/ice/snow_normal.png"));
+		_packed.SetShaderParameter("noise_tex", new NoiseTexture2D { Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true, Noise = new FastNoiseLite { Frequency = 0.02f, FractalOctaves = 3, Seed = 2424 } });
+		return _packed;
+	}
+	private static ShaderMaterial _packed;
+
 	/// <summary>An icicle a metre long, its top at the origin, hanging down: a few cones fused (thick at the root, a drip at its point).</summary>
 	public static Mesh IcicleMesh()
 	{
