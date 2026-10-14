@@ -154,7 +154,7 @@ public partial class SkiLodge
 		var k = new MeshKit();
 		// the woods' own snow (Poly Haven's, world-mapped), not the roofs' glazed look: packed hard into the
 		// doorway to the lintel, heaped outside, and a soft fan of it spilled in over the sill with loose clumps
-		k.Mat(WinterWoods.SoftSnow);
+		k.Mat(SnowMaze.SnowMazeLook.PackedSnow());   // (2026-10-14d: packed, grey-blue and gouged; the soft snow glared white under the mudroom bulb)
 		k.Color = Colors.White;
 		k.Blob(new Vector3(0, 0, -1.3f), new Vector3(2.1f, 2.7f, 1.7f), 2301, 0.18f, true, 1f);
 		k.Blob(new Vector3(0.05f, 0, -0.4f), new Vector3(0.78f, 2.35f, 0.62f), 2302, 0.12f, true, 1f);   // the doorway, packed full
