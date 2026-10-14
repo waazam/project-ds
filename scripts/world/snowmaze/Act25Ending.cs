@@ -58,6 +58,20 @@ public static class Act25Ending
 		return Choose(Pictures, AllPictures, s?.TotalDeaths ?? 0, (s?.PlaySeconds ?? 0) / 3600.0);
 	}
 
+	/// <summary>
+	/// Decides the ending once and saves it (its flag), or returns the one already decided. Called before the Act 24
+	/// checkpoint is saved (2026-10-13: the checkpoint went first, so quitting in the gap Continued into ending 1 whatever
+	/// the record said), and again by <see cref="Play"/>, which then keeps the same one even if the clock has crossed a
+	/// threshold in between.
+	/// </summary>
+	public static int Decide(StoryManager s)
+	{
+		for (int n = 1; n <= 5; n++) if (s != null && s.HasFlag(FlagPrefix + n)) return n;
+		int ending = ForThisGame();
+		s?.SetFlag(FlagPrefix + ending);
+		return ending;
+	}
+
 	public static int Chosen(StoryManager s)
 	{
 		for (int n = 1; n <= 5; n++) if (s != null && s.HasFlag(FlagPrefix + n)) return n;
@@ -68,8 +82,7 @@ public static class Act25Ending
 	public static async Task Play(Node owner, PlayerController player, WendigoHunter hunter, SnowMazeCave cave, CancellationToken ct)
 	{
 		var body = hunter.Body;
-		int ending = ForThisGame();
-		StoryManager.Instance?.SetFlag(FlagPrefix + ending);
+		int ending = Decide(StoryManager.Instance);
 		GD.Print($"[story] Act 25: the ending - {ending} (pictures {Pictures}, all {AllPictures}, deaths {StoryManager.Instance?.TotalDeaths}, {StoryManager.Instance?.PlaySeconds / 3600.0:0.00} h)");
 		// it staggers back from them into the wall: away from them, to the snow behind it
 		var from = body.GlobalPosition;

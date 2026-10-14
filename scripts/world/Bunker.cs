@@ -70,7 +70,8 @@ public partial class Bunker : Node3D
 	private Node3D _gen;
 	private Node3D _doorNode;
 	private CollisionShape3D _closedCollision, _openCollision;
-	private Area3D _openTrigger;
+	private Area3D _openTrigger, _entryTrigger;
+	private bool _entryRetrying;
 	/// <summary>Where the apron's ramp meets lower ground in front (top surface, local), or null when the apron is flat.</summary>
 	private Vector3? _rampEndTop;
 
@@ -307,7 +308,7 @@ public partial class Bunker : Node3D
 		// Coming within OpenRadius after the fire opens the door (a trigger, not a per-frame poll).
 		_openTrigger = StoryBeat.MakeTrigger(_gen, new CylinderShape3D { Radius = OpenRadius, Height = 30f }, Vector3.Zero, OnApproach, "OpenTrigger");
 		// A proper doorway trigger: just inside the hatch, so only walking in through the door counts.
-		StoryBeat.MakeTrigger(_gen, new BoxShape3D { Size = new Vector3(0.9f, 1.7f, 1.1f) }, new Vector3(0, fy + 0.95f, -1.05f), OnEntered, "EntryTrigger");
+		_entryTrigger = StoryBeat.MakeTrigger(_gen, new BoxShape3D { Size = new Vector3(0.9f, 1.7f, 1.1f) }, new Vector3(0, fy + 0.95f, -1.05f), OnEntered, "EntryTrigger");
 
 		// The station card: laminated, bolted to the face right of the frame, readable while the hatch is still locked.
 		PaperKit.Pinned(_gen, StationCardLocal + Vector3.Back * 0.012f, Vector3.Back, new Vector2(0.16f, 0.11f), PaperKit.Look.Card,
@@ -384,10 +385,28 @@ public partial class Bunker : Node3D
 		// After the walkie the interior has nothing left and no way back out: the doorway stays dark.
 		if (story is { Current: >= Checkpoint.Act10WalkieFound }) return;
 		var interior = BunkerInterior.Instance;
-		if (interior == null || interior.IsAdmitting) return;
+		if (interior == null) return;
+		// (2026-10-13) stepped in while an admission was still running: it used to wait for them to step out and back
+		// in; now it tries again as soon as that's over, as long as they're still in the doorway
+		if (interior.IsAdmitting) { _ = RetryEntry(player); return; }
 		interior.AdmitPlayer(player);
 		story?.ReachCheckpoint(Checkpoint.Act8BunkerEntered, ApproachPointWorld, ApproachYaw);
 		GD.Print("[story] Act 8: into the bunker");
 		UI.ChapterCard.Show(interior, 3, 2.5f);
+	}
+
+	/// <summary>Waits out a running admission, then enters again if the player is still standing in the doorway.</summary>
+	private async System.Threading.Tasks.Task RetryEntry(PlayerController player)
+	{
+		if (_entryRetrying) return;
+		_entryRetrying = true;
+		try
+		{
+			while (IsInstanceValid(this) && IsInstanceValid(player) && BunkerInterior.Instance is { IsAdmitting: true })
+				await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			if (!IsInstanceValid(this) || !IsInstanceValid(player)) return;
+			if (ReferenceEquals(StoryBeat.PlayerInside(_entryTrigger), player)) OnEntered(player);
+		}
+		finally { if (IsInstanceValid(this)) _entryRetrying = false; }
 	}
 }

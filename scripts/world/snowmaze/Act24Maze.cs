@@ -505,6 +505,9 @@ public partial class Act24Maze : Node3D
 		Finished = true;
 		var player = StoryBeat.Player(this);
 		GD.Print("[story] Act 24: the fourth burn - it's finished");
+		// the ending decided and saved first, so the checkpoint's save already carries it (a quit in between can't
+		// Continue into the fallback, ending 1)
+		Act25Ending.Decide(StoryManager.Instance);
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act24Finished);
 		await Act25Ending.Play(this, player, Hunter, Cave, ct);
 	}

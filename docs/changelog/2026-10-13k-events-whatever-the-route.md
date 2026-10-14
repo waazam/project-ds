@@ -28,6 +28,15 @@ along walls, and beats that never came because the one trigger they depended on 
 | Act 23 202 and 203 slam and save (checkpoints 24, 25) | `SkiLodge.Act23` | "Been in the room" isn't saved. A Continue after taking the room's key never needed a visit back, so no slam and no save. | Passing the open door (within 4 m) with the key taken does it. |
 | Act 22 the wendigo's first appearance on the road (every later glimpse waits on it) | `WinterWoods.Stalking` | Put off 2 s every time its spot was in view. Looking straight down a straight could keep putting it off to the road's end. | After three tries it takes a spot further off in the murk (38, 52 or 66 m) that isn't in view. |
 
+## Follow-up: the two left over
+
+| Event | Where | How it could go wrong | Fix |
+|---|---|---|---|
+| The ending, Act 24's last save | `Act24Maze.Defeated`, `Act25Ending` | Checkpoint 34 was saved before the `ending_N` flag. A quit in that gap had Continue fall back to ending 1, whatever the record said. | `Act25Ending.Decide` picks the ending and saves its flag before the checkpoint. `Play` reuses the decided ending, so the clock crossing the 2-hour mark in between can't change it. |
+| Into the bunker (checkpoint 7) | `Bunker.OnEntered` | Stepping into the doorway while an admission was still running did nothing until the player stepped out and back in. | It waits for that admission to finish, then enters if the player is still in the doorway. |
+
+Tested with beats 8, 8c, 24a, 25-1 and 25-4, all passing. In 24a the log shows `flag set: ending_1` before `checkpoint reached: Act24Finished`.
+
 ## Checked and left as they are
 
 - **Act 1**
