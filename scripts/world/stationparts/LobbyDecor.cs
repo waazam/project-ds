@@ -123,7 +123,7 @@ public partial class LobbyDecor : Node3D
 		// wainscot and a chair rail round the lower walls (kept and damp stages)
 		var wain = new MeshKit();
 		wain.Mat(PropTextures.DeckMat);
-		wain.Color = new Color(0.46f, 0.34f, 0.24f);
+		wain.Color = new Color(0.36f, 0.28f, 0.21f);   // (2026-10-13g: a step darker and browner, was 0.46, 0.34, 0.24)
 		void Strip(Vector3 a, Vector3 b, Vector3 inward)
 		{
 			Vector3 c = (a + b) * 0.5f + inward * 0.09f;
@@ -148,9 +148,9 @@ public partial class LobbyDecor : Node3D
 		var floorK = new MeshKit();
 		var ceilK = new MeshKit();
 		floorK.Mat(BuildingTextures.FloorMat);
-		floorK.Color = new Color(0.62f, 0.52f, 0.4f);
+		floorK.Color = new Color(0.5f, 0.44f, 0.37f);   // (2026-10-13g: worn and greyer, was 0.62, 0.52, 0.4)
 		ceilK.Mat(BuildingTextures.BoardsMat);
-		ceilK.Color = new Color(0.55f, 0.5f, 0.44f);
+		ceilK.Color = new Color(0.46f, 0.42f, 0.38f);
 		StationKit.FloorAndCeiling(floorK, ceilK, body, W, D, H, 0);
 		floorK.Color = Colors.White;
 		floorK.CommitTo(this, "Floor");
@@ -158,18 +158,31 @@ public partial class LobbyDecor : Node3D
 		ceilK.CommitTo(this, "Ceiling", false);
 	}
 
+	private static StandardMaterial3D RugMat(string key, Color c)
+	{
+		var m = StationTextures.Flat(key, c, 1f, 0.05f);
+		if (!m.HasMeta("relief"))
+		{
+			m.Uv1Scale = Vector3.One * 2f;
+			World.SurfaceKit.Relief(m, "carpet", 0.8f);
+			m.SetMeta("relief", "carpet");
+			World.DetailKit.Apply(m, World.DetailKit.Kind.Fabric);
+		}
+		return m;
+	}
 	/// <summary>Stage 0 (and some of it lingering): the kept station.</summary>
 	private void BuildKept(RandomNumberGenerator rng)
 	{
 		// the rug (gone by the industrial stage)
 		var rug = Group("Rug", 0, 2);
 		var k = new MeshKit();
-		k.Mat(StationTextures.Flat("st_rug", new Color(0.5f, 0.16f, 0.12f), 0.95f, 0.05f));
+		// (2026-10-13g, the texture-mood pass: a flat, bright red and gold; now a trodden, faded wool with the carpet's weave)
+		k.Mat(RugMat("st_rug", new Color(0.34f, 0.15f, 0.12f)));
 		k.Color = Colors.White;
 		BuildKit.Box(k, new Vector3(0, 0.005f, 0), new Vector3(4.2f, 0.01f, 3f));
-		k.Mat(StationTextures.Flat("st_rug_border", new Color(0.78f, 0.62f, 0.3f), 0.95f, 0.05f));
+		k.Mat(RugMat("st_rug_border", new Color(0.42f, 0.35f, 0.22f)));
 		BuildKit.Box(k, new Vector3(0, 0.007f, 0), new Vector3(3.6f, 0.01f, 2.4f));
-		k.Mat(StationTextures.Flat("st_rug", new Color(0.5f, 0.16f, 0.12f), 0.95f, 0.05f));
+		k.Mat(RugMat("st_rug", new Color(0.34f, 0.15f, 0.12f)));
 		BuildKit.Box(k, new Vector3(0, 0.009f, 0), new Vector3(3.4f, 0.01f, 2.2f));
 		k.CommitTo(rug, "Rug", false);
 

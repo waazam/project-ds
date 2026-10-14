@@ -90,10 +90,31 @@ public partial class EndingDirector : Node3D
 
 	/// <summary>Behind them the snowbank and its hole, the cave's light in it; round them, snow thinning to nothing over
 	/// twenty metres into the autumn leaves.</summary>
+	/// <summary>(2026-10-13g, the texture-mood pass: the winter's soft snow, out here in the autumn woods' dusk, glared as
+	/// clean white shapes under the lantern beside the dark, damp floor) Old snow, going: greyer, wetter, its crust in
+	/// deeper relief. Its own copy, so the lodge's and the maze's snow are as they were.</summary>
+	private static Material EdgeSnow
+	{
+		get
+		{
+			if (_edgeSnow != null) return _edgeSnow;
+			_edgeSnow = (Material)WinterWoods.SoftSnow.Duplicate();
+			_edgeSnow.ResourceName = "end_old_snow";
+			if (_edgeSnow is ShaderMaterial sm)
+			{
+				sm.SetShaderParameter("top_color", new Color(0.53f, 0.54f, 0.56f));
+				sm.SetShaderParameter("side_color", new Color(0.38f, 0.4f, 0.45f));
+				sm.SetShaderParameter("glisten", 0.25f);
+			}
+			return _edgeSnow;
+		}
+	}
+	private static Material _edgeSnow;
+
 	private void BuildSnowEdge(Vector3 at, Vector3 tan)
 	{
 		var k = new MeshKit();
-		k.Mat(WinterWoods.SoftSnow);
+		k.Mat(EdgeSnow);
 		k.Color = Colors.White;
 		var back = tan.Normalized();   // (behind them: up the trail, the way they came; the walk down goes the other way)
 		var side = new Vector3(back.Z, 0, -back.X);

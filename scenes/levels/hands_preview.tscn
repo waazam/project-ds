@@ -1,0 +1,58 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://scripts/world/HandsPreview.cs" id="2_preview"]
+[ext_resource type="Script" path="res://scripts/ui/EquippedItemHud.cs" id="3_hud"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.2, 0.22, 0.23, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.45, 0.48, 0.5, 1)
+ambient_light_energy = 0.55
+tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="Ground"]
+albedo_color = Color(0.3, 0.27, 0.22, 1)
+
+[sub_resource type="StandardMaterial3D" id="Wall"]
+albedo_color = Color(0.42, 0.4, 0.37, 1)
+
+[sub_resource type="StandardMaterial3D" id="Wood"]
+albedo_color = Color(0.35, 0.26, 0.18, 1)
+
+[node name="HandsPreview" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 0, 10, 0)
+light_energy = 1.0
+shadow_enabled = true
+
+[node name="Ground" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+use_collision = true
+size = Vector3(40, 1, 40)
+material = SubResource("Ground")
+
+[node name="Wall" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -2.5)
+use_collision = true
+size = Vector3(8, 3, 0.3)
+material = SubResource("Wall")
+
+[node name="Table" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0.4, -1.3)
+use_collision = true
+size = Vector3(1, 0.8, 0.7)
+material = SubResource("Wood")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+
+[node name="Hud" type="CanvasLayer" parent="."]
+script = ExtResource("3_hud")
+
+[node name="Preview" type="Node3D" parent="."]
+script = ExtResource("2_preview")

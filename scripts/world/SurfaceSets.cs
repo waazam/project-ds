@@ -36,6 +36,18 @@ public static class SurfaceSets
 		return m;
 	}
 
+	/// <summary>(2026-10-13g, the texture-mood pass) A set's relief and roughness only, on a material that already draws
+	/// that set's albedo itself (a triplanar projection, a tint): without them, under the lantern, the surface was a flat
+	/// print beside the early acts' rough, weathered ones. Once per material; the material's own roughness scales the map.</summary>
+	public static T Relief<T>(T m, string set, float normal = 1f) where T : StandardMaterial3D
+	{
+		if (m == null || m.HasMeta("set_relief")) return m;
+		m.SetMeta("set_relief", set);
+		if (Tex(set, "normal") is { } n) { m.NormalEnabled = true; m.NormalTexture = n; m.NormalScale = normal; }
+		if (Tex(set, "rough") is { } r) { m.RoughnessTexture = r; m.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red; }
+		return m;
+	}
+
 	/// <summary>(2026-10-10c, the retexture pass: "go through https://polyhaven.com/textures and make sure EVERYTHING looks good")
 	/// A Poly Haven scan (tools/textures/polyhaven_sets.py: ph_&lt;id&gt;) laid over a material that was drawn in code: its
 	/// albedo, normal and roughness, at <paramref name="uvScale"/> times the material's own repeat. Once per material (it's

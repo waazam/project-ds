@@ -61,7 +61,10 @@ public partial class Library : Node3D
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		_body.SetMeta("surface", "wood");
 		AddChild(_body);
-		_wood = new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.36f, 0.22f, 0.14f), Roughness = 0.55f, MetallicSpecular = 0.4f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.3f };
+		// (2026-10-13g, the texture-mood pass: the library's surfaces were flat colour (the plaster, the rug, the chairs) or
+		// a glossy orange floor; now old and worn like the cabin: the woods duller with their grain in relief, the plaster
+		// a darker, cracked skin, the rug a trodden wool, the chairs cracked leather)
+		_wood = SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.32f, 0.21f, 0.14f), Roughness = 0.8f, MetallicSpecular = 0.3f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.3f }, "hinoki", 0.9f);
 		BuildShell();
 		BuildShelves();
 		BuildJournal();
@@ -95,7 +98,7 @@ public partial class Library : Node3D
 	private void BuildShell()
 	{
 		var plaster = new MeshKit();
-		plaster.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.85f, 0.8f, 0.7f), Roughness = 0.9f, VertexColorUseAsAlbedo = true });
+		plaster.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = SurfaceSets.Tex("vault_plaster"), AlbedoColor = new Color(0.5f, 0.46f, 0.4f), Roughness = 1f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.45f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic }, "vault_plaster", 1f));
 		Slab(plaster, new Vector3(-HalfW - 0.15f, Height * 0.5f, Depth * 0.5f), new Vector3(0.3f, Height, Depth + 0.3f));
 		Slab(plaster, new Vector3(HalfW + 0.15f, Height * 0.5f, Depth * 0.5f), new Vector3(0.3f, Height, Depth + 0.3f));
 		// the back wall, with the gap the bookcase hides
@@ -112,7 +115,7 @@ public partial class Library : Node3D
 		plaster.CommitTo(this, "Plaster", true);
 		// a parquet floor, beams across the ceiling
 		var floor = new MeshKit();
-		floor.Mat(new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.55f, 0.36f, 0.22f), Roughness = 0.4f, MetallicSpecular = 0.5f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.8f });
+		floor.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.4f, 0.29f, 0.21f), Roughness = 0.75f, MetallicSpecular = 0.35f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.8f }, "hinoki", 1f));
 		Slab(floor, new Vector3(0, -0.05f, Depth * 0.5f), new Vector3(HalfW * 2f, 0.1f, Depth));
 		floor.CommitTo(this, "Floor", true);
 		var beams = new MeshKit();
@@ -125,12 +128,12 @@ public partial class Library : Node3D
 		beams.CommitTo(this, "Beams", true);
 		// a big rug
 		var rug = new MeshKit();
-		rug.Mat(new StandardMaterial3D { AlbedoColor = Colors.White, Roughness = 1f, VertexColorUseAsAlbedo = true });
-		rug.Color = new Color(0.42f, 0.1f, 0.09f);
+		rug.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoColor = Colors.White, Roughness = 1f, VertexColorUseAsAlbedo = true, Uv1Scale = Vector3.One * 2f }, "carpet", 0.8f));
+		rug.Color = new Color(0.3f, 0.12f, 0.1f);
 		BuildKit.Box(rug, new Vector3(0.6f, 0.006f, 6.5f), new Vector3(5.2f, 0.012f, 7f));
-		rug.Color = new Color(0.62f, 0.48f, 0.22f);
+		rug.Color = new Color(0.42f, 0.35f, 0.22f);
 		BuildKit.Box(rug, new Vector3(0.6f, 0.008f, 6.5f), new Vector3(4.6f, 0.012f, 6.4f));
-		rug.Color = new Color(0.2f, 0.14f, 0.28f);
+		rug.Color = new Color(0.18f, 0.15f, 0.2f);
 		BuildKit.Box(rug, new Vector3(0.6f, 0.01f, 6.5f), new Vector3(4.2f, 0.012f, 6.0f));
 		rug.CommitTo(this, "Rug", false);
 	}
@@ -291,7 +294,7 @@ public partial class Library : Node3D
 	private void BuildFireplace()
 	{
 		var stone = new MeshKit();
-		stone.Mat(new StandardMaterial3D { AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.75f, 0.7f, 0.62f), Roughness = 0.85f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.2f });
+		stone.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = SurfaceSets.Tex("fireplace_stone"), AlbedoColor = new Color(0.62f, 0.58f, 0.53f), Roughness = 1f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.8f }, "fireplace_stone", 1.1f));   // (2026-10-13g: sooted stone, was a pale clean concrete)
 		float z = 6.5f, x = HalfW;
 		Slab(stone, new Vector3(x - 0.3f, 0.6f, z - 0.9f), new Vector3(0.6f, 1.2f, 0.4f));
 		Slab(stone, new Vector3(x - 0.3f, 0.6f, z + 0.9f), new Vector3(0.6f, 1.2f, 0.4f));
@@ -325,16 +328,16 @@ public partial class Library : Node3D
 		_body.AddChild(new CollisionShape3D { Position = new Vector3(0, 0.4f, 8.2f), Shape = new BoxShape3D { Size = new Vector3(1.6f, 0.8f, 0.9f) } });
 		// two armchairs by the fire
 		var chair = new MeshKit();
-		chair.Mat(new StandardMaterial3D { AlbedoColor = Colors.White, Roughness = 0.8f, VertexColorUseAsAlbedo = true });
+		chair.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = SurfaceSets.Tex("leather"), AlbedoColor = Colors.White, Roughness = 0.85f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.5f }, "leather", 0.8f));
 		// either side of the fire, turned in towards it and each other
 		foreach (var (cz, dir) in new[] { (4.75f, 1f), (8.25f, -1f) })
 		{
-			var leather = new Color(0.3f, 0.1f, 0.07f);
+			var leather = new Color(0.66f, 0.52f, 0.46f);   // (over the leather photo, itself a dark oxblood)
 			const float cx = 4.0f;
 			Slab(chair, new Vector3(cx, 0.25f, cz), new Vector3(0.8f, 0.5f, 0.8f), color: leather);
 			Slab(chair, new Vector3(cx, 0.8f, cz - dir * 0.36f), new Vector3(0.8f, 0.9f, 0.14f), false, color: leather * 0.9f);
 			foreach (float s in new[] { -0.36f, 0.36f }) Slab(chair, new Vector3(cx + s, 0.6f, cz), new Vector3(0.12f, 0.2f, 0.8f), false, color: leather * 1.1f);
-			Slab(chair, new Vector3(cx, 0.53f, cz + dir * 0.05f), new Vector3(0.6f, 0.07f, 0.62f), false, color: new Color(0.4f, 0.15f, 0.1f));   // the cushion
+			Slab(chair, new Vector3(cx, 0.53f, cz + dir * 0.05f), new Vector3(0.6f, 0.07f, 0.62f), false, color: new Color(0.72f, 0.56f, 0.48f));   // the cushion
 		}
 		chair.CommitTo(this, "Armchairs", true);
 		// a globe, a grandfather clock, a rolling ladder, a floor lamp by the door
@@ -501,7 +504,7 @@ public partial class Library : Node3D
 	private void BuildPassage()
 	{
 		var stone = new MeshKit();
-		stone.Mat(new StandardMaterial3D { AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.6f, 0.58f, 0.54f), Roughness = 0.9f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.8f });
+		stone.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.6f, 0.58f, 0.54f), Roughness = 1f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.8f }, "concrete_clean", 1f));
 		// the round room's wall starts at its radius; its floor disc reaches just short of it
 		float z0 = Depth + 0.3f, zWall = RoundRoomAt.Z - RoundRoom.Radius - 0.6f, zc = (z0 + zWall) * 0.5f;   // up to the round wall's outer face
 		Slab(stone, new Vector3(-0.85f, 1.25f, zc), new Vector3(0.3f, 2.5f, zWall - z0));

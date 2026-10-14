@@ -99,7 +99,8 @@ public partial class HeldLantern : HeldItem
 
 	// (2026-10-12) only while it gives light: with the flame dead and the blacklight off it showed a lit flame in the hand that
 	// lit nothing (the owner, Act 17's pipe: "your lantern literally doesnt light up anything"); dark, it's lowered
-	protected override bool Wanted => _lantern != null && _lantern.IsOn && (_lantern.Shining || _lantern.Dying) && !CameraUp;
+	// (2026-10-13j) and hung at the belt while both hands are on the flamethrower's wand
+	protected override bool Wanted => _lantern != null && _lantern.IsOn && (_lantern.Shining || _lantern.Dying) && !CameraUp && !PlayerHands.BothHandsOnWand(Player);
 
 	/// <summary>The left hand round the top of the bail, from above (the pivot is the bail's top, its wire along X): the
 	/// back of the gloved hand up, four fingers curled over the wire and under it, the thumb round it from behind; the cuff,

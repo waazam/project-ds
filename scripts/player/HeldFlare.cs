@@ -24,7 +24,7 @@ public partial class HeldFlare : HeldItem
 	public static bool AnyLit => _instance is { Lit: true } f && IsInstanceValid(f);
 
 	private static HeldFlare _instance;
-	private Node3D _model;
+	private Node3D _model, _tilt;
 	private MeshInstance3D _core;
 	private OmniLight3D _light, _fill;
 	private GpuParticles3D _sparks;
@@ -47,11 +47,16 @@ public partial class HeldFlare : HeldItem
 
 	protected override void Build()
 	{
-		_model = new Node3D { Name = "Model", Rotation = new Vector3(Mathf.DegToRad(-28f), 0, Mathf.DegToRad(-8f)) };
-		AddChild(_model);
+		// (2026-10-13j) seated in the fist: the stick upright through the hand's grip (its Stick pose, along Y), the fist round
+		// its lower third, the burning end up; the hand and the flare tilted out together (the flare alone had been tilted,
+		// crossing the upright fist)
+		_tilt = new Node3D { Name = "Tilt", Rotation = new Vector3(Mathf.DegToRad(-28f), 0, Mathf.DegToRad(-8f)) };
+		AddChild(_tilt);
+		_model = new Node3D { Name = "Model", Position = new Vector3(0, -0.075f, 0) };
+		_tilt.AddChild(_model);
 		Flare.BuildModel(_model, out _core);
-		_model.Position = new Vector3(0, -0.06f, 0);
-		BuildFist(this, new Vector3(0, -0.02f, 0), new Color(0.09f, 0.075f, 0.065f), new Color(0.07f, 0.075f, 0.07f));
+		if (BuildArm(_tilt, HandSide.Right, HandPose.Stick, Vector3.Zero) is { } hand) hand.RotationDegrees = new Vector3(0f, -60f, 0f);
+		else BuildFist(_tilt, Vector3.Zero, new Color(0.09f, 0.075f, 0.065f), new Color(0.07f, 0.075f, 0.07f));
 		SetLayer(this);
 		_sparks = Flare.Sparks();
 		_sparks.Position = new Vector3(0, 0.27f, 0);
@@ -154,6 +159,6 @@ public partial class HeldFlare : HeldItem
 	{
 		// held a little out and up, wavering with the hand; lifted as it's struck
 		Hold = Rest + new Vector3(0, _strike * 0.12f, 0);
-		_model.Rotation = new Vector3(Mathf.DegToRad(-28f) + Mathf.Sin(_t * 1.1f) * 0.02f, 0, Mathf.DegToRad(-8f) + Mathf.Sin(_t * 0.8f) * 0.02f);
+		_tilt.Rotation = new Vector3(Mathf.DegToRad(-28f) + Mathf.Sin(_t * 1.1f) * 0.02f, 0, Mathf.DegToRad(-8f) + Mathf.Sin(_t * 0.8f) * 0.02f);
 	}
 }
