@@ -130,8 +130,9 @@ public partial class StationRoom2 : Node3D
 		f.CommitTo(this, "Floor", true);
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, -0.05f, 0), Shape = new BoxShape3D { Size = new Vector3(Half * 2f, 0.1f, Half * 2f) } });
 		var c = new MeshKit();
-		c.Mat(StationTextures.Flat("st_offwhite_ceil", new Color(0.86f, 0.83f, 0.76f), 0.85f, 0.15f));
-		c.Color = Colors.White;
+		// (2026-10-14b: the station's plaster ceiling; it was a flat, untextured off-white, the brightest thing in the room)
+		c.Mat(StationTextures.CeilingMat);
+		c.Color = new Color(0.85f, 0.82f, 0.78f);
 		BuildKit.Box(c, new Vector3(0, Height + 0.05f, 0), new Vector3(Half * 2f, 0.1f, Half * 2f), 1f, BuildKit.Face.PY);
 		c.CommitTo(this, "Ceiling", false);
 		// one bare bulb on a flex over the table

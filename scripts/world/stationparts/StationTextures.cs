@@ -295,6 +295,51 @@ public static class StationTextures
 			AlbedoColor = c, EmissionEnabled = true, Emission = c, EmissionEnergyMultiplier = energy,
 		}));
 
+	// ------------------------------------------------------------------ the station's own surfaces (2026-10-14b)
+	// (the owner: "go through each scene and make everything look better. for example cabin wall and door shouldn't be the
+	// same texture") The station was one wood everywhere: the floor, the ceiling, the wainscot, the doors, their frames and
+	// the furniture were all the same hinoki, a step lighter or darker. Each part has its own surface now: a plank floor, a
+	// plaster ceiling, beaded boards under the chair rail, painted panel doors, dark casings. All projected in the object's
+	// own space (MeshKit's meshes carry no tangents; a projection needs none), each its own scan.
+
+	/// <summary>A scan projected three ways in the object's space, <paramref name="perMetre"/> tiles to a metre.</summary>
+	private static StandardMaterial3D Projected(string key, string set, Color tint, float perMetre, float normal, float rough, float spec = 0.3f)
+	{
+		if (_mat.TryGetValue(key, out var have)) return (StandardMaterial3D)have;
+		var m = new StandardMaterial3D { ResourceName = key, VertexColorUseAsAlbedo = true, MetallicSpecular = spec };
+		SurfaceSets.Apply(m, set, normal);
+		m.AlbedoColor = tint;
+		m.Roughness = rough;
+		m.Uv1Triplanar = true;
+		m.Uv1WorldTriplanar = false;
+		m.Uv1TriplanarSharpness = 6f;
+		m.Uv1Scale = Vector3.One * perMetre;
+		ProcTextures.AddGrime(m, key);
+		_mat[key] = m;
+		return m;
+	}
+
+	/// <summary>Paint over a grain: <paramref name="under"/>'s relief and roughness, the plaster's mottle as the paint's
+	/// own unevenness, in <paramref name="paint"/>.</summary>
+	private static StandardMaterial3D Painted(string key, string under, Color paint, float perMetre, float normal, float rough)
+	{
+		if (_mat.TryGetValue(key, out var have)) return (StandardMaterial3D)have;
+		var m = Projected(key, under, paint, perMetre, normal, rough, 0.35f);
+		if (SurfaceSets.Tex("plaster") is { } mottle) m.AlbedoTexture = mottle;
+		return m;
+	}
+
+	/// <summary>The lobby's and the rooms' floor: worn oak planks, dulled and greyed where they're walked.</summary>
+	public static StandardMaterial3D PlankFloorMat => Projected("st_plankfloor", "ph_wood_floor", new Color(0.62f, 0.54f, 0.45f), 0.8f, 1f, 0.82f, 0.28f);
+	/// <summary>The ceilings: old distemper on plaster, gone the colour of weak tea.</summary>
+	public static StandardMaterial3D CeilingMat => Projected("st_ceiling", "plaster", new Color(0.5f, 0.47f, 0.41f), 1.1f, 0.6f, 0.95f, 0.15f);
+	/// <summary>Beaded boards under the chair rail: narrow upright planks, darker and waxed.</summary>
+	public static StandardMaterial3D WainscotMat => Projected("st_wainscot", "old_planks", new Color(0.62f, 0.5f, 0.4f), 1.4f, 1f, 0.7f, 0.35f);
+	/// <summary>The doors: panelled, in an old institutional green worn to the wood at the edges (the grain under the paint).</summary>
+	public static StandardMaterial3D DoorPaintMat => Painted("st_doorpaint", "oak", new Color(0.3f, 0.34f, 0.28f), 1.2f, 0.7f, 0.72f);
+	/// <summary>The doors' casings and linings: dark stained wood, a shade off the crown mouldings.</summary>
+	public static StandardMaterial3D CasingMat => Projected("st_casing", "darkwood", new Color(0.55f, 0.45f, 0.38f), 2f, 0.8f, 0.6f, 0.4f);
+
 	/// <summary>A plain coloured surface (vertex colour tints), cached.</summary>
 	public static StandardMaterial3D Flat(string key, Color c, float rough = 0.8f, float spec = 0.3f) => (StandardMaterial3D)(
 		_mat.TryGetValue(key, out var m) ? m : (_mat[key] = new StandardMaterial3D
