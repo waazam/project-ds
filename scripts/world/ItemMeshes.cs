@@ -679,6 +679,8 @@ public static class ItemMeshes
 	/// <summary>How far the lantern's bail rises over its cap (0.1: lying about, folded down; the one in the hand is built
 	/// with it standing tall, the way it's carried: see HeldLantern).</summary>
 	public static float LanternBailRise = 0.1f;
+	/// <summary>(2026-10-13d) The bail with a wooden grip across its top (the one in the hand, see HeldLantern).</summary>
+	public static bool LanternBailGrip;
 
 	private static void Lantern(MeshKit k, Node3D parent, ref Built b)
 	{
@@ -740,12 +742,27 @@ public static class ItemMeshes
 		k.Color = new Color(0.38f, 0.38f, 0.4f);
 		k.Mat(ItemTextures.SteelMat);
 		Vector3 prev = default;
-		for (int i = 0; i <= 12; i++)
+		// (2026-10-13d) the one in the hand: its top straight across (a squarer arc), under a turned wooden grip the fist closes
+		// round (the wire alone left nothing for the fingers to wrap)
+		int segs = LanternBailGrip ? 20 : 12;
+		for (int i = 0; i <= segs; i++)
 		{
-			float a = Mathf.Pi * i / 12f;
-			Vector3 p = new(Mathf.Cos(a) * 0.07f, 0.232f + Mathf.Sin(a) * LanternBailRise, 0);
+			float a = Mathf.Pi * i / segs, c = Mathf.Cos(a), s = Mathf.Sin(a);
+			if (LanternBailGrip) { c = Mathf.Sign(c) * Mathf.Sqrt(Mathf.Abs(c)); s = Mathf.Sqrt(Mathf.Abs(s)); }
+			Vector3 p = new(c * 0.07f, 0.232f + s * LanternBailRise, 0);
 			if (i > 0) k.Cylinder(prev, p, 0.003f, 0.003f, 5, false);
 			prev = p;
+		}
+		if (LanternBailGrip)
+		{
+			k.Color = new Color(0.36f, 0.22f, 0.13f);
+			k.Mat(ItemTextures.TurnedWoodMat);
+			float y = 0.232f + LanternBailRise;
+			// (a barrel: fuller in the middle, its ends rounded down to the wire)
+			var xs = new[] { -0.043f, -0.039f, -0.02f, 0.02f, 0.039f, 0.043f };
+			var rs = new[] { 0.0045f, 0.0082f, 0.0091f, 0.0091f, 0.0082f, 0.0045f };
+			for (int i = 0; i < xs.Length - 1; i++)
+				k.Cylinder(new Vector3(xs[i], y, 0), new Vector3(xs[i + 1], y, 0), rs[i], rs[i + 1], 14, i == 0 || i == xs.Length - 2);
 		}
 		// flame
 		k.Color = Colors.White;

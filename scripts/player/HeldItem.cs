@@ -24,6 +24,7 @@ public abstract partial class HeldItem : Node3D
 
 	private float _stride, _amp, _run, _lagYaw, _lagPitch, _prevYaw, _prevPitch, _shakeT;
 	private bool _built;
+	private readonly System.Collections.Generic.List<FirstPersonHand> _hands = new();
 
 	/// <summary>The camera's viewfinder up to the eye (the hands are busy with it).</summary>
 	protected bool CameraUp => Player?.GetNodeOrNull<CameraTool>("CameraTool") is { IsRaised: true };
@@ -67,6 +68,7 @@ public abstract partial class HeldItem : Node3D
 			AddChild(new OmniLight3D { Name = "HeldRim", Position = new Vector3(0.28f, 0.32f, 0.22f), LightColor = new Color(0.58f, 0.66f, 0.82f), LightEnergy = 0.45f, OmniRange = 1.1f, OmniAttenuation = 1.2f, ShadowEnabled = false, LightCullMask = HeldLayer, LightSpecular = 0.6f });
 			Hold = Rest;
 			Visible = false;
+			foreach (var n in FindChildren("*", "", true, false)) if (n is FirstPersonHand h) _hands.Add(h);
 		}
 		float dt = Mathf.Min((float)delta, 0.05f);
 		bool want = Wanted;
@@ -111,6 +113,12 @@ public abstract partial class HeldItem : Node3D
 		// (2026-10-10) after a fright the hand shakes a little, settling over a few seconds (slow, small: never a jitter)
 		_shakeT += dt;
 		float tr = PlayerBreathing.Tremble;
+		// (2026-10-13d) the hand's own life: a hair's shift on the grip with the stride; gripped tighter at a run or after a fright
+		foreach (var h in _hands)
+		{
+			h.Stride = sway * _amp;
+			h.Tension = Mathf.Max(_run, Mathf.Clamp(tr * 1.5f, 0f, 1f));
+		}
 		var shake = tr > 0.001f ? new Vector3(Mathf.Sin(_shakeT * 13.1f) + 0.6f * Mathf.Sin(_shakeT * 21.7f), Mathf.Sin(_shakeT * 15.3f + 1f) + 0.5f * Mathf.Sin(_shakeT * 24.1f), 0f) * 0.0025f * tr : Vector3.Zero;
 		Position = Lowered.Lerp(Hold, r) + bob + shake + new Vector3(_lagYaw * 0.35f, _lagPitch * 0.3f, 0f);
 		Rotation = new Vector3(_lagPitch * 0.5f + shake.Y * 3f, _lagYaw * 0.6f, shake.X * 3f);
@@ -129,45 +137,25 @@ public abstract partial class HeldItem : Node3D
 	}
 
 	/// <summary>(2026-10-11, the owner: "I can see pieces of the player arm not connected to each other ... we need to
-	/// bridge the meshes") A first-person arm modelled in Blender as one fused skin (tools/Blender/fp_arms.py): glove,
-	/// wrist, cuff and sleeve together, its fingers curled round the grip at its origin. Null if the model's missing.</summary>
-	protected static Node3D BuildArm(Node3D parent, string model, Vector3 at, float scale = 1f)
+	/// bridge the meshes"; 2026-10-13d: the reusable <see cref="FirstPersonHand"/>) A first-person gloved hand, its cuff and
+	/// sleeve, its socket (the grip) at <paramref name="at"/>, named "Arm". Null if the model's missing. The holder keeps its
+	/// stride and tension up to date.</summary>
+	protected static FirstPersonHand BuildArm(Node3D parent, HandSide side, HandPose pose, Vector3 at)
 	{
-		string path = $"res://assets/models/player/{model}.glb";
-		if (!ResourceLoader.Exists(path)) return null;
-		var arm = GD.Load<PackedScene>(path).Instantiate<Node3D>();
-		arm.Name = "Arm";
-		arm.Position = at;
-		arm.Scale = Vector3.One * scale;
-		parent.AddChild(arm);
-		// its own baked maps (skin, nails, the sleeve); the sleeve drawn both sides (its cuff is open), the skin a soft sheen
-		foreach (var n in arm.FindChildren("*", "MeshInstance3D", true, false))
-		{
-			var mi = (MeshInstance3D)n;
-			mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-			for (int si = 0; si < mi.Mesh.GetSurfaceCount(); si++)
-				if (mi.Mesh.SurfaceGetMaterial(si) is StandardMaterial3D sm)
-				{
-					var m = (StandardMaterial3D)sm.Duplicate();
-					bool cloth = sm.ResourceName.StartsWith("fp_sleeve");
-					m.VertexColorUseAsAlbedo = true;   // (coloured by vertex: skin, knuckles, nails, the sleeve)
-					m.AlbedoColor = Colors.White;
-					m.AlbedoTexture = null;
-					m.CullMode = cloth ? BaseMaterial3D.CullModeEnum.Disabled : BaseMaterial3D.CullModeEnum.Back;
-					m.Roughness = cloth ? 0.95f : 0.55f;
-					m.MetallicSpecular = cloth ? 0.15f : 0.42f;   // (the gloves: dark leather, a soft sheen along the knuckles)
-					if (!cloth) { m.RimEnabled = true; m.Rim = 0.2f; m.RimTint = 0.3f; }
-					mi.SetSurfaceOverrideMaterial(si, m);
-				}
-		}
-		return arm;
+		var hand = FirstPersonHand.Create(side, pose);
+		if (hand == null) return null;
+		hand.Name = "Arm";
+		hand.Position = at;
+		parent.AddChild(hand);
+		return hand;
 	}
 
-	/// <summary>The right hand's fist round a handle at <paramref name="at"/> (the grip), its forearm and sleeve back out
+
+	/// <summary>The right hand's fist round an upright handle at <paramref name="at"/> (the grip), its forearm and sleeve back out
 	/// of view (<see cref="BuildArm"/>; the old built-up fist only if the model's missing).</summary>
 	protected static void BuildFist(Node3D parent, Vector3 at, Color glove, Color sleeve)
 	{
-		if (BuildArm(parent, "fp_arm_fist_R", at) != null) return;
+		if (BuildArm(parent, HandSide.Right, HandPose.Stick, at) != null) return;
 		var k = new World.MeshKit();
 		// (matte, no sheen: lit from beside, a glossy sleeve showed a pale streak and read as a pole)
 		k.Mat(new StandardMaterial3D { ResourceName = "glove", AlbedoColor = glove, Roughness = 1f, MetallicSpecular = 0f });

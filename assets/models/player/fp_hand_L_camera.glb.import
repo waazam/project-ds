@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://ckfs3y5laythu"
-path="res://.godot/imported/fp_arm_fist_R.glb-8737d2558ff92990df47d8ae549e44bc.scn"
+uid="uid://c3thbut86518f"
+path="res://.godot/imported/fp_hand_L_camera.glb-2bf461fd44c349c960a52267e33116e0.scn"
 
 [deps]
 
-source_file="res://assets/models/player/fp_arm_fist_R.glb"
-dest_files=["res://.godot/imported/fp_arm_fist_R.glb-8737d2558ff92990df47d8ae549e44bc.scn"]
+source_file="res://assets/models/player/fp_hand_L_camera.glb"
+dest_files=["res://.godot/imported/fp_hand_L_camera.glb-2bf461fd44c349c960a52267e33116e0.scn"]
 
 [params]
 
