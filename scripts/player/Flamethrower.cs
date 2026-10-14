@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Systems;
 using ProjectDS.World;

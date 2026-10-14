@@ -1,4 +1,4 @@
-﻿// Napalm burning where it landed (2026-10-14d): tongues of flame standing up off a splash of sticky fuel (on the snow, on
+// Napalm burning where it landed (2026-10-14d): tongues of flame standing up off a splash of sticky fuel (on the snow, on
 // the ice, on a post, on the wendigo), the way flame_volume.gdshader draws a fire's tongues (a sphere drawn up into a
 // writhing teardrop), but napalm's: a low, rich, orange body, the hottest yellow only down in its root, its tips tearing
 // off into sooty black (premultiplied: the flame adds its light, the soot darkens). Slow licks, nothing flashes.

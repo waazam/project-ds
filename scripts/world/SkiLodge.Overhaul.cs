@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Godot;
 using ProjectDS.Audio;
 using ProjectDS.World.LodgeParts;

@@ -1,4 +1,4 @@
-﻿// The flamethrower's smoke and steam (2026-10-14d): soft puffs turned to the eye (the stream turns each quad), their
+// The flamethrower's smoke and steam (2026-10-14d): soft puffs turned to the eye (the stream turns each quad), their
 // shape from the weather's smoke flipbook (a dense knot billowing out to a thin wisp over its life) torn by noise.
 // Napalm's smoke is thick, oily and near black, lit from below by the fire it came off (a dull orange underglow that
 // fades as it climbs away); the steam where it hits the snow is a pale grey-white that's gone in a second or two.
