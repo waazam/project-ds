@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-13b — The fir always comes down 25 s after its creak, wherever you are; the descent's music started 8.5 s in so its build ends at the edge; a near miss at the lake on every crossing (the hunter rears right behind the stern and sinks away); "Who are you!" is the player's own shout, not the radio's](2026-10-13b-the-fir-the-descent-the-near-miss-and-the-shout.md)
 - [2026-10-13 — Polish pass: the outline (sound, weather, look, the player, story beats and puzzles, performance, bugs, tests, docs, in one page)](2026-10-13-polish-pass-outline.md)
 - [2026-10-13 — Shorter stairs and halls, and running always gets you there: every long walk timed walking and running; the stairwell 20 turns (was 30) with its sprint loop-back gone from the code; the narrow corridor 120 m and the red-light hall 330 m (red light, green light unchanged); the long stair 16 flights (was 52), the church and everything after it brought down to match](2026-10-13-shorter-stairs-and-halls.md)
 - [2026-10-13 — The lag pass: a meter for every frame (the old logger's 150 ms were the engine's cap; the giant's first step was 3.2 s); the giant, the crawler, the lake thing, the bunker's scare, the pursuer, the clock and the dining tables made or warmed ahead of their moments; a late save no longer fading in mid-build; the sound director's and the body's per-frame garbage gone](2026-10-13-the-lag-pass.md)

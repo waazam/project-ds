@@ -229,7 +229,7 @@ public partial class Act11Ending : Node3D
 		await Cutscene.Wait(this, GameSettings.Instance.AutoTest ? 0.5 : 2.0, ct);
 		await RadioLine("\"Did you see them?\"", 0.8f, 3.0f, 0.8f, ct);
 		await Cutscene.Wait(this, 0.7, ct);
-		await RadioLine("\"Who are you!\"", 0.6f, 2.2f, 0.8f, ct);
+		await PlayerShout("\"Who are you!\"", ct);
 		await Cutscene.Wait(this, 1.0, ct);
 
 		_fogLineArmed = true;
@@ -242,6 +242,29 @@ public partial class Act11Ending : Node3D
 	}
 	/// <summary>The levels of the radio's crackle ticks and its squelch open/close, on the Radio bus.</summary>
 	private const float TickDb = -22f, SquelchDb = -16f;
+	/// <summary>The player's own sharp breath before their shout (dB, non-positional on the dry Player bus).</summary>
+	[Export] public float ShoutBreathDb = -7f;
+
+	/// <summary>
+	/// The only line the player ever says (Dan, 2026-10-13: their own shout, not the radio's): dry and close, in
+	/// their own head. No squelch, no open-channel rush, no crackle, nothing on the Radio bus; a quick hard breath in on
+	/// the Player bus (its reverb all but dry) as it comes, and the words come up fast, the way a shout does.
+	/// </summary>
+	private async Task PlayerShout(string line, CancellationToken ct)
+	{
+		if (Subtitle.Instance == null) return;
+		const string breath = "res://assets/audio/sfx/breath_in_04.wav";
+		if (ResourceLoader.Exists(breath))
+		{
+			var s = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(breath), Bus = "Player", VolumeDb = ShoutBreathDb, PitchScale = 1.12f };
+			Cutscene.SceneRoot(this).AddChild(s);
+			s.Finished += s.QueueFree;
+			s.Play();
+		}
+		await Cutscene.Wait(this, 0.18, ct);
+		await Subtitle.Instance.Show(line, 0.15f, 2.0f, 0.8f, ct);
+	}
+
 	/// <summary>The open-channel static under a line: real FM inter-station noise through the little speaker.</summary>
 	[Export] public float StaticBedDb = -19f;
 

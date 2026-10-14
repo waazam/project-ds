@@ -26,8 +26,8 @@ namespace ProjectDS.World;
 ///    actual wave surface and the view rocks with it. The mouse is free to look around throughout.
 ///    The dread starts early (<see cref="Beats"/>): fog closing in, something under the boat, a far
 ///    foghorn, a limb come up to watch, knocking from below, the hush.
-/// 3. Midway, it goes wrong: the birds stop, something thuds under the water, the water ahead domes
-///    up — and tentacles covered in bloodshot eyes erupt all round (a <see cref="LakeCreature"/>): a
+/// 3. Midway, it goes wrong: the birds stop, something thuds under the water, and with no more warning
+///    than that tentacles covered in bloodshot eyes erupt all round (a <see cref="LakeCreature"/>): a
 ///    foghorn bellow, the world briefly regraded red (once, easing away; Reduce Flashing softens it),
 ///    a ring wave that tosses the boat, the lake turning white-capped, every eye opening and turning
 ///    to the player, one limb rearing up and slamming down beside the boat. About eight seconds.
@@ -104,6 +104,12 @@ public partial class LakeCrossingEvent : Node3D
 	/// rears behind the stern; it only takes the boat after <see cref="WarnSeconds"/> of that.</summary>
 	[Export] public float WarnGap = 5f;
 	[Export] public float WarnSeconds = 1.5f;
+	/// <summary>The near miss (Dan, 2026-10-13: a good rower never let it close in): once on every crossing, from
+	/// this fraction of it, the hunter rushes up under the stern, rears right behind the boat (<see cref="NearMissGap"/>
+	/// m from it, rail to rail: about a metre and a half off the transom), holds a breath, and sinks away back to
+	/// <see cref="HuntStart"/>. Scripted from start to end: it never warns, never takes, and never slows the boat.</summary>
+	[Export] public float NearMissAt = 0.655f;
+	[Export] public float NearMissGap = 3.4f;
 	/// <summary>Kept for compatibility with older tuning; the current is now <see cref="CurrentPull"/>.</summary>
 	[Export] public float CurrentPushbackPerSecond = 1.5f;
 
@@ -134,6 +140,10 @@ public partial class LakeCrossingEvent : Node3D
 	public int Surges { get; private set; }
 	public bool FinalDash { get; private set; }
 	public int Warnings { get; private set; }
+	/// <summary>For tests: near misses so far (one a crossing), whether one is playing, and the closest it came (m).</summary>
+	public int NearMisses { get; private set; }
+	public bool InNearMiss => _nearMissT >= 0f;
+	public float NearMissClosest { get; private set; } = 999f;
 	/// <summary>What the prompt is saying: how close the hunter is (0..1, red as it nears 1), and which
 	/// steer key it lights to get out from under a strike (-1 / +1, 0 none).</summary>
 	public float Danger => _prompt?.Danger ?? 0f;
@@ -766,8 +776,9 @@ public partial class LakeCrossingEvent : Node3D
 	///   on the boat; it watches it go by, and slides back under;
 	/// - 0.35: knocking on the hull from below, twice; rings spreading round the boat;
 	/// - then the hush, the shadow sliding under, the thud that lurches the boat: the breach.
-	/// After it, with the hunter behind: limbs surfacing to stare, each closer than the last (0.52, 0.69,
-	/// 0.83); two that strike at the boat (0.60, 0.77: <see cref="Strike"/>); and the final dash (from
+	/// After it, with the hunter behind: limbs surfacing to stare, each closer than the last (0.52, 0.72,
+	/// 0.83); two that strike at the boat (0.60, 0.77: <see cref="Strike"/>); the hunter's near miss right
+	/// behind the stern (from <see cref="NearMissAt"/>: <see cref="BeginNearMiss"/>); and the final dash (from
 	/// <see cref="FinalDashAt"/>, in <see cref="Hunt"/>).
 	/// </summary>
 	private void Beats(bool rough, CancellationToken ct)
@@ -784,6 +795,7 @@ public partial class LakeCrossingEvent : Node3D
 			if (Passed("hush", b - 9f / _total))
 			{
 				_lake.Hush();
+				PrepareBreach();
 				ForestAmbienceManager.Instance?.RequestSilence(this, 0.62f, 5);
 				Sfx("underwater_thoom", 1, _boat.GlobalPosition + Vector3.Down * 6f, "Unnatural", -6f, 20f);
 				RingsAround(3, 5f, 9f);
@@ -803,7 +815,9 @@ public partial class LakeCrossingEvent : Node3D
 		_fogTarget = Progress < 0.8f ? 1f : Mathf.Lerp(1f, 0.55f, (Progress - 0.8f) / 0.15f);
 		if (Passed("glimpse1", 0.52f)) Glimpse(22f, 18f, 3.5f);
 		if (Passed("strike1", 0.60f)) Strike(1);
-		if (Passed("glimpse2", 0.69f)) Glimpse(14f, 14f, 3f);
+		// the near miss, once on every crossing, once the first strike is over (not while a strike's key is lit)
+		if (Progress >= NearMissAt && Progress < FinalDashAt - 0.04f && _prompt.Next == 0 && _beats.Add("nearmiss")) BeginNearMiss();
+		if (Passed("glimpse2", 0.72f)) Glimpse(14f, 14f, 2.4f);
 		if (Passed("strike2", 0.77f)) Strike(-1);
 		if (Passed("glimpse3", 0.83f)) Glimpse(10f, 9f, 2.6f);
 	}
@@ -1059,6 +1073,7 @@ public partial class LakeCrossingEvent : Node3D
 	/// <summary>Moves the hunter on; true once it has the boat.</summary>
 	private bool Hunt(float dt, double clock)
 	{
+		if (_nearMissT >= 0f) { NearMiss(dt, clock); return false; }
 		// its pace: steady, a surge now and then, the dash at the end
 		if (!FinalDash && Progress >= FinalDashAt)
 		{
@@ -1101,32 +1116,8 @@ public partial class LakeCrossingEvent : Node3D
 		else { _warning = false; _warnT = Mathf.Max(0f, _warnT - dt * 2f); }
 		if (gap <= CatchGap && _warnT < WarnSeconds) { _hunt = _s - CatchGap; gap = CatchGap; }
 
-		float near = 1f - Mathf.Clamp((gap - CatchGap) / (HuntStart - CatchGap), 0f, 1f);
-		Vector3 hw = RailWorld(_hunt, _huntLat);
-		Vector2 l = new Vector2(hw.X - _lake.GlobalPosition.X, hw.Z - _lake.GlobalPosition.Z);
-		_lake.Waves.ShadowAt = l;
-		_lake.Waves.ShadowRadius = 7f;
-		_lake.Waves.Shadow = 0.45f + 0.45f * near;
-		float rise = Mathf.Lerp(0.12f, 0.6f, near) + (surging || FinalDash ? 0.2f : 0f) + (_warning ? 0.2f : 0f);
-		if (LastCreature != null && GodotObject.IsInstanceValid(LastCreature))
-			LastCreature.SetHunter(hw, _boat.GlobalPosition, rise);
-		if (_heart != null) _heart.VolumeDb = Mathf.Lerp(-16f, -2f, near);
-		if (_huntVoice != null)
-		{
-			_huntVoice.GlobalPosition = hw with { Y = _lake.GlobalPosition.Y - 0.5f };
-			if (_huntRumble != null) _huntRumble.VolumeDb = Mathf.Lerp(-22f, 0f, near) + (surging || FinalDash ? 4f : 0f);
-		}
-		// its wake: the water churning where it goes, harder when it comes for the boat
-		_huntWakeT -= dt;
-		if (_huntWakeT <= 0f)
-		{
-			_huntWakeT = surging || FinalDash ? 0.16f : 0.4f;
-			Vector3 w = hw with { Y = _lake.WaterHeightAt(hw, out _) };
-			Vector3 toBoat = _boat.GlobalPosition - hw; toBoat.Y = 0;
-			Vector3 front = w + toBoat.Normalized() * 1.6f;
-			LakeFx.Ripple(Cutscene.SceneRoot(this), front, surging ? 3.2f : 2.2f, 1.8f, 0.35f);
-			if (surging || FinalDash || near > 0.5f) LakeFx.Splash(Cutscene.SceneRoot(this), front + Vector3.Up * 0.2f, 0.8f, 8, toBoat.Normalized() * 0.8f);
-		}
+		bool hot = surging || FinalDash;
+		float near = HunterLooks(dt, gap, hot, surging, Mathf.Lerp(0.12f, 0.6f, Near(gap)) + (hot ? 0.2f : 0f) + (_warning ? 0.2f : 0f));
 		// close behind: it knocks on the hull
 		_knockTimer -= dt;
 		if (near > 0.6f && _knockTimer <= 0)
@@ -1137,6 +1128,123 @@ public partial class LakeCrossingEvent : Node3D
 		}
 		_prompt.Danger = Mathf.Max(Mathf.Clamp((WarnGap + 4f - gap) / 4f, 0f, 1f), surging || FinalDash ? 0.55f : 0f);
 		return gap <= CatchGap;
+	}
+
+	/// <summary>0 with the hunter far back, 1 with it at the catch gap.</summary>
+	private float Near(float gap) => 1f - Mathf.Clamp((gap - CatchGap) / (HuntStart - CatchGap), 0f, 1f);
+
+	/// <summary>Shows the hunter where it is now, <paramref name="gap"/> metres behind the boat: its limb at
+	/// <paramref name="rise"/> (0 a shadow, 1 reared right up), its shadow under the water, the heartbeat and its
+	/// undertone, and its wake churning toward the boat (harder when <paramref name="hot"/>). Returns how near it is.</summary>
+	private float HunterLooks(float dt, float gap, bool hot, bool bigWake, float rise)
+	{
+		float near = Near(gap);
+		Vector3 hw = RailWorld(_hunt, _huntLat);
+		Vector2 l = new Vector2(hw.X - _lake.GlobalPosition.X, hw.Z - _lake.GlobalPosition.Z);
+		_lake.Waves.ShadowAt = l;
+		_lake.Waves.ShadowRadius = 7f;
+		_lake.Waves.Shadow = 0.45f + 0.45f * near;
+		if (LastCreature != null && GodotObject.IsInstanceValid(LastCreature))
+			LastCreature.SetHunter(hw, _boat.GlobalPosition, rise);
+		if (_heart != null) _heart.VolumeDb = Mathf.Lerp(-16f, -2f, near);
+		if (_huntVoice != null)
+		{
+			_huntVoice.GlobalPosition = hw with { Y = _lake.GlobalPosition.Y - 0.5f };
+			if (_huntRumble != null) _huntRumble.VolumeDb = Mathf.Lerp(-22f, 0f, near) + (hot ? 4f : 0f);
+		}
+		// its wake: the water churning where it goes, harder when it comes for the boat
+		_huntWakeT -= dt;
+		if (_huntWakeT <= 0f)
+		{
+			_huntWakeT = hot ? 0.16f : 0.4f;
+			Vector3 w = hw with { Y = _lake.WaterHeightAt(hw, out _) };
+			Vector3 toBoat = _boat.GlobalPosition - hw; toBoat.Y = 0;
+			Vector3 front = w + toBoat.Normalized() * 1.6f;
+			LakeFx.Ripple(Cutscene.SceneRoot(this), front, bigWake ? 3.2f : 2.2f, 1.8f, 0.35f);
+			if (hot || near > 0.5f) LakeFx.Splash(Cutscene.SceneRoot(this), front + Vector3.Up * 0.2f, 0.8f, 8, toBoat.Normalized() * 0.8f);
+		}
+		return near;
+	}
+
+	// ------------------------------------------------------------------ the near miss
+
+	private float _nearMissT = -1f, _nearMissFrom;
+	private bool _nearMissUp, _nearMissDown;
+	/// <summary>The near miss's beats (s): the rush in under the water, up behind the stern, and back under.</summary>
+	private const float NearRush = 0.9f, NearUp = 3.1f, NearGone = 5.2f;
+
+	/// <summary>
+	/// The near miss (Dan, 2026-10-13): a good rower had never once let the hunter close in, so on every crossing,
+	/// mid-to-late, it gets close anyway. Its wake comes racing up behind, it goes quiet under the stern, then it
+	/// breaks the surface right behind the boat with its foghorn bellow and a burst of water, rears there (every eye on the
+	/// boat, in plain view for anyone who looks back), the stern dragged down and the boat rocked; then it sinks
+	/// away and drops back. Scripted from first to last (<see cref="NearMiss"/>): no warning, no take, the boat
+	/// keeps its way, the surges wait for it, and the hunt goes on from <see cref="HuntStart"/> behind.
+	/// </summary>
+	private void BeginNearMiss()
+	{
+		if (!_huntOn || FinalDash || Caught) return;
+		NearMisses++;
+		_nearMissT = 0f;
+		_nearMissFrom = Mathf.Max(_s - _hunt, NearMissGap + 0.5f);
+		_nearMissUp = _nearMissDown = false;
+		_surgeLeft = 0;
+		_warning = false; _warnT = 0f;
+		Vector3 at = RailWorld(_hunt, _huntLat) with { Y = _lake.GlobalPosition.Y };
+		Sfx("underwater_thoom", 1, at + Vector3.Down * 3f, "Unnatural", 0f, 16f);
+		GD.Print($"[lake] the near miss: it comes for the stern from {_nearMissFrom:0.0} m back");
+	}
+
+	/// <summary>Moves the near miss on (in place of <see cref="Hunt"/> while it plays).</summary>
+	private void NearMiss(float dt, double clock)
+	{
+		_nearMissT += dt;
+		float t = _nearMissT;
+		float gap;
+		if (t < NearRush) gap = Mathf.Lerp(_nearMissFrom, NearMissGap, Mathf.SmoothStep(0f, 1f, t / NearRush));
+		else if (t < NearUp) gap = NearMissGap;
+		else gap = Mathf.Lerp(NearMissGap, HuntStart, Mathf.SmoothStep(0f, 1f, (t - NearUp) / (NearGone - NearUp)));
+		_hunt = _s - gap;
+		_huntLat = Mathf.MoveToward(_huntLat, _lat, dt * 3f);
+		NearMissClosest = Mathf.Min(NearMissClosest, gap);
+		MinGap = Mathf.Min(MinGap, gap);
+		Vector3 stern = RailWorld(_s - Rowboat.HalfLength - 0.6f, _lat) with { Y = _lake.GlobalPosition.Y };
+
+		if (!_nearMissUp && t >= NearRush)
+		{
+			// up, right behind them
+			_nearMissUp = true;
+			Sfx("breach_erupt", 1, stern, "Unnatural", 0f, 12f, 120f);
+			PlayFoghorn(stern + Vector3.Down * 1f, -1f);   // its own voice, the foghorn, right behind them
+			Sfx("limb_rise", 3, stern, "Unnatural", 0f, 10f, 90f);
+			Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -1f);
+			LakeFx.Column(Cutscene.SceneRoot(this), stern, 3.5f);
+			LakeFx.Splash(Cutscene.SceneRoot(this), stern + Vector3.Up * 0.4f, 2.2f, 40, _boat.GlobalBasis.Z * -1.5f);
+			for (int i = 0; i < 3; i++) LakeFx.Ripple(Cutscene.SceneRoot(this), stern, 3f + i * 1.6f, 2.4f + i * 0.4f, 0.45f);
+			// the stern dragged down, the bow lifted, the boat rolled and shaken (her way kept: it's a scare, not a hit)
+			_pitchVel += 0.45f;
+			_dipVel -= 0.3f;
+			_rollVel += _rng.Randf() < 0.5f ? -0.35f : 0.35f;
+			_shake = Mathf.Max(_shake, 0.4f);
+			if (_heart != null) _heart.VolumeDb = 0f;
+		}
+		if (!_nearMissDown && t >= NearUp)
+		{
+			// and back under
+			_nearMissDown = true;
+			Sfx("underwater_thoom", 1, stern + Vector3.Down * 3f, "Unnatural", -3f, 16f);
+			LakeFx.Splash(Cutscene.SceneRoot(this), stern + Vector3.Up * 0.2f, 1.2f, 16);
+			RingsAround(3, 2f, 5f);
+		}
+		float rise = t < NearRush ? 0.15f : t < NearUp ? 1f : 0.05f;
+		HunterLooks(dt, gap, true, t < NearRush, rise);
+		_prompt.Danger = t < NearUp ? 1f : Mathf.Lerp(1f, 0.3f, (t - NearUp) / (NearGone - NearUp));
+		if (t >= NearGone)
+		{
+			_nearMissT = -1f;
+			_surgeAt = clock + _rng.RandfRange(SurgeEvery.X, SurgeEvery.Y);
+			GD.Print($"[lake] the near miss is over: {NearMissClosest:0.0} m at its closest, back to {_s - _hunt:0.0} m");
+		}
 	}
 
 
@@ -1218,18 +1326,16 @@ public partial class LakeCrossingEvent : Node3D
 	// ------------------------------------------------------------------ the breach
 
 	/// <summary>
-	/// The breach: the act's centrepiece, about thirteen seconds with the input taken (the view is
+	/// The breach: the act's centrepiece, about nine seconds with the input taken (the view is
 	/// steered throughout; the player only watches). Beat by beat:
-	/// 1. The lake holds its breath. The boat drifts to a dead stop on water gone still; a heartbeat
-	///    comes up; the view is drawn down over the bow, into the water, as the field of view narrows.
-	/// 2. An eye opens down there — the size of a house, seen through the peaty water under the
-	///    shadow that slid beneath the boat — its pupil blown wide, then snapping to a goat's slit:
-	///    it has found the player. Whispering.
-	/// 3. It comes up. The eye shuts; the water over it domes up; a foghorn bellow from under the lake.
-	/// 4. The breach. First and slowest, one limb as thick as a tree and fifteen metres tall, the view
-	///    dragged up it as it towers; then the ring of others: plumes of water, a ring wave that
-	///    heaves the boat, the whole world regraded red for a moment (once, easing away), the field of
-	///    view punched wide, the lake turned white-capped.
+	/// 1-4. The burst (Dan, 2026-10-13: "remove the giant eyeball before the kraken jumps out of the water, just have it
+	///    jump out of the water and scare the player"; there was a stop, the view drawn down into the water, a house-sized
+	///    eye opening in the deep and a dome of water first, about five seconds of build-up). Now, mid-stroke, out of the
+	///    hush: it breaks the surface ten metres ahead with a roar of water and its foghorn bellow, a column of spray, the
+	///    boat thrown back, rolled and stopped dead, the view snapped up to it and then dragged up the colossus, one limb
+	///    as thick as a tree and fifteen metres tall, as it towers; then the ring of others: a ring wave that heaves the
+	///    boat, the whole world regraded red for a moment (once, easing away), the field of view punched wide, the lake
+	///    turned white-capped.
 	/// 5. Surrounded: two more come up right beside the boat.
 	/// 6. Every eye on every limb opens at once, with a wet chorus, and turns to the player; a beat;
 	///    they all blink, together.
@@ -1238,6 +1344,24 @@ public partial class LakeCrossingEvent : Node3D
 	/// 8. Another rears and slams down beside the boat: the boat is thrown, spray comes over.
 	/// 9. It lets go: most of it slides back under, the colossus last; two stay up, watching.
 	/// </summary>
+	private LakeCreature _breachCreature;
+	private Task _breachPrep = Task.CompletedTask;
+
+	/// <summary>What breaks the surface, built ahead from the hush on, a limb a frame, unseen (the lag pass, 2026-10-13:
+	/// built all at once as it broke, it held that frame a quarter of a second), where the boat will be when it breaks:
+	/// 10 m ahead of the breach point, on the boat's line.</summary>
+	private void PrepareBreach()
+	{
+		if (_breachCreature != null) return;
+		float bs = BreachAtFraction * _total;
+		float water = _lake.GlobalPosition.Y;
+		Vector3 boatAt = RailWorld(bs, _lat) with { Y = water };
+		Vector3 center = RailWorld(bs + 10f, _lat) with { Y = water };
+		_breachCreature = new LakeCreature { Name = "LakeCreature" };
+		Cutscene.SceneRoot(this).AddChild(_breachCreature);
+		_breachPrep = _breachCreature.PrepareOverFrames(center, boatAt);
+	}
+
 	private async Task Breach(PlayerController player, CancellationToken ct)
 	{
 		InBreach = true;
@@ -1246,83 +1370,48 @@ public partial class LakeCrossingEvent : Node3D
 		var rig = player.CameraRig;
 		try
 		{
-			Vector3 fwd = -_boat.GlobalBasis.Z; fwd.Y = 0; fwd = fwd.Normalized();
 			float water = _lake.GlobalPosition.Y;
-			Vector3 side = _boat.GlobalBasis.X; side.Y = 0; side = side.Normalized();
-			// right under the gunwale: the view is taken down over the side, straight into it
-			Vector3 eyeW = (_boat.GlobalPosition + side * 4.2f + fwd * 1.5f) with { Y = water };
-			Vector3 centerW = (_boat.GlobalPosition + fwd * 10f) with { Y = water };
 			Vector3 shoreW = _lake.ToGlobal(new Vector3(_p2.X, 0f, _p2.Y));
-			Vector2 eyeL = Local2(eyeW), centerL = Local2(centerW);
+			// (built ahead, unseen, from the hush on: PrepareBreach. Dan, 2026-10-13: no giant eye in the deep first, no
+			// stop and look down into the water; it just bursts up out of the lake in front of the boat as they row)
+			if (_breachCreature == null) PrepareBreach();
+			var creature = _breachCreature;
+			await _breachPrep;
+			Vector3 centerW = creature.GlobalPosition with { Y = water };
+			Vector2 centerL = Local2(centerW);
 
-			// 1. the lake holds its breath
-			var coast = CoastTo(0f, 1.2f, ct);
-			if (_heart != null) { _heart.VolumeDb = -24f; _heart.Play(); _heart.CreateTween().TweenProperty(_heart, "volume_db", -11f, 2.5f); }
-			Vector2 shadowFrom = _lake.Waves.Shadow > 0.05f ? _lake.Waves.ShadowAt : eyeL;
-			_ = RampWaves((ref LakeShape.Waves w, float u) =>
-			{
-				w.ShadowAt = shadowFrom.Lerp(eyeL, Mathf.SmoothStep(0f, 1f, u));
-				w.ShadowRadius = 16f;
-				w.Shadow = Mathf.Max(w.Shadow, 0.9f * u);
-			}, 1.8f, ct);
-			_ = FovTo(rig, -6f, 2.4f, ct);
-			await LookAt(player, () => eyeW + Vector3.Down * 2.5f, 1.4f, 3f, ct);
-			await coast;
-			// (the boat has stopped: what breaks the surface is built now, a limb a frame, unseen, while the eye opens; the
-			// lag pass, 2026-10-13: built all at once as it broke, it held that frame a quarter of a second)
-			var creature = new LakeCreature { Name = "LakeCreature" };
-			Cutscene.SceneRoot(this).AddChild(creature);
-			var prepared = creature.PrepareOverFrames(centerW, _boat.GlobalPosition);
-
-			// 2. an eye opens in the deep, and finds them (its pupil turns toward the boat: across, in its own axes)
-			Vector2 toBoat = new(0f, -1f);
-			_lake.Waves.EyeAt = eyeL;
-			_lake.Waves.EyeRadius = 5.5f;
-			_lake.Waves.EyeAxis = new Vector2(fwd.X, fwd.Z);
-			_lake.Waves.EyePupil = 1f;
-			_lake.Waves.EyeLook = Vector2.Zero;
-			Sfx("whisper_voice", 3, eyeW + Vector3.Down * 3f, "Unnatural", -12f, 8f);
-			_ = LookAt(player, () => eyeW + Vector3.Down * 2.5f, 1.5f, 3f, ct);
-			await RampWaves((ref LakeShape.Waves w, float u) => w.EyeOpen = Mathf.SmoothStep(0f, 1f, u), 1.3f, ct);
-			await Cutscene.Wait(this, 0.2, ct);
-			Sfx("underwater_thoom", 1, eyeW + Vector3.Down * 5f, "Unnatural", -9f, 20f);
-			await RampWaves((ref LakeShape.Waves w, float u) =>
-			{
-				w.EyePupil = Mathf.Lerp(1f, 0.06f, Mathf.SmoothStep(0f, 1f, u));
-				w.EyeLook = toBoat * Mathf.SmoothStep(0f, 1f, u);
-			}, 0.45f, ct);
-			_shake = 0.12f;
-			Sfx("whisper_voice", 3, eyeW + Vector3.Down * 2f, "Unnatural", -6f, 8f);
-			await Cutscene.Wait(this, 0.6, ct);
-
-			// 3. it comes up: the eye shuts, the water domes, the horn sounds
-			_lake.Waves.BulgeAt = centerL;
-			PlayFoghorn(centerW);
-			var shut = RampWaves((ref LakeShape.Waves w, float u) => { w.EyeOpen = 1f - Mathf.SmoothStep(0f, 1f, u); w.Shadow = Mathf.Lerp(0.9f, 0.35f, u); }, 0.9f, ct);
-			var bulge = RampWaves((ref LakeShape.Waves w, float u) => w.Bulge = Mathf.SmoothStep(0f, 1.7f, u), 1.4f, ct);
-			_ = FovTo(rig, 0f, 1.2f, ct);
-			_dipVel -= 0.3f;
-			await LookAt(player, () => centerW + Vector3.Up * 1.5f, 1.1f, 3f, ct);
-			await bulge;
-			await shut;
-
-			// 4. the breach
-			await prepared;
+			// 1. the burst: it breaks the surface ahead with no warning, the boat thrown back and stopped dead
 			creature.Breach(centerW, _boat.GlobalPosition, BreachHoldSeconds);
 			creature.Slammed += OnSlam;
 			LastCreature = creature;
-			Sfx("breach_erupt", 1, centerW, "Unnatural", 3f, 18f, 160f);
+			Sfx("breach_erupt", 1, centerW, "Unnatural", 4f, 18f, 160f);
+			PlayFoghorn(centerW + Vector3.Down * 2f, 3f);
+			Sfx("tentacle_slam", 2, centerW, "Unnatural", 0f, 14f, 140f);
 			ForestAmbienceManager.Instance?.Startle(1f, 3f);
+			LakeFx.Column(Cutscene.SceneRoot(this), centerW, 7f);
+			LakeFx.Splash(Cutscene.SceneRoot(this), centerW + Vector3.Up * 0.5f, 3f, 60);
+			Vector3 bow = _boat.ToGlobal(new Vector3(0, 0.3f, -Rowboat.HalfLength));
+			LakeFx.Splash(Cutscene.SceneRoot(this), bow, 1.8f, 30, _boat.GlobalBasis.Z * 1.6f);
+			Sfx("wave_slap", 4, bow, "Weather", 2f, 6f);
+			Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", 0f);
 			_lake.Waves.RingAt = centerL;
-			_ = RampWaves((ref LakeShape.Waves w, float u) => { w.Bulge = Mathf.Lerp(1.7f, 0f, Mathf.SmoothStep(0f, 1f, u)); w.Shadow = Mathf.Lerp(0.35f, 0f, u); }, 0.7f, ct);
+			float shadow0 = _lake.Waves.Shadow;
+			_ = RampWaves((ref LakeShape.Waves w, float u) => w.Shadow = Mathf.Lerp(shadow0, 0f, u), 0.7f, ct);
 			_ = RampWaves((ref LakeShape.Waves w, float u) => { w.RingRadius = Mathf.Lerp(3f, 70f, u); w.RingHeight = Mathf.Lerp(0.55f, 0f, u); }, 9f, ct);
 			_ = RampWaves((ref LakeShape.Waves w, float u) => w.Intensity = Mathf.SmoothStep(0f, 1f, u), 3f, ct);
-			_shake = 0.7f;
-			if (_heart != null) _heart.VolumeDb = -6f;
+			var coast = CoastTo(0f, 0.9f, ct);
+			// the boat rears back from it and rolls; the view jolts
+			_pitchVel += 0.6f;
+			_rollVel += _rng.Randf() < 0.5f ? -0.4f : 0.4f;
+			_dipVel -= 0.4f;
+			_shake = 0.8f;
+			if (_heart != null) { _heart.VolumeDb = -4f; _heart.Play(); }
 			_ = RedWash(ct);
 			_ = FovPunch(rig, ct);
-			// the view is dragged up the colossus as it towers out of the lake
-			await LookAt(player, () => creature.ColossusTop() ?? centerW + Vector3.Up * 8f, 2.2f, 2.6f, ct);
+			// the view snapped up to it, then dragged up the colossus as it towers out of the lake
+			await LookAt(player, () => centerW + Vector3.Up * 4f, 0.35f, 9f, ct);
+			await LookAt(player, () => creature.ColossusTop() ?? centerW + Vector3.Up * 8f, 2.0f, 2.6f, ct);
+			await coast;
 
 			// 5. surrounded: the others come up all round, two right beside the boat
 			Sfx("breach_erupt", 1, _boat.GlobalPosition + _boat.GlobalBasis.X * 5f, "Unnatural", -4f, 12f, 120f);
@@ -1425,7 +1514,7 @@ public partial class LakeCrossingEvent : Node3D
 	}
 
 	/// <summary>The vast shadow gliding under the boat on the approach: it comes in from off to one side
-	/// behind, passes beneath, and settles out ahead, where the eye will open.</summary>
+	/// behind, passes beneath, and settles out ahead, where it will break the surface.</summary>
 	private async Task ShadowPass(CancellationToken ct)
 	{
 		Vector3 right = _boat.GlobalBasis.X; right.Y = 0;

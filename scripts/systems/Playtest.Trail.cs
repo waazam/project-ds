@@ -278,6 +278,40 @@ public partial class Playtest
 		Shot("stairs_found");
 	}
 
+	/// <summary>The dead fir with their back to it (Dan, 2026-10-13: nobody gets stuck waiting on it): stood near it
+	/// looking back down the trail, then wandering off that way, never turning, it still comes down after its long
+	/// wait (about 25 s), with its crack and its fall heard, and lets them go on.</summary>
+	private async Task Act1FirUnseen(CancellationToken ct)
+	{
+		await Control(ct, 40);
+		var terrain = GroundSnap.FindTerrain(this);
+		var fir = _bot.FirstOf<FallenTree>();
+		var falls = _bot.FirstOf<Act1TreeFalls>();
+		Require("the trail, the dead fir", terrain != null && fir != null && falls != null);
+		var trailEnd = terrain.TrailPoint(terrain.TrailLength, out var tan);
+		var stand = trailEnd - tan * 9f;
+		await _bot.Teleport(stand, stand - tan * 20f, ct);
+		await _bot.Aim(stand - tan * 20f + Vector3.Up * 1.5f, ct);
+		var firFoot = new Vector3(fir.Root.X, terrain.HeightAt(fir.Root.X, fir.Root.Y), fir.Root.Y);
+		float d = TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(firFoot));
+		bool Cracked() => fir.Fallen || (fir.Falling && !fir.Held);
+		using (Fast(3)) await _bot.WaitUntilGame(() => fir.Held, 4, ct);
+		Check("stood near it with their back to it: it creaks and waits", fir.Held && !Cracked(), $"{d:0} m from its foot");
+		using (Fast(3)) await _bot.WaitUntilGame(() => fir.CreakTime > 15f || Cracked(), 20, ct);
+		Check("15 s on, still waiting to be seen", !Cracked(), $"creaking {fir.CreakTime:0.0} s");
+		// and then they wander off back down the trail, still never looking (out past where it may fall when seen)
+		var off = stand - tan * 20f;
+		await _bot.Teleport(off, off - tan * 20f, ct);
+		await _bot.Aim(off - tan * 20f + Vector3.Up * 1.5f, ct);
+		float heldFor = 0f;
+		using (Fast(3)) await _bot.WaitUntilGame(() => { if (!Cracked()) heldFor = fir.CreakTime; return Cracked(); }, 20, ct);
+		Check("never looked at: it comes down anyway after about 25 s", Cracked() && falls.FirSeen == false && falls.UnseenFalls >= 1 && heldFor is > 22f and < 29f,
+			$"held {heldFor:0.0} s, seen {falls.FirSeen}, {TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(firFoot)):0} m off");
+		using (Fast(3)) await _bot.WaitUntil(() => fir.Fallen && !falls.Watching && Player.WadeScale > 0.98f, 10, ct);
+		Check("it lies across the trail, and they're free to go on", fir.Fallen && !falls.Watching && Player.WadeScale > 0.98f, $"pace {Player.WadeScale:0.00}, watching {falls.Watching}");
+		Shot("fir_down_unseen");
+	}
+
 	/// <summary>A point on the autotest route (or straight back from it) <paramref name="metres"/> short of <paramref name="target"/>.</summary>
 	private Vector3 RouteEnd(Vector3 target, float metres)
 	{

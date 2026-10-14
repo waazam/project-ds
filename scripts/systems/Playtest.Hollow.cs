@@ -539,6 +539,46 @@ public partial class Playtest
 		finally { _bot.Release(); }
 	}
 
+	/// <summary>Three frames actually drawn (time-compressed, a few physics frames can pass inside one drawn frame).</summary>
+	private async Task Drawn(CancellationToken ct)
+	{
+		for (int i = 0; i < 3; i++) await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+		ct.ThrowIfCancellationRequested();
+	}
+
+	/// <summary>Seated in the boat, mid-stroke (Dan, 2026-10-13: "the heads or something's clipping in the rowboat"; it
+	/// was the inside of the jacket's collar, the eye inside the chest): a picture looking forward, back, to each side and
+	/// down, and the middle of the view looking forward must be the lake, not the body.</summary>
+	private async Task BoatLook(LakeCrossingEvent crossing, CancellationToken ct)
+	{
+		var boat = crossing.Boat;
+		Vector3 eye() => Player.CameraRig.Camera.GlobalPosition;
+		Vector3 fwd = (-boat.GlobalBasis.Z with { Y = 0 }).Normalized(), side = (boat.GlobalBasis.X with { Y = 0 }).Normalized();
+		float Centre()
+		{
+			var img = GetViewport().GetTexture().GetImage();
+			int w = img.GetWidth(), h = img.GetHeight(); float sum = 0; int n = 0;
+			for (int y = h * 3 / 8; y < h * 5 / 8; y += 8) for (int x = w / 4; x < w * 3 / 4; x += 8) { sum += img.GetPixel(x, y).Luminance; n++; }
+			return sum / n;
+		}
+		float ahead = 0f;
+		var looks = new (string name, Vector3 dir)[]
+		{
+			("boat_fwd", fwd), ("boat_back", -fwd), ("boat_left", -side), ("boat_right", side),
+			("boat_down", fwd * 0.5f + Vector3.Down), ("boat_back_down", -fwd * 0.6f + Vector3.Down * 0.5f),
+		};
+		foreach (var (name, dir) in looks)
+		{
+			await RowUntil(crossing, () => false, ct, 0.45);
+			await _bot.Aim(eye() + dir * 10f, ct);
+			await Drawn(ct);
+			if (name == "boat_fwd") ahead = Centre();
+			Shot(name);
+		}
+		await _bot.Aim(eye() + fwd * 10f, ct);
+		Check("seated in the boat: the view ahead is the lake, nothing of the body in front of the eye", ahead > 0.1f, $"middle of the view {ahead:0.00} bright");
+	}
+
 	private async Task Act12(CancellationToken ct)
 	{
 		await Control(ct, 40);
@@ -557,6 +597,7 @@ public partial class Playtest
 		Require("boarded the boat", crossing.Boarded);
 		using (Fast(3)) await _bot.WaitUntil(() => crossing.Paddling, 8, ct);
 		Check("seated, pushed off, the oars in hand", crossing.Paddling && Player.CameraRig.EyeHeight < 1.2f);
+		if (Phase == 0) await BoatLook(crossing, ct);
 		using (Fast(2))
 		{
 			if (Phase == 0)
@@ -595,6 +636,8 @@ public partial class Playtest
 			await RowUntil(crossing, () => crossing.Landed, ct, 120, smart: true);
 		}
 		Check("strikes and surges on the way, and it gave chase to the beach", crossing.Strikes >= 1 && crossing.Surges >= 1, $"{crossing.Strikes} strikes ({crossing.StrikeHits} hit), {crossing.Surges} surges, dash {crossing.FinalDash}");
+		Check("one near miss: it reared right behind the stern, and sank away", crossing.NearMisses == 1 && !crossing.InNearMiss && crossing.NearMissClosest < 4.5f,
+			$"{crossing.NearMisses} near misses, {crossing.NearMissClosest:0.0} m at the closest");
 		Check("rowed hard: across the current, landed", crossing.Landed, $"progress {crossing.Progress:0.00}");
 		await _bot.WaitUntil(() => Input.Enabled, 10, ct);
 		Check("stood up on the far beach", Player.CameraRig.EyeHeight > 1.5f);

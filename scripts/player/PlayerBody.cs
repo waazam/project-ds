@@ -47,7 +47,7 @@ public partial class PlayerBody : Node3D
 	private int[] _order;
 	private float _l1, _l2;     // thigh and shin
 	private float _bodyYaw, _turnPhase, _breathT, _cycle, _lookDown, _sitW, _lanternW, _runW;
-	private bool _turning, _yawSet;
+	private bool _turning, _yawSet, _seatedHidden;
 	private Vector3 _lastPos;
 	/// <summary>For tests: whether it's drawn (seen and in the shadow), and where its feet are (world).</summary>
 	public bool Shown { get; private set; }
@@ -108,6 +108,8 @@ public partial class PlayerBody : Node3D
 	/// chest seen it must stay back while walking (0.6 brought the shoulders up under the eye); crouched, 0.28 put the whole
 	/// chest behind the eye and left two thighs alone in the view.</summary>
 	private const float BackMoving = 0.25f, BackCrouch = 0.12f;
+	/// <summary>The standing eye height the model's rest pose is built for (the camera rig's default).</summary>
+	private const float StandEye = 1.62f;
 	private static readonly Color JacketOlive = new(0.15f, 0.17f, 0.125f);
 	/// <summary>The height (the model's rest pose) above which the sleeves are seen: the shoulders' caps.</summary>
 	private const float ShoulderCut = 1.3f;
@@ -245,6 +247,7 @@ public partial class PlayerBody : Node3D
 			foreach (var g in _seen)
 				if (g.Name == "Shoulders") g.Visible = inView;   // (a seen copy only: the whole arm is already in the shadow)
 				else g.CastShadow = inView ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.ShadowsOnly;
+			_seatedHidden = false;   // (seated, the chest goes back to the shadow below)
 		}
 		_lightSweep -= delta;
 		if (_lightSweep <= 0) { _lightSweep = 1.0; KeepOwnLightsOff(_p); }
@@ -274,10 +277,26 @@ public partial class PlayerBody : Node3D
 		// 60 degrees and only the toes showed at the bottom of the view)
 		_lookDown = Mathf.SmoothStep(0.6f, 1.45f, -rig.Pitch);
 		_sitW = Mathf.MoveToward(_sitW, rig.EyeHeight < 1.3f && _p.CrouchAmount < 0.2f ? 1f : 0f, dt * 3f);
+		// seated, the chest and the shoulders' caps are drawn in the shadow only (Dan, 2026-10-13, the rowboat: looking
+		// down or round, the collar came within the near plane and showed cut open, black and jagged). The lap, the jeans
+		// and the boots are still seen.
+		bool seated = _sitW > 0.5f;
+		if (seated != _seatedHidden)
+		{
+			_seatedHidden = seated;
+			foreach (var g in _seen)
+			{
+				string gn = g.Name.ToString();
+				if (gn == "Shoulders") g.Visible = _inView && !seated;
+				else if (gn.StartsWith("Chest"))
+					g.CastShadow = _inView && !seated ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.ShadowsOnly;
+			}
+		}
 		// (walking, less: the feet stepping out ahead stay in view; crouched, more: the knees go under the eye, not up
 		// in front of it)
 		float moving = Mathf.SmoothStep(0.3f, 1.5f, new Vector2(_p.Velocity.X, _p.Velocity.Z).Length());
-		float back = (0.09f + 0.16f * _lookDown * (1f - BackMoving * moving) + BackCrouch * _p.CrouchAmount) * (1f - _sitW);
+		// (seated too, Dan 2026-10-13: with none, looking down in the rowboat looked down inside the collar)
+		float back = 0.09f + 0.16f * _lookDown * (1f - BackMoving * moving) + BackCrouch * _p.CrouchAmount;
 		GlobalTransform = new Transform3D(basis, _p.GlobalPosition - fwd * back);
 
 		// the stride: in step with the footsteps (a foot down on each footfall); standing, the feet still
@@ -307,7 +326,10 @@ public partial class PlayerBody : Node3D
 		// the hips: down on each footfall, down for a crouch, down to sit; turned with the leading leg
 		var hipsRest = _restG[_hips];
 		float bob = -0.022f * moveW * (0.5f + 0.5f * Mathf.Cos(cyc * 2f)) * (1f + _runW);
-		float drop = crouch * (_p.CrouchEyeDrop * 0.85f) + _sitW * 0.5f;
+		// (seated, the whole upper body comes down with the eye. Dan, 2026-10-13, the rowboat: with a fixed 0.5 m the chest
+		// stood 0.2 m too high for the boat's 0.92 m eye, so the eye sat inside the collar and the jacket's inside filled
+		// the view, a black jagged shape with the zip up through it)
+		float drop = crouch * (_p.CrouchEyeDrop * 0.85f) + _sitW * Mathf.Clamp(StandEye - _p.CameraRig.EyeHeight, 0.5f, 0.8f);
 		// on a slope or a stair going down, the hips go down to let the lower foot reach
 		float reachDrop = 0f;
 		float[] ground = new float[2];

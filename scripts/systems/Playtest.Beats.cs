@@ -61,6 +61,7 @@ public partial class Playtest
 		{
 			new("0", 0, "Systems: movement, run and stamina, crouch, the pause menu, settings, key rebinding, quit to menu", Seed.Fresh, 150, SystemsBeat),
 			new("1", 1, "Act 1: the opening, the register, the album, photographs (and the omen), the fir, the stairs found", Seed.Fresh, 160, Act1),
+			new("1b", 1, "Act 1: the dead fir with their back to it: it still comes down after its wait", Seed.Fresh, 90, Act1FirUnseen),
 			new("2", 2, "Act 2: onto the stairs, the float, no way down, the post, the collapse; the wake in the Hollow", At(Checkpoint.Act1Start, new string[0], "camera;tool=None"), 150, Act2),
 			new("3", 3, "Act 3: the camp, the note, lantern and compass, the flame and the blacklight, the inventory, out of the safe zone", At(3), 120, Act3),
 			new("4", 4, "Act 4: the storm walk: numbers 1-2 under the blacklight, the stalker, far footfalls", At(4), 120, Act4),
