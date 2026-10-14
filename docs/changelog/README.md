@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-13g — The later acts' surfaces in the early acts' mood: the bunker's concrete in relief and its plastics yellowed; the station lobby's paper, rug and wood aged; Act 14's plate rusted; the boss room's pipes stained and dulled; the library's flat plaster, rug, chairs and glossy floor made worn; the church's marbles dulled; the lodge's skis and Act 25's snow toned down (with the audit table)](2026-10-13g-the-later-acts-in-the-early-acts-mood.md)
 - [2026-10-13f — Cleanup, second pass: unused sounds and textures, dead code (Act7Whispers, CabinReturnEvent, the burnt cabin, the trail's stones), old harnesses and stale docs](2026-10-13f-cleanup.md)
 - [2026-10-13e — The story's open points settled (STORY.md Revision 4.1): the rain stops with the cap, inside the cabin; the code trees at their fixed spots, dialled from memory; the fir's 7-9 s stop and 25 s fall; the giant pacing until the fire's been watched, its rattle with it; "Who are you!" the player's own shout; a 32 s Act 11 climb and a 16-flight long stair; the lake's near miss; the stairwell's music timed to the bottom; thought captions and the count of 69 allowed](2026-10-13e-story-decisions.md)
 - [2026-10-13 — Polish pass: the outline (sound, weather, look, the player, story beats and puzzles, performance, bugs, tests, docs, in one page)](2026-10-13-polish-pass-outline.md)

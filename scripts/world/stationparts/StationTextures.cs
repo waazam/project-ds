@@ -88,17 +88,30 @@ public static class StationTextures
 	/// <summary>Faded sage-and-cream striped wallpaper with a small damask dot between the stripes.</summary>
 	// (2026-10-13, the look audit: the lobby's cream paper under its lamp and the lantern read near white, a clean bright
 	// room; aged a step darker and yellower, the texture as it was)
-	public static StandardMaterial3D WallpaperMat => Aged(WallpaperFresh, new Color(0.74f, 0.7f, 0.6f));
-	private static StandardMaterial3D Aged(StandardMaterial3D m, Color c) { m.AlbedoColor = c; return m; }
+	// (2026-10-13g, the texture-mood pass: still a clean yellow-cream room under its lamp beside the cabin's worn wood;
+	// the paper is old now: greyer, darker, foxed and yellowed in blotches, and the plaster's
+	// relief and roughness under it, so the lantern finds a surface instead of a print)
+	public static StandardMaterial3D WallpaperMat => Aged(WallpaperFresh, new Color(0.6f, 0.57f, 0.5f));
+	private static StandardMaterial3D Aged(StandardMaterial3D m, Color c)
+	{
+		m.AlbedoColor = c;
+		if (!m.HasMeta("relief")) { SurfaceKit.Relief(m, "plaster", 0.55f); m.SetMeta("relief", "plaster"); }
+		return m;
+	}
 	private static StandardMaterial3D WallpaperFresh => Std("st_wallpaper", Make("st_wallpaper", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 4, 3, 11);
 		bool stripe = (x / 8) % 2 == 0;
-		Color c = stripe ? new Color(0.62f, 0.66f, 0.55f) : new Color(0.8f, 0.77f, 0.66f);
+		Color c = stripe ? new Color(0.56f, 0.57f, 0.5f) : new Color(0.7f, 0.67f, 0.58f);
 		int dx = x % 16 - 12, dy = y % 16 - 8;
-		if (!stripe && dx * dx + dy * dy < 5) c = new Color(0.6f, 0.52f, 0.42f);
-		return c * (0.9f + 0.18f * n);
-	}), 0.9f, 0.2f);
+		if (!stripe && dx * dx + dy * dy < 5) c = new Color(0.5f, 0.44f, 0.37f);
+		c *= 0.88f + 0.2f * n;
+		// foxing: yellow-brown blotches, a few darker specks
+		float fox = Mathf.SmoothStep(0.56f, 0.78f, Fbm(x + 21, y + 5, 64, 3, 3, 14));
+		c = c.Lerp(new Color(0.42f, 0.34f, 0.22f), fox * 0.45f);
+		if (Hash(x, y, 15) > 0.985f) c *= 0.75f;
+		return c;
+	}), 0.92f, 0.15f);
 
 	/// <summary>Room 2's paper: deep blood-red stripes, a darker crimson between them, a faint raised
 	/// damask pattern pressed into the dark stripes, and a fine linen weave over all of it.</summary>

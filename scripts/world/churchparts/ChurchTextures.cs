@@ -171,7 +171,8 @@ public static class ChurchTextures
 		return c * SurfaceKit.Grain("limestone", x / 256f, y / 256f, 0.18f, 2f);
 	});
 
-	public static StandardMaterial3D MarbleMat => Tint(Uv("ch_marble", Marble, 2f, 0.3f, 0.5f), new Color(0.4f, 0.38f, 0.37f));
+	// (2026-10-13g, the texture-mood pass: the marbles were polished glass under the candles; worn dull by feet now)
+	public static StandardMaterial3D MarbleMat => Tint(Uv("ch_marble", Marble, 2f, 0.52f, 0.4f), new Color(0.4f, 0.38f, 0.37f));
 
 	/// <summary>Old cobbles (the owner's reference): Poly Haven's cobblestone floor, rounded stones of every shade of
 	/// grey and brown packed in dark grit; its green moss mostly greyed out (inside a church), a 2 m tile.</summary>
@@ -193,7 +194,7 @@ public static class ChurchTextures
 		return c;
 	});
 
-	public static StandardMaterial3D RedMarbleMat => Tint(Uv("ch_redmarble", RedMarble, 2f, 0.3f, 0.5f), new Color(0.62f, 0.5f, 0.48f));
+	public static StandardMaterial3D RedMarbleMat => Tint(Uv("ch_redmarble", RedMarble, 2f, 0.52f, 0.4f), new Color(0.5f, 0.43f, 0.41f));
 
 	/// <summary>The medallion set in the aisle before the chancel: an eight-pointed star in a ring of red,
 	/// cream and black marble (one texture across the whole disc).</summary>

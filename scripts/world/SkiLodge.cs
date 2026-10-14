@@ -752,7 +752,7 @@ public partial class SkiLodge : Node3D
 	// ------------------------------------------------------------------ materials
 
 	private static StandardMaterial3D _timber, _trim, _door, _glass, _lit, _roofSnow, _ski;
-	private static StandardMaterial3D SkiPaint => _ski ??= new StandardMaterial3D { ResourceName = "lodge_ski", AlbedoColor = new Color(0.42f, 0.12f, 0.1f), Roughness = 0.5f };
+	private static StandardMaterial3D SkiPaint => _ski ??= new StandardMaterial3D { ResourceName = "lodge_ski", AlbedoColor = new Color(0.33f, 0.12f, 0.09f), Roughness = 0.72f };   // (2026-10-13g: old, chalky red lacquer, was a bright glossy red)
 	/// <summary>Dark-stained board-and-batten, the lodge's upper storeys.</summary>
 	public static StandardMaterial3D LodgeTimber => _timber ??= Tinted(BuildingTextures.BoardsMat, new Color(0.62f, 0.48f, 0.38f), "lodge_timber");
 	public static StandardMaterial3D LodgeTrim => _trim ??= Tinted(BuildingTextures.BoardsMat, new Color(0.45f, 0.34f, 0.27f), "lodge_trim");
