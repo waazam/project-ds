@@ -15,7 +15,7 @@ public partial class SoundCaption : CanvasLayer
 	public static SoundCaption Instance { get; private set; }
 	private static readonly Dictionary<string, string> Captions = new()
 	{
-		["wall_knock"] = "knocking", ["door_knock"] = "knocking", ["whisper_voice"] = "whispering", ["wendigo_howl_far"] = "a howl, far off",
+		["keypad_accept"] = "a beep, and the lock clacks", ["keypad_deny"] = "a buzz", ["wall_knock"] = "knocking",["door_knock"] = "knocking", ["whisper_voice"] = "whispering", ["wendigo_howl_far"] = "a howl, far off",
 		["wendigo_howl"] = "a howl", ["wendigo_mimic"] = "a voice that isn't human", ["wendigo_mumble"] = "muttering", ["wendigo_step"] = "heavy footsteps",
 		["wendigo_land"] = "something lands", ["wendigo_leap"] = "something leaps", ["creature_snarl"] = "a snarl", ["claw_rake"] = "claws on wood",
 		["claw_scrape"] = "scraping", ["door_creak"] = "a door creaks", ["door_slam"] = "a door slams", ["door_ram"] = "a crash against the door",

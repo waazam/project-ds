@@ -224,12 +224,17 @@ public static partial class BunkerTextures
 	/// <summary>Rust runs (orange-brown) from a fixing point.</summary>
 	public static Texture2D RustRun() => Make("bk_rust", 32, 64, (x, y) =>
 	{
-		float len = 0.3f + Fbm(x, 0, 32, 64, 8, 2, 361) * 0.7f;
-		float cx = 1f - Mathf.Abs(x - 15.5f) / 10f;
+		// (2026-10-14b, the graphics pass: one solid orange wedge, a painted spike; now a stain at the source and thin runs
+		// of different lengths weeping out of it, each fading as it goes)
+		float len = 0.25f + Fbm(x * 3f, 0, 32, 64, 8, 2, 361) * 0.75f;
+		float cx = 1f - Mathf.Abs(x - 15.5f) / 13f;
 		float v = y / 64f;
-		float a = Mathf.SmoothStep(len, len - 0.25f, v) * Mathf.SmoothStep(0f, 0.6f, cx);
-		a *= 0.6f + 0.4f * Fbm(x, y, 32, 64, 4, 2, 362);
-		return new Color(0.3f, 0.14f, 0.06f, Mathf.Clamp(a, 0f, 1f));
+		float runs = Mathf.SmoothStep(0.5f, 0.72f, Fbm(x * 3f, y * 0.12f, 32, 64, 8, 2, 363));
+		float source = Mathf.SmoothStep(0.22f, 0.02f, v) * (0.5f + 0.5f * Fbm(x, y, 32, 64, 4, 2, 364));
+		float a = Mathf.Max(runs * Mathf.SmoothStep(len, len - 0.3f, v) * (1f - v * 0.6f), source) * Mathf.SmoothStep(0f, 0.5f, cx);
+		a *= 0.55f + 0.45f * Fbm(x, y, 32, 64, 4, 2, 362);
+		var c = new Color(0.3f, 0.14f, 0.06f).Lerp(new Color(0.2f, 0.1f, 0.05f), v);
+		return new Color(c.R, c.G, c.B, Mathf.Clamp(a * 0.85f, 0f, 1f));
 	});
 
 	/// <summary>An irregular damp/dirt blotch with a soft, ragged edge.</summary>
@@ -239,7 +244,8 @@ public static partial class BunkerTextures
 		float r = Mathf.Sqrt(dx * dx + dy * dy);
 		float edge = 0.62f + 0.3f * Fbm(x, y, 64, 64, 4, 3, 371);
 		float a = Mathf.SmoothStep(edge, edge - 0.3f, r) * (0.55f + 0.45f * Fbm(x, y, 64, 64, 8, 2, 372));
-		return new Color(0.06f, 0.055f, 0.045f, Mathf.Clamp(a, 0f, 1f));
+		// (2026-10-14b: browner and fainter; at full strength on the floor they read as black holes)
+		return new Color(0.1f, 0.085f, 0.06f, Mathf.Clamp(a * 0.7f, 0f, 1f));
 	});
 
 	/// <summary>Moss patch (green, fuzzy edge).</summary>
@@ -254,25 +260,34 @@ public static partial class BunkerTextures
 		return new Color(c.R, c.G, c.B, Mathf.Clamp(a, 0f, 1f));
 	});
 
-	/// <summary>A standing-water puddle (dark; pair with <see cref="PuddleOrm"/> for the gloss).</summary>
+	/// <summary>A standing-water puddle (pair with <see cref="PuddleOrm"/> for the gloss).</summary>
+	// (2026-10-14b, the graphics pass: they were near-black ellipses at 75 %, read as holes in the floor or pools of oil;
+	// now a lobed, ragged shape, a thin film at the rim and a darker, deeper middle: wet concrete rather than ink)
 	public static Texture2D Puddle() => Make("bk_puddle", 64, 64, (x, y) =>
 	{
-		float dx = (x - 31.5f) / 32f, dy = (y - 31.5f) / 20f;
-		float r = Mathf.Sqrt(dx * dx + dy * dy);
-		float edge = 0.7f + 0.25f * Fbm(x, y, 64, 64, 4, 3, 391);
-		float a = Mathf.SmoothStep(edge, edge - 0.15f, r);
-		return new Color(0.03f, 0.03f, 0.028f, a * 0.75f);
+		var (a, depth) = PuddleShape(x, y);
+		var c = new Color(0.15f, 0.145f, 0.13f).Lerp(new Color(0.06f, 0.058f, 0.052f), depth);
+		return new Color(c.R, c.G, c.B, a * (0.32f + 0.36f * depth));
 	});
 
-	/// <summary>ORM for puddles: occlusion 1, roughness very low, metal 0.</summary>
+	/// <summary>ORM for puddles: occlusion 1, roughness very low (a little higher at the film's rim), metal 0.</summary>
 	public static Texture2D PuddleOrm() => Make("bk_puddle_orm", 64, 64, (x, y) =>
 	{
-		float dx = (x - 31.5f) / 32f, dy = (y - 31.5f) / 20f;
-		float r = Mathf.Sqrt(dx * dx + dy * dy);
-		float edge = 0.7f + 0.25f * Fbm(x, y, 64, 64, 4, 3, 391);
-		float a = Mathf.SmoothStep(edge, edge - 0.15f, r);
-		return new Color(1f, 0.08f, 0f, a);
+		var (a, depth) = PuddleShape(x, y);
+		return new Color(1f, Mathf.Lerp(0.3f, 0.05f, depth), 0f, a);
 	});
+
+	/// <summary>A puddle's coverage (soft, lobed, ragged) and its depth (0 at the rim, 1 in the middle).</summary>
+	private static (float a, float depth) PuddleShape(int x, int y)
+	{
+		float dx = (x - 31.5f) / 32f, dy = (y - 31.5f) / 27f;
+		float r = Mathf.Sqrt(dx * dx + dy * dy), ang = Mathf.Atan2(dy, dx);
+		float edge = 0.6f + 0.1f * Mathf.Sin(ang * 3f + 1.1f) + 0.06f * Mathf.Sin(ang * 5f + 0.3f) + 0.32f * (Fbm(x, y, 64, 64, 4, 4, 391) - 0.5f);
+		float a = Mathf.SmoothStep(edge + 0.02f, edge - 0.12f, r);
+		float depth = Mathf.Clamp(1f - r / Mathf.Max(edge, 0.05f), 0f, 1f);
+		depth = Mathf.SmoothStep(0f, 0.8f, depth) * (0.75f + 0.25f * Fbm(x, y, 64, 64, 8, 2, 392));
+		return (a, depth);
+	}
 
 	/// <summary>Branching hairline cracks.</summary>
 	public static Texture2D Cracks()
@@ -427,9 +442,9 @@ public static partial class BunkerTextures
 
 	public static ShaderMaterial HallWallMat => Concrete("bk_m_hallwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.05f, 0.5f, 0.35f, new Color(1f, 1f, 1f));
 	// (2026-10-13g: the hall's floor was the palest, cleanest surface down here; a step darker, more grime trodden into it)
-	public static ShaderMaterial HallFloorMat => Concrete("bk_m_hallfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.04f, 0.6f, 0f, new Color(0.76f, 0.75f, 0.72f));
+	public static ShaderMaterial HallFloorMat => Concrete("bk_m_hallfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.04f, 0.6f, 0f, new Color(0.72f, 0.68f, 0.62f));   // (2026-10-14b: warmer, toward the walls' own concrete: a cold blue-grey strip under brown walls, it didn't belong to them)
 	public static ShaderMaterial RoomWallMat => Concrete("bk_m_roomwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.06f, 0.65f, 0.45f, new Color(0.78f, 0.78f, 0.8f));
-	public static ShaderMaterial RoomFloorMat => Concrete("bk_m_roomfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.05f, 0.6f, 0f, new Color(0.7f, 0.7f, 0.72f));
+	public static ShaderMaterial RoomFloorMat => Concrete("bk_m_roomfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.05f, 0.6f, 0f, new Color(0.68f, 0.65f, 0.6f));   // (2026-10-14b: warmer, as the hall's)
 	public static ShaderMaterial MazeWallMat => Concrete("bk_m_mazewall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.09f, 0.6f, 0.4f, new Color(0.85f, 0.83f, 0.8f), 0.035f);
 	public static ShaderMaterial MazeFloorMat => Concrete("bk_m_mazefloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.08f, 0.55f, 0f, new Color(0.8f, 0.79f, 0.77f));
 	public static ShaderMaterial ExteriorConcreteMat => Concrete("bk_m_ext", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0f, 0.75f, 0.55f, new Color(0.6f, 0.61f, 0.57f));

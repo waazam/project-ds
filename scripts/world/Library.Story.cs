@@ -122,6 +122,8 @@ public partial class Library
 			case "bump": Sfx("wood_bump", 3, at, -6f, 1f); break;
 			case "turn": Sfx("cryptex_click", 4, at, -14f, 1.3f); break;
 			case "tick": Sfx("cryptex_click", 4, at, -18f, 1.6f); break;
+			// a piece let go off the box (or clicked out of it): a soft wooden clack as it settles back on the table
+			case "clack": Sfx("wood_place", 3, at, -12f, (float)GD.RandRange(1.04, 1.18)); break;
 		}
 	}
 

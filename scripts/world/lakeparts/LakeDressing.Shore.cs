@@ -123,8 +123,11 @@ public partial class LakeDressing
 		Vector3 Axis(float y) => new Vector3(0, y, 0) + lean * (y / height) * (y / height) * 2f;
 		var rings = new List<(Vector3, float, Color)>
 		{
-			(new Vector3(0, -0.4f, 0), 1.25f, bark), (new Vector3(0, 0.05f, 0), 1.05f, bark), (Axis(0.5f), 0.68f, bark),
-			(Axis(1.2f), 0.44f, bark), (Axis(2.4f), 0.34f, bark), (Axis(height * 0.5f), 0.26f, bark * 1.05f), (Axis(height * 0.95f), 0.06f, bark * 1.1f),
+			// (2026-10-14b, the graphics pass: the flare was a straight cone from 1.25 m to 0.44 m, a tent against the dawn; a
+			// cypress's foot swells out in a curve, steep near the ground and quickly slender: the rings follow that curve)
+			(new Vector3(0, -0.4f, 0), 1.3f, bark * 0.85f), (new Vector3(0, 0f, 0), 1.0f, bark * 0.9f), (Axis(0.25f), 0.74f, bark),
+			(Axis(0.5f), 0.57f, bark), (Axis(0.85f), 0.47f, bark), (Axis(1.3f), 0.41f, bark), (Axis(2.4f), 0.34f, bark),
+			(Axis(height * 0.5f), 0.26f, bark * 1.05f), (Axis(height * 0.95f), 0.06f, bark * 1.1f),
 		};
 		ForestScatter.TrunkLoft(k, rings, 14, 1f);
 		// the flutes: buttresses running down the flare
@@ -133,7 +136,11 @@ public partial class LakeDressing
 			float a = Mathf.Tau * i / 7f + rng.RandfRange(-0.2f, 0.2f);
 			var o = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
 			k.Color = bark * 0.95f;
-			k.Cylinder(o * 0.32f + Vector3.Up * 2.2f, o * 1.1f + Vector3.Down * 0.1f, 0.1f, 0.26f, 5, false);
+			// (down the same curve as the flare, not a straight strut across it)
+			var flute = new List<Vector3>();
+			foreach (var (y, r) in new[] { (-0.15f, 1.12f), (0.15f, 0.84f), (0.45f, 0.6f), (0.85f, 0.46f), (1.5f, 0.38f), (2.3f, 0.32f) })
+				flute.Add(o * r + Axis(Mathf.Max(y, 0f)) - new Vector3(0, Mathf.Max(y, 0f), 0) + Vector3.Up * y);
+			BunkerParts.BunkerKit.Tube(k, flute, 0.24f, 0.07f, 5);
 		}
 		// the roots: heaved up, twisting out across the ground and down into the water
 		for (int i = 0; i < 11; i++)

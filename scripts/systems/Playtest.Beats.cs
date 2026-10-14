@@ -71,7 +71,7 @@ public partial class Playtest
 			new("6", 6, "Act 6: the footbridge, the voice, the clearing's loop of flights, the fall and the wake", At(6), 200, Act6),
 			new("6b", 6, "Act 6: over the creek beside the footbridge (wading): checkpoint 5, the compass, the voice", At(6), 80, Act6Creek),
 			new("7", 7,"Act 7: the lookout, the fire, the giant, numbers 3-4", At(7), 160, Act7),
-			new("8", 8, "Acts 8-10: the dial (wrong, right), the hallway's red, the vine door, the CRT room, the walkie, the rooms, the run out", At(8), 220, Act8To10),
+			new("8", 8, "Acts 8-10: the keypad (wrong, right), the hallway's red, the vine door, the CRT room, the walkie, the rooms, the run out", At(8), 220, Act8To10),
 			ContinueBeat("8c", 8, "act8_bunker_entered"),
 			new("11", 11, "Act 11: the radio, the pursuer, the tall stairs, the cap seated, the giant", At(11), 200, Act11),
 			new("12", 12, "Act 12: the boat; drowned by the lake (reload); rowed across; the station door", At(12), 260, Act12),

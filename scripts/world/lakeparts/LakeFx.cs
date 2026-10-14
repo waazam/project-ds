@@ -103,10 +103,16 @@ public static class LakeFx
 		tw.Chain().TweenCallback(Callable.From(mi.QueueFree));
 	}
 
-	private static void Burst(Node parent, string name, Vector3 at, ParticleProcessMaterial pm, int amount, float life, Texture2D tex, float quad)
+	// (2026-10-14b: every burst made its own spray material, quad and fade ramp; a one-off 137-147 ms hitch was logged as the
+	// near miss threw up its column, splash and three ripples at once. The spray's material and quads, and the ramp, are made
+	// once and shared now)
+	private static StandardMaterial3D _spray;
+	private static readonly System.Collections.Generic.Dictionary<int, QuadMesh> _quads = new();
+	private static GradientTexture1D _fade;
+
+	private static QuadMesh SprayQuad(Texture2D tex, float quad)
 	{
-		var draw = new QuadMesh { Size = Vector2.One * quad };
-		draw.Material = new StandardMaterial3D
+		_spray ??= new StandardMaterial3D
 		{
 			AlbedoTexture = tex,
 			AlbedoColor = SprayTint,
@@ -116,6 +122,22 @@ public static class LakeFx
 			VertexColorUseAsAlbedo = true,
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		};
+		int key = Mathf.RoundToInt(quad * 100f);
+		if (!_quads.TryGetValue(key, out var q)) _quads[key] = q = new QuadMesh { Size = Vector2.One * (key / 100f), Material = _spray };
+		return q;
+	}
+
+	/// <summary>Builds the shared spray pieces ahead of time (the crossing's load).</summary>
+	public static void Warm()
+	{
+		SprayQuad(SoftDot(), 0.6f);
+		Ring();
+		Fade();
+	}
+
+	private static void Burst(Node parent, string name, Vector3 at, ParticleProcessMaterial pm, int amount, float life, Texture2D tex, float quad)
+	{
+		var draw = SprayQuad(tex, quad);
 		var p = new GpuParticles3D
 		{
 			Name = name, Amount = amount, Lifetime = life, OneShot = true, Explosiveness = 0.92f,
@@ -131,11 +153,12 @@ public static class LakeFx
 
 	private static GradientTexture1D Fade()
 	{
+		if (_fade != null) return _fade;
 		var g = new Gradient();
 		g.SetColor(0, new Color(1, 1, 1, 1));
 		g.SetColor(1, new Color(1, 1, 1, 0));
 		g.AddPoint(0.6f, new Color(1, 1, 1, 0.7f));
-		return new GradientTexture1D { Gradient = g };
+		return _fade = new GradientTexture1D { Gradient = g };
 	}
 
 	/// <summary>A thin bright ring on transparency, with a fainter inner echo.</summary>
