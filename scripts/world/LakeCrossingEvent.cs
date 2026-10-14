@@ -1326,7 +1326,7 @@ public partial class LakeCrossingEvent : Node3D
 	// ------------------------------------------------------------------ the breach
 
 	/// <summary>
-	/// The breach: the act's centrepiece, about nine seconds with the input taken (the view is
+	/// The breach: the act's centrepiece, about eleven seconds with the input taken (the view is
 	/// steered throughout; the player only watches). Beat by beat:
 	/// 1-4. The burst (Dan, 2026-10-13: "remove the giant eyeball before the kraken jumps out of the water, just have it
 	///    jump out of the water and scare the player"; there was a stop, the view drawn down into the water, a house-sized

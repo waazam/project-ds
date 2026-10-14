@@ -47,6 +47,9 @@ public partial class Act11Ending : Node3D
 	/// <summary>The silence over black after the grab is 0.6 of this (seconds), before the last radio line.</summary>
 	[Export] public float HumOutSeconds = 4f;
 	[Export] public float FogRampRadius = 70f;
+	/// <summary>How near the foot of the flight (m) they are "under the stairs": the stairs' first call and the radio's
+	/// "Don't go up." (STORY.md, Act 11; 2026-10-13: both came at the fog's edge, 70 m out).</summary>
+	[Export] public float UnderStairsRadius = 14f;
 	/// <summary>Silence priority: above the storm's, so the climb is silent whatever else is going on.</summary>
 	[Export] public int SilencePriority = 100;
 	[ExportGroup("Stairs hum")]
@@ -372,6 +375,8 @@ public partial class Act11Ending : Node3D
 		// stairs' midpoint — from the ground you can never quite see where they end.
 		_fogZone = StoryBeat.MakeTrigger(_original, new CylinderShape3D { Radius = FogRampRadius, Height = 200f },
 			Vector3.Zero, _ => RampFog(_fogLineArmed), "Act11FogZone");
+		_underZone = StoryBeat.MakeTrigger(_original, new CylinderShape3D { Radius = UnderStairsRadius, Height = 40f },
+			Vector3.Zero, _ => UnderTheStairs(), "Act11UnderStairs");
 		if (_original.HasNewel && StoryManager.Instance?.HasFlag(StoryManager.Flag.NewelSeated) != true)
 		{
 			var seat = new PickupInteractable
@@ -468,10 +473,25 @@ public partial class Act11Ending : Node3D
 		_fogZone.QueueFree();
 		_fogZone = null;
 		StoryBeat.Atmosphere(this)?.SetHeightFog(_original.GlobalPosition.Y + _original.TotalHeight * 0.4f, 0.1f, 9f);
-		if (ask) _ = Cutscene.Run(this, ct => Ask("\"Don't go up.\"", ct));
-		// The stairs call once as the player comes under them (the second time is half way up). Not at the
-		// top: the cap's own beat calls RampFog too, after the climb is over.
-		if (!_climbFired && !_calledAtFoot) { _calledAtFoot = true; PlayCall("medium", -4f); }
+		// (the radio's "Don't go up." and the stairs' first call wait until they're under the stairs, UnderTheStairs:
+		// 2026-10-13, both came here, at the fog's edge 70 m out)
+		_askUnder = ask;
+	}
+
+	private Area3D _underZone;
+	private bool _askUnder;
+
+	/// <summary>Under the stairs, at the foot of the flight: the radio says "Don't go up." (when they walked here: not on a
+	/// Continue that lands inside the fog) and the stairs call once from up in the fog (the second time is half way up).
+	/// Not after the cap is placed.</summary>
+	private void UnderTheStairs()
+	{
+		if (_underZone == null || _climbFired) return;
+		_underZone.QueueFree();
+		_underZone = null;
+		if (_fogZone != null) RampFog(_fogLineArmed);   // (in from a side the fog zone somehow missed)
+		if (_askUnder) _ = Cutscene.Run(this, ct => Ask("\"Don't go up.\"", ct));
+		if (!_calledAtFoot) { _calledAtFoot = true; PlayCall("medium", -4f); }
 	}
 
 	/// <summary>
