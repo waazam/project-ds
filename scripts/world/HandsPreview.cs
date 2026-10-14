@@ -190,6 +190,11 @@ public partial class HandsPreview : Node3D
 			var holder = new Node3D();
 			cam.AddChild(holder);
 			holder.AddChild(m);
+			// in its hand, as it's held (the spec's place in the grip; the hand's turn left out so it's seen square)
+			var spec = HeldModels.SpecOf(k);
+			m.Position = spec.ItemAt;
+			m.RotationDegrees = spec.ItemTurn;
+			if (FirstPersonHand.Create(HandSide.Right, spec.Pose) is { } hand) holder.AddChild(hand);
 			float dist = k is ToolKind.Axe or ToolKind.Crowbar ? 0.75f : k is ToolKind.Lighter ? 0.18f : k is ToolKind.Hammer or ToolKind.Knife or ToolKind.NewelPost ? 0.42f : 0.3f;
 			float mid = k is ToolKind.Axe ? 0.2f : k is ToolKind.Crowbar ? 0.05f : k is ToolKind.Hammer or ToolKind.Knife ? 0.06f : k is ToolKind.Radio ? 0.03f : 0f;
 			holder.Position = new Vector3(0, -mid, -dist);

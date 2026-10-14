@@ -8,7 +8,7 @@ namespace ProjectDS.Player;
 /// <summary>
 /// The things the right hand holds, built for being held (2026-10-13j, the owner: "create objects that look good and fit
 /// in the hands correctly and face the correct way"). Each is modelled on the real thing at its real size, in grip
-/// space (<see cref="IFirstPersonHand.Socket"/>: the origin in the middle of the closed fist, the handle up +Y through
+/// space (<see cref="FirstPersonHand"/>'s socket: the origin in the middle of the closed fist, the handle up +Y through
 /// it, -Z forward, away from the eye), and worn the way a found thing is worn: oiled and grimy where it's held, scale on
 /// the forged steel, a honed edge catching the light, scuffed leatherette, a rusted bar.
 /// <list type="bullet">
@@ -39,23 +39,29 @@ public static class HeldModels
 	/// where the thing sits in the hand (grip space).</summary>
 	public sealed class Spec
 	{
-		public HandPose Pose = HandPose.ToolGrip;
+		public HandPose Pose = HandPose.Stick;
 		public Vector3 HandAt = new(0.24f, -0.26f, -0.46f);
 		public Vector3 HandTurn;
 		public Vector3 ItemAt;
 		public Vector3 ItemTurn;
 	}
 
+	/// <summary>The hand's Stick pose closes with its knuckles toward its own -X (the forearm off along +X, the back of the
+	/// hand to +Z): a tool's working end (the bit, the face, the claw, the edge) turned that way leads with the knuckles, as
+	/// in a real grip. The hand's turn (yaw -60) then brings the knuckles round to forward and a little in, the forearm
+	/// back to the lower right, and the back of the hand (never the palm) to the eye.</summary>
+	private static readonly Vector3 KnucklesWay = new(0f, 90f, 0f);
+
 	public static Spec SpecOf(ToolKind kind) => kind switch
 	{
-		ToolKind.Camera => new Spec { Pose = HandPose.CameraHold, HandAt = new(0.2f, -0.22f, -0.42f), HandTurn = new(-6f, -38f, 4f), ItemAt = new(-0.052f, 0.012f, 0.004f) },
-		ToolKind.Axe => new Spec { HandAt = new(0.25f, -0.29f, -0.44f), HandTurn = new(-30f, -36f, 10f) },
-		ToolKind.Hammer => new Spec { HandAt = new(0.24f, -0.27f, -0.43f), HandTurn = new(-26f, -36f, 10f) },
-		ToolKind.Crowbar => new Spec { HandAt = new(0.25f, -0.3f, -0.45f), HandTurn = new(-20f, -36f, 9f) },
-		ToolKind.Knife => new Spec { HandAt = new(0.23f, -0.25f, -0.44f), HandTurn = new(-36f, -40f, 6f) },
-		ToolKind.Lighter => new Spec { Pose = HandPose.SmallGrip, HandAt = new(0.19f, -0.21f, -0.4f), HandTurn = new(-6f, -30f, 4f), ItemAt = new(0f, 0.012f, 0f) },
-		ToolKind.Radio => new Spec { Pose = HandPose.SmallGrip, HandAt = new(0.2f, -0.26f, -0.42f), HandTurn = new(-10f, -20f, 6f), ItemAt = new(0f, 0.03f, 0.004f), ItemTurn = new(0f, -60f, 0f) },   // (its speaker turned to the eye)
-		ToolKind.NewelPost => new Spec { HandAt = new(0.25f, -0.37f, -0.56f), HandTurn = new(-12f, -30f, 6f) },
+		ToolKind.Camera => new Spec { Pose = HandPose.Camera, HandAt = new(0.2f, -0.22f, -0.42f), HandTurn = new(-6f, -10f, 4f), ItemAt = new(-0.06f, 0.01f, 0f) },
+		ToolKind.Axe => new Spec { HandAt = new(0.25f, -0.26f, -0.46f), HandTurn = new(-24f, -72f, 8f), ItemTurn = KnucklesWay },
+		ToolKind.Hammer => new Spec { HandAt = new(0.24f, -0.24f, -0.44f), HandTurn = new(-22f, -72f, 8f), ItemTurn = KnucklesWay },
+		ToolKind.Crowbar => new Spec { HandAt = new(0.25f, -0.27f, -0.46f), HandTurn = new(-18f, -72f, 8f), ItemTurn = KnucklesWay },
+		ToolKind.Knife => new Spec { HandAt = new(0.23f, -0.25f, -0.44f), HandTurn = new(-36f, -60f, 6f), ItemTurn = KnucklesWay },
+		ToolKind.Lighter => new Spec { Pose = HandPose.Stick, HandAt = new(0.19f, -0.21f, -0.4f), HandTurn = new(-6f, -60f, 4f), ItemAt = new(0f, 0.012f, 0f), ItemTurn = KnucklesWay },
+		ToolKind.Radio => new Spec { Pose = HandPose.Stick, HandAt = new(0.21f, -0.22f, -0.44f), HandTurn = new(-8f, -60f, 6f), ItemAt = new(0f, 0.045f, 0f), ItemTurn = new(0f, -30f, 0f) },   // (its speaker turned to the eye)
+		ToolKind.NewelPost => new Spec { HandAt = new(0.26f, -0.31f, -0.62f), HandTurn = new(-10f, -66f, 6f), ItemTurn = KnucklesWay },
 		_ => new Spec(),
 	};
 
@@ -638,6 +644,14 @@ public static class HeldModels
 		var last = rings[^1].C;
 		rings.Add(new(last + new Vector3(0, -0.016f, -0.002f), 0.0124f, 0.004f));
 		ItemMeshes.Loft(k, rings, 6, true, false, Vector3.Right, 6f);
+		// where it's held: a wrap of old black friction tape, fat enough for the fist to close round (the bar alone is 2 cm)
+		k.Mat(Rubber); k.Color = new Color(1.3f, 1.25f, 1.2f);
+		for (int i = 0; i < 9; i++)
+		{
+			float y0 = -0.072f + i * 0.016f;
+			Turn(k, Vector3.Zero, Vector3.Up, new[] { new Vector2(0.0098f, y0 - 0.001f), new Vector2(0.0142f, y0 + 0.001f), new Vector2(0.0146f, y0 + 0.009f), new Vector2(0.0141f, y0 + 0.0165f), new Vector2(0.0098f, y0 + 0.0175f) }, 12, false, false, 20f);
+		}
+		k.Mat(RustIron); k.Color = Colors.White;
 		// the claw's two prongs either side of the nail slot
 		foreach (float s in new[] { -1f, 1f })
 		{

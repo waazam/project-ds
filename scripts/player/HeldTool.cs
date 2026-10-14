@@ -4,7 +4,7 @@ namespace ProjectDS.Player;
 
 /// <summary>
 /// What the right hand holds, seen (2026-10-13j; see <see cref="PlayerHands"/>): the chosen thing
-/// (<see cref="PlayerInventory.InHand"/>) in a right hand (<see cref="IFirstPersonHand"/>), its model from
+/// (<see cref="PlayerInventory.InHand"/>) in the right hand (<see cref="FirstPersonHand"/>), its model from
 /// <see cref="HeldModels"/>, held where and how its <see cref="HeldModels.Spec"/> says. A switch lowers the old thing out of
 /// the bottom of the view (rolling away a little as it goes), swaps it, and raises the new one (rolling in), a quarter of a
 /// second each way, with the stride's bob and the view's lag of every held thing (<see cref="HeldItem"/>). The camera,
@@ -17,7 +17,8 @@ public partial class HeldTool : HeldItem
 	private ToolKind _shown = ToolKind.None;
 	private HeldModels.Spec _spec = HeldModels.SpecOf(ToolKind.None);
 	private Node3D _pivot, _model;
-	private IFirstPersonHand _hand;
+	private Node3D _grip;   // (the hand's socket: the hand and the thing in it, turned as the spec says)
+	private FirstPersonHand _hand;
 	private OmniLight3D _fill;
 	private bool _ready;
 	private CameraTool _camTool;
@@ -26,7 +27,7 @@ public partial class HeldTool : HeldItem
 	/// <summary>For tests: what's built in the hand now, and whether it's up.</summary>
 	public ToolKind Shown => _shown;
 	public bool Ready(ToolKind kind) => _shown == kind && Raise > 0.9f;
-	public IFirstPersonHand Hand => _hand;
+	public FirstPersonHand Hand => _hand;
 	public Node3D Model => _model;
 
 	protected override Vector3 Rest => _spec.HandAt;
@@ -65,21 +66,23 @@ public partial class HeldTool : HeldItem
 
 	private void Dress(ToolKind kind)
 	{
-		if (_hand != null) { _hand.Root.QueueFree(); _hand = null; }
+		if (_grip != null) { _pivot.RemoveChild(_grip); _grip.QueueFree(); _grip = null; _hand = null; }
 		_model = null;
 		_shown = kind;
 		_spec = HeldModels.SpecOf(kind);
 		if (kind == ToolKind.None) return;
-		_hand = FirstPersonHands.Create(HandSide.Right, _spec.Pose);
-		_pivot.AddChild(_hand.Root);
+		_grip = new Node3D { Name = "Grip", RotationDegrees = _spec.HandTurn };
+		_pivot.AddChild(_grip);
+		_hand = FirstPersonHand.Create(HandSide.Right, _spec.Pose);
+		if (_hand != null) _grip.AddChild(_hand);
 		_model = HeldModels.Build(kind);
 		if (_model != null)
 		{
 			_model.Position = _spec.ItemAt;
 			_model.RotationDegrees = _spec.ItemTurn;
-			_hand.Socket.AddChild(_model);
+			_grip.AddChild(_model);
 		}
-		_hand.Root.RotationDegrees = _spec.HandTurn;
+		TrackHands();
 		SetLayer(this);
 		foreach (var n in FindChildren("*", "GeometryInstance3D", true, false))
 			((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -92,7 +95,7 @@ public partial class HeldTool : HeldItem
 
 	protected override void Animate(float dt)
 	{
-		if (_hand == null) return;
+		if (_grip == null) return;
 		var target = Target;
 		if (target != _lastTarget) { _lastTarget = target; PlayerHands.Sound(this, "cloth", 4, -20f); }
 		// the switch: it rolls in from below and rolls away as it goes (the wrist turning, not a slide)
@@ -104,8 +107,8 @@ public partial class HeldTool : HeldItem
 		float e = Mathf.SmoothStep(0f, 1f, eye);
 		Hold = Rest.Lerp(new Vector3(0.05f, -0.06f, -0.2f), e);
 		turn = turn.Lerp(new Vector3(0f, 0f, 0f), e);
-		_hand.Root.RotationDegrees = turn;
-		_hand.Root.Visible = eye < 0.55f;
+		_grip.RotationDegrees = turn;
+		_grip.Visible = eye < 0.55f;
 		// the walkie's LED: alive from the bunker's door on
 		if (_shown == ToolKind.Radio && _model != null)
 			HeldModels.SetLed(_model, Systems.StoryManager.Instance is { } s && s.Current >= Systems.Checkpoint.Act10WalkieFound);

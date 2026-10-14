@@ -236,6 +236,52 @@ public partial class Playtest
 		Check("the axe breaks the boards, and is used up", cabin.IsOpen && !Inv.HasTool(ToolKind.Axe));
 	}
 
+	// ------------------------------------------------------------------ the creek, not by the bridge
+
+	/// <summary>
+	/// (2026-10-13, Dan: events must fire "even if character doesnt cross the bridge") Over the creek well beside the
+	/// footbridge, never touching its deck: from the near bank <paramref name="offset"/> m to one side of it, wading
+	/// straight across; if the water or the banks stop the bot, a teleport to the far bank (a jump, a way round) stands
+	/// in for it. Returns how it got over ("waded" / "teleported").
+	/// </summary>
+	private async Task<string> CrossCreekBesideBridge(Footbridge fb, System.Func<bool> done, CancellationToken ct, float offset = 14f)
+	{
+		var t = Terrain;
+		Require("the footbridge and its creek", fb != null && t != null && fb.HasCrossingLine);
+		t.TrailDistance(fb.GlobalPosition.X, fb.GlobalPosition.Z, out float sb);
+		Vector3 c = t.TrailPoint(sb, out Vector3 dir);
+		Vector3 side = dir.Cross(Vector3.Up).Normalized() * offset;
+		// (whichever side of the bridge the creek runs straight across; in the Hollow it bends away right at the bridge)
+		if (fb.IsAcross(c - dir * 9f + side) || !fb.IsAcross(c + dir * 9f + side)) side = -side;
+		Vector3 from = c - dir * 9f + side, to = c + dir * 9f + side;
+		Check("the start, beside the bridge, is on the near side of the creek", !fb.IsAcross(from), $"{from}");
+		Check("the goal, beside the bridge, is on the far side", fb.IsAcross(to), $"{to}");
+		await _bot.Teleport(from, to, ct);
+		await _bot.WalkTo(to, 1.5f, ct, done, giveUp: 6f);
+		await _bot.Frames(15, ct);
+		if (done()) return "waded";
+		await _bot.Teleport(to, to + dir * 5f, ct);
+		await _bot.Frames(15, ct);
+		return "teleported";
+	}
+
+	/// <summary>Act 6 by the water: checkpoint 5, the compass and the clearing's turn without setting foot on the bridge.</summary>
+	private async Task Act6Creek(CancellationToken ct)
+	{
+		await Control(ct, 40);
+		var fb = _bot.FirstOf<Footbridge>();
+		var deck = _bot.FirstOf<BridgeCrossEvent>();
+		string how = await CrossCreekBesideBridge(fb, () => Story.Current >= Checkpoint.Act6BridgeCrossed, ct);
+		await _bot.WaitUntil(() => Story.Current >= Checkpoint.Act6BridgeCrossed, 4, ct);
+		Check($"checkpoint 5 across the creek beside the bridge ({how})", Story.Current == Checkpoint.Act6BridgeCrossed, $"{Story.Current}");
+		Check("never on the deck", deck == null || StoryBeat.PlayerInside(deck) == null);
+		CheckObjective("the compass points at the clearing", "stairs_clearing_marker");
+		var act6 = _bot.FirstOf<Act6ClearingEvent>();
+		await _bot.WaitUntil(() => act6 != null && act6.LoopVoiceCount >= 1, 12, ct);
+		Check("across the creek the voice calls all the same", act6 != null && act6.VoiceCalling && act6.LoopVoiceCount >= 1);
+		Shot("creek");
+	}
+
 	// ------------------------------------------------------------------ Act 6
 
 	private async Task Act6(CancellationToken ct)

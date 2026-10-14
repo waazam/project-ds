@@ -11,6 +11,7 @@ namespace ProjectDS.World;
 /// test-output/body/. Not used by the game.
 ///
 ///     Godot --path . --resolution 1280x720 res://scenes/levels/body_preview.tscn
+///     Godot --path . --resolution 1280x720 res://scenes/levels/body_preview.tscn -- --hand=after   (the lantern's hand only)
 /// </summary>
 public partial class BodyPreview : Node3D
 {
@@ -21,9 +22,128 @@ public partial class BodyPreview : Node3D
 
 	public override void _Ready()
 	{
-		_dir = ProjectSettings.GlobalizePath("res://test-output/body");
+		// (2026-10-13d) `-- --hand[=tag]`: the lantern's hand alone, from the eye and close up, in light and dark, flame and
+		// blacklight, still, walking and running, looking up and down; shots to test-output/hand/<tag>/
+		string hand = null;
+		foreach (var a in OS.GetCmdlineUserArgs())
+			if (a == "--hand") hand = "now";
+			else if (a.StartsWith("--hand=")) hand = a.Substring(7);
+		_dir = ProjectSettings.GlobalizePath(hand != null ? $"res://test-output/hand/{hand}" : "res://test-output/body");
 		DirAccess.MakeDirRecursiveAbsolute(_dir);
-		_ = Run();
+		if (hand == "poses") { _ = RunPoses(); return; }
+		_ = hand != null ? RunHand() : Run();
+	}
+
+	/// <summary>(`-- --hand=poses`) Every <see cref="FirstPersonHand"/> pose, both sides, seen from about where the eye would
+	/// be, lit by a warm lamp close by and then in the dark under it alone.</summary>
+	private async Task RunPoses()
+	{
+		await Frames(10);
+		if (GetTree().GetFirstNodeInGroup("player") is PlayerController pc) pc.ProcessMode = ProcessModeEnum.Disabled;
+		var sun = GetNodeOrNull<DirectionalLight3D>("../Sun");
+		var env = GetNodeOrNull<WorldEnvironment>("../WorldEnvironment")?.Environment;
+		var cam = new Camera3D { Name = "PoseCam", Fov = 34f, Near = 0.02f };
+		AddChild(cam);
+		cam.MakeCurrent();
+		var lamp = new OmniLight3D { LightColor = new Color(1f, 0.66f, 0.36f), LightEnergy = 0.5f, OmniRange = 1.2f, OmniAttenuation = 1.5f };
+		AddChild(lamp);
+		var rim = new OmniLight3D { LightColor = new Color(0.58f, 0.66f, 0.82f), LightEnergy = 0.45f, OmniRange = 1.1f };
+		AddChild(rim);
+		foreach (bool dark in new[] { false, true })
+		{
+			if (sun != null) sun.Visible = !dark;
+			if (env != null) { env.AmbientLightEnergy = dark ? 0.02f : 0.6f; env.BackgroundColor = dark ? new Color(0.01f, 0.01f, 0.012f) : new Color(0.32f, 0.36f, 0.34f); }
+			foreach (HandPose pose in System.Enum.GetValues(typeof(HandPose)))
+				foreach (HandSide side in new[] { HandSide.Left, HandSide.Right })
+				{
+					var h = FirstPersonHand.Create(side, pose);
+					if (h == null) { Check($"{side} {pose} model", false); continue; }
+					var at = new Vector3(0, 20f, 0);
+					h.Position = at;
+					AddChild(h);
+					float sx = side == HandSide.Left ? 1f : -1f;
+					var eye = pose == HandPose.Handle ? new Vector3(0.23f, 0.07f, 0.64f) : new Vector3(0.22f, 0.13f, 0.55f);
+					cam.Position = at + new Vector3(eye.X * sx, eye.Y, eye.Z) * 0.55f;
+					cam.LookAt(at + new Vector3(-0.012f * sx, 0.01f, 0.02f));
+					lamp.Position = at + new Vector3(0.03f * sx, -0.12f, 0.06f);
+					rim.Position = at + new Vector3(0.28f * sx, 0.32f, 0.22f);
+					await Frames(4);
+					Shot($"pose_{pose}_{side}{(dark ? "_dark" : "")}".ToLowerInvariant());
+					h.QueueFree();
+					await Frames(1);
+				}
+		}
+		GD.Print($"[body] done: {_fails} failed");
+		GetTree().Quit(_fails == 0 ? 0 : 1);
+	}
+
+	private static T Find<T>(Node n) where T : class
+	{
+		if (n is T t) return t;
+		foreach (var c in n.GetChildren()) if (Find<T>(c) is { } f) return f;
+		return null;
+	}
+
+	/// <summary>The lantern's hand: from the eye, and close (a narrow camera at the eye, aimed at the fist).</summary>
+	private async Task RunHand()
+	{
+		await Frames(10);
+		_p = GetTree().GetFirstNodeInGroup("player") as PlayerController;
+		_in = _p?.PlayerInput;
+		if (_p == null) { GetTree().Quit(1); return; }
+		_in.Scripted = true;
+		_p.Teleport(new Vector3(0, 0.05f, 6f), 0f);
+		_p.Inventory?.TryPickup(ToolKind.Lantern);
+		var sun = GetNodeOrNull<DirectionalLight3D>("../Sun");
+		var env = GetNodeOrNull<WorldEnvironment>("../WorldEnvironment")?.Environment;
+		if (sun != null) sun.LightEnergy = 0.25f;
+		await Seconds(1.2);
+		var held = Find<HeldLantern>(_p);
+		var lantern = _p.GetNodeOrNull<Lantern>("Lantern");
+		Check("the lantern's held up", held != null && held.Up);
+		var eye = _p.CameraRig.Camera;
+		var close = new Camera3D { Name = "Close", Fov = 16f, Near = 0.02f };
+		AddChild(close);
+		async Task Both(string name)
+		{
+			Shot(name);
+			var arm = held?.GetNodeOrNull<Node3D>("Arm");
+			if (arm == null) return;
+			close.GlobalTransform = eye.GlobalTransform;
+			close.LookAt(arm.GlobalPosition - eye.GlobalBasis.Y * 0.02f, eye.GlobalBasis.Y);
+			close.MakeCurrent();
+			await Frames(2);
+			Shot(name + "_close");
+			eye.MakeCurrent();
+			await Frames(1);
+		}
+		async Task Set(bool dark, bool uv)
+		{
+			if (sun != null) sun.Visible = !dark;
+			if (env != null) { env.AmbientLightEnergy = dark ? 0.02f : 0.6f; env.BackgroundColor = dark ? new Color(0.01f, 0.01f, 0.012f) : new Color(0.32f, 0.36f, 0.34f); }
+			lantern?.SetBlacklight(uv);
+			await Seconds(0.6);
+		}
+		await Set(false, false);
+		Look(-10f); await Seconds(0.6); await Both("01_light_rest");
+		Look(35f); await Seconds(0.6); await Both("02_light_up");
+		Look(-55f); await Seconds(0.6); await Both("03_light_down");
+		await Set(true, false);
+		Look(-10f); await Seconds(0.6); await Both("04_dark_flame");
+		await Set(true, true);
+		await Both("05_dark_blacklight");
+		await Set(false, true);
+		await Both("06_light_blacklight");
+		await Set(true, false);
+		_in.ScriptedFocus = true; await Seconds(1.0); await Both("07_dark_gathered");
+		_in.ScriptedFocus = false; await Seconds(0.8);
+		await Walk(new Vector2(0, 1), false, 1.7, -10f, "08_dark_walk", 1.5);
+		await Walk(new Vector2(0, -1), true, 1.9, -10f, "09_dark_run", 1.6);
+		await Set(false, false);
+		await Walk(new Vector2(0, 1), true, 1.9, 20f, "10_light_run_up", 1.6);
+		await Walk(new Vector2(0, -1), false, 1.7, -45f, "11_light_walk_down", 1.5);
+		GD.Print($"[body] done: {_fails} failed");
+		GetTree().Quit(_fails == 0 ? 0 : 1);
 	}
 
 	private async Task Frames(int n) { for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }

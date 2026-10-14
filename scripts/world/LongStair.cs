@@ -130,8 +130,8 @@ public partial class LongStair : Node3D
 	{
 		// out through the top room's arch: jambs through its wall's thickness, a floor to the first step
 		var k = new MeshKit();
-		k.Mat(StairwellTextures.CleanMat);
-		k.Color = new Color(0.8f, 0.8f, 0.8f);
+		k.Mat(RoundRoom.TopStone);   // (the top room's own stone, its arch's thickness: 2026-10-13c)
+		k.Color = Colors.White;
 		foreach (float s in new[] { -1f, 1f })
 			Solid(k, _concrete, new Vector3(s * (HalfW + 0.45f), Head * 0.5f, (4.5f + StartZ) * 0.5f), new Vector3(0.9f, Head, StartZ - 4.5f));
 		Solid(k, _concrete, new Vector3(0, -0.012f - 0.1f, (4.75f + StartZ) * 0.5f), new Vector3(HalfW * 2f, 0.2f, StartZ - 4.75f));

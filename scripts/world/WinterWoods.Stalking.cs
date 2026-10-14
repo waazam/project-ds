@@ -40,6 +40,7 @@ public partial class WinterWoods
 	public int Mimics { get; private set; }
 	public int StalkSteps { get; private set; }
 
+	private int _firstDeferred;   // the first appearance put off (in view) this many times
 	private double _stalkClock, _nextAppear = 22, _nextVoice = 40, _watchUntil, _seenAt = -1, _nextStep, _stepBurstEnd;
 	private int _stepsLeft;
 	private float _closer;
@@ -129,11 +130,21 @@ public partial class WinterWoods
 		{
 			// ahead down the road, standing in the middle of it, at the edge of the murk (in the pale haze now: a dark
 			// shape in it, 24 m off)
-			var at = RoadAt(Mathf.Min(s + 24f, Length - 60f), out _);
-			var world = ToGlobal(at);
-			if (Seen(cam, world + Vector3.Up * 2.4f, 50f)) { _nextAppear = _stalkClock + 2; return false; }   // wait until they're not looking that way
-			Place(world, player.GlobalPosition);
-			return true;
+			// (2026-10-13, the skippable-events audit) a player who keeps looking straight down the road kept putting it off,
+			// on a straight possibly to the road's end, and with it every stalking glimpse after: after a few tries it takes
+			// a spot further off in the murk (or round the next bend) that isn't in view
+			float[] ahead = _firstDeferred < 3 ? new[] { 24f } : new[] { 24f, 38f, 52f, 66f };
+			foreach (float a in ahead)
+			{
+				var at = RoadAt(Mathf.Min(s + a, Length - 60f), out _);
+				var world = ToGlobal(at);
+				if (Seen(cam, world + Vector3.Up * 2.4f, 50f)) continue;
+				Place(world, player.GlobalPosition);
+				return true;
+			}
+			_firstDeferred++;
+			_nextAppear = _stalkClock + 2;   // wait until they're not looking that way
+			return false;
 		}
 		// behind: a tree 16-40 m back (a little closer each time it gets away unseen), off the road, in a clear line
 		float near = Mathf.Max(12f, 16f - _closer), far = Mathf.Max(near + 8f, 28f - _closer);

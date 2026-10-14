@@ -123,7 +123,8 @@ public partial class FrogChorus : Node3D
 }
 
 /// <summary>Moths at the lantern on a summer night in the woods: two or three, circling its glass, darting, batting at
-/// it. Only while it's lit, outdoors, in the summer woods, and not in the rain.</summary>
+/// it. Only while it's lit, outside (no room, hall, tunnel or cellar), in the summer woods, and not in the rain. Small: about the
+/// size of a real moth (2026-10-13, the owner: "make the bugs around the lantern smaller").</summary>
 public partial class LanternMoths : Node3D
 {
 	private readonly MeshInstance3D[] _moths = new MeshInstance3D[3];
@@ -131,6 +132,7 @@ public partial class LanternMoths : Node3D
 	private float _t, _shown;
 	private PlayerController _player;
 	private Lantern _lantern;
+	private ForestAtmosphere _atmo;
 
 	public static bool Season => StoryManager.Instance is { } s && s.Current >= Checkpoint.Act2StairsClimbed && s.Current < Checkpoint.Act12LakeCrossed
 		&& !(Audio.ForestAmbienceManager.Instance?.IsIndoor ?? false) && (RainVfx.Instance?.Intensity ?? 0f) < 0.2f;
@@ -145,10 +147,10 @@ public partial class LanternMoths : Node3D
 		};
 		for (int i = 0; i < _moths.Length; i++)
 		{
-			_moths[i] = new MeshInstance3D { Name = $"Moth{i}", Mesh = new QuadMesh { Size = new Vector2(0.035f, 0.025f) }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
+			_moths[i] = new MeshInstance3D { Name = $"Moth{i}", Mesh = new QuadMesh { Size = new Vector2(0.018f, 0.013f) }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
 			AddChild(_moths[i]);
 			_phase[i] = i * 2.1f;
-			_r[i] = 0.16f + 0.07f * i;
+			_r[i] = 0.13f + 0.05f * i;
 			_speed[i] = 3.2f + 0.9f * i;
 		}
 		TopLevel = true;
@@ -159,8 +161,13 @@ public partial class LanternMoths : Node3D
 		float dt = (float)delta;
 		_t += dt;
 		_lantern ??= _player?.GetNodeOrNull<Lantern>("Lantern");
-		bool want = _lantern is { IsOn: true, Blacklight: false } && Season;
-		_shown = Mathf.MoveToward(_shown, want ? 1f : 0f, dt * 0.25f);
+		// outside only (Dan, 2026-10-13: "only when outside"): not in any room, hall, tunnel or underground, not only where an
+		// IndoorZone is (the cabin and the bunker had one; the shed, the station and the tunnels did not)
+		_atmo ??= GetTree().GetFirstNodeInGroup("atmosphere") as ForestAtmosphere;
+		bool outside = _atmo == null || (_atmo.Enclosed < 0.5f && _atmo.Interior < 0.5f && _atmo.Underground < 0.5f);
+		bool want = _lantern is { IsOn: true, Blacklight: false } && Season && outside;
+		// (gone at once on stepping in; back slowly outside)
+		_shown = Mathf.MoveToward(_shown, want ? 1f : 0f, dt * (want ? 0.25f : 2f));
 		int n = Mathf.Clamp(Mathf.CeilToInt(_shown * 3f - 0.01f), 0, 3);
 		var centre = _lantern?.HeldFlameAt ?? (_player?.GlobalPosition + Vector3.Up * 1.1f) ?? GlobalPosition;
 		for (int i = 0; i < _moths.Length; i++)

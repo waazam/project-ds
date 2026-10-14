@@ -66,9 +66,10 @@ public partial class HeldLantern : HeldItem
 		_model = new Node3D { Name = "Model", Position = new Vector3(0, -HangDrop, 0), Scale = Vector3.One * ModelScale };
 		_swing.AddChild(_model);
 		ItemMeshes.LanternBailRise = BailRise;
+		ItemMeshes.LanternBailGrip = true;   // (2026-10-13d: a wooden grip on the bail, the fist round it)
 		ItemMeshes.Built built;
 		try { built = ItemMeshes.Build(ToolKind.Lantern, _model); }
-		finally { ItemMeshes.LanternBailRise = 0.1f; }
+		finally { ItemMeshes.LanternBailRise = 0.1f; ItemMeshes.LanternBailGrip = false; }
 		if (built.Glow != null) { built.Glow.QueueFree(); }   // (the lantern's own light is the real one)
 		foreach (var c in _model.GetChildren())
 			if (c is MeshInstance3D mi && mi.Mesh != null)
@@ -106,7 +107,7 @@ public partial class HeldLantern : HeldItem
 	/// and the jacket's sleeve reaching back from the wrist toward the body, out of the view's lower left corner.</summary>
 	private static void BuildBailGrip(Node3D parent)
 	{
-		if (BuildArm(parent, "fp_arm_bail_L", Vector3.Zero, 1.1f) != null) return;   // (the modelled one: one skin, no seams)
+		if (BuildArm(parent, HandSide.Left, HandPose.Handle, Vector3.Zero) != null) return;   // (the modelled one: one skin, no seams)
 		var k = new MeshKit();
 		k.Mat(new StandardMaterial3D { ResourceName = "glove", AlbedoColor = new Color(0.09f, 0.075f, 0.065f), Roughness = 0.85f, MetallicSpecular = 0.15f });
 		k.Color = Colors.White;
@@ -178,7 +179,7 @@ public partial class HeldLantern : HeldItem
 		}
 		_swing.Rotation = new Vector3(_ang.X, 0f, _ang.Y);
 		// the wrist giving a little with the lantern's swing (the hand isn't a clamp: it rides the weight)
-		if (GetNodeOrNull<Node3D>("Arm") is { } arm) arm.Rotation = new Vector3(_ang.X * 0.22f, 0f, _ang.Y * 0.18f);
+		if (GetNodeOrNull<Node3D>("Arm") is { } arm) arm.Rotation = new Vector3(_ang.X * 0.1f, 0f, _ang.Y * 0.08f);   // (2026-10-13d: a firm wrist, "more strong": was 0.22 and 0.18)
 		// the flame's light from its glass; the violet bulb with the blacklight
 		if (_model.GetNodeOrNull<MeshInstance3D>("UvBulb") is { } uv) uv.Visible = _lantern.Blacklight;
 		AmberGlass.Emission = _lantern.Blacklight ? new Color(0.4f, 0.15f, 0.9f) : new Color(1f, 0.52f, 0.2f);

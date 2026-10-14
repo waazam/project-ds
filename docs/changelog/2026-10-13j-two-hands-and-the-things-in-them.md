@@ -113,14 +113,27 @@ way, look up pictures if needed".
   - The world's lamps are kept off them, as before.
 - **Motion:** they bob with the stride and lag behind the view's turns, the same as the lantern (`HeldItem`).
 
-## The hand (`HandRig.cs`): waiting on the new one
-- The held things are built against a small interface, `IFirstPersonHand`, which has a `Side`, a `Pose`, a `Root` and a
-  `Socket`. A hand comes from `FirstPersonHands.Factory`.
-- **For now it's the Blender fist** (`LegacyHand`: `fp_arm_fist_R`, mirrored for the left), with its socket turned to
-  its knuckles.
-- **Each thing's hold is data** (`HeldModels.SpecOf`: the pose, where the hand is and how it's turned, and where the
-  thing sits in it). That's so the realistic hand being built alongside (grip poses for the lantern's bail, the camera,
-  a flare or tool, and relaxed) can be plugged in and the holds re-tuned.
+## In the real hands (`FirstPersonHand`, merged from the hand rebuild)
+- **Every right-hand thing is in the gloved hand.**
+  - The camera is in its Camera pose: the fingers round its front edge, the thumb up its back, by the right end.
+  - Everything else is in the Stick pose: the handle runs up through the fist along the pose's grip axis, so the
+    fingers close round it, not in front of it.
+- **Which way they face:** each tool's working end is turned toward the fist's knuckles (`KnucklesWay`), so the bit,
+  the face, the claw and the edge lead as in a real grip. The hand is then turned (yaw -72 for the long tools) so the
+  knuckles face forward and a little in, the forearm runs back to the lower right, and the back of the hand faces the
+  eye, never the palm.
+- **The crowbar** has a wrap of black friction tape where it's held. The bare bar is 2 cm, and the fist closes on 3.2 cm.
+- **The flare** stands upright through the fist, gripped round its lower third. It was tilted 28 degrees against the
+  upright grip; now the hand and the flare tilt out together.
+- **The flamethrower:** the right hand is on the rear pistol grip and the left reaches across to the front grip, its
+  forearm back to the lower left.
+- **Stride and tension:** each hand gets the stride and tension from `HeldItem`, or from the wand (gripped hard while
+  firing or running).
+- Each thing's hold is data (`HeldModels.SpecOf`: the pose, where the hand is and how it's turned, and where the thing
+  sits in it), for re-tuning.
+- **The cap** is gripped by its neck, which is thicker than the Stick pose closes on. It's the one hold that could use a
+  cradling pose later.
+
 
 ## Controls (`GameSettings.RegisterInputActions`, `PlayerInput.cs`, README)
 - **Pad:** RB / LB go next / back round the wheel, and also zoom the camera and turn the album's pages. The blacklight

@@ -40,6 +40,10 @@ public partial class Flamethrower : Node3D
 	private float _lock, _kick, _sway, _pilotT;
 	/// <summary>0 lowered out of view .. 1 up in the hands.</summary>
 	public float WandRaise { get; private set; }
+	/// <summary>How the hands sit on the wand's two grips (tuned to the hand's Stick pose).</summary>
+	public static Vector3 WandGripTurn = new(15f, -20f, 0f);   // (the right: its knuckles along the barrel, the forearm straight back)
+	public static Vector3 WandGripTurnLeft = new(15f, 0f, 0f);   // (the left: reaching across, the forearm back to the lower left)
+	private readonly System.Collections.Generic.List<FirstPersonHand> _hands = new();
 	private AudioStreamPlayer _roar;
 	private OmniLight3D _pilot;
 	private GpuParticles3D _vent;
@@ -79,15 +83,15 @@ public partial class Flamethrower : Node3D
 		if (model != null) model.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
 		// (2026-10-13j) both hands on it: the right round the rear pistol grip, its finger on the trigger; the left round the
 		// front grip under the barrel (the lantern hangs at the belt meanwhile, see PlayerHands)
-		foreach (var (side, at) in new[] { (HandSide.Right, new Vector3(0f, -0.03f, -0.02f)), (HandSide.Left, new Vector3(0f, -0.032f, -0.4f)) })
+		foreach (var (side, at) in new[] { (HandSide.Right, new Vector3(0f, -0.03f, -0.02f)), (HandSide.Left, new Vector3(0.012f, -0.032f, -0.4f)) })
 		{
-			var hand = FirstPersonHands.Create(side, HandPose.ToolGrip);
-			hand.Root.Position = at;
-			// (turned so the knuckles face along the barrel)
-			hand.Root.RotationDegrees = new Vector3(side == HandSide.Right ? 14f : 10f, side == HandSide.Right ? -47f : 47f, 0f);
-			_wand.AddChild(hand.Root);
-			foreach (var n in hand.Root.FindChildren("*", "GeometryInstance3D", true, false))
-				((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+			var hand = FirstPersonHand.Create(side, HandPose.Stick);
+			if (hand == null) continue;
+			hand.Position = at;
+			// (the grips raked back a little, as the pistol grips are)
+			hand.RotationDegrees = side == HandSide.Right ? WandGripTurn : WandGripTurnLeft;
+			_wand.AddChild(hand);
+			_hands.Add(hand);
 		}
 		// (the wand's model runs along -Z, its nozzle's mouth 0.82 m out)
 		_nozzle = new Node3D { Name = "Nozzle", Position = new Vector3(0f, 0.035f, -0.86f) };
@@ -209,6 +213,8 @@ public partial class Flamethrower : Node3D
 			var bob = new Vector3(Mathf.Sin(_sway) * 0.008f, Mathf.Abs(Mathf.Cos(_sway)) * 0.006f, 0f) * Mathf.Clamp(_player.GroundSpeed / 3f, 0f, 1f);
 			var shake = Firing ? new Vector3(Mathf.Sin(_pilotT * 31f), Mathf.Sin(_pilotT * 27f + 1f), 0f) * 0.0018f : Vector3.Zero;
 			float up = Mathf.SmoothStep(0f, 1f, WandRaise);
+			// the hands' own life: a hair's shift with the walk, gripped hard while it fires
+			foreach (var h in _hands) { h.Stride = Mathf.Sin(_sway) * Mathf.Clamp(_player.GroundSpeed / 3f, 0f, 1f); h.Tension = Mathf.Max(_kick, _player.IsRunning ? 1f : 0f); }
 			_wand.Position = WandRest + bob + shake + new Vector3(0f, 0.004f, 0.025f) * _kick + new Vector3(0.05f, -0.42f, 0.12f) * (1f - up);
 			_wand.Rotation = new Vector3(0.03f * _kick - 0.5f * (1f - up), 0.04f, -0.25f * (1f - up));
 			if (_pilot != null) _pilot.LightEnergy = Firing ? 0.8f : 0.25f;

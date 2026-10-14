@@ -2,29 +2,27 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://do1k6rm5o314x"
-path="res://.godot/imported/fp_arm_fist_R_fp_arm_fist_R_albedo.png-c3711314e3edfa7ee716d171c1bb0f5d.ctex"
+uid="uid://cfaicj8c6lbry"
+path.s3tc="res://.godot/imported/flesh_detail_normal.png-b8e887b97e2177e7c86d8d8d452a26c0.s3tc.ctex"
 metadata={
-"vram_texture": false
-}
-generator_parameters={
-"md5": "41ae72461defb7f967f1114f88bd20c1"
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
-source_file="res://assets/models/player/fp_arm_fist_R_fp_arm_fist_R_albedo.png"
-dest_files=["res://.godot/imported/fp_arm_fist_R_fp_arm_fist_R_albedo.png-c3711314e3edfa7ee716d171c1bb0f5d.ctex"]
+source_file="res://assets/textures/creatures/flesh_detail_normal.png"
+dest_files=["res://.godot/imported/flesh_detail_normal.png-b8e887b97e2177e7c86d8d8d452a26c0.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=0
+compress/normal_map=1
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1
@@ -40,4 +38,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
