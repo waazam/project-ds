@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-13 — The gloved hand: a real fist on a wooden grip (each finger one smooth skin, bent to the grip, the little finger tightest; a full thumb over them; tendons, knuckles, creases, seams and worn leather), a strong straight wrist, a hair of life on the grip; one reusable FirstPersonHand, left or right, in four poses (handle, stick, camera, relaxed)](2026-10-13d-the-gloved-hand.md)
 - [2026-10-13 — Polish pass: the outline (sound, weather, look, the player, story beats and puzzles, performance, bugs, tests, docs, in one page)](2026-10-13-polish-pass-outline.md)
 - [2026-10-13 — Shorter stairs and halls, and running always gets you there: every long walk timed walking and running; the stairwell 20 turns (was 30) with its sprint loop-back gone from the code; the narrow corridor 120 m and the red-light hall 330 m (red light, green light unchanged); the long stair 16 flights (was 52), the church and everything after it brought down to match](2026-10-13-shorter-stairs-and-halls.md)
 - [2026-10-13 — The lag pass: a meter for every frame (the old logger's 150 ms were the engine's cap; the giant's first step was 3.2 s); the giant, the crawler, the lake thing, the bunker's scare, the pursuer, the clock and the dining tables made or warmed ahead of their moments; a late save no longer fading in mid-build; the sound director's and the body's per-frame garbage gone](2026-10-13-the-lag-pass.md)

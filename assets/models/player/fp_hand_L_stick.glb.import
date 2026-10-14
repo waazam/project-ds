@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://c1enson2shavo"
-path="res://.godot/imported/fp_arm_bail_L.glb-fadc548b5e9720cafcbd2b09487103b8.scn"
+uid="uid://bd0f77p3pdjdc"
+path="res://.godot/imported/fp_hand_L_stick.glb-ffeb6bbe974458da92733f90a2a8442f.scn"
 
 [deps]
 
-source_file="res://assets/models/player/fp_arm_bail_L.glb"
-dest_files=["res://.godot/imported/fp_arm_bail_L.glb-fadc548b5e9720cafcbd2b09487103b8.scn"]
+source_file="res://assets/models/player/fp_hand_L_stick.glb"
+dest_files=["res://.godot/imported/fp_hand_L_stick.glb-ffeb6bbe974458da92733f90a2a8442f.scn"]
 
 [params]
 
