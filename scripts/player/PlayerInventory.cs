@@ -93,7 +93,7 @@ public partial class PlayerInventory : Node
 		if (_tools.Remove(kind)) Changed();
 	}
 
-	/// <summary>Takes the camera away (no longer used by the story: it stays with the player all game).</summary>
+	/// <summary>Takes the camera away. It stays with the player all game; only Act 25's endings take it (EndingDirector: the camera lifted back into the trunk).</summary>
 	public void TakeAwayCamera()
 	{
 		if (!HasCamera) return;

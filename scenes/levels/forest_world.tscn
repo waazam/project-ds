@@ -710,7 +710,6 @@ CrownFrom = 0.55
 script = ExtResource("27_friendtrail")
 Waypoints = PackedVector2Array(-1.5, -462.2, 4, -461.8, 9.5, -462.6, 12.8, -465.5, 13.5, -471, 18, -486, 24, -502, 29, -516, 31, -527)
 ItemAt = PackedFloat32Array()
-AvoidPath = NodePath("../Terrain/AutotestRoute")
 
 [node name="TreeFalls" type="Node3D" parent="."]
 script = ExtResource("41_treefalls")

@@ -41,7 +41,7 @@ public partial class HollowPreviewDriver : Node
 	private static readonly string[] F2 = { StoryManager.Flag.StairsClimbed };
 	private static readonly string[] F3Storm = F2.Concat(new[] { StoryManager.Flag.StormStarted, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, SafeZoneWatcher.ThingsLineFlag }).ToArray();
 	private static readonly string[] F3Giant = F3Storm.Concat(new[] { StoryManager.Flag.GiantEventDone, StoryManager.Flag.PickupTakenKey }).ToArray();
-	private static readonly string[] F5 = F3Giant.Concat(new[] { StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, CabinReturnEvent.SeenFlag }).ToArray();
+	private static readonly string[] F5 = F3Giant.Concat(new[] { StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe }).ToArray();
 	private static readonly string[] F5Post = F5.Concat(new[] { StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke }).ToArray();
 	private static readonly string[] F6Voice = F5Post.Concat(new[] { StoryManager.Flag.ClearingVoiceHeard }).ToArray();
 	private static readonly string[] F7 = F6Voice.Concat(new[] { StoryManager.Flag.Act6NightFell }).ToArray();
@@ -440,12 +440,10 @@ public partial class HollowPreviewDriver : Node
 	{
 		var cabin = First<Cabin>("cabin");
 		Check(cabin.DoorBoarded && !cabin.IsOpen, "cabin: boarded shut");
-		Check(!StoryManager.Instance.HasFlag(CabinReturnEvent.SeenFlag), "cabin: the boarded-shut thought not seen yet");
 		await Stand(cabin.WideApproachPoint, cabin.DoorCenter);
 		Shot("05_cabin_boarded");
 		await Stand(cabin.ApproachPoint, cabin.DoorCenter);
 		await Seconds(1.6);
-		Check(StoryManager.Instance.HasFlag(CabinReturnEvent.SeenFlag), "cabin: arriving at the door shows \"Boarded shut. From the outside.\" once (flag saved)");
 		Shot("05b_cabin_door_caption");
 		// the shed and the axe
 		var shed = AllOf<Shed>().FirstOrDefault();

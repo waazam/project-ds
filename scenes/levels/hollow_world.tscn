@@ -17,7 +17,6 @@
 [ext_resource type="Script" path="res://scripts/world/Act6ClearingEvent.cs" id="19_act6"]
 [ext_resource type="Script" path="res://scripts/world/Bunker.cs" id="21_bunker"]
 [ext_resource type="Script" path="res://scripts/world/BunkerInterior.cs" id="22_bunkerint"]
-[ext_resource type="Script" path="res://scripts/world/Act7Whispers.cs" id="23_whispers"]
 [ext_resource type="Script" path="res://scripts/world/Act11Ending.cs" id="25_act11"]
 [ext_resource type="Script" path="res://scripts/world/RainVfx.cs" id="26_rainvfx"]
 [ext_resource type="Script" path="res://scripts/world/Camp.cs" id="30_camp"]
@@ -592,9 +591,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -68)
 script = ExtResource("9_clear")
 Radius = 3.2
 ClearFoliage = false
-
-[node name="Act7Whispers" type="Node" parent="."]
-script = ExtResource("23_whispers")
 
 [node name="Lake" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2600, 0, -200)

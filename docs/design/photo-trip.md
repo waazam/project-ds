@@ -9,7 +9,7 @@
 > - **Survives Continue:** each picture is written as `photo_NNN.png` under `user://photos/` (`user://test_photos/` when `GameSettings.AutoTest`) with a line in `index.txt` (`number|subject|wrong`), and read back in `PhotoLog._Ready` when the level was loaded from a save. A new game (checkpoint None or Act1Start, not loaded from a save) empties the folder. The preview harnesses use `user://preview_photos/` (`PhotoLog.FolderOverride`).
 > - **The friend's note** on the info board no longer mentions a list: "Couldn't wait. Gone on ahead up the Blackfern to the old stone steps past the end of the trail. / Get the red one for me if you see it. / Back before dark. — C."
 >
-> Tests: `scenes/levels/photo_preview.tscn` (`PhotoPreviewDriver`): every subject recognised and captioned, a picture of nothing still in the album, the empty album, the album's two pages and the wheel, the black bird, the stairs, the take-away, and a real Continue that brings the album back. `scenes/levels/props_preview.tscn` plays the opening at the car.
+> Tests: `scenes/levels/photo_preview.tscn` (`PhotoPreviewDriver`): every subject recognised and captioned, a picture of nothing still in the album, the empty album, the album's two pages and the wheel, the black bird, the stairs, the take-away, and a real Continue that brings the album back.
 
 Design + implementation plan, 2026-09-21. Read-only analysis; nothing in the project was changed to write this.
 
@@ -17,7 +17,7 @@ The owner's ask: *"I want the beginning to be like a minigame where you're takin
 
 Ground rules kept throughout:
 - The bird beats stay exactly as they are (three cardinal-like birds in red, blue, purple; a fourth black one with a red eye glow whose photo brings a distant scream and empties the flock; the camera is taken away on the first step onto the stairs).
-- No story beat changes (`docs/REWORK_BRIEF.md` lines 5-8). Every story hook below is either pure flavour or explicitly marked as needing Dan's OK.
+- No story beat changes (the 2026-09-21 rework brief, since removed; its outcome is in [changelog 2026-09-21b](../changelog/2026-09-21b-opus-rework.md)). Every story hook below is either pure flavour or explicitly marked as needing Dan's OK.
 - Quiet, diegetic presentation. No busy HUD, no fanfare.
 
 All line numbers are as of 2026-09-21.
@@ -49,7 +49,7 @@ All line numbers are as of 2026-09-21.
 
 - Only two things about the camera persist: the flag `pickup_taken_camera` and `"camera"` in the inventory string (`PlayerInventory.Serialize`, `scripts/player/PlayerInventory.cs:40-49`). Saves are `ConfigFile`s with checkpoint, position, `flags` (comma list) and `inventory` (`scripts/systems/SaveSystem.cs:42-56`).
 - `StoryManager.SetFlag` saves immediately, but only once `Current > Checkpoint.None` (`scripts/systems/StoryManager.cs:203-209, 212-214`). `Act1Start` is reached by `GameFlow.Begin` right after the opening fade (`scripts/systems/GameFlow.cs:76-84`), and `ReachCheckpoint` writes every flag set so far (194-197), so Act 1 flags are safe from the first second of play.
-- **Not stored:** which birds were photographed (`Bird.Photographed`, `Bird.cs:34`, is plain runtime state; `Bird._Ready` never reads the story), the film count (`CameraTool._framesLeft`, lines 37, 50), whether the scream already happened. On Continue at `Act1Start` the player is put back at the spawn marker (`scripts/systems/RespawnPoints.cs:34-35`) with all four birds back and a fresh roll of 24. The black-bird scream can therefore replay. This is a restore-contract gap (`REWORK_BRIEF.md` line 13) independent of this feature; the plan fixes it.
+- **Not stored:** which birds were photographed (`Bird.Photographed`, `Bird.cs:34`, is plain runtime state; `Bird._Ready` never reads the story), the film count (`CameraTool._framesLeft`, lines 37, 50), whether the scream already happened. On Continue at `Act1Start` the player is put back at the spawn marker (`scripts/systems/RespawnPoints.cs:34-35`) with all four birds back and a fresh roll of 24. The black-bird scream can therefore replay. This is a restore-contract gap (the rework brief's restore contract) independent of this feature; the plan fixes it.
 
 ### 1.3 Tests that touch the camera
 
@@ -174,7 +174,7 @@ Blank shots get no print; the counter dropping is the feedback, as today.
 
 - **H1 (flavour, story-safe): the list is the friend's** (option B in 3.1). One header string. Recommended.
 - **H2 (flavour, story-safe): two photos come out wrong.** The black bird's thumbnail is stored darkened to near black with the two eye pixels left red; the stairs' thumbnail is stored with the frame darkened 70% and the page line reads `stairs?` with the film readout under it wrong (`"F--  1/--"`). Deniable, cheap (two branches in `PhotoLog.Record`), and it lands the "the pictures are wrong" note without a single new beat. Recommended, but it is exactly the kind of thing Dan should see and say yes to.
-- **H3 (a new beat, NOT proposed):** finding the friend's own prints of the same subjects later (e.g. inside the cabin in Act 5) would be new Act 5 content. `REWORK_BRIEF.md` forbids that without the lead. Listed only so nobody assumes it is in scope.
+- **H3 (a new beat, NOT proposed):** finding the friend's own prints of the same subjects later (e.g. inside the cabin in Act 5) would be new Act 5 content. The rework brief forbade that without the lead. Listed only so nobody assumes it is in scope.
 
 ### 3.6 The log page
 
@@ -205,7 +205,7 @@ Recommendation: **nothing that leaves the page.** Ticking the ninth listed box w
 
 ### 3.10 Photographs as data
 
-- One flag per subject: `"photo_" + id` (constants `StoryManager.Flag.PhotoPrefix = "photo_"` and `Photo(string id)`; a new `Flag` is the sanctioned way, `REWORK_BRIEF.md` line 14). Twelve flags, all set via `StoryManager.SetFlag`, each an immediate save (`StoryManager.cs:203-209`). `FlagSet` also re-checks story triggers (`scripts/systems/StoryTrigger.cs:43-49, 82-90`); harmless.
+- One flag per subject: `"photo_" + id` (constants `StoryManager.Flag.PhotoPrefix = "photo_"` and `Photo(string id)`; a new `Flag` is the sanctioned way per the rework brief). Twelve flags, all set via `StoryManager.SetFlag`, each an immediate save (`StoryManager.cs:203-209`). `FlagSet` also re-checks story triggers (`scripts/systems/StoryTrigger.cs:43-49, 82-90`); harmless.
 - Film left on Continue = `FilmFrames - (number of photo_* flags)`. Misses are forgiven. Exact film would need a value, and the save format is flags plus one inventory string; appending `;film=N` to `PlayerInventory.Serialize` is possible (old readers ignore a third segment, `PlayerInventory.cs:62`) but not worth the surface area.
 - Thumbnails are never saved. After Continue a ticked line has no print to show, and since prints are only shown at shot time nothing is missing on screen.
 - Birds restore themselves: in `Bird._Ready`, if `photo_bird_<color>` or `photo_bird_black` is set, the bird marks itself `Photographed`, leaves `"photo_birds"` and builds only its perch (no model, no calls). `Bird.cs` currently has no story read at all (lines 51-66). This also stops the scream replaying on Continue.
