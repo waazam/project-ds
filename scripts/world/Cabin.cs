@@ -241,7 +241,7 @@ public partial class Cabin : Node3D
 
 	private void BuildWalls(MeshKit k, List<(Vector3, Vector3, Basis)> cols)
 	{
-		var log = BuildingTextures.LogMat;
+		var log = BuildingTextures.CabinLogMat;
 		var end = BuildingTextures.LogEndMat;
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 977 + 5) };
 		float uLen = LogH * 4f;
@@ -299,8 +299,8 @@ public partial class Cabin : Node3D
 		k.Color = Colors.White;
 
 		// gables on the two side walls (vertical boards), under the roof line
-		k.Mat(BuildingTextures.BoardsMat);
-		k.Color = new Color(0.85f, 0.8f, 0.74f);
+		k.Mat(BuildingTextures.GableBoardsMat);   // (2026-10-14a: grey weathered boards, not the floor's and door's planks)
+		k.Color = new Color(0.9f, 0.88f, 0.85f);
 		foreach (int side in new[] { -1, 1 })
 		{
 			float x = side * Hw;
@@ -328,8 +328,8 @@ public partial class Cabin : Node3D
 	private void BuildRoof(MeshKit k)
 	{
 		var shingle = BuildingTextures.ShingleMat;
-		var boards = BuildingTextures.BoardsMat;
-		var trim = PropTextures.PostMat;
+		var boards = BuildingTextures.SmokedBoardsMat;
+		var trim = BuildingTextures.TimberAlongMat;
 		float rake = Hw + LogT * 0.5f + 0.3f;
 		float cos = 1f / Mathf.Sqrt(1f + Pitch * Pitch), sin = Pitch * cos;
 		const float thick = 0.12f;
@@ -415,9 +415,9 @@ public partial class Cabin : Node3D
 	private void BuildFoundationAndPorch(MeshKit k, List<(Vector3, Vector3, Basis)> cols)
 	{
 		var stone = BuildingTextures.StoneMat;
-		var deck = PropTextures.DeckMat;
-		var post = PropTextures.PostMat;
-		var boards = BuildingTextures.BoardsMat;
+		var deck = BuildingTextures.PorchDeckMat;
+		var post = BuildingTextures.TimberUpMat;
+		var boards = BuildingTextures.GableBoardsMat;
 		float o = Hw + LogT * 0.5f, od = Hd + LogT * 0.5f;
 
 		// stone foundation walls under each log wall, each down to its own lowest ground
@@ -448,7 +448,7 @@ public partial class Cabin : Node3D
 		k.Color = new Color(0.95f, 0.92f, 0.88f);
 		BuildKit.Box(k, new Vector3(0, -0.04f, (z0 + z1) * 0.5f), new Vector3(px * 2f, 0.08f, z1 - z0), 1f / 0.15f, BuildKit.Face.NY | BuildKit.Face.NZ);
 		// rim boards around the deck edge
-		k.Mat(post);
+		k.Mat(BuildingTextures.TimberAlongMat);
 		k.Color = new Color(0.75f, 0.7f, 0.64f);
 		BuildKit.Box(k, new Vector3(0, -0.17f, z1 + 0.02f), new Vector3(px * 2f + 0.04f, 0.26f, 0.04f), 1.4f);
 		foreach (int sx in new[] { -1, 1 })
@@ -487,7 +487,15 @@ public partial class Cabin : Node3D
 			BuildKit.Box(k, new Vector3(x, (g + topY) * 0.5f, postZ), new Vector3(0.14f, topY - g, 0.14f), 1.3f);
 			cols.Add((new Vector3(x, (0.02f + topY) * 0.5f, postZ), new Vector3(0.16f, topY, 0.16f), Basis.Identity));
 		}
-		// header beam over the posts
+		// header beam over the posts, with a knee brace off each post up into it (not across the steps' opening)
+		k.Mat(BuildingTextures.TimberAlongMat);
+		foreach (float x in postX)
+			foreach (int s in new[] { -1, 1 })
+			{
+				if (Mathf.Abs(x + s * 0.4f) > px) continue;
+				if (Mathf.Abs(x) < sw + 0.1f && Mathf.Sign(x) != s) continue;
+				k.Beam(new Vector3(x + s * 0.06f, roofAtPost - 0.52f, postZ), new Vector3(x + s * 0.38f, roofAtPost - 0.17f, postZ), 0.065f, 0.06f, 1.3f, Vector3.Back);
+			}
 		BuildKit.Box(k, new Vector3(0, roofAtPost - 0.09f, postZ), new Vector3(px * 2f, 0.18f, 0.14f), 1.3f);
 
 		// rails: front runs (either side of the steps) and the two ends
@@ -497,9 +505,11 @@ public partial class Cabin : Node3D
 			float len = d.Length();
 			bool alongZ = Mathf.Abs(d.Z) > Mathf.Abs(d.X);
 			k.Color = new Color(0.78f, 0.72f, 0.64f);
+			k.Mat(BuildingTextures.TimberAlongMat);
 			k.Beam(a + Vector3.Up * 0.92f, b + Vector3.Up * 0.92f, 0.07f, 0.06f, 1.3f);
 			k.Beam(a + Vector3.Up * 0.12f, b + Vector3.Up * 0.12f, 0.05f, 0.06f, 1.3f);
 			int n = Mathf.Max(1, Mathf.RoundToInt(len / 0.3f) - 1);
+			k.Mat(BuildingTextures.TimberUpMat);
 			for (int i = 1; i <= n; i++)
 			{
 				Vector3 p = a.Lerp(b, i / (float)(n + 1));
@@ -551,14 +561,14 @@ public partial class Cabin : Node3D
 			k.Mat(BuildingTextures.ShingleMat);
 			k.Quad(a0 + lift, a1 + lift, c1 + lift, c0 + lift, n, new Vector2(x0 * 0.9f, 0), new Vector2(x1 * 0.9f, 0), new Vector2(x1 * 0.9f, len * 0.9f), new Vector2(x0 * 0.9f, len * 0.9f));
 			k.Color = new Color(0.62f, 0.56f, 0.5f);
-			k.Mat(BuildingTextures.BoardsMat);
+			k.Mat(BuildingTextures.GableBoardsMat);
 			k.Quad(a0, a1, c1, c0, -n, new Vector2(x0, 0), new Vector2(x1, 0), new Vector2(x1, len), new Vector2(x0, len));
-			k.Mat(PropTextures.PostMat);
+			k.Mat(BuildingTextures.TimberAlongMat);
 			k.Color = new Color(0.7f, 0.64f, 0.56f);
 			k.Beam(c0 + lift * 0.5f + new Vector3(0, -0.03f, 0.02f), c1 + lift * 0.5f + new Vector3(0, -0.03f, 0.02f), 0.04f, 0.16f, 1.4f);
 		}
 		// open rafters under the porch roof
-		k.Mat(PropTextures.PostMat);
+		k.Mat(BuildingTextures.TimberAlongMat);
 		k.Color = new Color(0.66f, 0.6f, 0.52f);
 		for (float x = -xr + 0.25f; x < xr - 0.1f; x += 0.9f)
 			k.Beam(new Vector3(x, yb0 - 0.06f, z0 + 0.05f), new Vector3(x, yb1 - 0.06f, z1 - 0.05f), 0.06f, 0.11f, 1.4f);
@@ -582,8 +592,8 @@ public partial class Cabin : Node3D
 		_steps = n;
 		_stepRise = drop / n;
 		if (drop < 0.12f) { _steps = 0; return; }
-		var tread = PropTextures.DeckMat;
-		var post = PropTextures.PostMat;
+		var tread = BuildingTextures.PorchDeckMat;
+		var post = BuildingTextures.TimberAlongMat;
 		float sw = StepW * 0.5f;
 		for (int i = 1; i < n; i++)
 		{
@@ -627,9 +637,9 @@ public partial class Cabin : Node3D
 
 	private void BuildWindowFrames(MeshKit k)
 	{
-		var trim = PropTextures.PostMat;
+		var trim = BuildingTextures.CabinTrimMat;   // (2026-10-14a: painted like the door, not the walls' wood)
 		k.Mat(trim);
-		k.Color = new Color(0.6f, 0.55f, 0.5f);
+		k.Color = new Color(0.92f, 0.9f, 0.86f);
 		float zo = FrontFace + 0.015f;
 		foreach (float cx in new[] { -WinCx, WinCx })
 		{
@@ -646,8 +656,12 @@ public partial class Cabin : Node3D
 				BuildKit.Box(k, new Vector3(x, (_winBot + _winTop) * 0.5f, Hd), new Vector3(0.02f, _winTop - _winBot, LogT), 1.4f);
 		}
 		// door casing: jambs and head on the outside, lining in the opening
-		k.Color = new Color(0.62f, 0.57f, 0.52f);
+		k.Color = new Color(0.86f, 0.84f, 0.8f);
 		BuildKit.Box(k, new Vector3(0, _doorTop + 0.06f, zo), new Vector3(DoorWidth + 0.26f, 0.12f, 0.035f), 1.4f);
+		// a drip cap over the head casing, so the head reads as a moulding and not a plank
+		BuildKit.Box(k, new Vector3(0, _doorTop + 0.13f, zo + 0.02f), new Vector3(DoorWidth + 0.32f, 0.025f, 0.07f), 1.4f);
+		foreach (float cx in new[] { -WinCx, WinCx })
+			BuildKit.Box(k, new Vector3(cx, _winTop + 0.11f, zo + 0.02f), new Vector3(WinW + 0.26f, 0.022f, 0.06f), 1.4f);
 		foreach (int s in new[] { -1, 1 })
 		{
 			BuildKit.Box(k, new Vector3(s * (Dw + 0.055f), _doorTop * 0.5f, zo), new Vector3(0.11f, _doorTop, 0.035f), 1.4f);
@@ -655,7 +669,7 @@ public partial class Cabin : Node3D
 		}
 		BuildKit.Box(k, new Vector3(0, _doorTop - 0.012f, Hd), new Vector3(DoorWidth, 0.025f, LogT), 1.4f);
 		// threshold
-		k.Mat(PropTextures.DeckMat);
+		k.Mat(BuildingTextures.PorchDeckMat);
 		BuildKit.Box(k, new Vector3(0, -0.01f, Hd), new Vector3(DoorWidth, 0.03f, LogT + 0.06f), 5f);
 		k.Color = Colors.White;
 	}
@@ -671,8 +685,8 @@ public partial class Cabin : Node3D
 		_litPane = null;
 		if (Burning > 0f) return;   // sash burned/blown out, glass gone, so smoke can pour out
 		var ks = new MeshKit();
-		ks.Mat(PropTextures.PostMat);
-		ks.Color = new Color(0.42f, 0.38f, 0.34f);
+		ks.Mat(BuildingTextures.CabinTrimMat);
+		ks.Color = new Color(0.8f, 0.78f, 0.74f);
 		float zs = Hd + 0.02f;
 		foreach (float cx in new[] { -WinCx, WinCx })
 		{
@@ -709,12 +723,12 @@ public partial class Cabin : Node3D
 	{
 		float ix = Hw - LogT * 0.5f, iz = Hd - LogT * 0.5f;
 		// floor: planks run front to back
-		k.Mat(BuildingTextures.FloorMat);
+		k.Mat(BuildingTextures.CabinFloorMat);
 		k.Color = new Color(0.95f, 0.9f, 0.85f);
 		BuildKit.Box(k, new Vector3(0, -0.03f, 0), new Vector3(iz * 2f, 0.06f, ix * 2f), 1f / 0.6f, BuildKit.Face.NY, new Basis(Vector3.Up, Mathf.Pi * 0.5f));
 
 		// rafters under both slopes, a ridge beam and a purlin (the lamp hangs from it)
-		var beam = PropTextures.PostMat;
+		var beam = BuildingTextures.SmokedTimberMat;
 		k.Mat(beam);
 		k.Color = new Color(0.62f, 0.55f, 0.47f);
 		float cos = 1f / Mathf.Sqrt(1f + Pitch * Pitch);
@@ -742,8 +756,14 @@ public partial class Cabin : Node3D
 		BuildKit.Box(k, new Vector3(sx, 0.745f, sz), new Vector3(0.56f, 0.03f, 0.68f), 2f);
 		foreach (var (lx, lz) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
 			BuildKit.Box(k, new Vector3(sx + lx * 0.2f, 0.105f, sz + lz * 0.25f), new Vector3(0.05f, 0.21f, 0.05f), 2f, BuildKit.Face.NY | BuildKit.Face.PY);
-		k.Cylinder(new Vector3(sx - 0.05f, 0.76f, sz), new Vector3(sx - 0.05f, 1.75f, sz), 0.065f, 0.065f, 6, false);
-		k.Cylinder(new Vector3(sx - 0.05f, 1.75f, sz), new Vector3(-ix - 0.05f, 1.75f, sz), 0.065f, 0.065f, 6, false);
+		k.Cylinder(new Vector3(sx - 0.05f, 0.76f, sz), new Vector3(sx - 0.05f, 1.75f, sz), 0.065f, 0.065f, 12, false);
+		// (2026-10-14a) the pipe round (was six-sided): its collar on the stove, a joint and the damper's handle
+		k.Cylinder(new Vector3(sx - 0.05f, 0.755f, sz), new Vector3(sx - 0.05f, 0.82f, sz), 0.085f, 0.072f, 12, false);
+		k.Cylinder(new Vector3(sx - 0.05f, 1.2f, sz), new Vector3(sx - 0.05f, 1.24f, sz), 0.071f, 0.071f, 12, false);
+		k.Beam(new Vector3(sx - 0.05f, 1.0f, sz - 0.075f), new Vector3(sx - 0.05f, 1.0f, sz - 0.14f), 0.012f, 0.012f, 2f);
+		k.Cylinder(new Vector3(-ix + 0.02f, 1.75f, sz), new Vector3(-ix + 0.06f, 1.75f, sz), 0.11f, 0.11f, 12, true);
+		k.Cylinder(new Vector3(sx - 0.05f, 1.75f, sz), new Vector3(-ix - 0.05f, 1.75f, sz), 0.065f, 0.065f, 12, false);
+		k.Cylinder(new Vector3(sx - 0.05f, 1.74f, sz), new Vector3(sx - 0.05f, 1.815f, sz), 0.066f, 0.066f, 12, true);   // the elbow's closed top
 		// stove door (faces into the room)
 		k.Color = new Color(0.22f, 0.21f, 0.2f);
 		BuildKit.Box(k, new Vector3(sx + 0.255f, 0.46f, sz), new Vector3(0.02f, 0.26f, 0.3f), 2f);
@@ -775,7 +795,7 @@ public partial class Cabin : Node3D
 		}
 
 		// cot along the right wall
-		var wood = PropTextures.PostMat;
+		var wood = BuildingTextures.TimberAlongMat;
 		float cx = ix - 0.42f, cz0 = -iz + 0.1f, cz1 = cz0 + 1.9f, cw = 0.36f;
 		k.Mat(wood);
 		k.Color = new Color(0.75f, 0.68f, 0.6f);
@@ -787,14 +807,46 @@ public partial class Cabin : Node3D
 		k.Color = new Color(0.8f, 0.78f, 0.7f);
 		BuildKit.Box(k, new Vector3(cx, 0.44f, (cz0 + cz1) * 0.5f), new Vector3(cw * 2f + 0.02f, 0.12f, cz1 - cz0 - 0.02f), 2f, BuildKit.Face.NY);
 		// blanket, rumpled back, and a pillow
+		// (2026-10-14a: they were flat slabs) a wool blanket with a little body to it, its edges hanging down over the
+		// frame, the turned-back fold rolled; a soft, dented pillow
 		k.Mat(BuildingTextures.Plain("b_blanket", new Color(0.3f, 0.12f, 0.09f)));
 		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(cx + 0.01f, 0.515f, cz1 - 0.72f), new Vector3(cw * 2f + 0.08f, 0.04f, 1.25f), 1f, BuildKit.Face.NY, new Basis(Vector3.Up, 0.04f));
-		k.Color = new Color(0.8f, 0.8f, 0.8f);
-		BuildKit.Box(k, new Vector3(cx + 0.02f, 0.545f, cz1 - 1.38f), new Vector3(cw * 2f + 0.04f, 0.06f, 0.2f), 1f, BuildKit.Face.NY, new Basis(Vector3.Right, -0.5f));
+		{
+			float bz0 = cz1 - 1.33f, bz1 = cz1 - 0.06f, bxw = cw + 0.05f, by = 0.505f;
+			const int nz = 8;
+			var brng = new RandomNumberGenerator { Seed = (ulong)(Seed * 19 + 5) };
+			var lump = new float[nz + 1];
+			for (int i = 0; i <= nz; i++) lump[i] = brng.RandfRange(0f, 0.02f);
+			Vector3 P(float side, int i, bool hang) =>
+				new(cx + side * (hang ? bxw + 0.012f : bxw * 0.7f), hang ? by - 0.16f - lump[i] * 2f : by + 0.025f + lump[i], Mathf.Lerp(bz0, bz1, i / (float)nz));
+			Vector3 E(float side, int i) => new(cx + side * bxw, by + 0.005f, Mathf.Lerp(bz0, bz1, i / (float)nz));
+			for (int i = 0; i < nz; i++)
+			{
+				// the top, crowned over the mattress, rolling down over its edges, and hanging below the rails
+				k.Quad(P(-1, i, false), P(1, i, false), P(1, i + 1, false), P(-1, i + 1, false), Vector3.Up);
+				foreach (float sd in new[] { -1f, 1f })
+				{
+					Vector3 nOut = new(sd, 0.4f, 0);
+					k.Quad(P(sd, i, false), E(sd, i), E(sd, i + 1), P(sd, i + 1, false), nOut.Normalized());
+					k.Quad(E(sd, i), P(sd, i, true), P(sd, i + 1, true), E(sd, i + 1), new Vector3(sd, 0, 0));
+				}
+			}
+			// the end hanging over the foot
+			k.Quad(P(-1, nz, false), P(1, nz, false), E(1, nz) + new Vector3(0, -0.15f, 0.03f), E(-1, nz) + new Vector3(0, -0.15f, 0.03f), Vector3.Back);
+			// the turned-back fold: a roll across the cot
+			k.Color = new Color(0.82f, 0.8f, 0.8f);
+			k.Cylinder(new Vector3(cx - bxw - 0.01f, by + 0.045f, bz0 - 0.03f), new Vector3(cx + bxw + 0.01f, by + 0.05f, bz0 - 0.02f), 0.045f, 0.05f, 10, true);
+		}
 		k.Mat(BuildingTextures.Plain("b_pillow", new Color(0.62f, 0.6f, 0.54f)));
 		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(cx, 0.55f, cz0 + 0.22f), new Vector3(0.5f, 0.1f, 0.3f), 1f, BuildKit.Face.NY);
+		ItemMeshes.Loft(k, new[]
+		{
+			new ItemMeshes.Ring(new Vector3(cx - 0.25f, 0.555f, cz0 + 0.22f), 0.04f, 0.1f),
+			new ItemMeshes.Ring(new Vector3(cx - 0.2f, 0.56f, cz0 + 0.22f), 0.055f, 0.14f),
+			new ItemMeshes.Ring(new Vector3(cx, 0.555f, cz0 + 0.22f), 0.048f, 0.15f),
+			new ItemMeshes.Ring(new Vector3(cx + 0.2f, 0.56f, cz0 + 0.22f), 0.055f, 0.14f),
+			new ItemMeshes.Ring(new Vector3(cx + 0.25f, 0.555f, cz0 + 0.22f), 0.04f, 0.1f),
+		}, 12, true, true, Vector3.Up, 4f, null, null, 1f, 0.5f);
 		cols.Add((new Vector3(cx, 0.28f, (cz0 + cz1) * 0.5f), new Vector3(cw * 2f + 0.06f, 0.56f, cz1 - cz0), Basis.Identity));
 
 		// shelf on the right wall toward the front, with jars, tins and books
@@ -847,7 +899,7 @@ public partial class Cabin : Node3D
 		if (!modelled) k.Cylinder(new Vector3(shx - 0.02f, 1.515f, shz0 + 0.2f), new Vector3(shx - 0.02f, 1.63f, shz0 + 0.2f), 0.06f, 0.055f, 6, true);
 
 		// crate in the front-left corner
-		k.Mat(BuildingTextures.BoardsMat);
+		k.Mat(BuildingTextures.PorchDeckMat);
 		k.Color = new Color(0.8f, 0.72f, 0.62f);
 		BuildKit.Box(k, new Vector3(-ix + 0.34f, 0.25f, iz - 0.45f), new Vector3(0.55f, 0.5f, 0.5f), 1.8f, BuildKit.Face.NY, new Basis(Vector3.Up, 0.12f));
 		cols.Add((new Vector3(-ix + 0.34f, 0.25f, iz - 0.45f), new Vector3(0.55f, 0.5f, 0.5f), new Basis(Vector3.Up, 0.12f)));
@@ -882,8 +934,8 @@ public partial class Cabin : Node3D
 		_lamp = new OmniLight3D
 		{
 			Name = "Lamp",
-			LightColor = new Color(1f, 0.66f, 0.36f),
-			LightEnergy = 2.1f,
+			LightColor = new Color(1f, 0.7f, 0.45f),   // (2026-10-14a: a touch less orange; the wood was all one colour under it)
+			LightEnergy = 1.9f,
 			OmniRange = 7.5f,
 			OmniAttenuation = 1.1f,
 			ShadowEnabled = true,
@@ -940,22 +992,72 @@ public partial class Cabin : Node3D
 		if (IsOpen) _door.Rotation = new Vector3(0, Mathf.DegToRad(96f), 0);
 		float w = DoorWidth - 0.04f, h = _doorTop - 0.03f;
 		var k = new MeshKit();
-		k.Mat(BuildingTextures.BoardsMat);
-		k.Color = new Color(0.62f, 0.52f, 0.44f);
-		BuildKit.Box(k, new Vector3(w * 0.5f, h * 0.5f + 0.005f, 0), new Vector3(w, h, 0.05f), 1.3f);
-		// ledgers and a brace on the outside
-		k.Mat(PropTextures.PostMat);
-		k.Color = new Color(0.55f, 0.48f, 0.42f);
-		foreach (float y in new[] { 0.3f, h - 0.3f })
-			BuildKit.Box(k, new Vector3(w * 0.5f, y, 0.04f), new Vector3(w - 0.08f, 0.14f, 0.03f), 1.4f);
-		k.Beam(new Vector3(0.1f, 0.36f, 0.04f), new Vector3(w - 0.1f, h - 0.36f, 0.04f), 0.03f, 0.12f, 1.4f, Vector3.Back);
-		// latch and pull
+		// (2026-10-14a: the owner, "cabin wall and door shouldn't be the same texture") A ledged and braced door of its
+		// own: six upright boards (each its own shade and a hair proud or shy of the next, with a dark gap between) under
+		// an old green paint worn to the wood; the ledges and the brace on the inside; long iron strap hinges on pintles,
+		// a thumb latch and a keyhole plate on the outside.
+		k.Mat(BuildingTextures.CabinDoorMat);
+		var drng = new RandomNumberGenerator { Seed = (ulong)(Seed * 71 + 13) };
+		const int boardsN = 6;
+		float bw = w / boardsN;
+		for (int i = 0; i < boardsN; i++)
+		{
+			float sh = drng.RandfRange(0.86f, 1.06f);
+			k.Color = new Color(sh, sh * drng.RandfRange(0.97f, 1.01f), sh * 0.98f);
+			float bh = h - drng.RandfRange(0f, 0.025f);   // the feet worn uneven
+			float dz = drng.RandfRange(-0.004f, 0.004f);
+			BuildKit.Box(k, new Vector3(bw * (i + 0.5f), h - bh * 0.5f + 0.005f, dz), new Vector3(bw - 0.006f, bh, 0.045f), 1.3f);
+		}
+		// the gaps between the boards read dark: a backing just behind them
+		k.Color = new Color(0.12f, 0.11f, 0.1f);
+		BuildKit.Box(k, new Vector3(w * 0.5f, h * 0.5f + 0.005f, -0.004f), new Vector3(w - 0.02f, h - 0.03f, 0.03f), 1.3f);
+		// ledgers and a brace on the inside
+		k.Color = new Color(0.8f, 0.78f, 0.74f);
+		foreach (float y in new[] { 0.3f, h * 0.5f, h - 0.3f })
+			BuildKit.Box(k, new Vector3(w * 0.5f, y, -0.042f), new Vector3(w - 0.08f, 0.13f, 0.035f), 1.4f);
+		k.Beam(new Vector3(0.1f, 0.36f, -0.042f), new Vector3(w - 0.1f, h * 0.5f - 0.06f, -0.042f), 0.035f, 0.11f, 1.4f, Vector3.Forward);
+		k.Beam(new Vector3(0.1f, h * 0.5f + 0.06f, -0.042f), new Vector3(w - 0.1f, h - 0.36f, -0.042f), 0.035f, 0.11f, 1.4f, Vector3.Forward);
+
+		// the iron: strap hinges tapering from the hinge side, their knuckles round the pintles, rows of nail heads
 		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.5f, 0.47f, 0.44f);
-		BuildKit.Box(k, new Vector3(w - 0.12f, 1.0f, 0.06f), new Vector3(0.03f, 0.16f, 0.03f), 3f);
-		BuildKit.Box(k, new Vector3(w - 0.12f, 1.0f, -0.05f), new Vector3(0.03f, 0.12f, 0.03f), 3f);
+		k.Color = new Color(0.34f, 0.3f, 0.27f);
+		const float face = 0.0232f;
 		foreach (float y in new[] { 0.3f, h - 0.3f })
-			BuildKit.Box(k, new Vector3(0.14f, y, 0.058f), new Vector3(0.28f, 0.04f, 0.01f), 3f);
+		{
+			const float len = 0.62f;
+			// the strap: four short tapering lengths, then a rounded spear end
+			for (int s = 0; s < 4; s++)
+			{
+				float x0 = s * len / 4f, x1 = (s + 1) * len / 4f;
+				float t0 = Mathf.Lerp(0.055f, 0.032f, s / 4f), t1 = Mathf.Lerp(0.055f, 0.032f, (s + 1) / 4f);
+				k.Quad(new Vector3(x0, y - t0 * 0.5f, face + 0.006f), new Vector3(x1, y - t1 * 0.5f, face + 0.006f), new Vector3(x1, y + t1 * 0.5f, face + 0.006f), new Vector3(x0, y + t0 * 0.5f, face + 0.006f), Vector3.Back);
+				k.Quad(new Vector3(x0, y - t0 * 0.5f, face), new Vector3(x1, y - t1 * 0.5f, face), new Vector3(x1, y - t1 * 0.5f, face + 0.006f), new Vector3(x0, y - t0 * 0.5f, face + 0.006f), Vector3.Down);
+				k.Quad(new Vector3(x0, y + t0 * 0.5f, face + 0.006f), new Vector3(x1, y + t1 * 0.5f, face + 0.006f), new Vector3(x1, y + t1 * 0.5f, face), new Vector3(x0, y + t0 * 0.5f, face), Vector3.Up);
+			}
+			k.Cylinder(new Vector3(len, y, face), new Vector3(len, y, face + 0.006f), 0.026f, 0.026f, 8, true);
+			// the knuckle round its pintle at the jamb
+			k.Cylinder(new Vector3(-0.012f, y - 0.05f, face - 0.005f), new Vector3(-0.012f, y + 0.05f, face - 0.005f), 0.016f, 0.016f, 8, true);
+			// nails
+			k.Color = new Color(0.24f, 0.21f, 0.19f);
+			for (int nn = 0; nn < 4; nn++)
+				k.Cylinder(new Vector3(0.08f + nn * 0.16f, y, face + 0.006f), new Vector3(0.08f + nn * 0.16f, y, face + 0.011f), 0.007f, 0.006f, 6, true);
+			k.Color = new Color(0.34f, 0.3f, 0.27f);
+		}
+		// the thumb latch: a grip with its two cusped plates, the thumb press through the door, the bar and keeper inside
+		float lx = w - 0.13f, ly = 1.02f;
+		BuildKit.Box(k, new Vector3(lx, ly + 0.11f, face + 0.004f), new Vector3(0.05f, 0.07f, 0.008f), 3f);
+		BuildKit.Box(k, new Vector3(lx, ly - 0.11f, face + 0.004f), new Vector3(0.05f, 0.07f, 0.008f), 3f);
+		k.Beam(new Vector3(lx, ly + 0.08f, face + 0.008f), new Vector3(lx, ly + 0.04f, face + 0.045f), 0.016f, 0.012f, 3f);
+		k.Beam(new Vector3(lx, ly + 0.04f, face + 0.045f), new Vector3(lx, ly - 0.06f, face + 0.045f), 0.016f, 0.012f, 3f);
+		k.Beam(new Vector3(lx, ly - 0.06f, face + 0.045f), new Vector3(lx, ly - 0.09f, face + 0.008f), 0.016f, 0.012f, 3f);
+		k.Beam(new Vector3(lx, ly + 0.15f, face + 0.008f), new Vector3(lx - 0.01f, ly + 0.19f, face + 0.035f), 0.022f, 0.006f, 3f);
+		BuildKit.Box(k, new Vector3(w - 0.2f, ly + 0.2f, -0.068f), new Vector3(0.3f, 0.022f, 0.012f), 3f);
+		BuildKit.Box(k, new Vector3(w - 0.005f, ly + 0.2f, -0.07f), new Vector3(0.03f, 0.06f, 0.02f), 3f);
+		// keyhole plate under the latch
+		k.Color = new Color(0.3f, 0.27f, 0.23f);
+		BuildKit.Box(k, new Vector3(lx, ly - 0.25f, face + 0.003f), new Vector3(0.045f, 0.09f, 0.006f), 3f);
+		k.Color = new Color(0.02f, 0.02f, 0.02f);
+		BuildKit.Box(k, new Vector3(lx, ly - 0.255f, face + 0.0065f), new Vector3(0.008f, 0.025f, 0.001f), 3f);
 		k.CommitTo(_door, "DoorMesh");
 	}
 

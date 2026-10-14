@@ -126,8 +126,9 @@ public partial class Footbridge : Node3D
 		float L = Length / Mathf.Cos(pitch);
 		var tilt = new Transform3D(Basis.FromEuler(new Vector3(pitch, 0, 0)), Vector3.Zero);
 		var k = new MeshKit { Xf = tilt };
-		var deckMat = PropTextures.DeckMat;
-		var postMat = PropTextures.WetPostMat;
+		// (2026-10-14a: the bridge read as new orange lumber, the same planks as every building) weathered, damp timber
+		var deckMat = BuildingTextures.BridgePlankMat;
+		var postMat = BuildingTextures.BridgeAlongMat;
 		float hw = Width * 0.5f, deckTop = 0.04f, plankT = 0.06f;
 		float postW = 0.14f, postX = hw + postW * 0.5f + 0.01f;
 
@@ -177,12 +178,12 @@ public partial class Footbridge : Node3D
 				float depth = DepthBelow(x, z);
 				float shade = Rand(900 + pi++, 0.8f, 1.0f);
 				k.Color = new Color(shade, shade * 0.97f, shade * 0.95f);
-				k.Mat(postMat);
+				k.Mat(BuildingTextures.BridgePostMat);
 				SignKit.Post(k, new Vector3(x, -depth, z), railTop + depth - 0.02f, postW, 1.4f, 0.05f);
 			}
 			k.Color = new Color(0.82f, 0.8f, 0.77f);
 			// top rail: a flat board across the post tops
-			k.Mat(deckMat).Box(new Vector3(x - side * 0.01f, railTop + 0.045f, 0), new Vector3(0.15f, 0.05f, L + 0.12f), 1.3f);
+			k.Mat(postMat).Box(new Vector3(x - side * 0.01f, railTop + 0.045f, 0), new Vector3(0.15f, 0.05f, L + 0.12f), 1.3f);
 			// mid rail: a plank on the inside face of the posts
 			k.Box(new Vector3(x - side * (postW * 0.5f + 0.02f), railTop * 0.5f, 0), new Vector3(0.04f, 0.13f, L - 0.05f), 1.3f);
 			// kick board along the deck edge
