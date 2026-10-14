@@ -430,6 +430,7 @@ public partial class Playtest : Node
 			string file = $"{r.Act:00}_{r.Id}_{label}.png";
 			GetViewport()?.GetTexture()?.GetImage()?.SavePng(ProjectSettings.GlobalizePath($"{OutDir}/{file}"));
 			r.Shot ??= file;
+			if (World.GapAudit.Requested) World.GapAudit.Scan(GetTree().Root, file[..^4]);   // (the joints audit: --gap-audit)
 		}
 		catch (Exception e) { GD.PushWarning($"[playtest] screenshot '{label}' failed: {e.Message}"); }
 	}
