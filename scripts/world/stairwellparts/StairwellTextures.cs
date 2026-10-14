@@ -212,16 +212,28 @@ public static class StairwellTextures
 
 	/// <summary>Riveted clean steel plate for Room 3's walls: cold blue-grey panels, a rivet row round
 	/// each, the seams dark.</summary>
+	// (2026-10-13g, the texture-mood pass: the plates read clean, pale and polished, a hot glint under the lantern;
+	// now darker and duller, grime and rust weeping from the seams and the rivets, a damp bloom low on each plate)
 	public static StandardMaterial3D PlateMat => Std("sw_plate", Make("sw_plate", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 4, 3, 261);
-		float g = 0.36f + 0.1f * n;
+		float g = 0.27f + 0.1f * n;
 		int u = x % 32, v = y % 64;
-		if (u == 0 || v == 0) g = 0.12f;
-		else if ((u == 3 || u == 29) && v % 6 == 3) g = 0.52f;
-		else if ((v == 3 || v == 61) && u % 6 == 3) g = 0.52f;
-		return new Color(g * 0.92f, g * 0.97f, g * 1.05f);
-	}), 0.5f, 0.55f, 0.55f);
+		bool seam = u == 0 || v == 0, rivet = false;
+		if (seam) g = 0.09f;
+		else if ((u == 3 || u == 29) && v % 6 == 3) { g = 0.4f; rivet = true; }
+		else if ((v == 3 || v == 61) && u % 6 == 3) { g = 0.4f; rivet = true; }
+		var c = new Color(g * 0.95f, g * 0.97f, g * 1.0f);
+		// grime: blotchy, heavier toward each plate's foot
+		float grime = Mathf.SmoothStep(0.45f, 0.75f, Fbm(x, y, 64, 3, 3, 262)) * 0.6f + (v / 64f) * 0.3f;
+		c *= 1f - 0.35f * Mathf.Clamp(grime, 0f, 1f);
+		// rust: runs down from the rivet rows and the seams (the column under a rivet), and blooms
+		float run = (u <= 4 || u >= 28) ? Mathf.SmoothStep(0.55f, 0.8f, Fbm(x * 3f, y * 0.3f, 64, 4, 2, 263)) * (1f - v / 64f) : 0f;
+		float bloom = Mathf.SmoothStep(0.62f, 0.8f, Fbm(x, y, 64, 5, 3, 264));
+		c = c.Lerp(new Color(0.3f, 0.16f, 0.08f), Mathf.Clamp(run * 0.7f + bloom * 0.6f, 0f, 0.75f));
+		if (rivet) c = c.Lerp(new Color(0.34f, 0.2f, 0.1f), 0.4f);
+		return c;
+	}), 0.74f, 0.4f, 0.4f);
 
 	// ------------------------------------------------------------------ the burnt portraits
 

@@ -90,21 +90,28 @@ public static class BossTextures
 	/// <summary>Galvanized tube: dull silver, a little mottled.</summary>
 	public static StandardMaterial3D GalvanizedMat => SurfaceSets.Scan(Std("bt_galv", () => new StandardMaterial3D
 	{
-		AlbedoColor = new Color(0.62f, 0.64f, 0.66f), Roughness = 0.45f, Metallic = 0.7f, MetallicSpecular = 0.6f,
+		AlbedoColor = new Color(0.62f, 0.64f, 0.66f), Roughness = 0.72f, Metallic = 0.55f, MetallicSpecular = 0.5f,
 		Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f,
-	}), "metal_plate_02", 1f, 0.8f, new Color(0.8f, 0.82f, 0.84f));
+	}), "metal_plate_02", 1f, 1f, new Color(0.56f, 0.56f, 0.55f));
 
 	/// <summary>Canvas-wrapped insulation, cream to tan, a band every half metre.</summary>
 	public static StandardMaterial3D WrapMat(Color tint) => Std($"bt_wrap{tint.ToHtml()}", () => new StandardMaterial3D
 	{
+		// (2026-10-13g, the texture-mood pass: clean pale cream tubes that glared under the lamps; now old lagging, darker,
+		// water-stained in tide marks and blotches, soot along it, frayed darker at the bands)
 		AlbedoTexture = Make("bt_wrap", 32, 64, (x, y) =>
 		{
 			float n = Fbm(x, y, 32, 4, 3, 411);
-			float g = 0.85f + 0.12f * n;
-			if (y % 32 < 2) g *= 0.72f;   // a band
-			return new Color(g, g, g);
+			float g = 0.72f + 0.14f * n;
+			if (y % 32 < 2) g *= 0.6f;   // a band
+			else if (y % 32 < 4 || y % 32 > 29) g *= 0.85f;
+			float stain = Mathf.SmoothStep(0.5f, 0.72f, Fbm(x, y, 32, 3, 3, 412));
+			float soot = Mathf.SmoothStep(0.4f, 0.8f, Fbm(x * 0.5f, y * 2f, 32, 2, 2, 413));
+			var c = new Color(g, g * 0.96f, g * 0.88f);
+			c = c.Lerp(new Color(0.36f, 0.28f, 0.18f), stain * 0.55f);
+			return c * (1f - 0.3f * soot);
 		}),
-		AlbedoColor = tint, Roughness = 0.85f, MetallicSpecular = 0.2f, VertexColorUseAsAlbedo = true,
+		AlbedoColor = tint * 0.68f, Roughness = 0.95f, MetallicSpecular = 0.15f, VertexColorUseAsAlbedo = true,
 		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	});
 
@@ -117,12 +124,13 @@ public static class BossTextures
 			float g = 0.55f + 0.35f * Mathf.Abs(n - 0.5f) * 2f;
 			return new Color(g, g, g * 1.03f);
 		}),
-		Roughness = 0.3f, Metallic = 0.85f, MetallicSpecular = 0.7f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+		AlbedoColor = new Color(0.62f, 0.6f, 0.56f), Roughness = 0.5f, Metallic = 0.75f, MetallicSpecular = 0.6f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	});
 
 	public static StandardMaterial3D Painted(Color c, float rough = 0.5f, float metal = 0.3f) => Std($"bt_paint{c.ToHtml()}", () => new StandardMaterial3D
 	{
-		AlbedoColor = c, Roughness = rough, Metallic = metal, MetallicSpecular = 0.5f,
+		// (2026-10-13g: no fresh gloss down here; every painted pipe is dulled with grime)
+		AlbedoColor = c, Roughness = Mathf.Max(rough, 0.68f), Metallic = metal * 0.75f, MetallicSpecular = 0.45f,
 	});
 
 	/// <summary>A pressure gauge's face: white, black ticks round three quarters of it, a red arc near

@@ -185,11 +185,17 @@ public static partial class BunkerTextures
 	});
 
 	/// <summary>Moulded plastic: nearly flat with a soft mottling (tinted by vertex colour).</summary>
-	public static Texture2D Plastic() => Make("bk_plastic", 32, 32, (x, y) =>
+	// (2026-10-13g, the texture-mood pass: the screens' cases read clean, pale and new beside the early acts' weathered
+	// things; decades underground now: yellowed and darker, grime settled in blotches, scuffs, specks of mould)
+	public static Texture2D Plastic() => Make("bk_plastic2", 32, 32, (x, y) =>
 	{
 		float n = Fbm(x, y, 32, 32, 4, 3, 331);
-		float g = 0.84f + (n - 0.5f) * 0.18f + (Hash(x, y, 332) - 0.5f) * 0.05f;
-		return new Color(g, g, g);
+		float g = 0.66f + (n - 0.5f) * 0.2f + (Hash(x, y, 332) - 0.5f) * 0.06f;
+		float grime = Mathf.SmoothStep(0.45f, 0.75f, Fbm(x, y, 32, 32, 2, 3, 333));
+		g *= 1f - 0.35f * grime;
+		if (Hash(x, y, 334) > 0.96f) g *= 0.7f;                               // specks
+		var c = new Color(g, g * 0.95f, g * 0.86f);                            // yellowed
+		return c.Lerp(new Color(0.2f, 0.18f, 0.13f), grime * 0.25f);
 	});
 
 	/// <summary>Grey-green enamel with chips showing rust (shelves, cabinets, the desk).</summary>
@@ -398,6 +404,21 @@ public static partial class BunkerTextures
 			m.SetShaderParameter("low_grime", lowGrime);
 			m.SetShaderParameter("tint", tint);
 			m.SetShaderParameter("breathe", breathe);
+			// (2026-10-13g, the texture-mood pass: the bunker's concrete had the scan's colour only, a flat print under
+			// the lantern beside the early acts' rough, weathered surfaces) the scan's own relief and roughness
+			// (not the facade outside: that's the early acts' own look, the reference for the rest)
+			string set = key.Contains("floor") ? "ph_concrete_floor_worn_001" : "ph_concrete_wall_006";
+			if (key == "bk_m_ext") return m;
+			if (SurfaceSets.Tex(set, "normal") is { } nor)
+			{
+				m.SetShaderParameter("nor_tex", nor);
+				m.SetShaderParameter("normal_strength", key.Contains("floor") ? 1.1f : 1.4f);
+			}
+			if (SurfaceSets.Tex(set, "rough") is { } rough)
+			{
+				m.SetShaderParameter("rough_tex", rough);
+				m.SetShaderParameter("rough_map", 1f);
+			}
 			return m;
 		});
 
@@ -405,7 +426,8 @@ public static partial class BunkerTextures
 	private static Texture2D ScanOr(string id, Texture2D drawn) => SurfaceSets.Tex("ph_" + id) ?? drawn;
 
 	public static ShaderMaterial HallWallMat => Concrete("bk_m_hallwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.05f, 0.5f, 0.35f, new Color(1f, 1f, 1f));
-	public static ShaderMaterial HallFloorMat => Concrete("bk_m_hallfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.04f, 0.4f, 0f, new Color(0.95f, 0.95f, 0.95f));
+	// (2026-10-13g: the hall's floor was the palest, cleanest surface down here; a step darker, more grime trodden into it)
+	public static ShaderMaterial HallFloorMat => Concrete("bk_m_hallfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.04f, 0.6f, 0f, new Color(0.76f, 0.75f, 0.72f));
 	public static ShaderMaterial RoomWallMat => Concrete("bk_m_roomwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.06f, 0.65f, 0.45f, new Color(0.78f, 0.78f, 0.8f));
 	public static ShaderMaterial RoomFloorMat => Concrete("bk_m_roomfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.05f, 0.6f, 0f, new Color(0.7f, 0.7f, 0.72f));
 	public static ShaderMaterial MazeWallMat => Concrete("bk_m_mazewall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.09f, 0.6f, 0.4f, new Color(0.85f, 0.83f, 0.8f), 0.035f);
@@ -433,7 +455,7 @@ public static partial class BunkerTextures
 			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		});
 
-	public static StandardMaterial3D PlasticMat => Std("bk_m_plastic", Plastic(), 0.55f, 0.45f);
+	public static StandardMaterial3D PlasticMat => Std("bk_m_plastic", Plastic(), 0.78f, 0.3f);
 	public static StandardMaterial3D PaintedMetalMat => Std("bk_m_paint", PaintedMetal(), 0.75f, 0.35f);
 	public static StandardMaterial3D BarkMat => Std("bk_m_bark", ProcTextures.Bark(), 1f, 0.15f);
 
