@@ -69,7 +69,7 @@ public partial class PuzzleBox : Node3D
 				var shadow = new Decal
 				{
 					Name = "Shadow", Size = new Vector3(Cell * 1.25f, 0.2f, Cell * 1.25f), Position = new Vector3(0, -Cell * 0.5f - 0.004f - 0.1f, 0),
-					TextureAlbedo = ShadowTex(), Modulate = new Color(1, 1, 1, 0.6f), UpperFade = 0.15f, LowerFade = 0.6f, NormalFade = 0.4f, Visible = false,
+					TextureAlbedo = ShadowTex(), Modulate = new Color(1, 1, 1, 0.6f), UpperFade = 0.05f, LowerFade = 0.3f, NormalFade = 0.4f, Visible = false,
 				};
 				cube.AddChild(shadow);
 				p.Shadows.Add(shadow);
@@ -198,7 +198,7 @@ public partial class PuzzleBox : Node3D
 		foreach (var d in p.Shadows)
 		{
 			d.Visible = strength > 0.01f;
-			d.Modulate = new Color(1, 1, 1, Mathf.Clamp(strength, 0f, 1f) * 0.6f);
+			d.Modulate = new Color(1, 1, 1, Mathf.Clamp(strength, 0f, 1f) * 0.9f);
 		}
 	}
 

@@ -741,6 +741,24 @@ public partial class Playtest
 		o.PointerUp(c0);
 		Check("a click on a piece in the box takes it out", p0.At == null && !o.Holding, $"{p0.At}");
 		await _bot.Seconds(0.3, ct);
+		// real clicks, the wheel and a number key (in a corner, off every piece): the puzzle's, never the item in hand
+		// or the camera raised
+		var hands = PlayerHands.Instance;
+		int switches = hands?.Switches ?? 0;
+		var inHand = Inv.InHand;
+		void Mouse(MouseButton b, bool pressed) { Godot.Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = b, Pressed = pressed, Position = new Vector2(2, 2) }); Godot.Input.FlushBufferedEvents(); }
+		Mouse(MouseButton.Right, true);
+		await _bot.Frames(3, ct);
+		bool raised = Player.GetNodeOrNull<CameraTool>("CameraTool") is { Raising: true } || Player.PlayerInput.Focus;
+		Mouse(MouseButton.Right, false);
+		Mouse(MouseButton.WheelDown, true); Mouse(MouseButton.WheelDown, false);
+		Mouse(MouseButton.WheelUp, true); Mouse(MouseButton.WheelUp, false);
+		Godot.Input.ParseInputEvent(new InputEventAction { Action = "item_slot_2", Pressed = true }); Godot.Input.FlushBufferedEvents();
+		await _bot.Frames(3, ct);
+		Godot.Input.ParseInputEvent(new InputEventAction { Action = "item_slot_2", Pressed = false }); Godot.Input.FlushBufferedEvents();
+		await _bot.Frames(3, ct);
+		Check("right-click, the wheel and 1-9 don't switch the item in hand or raise the camera", !raised && (hands?.Switches ?? 0) == switches && Inv.InHand == inHand && o.IsOpen,
+			$"raised {raised}, switches {switches} -> {hands?.Switches}, in hand {inHand} -> {Inv.InHand}");
 	}
 
 	private const float OverlayHeldY = PuzzleOverlay.HeldY;

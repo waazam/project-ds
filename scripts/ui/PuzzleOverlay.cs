@@ -103,6 +103,7 @@ public partial class PuzzleOverlay : CanvasLayer
 		Holding = Dragging = false;
 		Selected = Mathf.Max(0, box.Pieces.FindIndex(p => p.At == null));
 		player.PlayerInput.BeginModal();
+		PlayerHands.Hold(this);   // the wheel, the shoulders and 1-9 are the puzzle's while it's open, never the item in hand
 		var playerCam = player.CameraRig?.Camera;
 		if (playerCam != null) playerCam.Current = false;
 		_cam = new Camera3D { Fov = 40f };
@@ -127,6 +128,7 @@ public partial class PuzzleOverlay : CanvasLayer
 		if (Holding) PutBack();
 		IsOpen = false;
 		_root.Visible = false;
+		PlayerHands.Release(this);
 		foreach (var g in _ghost) if (GodotObject.IsInstanceValid(g)) g.Visible = false;
 		Input.SetDefaultCursorShape(Input.CursorShape.Arrow);
 		Input.MouseMode = _mouseWas == Input.MouseModeEnum.Visible ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
