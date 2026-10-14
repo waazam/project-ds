@@ -15,6 +15,11 @@
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back;
 
+// (2026-10-13i, the owner: "the monster models look too smooth") the skin's detail maps and the mesh's own creases
+// (CreatureDetail.cs, creature_detail.gdshaderinc): wrinkles bunched in the creases and drawn tight over the bones,
+// cracked dry patches, raised veins, scars and pores, at the screen's own fineness; grime and shadow in every crease.
+#include "res://assets/shaders/creature_detail.gdshaderinc"
+
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
@@ -74,6 +79,7 @@ vec2 cells(vec3 p) {
 
 void vertex() {
 	v_p = (rest_space ? CUSTOM0.xyz : VERTEX) * detail_scale;
+	CD_VERTEX;
 	v_n = rest_space ? normalize(CUSTOM1.xyz) : NORMAL;
 	v_world_n = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
@@ -134,9 +140,18 @@ void fragment() {
 	float ch = smoothstep(1.0 - char_amount, 1.0 - char_amount + 0.25, n * 0.6 + n2 * 0.4 + char_amount * 0.3) * step(0.001, char_amount);
 	col = mix(col, vec3(0.025, 0.02, 0.018), ch);
 	EMISSION = vec3(0.9, 0.25, 0.05) * smoothstep(0.75, 0.95, n2) * ch * 0.25 + col * pallor;
+	// (2026-10-13i) the skin's detail: the veins blue-black under it, grime and shadow down in every crease and crack
+	CdSample d = cd_sample();
+	float occ = d.occ * cd_crease_occ(d);
+	col = mix(col, vec3(0.1, 0.08, 0.16), d.vein * vein_amt * 0.45 * (1.0 - bite) * (1.0 - crust));
+	col = mix(col * vec3(0.32, 0.27, 0.24), col, occ);
 	ALBEDO = col;
-	NORMAL_MAP = texture(normal_tex, UV).rgb;
-	NORMAL_MAP_DEPTH = 0.8;
+	AO = occ;
+	AO_LIGHT_AFFECT = 0.5;
+	vec2 bk = texture(normal_tex, UV).xy * 2.0 - 1.0;
+	vec3 baked_ts = normalize(vec3(bk * 0.8, sqrt(max(0.0, 1.0 - dot(bk, bk)))));
+	NORMAL_MAP = cd_pack(cd_blend(baked_ts, d.ts));
+	NORMAL_MAP_DEPTH = 1.0;
 	// its relief: the normal pushed by the fields' slope across the screen (the rest pose's fields, so it rides the skin)
 	float h = relief(p) * bump * 0.012;
 	vec3 dpx = dFdx(VERTEX), dpy = dFdy(VERTEX);
@@ -145,8 +160,10 @@ void fragment() {
 	vec3 sg = sign(det) * (dFdx(h) * r1v + dFdy(h) * r2v);
 	NORMAL = normalize(abs(det) * NORMAL - sg);
 	float wetness = max(max(smoothstep(0.5, 1.0, bite) * 0.8, woundCore), bloodAmt * wet);
-	ROUGHNESS = mix(mix(roughness, 0.2, wetness), 0.95, crust);
-	SPECULAR = mix(0.22, 0.6, wetness);
+	// (2026-10-13i) dry and dull on the open skin, slick down in the creases and the wet patches (it read as plastic)
+	wetness = max(wetness, max(d.wet * 0.45, (1.0 - occ) * 0.5) * (1.0 - crust));
+	ROUGHNESS = mix(mix(max(roughness, 0.8), 0.3, wetness), 0.95, crust);
+	SPECULAR = mix(0.16, 0.5, wetness);
 }
 
 void light() {

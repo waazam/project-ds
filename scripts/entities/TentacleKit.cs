@@ -25,6 +25,9 @@ public static class TentacleKit
 		m.SetShaderParameter("scale", scale);
 		m.SetShaderParameter("back_dir", backDir ?? new Vector3(0, 0, -1));
 		m.SetShaderParameter("back_amount", backAmount);
+		// (2026-10-13i, the owner: "too smooth") the creatures' skin detail: its creases, cracks, veins and pores
+		CreatureDetail.Hook(m);
+		m.SetShaderParameter("cd_scale", 1.4f);
 		return m;
 	}
 

@@ -78,6 +78,28 @@ public partial class WendigoArm : Node3D
 	private readonly RandomNumberGenerator _rng = new();
 	private GpuParticles3D _drip;
 
+	private static ShaderMaterial _flesh;
+
+	/// <summary>(2026-10-13i) Its hide (creature_flesh.gdshader) over the baked maps: ash-grey and bluer than the body's,
+	/// sinewed and wrinkled, the veins standing, wet in the creases, old blood run down it; a cold rim. One for every arm.</summary>
+	private static ShaderMaterial FleshMaterial(StandardMaterial3D baked)
+	{
+		if (_flesh != null) return _flesh;
+		_flesh = CreatureDetail.Hook(new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/creature_flesh.gdshader"), ResourceName = "wendigo_arm_flesh" });
+		_flesh.SetShaderParameter("albedo_tex", baked.AlbedoTexture);
+		_flesh.SetShaderParameter("normal_tex", baked.NormalTexture);
+		_flesh.SetShaderParameter("use_baked", baked.AlbedoTexture != null);
+		_flesh.SetShaderParameter("base_a", new Color(0.46f, 0.47f, 0.5f));
+		_flesh.SetShaderParameter("base_b", new Color(0.5f, 0.45f, 0.34f));
+		_flesh.SetShaderParameter("base_c", new Color(0.32f, 0.22f, 0.27f));
+		_flesh.SetShaderParameter("blood", 0.3f);
+		_flesh.SetShaderParameter("sores", 0.5f);
+		_flesh.SetShaderParameter("cd_scale", 2.2f);
+		_flesh.SetShaderParameter("rim", 0.45f);
+		_flesh.SetShaderParameter("uv_glow", 0.25f);
+		return _flesh;
+	}
+
 	public override void _Ready()
 	{
 		CreatureRim.Apply(this);
@@ -112,11 +134,13 @@ public partial class WendigoArm : Node3D
 			{
 				mi.MaterialOverlay = blood;
 				mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+				// (2026-10-13i, the owner: "too smooth") its rest pose and creases for the hide's detail
+				CreatureDetail.Prepare(mi, "w_skin");
 				for (int si = 0; si < mi.Mesh.GetSurfaceCount(); si++)
 					if (mi.Mesh.SurfaceGetMaterial(si) is StandardMaterial3D m)
 					{
 						m.SetMeta("detail_kind", -1);
-						if ((m.ResourceName ?? "").StartsWith("w_skin")) { m.RimEnabled = true; m.Rim = 0.4f; m.RimTint = 0.25f; }
+						if ((m.ResourceName ?? "").StartsWith("w_skin")) mi.SetSurfaceOverrideMaterial(si, FleshMaterial(m));
 					}
 			}
 		}
