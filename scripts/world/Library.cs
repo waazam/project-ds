@@ -343,7 +343,10 @@ public partial class Library : Node3D
 		}
 		iron.CommitTo(this, "FireDogs", false);
 		var logs = new MeshKit();
-		logs.Mat(SurfaceSets.Apply(new StandardMaterial3D { ResourceName = "lib_logs", AlbedoColor = new Color(0.32f, 0.26f, 0.21f), Roughness = 1f, VertexColorUseAsAlbedo = true }, "wood_log", 1f));
+		var logMat = SurfaceSets.Apply(new StandardMaterial3D { ResourceName = "lib_logs", AlbedoColor = new Color(0.32f, 0.26f, 0.21f), Roughness = 1f, VertexColorUseAsAlbedo = true }, "wood_log", 1f);
+		logMat.Uv1Triplanar = true;   // (MeshKit writes no tangents: the bark's normal map wants a projection)
+		logMat.Uv1Scale = Vector3.One * 2f;
+		logs.Mat(logMat);
 		logs.Color = Colors.White;
 		logs.Cylinder(new Vector3(x - 0.42f, 0.17f, z - 0.42f), new Vector3(x - 0.38f, 0.17f, z + 0.4f), 0.062f, 0.055f, 9, true, 2f);
 		logs.Cylinder(new Vector3(x - 0.24f, 0.17f, z - 0.38f), new Vector3(x - 0.27f, 0.18f, z + 0.42f), 0.055f, 0.06f, 9, true, 2f, 1.3f);
@@ -379,31 +382,31 @@ public partial class Library : Node3D
 		k.Xf = wood.Xf = xf;
 		var lean = new Basis(Vector3.Right, -0.1f);
 		k.Color = leather;
-		BuildKit.Box(k, new Vector3(0, 0.255f, 0.01f), new Vector3(0.82f, 0.31f, 0.8f));
+		k.BevelBox(new Vector3(0, 0.255f, 0.01f), new Vector3(0.82f, 0.31f, 0.8f), 0.03f);
 		// the seat cushion, its front edge rolled
 		k.Color = leather * 1.08f;
-		BuildKit.Box(k, new Vector3(0, 0.44f, 0.04f), new Vector3(0.56f, 0.07f, 0.6f));
+		k.BevelBox(new Vector3(0, 0.44f, 0.04f), new Vector3(0.56f, 0.07f, 0.6f), 0.03f);
 		k.Cylinder(new Vector3(-0.28f, 0.44f, 0.34f), new Vector3(0.28f, 0.44f, 0.34f), 0.035f, 0.035f, 10, true);
 		k.Cylinder(new Vector3(-0.28f, 0.475f, 0.04f), new Vector3(0.28f, 0.475f, 0.04f), 0.012f, 0.012f, 6, false);   // its welt
 		// the arms: a panel, a roll along the top, a scroll at the front
 		foreach (float s in new[] { -1f, 1f })
 		{
 			k.Color = leather * 0.95f;
-			BuildKit.Box(k, new Vector3(s * 0.35f, 0.53f, 0.0f), new Vector3(0.12f, 0.24f, 0.76f));
+			k.BevelBox(new Vector3(s * 0.35f, 0.53f, 0.0f), new Vector3(0.12f, 0.24f, 0.76f), 0.03f);
 			k.Color = leather * 1.12f;
 			k.Cylinder(new Vector3(s * 0.365f, 0.66f, -0.34f), new Vector3(s * 0.365f, 0.66f, 0.39f), 0.075f, 0.075f, 14, true);
 			k.Color = leather * 0.85f;
 			k.Cylinder(new Vector3(s * 0.355f, 0.62f, 0.39f), new Vector3(s * 0.355f, 0.62f, 0.405f), 0.1f, 0.1f, 16, true);
-			BuildKit.Box(k, new Vector3(s * 0.355f, 0.45f, 0.4f), new Vector3(0.14f, 0.3f, 0.015f));
+			k.BevelBox(new Vector3(s * 0.355f, 0.45f, 0.4f), new Vector3(0.14f, 0.3f, 0.015f), 0.03f);
 		}
 		// the back, leaning, rolled over the top, its cushion
 		k.Color = leather * 0.9f;
-		BuildKit.Box(k, new Vector3(0, 0.66f, -0.34f), new Vector3(0.84f, 0.52f, 0.15f), 1f, BuildKit.Face.None, lean);
+		k.BevelBox(new Vector3(0, 0.66f, -0.34f), new Vector3(0.84f, 0.52f, 0.15f), 0.035f, 1f, lean);
 		k.Color = leather * 1.05f;
 		Vector3 top = new Vector3(0, 0.66f, -0.34f) + lean * new Vector3(0, 0.27f, 0);
 		k.Cylinder(top + new Vector3(-0.43f, 0, 0), top + new Vector3(0.43f, 0, 0), 0.085f, 0.085f, 14, true);
 		k.Color = leather * 1.1f;
-		BuildKit.Box(k, new Vector3(0, 0.68f, -0.25f), new Vector3(0.56f, 0.34f, 0.07f), 1f, BuildKit.Face.None, lean);
+		k.BevelBox(new Vector3(0, 0.68f, -0.25f), new Vector3(0.56f, 0.34f, 0.07f), 0.035f, 1f, lean);
 		// turned feet
 		foreach (float fx in new[] { -0.36f, 0.36f })
 			foreach (float fz in new[] { -0.34f, 0.36f })
@@ -453,19 +456,19 @@ public partial class Library : Node3D
 		float cz2 = Depth - 0.75f;
 		_body.AddChild(new CollisionShape3D { Position = new Vector3(4.7f, 1.05f, cz2), Shape = new BoxShape3D { Size = new Vector3(0.5f, 2.1f, 0.4f) } });
 		k.Color = Colors.White * 0.9f;
-		BuildKit.Box(k, new Vector3(4.7f, 0.2f, cz2), new Vector3(0.52f, 0.4f, 0.44f));
-		BuildKit.Box(k, new Vector3(4.7f, 0.42f, cz2), new Vector3(0.48f, 0.05f, 0.4f));
+		k.BevelBox(new Vector3(4.7f, 0.2f, cz2), new Vector3(0.52f, 0.4f, 0.44f), 0.012f);
+		k.BevelBox(new Vector3(4.7f, 0.42f, cz2), new Vector3(0.48f, 0.05f, 0.4f), 0.012f);
 		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(4.72f, 0.92f, cz2), new Vector3(0.42f, 0.96f, 0.34f));
+		k.BevelBox(new Vector3(4.72f, 0.92f, cz2), new Vector3(0.42f, 0.96f, 0.34f), 0.012f);
 		k.Color = Colors.White * 1.15f;
-		BuildKit.Box(k, new Vector3(4.505f, 0.95f, cz2), new Vector3(0.012f, 0.7f, 0.22f));   // the trunk's door
+		k.BevelBox(new Vector3(4.505f, 0.95f, cz2), new Vector3(0.012f, 0.7f, 0.22f), 0.012f);   // the trunk's door
 		k.Color = Colors.White * 0.9f;
-		BuildKit.Box(k, new Vector3(4.7f, 1.42f, cz2), new Vector3(0.48f, 0.05f, 0.4f));
+		k.BevelBox(new Vector3(4.7f, 1.42f, cz2), new Vector3(0.48f, 0.05f, 0.4f), 0.012f);
 		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(4.7f, 1.66f, cz2), new Vector3(0.5f, 0.44f, 0.42f));
+		k.BevelBox(new Vector3(4.7f, 1.66f, cz2), new Vector3(0.5f, 0.44f, 0.42f), 0.012f);
 		k.Color = Colors.White * 0.85f;
-		BuildKit.Box(k, new Vector3(4.69f, 1.91f, cz2), new Vector3(0.54f, 0.06f, 0.46f));
-		BuildKit.Box(k, new Vector3(4.7f, 1.99f, cz2), new Vector3(0.46f, 0.1f, 0.38f));
+		k.BevelBox(new Vector3(4.69f, 1.91f, cz2), new Vector3(0.54f, 0.06f, 0.46f), 0.012f);
+		k.BevelBox(new Vector3(4.7f, 1.99f, cz2), new Vector3(0.46f, 0.1f, 0.38f), 0.012f);
 		k.Color = Colors.White;
 		k.CommitTo(this, "Tables", true);
 		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.15f, BottomRadius = 0.15f, Height = 0.02f, RadialSegments = 24 }, Position = new Vector3(4.448f, 1.66f, cz2), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.66f, 0.6f, 0.47f), Roughness = 0.8f } });

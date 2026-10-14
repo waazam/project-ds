@@ -66,6 +66,9 @@ public partial class Playtest : Node
 		public readonly Dictionary<string, BeatResult> Results = new();
 		public readonly ulong StartMs = Time.GetTicksMsec();
 		public ulong BeatStartMs, SeedAskedMs;
+		/// <summary>When this phase of the beat began (a reload begins a new one): the fps meter waits 1.5 s after it, so the
+		/// first frames after a reload's build (2026-10-14c: they read as a "3 fps minimum" in Act 18) aren't counted.</summary>
+		public ulong PhaseStartMs;
 		public double LoadTotal;
 		public int MenusSeen;
 		public bool FirstBootUsed;
@@ -263,6 +266,7 @@ public partial class Playtest : Node
 	{
 		Begin(beat);
 		if (_s.Active != _s.Index) { _s.Active = _s.Index; _s.Phase = 0; _s.BeatStartMs = Time.GetTicksMsec(); }
+		_s.PhaseStartMs = Time.GetTicksMsec();
 		ErrorLog.Beat = beat.Id;
 		GD.Print($"[playtest] ---- {beat.Id} {beat.Name} (phase {_s.Phase})");
 		var beatCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
@@ -351,7 +355,7 @@ public partial class Playtest : Node
 		if (_s == null || _bot?.Player == null || !IsInstanceValid(_bot.Player)) return;
 		_bot.Tick();
 		_fpsTimer += delta / Math.Max(Engine.TimeScale, 0.01);
-		if (_fpsTimer >= 0.5 && _s.Active == _s.Index && Result is { } r && !GetTree().Paused && Time.GetTicksMsec() - _s.BeatStartMs > 1500)
+		if (_fpsTimer >= 0.5 && _s.Active == _s.Index && Result is { } r && !GetTree().Paused && Time.GetTicksMsec() - _s.PhaseStartMs > 1500)
 		{
 			_fpsTimer = 0;
 			float fps = (float)Engine.GetFramesPerSecond();

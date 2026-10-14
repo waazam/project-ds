@@ -76,7 +76,7 @@ public partial class RoundRoom : Node3D
 	/// <summary>The dais: a dressed pale stone, unlike the poured walls (it was the walls' concrete, paler).</summary>
 	private static StandardMaterial3D DaisStone => _daisStone ??= SurfaceSets.Relief(new StandardMaterial3D
 	{
-		ResourceName = "roundroom_dais", AlbedoTexture = SurfaceSets.Tex("limestone"), AlbedoColor = new Color(0.5f, 0.48f, 0.44f), Roughness = 0.9f,
+		ResourceName = "roundroom_dais", AlbedoTexture = SurfaceSets.Tex("limestone"), AlbedoColor = new Color(0.42f, 0.4f, 0.37f), Roughness = 0.9f,
 		MetallicSpecular = 0.25f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = false, Uv1Scale = Vector3.One * 0.7f,
 		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
 	}, "limestone", 1.2f);
@@ -250,9 +250,9 @@ public partial class RoundRoom : Node3D
 			}
 			// jambs and a deep sill
 			frame.Color = Colors.White * 0.95f;
-			Seg(frame, face - side * (w * 0.5f + 0.09f) + Vector3.Up * (y0 + y1) * 0.5f, new Vector3(0.2f, y1 - y0, 0.26f), a, false);
-			Seg(frame, face + side * (w * 0.5f + 0.09f) + Vector3.Up * (y0 + y1) * 0.5f, new Vector3(0.2f, y1 - y0, 0.26f), a, false);
-			Seg(frame, face - d * 0.1f + Vector3.Up * (y0 - 0.08f), new Vector3(w + 0.5f, 0.16f, 0.45f), a, false);
+			frame.BevelBox(face - side * (w * 0.5f + 0.09f) + Vector3.Up * (y0 + y1) * 0.5f, new Vector3(0.2f, y1 - y0, 0.26f), 0.035f, 1f, new Basis(Vector3.Up, a));   // (2026-10-14c: eased edges)
+			frame.BevelBox(face + side * (w * 0.5f + 0.09f) + Vector3.Up * (y0 + y1) * 0.5f, new Vector3(0.2f, y1 - y0, 0.26f), 0.035f, 1f, new Basis(Vector3.Up, a));   // (2026-10-14c: eased edges)
+			frame.BevelBox(face - d * 0.1f + Vector3.Up * (y0 - 0.08f), new Vector3(w + 0.5f, 0.16f, 0.45f), 0.035f, 1f, new Basis(Vector3.Up, a));   // (2026-10-14c: eased edges)
 			// mullion bars in front of the bricks, as if there were glass once
 			frame.Color = new Color(0.25f, 0.24f, 0.22f);
 			frame.Beam(face - d * 0.07f + Vector3.Up * y0, face - d * 0.07f + Vector3.Up * (y1 + w * 0.5f), 0.05f, 0.05f, 1f, d);

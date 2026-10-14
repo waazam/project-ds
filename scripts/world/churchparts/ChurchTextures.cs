@@ -251,10 +251,25 @@ public static class ChurchTextures
 		Color c = white ? new Color(0.86f, 0.84f, 0.8f) * (0.92f + 0.1f * fine) : new Color(0.09f, 0.09f, 0.1f) * (0.9f + 0.4f * fine);
 		c = c.Lerp(white ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.3f, 0.3f, 0.32f), Mathf.Clamp(1f - vein / 0.05f, 0f, 1f) * 0.4f);
 		if (x % 64 == 0 || y % 64 == 0) c = new Color(0.4f, 0.38f, 0.35f);
+		// (2026-10-14c: it read as a clean game board, white and black edge to edge. Now centuries down there: the white
+		// gone to a yellowed grey, the black to a dusty charcoal, grime packed in the joints and spreading from them, damp
+		// blotches, and a square here and there cracked)
+		var dirt = new Color(0.22f, 0.19f, 0.15f);
+		c = white ? c.Lerp(new Color(0.4f, 0.37f, 0.31f), 0.7f) : c.Lerp(new Color(0.17f, 0.16f, 0.15f), 0.45f);
+		int jx = Mathf.Min(x % 64, 63 - x % 64), jy = Mathf.Min(y % 64, 63 - y % 64);
+		float joint = 1f - Mathf.SmoothStep(0f, 7f, Mathf.Min(jx, jy));
+		float blot = Mathf.SmoothStep(0.5f, 0.75f, Fbm(x, y, 256, 4, 4, 563));
+		c = c.Lerp(dirt, Mathf.Clamp(joint * 0.55f + blot * 0.45f, 0f, 0.8f));
+		int tile = (x / 64) * 7 + (y / 64) * 13;
+		if (Hash(tile, 0, 564) < 0.3f)
+		{
+			float crack = Mathf.Abs(Mathf.Sin((x + y * (Hash(tile, 1, 565) - 0.5f) * 2f) * 0.09f + Fbm(x, y, 256, 8, 3, 566) * 5f));
+			if (crack < 0.035f) c = dirt * 0.45f;
+		}
 		return c * SurfaceKit.Grain("limestone", x / 256f, y / 256f, 0.2f, 2f);
 	});
 
-	public static StandardMaterial3D ChequerMat => Tint(Uv("ch_chequer", Chequer, 2f, 0.45f, 0.4f), new Color(0.45f, 0.44f, 0.43f));
+	public static StandardMaterial3D ChequerMat => Tint(Uv("ch_chequer", Chequer, 2f, 0.62f, 0.32f), new Color(0.5f, 0.48f, 0.46f));   // (2026-10-14c: duller: was 0.45 rough, a polished board)
 
 	// ------------------------------------------------------------------ wood, metal, glass, snow
 
@@ -428,13 +443,32 @@ public static class ChurchTextures
 		else if (r < 0.62f) c = (pi % 2 == 0) ? new Color(0.1f, 0.18f, 0.66f) : new Color(0.64f, 0.08f, 0.1f);
 		else if (r < 0.8f) c = (pi % 3 == 0) ? new Color(0.8f, 0.58f, 0.14f) : new Color(0.1f, 0.4f, 0.22f);
 		else c = new Color(0.08f, 0.14f, 0.5f);
-		float lum = 0.85f + 0.25f * Hash(pi, (int)(r * 12), 631);
-		c *= lum;
-		// tracery: the petal edges, the rings, spokes
-		if (Mathf.Abs(pf - 0.5f) > 0.46f || Mathf.Abs(r - 0.16f) < 0.02f || Mathf.Abs(r - 0.62f) < 0.018f || Mathf.Abs(r - 0.8f) < 0.018f || Mathf.Abs(r - 0.96f) < 0.02f)
-			c = new Color(0.02f, 0.02f, 0.02f);
-		// small pieces inside each petal
-		if (Mathf.Abs(Mathf.Sin(r * 40f)) < 0.08f && r > 0.2f) c *= 0.3f;
+		// (2026-10-14c, the graphics pass: it read as a dartboard, flat primaries in clean rings. Now old glass: every
+		// petal cut into small irregular pieces in the lead, each its own shade and flaw, the colours sunk and smoky,
+		// grimed toward the rim, a roundel set in each petal's head, stone tracery between the petals.)
+		int band = r < 0.16f ? 0 : r < 0.62f ? 1 : r < 0.8f ? 2 : 3;
+		int sub = band == 1 ? Mathf.FloorToInt(pf * 3f) : band == 3 ? Mathf.FloorToInt(pf * 2f) : 0;
+		int ring = Mathf.FloorToInt(r * (band == 1 ? 11f : 8f) + 0.6f * Noise(a * 6f, r * 4f, 64, 640));
+		float ph = Hash(pi * 7 + sub, ring + band * 31, 632);
+		c = c.Lerp(ph < 0.25f ? new Color(0.55f, 0.42f, 0.18f) : ph > 0.85f ? new Color(0.3f, 0.32f, 0.36f) : c, ph < 0.25f || ph > 0.85f ? 0.55f : 0f);
+		float grey = (c.R + c.G + c.B) / 3f;
+		c = c.Lerp(new Color(grey, grey, grey), 0.3f);
+		c *= 0.5f + 0.45f * Hash(pi * 13 + sub, ring, 633) * (0.8f + 0.4f * Fbm(x, y, 256, 16, 2, 634));
+		// a roundel in the head of each petal
+		float ca = (pi + 0.5f) * Mathf.Tau / 12f - Mathf.Pi;
+		var rc = new Vector2(Mathf.Cos(ca), Mathf.Sin(ca)) * 0.71f;
+		float rd = (p - rc).Length();
+		if (rd < 0.075f) c = new Color(0.62f, 0.44f, 0.16f) * (0.55f + 0.3f * Fbm(x, y, 256, 32, 2, 635));
+		// grime: the edge of each piece and the rim of the window darker, smoke in drifts
+		c *= Mathf.Lerp(1f, 0.6f, Mathf.SmoothStep(0.55f, 0.97f, r)) * (0.75f + 0.35f * Fbm(x, y, 256, 4, 3, 636));
+		// the stone tracery (broad, dark) and the lead between the pieces (thin, black)
+		bool stone = Mathf.Abs(pf - 0.5f) > 0.465f && band >= 1 || Mathf.Abs(r - 0.16f) < 0.022f || Mathf.Abs(r - 0.62f) < 0.02f
+			|| Mathf.Abs(r - 0.8f) < 0.02f || r > 0.95f || Mathf.Abs(rd - 0.085f) < 0.014f;
+		float subF = band == 1 ? pf * 3f : band == 3 ? pf * 2f : 0.5f;
+		float ringF = r * (band == 1 ? 11f : 8f) + 0.6f * Noise(a * 6f, r * 4f, 64, 640);
+		bool lead = band > 0 && (Mathf.Abs(subF - Mathf.Round(subF)) < 0.05f || Mathf.Abs(ringF - Mathf.Round(ringF)) < 0.07f) || Mathf.Abs(rd - 0.04f) < 0.006f;
+		if (stone) return new Color(0.05f, 0.045f, 0.04f) * (0.7f + 0.6f * Fbm(x, y, 256, 16, 2, 637));
+		if (lead) return new Color(0.015f, 0.015f, 0.015f);
 		return c;
 	}, false);
 

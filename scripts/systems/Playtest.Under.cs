@@ -578,7 +578,11 @@ public partial class Playtest
 			Vector3 target = boss.ToGlobal(boss.RingLocal(sp + Mathf.Sign(bestOff) * Mathf.Min(Mathf.Abs(bestOff) + 0.8f, 2.2f)));
 			Trace18($"evade sp {sp:0.0} off {bestOff:0.0} v {TestBot.Flat(Player.Velocity).Length():0.0} run {Player.Stamina?.CanRun} | " + string.Join("; ", threats.Select(th => $"{boss.RingOf(boss.ToLocal(th.Item1)):0.0}@{TestBot.Flat(th.Item1 - Player.GlobalPosition).Length():0.0}m r{th.Item3:0.0} {th.Item2:0.00}s")));
 			Input.ScriptedInteract = false;
-			_bot.Steer(target);
+			// (2026-10-14c, the flaky "never crushed": Steer turns the view 5 degrees a frame, so a slam behind them on
+			// the way to a valve had the bot run on toward it for a third of a second while it came round, into the
+			// circle, then stall against the valve; a player flicks the mouse round. The view is turned at once.)
+			var away = TestBot.Flat(target - Player.GlobalPosition);
+			if (away.LengthSquared() > 0.01f) Player.CameraRig.SnapBehind(Mathf.Atan2(-away.X, -away.Z));
 			Input.ScriptedMove = new Vector2(0, 1);
 			Input.ScriptedRun = true;
 			return "evade";

@@ -157,6 +157,10 @@ public partial class Act15Hallway : Node3D
 			float s = _rng.Randf() < 0.5f ? -1f : 1f;
 			Box(black, new Vector3(s * (W1 * 0.5f - 0.005f), 1.2f, z), new Vector3(0.02f, 2.3f, 1.0f), null, false);
 			Box(wall, new Vector3(s * (W1 * 0.5f - 0.06f), 2.4f, z), new Vector3(0.14f, 0.12f, 1.25f), null, false, 0.8f);
+			// (2026-10-14c) a reveal round it, the black set back in the wall's thickness: it was a black card on the face
+			foreach (float e in new[] { -1f, 1f })
+				Box(wall, new Vector3(s * (W1 * 0.5f - 0.035f), 1.17f, z + e * 0.535f), new Vector3(0.07f, 2.34f, 0.07f), null, false, 0.72f);
+			Box(wall, new Vector3(s * (W1 * 0.5f - 0.03f), 0.015f, z), new Vector3(0.06f, 0.03f, 1.0f), null, false, 0.6f);
 		}
 
 		// the taper: the walls lean apart and the ceiling climbs
@@ -237,10 +241,16 @@ public partial class Act15Hallway : Node3D
 		_stripMat2 = Glow(Green, 1.3f);
 		s2.Mat(_stripMat2);
 		s1.Color = s2.Color = Colors.White;
+		// (2026-10-14c) each segment's bars sit in a low steel channel let into the floor, scuffed at its ends: they lay on
+		// the bare concrete like glowing sticks
+		var housing = new MeshKit();
+		housing.Mat(new StandardMaterial3D { ResourceName = "hw_strip_channel", AlbedoColor = new Color(0.07f, 0.07f, 0.065f), Metallic = 0.6f, Roughness = 0.55f, VertexColorUseAsAlbedo = true });
+		housing.Color = Colors.White;
 		void Strip(MeshKit k, float x, float z)
 		{
 			for (int b = -1; b <= 1; b++)
 				BuildKit.Box(k, new Vector3(x + b * 0.06f, 0.006f, z), new Vector3(0.03f, 0.012f, 0.75f));
+			BuildKit.Box(housing, new Vector3(x, 0.005f, z), new Vector3(0.21f, 0.01f, 0.82f), 1f, BuildKit.Face.NY);
 		}
 		for (float z = 1f; z < Part1 + Taper; z += 1f)
 		{
@@ -265,6 +275,7 @@ public partial class Act15Hallway : Node3D
 			Strip(rng.Randf() < 0.09f ? c2 : c1, 0f, z);
 		c1.CommitTo(this, "StripsCentre", false);
 		c2.CommitTo(this, "StripsCentreDead", false);
+		housing.CommitTo(this, "StripChannels", false);
 	}
 
 	/// <summary>The centre row's failing: every few seconds a soft dip (down to a third and back over a quarter of a

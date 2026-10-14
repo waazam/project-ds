@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-14c — Acts 15-21, the deep places' own surfaces: painted service doors in real frames (no more polka-dot steel), the closet's painted block, the round room's and the long stair's stained concrete with relief, no snow underground, the library's door casing, club chairs, clock, globe and a fire on logs, an old rose window and a worn crypt floor; the flaky Act 18 beat was the bot running into the slam while it turned](2026-10-14c-acts-15-21-the-deep-places-own-surfaces.md)
 - [2026-10-14b — Acts 8-14, each part its own surface: the station's plank floor, plaster ceiling, boarded wainscot, dark casings and green-painted panel doors (it was all one wood), its lamp's rose no longer blown out; Room 3's tread floor, rusted ceilings and real lamp shades; the stairwell's concrete in relief; the bunker's puddles as wet concrete, not black holes, its side doors, rust, chain and telephone rebuilt; the lake shore's photographed floor in relief and the cypresses' curved feet; the near miss's spray and sounds made ahead; `MeshKit.BevelBox`](2026-10-14b-acts-8-14-each-part-its-own-surface.md)
 
 - [2026-10-13m — The puzzle box by hand: Act 19's pieces picked up, dragged and dropped with the left mouse, turned with right-click or the wheel; a snapping ghost (warm where it fits, red where not), a lift and a shadow in hand; the keys and the pad as before](2026-10-13m-the-puzzle-box-by-hand.md)
