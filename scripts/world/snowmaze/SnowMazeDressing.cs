@@ -80,8 +80,11 @@ public partial class SnowMazeCave
 					var p = a + along * s + side * sd * w;
 					if (Open(p)) continue;
 					float r = rng.RandfRange(0.08f, 0.115f);
-					logs.Cylinder(p with { Y = floor }, p with { Y = top + rng.RandfRange(-0.05f, 0.12f) }, r, r * 0.95f, 8, true, 0.5f);
-					snow.Blob(p with { Y = top + 0.13f }, new Vector3(r * 1.1f, 0.05f, r * 1.1f), (int)(s * 31f) + (sd > 0 ? 7 : 0), 0.3f, true, 1f);
+					float postTop = top + rng.RandfRange(-0.05f, 0.12f);
+					logs.Cylinder(p with { Y = floor }, p with { Y = postTop }, r, r * 0.95f, 8, true, 0.5f);
+					// (2026-10-14d: the cap sits on its own post's top, a little down over it; it was at one height for every
+					// post, 1-18 cm over the shorter ones, on nothing)
+					snow.Blob(p with { Y = postTop + 0.025f }, new Vector3(r * 1.15f, 0.055f, r * 1.15f), (int)(s * 31f) + (sd > 0 ? 7 : 0), 0.3f, true, 1f);
 					Posts++;
 				}
 			// the planks behind the posts, and the walls' collision, a metre at a time

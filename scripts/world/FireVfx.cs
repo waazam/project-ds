@@ -30,6 +30,8 @@ public partial class FireVfx : Node3D
 	/// <summary>Initial smoke direction (local); it always ends up rising.</summary>
 	[Export] public Vector3 SmokeDirection = Vector3.Up;
 	[Export] public bool Embers = true;
+	/// <summary>Oily black smoke (napalm, 2026-10-14d) instead of the wood fire's grey.</summary>
+	[Export] public bool Dark;
 	[Export] public bool EmitLight = true;
 	[Export] public float LightRange = 12f;
 	[Export] public float LightEnergy = 3.2f;
@@ -147,7 +149,7 @@ public partial class FireVfx : Node3D
 				AngularVelocityMin = -20f, AngularVelocityMax = 20f,
 				ScaleMin = 0.8f, ScaleMax = 1.4f,
 				ScaleCurve = Curve01(0.4f, 1.8f),
-				ColorRamp = Ramp(new Color(0.36f, 0.33f, 0.3f, 0f), new Color(0.27f, 0.26f, 0.25f, 0.85f), new Color(0.33f, 0.33f, 0.33f, 0f), 0.1f),
+				ColorRamp = Dark ? Ramp(new Color(0.06f, 0.05f, 0.045f, 0f), new Color(0.04f, 0.035f, 0.03f, 0.92f), new Color(0.09f, 0.09f, 0.09f, 0f), 0.1f) : Ramp(new Color(0.36f, 0.33f, 0.3f, 0f), new Color(0.27f, 0.26f, 0.25f, 0.85f), new Color(0.33f, 0.33f, 0.33f, 0f), 0.1f),
 				TurbulenceEnabled = true,
 				TurbulenceNoiseStrength = 0.8f,
 				TurbulenceNoiseScale = 4f,

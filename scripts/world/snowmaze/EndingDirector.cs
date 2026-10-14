@@ -299,7 +299,7 @@ public partial class EndingDirector : Node3D
 		foreach (var g in _car.FindChildren("*", "", true, false))
 			if (g is GeometryInstance3D gi && !(_opening?.IsAncestorOf(gi) ?? false) && !UnderGeometry(gi, _car))
 				gi.GlobalTransform = carXf * (squash * (carXf.AffineInverse() * gi.GlobalTransform));
-		var fire = new FireVfx { Name = "Burning", Extent = new Vector3(0.7f, 1.4f, 0.6f), FlameScale = 0.8f, LightRange = 7f, LightEnergy = 2f, LightShadows = false, Position = new Vector3(0, 2f, 0) };
+		var fire = new NapalmBurn { Name = "Burning", LightRange = 7f, LightEnergy = 2.2f };   // (2026-10-14d: the fire on its bones)
 		w.AddChild(fire);
 		await Cutscene.Wait(this, 1.2, ct);
 		// down off the car and at them, slow, burning, dragging itself

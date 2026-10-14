@@ -1,4 +1,4 @@
-using Godot;
+﻿using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Systems;
 using ProjectDS.World;
@@ -37,7 +37,7 @@ public partial class Flamethrower : Node3D
 	private PlayerController _player;
 	private Node3D _wand, _nozzle;
 	private bool _active;
-	private float _lock, _kick, _sway, _pilotT;
+	private float _lock, _kick, _sway, _pilotT, _fire;
 	/// <summary>0 lowered out of view .. 1 up in the hands.</summary>
 	public float WandRaise { get; private set; }
 	/// <summary>How the hands sit on the wand's two grips (tuned to the hand's Stick pose).</summary>
@@ -99,7 +99,9 @@ public partial class Flamethrower : Node3D
 		// the igniter's little flame, always lit while it's held, its light on the hands
 		_pilot = new OmniLight3D { Name = "Pilot", Position = _nozzle.Position + new Vector3(0, 0.02f, 0.02f), LightColor = new Color(1f, 0.6f, 0.25f), LightEnergy = 0.25f, OmniRange = 1.4f, ShadowEnabled = false };
 		_wand.AddChild(_pilot);
-		var pilotFlame = new FireVfx { Name = "PilotFlame", Extent = new Vector3(0.025f, 0.05f, 0.025f), FlameScale = 0.4f, Smoke = false, Embers = false, EmitLight = false, Haze = false, Position = _nozzle.Position + new Vector3(0, 0.015f, 0.01f) };
+		// (2026-10-14d: two small licks at the mouth; the FireVfx here drew a flat disc of fire 35 cm across)
+		var pilotFlame = NapalmStream.PilotFlame();
+		pilotFlame.Position = _nozzle.Position + new Vector3(0f, 0.012f, 0.012f);
 		_wand.AddChild(pilotFlame);
 		_vent = new GpuParticles3D
 		{
@@ -117,9 +119,9 @@ public partial class Flamethrower : Node3D
 	private static System.Collections.Generic.Dictionary<string, Material> WandRoles => _roles ??= new()
 	{
 		// (painted steel, worn: matte olive drab; glossier and more metal, under its own warm pilot light it read as gold)
-		["olive"] = new StandardMaterial3D { ResourceName = "ft_olive", AlbedoColor = new Color(0.17f, 0.19f, 0.11f), Roughness = 0.82f, Metallic = 0.05f, AlbedoTexture = ProcTextures.Grime() },
-		["steel"] = new StandardMaterial3D { ResourceName = "ft_steel", AlbedoColor = new Color(0.16f, 0.16f, 0.16f), Roughness = 0.6f, Metallic = 0.6f },
-		["brass"] = new StandardMaterial3D { ResourceName = "ft_brass", AlbedoColor = new Color(0.36f, 0.28f, 0.14f), Roughness = 0.6f, Metallic = 0.6f, AlbedoTexture = ProcTextures.Grime() },
+		["olive"] = new StandardMaterial3D { ResourceName = "ft_olive", AlbedoColor = new Color(0.095f, 0.11f, 0.085f), Roughness = 0.94f, Metallic = 0f, MetallicSpecular = 0.15f, AlbedoTexture = ProcTextures.Grime() },
+		["steel"] = new StandardMaterial3D { ResourceName = "ft_steel", AlbedoColor = new Color(0.13f, 0.13f, 0.135f), Roughness = 0.68f, Metallic = 0.5f, AlbedoTexture = ProcTextures.Grime() },
+		["brass"] = new StandardMaterial3D { ResourceName = "ft_brass", AlbedoColor = new Color(0.2f, 0.16f, 0.1f), Roughness = 0.78f, Metallic = 0.35f, AlbedoTexture = ProcTextures.Grime() },
 		["rubber"] = new StandardMaterial3D { ResourceName = "ft_rubber", AlbedoColor = new Color(0.035f, 0.035f, 0.035f), Roughness = 0.8f },
 		["grip"] = new StandardMaterial3D { ResourceName = "ft_grip", AlbedoColor = new Color(0.08f, 0.07f, 0.06f), Roughness = 0.7f },
 		["soot"] = new StandardMaterial3D { ResourceName = "ft_soot", AlbedoColor = new Color(0.05f, 0.045f, 0.04f), Roughness = 0.9f },
@@ -217,7 +219,15 @@ public partial class Flamethrower : Node3D
 			foreach (var h in _hands) { h.Stride = Mathf.Sin(_sway) * Mathf.Clamp(_player.GroundSpeed / 3f, 0f, 1f); h.Tension = Mathf.Max(_kick, _player.IsRunning ? 1f : 0f); }
 			_wand.Position = WandRest + bob + shake + new Vector3(0f, 0.004f, 0.025f) * _kick + new Vector3(0.05f, -0.42f, 0.12f) * (1f - up);
 			_wand.Rotation = new Vector3(0.03f * _kick - 0.5f * (1f - up), 0.04f, -0.25f * (1f - up));
-			if (_pilot != null) _pilot.LightEnergy = Firing ? 0.8f : 0.25f;
+			// the mouth's light: the pilot's small glow on the hands; firing, the jet's glare on the wand, the hands and the
+			// snow underfoot, breathing with it (smooth, never a strobe)
+			if (_pilot != null)
+			{
+				_fire = Mathf.Lerp(_fire, Firing ? 1f : 0f, 1f - Mathf.Exp(-dt * (Firing ? 18f : 6f)));
+				float breathe = 1f + 0.15f * Mathf.Sin(_pilotT * 11f) * Mathf.Sin(_pilotT * 7.3f + 1f);
+				_pilot.LightEnergy = Mathf.Lerp(0.18f, 2.2f * breathe, _fire);
+				_pilot.OmniRange = Mathf.Lerp(1.2f, 4.5f, _fire);
+			}
 		}
 	}
 }

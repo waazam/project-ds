@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Godot;
 using ProjectDS.Audio;
 using ProjectDS.World.LodgeParts;
@@ -655,6 +655,8 @@ public partial class SkiLodge
 			float s = front ? 1f : -1f;
 			areas.Add((new Vector3(x0 + 0.5f, UpperY, Mathf.Min(s * (CorrHalf + 0.5f), s * (InnerZ - 0.5f))), new Vector3(x1 - 0.5f, UpperY, Mathf.Max(s * (CorrHalf + 0.5f), s * (InnerZ - 0.5f))), 9));
 		}
+		SurfaceProbe probe = null;
+		int visualTops = 0, onFurniture = 0;
 		foreach (var (min, max, count) in areas)
 		{
 			int placed = 0;
@@ -675,11 +677,21 @@ public partial class SkiLodge
 						if (space.IntersectRay(PhysicsRayQueryParameters3D.Create(ToGlobal(at + Vector3.Up * 0.3f), ToGlobal(at + Vector3.Up * 0.3f + d * 0.7f), 1)).Count > 0) { near = true; break; }
 					if (!near) continue;
 				}
+				// (2026-10-14d) on a piece of furniture: set down on its drawn top, not its collision box's (which runs up to
+				// 2 cm past it: the things stood on air)
+				if (!floor)
+				{
+					probe ??= new SurfaceProbe(this);
+					onFurniture++;
+					if (probe.TopNear((Vector3)hit["position"], 0.25f, 0.01f) is float y) { at = ToLocal(((Vector3)hit["position"]) with { Y = y }); visualTops++; }
+					else continue;   // (a collision box with nothing drawn on top: an invisible blocker; not on air)
+				}
 				string model = floor ? onFloor[_orng.RandiRange(0, onFloor.Length - 1)] : onTop[_orng.RandiRange(0, onTop.Length - 1)];
 				if (FurnitureKit.Add(k, model, at + Vector3.Up * 0.002f, _orng.RandfRange(0, Mathf.Tau), roles)) { placed++; Clutter++; }
 			}
 		}
 		k.CommitTo(this, "Clutter", true);
+		GD.Print($"[lodge] room clutter: {Clutter} placed, {visualTops} of {onFurniture} tries on furniture set on its drawn top");
 	}
 
 	// ------------------------------------------------------------------ the fire's last of it

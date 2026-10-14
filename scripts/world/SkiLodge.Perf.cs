@@ -79,6 +79,7 @@ public partial class SkiLodge
 			StationParts.StationTextures.BloodPoolMat, LodgeTextures.CopperMat, LodgeTextures.LeakMat,
 			SnowMaze.SnowMazeLook.PackedSnow(),   // (the tunnel out of the doors, built as the finale begins)
 		}) mats.Add(m);
+		foreach (var m in NapalmStream.WarmMaterials()) mats.Add(m);   // (2026-10-14d: the flamethrower's fire, the wendigo burning)
 		int i = 0;
 		foreach (var m in mats)
 		{

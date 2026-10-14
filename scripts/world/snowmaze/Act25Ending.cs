@@ -105,6 +105,7 @@ public static class Act25Ending
 		body.Hold("crouch", 1f, 0.5);
 		var fire = new FireVfx { Name = "Pyre", Extent = new Vector3(1.0f, 2.2f, 1.0f), FlameScale = 1f, LightRange = 9f, LightEnergy = 2.6f, LightShadows = false, Position = new Vector3(0, 0.2f, 0) };
 		body.AddChild(fire);
+		body.AddChild(new NapalmBurn { Name = "Burning", Size = WendigoHunter.BodyScale, LightEnergy = 1.4f });   // (2026-10-14d: and on it, all over it)
 		await Cutscene.Wait(owner, 1.6, ct);
 		// it burns through: the snow at its back sags and melts away, and there's light beyond
 		var hole = new MeshInstance3D

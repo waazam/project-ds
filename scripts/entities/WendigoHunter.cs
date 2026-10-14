@@ -70,7 +70,7 @@ public partial class WendigoHunter : Node3D
 	private readonly RandomNumberGenerator _rng = new();
 	private PlayerController _player;
 	private bool _phase2;
-	private FireVfx _burn;
+	private NapalmBurn _burn;
 
 	public void Setup(SnowMazeCave cave, Vector3 startLocal)
 	{
@@ -569,7 +569,7 @@ public partial class WendigoHunter : Node3D
 		AudioDirector.OneShot(this, "wendigo_howl_01", 1, Body.GlobalPosition + Vector3.Up * 3f, 4f, "Unnatural", 12f, 0.02f);
 		if (_burn == null || !IsInstanceValid(_burn))
 		{
-			_burn = new FireVfx { Name = "Burning", Extent = new Vector3(0.6f, 1.2f, 0.5f), FlameScale = 0.7f, LightRange = 6f, LightEnergy = 1.6f, LightShadows = false, Haze = false, Position = new Vector3(0, 1.4f, 0) };
+			_burn = new NapalmBurn { Name = "Burning", Size = BodyScale, LightRange = 6f, LightEnergy = 1.8f };   // (2026-10-14d: the fire on its bones, not a box of it beside it)
 			Body.AddChild(_burn);
 		}
 		_burn.Intensity = 1f;
