@@ -56,6 +56,7 @@ public sealed class TestBot
 		i.ScriptedMove = Vector2.Zero;
 		i.ScriptedRun = i.ScriptedFocus = i.ScriptedInteract = i.ScriptedLight = i.ScriptedPhoto = false;
 		i.ScriptedItemNext = i.ScriptedItemPrev = i.ScriptedPhotoLog = i.ScriptedLanternMode = i.ScriptedCrouch = i.ScriptedThrow = i.ScriptedBreath = false;
+		i.ScriptedSlot = 0;
 	}
 
 	// ------------------------------------------------------------------ time
@@ -395,11 +396,21 @@ public sealed class TestBot
 		await Seconds(0.2, ct);
 	}
 
+	/// <summary>(2026-10-13j) The camera into the right hand (right mouse raises it only from there), waiting while it comes up.</summary>
+	public async Task CameraInHand(CancellationToken ct)
+	{
+		var inv = Player?.Inventory;
+		if (inv == null || !inv.HasCamera || inv.InHand == ToolKind.Camera && PlayerHands.CameraReady(Player)) return;
+		inv.Select(ToolKind.Camera);
+		for (int i = 0; i < 40 && !PlayerHands.CameraReady(Player); i++) await Seconds(0.05, ct);
+	}
+
 	/// <summary>Raises the camera, zooms, aims at <paramref name="at"/>, lets the focus come in, and takes the picture.</summary>
 	public async Task<PhotoLog.Photo> TakePicture(Vector3 at, int zoom, CancellationToken ct)
 	{
 		var cam = FirstOf<CameraTool>();
 		int before = PhotoLog.Instance?.RecordedCount ?? 0;
+		await CameraInHand(ct);
 		Input.ScriptedFocus = true;
 		try
 		{

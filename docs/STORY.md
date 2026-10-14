@@ -3,7 +3,7 @@
 The authoritative outline of the game's story, act by act. Implementation follows this document. If the game and this document disagree, this document wins; raise the difference with Dan before changing either.
 
 **Revision 4 (2026-10-13): the whole story, as built.** This revision brings the outline up to date with the game through Act 25 and the end. It adds no new story; it describes what the game does, including Dan's changes of 2026-10-13: the falls seen in Act 1 and the title only with the stairs in view, the single wake, the code kept from memory, the clearing and the blood rain coming in at the cabin door, the fall off the edge of the last landing, the new rowing, and the shorter stairwell, hallways and long stair. Earlier revisions:
-- **Revision 4.1 (2026-10-13): owner decisions.** Dan settled the open points against the game as it plays: the rain stops for good when the cap is picked up, still inside the cabin; the code trees stay where they are (two on the walk to the cabin, two on the walk to the bunker) and the code is dialled from memory; the fir holds the player 7 to 9 seconds, and falls anyway after about 25 if they never look; the Act 11 climb stays short (about 32 seconds) and the long stair is 16 flights; the stairwell's music is timed to build to the bottom; every lake crossing has one near miss right behind the boat; "Who are you!" is the player's own shout; the giant paces its sky lane until the player has watched the fire, its rattle riding with it; and two rules loosened (rare one- or two-word thought captions; the album's and the credits' count of 69).
+- **Revision 4.1 (2026-10-13): owner decisions.** Dan settled the open points against the game as it plays: the rain stops for good when the cap is picked up, still inside the cabin; the code trees stay where they are (two on the walk to the cabin, two on the walk to the bunker) and the code is dialled from memory; the fir holds the player 7 to 9 seconds, and falls anyway after about 25 if they never look; the Act 11 climb stays short (about 32 seconds) and the long stair is 16 flights; the stairwell's music is timed to build to the bottom; every lake crossing has one near miss right behind the boat, and the breach bursts out with no eye opening first; "Who are you!" is the player's own shout; the giant paces its sky lane until the player has watched the fire, its rattle riding with it; and two rules loosened (rare one- or two-word thought captions; the album's and the credits' count of 69).
 - Revision 2 (2026-09-22) made the story linear, with no backtracking.
 - Revision 3 (2026-10-04) carried it past Act 11, through the lake, the station, the underground, the church, the winter woods and the lodge.
 
@@ -286,13 +286,13 @@ Over the black, after a silence, the radio asks one last time: *"Did you see the
 - A rowboat waits at the dock. W rows, both oars pulling together on their own rhythm; Shift rows hard, for as long as the breath lasts; A and D steer (or, alternated, row the old way).
 - The fog closes in on the water as they go, and thins again over the last stretch so the station comes out of it.
 - Something passes under the boat and bumps the hull. A foghorn sounds far off. A limb covered in bloodshot eyes comes up out of the fog to watch them pass, and slides back under. Something knocks on the planks from below.
-- Then the hush, and an eye the size of a house opens under the water beside them.
-- Every crossing has one near miss, scripted: something surfaces right behind the boat, close enough to touch, and goes under again.
-- Short of halfway, limbs covered in bloodshot eyes breach the water all round, a foghorn blast under them, and the lake turns white-capped. A hundred eyes open and blink together. One limb arches over the boat, looking down into it.
+- Then the hush: a shadow slides under the boat and the water stirs, while they are still rowing.
+- Short of halfway, with no warning, it bursts out of the water ahead of them: the boat is thrown back and stopped, spray over the bow (no eye opening first; Dan, 2026-10-13). Limbs covered in bloodshot eyes breach the water all round, a foghorn blast under them, and the lake turns white-capped. A hundred eyes open and blink together. One limb arches over the boat, looking down into it.
 
 **The hunt.** From then on a limb hunts the boat.
 - Row steadily and it falls behind, but every so often it comes for them and only rowing hard holds it off.
 - Limbs surface closer and closer, and two rear up and slam down at the boat: row hard or steer away.
+- Every crossing has one near miss, scripted, after the first strike: something surfaces right behind the boat, close enough to touch, rears there a moment and goes under again.
 - Over the last stretch it gives chase all the way to the beach.
 - Let it close and it knocks on the hull and rears up behind the stern; dawdle and it takes the boat and drags the player under. "The lake took you." reloads the shore.
 

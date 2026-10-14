@@ -6,17 +6,15 @@ using ProjectDS.Systems;
 namespace ProjectDS.UI;
 
 /// <summary>
-/// The item in hand, bottom-right, inside the cinematic bar (the owner): its icon and its name, and
-/// under it, small, the next item the wheel moves to. (2026-10-10c, the owner: "a full overhaul giving it some
-/// personality ... a glowing green ... custom animations for the green glow to really make them pop": all of it neon
-/// now, UI.NeonKit, in the colour chosen in the settings. Its life: the glow breathing slowly; a switch lights the new
-/// one like a tube striking (a soft dip, then full); a pickup sends a ring of light out round its icon; a glint runs
-/// round the icon's bracket now and then. Nothing strobes.) Everything carried still works at any time (the
-/// camera raises on right mouse, the lantern toggles on F, tools are used by walking up to what they're
-/// for); this shows one at a time. The mouse wheel (or the left shoulder button) moves through them,
-/// except while the camera is up (the wheel zooms it) or the album is open (it turns the pages). A new
-/// pickup comes to hand. Redraws on the inventory's ToolChanged signal or a turn of the wheel, not per
-/// frame.
+/// What's in the right hand, bottom-right, inside the cinematic bar (the owner): its icon and its name, and under it,
+/// small, the next one the wheel moves to. (2026-10-10c, the owner: "a full overhaul giving it some personality ... a
+/// glowing green ... custom animations for the green glow to really make them pop": all of it neon, UI.NeonKit, in the
+/// colour chosen in the settings. Its life: the glow breathing slowly; a switch lights the new one like a tube striking (a
+/// soft dip, then full); a pickup sends a ring of light out round its icon. Nothing strobes.)
+/// (2026-10-13j) It names the right hand's thing (<see cref="PlayerInventory.InHand"/>), which the hands really hold now
+/// (<see cref="PlayerHands"/>, <see cref="HeldTool"/>): the wheel, the bumpers and 1-9 switch it there, not here. It shows
+/// for a few seconds after a switch or a pickup and fades (with the contextual HUD, the default; off, it stays). Only
+/// shown once there's something to hold. Redraws on the inventory's signals, and while its glow lives.
 /// </summary>
 public partial class EquippedItemHud : CanvasLayer
 {
@@ -35,8 +33,8 @@ public partial class EquippedItemHud : CanvasLayer
 	private double _wantedUntil = 5.0;
 	private static FontVariation _font;
 
-	/// <summary>For tests: the item shown in hand.</summary>
-	public ToolKind Held => _held;
+	/// <summary>For tests: what the right hand holds (None: nothing).</summary>
+	public ToolKind Held => _inv != null && IsInstanceValid(_inv) ? _inv.InHand : _held;
 
 	public override void _Ready()
 	{
@@ -56,16 +54,9 @@ public partial class EquippedItemHud : CanvasLayer
 			_inv = _player?.Inventory;
 			if (_inv == null) return;
 			_inv.ToolChanged += Refresh;
+			_inv.HandChanged += OnHand;
+			_held = _inv.InHand;
 			Refresh();
-		}
-		// the wheel moves through what's carried, unless it's zooming the camera or turning the album
-		var input = _player?.PlayerInput;
-		bool cameraUp = CameraViewfinder.Current is { } vf && IsInstanceValid(vf) && vf.Raise > 0.01f;
-		bool albumOpen = GetTree().GetFirstNodeInGroup("photo_log_page") is PhotoLogPage { IsOpen: true };
-		if (input != null && !cameraUp && !albumOpen && _items.Length > 1)
-		{
-			if (input.ItemNextPressed) Step(1);
-			else if (input.ItemPrevPressed) Step(-1);
 		}
 		_clock += delta;
 		// shown when wanted (HudPresence): a few seconds after a switch or a pickup, or standing still a while
@@ -76,7 +67,7 @@ public partial class EquippedItemHud : CanvasLayer
 		_strike = Mathf.Min(1f, _strike + (float)delta / 0.55f);
 		_ring = Mathf.Max(0f, _ring - (float)delta / 0.9f);
 		if (_colour != NeonKit.Index) _colour = NeonKit.Index;
-		if (_draw.Visible) _draw.QueueRedraw();   // (its glow lives: redrawn each frame while it's shown; it's a handful of lines)
+		if (_draw.Visible && _presence > 0.001f) _draw.QueueRedraw();   // (its glow lives: redrawn each frame while it's shown; it's a handful of lines)
 		// sit inside the bottom bar when it is there (its height follows the window's shape)
 		var size = GetViewport().GetVisibleRect().Size;
 		float bar = Mathf.Max(0f, (size.Y - size.X / CinemaFrame.Aspect) * 0.5f);
@@ -88,42 +79,41 @@ public partial class EquippedItemHud : CanvasLayer
 
 	public override void _ExitTree()
 	{
-		if (_inv != null && IsInstanceValid(_inv)) _inv.ToolChanged -= Refresh;
+		if (_inv != null && IsInstanceValid(_inv)) { _inv.ToolChanged -= Refresh; _inv.HandChanged -= OnHand; }
 	}
 
-	private void Step(int dir)
+	/// <summary>The hand's changed: the new thing strikes up in the HUD for a few seconds.</summary>
+	private void OnHand()
 	{
-		int i = System.Array.FindIndex(_items, it => it.Kind == _held);
-		i = ((i < 0 ? 0 : i) + dir + _items.Length) % _items.Length;
-		_held = _items[i].Kind;
+		if (_inv == null || !IsInstanceValid(_inv)) return;
+		bool pickup = _items.Length > 0 && !_items.Any(i => i.Kind == _inv.InHand);
+		Refresh();
+		if (_inv.InHand == _held) return;
+		_held = _inv.InHand;
 		_flash = 1f;
 		_strike = 0f;
-		_wantedUntil = _clock + 4.0;
+		if (pickup) _ring = 1f;
+		_wantedUntil = _clock + (pickup ? 4.5 : 3.0);
 		_draw.QueueRedraw();
 	}
 
-	/// <summary>What the story wants in hand when the level comes up (Act 24 after a Continue or a death: the flamethrower),
-	/// taken the moment it's carried; set by <see cref="Prefer"/>.</summary>
-	private static ToolKind _preferred = ToolKind.None;
-
-	/// <summary>Puts <paramref name="kind"/> in hand (now if the HUD is up and it's carried, else as soon as it is).</summary>
+	/// <summary>Puts <paramref name="kind"/> in the right hand (Act 24 after a Continue or a death: the flamethrower) now if
+	/// it's carried, else as soon as it is.</summary>
 	public static void Prefer(SceneTree tree, ToolKind kind)
 	{
+		var inv = (tree?.GetFirstNodeInGroup("player") as PlayerController)?.Inventory;
+		if (inv != null && inv.Has(kind)) { inv.Select(kind); return; }
 		_preferred = kind;
-		if (tree?.GetFirstNodeInGroup("equipped_item_hud") is EquippedItemHud hud && IsInstanceValid(hud)) hud.Refresh();
 	}
+
+	private static ToolKind _preferred = ToolKind.None;
 
 	private void Refresh()
 	{
 		if (_inv == null || !IsInstanceValid(_inv)) { _draw.Visible = false; return; }
-		var now = _inv.OwnedItems().ToArray();
-		// a new pickup comes to hand; if the one in hand is gone, the first takes its place
-		var added = now.Where(n => !_items.Any(o => o.Kind == n.Kind)).ToArray();
-		if (_preferred != ToolKind.None && now.Any(n => n.Kind == _preferred)) { _held = _preferred; _preferred = ToolKind.None; }
-		else if (_items.Length > 0 && added.Length > 0) { _held = added[^1].Kind; _flash = 1f; _strike = 0f; _ring = 1f; _wantedUntil = _clock + 4.5; }
-		else if (!now.Any(n => n.Kind == _held)) _held = now.Length > 0 ? now[0].Kind : ToolKind.None;
-		_items = now;
-		_draw.Visible = now.Length > 0;
+		if (_preferred != ToolKind.None && _inv.Has(_preferred)) { var p = _preferred; _preferred = ToolKind.None; _inv.Select(p); }
+		_items = _inv.HandChoices().Select(k => (k, PlayerInventory.Label(k))).ToArray();
+		_draw.Visible = _items.Length > 1;
 		_draw.QueueRedraw();
 	}
 

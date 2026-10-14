@@ -62,11 +62,10 @@ public partial class Act1TreeFalls : Node3D
 	[Export] public float SightRange = 38f, SightCone = 34f;
 	/// <summary>The dead fir: how near (m, to its foot) before it begins to creak, and before it may fall.</summary>
 	[Export] public float FirCreakRange = 26f, FirFallRange = 22f;
-	/// <summary>Seconds a held tree waits to be seen before it comes down anyway: the fir (only near), and the trees
-	/// beside the way (only once the player is alongside them). Wards out in the woods never fall unseen.</summary>
+	/// <summary>Seconds a held tree waits to be seen before it comes down anyway: the fir (from its first creak,
+	/// wherever the player is by then; Dan, 2026-10-13), and the trees beside the way (only once the player is
+	/// alongside them). Wards out in the woods never fall unseen.</summary>
 	[Export] public float FirHoldMax = 25f, SideHoldMax = 12f;
-	/// <summary>The fir comes down unseen (the wait over) only with the player this near (m).</summary>
-	[Export] public float FirUnseenRange = 15f;
 
 	[ExportGroup("The stop")]
 	/// <summary>How many of the walls' first trees come down after the fir while the player stands and watches.</summary>
@@ -447,10 +446,12 @@ public partial class Act1TreeFalls : Node3D
 		}
 		if (!_fir.Held || _fir.CreakTime < 2.8f) return;
 		var (la, lb) = _fir.LieSegment;
-		if (d > FirFallRange || !Clear(pp, la, lb, 6.5f)) { FirGroan(d); return; }
-		bool seen = SeesFir(player);
-		// (unseen, only after a long wait and only close: a player stood near it with their back to it)
-		if (!seen && (_clock - _firHeldAt < FirHoldMax || d > FirUnseenRange)) { FirGroan(d); return; }
+		// Dan, 2026-10-13: nobody gets stuck waiting on it. Once the long wait is over it comes down wherever they are
+		// (their back to it, or wandered off after its creak), with its whole crack and fall; only never on top of them.
+		bool waitOver = _clock - _firHeldAt >= FirHoldMax;
+		if ((d > FirFallRange && !waitOver) || !Clear(pp, la, lb, 6.5f)) { FirGroan(d); return; }
+		bool seen = d <= FirFallRange && SeesFir(player);
+		if (!seen && !waitOver) { FirGroan(d); return; }
 		_fir.Release();
 		FirSeen = seen;
 		if (seen) SeenFalls++; else UnseenFalls++;

@@ -391,6 +391,7 @@ public partial class StoryTest : Node
 		Vector3 to = Flat(bird.GlobalPosition - _player.GlobalPosition).Normalized();
 		if (to == Vector3.Zero) to = Vector3.Forward;
 		await Teleport(bird.GlobalPosition - to * 6f, bird.GlobalPosition, ct);
+		if (_inv.InHand != ToolKind.Camera) { _inv.Select(ToolKind.Camera); await Seconds(0.6, ct); }   // (2026-10-13j: right mouse raises it only from the hand)
 		_input.ScriptedFocus = true;
 		await Seconds(0.6, ct);
 		await Aim(bird.GlobalPosition + Vector3.Up * 0.05f, ct);
@@ -440,6 +441,7 @@ public partial class StoryTest : Node
 	{
 		var cam = FirstOf<CameraTool>();
 		int before = PhotoLog.Instance?.RecordedCount ?? 0;
+		if (_inv.InHand != ToolKind.Camera) { _inv.Select(ToolKind.Camera); await Seconds(0.6, ct); }   // (2026-10-13j: right mouse raises it only from the hand)
 		_input.ScriptedFocus = true;
 		await Seconds(0.4, ct);
 		cam?.SetZoom(zoom);
@@ -1598,11 +1600,14 @@ public partial class StoryTest : Node
 		await WaitUntil(() => crossing.InBreach, 5, ct);
 
 		// the breach, beat by beat
-		await WaitUntil(() => lake.Waves.EyeOpen > 0.9f, 10, ct);
-		Check("an eye opens in the deep under the boat", lake.Waves.EyeOpen > 0.9f, $"open {lake.Waves.EyeOpen:0.00}");
-		Screenshot("deep_eye");
+		// (Dan, 2026-10-13: no giant eye in the deep first; it bursts straight up out of the water)
+		ulong breachAt = Time.GetTicksMsec();
 		await WaitUntil(() => crossing.LastCreature is { Breaching: true }, 10, ct);
-		Check("the creature breaches", crossing.LastCreature is { Breaching: true });
+		float waited = (Time.GetTicksMsec() - breachAt) / 1000f;
+		Check("the creature bursts out of the water at once, no eye in the deep first", crossing.LastCreature is { Breaching: true } && waited < 1.0f && lake.Waves.EyeOpen < 0.01f,
+			$"{waited:0.00} s after the breach began, eye {lake.Waves.EyeOpen:0.00}");
+		await Seconds(0.3, ct);
+		Screenshot("breach_burst");
 		await WaitUntil(() => crossing.LastCreature is { ColossusUp: true }, 8, ct);
 		Check("the colossus towers out of the lake", crossing.LastCreature is { ColossusUp: true });
 		Check("the world went red for a moment", crossing.RedPeak > 0.2f, $"peak {crossing.RedPeak:0.00}");
@@ -1650,6 +1655,17 @@ public partial class StoryTest : Node
 		Check("a limb erupts beside the boat and rears to strike", crossing.Strikes >= 1);
 		await Aim(crossing.LastScare + Vector3.Up * 5f, ct);
 		Screenshot("lake_strike");
+		// the near miss (Dan, 2026-10-13): however well they row, it rears right behind the stern once, and sinks away
+		await RowUntil(crossing, () => crossing.NearMisses >= 1 || crossing.Landed, ct, 40, smart: smartRow);
+		int warnedBefore = crossing.Warnings;
+		await RowFor(crossing, 2.0, ct, smart: smartRow);
+		await Aim(crossing.HunterWorld + Vector3.Up * 3f, ct);
+		Screenshot("lake_near_miss");
+		Check("the near miss: it rears right behind the stern", crossing.NearMisses == 1 && crossing.InNearMiss && crossing.NearMissClosest < 4.5f && !crossing.Caught,
+			$"{crossing.NearMissClosest:0.0} m at its closest, at {crossing.Progress:0.00} of the crossing");
+		await RowUntil(crossing, () => !crossing.InNearMiss || crossing.Landed, ct, 10, smart: smartRow);
+		Check("and sinks away, back down the hunt (no warning, no take)", !crossing.InNearMiss && !crossing.Caught && crossing.HuntGap > 8f && crossing.Warnings == warnedBefore,
+			$"gap {crossing.HuntGap:0.0} m, warnings {crossing.Warnings - warnedBefore} in it");
 		await RowUntil(crossing, () => crossing.Progress > 0.72f || crossing.Landed, ct, 40, smart: smartRow);
 		Screenshot("rowing_current");
 		await RowUntil(crossing, () => crossing.FinalDash || crossing.Landed, ct, 40, smart: smartRow);

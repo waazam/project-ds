@@ -31,6 +31,13 @@ public partial class PlayerInput : Node
 	public bool PhotoPressed => Live && Edge(Photo);
 	public bool ItemNextPressed => Live && Edge(ItemNext);
 	public bool ItemPrevPressed => Live && Edge(ItemPrev);
+	/// <summary>(2026-10-13j) 1-9 pressed this frame (read in _Process): the right hand's thing by its place on the wheel; 0
+	/// none. A number key the player has bound to one of the game's actions (Settings > KEYS) does that action instead.</summary>
+	public int SlotPressed => Live ? _slot : 0;
+	/// <summary>A scripted 1-9 (0: none): pressed on the frame it turns non-zero.</summary>
+	public int ScriptedSlot;
+	private int _slot, _slotWas;
+	private static readonly Key[] SlotKeys = { Key.Key1, Key.Key2, Key.Key3, Key.Key4, Key.Key5, Key.Key6, Key.Key7, Key.Key8, Key.Key9 };
 	/// <summary>Tab / Back: the Act 1 shot list opened or put away.</summary>
 	public bool PhotoLogPressed => Live && Edge(PhotoLog);
 	/// <summary>B / right shoulder: the lantern between its warm flame and its blacklight.</summary>
@@ -202,6 +209,21 @@ public partial class PlayerInput : Node
 			_wasHeld[i] = down;
 		}
 		_capturedLastFrame = captured;
+		// 1-9: the edge of the first number key down (one the player has given to another action doesn't count)
+		int slot = 0;
+		if (Scripted) slot = ScriptedSlot;
+		else
+			for (int n = 0; n < SlotKeys.Length && slot == 0; n++)
+				if (Input.IsActionPressed($"item_slot_{n + 1}") && !BoundElsewhere(SlotKeys[n])) slot = n + 1;
+		_slot = slot != 0 && slot != _slotWas ? slot : 0;
+		_slotWas = slot;
+	}
+
+	private static bool BoundElsewhere(Key key)
+	{
+		foreach (var (action, _) in KeyRebinds.Actions)
+			if (KeyRebinds.KeyOf(action) == key) return true;
+		return false;
 	}
 
 	private bool ScriptedButton(int i) => i switch

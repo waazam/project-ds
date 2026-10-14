@@ -36,6 +36,18 @@ public partial class Stairwell
 	public int CrawlerCatches { get; private set; }
 	public bool MusicPlaying => _music is { Playing: true };
 
+	/// <summary>
+	/// Seconds into the descent's track where it starts (Dan, 2026-10-13: the shorter stairwell cut its build off).
+	/// The file is 4:12 but its music is the first 1:48 (the rest is silence): a steady first minute, a break at
+	/// 1:00, the build at full from 1:04 to 1:35, then its own fade to 1:48. Measured (`--measure-walks`): walking,
+	/// the music starts 2.5 s down and the edge of the fallen flight comes 87 s after, so from 8.5 s in the build
+	/// runs through the last half of the descent and ends as they reach the edge, where our fade (5 s) rides the
+	/// track's own. Sprinting (65 s) reaches the edge in the build. Wherever the track is, the edge fades it.
+	/// </summary>
+	[Export] public float DescentMusicOffset = 8.5f;
+	/// <summary>For tests: where the descent's track was when the edge faded it (s; -1 until then).</summary>
+	public float MusicEndedAt { get; private set; } = -1f;
+
 	private AudioStreamPlayer _music;
 	private bool _musicStarted;
 	private float _crawlS, _crawlV, _playerSPrev = -1f, _playerV, _still, _surge, _surgeAt = 9f, _huntTime;
@@ -59,7 +71,13 @@ public partial class Stairwell
 		var story = StoryManager.Instance;
 		bool firstDescent = story == null || story.Current < Checkpoint.Act14Finished;
 		// fading away at the edge of the fallen flight
-		if (_music is { Playing: true } && PathS(l) >= GapCorner - 0.5f && !_musicEnding) { _musicEnding = true; EndDescentMusic(5f); }
+		if (_music is { Playing: true } && PathS(l) >= GapCorner - 0.5f && !_musicEnding)
+		{
+			_musicEnding = true;
+			MusicEndedAt = _music.GetPlaybackPosition();
+			GD.Print($"[story] Act 14: the descent's music fades at the edge ({MusicEndedAt:0.0} s into the track)");
+			EndDescentMusic(5f);
+		}
 		// on the way down: from the top landing, once, to the edge
 		if (!_musicStarted && firstDescent && PlayerInShaft && PathS(l) > 0.3f)
 		{
@@ -70,11 +88,20 @@ public partial class Stairwell
 				_music = new AudioStreamPlayer { Name = "DescentMusic", Stream = GD.Load<AudioStream>(path), Bus = "Music", VolumeDb = -30f };
 				if (AudioServer.GetBusIndex("Music") < 0) _music.Bus = "Master";
 				AddChild(_music);
-				_music.Play();
+				_music.Play(DescentMusicOffset);
 				CreateTween().TweenProperty(_music, "volume_db", -7f, 4f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
 				GD.Print("[story] Act 14: the descent's music begins");
 			}
 		}
+	}
+
+	/// <summary>For `--measure-walks`: the descent's music forgotten, to start again on the next way down.</summary>
+	public void ResetDescentMusicForTests()
+	{
+		if (_music != null && IsInstanceValid(_music)) _music.QueueFree();
+		_music = null;
+		_musicStarted = _musicEnding = false;
+		MusicEndedAt = -1f;
 	}
 
 	/// <summary>Fades the descent's music out (at the edge of the fallen flight, or the fall).</summary>
