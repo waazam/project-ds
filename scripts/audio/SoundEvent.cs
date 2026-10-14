@@ -1,6 +1,7 @@
 using Godot;
 using ProjectDS.Player;
 using ProjectDS.Systems;
+using ProjectDS.World;
 
 namespace ProjectDS.Audio;
 
@@ -10,7 +11,15 @@ namespace ProjectDS.Audio;
 /// direction far away. Distance attenuation is off, so it arrives at full
 /// weight but still pans to where it came from. It can startle the forest into
 /// a temporary hush. The place is a trigger volume (radius <see cref="Radius"/>
-/// around the target), not a per-frame distance check; the delay is pausable.
+/// around the target); the delay is pausable.
+///
+/// Never skipped by going another way (Dan, 2026-10-13: "make sure events are
+/// still triggered even if character doesnt cross the bridge. for example the
+/// gunshot in the beginning"): when the target is a <see cref="Footbridge"/>,
+/// getting over its creek by any route (wading beside it, jumping the banks,
+/// going round the stream's end) fires it too, checked a few times a second
+/// (<see cref="Footbridge.IsAcross"/>). On the deck it still fires where it
+/// always did, half way over.
 ///
 /// Restore-aware: it belongs to one stretch of the story. Once the checkpoint
 /// <see cref="OnlyBefore"/> has been reached (on Continue, or during play) it
@@ -34,12 +43,17 @@ public partial class SoundEvent : Node
 	[Export] public Checkpoint OnlyBefore = Checkpoint.Act2StairsClimbed;
 
 	public bool Fired { get; private set; }
+	/// <summary>For tests: how it fired ("trigger": the volume on the deck; "across": over the creek another way), or null.</summary>
+	public string FiredBy { get; private set; }
 
 	private AudioStreamPlayer3D _voice;
 	private Area3D _trigger;
+	private Footbridge _bridge;
+	private double _poll;
 
 	public override void _Ready()
 	{
+		SetProcess(false);
 		var target = GetNodeOrNull<Node3D>(TargetPath);
 		if (target == null) GD.PushWarning($"SoundEvent {Name}: no target at {TargetPath}");
 		_voice = new AudioStreamPlayer3D
@@ -62,20 +76,32 @@ public partial class SoundEvent : Node
 	private void Restore(Node3D target)
 	{
 		if (TooLate) { Fired = true; return; }   // a Continue from later on: it already happened
-		_trigger = StoryBeat.MakeTrigger(target, new CylinderShape3D { Radius = Radius, Height = 40f }, Vector3.Zero, OnEntered, $"{Name}Trigger");
+		_trigger = StoryBeat.MakeTrigger(target, new CylinderShape3D { Radius = Radius, Height = 40f }, Vector3.Zero, p => OnEntered(p, "trigger"), $"{Name}Trigger");
+		_bridge = target as Footbridge;
+		if (_bridge is { HasCrossingLine: true }) SetProcess(true);
 	}
 
-	private void OnEntered(PlayerController player)
+	public override void _Process(double delta)
+	{
+		if (Fired || _bridge == null || !IsInstanceValid(_bridge)) { SetProcess(false); return; }
+		if ((_poll -= delta) > 0) return;
+		_poll = 0.1;
+		if (StoryBeat.Player(this) is { } p && _bridge.IsAcross(p.GlobalPosition)) OnEntered(p, "across");
+	}
+
+	private void OnEntered(PlayerController player, string how)
 	{
 		if (Fired) return;
 		Fired = true;
+		FiredBy = how;
+		SetProcess(false);
 		_trigger?.QueueFree();
 		_trigger = null;
 		if (TooLate) return;   // the story moved on while the trigger stood
 		_ = Cutscene.Run(this, async ct =>
 		{
 			await Cutscene.Wait(this, GD.RandRange(DelaySeconds.X, DelaySeconds.Y), ct);
-			GD.Print($"[event] {Name} fired");
+			GD.Print($"[event] {Name} fired ({how})");
 			var dir = new Vector3(FromDirection.X, 0f, FromDirection.Z).Normalized();
 			_voice.GlobalPosition = player.GlobalPosition + dir * 60f + Vector3.Up * 4f;
 			_voice.Play();

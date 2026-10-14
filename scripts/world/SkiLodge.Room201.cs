@@ -177,6 +177,10 @@ public partial class SkiLodge
 		await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
 		while (NoteOverlay.Instance is { IsOpen: true }) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		await ToSignal(GetTree().CreateTimer(0.9), SceneTreeTimer.SignalName.Timeout);
+		// Only with them inside (2026-10-13, the skippable-events audit): the letter doesn't hold them still, and a player
+		// who walked out reading it was jammed out in the corridor, the way on (the bathroom's hole) behind the door.
+		while (IsInstanceValid(this) && IsInstanceValid(player) && !Room201Jammed && !InRoom201(player.GlobalPosition))
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		if (!IsInstanceValid(this) || Room201Jammed) return;
 		Room201Jammed = true;
 		StoryManager.Instance?.SetFlag(LodgeFlag.Room201Jammed);

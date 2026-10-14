@@ -124,8 +124,27 @@ public partial class Bunker : Node3D
 		}
 		if (IsOpen || !StoryAllowsOpening) return;
 		SayDialLine();
+		NudgeMissingNumbers();
 	}
-	private ulong _nudgedAt;
+	private ulong _nudgedAt, _numbersNudgedAt;
+
+	/// <summary>
+	/// (2026-10-13, the skippable-events audit) The last two numbers stand by the trail's loop from the lookout, but the
+	/// compass points straight across the woods to the bunker, so a player who follows it can reach the dial without
+	/// ever passing them (nor the "something on a tree back there" nudge, which needs them close). At the door with
+	/// either still unread: one short line under the picture, as the trees' own nudges do (at most once a minute).
+	/// </summary>
+	private void NudgeMissingNumbers()
+	{
+		var s = StoryManager.Instance;
+		if (s == null || s.HasFlag(StoryManager.Flag.BunkerUnlocked)) return;
+		if (s.HasFlag(StoryManager.Flag.CodeDigit(3)) && s.HasFlag(StoryManager.Flag.CodeDigit(4))) return;
+		if (_numbersNudgedAt != 0 && Time.GetTicksMsec() - _numbersNudgedAt < 60000) return;
+		if (UI.Subtitle.Instance is not { } sub) return;
+		_numbersNudgedAt = Time.GetTicksMsec();
+		_ = sub.Show($"His last numbers are on the trees by the path, back toward the lookout.   {UI.KeyHint.Blacklight}: the blacklight.", 0.8f, 5f, 1.2f);
+		GD.Print("[story] Act 7: at the dial with numbers 3-4 unread: the nudge back along the path");
+	}
 
 	/// <summary>Checkpoint 6 could conceivably fire with the player already inside the radius: re-check.</summary>
 	private void OnCheckpoint(Checkpoint _)

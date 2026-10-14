@@ -80,7 +80,8 @@ public partial class StationRoom2 : Node3D
 		BuildTable();
 		BuildWater();
 		BuildStairs();
-		_entry = StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(1.4f, 2.4f, 2.4f) }, new Vector3(Half - 1.6f, 1.2f, 0), OnEntered, "Room2Entry");
+		// the room's whole width (2026-10-13, the skippable-events audit: 2.4 m let a player slide along the door wall round it)
+		_entry = StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(1.4f, 2.4f, Half * 2f - 0.2f) }, new Vector3(Half - 1.6f, 1.2f, 0), OnEntered, "Room2Entry");
 
 		if (s != null && s.HasFlag(StoryManager.Flag.StationRoom2Solved))
 		{
