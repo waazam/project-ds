@@ -71,7 +71,7 @@ public partial class SkiLodge
 		["ribbon"] = Matte("xmas_ribbon", new Color(0.42f, 0.05f, 0.04f), 0.45f),
 		["felt"] = Matte("xmas_felt", new Color(0.3f, 0.05f, 0.04f), 1f),
 		["fur"] = LodgeTextures.PillowMat,
-		["wood"] = LodgeTextures.DarkWoodMat,
+		["wood"] = LodgeTextures.DoorWoodMat,
 		["cloth"] = LodgeTextures.TableclothMat,
 		["glass"] = BottleGlass,
 		["metal"] = LodgeTextures.BrassMat,

@@ -645,6 +645,15 @@ public partial class SkiLodge : Node3D
 
 	// ------------------------------------------------------------------ the mudroom (Act 23 starts in here)
 
+	private static readonly StandardMaterial3D[] _coatWool = new StandardMaterial3D[3];
+	/// <summary>A heavy wool in <paramref name="c"/>: the linen's weave at a coarse scale, fully rough.</summary>
+	private static StandardMaterial3D CoatWool(Color c, int i) => _coatWool[i] ??= new StandardMaterial3D
+	{
+		ResourceName = $"lodge_coat_wool_{i}", AlbedoColor = c, Roughness = 1f, MetallicSpecular = 0.2f,
+		AlbedoTexture = LodgeParts.LodgeTextures.LinenMat.AlbedoTexture, Uv1Scale = Vector3.One * 3f,
+		NormalEnabled = LodgeParts.LodgeTextures.LinenMat.NormalTexture != null, NormalTexture = LodgeParts.LodgeTextures.LinenMat.NormalTexture,
+	};
+
 	private void BuildMudroom()
 	{
 		var k = new MeshKit();
@@ -652,11 +661,11 @@ public partial class SkiLodge : Node3D
 		// (2026-10-14d, the graphics pass: the mudroom was one orange pine box, floor, walls, ceiling and door alike, and
 		// its boards were the cabin's own. Now a working back room: a flagstone floor for wet boots, board wainscot to a
 		// rail, the corridor's painted plaster above it, a darker boarded ceiling on two beams, a skirting board)
-		k.Mat(LodgeTextures.FlagstoneMat);
+		k.Mat(LodgeParts.LodgeTextures.FlagstoneMat);
 		k.Color = new Color(0.62f, 0.6f, 0.58f);
 		k.Quad(new Vector3(x0, 0.02f, z0), new Vector3(x1, 0.02f, z0), new Vector3(x1, 0.02f, z1), new Vector3(x0, 0.02f, z1), Vector3.Up);
 		Col(new Vector3((x0 + x1) * 0.5f, -0.2f, (z0 + z1) * 0.5f), new Vector3(x1 - x0, 0.44f, z1 - z0));
-		k.Mat(LodgeTextures.DarkWoodMat);
+		k.Mat(LodgeParts.LodgeTextures.DarkWoodMat);
 		k.Color = new Color(0.62f, 0.58f, 0.56f);
 		k.Quad(new Vector3(x0, top, z1), new Vector3(x1, top, z1), new Vector3(x1, top, z0), new Vector3(x0, top, z0), Vector3.Down);
 		const float rail = 1.15f;
@@ -671,7 +680,7 @@ public partial class SkiLodge : Node3D
 			}
 			if (y1 > rail)
 			{
-				k.Mat(LodgeTextures.PlasterMat);
+				k.Mat(LodgeParts.LodgeTextures.PlasterMat);
 				k.Color = Colors.White;
 				k.Quad(a + Vector3.Up * Mathf.Max(y0, rail), b + Vector3.Up * Mathf.Max(y0, rail), b + Vector3.Up * y1, a + Vector3.Up * y1, n);
 			}
@@ -685,7 +694,7 @@ public partial class SkiLodge : Node3D
 		Wall(new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), 0f, top, Vector3.Right);
 		Wall(new Vector3(x1, 0, z1), new Vector3(x1, 0, z0), 0f, top, Vector3.Left);
 		// the rail and the skirting along the side walls and the back wall either side of the door; two ceiling beams
-		k.Mat(LodgeTextures.DarkWoodMat);
+		k.Mat(LodgeParts.LodgeTextures.DarkWoodMat);
 		k.Color = new Color(0.8f, 0.76f, 0.72f);
 		foreach (var (cx, len, sx) in new[] { (x0 + 0.02f, z1 - z0, 1f), (x1 - 0.02f, z1 - z0, -1f) })
 		{
@@ -718,8 +727,17 @@ public partial class SkiLodge : Node3D
 		// coats on hooks over the bench on the other wall, boots kicked off under it
 		if (modelled)
 		{
+			// (2026-10-14d: each its own wool, a faded red, a navy, a loden green; three of one dark brown read as one flat
+			// dark shape on the wall)
+			var wools = new[] { new Color(0.36f, 0.1f, 0.08f), new Color(0.11f, 0.13f, 0.2f), new Color(0.2f, 0.23f, 0.15f) };
+			int ci = 0;
 			foreach (float zz in new[] { (z0 + z1) * 0.5f - 1.0f, (z0 + z1) * 0.5f - 0.3f, (z0 + z1) * 0.5f + 0.7f })
-				FurnitureKit.Add(k, "coat_on_hook", new Vector3(x1 - 0.02f, 1.95f, zz), -Mathf.Pi * 0.5f + Mathf.Pi, roles);
+			{
+				var cr = Woodwork;
+				cr["cloth"] = CoatWool(wools[ci], ci);
+				ci++;
+				FurnitureKit.Add(k, "coat_on_hook", new Vector3(x1 - 0.02f, 1.95f, zz), -Mathf.Pi * 0.5f + Mathf.Pi, cr);
+			}
 			FurnitureKit.Add(k, "boots", new Vector3(x1 - 0.35f, 0.02f, (z0 + z1) * 0.5f + 0.2f), 1.9f, roles);
 		}
 		k.Mat(SkiPaint);

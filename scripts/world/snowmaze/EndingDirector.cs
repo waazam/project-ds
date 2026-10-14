@@ -111,6 +111,44 @@ public partial class EndingDirector : Node3D
 	}
 	private static Material _edgeSnow;
 
+	private static Texture2D _patchAlb, _patchNor;
+	/// <summary>(2026-10-14d) A patch of old snow, going: crusted, with ragged, broken edges and holes melted through it where
+	/// the ground shows (alpha), drawn once in code.</summary>
+	private static Texture2D PatchAlbedo()
+	{
+		if (_patchAlb != null) return _patchAlb;
+		const int S = 256;
+		var n = new FastNoiseLite { Frequency = 0.018f, FractalOctaves = 5, Seed = 2531 };
+		var g = new FastNoiseLite { Frequency = 0.12f, FractalOctaves = 2, Seed = 2532 };
+		var img = Image.CreateEmpty(S, S, false, Image.Format.Rgba8);
+		var nor = Image.CreateEmpty(S, S, false, Image.Format.Rgba8);
+		float H(int x, int y)
+		{
+			float u = (x + 0.5f) / S * 2f - 1f, v = (y + 0.5f) / S * 2f - 1f;
+			float r = Mathf.Sqrt(u * u + v * v);
+			return Mathf.Clamp((1f - r * 1.15f) + (n.GetNoise2D(x, y)) * 0.75f, 0f, 1f);
+		}
+		for (int y = 0; y < S; y++)
+			for (int x = 0; x < S; x++)
+			{
+				float h = H(x, y);
+				float a = Mathf.SmoothStep(0.12f, 0.3f, h);
+				float grain = 0.85f + 0.15f * g.GetNoise2D(x, y);
+				// thinner toward its edge: the wet ground greying it from under
+				float body = Mathf.Lerp(0.72f, 1f, Mathf.SmoothStep(0.15f, 0.6f, h)) * grain;
+				img.SetPixel(x, y, new Color(body, body, body * 1.03f, a));
+				float hx = H(Mathf.Min(x + 1, S - 1), y) - H(Mathf.Max(x - 1, 0), y), hy = H(x, Mathf.Min(y + 1, S - 1)) - H(x, Mathf.Max(y - 1, 0));
+				var nn = new Vector3(-hx * 6f, -hy * 6f, 1f).Normalized();
+				nor.SetPixel(x, y, new Color(nn.X * 0.5f + 0.5f, nn.Y * 0.5f + 0.5f, nn.Z * 0.5f + 0.5f, 1f));
+			}
+		img.GenerateMipmaps();
+		nor.GenerateMipmaps();
+		_patchAlb = ImageTexture.CreateFromImage(img);
+		_patchNor = ImageTexture.CreateFromImage(nor);
+		return _patchAlb;
+	}
+	private static Texture2D PatchNormal() { PatchAlbedo(); return _patchNor; }
+
 	private void BuildSnowEdge(Vector3 at, Vector3 tan)
 	{
 		var k = new MeshKit();
@@ -122,7 +160,9 @@ public partial class EndingDirector : Node3D
 		k.Blob(bank + Vector3.Up * 1.2f, new Vector3(4.5f, 2.6f, 2.4f), 2501, 0.22f, false, 1f, 0f, 2);   // (2026-10-13: smooth, subdivided: faceted, they read as pale boulders)
 		k.Blob(bank + side * 3.4f + Vector3.Up * 0.7f, new Vector3(2.4f, 1.5f, 2f), 2502, 0.22f, false, 1f, 0f, 2);
 		k.Blob(bank - side * 3.2f + Vector3.Up * 0.8f, new Vector3(2.6f, 1.6f, 2.2f), 2503, 0.22f, false, 1f, 0f, 2);
-		// the snow on the ground, in drifts that thin and break up into patches as they go
+		// the snow on the ground, thinning and breaking up into patches as it goes (2026-10-14d: laid on the ground as decals,
+		// soft-edged and following every bump of it; the flat blobs half sunk in the slope showed hard cut edges where the
+		// ground came up through them). A few low drifts heaped against the bank still have their body.
 		var rng = new RandomNumberGenerator { Seed = 2504 };
 		for (int i = 0; i < 46; i++)
 		{
@@ -131,13 +171,30 @@ public partial class EndingDirector : Node3D
 			var p = at + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r;
 			if (_terrain != null) p.Y = _terrain.HeightAt(p.X, p.Z);
 			float s = Mathf.Lerp(2.2f, 0.5f, r / 18f) * rng.RandfRange(0.6f, 1.2f);
-			k.Blob(p, new Vector3(s, 0.06f + 0.1f * (1f - r / 18f), s * rng.RandfRange(0.6f, 1f)), 2510 + i, 0.3f, false, 1f, 0f, 2);
+			float sz = s * rng.RandfRange(0.6f, 1f);
+			var d = new Decal
+			{
+				Name = $"SnowPatch{i}", TextureAlbedo = PatchAlbedo(), TextureNormal = PatchNormal(), Size = new Vector3(s * 2.6f, 1.6f, sz * 2.6f),
+				Modulate = new Color(0.66f, 0.68f, 0.72f, Mathf.Lerp(1f, 0.75f, r / 18f)), AlbedoMix = 1f, UpperFade = 0.3f, LowerFade = 0.3f, NormalFade = 0.1f,
+				CullMask = 1, DistanceFadeEnabled = true, DistanceFadeBegin = 45f, DistanceFadeLength = 10f,
+			};
+			AddChild(d);
+			d.GlobalPosition = p;
+			d.GlobalBasis = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau);
+		}
+		foreach (var (o, rad, seed) in new[] { (side * 1.6f - back * 0.9f, new Vector3(1.6f, 0.35f, 1.1f), 2520), (-side * 1.9f - back * 1.1f, new Vector3(1.3f, 0.28f, 1.0f), 2521) })
+		{
+			var p = bank + o;
+			if (_terrain != null) p.Y = _terrain.HeightAt(p.X, p.Z);
+			k.Blob(p, rad, seed, 0.25f, false, 1f, 0f, 2);
 		}
 		k.CommitTo(this, "SnowEdge", false);
+		// the hole they came out of: near black, the dark of the tunnel behind it (it was a flat pale-blue disc on the
+		// bank's face, and read as a panel)
 		var hole = new MeshKit();
-		hole.Mat(new StandardMaterial3D { ResourceName = "cave_mouth", AlbedoColor = new Color(0.2f, 0.32f, 0.45f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded });
+		hole.Mat(new StandardMaterial3D { ResourceName = "cave_mouth", AlbedoColor = new Color(0.012f, 0.02f, 0.03f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded });
 		hole.Color = Colors.White;
-		hole.Blob(bank + Vector3.Up * 0.9f - back * 2.2f, new Vector3(1.1f, 1.0f, 0.2f), 2505, 0.2f, false, 1f);
+		hole.Blob(bank + Vector3.Up * 0.85f - back * 2.15f, new Vector3(0.95f, 0.85f, 0.3f), 2505, 0.08f, false, 1f, 0f, 3);   // (smooth: its facets read as a cut-out)
 		hole.CommitTo(this, "CaveMouth", false);
 		var body = new StaticBody3D { Name = "BankBody", CollisionLayer = 1, CollisionMask = 0 };
 		body.AddChild(new CollisionShape3D { Position = bank + Vector3.Up * 1.2f, Shape = new BoxShape3D { Size = new Vector3(8f, 2.4f, 3f) }, Basis = Basis.LookingAt(back, Vector3.Up) });

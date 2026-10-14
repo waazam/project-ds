@@ -33,6 +33,19 @@ public static class SnowMazeLook
 	}
 	private static ShaderMaterial _packed;
 
+	/// <summary>(2026-10-14d) The packed snow indoors, under a bulb a metre or two off (the drift through the mudroom's back
+	/// door): its crests a step greyer, so the bulb doesn't burn it to a white wedge.</summary>
+	public static ShaderMaterial PackedSnowIndoor()
+	{
+		if (_packedIn != null) return _packedIn;
+		_packedIn = (ShaderMaterial)PackedSnow().Duplicate();
+		_packedIn.ResourceName = "packed_snow_indoor";
+		_packedIn.SetShaderParameter("crest_color", new Color(0.5f, 0.52f, 0.56f));
+		_packedIn.SetShaderParameter("hollow_color", new Color(0.26f, 0.31f, 0.38f));
+		return _packedIn;
+	}
+	private static ShaderMaterial _packedIn;
+
 	/// <summary>An icicle a metre long, its top at the origin, hanging down: a few cones fused (thick at the root, a drip at its point).</summary>
 	public static Mesh IcicleMesh()
 	{

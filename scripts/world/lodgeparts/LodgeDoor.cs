@@ -17,6 +17,8 @@ public partial class LodgeDoor : Node3D
 {
 	public enum State { Locked, Open, Closed, Jammed }
 	public float Width = 1.0f, Height = 2.2f, OpenAngle = 1.6f;
+	/// <summary>(2026-10-14d) The leaf's own surface (a painted back-of-house door); null: the rooms' dark wood.</summary>
+	public Material LeafMat;
 	public string Number = "";
 	/// <summary>One of a pair of doors meeting at their latch sides (the dining room's): no jamb on that side, and the
 	/// head stops there, meeting the other's (the two casings had overlapped flush there, flickering).</summary>
@@ -53,7 +55,7 @@ public partial class LodgeDoor : Node3D
 		_leaf = new Node3D { Name = "Leaf" };
 		AddChild(_leaf);
 		var k = new MeshKit();
-		k.Mat(LodgeTextures.DarkWoodMat);
+		k.Mat(LeafMat ?? LodgeTextures.DoorWoodMat);
 		k.Color = Colors.White;
 		// (a hair narrower than its opening, no more: a centimetre's gap each side showed the lit room through it, a dotted line
 		// of light down each edge when seen along a corridor)

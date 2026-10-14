@@ -186,7 +186,8 @@ public partial class SkiLodge
 	/// <summary>The roles' materials for the modelled clutter (FurnitureKit): the lodge's own.</summary>
 	private static System.Collections.Generic.Dictionary<string, Material> Woodwork => new()
 	{
-		["wood"] = LodgeTextures.DarkWoodMat, ["metal"] = LodgeTextures.BrassMat, ["face"] = LodgeTextures.PorcelainMat, ["black"] = LodgeTextures.BlackMat,
+		// (2026-10-14d: furniture in a smooth varnished wood, not the wainscot's planks)
+		["wood"] = LodgeTextures.DoorWoodMat, ["metal"] = LodgeTextures.BrassMat, ["face"] = LodgeTextures.PorcelainMat, ["black"] = LodgeTextures.BlackMat,
 		["glass"] = BottleGlass, ["upholstery"] = LodgeTextures.LeatherMat, ["leather"] = LodgeTextures.LeatherMat, ["paper"] = Paper,
 		["label"] = Paper, ["cork"] = LodgeTextures.DarkWoodMat, ["ceramic"] = LodgeTextures.PorcelainMat, ["cloth"] = Wool,
 		["iron"] = LodgeTextures.IronMat, ["bark"] = BuildingTextures.LogMat, ["wax"] = Wax, ["rubber"] = LodgeTextures.BlackMat,
@@ -743,7 +744,7 @@ public partial class SkiLodge
 		}
 		// the chairs (all 72 the same model): one instanced set, drawn once for all of them, rather than 72 copies
 		// merged into the room's mesh (the optimization pass, 2026-10-02)
-		var chairMesh = FurnitureKit.Mesh("dining_chair", new() { ["wood"] = LodgeTextures.DarkWoodMat, ["upholstery"] = LodgeTextures.VelvetVioletMat });
+		var chairMesh = FurnitureKit.Mesh("dining_chair", new() { ["wood"] = LodgeTextures.DoorWoodMat, ["upholstery"] = LodgeTextures.VelvetVioletMat });
 		if (chairMesh == null) foreach (var xf in chairs) LodgeKit.Chair(k, xf.Origin, xf.Basis.GetEuler().Y, LodgeTextures.VelvetVioletMat);
 		foreach (float x in new[] { 17f, 27f, 37f })
 		{
