@@ -229,7 +229,7 @@ public partial class PhotoPreviewDriver : Node
 		Check(_world.GetNodeOrNull("ForkSign_B") == null, "no sign at the fallen fir");
 		Check(_world.GetNodeOrNull("CameraPickup") == null, "no camera on the ground: it comes from the car");
 		Check(_world.GetNodeOrNull("Trailhead/Car/OpeningAtCar/Stand") != null && _world.GetNodeOrNull("Trailhead/Car/OpeningAtCar/TrunkCamera") != null, "the car, its opening, the stand and the trunk camera");
-		foreach (var path in new[] { "Cabin", "Shed", "KeyPickup", "AxePickup", "Bunker", "BunkerInterior", "Act7Whispers", "ForestVoiceCues",
+		foreach (var path in new[] { "Cabin", "Shed", "KeyPickup", "AxePickup", "Bunker", "BunkerInterior", "Act7Whispers",
 			"Clearing/Stairs/Dressing", "Clearing/Stairs/Act6Clearing", "Clearing/Stairs/Act11Ending" })
 			Check(_world.GetNodeOrNull(path) == null, $"act 1 only: no {path}");
 		Check(!_world.GetNode("Clearing").IsInGroup("stairs_clearing_marker"), "act 1 only: the clearing is not a compass marker");

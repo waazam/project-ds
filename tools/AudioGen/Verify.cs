@@ -80,7 +80,6 @@ public static class Verify
 	{
 		"rain_loop" => (150, 240),
 		"choir_chant_loop" => (50, 130),   // 108 s since 2026-09-22: Dan wants the chant sparse (6-14 s between phrases)
-		_ when name.StartsWith("creature_rattle_cand") => (18, 30),
 		_ when name.StartsWith("creature_giant_rattle") => (22, 28),
 		_ when name.EndsWith("_loop") => (20, 40),
 		_ when name.StartsWith("thunder") => (6, 18),

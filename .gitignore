@@ -30,3 +30,4 @@ desktop.ini
 
 # Session test logs
 /scratchpad_*.log
+__pycache__/

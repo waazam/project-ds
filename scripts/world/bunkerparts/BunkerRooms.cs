@@ -86,7 +86,6 @@ public partial class BunkerRooms : Node3D
 	private bool _burstOn = true;
 	private float _burstTimer = 1.2f, _burstDb;
 	private System.Collections.Generic.List<AudioStream> _rattleTakes = new();
-	private ProjectDS.Audio.RecentPicker _rattlePicker;
 	private double _joltUntil = -1;
 	private readonly Color _lampA = new(0.72f, 0.07f, 0.05f), _lampB = new(0.42f, 0.12f, 0.48f);
 	private float _lampPhase;

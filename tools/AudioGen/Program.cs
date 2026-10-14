@@ -113,12 +113,6 @@ for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"creature_snarl_{k:00}", sf
 for (int i = 1; i <= 8; i++) { int k = i; int len = new[] { 24, 28, 22, 26, 30, 25, 21, 29 }[k - 1]; jobs.Add(($"creature_rattle_loop_{k:00}", sfx, true, Lo, (r, sr) => Creature.RattleLoop(r, sr, len, k))); }
 jobs.Add(("creature_giant_rattle_loop_01", sfx, true, Lo, (r, sr) => Creature.GiantRattle(r, sr, 26)));
 // Rattle candidates (Dan, 2026-09-22: the click reads as hooves): a..f, not wired in until he picks one.
-jobs.Add(("creature_rattle_cand_a", sfx, true, Lo, (r, sr) => Creature.RattleCroak(r, sr, 24, Creature.RattleVar.Base)));
-jobs.Add(("creature_rattle_cand_b", sfx, true, Lo, (r, sr) => Creature.RattleInsect(r, sr, 22, Creature.RattleVar.Base)));
-jobs.Add(("creature_rattle_cand_c", sfx, true, Lo, (r, sr) => Creature.RattleWetClicks(r, sr, 24, Creature.RattleVar.Base)));
-jobs.Add(("creature_rattle_cand_d", sfx, true, Lo, (r, sr) => Creature.RattleBone(r, sr, 26, Creature.RattleVar.Base)));
-jobs.Add(("creature_rattle_cand_e", sfx, true, Lo, (r, sr) => Creature.RattleRatchet(r, sr, 22, Creature.RattleVar.Base)));
-jobs.Add(("creature_rattle_cand_f", sfx, true, Lo, (r, sr) => Creature.RattleCroakClicks(r, sr, 24, Creature.RattleVar.Base)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_foghorn_{i:00}", sfx, false, Lo, (r, sr) => Creature.Foghorn(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_moan_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantMoan(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_bellow_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantBellow(r, sr)));
