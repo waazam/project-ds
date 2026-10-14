@@ -372,6 +372,12 @@ public partial class Act15Hallway : Node3D
 		}
 		foreach (float y in new[] { 0.5f, 1.05f, 1.6f, 2.1f })
 		{
+			// (the hallway's own draws, as the old placeholder shelves made them: what comes after them, red light, green
+			// light's timings among it, comes out the same as before; Dan, 2026-10-13: "leave red light green light as it was")
+			for (float x = -ClosetHalf + 0.15f; x < ClosetHalf - 0.1f; x += _rng.RandfRange(0.12f, 0.22f))
+			{ _rng.RandiRange(0, 4); _rng.RandfRange(0.14f, 0.3f); _rng.RandfRange(0.035f, 0.06f); }
+			for (float z = z0 + 0.6f; z < z1 - 0.5f; z += _rng.RandfRange(0.14f, 0.24f))
+			{ _rng.RandiRange(0, 4); _rng.RandfRange(0.12f, 0.26f); }
 			BuildKit.Box(sk, new Vector3(0, y, z1 - 0.2f), new Vector3(ClosetHalf * 2f, 0.03f, 0.36f));
 			BuildKit.Box(sk, new Vector3(-ClosetHalf + 0.18f, y, (z0 + z1) * 0.5f + 0.2f), new Vector3(0.36f, 0.03f, ClosetDepth - 0.8f));
 			// the back shelf two deep (the back row a little along, behind the gaps), the side shelf one
