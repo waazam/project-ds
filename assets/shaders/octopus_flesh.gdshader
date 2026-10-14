@@ -11,6 +11,11 @@
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
+// (2026-10-13i, the owner: "the monster models look too smooth") the creatures' skin detail (its masks: the creases,
+// cracks and pores as height, the veins raised) worked into the bumps and the grime, finer than the noise's
+#include "res://assets/shaders/creature_detail.gdshaderinc"
+uniform float detail_bump = 0.5;
+
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform float scale = 0.9;
 /// Object-space direction of the back (the green side): the suckers are on the other side.
@@ -44,6 +49,7 @@ varying vec3 v_nrm;
 void vertex() {
 	v_obj = rest_space ? CUSTOM0.xyz : VERTEX;
 	v_nrm = rest_space ? CUSTOM1.xyz : NORMAL;
+	cd_p = v_obj; cd_n = v_nrm; cd_k = 0.0; cd_t = vec4(0.0);
 }
 
 // noise projected three ways and blended by the surface's facing (no stripes on any side)
@@ -116,6 +122,19 @@ void fragment() {
 		vec3 gv = (VIEW_MATRIX * (MODEL_MATRIX * vec4(grad, 0.0))).xyz;
 		NORMAL = normalize(NORMAL - gv * bump * 0.06);
 	}
+	// (2026-10-13i) the skin's fine relief (its creases and cracks sunk, its veins raised), by the same screen-space slope
+	CdSample d = cd_sample_masks();
+	{
+		vec3 dpx = dFdx(VERTEX), dpy = dFdy(VERTEX);
+		vec3 r1v = cross(dpy, NORMAL), r2v = cross(NORMAL, dpx);
+		float det = dot(dpx, r1v);
+		float hd = ((d.occ - 1.0) * 0.8 + d.vein * 0.35) * detail_bump * 0.012 / max(cd_scale, 0.1);
+		vec3 sg = sign(det) * (dFdx(hd) * r1v + dFdy(hd) * r2v);
+		NORMAL = normalize(abs(det) * NORMAL - sg);
+	}
+	col = mix(col, flesh_dark.rgb * 0.4, d.vein * 0.35 * (1.0 - dorsal * 0.5));
+	col = mix(grime.rgb * 0.6, col, mix(0.55, 1.0, d.occ));
+	slime = max(slime * (0.7 + 0.6 * d.wet), (1.0 - d.occ) * 0.6 * (1.0 - r1 * 0.7));
 
 	ALBEDO = col;
 	ROUGHNESS = mix(0.42, 0.06, slime) + r1 * 0.3;

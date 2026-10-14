@@ -71,9 +71,18 @@ public partial class Crawler : Node3D
 		{
 			var mi = (MeshInstance3D)n;
 			mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+			// (2026-10-13i) its rest pose and creases, for the hide's detail (CreatureDetail)
+			CreatureDetail.Prepare(mi, "c_skin");
 			for (int s = 0; s < (mi.Mesh?.GetSurfaceCount() ?? 0); s++)
 			{
 				if (mi.Mesh.SurfaceGetMaterial(s) is not StandardMaterial3D m) continue;
+				if ((m.ResourceName ?? "").StartsWith("c_skin"))
+				{
+					// (2026-10-13i, the owner: "too smooth") its hide drawn: wrinkles, cracked dry skin, veins, scars, pores,
+					// the creases dark, wet and dry, light through the thin flesh; and its own answer to the blacklight
+					mi.SetSurfaceOverrideMaterial(s, FleshMaterial(m));
+					continue;
+				}
 				// its own baked colours, and the blacklight's glow over them; a cold rim so it reads against the dark
 				var t = (StandardMaterial3D)m.Duplicate();
 				string mn = m.ResourceName ?? "";
@@ -92,6 +101,25 @@ public partial class Crawler : Node3D
 		_skel.AddChild(att);
 		_head = att;
 		return true;
+	}
+
+	private static ShaderMaterial _flesh;
+
+	/// <summary>The hide (creature_flesh.gdshader) over the model's baked maps; one for every crawler.</summary>
+	private static ShaderMaterial FleshMaterial(StandardMaterial3D baked)
+	{
+		if (_flesh != null) return _flesh;
+		_flesh = CreatureDetail.Hook(new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/creature_flesh.gdshader"), ResourceName = "crawler_flesh" });
+		_flesh.SetShaderParameter("albedo_tex", baked.AlbedoTexture);
+		_flesh.SetShaderParameter("normal_tex", baked.NormalTexture);
+		_flesh.SetShaderParameter("use_baked", baked.AlbedoTexture != null);
+		// pale, starved, faintly grey-green, bruised dark here and there (no blood: it isn't bleeding)
+		_flesh.SetShaderParameter("base_a", new Color(0.6f, 0.59f, 0.55f));
+		_flesh.SetShaderParameter("base_b", new Color(0.5f, 0.52f, 0.44f));
+		_flesh.SetShaderParameter("base_c", new Color(0.38f, 0.32f, 0.34f));
+		_flesh.SetShaderParameter("cd_scale", 1.7f);
+		_flesh.SetShaderParameter("sores", 0.5f);
+		return _flesh;
 	}
 
 	private int B(string name) => _boneIx != null && _boneIx.TryGetValue(name, out int i) ? i : -1;

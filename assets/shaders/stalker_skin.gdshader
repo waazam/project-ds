@@ -17,8 +17,21 @@
 // the grain of its hide (edge_*: gone by edge_far), so the model can be seen for what it is without it ever looking
 // lit. eyeshine: its eyes catch the lantern like an animal's (set by StalkerBody from the lantern and the head's
 // facing; brightest in the middle of each eye, as a glint).
+//
+// (2026-10-13i, the owner: "the monster models look too smooth, add more detail") Still a hole in the scene, still
+// unlit: but up close the faint edge light now finds its hide's detail (creature_detail.gdshaderinc: the wrinkles, the
+// cracked dry skin, the veins, the scars), and its bones: the ridges of the mesh (ribs, the spine's knuckles, the
+// collarbones, the knuckles of its hands) catch a breath of it, the creases between them stay black.
 shader_type spatial;
 render_mode cull_disabled, unshaded;
+
+#include "res://assets/shaders/creature_detail.gdshaderinc"
+/// How much the mesh's ridges catch the edge light up close (its bones under the hide), against the outline's own.
+uniform float ridge_light : hint_range(0.0, 2.0) = 1.0;
+
+void vertex() {
+	CD_VERTEX;
+}
 
 uniform vec3 albedo : source_color = vec3(0.0, 0.0, 0.0);
 uniform vec3 face_tint : source_color = vec3(0.05, 0.052, 0.055);
@@ -65,12 +78,22 @@ void fragment() {
 	if (use_maps) {
 		float near = 1.0 - smoothstep(edge_near, edge_far, length(VERTEX));
 		if (near > 0.0) {
-			vec3 nm = texture(detail_normal, UV).xyz * 2.0 - 1.0;
+			// the baked map with the skin's detail laid over it (2026-10-13i)
+			CdSample d = cd_sample();
+			vec3 nm = cd_blend(cd_unpack(texture(detail_normal, UV).xy), d.ts);
 			vec3 nd = normalize(TANGENT * nm.x + BINORMAL * nm.y + n * nm.z);
+			if (!FRONT_FACING) nd = n;   // (the rags' backs: no detail)
 			float fres = pow(1.0 - clamp(dot(nd, VIEW), 0.0, 1.0), 3.0);
 			// the hide's own tone (its maps are nearly black: brought up to a 0..2 weight) shapes the edge
 			float tone = clamp(dot(texture(detail_albedo, UV).rgb, vec3(0.33)) * 14.0, 0.4, 2.0);
-			col += edge_color * edge_light * near * fres * tone * (1.0 - eye);
+			float occ = d.occ * cd_crease_occ(d);
+			// (2026-10-13i) The faint light over all of it up close (as before: the baked map's z was lost in its
+			// import, so the edge term lit the whole figure evenly; that pallor is kept) now shaped by its hide: the
+			// skin's grain tilting toward you or away, its bones' ridges a breath brighter, black down in every crease.
+			float ridge = smoothstep(0.1, 0.9, -d.curv);
+			float shade = clamp(0.75 + 2.5 * dot(nd - n, VIEW) + 0.4 * ridge * ridge_light, 0.15, 1.7);
+			col += edge_color * edge_light * near * tone * (shade * occ + fres * 0.6) * (1.0 - eye);
+			col *= mix(0.6, 1.0, occ);
 		}
 	}
 	ALBEDO = col + eye_color * (eye_glow + eyeshine * pow(facing, 3.0)) * eye;
