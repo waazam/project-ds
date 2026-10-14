@@ -171,6 +171,7 @@ public partial class StoryTest
 		var path = new List<Vector3>();
 		for (int k = 0; k <= sw.GapCorner; k++) path.Add(sw.CornerWorld(k));
 		var results = new WalkResult[2];
+		var musicAt = new float[2];
 		for (int pass = 0; pass < 2; pass++)
 		{
 			// (the question at the edge from the last pass: stepped back from)
@@ -180,14 +181,21 @@ public partial class StoryTest
 			Place(sw.TrenchTopWorld, sw.CornerWorld(0));
 			await Frames(5, ct);
 			GD.Print($"[walks] Act 14 pass {pass} start at {_player.GlobalPosition}, choosing {sw.Choosing}, input {_input.Enabled}");
+			sw.ResetDescentMusicForTests();   // (its music again on each way down: where it is at the edge, walking and running)
 			await Rest(ct);
 			// from the top of the trench to the last landing above the fallen flight
 			results[pass] = await Traverse(path, pass == 1, ct, reach: 0.45f, giveUp: 900);
-			GD.Print($"[walks] Act 14 pass {pass}: deepest turn {sw.DeepestRev}, crawler caught {sw.CrawlerCatches}, music {sw.MusicPlaying}");
+			GD.Print($"[walks] Act 14 pass {pass}: deepest turn {sw.DeepestRev}, crawler caught {sw.CrawlerCatches}, music {sw.MusicPlaying}, faded at the edge {sw.MusicEndedAt:0.0} s into the track");
+			musicAt[pass] = sw.MusicEndedAt;
 		}
 		ReportWalk($"Act 14: the stairwell ({sw.Revolutions} turns, {sw.Flights} flights, {-Stairwell.CornerY(sw.GapCorner):0} m down)", results[0], results[1]);
 		if (ResourceLoader.Exists("res://assets/audio/music/stairwell_descent.mp3"))
-			Check("[walks] Act 14: the descent's music", true, $"{GD.Load<AudioStream>("res://assets/audio/music/stairwell_descent.mp3").GetLength():0.0} s long");
+		{
+			Check("[walks] Act 14: the descent's music", true, $"{GD.Load<AudioStream>("res://assets/audio/music/stairwell_descent.mp3").GetLength():0.0} s long, started {sw.DescentMusicOffset:0.0} s in");
+			// (Dan, 2026-10-13: its build lands at the bottom; the edge fades it wherever it is. The build is 64-95 s in)
+			Check("[walks] Act 14: walking, the music is at the end of its build at the edge", musicAt[0] is > 86f and < 100f, $"{musicAt[0]:0.0} s into the track");
+			Check("[walks] Act 14: running, the edge fades it too (in the build)", musicAt[1] is > 55f and < 100f, $"{musicAt[1]:0.0} s into the track");
+		}
 	}
 
 	// ------------------------------------------------------------------ Act 15: the corridor and the hall
