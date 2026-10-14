@@ -1271,36 +1271,36 @@ public partial class StoryTest : Node
 			lantern?.SetBlacklight(false);
 		}
 
-		// The dial: a wrong code keeps it shut, the notes' code opens it.
-		await Teleport(bunker.ApproachPointWorld, bunker.HatchWorld, ct);
-		await WalkTo(bunker.ToGlobal(new Vector3(0, 0.3f, 2.0f)), 0.6f, ct);
-		await Aim(bunker.HatchWorld, ct);
-		GD.Print($"[storytest] dial: focused '{_player.Interaction?.Focused?.GetParent()?.Name}' prompt '{_player.Interaction?.PromptText}'");
+		// The keypad (2026-10-13: a real one beside the door, used in the world): a wrong code keeps it shut, the notes' code opens it.
+		await Teleport(bunker.ApproachPointWorld, bunker.KeypadWorld, ct);
+		await WalkTo(bunker.ToGlobal(new Vector3(1.3f, 0.3f, 1.5f)), 0.5f, ct);
+		await Aim(bunker.KeypadWorld, ct);
+		GD.Print($"[storytest] keypad: focused '{_player.Interaction?.Focused?.Name}' prompt '{_player.Interaction?.PromptText}'");
 		await Press(ct);
-		await WaitUntil(() => CodeLockOverlay.Instance is { IsOpen: true }, 3, ct);
-		Check("E on the dial holds it up", CodeLockOverlay.Instance is { IsOpen: true });
-		Screenshot("dial");
-		if (CodeLockOverlay.Instance is { IsOpen: true } dial)
+		var pad = bunker.Keypad;
+		await WaitUntil(() => pad is { Engaged: true }, 3, ct);
+		Check("E on the keypad leans in to it", pad is { Engaged: true });
+		await Seconds(0.8, ct);
+		Screenshot("keypad");
+		if (pad is { Engaged: true })
 		{
-			// (2026-10-13) the wheels start at nought: the code is entered from memory, never filled in
-			Check("the dial comes up at nought, not filled in", dial.Entered == "0000", $"wheels {dial.Entered}");
-			// the player dials the code they remember, wheel by wheel through their own keys
-			for (int w = 0; w < 4 && lot != null; w++)
-			{
-				if (w > 0) await Key("move_right", ct);
-				for (int turns = 0; turns < 10 && dial.Entered[w] != lot.Code[w]; turns++) await Key("move_forward", ct);
-			}
-			Check("the remembered code is dialled", dial.Entered == lot?.Code, $"wheels {dial.Entered}");
-			// Through the player's own keys (the overlay's input path), not the test shortcut: turn the wheel under the
-			// cursor one notch (a wrong code), try it, turn it back, try again.
-			string before = dial.Entered;
-			await Key("move_forward", ct);
-			Check("W turns the wheel under the cursor", dial.Entered != before, $"{before} -> {dial.Entered}");
+			// (2026-10-13) the readout starts empty: the code is entered from memory, never filled in
+			Check("the keypad comes up empty, not filled in", pad.Entered == "", $"'{pad.Entered}'");
+			// the player keys a wrong code with the arrows (the D-pad) and E, as on a controller: 5, 5, 5, 5, then #
+			for (int i = 0; i < 4; i++) await Key("interact", ct);
+			await MoveTo(pad, ProjectDS.World.BunkerParts.BunkerKeypad.Enter, ct);
 			await Key("interact", ct);
-			await Seconds(0.4, ct);
-			Check("a wrong code keeps the hatch shut", !bunker.IsOpen && dial.IsOpen, $"wheels {dial.Entered}");
-			await Key("move_back", ct);
-			Check("S turns it back to the notes' code", dial.Entered == lot?.Code, $"wheels {dial.Entered}");
+			await Seconds(0.1, ct);
+			Check("a wrong code keeps the hatch shut and lights the red lamp", !bunker.IsOpen && pad.LampState == ProjectDS.World.BunkerParts.BunkerKeypad.Lamp.Denied, $"lamp {pad.LampState}");
+			await WaitUntil(() => pad.Entered == "" && pad.LampState == ProjectDS.World.BunkerParts.BunkerKeypad.Lamp.Locked, 3, ct);
+			// then the code they remember, key by key through the same keys
+			foreach (char c in lot?.Code ?? "")
+			{
+				await MoveTo(pad, System.Array.IndexOf(ProjectDS.World.BunkerParts.BunkerKeypad.Keys, c.ToString()), ct);
+				await Key("interact", ct);
+			}
+			Check("the remembered code is keyed in", pad.Entered == lot?.Code, $"'{pad.Entered}'");
+			await MoveTo(pad, ProjectDS.World.BunkerParts.BunkerKeypad.Enter, ct);
 			await Key("interact", ct);
 		}
 		await WaitUntil(() => bunker.IsOpen, 5, ct);
@@ -1311,7 +1311,8 @@ public partial class StoryTest : Node
 				string.Join(", ", dressed.Select(d => $"{d.GetParent().Name} {d.Placed}{(d.Finished ? "" : " (laying)")}")));
 		}
 		Check("the code is saved (the door stays open on Continue)", StoryManager.Instance.HasFlag(StoryManager.Flag.BunkerUnlocked));
-		Check("the dial is put down and control is back", CodeLockOverlay.Instance is not { IsOpen: true } && !_input.Modal);
+		await WaitUntil(() => pad is not { ViewUp: true } && !_input.Modal, 4, ct);
+		Check("the keypad lets go and control is back", pad is not { ViewUp: true } && !_input.Modal);
 		Screenshot("bunker_open");
 		if (!Entered()) await WalkTo(bunker.EntryPointWorld, 0.3f, ct, stopWhen: Entered);
 		await WaitUntil(Entered, 12, ct);
@@ -4655,6 +4656,16 @@ public partial class StoryTest : Node
 		await Frames(2, ct);
 		Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false }); Input.FlushBufferedEvents();
 		await Frames(2, ct);
+	}
+
+	/// <summary>Moves the bunker keypad's highlight to key <paramref name="target"/> with the arrows, as a player would.</summary>
+	private async Task MoveTo(ProjectDS.World.BunkerParts.BunkerKeypad pad, int target, CancellationToken ct)
+	{
+		for (int guard = 0; guard < 8 && pad.Selected != target; guard++)
+		{
+			int dc = target % 3 - pad.Selected % 3, dr = target / 3 - pad.Selected / 3;
+			await Key(dr < 0 ? "move_forward" : dr > 0 ? "move_back" : dc < 0 ? "move_left" : "move_right", ct);
+		}
 	}
 
 	private async Task ReadTreeNote(SurveyLot lot, int i, CancellationToken ct)

@@ -393,6 +393,15 @@ public partial class Playtest
 
 	// ------------------------------------------------------------------ Acts 8-10
 
+	/// <summary>One press and release of a keyboard key through the real input pipeline (the bunker's keypad reads the number keys).</summary>
+	private async Task TypeKey(Key key, CancellationToken ct)
+	{
+		Godot.Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = true }); Godot.Input.FlushBufferedEvents();
+		await _bot.Frames(2, ct);
+		Godot.Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = false }); Godot.Input.FlushBufferedEvents();
+		await _bot.Frames(2, ct);
+	}
+
 	private async Task Act8To10(CancellationToken ct)
 	{
 		await Control(ct, 40);
@@ -402,31 +411,47 @@ public partial class Playtest
 		await _bot.Teleport(bunker.ApproachPointWorld + (bunker.ApproachPointWorld - bunker.HatchWorld).Normalized() * 5f, bunker.HatchWorld, ct);
 		await _bot.WalkTo(bunker.ToGlobal(new Vector3(0, 0.3f, 2.0f)), 0.6f, ct);
 		Check("the hatch is shut", !bunker.IsOpen);
-		await _bot.Aim(bunker.HatchWorld, ct);
+		// (2026-10-13) the code goes in on the keypad right of the door, in the world: no overlay, no cursor
+		var pad = bunker.Keypad;
+		Require("the keypad", pad != null);
+		Check("the keypad is awake after the fire", pad.Powered && pad.LampState == BunkerKeypad.Lamp.Locked, $"powered {pad.Powered}, lamp {pad.LampState}");
+		await _bot.WalkTo(bunker.ToGlobal(new Vector3(1.3f, 0.3f, 1.5f)), 0.5f, ct);
+		var mouse = Godot.Input.MouseMode;
+		await _bot.Aim(bunker.KeypadWorld, ct);
+		Shot("keypad");
 		await _bot.Press(ct);
-		await _bot.WaitUntil(() => CodeLockOverlay.Instance is { IsOpen: true }, 3, ct);
-		var dial = CodeLockOverlay.Instance;
-		Require("E on the dial holds it up", dial is { IsOpen: true });
-		Check("the dial comes up at nought: the code is the player's to remember", dial.Entered == "0000", $"{dial.Entered}");
-		Shot("dial");
-		string was = dial.Entered;
+		await _bot.WaitUntil(() => pad.Engaged, 3, ct);
+		Require("E on the keypad leans in to it", pad.Engaged);
+		await _bot.Seconds(0.8, ct);   // the view eases in
+		Check("a close view of the pad, the mouse untouched", GetViewport().GetCamera3D()?.GetParent() == pad && Godot.Input.MouseMode == mouse && Input.Modal,
+			$"camera {GetViewport().GetCamera3D()?.Name}, mouse {Godot.Input.MouseMode} (was {mouse})");
+		Check("the readout starts empty: the code is the player's to remember", pad.Entered == "", $"'{pad.Entered}'");
+		Shot("keypad_close");
+		// the arrows (the D-pad) and E press the highlighted key; the view's centre sits on it
 		await _bot.Key("move_forward", ct);
-		Check("W turns the wheel", dial.Entered != was, $"{was} -> {dial.Entered}");
 		await _bot.Key("interact", ct);
-		await _bot.Seconds(0.4, ct);
-		Check("a wrong code: it stays shut", !bunker.IsOpen && dial.IsOpen);
-		// the code remembered from the four notes, dialled wheel by wheel through the player's own keys
+		Check("up from 5 and E: 2", pad.Entered == "2" && pad.Selected == 1, $"'{pad.Entered}', on {BunkerKeypad.Keys[pad.Selected]}");
+		await TypeKey(Key.Backspace, ct);
+		Check("Backspace takes it back", pad.Entered == "", $"'{pad.Entered}'");
+		// a wrong code, through the number keys and Enter: a buzz, the red lamp, cleared
+		foreach (var k in new[] { Key.Key1, Key.Key3, Key.Key5, Key.Key7 }) await TypeKey(k, ct);
+		Check("the number keys type", pad.Entered == "1357", $"'{pad.Entered}'");
+		await TypeKey(Key.Enter, ct);
+		await _bot.Seconds(0.1, ct);
+		Check("a wrong code: the red lamp, still shut", pad.LampState == BunkerKeypad.Lamp.Denied && !bunker.IsOpen, $"lamp {pad.LampState}");
+		await _bot.WaitUntil(() => pad.Entered == "" && pad.LampState == BunkerKeypad.Lamp.Locked, 3, ct);
+		Check("...and it clears", pad.Entered == "" && pad.Engaged, $"'{pad.Entered}'");
+		// the code remembered from the four notes, keyed in on the numpad
 		string code = lot?.Code ?? "";
-		for (int w = 0; w < 4 && code.Length == 4; w++)
-		{
-			if (w > 0) await _bot.Key("move_right", ct);
-			for (int turns = 0; turns < 10 && dial.Entered[w] != code[w]; turns++) await _bot.Key("move_forward", ct);
-		}
-		Check("the remembered code dialled", dial.Entered == code, $"{dial.Entered} vs {code}");
-		await _bot.Key("interact", ct);
+		foreach (char c in code) await TypeKey(Key.Kp0 + (c - '0'), ct);
+		Check("the remembered code keyed in", pad.Entered == code, $"{pad.Entered} vs {code}");
+		Shot("keypad_code");
+		await TypeKey(Key.KpEnter, ct);
 		await _bot.WaitUntil(() => bunker.IsOpen, 5, ct);
 		Check("the code from the notes opens it, saved", bunker.IsOpen && Story.HasFlag(StoryManager.Flag.BunkerUnlocked));
-		Check("the dial is put down", CodeLockOverlay.Instance is not { IsOpen: true } && !Input.Modal);
+		Check("the green lamp", pad.LampState == BunkerKeypad.Lamp.Open);
+		await _bot.WaitUntil(() => !pad.ViewUp && !Input.Modal, 4, ct);
+		Check("the view comes back to the eye and control with it", !pad.ViewUp && !Input.Modal && GetViewport().GetCamera3D() == Player.CameraRig.Camera);
 		await _bot.WalkTo(bunker.EntryPointWorld, 0.3f, ct, () => Story.Current >= Checkpoint.Act8BunkerEntered);
 		await _bot.WaitUntil(() => Story.Current >= Checkpoint.Act8BunkerEntered, 10, ct);
 		Check("checkpoint 7 entering the bunker", Story.Current == Checkpoint.Act8BunkerEntered);
