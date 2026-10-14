@@ -447,6 +447,8 @@ public partial class GameSettings : Node
 		AddKeys("crouch", Key.C, Key.Ctrl);   // a toggle (either Ctrl answers, the left one included)
 		AddKeys("throw", Key.G);
 		AddKeys("hold_breath", Key.V);
+		// 1-9: the right hand's thing by its place on the wheel (2026-10-13j)
+		for (int n = 1; n <= 9; n++) AddKeys($"item_slot_{n}", Key.Key0 + n);
 
 		AddAxis("move_forward", JoyAxis.LeftY, -1);
 		AddAxis("move_back", JoyAxis.LeftY, 1);
@@ -464,13 +466,16 @@ public partial class GameSettings : Node
 		AddButton("flashlight_toggle", JoyButton.Y);
 		AddButton("photo", JoyButton.X);
 		AddButton("photo_log", JoyButton.Back);
-		AddButton("lantern_mode", JoyButton.RightShoulder);
+		// (2026-10-13j: the bumpers are the right hand's, LB back and RB on round the wheel; the blacklight moved to the d-pad)
+		AddButton("lantern_mode", JoyButton.DpadDown);
 		AddButton("lean_left", JoyButton.DpadLeft);
 		AddButton("lean_right", JoyButton.DpadRight);
 		AddButton("crouch", JoyButton.RightStick);
 		AddButton("throw", JoyButton.B);
 		AddButton("hold_breath", JoyButton.DpadUp);
-		AddButton("item_next", JoyButton.LeftShoulder);   // the item in hand (the HUD), the camera's zoom, the album's pages
+		// the right hand's thing (the wheel), the camera's zoom, the album's pages
+		AddButton("item_next", JoyButton.RightShoulder);
+		AddButton("item_prev", JoyButton.LeftShoulder);
 	}
 
 	private static void Ensure(string action)

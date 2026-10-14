@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://scripts/player/PlayerInventory.cs" id="6_inventory"]
 [ext_resource type="Script" path="res://scripts/player/Lantern.cs" id="7_lantern"]
 [ext_resource type="Script" path="res://scripts/player/CameraTool.cs" id="8_camtool"]
+[ext_resource type="Script" path="res://scripts/player/PlayerHands.cs" id="21_hands"]
 [ext_resource type="Script" path="res://scripts/player/PlayerStamina.cs" id="9_stamina"]
 
 [sub_resource type="CapsuleShape3D" id="Body"]
@@ -118,6 +119,9 @@ script = ExtResource("7_lantern")
 
 [node name="CameraTool" type="Node" parent="."]
 script = ExtResource("8_camtool")
+
+[node name="Hands" type="Node" parent="."]
+script = ExtResource("21_hands")
 
 [node name="Stamina" type="Node" parent="."]
 script = ExtResource("9_stamina")

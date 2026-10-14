@@ -40,6 +40,8 @@ public partial class CameraTool : Node
 	public bool IsRaised => _raise > 0.85f;
 	/// <summary>The camera is on its way up (or up): the viewfinder is drawing.</summary>
 	public bool Raising => _raise > 0.01f;
+	/// <summary>0 at rest .. 1 at the eye (the camera in the hand follows it up).</summary>
+	public float RaiseAmount => _raise;
 	public int FramesLeft => _framesLeft;
 	public int ZoomIndex { get; private set; }
 	public float Zoom => ZoomSteps[ZoomIndex];
@@ -89,7 +91,8 @@ public partial class CameraTool : Node
 		}
 		if (_pendingShot) { _pendingShot = false; _viewfinder.HideMarks = false; Shoot(); }
 		var input = _player.PlayerInput;
-		bool raising = _inv.HasCamera && input.Enabled && input.Focus;
+		// (2026-10-13j) only with the camera in the right hand (and up there): otherwise right mouse gathers the lantern's beam
+		bool raising = _inv.HasCamera && PlayerHands.CameraReady(_player) && input.Enabled && input.Focus;
 		_raise = Mathf.MoveToward(_raise, raising ? 1f : 0f, (float)delta / Mathf.Max(RaiseSeconds, 0.01f));
 		_viewfinder.Raise = _raise;
 		_viewfinder.FramesLeft = _framesLeft;

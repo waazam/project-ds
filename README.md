@@ -29,6 +29,11 @@ Godot_v4.7.2-stable_mono_win64_console.exe --path . -- --autotest --story-from=1
 Godot_v4.7.2-stable_mono_win64_console.exe --path . -- --autotest --story-from=14 --story-to=14 --measure-walks   # time each long stair and hall, walking and running
 Godot_v4.7.2-stable_mono_win64_console.exe --path . -- --autotest --hitches   # the lag meter: every frame over 33 ms and its cause, hitches.txt beside the report
 
+# the inventory and the hands: switching checks, then each held thing shot from the eye (test-output/hands/)
+Godot_v4.7.2-stable_mono_win64_console.exe --path . res://scenes/levels/hands_preview.tscn
+Godot_v4.7.2-stable_mono_win64_console.exe --path . res://scenes/levels/hands_preview.tscn -- --hands-shots=Axe,Camera   # only those shots
+Godot_v4.7.2-stable_mono_win64_console.exe --path . res://scenes/levels/hands_preview.tscn -- --hands-studio            # each model alone, turned
+
 # the Continue round trip for every checkpoint (report in test-output/systems/)
 Godot_v4.7.2-stable_mono_win64_console.exe --path . -- --continue-test
 ```
@@ -36,6 +41,8 @@ Godot_v4.7.2-stable_mono_win64_console.exe --path . -- --continue-test
 
 ## Controls
 The keyboard keys for moving, running, crouching, leaning, use, the lantern, the blacklight, the album, throwing and holding breath can be rebound under Settings > KEYS (`KeyRebinds.cs`, kept in the settings file). The mouse buttons, the pad's buttons and the fixed keys (Esc, F11) stay as they are, and the hints on screen name the keys as bound.
+
+Two hands: the lantern is always the left hand's; the right hand holds one thing (the camera, the axe, the hammer, the cap, the walkie-talkie, the knife, the lighter, the crowbar, the flamethrower) or nothing. Keys, keycards and the compass are pocketed. The flamethrower takes both hands (the lantern hangs at the belt). A 1-9 key the player has rebound to an action does that action instead.
 
 | | Keyboard / mouse | Gamepad |
 |---|---|---|
@@ -46,11 +53,12 @@ The keyboard keys for moving, running, crouching, leaning, use, the lantern, the
 | Lean left / right | Q / R | D-pad left / right |
 | Use / read / take | E | A |
 | Lantern on / off | F | Y |
-| Blacklight (the lantern's other light) | B | RB |
-| Gather the lantern's beam; raise the camera | Right mouse (hold) | RT |
-| Take a picture | Left mouse | X |
-| Camera zoom (while raised) | Mouse wheel | |
-| Item in hand (the item wheel) | Mouse wheel | LB |
+| Blacklight (the lantern's other light) | B | D-pad down |
+| The right hand's: raise the camera (when it's in hand), else gather the lantern's beam | Right mouse (hold) | RT |
+| Take a picture (the camera raised); fire the flamethrower (Act 24) | Left mouse | X |
+| Camera zoom (while raised) | Mouse wheel | RB / LB |
+| Right hand: next / previous thing (an empty hand among them) | Mouse wheel | RB / LB |
+| Right hand: a thing by its place (again: put it away) | 1-9 | |
 | Photo album (its pages: the wheel) | Tab | Back |
 | Throw (a flare, a tin) | G | B |
 | Hold breath | V | D-pad up |

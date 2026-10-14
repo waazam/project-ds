@@ -21,6 +21,8 @@ public abstract partial class HeldItem : Node3D
 	protected abstract void Build();
 	protected abstract void Animate(float dt);
 	protected virtual void OnHidden() { }
+	/// <summary>Seconds to raise it into view or lower it out (each way).</summary>
+	protected virtual float RaiseSeconds => 0.5f;
 
 	private float _stride, _amp, _run, _lagYaw, _lagPitch, _prevYaw, _prevPitch, _shakeT;
 	private bool _built;
@@ -68,11 +70,11 @@ public abstract partial class HeldItem : Node3D
 			AddChild(new OmniLight3D { Name = "HeldRim", Position = new Vector3(0.28f, 0.32f, 0.22f), LightColor = new Color(0.58f, 0.66f, 0.82f), LightEnergy = 0.45f, OmniRange = 1.1f, OmniAttenuation = 1.2f, ShadowEnabled = false, LightCullMask = HeldLayer, LightSpecular = 0.6f });
 			Hold = Rest;
 			Visible = false;
-			foreach (var n in FindChildren("*", "", true, false)) if (n is FirstPersonHand h) _hands.Add(h);
+			TrackHands();
 		}
 		float dt = Mathf.Min((float)delta, 0.05f);
 		bool want = Wanted;
-		Raise = Mathf.MoveToward(Raise, want ? 1f : 0f, dt / 0.5f);
+		Raise = Mathf.MoveToward(Raise, want ? 1f : 0f, dt / RaiseSeconds);
 		bool show = Raise > 0.01f;
 		if (Visible != show) { Visible = show; if (!show) OnHidden(); }
 		if (!show) return;
@@ -124,13 +126,20 @@ public abstract partial class HeldItem : Node3D
 		Rotation = new Vector3(_lagPitch * 0.5f + shake.Y * 3f, _lagYaw * 0.6f, shake.X * 3f);
 	}
 
+	/// <summary>(Re)finds the hands under this held thing, to keep their stride and tension up to date (call after building new ones).</summary>
+	protected void TrackHands()
+	{
+		_hands.Clear();
+		foreach (var n in FindChildren("*", "", true, false)) if (n is FirstPersonHand h && !h.IsQueuedForDeletion()) _hands.Add(h);
+	}
+
 	/// <summary>The render layer the held things are on (out of the lantern's own light: see <see cref="SetLayer"/>).</summary>
 	public const uint HeldLayer = 1u << 19;
 	/// <summary>The jacket's sleeve, as the body's (a shade under its hips: the held things are lit close by their own fill).</summary>
 	public static readonly Color JacketSleeve = new(0.085f, 0.1f, 0.07f);
 
 	/// <summary>Puts everything drawn under <paramref name="n"/> on the held layer only.</summary>
-	protected static void SetLayer(Node n)
+	internal static void SetLayer(Node n)
 	{
 		if (n is VisualInstance3D v && n is not Light3D) v.Layers = HeldLayer;
 		foreach (var c in n.GetChildren()) SetLayer(c);
@@ -140,7 +149,7 @@ public abstract partial class HeldItem : Node3D
 	/// bridge the meshes"; 2026-10-13d: the reusable <see cref="FirstPersonHand"/>) A first-person gloved hand, its cuff and
 	/// sleeve, its socket (the grip) at <paramref name="at"/>, named "Arm". Null if the model's missing. The holder keeps its
 	/// stride and tension up to date.</summary>
-	protected static FirstPersonHand BuildArm(Node3D parent, HandSide side, HandPose pose, Vector3 at)
+	internal static FirstPersonHand BuildArm(Node3D parent, HandSide side, HandPose pose, Vector3 at)
 	{
 		var hand = FirstPersonHand.Create(side, pose);
 		if (hand == null) return null;
