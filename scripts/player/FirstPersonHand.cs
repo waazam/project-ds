@@ -18,6 +18,12 @@ public enum HandPose
 	Camera,
 	/// <summary>Open and at ease, the fingers gently curled; the socket is the middle of the palm.</summary>
 	Relaxed,
+	/// <summary>(2026-10-14e) A hand cradling a thick upright neck (the newel cap's, 7.2 cm across) along Y through the
+	/// socket: the fingers half round it, the thumb opposite.</summary>
+	Wide,
+	/// <summary>(2026-10-14e) A tight fist round a small upright thing (the lighter) along Y through the socket, 1.9 cm across,
+	/// the thumb over the fingers.</summary>
+	Small,
 }
 
 /// <summary>
@@ -60,7 +66,7 @@ public partial class FirstPersonHand : Node3D
 	public Vector3 GripAxis => Pose switch
 	{
 		HandPose.Handle => Vector3.Right,
-		HandPose.Stick or HandPose.Camera => Vector3.Up,
+		HandPose.Stick or HandPose.Camera or HandPose.Wide or HandPose.Small => Vector3.Up,
 		_ => Vector3.Right,
 	};
 
@@ -70,6 +76,8 @@ public partial class FirstPersonHand : Node3D
 		HandPose.Handle => 0.0085f,
 		HandPose.Stick => 0.016f,
 		HandPose.Camera => 0.021f,
+		HandPose.Wide => 0.036f,
+		HandPose.Small => 0.0095f,
 		_ => 0f,
 	};
 
@@ -145,14 +153,24 @@ public partial class FirstPersonHand : Node3D
 					m.AlbedoColor = Colors.White;
 					m.AlbedoTexture = null;
 					m.CullMode = cloth ? BaseMaterial3D.CullModeEnum.Disabled : BaseMaterial3D.CullModeEnum.Back;
-					m.Roughness = cloth ? 0.95f : 0.62f;
-					m.MetallicSpecular = cloth ? 0.15f : 0.4f;   // (the gloves: dark leather, a soft sheen along the knuckles)
+					// (2026-10-14e: worn work-glove leather, matte with a low sheen: a glossy one read as latex over bone)
+					m.Roughness = cloth ? 0.95f : 0.74f;
+					m.MetallicSpecular = cloth ? 0.15f : 0.3f;
 					if (!cloth)
 					{
-						m.RimEnabled = true; m.Rim = 0.2f; m.RimTint = 0.3f;
-						m.NormalEnabled = true; m.NormalTexture = LeatherGrain; m.NormalScale = 0.55f;
-						m.RoughnessTexture = LeatherRough; m.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red;
-						m.Uv1Triplanar = true; m.Uv1Scale = Vector3.One * 38f; m.Uv1TriplanarSharpness = 2f;
+						m.RimEnabled = true; m.Rim = 0.12f; m.RimTint = 0.4f;
+						if (sm.NormalTexture != null)
+						{
+							// (the modelled hand's own baked map: its folds, seams and grain)
+							m.NormalEnabled = true; m.NormalTexture = sm.NormalTexture; m.NormalScale = 1f;
+							m.RoughnessTexture = null; m.Uv1Triplanar = false;
+						}
+						else
+						{
+							m.NormalEnabled = true; m.NormalTexture = LeatherGrain; m.NormalScale = 0.55f;
+							m.RoughnessTexture = LeatherRough; m.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red;
+							m.Uv1Triplanar = true; m.Uv1Scale = Vector3.One * 38f; m.Uv1TriplanarSharpness = 2f;
+						}
 					}
 					mi.SetSurfaceOverrideMaterial(si, m);
 				}

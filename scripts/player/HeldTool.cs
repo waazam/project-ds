@@ -55,6 +55,22 @@ public partial class HeldTool : HeldItem
 		AddChild(_fill);
 		_camTool = Player.GetNodeOrNull<CameraTool>("CameraTool");
 		_ready = true;
+		Prewarm(this);
+	}
+
+	/// <summary>(2026-10-14e: a 1.19 s frame at the knife's pickup in the station, its model, its materials and the hand's
+	/// built and compiled as it first showed) Every held thing and every pose of the hand, both sides, made once at the
+	/// level's load and drawn in the black with the rest of the warm-up (<see cref="Systems.ShaderWarmup.Prewarm"/>), so
+	/// no pickup or switch builds a model's file or a shader on the spot.</summary>
+	internal static void Prewarm(Node from)
+	{
+		var all = new Node3D { Name = "HeldWarmUp" };
+		foreach (ToolKind k in System.Enum.GetValues(typeof(ToolKind)))
+			if (HeldModels.Build(k) is { } m) all.AddChild(m);
+		foreach (HandPose pose in System.Enum.GetValues(typeof(HandPose)))
+			foreach (var side in new[] { HandSide.Left, HandSide.Right })
+				if (FirstPersonHand.Create(side, pose) is { } h) { h.ProcessMode = ProcessModeEnum.Disabled; all.AddChild(h); }
+		Systems.ShaderWarmup.Prewarm(from, all);
 	}
 
 	public override void _Process(double delta)
