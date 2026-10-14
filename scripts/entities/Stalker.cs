@@ -114,8 +114,6 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	[Export] public float RattleRange = 34f;   // (was 26)
 	/// <summary>Level of the rattle when it is right on you.</summary>
 	[Export] public float RattleMaxDb = 3f;
-	/// <summary>Unused since 2026-09-22 (the rate is lerp(0.55, 1, intensity) in UpdateRattle); kept so scene overrides still load.</summary>
-	[Export] public Vector2 RattlePitch = new(0.72f, 1f);
 
 	public State Current { get; private set; } = State.Dormant;
 

@@ -56,8 +56,6 @@ public partial class GiantStalkerEvent : Node
 	[Export] public float LeanDegrees = 3f;
 	/// <summary>How far the soles sink into the undergrowth, as a fraction of BodyScale.</summary>
 	[Export] public float SoleSink = 0.03f;
-	/// <summary>Unused since 2026-09-22 (Dan: no roar); kept so scene overrides still load.</summary>
-	[Export] public float BellowVolumeDb = 3f;
 
 	private static AudioStream Load(string path) => ResourceLoader.Exists(path) ? GD.Load<AudioStream>(path) : null;
 

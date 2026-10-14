@@ -103,8 +103,6 @@ public partial class ForestPreview : Node3D
 		var obstacle = GetTree().GetFirstNodeInGroup("autotest_obstacle") as Node3D;
 		if (obstacle != null && spawn != null) Log($"obstacle {obstacle.GlobalPosition} dist {obstacle.GlobalPosition.DistanceTo(spawn.GlobalPosition):0.0}");
 		foreach (var n in GetTree().GetNodesInGroup("stream_audio_points")) Log($"stream point {((Node3D)n).Name} {((Node3D)n).GlobalPosition}");
-		var vanish = GetTree().Root.FindChild("Vanishing", true, false) as VanishingProp;
-		if (vanish != null) Log($"vanishing prop {vanish.GlobalPosition}");
 		foreach (var n in GetTree().GetNodesInGroup("trail"))
 			if (n is Path3D p) Log($"trail path points {p.Curve.PointCount}, first {p.GlobalTransform * p.Curve.GetPointPosition(0)} last {p.GlobalTransform * p.Curve.GetPointPosition(p.Curve.PointCount - 1)}");
 
@@ -124,18 +122,6 @@ public partial class ForestPreview : Node3D
 			}
 			foreach (float s in new[] { 40f, 88f, 125f })
 				views.Add(($"03_trail_{s:000}", Eye(TP(s)), Eye(TP(s + 12f))));
-			if (vanish != null)
-				views.Add(("04_fragment_look", Eye(TP(80f)), vanish.GlobalPosition + new Vector3(0, 0.8f, 0)));
-			if (vanish != null)
-			{
-				Vector3 fp = vanish.GlobalPosition;
-				Vector3 nearV = fp + new Vector3(8, 0, 10); nearV.Y = _terrain.HeightAt(nearV.X, nearV.Z);
-				views.Add(("04b_fragment_near", Eye(nearV), fp + new Vector3(0, 0.6f, 0)));
-				Vector3 v0 = TP(80f);
-				var sb = new System.Text.StringBuilder("sightline heights:");
-				for (int i = 0; i <= 10; i++) { var q = v0.Lerp(fp, i / 10f); sb.Append($" {_terrain.HeightAt(q.X, q.Z) - Mathf.Lerp(v0.Y + 1.6f, fp.Y + 0.6f, i / 10f):0.0}"); }
-				Log(sb.ToString());
-			}
 			views.Add(("05_bridge", Eye(TP(crossS - 11f)), Eye(TP(crossS + 2f)) + new Vector3(0, -1.2f, 0)));
 			Vector3 side = cross + new Vector3(7, 0, 4); side.Y = _terrain.HeightAt(side.X, side.Z);
 			views.Add(("06_bridge_side", Eye(side), cross + new Vector3(0, 0.3f, 0)));
@@ -221,7 +207,7 @@ public partial class ForestPreview : Node3D
 			}
 		}
 
-		if (WalkTest) await Walk(spawn, approach, stairsTrig, vanish);
+		if (WalkTest) await Walk(spawn, approach, stairsTrig);
 
 		Log(_fails == 0 ? "ALL CHECKS PASSED" : $"{_fails} CHECK(S) FAILED");
 		if (QuitWhenDone) GetTree().Quit(_fails == 0 ? 0 : 1);
@@ -255,7 +241,7 @@ public partial class ForestPreview : Node3D
 		}
 	}
 
-	private async Task Walk(Node3D spawn, Node3D approach, Area3D trigger, VanishingProp vanish)
+	private async Task Walk(Node3D spawn, Node3D approach, Area3D trigger)
 	{
 		var path = (GetTree().GetFirstNodeInGroup("autotest_route") ?? GetTree().GetFirstNodeInGroup("trail")) as Path3D;
 		if (path == null || spawn == null) { Check(false, "trail path + spawn exist"); return; }
@@ -270,8 +256,7 @@ public partial class ForestPreview : Node3D
 
 		bool reachedTop = false;
 		if (trigger != null) trigger.BodyEntered += b => { if (b == body) reachedTop = true; };
-		float walked = 0; bool vanished = false; float vanishedAt = -1;
-		if (vanish != null) vanish.Vanished += () => { vanished = true; vanishedAt = walked; };
+		float walked = 0;
 
 		var targets = new List<Vector3>();
 		for (int i = 0; i < path.Curve.PointCount; i++) targets.Add(path.GlobalTransform * path.Curve.GetPointPosition(i));
@@ -284,7 +269,6 @@ public partial class ForestPreview : Node3D
 		bool climbing = false; float climbT = 0; float maxY = -999;
 		Vector3 look = -spawn.GlobalBasis.Z;
 		var shotAt = new HashSet<int> { 55, 65, 75, 85, 120 };
-		bool seenLogged = false;
 		while (true)
 		{
 			await PhysFrame();
@@ -324,15 +308,6 @@ public partial class ForestPreview : Node3D
 			_cam.GlobalPosition = body.GlobalPosition + new Vector3(0, 1.6f, 0) - look * 2.2f + new Vector3(0, 0.3f, 0);
 			_cam.LookAt(body.GlobalPosition + new Vector3(0, 1.4f, 0) + look * 6f, Vector3.Up);
 
-			if (vanish != null && vanish.HasBeenSeen && !seenLogged)
-			{
-				seenLogged = true;
-				Log($"fragment first seen at {walked:0} m walked, camera {_cam.GlobalPosition}");
-				Engine.TimeScale = 1;
-				await Frames(2);
-				GetViewport().GetTexture().GetImage().SavePng($"{_out}/walk_seen.png");
-				Engine.TimeScale = WalkTimeScale;
-			}
 			int wm = (int)walked;
 			if (shotAt.Remove(wm))
 			{
@@ -353,7 +328,6 @@ public partial class ForestPreview : Node3D
 		Engine.TimeScale = 1;
 		Check(idx >= targets.Count, $"walker followed trail to the stairs approach (reached {idx}/{targets.Count}, walked {walked:0} m, at {body.GlobalPosition})");
 		Check(reachedTop, $"walker climbed the stairs into stairs_top_trigger (max y {maxY:0.00})");
-		if (vanish != null) Check(vanished, $"fragment vanished during the walk (at {vanishedAt:0} m walked)");
 		body.QueueFree();
 
 		// obstacle check: walk straight at it from spawn

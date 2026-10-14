@@ -1,16 +1,12 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/world/Cabin.cs" id="1_cabin"]
-[ext_resource type="Script" path="res://scripts/world/CabinReturnEvent.cs" id="2_return"]
 [ext_resource type="Script" path="res://scripts/world/DoorBreakEvent.cs" id="5_break"]
 [ext_resource type="PackedScene" path="res://scenes/entities/friend.tscn" id="6_friend"]
 [ext_resource type="Script" path="res://scripts/world/CabinExitLine.cs" id="7_exitline"]
 [ext_resource type="Script" path="res://scripts/world/CabinFireEvent.cs" id="8_fire"]
 [ext_resource type="Script" path="res://scripts/audio/IndoorZone.cs" id="9_indoor"]
 [ext_resource type="Script" path="res://scripts/world/PhotoSubject.cs" id="10_photo"]
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_porch"]
-size = Vector3(6, 5, 5)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_breakin"]
 size = Vector3(3.0, 5.0, 3.0)
@@ -20,16 +16,6 @@ size = Vector3(3.95, 2.3, 4.95)
 
 [node name="Cabin" type="Node3D" groups=["cabin"]]
 script = ExtResource("1_cabin")
-
-[node name="ReturnTrigger" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4.8)
-collision_layer = 0
-collision_mask = 2
-monitorable = false
-script = ExtResource("2_return")
-
-[node name="Shape" type="CollisionShape3D" parent="ReturnTrigger"]
-shape = SubResource("BoxShape3D_porch")
 
 [node name="DoorBreakTrigger" type="Area3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 3.0)

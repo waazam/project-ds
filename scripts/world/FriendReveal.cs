@@ -32,9 +32,6 @@ public partial class FriendReveal : StoryTrigger
 		_cabin ??= StoryBeat.Cabin(this);
 	}
 
-	/// <summary>Unused since 2026-09-22 (no self-talk); kept for references.</summary>
-	public const string Line = "He's not here.";
-
 	protected override bool RecheckWhileInside => true;
 
 	protected override bool AlreadyHappened(StoryManager s) => s.Current >= Checkpoint.Act5CabinEntered;

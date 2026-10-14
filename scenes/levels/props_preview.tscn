@@ -1,9 +1,0 @@
-[gd_scene format=3]
-
-[ext_resource type="PackedScene" path="res://scenes/levels/trail_slice.tscn" id="1_level"]
-[ext_resource type="Script" path="res://scripts/world/PropsPreview.cs" id="2_preview"]
-
-[node name="PropsPreview" type="Node3D"]
-script = ExtResource("2_preview")
-
-[node name="TrailSlice" parent="." instance=ExtResource("1_level")]

@@ -12,6 +12,9 @@ real"). Seamless, 1024 px (the log 1024 x 256: one course), each an albedo, a no
   concrete_b     the same, older: stained, efflorescence, water tide-marks, more cracks
   concrete_clean poured smooth: board-form marks, faint
 
+wood_boards/floor/dark/pine are no longer baked (2026-10-13 cleanup: the hinoki scan replaced them, the outputs were
+deleted); their functions are kept as history.
+
     python tools/textures/surfaces.py [names...]
 """
 import os
@@ -282,10 +285,6 @@ def concrete_grime():
 JOBS = {
     "concrete_grime": concrete_grime,
     "wood_log": wood_log,
-    "wood_boards": lambda: boards("wood_boards", [0.13, 0.1, 0.075], [0.38, 0.32, 0.25], True, 128, 0.4, 20),
-    "wood_floor": wood_floor,
-    "wood_dark": wood_dark,
-    "wood_pine": wood_pine,
     "concrete_a": lambda: concrete("concrete_a", 61, 0.4),
     "concrete_b": lambda: concrete("concrete_b", 81, 1.0),
     "concrete_clean": concrete_clean,

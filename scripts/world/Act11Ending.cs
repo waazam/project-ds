@@ -39,8 +39,6 @@ namespace ProjectDS.World;
 public partial class Act11Ending : Node3D
 {
 	[Export] public NodePath OriginalStairsPath = "..";
-	/// <summary>Unused since 2026-10-03 (it's sized so its eyes stand well above the landing: GiantRise.SizeFor).</summary>
-	[Export] public float BodyScale = 24f;
 	/// <summary>How far beyond the landing it rises (metres, level): its size is then set so its eyes stand well
 	/// above the player's (about a 38 degree look-up), whatever the drop to the woods' floor.</summary>
 	[Export] public float GiantDistance = 40f;
