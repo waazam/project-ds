@@ -59,9 +59,9 @@ public static class HeldModels
 		ToolKind.Hammer => new Spec { HandAt = new(0.24f, -0.24f, -0.44f), HandTurn = new(-22f, -72f, 8f), ItemTurn = KnucklesWay },
 		ToolKind.Crowbar => new Spec { HandAt = new(0.25f, -0.27f, -0.46f), HandTurn = new(-18f, -72f, 8f), ItemTurn = KnucklesWay },
 		ToolKind.Knife => new Spec { HandAt = new(0.23f, -0.25f, -0.44f), HandTurn = new(-36f, -60f, 6f), ItemTurn = KnucklesWay },
-		ToolKind.Lighter => new Spec { Pose = HandPose.Stick, HandAt = new(0.19f, -0.21f, -0.4f), HandTurn = new(-6f, -60f, 4f), ItemAt = new(0f, 0.012f, 0f), ItemTurn = KnucklesWay },
+		ToolKind.Lighter => new Spec { Pose = HandPose.Small, HandAt = new(0.19f, -0.21f, -0.4f), HandTurn = new(-6f, -60f, 4f), ItemAt = new(0f, 0.026f, 0f), ItemTurn = KnucklesWay },
 		ToolKind.Radio => new Spec { Pose = HandPose.Stick, HandAt = new(0.21f, -0.22f, -0.44f), HandTurn = new(-8f, -60f, 6f), ItemAt = new(0f, 0.045f, 0f), ItemTurn = new(0f, -30f, 0f) },   // (its speaker turned to the eye)
-		ToolKind.NewelPost => new Spec { HandAt = new(0.26f, -0.31f, -0.62f), HandTurn = new(-10f, -66f, 6f), ItemTurn = KnucklesWay },
+		ToolKind.NewelPost => new Spec { Pose = HandPose.Wide, HandAt = new(0.26f, -0.31f, -0.62f), HandTurn = new(-10f, -66f, 6f), ItemTurn = KnucklesWay },
 		_ => new Spec(),
 	};
 
