@@ -603,7 +603,7 @@ public partial class ForestAtmosphere : Node
 			Mood.Night => (new Color(0.5f, 0.62f, 0.9f), 0.02f, 0.3f),
 			Mood.Menacing => (new Color(0.75f, 0.45f, 0.5f), 0.018f, 0.2f),
 			Mood.Dawn => (new Color(1f, 0.78f, 0.55f), 0.12f, 0.6f),
-			_ => (new Color(1f, 0.88f, 0.66f), 0.16f, Mathf.Lerp(0.55f, 1f, _open)),
+			_ => (new Color(1f, 0.88f, 0.66f), 0.075f, Mathf.Lerp(0.55f, 1f, _open)),   // (2026-10-13: was 0.16, the shafts read as solid pale columns)
 		};
 		bool indoors = Audio.ForestAmbienceManager.Instance is { IsIndoor: true };
 		float strength = indoors || _winterSunOn ? 0f : target.strength * (1f - 0.85f * storm) * ShaftScale;   // (the dawn sun lies too low for shafts)
@@ -647,6 +647,7 @@ public partial class ForestAtmosphere : Node
 		if (!on) return;
 		float d = Mathf.Lerp(VolumetricOpen, VolumetricWinter, winter);
 		d = Mathf.Lerp(d, VolumetricInterior, Mathf.Max(inside, lodge));
+		d = Mathf.Lerp(d, VolumetricEnclosed, Enclosed * (1f - under));
 		d = Mathf.Lerp(d, VolumetricUnderground, under);
 		_env.VolumetricFogDensity = d * (1f + 0.4f * storm) + 0.02f * Mathf.Clamp(Blizzard, 0f, 1f);
 		Color hue = Lum(fog) > 0.001f ? fog * (0.6f / Mathf.Max(Lum(fog), 0.001f)) : new Color(0.6f, 0.6f, 0.6f);
@@ -658,7 +659,7 @@ public partial class ForestAtmosphere : Node
 		{
 			if (_banks == null) { _banks = new FogBanks { Name = "FogBanks" }; AddChild(_banks); }
 			float act1 = _act1On ? Mathf.Clamp(_act1, 0f, 1f) * (1f + 0.35f * _stairs) : 0f;
-			float s = (1f - under) * (1f - inside) * (1f - lodge) * (1f - 0.4f * winter) * (0.7f + 0.6f * act1);
+			float s = (1f - under) * (1f - inside) * (1f - lodge) * (1f - Enclosed) * (1f - 0.4f * winter) * (0.7f + 0.6f * act1);
 			_banks.Follow(GetViewport().GetCamera3D(), s);
 			_banks.Tint(_env.VolumetricFogAlbedo);
 		}
@@ -670,9 +671,33 @@ public partial class ForestAtmosphere : Node
 	/// <summary>For tests: the fog banks drifting here now.</summary>
 	public bool FogBanksOn => _banks != null && _banks.Visible;
 
+	/// <summary>0..1 how far the eye is inside a building's room or a tunnel (AudioDirector's spaces: every interior has
+	/// one): the woods' fog stays outside (2026-10-13, the owner: "there's fog inside some of the buildings"). The snow
+	/// maze's open trenches keep theirs; the church and the lodge layer their own haze over this.</summary>
+	public float Enclosed { get; private set; }
+	/// <summary>Off: the outdoor fog follows you in, as before (A/B comparisons).</summary>
+	[Export] public bool EnclosedClearsFog = true;
+	/// <summary>Of the outdoor fog, how much is left inside: the haze across a small room, a breath of it at most.</summary>
+	[Export] public float EnclosedFogKeep = 0.2f;
+	/// <summary>Indoors, where the depth fog (Act 1's, the winter woods') begins: past the walls of any room.</summary>
+	[Export] public float EnclosedFogBegin = 16f;
+	/// <summary>Indoors, how much of the outdoor ambient is kept (the interiors read flat and over-lit in full daylight ambient).</summary>
+	[Export] public float EnclosedAmbientScale = 0.55f;
+	/// <summary>Volumetric fog indoors: just enough for a lamp's halo and a window's shaft, never a haze across the room.</summary>
+	[Export] public float VolumetricEnclosed = 0.0035f;
+
+	private void UpdateEnclosed()
+	{
+		bool inRoom = EnclosedClearsFog && Audio.AudioDirector.CurrentSpace is { } sp && sp != Audio.AudioDirector.Space.Snow;
+		float k = 1f - Mathf.Exp(-(float)GetProcessDeltaTime() / 0.35f);
+		Enclosed = Mathf.Lerp(Enclosed, inRoom ? 1f : 0f, k);
+		if (Mathf.Abs(Enclosed - (inRoom ? 1f : 0f)) < 0.002f) Enclosed = inRoom ? 1f : 0f;
+	}
+
 	/// <summary>Storm, wetness, ambient floor and lightning, layered over the base every frame.</summary>
 	private void ApplyLayers()
 	{
+		UpdateEnclosed();
 		float storm = Mathf.Clamp(Storm, 0f, 1f);
 		float flash = Mathf.Max(0f, Flash);
 
@@ -746,6 +771,13 @@ public partial class ForestAtmosphere : Node
 			ambient *= 1f - (1f - UndergroundAmbientKeep) * under;
 			sunEnergy *= 1f - under;
 		}
+		// indoors (a room, a hall, a tunnel above ground): the woods' fog stays outside
+		float encl = Enclosed * (1f - under);
+		// (the church's own near-black haze is its darkness, not a fog: kept)
+		density *= Mathf.Lerp(1f, EnclosedFogKeep, encl * (1f - inside));
+		// ...and so does most of the sky's light: a room is lit by its lamps, its windows and the lantern, not by an even
+		// daylight from nowhere (the church and the lodge keep their own tuned ambient)
+		ambient *= Mathf.Lerp(1f, EnclosedAmbientScale, encl * (1f - inside) * (1f - lodge));
 		_env.FogLightColor = fog;
 		_env.FogDensity = density;
 		// Act 22's dusk: the fog swallows the sky's warm glow too (a low snow sky, not a sunset)
@@ -787,6 +819,12 @@ public partial class ForestAtmosphere : Node
 				_env.FogDensity = Mathf.Lerp(0.2f, 1f, e);
 				_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 1f, e);
 			}
+			// indoors: the depth fog starts past the room's walls (the view out of the door keeps its fog)
+			if (encl > 0.001f)
+			{
+				_env.FogDepthBegin = Mathf.Lerp(_env.FogDepthBegin, Mathf.Max(_env.FogDepthBegin, EnclosedFogBegin), encl);
+				_env.FogDepthEnd = Mathf.Max(_env.FogDepthEnd, _env.FogDepthBegin + 12f);
+			}
 		}
 		else if (_act1Applied)
 		{
@@ -795,7 +833,7 @@ public partial class ForestAtmosphere : Node
 			_env.FogDepthBegin = _levelDepthBegin; _env.FogDepthEnd = _levelDepthEnd; _env.FogDepthCurve = _levelDepthCurve;
 		}
 		// the blizzard (Weather's): the snow-fog closes the view in, whatever the place's own fog was
-		float bliz = Mathf.Clamp(Blizzard, 0f, 1f) * (1f - under) * (1f - inside);
+		float bliz = Mathf.Clamp(Blizzard, 0f, 1f) * (1f - under) * (1f - inside) * (1f - encl);
 		if (bliz > 0.001f)
 		{
 			float e = bliz * bliz * (3f - 2f * bliz);

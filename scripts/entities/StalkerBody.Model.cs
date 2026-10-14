@@ -6,7 +6,7 @@ namespace ProjectDS.Entities;
 /// <summary>
 /// The remodelled stalker (the owner, 2026-10-02: on par with the wendigo). tools/Blender/stalker.py's figure
 /// (assets/models/stalker/stalker.glb): about 85,000 triangles, one hide fused over its bones, a small mask of a face
-/// with deep sockets, the eyes far back in them, the shoulders' crowns of root spikes, rags on chains of bones; skinned
+/// with deep sockets, the eyes far back in them, the shoulders' knotted roots (no spikes since 2026-10-13), rags on chains of bones; skinned
 /// to a skeleton with its clips (idle, peek_R/L, duck_R/L, walk, shove, loom, stare). Every surface is still drawn
 /// with <see cref="Skin"/> (the black, the dissolve, the eyes), now with the model's baked maps for the faint edge
 /// light up close.

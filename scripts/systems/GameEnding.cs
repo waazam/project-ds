@@ -23,9 +23,14 @@ public static class GameEnding
 	{
 		Played = true;
 		GD.Print("[story] the end of the story: the credits");
+		// the pause menu locked from the moment the story ends (the fade to the credits included: "Quit to Menu" in it
+		// pulled the level out from under the ending)
+		var pause = from.GetTree().GetFirstNodeInGroup("pause_menu") as UI.PauseMenu ?? from.GetTree().CurrentScene?.FindChild("PauseMenu", true, false) as UI.PauseMenu;
+		if (pause != null) { if (from.GetTree().Paused) pause.SetOpen(false); pause.Locked = true; }
 		if (player != null) StoryBeat.ReachCheckpoint(player, Checkpoint.GameFinished);
 		var fader = StoryBeat.Fader(from);
 		if (fader != null) await fader.Fade(1f, 3f, ct);
+		if (!GodotObject.IsInstanceValid(from) || !from.IsInsideTree()) return;   // (the level went meanwhile)
 		if (from.GetTree().GetFirstNodeInGroup("act11_ending") is Act11Ending ending) { await ending.Credits(fader, ct); return; }
 		// (the story now ends in the trailhead, Act 25, where there is no Act 11 to run them: the same credits here; the
 		// sweep, 2026-10-07, found every ending stopping at the black)

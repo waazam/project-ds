@@ -98,7 +98,16 @@ public class SaveData
 public static class SaveSystem
 {
 	// Test runs write their own slots so they never overwrite a real save.
-	private static string Prefix => GameSettings.Instance?.AutoTest == true || GameSettings.Instance?.Trailer == true ? "user://test_save_" : "user://save_";
+	// (the playtest's are its own process's: any other test running at the same time writes the shared test slots)
+	private static string Prefix => GameSettings.Instance?.PlaytestRun == true ? $"user://playtest_save_{OS.GetProcessId()}_"
+		: GameSettings.Instance?.AutoTest == true || GameSettings.Instance?.Trailer == true ? "user://test_save_" : "user://save_";
+
+	/// <summary>Deletes this process's save slots (the playtest's, when it's done).</summary>
+	public static void DeleteSlots()
+	{
+		foreach (var p in new[] { PathA, PathB })
+			if (FileAccess.FileExists(p)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(p));
+	}
 	private static string PathA => Prefix + "a.cfg";
 	private static string PathB => Prefix + "b.cfg";
 

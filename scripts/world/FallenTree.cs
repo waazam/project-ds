@@ -99,6 +99,7 @@ public partial class FallenTree : Node3D
 			{
 				_standBody.CollisionLayer = 0;
 				_lieBody.CollisionLayer = 1;
+				PutOutBeside();
 				Landed?.Invoke();
 				GD.Print("[story] Act 1: the dead fir came down across the trail");
 			}
@@ -127,6 +128,51 @@ public partial class FallenTree : Node3D
 	/// <summary>Brings it down now (the story, a preview).</summary>
 	public void Fall() => _motion.Start();
 
+	/// <summary>Never pinned under it (2026-10-13; the story never brings it down near them, this is the backstop): a
+	/// player inside its length when it lands is put out beside it, on their own side, clear of the crown.</summary>
+	private void PutOutBeside()
+	{
+		if (GetTree().GetFirstNodeInGroup("player") is not Node3D p) return;
+		var (a, b) = LieSegment;
+		var a2 = new Vector2(a.X, a.Z); var b2 = new Vector2(b.X, b.Z); var q = new Vector2(p.GlobalPosition.X, p.GlobalPosition.Z);
+		var dir = (b2 - a2).Normalized();
+		float along = (q - a2).Dot(dir);
+		var side = new Vector2(-dir.Y, dir.X);
+		float off = (q - a2).Dot(side);
+		if (along < -1f || along > a2.DistanceTo(b2) + 2f || Mathf.Abs(off) > 3.6f) return;
+		var to2 = q + side * ((off >= 0 ? 1f : -1f) * 4.2f - off);
+		p.GlobalPosition = new Vector3(to2.X, Ground(to2.X, to2.Y) + 0.05f, to2.Y);
+		GD.Print("[story] Act 1: the fir came down where the player stood; put out beside it");
+	}
+
+	/// <summary>Told when to come down by <see cref="Act1TreeFalls"/> (2026-10-13: it waits to be seen), not by distance
+	/// alone.</summary>
+	public bool Directed { get; set; }
+
+	/// <summary>Starts the creak; held, it hangs leaning at the end of it, groaning, until <see cref="Release"/>.</summary>
+	public void StartCreak(bool hold)
+	{
+		_motion.Hold = hold;
+		_motion.Start();
+	}
+
+	public void Release() => _motion.Hold = false;
+	public bool Held => _motion.State == TreeFallMotion.Phase.Creak && _motion.Hold;
+	public float CreakTime => _motion.CreakTime;
+	public bool Standing => _motion.State == TreeFallMotion.Phase.Standing;
+	/// <summary>Its foot on the ground (the hinge).</summary>
+	public Vector3 Foot => _pivot;
+	/// <summary>Where it lies: root to tip, on the ground (world).</summary>
+	public (Vector3 a, Vector3 b) LieSegment => (_pivot, new Vector3(Tip.X, _terrain?.HeightAt(Tip.X, Tip.Y) ?? _pivot.Y, Tip.Y));
+
+	/// <summary>A point up its trunk as it stands (or leans, or falls) now, <paramref name="u"/> of the way up.</summary>
+	public Vector3 TrunkPoint(float u)
+	{
+		var lie = LieSegment.b - _pivot;
+		var now = new Basis(_rotAxis, _motion.Angle - _motion.End) * lie.Normalized();
+		return _pivot + now * (_motion.Length * u);
+	}
+
 	private void PoseFall()
 	{
 		var to = new Transform3D(Basis.Identity, _pivot);
@@ -138,7 +184,7 @@ public partial class FallenTree : Node3D
 		if (_motion.State == TreeFallMotion.Phase.Down) { SetProcess(false); return; }
 		if (_motion.State == TreeFallMotion.Phase.Standing)
 		{
-			if (GetTree().GetFirstNodeInGroup("player") is Node3D p
+			if (!Directed && GetTree().GetFirstNodeInGroup("player") is Node3D p
 				&& new Vector2(p.GlobalPosition.X - Root.X, p.GlobalPosition.Z - Root.Y).Length() < FallTriggerDistance)
 				_motion.Start();
 			return;

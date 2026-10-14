@@ -36,7 +36,9 @@ public partial class RainVfx : Node3D
 	/// <summary>0..1, lags Intensity (read-only for others).</summary>
 	public float Wetness { get; private set; }
 
-	private float _dripT = 2f;
+	private float _dripT = 2f, _sinceRain = 999f;
+	/// <summary>How long the boughs and the eaves go on dripping once the rain has stopped (seconds).</summary>
+	[Export] public float AfterDripSeconds = 12f;
 	private GpuParticles3D _splash;
 	private ParticleProcessMaterial _splashPm;
 	private Image _splashPoints;
@@ -248,17 +250,23 @@ public partial class RainVfx : Node3D
 			if (IsInstanceValid(owner) && box.HasPoint(owner.GlobalTransform.AffineInverse() * cp)) { sheltered = true; break; }
 
 		float shown = sheltered ? 0f : _intensity;
+		// how long since the rain stopped (the drips after it)
+		_sinceRain = _intensity > 0.02f ? 0f : _sinceRain + dt;
 		// the boughs dripping: in the rain, out in the woods, fat drops off the branches onto the leaves round them, now
 		// near, now a few metres off (2026-10-07: the storm walk's sound, less the same all the way)
 		_dripT -= dt;
 		// (2026-10-10: and after it, slower, while the woods are still wet)
-		float dripping = Mathf.Max(_intensity, Mathf.Clamp((Wetness - 0.2f) * 1.2f, 0f, 0.6f));
+		// (2026-10-13, Dan: "the rain continues over the cabin ... even when it's supposed to be fully gone": the drips ran on
+		// as long as the ground was wet, a minute and more after the storm broke, and read as the rain still falling. Now a
+		// short spell of them, thinning out over AfterDripSeconds.)
+		float after = Mathf.Clamp(1f - _sinceRain / AfterDripSeconds, 0f, 1f);
+		float dripping = Mathf.Max(_intensity, Mathf.Clamp((Wetness - 0.2f) * 1.2f, 0f, 0.6f) * after);
 		if (!sheltered && dripping > 0.3f && _dripT <= 0f)
 		{
 			_dripT = (float)GD.RandRange(1.2, 3.6) / Mathf.Max(dripping, 0.3f) * (_intensity > 0.3f ? 1f : 1.8f);
 			float a = (float)GD.RandRange(0.0, Mathf.Tau), r = (float)GD.RandRange(1.5, 7.0);
 			var at = cp + new Vector3(Mathf.Cos(a) * r, (float)GD.RandRange(-1.0, 1.5), Mathf.Sin(a) * r);
-			Audio.AudioDirector.OneShot(this, "canopy_drip", 6, at, -14f + 4f * _intensity, "Weather", 3f, 0.08f);
+			Audio.AudioDirector.OneShot(this, "canopy_drip", 6, at, -14f + 4f * _intensity, "Weather", 3f, 0.04f);
 		}
 		// the streaks are Weather's now (the weather pass): wrapping round the camera, slanting with the shared wind,
 		// never under a roof or the trees; a touch fewer than full (Dan, 2026-09-22)

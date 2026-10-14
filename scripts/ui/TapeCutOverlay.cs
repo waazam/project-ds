@@ -168,7 +168,7 @@ public partial class TapeCutOverlay : CanvasLayer
 	{
 		string path = $"res://assets/audio/sfx/knife_slice_{GD.RandRange(1, 3):00}.wav";
 		if (!ResourceLoader.Exists(path) || _player == null) return;
-		var s = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(path), Bus = "Player", VolumeDb = -6f, PitchScale = (float)GD.RandRange(0.92, 1.08) };
+		var s = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(path), Bus = "Player", VolumeDb = -6f, PitchScale = (float)GD.RandRange(0.96, 1.04) };   // (2026-10-13: was 0.92-1.08)
 		Cutscene.SceneRoot(this).AddChild(s);
 		s.Finished += s.QueueFree;
 		s.Play();

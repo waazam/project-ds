@@ -530,7 +530,9 @@ public static class Sfx
 		double f0 = r.R(360, 520) * (1.0 + 0.09 * limb);            // the tread's first mode
 		double[] ratio = { 1.0, 2.71, 5.18, 8.43, 11.6 };
 		double[] amp = { 1.0, 0.55, 0.32, 0.18, 0.1 };
-		double[] tau = { 0.1, 0.07, 0.045, 0.03, 0.02 };
+		// (2026-10-13, the circus sweep: the ringing modes were the loudest thing in it, a pitched "ding" per plant (tonal 1.00,
+		// 40 dB over its neighbours); now a dull clank under the slap: quieter and shorter)
+		double[] tau = { 0.05, 0.035, 0.024, 0.016, 0.012 };
 		var slap = Biquad.Bp(sr, r.R(900, 1400), 0.9);
 		var flesh = Biquad.Lp(sr, 420);
 		var tick = Biquad.Hp(sr, 4200);
@@ -545,7 +547,7 @@ public static class Sfx
 			v += tick.P(r.W()) * Perc(t, 0.0001, 0.003) * 0.6;
 			// the tread ringing
 			for (int m = 0; m < ratio.Length; m++)
-				v += Math.Sin(Math.Tau * f0 * ratio[m] * t + m) * amp[m] * Math.Exp(-t / tau[m]) * 0.28 * heavy * Math.Min(1.0, t / 0.002);
+				v += Math.Sin(Math.Tau * f0 * ratio[m] * t + m) * amp[m] * Math.Exp(-t / tau[m]) * 0.05 * heavy * Math.Min(1.0, t / 0.002);
 			x[i] = v;
 		}
 		// the tread rattling in its frame, a beat after

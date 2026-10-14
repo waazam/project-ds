@@ -14,11 +14,12 @@ namespace ProjectDS.World;
 /// too, and more marks are scattered along both stretches, so the player has to look closely. Bare
 /// footprints in the same ink lead from the lookout to the bunker's door. Placement is by trail distance
 /// between the landmarks (<see cref="NoteFractions"/>), so the scene's node transform doesn't matter.
-/// The camp note tells of the ink, and the HUD tracker shows from there.
+/// The camp note tells of the ink (and a nudge under the picture names the blacklight's key: <see cref="TreeNote"/>).
 ///
 /// Tracking: every digit read is saved as <see cref="StoryManager.Flag.CodeDigit"/>(n) at once and
-/// the digit is shown big on screen for a moment; <see cref="Known"/> is the "4 _ 2 _" the HUD shows
-/// (<see cref="UI.CodeLockOverlay"/>) and the dial pre-fills. Each digit found turns the stalker's
+/// the digit is shown big on screen for a moment. That's all the player gets: (2026-10-13, the owner: "remove the UI
+/// for the bunker code, the player should have to remember themselves") there's no tracker on the HUD and the dial
+/// (<see cref="UI.CodeLockOverlay"/>) starts at nought; <see cref="Known"/> is for tests. Each digit found turns the stalker's
 /// clicking up a notch (Urgency) until the door is open. Group "survey_lot" (the name the bunker's
 /// dial and the HUD look up; kept).
 /// </summary>
@@ -111,11 +112,21 @@ public partial class SurveyLot : Node3D
 				AddChild(cz);
 				cz.GlobalPosition = at;
 				// the decoy trees round it, off the path, facing it the same way
+				// (2026-10-13, the owner: "too grouped up") spread out: 4.5-10 m from it and at least 3.5 m from each other
+				var trees = new List<Vector3> { at };
 				for (int d = 0; d < DecoysPerNote; d++)
 				{
-					float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(3.2f, 6.5f);
-					Vector3 dp = at + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
-					if (terrain.RouteDistance(dp.X, dp.Z) < 2.4f) dp = at + right * (side * r);   // never on the path
+					Vector3 dp = at;
+					for (int tries = 0; tries < 12; tries++)
+					{
+						float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(4.5f, 10f);
+						dp = at + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+						if (terrain.RouteDistance(dp.X, dp.Z) < 2.4f) dp = at + right * (side * r);   // never on the path
+						bool clear = true;
+						foreach (var o in trees) if (Flat(o - dp).Length() < 3.5f) clear = false;
+						if (clear) break;
+					}
+					trees.Add(dp);
 					dp.Y = terrain.HeightAt(dp.X, dp.Z);
 					var decoy = new TreeNote { Name = $"Decoy{i + 1}_{d}", Label = $"d{i}{d}", Digit = Code[i] - '0', Decoy = true, MarkAngle = rng.RandfRange(-1.5f, 1.5f), TrunkRadius = rng.RandfRange(0.24f, 0.36f), TrunkHeight = rng.RandfRange(5.5f, 8f) };
 					AddChild(decoy);
@@ -125,11 +136,22 @@ public partial class SurveyLot : Node3D
 					AddChild(dz);
 					dz.GlobalPosition = dp;
 				}
-				// marks on the ground round them
-				for (int g = 0; g < 7; g++)
+				// a few marks on the ground round them, well apart (they were seven in a heap)
+				var marks = new List<Vector3>();
+				for (int g = 0; g < 4; g++)
 				{
-					float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(0.8f, 5.5f);
-					Vector3 gp = at + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+					Vector3 gp = at;
+					bool clear = false;
+					for (int tries = 0; tries < 12 && !clear; tries++)
+					{
+						float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(1.5f, 9f);
+						gp = at + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+						clear = true;
+						foreach (var o in marks) if (Flat(o - gp).Length() < 2.5f) clear = false;
+						foreach (var o in trees) if (Flat(o - gp).Length() < 0.9f) clear = false;
+					}
+					if (!clear) continue;
+					marks.Add(gp);
 					GroundMark(terrain, gp, rng, Code[i] - '0');
 				}
 			}
@@ -173,10 +195,14 @@ public partial class SurveyLot : Node3D
 	{
 		p.Y = terrain.HeightAt(p.X, p.Z);
 		int kind = rng.RandiRange(0, 9);
-		Texture2D tex = kind switch { 0 or 1 => UvInk.Hand(), 2 or 3 => UvInk.Foot(), 4 => UvInk.Digit((avoidDigit + 5 + rng.RandiRange(0, 3)) % 10, true), _ => UvInk.Smear(rng.RandiRange(0, 20)) };
-		float size = kind is 2 or 3 ? 0.28f : rng.RandfRange(0.3f, 0.6f);
-		var mi = UvInk.OnGround(this, p, rng.RandfRange(0f, Mathf.Tau), new Vector2(size, kind is 2 or 3 ? size * 2f : size), tex, rng.Randf() < 0.35f ? UvInk.Green : UvInk.Pale);
-		mi.GlobalTransform = new Transform3D(GroundBasis(terrain, p, rng.RandfRange(0f, Mathf.Tau)), p + Vector3.Up * 0.02f);
+		// a hand on the ground: something went on all fours here (the thing's, clawed), or someone fell and dragged
+		HandKind hk = rng.RandiRange(0, 4) switch { 0 => HandKind.Claw, 1 => HandKind.ClawDragged, 2 => HandKind.Dragged, 3 => HandKind.Splayed, _ => HandKind.ClawSplayed };
+		bool clawed = hk is HandKind.Claw or HandKind.ClawDragged or HandKind.ClawSplayed;
+		Texture2D tex = kind switch { 0 or 1 => UvInk.Hand(hk, rng.RandiRange(0, 5)), 2 or 3 => UvInk.Foot(), 4 => UvInk.Digit((avoidDigit + 5 + rng.RandiRange(0, 3)) % 10, true), _ => UvInk.Smear(rng.RandiRange(0, 20)) };
+		float size = kind switch { 2 or 3 => 0.28f, 0 or 1 => clawed ? rng.RandfRange(0.3f, 0.38f) : rng.RandfRange(0.21f, 0.25f), _ => rng.RandfRange(0.3f, 0.6f) };
+		// (2026-10-13) the decal's basis is the ground's slope there (it was a flat card laid over it, set after)
+		UvInk.OnGround(this, p, GroundBasis(terrain, p, rng.RandfRange(0f, Mathf.Tau)), new Vector2(size, kind is 2 or 3 ? size * 2f : size), tex,
+			rng.Randf() < 0.35f ? UvInk.Green : UvInk.Pale, 1.4f, rng.Randf() < 0.5f);
 		GroundMarks++;
 	}
 

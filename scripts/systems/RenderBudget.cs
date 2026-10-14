@@ -58,10 +58,12 @@ public partial class RenderBudget : Node
 		for (int i = 0; i < 90 && !IsInsideTree(); i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		for (int i = 0; i < 300; i++)
 		{
+			if (!IsInsideTree()) return;   // (the level left again before it had built: a quick death, a quit)
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 			if (StationInterior.Instance?.Boss?.Library?.Round?.Stair?.Church?.FontKeyPickup != null || StationInterior.Instance is { Built: false }) break;
 		}
-		for (int i = 0; i < 3; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		for (int i = 0; i < 3 && IsInsideTree(); i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		if (!IsInsideTree()) return;
 		if (StationInterior.Instance is Node3D st)
 		{
 			// the areas, in the story's order

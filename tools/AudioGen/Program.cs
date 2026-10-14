@@ -139,6 +139,7 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"item_take_{i:00}", sfx, false, Lo, (r, 
 jobs.Add(("lantern_on_01", sfx, false, Lo, (r, sr) => Foley.LanternOn(r, sr)));
 jobs.Add(("lantern_off_01", sfx, false, Lo, (r, sr) => Foley.LanternOff(r, sr)));
 jobs.Add(("uv_hum_01", sfx, false, Lo, (r, sr) => Foley.UvHum(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"flame_gutter_{i:00}", sfx, false, Lo, (r, sr) => Foley.FlameGutter(r, sr)));   // (2026-10-13: the lantern guttering; it borrowed bulb_sputter)
 for (int i = 1; i <= 2; i++) jobs.Add(($"door_locked_{i:00}", sfx, false, Lo, (r, sr) => Foley.DoorLocked(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_gravel_{i:00}", sfx, false, Lo, (r, sr) => Steps.Gravel(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_mud_{i:00}", sfx, false, Lo, (r, sr) => Steps.Mud(r, sr)));

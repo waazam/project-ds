@@ -13,6 +13,7 @@ public readonly struct BuildTimer : System.IDisposable
 	public void Dispose()
 	{
 		double ms = (Godot.Time.GetTicksUsec() - _t0) / 1000.0;
+		PerfProbe.Built(_what, ms);
 		if (ms >= 80.0) GD.Print($"[build] {_what}: {ms:0} ms");
 	}
 }

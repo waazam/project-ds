@@ -10,20 +10,18 @@ namespace ProjectDS.World;
 /// <summary>
 /// Act 14: the stairwell under Room 3. A concrete-lined trench in Room 3's floor steps down into the
 /// top of a square shaft, and steel stairs wind down round an open well, four flights to a turn, the
-/// way they do in a tall building's fire stairs. It goes down for about five minutes' walk. It is
-/// nearly black: a few caged bulbs, most of them dead, and fog that swallows the well a couple of
-/// turns down, so the bottom is never in sight and there is no counting what is left.
+/// way they do in a tall building's fire stairs. It goes down for about a minute and a half's walk
+/// (2026-10-13). It is nearly black: a few caged bulbs, most of them dead, and fog that swallows the
+/// well a couple of turns down, so the bottom is never in sight and there is no counting what is left.
 ///
 /// The walls change on the way down: clean poured concrete, then stained and cracked, then dark,
 /// oily and grimy and no longer quite flat (<c>stairwell_concrete.gdshader</c>, by depth). The
 /// stairs stay the same steel all the way.
 ///
-/// Running on these stairs is punished without comment: a second or so into a sprint, the player is
-/// moved back up the shaft, whole turns of it, to near the top. Every turn is built identically and
-/// the move is a whole number of turns (a multiple of the bulbs' spacing), keeping their exact place
-/// on the turn, their speed and their view, and the walls' grime is held where it was and only
-/// allowed to drift back slowly, so nothing on screen changes at the moment it happens. Only the
-/// numbers painted on the landings give it away, to someone paying attention.
+/// Running on these stairs is just running (the owner, 2026-10-12: "take that teleporting sprint
+/// mechanic out of it so the player can run"; 2026-10-13: the last of it, switched off, is gone from the
+/// code too): it gets them down about twice as fast as walking. The only thing that ever puts them back
+/// up the shaft is the crawler, if they stand still and let it reach them (<c>Stairwell.Crawler.cs</c>).
 ///
 /// The events on the way down are in <c>Stairwell.Events.cs</c>; the fallen flight at the bottom
 /// (jump across, or jump down) and the chamber under it in <c>Stairwell.Bottom.cs</c>.
@@ -46,12 +44,7 @@ public partial class Stairwell : Node3D
 	public const float RevDrop = FlightDrop * 4f;
 	/// <summary>Turns of the stair (about 4.5 s each at a walk).</summary>
 	[Export] public int Revolutions = DefaultRevolutions;
-	/// <summary>How long a sprint lasts on these stairs before it is taken back.</summary>
-	[Export] public float SprintGrace = 0.7f;
-	/// <summary>(2026-10-12, the owner: "take that teleporting sprint mechanic out of it so the player can run") Off: running
-	/// on the stairs is just running now.</summary>
-	[Export] public bool SprintTakesBack = false;
-	/// <summary>Bulbs (and everything else that repeats) every this many turns; a loop-back is a multiple of it.</summary>
+	/// <summary>Bulbs (and the hands on the rail) every this many turns.</summary>
 	public const int Period = 3;
 	private const int ChunkRevs = 4;
 	private const float DrawRange = 34f;
@@ -61,7 +54,7 @@ public partial class Stairwell : Node3D
 	public int GapCorner => Flights;
 	public float BottomY => BottomYFor(Revolutions);
 	/// <summary>Turns of the shaft (the owner: 64 was far too long; 40 is about three minutes at a walk).</summary>
-	public const int DefaultRevolutions = 30;   // (2026-10-12, the owner: a quarter shorter)
+	public const int DefaultRevolutions = 20;   // (2026-10-12, the owner: a quarter shorter, 40 to 30; 2026-10-13, "way too long": a third off again)
 	/// <summary>The descent's events and signs were written for 64 turns; they're placed at the same
 	/// fraction of the way down whatever the length (<see cref="R"/>).</summary>
 	public const int DesignRevolutions = 64;
@@ -74,11 +67,8 @@ public partial class Stairwell : Node3D
 
 	// ---- for tests and other beats ----
 	public static Stairwell Instance { get; private set; }
-	/// <summary>How many times a sprint has been taken back.</summary>
-	public int LoopBacks { get; private set; }
 	/// <summary>The furthest turn reached.</summary>
 	public int DeepestRev { get; private set; }
-	public float GrimeBias => _grimeBias;
 	public bool PlayerInShaft { get; private set; }
 	public int PlayerRev { get; private set; }
 	public int LitBulbs => _bulbs.Count;
@@ -88,13 +78,19 @@ public partial class Stairwell : Node3D
 	private StaticBody3D _body;
 	private readonly List<(OmniLight3D light, int rev)> _bulbs = new();
 	private readonly RandomNumberGenerator _rng = new() { Seed = 1414 };
-	private float _sprint, _grimeBias;
 	private AudioStreamPlayer _drone, _hum;
 	private float _silenceUntil = -1f;
 
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
-	public override void _Ready() => Callable.From(Build).CallDeferred();
+	public override void _Ready()
+	{
+		Callable.From(Build).CallDeferred();
+		// the crawler's shaders drawn once in the build's black (the lag pass, 2026-10-13: made on the spot as it comes
+		// down after them, it froze the game 1.8 s)
+		if (StoryManager.Instance is not { Current: >= Checkpoint.Act14Finished })
+			ShaderWarmup.Prewarm(this, new Entities.Crawler { Name = "CrawlerWarmUp" });
+	}
 
 	public static float CornerY(int k) => Y0 - k * FlightDrop;
 	public static Vector2 CornerXZ(int k) => Seq[((k % 4) + 4) % 4];
@@ -493,22 +489,6 @@ public partial class Stairwell : Node3D
 		SetLevel(_drone, under && !silent ? Mathf.Lerp(-18f, -8f, depth) : -80f, dt);
 		SetLevel(_hum, under ? Mathf.Lerp(-30f, -8f, depth * depth) : -80f, dt);
 
-		// grime held after a loop-back drifts back to the truth, slower than the walls grime on the way down
-		if (_grimeBias > 0f)
-		{
-			_grimeBias = Mathf.MoveToward(_grimeBias, 0f, dt * 0.003f);
-			_wallMat.SetShaderParameter("grime_bias", _grimeBias);
-		}
-
-		// running: taken back up
-		// (not while the crawler hunts them: then running is the way to live)
-		if (SprintTakesBack && PlayerInShaft && player.IsRunning && player.PlayerInput.Enabled && rev >= Period + 1f && PlayerRev < Revolutions - 2 && !CrawlerHunting)
-		{
-			_sprint += dt;
-			if (_sprint > SprintGrace) LoopBack(player, PlayerRev);
-		}
-		else _sprint = Mathf.Max(0f, _sprint - dt * 2f);
-
 		ProcessEvents(player, l, dt);
 		ProcessDescentMusic(player, l);
 		ProcessCrawler(player, l, dt);
@@ -521,25 +501,5 @@ public partial class Stairwell : Node3D
 		p.VolumeDb = Mathf.MoveToward(p.VolumeDb, db, dt * 20f);
 		if (p.VolumeDb > -79f && !p.Playing) p.Play();
 		else if (p.VolumeDb <= -79f && p.Playing) p.Stop();
-	}
-
-	/// <summary>Moves the running player up a whole number of turns (a multiple of <see cref="Period"/>)
-	/// so they land two to four turns from the top, exactly where they were on the turn, still running,
-	/// looking the same way. The walls' grime is held so nothing on screen changes.</summary>
-	public void LoopBack(PlayerController player, int rev)
-	{
-		int target = Period - 1 + ((rev - (Period - 1)) % Period);
-		int up = rev - target;
-		if (up <= 0) return;
-		_sprint = 0f;
-		Vector3 d = ToGlobal(new Vector3(0, up * RevDrop, 0)) - ToGlobal(Vector3.Zero);
-		player.GlobalPosition += d;
-		player.CameraRig?.ShiftBy(d);
-		float span = Mathf.Max(0.001f, Y0 - CornerY(GapCorner));
-		_grimeBias += up * RevDrop / span;
-		_wallMat.SetShaderParameter("grime_bias", _grimeBias);
-		LoopBacks++;
-		PlayerRev = target;
-		GD.Print($"[story] Act 14: ran on the stairs - quietly back up {up} turns (turn {rev} to {target})");
 	}
 }

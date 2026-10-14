@@ -19,16 +19,16 @@ namespace ProjectDS.Player;
 public partial class Lantern : Node3D
 {
 	[ExportGroup("Radial glow")]
-	[Export] public float GlowRange = 16f;   // the owner: further, so more can be seen (was 9.5; the energy is eased to keep the near light as it was)
-	[Export] public float GlowEnergy = 2.9f;   // was 1.5 at the shorter range, then 1.35 (2026-10-07: the storm walk too dark to see)
+	[Export] public float GlowRange = 21f;   // (2026-10-13, the owner: "the regular lantern should be brighter": 21 m, 4.3; was 16, 2.9)   // the owner: further, so more can be seen (was 9.5; the energy is eased to keep the near light as it was)
+	[Export] public float GlowEnergy = 4.3f;   // was 1.5 at the shorter range, then 1.35 (2026-10-07: the storm walk too dark to see)
 	[Export] public float GlowAttenuation = 0.8f;   // (2026-10-12, the owner: "doing a very poor job at actually illuminating the environment": 16 m, 2.9, 0.8 - was 14, 2.3, 1.0)   // (was 1.3: it falls off more gently, lighting the ground and trunks further out)
 	/// <summary>How much of the glow remains while the beam is focused.</summary>
 	[Export] public float GlowWhileFocused = 0.55f;
 	[Export] public Color LightColor = new(1.0f, 0.72f, 0.42f);
 
 	[ExportGroup("Focused beam")]
-	[Export] public float BeamRange = 24f;   // was 13 (the owner: throw it further)
-	[Export] public float BeamEnergy = 2.5f;   // was 2.2, 2.6, 2.9
+	[Export] public float BeamRange = 30f;   // (2026-10-13: 30 m, 3.6; was 24, 2.5)   // was 13 (the owner: throw it further)
+	[Export] public float BeamEnergy = 3.6f;   // was 2.2, 2.6, 2.9
 	[Export] public float BeamAngle = 35f;
 	[Export] public float Sharpness = 6f;
 
@@ -55,7 +55,7 @@ public partial class Lantern : Node3D
 		_douseAt = _t + 1.5;
 		_dyingUntil = _t + 1.5;
 		_dyingLength = 1.5f;
-		Audio.AudioDirector.OneShot(this, "bulb_sputter", 3, null, -10f, "Player");
+		Audio.AudioDirector.OneShot(this, "flame_gutter", 3, null, -10f, "Player");   // (2026-10-13: a flame guttering, not the station bulb's falling buzz)
 		GD.Print("[story] Act 23: a draught in the walls - the lantern gutters out");
 	}
 
@@ -108,7 +108,7 @@ public partial class Lantern : Node3D
 		_dyingUntil = _t + 0.8;
 		_dyingLength = 0.8f;
 		Audio.AudioDirector.OneShot(this, "ice_tinkle", 3, null, -6f, "Player", 3f, 0.1f);
-		Audio.AudioDirector.OneShot(this, "bulb_sputter", 3, null, -8f, "Player");
+		Audio.AudioDirector.OneShot(this, "flame_gutter", 3, null, -8f, "Player");
 		GD.Print("[story] Act 23: the lantern knocked from the hand - out");
 	}
 
@@ -130,7 +130,7 @@ public partial class Lantern : Node3D
 		Systems.StoryManager.Instance?.SetFlag(Systems.StoryManager.Flag.LanternFlameDead);
 		_dyingUntil = _t + seconds;
 		_dyingLength = seconds;
-		Audio.AudioDirector.OneShot(this, "bulb_sputter", 3, null, -10f, "Player");
+		Audio.AudioDirector.OneShot(this, "flame_gutter", 3, null, -10f, "Player");   // (2026-10-13: a flame guttering, not the station bulb's falling buzz)
 		GD.Print("[story] Act 14: the lantern's flame gutters out");
 	}
 	private float _dyingLength = 3.2f;
@@ -157,7 +157,7 @@ public partial class Lantern : Node3D
 			_dyingUntil = _t + 2.2;
 			_dyingLength = 2.2f;
 			Blacklight = false;
-			Audio.AudioDirector.OneShot(this, "bulb_sputter", 3, null, -10f, "Player");
+			Audio.AudioDirector.OneShot(this, "flame_gutter", 3, null, -10f, "Player");   // (2026-10-13: a flame guttering, not the station bulb's falling buzz)
 			GD.Print("[story] Act 2: the lantern's flame gutters out - the blacklight's what's left");
 			return;
 		}
@@ -165,14 +165,14 @@ public partial class Lantern : Node3D
 		if (!Dying && !_gutterHinted && UI.Subtitle.Instance != null)
 		{
 			_gutterHinted = true;
-			_ = UI.Subtitle.Instance.Show("The flame's gone out.   B: try its blacklight.", 0.6f, 5f, 1f);
+			_ = UI.Subtitle.Instance.Show($"The flame's gone out.   {UI.KeyHint.Blacklight}: try its blacklight.", 0.6f, 5f, 1f);
 		}
 		if (!uvOn) return;
 		_uvT += dt;
 		if (_uvT < FirstRelightAfter) return;
 		s.SetFlag(FirstRelitFlag);
 		GD.Print("[story] Act 2: the wick's taken again");
-		if (UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show("The wick's caught again.   B: back to the flame.", 0.6f, 3.5f, 1f);
+		if (UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show($"The wick's caught again.   {UI.KeyHint.Blacklight}: back to the flame.", 0.6f, 3.5f, 1f);
 	}
 	private bool _deadHinted, _snuffHinted;
 
@@ -217,7 +217,9 @@ public partial class Lantern : Node3D
 		// nor its shadows (2026-10-11): the cull mask leaves the held lantern unlit but it still cast, and its wire guards'
 		// rings and struts, right round the flame, threw a heavy grid over everything
 		_glow.ShadowCasterMask &= ~HeldItem.HeldLayer;
-		BuildCage(_glow);
+		// (2026-10-13, the owner: "lantern causes weird shadow on wall when walking up stairs in tunnel") no cage in its shadows any
+		// more: its struts, a hand's width from the flame, threw thin dark lines that swept over a near wall with every swing of
+		// the lantern (and streaked the ground at your feet). The world's own shadows from it stay.
 		// the lantern in the hand, seen (once the camera's there)
 		Callable.From(() => { if (GetParent() is PlayerController p && p.CameraRig?.Camera != null) HeldItem.Attach<HeldLantern>(p); }).CallDeferred();
 		_beam = new SpotLight3D
@@ -262,6 +264,25 @@ public partial class Lantern : Node3D
 		return cage;
 	}
 
+	/// <summary>(2026-10-13) The light where the held flame is, unless a wall is between the eye and it (the lantern swung out
+	/// against a stair's wall, or pushed into it on a narrow flight): then just this side of the wall, so it never lights the
+	/// wall from inside, or the far side of it, with the near side in its shadow.</summary>
+	private Vector3 KeptOutOfWalls(Vector3 eye, Vector3 flame)
+	{
+		var space = GetWorld3D()?.DirectSpaceState;
+		if (space == null) return flame;
+		Vector3 to = flame - eye;
+		float len = to.Length();
+		if (len < 0.01f) return flame;
+		Vector3 dir = to / len;
+		var q = PhysicsRayQueryParameters3D.Create(eye, flame + dir * 0.08f, 1u);
+		q.Exclude = _rayExclude ??= new Godot.Collections.Array<Rid> { _player.GetRid() };
+		var hit = space.IntersectRay(q);
+		if (hit.Count == 0) return flame;
+		float d = eye.DistanceTo((Vector3)hit["position"]);
+		return eye + dir * Mathf.Max(0.05f, Mathf.Min(len, d - 0.12f));
+	}
+	private Godot.Collections.Array<Rid> _rayExclude;
 	/// <summary>The blacklight's beam, for the ink's shader (globals) and for code (<see cref="Uv"/>).</summary>
 	private void PublishUv(bool on, Camera3D cam)
 	{
@@ -300,7 +321,7 @@ public partial class Lantern : Node3D
 		var cam = _player.CameraRig?.Camera;
 		if (cam == null) return;
 		GlobalTransform = cam.GlobalTransform;
-		if (HeldFlameAt is { } flame) _glow.GlobalPosition = flame;
+		if (HeldFlameAt is { } flame) _glow.GlobalPosition = KeptOutOfWalls(cam.GlobalPosition, flame);
 		else _glow.Position = GlowCarried;
 		// (its clock runs whatever it's showing: it had only run while the flame was lit, so a flame that died with the
 		// blacklight on stayed "dying" for ever, and lit again the moment the blacklight went off)
@@ -319,8 +340,8 @@ public partial class Lantern : Node3D
 			{
 				// the flame won't take: the striker clicks, a spark, nothing
 				Audio.AudioDirector.OneShot(this, "lighter_flick", 1, null, -14f, "Player", 3f, 0.08f);
-				if (Guttered) { if (UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show("It won't light.   B: its blacklight.", 0.4f, 3f, 0.8f); }
-				else if (!_deadHinted && UI.Subtitle.Instance != null) { _deadHinted = true; _ = UI.Subtitle.Instance.Show("The flame won't take.   B: the blacklight still works.", 0.6f, 4f, 1f); }
+				if (Guttered) { if (UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show($"It won't light.   {UI.KeyHint.Blacklight}: its blacklight.", 0.4f, 3f, 0.8f); }
+				else if (!_deadHinted && UI.Subtitle.Instance != null) { _deadHinted = true; _ = UI.Subtitle.Instance.Show($"The flame won't take.   {UI.KeyHint.Blacklight}: the blacklight still works.", 0.6f, 4f, 1f); }
 			}
 			else
 			{
@@ -340,7 +361,7 @@ public partial class Lantern : Node3D
 		else if (!_hinted && _inv.HasLantern)
 		{
 			_hinted = true;
-			if (!string.IsNullOrEmpty(HowToLine) && UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show(HowToLine, 1.0f, 5.5f, 1.4f);
+			if (!string.IsNullOrEmpty(HowToLine) && UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show(HowToLine.Replace("F:", UI.KeyHint.Lantern + ":").Replace("B:", UI.KeyHint.Blacklight + ":"), 1.0f, 5.5f, 1.4f);   // (the keys as bound)
 		}
 
 		// (2026-10-12) the flame dead (Acts 14-20) and the lantern on: it goes to its blacklight by itself, once, rather than

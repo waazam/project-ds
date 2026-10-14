@@ -374,10 +374,10 @@ public static class LodgeTextures
 		// 202, ochre in 203), the plaster's own faint texture all the wall shows
 		Color paint = set switch
 		{
-			"stripe" => new Color(0.56f, 0.6f, 0.48f),
-			"floral" => new Color(0.66f, 0.5f, 0.45f),
-			"trellis" => new Color(0.72f, 0.6f, 0.42f),
-			_ => new Color(0.8f, 0.7f, 0.54f),
+			"stripe" => new Color(0.46f, 0.49f, 0.39f),   // (2026-10-13: each a step darker and dirtier: in the lantern's glow the pale paint went flat white)
+			"floral" => new Color(0.53f, 0.4f, 0.36f),
+			"trellis" => new Color(0.57f, 0.47f, 0.33f),
+			_ => new Color(0.6f, 0.52f, 0.4f),
 		};
 		m = new StandardMaterial3D { ResourceName = key, Roughness = 0.92f, MetallicSpecular = 0.12f, VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Uv1Scale = Vector3.One * 0.8f, AlbedoColor = paint };
 		SurfaceSets.Apply(m, "plaster", 0.35f);
@@ -458,8 +458,9 @@ public static class LodgeTextures
 	/// <summary>Old silver plate: tarnished, soft-sheened (it catches the lamps without mirroring the dark).</summary>
 	public static StandardMaterial3D SilverMat => _plain("lodge_m_silver", new Color(0.62f, 0.6f, 0.56f), 0.32f, 0.7f, 0.85f);
 	public static StandardMaterial3D MirrorMat => _plain("lodge_m_mirror", new Color(0.4f, 0.42f, 0.45f), 0.02f, 1f, 1f);
-	public static StandardMaterial3D PlasterMat => Std("lodge_m_plaster", Plaster, 0.9f, 0.2f, new Color(0.74f, 0.7f, 0.62f), null, null, 0.3f, 1.5f);
-	public static StandardMaterial3D CeilingMat => Std("lodge_m_ceiling", Plaster, 0.95f, 0.1f, new Color(0.62f, 0.58f, 0.5f), null, null, 0.3f, 2f);
+	// (2026-10-13, the look audit: were 0.74, 0.7, 0.62 and 0.62, 0.58, 0.5: by the lantern the back rooms' plaster went flat white)
+	public static StandardMaterial3D PlasterMat => Std("lodge_m_plaster", Plaster, 0.9f, 0.2f, new Color(0.58f, 0.54f, 0.47f), null, null, 0.3f, 1.5f);
+	public static StandardMaterial3D CeilingMat => Std("lodge_m_ceiling", Plaster, 0.95f, 0.1f, new Color(0.52f, 0.48f, 0.42f), null, null, 0.3f, 2f);
 	/// <summary>The lobby's lower walls inside: Poly Haven's stacked stone, cool and even (the outside's mossy stone
 	/// read as dirt in here).</summary>
 	public static Texture2D LobbyStone => Make("lodge_lobbystone", 256, 256, (u, v) => SurfaceKit.Tinted("lobby_stone", u, v, new Color(0.98f, 0.96f, 0.94f), 0.36f, 0.5f));

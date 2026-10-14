@@ -45,6 +45,9 @@ public partial class BloodRain : Node3D
 	public float Intensity { get; set; }
 	/// <summary>A multiplier on the fog's red (the daze pulses it with the hum); 1 = none.</summary>
 	public float TintPulse { get; set; } = 1f;
+	/// <summary>How much of it reaches the player where they are (0..1, scales the drops, the sound and the red; 1 by
+	/// default). Act 6 starts it at the cabin door at 0 and brings it in along the way to the bridge.</summary>
+	public float Presence { get; set; } = 1f;
 	/// <summary>It is running (from Start until Stop's fade begins).</summary>
 	public bool Active { get; private set; }
 	/// <summary>The intensity actually applied right now (lags <see cref="Intensity"/>).</summary>
@@ -101,7 +104,7 @@ public partial class BloodRain : Node3D
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 			TopLevel = true,
 			Emitting = true,
-			AmountRatio = 0.12f,
+			AmountRatio = 0.12f * Mathf.Clamp(Presence, 0f, 1f),
 		};
 		AddChild(e);
 		return e;
@@ -156,10 +159,11 @@ public partial class BloodRain : Node3D
 		if (!Active || _blood == null) return;
 		float want = Mathf.Clamp(Intensity, 0f, 1f);
 		_applied = Mathf.MoveToward(_applied, want, (float)delta * Ease);
-		_blood.AmountRatio = Mathf.Lerp(0.12f, 1f, _applied);
-		if (_near != null) _near.AmountRatio = Mathf.Lerp(0.1f, 1f, _applied);
-		if (_audio != null) _audio.VolumeDb = Mathf.Lerp(-34f, LevelDb, _applied);
-		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.BloodTint = Mathf.Clamp(TintMax * _applied * TintPulse, 0f, 1f);
+		float pr = Mathf.Clamp(Presence, 0f, 1f);
+		_blood.AmountRatio = Mathf.Lerp(0.12f, 1f, _applied) * pr;
+		if (_near != null) _near.AmountRatio = Mathf.Lerp(0.1f, 1f, _applied) * pr;
+		if (_audio != null) _audio.VolumeDb = Mathf.Lerp(-34f, LevelDb, _applied) + (pr > 0.001f ? Mathf.LinearToDb(pr) : -60f);
+		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.BloodTint = Mathf.Clamp(TintMax * _applied * TintPulse * pr, 0f, 1f);
 		Place((float)delta);
 	}
 

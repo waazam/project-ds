@@ -24,6 +24,11 @@ public sealed class TreeFallMotion
 	public float CreakSeconds = 2.3f;
 	/// <summary>"creak", "crack", "impact", "down".</summary>
 	public Action<string> Event;
+	/// <summary>Held at the end of its creak, leaning and groaning, instead of cracking (2026-10-13: a fall waits to be
+	/// seen; the creak is what turns the player's head). Let go, it cracks at once.</summary>
+	public bool Hold;
+	/// <summary>Seconds since the creak began (it keeps counting while held).</summary>
+	public float CreakTime => State == Phase.Creak ? _t : 0f;
 	private float _t, _w;
 
 	public void Start()
@@ -50,7 +55,9 @@ public sealed class TreeFallMotion
 				float u = Mathf.Clamp(_t / CreakSeconds, 0f, 1f);
 				// leaning over a few degrees as the hinge wood gives, in fits
 				Angle = 0.045f * u * u + 0.004f * Mathf.Sin(_t * 9f) * u;
-				if (_t >= CreakSeconds) { State = Phase.Fall; _w = 0.04f; Event?.Invoke("crack"); }
+				// held: it hangs there at its lean, giving a little in slow fits, until it's let go
+				if (_t >= CreakSeconds && Hold) Angle += 0.006f * (0.5f - 0.5f * Mathf.Cos((_t - CreakSeconds) * 1.3f));
+				if (_t >= CreakSeconds && !Hold) { State = Phase.Fall; _w = 0.04f; Event?.Invoke("crack"); }
 				break;
 			}
 			case Phase.Fall:
@@ -117,6 +124,22 @@ public sealed class TreeFallMotion
 				Dust(owner, land);
 				break;
 		}
+	}
+
+	private static readonly RandomNumberGenerator _groanRng = new();
+	private static int _lastGroanTake = -1;
+
+	/// <summary>A held tree groaning again while it waits to be seen (2026-10-13): another of the creak takes each time
+	/// (never the one just heard, the owner's no-repeats rule), its pitch a little different, a little quieter the more
+	/// it has groaned.</summary>
+	public static void Groan(Node3D owner, Vector3 foot, int seed, int count)
+	{
+		int take;
+		do take = 1 + _groanRng.RandiRange(0, 2); while (take == _lastGroanTake);
+		_lastGroanTake = take;
+		float db = 5f - Mathf.Min(count, 4) * 1.2f;
+		Systems.StoryBeat.PlayAt(owner, $"res://assets/audio/sfx/tree_fall_creak_{take:00}.wav", "Events", owner.ToLocal(foot + Vector3.Up * 2.5f), db, 14f, 140f,
+			_groanRng.RandfRange(0.86f, 1.06f));
 	}
 
 	/// <summary>The ground shudders under you, a little, by how near it came down.</summary>
@@ -267,6 +290,27 @@ public partial class FallingTree : Node3D
 	}
 
 	public void Fall() => _m.Start();
+
+	/// <summary>Starts its creak; held, it hangs at the end of it until <see cref="Release"/> (2026-10-13).</summary>
+	public void Fall(bool hold, float creakSeconds)
+	{
+		_m.CreakSeconds = creakSeconds;
+		_m.Hold = hold;
+		_m.Start();
+	}
+
+	public void Release() => _m.Hold = false;
+	public bool Held => _m.State == TreeFallMotion.Phase.Creak && _m.Hold;
+
+	/// <summary>Where it will lie: its foot and nine tenths of the way to its top, laid on the ground.</summary>
+	public (Vector3 a, Vector3 b) LieSegment => (GlobalPosition, GlobalPosition + FallDir * Height * 0.95f);
+
+	/// <summary>Points along its trunk as it stands now (for whether it's seen): low, middle, high.</summary>
+	public Vector3 TrunkPoint(float u)
+	{
+		var axis = Vector3.Up.Cross(FallDir).Normalized();
+		return GlobalPosition + (new Basis(axis, _m.Angle) * Vector3.Up) * (Height * u);
+	}
 
 	private void Landed()
 	{

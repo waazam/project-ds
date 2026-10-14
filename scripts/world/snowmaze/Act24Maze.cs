@@ -493,6 +493,8 @@ public partial class Act24Maze : Node3D
 		if (player == null) return;
 		player.Inventory?.TryPickup(ToolKind.Flamethrower);
 		if (player.GetNodeOrNull<Flamethrower>("Flamethrower") == null) player.AddChild(new Flamethrower { Name = "Flamethrower" });
+		// in their hands, not just carried: after a Continue (or a death) the HUD would otherwise start on the camera
+		UI.EquippedItemHud.Prefer(player.GetTree(), ToolKind.Flamethrower);
 	}
 
 	// ------------------------------------------------------------------ the end of it

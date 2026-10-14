@@ -65,6 +65,11 @@ public partial class LakeCreature : Node3D
 		/// <summary>The one that follows the boat after the breach: placed and raised from outside.</summary>
 		public bool Hunter;
 		public float HuntRise;
+		/// <summary>A lone limb (<see cref="Surface"/>): its eyes are its own, open as soon as it's up, and it
+		/// goes back under by itself — after <see cref="SinkAfter"/> seconds up, or once it has struck.</summary>
+		public bool Lone;
+		public float SinkAfter = -1f, StrikeAfter = -1f;
+		public bool Struck;
 		public Skeleton3D Skel;
 		/// <summary>The follow-through: each joint's bend lagging a little behind the one before (secondary motion).</summary>
 		public Vector3[] Lag;
@@ -90,7 +95,12 @@ public partial class LakeCreature : Node3D
 		CreatureRim.Apply(this, far: true);
 		_rng = new RandomNumberGenerator { Seed = (ulong)Seed };
 		Visible = false;
+		if (WarmUpOnly) BuildLimb(Vector3.Zero, 6f, 0.7f, 4);
 	}
+
+	/// <summary>A throwaway for the load's shader warm-up (<see cref="Systems.ShaderWarmup.Prewarm"/>): one limb, its eyes,
+	/// mouth and drips, never shown (the lag pass, 2026-10-13: the breach's first sight compiled 23 pipelines, 1.4 s).</summary>
+	public bool WarmUpOnly;
 
 	// ------------------------------------------------------------------ building
 
@@ -298,6 +308,27 @@ public partial class LakeCreature : Node3D
 	public void Breach(Vector3 center, Vector3 boat, double holdSeconds = 0)
 	{
 		World.FrogChorus.Hush(120f);   // (2026-10-10: every frog on the shore goes still)
+		_prep ??= Prepare(center, boat).GetEnumerator();
+		while (_prep.MoveNext()) { }   // (whatever wasn't built ahead, built now)
+		Visible = true;
+		Breaching = true;
+	}
+
+	/// <summary>The limbs built ahead of the breach, a limb a frame, unseen (the lag pass, 2026-10-13: all built on the
+	/// spot as it broke the surface, they held that frame a quarter of a second); <see cref="Breach"/> then only brings
+	/// them up. The same arc and limbs as building them there and then (the boat has stopped by now).</summary>
+	public async System.Threading.Tasks.Task PrepareOverFrames(Vector3 center, Vector3 boat)
+	{
+		_prep ??= Prepare(center, boat).GetEnumerator();
+		while (IsInstanceValid(this) && IsInsideTree() && _prep.MoveNext())
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		// (the cold rim on every limb, as when they were all built in the frame it went on: it skips what has it)
+		if (IsInstanceValid(this)) CreatureRim.Apply(this, far: true);
+	}
+	private IEnumerator<int> _prep;
+
+	private IEnumerable<int> Prepare(Vector3 center, Vector3 boat)
+	{
 		GlobalPosition = center;
 		Vector3 toBoat = boat - center; toBoat.Y = 0;
 		float baseAng = Mathf.Atan2(toBoat.X, toBoat.Z);
@@ -330,6 +361,7 @@ public partial class LakeCreature : Node3D
 			Vector3 look = toBoat - local; look.Y = 0;
 			limb.BaseYaw = Mathf.Atan2(look.X, look.Z);
 			limb.Root.Rotation = new Vector3(0, limb.BaseYaw, 0);
+			yield return i;
 		}
 		// and behind them all, first and slowest, the one that dwarfs the rest
 		{
@@ -348,8 +380,6 @@ public partial class LakeCreature : Node3D
 			// the others come up after it
 			foreach (var l in _limbs) if (!l.Colossus) { l.Delay += 0.7f; l.T = -l.Delay; }
 		}
-		Visible = true;
-		Breaching = true;
 	}
 
 	/// <summary>The limb nearest the boat curls over it and hangs there, looking down into it.</summary>
@@ -455,12 +485,49 @@ public partial class LakeCreature : Node3D
 		_hunter.LoomTarget = 1f;
 	}
 
+	/// <summary>
+	/// One limb on its own, out on the open water during the crossing: it comes up at
+	/// <paramref name="rootWorld"/> (on the surface) facing <paramref name="toward"/>, every eye on it
+	/// open and turned on the boat. With <paramref name="strikeAfter"/> ≥ 0 it holds that many seconds,
+	/// then rears and slams down toward <paramref name="toward"/> (<see cref="Slammed"/> reports where)
+	/// and sinks; otherwise it stares for <paramref name="sinkAfter"/> seconds and sinks. Survives
+	/// <see cref="Release"/>; <see cref="SinkAll"/> takes it down with the rest.
+	/// </summary>
+	public void Surface(Vector3 rootWorld, Vector3 toward, float length, float sinkAfter, float strikeAfter = -1f)
+	{
+		if (!Breaching)
+		{
+			GlobalPosition = rootWorld;
+			_time = 0;
+		}
+		var l = BuildLimb(ToLocal(rootWorld) with { Y = 0f }, length, _rng.RandfRange(0.6f, 0.76f), _rng.RandiRange(14, 20));
+		l.Lone = true;
+		l.State = State.Rising;
+		l.T = 0f;
+		l.RiseTime = strikeAfter >= 0f ? 0.85f : 1.4f;
+		l.SinkTime = 1.8f;
+		l.SinkAfter = sinkAfter;
+		l.StrikeAfter = strikeAfter;
+		Vector3 look = toward - rootWorld; look.Y = 0;
+		l.BaseYaw = Mathf.Atan2(look.X, look.Z);
+		l.Root.Rotation = new Vector3(0, l.BaseYaw, 0);
+		Visible = true;
+		Breaching = true;
+	}
+
+	/// <summary>How far out from its root a limb of <paramref name="length"/> brings its tip down when it
+	/// slams (the curl of the strike carries it most of the way over). Measured off the pose.</summary>
+	public static float SlamReach(float length) => length * 0.65f;
+
+	/// <summary>For tests: how many lone limbs (<see cref="Surface"/>) have come up so far.</summary>
+	public int LoneSurfaced => _limbs.FindAll(l => l.Lone && l.Surfaced).Count;
+
 	/// <summary>All but the watchers go back under; the watchers stay up, swaying, staring.</summary>
 	public void Release()
 	{
 		foreach (var l in _limbs)
 		{
-			if (l.Hunter) continue;
+			if (l.Hunter || l.Lone) continue;
 			l.LoomTarget = 0f;
 			if (!l.Watcher && l.State is State.Up or State.Rising) { l.State = State.Sinking; l.T = l.Colossus ? -0.6f : _rng.RandfRange(-0.3f, 0f); }
 		}
@@ -524,6 +591,13 @@ public partial class LakeCreature : Node3D
 					l.Rise = l.Hunter ? Mathf.MoveToward(l.Rise, l.HuntRise, dt * 0.8f) : 1f;
 					l.UpFor += dt;
 					if (l.Drips != null && l.Drips.Emitting && l.UpFor > 3.5f) l.Drips.Emitting = false;
+					if (l.Lone)
+					{
+						// a lone limb: holds, staring; strikes if it was sent to; then goes back under
+						if (l.StrikeAfter >= 0f && !l.Struck && l.UpFor >= l.StrikeAfter) { l.Struck = true; l.SlamT = 0f; l.SlamHit = false; }
+						bool done = l.Struck ? l.SlamT < 0f : l.SinkAfter >= 0f && l.UpFor >= l.SinkAfter;
+						if (done) { l.State = State.Sinking; l.T = 0f; }
+					}
 					break;
 				case State.Sinking:
 					if (l.T < 0f) break;
@@ -609,7 +683,7 @@ public partial class LakeCreature : Node3D
 
 	private void UpdateEyes(Limb l, float dt)
 	{
-		bool open = (_eyesOpened || l.Hunter) && (l.State is State.Up or State.Rising) && (l.Rise > 0.6f || l.Hunter);
+		bool open = (_eyesOpened || l.Hunter || l.Lone) && (l.State is State.Up or State.Rising) && (l.Rise > 0.6f || l.Hunter);
 		if (l.State == State.Sinking) l.EyeScale = Mathf.MoveToward(l.EyeScale, 0f, dt * 1.5f);
 		else if (open && l.EyeScale < 1f)
 		{

@@ -26,7 +26,7 @@ public partial class ContinueRoundTripTest : Node
 {
 	private const string OutDir = "res://test-output/systems";
 
-	private record Scenario(string Name, Checkpoint Cp, string[] Flags, string Inventory);
+	internal record Scenario(string Name, Checkpoint Cp, string[] Flags, string Inventory);
 
 	private static readonly string[] F2 = { StoryManager.Flag.StairsClimbed };
 	private static readonly string[] F5 = F2.Concat(new[] { StoryManager.Flag.StormStarted, StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2) }).ToArray();
@@ -39,7 +39,7 @@ public partial class ContinueRoundTripTest : Node
 	private static readonly string[] F10 = F10Scared.Concat(new[] { StoryManager.Flag.BunkerMazeExited }).ToArray();
 	private static readonly string[] F11 = F10.Concat(new[] { StoryManager.Flag.Act11DialogueDone }).ToArray();
 	// Act 13 all done: every puzzle in the station solved and the iron door open.
-	private static readonly string[] F13 = F11.Concat(new[] { StoryManager.Flag.NewelSeated,
+	internal static readonly string[] F13 = F11.Concat(new[] { StoryManager.Flag.NewelSeated,
 		StoryManager.Flag.StationBasementTapeCut, StoryManager.Flag.StationLightsDead, StoryManager.Flag.StationBasementDrained,
 		StoryManager.Flag.StationClockBroken, StoryManager.Flag.StationRoom1Open, StoryManager.Flag.StationRoom1Solved,
 		StoryManager.Flag.StationRoom2Solved, StoryManager.Flag.StationWebBurned, StoryManager.Flag.StationDoor3Seen,
@@ -47,17 +47,17 @@ public partial class ContinueRoundTripTest : Node
 		StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet,
 		StoryManager.Flag.StationDoor3Open }).ToArray();
 
-	private static readonly string[] F22 = F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
+	internal static readonly string[] F22 = F13.Concat(new[] { StoryManager.Flag.Act14JumpedDown, StoryManager.Flag.Act18IntroSeen, StoryManager.Flag.RoundRoomWebBurned, StoryManager.Flag.RoundRoomPowered,
 		StoryManager.Flag.ChurchCandle(1), StoryManager.Flag.ChurchCandle(2), StoryManager.Flag.ChurchCandle(3), StoryManager.Flag.ChurchCandle(4), StoryManager.Flag.ChurchVestryOpen,
 		StoryManager.Flag.ChurchFontOpen, StoryManager.Flag.ChurchChalicePlaced, "pickup_taken_church_font_key", "pickup_taken_church_chalice",
 		StoryManager.Flag.LodgeFrontTried, StoryManager.Flag.LodgeBackDoorOpen, LodgeFlag.SnowedIn }).ToArray();
-	private static readonly string[] F23a = F22.Concat(new[] { LodgeFlag.Taken(LodgeFlag.Card202), LodgeFlag.Room202Open, LodgeFlag.Taken(LodgeFlag.PantryKey), LodgeFlag.Room202Jammed }).ToArray();
-	private static readonly string[] F23b = F23a.Concat(new[] { LodgeFlag.PantryOpen, LodgeFlag.Taken(LodgeFlag.Card203), LodgeFlag.Room203Open, LodgeFlag.Taken(LodgeFlag.DiningKey), LodgeFlag.Note204, LodgeFlag.Room204Open, LodgeFlag.Room203Jammed }).ToArray();
-	private static readonly string[] F23c = F23b.Concat(new[] { LodgeFlag.DiningOpen, LodgeFlag.StormUp, LodgeFlag.Table(0, 1), LodgeFlag.Table(3, 2), LodgeFlag.Table(1, 3), LodgeFlag.Table(4, 4), LodgeFlag.Table(2, 5), LodgeFlag.Table(5, 6), LodgeFlag.Taken(LodgeFlag.Card201) }).ToArray();
-	private static readonly string[] F23d = F23c.Concat(new[] { LodgeFlag.Room201Open, LodgeFlag.Letter201, LodgeFlag.Room201Jammed }).ToArray();
-	private static readonly string[] F23e = F23d.Concat(new[] { LodgeFlag.InCrawlspace, LodgeFlag.Frozen }).ToArray();
-	private static readonly string[] F23f = F23e.Concat(new[] { LodgeFlag.WardrobeDown }).ToArray();
-	private static readonly Scenario[] Scenarios =
+	internal static readonly string[] F23a = F22.Concat(new[] { LodgeFlag.Taken(LodgeFlag.Card202), LodgeFlag.Room202Open, LodgeFlag.Taken(LodgeFlag.PantryKey), LodgeFlag.Room202Jammed }).ToArray();
+	internal static readonly string[] F23b = F23a.Concat(new[] { LodgeFlag.PantryOpen, LodgeFlag.Taken(LodgeFlag.Card203), LodgeFlag.Room203Open, LodgeFlag.Taken(LodgeFlag.DiningKey), LodgeFlag.Note204, LodgeFlag.Room204Open, LodgeFlag.Room203Jammed }).ToArray();
+	internal static readonly string[] F23c = F23b.Concat(new[] { LodgeFlag.DiningOpen, LodgeFlag.StormUp, LodgeFlag.Table(0, 1), LodgeFlag.Table(3, 2), LodgeFlag.Table(1, 3), LodgeFlag.Table(4, 4), LodgeFlag.Table(2, 5), LodgeFlag.Table(5, 6), LodgeFlag.Taken(LodgeFlag.Card201) }).ToArray();
+	internal static readonly string[] F23d = F23c.Concat(new[] { LodgeFlag.Room201Open, LodgeFlag.Letter201, LodgeFlag.Room201Jammed }).ToArray();
+	internal static readonly string[] F23e = F23d.Concat(new[] { LodgeFlag.InCrawlspace, LodgeFlag.Frozen }).ToArray();
+	internal static readonly string[] F23f = F23e.Concat(new[] { LodgeFlag.WardrobeDown }).ToArray();
+	internal static readonly Scenario[] Scenarios =
 	{
 		new("act1_start", Checkpoint.Act1Start, new string[0], "camera;tool=None"),
 		new("act2_stairs_climbed", Checkpoint.Act2StairsClimbed, F2, ";tool=None"),
@@ -344,7 +344,8 @@ public partial class ContinueRoundTripTest : Node
 		Check("cabin fire state", fire != null && fire.Burning == wantFire, $"burning {fire?.Burning} (want {wantFire})");
 
 		var act6 = FindFirst<Act6ClearingEvent>();
-		int wantMinis = StoryBeat.Act6Revealed(story) && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) ? 15 : 0;   // gone for good after the fall (Act 7)
+		// up from the cabin door with the cap (a Continue with it taken: at once), gone for good after the fall (Act 7)
+		int wantMinis = story.NewelPostTaken && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) && story.Current < Checkpoint.Act7CabinBurning ? 15 : 0;
 		Check("clearing mini stairs", act6 != null && act6.MiniStairCount == wantMinis, $"{act6?.MiniStairCount} (want {wantMinis})");
 		Check("no leftover clearing spotlight", act6 is { SpotlightActive: false }, "");
 		// The loop is armed again (nothing lit until a flight is chosen) whenever the voice has spoken but the fall has not come.

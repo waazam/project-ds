@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Godot;
 
 namespace ProjectDS.Player;
@@ -33,7 +33,7 @@ public partial class PlayerBody : Node3D
 	public const uint BodyLayer = 1u << 17;
 	private double _lightSweep;
 	private bool _inView = true;
-	private static readonly string[] Seen = { "Torso", "Legs", "Boots", "Belt" };
+	private static readonly string[] Seen = { "Torso", "Chest", "Legs", "Boots", "Belt" };
 
 	private PlayerController _p;
 	private PlayerFootsteps _steps;
@@ -88,13 +88,87 @@ public partial class PlayerBody : Node3D
 						m.MetallicSpecular = leather ? 0.35f : 0.12f;
 						m.Roughness = leather ? 0.7f : 1f;
 						// (the jacket's hips, seen from just above: one even olive, the bake's colours patchy over its cut)
-						if (g.Name.ToString().StartsWith("Torso")) { m.AlbedoTexture = null; m.AlbedoColor = new Color(0.15f, 0.17f, 0.125f); }
+						if (Jacket(g.Name)) { m.AlbedoTexture = null; m.AlbedoColor = JacketOlive; }
 						mi.SetSurfaceOverrideMaterial(si, m);
 					}
 		}
 		Bones();
+		// (2026-10-13, the owner: "the cutoff body when looking down") the shoulders seen: the tops of the sleeves, down to
+		// just under the shoulder, so the jacket's chest closes round them (with the sleeves gone its arm-holes showed as
+		// ragged open flaps at the bottom corners of the view). The rest of the arm stays in the shadow only: the arms in
+		// view are the held things' own.
+		foreach (var g in _shadow)
+			if (g is MeshInstance3D arms && arms.Name.ToString().StartsWith("Arms") && Trimmed(arms, "Shoulders", v => v.Y > ShoulderCut) is { } sh)
+				_seen.Add(sh);
 		_lastPos = _p.GlobalPosition;
 		GD.Print($"[body] the player's body: {_sk.GetBoneCount()} bones, seen {_seen.Count}, in the shadow {_shadow.Count}");
+	}
+
+	/// <summary>(2026-10-13) How much less the body sits back from the eye while walking, and how much more crouched. With the
+	/// chest seen it must stay back while walking (0.6 brought the shoulders up under the eye); crouched, 0.28 put the whole
+	/// chest behind the eye and left two thighs alone in the view.</summary>
+	private const float BackMoving = 0.25f, BackCrouch = 0.12f;
+	private static readonly Color JacketOlive = new(0.15f, 0.17f, 0.125f);
+	/// <summary>The height (the model's rest pose) above which the sleeves are seen: the shoulders' caps.</summary>
+	private const float ShoulderCut = 1.3f;
+	private static bool Jacket(StringName name) { string s = name.ToString(); return s.StartsWith("Torso") || s.StartsWith("Chest") || s.StartsWith("Shoulders"); }
+
+	/// <summary>A seen copy of part of a skinned mesh: only its triangles whose three corners pass <paramref name="keep"/>
+	/// (in the rest pose), on the same skeleton and skin, drawn but casting no shadow (the whole part already does).</summary>
+	private MeshInstance3D Trimmed(MeshInstance3D src, string name, System.Func<Vector3, bool> keep)
+	{
+		if (src.Mesh is not ArrayMesh am) return null;
+		var mesh = new ArrayMesh();
+		var mats = new List<Material>();
+		// the skin's bind for the chest (the bones' indices in the mesh are the skin's binds)
+		int rigidTo = -1;
+		if (src.Skin is { } skin)
+			for (int b = 0; b < skin.GetBindCount(); b++)
+				if (skin.GetBindName(b) == "chest" || (skin.GetBindName(b) == "" && skin.GetBindBone(b) == _chest)) { rigidTo = b; break; }
+		for (int si = 0; si < am.GetSurfaceCount(); si++)
+		{
+			var arrays = am.SurfaceGetArrays(si);
+			var verts = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+			var idx = arrays[(int)Mesh.ArrayType.Index].AsInt32Array();
+			if (idx == null || idx.Length == 0) continue;
+			var kept = new List<int>(idx.Length);
+			for (int t = 0; t + 2 < idx.Length; t += 3)
+				if (keep(verts[idx[t]]) && keep(verts[idx[t + 1]]) && keep(verts[idx[t + 2]]))
+				{ kept.Add(idx[t]); kept.Add(idx[t + 1]); kept.Add(idx[t + 2]); }
+			if (kept.Count == 0) continue;
+			arrays[(int)Mesh.ArrayType.Index] = kept.ToArray();
+			// (carried rigidly by the chest: swung with the arm, or raised with the lantern, the shoulder's cut edge came up
+			// into the view)
+			if (rigidTo >= 0 && arrays[(int)Mesh.ArrayType.Bones].VariantType != Variant.Type.Nil)
+			{
+				var bones = arrays[(int)Mesh.ArrayType.Bones].AsInt32Array();
+				var weights = arrays[(int)Mesh.ArrayType.Weights].AsFloat32Array();
+				int stride = bones.Length / verts.Length;
+				for (int v = 0; v < verts.Length; v++)
+					for (int k = 0; k < stride; k++) { bones[v * stride + k] = k == 0 ? rigidTo : 0; weights[v * stride + k] = k == 0 ? 1f : 0f; }
+				arrays[(int)Mesh.ArrayType.Bones] = bones;
+				arrays[(int)Mesh.ArrayType.Weights] = weights;
+			}
+			var flags = am.SurfaceGetFormat(si) & Mesh.ArrayFormat.FlagUse8BoneWeights;
+			mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays, null, null, flags);
+			var m = (StandardMaterial3D)(src.GetSurfaceOverrideMaterial(si) ?? am.SurfaceGetMaterial(si)).Duplicate();
+			m.AlbedoTexture = null;
+			m.AlbedoColor = JacketOlive;
+			m.MetallicSpecular = 0.12f;
+			m.Roughness = 1f;
+			mats.Add(m);
+		}
+		if (mesh.GetSurfaceCount() == 0) return null;
+		GD.Print($"[body] {name}: a seen copy of {src.Name}, {mesh.GetSurfaceCount()} surfaces, carried by bind {rigidTo}");
+		var mi = new MeshInstance3D
+		{
+			Name = name, Mesh = mesh, Skin = src.Skin, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			GIMode = GeometryInstance3D.GIModeEnum.Disabled, ExtraCullMargin = 1f, Layers = BodyLayer, Transform = src.Transform,
+		};
+		for (int i = 0; i < mats.Count; i++) mi.SetSurfaceOverrideMaterial(i, mats[i]);
+		src.GetParent().AddChild(mi);
+		mi.Skeleton = mi.GetPathTo(_sk);
+		return mi;
 	}
 
 	/// <summary>Every light the player carries (under the player, the camera included) leaves the body out of its shadows.</summary>
@@ -168,7 +242,9 @@ public partial class PlayerBody : Node3D
 		if (inView != _inView)
 		{
 			_inView = inView;
-			foreach (var g in _seen) g.CastShadow = inView ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.ShadowsOnly;
+			foreach (var g in _seen)
+				if (g.Name == "Shoulders") g.Visible = inView;   // (a seen copy only: the whole arm is already in the shadow)
+				else g.CastShadow = inView ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.ShadowsOnly;
 		}
 		_lightSweep -= delta;
 		if (_lightSweep <= 0) { _lightSweep = 1.0; KeepOwnLightsOff(_p); }
@@ -194,12 +270,14 @@ public partial class PlayerBody : Node3D
 		var basis = new Basis(Vector3.Up, _bodyYaw);
 		var fwd = -basis.Z;
 		// back from the eye: the eye is ahead of the spine, and further ahead as the head bows to look down
-		_lookDown = Mathf.Clamp(-rig.Pitch / 1.1f, 0f, 1f);
+		// (2026-10-13: eased in later, from 35 to 83 degrees down: with the chest seen, the old ramp had the body fully back by
+		// 60 degrees and only the toes showed at the bottom of the view)
+		_lookDown = Mathf.SmoothStep(0.6f, 1.45f, -rig.Pitch);
 		_sitW = Mathf.MoveToward(_sitW, rig.EyeHeight < 1.3f && _p.CrouchAmount < 0.2f ? 1f : 0f, dt * 3f);
 		// (walking, less: the feet stepping out ahead stay in view; crouched, more: the knees go under the eye, not up
 		// in front of it)
 		float moving = Mathf.SmoothStep(0.3f, 1.5f, new Vector2(_p.Velocity.X, _p.Velocity.Z).Length());
-		float back = (0.09f + 0.16f * _lookDown * (1f - 0.6f * moving) + 0.28f * _p.CrouchAmount) * (1f - _sitW);
+		float back = (0.09f + 0.16f * _lookDown * (1f - BackMoving * moving) + BackCrouch * _p.CrouchAmount) * (1f - _sitW);
 		GlobalTransform = new Transform3D(basis, _p.GlobalPosition - fwd * back);
 
 		// the stride: in step with the footsteps (a foot down on each footfall); standing, the feet still
@@ -418,11 +496,16 @@ public partial class PlayerBody : Node3D
 		var w = ToGlobal(new Vector3(localPoint.X, 0, localPoint.Z));
 		var space = GetWorld3D()?.DirectSpaceState;
 		if (space == null) return null;
-		var q = PhysicsRayQueryParameters3D.Create(w + Vector3.Up * 0.55f, w + Vector3.Down * 0.7f, 1u);
-		q.Exclude = new Godot.Collections.Array<Rid> { _p.GetRid() };
-		var hit = space.IntersectRay(q);
+		// (one query kept: four rays a frame, each a new query and exclude list, were engine objects by the thousand for
+		// the collector to finalize, its pauses the commonest hitch in play; the lag pass, 2026-10-13)
+		_groundQ ??= new PhysicsRayQueryParameters3D { CollisionMask = 1u, Exclude = new Godot.Collections.Array<Rid> { _p.GetRid() } };
+		_groundQ.From = w + Vector3.Up * 0.55f;
+		_groundQ.To = w + Vector3.Down * 0.7f;
+		using var hit = space.IntersectRay(_groundQ);
 		if (hit.Count == 0) return null;
-		float h = ((Vector3)hit["position"]).Y - _p.GlobalPosition.Y;
+		float h = ((Vector3)hit[PositionKey]).Y - _p.GlobalPosition.Y;
 		return Mathf.Clamp(h, -0.45f, 0.45f);
 	}
+	private PhysicsRayQueryParameters3D _groundQ;
+	private static readonly Variant PositionKey = "position";
 }

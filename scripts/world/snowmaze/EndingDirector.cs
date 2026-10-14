@@ -98,9 +98,9 @@ public partial class EndingDirector : Node3D
 		var back = tan.Normalized();   // (behind them: up the trail, the way they came; the walk down goes the other way)
 		var side = new Vector3(back.Z, 0, -back.X);
 		var bank = at + back * 3.5f;
-		k.Blob(bank + Vector3.Up * 1.2f, new Vector3(4.5f, 2.6f, 2.4f), 2501, 0.3f, true, 1f);
-		k.Blob(bank + side * 3.4f + Vector3.Up * 0.7f, new Vector3(2.4f, 1.5f, 2f), 2502, 0.3f, true, 1f);
-		k.Blob(bank - side * 3.2f + Vector3.Up * 0.8f, new Vector3(2.6f, 1.6f, 2.2f), 2503, 0.3f, true, 1f);
+		k.Blob(bank + Vector3.Up * 1.2f, new Vector3(4.5f, 2.6f, 2.4f), 2501, 0.22f, false, 1f, 0f, 2);   // (2026-10-13: smooth, subdivided: faceted, they read as pale boulders)
+		k.Blob(bank + side * 3.4f + Vector3.Up * 0.7f, new Vector3(2.4f, 1.5f, 2f), 2502, 0.22f, false, 1f, 0f, 2);
+		k.Blob(bank - side * 3.2f + Vector3.Up * 0.8f, new Vector3(2.6f, 1.6f, 2.2f), 2503, 0.22f, false, 1f, 0f, 2);
 		// the snow on the ground, in drifts that thin and break up into patches as they go
 		var rng = new RandomNumberGenerator { Seed = 2504 };
 		for (int i = 0; i < 46; i++)
@@ -110,7 +110,7 @@ public partial class EndingDirector : Node3D
 			var p = at + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r;
 			if (_terrain != null) p.Y = _terrain.HeightAt(p.X, p.Z);
 			float s = Mathf.Lerp(2.2f, 0.5f, r / 18f) * rng.RandfRange(0.6f, 1.2f);
-			k.Blob(p, new Vector3(s, 0.06f + 0.1f * (1f - r / 18f), s * rng.RandfRange(0.6f, 1f)), 2510 + i, 0.4f, true, 1f);
+			k.Blob(p, new Vector3(s, 0.06f + 0.1f * (1f - r / 18f), s * rng.RandfRange(0.6f, 1f)), 2510 + i, 0.3f, false, 1f, 0f, 2);
 		}
 		k.CommitTo(this, "SnowEdge", false);
 		var hole = new MeshKit();
@@ -124,6 +124,14 @@ public partial class EndingDirector : Node3D
 	}
 
 	/// <summary>An old cabin beside the trail on the way down, its door hanging open (theirs, if they'd stayed).</summary>
+	/// <summary>Whether a mesh sits under another mesh (below <paramref name="root"/>): squashed already with its parent.</summary>
+	private static bool UnderGeometry(Node n, Node root)
+	{
+		for (var p = n.GetParent(); p != null && p != root; p = p.GetParent())
+			if (p is GeometryInstance3D) return true;
+		return false;
+	}
+
 	private void BuildCabin()
 	{
 		if (_terrain == null) return;
@@ -263,8 +271,13 @@ public partial class EndingDirector : Node3D
 		AudioDirector.OneShot(this, "door_ram_burst", 1, CarAt, 7f, "Events", 12f, 0.02f);
 		AudioDirector.OneShot(this, "window_shatter", 2, CarAt, 6f, "Events", 10f, 0.05f);
 		// the car crushed flat under it
-		if (_car.GetNodeOrNull<Node3D>("Mesh") is { } mesh) mesh.Scale = new Vector3(1.05f, 0.55f, 1f);
-		else _car.Scale = new Vector3(1.05f, 0.55f, 1f);
+		// crushed: only its meshes squashed about the car's own origin, never the car node (its trunk's pick area, a physics
+		// body, can't take a non-uniform scale: Jolt logged an error every time)
+		var squash = new Transform3D(Basis.FromScale(new Vector3(1.05f, 0.55f, 1f)), Vector3.Zero);
+		var carXf = _car.GlobalTransform;
+		foreach (var g in _car.FindChildren("*", "", true, false))
+			if (g is GeometryInstance3D gi && !(_opening?.IsAncestorOf(gi) ?? false) && !UnderGeometry(gi, _car))
+				gi.GlobalTransform = carXf * (squash * (carXf.AffineInverse() * gi.GlobalTransform));
 		var fire = new FireVfx { Name = "Burning", Extent = new Vector3(0.7f, 1.4f, 0.6f), FlameScale = 0.8f, LightRange = 7f, LightEnergy = 2f, LightShadows = false, Position = new Vector3(0, 2f, 0) };
 		w.AddChild(fire);
 		await Cutscene.Wait(this, 1.2, ct);

@@ -30,7 +30,11 @@ public partial class BlacklightSecrets : Node
 {
 	public int Written { get; private set; }
 
-	public override void _Ready() => _ = Place();
+	public override void _Ready()
+	{
+		_ = Place();
+		if (UvTour.Requested(out _)) AddChild(new UvTour { Name = "UvTour" });
+	}
 
 	private async Task Place()
 	{
@@ -51,23 +55,40 @@ public partial class BlacklightSecrets : Node
 			Vector3 at = camp.StumpLocal + new Vector3(-0.2f, 0, 1.1f);
 			if (terrain != null) at.Y = terrain.HeightAt(camp.ToGlobal(at).X, camp.ToGlobal(at).Z) - camp.GlobalPosition.Y + 0.02f;
 			W(camp, at, Vector3.Up, "HE COUNTS THE STEPS", 1.6f, G, 0.4f);
-			Mark(camp, camp.StumpLocal + new Vector3(0, 0.3f, camp.StumpRadius + 0.01f), Vector3.Back, UvInk.Hand(), 0.2f, P);
+			// a hand on the stump's side, wrapped round it (it was a flat card at a guessed height, off the bark)
+			var stump = new Node3D { Name = "StumpInk", Position = camp.ToLocal(camp.StumpTopWorld) - Vector3.Up * camp.StumpHeight };
+			camp.AddChild(stump);
+			UvInk.OnTrunk(stump, camp.StumpHeight * 0.55f, 0.25f, camp.StumpRadius, 0.2f, 0.2f, UvInk.Hand(HandKind.Pressed, 1), P, 1.4f, false, 0.03f);
+			Written++;
 		}
 		// the cabin
 		if (GetTree().GetFirstNodeInGroup("cabin") is Cabin cabin)
 		{
 			float hd = cabin.Depth * 0.5f, hw = cabin.Width * 0.5f;
 			W(cabin, new Vector3(0, 1.55f, -hd + 0.2f), Vector3.Back, "IT KNOCKS THREE TIMES", 1.9f, C);
-			for (int i = 0; i < 4; i++) Mark(cabin, new Vector3(-hw + 0.2f, 1.1f + (i % 2) * 0.28f, -1.2f + i * 0.35f), Vector3.Right, UvInk.Tally(), 0.3f, P, 0.05f * i);
-			Mark(cabin, new Vector3(-0.25f, 0.75f, hd - 0.12f), Vector3.Forward, UvInk.Hand(), 0.13f, G);
-			Mark(cabin, new Vector3(0.2f, 0.9f, hd - 0.12f), Vector3.Forward, UvInk.Hand(), 0.12f, G, 0.4f);
+			// days tallied, apart and not in a row (they were a block)
+			float[] th = { 1.05f, 1.42f, 1.18f, 1.55f };
+			for (int i = 0; i < 4; i++) Mark(cabin, new Vector3(-hw + 0.2f, th[i], -1.45f + i * 0.6f), Vector3.Right, UvInk.Tally(), 0.26f + 0.03f * (i % 2), P, 0.08f * i - 0.1f);
+			// small hands low on the door: a child's, a left and a right, apart
+			Mark(cabin, new Vector3(-0.32f, 0.72f, hd - 0.12f), Vector3.Forward, UvInk.Hand(HandKind.Small, 0), 0.13f, G, -0.15f, true);
+			Mark(cabin, new Vector3(0.28f, 0.98f, hd - 0.12f), Vector3.Forward, UvInk.Hand(HandKind.Small, 1), 0.125f, G, 0.3f);
 		}
 		// the bunker
 		if (BunkerInterior.Instance is Node3D bi)
 		{
 			float x = BunkerLayout.HallHalfWidth - 0.2f;
 			W(bi, new Vector3(-x, 1.6f, -30f), Vector3.Right, "IT'S ON THE CEILING", 1.6f, C);
-			for (float z = -40f; z > -56f; z -= 1.4f) Mark(bi, new Vector3(x, 1.05f + 0.05f * Mathf.Sin(z), z), Vector3.Left, UvInk.Hand(), 0.2f, P, 0.3f);
+			// a hand dragged along the wall: someone feeling their way down the hall, a print every few steps, the
+			// smear trailing back the way they came (it was a row of one stamp every 1.4 m)
+			var hr = new RandomNumberGenerator { Seed = 7710 };
+			HandKind[] along = { HandKind.Dragged, HandKind.Partial, HandKind.Dragged, HandKind.Fingertips, HandKind.Dragged, HandKind.Pressed, HandKind.Dragged };
+			int hi = 0;
+			for (float z = -40f; z > -56f; z -= hr.RandfRange(2.0f, 2.9f), hi++)
+			{
+				var hk = along[hi % along.Length];
+				Mark(bi, new Vector3(x, hr.RandfRange(0.98f, 1.22f), z), Vector3.Left, UvInk.Hand(hk, hi), hk == HandKind.Dragged ? 0.3f : 0.2f, P,
+					(hk == HandKind.Dragged ? -Mathf.Pi * 0.5f : 0f) + hr.RandfRange(-0.25f, 0.25f));
+			}
 			W(bi, new Vector3(0, 2.4f, BunkerLayout.CrtRoomBackZ + 0.08f), Vector3.Back, "THE STAIRS WANT YOU BACK", 3f, G);
 			W(bi, BunkerLayout.MazeOffset + new Vector3(2.5f, 1.7f, -BunkerRooms.RoomD + 0.1f), Vector3.Back, "YOU'VE BEEN HERE BEFORE", 1.8f, C);
 		}
@@ -90,8 +111,20 @@ public partial class BlacklightSecrets : Node
 			if (st.Room1 is { } r1)
 			{
 				var rng = new RandomNumberGenerator { Seed = 1301 };
-				for (int i = 0; i < 9; i++)
-					Mark(r1, new Vector3(rng.RandfRange(-2.2f, 2.2f), StationRoom1.Height - 0.03f, rng.RandfRange(-2.2f, 2.2f)), Vector3.Down, UvInk.Hand(), 0.2f, P, rng.RandfRange(0f, Mathf.Tau));
+				// the thing's hands across the ceiling (it was on the ceiling): clawed, left and right, a stride apart
+				// (they were nine dropped at random, some in a heap)
+				var spots = new System.Collections.Generic.List<Vector2>();
+				for (int i = 0; i < 40 && spots.Count < 8; i++)
+				{
+					var s = new Vector2(rng.RandfRange(-2.2f, 2.2f), rng.RandfRange(-2.2f, 2.2f));
+					bool clear = true;
+					foreach (var o in spots) if (o.DistanceTo(s) < 1.0f) clear = false;
+					if (!clear) continue;
+					spots.Add(s);
+					int k = spots.Count;
+					Mark(r1, new Vector3(s.X, StationRoom1.Height - 0.03f, s.Y), Vector3.Down, UvInk.Hand(k % 3 == 0 ? HandKind.ClawSplayed : HandKind.Claw, k),
+						rng.RandfRange(0.3f, 0.36f), P, rng.RandfRange(0f, Mathf.Tau), (k & 1) == 0);
+				}
 			}
 			if (st.Basement is { } b)
 				W(b, new Vector3(StationBasement.Drain.X, StationBasement.Floor + 1.6f, StationBasement.MinZ + 0.18f), Vector3.Back, "IT MOVES WHEN YOU LOOK AWAY", 2.4f, C);
@@ -100,7 +133,7 @@ public partial class BlacklightSecrets : Node
 			{
 				W(hw, new Vector3(-Act15Hallway.W1 * 0.5f + 0.03f, 1.5f, 8f), Vector3.Right, "DON'T MOVE IN THE RED", 1.3f, G);
 				W(hw, new Vector3(-Act15Hallway.W2 * 0.5f + 0.03f, 1.5f, Act15Hallway.End - 6f), Vector3.Right, "THE SWITCH IS BY THE DOOR", 1.5f, C);
-				Mark(hw, new Vector3(Act15Hallway.DoorWidth * 0.5f + 0.25f, 1.55f, Act15Hallway.End + 0.2f + 0.04f), Vector3.Back, UvInk.Hand(), 0.2f, P);
+				Mark(hw, new Vector3(Act15Hallway.DoorWidth * 0.5f + 0.25f, 1.55f, Act15Hallway.End + 0.2f + 0.04f), Vector3.Back, UvInk.Hand(HandKind.Pressed, 2), 0.2f, P, 0.1f, false, true);
 			}
 			if (st.Sewer is { } sw)
 				W(sw, new Vector3(0, Sewer.PlatTop + 0.012f, Sewer.HoleLocal.Z - Sewer.HoleHalf - 0.8f), Vector3.Up, "DOWN", 1.3f, C, Mathf.Pi);
@@ -123,9 +156,10 @@ public partial class BlacklightSecrets : Node
 		Written++;
 	}
 
-	private void Mark(Node3D parent, Vector3 local, Vector3 normal, Texture2D mask, float size, Color ink, float spin = 0f)
+	/// <summary>A mark (a left hand when <paramref name="mirror"/>); <paramref name="pinned"/>: a clue, never dropped.</summary>
+	private void Mark(Node3D parent, Vector3 local, Vector3 normal, Texture2D mask, float size, Color ink, float spin = 0f, bool mirror = false, bool pinned = false)
 	{
-		UvInk.OnSurface(parent, local, normal, new Vector2(size, size), mask, ink, 1.4f, spin);
+		UvInk.OnSurface(parent, local, normal, new Vector2(size, size), mask, ink, 1.4f, spin, mirror, pinned);
 		Written++;
 	}
 }

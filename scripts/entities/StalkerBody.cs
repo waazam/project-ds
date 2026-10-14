@@ -298,9 +298,9 @@ public partial class StalkerBody : Node3D
 			return m;
 		}, jitter: 0.03f);
 
-		// The shoulders (the owner: not round and bubbly, spiked roots): each a tight, knotted mass of
-		// root where the arm hangs from, and out of it a crown of gnarled root spikes twisting up, out
-		// and back, splitting as they go, so the side profile is jagged, not a ball.
+		// The shoulders (the owner: not round and bubbly): each a tight, knotted mass of root where the arm
+		// hangs from. (Its crown of root spikes was taken off, 2026-10-13: "remove spikes from the stalker's
+		// shoulders and the giant's shoulders".)
 		foreach (int side in new[] { -1, 1 })
 		{
 			Vector3 c = side < 0 ? new Vector3(-0.36f, 2.06f, 0.05f) : new Vector3(0.37f, 2.09f, 0.05f);
@@ -329,15 +329,11 @@ public partial class StalkerBody : Node3D
 				Vector3 p1 = p0 + (dir + kink * 0.4f).Normalized() * len * 0.45f;
 				Vector3 p2 = p1 + (dir - kink * 0.3f).Normalized() * len * 0.35f;
 				Vector3 p3 = p2 + (dir + kink * 0.2f + Vector3.Up * 0.15f).Normalized() * len * 0.3f;
-				k.Color = Bark;
-				k.Cylinder(p0, p1, 0.04f, 0.028f, 4, true, 1f, _rng.RandfRange(0f, Mathf.Tau));
-				k.Cylinder(p1, p2, 0.028f, 0.016f, 4, true, 1f, _rng.RandfRange(0f, Mathf.Tau));
-				k.Cylinder(p2, p3, 0.016f, 0f, 3, true, 1f, _rng.RandfRange(0f, Mathf.Tau));
+				// (2026-10-13, the owner: "remove spikes from the stalker's shoulders and the giant's shoulders") not built;
+				// their random draws are still made so the rest of the figure comes out as before
+				_ = (p3, _rng.RandfRange(0f, Mathf.Tau), _rng.RandfRange(0f, Mathf.Tau), _rng.RandfRange(0f, Mathf.Tau));
 				if (_rng.Randf() < 0.6f)
-				{
-					Vector3 shoot = (dir + new Vector3(_rng.RandfRange(-0.8f, 0.8f), _rng.RandfRange(0.1f, 0.6f), _rng.RandfRange(-0.8f, 0.8f))).Normalized();
-					k.Cylinder(p1, p1 + shoot * len * 0.3f, 0.014f, 0f, 3, true);
-				}
+					_ = (_rng.RandfRange(-0.8f, 0.8f), _rng.RandfRange(0.1f, 0.6f), _rng.RandfRange(-0.8f, 0.8f));
 			}
 		}
 
@@ -353,8 +349,12 @@ public partial class StalkerBody : Node3D
 			(new(-0.03f, 1.78f, -0.18f), new(0.1f, 0.2f, -1f), 0.1f),
 			(new(-0.48f, 1.98f, 0.0f), new(-1f, 0.4f, -0.3f), 0.14f),
 		};
+		// (2026-10-13) the shards on the shoulders (|x| > 0.25) went with the spikes; their draw is still made
 		foreach (var (root, dir, len) in shards)
+		{
+			if (Mathf.Abs(root.X) > 0.25f) { _rng.RandfRange(0f, Mathf.Tau); continue; }
 			Shard(k, root, root + dir.Normalized() * len, 0.035f);
+		}
 
 		// Mantle: rags from around the shoulders, longest at the back.
 		for (int i = 0; i < 16; i++)

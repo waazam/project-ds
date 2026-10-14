@@ -49,6 +49,9 @@ public partial class Shed : Node3D
 			if (AutoGround && !_grounded) GroundSelf();
 		}
 		Build();
+		// (2026-10-13) a room of its own like every other building's: the woods' fog and sounds stay outside
+		if (!Engine.IsEditorHint())
+			Audio.AudioDirector.Zone(this, new Vector3(0, WallHeight * 0.5f, 0), new Vector3(Width - 0.1f, WallHeight, Depth - 0.1f), Audio.AudioDirector.Space.Room, "ShedVerb");
 	}
 
 	private void GroundSelf()

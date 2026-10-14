@@ -58,6 +58,7 @@ public partial class Subtitle : CanvasLayer
 		double t = 0;
 		while (t < hold)
 		{
+			if (!IsInsideTree()) return;   // (the level changed under it: a reload while a line was showing)
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 			if (!Owns(gen, ct)) return;
 			if (CanProcess()) t += GetProcessDeltaTime();
@@ -71,6 +72,7 @@ public partial class Subtitle : CanvasLayer
 	{
 		while (IsInstanceValid(tween) && tween.IsValid())
 		{
+			if (!IsInsideTree()) return false;
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 			if (!Owns(gen, ct)) return false;
 		}

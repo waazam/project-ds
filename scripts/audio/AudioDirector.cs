@@ -60,7 +60,7 @@ public partial class AudioDirector : Node
 	{
 		public AudioStreamPlayer3D P;
 		public float Occ, Applied, Written = float.NaN, BaseCutoff;
-		public double LastPlayed;
+		public double LastPlayed, LastLook;
 	}
 	private readonly List<Tracked> _tracked = new();
 	private int _cursor;
@@ -205,7 +205,7 @@ public partial class AudioDirector : Node
 			var p = new AudioStreamPlayer3D
 			{
 				Stream = GD.Load<AudioStream>(path), Bus = Bus, VolumeDb = Db, UnitSize = 6f, MaxDistance = Radius * 1.3f,
-				PitchScale = _rng.RandfRange(0.85f, 1.05f),
+				PitchScale = _rng.RandfRange(0.94f, 1.03f),   // (2026-10-13: was 0.85-1.05; a drip or a chain a different note each time is a xylophone)
 			};
 			parent.AddChild(p);
 			p.Position = Spots[_rng.RandiRange(0, Spots.Length - 1)];
@@ -253,7 +253,7 @@ public partial class AudioDirector : Node
 		{
 			var t = _tracked[i];
 			if (!IsInstanceValid(t.P)) continue;
-			if (t.P.Playing) { playing++; t.LastPlayed = _clock; (playingNames ??= new()).Add(Where(t.P)); }
+			if (t.P.Playing) { playing++; t.LastPlayed = _clock; }
 			// a leak: a one-shot dropped into the level (not an emitter's reusable voice) that finished long ago and was never freed
 			else if (!t.P.Autoplay && _clock - t.LastPlayed > 60 && !IsLooping(t.P) && t.P.GetParent() == GetTree().CurrentScene) { leaks++; (leakNames ??= new()).Add(Where(t.P)); }
 			if (t.Occ > 0.5f) occluded++;
@@ -263,12 +263,28 @@ public partial class AudioDirector : Node
 			_cursor = (_cursor + 1) % _tracked.Count;
 			var t = _tracked[_cursor];
 			if (!IsInstanceValid(t.P) || !t.P.Playing || space == null) continue;
-			if (t.P.AttenuationModel == AudioStreamPlayer3D.AttenuationModelEnum.Disabled || t.P.HasMeta("no_occlusion") || t.P.Bus == "Player" || t.P.Bus == "Music" || t.P.Bus == "Radio") continue;
+			if (t.P.AttenuationModel == AudioStreamPlayer3D.AttenuationModelEnum.Disabled || t.P.HasMeta(NoOcclusionMeta)) continue;
+			// (the names kept as engine names, compared once: a string each time was more garbage a frame)
+			var bus = t.P.Bus;
+			if (bus == BusPlayer || bus == BusMusic || bus == BusRadio) continue;
 			float target = Blocked(space, ear, t.P.GlobalPosition) ? 1f : 0f;
-			t.Occ = Mathf.MoveToward(t.Occ, target, 0.35f);
+			// (2026-10-13, the "bouncy" sweep) It stepped 0.35 per look, however long since the last one: with a handful of
+			// sounds a sound was looked at every frame or two, so a trunk crossing the line, or the head bob grazing a
+			// rise in the ground, muffled it and let it go in a tenth of a second, a "wah" on the stalker's clicks and the
+			// woods' sounds as you walked. Now it eases by time: ~0.4 s to muffle, ~0.6 s to clear.
+			float since = Mathf.Clamp((float)(_clock - t.LastLook), 0f, 0.25f);
+			t.LastLook = _clock;
+			t.Occ = Mathf.MoveToward(t.Occ, target, since * (target > t.Occ ? 2.5f : 1.7f));
 			ApplyOcclusion(t);
 		}
-		if (playing > MaxConcurrent) { MaxConcurrent = playing; BusiestMix = Summarise(playingNames); }
+		// (the names only when it's a new busiest: built every frame they were a pile of strings for the collector, 2026-10-13)
+		if (playing > MaxConcurrent)
+		{
+			MaxConcurrent = playing;
+			playingNames = new();
+			foreach (var t in _tracked) if (IsInstanceValid(t.P) && t.P.Playing) playingNames.Add(Where(t.P));
+			BusiestMix = Summarise(playingNames);
+		}
 		if (leaks > Leaks) LeakNames = Summarise(leakNames);
 		Leaks = Mathf.Max(Leaks, leaks);
 		Occluded = occluded;
@@ -280,18 +296,35 @@ public partial class AudioDirector : Node
 	private static bool IsLooping(AudioStreamPlayer3D p) => p.Stream is AudioStreamWav w && w.LoopMode != AudioStreamWav.LoopModeEnum.Disabled;
 
 	/// <summary>Is there level geometry between the ear and the sound? (The last metre by the sound is
-	/// skipped, so a sound set just inside a door, a wall or its own prop isn't counted as behind it.)</summary>
+	/// skipped, so a sound set just inside a door, a wall or its own prop isn't counted as behind it.)
+	/// (2026-10-13) Three lines, not one: the straight one and two either side of it, half a metre out and a little higher.
+	/// Only when all three are cut is the sound behind something: a wall or a building cuts them all, a tree trunk or a
+	/// post (sound bends round those) only the middle one, and a rise in the ground grazed by the eye line as the head
+	/// bobs no longer flicks it on and off.</summary>
 	private static bool Blocked(PhysicsDirectSpaceState3D space, Vector3 ear, Vector3 src)
 	{
 		Vector3 d = src - ear;
 		float len = d.Length();
 		if (len < 1.5f) return false;
-		var q = PhysicsRayQueryParameters3D.Create(ear, ear + d * ((len - 1f) / len), 1u);
-		q.CollideWithAreas = false;
-		q.HitFromInside = false;
-		var hit = space.IntersectRay(q);
+		Vector3 end = ear + d * ((len - 1f) / len);
+		if (!Ray(space, ear, end)) return false;
+		Vector3 side = d.Cross(Vector3.Up);
+		side = side.LengthSquared() < 1e-6f ? Vector3.Right : side.Normalized();
+		Vector3 off = side * 0.5f + Vector3.Up * 0.3f, off2 = -side * 0.5f + Vector3.Up * 0.3f;
+		return Ray(space, ear + off, end + off) && Ray(space, ear + off2, end + off2);
+	}
+
+	private static bool Ray(PhysicsDirectSpaceState3D space, Vector3 from, Vector3 to)
+	{
+		// (one query reused: a new one per ray, up to twelve a frame, was an engine object a time for the collector to finalize)
+		_blockQuery ??= new PhysicsRayQueryParameters3D { CollisionMask = 1u, CollideWithAreas = false, HitFromInside = false };
+		_blockQuery.From = from;
+		_blockQuery.To = to;
+		using var hit = space.IntersectRay(_blockQuery);
 		return hit.Count > 0;
 	}
+	private static PhysicsRayQueryParameters3D _blockQuery;
+	private static readonly StringName NoOcclusionMeta = "no_occlusion", BusPlayer = "Player", BusMusic = "Music", BusRadio = "Radio";
 
 	/// <summary>Muffled and pulled back while behind something: the low-pass drops to a dull thud and the
 	/// level falls about 8 dB (on top of whatever the sound's owner does with its volume).</summary>

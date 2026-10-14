@@ -22,6 +22,19 @@ uniform float tex_gamma = 1.0;
 uniform float roughness = 1.0;
 uniform float specular = 0.25;
 uniform bool sway = true;
+// (2026-10-13, the owner: "at the beginning they look like paper") a trunk's roundness. The woods' ambient is a flat
+// colour, so in the canopy's shade (all ambient, no sun) a trunk was one tone edge to edge: a flat card. The ambient now
+// falls off toward the trunk's silhouette, on its downward faces and in the bark's furrows (AO darkens only the ambient
+// light, never the sun).
+uniform float round_shade = 0.62;
+uniform float under_shade = 0.35;
+uniform float cavity = 0.3;
+// ...and in the sun and the lantern: the lit side falls off faster toward the trunk's edge (a cylinder, not a lit card),
+// and the bark's furrows stay dark where the light catches only the plates (the fine bark had averaged to one pale beige).
+uniform float light_falloff = 1.6;
+uniform float light_cavity = 0.5;
+// the direct light's share (the tint lifts the bark for the shade under the canopy; this keeps the sunlit side from going pale)
+uniform float light_gain = 0.7;
 global uniform float winter;
 // (2026-10-10) the rain soaked in (RainVfx's wetness): the bark darker and glossier, wettest down the trunk's lee
 global uniform float wet;
@@ -59,6 +72,14 @@ void fragment() {
 	}
 	ROUGHNESS = roughness;
 	SPECULAR = specular;
+	{
+		vec3 gn = normalize(NORMAL);
+		float ndv = clamp(dot(gn, normalize(VIEW)), 0.0, 1.0);
+		float wy = (INV_VIEW_MATRIX * vec4(gn, 0.0)).y;
+		float cav = mix(1.0 - cavity, 1.0, smoothstep(0.02, 0.25, dot(ALBEDO, vec3(0.333))));
+		AO = mix(1.0 - round_shade, 1.0, pow(ndv, 0.8)) * mix(1.0, 1.0 - under_shade, clamp(-wy, 0.0, 1.0)) * cav;
+		AO_LIGHT_AFFECT = 0.0;
+	}
 	if (wet > 0.001) {
 		vec3 wp2 = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 		float runs = 0.75 + 0.25 * sin(wp2.y * 3.1 + wp2.x * 7.0 + wp2.z * 5.0);
@@ -66,5 +87,18 @@ void fragment() {
 		ALBEDO *= 1.0 - 0.42 * k;
 		ROUGHNESS = mix(roughness, 0.32, k);
 		SPECULAR = mix(specular, 0.5, k);
+	}
+}
+
+void light() {
+	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
+	float furrow = mix(1.0 - light_cavity, 1.0, smoothstep(0.02, 0.22, dot(ALBEDO, vec3(0.333))));
+	DIFFUSE_LIGHT += pow(ndl, light_falloff) * furrow * light_gain * ATTENUATION * LIGHT_COLOR / PI;
+	// a plain sheen for the wet bark (dry, the bark is fully rough: none)
+	float gloss = 1.0 - ROUGHNESS;
+	if (gloss > 0.01) {
+		vec3 h = normalize(VIEW + LIGHT);
+		float s = pow(clamp(dot(NORMAL, h), 0.0, 1.0), mix(4.0, 48.0, gloss));
+		SPECULAR_LIGHT += s * ndl * gloss * SPECULAR_AMOUNT * ATTENUATION * LIGHT_COLOR;
 	}
 }

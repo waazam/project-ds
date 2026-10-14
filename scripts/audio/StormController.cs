@@ -49,6 +49,7 @@ public partial class StormController : Node
 	{
 		if (Instance == this) Instance = null;
 		ForestAmbienceManager.Instance?.ReleaseSilence(this);
+		if (StoryManager.Instance is { } story) story.FlagSet -= OnFlag;
 	}
 
 	public override void _Ready()
@@ -70,19 +71,47 @@ public partial class StormController : Node
 		layer.AddChild(_flash);
 		_nextStrike = _rng.RandfRange(LightningInterval.X, LightningInterval.Y);
 		SetProcess(false);
+		if (StoryManager.Instance is { } story) story.FlagSet += OnFlag;
 		Callable.From(Restore).CallDeferred();
 	}
 
 	private void Restore()
 	{
-		if (StoryBeat.StormShouldRage(StoryManager.Instance)) Activate(0.1f);
+		var s = StoryManager.Instance;
+		if (!StoryBeat.StormShouldRage(s)) return;
+		// the cap already taken (a save from inside the cabin with it in hand): the storm broke with it (Dan, 2026-09-22: the
+		// rain must be over while still inside), so it doesn't come back
+		if (s.NewelPostTaken) { BreakWithTheCap(); return; }
+		Activate(0.1f);
 	}
+
+	/// <summary>(2026-10-13, Dan: "the rain continues over the cabin near the beginning even when it's supposed to be fully
+	/// gone") The storm breaks the moment the cap is taken. FriendReveal did this, but only in a live run: it subscribes
+	/// when the player first walks in, and after a Continue into the cabin (its checkpoint already reached) it never does,
+	/// so the rain went on over the cabin until the doorway's CabinExitLine, which faded it over 6 s from full, outside.
+	/// Here it holds on every path.</summary>
+	private void OnFlag(string flag)
+	{
+		if (flag == StoryManager.Flag.NewelPostTaken) BreakWithTheCap();
+	}
+
+	private void BreakWithTheCap()
+	{
+		if (Active) Deactivate(CapBreakSeconds);
+		if (StoryManager.Instance is { } s && !s.HasFlag(StoryManager.Flag.DawnBroke)) s.SetFlag(StoryManager.Flag.DawnBroke);
+	}
+
+	/// <summary>How quickly the rain dies away when the cap is taken (it's heard through the roof, and seen at the window).</summary>
+	[Export] public float CapBreakSeconds = 3f;
 
 	public void Activate() => Activate(RainFadeSeconds);
 
 	public void Activate(float fadeSeconds)
 	{
 		if (Active) return;
+		// once broken (the cap taken, the cabin left) the storm is over for good: nothing brings the normal rain back (the
+		// blood rain of Act 6 is BloodRain's own, and untouched by this)
+		if (StoryManager.Instance?.HasFlag(StoryManager.Flag.DawnBroke) == true) return;
 		Active = true;
 		SetProcess(true);
 		ForestAmbienceManager.Instance?.RequestSilence(this, 1f, SilencePriority);

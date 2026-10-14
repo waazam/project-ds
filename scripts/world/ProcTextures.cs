@@ -525,7 +525,9 @@ public static class ProcTextures
 		m.SetShaderParameter("use_normal", true);
 		m.SetShaderParameter("uv_scale", new Vector2(0.9f, 0.55f));   // (2026-10-12: bigger furrows, readable further off; was 1.5, 1.2)
 		// (2026-10-12: darker and deeper, the furrows near black; was a flat 1.05 tint and the relief at 1)
-		m.SetShaderParameter("tint", new Color(0.6f, 0.53f, 0.47f));
+		// (2026-10-13: lifted again, 0.6, 0.53, 0.47 had the trunks in the canopy's shade near black: flat cut-outs against the
+		// sunlit floor. The furrows stay dark by the curve below and the shading's own cavity.)
+		m.SetShaderParameter("tint", new Color(1f, 0.88f, 0.77f));
 		m.SetShaderParameter("tex_gamma", 1.5f);
 		m.SetShaderParameter("normal_strength", 1.8f);
 		return m;
@@ -571,6 +573,33 @@ public static class ProcTextures
 		m.SetShaderParameter("alpha_cut", 0.5f);
 		m.SetShaderParameter("mip_boost", 0.45f);
 		m.SetShaderParameter("back_shade", 0.35f);
+		m.SetShaderParameter("inner_ao", 0.55f);      // (2026-10-13) the crown in depth, not paper cut-outs
+		m.SetShaderParameter("translucency", 0.3f);
+		return m;
+	});
+
+	/// <summary>(2026-10-13) The firs' sprays of needles: the photographed spray (assets/textures/winter/fir_bough.png, its
+	/// stem turned to the card's root edge), many small ones to a bough in place of two big drawn fronds. The foliage
+	/// shader as the boughs had it, the crown's depth and the sun through the needles.</summary>
+	public static ShaderMaterial FirSprayMat => (ShaderMaterial)Cached("firspray", () =>
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+		DetailKit.Hook(m, DetailKit.Kind.Foliage);
+		var img = GD.Load<Texture2D>("res://assets/textures/winter/fir_bough.png").GetImage();
+		if (img.IsCompressed()) img.Decompress();
+		img.FlipY();
+		if (!img.HasMipmaps()) img.GenerateMipmaps();
+		m.SetShaderParameter("albedo_tex", ImageTexture.CreateFromImage(img));
+		m.SetShaderParameter("tex_size", new Vector2(img.GetWidth(), img.GetHeight()));
+		m.SetShaderParameter("tint", new Color(1.05f, 1.15f, 0.95f));
+		m.SetShaderParameter("sway", 0.06f);
+		m.SetShaderParameter("sway_speed", 0.7f);
+		m.SetShaderParameter("normal_up", 0.45f);
+		m.SetShaderParameter("alpha_cut", 0.45f);
+		m.SetShaderParameter("mip_boost", 0.35f);
+		m.SetShaderParameter("back_shade", 0.3f);
+		m.SetShaderParameter("inner_ao", 0.45f);
+		m.SetShaderParameter("translucency", 0.3f);
 		return m;
 	});
 

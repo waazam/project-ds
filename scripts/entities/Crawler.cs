@@ -277,10 +277,14 @@ public partial class Crawler : Node3D
 	{
 		var space = GetWorld3D()?.DirectSpaceState;
 		if (space == null) return p;
-		var q = PhysicsRayQueryParameters3D.Create(p + Vector3.Up * 1.2f, p + Vector3.Down * 2.5f, 1u);
-		var hit = space.IntersectRay(q);
+		// (one query kept, the ends moved: a new one per limb per frame was garbage for the collector; the lag pass)
+		_groundQ ??= PhysicsRayQueryParameters3D.Create(Vector3.Zero, Vector3.Down, 1u);
+		_groundQ.From = p + Vector3.Up * 1.2f;
+		_groundQ.To = p + Vector3.Down * 2.5f;
+		using var hit = space.IntersectRay(_groundQ);
 		return hit.Count > 0 ? (Vector3)hit["position"] : p;
 	}
+	private PhysicsRayQueryParameters3D _groundQ;
 
 	public override void _Process(double delta)
 	{
@@ -355,7 +359,7 @@ public partial class Crawler : Node3D
 			{
 				_voice.Stream = GD.Load<AudioStream>(path);
 				_voice.VolumeDb = Mathf.Lerp(-6f, -1f, Hurry);
-				_voice.PitchScale = _rng.RandfRange(0.94f, 1.06f) * Mathf.Lerp(1f, 1.1f, Hurry);
+				_voice.PitchScale = _rng.RandfRange(0.94f, 1.0f) * Mathf.Lerp(1f, 1.05f, Hurry);   // (2026-10-13: a voice never above its take: up to 1.17 it went thin and squeaky)
 				_voice.Play();
 			}
 			_breathAt = _time + BreathEvery * Mathf.Lerp(1f, 0.4f, Hurry) * _rng.RandfRange(0.4f, 1f);
@@ -386,7 +390,7 @@ public partial class Crawler : Node3D
 		_stepVoice = (_stepVoice + 1) % StepVoices;
 		p.Stream = _stepStreams[_rng.RandiRange(0, _stepStreams.Length - 1)];
 		p.VolumeDb = db;
-		p.PitchScale = 1f + _rng.RandfRange(-0.08f, 0.08f);
+		p.PitchScale = 1f + _rng.RandfRange(-0.04f, 0.04f);   // (2026-10-13: was +-8 %, each plant a different note on the tread)
 		p.GlobalPosition = at;
 		p.Play();
 	}

@@ -15,10 +15,17 @@ namespace ProjectDS.World;
 /// scratches, drips;</item>
 /// <item>bare footprints (left and right).</item>
 /// </list>
-/// Placing: <see cref="OnTrunk"/> wraps a mark round a trunk, <see cref="OnGround"/> lays one on the
-/// ground, and <see cref="Scatter"/> builds a MultiMesh of many ground marks at once (the footprints).
+/// Placing: <see cref="OnSurface"/> puts one on a wall, floor or ceiling, <see cref="OnTrunk"/> on a trunk,
+/// <see cref="OnGround"/> on the ground, and <see cref="Scatter"/> many ground marks at once (the footprints).
+///
+/// (2026-10-13, the owner: marks "floating on nothing ... on an invisible piece of paper") Every mark is a projected
+/// decal now (<c>uv_ink.gdshader</c>): a thin box the ink is cast through onto whatever real surface lies inside it,
+/// so it wraps bark and boards, never stands off them, and shows nothing where there is nothing. A mark on a wall,
+/// floor or ceiling is then checked against the visible geometry a moment after it is placed
+/// (<see cref="UvInkSettler"/>): moved onto the surface if it was off it, moved along it if there was none, and
+/// dropped if there is no surface near it at all (the words are moved, never dropped).
 /// </summary>
-public static class UvInk
+public static partial class UvInk
 {
 	public static readonly Color Cyan = new(0.55f, 0.85f, 1.0f);
 	public static readonly Color Green = new(0.45f, 1.0f, 0.4f);
@@ -27,6 +34,22 @@ public static class UvInk
 	private static readonly Dictionary<string, Texture2D> _tex = new();
 	private static readonly Dictionary<string, ShaderMaterial> _mat = new();
 	private static Texture2D _grain;
+
+	/// <summary>One mark in the ink: its node (the decal's box), where on the surface it is and which way that faces, in
+	/// the box's own space (for the settling and the audit, <see cref="UvTour"/>), its size, and what it is.</summary>
+	public record Mark(GeometryInstance3D Node, Vector3 Local, Vector3 Normal, float Size, string Kind)
+	{
+		public (Vector3 c, Vector3 n) World() => (Node.GlobalTransform * Local, (Node.GlobalBasis * Normal).Normalized());
+	}
+	public static readonly List<Mark> Marks = new();
+
+	/// <summary>The decal's box: a unit cube (scaled by each mark's transform).</summary>
+	private static BoxMesh _box;
+	private static BoxMesh Box => _box ??= new BoxMesh { Size = Vector3.One };
+	public static Mesh SharedBox => Box;
+
+	/// <summary>How thick the box is (metres): how far off the surface a mark still finds it, either side.</summary>
+	public const float WallDepth = 0.1f, GroundDepth = 0.45f;
 
 	// ------------------------------------------------------------------ strokes
 
@@ -121,12 +144,6 @@ public static class UvInk
 		return Strokes($"uv_digit{d}{(struck ? "x" : "")}", 48, 64, s, 0.075f, 900 + d);
 	}
 
-	/// <summary>A handprint, fingers spread (mirrored for the other hand by the placement).</summary>
-	public static Texture2D Hand() => Strokes("uv_hand", 64, 64, new List<List<Vector2>>
-	{
-		L(0.26f, 0.5f, 0.12f, 0.3f), L(0.38f, 0.42f, 0.33f, 0.1f), L(0.5f, 0.4f, 0.5f, 0.06f), L(0.62f, 0.42f, 0.67f, 0.1f), L(0.74f, 0.5f, 0.84f, 0.28f),
-	}, 0.055f, 41, p => 1f - Mathf.SmoothStep(0.19f, 0.24f, ((p - new Vector2(0.5f, 0.66f)) * new Vector2(1f, 0.85f)).Length()));
-
 	/// <summary>A bare footprint: heel and ball, a waist between, five toes.</summary>
 	public static Texture2D Foot() => Strokes("uv_foot", 32, 64, new List<List<Vector2>>
 	{
@@ -164,7 +181,8 @@ public static class UvInk
 	{
 		switch (i % 7)
 		{
-			case 0: return Hand();
+			// a hand: on the trees, mostly the thing's (it climbs them), now and then a person's
+			case 0: return (i / 7 % 4) switch { 0 => Hand(HandKind.Claw, i), 1 => Hand(HandKind.ClawDragged, i), 2 => Hand(HandKind.Pressed, i), _ => Hand(HandKind.ClawSplayed, i) };
 			case 1: return Smear(i);
 			case 2: return Tally();
 			case 3: return Eye();
@@ -192,15 +210,16 @@ public static class UvInk
 		Systems.TexGen.Stop(__tg);
 	}
 
-	public static ShaderMaterial Mat(Texture2D mask, Color ink, float strength = 1.6f)
+	public static ShaderMaterial Mat(Texture2D mask, Color ink, float strength = 1.6f, bool mirror = false)
 	{
-		string key = $"{mask.GetRid()}_{ink.ToHtml()}_{strength}";
+		string key = $"{mask.GetRid()}_{ink.ToHtml()}_{strength}_{mirror}";
 		if (_mat.TryGetValue(key, out var m)) return m;
 		m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/uv_ink.gdshader") };
 		m.SetShaderParameter("mask_tex", mask);
 		m.SetShaderParameter("grain_tex", Grain());
 		m.SetShaderParameter("ink", ink);
 		m.SetShaderParameter("strength", strength);
+		m.SetShaderParameter("mirror", mirror);
 		_mat[key] = m;
 		return m;
 	}
@@ -239,76 +258,109 @@ public static class UvInk
 		return n;
 	}
 
-	/// <summary>A mark flat on a surface: centred at <paramref name="local"/> in <paramref name="parent"/>'s space,
-	/// facing along <paramref name="normal"/>, <paramref name="size"/> metres, turned <paramref name="spin"/> radians in its plane.</summary>
-	public static MeshInstance3D OnSurface(Node3D parent, Vector3 local, Vector3 normal, Vector2 size, Texture2D mask, Color ink, float strength = 1.6f, float spin = 0f)
+	// ------------------------------------------------------------------ placing (projected decals)
+
+	/// <summary>The mark's across (right, as you face it) and down directions on a surface facing <paramref name="n"/>,
+	/// turned <paramref name="spin"/> radians in its plane.</summary>
+	private static (Vector3 right, Vector3 down) Frame(Vector3 n, float spin)
 	{
-		normal = normal.Normalized();
-		Vector3 up = Mathf.Abs(normal.Y) > 0.95f ? Vector3.Forward : Vector3.Up;
-		Vector3 x = up.Cross(normal).Normalized(), y = normal.Cross(x).Normalized();
-		var rot = new Basis(normal, spin);
-		x = rot * x; y = rot * y;
-		var k = new MeshKit();
-		k.Mat(Mat(mask, ink, strength));
-		k.Color = Colors.White;
-		Vector3 c = local + normal * 0.012f, ex = x * size.X * 0.5f, ey = y * size.Y * 0.5f;
-		k.Quad(c - ex - ey, c + ex - ey, c + ex + ey, c - ex + ey, normal, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
-		return k.CommitTo(parent, "UvWriting", false);
+		Vector3 up = Mathf.Abs(n.Y) > 0.95f ? Vector3.Forward : Vector3.Up;
+		Vector3 x = up.Cross(n).Normalized(), y = n.Cross(x).Normalized();
+		var rot = new Basis(n, spin);
+		return (rot * x, -(rot * y));
 	}
 
-	/// <summary>Words in the ink on a surface.</summary>
-	public static MeshInstance3D Write(Node3D parent, Vector3 local, Vector3 normal, string text, float width, Color ink, float spin = 0f, float strength = 1.6f)
-		=> OnSurface(parent, local, normal, new Vector2(width, width * 160f / 512f), Text(parent, text), ink, strength, spin);
-
-	// ------------------------------------------------------------------ placing
-
-	/// <summary>A mark wrapped round a trunk: centred at height <paramref name="y"/> on the side facing
-	/// <paramref name="angle"/> (radians round the trunk's local Y, 0 = +Z), <paramref name="w"/> by
-	/// <paramref name="h"/> metres, <paramref name="radius"/> the trunk's radius there. In the trunk
-	/// node's space.</summary>
-	public static MeshInstance3D OnTrunk(Node3D trunk, float y, float angle, float radius, float w, float h, Texture2D mask, Color ink, float strength = 1.6f, bool mirror = false, float tilt = 0f)
-	{
-		var k = new MeshKit();
-		k.Mat(Mat(mask, ink, strength));
-		k.Color = Colors.White;
-		const int n = 8;
-		float r = radius + 0.012f;
-		float span = Mathf.Min(w / r, Mathf.Pi * 0.9f);
-		for (int i = 0; i < n; i++)
-		{
-			float u0 = i / (float)n, u1 = (i + 1) / (float)n;
-			float a0 = angle + (u0 - 0.5f) * span, a1 = angle + (u1 - 0.5f) * span;
-			Vector3 d0 = new(Mathf.Sin(a0), 0, Mathf.Cos(a0)), d1 = new(Mathf.Sin(a1), 0, Mathf.Cos(a1));
-			float t0 = (u0 - 0.5f) * tilt, t1 = (u1 - 0.5f) * tilt;
-			Vector3 b0 = d0 * r + Vector3.Up * (y - h * 0.5f + t0), b1 = d1 * r + Vector3.Up * (y - h * 0.5f + t1);
-			Vector3 c0 = d0 * r + Vector3.Up * (y + h * 0.5f + t0), c1 = d1 * r + Vector3.Up * (y + h * 0.5f + t1);
-			float uu0 = mirror ? 1f - u0 : u0, uu1 = mirror ? 1f - u1 : u1;
-			k.Quad(b0, b1, c1, c0, (d0 + d1).Normalized(), new Vector2(uu0, 1), new Vector2(uu1, 1), new Vector2(uu1, 0), new Vector2(uu0, 0));
-		}
-		var mi = k.CommitTo(trunk, "UvMark", false);
-		return mi;
-	}
-
-	/// <summary>One mark lying on the ground at a world point, turned to <paramref name="yaw"/>.</summary>
-	public static MeshInstance3D OnGround(Node parent, Vector3 world, float yaw, Vector2 size, Texture2D mask, Color ink, float strength = 1.4f)
+	/// <summary>The decal's box: across, the surface's normal (the box's depth), and down.</summary>
+	private static MeshInstance3D Decal(Node parent, string name, Vector3 right, Vector3 n, Vector3 down, Vector3 size, Vector3 origin, Material mat, bool global)
 	{
 		var mi = new MeshInstance3D
 		{
-			Name = "UvGround", Mesh = new PlaneMesh { Size = size }, MaterialOverride = Mat(mask, ink, strength),
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			Name = name, Mesh = Box, MaterialOverride = mat,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, GIMode = GeometryInstance3D.GIModeEnum.Disabled,
 		};
+		var xf = new Transform3D(new Basis(right * size.X, n * size.Y, down * size.Z), origin);
 		parent.AddChild(mi);
-		mi.GlobalTransform = new Transform3D(new Basis(Vector3.Up, yaw), world + Vector3.Up * 0.02f);
+		if (global && mi.IsInsideTree()) mi.GlobalTransform = xf;
+		else mi.Transform = xf;
 		return mi;
 	}
 
-	/// <summary>Many marks of one kind on the ground in one draw (the footprints to the bunker).</summary>
+	/// <summary>A mark flat on a surface: centred at <paramref name="local"/> in <paramref name="parent"/>'s space,
+	/// facing along <paramref name="normal"/>, <paramref name="size"/> metres, turned <paramref name="spin"/> radians in its
+	/// plane, <paramref name="mirror"/> for the other hand. Checked against the surface a moment later
+	/// (<see cref="UvInkSettler"/>): <paramref name="pinned"/> marks (the words, the clues) are moved but never dropped.</summary>
+	public static MeshInstance3D OnSurface(Node3D parent, Vector3 local, Vector3 normal, Vector2 size, Texture2D mask, Color ink, float strength = 1.6f, float spin = 0f, bool mirror = false, bool pinned = false, float depth = WallDepth)
+	{
+		normal = normal.Normalized();
+		var (right, down) = Frame(normal, spin);
+		var mi = Decal(parent, "UvWriting", right, normal, down, new Vector3(size.X, depth, size.Y), local, Mat(mask, ink, strength, mirror), false);
+		var m = new Mark(mi, Vector3.Zero, Vector3.Up, Mathf.Max(size.X, size.Y), pinned ? "words" : "wall");
+		Marks.Add(m);
+		UvInkSettler.Queue(m, pinned);
+		return mi;
+	}
+
+	/// <summary>Words in the ink on a surface (never dropped: they say something).</summary>
+	public static MeshInstance3D Write(Node3D parent, Vector3 local, Vector3 normal, string text, float width, Color ink, float spin = 0f, float strength = 1.6f)
+		=> OnSurface(parent, local, normal, new Vector2(width, width * 160f / 512f), Text(parent, text), ink, strength, spin, false, true);
+
+	/// <summary>A mark on a trunk: centred at height <paramref name="y"/> on the side facing <paramref name="angle"/>
+	/// (radians round the trunk's local Y, 0 = +Z), <paramref name="w"/> by <paramref name="h"/> metres,
+	/// <paramref name="radius"/> the trunk's radius there, in the trunk node's space. Cast onto the bark from outside it,
+	/// so it lies on the trunk's real faces (it wraps round them).</summary>
+	public static MeshInstance3D OnTrunk(Node3D trunk, float y, float angle, float radius, float w, float h, Texture2D mask, Color ink, float strength = 1.6f, bool mirror = false, float tilt = 0f)
+	{
+		Vector3 d = new(Mathf.Sin(angle), 0, Mathf.Cos(angle));
+		var (right, down) = Frame(d, Mathf.Atan2(tilt, Mathf.Max(w, 0.05f)));
+		// the box reaches from well inside the trunk to a little outside its widest (the bark's corners): the far side
+		// faces away, so the ink never shows through on it
+		float inner = radius * 0.3f, outer = radius + 0.1f;
+		float depth = outer - inner, mid = (outer + inner) * 0.5f;
+		float width = Mathf.Min(w, radius * 1.9f);
+		var mi = Decal(trunk, "UvMark", right, d, down, new Vector3(width, depth, h), d * mid + Vector3.Up * y, Mat(mask, ink, strength, mirror), false);
+		Marks.Add(new Mark(mi, new Vector3(0, (radius - mid) / depth, 0), Vector3.Up, Mathf.Max(w, h), "trunk"));
+		return mi;
+	}
+
+	/// <summary>A ground basis: lying on a slope with normal <paramref name="n"/>, turned to <paramref name="yaw"/> (its Y the normal).</summary>
+	public static Basis GroundBasis(Vector3 n, float yaw)
+	{
+		n = n.Normalized();
+		Vector3 fwd = new(Mathf.Sin(yaw), 0, Mathf.Cos(yaw));
+		Vector3 x = n.Cross(fwd).Normalized(), z = x.Cross(n).Normalized();
+		return new Basis(x, n, z);
+	}
+
+	/// <summary>One mark lying on the ground at a world point, turned to <paramref name="yaw"/> (on the level).</summary>
+	public static MeshInstance3D OnGround(Node parent, Vector3 world, float yaw, Vector2 size, Texture2D mask, Color ink, float strength = 1.4f)
+		=> OnGround(parent, world, GroundBasis(Vector3.Up, yaw), size, mask, ink, strength);
+
+	/// <summary>One mark lying on the ground at a world point, along a ground basis (<see cref="GroundBasis"/>: its Y the
+	/// ground's normal). The box is deep enough to find the ground's real faces between the height samples.</summary>
+	public static MeshInstance3D OnGround(Node parent, Vector3 world, Basis ground, Vector2 size, Texture2D mask, Color ink, float strength = 1.4f, bool mirror = false)
+	{
+		var mi = Decal(parent, "UvGround", ground.X.Normalized(), ground.Y.Normalized(), ground.Z.Normalized(), new Vector3(size.X, GroundDepth, size.Y), world, Mat(mask, ink, strength, mirror), true);
+		Marks.Add(new Mark(mi, Vector3.Zero, Vector3.Up, Mathf.Max(size.X, size.Y), "ground"));
+		return mi;
+	}
+
+	/// <summary>Many marks of one kind on the ground in one draw (the footprints to the bunker). Each transform is a
+	/// ground basis (Y the normal) at the spot; one mirrored (a left foot from a right) mirrors the lot.</summary>
 	public static MultiMeshInstance3D Scatter(Node parent, string name, List<Transform3D> xforms, Vector2 size, Texture2D mask, Color ink, float strength = 1.4f)
 	{
-		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = new PlaneMesh { Size = size }, InstanceCount = xforms.Count };
-		for (int i = 0; i < xforms.Count; i++) mm.SetInstanceTransform(i, xforms[i]);
-		var mmi = new MultiMeshInstance3D { Name = name, Multimesh = mm, MaterialOverride = Mat(mask, ink, strength), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+		bool mirror = false;
+		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = Box, InstanceCount = xforms.Count };
+		for (int i = 0; i < xforms.Count; i++)
+		{
+			var b = xforms[i].Basis;
+			// a mirrored basis would turn the box inside out: unmirror it, and mirror the ink instead
+			if (b.Determinant() < 0f) { b.X = -b.X; mirror = true; }
+			var box = new Basis(b.X.Normalized() * size.X, b.Y.Normalized() * GroundDepth, b.Z.Normalized() * size.Y);
+			mm.SetInstanceTransform(i, new Transform3D(box, xforms[i].Origin));
+		}
+		var mmi = new MultiMeshInstance3D { Name = name, Multimesh = mm, MaterialOverride = Mat(mask, ink, strength, mirror), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, GIMode = GeometryInstance3D.GIModeEnum.Disabled };
 		parent.AddChild(mmi);
 		return mmi;
 	}
 }
+

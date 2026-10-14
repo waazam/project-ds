@@ -22,7 +22,7 @@ public partial class LightShafts : Node3D
 	/// <summary>Anchors are rolled within this distance of the player (and dropped beyond 1.3x it).</summary>
 	[Export] public float Radius = 60f;
 	[Export] public Vector2 Length = new(22f, 44f);
-	[Export] public Vector2 Width = new(0.7f, 2.4f);
+	[Export] public Vector2 Width = new(1.8f, 4.5f);   // (2026-10-13: was 0.7..2.4: thin, crisp, near the eye they read as pale paper strips among the trunks)
 	/// <summary>0..1 overall strength; the atmosphere drives it (mood, indoors, storm).</summary>
 	public float Strength { get; set; } = 1f;
 	/// <summary>The shafts' colour and peak additive intensity (the atmosphere sets these per mood).</summary>
@@ -150,7 +150,7 @@ public partial class LightShafts : Node3D
 
 			float dist = toCam.Length();
 			float far = 1f - Mathf.SmoothStep(Radius * 0.55f, Radius, dist);
-			float near = Mathf.SmoothStep(3f, 9f, dist);
+			float near = Mathf.SmoothStep(10f, 22f, dist);   // (was 3..9 m: a shaft at arm's length was a hard white bar)
 			float along = Mathf.Abs(fwd.Dot(up));
 			float endOn = 1f - Mathf.SmoothStep(0.55f, 0.9f, along);
 			float drift = 0.72f + 0.28f * Mathf.Sin(_t * 0.23f + _phase[i]) * Mathf.Sin(_t * 0.071f + _phase[i] * 1.7f);

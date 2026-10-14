@@ -48,7 +48,11 @@ public partial class SongCues : Node
 			Cue();
 	}
 
-	private void OnCheckpoint(Checkpoint cp) => Cue();
+	// (2026-10-13, the "bouncy / circus" sweep: checkpoints only from Act 24 on, inside the song itself. A checkpoint is the
+	// game saving, not something the player did, and many fall on a scare (landing in the pit, the lodge's doors): a bright
+	// synth stab there read as a game show. The finds, notes, locks and puzzles still play it everywhere. To restore it
+	// everywhere: Cue() unconditionally here.)
+	private void OnCheckpoint(Checkpoint cp) { if (cp >= Checkpoint.Act24Maze) Cue(); }
 
 	/// <summary>The next of the phrase (a moment's grace: two flags at once are one find, one cue).</summary>
 	public void Cue()
@@ -71,7 +75,12 @@ public partial class SongCues : Node
 		_step++;
 		var path = $"res://assets/audio/music/petty_theft/{name}.ogg";
 		if (!ResourceLoader.Exists(path)) return;
-		var p = new AudioStreamPlayer { Name = "Cue", Stream = GD.Load<AudioStream>(path), Bus = AudioServer.GetBusIndex("Music") >= 0 ? "Music" : "Master", VolumeDb = _pendingUnder ? -3f : -5f };   // (2026-10-11: up with the score; at -11 they were lost)
+		// (2026-10-11: up with the score; at -11 they were lost) (2026-10-13: those levels were set with the Music bus at -24 dB;
+		// the next day it went to -16 (GameSettings.MusicBaseDb) and Act 24's boost came down to match, but these didn't, so
+		// everywhere outside Act 24 every cue rang 8 dB over where it was tuned, over the steps and the woods. Back by 8 there.)
+		bool score = !string.IsNullOrEmpty(Act24Score.Instance?.Playing);
+		float db = (_pendingUnder ? -3f : -5f) - (score ? 0f : 8f);
+		var p = new AudioStreamPlayer { Name = "Cue", Stream = GD.Load<AudioStream>(path), Bus = AudioServer.GetBusIndex("Music") >= 0 ? "Music" : "Master", VolumeDb = db };
 		AddChild(p);
 		p.Finished += p.QueueFree;
 		p.Play();

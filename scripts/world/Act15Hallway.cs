@@ -16,13 +16,13 @@ namespace ProjectDS.World;
 ///
 /// First a claustrophobic industrial corridor, a body's width across and so tall its ceiling is lost:
 /// raw concrete, strip lights in the floor, a dim green haze from somewhere far ahead. It is too long:
-/// about two minutes' walk (one at a run). Then it tapers out into a stretched, cavernous version of
+/// about 45 s at a walk (2026-10-13). Then it tapers out into a stretched, cavernous version of
 /// itself, green lamps hanging on long cables out of the dark overhead.
 ///
 /// In the middle of it stands the shadow man (<see cref="ShadowMan"/>), frozen, because the lights
 /// are green. Once the player is past him, the lights play red light, green light: every 20-30 s they
 /// flicker three times and turn red with a low siren, and he is right behind the player. Anyone still
-/// moving while it is red is taken, and wakes at Act 15's start. About eight minutes of it to the door
+/// moving while it is red is taken, and wakes just past him. About three minutes of it at a walk to the door
 /// at the end: a janitor's closet, whose door swings shut behind them (<see cref="Checkpoint.Act15Finished"/>).
 ///
 /// The flicker is three slow blinks, not a strobe; with Reduce Flashing it is three soft dips.
@@ -31,7 +31,9 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class Act15Hallway : Node3D
 {
-	public const float Part1 = 178f, Taper = 30f, Part2 = 523f;   // (2026-10-12, the owner: "way too long", 45% off: was 324 and 950)
+	// (2026-10-12, the owner: "way too long", 45% off: was 324 and 950; 2026-10-13, "some of the hallways are way too long":
+	// about a third off again, was 178 and 523; the red light, green light rule itself is unchanged)
+	public const float Part1 = 120f, Taper = 30f, Part2 = 330f;
 	public const float W1 = 1.6f, H1 = 22f, W2 = 3.8f, H2 = 34f;
 	public const float ShadowZ = Part1 + Taper + 20f;
 	public const float End = Part1 + Taper + Part2;

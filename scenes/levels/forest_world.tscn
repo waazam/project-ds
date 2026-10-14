@@ -436,19 +436,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -0.27, -160)
 
 [node name="Props" type="Node3D" parent="."]
 
-[node name="DroppedBackpack" type="Node3D" parent="Props"]
-script = ExtResource("5_prop")
-Kind = 6
-ClearRadius = 0.9
-ClearFoliage = true
-
-[node name="TrailAnchor" type="Node" parent="Props/DroppedBackpack"]
-script = ExtResource("6_anchor")
-Distance = 76.0
-Offset = -3.1
-YawDegrees = 55.0
-HeightOffset = 0.0
-
 [node name="LostBoot" type="Node3D" parent="Props"]
 script = ExtResource("5_prop")
 Kind = 7

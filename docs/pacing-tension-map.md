@@ -1,4 +1,4 @@
-# Pacing and tension map (alpha, Acts 1–21)
+# Pacing and tension map (Acts 1–25)
 
 How the build breathes. Every act is rated for stress, from 1 (quiet, safe) to 5 (a chase, a fight
 or a scare that can kill), and given a role. The rule we keep: never more than two 4–5s back to back
@@ -26,6 +26,10 @@ it's picked up again. Scare fatigue sets in when the dread never drops.
 | 19 | The library | 1 | Real breathing room: warm, lit, a puzzle box |
 | 20 | The round room, the switches, the ascent | 2 | Awe more than fear |
 | 21 | The long stair; the church in the snow | 2 → 3 | Dread and wonder; a puzzle, a trap shut behind you, blood on the floor |
+| 22 | The winter woods, the plowed road | 3 | Unease in the open: the wendigo only glimpsed behind them, never touching them |
+| 23 | The ski lodge, the walls, the finale | 2 → 5 | Opens quiet and wrong (lit, empty, things moved behind them), tightens through the dining hall and the crawlspace, ends at a peak: the wendigo through the doors, the hall on fire |
+| 24 | The snow maze, the trenches, the flamethrower | 5 | The hunt, then the hunt turned round: four burns |
+| 25 | Out into the autumn woods; the car; the endings | 1 → 3 | The breath after it all; how hard the end lands depends on the ending |
 
 ## What this pass changed (the owner's pacing and tension mapping)
 - **The sewer (Act 17)** sits between the hallway and closet (15–16) and the boss (18). That was

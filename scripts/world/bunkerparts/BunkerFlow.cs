@@ -84,6 +84,14 @@ public partial class BunkerFlow : Node
 			_hallway.SetRedInstant();
 		}
 		_jumpscared = s.HasFlag(JumpscareFlag) || s.CrtPuzzleDone;
+		// the scare's body built now, as the bunker builds, and kept still and hidden till its moment (the lag pass,
+		// 2026-10-13: built on the spot, it held the frame it appears in for 60 ms)
+		if (!_jumpscared && _scareBody == null)
+		{
+			_scareBody = new StalkerBody { Name = "HallwayScare", Seed = 2077, Size = 1.08f, Visible = false, ProcessMode = ProcessModeEnum.Disabled };
+			_interior.AddChild(_scareBody);
+			if (_scareBody.IsInsideTree()) _scareBody.GlowEyes(new Color(1f, 0.16f, 0.05f), 8f);   // (its lit eyes' shader drawn by the load's warm-up too)
+		}
 		bool inMaze = s.HasFlag(StoryManager.Flag.BunkerMazeEntered);
 		if (inMaze) HideHallway();
 		if (s.HasFlag(StoryManager.Flag.BunkerMazeExited)) _maze.MarkExited();
@@ -122,6 +130,7 @@ public partial class BunkerFlow : Node
 	private const float JumpscareFrac = 0.56f;
 	private const string JumpscareFlag = "bunker_jumpscare_done";
 	private bool _jumpscared;
+	private StalkerBody _scareBody;
 	/// <summary>For the autotest: it has stepped out in the hallway.</summary>
 	public bool JumpscareFired => _jumpscared;
 
@@ -151,8 +160,11 @@ public partial class BunkerFlow : Node
 	/// </summary>
 	private async System.Threading.Tasks.Task Jumpscare(Vector3 local, PlayerController player, System.Threading.CancellationToken ct)
 	{
-		var body = new StalkerBody { Name = "HallwayScare", Seed = 2077, Size = 1.08f };
-		_interior.AddChild(body);
+		var body = _scareBody != null && IsInstanceValid(_scareBody) ? _scareBody : new StalkerBody { Name = "HallwayScare", Seed = 2077, Size = 1.08f };
+		_scareBody = null;
+		if (body.GetParent() == null) _interior.AddChild(body);
+		body.ProcessMode = ProcessModeEnum.Inherit;
+		body.Visible = true;
 		Vector3 at = new(Mathf.Clamp(local.X, -1f, 1f) * 0.3f, 0f, local.Z - 2.0f);
 		body.Position = at;
 		body.Rotation = new Vector3(0, Mathf.Atan2(local.X - at.X, local.Z - at.Z), 0);

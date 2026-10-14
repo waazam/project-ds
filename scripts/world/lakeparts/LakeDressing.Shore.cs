@@ -163,64 +163,39 @@ public partial class LakeDressing
 			k.Color = bark * 0.85f;
 			k.Cylinder(p, p + new Vector3(rng.RandfRange(-0.05f, 0.05f), h, 0), 0.13f, 0.05f, 6, true);
 		}
-		// the crown: limbs out from the upper half of the trunk in every direction, sprays of feathery bough hanging off
-		// each in layers (a bald cypress's soft, bright, ragged crown), moss hanging thick through it
+		// the crown (2026-10-13, the owner: "the lake shore firs look bad too"): it was sixteen sticks high on a bare pole, big
+		// feathery sprays hanging off their ends that thinned to nothing with distance: against the dawn sky, a palm. Now the
+		// woods' own fir crown (ForestScatter.FirCrown): whorls of limbs from a third of the way up, each a dark core and
+		// small sprays of needles along its wood, tapering to the top; in the cypress's brighter, yellower green, the moss
+		// still hanging through it.
+		float s = height / 15f;
+		var axis = new System.Func<float, Vector3>(Axis);
+		ForestScatter.FirCrown(k, rng, axis, height, 0.3f * s, 0.3f, Mathf.RoundToInt(height * 0.85f), 3.3f * s, 0.12f, CypressFoliage);
 		var mossRng = new RandomNumberGenerator { Seed = (ulong)(seed * 31 + 7) };
-		int limbs = 16;
-		for (int i = 0; i < limbs; i++)
+		for (int m = 0; m < 14; m++)
 		{
-			float f = Mathf.Lerp(0.38f, 0.95f, i / (limbs - 1f)) + rng.RandfRange(-0.03f, 0.03f);
-			float a = i * 2.39996f + rng.RandfRange(-0.3f, 0.3f);   // the golden angle: all the way round
-			var o = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
-			float len = Mathf.Lerp(4.0f, 1.4f, Mathf.Pow(i / (limbs - 1f), 0.8f)) * rng.RandfRange(0.8f, 1.15f);
-			Vector3 from = Axis(height * f), to = from + o * len + Vector3.Up * rng.RandfRange(0.1f, 0.8f);
-			k.Mat(ProcTextures.TreeBarkMat);
-			k.Color = bark;
-			k.Cylinder(from, to, 0.12f * (1.2f - f), 0.03f, 5, false);
-			k.Mat(CypressFoliage);
-			Vector3 side = new Vector3(-o.Z, 0, o.X);
-			for (int b = 0; b < 14; b++)
-			{
-				float u = 0.1f + 0.9f * b / 13f;
-				Vector3 at = from.Lerp(to, u) + Vector3.Up * rng.RandfRange(-0.15f, 0.25f);
-				float w = rng.RandfRange(1.3f, 2.1f) * (1.1f - 0.3f * u);
-				// a spray: out and drooping, turned a little each way
-				Vector3 sd = (side * Mathf.Cos(b * 1.3f) + o * 0.3f).Normalized();
-				Vector3 tip = at + (o * 0.5f + sd * 0.35f).Normalized() * w * 0.7f + Vector3.Down * w * 0.55f;
-				float lum = rng.RandfRange(0.8f, 1.15f);
-				k.Color = new Color(lum, lum, lum);
-				Vector3 n = (Vector3.Up + o * 0.3f).Normalized();
-				k.Quad(at - sd * w * 0.5f, at + sd * w * 0.5f, tip + sd * w * 0.38f, tip - sd * w * 0.38f, n,
-					new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
-			}
-			for (int m = 0; m < 3; m++)
-				if (mossRng.Randf() < 0.7f)
-					ForestScatter.MossCard(k, from.Lerp(to, mossRng.RandfRange(0.2f, 0.95f)), mossRng.RandfRange(0.8f, 2.2f), mossRng.RandfRange(0.35f, 0.6f), mossRng);
-		}
-		// its top: a few sprays round the leader
-		k.Mat(CypressFoliage);
-		for (int b = 0; b < 6; b++)
-		{
-			float a = b * 1.05f;
-			Vector3 at = Axis(height * 0.97f), o = new(Mathf.Cos(a), 0, Mathf.Sin(a)), sd = new(-o.Z, 0, o.X);
-			Vector3 tip = at + o * 0.9f + Vector3.Down * 0.6f;
-			k.Color = Colors.White;
-			k.Quad(at - sd * 0.6f, at + sd * 0.6f, tip + sd * 0.4f, tip - sd * 0.4f, Vector3.Up, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+			float f = mossRng.RandfRange(0.32f, 0.8f), a = mossRng.RandfRange(0f, Mathf.Tau);
+			var at = Axis(height * f) + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * mossRng.RandfRange(0.6f, 2.4f) * s * (1.1f - f);
+			ForestScatter.MossCard(k, at, mossRng.RandfRange(0.8f, 2.2f), mossRng.RandfRange(0.35f, 0.6f), mossRng);
 		}
 		return k.Commit();
 	}
 
-	private static StandardMaterial3D _cypressFoliage;
-	/// <summary>A bald cypress's feathery sprays: the fir spray photo, a brighter, yellower green, the same on both faces and
-	/// lit through from behind (the crown is mostly seen from below, against the sky).</summary>
-	private static StandardMaterial3D CypressFoliage => _cypressFoliage ??= new StandardMaterial3D
+	private static Material _cypressFoliage;
+	/// <summary>A bald cypress's feathery sprays: the firs' spray (the woods' foliage shader, ProcTextures.FirSprayMat), a
+	/// brighter, yellower green and lit through more from behind (the crown is mostly seen from below, against the sky).</summary>
+	private static Material CypressFoliage
 	{
-		ResourceName = "cypress_foliage", AlbedoTexture = GD.Load<Texture2D>("res://assets/textures/winter/fir_bough.png"),
-		AlbedoColor = new Color(0.95f, 1.15f, 0.62f), Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 0.4f,
-		CullMode = BaseMaterial3D.CullModeEnum.Disabled, Roughness = 1f, VertexColorUseAsAlbedo = true,
-		BacklightEnabled = true, Backlight = new Color(0.25f, 0.32f, 0.14f),
-		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
-	};
+		get
+		{
+			if (_cypressFoliage != null) return _cypressFoliage;
+			var m = (ShaderMaterial)ProcTextures.FirSprayMat.Duplicate();
+			m.ResourceName = "cypress_foliage";
+			m.SetShaderParameter("tint", new Color(0.95f, 1.12f, 0.66f));
+			m.SetShaderParameter("translucency", 0.45f);
+			return _cypressFoliage = m;
+		}
+	}
 
 	/// <summary>Tall reed: a dense stand of thin stems, crossed cards higher than a man, gone gold at their tops, plumes.</summary>
 	private static Mesh TallReedMesh()

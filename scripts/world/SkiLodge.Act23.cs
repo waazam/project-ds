@@ -213,7 +213,7 @@ public partial class SkiLodge
 		AddChild(Card202Pickup);
 		// only the blacklight finds it: a smeared handprint and an arrow on the counter's front, pointing under, and the
 		// card's edge glowing where it's taped
-		UvInk.OnSurface(this, new Vector3(BarCounterX + 0.025f, 0.72f, 3.9f), Vector3.Right, new Vector2(0.22f, 0.22f), UvInk.Hand(), UvInk.Green, 1.8f, 0.3f);
+		UvInk.OnSurface(this, new Vector3(BarCounterX + 0.025f, 0.72f, 3.9f), Vector3.Right, new Vector2(0.24f, 0.24f), UvInk.Hand(HandKind.Dragged, 2), UvInk.Green, 1.8f, 0.15f, false, true);
 		UvInk.Write(this, new Vector3(BarCounterX + 0.025f, 0.42f, 3.9f), Vector3.Right, "UNDER", 0.34f, UvInk.Green, 0f, 1.8f);
 		UvInk.OnSurface(this, BarCardSpot.Position + new Vector3(0, -0.006f, 0), Vector3.Down, new Vector2(0.1f, 0.07f), UvInk.Smear(3), UvInk.Pale, 2.2f);
 		Callable.From(() =>
@@ -358,6 +358,19 @@ public partial class SkiLodge
 	{
 		DiningDoorL.Opened += _ => { StoryManager.Instance?.SetFlag(LodgeFlag.DiningOpen); GD.Print("[story] Act 23: the dining room's doors open - frost in the air"); };
 		if (Has(LodgeFlag.DiningOpen)) { DiningDoorL.Open(null, instant: true); DiningDoorR.Open(null, instant: true); }
+		// what's under the sheets read in now, as the lodge builds (in the black), not as each sheet comes off (the lag pass,
+		// 2026-10-13: the first sheet's dishes, read and their maps lifted on the spot, held the game a third of a second);
+		// and the dishes' shaders drawn once with the rest
+		if (!Has(LodgeFlag.Table(0, 1)) && !Has(LodgeFlag.Table(1, 1)) && !Has(LodgeFlag.Table(2, 1)) && !Has(LodgeFlag.Table(3, 1)) && !Has(LodgeFlag.Table(4, 1)) && !Has(LodgeFlag.Table(5, 1)))
+		{
+			foreach (var m in new[] { "setting_meat", "setting_soup", "candelabrum", "carcass_dish", "cloche", "dining_leg", "dining_top_half", "silver_platter", "skeleton_headless", "soup_tureen_bowl" })
+				FurnitureKit.Has(m);
+			var dishes = new MeshKit { Color = Colors.White };
+			Dishes(dishes);
+			var warm = new Node3D { Name = "DishesWarmUp" };
+			if (!dishes.IsEmpty) dishes.CommitTo(warm, "Mesh", false);
+			Systems.ShaderWarmup.Prewarm(this, warm);
+		}
 		for (int t = 0; t < 6; t++)
 		{
 			_tables[t] = BuildTable(t);
@@ -1064,7 +1077,9 @@ public partial class SkiLodge
 		bool inside = InsideLocal(l);
 		// performance: the shaders warmed on the way in, the woods put away while indoors (SkiLodge.Perf.cs)
 		WarmProcess();
-		if (inside && !WarmedUp) WarmUp();
+		// (at once, the first frame after the lodge is built, in that build's black: on the way in, it held the game 90 ms
+		// at the back door; the lag pass, 2026-10-13)
+		if (!WarmedUp) WarmUp();
 		UpdateOutdoor(inside);
 		// the crawlspace (its hand-overs, its dust, its howls, its arms), and the frozen lodge's storm
 		CrawlProcess(player, l, dt);

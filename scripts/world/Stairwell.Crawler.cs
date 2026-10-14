@@ -14,8 +14,8 @@ namespace ProjectDS.World;
 ///
 /// It keeps its distance on its own terms: it hangs back a turn or so above (in sight across the well, if
 /// they look up), then surges closer, then falls back; however fast they go it's never far behind, and if
-/// they stop it comes on. The point is not to look back, and to keep going. Running is the escape now:
-/// the shaft's old trick (a sprint quietly taken back up to the top) is off while it hunts.
+/// they stop it comes on. The point is not to look back, and to keep going. Running is the escape (the
+/// shaft's old trick, a sprint quietly taken back up to the top, is gone: 2026-10-12/13).
 ///
 /// If it reaches them it takes them: a lunge, black, and they come to three turns further up, with it
 /// somewhere above again. (Not a death: the descent is long, and the stairwell's punishment has always

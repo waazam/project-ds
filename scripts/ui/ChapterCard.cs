@@ -8,7 +8,7 @@ namespace ProjectDS.UI;
 /// <summary>
 /// The chapters' title drops (2026-10-10c, the owner: "add chapter title cards to the game to make it feel like a book
 /// ... Big Bold letters on the screen", with Alan Wake 2's in mind: one word or three in huge, heavy, condensed capitals
-/// across the middle of the picture, the chapter's number small under them, over the game going on).
+/// across the middle of the picture, over the game going on; since 2026-10-13 the title alone, no chapter number).
 ///
 /// Eight chapters (docs/outline): 1 Back to Nature (Act 1), 2 The Stairs (Act 2), 3 Root of the Problem (Act 8),
 /// 4 Dawn is Breaking (Act 12), 5 Ever Upward (Act 19), 6 The Great Door (Act 21), 7 Enjoy Your Stay (Act 23), 8 Return
@@ -26,7 +26,6 @@ public partial class ChapterCard : CanvasLayer
 	{
 		"", "BACK TO NATURE", "THE STAIRS", "ROOT OF THE PROBLEM", "DAWN IS BREAKING", "EVER UPWARD", "THE GREAT DOOR", "ENJOY YOUR STAY", "RETURN",
 	};
-	private static readonly string[] Numbers = { "", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT" };
 	/// <summary>(the owner: "dont make the chapter font red make it like that 3rd picture kind of off white topeish") An old
 	/// paper's off-white, a little taupe; the number under it a shade darker.</summary>
 	// (2026-10-11, the owner: "a little harsh and needs to be warmed up a little": a warmer, softer old-paper cream)
@@ -59,11 +58,15 @@ public partial class ChapterCard : CanvasLayer
 		Spawn(from, n, delay);
 	}
 
-	/// <summary>The game's name (the trailer's title) and then chapter 2: at the stairs, as the forest goes dead silent.</summary>
+	/// <summary>The game's name (the trailer's title) and then chapter 2: at the stairs, as the forest goes dead silent.
+	/// Only once the player is close to the stairs and has them in view (2026-10-13, the owner: "I don't want to see the
+	/// stairs text on the screen until the player is close to the stairs and can see them in view";
+	/// <see cref="World.FirstClimbEvent.StairsRevealed"/>): before that, a call is let go and comes again.</summary>
 	public static void TitleThenStairs(Node from)
 	{
 		var s = StoryManager.Instance;
 		if (from == null || !from.IsInsideTree() || (s != null && s.HasFlag(Flag(2)))) return;
+		if (!World.FirstClimbEvent.StairsRevealed) return;
 		s?.SetFlag(Flag(2));
 		Spawn(from, 0, 1.6f, then: 2);
 	}
@@ -78,7 +81,7 @@ public partial class ChapterCard : CanvasLayer
 	private float _wait;
 	private double _t = -1;
 	private Control _root;
-	private Label _title, _sub;
+	private Label _title;
 	private TextureRect _band;
 	private const float FadeIn = 0.9f, Hold = 4.6f, FadeOut = 1.6f;
 
@@ -123,20 +126,8 @@ public partial class ChapterCard : CanvasLayer
 		_title.AddThemeConstantOverride("shadow_offset_y", 1);
 		_title.AddThemeConstantOverride("shadow_outline_size", 2);
 		_title.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		_title.OffsetTop = title ? 0 : -14;
+		_title.OffsetTop = 0;   // (2026-10-13, Dan: "just say the title of the chapter": no "CHAPTER N" line under it)
 		_root.AddChild(_title);
-		_sub = new Label
-		{
-			Text = title ? "" : $"CHAPTER {Numbers[_n]}", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-		};
-		_sub.AddThemeFontOverride("font", new FontVariation { BaseFont = Anton ?? UiKit.Serif, SpacingGlyph = 4 });
-		_sub.AddThemeFontSizeOverride("font_size", 13);
-		_sub.AddThemeColorOverride("font_color", col.Darkened(0.12f));
-		_sub.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		_sub.OffsetTop = size * 0.5f + 22;
-		_sub.OffsetBottom = size * 0.5f + 22;
-		_root.AddChild(_sub);
 		_root.Modulate = new Color(1, 1, 1, 0);
 		Current = this;
 	}
@@ -152,8 +143,9 @@ public partial class ChapterCard : CanvasLayer
 			_t = 0;
 			Shown.Add(_n);
 			GD.Print(_n == 0 ? "[story] title: DEAD SILENT" : $"[story] chapter {_n}: {Titles[_n]}");
-			if (_n == 0) AudioDirector.OneShot(this, "title_drop", 1, null, -9f, AudioServer.GetBusIndex("Music") >= 0 ? "Music" : "Master", 3f, 0f);
-			else AudioDirector.OneShot(this, "chapter_hit", 1, null, -7f, AudioServer.GetBusIndex("Music") >= 0 ? "Music" : "Master", 3f, 0f);
+			// (2026-10-13: both tuned on the Music bus at -24 dB; it sits at -16 now (GameSettings.MusicBaseDb), so 8 dB back)
+			if (_n == 0) AudioDirector.OneShot(this, "title_drop", 1, null, -17f, AudioServer.GetBusIndex("Music") >= 0 ? "Music" : "Master", 3f, 0f);
+			else AudioDirector.OneShot(this, "chapter_hit", 1, null, -15f, AudioServer.GetBusIndex("Music") >= 0 ? "Music" : "Master", 3f, 0f);
 		}
 		if (GetTree().Paused) return;
 		_t += delta;

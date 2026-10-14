@@ -280,9 +280,9 @@ public partial class Library : Node3D
 			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.4f, 0.08f, 0.07f), Roughness = 0.6f },
 		});
 		// the palm on the spine, the fingers up over the top of it (the way you'd tip a book out)
-		UvInk.OnSurface(_jutting, new Vector3(0, 0.06f, -0.12f), Vector3.Forward, new Vector2(0.09f, 0.13f), UvInk.Hand(), UvInk.Pale, 2f);
+		UvInk.OnSurface(_jutting, new Vector3(0, 0.06f, -0.12f), Vector3.Forward, new Vector2(0.09f, 0.13f), UvInk.Hand(HandKind.Pressed, 3), UvInk.Pale, 2f, 0f, false, true, 0.03f);
 		// and fingertip smudges along its top, from tipping it out
-		UvInk.OnSurface(_jutting, new Vector3(0, 0.16f, -0.06f), Vector3.Up, new Vector2(0.08f, 0.1f), UvInk.Smear(7), UvInk.Pale, 1.4f, 0.3f);
+		UvInk.OnSurface(_jutting, new Vector3(0, 0.16f, -0.06f), Vector3.Up, new Vector2(0.08f, 0.1f), UvInk.Hand(HandKind.Fingertips, 4), UvInk.Pale, 1.4f, Mathf.Pi + 0.2f, false, true, 0.04f);
 		BookUse = new PickupInteractable { Name = "Book", PickRadius = 0.2f, MaxDistance = 2.4f, PromptFor = p => p?.Inventory is { } inv && inv.HasTool(ToolKind.Bookmark) ? "Slide the bookmark in" : "One of the books sticks out.", CanUse = _ => !BookcaseOpen, Position = _jutting.Position + new Vector3(0, 0, -0.12f) };
 		BookUse.Interacted += OnBook;
 		_bookcase.AddChild(BookUse);

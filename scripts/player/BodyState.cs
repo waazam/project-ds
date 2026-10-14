@@ -59,10 +59,12 @@ public partial class BodyState : Node
 			float want = Fear > 0.05f ? Mathf.Lerp(-26f, -6f, Fear) : -80f;
 			if (want > -79f && !_heart.Playing) _heart.Play();
 			_heart.VolumeDb = Mathf.MoveToward(_heart.VolumeDb, want, dt * 30f);
-			_heart.PitchScale = Mathf.Lerp(1f, 1.25f, Fear);
+			// (2026-10-13, the "bouncy" sweep: up to 1.25 the thump itself rose a third, a ball bouncing faster; 1.12 quickens it
+			// and keeps it low. The view's pulse below keeps step.)
+			_heart.PitchScale = Mathf.Lerp(1f, 1.12f, Fear);
 			if (_heart.VolumeDb < -79f && _heart.Playing) _heart.Stop();
 		}
-		float pulse = Fear * (0.5f + 0.5f * Mathf.Pow(Mathf.Max(0f, Mathf.Sin((float)_clock * Mathf.Tau * 1.7f * Mathf.Lerp(1f, 1.25f, Fear))), 6f));
+		float pulse = Fear * (0.5f + 0.5f * Mathf.Pow(Mathf.Max(0f, Mathf.Sin((float)_clock * Mathf.Tau * 1.7f * Mathf.Lerp(1f, 1.12f, Fear))), 6f));
 		VignetteExtra = 0.2f * spent + 0.32f * pulse;
 		// the sway: the view drifting a hair with the laboured breath (no roll)
 		var cam = _p.CameraRig?.Camera;

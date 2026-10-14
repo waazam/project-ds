@@ -63,7 +63,7 @@ public partial class ForestScatter
 		DetailKit.Hook(m, DetailKit.Kind.Foliage);
 		m.SetShaderParameter("albedo_tex", ImageTexture.CreateFromImage(img));
 		Systems.TexGen.Stop(__tg);
-		m.SetShaderParameter("tint", new Color(0.95f, 1f, 0.92f));
+		m.SetShaderParameter("tint", new Color(0.62f, 0.66f, 0.6f));   // (2026-10-13: was 0.95, 1, 0.92: in a gap of sun the beards glared off the dark trunks like pinned paper)
 		m.SetShaderParameter("sway", 0.05f);
 		m.SetShaderParameter("sway_speed", 0.7f);
 		m.SetShaderParameter("normal_up", 0.3f);

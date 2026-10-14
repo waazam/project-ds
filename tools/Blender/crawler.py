@@ -206,9 +206,10 @@ def build_hands(m):
         parts = [lumpy_sphere("Palm", palm + P(0, 0, -0.01), R(0.045, 0.018, 0.065), None, 50 + L["s"], amp=0.06, subdiv=3)]
         parts.append(chain("Wrist", [L["foot"] + P(0, 0.05, 0.02), L["foot"] + P(0, 0.02, -0.01), palm + P(0, 0.008, 0.01)], [0.026, 0.026, 0.024]))
         for k, pts in enumerate(fingers):
-            parts.append(chain(f"Finger{k}", [palm.lerp(pts[0], 0.5)] + pts, [0.012, 0.012, 0.0105, 0.009, 0.007]))
+            # (2026-10-13, the owner: hands "more claw like") thinner to the tip, the knuckles knobbed up out of the back
+            parts.append(chain(f"Finger{k}", [palm.lerp(pts[0], 0.5)] + pts, [0.012, 0.0115, 0.0098, 0.0082, 0.006]))
             for q in pts[1:-1]:
-                parts.append(lumpy_sphere("Knuckle", q, (0.011, 0.011, 0.011), None, 60 + k, amp=0.08, subdiv=2))
+                parts.append(lumpy_sphere("Knuckle", q + P(0, 0.004, 0), (0.0138, 0.0128, 0.0138), None, 60 + k, amp=0.1, subdiv=2))
         hand = join(parts, f"Hand{L['kind']}{L['s']}")
         remesh(hand, 0.0028, 3)
         hand.data.materials.clear()
@@ -217,7 +218,8 @@ def build_hands(m):
         for k, pts in enumerate(fingers):
             tip, prev = pts[-1], pts[-2]
             d = (tip - prev).normalized()
-            n = chain(f"Nail{k}", [tip - d * 0.006, tip + d * 0.012, tip + d * 0.02 + P(0, -0.008, 0)], [0.006, 0.004, 0.0008])
+            # black hooked claws curling down into the floor (they were 2 cm nails)
+            n = W.talon(f"Nail{k}", tip, d, P(0, -1, 0), 0.042 if L["kind"] == "arm" else 0.03, 0.0056)
             n.data.materials.append(m["nail"])
             nails.append(n)
         obs.append((L, hand, nails, fingers))

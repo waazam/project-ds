@@ -20,17 +20,20 @@ public static class Steps
 	/// giving (the slap muffled, the thud slower).</summary>
 	static void Boot(double[] x, Rng r, int sr, double t, double weight, double soft)
 	{
-		double roll = r.R(0.055, 0.1);
-		for (int c = 0; c < 2; c++)
-		{
-			double t0 = t + c * roll, a = weight * (c == 0 ? 1.0 : r.R(0.4, 0.55));
-			// the weight: noise under ~160 Hz, a slower attack the softer the ground
-			Slap(x, r, sr, t0, a * 1.3, 35, 160 + 60 * (1 - soft), 0.03 + 0.03 * soft, 0.003 + 0.006 * soft);
-			// the body of it: 180-700 Hz, short
-			Slap(x, r, sr, t0, a * 0.7, 180, 700 - 250 * soft, 0.012 + 0.01 * soft, 0.0015 + 0.003 * soft);
-			// the sole's leather on the ground: a little scuff of grit, very short, dark
-			Slap(x, r, sr, t0 + 0.002, a * 0.22 * (1 - 0.7 * soft), 900, 3200, 0.006, 0.0006);
-		}
+		// (2026-10-13, the "bouncy / circus" sweep) The boot was two low thuds, heel then toe, each mostly noise under
+		// 160 Hz: 70-90 % of every step's energy sat under 200 Hz (tools/AudioAudit), and a low thump, a beat, a softer
+		// low thump, its pitch nudged up or down each step, is a ball bouncing. Now one heel strike that's mostly the
+		// ground's body (150 Hz-1.6 kHz), a little weight under it, the sole's contact on top, and the roll onto the toe a
+		// soft scuff along the ground, never a second thud.
+		// the weight: a little low body, short (the softer the ground, the slower and duller)
+		Slap(x, r, sr, t, weight * 0.55, 50, 150, 0.014 + 0.016 * soft, 0.002 + 0.004 * soft);
+		// the heel into the ground: the body of the step
+		Slap(x, r, sr, t + 0.001, weight * 0.95, 160, 1700 - 700 * soft, 0.009 + 0.009 * soft, 0.0008 + 0.0025 * soft);
+		// the sole's leather meeting it: a dry tick, very short
+		Slap(x, r, sr, t + 0.002, weight * 0.4 * (1 - 0.65 * soft), 1200, 4800, 0.0035, 0.0003);
+		// the roll onto the toe: a scuff of the sole along the ground (a swell of mid noise, no impact in it)
+		double roll = r.R(0.045, 0.085);
+		Slap(x, r, sr, t + roll * 0.5, weight * r.R(0.22, 0.32), 350, 2600 - 900 * soft, roll * 0.45, roll * 0.35);
 	}
 
 	/// <summary>A scatter of tiny dark grains (the ground breaking up under the sole): many soft clicks, band-limited and

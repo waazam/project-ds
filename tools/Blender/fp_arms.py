@@ -156,18 +156,19 @@ class Hand:
         self.parts = []
         self.nails = []
         self.joints = []   # (point, how red: knuckles and tips)
+        self.full = 1.0    # (the palm's depth: a gloved fist's back is fuller and rounder)
 
     def P(self, f, b, s):
         return self.w + self.f * f + self.b * b + self.s * s
 
-    def palm(self):
+    def palm(self, tendons=True):
         # the palm lofted from the wrist to the knuckles: wider and flatter toward them, the back arched across
         cs, secs = [], []
         for i in range(9):
             t = i / 8
             f = -0.012 + t * 0.1   # (from back inside the wrist: no cut end left showing at the bend)
             half_w = 0.029 + 0.013 * math.sin(t * math.pi * 0.6) + 0.002 * t
-            back, front = 0.0115 - 0.002 * t, -0.0135 + 0.002 * t
+            back, front = (0.0115 - 0.002 * t) * self.full, (-0.0135 + 0.002 * t) * self.full
             c = self.P(f, (back + front) * 0.5, -0.002)
             hw, hb = half_w, (back - front) * 0.5
             def sec(a, hw=hw, hb=hb):
@@ -175,7 +176,7 @@ class Hand:
                 x = ca * hw
                 y = sa * hb
                 if y > 0:
-                    y += 0.003 * (1 - (x / hw) ** 2)     # (the back of the hand arched across)
+                    y += 0.003 * self.full ** 3 * (1 - (x / hw) ** 2)     # (the back of the hand arched across)
                 return self.s * x + self.b * y
             cs.append(c)
             secs.append(sec)
@@ -186,7 +187,7 @@ class Hand:
         # the wrist's bones, standing out a little each side
         self.parts.append(ellipsoid("UlnaHead", self.P(-0.008, 0.003, -0.022), (self.f, self.b, self.s), (0.011, 0.008, 0.007)))
         # the tendons, faint across the back of the hand to each knuckle
-        for name, bones, s0, f0, r in FINGERS:
+        for name, bones, s0, f0, r in (FINGERS if tendons else ()):
             self.parts.append(capsule(f"Tendon_{name}", self.P(0.016, 0.0098, s0 * 0.5), self.P(f0 - 0.014, 0.0103, s0), 0.0019, 0.0018))
         # the glove's cuff: a slightly fuller band round the wrist, its edge tucked under the sleeve
         self.parts.append(ellipsoid("GloveCuff", self.P(-0.022, -0.001, -0.001), (self.f, self.b, self.s), (0.018, 0.02, 0.031)))
@@ -291,7 +292,7 @@ def nail(name, at, along, up, r):
     return _obj(name, bm)
 
 
-def sleeve(name, wrist, toward, b, length, seed):
+def sleeve(name, wrist, toward, b, length, seed, cuff=0.041, swell=0.015, start=0.022, oval=1.0):
     """The jacket's sleeve over the forearm: a loose tube from just over the wrist bone back past the elbow, its folds
     gathered toward the cuff, a cuff band at its end. Open at the cuff."""
     cs, secs = [], []
@@ -302,15 +303,15 @@ def sleeve(name, wrist, toward, b, length, seed):
     v = toward.cross(u).normalized()
     for i in range(n + 1):
         t = i / n
-        c = wrist + toward * (0.022 + length * t)
-        base = 0.041 + 0.015 * min(1, t * 2.2) + (0.004 if t < 0.06 else 0.0)
+        c = wrist + toward * (start + length * t)
+        base = cuff + swell * min(1, t * 2.2) + (0.004 if t < 0.06 else 0.0)
         gather = math.exp(-t * 4)   # (folds bunched near the cuff, easing off up the arm)
         def sec(a, t=t, base=base, gather=gather):
             fold = 0.0
             for k in range(3):
                 fold += math.sin(a * (2 + k) + phase[k] + t * (14 + 5 * k)) * (0.0045 - 0.001 * k)
             fold += math.sin(t * 38 + phase[3] + a) * 0.004 * gather
-            ry = 1.0 + 0.12 * math.sin(a * 2 + phase[4])
+            ry = (1.0 + 0.12 * math.sin(a * 2 + phase[4])) * (oval + (1 - oval) * min(1.0, t * 3))   # (oval: flat round the wrist at the cuff)
             return (u * math.cos(a) + v * math.sin(a) * ry) * (base + fold * (0.5 + gather))
         cs.append(c)
         secs.append(sec)
@@ -344,8 +345,8 @@ def paint(ob, fn):
     me.color_attributes.active_color = attr
 
 
-GLOVE = V((0.018, 0.013, 0.01))
-GLOVE_WORN = V((0.045, 0.034, 0.026))
+GLOVE = V((0.034, 0.025, 0.019))      # (2026-10-13: a shade up from near black, so its shape reads in the dark)
+GLOVE_WORN = V((0.075, 0.056, 0.042))
 
 
 def glove_colour(hand):
@@ -484,30 +485,32 @@ def place(hand, pts_list, target):
 
 def bail_left():
     """The lantern carried by its bail (a wire along X): fingers forward over it and curled back under it."""
-    # (2026-10-11, the owner: "too stiff and unnaturally bent ... the grip is still too loose": the forearm now drops away
-    # down and back to the lower left, the hand carried a little up from it at the wrist, the way a lantern's carried)
-    f = G(0.08, 0.1, -1.0)       # the knuckles' way: forward, a touch up, a little in toward the middle
-    b = G(0.0, 1.0, 0.4)         # the back of the hand: up, and back toward the eye
+    # (2026-10-13, the owner: "Fix the hand holding the lantern". It was a flat paddle laid on the wire: the palm level
+    # and the back of the hand turned up to the eye, the fingers hooked straight down under it, so from the eye it read as
+    # a black pancake on the bail, and the sleeve was a wide open tube. Now a closed fist round the wire, the way a lantern
+    # is held out by its bail: the forearm rising from the elbow, the knuckles forward, the back of the hand up and rolled a
+    # little out to the left, the fingers wrapped right round the wire with their tips into the palm, the thumb closed over
+    # the front of the first two fingers. The wire runs through the fist from the little finger to the first. The sleeve
+    # fits the wrist, the glove's cuff showing under it.)
+    f = G(0.22, 0.32, -1.0)      # the knuckles' way: forward, up along the forearm, a little in toward the middle
+    b = G(-0.42, 1.0, 0.32)      # the back of the hand: up, rolled out to the left, a little back toward the eye
     hand = Hand(G(-0.03, 0.06, 0.1), f, b, right=False)
-    hand.palm()
+    hand.full = 1.3
+    hand.palm(tendons=False)
     grip = []
     fingers = {}
-    for (name, bones, s0, f0, r), spread in zip(FINGERS, (0.03, 0.0, -0.03, -0.07)):
-        pts = hand.finger(name, bones, s0, f0, r, (0.3, 1.75, 1.15), spread)
+    for (name, bones, s0, f0, r), spread in zip(FINGERS, (0.04, 0.0, -0.04, -0.09)):
+        pts = hand.finger(name, bones, s0, f0, r, (1.3, 1.7, 1.15), spread)
         fingers[name] = pts
-        # (the wire in the crease inside the middle knuckle, the finger closed tight round it: a finger's radius in from
-        # the joint toward the middle of the curl, and the wire's own)
-        # (pts: the knuckle, the middle joint, the last joint, the tip)
-        c = (pts[0] + pts[1] + pts[2] + pts[3]) / 4
-        grip.append(pts[1] + (c - pts[1]).normalized() * (r * 0.92 + 0.0016))
-    # the thumb laid along the side of the first finger, resting on it
-    ix = fingers["index"]
-    hand.thumb(ix[1] + hand.s * 0.013 + hand.b * 0.003 - hand.f * 0.004)
-    # the wire runs under the middle bones: the hook's inside (a finger's radius in from the bone line)
+        # (pts: the knuckle, the middle joint, the last joint, the tip) the wire in the middle of the curl
+        grip.append((pts[0] * 0.5 + pts[1] + pts[2] + pts[3] * 0.5) / 3)
+    # the thumb closed over the front of the curled first and middle fingers
+    tip = fingers["index"][2].lerp(fingers["middle"][2], 0.35) + hand.b * 0.006
+    hand.thumb(tip + (tip - hand.P(0.05, 0, 0)).normalized() * 0.008, out=0.01)
     place(hand, grip, G(0, 0, 0))
-    toward = G(-0.3, -0.85, 0.55).normalized()
+    toward = G(-0.12, -0.68, 0.72).normalized()   # (down and back to the elbow under it: the forearm rises to the fist)
     hand.forearm(toward, 0.32)
-    sl = sleeve("Sleeve", hand.w, toward, hand.b, 0.42, 7)
+    sl = sleeve("Sleeve", hand.w, toward, hand.b, 0.42, 7, cuff=0.036, swell=0.011, start=0.03, oval=0.72)
     return build(hand, "ArmBailL", sl, "fp_arm_bail_L")
 
 
@@ -561,6 +564,8 @@ SHAPE = "--" in sys.argv and "shape" in sys.argv[sys.argv.index("--") + 1:]
 def main():
     clear()
     a = bail_left()
+    # (the bail's wire in the previews only, along X through the grip)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.0028, depth=0.16, location=(0, 0, 0), rotation=(0, math.pi / 2, 0))
     preview(a, "bail_L", G(0.27, 0.11, 0.62))
     clear()
     b = fist_right()

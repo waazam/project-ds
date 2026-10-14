@@ -101,7 +101,8 @@ public partial class Stairwell
 		{
 			int k = r * 4 + 2;
 			Vector2 p = CornerXZ(k);
-			UvInk.OnSurface(this, new Vector3(-H + 0.02f, CornerY(k) + 1.0f, p.Y + 0.4f), Vector3.Right, new Vector2(0.18f, 0.18f), UvInk.Hand(), UvInk.Pale, 1.3f, r * 0.7f);
+			UvInk.OnSurface(this, new Vector3(-H + 0.02f, CornerY(k) + 1.0f, p.Y + 0.4f), Vector3.Right, new Vector2(0.2f, 0.2f),
+				UvInk.Hand((r % 4) switch { 0 => HandKind.Fingertips, 1 => HandKind.Partial, 2 => HandKind.Dragged, _ => HandKind.Pressed }, r), UvInk.Pale, 1.3f, (r % 5 - 2) * 0.18f, (r & 1) == 1);
 		}
 
 		// a steel door on turn 10's third landing, painted shut, in the outer wall

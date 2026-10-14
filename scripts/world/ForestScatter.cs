@@ -174,7 +174,31 @@ public partial class ForestScatter : Node3D
 				MossCard(k, from + dir.Normalized() * len * mossRng.RandfRange(0.5f, 0.95f), mossRng.RandfRange(0.5f, 1.3f), mossRng.RandfRange(0.25f, 0.45f), mossRng);
 		}
 
-		// ---- bough tiers
+		// ---- bough tiers (FirCrown: shared with the lake's cypresses)
+		FirCrown(k, rng, Axis, height, trunkR, crownStart, tiers, maxR, ragged, ProcTextures.FirSprayMat);
+		k.Mat(ProcTextures.FirBranchMat);
+		// leader: two crossed vertical cards at the very top
+		{
+			float lh = Mathf.Max(1.4f, height * 0.09f), lw = lh * 0.35f;
+			Vector3 b = Axis(height * 0.86f), top = Axis(height * 0.86f) + Vector3.Up * lh;
+			k.Color = new Color(0.9f, 0.9f, 0.9f);
+			for (int i = 0; i < 2; i++)
+			{
+				float a = i * Mathf.Pi * 0.5f + seed;
+				Vector3 sd = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * lw;
+				Vector3 nn = new Vector3(-sd.Z, 0, sd.X).Normalized();
+				k.Quad(b - sd, b + sd, top + sd * 0.2f, top - sd * 0.2f, nn,
+					new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+			}
+		}
+		return k.Commit();
+	}
+
+	/// <summary>A fir's crown: <paramref name="tiers"/> whorls of boughs from <paramref name="crownStart"/> of the height to the
+	/// top, each a dark core skirt (FirBranchMat) and limbs of wood carrying sprays of needles (<paramref name="spray"/>).</summary>
+	internal static void FirCrown(MeshKit k, RandomNumberGenerator rng, System.Func<float, Vector3> Axis, float height, float trunkR, float crownStart, int tiers, float maxR, float ragged, Material spray)
+	{
+		k.Mat(ProcTextures.FirBranchMat);
 		k.Mat(ProcTextures.FirBranchMat);
 		float y0 = crownStart * height;
 		for (int t = 0; t < tiers; t++)
@@ -205,46 +229,62 @@ public partial class ForestScatter : Node3D
 					k.Tri(apex, p0, p1, nn.Normalized(), new Vector2(0.5f, 0.99f), new Vector2(0.1f, 0.93f), new Vector2(0.9f, 0.93f));
 				}
 			}
+			// (2026-10-13, the owner: "the lake shore firs look bad too": each bough was two huge frond-shaped cards, up to
+			// four metres, so against a bright sky a fir read as a palm, a few paper fronds on a pole.) Each bough is now a
+			// limb of wood out of the trunk carrying sprays of needles along it, the photographed spray, a fraction of the
+			// size: one carrying on from the limb's end, a pair fanning out to its sides, rolled a little each way so the
+			// bough has thickness; the tiers stacked closer.
 			for (int i = 0; i < n; i++)
 			{
-				if (rng.Randf() < ragged && t < tiers - 2) continue;
+				if (rng.Randf() < ragged * 0.5f && t < tiers - 2) continue;
 				float a = rot + Mathf.Tau * i / n + rng.RandfRange(-0.25f, 0.25f);
 				float L = R * rng.RandfRange(0.78f, 1.12f);
 				Vector3 dir = new(Mathf.Cos(a), 0, Mathf.Sin(a));
 				Vector3 side = new(-dir.Z, 0, dir.X);
 				float dr = droop * rng.RandfRange(0.75f, 1.3f);
 				float pitch = rng.RandfRange(-0.12f, 0.1f);            // some boughs lift, some sag
-				Vector3 root = c + dir * trunkR * 0.3f + Vector3.Up * rng.RandfRange(-0.35f, 0.45f);
-				// out fairly level, then the outer half hangs down
-				Vector3 mid = root + dir * L * 0.5f + Vector3.Down * (L * 0.5f * Mathf.Tan(dr * 0.35f + pitch));
-				Vector3 tip = mid + dir * L * 0.47f + Vector3.Down * (L * 0.5f * Mathf.Tan(Mathf.Min(dr * 1.15f + pitch, 0.95f)));
-				float hw = L * 0.44f;
-				Vector3 nrm1 = (mid - root).Cross(side).Normalized(); if (nrm1.Y < 0) nrm1 = -nrm1;
-				Vector3 nrm2 = (tip - mid).Cross(side).Normalized(); if (nrm2.Y < 0) nrm2 = -nrm2;
+				Vector3 root = c + Vector3.Up * rng.RandfRange(-0.35f, 0.45f);
+				float sag = Mathf.Tan(Mathf.Min(dr * 0.7f + pitch, 0.9f));
+				Vector3 P(float u) => root + dir * (trunkR * 0.3f + L * u) + Vector3.Down * (L * u * u * sag * 0.75f);
+				Vector3 Dir(float u) => (P(u + 0.05f) - P(u)).Normalized();
 				float lum = ao * rng.RandfRange(0.85f, 1.1f);
-				k.Color = new Color(lum * 0.7f, lum * 0.7f, lum * 0.7f);
-				k.Quad(root - side * hw * 0.5f, root + side * hw * 0.5f, mid + side * hw, mid - side * hw, nrm1,
-					new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0.5f), new Vector2(0, 0.5f));
-				k.Color = new Color(lum, lum, lum);
-				k.Quad(mid - side * hw, mid + side * hw, tip + side * hw * 0.8f, tip - side * hw * 0.8f, nrm2,
-					new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0), new Vector2(0, 0));
+				// the limb itself, out of the trunk (three-sided: it's mostly hidden in its needles)
+				// (the upper crown's short boughs: their limb and their side pair can't be seen, so they're left out)
+				if (f < 0.65f)
+				{
+					k.Mat(ProcTextures.TreeBarkMat);
+					k.Color = new Color(0.5f, 0.48f, 0.46f) * Mathf.Lerp(0.8f, 1f, ao);
+					k.Cylinder(root - dir * trunkR * 0.2f, P(0.82f), Mathf.Clamp(trunkR * 0.16f, 0.025f, 0.09f), 0.015f, 3, false, 2f);
+				}
+				k.Mat(spray);
+				float w = Mathf.Max(0.5f, L * 0.42f);
+				// the leading spray, carrying on from the limb's end, and the pair off its sides
+				Spray(k, P(0.42f), Dir(0.5f), L * 0.62f, w, rng.RandfRange(-0.3f, 0.3f), sag, new Color(lum, lum, lum));
+				if (L < 1.1f) continue;
+				float lum2 = lum * 0.85f;
+				Vector3 d0 = Dir(0.3f);
+				Spray(k, P(0.22f), (d0 * 0.6f + side * 0.8f).Normalized(), L * 0.5f, w * 0.85f, rng.RandfRange(0.15f, 0.45f), sag, new Color(lum2, lum2, lum2));
+				Spray(k, P(0.22f), (d0 * 0.6f - side * 0.8f).Normalized(), L * 0.5f, w * 0.85f, -rng.RandfRange(0.15f, 0.45f), sag, new Color(lum2, lum2, lum2));
 			}
+			k.Mat(ProcTextures.FirBranchMat);
 		}
-		// leader: two crossed vertical cards at the very top
-		{
-			float lh = Mathf.Max(1.4f, height * 0.09f), lw = lh * 0.35f;
-			Vector3 b = Axis(height * 0.86f), top = Axis(height * 0.86f) + Vector3.Up * lh;
-			k.Color = new Color(0.9f, 0.9f, 0.9f);
-			for (int i = 0; i < 2; i++)
-			{
-				float a = i * Mathf.Pi * 0.5f + seed;
-				Vector3 sd = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * lw;
-				Vector3 nn = new Vector3(-sd.Z, 0, sd.X).Normalized();
-				k.Quad(b - sd, b + sd, top + sd * 0.2f, top - sd * 0.2f, nn,
-					new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
-			}
-		}
-		return k.Commit();
+	}
+
+	/// <summary>One spray of needles (FirSprayMat): a card from <paramref name="at"/> out along <paramref name="d"/>, its tip
+	/// hanging by the bough's sag, rolled <paramref name="roll"/> radians about its length.</summary>
+	internal static void Spray(MeshKit k, Vector3 at, Vector3 d, float len, float w, float roll, float sag, Color col)
+	{
+		d = d.Normalized();
+		Vector3 s = d.Cross(Vector3.Up);
+		s = s.LengthSquared() < 1e-4f ? Vector3.Right : s.Normalized();
+		Vector3 up = s.Cross(d).Normalized();
+		Vector3 sr = s * Mathf.Cos(roll) + up * Mathf.Sin(roll);
+		Vector3 tip = at + d * len + Vector3.Down * len * (0.15f + 0.3f * sag);
+		Vector3 n = (tip - at).Cross(sr).Normalized();
+		if (n.Y < 0) n = -n;
+		k.Color = col;
+		k.Quad(at - sr * w * 0.5f, at + sr * w * 0.5f, tip + sr * w * 0.5f, tip - sr * w * 0.5f, n,
+			new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
 	}
 
 	/// <summary>The root flare (the fidelity pass, 2026-10-02): four to six roots spreading from the trunk's foot, each
@@ -320,7 +360,7 @@ public partial class ForestScatter : Node3D
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 104729) };
 		var k = new MeshKit();
-		k.Color = new Color(0.75f, 0.72f, 0.68f);
+		k.Color = new Color(0.6f, 0.58f, 0.55f);   // (2026-10-13: was 0.75, with the bark's tint since lifted)
 		float lean = rng.RandfRange(-0.25f, 0.25f);
 		Vector3 top = new(lean, 4.2f, rng.RandfRange(-0.2f, 0.2f));
 		k.Mat(ProcTextures.TreeBarkMat);
@@ -363,11 +403,12 @@ public partial class ForestScatter : Node3D
 		// one smooth trunk from its flare in the ground, bleached higher up where the bark is sloughing off
 		TrunkLoft(k, new System.Collections.Generic.List<(Vector3, float, Color)>
 		{
-			(new Vector3(0, -0.4f, 0), r * 1.5f, new Color(0.7f, 0.7f, 0.7f)), (new Vector3(0, 0.0f, 0), r * 1.3f, new Color(0.72f, 0.72f, 0.72f)),
-			(new Vector3(0, 0.4f, 0), r * 1.1f, new Color(0.72f, 0.72f, 0.72f)), (top * 0.5f, r * 0.7f, new Color(0.8f, 0.8f, 0.78f)),
-			(top, r * 0.25f, new Color(0.9f, 0.9f, 0.88f)),
+			// (2026-10-13: darker, 0.7 to 0.9 before: the bleached tops read as pale paper columns in the shade)
+			(new Vector3(0, -0.4f, 0), r * 1.5f, new Color(0.56f, 0.55f, 0.54f)), (new Vector3(0, 0.0f, 0), r * 1.3f, new Color(0.58f, 0.57f, 0.56f)),
+			(new Vector3(0, 0.4f, 0), r * 1.1f, new Color(0.58f, 0.57f, 0.56f)), (top * 0.5f, r * 0.7f, new Color(0.62f, 0.61f, 0.59f)),
+			(top, r * 0.25f, new Color(0.66f, 0.65f, 0.62f)),
 		}, 10, 1f);
-		Roots(k, r * 1.3f, seed, new Color(0.7f, 0.7f, 0.7f));
+		Roots(k, r * 1.3f, seed, new Color(0.56f, 0.55f, 0.54f));
 		k.Color = new Color(0.62f, 0.6f, 0.56f);
 		k.Mat(ProcTextures.TreeEndGrainMat).Cylinder(top, top + new Vector3(0.05f, 0.08f, 0), r * 0.25f, 0.02f, 6, false, 1f);   // broken top
 		k.Mat(ProcTextures.TreeBarkMat);

@@ -19,6 +19,11 @@ uniform float mip_boost = 0.35;
 uniform vec2 tex_size = vec2(64.0, 64.0);
 /// Extra darkening of the back (under) side of cards.
 uniform float back_shade = 0.0;
+/// (2026-10-13, the trees "like paper") depth in a crown: the ambient falls off toward a card's root (UV.y = 1, in by
+/// the trunk, under the boughs above) so the tiers read as layered masses, not flat cut-outs one tone through.
+uniform float inner_ao = 0.0;
+/// Sun through the needles (seen from beneath against a lit sky, the boughs glow a little instead of going to black).
+uniform float translucency = 0.0;
 global uniform float winter;
 
 void vertex() {
@@ -49,4 +54,9 @@ void fragment() {
 	ALPHA = a;
 	ALPHA_SCISSOR_THRESHOLD = alpha_cut;
 	ROUGHNESS = 1.0;
+	if (inner_ao > 0.0) {
+		AO = 1.0 - inner_ao * smoothstep(0.15, 1.0, UV.y);
+		AO_LIGHT_AFFECT = 0.25;
+	}
+	if (translucency > 0.0) BACKLIGHT = ALBEDO * translucency;
 }

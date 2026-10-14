@@ -109,7 +109,7 @@ public partial class PlayerFootsteps : Node
 		if (set.Length == 0) return;
 		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.9f, 1.04f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
-			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.9f, 1.1f));
+			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.95f, 1.05f));
 		StepsPlayed++;
 		EmitSignal(SignalName.Stepped);
 	}
@@ -123,9 +123,11 @@ public partial class PlayerFootsteps : Node
 		if (set.Length == 0) return;
 
 		float loudness = Mathf.Remap(Mathf.Clamp(speed, 1f, 5f), 1f, 5f, -2f, 3f) + CrouchQuietDb * _player.CrouchAmount + (deep ? -1.5f : 0f);
-		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.92f, 1.08f));
+		// (2026-10-13, the "bouncy" sweep: +-8 % put each step on a different note; the takes and the no-repeat picker carry
+		// the variety, the pitch only a hair)
+		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.965f, 1.035f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
-			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.9f, 1.1f));
+			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.95f, 1.05f));
 		StepsPlayed++;
 		EmitSignal(SignalName.Stepped);
 	}

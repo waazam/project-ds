@@ -259,6 +259,26 @@ def chain(name, pts, radii, subdiv=1):
     return skin_tree(name, pts, [(i - 1, i) for i in range(1, len(pts))], radii, None, subdiv=subdiv)
 
 
+def talon(name, tip, d, curl, length, r0, turn=1.25, segs=7):
+    """A hooked talon (2026-10-13, the owner: hands "more claw like"): rooted inside the fingertip, out along the
+    finger's line `d`, curving ever harder toward `curl` (the palm side) through `turn` radians, thick at the root and
+    drawn to a needle point. Shared by the stalker and the crawler (they import this file)."""
+    d = d.normalized()
+    c = (curl - d * curl.dot(d)).normalized()
+    pts, radii = [tip - d * length * 0.22], [r0 * 1.1]
+    cur, step = tip - d * length * 0.06, length / segs
+    pts.append(cur)
+    radii.append(r0)
+    for i in range(1, segs + 1):
+        t = i / segs
+        a = turn * t * t
+        dirv = (d * math.cos(a) + c * math.sin(a)).normalized()
+        cur = cur + dirv * step
+        pts.append(cur)
+        radii.append(max(r0 * (1.0 - t) ** 0.9, r0 * 0.04))
+    return chain(name, pts, radii)
+
+
 def ribs_curves():
     """Ten ribs a side: (side, index, the curve's points along the torso's surface)."""
     out = []
@@ -302,12 +322,17 @@ def build_flesh(m):
             parts.append(chain(f"Sinew{s}{k}", [el.lerp(wr, 0.12) + off * 1.3, el.lerp(wr, 0.55) + off * 1.05, wr.lerp(el, 0.06) + off * 0.6], [0.012, 0.011, 0.008]))
         # the hand: the palm's body, then the fingers and thumb with their knuckles
         parts.append(lumpy_sphere(f"Palm{s}", wr.lerp(J["palm"], 0.55), (0.028, 0.085, 0.115), None, 14 + s, amp=0.04, subdiv=3))
+        # (2026-10-13) bonier: the knuckles stand out of the back of the hand (+s X: the palm faces in), the tendons run
+        # from the wrist to each of them under the skin, the fingers thin to the claws
+        dorsal = V((s, 0, 0))
         for k, pts in enumerate(finger_chains(s, J["palm"], wr)):
             thumb = k == 4
-            r = [0.024, 0.02, 0.017, 0.014] if not thumb else [0.028, 0.022, 0.018, 0.015]
+            r = [0.024, 0.0185, 0.015, 0.0115] if not thumb else [0.028, 0.021, 0.017, 0.013]
             parts.append(chain(f"Finger{s}_{k}", [J["palm"].lerp(pts[0], 0.4) if not thumb else wr.lerp(J["palm"], 0.3)] + pts, [r[0]] + r))
             for jj, q in enumerate(pts[:-1]):
-                parts.append(lumpy_sphere(f"Knuckle{s}_{k}_{jj}", q, (r[jj] * 1.12, r[jj] * 1.12, r[jj] * 1.2), None, 100 + k * 5 + jj, amp=0.08, subdiv=2))
+                parts.append(lumpy_sphere(f"Knuckle{s}_{k}_{jj}", q + dorsal * r[jj] * 0.35, (r[jj] * 1.38, r[jj] * 1.3, r[jj] * 1.42), None, 100 + k * 5 + jj, amp=0.1, subdiv=2))
+            if not thumb:
+                parts.append(chain(f"HandTendon{s}_{k}", [wr + dorsal * 0.02, wr.lerp(pts[0], 0.5) + dorsal * 0.026, pts[0] + dorsal * 0.018], [0.009, 0.0105, 0.012]))
         # the legs, a deer's: the knee forward, the hock back and up, the long foot to the ball, three toes
         L = leg_joints(s)
         hp, kn, hk, bl = L["hip"], L["knee"], L["hock"], L["ball"]
@@ -474,12 +499,8 @@ def build_parts(m):
         for k, pts in enumerate(finger_chains(s, J["palm"], J["wrist"])):
             tip, prev = pts[-1], pts[-2]
             d = (tip - prev).normalized()
-            hook = (d + V((-s, 0, 0)) * 0.6).normalized()
-            L = 0.11 if k < 4 else 0.08
-            a = tip - d * 0.01
-            b = a + d * L * 0.5 + hook * L * 0.15
-            c2 = b + hook * L * 0.6
-            ob = chain(f"Claw{s}_{k}", [a, b, c2], [0.014, 0.009, 0.0015])
+            # (2026-10-13) long black talons hooked hard in toward the palm (they were short straight cones)
+            ob = talon(f"Claw{s}_{k}", tip, d, V((-s, 0, 0)), 0.17 if k < 4 else 0.13, 0.0125)
             ob.data.materials.append(m["claw"])
             add(ob, f"f{k}_3_{'R' if s > 0 else 'L'}")
         L = leg_joints(s)
@@ -1281,12 +1302,15 @@ def build_arm():
     p = lumpy_sphere("Palm", (0, 0, 0), (0.12, 0.09, 0.032), None, 4, amp=0.04, subdiv=3)
     p.location = pc
     parts.append(p)
+    up = V((0, 0, 1))   # the back of the hand (it lies palm down)
     for k, pts in enumerate(fing):
         thumb = k == 4
-        r = [0.026, 0.022, 0.019, 0.015] if not thumb else [0.03, 0.024, 0.02, 0.016]
+        r = [0.026, 0.0205, 0.017, 0.013] if not thumb else [0.03, 0.023, 0.019, 0.015]
         parts.append(chain(f"Finger{k}", [palm.lerp(pts[0], 0.4) if not thumb else wr.lerp(palm, 0.3)] + pts, [r[0]] + r))
         for j, q in enumerate(pts[:-1]):
-            parts.append(lumpy_sphere(f"Knuckle{k}_{j}", q, (r[j] * 1.25,) * 3, None, 100 + k * 5 + j, amp=0.06, subdiv=2))
+            parts.append(lumpy_sphere(f"Knuckle{k}_{j}", q + up * r[j] * 0.35, (r[j] * 1.4, r[j] * 1.35, r[j] * 1.42), None, 100 + k * 5 + j, amp=0.1, subdiv=2))
+        if not thumb:
+            parts.append(chain(f"HandTendon{k}", [wr + up * 0.024, wr.lerp(pts[0], 0.5) + up * 0.03, pts[0] + up * 0.02], [0.009, 0.011, 0.012]))
     flesh = join(parts, "ArmFlesh")
     add_mod(flesh, "REMESH", mode="VOXEL", voxel_size=0.008, adaptivity=0.0)
     apply_mods(flesh)
@@ -1313,11 +1337,7 @@ def build_arm():
     for k, pts in enumerate(fing):
         tip, prev = pts[-1], pts[-2]
         d = (tip - prev).normalized()
-        hook = (d + V((0, 0, -1)) * 0.6).normalized()
-        L = 0.11 if k < 4 else 0.08
-        a = tip - d * 0.01
-        b = a + d * L * 0.5 + hook * L * 0.15
-        c = chain(f"Claw{k}", [a, b, b + hook * L * 0.6], [0.014, 0.009, 0.0015])
+        c = talon(f"Claw{k}", tip, d, V((0, 0, -1)), 0.17 if k < 4 else 0.13, 0.0135)
         c.data.materials.append(m["claw"])
         paint(c, flat_colour((0.012, 0.012, 0.016)))
         detail_attr(c, 0.1)

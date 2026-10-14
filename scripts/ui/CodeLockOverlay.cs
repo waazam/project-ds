@@ -35,10 +35,6 @@ public partial class CodeLockOverlay : CanvasLayer
 	private bool _closing;
 	private float _shake;
 	private AudioStreamPlayer _clunk;
-	private Label _tracker;
-	private double _trackerPoll;
-	/// <summary>For tests: the corner tracker's text ("STATION 3   4 _ 2 _"), empty while hidden.</summary>
-	public string TrackerText => _tracker is { Visible: true } ? _tracker.Text : "";
 
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
@@ -104,15 +100,6 @@ public partial class CodeLockOverlay : CanvasLayer
 
 		_clunk = new AudioStreamPlayer { Bus = "Events", VolumeDb = -14f };
 		AddChild(_clunk);
-		// The tracker: the digits found so far, top right, from the first one until the door is open (Dan, 2026-09-22).
-		_tracker = new Label { Text = "", HorizontalAlignment = HorizontalAlignment.Right, MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
-		_tracker.AddThemeFontOverride("font", UiKit.MonoSpaced);
-		_tracker.AddThemeFontSizeOverride("font_size", 10);
-		_tracker.AddThemeColorOverride("font_color", new Color(0.72f, 0.7f, 0.62f));
-		_tracker.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.7f));
-		_tracker.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-		_tracker.OffsetLeft = -260; _tracker.OffsetRight = -14; _tracker.OffsetTop = 12; _tracker.OffsetBottom = 30;
-		AddChild(_tracker);
 		Paint();
 	}
 
@@ -123,16 +110,10 @@ public partial class CodeLockOverlay : CanvasLayer
 		_code = code ?? "";
 		_onSuccess = onSuccess;
 		_player = player;
-		// Pre-filled with the digits found on the way; the cursor sits on the first unknown wheel.
-		string known = (GetTree().GetFirstNodeInGroup("survey_lot") as SurveyLot)?.Known ?? "";
-		_cursor = -1;
-		for (int i = 0; i < Wheels; i++)
-		{
-			char c = i < known.Length ? known[i] : '_';
-			_digits[i] = char.IsDigit(c) ? c : '0';
-			if (_cursor < 0 && !char.IsDigit(c)) _cursor = i;
-		}
-		if (_cursor < 0) _cursor = 0;
+		// (2026-10-13, the owner: "the player should have to remember themselves") the wheels start at nought every time: the
+		// code is entered from memory, never filled in from the digits found
+		for (int i = 0; i < Wheels; i++) _digits[i] = '0';
+		_cursor = 0;
 		_closing = false;
 		_player?.PlayerInput.BeginModal();
 		_root.Visible = true;
@@ -211,7 +192,6 @@ public partial class CodeLockOverlay : CanvasLayer
 
 	public override void _Process(double delta)
 	{
-		if ((_trackerPoll -= delta) <= 0) { _trackerPoll = 0.4; UpdateTracker(); }
 		if (!IsOpen) return;
 		if (_player != null && (!IsInstanceValid(_player) || !_player.PlayerInput.Enabled)) { Close(); return; }
 		if (_shake > 0f)
@@ -249,17 +229,5 @@ public partial class CodeLockOverlay : CanvasLayer
 		cell.Scale = new Vector2(1f, 0.45f);
 		var tw = cell.CreateTween();
 		tw.TweenProperty(cell, "scale", Vector2.One, 0.12f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
-	}
-
-	/// <summary>"STATION 3   4 _ 2 _": shown once the first digit is found, until the door is open.</summary>
-	private void UpdateTracker()
-	{
-		if (_tracker == null) return;
-		var lot = GetTree().GetFirstNodeInGroup("survey_lot") as SurveyLot;
-		var s = StoryManager.Instance;
-		// From the moment the camp note is read (it says: a bunker, a steel door, four numbers) until the door is open.
-		bool show = lot != null && s != null && (lot.ReadCount > 0 || s.HasFlag(Camp.NoteReadFlag)) && !s.HasFlag(StoryManager.Flag.BunkerUnlocked) && s.Current < Checkpoint.Act8BunkerEntered;
-		_tracker.Visible = show;
-		if (show) _tracker.Text = "CODE  " + string.Join(" ", lot.Known.ToCharArray());
 	}
 }

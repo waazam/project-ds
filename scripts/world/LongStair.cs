@@ -12,8 +12,8 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// Act 21's first half (the owner's "Real Act 21"): from the little room at the top of the round room's
-/// shaft, one long straight staircase up through the rock to the surface: about three minutes at a
-/// sprint, longer at a walk (52 flights of 32 steps, a landing between each, about 300 m of climb).
+/// shaft, one long straight staircase up through the rock to the surface: about a minute and a half at a
+/// walk, under a minute at a sprint (16 flights of 32 steps, a landing between each, about 92 m of climb).
 /// It starts as bare poured concrete with caged bulbs and a steel rail; somewhere past a quarter of the
 /// way up timber starts to appear (a shoring frame, a patch of planking on the wall, a board laid over a
 /// broken tread) and, very slowly, over the middle of the climb, the wood takes over, until the last
@@ -26,7 +26,10 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class LongStair : Node3D
 {
-	public const int Flights = 52, StepsPerFlight = 32;
+	/// <summary>(2026-09-27: 70, then 52, "nearer four minutes than three at a sprint"; 2026-10-13, the owner, "some of the
+	/// hallways and staircases are way too long": 16, about a minute and a half at a walk, under a minute at a sprint. The
+	/// church and everything past it hang off the top, so they come down and nearer with it.)</summary>
+	public const int Flights = 16, StepsPerFlight = 32;
 	public const float Rise = 0.18f, Run = 0.28f, Landing = 2.2f, TopLanding = 3.2f;
 	public const float HalfW = 1.0f, Head = 2.6f, WallT = 0.3f;
 	public const float StartZ = RoundRoom.TopR + 0.8f;

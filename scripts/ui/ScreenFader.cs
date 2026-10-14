@@ -128,6 +128,7 @@ public partial class ScreenFader : CanvasLayer
 		double t = 0;
 		while (t < hold)
 		{
+			if (!IsInsideTree()) return;   // (a level change mid-caption, as Own() already allows for)
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 			if (!Owns(slot, gen, ct)) return;
 			if (CanProcess()) t += GetProcessDeltaTime();
@@ -166,6 +167,7 @@ public partial class ScreenFader : CanvasLayer
 	{
 		while (IsInstanceValid(tween) && tween.IsValid())
 		{
+			if (!IsInsideTree()) return;
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 			if (!ct.IsCancellationRequested) continue;
 			if (IsInstanceValid(tween) && tween.IsValid()) tween.Kill();

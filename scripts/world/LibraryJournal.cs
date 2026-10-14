@@ -53,7 +53,7 @@ public partial class Library
 		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.14f, 0.022f, 0.2f) }, Position = new Vector3(0.006f, 0, 0), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.76f, 0.6f), Roughness = 0.9f } });
 		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.155f, 0.03f, 0.018f) }, Position = new Vector3(0, 0, 0.03f), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.08f, 0.05f), Roughness = 0.6f } });
 		// what the blacklight shows: a hand on the cover, and "READ" on the shelf's back above it
-		UvInk.OnSurface(book, new Vector3(-0.005f, 0.014f, -0.015f), Vector3.Up, new Vector2(0.12f, 0.15f), UvInk.Hand(), UvInk.Pale, 2f, 0.3f);
+		UvInk.OnSurface(book, new Vector3(-0.005f, 0.014f, -0.015f), Vector3.Up, new Vector2(0.12f, 0.15f), UvInk.Hand(HandKind.Pressed, 5), UvInk.Pale, 2f, 0.3f, false, true, 0.02f);
 		UvInk.Write(this, new Vector3(-HalfW + 0.022f, 1.66f, JournalZ), Vector3.Right, "READ", 0.26f, UvInk.Cyan);
 		Journal = new Readable
 		{

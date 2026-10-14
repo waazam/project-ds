@@ -96,6 +96,7 @@ public partial class Act6ClearingEvent : Node3D
 	private bool _loopArmed;      // the voice has spoken: any whole flight starts the loop
 	private bool _loopStarted;    // a flight was chosen: the light and the compass follow the legs
 	private bool _loopBusy;       // a blink or the fall is playing
+	private bool _falling;        // the fall is playing: it drives the view's roll itself
 	private bool _loopDone;
 	private bool _calling;        // the voice calls out of the trees (from the clearing's edge until the fall)
 	private int _loopClimbs;      // planned flights this run (4 to 6)
@@ -300,6 +301,8 @@ public partial class Act6ClearingEvent : Node3D
 		// Dressing that was never attached would otherwise outlive the level.
 		FreeIfDetached(ref _stand);
 		FreeIfDetached(ref _lights);
+		foreach (var n in _pendingAttach) if (IsInstanceValid(n) && n.GetParent() == null) n.Free();
+		_pendingAttach.Clear();
 	}
 
 	private static void FreeIfDetached(ref Node3D n)
@@ -344,7 +347,12 @@ public partial class Act6ClearingEvent : Node3D
 		}
 	}
 
-	private void OnFlag(string _) => TryReveal();
+	private void OnFlag(string flag)
+	{
+		// The cap taken: watch for the cabin door (the spawn, PollSpawn).
+		if (flag == StoryManager.Flag.NewelPostTaken && !_spawned && !_loopDone) SetProcess(true);
+		TryReveal();
+	}
 
 	private void TryReveal()
 	{
@@ -356,7 +364,14 @@ public partial class Act6ClearingEvent : Node3D
 	private void Restore()
 	{
 		var s = StoryManager.Instance;
-		if (!StoryBeat.Act6Revealed(s)) return;
+		if (!StoryBeat.Act6Revealed(s))
+		{
+			// The cap taken, the bridge not yet crossed: the clearing stands already (the slam isn't saved, so on a
+			// Continue the door is open: it all goes up at once, under the load).
+			if (s is { NewelPostTaken: true } && !s.HasFlag(StoryManager.Flag.ClearingLoopDone) && s.Current < Checkpoint.Act7CabinBurning)
+				Spawn(staggered: false);
+			return;
+		}
 		_voiceFired = s.ClearingVoiceHeard;
 		_loopDone = s.HasFlag(StoryManager.Flag.ClearingLoopDone);
 		if (_loopDone)
@@ -398,13 +413,12 @@ public partial class Act6ClearingEvent : Node3D
 	{
 		_revealed = true;
 		_player ??= StoryBeat.Player(this);
-		PrepareDressing();
+		// The stairs, the ring and the blood rain are normally already there (spawned as the cabin door opened);
+		// a Continue past the bridge, or a preview, puts them up here at once.
+		if (!_spawned) Spawn(staggered: false);
+		else FinishSpawn();
 		// Continue applies the saved mood itself (GameFlow); only a live reveal fades to it.
 		if (!restoring) StoryBeat.SetMood(this, ForestAtmosphere.Mood.Menacing, 14f);
-		_dressing?.Reveal(GlobalPosition, FenceRadius + 20f);
-		if (_stand.GetParent() == null) AddChild(_stand);
-		if (_lights.GetParent() == null) AddChild(_lights);
-		BuildFence();
 		// Thick with fog from here on (Dan, 2026-09-22): the far stairs are grey shapes in it.
 		if (!_loopDone) StoryBeat.Atmosphere(this)?.SetHeightFog(GlobalPosition.Y + 1.0f, ClearingFogDensity, restoring ? 0.1f : 12f);
 		// "Come up and see" starts the moment the stairs load in (Dan, 2026-09-22): the reveal itself calls, no
@@ -419,6 +433,121 @@ public partial class Act6ClearingEvent : Node3D
 			_voiceZone.GlobalPosition = GlobalPosition;
 		}
 		if (!restoring) GD.Print("[story] Act 6: the woods around the clearing turn");
+	}
+
+	// ------------------------------------------------------------------ the spawn (the cabin door)
+
+	private bool _spawned, _sawReopen;
+	private Cabin _cabin;
+	private Node3D _bridge;
+	private readonly List<Node> _pendingAttach = new();
+	private bool _pendingDressing, _pendingLights, _pendingFence;
+
+	/// <summary>For tests: the clearing's stairs, ring and blood rain are in the world (from the cabin door on).</summary>
+	public bool Spawned => _spawned;
+	/// <summary>For tests: how much of the blood rain reaches the player where they stand (0 by the cabin, 1 past the bridge).</summary>
+	public float BloodPresence { get; private set; }
+
+	/// <summary>
+	/// Dan, 2026-10-13: "the rain and everything should spawn in when you open the cabin door to leave, but the
+	/// player won't see all the blood rain till he's over the bridge." With the cap in hand, the moment the slammed
+	/// door is opened again (or, with no slam to undo, on a Continue with the cap taken, at once) the woods' giants,
+	/// the clearing's fifteen stairs, its lights and its ring of deadfall go into the world (a piece a frame, so
+	/// there's no hitch) and the blood rain begins, unseen by the cabin and coming in along the way to the bridge
+	/// (<see cref="UpdateBloodPresence"/>). The clearing's turn (the menace, the fog, the voice) stays at the bridge.
+	/// </summary>
+	private void PollSpawn()
+	{
+		if (_spawned || _loopDone) return;
+		var s = StoryManager.Instance;
+		if (s is not { NewelPostTaken: true } || s.HasFlag(StoryManager.Flag.ClearingLoopDone) || s.Current >= Checkpoint.Act7CabinBurning) return;
+		_cabin ??= GetTree().GetFirstNodeInGroup("cabin") as Cabin;
+		if (_cabin != null && IsInstanceValid(_cabin) && _cabin.SlammedShut)
+		{
+			// Shut behind them: wait for E to open it again (the E-point comes 0.2 s after the slam and goes once used).
+			if (_cabin.DoorReopen != null) { _sawReopen = true; return; }
+			if (!_sawReopen) return;
+		}
+		Spawn(staggered: true);
+	}
+
+	private void Spawn(bool staggered)
+	{
+		if (_spawned) { FinishSpawn(); return; }
+		_spawned = true;
+		_player ??= StoryBeat.Player(this);
+		PrepareDressing();
+		_pendingDressing = _pendingLights = _pendingFence = true;
+		if (_stand.GetParent() == null)
+		{
+			// The stand goes in empty and its stairs follow it, a few a frame.
+			foreach (var child in _stand.GetChildren()) { _stand.RemoveChild(child); _pendingAttach.Add(child); }
+			AddChild(_stand);
+		}
+		if (staggered) _ = Cutscene.Run(this, SpawnOverFrames);
+		else FinishSpawn();
+		StartBlood();
+		UpdateBloodPresence();
+		SetProcess(true);
+		GD.Print($"[story] Act 6: the clearing's stairs, the ring and the blood rain spawn{(staggered ? " (the cabin door opened)" : "")}");
+	}
+
+	private async Task SpawnOverFrames(CancellationToken ct)
+	{
+		await Cutscene.Frame(this, ct);
+		if (_pendingDressing) { _pendingDressing = false; _dressing?.Reveal(GlobalPosition, FenceRadius + 20f); }
+		await Cutscene.Frame(this, ct);
+		if (_pendingLights) { _pendingLights = false; if (_lights != null && _lights.GetParent() == null) AddChild(_lights); }
+		while (_pendingAttach.Count > 0)
+		{
+			await Cutscene.Frame(this, ct);
+			for (int i = 0; i < 2 && _pendingAttach.Count > 0; i++) AttachNext();
+		}
+		await Cutscene.Frame(this, ct);
+		if (_pendingFence) { _pendingFence = false; BuildFence(); }
+	}
+
+	private void AttachNext()
+	{
+		var n = _pendingAttach[0];
+		_pendingAttach.RemoveAt(0);
+		if (IsInstanceValid(n) && _stand != null && IsInstanceValid(_stand) && n.GetParent() == null) _stand.AddChild(n);
+	}
+
+	/// <summary>Whatever of the spawn is still waiting goes in now.</summary>
+	private void FinishSpawn()
+	{
+		if (_pendingDressing) { _pendingDressing = false; _dressing?.Reveal(GlobalPosition, FenceRadius + 20f); }
+		if (_pendingLights) { _pendingLights = false; if (_lights != null && _lights.GetParent() == null) AddChild(_lights); }
+		while (_pendingAttach.Count > 0) AttachNext();
+		if (_pendingFence) { _pendingFence = false; BuildFence(); }
+	}
+
+	/// <summary>
+	/// The blood rain is falling from the cabin door on, but it is only really seen past the bridge: by the cabin
+	/// none of it reaches them (no drops, no sound, no red in the fog), and it comes in over the way to the bridge,
+	/// all of it there (the loop's own rise, a few drops to heavy, goes on from that).
+	/// </summary>
+	private void UpdateBloodPresence()
+	{
+		if (_blood == null || !IsInstanceValid(_blood)) return;
+		float p = 1f;
+		var s = StoryManager.Instance;
+		if (s != null && s.Current < Checkpoint.Act6BridgeCrossed && _player != null && IsInstanceValid(_player))
+		{
+			_cabin ??= GetTree().GetFirstNodeInGroup("cabin") as Cabin;
+			_bridge ??= GetTree().GetFirstNodeInGroup("bridge_marker") as Node3D;
+			if (_cabin != null && _bridge != null && IsInstanceValid(_cabin) && IsInstanceValid(_bridge))
+			{
+				Vector2 at = new(_player.GlobalPosition.X, _player.GlobalPosition.Z);
+				float dc = at.DistanceTo(new Vector2(_cabin.GlobalPosition.X, _cabin.GlobalPosition.Z));
+				float db = at.DistanceTo(new Vector2(_bridge.GlobalPosition.X, _bridge.GlobalPosition.Z));
+				float along = dc / Mathf.Max(0.01f, dc + db);   // 0 at the cabin, 1 at the bridge
+				p = Mathf.SmoothStep(0.25f, 1f, along);
+			}
+		}
+		BloodPresence = p;
+		_blood.Presence = p;
 	}
 
 	private void OnVoiceZoneEntered(PlayerController player)
@@ -758,7 +887,7 @@ public partial class Act6ClearingEvent : Node3D
 	{
 		if (_calling || _loopDone) return;
 		_calling = true;
-		StartBlood();   // the blood rain starts with the calling, as soon as the stairs load in (Dan, 2026-09-22)
+		StartBlood();   // (normally already falling: it starts as the cabin door opens, Spawn; a Continue past the bridge starts it here)
 		_ = Cutscene.Run(this, LoopVoices);
 		GD.Print("[story] Act 6: the voice starts calling out of the trees");
 	}
@@ -936,6 +1065,7 @@ public partial class Act6ClearingEvent : Node3D
 		_blood = new BloodRain { Name = "BloodRain", Follow = _player };
 		AddChild(_blood);
 		_blood.Intensity = 0.12f;
+		UpdateBloodPresence();   // (from the cabin door: none of it reaches them there yet)
 		_blood.Start();
 	}
 
@@ -1071,7 +1201,7 @@ public partial class Act6ClearingEvent : Node3D
 			{
 				var tw = CreateTween().SetParallel();
 				tw.TweenProperty(rig, "FovSwim", 0f, 1.2f).SetTrans(Tween.TransitionType.Sine);
-				tw.TweenProperty(rig, "RollSwim", 0f, 1.2f).SetTrans(Tween.TransitionType.Sine);
+				if (!_falling) tw.TweenProperty(rig, "RollSwim", 0f, 1.2f).SetTrans(Tween.TransitionType.Sine);   // (the fall eases the roll off itself)
 			}
 			if (humNode != null && IsInstanceValid(humNode)) humNode.PitchScale = 1f;
 			if (_blood != null && IsInstanceValid(_blood)) _blood.TintPulse = 1f;
@@ -1100,66 +1230,24 @@ public partial class Act6ClearingEvent : Node3D
 			DetachOneWay();
 			var hum = Audio.StairsHum.Instance;
 			hum?.SetOverrideDb(hum.MaxDb);
-			// Smooth, not snappy (Dan, 2026-09-22): no lurch. A slow forward stumble off the back edge along a gentle
-			// arc over 1.4-1.8 s, the view pitching down slowly, and the black coming in over the last 0.6 s of the
-			// drop rather than at the impact; a soft body thump as it lands in the dark.
+			// Smooth, not snappy (Dan, 2026-09-22): no jolt. Rebuilt 2026-10-13 (Dan: "looks funky, like he falls through
+			// the top": the old tweens all ran at once, so the drop began at the front of the landing and the eye sank
+			// down through the stone). Now one path in three parts, planned ahead and swept against the world: a stumble to
+			// the edge, gathering pace, as the landing sags under them; a tip over it, the body pivoting on the edge (or on
+			// a side wall's coping) so the view goes over and down onto the drop; and the drop itself, falling free from
+			// there with a slow roll. The black comes in over the last 0.6 s of it; a soft body thump in the dark.
 			StoryBeat.PlayAt(this, "res://assets/audio/sfx/breath_in_02.wav", "Events", Vector3.Zero, -8f, pitch: 0.9f);
+			_falling = true;
 			StopDaze();
-			Vector3 start = _player.GlobalPosition;
-			// Two phases, so the body never passes through the stone (Dan, 2026-09-22: it looked like falling THROUGH the
-			// stairs): first a stumble straight off the landing's back edge at landing height, well clear of the flight's
-			// back wall (1.8 m beyond BackZ, in the flight's own -Z, away from the treads), then the drop from there. If the
-			// ground behind is higher than the landing (a slope), the edge is taken off the SIDE of the landing instead.
-			float landingY = from.ToGlobal(new Vector3(0, from.TotalHeight, from.BackZ)).Y;
-			Vector3 edge = from.ToGlobal(new Vector3(0, from.TotalHeight, from.BackZ - 1.8f));
-			float groundBehind = terrain?.HeightAt(edge.X, edge.Z) ?? (landingY - from.TotalHeight * from.Scale.Y);
-			if (groundBehind > landingY - 1.5f)
-			{
-				float side = _rng.Randf() < 0.5f ? -1f : 1f;
-				edge = from.ToGlobal(new Vector3(side * (from.Width * 0.5f + 2.2f), from.TotalHeight, (from.TopFrontZ + from.BackZ) * 0.5f));
-				groundBehind = terrain?.HeightAt(edge.X, edge.Z) ?? groundBehind;
-			}
-			edge.Y = start.Y;   // the stumble stays at the landing's height until the edge
-			Vector3 land = new(edge.X, groundBehind + 0.1f, edge.Z);
-			float drop = Mathf.Max(1f, start.Y - land.Y);
-			float stumble = 0.55f;
-			float seconds = Mathf.Clamp(0.9f + 0.18f * drop, 1.4f, 1.8f);
-			FallClearOfFlight = from.ToLocal(land).Z < from.BackZ - 1.0f || Mathf.Abs(from.ToLocal(land).X) > from.Width * 0.5f + 1.0f;
-			var t = CreateTween();
-			t.SetParallel();
-			t.TweenProperty(_player, "global_position:x", edge.X, stumble).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-			t.TweenProperty(_player, "global_position:z", edge.Z, stumble).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-			t.Chain();
-			t.SetParallel();
-			// Off the edge: the drop, drifting a last half metre outward as it goes.
-			Vector3 drift = (land - start); drift.Y = 0;
-			drift = drift.Length() > 0.01f ? drift.Normalized() * 0.5f : Vector3.Zero;
-			t.TweenProperty(_player, "global_position:x", land.X + drift.X, seconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-			t.TweenProperty(_player, "global_position:z", land.Z + drift.Z, seconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
-			t.TweenProperty(_player, "global_position:y", land.Y, seconds).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
-			seconds += stumble;   // the timers below cover the whole thing
+			var plan = PlanFall(from, terrain);
+			FallClearOfFlight = plan.ClearOfFlight;
+			GD.Print($"[story] Act 6: the fall goes off the {plan.Side} of {from.Name}: {plan.Duration:0.00} s (the tip at {plan.TipAt * FallStep:0.00} s, the drop at {plan.DropAt * FallStep:0.00} s), {plan.Drop:0.0} m, eye path {(plan.Hit < 0 ? "clear" : $"BLOCKED at {plan.Hit * FallStep:0.00} s")}");
 			_ = Cutscene.Run(this, async ct2 =>
 			{
-				// The view tips forward and down about 18 degrees over the whole drop, on a sine, no yaw, no roll.
-				double elapsed = 0, total = seconds;
-				float applied = 0f;
-				while (elapsed < total && IsInstanceValid(_player))
-				{
-					float dt = (float)GetProcessDeltaTime();
-					elapsed += dt;
-					float want = -Mathf.DegToRad(18f) * Mathf.Sin(0.5f * Mathf.Pi * Mathf.Clamp((float)(elapsed / total), 0f, 1f));
-					_player.PlayerInput?.AddCutsceneLook(new Vector2(0f, want - applied));
-					applied = want;
-					await Cutscene.Frame(this, ct2);
-				}
-			});
-			_ = Cutscene.Run(this, async ct2 =>
-			{
-				// The black comes in over the last 0.6 s of the drop.
-				await Cutscene.Wait(this, Mathf.Max(0f, seconds - 0.6f), ct2);
+				await Cutscene.Wait(this, Mathf.Max(0f, plan.Duration - 0.6f), ct2);
 				if (fader != null) await fader.Fade(1f, 0.6f, ct2);
 			});
-			await Cutscene.Tween(this, t, ct);
+			await PlayFall(plan, ct);
 			if (fader != null && fader.BlackAlpha < 0.99f) await fader.Fade(1f, 0.1f, ct);
 			// Landing in the dark: a proper body thump, flat at the ear, and the breath going out of them.
 			PlayFlat($"res://assets/audio/sfx/body_thump_{_rng.RandiRange(1, 2):00}.wav", 8f);
@@ -1184,6 +1272,9 @@ public partial class Act6ClearingEvent : Node3D
 				wake.Y = terrain.HeightAt(wake.X, wake.Z) + 0.2f;
 				_player.Teleport(wake, Mathf.Atan2(-tan.X, -tan.Z));
 			}
+			// (the fall left the view tipped down and rolled: they wake looking along the trail, level)
+			if (_player?.CameraRig is { } wokeRig) { wokeRig.SetPitch(Mathf.DegToRad(-6f)); wokeRig.RollSwim = 0f; }
+			ShowBody();
 			// Behind the black: the stairs were never there. Forest over the clearing and the way back; a light far off.
 			ResetWorld(restoring: false);
 			var atmo = StoryBeat.Atmosphere(this);
@@ -1195,11 +1286,275 @@ public partial class Act6ClearingEvent : Node3D
 			atmo?.SetHeightFog(wake.Y - 4f, 0.03f, WakeFogClearSeconds);
 			GD.Print("[story] Act 6: woke on the trail; night, fog");
 		}
-		finally { _loopBusy = false; }
+		finally { _loopBusy = false; _falling = false; ShowBody(); }
 	}
 
 	/// <summary>For tests: the fall's landing point lay clear of the flight (behind its back wall or off its side).</summary>
 	public bool FallClearOfFlight { get; private set; }
+	/// <summary>For tests: the fall's planned eye path met nothing on the way down (swept against the world's collision).</summary>
+	public bool FallPathClear { get; private set; }
+
+	// ------------------------------------------------------------------ the fall's path
+
+	/// <summary>The fall's path is sampled at this step (seconds).</summary>
+	private const float FallStep = 1f / 120f;
+	private const float FallTipRate = 6f;          // the topple's pull (rad/s^2 per sine of the lean): a little slower than a real one
+	private const float FallRelease = 1.25f;       // the lean (rad from upright) at which the tip lets go into the drop
+	private const float FallEyeAtImpact = 0.45f;   // the eye's height over the ground when it ends (lying, in the dark)
+
+	private sealed class FallPlan
+	{
+		public readonly List<Vector3> Eye = new();     // where the eye is, one sample per FallStep
+		public readonly List<Vector3> Pose = new();    // the view: (pitch, yaw offset, roll), radians
+		public readonly List<Vector3> Stride = new();  // the body's walking velocity (the stumble's steps; zero after)
+		public int TipAt, DropAt, HideAt, Hit = -1;
+		public string HitWhat = "";
+		public string Side;
+		public float Drop, GroundY;
+		public bool ClearOfFlight;
+		public float Duration => (Eye.Count - 1) * FallStep;
+	}
+
+	/// <summary>
+	/// Plans the fall off the last landing: off its back edge, in line with where they stand, unless the ground behind
+	/// is too near (a slope) or the path meets something; then over one of its side walls. Each way is simulated whole
+	/// and its eye path swept against the world (a small sphere along every sample, from the first stumbling step until
+	/// the eye is near the ground), and the first clear one is taken.
+	/// </summary>
+	private FallPlan PlanFall(StaircaseBuilder from, ForestTerrain terrain)
+	{
+		var rig = _player.CameraRig;
+		float eyeH = rig?.EyeHeight ?? 1.62f;
+		Vector3 feet = _player.GlobalPosition;
+		Vector3 local = from.ToLocal(feet);
+		float sc = Mathf.Max(0.01f, from.Scale.X);
+		float top = from.ToGlobal(new Vector3(0, from.TotalHeight, from.BackZ)).Y;
+		float hw = from.Width * 0.5f, inset = 0.32f / sc;
+		float pitch0 = rig?.Pitch ?? 0f, yaw0 = rig?.Yaw ?? 0f;
+		float rollSign = _rng.Randf() < 0.5f ? -1f : 1f;
+
+		var tries = new List<(string side, Vector3 pivot, Vector3 stop, Vector3 outDir)>();
+		float x = Mathf.Clamp(local.X, -hw + inset, hw - inset);
+		tries.Add(("back", from.ToGlobal(new Vector3(x, from.TotalHeight, from.BackZ)),
+			from.ToGlobal(new Vector3(x, from.TotalHeight, from.BackZ + 0.1f / sc)), (-from.GlobalBasis.Z).Normalized()));
+		// The side walls, between the back pier and the top tread; pivoting on the outer edge of the coping.
+		float z = Mathf.Clamp(local.Z, from.BackZ + 0.6f, from.TopFrontZ - 0.05f);
+		float first = _rng.Randf() < 0.5f ? -1f : 1f;
+		foreach (float side in new[] { first, -first })
+			tries.Add((side < 0 ? "left side" : "right side",
+				from.ToGlobal(new Vector3(side * (hw + from.WallThickness + 0.035f), from.TotalHeight + from.WallHeight + 0.02f, z)),
+				from.ToGlobal(new Vector3(side * (hw - inset), from.TotalHeight, z)), (from.GlobalBasis.X * side).Normalized()));
+
+		float GroundAt(Vector3 p) => terrain?.HeightAt(p.X, p.Z) ?? (top - from.TotalHeight * from.Scale.Y);
+		FallPlan best = null;
+		foreach (var (side, pivot, stop, outDir) in tries)
+		{
+			var plan = SimulateFall(feet + Vector3.Up * eyeH, stop.Y + eyeH, stop, pivot, outDir, pitch0, yaw0, rollSign, GroundAt);
+			plan.Side = side;
+			// Off the back, the drop must be a real one (on a slope the ground behind can come up nearly to the landing).
+			if (side == "back" && plan.Drop < 1.5f) plan.Hit = Mathf.Max(0, plan.DropAt);
+			if (plan.Hit < 0) SweepFall(plan);
+			Vector3 end = from.ToLocal(plan.Eye[^1]);
+			plan.ClearOfFlight = end.Z < from.BackZ - 1.0f || Mathf.Abs(end.X) > hw + from.WallThickness + 1.0f;
+			if (plan.Hit >= 0 || !plan.ClearOfFlight)
+			{
+				GD.Print($"[story] Act 6: the fall can't go off the {side} of {from.Name} (blocked at {plan.Hit * FallStep:0.00} s by {plan.HitWhat}, {plan.Drop:0.0} m)");
+				if (best == null || (best.Hit >= 0 && plan.Hit > best.Hit)) best = plan;
+				continue;
+			}
+			best = plan;
+			break;
+		}
+		FallPathClear = best.Hit < 0;
+		return best;
+	}
+
+	/// <summary>One way off the landing, start to impact (see <see cref="PlanFall"/>).</summary>
+	private FallPlan SimulateFall(Vector3 eye0, float stopEyeY, Vector3 stop, Vector3 pivot, Vector3 outDir,
+		float pitch0, float yaw0, float rollSign, System.Func<Vector3, float> groundAt)
+	{
+		var p = new FallPlan();
+		outDir.Y = 0f;
+		outDir = outDir.Normalized();
+		float outYaw = Mathf.Atan2(-outDir.X, -outDir.Z);
+		float turn = Mathf.Wrap(outYaw - yaw0, -Mathf.Pi, Mathf.Pi);
+		float tipPitch = Mathf.DegToRad(-20f), dropPitch = Mathf.DegToRad(-62f), endPitch = Mathf.DegToRad(-72f);
+
+		// 1. The stumble: to the edge, gathering pace (no jolt), the view turning to face out over it and dropping to
+		// the stone at their feet, while the landing sags a few centimetres under them.
+		Vector3 a = eye0, b = new(stop.X, stopEyeY - 0.06f, stop.Z);
+		float dist = new Vector2(b.X - a.X, b.Z - a.Z).Length();
+		float tStumble = Mathf.Clamp(0.4f + dist / 1.6f, 0.65f, 1.4f);
+		int n = Mathf.CeilToInt(tStumble / FallStep);
+		Vector3 flat = (b - a) with { Y = 0f };
+		for (int i = 0; i <= n; i++)
+		{
+			float u = i / (float)n, sm = Mathf.SmoothStep(0f, 1f, u);
+			float s = Mathf.Pow(u, 1.6f);
+			Vector3 e = a.Lerp(b, s);
+			e.Y = Mathf.Lerp(a.Y, stopEyeY, sm) - 0.06f * sm;
+			p.Eye.Add(e);
+			p.Pose.Add(new Vector3(Mathf.Lerp(pitch0, tipPitch, sm), turn * sm, 0f));
+			p.Stride.Add(flat * (1.6f * Mathf.Pow(Mathf.Max(u, 0.0001f), 0.6f) / tStumble));
+		}
+		p.TipAt = p.Eye.Count;
+
+		// 2. The tip: the body pivots on the edge (a rod toppling, a little slow), carried over by the stumble's pace.
+		Vector3 axis = Vector3.Up.Cross(outDir).Normalized();
+		Vector3 r0 = b - pivot;
+		float R = r0.Length();
+		float phi0 = Mathf.Atan2(r0.Dot(outDir), r0.Dot(Vector3.Up));
+		float omega = (flat.Length() * 1.6f / tStumble) / Mathf.Max(R, 0.5f);
+		// (going over a wall from inside it, the lean starts back from upright: enough pace to carry it over the top)
+		if (phi0 < 0f) omega = Mathf.Max(omega, Mathf.Sqrt(2f * FallTipRate * (1f - Mathf.Cos(phi0))) + 0.6f);
+		omega = Mathf.Max(omega, 0.6f);
+		float phi = phi0;
+		while (phi < FallRelease && p.Eye.Count < 2000)
+		{
+			omega += FallTipRate * Mathf.Sin(phi) * FallStep;
+			phi += omega * FallStep;
+			Vector3 e = pivot + r0.Rotated(axis, phi - phi0);
+			float f = Mathf.Clamp((phi - phi0) / (FallRelease - phi0), 0f, 1f);
+			p.Eye.Add(e);
+			p.Pose.Add(new Vector3(Mathf.Lerp(tipPitch, dropPitch, Mathf.Pow(f, 1.2f)), turn, rollSign * Mathf.DegToRad(5f) * f * f));
+			p.Stride.Add(Vector3.Zero);
+			// The legs go from view once the eye is out past the edge (the body is drawn stood up: it can't topple with it).
+			if (p.HideAt == 0 && (e - pivot).Dot(outDir) > 0.3f) p.HideAt = p.Eye.Count - 1;
+		}
+		if (p.HideAt == 0) p.HideAt = p.Eye.Count - 1;
+		p.DropAt = p.Eye.Count;
+
+		// 3. The drop: falling free from the tip's last swing, accelerating, the roll growing.
+		Vector3 eye = p.Eye[^1];
+		Vector3 v = omega * axis.Cross(eye - pivot);
+		float startY = eye.Y;
+		var dropEyes = new List<Vector3>();
+		for (int i = 0; i < 1200; i++)
+		{
+			v.Y -= 9.8f * FallStep;
+			v.X *= 1f - 0.8f * FallStep;
+			v.Z *= 1f - 0.8f * FallStep;
+			eye += v * FallStep;
+			float g = groundAt(eye);
+			if (eye.Y <= g + FallEyeAtImpact) { eye.Y = g + FallEyeAtImpact; dropEyes.Add(eye); p.GroundY = g; break; }
+			dropEyes.Add(eye);
+			p.GroundY = g;
+		}
+		for (int i = 0; i < dropEyes.Count; i++)
+		{
+			float g = (i + 1) / (float)dropEyes.Count;
+			float ease = Mathf.Sin(g * Mathf.Pi * 0.5f);
+			p.Eye.Add(dropEyes[i]);
+			p.Pose.Add(new Vector3(Mathf.Lerp(dropPitch, endPitch, ease), turn + rollSign * Mathf.DegToRad(4f) * g * g, rollSign * Mathf.DegToRad(5f + 8f * g * g)));
+			p.Stride.Add(Vector3.Zero);
+		}
+		p.Drop = startY - p.Eye[^1].Y;
+		return p;
+	}
+
+	/// <summary>Sweeps the planned eye along the world's collision: a small sphere at every sample, until the eye is
+	/// near the ground (the ground itself is where it ends). The first sample that touches anything is the plan's Hit.</summary>
+	private void SweepFall(FallPlan plan)
+	{
+		var space = _player.GetWorld3D().DirectSpaceState;
+		var exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+		var q = new PhysicsShapeQueryParameters3D { Shape = new SphereShape3D { Radius = 0.18f }, CollisionMask = 1u, Exclude = exclude };
+		for (int i = 0; i < plan.Eye.Count; i++)
+		{
+			Vector3 e = plan.Eye[i];
+			if (i >= plan.DropAt && e.Y < plan.GroundY + 0.9f) break;
+			q.Transform = new Transform3D(Basis.Identity, e);
+			foreach (var h in space.IntersectShape(q, 8))
+			{
+				string what = SolidShapeName(h);
+				if (what == null) continue;
+				plan.Hit = i;
+				plan.HitWhat = $"{what} at {e}";
+				return;
+			}
+		}
+	}
+
+	/// <summary>What a shape query touched, or null when it's nothing to see: the invisible TopGuard along a landing's
+	/// back edge is only there to keep a walking player on the stairs, and the fall goes through it. (The cheek walls'
+	/// collision stands 0.4 m above their stone; it's counted, which only keeps the eye further off them.)</summary>
+	internal static string SolidShapeName(Godot.Collections.Dictionary hit)
+	{
+		var node = hit["collider"].As<Node>();
+		if (node is CollisionObject3D co)
+		{
+			int shape = hit["shape"].AsInt32();
+			var owner = co.ShapeOwnerGetOwner(co.ShapeFindOwner(shape)) as Node;
+			if (owner?.Name == "TopGuard") return null;
+			return $"{node.GetPath()}:{owner?.Name}";
+		}
+		return node?.GetPath().ToString() ?? "?";
+	}
+
+	/// <summary>Plays a planned fall: the body carried along the path (the stumble walked, its footsteps and stride
+	/// real), the eye kept on it with no lag, the view set from the plan through the cutscene look.</summary>
+	private async Task PlayFall(FallPlan plan, CancellationToken ct)
+	{
+		var rig = _player.CameraRig;
+		float eyeH = rig?.EyeHeight ?? 1.62f;
+		float roll0 = rig?.RollSwim ?? 0f;
+		Vector2 applied = Vector2.Zero;
+		Vector3 pose0 = plan.Pose[0];
+		double t = 0;
+		float lastY = _player.GlobalPosition.Y;
+		while (IsInstanceValid(_player))
+		{
+			float fi = Mathf.Min((float)(t / FallStep), plan.Eye.Count - 1);
+			int i = Mathf.FloorToInt(fi);
+			int j = Mathf.Min(i + 1, plan.Eye.Count - 1);
+			float w = fi - i;
+			Vector3 eye = plan.Eye[i].Lerp(plan.Eye[j], w);
+			Vector3 pose = plan.Pose[i].Lerp(plan.Pose[j], w);
+			_player.GlobalPosition = eye - Vector3.Up * eyeH;
+			_player.Velocity = i < plan.TipAt ? plan.Stride[i] : Vector3.Zero;
+			float dy = _player.GlobalPosition.Y - lastY;
+			lastY = _player.GlobalPosition.Y;
+			if (rig != null)
+			{
+				rig.ShiftBy(new Vector3(0f, dy, 0f));   // the eye on the path: no easing behind it as it drops
+				float fade = Mathf.Clamp(i / (float)Mathf.Max(1, plan.TipAt), 0f, 1f);
+				rig.RollSwim = roll0 * (1f - fade) + pose.Z;
+			}
+			// The view: pitch from where it was, yaw turned out over the edge (as offsets, through the cutscene look).
+			var want = new Vector2(pose.Y - pose0.Y, pose.X - pose0.X);
+			_player.PlayerInput?.AddCutsceneLook(want - applied);
+			applied = want;
+			if (i >= plan.HideAt) HideBody();
+			if (fi >= plan.Eye.Count - 1) break;
+			await Cutscene.Frame(this, ct);
+			t += GetProcessDeltaTime();
+		}
+		if (IsInstanceValid(_player))
+		{
+			// Down: lying on the ground in the dark (the body is put back on its feet there; it's black, and it wakes elsewhere).
+			Vector3 end = plan.Eye[^1];
+			_player.GlobalPosition = new Vector3(end.X, plan.GroundY + 0.1f, end.Z);
+			_player.Velocity = Vector3.Zero;
+		}
+	}
+
+	private bool _bodyHidden;
+
+	/// <summary>The player's own body (PlayerBody, drawn stood up) is hidden while they topple and fall: it would hang
+	/// upright under the eye. Hiding is only ours to undo; PlayerBody shows itself again on its own terms after.</summary>
+	private void HideBody()
+	{
+		if (_bodyHidden || PlayerBody.Instance is not { } body || !IsInstanceValid(body)) return;
+		body.Visible = false;
+		_bodyHidden = true;
+	}
+
+	private void ShowBody()
+	{
+		if (!_bodyHidden) return;
+		_bodyHidden = false;
+		if (PlayerBody.Instance is { } body && IsInstanceValid(body)) body.Visible = body.Shown;
+	}
 
 	/// <summary>A one-shot flat at the ear (no 3D falloff) on the Events bus, freed when it ends.</summary>
 	private void PlayFlat(string path, float db)
@@ -1246,6 +1601,9 @@ public partial class Act6ClearingEvent : Node3D
 		// The stand, the lights, the ring: gone.
 		if (_stand != null && IsInstanceValid(_stand)) { if (_stand.GetParent() != null) _stand.GetParent().RemoveChild(_stand); _stand.QueueFree(); }
 		_stand = null;
+		foreach (var n in _pendingAttach) if (IsInstanceValid(n) && n.GetParent() == null) n.QueueFree();
+		_pendingAttach.Clear();
+		_pendingDressing = _pendingLights = _pendingFence = false;
 		_minis.Clear();
 		_loopStairs.Clear();
 		_trailStair = null;
@@ -1377,6 +1735,8 @@ public partial class Act6ClearingEvent : Node3D
 	public override void _Process(double delta)
 	{
 		_player ??= StoryBeat.Player(this);
+		PollSpawn();
+		UpdateBloodPresence();
 		WatchForChoice();
 		if (_playerSpot == null || _player == null || !IsInstanceValid(_player)) return;
 		FollowPlayer();

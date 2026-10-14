@@ -175,6 +175,9 @@ public partial class GameSettings : Node
 	/// <summary>`--continue-test`: instead of the walkthrough, write a save for every checkpoint in
 	/// turn, Continue from it, and check the restored world (see ContinueRoundTripTest).</summary>
 	public bool ContinueTest { get; private set; }
+	/// <summary>`--playtest`: the fast whole-game functionality test (<see cref="Playtest"/>): every act and system, each beat
+	/// seeded from its own save and jumped to. Runs on the autotest's test slots and defaults.</summary>
+	public bool PlaytestRun { get; private set; }
 	/// <summary>`--trailer`: straight into the Hollow at an early save (the test slots, never the player's) and
 	/// run <see cref="TrailerDirector"/>; record it with Godot's `--write-movie`.</summary>
 	public bool Trailer { get; private set; }
@@ -184,7 +187,9 @@ public partial class GameSettings : Node
 	/// (only 2 today: the Hollow wake). 0 = normal start. Overwrites the real save slot.</summary>
 	public int StartAct { get; private set; }
 
-	private const string SavePath = "user://settings.cfg";
+	/// <summary>The settings file. Test runs never read it (they run on defaults) and write their own, so a test that opens
+	/// the pause menu or rebinds a key can't overwrite the player's settings.</summary>
+	private string SavePath => AutoTest ? "user://test_settings.cfg" : "user://settings.cfg";
 
 	public override void _EnterTree()
 	{
@@ -195,13 +200,14 @@ public partial class GameSettings : Node
 		AutoTestSkipToAct7 = args.Contains("--skip-to-act7");
 		AutoTestSkipToAct11 = args.Contains("--skip-to-act11");
 		ContinueTest = args.Contains("--continue-test");
+		PlaytestRun = args.Contains("--playtest");
 		Trailer = args.Contains("--trailer") || args.Contains("--trailer-ending");
 		TrailerEnding = args.Contains("--trailer-ending");
 		// the game's title (the owner, 2026-09-27: "Dead Silent" from now on). The project's own name stays
 		// "Project DS" so the save and settings folder doesn't move.
 		DisplayServer.WindowSetTitle("Dead Silent");
 		foreach (var a in args) if (a.StartsWith("--start-act=") && int.TryParse(a["--start-act=".Length..], out int sa)) StartAct = sa;
-		if (ContinueTest) AutoTest = true;   // same test save slots and defaults
+		if (ContinueTest || PlaytestRun) AutoTest = true;   // same test save slots and defaults
 		RegisterInputActions();
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
@@ -384,8 +390,13 @@ public partial class GameSettings : Node
 	/// <summary>`--settings-test` (on the built game too, 2026-10-07): every setting set to something other than its
 	/// default, saved, scrambled, and read back from the file as a restart would; each compared. The player's own file
 	/// is put back afterwards. Prints PASS or FAIL per setting, and quits (exit code 0 if all came back).</summary>
-	public void RunSettingsTest()
+	public void RunSettingsTest() => GetTree().Quit(SettingsRoundTrip(out _) == 0 ? 0 : 1);
+
+	/// <summary>The round trip itself (`--settings-test`, and the playtest): every setting changed, saved, scrambled and read
+	/// back from the file; the settings and the file put back as they were. Returns how many didn't come back.</summary>
+	public int SettingsRoundTrip(out string report)
 	{
+		var lines = new System.Text.StringBuilder();
 		string backup = Godot.FileAccess.FileExists(SavePath) ? Godot.FileAccess.GetFileAsString(SavePath) : null;
 		var before = Snapshot();
 		var keep = (MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera);
@@ -402,7 +413,7 @@ public partial class GameSettings : Node
 		foreach (var (k, v) in want)
 		{
 			bool ok = got.TryGetValue(k, out var g) && g == v;
-			if (!ok) bad++;
+			if (!ok) { bad++; lines.Append($"{k}: saved {v}, read back {g}; "); }
 			GD.Print($"[settings-test] {(ok ? "PASS" : "FAIL")} {k}: saved {v}, read back {g}");
 		}
 		// the player's own settings back, and their file
@@ -411,7 +422,8 @@ public partial class GameSettings : Node
 		if (backup != null) { using var f = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Write); f?.StoreString(backup); }
 		else DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
 		GD.Print($"[settings-test] {want.Count - bad}/{want.Count} settings survive a restart; the player's own put back ({(Snapshot()["brightness"] == before["brightness"] ? "unchanged" : "CHANGED")})");
-		GetTree().Quit(bad == 0 ? 0 : 1);
+		report = $"{want.Count - bad}/{want.Count} settings survive a restart" + (bad > 0 ? ": " + lines : "");
+		return bad;
 	}
 
 	private static void RegisterInputActions()

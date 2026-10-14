@@ -74,6 +74,10 @@ public partial class GiantStalkerEvent : Node
 		SetProcess(true);   // the far footfalls poll the story window (they sleep once the cabin is entered)
 		Callable.From(Restore).CallDeferred();
 		if (StoryManager.Instance is { } s) s.CheckpointReached += OnCheckpoint;
+		// its skin's shader drawn once in the load's black (the lag pass, 2026-10-13: made on the spot, its first sight froze
+		// the game for 3 s as it walked out of the murk)
+		if (StoryManager.Instance is { GiantEventDone: false })
+			ShaderWarmup.Prewarm(this, new StalkerBody { Name = "Act7GiantWarmUp", Skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/giant_skin.gdshader") }, Size = BodyScale });
 	}
 
 	public override void _ExitTree()

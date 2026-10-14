@@ -124,6 +124,11 @@ public partial class Act11Ending : Node3D
 	public override void _Ready()
 	{
 		AddToGroup("act11_ending");
+		// the thing that follows them out of the bunker, its eyes lit, drawn once in the load's black (the lag pass,
+		// 2026-10-13: made on the spot, its first sight cost 140 ms)
+		if (StoryManager.Instance is { Current: < Checkpoint.Act11GiantEncounter })
+			Systems.ShaderWarmup.Prewarm(this, new Entities.StalkerBody { Name = "PursuerWarmUp", Seed = 2077, Size = 1.08f, Idle = true },
+				b => ((Entities.StalkerBody)b).GlowEyes(new Color(1f, 0.16f, 0.05f), 6f));
 		_original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
 		SetProcess(false);   // only while the way up is open
 		Callable.From(Restore).CallDeferred();

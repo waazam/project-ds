@@ -12,7 +12,7 @@ Writes:
   build/blender/stalker_*.png         previews
 
 The design is the game's (StalkerBody.cs), in its units (Size 1 is about 2.2 m to the hump): gaunt and hunched, heavy
-high shoulders crowned with gnarled root spikes, a small long head slung forward and low between them on a thin neck,
+high shoulders knotted with roots (no spikes, the owner 2026-10-13), a small long head slung forward and low between them on a thin neck,
 arms that hang past the knees to long many-jointed fingers, knees bent a little wrong, rags off the shoulders, arms and
 hips, bark shards along the spine. Now as one hide drawn tight over the bones (ribs, the spine's knuckles, the shoulder
 blades, the hip bones, knuckles, the tendons in the neck and wrists), fused by a voxel remesh; the face a small
@@ -296,13 +296,19 @@ def build_hand(m, s):
     parts = [chain(f"Wrist{s}", [wr.lerp(J["elbow"], 0.08), wr, wr.lerp(palm, 0.5)], [0.027, 0.026, 0.022])]
     pb = lumpy_sphere(f"Palm{s}", wr.lerp(palm, 0.6), (0.014, 0.034, 0.055), None, 14 + s, amp=0.05, subdiv=3)
     parts.append(pb)
+    # (2026-10-13, the owner: hands "more claw like") bonier: the fingers thinning between knobbed knuckles that stand
+    # out of the back of the hand (+s X: the hanging palm faces the thigh), the tendons to each knuckle raised under
+    # the hide, the tips drawn thin into the talons (build_nails)
+    dorsal = V((s, 0, 0))
     for k, pts in enumerate(finger_chains(s, J)):
         thumb = k == 4
-        r = [0.0115, 0.0102, 0.009, 0.0072] if not thumb else [0.013, 0.011, 0.0095, 0.0078]
+        r = [0.0112, 0.0094, 0.008, 0.0062] if not thumb else [0.013, 0.0105, 0.0088, 0.007]
         root = palm.lerp(pts[0], 0.3) if not thumb else wr.lerp(palm, 0.25)
         parts.append(chain(f"Finger{s}_{k}", [root] + pts, [r[0]] + r))
         for j, q in enumerate(pts[:-1]):
-            parts.append(lumpy_sphere(f"Knuckle{s}_{k}_{j}", q, (r[j] * 1.25,) * 3, None, 100 + k * 5 + j, amp=0.08, subdiv=2))
+            parts.append(lumpy_sphere(f"Knuckle{s}_{k}_{j}", q + dorsal * r[j] * 0.35, (r[j] * 1.45, r[j] * 1.35, r[j] * 1.45), None, 100 + k * 5 + j, amp=0.1, subdiv=2))
+        if not thumb:
+            parts.append(chain(f"HandTendon{s}_{k}", [wr + dorsal * 0.011, wr.lerp(pts[0], 0.5) + dorsal * 0.013, pts[0] + dorsal * 0.009], [0.0034, 0.004, 0.0045]))
     hand = join(parts, f"Hand{s}")
     remesh(hand, 0.0026, 3)
     hand.data.materials.clear()
@@ -491,7 +497,7 @@ def build_head(m):
 # ------------------------------------------------------------------ the parts that aren't hide
 
 def build_crowns(m):
-    """The shoulders' crowns of gnarled root spikes (the owner: not round and bubbly, spiked roots) and the bark shards
+    """The shoulders' knotted root masses (their spikes gone, 2026-10-13) and the bark shards
     along the spine and the elbows."""
     P = []
     for s in (1, -1):
@@ -500,8 +506,10 @@ def build_crowns(m):
         for w in range(5):
             a = w / 5 * math.tau + rnd.uniform(-0.3, 0.3)
             fr = c + V((math.cos(a) * 0.09, math.sin(a) * 0.08, -0.1 + rnd.uniform(-0.03, 0.03)))
-            to = c + V((math.cos(a + 1.3) * 0.07 * s, math.sin(a + 1.3) * 0.07, 0.08))
-            knots.append(chain(f"Knot{s}{w}", [fr, fr.lerp(to, 0.5) + V((rnd.uniform(-0.01, 0.01), 0, 0)), to], [0.04, 0.034, 0.026]))
+            # (2026-10-13) with the spikes gone the strands no longer stand up out of the shoulder in knobs: they wrap
+            # it, low and thick, a knotted mass that reads as the shoulder itself
+            to = c + V((math.cos(a + 1.3) * 0.075 * s, math.sin(a + 1.3) * 0.075, 0.015))
+            knots.append(chain(f"Knot{s}{w}", [fr, fr.lerp(to, 0.5) + V((rnd.uniform(-0.01, 0.01), 0, 0.02)), to], [0.042, 0.04, 0.034]))
         spikes = [((0.55 * s, -0.25, 0.9), 0.34), ((0.9 * s, -0.1, 0.45), 0.3), ((0.35 * s, -0.75, 0.8), 0.36), ((0.8 * s, -0.55, 0.15), 0.27),
                   ((0.15 * s, 0.2, 1.0), 0.22), ((0.95 * s, 0.35, 0.6), 0.2), ((0.5 * s, -0.95, 0.3), 0.3)]
         for i, (d0, ln) in enumerate(spikes):
@@ -511,18 +519,18 @@ def build_crowns(m):
             p1 = p0 + (d + kink * 0.4).normalized() * ln * 0.45
             p2 = p1 + (d - kink * 0.3).normalized() * ln * 0.35
             p3 = p2 + (d + kink * 0.2 + V((0, 0, 0.15))).normalized() * ln * 0.3
-            knots.append(chain(f"Spike{s}{i}", [p0, p1, p2, p3], [0.036, 0.026, 0.014, 0.002]))
+            # (2026-10-13, the owner: "remove spikes from the stalker's shoulders and the giant's shoulders") no spikes or
+            # shoots: only the knotted root mass is left on each shoulder. Their random draws are still made, so every
+            # other part of the figure comes out exactly as before.
             if rnd.random() < 0.6:
                 sh = (d + V((rnd.uniform(-0.8, 0.8), rnd.uniform(-0.8, 0.8), rnd.uniform(0.1, 0.6)))).normalized()
-                knots.append(chain(f"Shoot{s}{i}", [p1, p1 + sh * ln * 0.16, p1 + sh * ln * 0.3], [0.013, 0.007, 0.0015]))
         crown = join(knots, f"Crown{s}")
         crown.data.materials.clear()
         crown.data.materials.append(m["bark"])
         P.append((crown, "clav_R" if s > 0 else "clav_L"))
-    shards = [((-0.44, 2.14, -0.02), (-0.8, 0.55, -0.6), 0.19, "chest"), ((-0.3, 2.16, -0.06), (-0.2, 0.5, -1), 0.15, "chest"),
-              ((0.45, 2.17, -0.01), (0.8, 0.6, -0.5), 0.21, "chest"), ((0.32, 2.18, -0.07), (0.3, 0.45, -1), 0.14, "chest"),
-              ((0.0, 2.06, -0.13), (0.1, 0.6, -1), 0.17, "chest"), ((0.02, 1.94, -0.18), (-0.1, 0.4, -1), 0.13, "chest"),
-              ((-0.03, 1.78, -0.18), (0.1, 0.2, -1), 0.1, "chest"), ((-0.48, 1.98, 0.0), (-1, 0.4, -0.3), 0.14, "chest"),
+    # (2026-10-13) the shards on the shoulders went with the spikes; the ones down the middle of the back stay
+    shards = [((0.0, 2.06, -0.13), (0.1, 0.6, -1), 0.17, "chest"), ((0.02, 1.94, -0.18), (-0.1, 0.4, -1), 0.13, "chest"),
+              ((-0.03, 1.78, -0.18), (0.1, 0.2, -1), 0.1, "chest"),
               ((0.03, 1.62, -0.17), (0.05, 0.1, -1), 0.08, "spine"), ((-0.02, 1.48, -0.13), (0, 0.05, -1), 0.07, "spine")]
     for i, (r, d, ln, bone) in enumerate(shards):
         root = D(*r)
@@ -549,11 +557,8 @@ def build_nails(m):
         for k, pts in enumerate(finger_chains(s, J)):
             tip, prev = pts[-1], pts[-2]
             d = (tip - prev).normalized()
-            hook = (d + V((-s, 0, 0)) * 0.5).normalized()
-            a = tip - d * 0.012
-            b = a + d * 0.018 + hook * 0.004
-            c = b + hook * 0.016
-            n = chain(f"Nail{s}{k}", [a, b, c], [0.0075, 0.005, 0.0008])
+            # (2026-10-13) talons, not nails: twice as long, hooked in toward the palm (they were 3 cm, barely curved)
+            n = W.talon(f"Nail{s}{k}", tip, d, V((-s, 0, 0)), 0.07 if k < 4 else 0.055, 0.0068)
             n.data.materials.append(m["nail"])
             P.append((n, f"f{k}_3_{sx}"))
         L = leg_joints(s)

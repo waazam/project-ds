@@ -1,5 +1,6 @@
 using Godot;
 using ProjectDS.Player;
+using ProjectDS.Systems;
 
 namespace ProjectDS.World;
 
@@ -111,14 +112,45 @@ public partial class TreeNote : Node3D
 			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.42f, 0.52f, UvInk.Digit(Mathf.Clamp(Digit, 0, 9)), UvInk.Cyan, 1.9f, false, rng.RandfRange(-0.04f, 0.04f));
 			_sheetLocal = post * (new Vector3(Mathf.Sin(MarkAngle), 0, Mathf.Cos(MarkAngle)) * (rAt(y) + 0.02f) + Vector3.Up * y);
 		}
-		int marks = Decoy ? rng.RandiRange(1, 3) : rng.RandiRange(0, 1);
+		// (2026-10-13, the owner: "too grouped up") one or two to a tree, never overlapping each other or his number;
+		// a hand is often the thing's (it climbs these, its long fingers round the bark), now and then a person's,
+		// at a hand's real size
+		int marks = Decoy ? rng.RandiRange(1, 2) : rng.RandiRange(0, 1);
+		var placed = new System.Collections.Generic.List<(float y, float a, float s)>();
+		if (!Decoy) placed.Add((NoteHeight, MarkAngle, 0.52f));
 		for (int i = 0; i < marks; i++)
 		{
-			float y = rng.RandfRange(0.7f, 2.1f), a = MarkAngle + rng.RandfRange(-2.2f, 2.2f);
-			if (!Decoy && Mathf.Abs(y - NoteHeight) < 0.5f) y = NoteHeight - 0.65f;
-			var tex = UvInk.Decoy(rng.RandiRange(0, 13), Digit);
-			float size = rng.RandfRange(0.3f, 0.5f);
-			UvInk.OnTrunk(ink, y, a, rAt(y), size, size * 0.9f, tex, rng.Randf() < 0.3f ? UvInk.Green : UvInk.Pale, rng.RandfRange(1.1f, 1.7f), rng.Randf() < 0.5f, rng.RandfRange(-0.08f, 0.08f));
+			Texture2D tex;
+			float size;
+			if (rng.Randf() < 0.4f)
+			{
+				int h = rng.RandiRange(0, 7);
+				var kind = h switch { 0 or 1 => HandKind.Claw, 2 => HandKind.ClawSplayed, 3 or 4 => HandKind.ClawDragged, 5 => HandKind.Pressed, 6 => HandKind.Dragged, _ => HandKind.Splayed };
+				tex = UvInk.Hand(kind, rng.RandiRange(0, 5));
+				size = kind is HandKind.Claw or HandKind.ClawSplayed or HandKind.ClawDragged ? rng.RandfRange(0.3f, 0.38f) : rng.RandfRange(0.2f, 0.24f);
+			}
+			else
+			{
+				tex = UvInk.Decoy(rng.RandiRange(0, 13), Digit);
+				size = rng.RandfRange(0.3f, 0.45f);
+			}
+			float y = 0f, a = 0f;
+			bool clear = false;
+			for (int tries = 0; tries < 16 && !clear; tries++)
+			{
+				y = rng.RandfRange(0.75f, 2.3f);
+				a = MarkAngle + rng.RandfRange(-2.4f, 2.4f);
+				clear = true;
+				foreach (var (py, pa, ps) in placed)
+				{
+					float gap = (size + ps) * 0.5f + 0.06f;
+					float arc = Mathf.Abs(Mathf.AngleDifference(pa, a)) * rAt(y);
+					if (Mathf.Abs(py - y) < gap && arc < gap) clear = false;
+				}
+			}
+			if (!clear) continue;
+			placed.Add((y, a, size));
+			UvInk.OnTrunk(ink, y, a, rAt(y), size, size * 0.95f, tex, rng.Randf() < 0.3f ? UvInk.Green : UvInk.Pale, rng.RandfRange(1.1f, 1.7f), rng.Randf() < 0.5f, rng.RandfRange(-0.08f, 0.08f));
 		}
 		if (Decoy) _sheetLocal = post * (Vector3.Up * NoteHeight);
 	}
@@ -165,6 +197,71 @@ public partial class TreeNote : Node3D
 		}
 		Glow = Mathf.MoveToward(Glow, target, dt * (target > Glow ? 3f : 1.8f));
 		if (Revealed && !Read) { Read = true; FirstRead?.Invoke(); }
+		if (!Decoy) Hints(dt, playerDist);
+	}
 
+	// ------------------------------------------------------------------ the nudges (2026-10-13)
+
+	/// <summary>Saved once shown: the nudge after the camp note (the lantern's lesson done), and the one after walking past a number
+	/// in the dark. Each comes once in a game.</summary>
+	public const string HintFirstFlag = "hint_code_blacklight", HintPassedFlag = "hint_code_passed";
+	private float _hintWait, _passWait;
+	private bool _near, _nearUv, _passPending;
+
+	/// <summary>(2026-10-13, the owner: "Show text that nudges the player to use the blacklight to find the code") Two short
+	/// lines under the picture, in the game's hint style, with the blacklight's key as bound:
+	/// <list type="bullet">
+	/// <item>once R.H.'s camp note (a bunker, four numbers, the ink) is read and the lantern's own lesson at the camp is over, while no digit's been found;</item>
+	/// <item>once, if they walk on past one of his numbers without the blacklight on near it (within 9 m, then 16 m on).</item>
+	/// </list>
+	/// Never over another line, the note, or a cutscene; neither again once a digit's found that way or the door's open.</summary>
+	private void Hints(float dt, float playerDist)
+	{
+		if (StoryManager.Instance is not { } s || UI.Subtitle.Instance is not { } sub) return;
+		if (s.HasFlag(StoryManager.Flag.BunkerUnlocked) || s.Current >= Checkpoint.Act8BunkerEntered || !s.HasFlag(Camp.NoteReadFlag)) return;
+		bool hasLantern = _player.Inventory?.HasLantern ?? false;
+		bool clear = !sub.CurrentlyShowing && !(_player.PlayerInput?.Modal ?? false) && !_player.PlayerInput.Scripted && hasLantern && Systems.Cutscene.InputLocks == 0;   // (input locks: a long-running ambient beat counts as a cutscene too)
+		bool anyRead = false;
+		for (int n = 1; n <= 4; n++) if (s.HasFlag(StoryManager.Flag.CodeDigit(n))) { anyRead = true; break; }
+		string key = UI.KeyHint.Blacklight;
+		// the first: the first note's tree drives it (one line, not four)
+		// (after the lantern's own lesson at the camp, if it's still to come: the flame guttering, "B: try its blacklight", and lit
+		// again; three lines about B in a row would be too many)
+		bool lessonDone = s.HasFlag(Player.Lantern.FirstRelitFlag) || s.Current >= Checkpoint.Act5CabinEntered;
+		if (Label == "1" && !s.HasFlag(HintFirstFlag) && !anyRead && lessonDone)
+		{
+			_hintWait = clear ? _hintWait + dt : 0f;
+			if (_hintWait > 3.5f)
+			{
+				s.SetFlag(HintFirstFlag);
+				_ = sub.Show($"His numbers are on the trees.   {key}: the blacklight shows them.", 0.8f, 5f, 1.2f);
+				GD.Print($"[story] the nudge: his numbers are on the trees ({key})");
+			}
+		}
+		// walked past this one in the dark
+		if (Read || s.HasFlag(HintPassedFlag)) { _near = false; _passPending = false; return; }
+		float flat = new Vector2(_player.GlobalPosition.X - GlobalPosition.X, _player.GlobalPosition.Z - GlobalPosition.Z).Length();
+		if (flat < 9f)
+		{
+			if (!_near) { _near = true; _nearUv = false; }
+			if (Player.Lantern.Uv.on) _nearUv = true;
+		}
+		else if (_near && flat > 16f)
+		{
+			_near = false;
+			if (!_nearUv && hasLantern) { _passPending = true; _passWait = 0f; }
+		}
+		if (_passPending)
+		{
+			_passWait += dt;
+			if (_passWait > 20f || flat < 9f) _passPending = false;   // (too late to mean anything, or they've gone back)
+			else if (clear)
+			{
+				_passPending = false;
+				s.SetFlag(HintPassedFlag);
+				_ = sub.Show($"Something on a tree back there.   {key}: the blacklight.", 0.8f, 4.5f, 1.2f);
+				GD.Print($"[note {Label}] walked past it in the dark: the nudge");
+			}
+		}
 	}
 }

@@ -158,6 +158,7 @@ public static class AnimKit
 		private Spring3 _arm;
 		private readonly Spring1[] _legOff;
 		private readonly Godot.Collections.Array<Rid> _exclude = new();
+		private PhysicsRayQueryParameters3D _plantQ;
 		// every bone it turns: what its pose was before (this frame's clip) and after; a bone the clip doesn't key keeps last
 		// frame's result, so it's put back first (else the lean would pile up frame on frame)
 		private readonly int[] _touched;
@@ -264,8 +265,11 @@ public static class AnimKit
 				if (thigh < 0 || shin < 0 || foot < 0) continue;
 				int contact = toe >= 0 ? toe : foot;
 				Vector3 c = _sk.GlobalTransform * _sk.GetBoneGlobalPose(contact).Origin;
-				var q = PhysicsRayQueryParameters3D.Create(c + Vector3.Up * reach, c + Vector3.Down * reach, 1u, _exclude);
-				var hit = space.IntersectRay(q);
+				// (one query kept, the ends moved: a new one per leg per frame was garbage for the collector; the lag pass)
+				_plantQ ??= PhysicsRayQueryParameters3D.Create(Vector3.Zero, Vector3.Down, 1u, _exclude);
+				_plantQ.From = c + Vector3.Up * reach;
+				_plantQ.To = c + Vector3.Down * reach;
+				using var hit = space.IntersectRay(_plantQ);
 				// the ground under the foot against the ground the body stands on: only the difference (a lifted foot in the
 				// clip keeps its lift)
 				float d = hit.Count > 0 && grounded ? Mathf.Clamp(((Vector3)hit["position"]).Y - floorY, -reach, reach) : 0f;

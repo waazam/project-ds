@@ -17,7 +17,8 @@ public static class LibrarySounds
 	{
 		var x = Buf(sr, 0.6);
 		Slap(x, r, sr, 0.0, 0.25, 1500, 5000, 0.03, 0.004);
-		Knock(x, r, sr, 0.03, 0.5, r.R(1700, 2300), 18, 0.018);
+		Knock(x, r, sr, 0.03, 0.35, r.R(1700, 2300), 4, 0.012);   // (2026-10-13: Q 18 rang like a woodblock; a dull tick now)
+		Slap(x, r, sr, 0.03, 0.4, 900, 6000, 0.004, 0.0003);
 		return FinishOneShot(Wet(x, sr, 1.0, 0.18, 0.7, 0.6, 0.6), sr, -3, 120);
 	}
 
@@ -26,11 +27,12 @@ public static class LibrarySounds
 	public static double[] WoodPlace(Rng r, int sr)
 	{
 		var x = Buf(sr, 0.9);
-		Knock(x, r, sr, 0.0, 1.0, r.R(520, 640), 12, 0.05);
-		Knock(x, r, sr, 0.0, 0.55, r.R(1300, 1600), 20, 0.03);
-		Slap(x, r, sr, 0.0, 0.3, 400, 3500, 0.01, 0.0005);
+		// (2026-10-13, the circus sweep: Q 12-20 knocks were a temple block; the box's hollow is a low-Q body now)
+		Knock(x, r, sr, 0.0, 0.8, r.R(520, 640), 3.5, 0.04);
+		Knock(x, r, sr, 0.0, 0.25, r.R(1300, 1600), 4, 0.02);
+		Slap(x, r, sr, 0.0, 0.6, 300, 3500, 0.012, 0.0005);
 		double t2 = r.R(0.06, 0.09);
-		Knock(x, r, sr, t2, 0.3, r.R(700, 800), 14, 0.03);
+		Slap(x, r, sr, t2, 0.3, 400, 3000, 0.008, 0.0004);
 		return FinishOneShot(Wet(x, sr, 1.0, 0.22, 0.8, 0.55, 0.7), sr, -3, 150);
 	}
 
@@ -38,9 +40,11 @@ public static class LibrarySounds
 	public static double[] WoodBump(Rng r, int sr)
 	{
 		var x = Buf(sr, 0.7);
-		Knock(x, r, sr, 0.0, 1.0, r.R(900, 1100), 16, 0.025);
-		Slap(x, r, sr, 0.0, 0.35, 800, 5000, 0.006, 0.0003);
-		Knock(x, r, sr, r.R(0.07, 0.1), 0.55, r.R(950, 1150), 16, 0.02);
+		Knock(x, r, sr, 0.0, 0.6, r.R(900, 1100), 4, 0.02);   // (2026-10-13: was Q 16, a woodblock)
+		Slap(x, r, sr, 0.0, 0.6, 600, 5000, 0.006, 0.0003);
+		double t2 = r.R(0.07, 0.1);
+		Knock(x, r, sr, t2, 0.35, r.R(950, 1150), 4, 0.016);
+		Slap(x, r, sr, t2, 0.35, 600, 5000, 0.005, 0.0003);
 		return FinishOneShot(Wet(x, sr, 1.0, 0.2, 0.7, 0.6, 0.6), sr, -3, 120);
 	}
 

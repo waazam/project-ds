@@ -124,7 +124,11 @@ public partial class RainVfx
 	/// <summary>Drops off the shelters' eaves while it's wet (made once per set of shelters).</summary>
 	private void Eaves(float dt)
 	{
-		float rate = Mathf.Max(_intensity, Mathf.Clamp((Wetness - 0.15f) * 1.5f, 0f, 0.8f));
+		// (2026-10-13: these run along the top of each shelter's box, which for the cabin is its ridge, so after the storm broke
+		// lines of drops kept falling all round the cabin's roof for over a minute: "the rain continues over the cabin". Only a
+		// short spell after the rain now, as the boughs.)
+		float after = Mathf.Clamp(1f - _sinceRain / AfterDripSeconds, 0f, 1f);
+		float rate = Mathf.Max(_intensity, Mathf.Clamp((Wetness - 0.15f) * 1.5f, 0f, 0.8f) * after);
 		if (_eavesFor != _shelters.Count)
 		{
 			foreach (var e in _eaves) if (IsInstanceValid(e)) e.QueueFree();

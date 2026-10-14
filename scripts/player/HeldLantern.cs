@@ -21,12 +21,14 @@ public partial class HeldLantern : HeldItem
 {
 	// (2026-10-12, the owner's reference shots: the arm out ahead, the fist up at the top of a tall wire bail, the lantern
 	// hanging well down under it; was the fist right down on its cap, clamping it)
-	protected override Vector3 Rest => new(-0.23f, -0.02f, -0.64f);
+	// (2026-10-13, the owner: "the lantern should be higher up on the screen, the handle is too long": a hurricane lantern's own
+	// bail, the fist just over its cap, and the whole lantern up in the lower left of the view instead of hanging off its bottom edge)
+	protected override Vector3 Rest => new(-0.23f, -0.07f, -0.64f);
 	protected override Vector3 Lowered => new(-0.3f, -0.85f, -0.5f);
 	/// <summary>The beam gathered: lifted, in toward the middle, out ahead.</summary>
-	private static readonly Vector3 Gathered = new(-0.14f, 0.03f, -0.68f);
+	private static readonly Vector3 Gathered = new(-0.14f, -0.02f, -0.68f);   // (2026-10-13: a touch lower with the shorter bail; was y 0.03)
 	/// <summary>The bail standing up over the cap, and how far under the fist the lantern hangs on it.</summary>
-	private const float BailRise = 0.22f, ModelScale = 0.95f;
+	private const float BailRise = 0.09f, ModelScale = 0.95f;   // (2026-10-13: 0.09, a normal bail; was 0.22, the lantern hung well down under the fist)
 	private static float HangDrop => (0.232f + BailRise) * ModelScale;
 	/// <summary>Thrust up at something in front of them (Act 23's end: held up into the wendigo's face): high, in the middle,
 	/// at arm's length.</summary>
@@ -168,7 +170,7 @@ public partial class HeldLantern : HeldItem
 			_lastYaw = yaw;
 			// (gentle: the push is clamped, the swing damped; it never flails)
 			var push = new Vector2(Mathf.Clamp(local.Z * 0.045f, -0.6f, 0.6f), Mathf.Clamp(-local.X * 0.045f + turn * 0.12f, -0.8f, 0.8f));
-			const float k = 16f, c = 3.6f;   // (a longer bail: a slower, heavier swing)
+			const float k = 20f, c = 4f;   // (2026-10-13: the shorter bail swings a little quicker; was 16 and 3.6 on the tall one)
 			_angVel += (push * 9f - _ang * k - _angVel * c) * dt;
 			_ang += _angVel * dt;
 			_ang = _ang.Clamp(new Vector2(-0.45f, -0.5f), new Vector2(0.45f, 0.5f));
@@ -179,6 +181,10 @@ public partial class HeldLantern : HeldItem
 		// the flame's light from its glass; the violet bulb with the blacklight
 		if (_model.GetNodeOrNull<MeshInstance3D>("UvBulb") is { } uv) uv.Visible = _lantern.Blacklight;
 		AmberGlass.Emission = _lantern.Blacklight ? new Color(0.4f, 0.15f, 0.9f) : new Color(1f, 0.52f, 0.2f);
+		// (2026-10-13, the owner: the flame brighter, the blacklight as it was: the glass glows and the hand is lit a little
+		// more by the flame; the blacklight's 0.9 and 1.1 unchanged)
+		AmberGlass.EmissionEnergyMultiplier = _lantern.Blacklight ? 0.9f : 1.2f;
+		_fill.LightEnergy = _lantern.Blacklight ? 1.1f : 1.3f;
 		_fill.LightColor = _lantern.Blacklight ? new Color(0.5f, 0.3f, 1f) : new Color(1f, 0.66f, 0.36f);
 		_lantern.HeldFlameAt = Raise > 0.05f ? FlameWorld : null;
 	}

@@ -68,6 +68,8 @@ public partial class OpeningAtCar : Node3D
 		}
 		// The rig resets its pitch when the level boots: look into the trunk again right before the picture comes up.
 		rig.SetPitch(Mathf.DegToRad(LookIntoTrunkPitch));
+		// (the level's shaders built before the picture comes up: on a slow machine the cards can end first; the lag pass)
+		await Systems.ShaderWarmup.WaitReady(this, ct);
 		await fader.Fade(0f, quick ? 0.2f : 2.4f, ct);
 		if (!quick) await Cutscene.Wait(this, 1.0f, ct);
 		if (!Alive(player)) return;

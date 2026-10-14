@@ -102,13 +102,25 @@ public partial class EquippedItemHud : CanvasLayer
 		_draw.QueueRedraw();
 	}
 
+	/// <summary>What the story wants in hand when the level comes up (Act 24 after a Continue or a death: the flamethrower),
+	/// taken the moment it's carried; set by <see cref="Prefer"/>.</summary>
+	private static ToolKind _preferred = ToolKind.None;
+
+	/// <summary>Puts <paramref name="kind"/> in hand (now if the HUD is up and it's carried, else as soon as it is).</summary>
+	public static void Prefer(SceneTree tree, ToolKind kind)
+	{
+		_preferred = kind;
+		if (tree?.GetFirstNodeInGroup("equipped_item_hud") is EquippedItemHud hud && IsInstanceValid(hud)) hud.Refresh();
+	}
+
 	private void Refresh()
 	{
 		if (_inv == null || !IsInstanceValid(_inv)) { _draw.Visible = false; return; }
 		var now = _inv.OwnedItems().ToArray();
 		// a new pickup comes to hand; if the one in hand is gone, the first takes its place
 		var added = now.Where(n => !_items.Any(o => o.Kind == n.Kind)).ToArray();
-		if (_items.Length > 0 && added.Length > 0) { _held = added[^1].Kind; _flash = 1f; _strike = 0f; _ring = 1f; _wantedUntil = _clock + 4.5; }
+		if (_preferred != ToolKind.None && now.Any(n => n.Kind == _preferred)) { _held = _preferred; _preferred = ToolKind.None; }
+		else if (_items.Length > 0 && added.Length > 0) { _held = added[^1].Kind; _flash = 1f; _strike = 0f; _ring = 1f; _wantedUntil = _clock + 4.5; }
 		else if (!now.Any(n => n.Kind == _held)) _held = now.Length > 0 ? now[0].Kind : ToolKind.None;
 		_items = now;
 		_draw.Visible = now.Length > 0;

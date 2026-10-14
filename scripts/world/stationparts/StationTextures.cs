@@ -86,7 +86,11 @@ public static class StationTextures
 	// ------------------------------------------------------------------ walls and floors
 
 	/// <summary>Faded sage-and-cream striped wallpaper with a small damask dot between the stripes.</summary>
-	public static StandardMaterial3D WallpaperMat => Std("st_wallpaper", Make("st_wallpaper", 64, 64, (x, y) =>
+	// (2026-10-13, the look audit: the lobby's cream paper under its lamp and the lantern read near white, a clean bright
+	// room; aged a step darker and yellower, the texture as it was)
+	public static StandardMaterial3D WallpaperMat => Aged(WallpaperFresh, new Color(0.74f, 0.7f, 0.6f));
+	private static StandardMaterial3D Aged(StandardMaterial3D m, Color c) { m.AlbedoColor = c; return m; }
+	private static StandardMaterial3D WallpaperFresh => Std("st_wallpaper", Make("st_wallpaper", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 4, 3, 11);
 		bool stripe = (x / 8) % 2 == 0;

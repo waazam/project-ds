@@ -98,7 +98,7 @@ public partial class StoryTest : Node
 	private static int ActOf(StepDef s) => s.Act.StartsWith("Acts 8-10") ? 8 : int.TryParse(s.Act.Split(' ')[1].TrimEnd(':'), out int n) ? n : 0;
 
 	/// <summary>The save a full run would have written by the start of <paramref name="act"/> (3..11).</summary>
-	private static (Checkpoint cp, string[] flags, string inventory) StateFor(int act)
+	internal static (Checkpoint cp, string[] flags, string inventory) StateFor(int act)
 	{
 		const string F = "";
 		string[] f2 = { StoryManager.Flag.StairsClimbed };
@@ -193,6 +193,7 @@ public partial class StoryTest : Node
 			_input.Scripted = true;
 			_lastPos = _player.GlobalPosition;
 			if (TryStoryFrom()) return;   // the Hollow's StoryTest resumes at the chosen act
+			if (Act1ApproachMode() is { Length: > 0 } approach) { _s.CurrentAct = $"Act 1 approach: {approach}"; await Act1Approach(approach, _cts.Token); Finish(); return; }
 			string level = GetTree().CurrentScene?.SceneFilePath ?? "";
 			while (_s.Step < _steps.Count)
 			{
@@ -220,9 +221,10 @@ public partial class StoryTest : Node
 					}
 				}
 				_s.CurrentAct = step.Act;
+				PerfProbe.Act = step.Act;
 				GD.Print($"[storytest] ---- {step.Act}");
 				var t0 = Time.GetTicksMsec();
-				await step.Run(_cts.Token);
+				await (MeasureWalks ? MeasureFor(step) : step.Run)(_cts.Token);
 				if (_cts.IsCancellationRequested) return;   // the level changed under us: the next level's StoryTest resumes
 				GD.Print($"[storytest] {step.Act} took {(Time.GetTicksMsec() - t0) / 1000.0:0.0}s");
 				// the audio sweep's QA: every act's sounds on real buses, bounded, not too loud, freed when done,
@@ -472,21 +474,39 @@ public partial class StoryTest : Node
 		float s = Mathf.Max(0f, terrain.TrailLength - 25f);
 		var start = terrain.TrailPoint(s, out var tangent);
 		await Teleport(start, start + tangent * 10f, ct);
+		bool titleEarly = StoryManager.Instance.HasFlag(ChapterCard.Flag(2));
 		if (fir != null)
 		{
-			// walk on toward it, looking at it, until it goes
+			// walk on toward it, looking at it: it creaks as they near, and comes down once they're near enough and
+			// looking (2026-10-13: the falls wait to be seen); they stop and watch it, and the walls' first trees after it
 			var firFoot = new Vector3(fir.Root.X, terrain.HeightAt(fir.Root.X, fir.Root.Y), fir.Root.Y);
-			_ = WalkTo(start + tangent * 6f, 1f, ct);
-			await Aim(firFoot + Vector3.Up * 7f, ct);
-			await WaitUntil(() => fir.Falling, 6, ct);
-			Check("it creaks and starts to come down as they near", fir.Falling || fir.Fallen);
-			await Seconds(3.6, ct);
-			await Aim(firFoot + Vector3.Up * 4f, ct);
-			Screenshot("fir_falling");
+			await Aim(firFoot + Vector3.Up * 6f, ct);
+			bool Cracked() => fir.Fallen || (fir.Falling && !fir.Held);
+			await WalkTo(terrain.TrailPoint(terrain.TrailLength, out _), 1.5f, ct, stopWhen: Cracked, giveUp: 20f);
+			Check("it creaks as they near, and comes down once they're looking", Cracked() && falls is { FirSeen: true },
+				$"{Flat(_player.GlobalPosition).DistanceTo(Flat(firFoot)):0} m from its foot");
+			Check("they stop to watch it fall", falls is { Watching: true });
+			// stood still, pressing on (not touching the mouse): their pace dies away, the view is drawn to the falls
+			float slowest = 99f; ulong t0 = Time.GetTicksMsec(); bool shot = false;
+			while (falls is { Watching: true } && Time.GetTicksMsec() - t0 < 45000)
+			{
+				_input.ScriptedMove = new Vector2(0, 1);
+				await Frames(1, ct);
+				if (Time.GetTicksMsec() - t0 > 1500) slowest = Mathf.Min(slowest, _player.GroundSpeed);
+				if (!shot && Time.GetTicksMsec() - t0 > 2500) { Screenshot("fir_falling"); shot = true; }
+			}
+			_input.ScriptedMove = Vector2.Zero;
+			Check("their pace dies away while the trees come down", slowest < 0.3f, $"slowest {slowest:0.00} m/s");
+			if (falls != null)
+				Check("the walls' first trees come down after it while they watch, and the stop is brief", falls.LastWatchFalls >= 2 && falls.LastWatchSeconds < falls.WatchMax,
+					$"{falls.LastWatchFalls} came down (the fir too) in {falls.LastWatchSeconds:0.0} s");
 			await WaitUntil(() => fir.Fallen, 12, ct);
 			Check("the dead fir came down across the trail, and lies there", fir.Fallen);
 			Screenshot("fir_down");
+			await WaitUntil(() => _player.WadeScale > 0.98f, 6, ct);
+			Check("and their pace comes back", _player.WadeScale > 0.98f, $"pace {_player.WadeScale:0.00}");
 		}
+		Check("no title over the stairs from the fallen fir (they can't see the stairs yet)", !titleEarly && !StoryManager.Instance.HasFlag(ChapterCard.Flag(2)));
 		var route = RouteFrom(_player.GlobalPosition);
 		bool ok = true;
 		foreach (var p in route)
@@ -499,9 +519,12 @@ public partial class StoryTest : Node
 		{
 			Check("trees came down beside the way, left and right, as they went", falls.SideStarted >= 5, $"{falls.SideStarted} of {falls.SideCount}");
 			Check("and across it behind them", falls.BehindStarted >= 2, $"{falls.BehindStarted}");
+			Check("the falls ahead of them came down in view", falls.SeenFalls >= 5 && falls.UnseenFalls <= 1, $"seen {falls.SeenFalls}, unseen {falls.UnseenFalls}");
 			Check("they come down flat on the ground, not propped on their branches", falls.MaxRestTip < 0.5f, $"highest {falls.MaxRestTip:0.00} m");
 		}
 		Screenshot("stairs_found");
+		Check("the stairs' title only once they're close and the stairs in view", climb.Revealed && climb.RevealedAt <= climb.RevealRange + 0.5f,
+			$"revealed {climb.Revealed} at {climb.RevealedAt:0.0} m");
 		if (StoryBeat.Atmosphere(this) is { } atm)
 			Check("the fog thickest by the stairs: a third denser again than at the fallen fir", atm.Act1StairsFog > 0.6f && atm.VisibilityMetres < atm.Act1NearEnd * 0.85f,
 				$"stairs {atm.Act1StairsFog:0.00}, seeing {atm.VisibilityMetres:0.0} m");
@@ -607,9 +630,10 @@ public partial class StoryTest : Node
 		var campNote = AllOf<Readable>().OrderBy(r => r.GlobalPosition.DistanceTo(lantern.GlobalPosition)).FirstOrDefault();
 		if (campNote != null && campNote.GlobalPosition.DistanceTo(lantern.GlobalPosition) < 6f) await ReadIt(campNote, ct);
 		else Check("R.H.'s note at the camp", false);
-		// His note says: a bunker, a steel door, four numbers. The corner tracker starts right there, empty.
+		// His note says: a bunker, a steel door, four numbers. (2026-10-13: no code tracker on the HUD any more: the player
+		// remembers the digits themselves.)
 		await Seconds(0.6, ct);
-		Check("the code tracker starts with the note", StoryManager.Instance.HasFlag(Camp.NoteReadFlag) && (CodeLockOverlay.Instance?.TrackerText ?? "").Contains("_ _ _ _"), $"tracker '{CodeLockOverlay.Instance?.TrackerText}'");
+		Check("the camp note is read", StoryManager.Instance.HasFlag(Camp.NoteReadFlag));
 		await UseIt(lantern, ct);
 		await UseIt(compass, ct);
 		Check("lantern and compass in hand", _inv.HasLantern && _inv.HasCompass);
@@ -746,6 +770,8 @@ public partial class StoryTest : Node
 		Screenshot("cabin_inside");
 		var post = Pickups(ToolKind.NewelPost).FirstOrDefault();
 		Check("the newel post is on the table", post != null);
+		var act6Spawn = AllOf<Act6ClearingEvent>().FirstOrDefault();
+		Check("the clearing's stairs aren't there yet", act6Spawn is { Spawned: false, MiniStairCount: 0, BloodRaining: false }, $"spawned {act6Spawn?.Spawned}, minis {act6Spawn?.MiniStairCount}");
 		// The moment they are in: three quick knocks on the wall outside, and the door slams shut behind
 		// them (Dan, 2026-09-22); E on it swings it open again. No lines anywhere in here.
 		var reveal = FirstOf<FriendReveal>();
@@ -767,6 +793,12 @@ public partial class StoryTest : Node
 		if (cabin.DoorReopen != null) await UseIt(cabin.DoorReopen, ct);
 		await Seconds(0.7, ct);
 		Check("the door opens again with E", cabin.DoorReopen == null);
+		// The clearing spawns as the door opens to leave (Dan, 2026-10-13), the blood rain with it, unseen by the cabin.
+		await WaitUntil(() => act6Spawn is { Spawned: true, MiniStairCount: 15, Fenced: true }, 3, ct);
+		Check("the clearing's stairs, ring and blood rain spawn as the door opens", act6Spawn is { Spawned: true, MiniStairCount: 15, Fenced: true, BloodRaining: true } && StoryManager.Instance.Current < Checkpoint.Act6BridgeCrossed,
+			$"spawned {act6Spawn?.Spawned}, minis {act6Spawn?.MiniStairCount}, fenced {act6Spawn?.Fenced}, blood {act6Spawn?.BloodRaining}");
+		Check("none of the blood rain is seen by the cabin", act6Spawn is { BloodPresence: < 0.05f }, $"presence {act6Spawn?.BloodPresence:0.00}");
+		Check("the blood rain brings no storm back", StormController.Instance is not { Active: true });
 		await WalkTo(cabin.DoorCenter, 0.6f, ct);
 		await WalkTo(cabin.GlobalTransform * new Vector3(-6f, 0f, 3.5f), 1f, ct);
 		await WaitUntil(() => StoryManager.Instance.HasFlag(StoryManager.Flag.DawnBroke), 8, ct);
@@ -794,6 +826,7 @@ public partial class StoryTest : Node
 		var clearing = GetTree().GetFirstNodeInGroup("stairs_clearing_marker") as Node3D;
 		if (clearing == null) return;
 		var act6 = AllOf<Act6ClearingEvent>().FirstOrDefault();
+		Check("over the bridge, the blood rain is all there", act6 is { BloodRaining: true, BloodPresence: > 0.95f }, $"raining {act6?.BloodRaining}, presence {act6?.BloodPresence:0.00}");
 		// "Come up and see" starts as soon as the creek is crossed (Dan, 2026-09-22), long before the ring.
 		await WaitUntil(() => act6 is { LoopVoiceCount: >= 1 }, 12, ct);
 		Check("the voice starts calling as soon as the creek is crossed", act6 is { VoiceCalling: true, LoopVoiceCount: >= 1 }, $"calling {act6?.VoiceCalling}, {act6?.LoopVoiceCount} calls");
@@ -1012,6 +1045,7 @@ public partial class StoryTest : Node
 		Check("the last landing ends in the fall", act6 is { LoopDone: true });
 		Check("the fall is the saved beat", StoryManager.Instance.HasFlag(StoryManager.Flag.ClearingLoopDone));
 		Check("the fall went off the edge, clear of the flight", act6 is { FallClearOfFlight: true });
+		Check("the fall's eye path met nothing on the way down (swept against the stone)", act6 is { FallPathClear: true });
 		Check("the voice kept calling during the loop", act6 is { LoopVoiceCount: >= 1 }, $"{act6?.LoopVoiceCount} calls");
 		Check("blood rained harder with every flight", bloodRose);
 		Check("every hand-off landed part way along a flight, never near its foot", landedMidFlight && fractions.All(f => f is >= 0.3f and <= 0.75f), $"landed at {string.Join(", ", fractions.Select(f => f.ToString("0.00")))}");
@@ -1222,7 +1256,6 @@ public partial class StoryTest : Node
 		var lot = FirstInGroup<SurveyLot>("survey_lot");
 		string read = lot?.Known ?? "";
 		Check("the four notes' digits were read on the way", lot != null && lot.ReadCount == 4 && read == lot.Code, $"known {read}, code {lot?.Code}");
-		Check("the tracker shows the whole code", (CodeLockOverlay.Instance?.TrackerText ?? "").Replace(" ", "").EndsWith(lot?.Code ?? "?"), $"'{CodeLockOverlay.Instance?.TrackerText}'");
 		// the blacklight footprints lead to the door (a look along them)
 		if (lot != null)
 		{
@@ -1249,7 +1282,15 @@ public partial class StoryTest : Node
 		Screenshot("dial");
 		if (CodeLockOverlay.Instance is { IsOpen: true } dial)
 		{
-			Check("the dial comes up pre-filled with the digits found", dial.Entered == lot?.Code, $"wheels {dial.Entered}");
+			// (2026-10-13) the wheels start at nought: the code is entered from memory, never filled in
+			Check("the dial comes up at nought, not filled in", dial.Entered == "0000", $"wheels {dial.Entered}");
+			// the player dials the code they remember, wheel by wheel through their own keys
+			for (int w = 0; w < 4 && lot != null; w++)
+			{
+				if (w > 0) await Key("move_right", ct);
+				for (int turns = 0; turns < 10 && dial.Entered[w] != lot.Code[w]; turns++) await Key("move_forward", ct);
+			}
+			Check("the remembered code is dialled", dial.Entered == lot?.Code, $"wheels {dial.Entered}");
 			// Through the player's own keys (the overlay's input path), not the test shortcut: turn the wheel under the
 			// cursor one notch (a wrong code), try it, turn it back, try again.
 			string before = dial.Entered;
@@ -1523,12 +1564,36 @@ public partial class StoryTest : Node
 		await WaitUntil(() => crossing.Paddling, 8, ct);
 		Check("pushed off from the dock and handed the oars over", crossing.Paddling);
 
-		Engine.TimeScale = 3.0;
-		await PaddleUntil(() => crossing.Progress > 0.3f || crossing.InBreach, ct, 45);
-		Check("rowing makes way: strokes counted, the boat moving", crossing.StrokeCount > 4 && crossing.Speed > 0.5f, $"{crossing.StrokeCount} strokes, {crossing.Speed:0.0} m/s");
+		// (2026-10-13) the crossing at real speed, so its times are a player's: W rows on its own rhythm, Shift rows
+		// hard, A/D steer; alternating A and D still rows the old way
+		Engine.TimeScale = 1.0;
+		await RowFor(crossing, 2.5, ct, alternate: true);
+		Check("the old way still rows: alternating A and D", crossing.StrokeCount >= 4 && crossing.Speed > 1.2f, $"{crossing.StrokeCount} strokes, {crossing.Speed:0.0} m/s");
+		await RowFor(crossing, 3.5, ct);
+		Check("holding W rows on its own steady rhythm", crossing.Speed > 2.6f && !crossing.RowingHard, $"{crossing.Speed:0.0} m/s, {crossing.StrokeCount} strokes");
 		Screenshot("rowing_calm");
-		await PaddleUntil(() => !crossing.Paddling || crossing.InBreach, ct, 45);
-		Check("paddled to the breach point", crossing.InBreach || crossing.Progress >= crossing.BreachAtFraction - 0.02f, $"progress {crossing.Progress:0.00}");
+		await RowFor(crossing, 3.0, ct, hard: true);
+		Check("Shift with W rows hard: quicker, and it spends breath", crossing.Speed > 3.6f && crossing.Breath < 0.8f, $"{crossing.Speed:0.0} m/s, breath {crossing.Breath:0.00}");
+		await RowFor(crossing, 1.6, ct, steer: 1);
+		float off = crossing.Sideways;
+		Check("D steers the boat across", Mathf.Abs(off) > 0.8f, $"{off:0.0} m off the line");
+		await RowFor(crossing, 3.5, ct);
+		Check("let go and she eases back toward the line for the station", Mathf.Abs(crossing.Sideways) < Mathf.Abs(off) - 0.3f, $"{off:0.0} -> {crossing.Sideways:0.0} m");
+
+		// the dread starts early: something under the boat, the fog closing in, a limb out on the water
+		await RowUntil(crossing, () => crossing.Bumps >= 1 || crossing.InBreach, ct, 30);
+		await RowFor(crossing, 1.2, ct);
+		Check("something big passes under the boat and bumps the hull", crossing.Bumps >= 1, $"progress {crossing.Progress:0.00}");
+		Screenshot("lake_bump");
+		await RowUntil(crossing, () => crossing.Glimpses >= 1 || crossing.InBreach, ct, 30);
+		await RowFor(crossing, 1.6, ct);
+		Check("a limb surfaces out on the water to watch the boat go by", crossing.Glimpses >= 1);
+		await Aim(crossing.LastScare + Vector3.Up * 3.5f, ct);
+		Screenshot("lake_glimpse");
+		await RowUntil(crossing, () => crossing.InBreach || !crossing.Paddling, ct, 40);
+		Check("rowed to the breach point", crossing.InBreach || crossing.Progress >= crossing.BreachAtFraction - 0.02f, $"progress {crossing.Progress:0.00}");
+		Check("the fog thickened on the water on the way out", crossing.Fog > 0.3f, $"fog {crossing.Fog:0.00}");
+		Check("knocking from under the hull before the breach", crossing.Bumps >= 2, $"{crossing.Bumps} bumps");
 		await WaitUntil(() => crossing.InBreach, 5, ct);
 
 		// the breach, beat by beat
@@ -1557,7 +1622,12 @@ public partial class StoryTest : Node
 		{
 			// First time through: stop rowing. It should catch the boat and drag them under.
 			_s.LakeDeathDone = true;
-			await WaitUntil(() => crossing.Caught, 60, ct);
+			await WaitUntil(() => crossing.Warnings >= 1 || crossing.Caught, 30, ct);
+			bool warnedFirst = crossing.Warnings >= 1 && !crossing.Caught;
+			await Aim(crossing.HunterWorld + Vector3.Up * 1.5f, ct);
+			Screenshot("lake_hunter_close");
+			Check("fair warning before the take: it closes in, knocks, and the prompt goes red", warnedFirst && crossing.Danger > 0.5f, $"gap {crossing.HuntGap:0.0}, danger {crossing.Danger:0.00}");
+			await WaitUntil(() => crossing.Caught, 30, ct);
 			Check("too slow: the hunter catches the boat", crossing.Caught, $"gap {crossing.HuntGap:0.0}");
 			await WaitUntil(() => _player.GlobalPosition.Y < lake.GlobalPosition.Y - 2.5f, 15, ct);
 			Screenshot("drowning");
@@ -1571,10 +1641,24 @@ public partial class StoryTest : Node
 		// Second time: row for it, at full speed, so the hunter falls behind.
 		Engine.TimeScale = 1.0;
 
-		await PaddleUntil(() => crossing.Progress > 0.7f || crossing.Landed, ct, 60);
+		// a steady rower: W held, Shift when it comes for the boat, A/D away from a strike (the prompt lights the key).
+		// `--lake-steady` rows W only (never Shift, never steering): the slowest player who keeps rowing must still make it.
+		bool smartRow = !OS.GetCmdlineUserArgs().Contains("--lake-steady");
+		await RowUntil(crossing, () => crossing.Strikes >= 1 || crossing.Landed, ct, 40, smart: smartRow);
+		await RowFor(crossing, 1.3, ct, smart: smartRow);
+		Check("a limb erupts beside the boat and rears to strike", crossing.Strikes >= 1);
+		await Aim(crossing.LastScare + Vector3.Up * 5f, ct);
+		Screenshot("lake_strike");
+		await RowUntil(crossing, () => crossing.Progress > 0.72f || crossing.Landed, ct, 40, smart: smartRow);
 		Screenshot("rowing_current");
-		await PaddleUntil(() => crossing.Landed, ct, 60);
+		await RowUntil(crossing, () => crossing.FinalDash || crossing.Landed, ct, 40, smart: smartRow);
+		await RowFor(crossing, 1.0, ct, smart: smartRow);
+		Screenshot("lake_final_dash");
+		await RowUntil(crossing, () => crossing.Landed, ct, 40, smart: smartRow);
 		Check("crossed the current and landed", crossing.Landed, $"progress {crossing.Progress:0.00}");
+		Check("it came for the boat (surges) and gave chase to the beach", crossing.Surges >= 1 && crossing.FinalDash, $"{crossing.Surges} surges, dash {crossing.FinalDash}");
+		Check("limbs kept surfacing, closer each time, and two struck at the boat", crossing.Glimpses >= 4 && crossing.Strikes >= 2, $"{crossing.Glimpses} limbs, {crossing.Strikes} strikes, {crossing.StrikeHits} hit");
+		Check("a steady rower makes the crossing in about a minute and a half at most", crossing.CrossingSeconds > 45 && crossing.CrossingSeconds < 95, $"{crossing.CrossingSeconds:0.0} s boarding to the beach");
 		Check("stood up again on the beach", _player.CameraRig.EyeHeight > 1.5f && _player.GlobalPosition.DistanceTo(lake.FarDockWorld) < 1.5f, $"eye {_player.CameraRig.EyeHeight:0.00} at {_player.GlobalPosition}");
 		Screenshot("landed");
 
@@ -1989,7 +2073,7 @@ public partial class StoryTest : Node
 		try
 		{
 			await DescendTo(sw, 8 * 4, ct);
-			Check("walking down: turn 8 reached, never taken back", sw.DeepestRev >= 7 && sw.LoopBacks == 0, $"deepest {sw.DeepestRev}, loops {sw.LoopBacks}");
+			Check("walking down: turn 8 reached", sw.DeepestRev >= 7, $"deepest {sw.DeepestRev}");
 			Screenshot("stairwell_turn8");
 			await Aim(sw.ToGlobal(new Vector3(-Stairwell.H, Stairwell.CornerY(32) + 1.45f, Stairwell.CornerXZ(32).Y)), ct);
 			Screenshot("painted_number");
@@ -1998,6 +2082,7 @@ public partial class StoryTest : Node
 			int revBefore = sw.PlayerRev;
 			int k = CornerOf(sw);
 			double t = 0;
+			float lowest = _player.GlobalPosition.Y, upJump = 0f;
 			_input.ScriptedRun = true;
 			try
 			{
@@ -2009,10 +2094,12 @@ public partial class StoryTest : Node
 					_input.ScriptedMove = new Vector2(0, 1);
 					await Frames(1, ct);
 					t += GetProcessDeltaTime();
+					upJump = Mathf.Max(upJump, _player.GlobalPosition.Y - lowest);
+					lowest = Mathf.Min(lowest, _player.GlobalPosition.Y);
 				}
 			}
 			finally { _input.ScriptedRun = false; _input.ScriptedMove = Vector2.Zero; }
-			Check("running on the stairs: never taken back, further down", sw.LoopBacks == 0 && sw.PlayerRev > revBefore, $"turn {revBefore} -> {sw.PlayerRev}, loops {sw.LoopBacks}");
+			Check("running on the stairs: further down, never moved back up the shaft", upJump < 0.5f && sw.PlayerRev > revBefore, $"turn {revBefore} -> {sw.PlayerRev}, rose {upJump:0.00} m at most");
 			await Frames(10, ct);
 			Check("still on the stairs after it", sw.InShaft(_player.GlobalPosition), $"{_player.GlobalPosition}");
 			Screenshot("after_the_run");
@@ -2181,7 +2268,7 @@ public partial class StoryTest : Node
 			await HallWalk(hw, Act15Hallway.Part1, false, ct);
 			double walked = (Time.GetTicksMsec() - t0) / 1000.0 * Engine.TimeScale;
 			double full = walked * Act15Hallway.Part1 / Mathf.Max(1f, Act15Hallway.Part1 - z0);
-			Check("the narrow stretch: about a minute at a walk (2026-10-12: 45% shorter)", full > 50 && full < 85, $"{full:0} s");
+			Check("the narrow stretch: under a minute at a walk (2026-10-13: a third shorter again)", full > 35 && full < 60, $"{full:0} s");
 			await HallWalk(hw, Act15Hallway.Part1 + Act15Hallway.Taper + 4f, false, ct);
 			Engine.TimeScale = 1.0;
 			await Aim(hw.Shadow.GlobalPosition + Vector3.Up * 1.8f, ct);
@@ -2272,11 +2359,11 @@ public partial class StoryTest : Node
 			}
 			await game;
 			double minutes = (Time.GetTicksMsec() - t1) / 1000.0 * 3.0 / 60.0;
-			Check("red light, green light all the way to the door: never taken", !PlayerDeath.Dying && hw.Reds >= 4, $"{hw.Reds} reds, about {minutes:0.0} min");
+			Check("red light, green light all the way to the door: never taken", !PlayerDeath.Dying && hw.Reds >= 3, $"{hw.Reds} reds, about {minutes:0.0} min");
 			Check("looked round at him in the red and lived", turnedShot);
 			Check("from halfway down the hall, the reds put him in front of you: stand still, then go round him", hw.FrontReds >= 1 && frontOk && frontShot, $"{hw.FrontReds} reds in front");
 			Check("he never stands in front of the door", doorClear);
-			Check("his turns in the red vary (each run of the test takes them in order)", hw.TurnsSeen.Count >= 3, string.Join(", ", hw.TurnsSeen));
+			Check("his turns in the red vary (each run of the test takes them in order)", hw.TurnsSeen.Count >= 2, string.Join(", ", hw.TurnsSeen));
 		}
 		finally { Engine.TimeScale = 1.0; }
 
@@ -2946,7 +3033,7 @@ public partial class StoryTest : Node
 		await WalkTo(stair.BottomWorld, 0.5f, ct, giveUp: 8f);
 		await Aim(stair.PointAt(0.03f) + Vector3.Up * 1.4f, ct);
 		Screenshot("long_stair_bottom");
-		// three minutes at a sprint: run up it for thirty seconds and see how far that got
+		// under a minute at a sprint (2026-10-13): run up it for thirty seconds and see how far that got
 		float p0 = stair.Progress(_player.GlobalPosition);
 		ulong t0 = Time.GetTicksMsec();
 		_input.ScriptedRun = true;
@@ -2955,7 +3042,7 @@ public partial class StoryTest : Node
 		float p1 = stair.Progress(_player.GlobalPosition);
 		double secs = (Time.GetTicksMsec() - t0) / 1000.0;
 		double estimate = (p1 - p0) > 0.001f ? secs / (p1 - p0) : 9999;
-		Check("the long stair takes about three minutes at a sprint", estimate > 140 && estimate < 240, $"{p1 - p0:P1} of the way in {secs:0} s: about {estimate:0} s to the top");
+		Check("the long stair takes under a minute and a half at a sprint", estimate > 30 && estimate < 90,$"{p1 - p0:P1} of the way in {secs:0} s: about {estimate:0} s to the top");
 		Screenshot("long_stair_climbing");
 		// the change from concrete to wood, long and slow
 		foreach (var (at, name) in new[] { (0.3f, "stair_first_timber"), (0.5f, "stair_half_wood"), (0.7f, "stair_mostly_wood"), (0.93f, "stair_old_wood") })
@@ -3300,7 +3387,7 @@ public partial class StoryTest : Node
 		// the seventh chapter's card over the mudroom (UI.ChapterCard): big, red, once
 		await WaitUntil(() => UI.ChapterCard.Shown.Contains(7), 15, ct);
 		await Seconds(2.4, ct);
-		Check("the chapter's title drops: CHAPTER SEVEN, ENJOY YOUR STAY", UI.ChapterCard.Shown.Contains(7) && s.HasFlag(UI.ChapterCard.Flag(7)), string.Join(",", UI.ChapterCard.Shown));
+		Check("the chapter title drops: ENJOY YOUR STAY", UI.ChapterCard.Shown.Contains(7) && s.HasFlag(UI.ChapterCard.Flag(7)), string.Join(",", UI.ChapterCard.Shown));
 		Screenshot("act22_chapter_seven");
 	}
 
@@ -3811,7 +3898,7 @@ public partial class StoryTest : Node
 
 	// ------------------------------------------------------------------ Act 24
 
-	private static readonly string[] Act23Done =
+	internal static readonly string[] Act23Done =
 	{
 		LodgeFlag.Taken(LodgeFlag.Card202), LodgeFlag.Room202Open, LodgeFlag.Taken(LodgeFlag.PantryKey), LodgeFlag.Room202Jammed, LodgeFlag.PantryOpen,
 		LodgeFlag.Taken(LodgeFlag.Card203), LodgeFlag.Room203Open, LodgeFlag.Taken(LodgeFlag.DiningKey), LodgeFlag.Note204, LodgeFlag.Room204Open, LodgeFlag.Room203Jammed,
@@ -4324,10 +4411,13 @@ public partial class StoryTest : Node
 		await Frames(4, ct);
 	}
 
-	/// <summary>Spams the paddle keys in alternation (A, D, A, D...) until <paramref name="done"/>
-	/// is true or <paramref name="giveUp"/> seconds pass, mirroring <see cref="PushFor"/> but
-	/// alternating sides instead of holding one.</summary>
-	private async Task PaddleUntil(Func<bool> done, CancellationToken ct, double giveUp)
+	/// <summary>Rows the boat (Act 12) until <paramref name="done"/> or <paramref name="giveUp"/> seconds
+	/// (a failed check). Holds W; <paramref name="hard"/> adds Shift, <paramref name="steer"/> A or D;
+	/// <paramref name="alternate"/> rows the old way instead, A, D, A, D (about three strokes a second).
+	/// <paramref name="smart"/> rows like a steady player would: Shift while the prompt says it's
+	/// coming (and there's breath), the lit steer key while a limb strikes.</summary>
+	private async Task RowUntil(LakeCrossingEvent crossing, Func<bool> done, CancellationToken ct, double giveUp,
+		bool hard = false, int steer = 0, bool alternate = false, bool smart = false, bool failOnGiveUp = true)
 	{
 		double t = 0, sideTimer = 0; bool left = true;
 		try
@@ -4337,17 +4427,42 @@ public partial class StoryTest : Node
 				ct.ThrowIfCancellationRequested();
 				if (_input.Enabled)
 				{
-					sideTimer -= GetProcessDeltaTime();
-					if (sideTimer <= 0) { left = !left; sideTimer = 0.15; }
-					_input.ScriptedMove = new Vector2(left ? -1f : 1f, 0f);
+					if (alternate)
+					{
+						sideTimer -= GetPhysicsProcessDeltaTime();
+						if (sideTimer <= 0) { left = !left; sideTimer = 0.33; }
+						_input.ScriptedMove = new Vector2(left ? -1f : 1f, 0f);
+						_input.ScriptedRun = false;
+					}
+					else
+					{
+						int s = steer;
+						bool h = hard;
+						if (smart)
+						{
+							s = crossing.DodgeHint;
+							h = (crossing.Danger > 0.5f || crossing.FinalDash) && (crossing.RowingHard || crossing.Breath > 0.3f);
+						}
+						_input.ScriptedMove = new Vector2(s, 1f);
+						_input.ScriptedRun = h;
+					}
 				}
 				await Frames(1, ct);
-				t += GetProcessDeltaTime();
-				if (t > giveUp) { Check("paddling", "made it before giving up", false, $"stuck after {giveUp:0}s"); return; }
+				t += GetPhysicsProcessDeltaTime();
+				if (t > giveUp)
+				{
+					if (failOnGiveUp) Check("rowing", "made it before giving up", false, $"stuck after {giveUp:0}s at progress {crossing.Progress:0.00}");
+					return;
+				}
 			}
 		}
-		finally { if (_input != null) _input.ScriptedMove = Vector2.Zero; }
+		finally { if (_input != null) { _input.ScriptedMove = Vector2.Zero; _input.ScriptedRun = false; } }
 	}
+
+	/// <summary>Rows for <paramref name="seconds"/> (see <see cref="RowUntil"/>).</summary>
+	private Task RowFor(LakeCrossingEvent crossing, double seconds, CancellationToken ct,
+		bool hard = false, int steer = 0, bool alternate = false, bool smart = false)
+		=> RowUntil(crossing, () => crossing.InBreach || crossing.Landed, ct, seconds, hard, steer, alternate, smart, failOnGiveUp: false);
 
 	// ------------------------------------------------------------------ bot
 
@@ -4577,8 +4692,7 @@ public partial class StoryTest : Node
 			Screenshot("ground_marks_blacklight");
 		}
 		await Seconds(0.6, ct);
-		Check($"digit {i + 1} is saved and shown in the tracker", StoryManager.Instance.HasFlag(StoryManager.Flag.CodeDigit(i + 1))
-			&& (CodeLockOverlay.Instance?.TrackerText ?? "").Contains(note.Digit.ToString()), $"tracker '{CodeLockOverlay.Instance?.TrackerText}'");
+		Check($"digit {i + 1} is saved", StoryManager.Instance.HasFlag(StoryManager.Flag.CodeDigit(i + 1)));
 		// back to the flame for the walk on
 		await PressLanternMode(lantern, false, ct);
 		Check("B switches it back to the flame", lantern is { Blacklight: false });
@@ -4607,12 +4721,14 @@ public partial class StoryTest : Node
 	{
 		_s.Checks.Add((act, name, ok, detail ?? ""));
 		_lastEvent = name;
+		PerfProbe.Mark($"check: {name}");
 		GD.Print($"[storytest] {(ok ? "PASS" : "FAIL")} {name} {detail}");
 	}
 
 	private void Screenshot(string label)
 	{
 		_lastEvent = $"screenshot {label}";
+		PerfProbe.Mark(_lastEvent);
 		try
 		{
 			var img = GetViewport()?.GetTexture()?.GetImage();

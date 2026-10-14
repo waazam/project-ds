@@ -72,6 +72,7 @@ public partial class GameFlow : Node
 			AddChild(new World.SnowMaze.EndingDirector { Name = "EndingDirector" });
 		if (GameSettings.Instance.Trailer) AddChild(new TrailerDirector());
 		else if (GameSettings.Instance.ContinueTest) AddChild(new ContinueRoundTripTest());
+		else if (GameSettings.Instance.PlaytestRun) AddChild(new Playtest { Name = "Playtest" });
 		else if (GameSettings.Instance.AutoTest) AddChild(new StoryTest());
 		// the song's synth as the cues for finds and progress (Audio.SongCues)
 		AddChild(new Audio.SongCues { Name = "SongCues" });
@@ -151,14 +152,14 @@ public partial class GameFlow : Node
 
 	[ExportGroup("Wake-up (arriving from the stairs)")]
 	[Export] public float WakeBlackSeconds = 2.5f;
-	[Export] public float WakeSeconds = 7f;
+	[Export] public float WakeSeconds = 8f;
 	[Export] public float WakePitchDegrees = -60f;
 	[Export] public float WakeVignette = 2.4f;
 	[Export] public string WakeLine = "";   // was "This isn't the trail." (self-talk removed, Dan 2026-09-22)
 
 	/// <summary>
 	/// Act 2's end, in the hollow: the stairs have let go of the player somewhere they have never been.
-	/// They come to face down in the dark; their eyes open and fall shut twice, then their sight clears
+	/// They come to face down in the dark; their sight comes up out of the black once and clears
 	/// slowly while their head lifts. Input stays locked throughout (the reference GameFlow took in
 	/// _Ready is released only once they are up), then the one line plays.
 	/// </summary>
@@ -185,20 +186,15 @@ public partial class GameFlow : Node
 			await Cutscene.Wait(this, quick ? 0.2f : WakeBlackSeconds, ct);
 			await ShaderWarmup.WaitReady(this, ct);
 			LogLoad();
-			if (!quick)
-			{
-				await _fader.Fade(0.55f, 1.4f, ct);
-				await _fader.Fade(1f, 1.1f, ct);
-				await Cutscene.Wait(this, 0.8f, ct);
-				await _fader.Fade(0.35f, 1.6f, ct);
-				await _fader.Fade(0.8f, 0.9f, ct);
-			}
+			// (2026-10-13, the owner: "it wakes you up then blacks out again. It should just wake up from the black out") one
+			// wake, straight out of the black: no blinks (it opened to half, shut again, opened, shut, then cleared, which read
+			// as a second blackout). The black lifts slowly at first, then clears as the head comes up.
 			float seconds = quick ? 0.4f : WakeSeconds;
 			float startAlpha = _fader.BlackAlpha;
 			var tween = CreateTween();
 			tween.TweenMethod(Callable.From<float>(p =>
 			{
-				_fader.BlackAlpha = Mathf.Lerp(startAlpha, 0f, p);
+				_fader.BlackAlpha = Mathf.Lerp(startAlpha, 0f, Mathf.Clamp(p * 1.15f, 0f, 1f));   // (clear a little before the head's up)
 				post?.SetShaderParameter("vignette", Mathf.Lerp(WakeVignette, baseVignette, p));
 				rig.SetPitch(Mathf.Lerp(downPitch, levelPitch, Mathf.SmoothStep(0.25f, 1f, p)));
 			}), 0f, 1f, seconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);

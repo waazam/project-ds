@@ -111,6 +111,14 @@ public partial class StationBasement : Node3D
 			if (s.HasFlag(StoryManager.Flag.StationBasementDrained)) { Drained = true; Turns = TurnsNeeded; SetDrained(); }
 			if (s.HasFlag(StoryManager.Flag.StationClockBroken)) { ClockBroken = true; BreakClock(false); }
 		}
+		// the clock's burst of dust drawn once in the build's black, and its sounds read (the lag pass, 2026-10-13: made on
+		// the spot as it broke, its first sight held the game a tenth of a second)
+		if (!ClockBroken)
+		{
+			Systems.ShaderWarmup.Prewarm(this, ClockDust(Vector3.Zero));
+			GD.Load<AudioStream>("res://assets/audio/sfx/clock_break.wav");
+			GD.Load<AudioStream>("res://assets/audio/sfx/clock_chime_drowned.wav");
+		}
 		// brick down here: the room rings, the stairs are a narrow throat; water drips in the dark
 		AudioDirector.Zone(this, new Vector3((MinX + MaxX) * 0.5f, Floor + RoomHeight * 0.5f, (MinZ + StairBottom) * 0.5f), new Vector3(MaxX - MinX, RoomHeight, StairBottom - MinZ), AudioDirector.Space.Hall, "BasementVerb");
 		AudioDirector.Zone(this, new Vector3(0, Floor * 0.5f + 1f, StairBottom * 0.5f), new Vector3(2.2f, -Floor + 2.4f, -StairBottom), AudioDirector.Space.Tunnel, "BasementStairVerb");
@@ -716,21 +724,23 @@ public partial class StationBasement : Node3D
 				Vector3 p = (at + new Vector3(0, 1.85f, 0.3f)).Lerp(keyAt, u);
 				key.Position = p + Vector3.Up * Mathf.Sin(u * Mathf.Pi) * 0.7f;
 			}), 0f, 1f, 0.7f);
-			var dust = new GpuParticles3D
-			{
-				Name = "Dust", Amount = 40, Lifetime = 1.6, OneShot = true, Explosiveness = 0.9f, Position = at + Vector3.Up * 1.1f,
-				ProcessMaterial = new ParticleProcessMaterial { Spread = 180f, InitialVelocityMin = 0.5f, InitialVelocityMax = 2f, Gravity = new Vector3(0, -1.5f, 0), ScaleMin = 1f, ScaleMax = 2.5f },
-				DrawPass1 = new QuadMesh
-				{
-					Size = Vector2.One * 0.25f,
-					Material = new StandardMaterial3D { AlbedoTexture = LakeParts.LakeFx.SoftDot(), AlbedoColor = new Color(0.4f, 0.36f, 0.3f, 0.5f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded },
-				},
-			};
+			var dust = ClockDust(at + Vector3.Up * 1.1f);
 			AddChild(dust);
 			dust.Emitting = true;
 			dust.Finished += dust.QueueFree;
 		}
 	}
+
+	private static GpuParticles3D ClockDust(Vector3 at) => new()
+	{
+		Name = "Dust", Amount = 40, Lifetime = 1.6, OneShot = true, Explosiveness = 0.9f, Position = at,
+		ProcessMaterial = new ParticleProcessMaterial { Spread = 180f, InitialVelocityMin = 0.5f, InitialVelocityMax = 2f, Gravity = new Vector3(0, -1.5f, 0), ScaleMin = 1f, ScaleMax = 2.5f },
+		DrawPass1 = new QuadMesh
+		{
+			Size = Vector2.One * 0.25f,
+			Material = new StandardMaterial3D { AlbedoTexture = LakeParts.LakeFx.SoftDot(), AlbedoColor = new Color(0.4f, 0.36f, 0.3f, 0.5f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded },
+		},
+	};
 
 	// ------------------------------------------------------------------ sound
 

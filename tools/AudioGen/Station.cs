@@ -43,8 +43,20 @@ public static class Station
 	{
 		var x = Buf(sr, 0.9);
 		for (double t = 0.01; t < 0.6; t += r.R(0.005, 0.04)) Slap(x, r, sr, t, r.LogR(0.1, 0.8) * Env(t / 0.6, 0.1, 0.5), 1500, 8000, r.R(0.001, 0.004), 0.0001);
-		AddTone(x, sr, 0.0, 0.7, u => 100 * (1 - 0.1 * u), u => 0.4 * Env(u, 0.05, 0.6), new[] { 1.0, 0, 0.5, 0, 0.3 });
-		Knock(x, r, sr, 0.05, 0.4, 2400, 8, 0.01);
+		// (2026-10-13, the circus sweep) The buzz was a 100 Hz tone falling 10 % (its 300 Hz partial the loudest): a sad
+		// trombone's "bwow", and the lantern played it every time its flame guttered. Now the filament's arcing: a rough
+		// mains buzz at a fixed pitch, chopped on and off by the bad contact, never sliding.
+		var buzz = new double[x.Length];
+		AddTone(buzz, sr, 0.0, 0.7, u => 120, u => 0.3 * Env(u, 0.05, 0.6), new[] { 0.5, 1.0, 0.7, 0.55, 0.4, 0.3, 0.2 });
+		bool on = true;
+		double next = 0;
+		for (int i = 0; i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			if (t >= next) { on = r.Chance(on ? 0.45 : 0.7); next = t + r.R(0.008, 0.05); }
+			x[i] += buzz[i] * (on ? 1.0 : 0.08) * (1 + 0.3 * r.W());
+		}
+		HighPass(x, sr, 90);
 		return FinishOneShot(x, sr, -3, 60);
 	}
 

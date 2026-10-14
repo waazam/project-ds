@@ -55,11 +55,67 @@ public partial class FirstClimbEvent : StoryTrigger
 	protected override bool AlreadyHappened(StoryManager s) => s.Current >= Checkpoint.Act2StairsClimbed;
 	protected override bool CanFire(StoryManager s, PlayerController p) => s.Current < Checkpoint.Act2StairsClimbed;
 
+	[ExportGroup("The reveal")]
+	/// <summary>The game's title over the stairs (2026-10-13, the owner: "I don't want to see the stairs text on the screen
+	/// until the player is close to the stairs and can see them in view"): within this many metres of the flight
+	/// (from the eye), and some point of it on screen within <see cref="RevealCone"/> degrees of the middle of the view,
+	/// nothing solid between.</summary>
+	[Export] public float RevealRange = 18f;
+	[Export] public float RevealCone = 36f;
+
+	/// <summary>For the tests and the title drop: the stairs have been seen, close, by the player (this level).</summary>
+	public bool Revealed { get; private set; }
+	/// <summary>For the tests: how far the player's eye was from the flight when it was revealed.</summary>
+	public float RevealedAt { get; private set; }
+	private static FirstClimbEvent _revealed;
+	/// <summary>The stairs are in view, close (<see cref="ChapterCard.TitleThenStairs"/> waits for this).</summary>
+	public static bool StairsRevealed => _revealed != null && IsInstanceValid(_revealed) && _revealed.Revealed;
+	private double _poll;
+
 	public override void _Ready()
 	{
 		base._Ready();
 		// Deferred: a sibling (the Act 6 clearing event) may still be setting the flight's length.
 		Callable.From(CoverWholeFlight).CallDeferred();
+	}
+
+	public override void _ExitTree()
+	{
+		base._ExitTree();
+		if (_revealed == this) _revealed = null;
+	}
+
+	public override void _Process(double delta)
+	{
+		if (Revealed) { SetProcess(false); return; }
+		var s = StoryManager.Instance;
+		if (s == null || s.Current >= Checkpoint.Act2StairsClimbed || s.HasFlag(ChapterCard.Flag(2))) return;
+		_poll -= delta;
+		if (_poll > 0) return;
+		_poll = 0.1;
+		if (GetParent() is not StaircaseBuilder stairs || StoryBeat.Player(this) is not { } player) return;
+		var eye = player.CameraRig?.Camera?.GlobalPosition ?? player.GlobalPosition;
+		// up the middle of the flight, and the post at the top
+		var xf = stairs.GlobalTransform;
+		for (int k = 0; k <= 6; k++)
+		{
+			int i = (stairs.Steps - 1) * k / 6;
+			var p = xf * new Vector3(0f, (i + 1) * stairs.Rise + 0.35f, -i * stairs.Run - stairs.Run * 0.5f);
+			if (!Act1TreeFalls.InSight(player, p, RevealRange, RevealCone, stairs)) continue;
+			Reveal(eye.DistanceTo(p));
+			return;
+		}
+		if (stairs.HasNewel && Act1TreeFalls.InSight(player, stairs.NewelSeatGlobal.Origin + Vector3.Up * 0.3f, RevealRange, RevealCone, stairs))
+			Reveal(eye.DistanceTo(stairs.NewelSeatGlobal.Origin));
+	}
+
+	private void Reveal(float d)
+	{
+		Revealed = true;
+		RevealedAt = d;
+		_revealed = this;
+		GD.Print($"[story] Act 1: the stairs, in view, {d:0.0} m off");
+		ChapterCard.TitleThenStairs(this);
 	}
 
 	/// <summary>
