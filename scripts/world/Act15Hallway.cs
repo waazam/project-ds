@@ -340,23 +340,44 @@ public partial class Act15Hallway : Node3D
 		sk.Color = new Color(0.6f, 0.6f, 0.55f);
 		var bk = new MeshKit();
 		bk.Mat(new StandardMaterial3D { Roughness = 0.5f, VertexColorUseAsAlbedo = true });
-		Color[] bottle = { new(0.75f, 0.7f, 0.2f), new(0.2f, 0.35f, 0.7f), new(0.85f, 0.85f, 0.8f), new(0.6f, 0.15f, 0.12f), new(0.3f, 0.5f, 0.3f) };
+		// (2026-10-13c: the paint cans, jugs, sprays and bottles turned from their real shapes, labelled and aged; they
+		// were plain coloured cylinders, placeholders. Their own seed: the same shelves every game)
+		var stock = new MeshKit();
+		var shadows = new MeshKit();   // (their shadows from plain stand-ins: a tenth of the triangles in every shadow pass)
+		var srng = new RandomNumberGenerator { Seed = 1616 };
+		JanitorShelf.Kind Pick(float y)
+		{
+			float r = srng.Randf();
+			// the heavy paint low down, the bottles and sprays up high
+			if (y < 0.8f) return r < 0.45f ? JanitorShelf.Kind.Gallon : r < 0.75f ? JanitorShelf.Kind.Jug : JanitorShelf.Kind.Quart;
+			if (y < 1.3f) return r < 0.3f ? JanitorShelf.Kind.Jug : r < 0.55f ? JanitorShelf.Kind.Quart : r < 0.8f ? JanitorShelf.Kind.Spray : JanitorShelf.Kind.Gallon;
+			return r < 0.3f ? JanitorShelf.Kind.Spray : r < 0.55f ? JanitorShelf.Kind.Bottle : r < 0.8f ? JanitorShelf.Kind.Quart : JanitorShelf.Kind.Pint;
+		}
+		// a row of them along a shelf from a to b, facing `face` (yaw), a gap here and there
+		void Row(float y, Vector3 a, Vector3 b, float faceYaw, float gaps = 0.12f)
+		{
+			float len = a.DistanceTo(b), u = srng.RandfRange(0f, 0.04f);
+			var along = (b - a) / len;
+			while (true)
+			{
+				var kind = Pick(y);
+				float w = JanitorShelf.Footprint(kind);
+				if (u + w > len) break;
+				if (srng.Randf() < gaps) { u += srng.RandfRange(0.06f, 0.16f); continue; }
+				var at = a + along * (u + w * 0.5f) + Vector3.Up * (y + 0.015f);
+				JanitorShelf.Add(stock, kind, at, faceYaw + srng.RandfRange(-0.45f, 0.45f), srng);
+				JanitorShelf.ShadowProxy(shadows, kind, at);
+				u += w + srng.RandfRange(0.005f, 0.04f);
+			}
+		}
 		foreach (float y in new[] { 0.5f, 1.05f, 1.6f, 2.1f })
 		{
 			BuildKit.Box(sk, new Vector3(0, y, z1 - 0.2f), new Vector3(ClosetHalf * 2f, 0.03f, 0.36f));
 			BuildKit.Box(sk, new Vector3(-ClosetHalf + 0.18f, y, (z0 + z1) * 0.5f + 0.2f), new Vector3(0.36f, 0.03f, ClosetDepth - 0.8f));
-			for (float x = -ClosetHalf + 0.15f; x < ClosetHalf - 0.1f; x += _rng.RandfRange(0.12f, 0.22f))
-			{
-				bk.Color = bottle[_rng.RandiRange(0, bottle.Length - 1)];
-				float bh = _rng.RandfRange(0.14f, 0.3f), br = _rng.RandfRange(0.035f, 0.06f);
-				bk.Cylinder(new Vector3(x, y + 0.015f, z1 - 0.2f), new Vector3(x, y + 0.015f + bh, z1 - 0.2f), br, br * 0.9f, 8, true);
-			}
-			for (float z = z0 + 0.6f; z < z1 - 0.5f; z += _rng.RandfRange(0.14f, 0.24f))
-			{
-				bk.Color = bottle[_rng.RandiRange(0, bottle.Length - 1)];
-				float bh = _rng.RandfRange(0.12f, 0.26f);
-				bk.Cylinder(new Vector3(-ClosetHalf + 0.18f, y + 0.015f, z), new Vector3(-ClosetHalf + 0.18f, y + 0.015f + bh, z), 0.045f, 0.04f, 8, true);
-			}
+			// the back shelf two deep (the back row a little along, behind the gaps), the side shelf one
+			Row(y, new Vector3(-ClosetHalf + 0.4f, 0, z1 - 0.1f), new Vector3(ClosetHalf - 0.05f, 0, z1 - 0.1f), 0f, 0.4f);
+			Row(y, new Vector3(-ClosetHalf + 0.38f, 0, z1 - 0.28f), new Vector3(ClosetHalf - 0.05f, 0, z1 - 0.28f), 0f);
+			Row(y, new Vector3(-ClosetHalf + 0.18f, 0, z0 + 0.62f), new Vector3(-ClosetHalf + 0.18f, 0, z1 - 0.42f), -Mathf.Pi * 0.5f);
 		}
 		foreach (float x in new[] { -ClosetHalf + 0.02f, ClosetHalf - 0.02f })
 			foreach (float z in new[] { z1 - 0.02f, z1 - 0.38f })
@@ -364,15 +385,19 @@ public partial class Act15Hallway : Node3D
 		// the mop, fallen across the floor, and its bucket
 		sk.Color = new Color(0.45f, 0.32f, 0.2f);
 		sk.Cylinder(new Vector3(0.9f, 0.04f, z0 + 0.5f), new Vector3(-0.3f, 0.03f, z1 - 0.7f), 0.016f, 0.016f, 6, true);
-		bk.Color = new Color(0.7f, 0.68f, 0.6f);
-		bk.Cylinder(new Vector3(-0.35f, 0.02f, z1 - 0.75f), new Vector3(-0.3f, 0.06f, z1 - 0.6f), 0.12f, 0.05f, 8, true);
-		bk.Color = new Color(0.55f, 0.52f, 0.1f);
-		bk.Cylinder(new Vector3(0.75f, 0, z0 + 0.45f), new Vector3(0.75f, 0.32f, z0 + 0.45f), 0.15f, 0.18f, 12, true);
+		var floor = new MeshKit();
+		JanitorShelf.MopHead(floor, new Vector3(-0.3f, 0f, z1 - 0.7f), new Vector3(-0.3f, 0f, z1 - 0.7f) - new Vector3(0.9f, 0f, z0 + 0.5f), srng);
+		JanitorShelf.Bucket(floor, new Vector3(0.75f, 0, z0 + 0.45f), 0.4f);
+		// a tin knocked off the side shelf, in what it spilled
+		JanitorShelf.Spilled(floor, new Vector3(-0.62f, 0f, z0 + 1.15f), 2.2f, new Color(0.3f, 0.1f, 0.07f), srng);
 		// a light switch by the door (Act 16)
 		bk.Color = new Color(0.85f, 0.84f, 0.8f);
 		BuildKit.Box(bk, new Vector3(DoorWidth * 0.5f + 0.25f, 1.25f, z0 + 0.02f), new Vector3(0.08f, 0.12f, 0.02f));
 		sk.CommitTo(this, "Shelves", true);
 		bk.CommitTo(this, "Things", true);
+		stock.CommitTo(this, "Stock", false);
+		shadows.CommitTo(this, "StockShadows", true).CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly;
+		floor.CommitTo(this, "FloorThings", true);
 
 		// the door: it opens into the closet, and shuts behind whoever goes in
 		_doorHinge = new Node3D { Name = "ClosetDoor", Position = new Vector3(-DoorWidth * 0.5f, 0, End + 0.1f) };

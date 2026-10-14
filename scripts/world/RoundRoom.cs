@@ -52,6 +52,24 @@ public partial class RoundRoom : Node3D
 	private StandardMaterial3D _stone;
 	private bool _checkpointed;
 
+	/// <summary>The little room at the top's stone (Act 21 starts in it), and the long stair's way out of it. (2026-10-13c,
+	/// the look audit: with the lantern up close its pale walls went flat and blown out, one bright tone wall to wall.) Its
+	/// own: older and darker than the drum's, rough, with the concrete's relief, so the lantern shows its pits and
+	/// pours and falls off across it. The drum below and the stair above are as they were.</summary>
+	public static StandardMaterial3D TopStone => _topStone ??= MakeTopStone();
+	private static StandardMaterial3D _topStone;
+
+	private static StandardMaterial3D MakeTopStone()
+	{
+		var m = new StandardMaterial3D
+		{
+			ResourceName = "roundroom_top_stone", AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.5f, 0.47f, 0.42f),
+			Roughness = 1f, MetallicSpecular = 0.12f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f,
+		};
+		SurfaceSets.Apply(m, "concrete_b", 1.4f);
+		return m;
+	}
+
 	public override void _Ready() => Callable.From(Build).CallDeferred();
 
 	private void Build()
@@ -451,7 +469,8 @@ public partial class RoundRoom : Node3D
 	{
 		float y0 = Rise + DaisTop;
 		var k = new MeshKit();
-		k.Mat(_stone);
+		k.Mat(TopStone);
+		k.Color = Colors.White;
 		const int n = 28;
 		float segW = Mathf.Tau * (TopR + 0.3f) / n + 0.05f;
 		for (int i = 0; i < n; i++)
@@ -462,7 +481,7 @@ public partial class RoundRoom : Node3D
 			if (way) { Seg(k, dir * (TopR + 0.3f) + Vector3.Up * (y0 + (2.4f + TopH + 0.2f) * 0.5f), new Vector3(segW, TopH + 0.2f - 2.4f, 0.6f), a, true); continue; }
 			Seg(k, dir * (TopR + 0.3f) + Vector3.Up * (y0 + TopH * 0.5f), new Vector3(segW, TopH + 0.4f, 0.6f), a, true);
 		}
-		k.Color = Colors.White * 0.9f;
+		k.Color = Colors.White * 0.8f;
 		k.Cylinder(new Vector3(0, y0 + TopH, 0), new Vector3(0, y0 + TopH + 0.3f, 0), TopR + 0.6f, TopR + 0.6f, 32, true);
 		// the floor ring round the shaft
 		for (int i = 0; i < 48; i++)

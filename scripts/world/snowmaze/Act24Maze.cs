@@ -146,7 +146,7 @@ public partial class Act24Maze : Node3D
 		root.GlobalTransform = _lodge.GlobalTransform;
 		var csg = new CsgCombiner3D { Name = "Snow", UseCollision = true, CollisionLayer = 1, CollisionMask = 0 };
 		root.AddChild(csg);
-		var snow = WinterWoods.SoftSnow;
+		var snow = SnowMazeLook.PackedSnow();   // (2026-10-13c: packed and gouged; the fresh snow read as white plastic in here)
 		// the snow over it all: the long bank, lumpy on top, and the mass it ends in
 		const float seg = 4f;
 		int n = Mathf.CeilToInt((zEnd - z0) / seg);
@@ -217,7 +217,7 @@ public partial class Act24Maze : Node3D
 	{
 		var space = GetWorld3D().DirectSpaceState;
 		var lip = new MeshKit();
-		lip.Mat(WinterWoods.SoftSnow);
+		lip.Mat(SnowMazeLook.PackedSnow());
 		lip.Color = Colors.White;
 		var ice = new MeshKit();
 		ice.Mat(WinterWoods.IceMat);
