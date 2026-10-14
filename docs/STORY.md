@@ -3,6 +3,7 @@
 The authoritative outline of the game's story, act by act. Implementation follows this document. If the game and this document disagree, this document wins; raise the difference with Dan before changing either.
 
 **Revision 4 (2026-10-13): the whole story, as built.** This revision brings the outline up to date with the game through Act 25 and the end. It adds no new story; it describes what the game does, including Dan's changes of 2026-10-13: the falls seen in Act 1 and the title only with the stairs in view, the single wake, the code kept from memory, the clearing and the blood rain coming in at the cabin door, the fall off the edge of the last landing, the new rowing, and the shorter stairwell, hallways and long stair. Earlier revisions:
+- **Revision 4.1 (2026-10-13): owner decisions.** Dan settled the open points against the game as it plays: the rain stops for good when the cap is picked up, still inside the cabin; the code trees stay where they are (two on the walk to the cabin, two on the walk to the bunker) and the code is dialled from memory; the fir holds the player 7 to 9 seconds, and falls anyway after about 25 if they never look; the Act 11 climb stays short (about 32 seconds) and the long stair is 16 flights; the stairwell's music is timed to build to the bottom; every lake crossing has one near miss right behind the boat; "Who are you!" is the player's own shout; the giant paces its sky lane until the player has watched the fire, its rattle riding with it; and two rules loosened (rare one- or two-word thought captions; the album's and the credits' count of 69).
 - Revision 2 (2026-09-22) made the story linear, with no backtracking.
 - Revision 3 (2026-10-04) carried it past Act 11, through the lake, the station, the underground, the church, the winter woods and the lodge.
 
@@ -31,10 +32,10 @@ The player is following his trail without meaning to.
 
 **Dan's rules.**
 - Every voice in the game is deep, never high-pitched: the clearing's voice, the whispers, the choir, the radio, and the wendigo's stolen voices.
-- The player never talks to himself (2026-09-22).
+- The player never talks to himself (2026-09-22). Two exceptions (2026-10-13): a rare thought caption of one or two words (like "Trenches."), and the one line he says aloud, his shout of *"Who are you!"* at the radio in Act 11.
 - The stairs get no backstory.
 - R.H. is never seen.
-- The photos have no checklist.
+- The photos have no checklist (2026-10-13): the album shows a count of how many of the 69 things have been found ("N/69 found") and the credits say "N of 69", but nothing ever lists what is left to find.
 - No sound repeats: many variations, never the same one twice running.
 - Nothing flashes or strobes, and the camera never shakes hard or snaps.
 
@@ -54,7 +55,7 @@ The real horror and scares only start happening after the player finds the stair
 **Photos.** The player carries a camera, and keeps it for the whole game. Right mouse raises it, left mouse takes the picture and Tab opens the album.
 - **Subjects.** They can take pictures of anything: birds, a doe, a frog by the creek, wildflowers, mushrooms, the waterfall, a strange standing stone, or just the trees.
 - **The album.** Every picture goes into the album, scored for clarity, focus, framing and zoom (one to five stars). The camera zooms (x1 to x4), focuses itself, and fires a soft flash in the dark.
-- **No checklist.** Nothing is required and there is no checklist. The album keeps a tally of how many things have been photographed, but never lists what's left. It is all optional, there to add realism: it's what someone could be doing on a trip to the woods before things kick off with the stairs.
+- **No checklist.** Nothing is required and there is no checklist. The album's footer keeps count of how many of the 69 things have been photographed ("N/69 found"), but never lists what's left. It is all optional, there to add realism: it's what someone could be doing on a trip to the woods before things kick off with the stairs.
 - **The player's notes.** After the prints, the album has a page of pencil notes in the photographer's own hand, a line for each thing the first time it's on film.
 
 - There are only 3 birds in the game (cardinals in red, blue and purple). They are gone from Act 2 on.
@@ -67,7 +68,8 @@ The real horror and scares only start happening after the player finds the stair
 **Finding the stairs.** Near the trail's end a leaning board says TRAIL CLOSED / No Entry Past This Point. A dead fir stands at the end of the trail. There is no path past it: the woods make one, and the player sees it happen.
 - **Seen.** Every tree that comes down ahead of them creaks first, and then waits, leaning and groaning, until the player is looking at it; only then does it crack and fall. They fall flat and heavy, never floating or rolling, landing with a heavy thud.
 - **The fir.** It starts to creak as they come near the trail's end, and comes down across the trail, tearing its roots up, once they are close and have it in view.
-- **The stop.** The crack stops them: their legs go, as if startled, and their eyes are drawn (gently, never held) to the falling fir and then to the first trees of the walls coming down after it, one by one. A few seconds later they can walk again.
+- **The stop.** The crack stops them: their legs go, as if startled, and their eyes are drawn (gently, never held) to the falling fir and then to the first trees of the walls coming down after it, one by one. It holds them seven to nine seconds to watch the falls; then they can walk again.
+- **If they never look.** The fir doesn't wait for ever: if the player never turns to it, it comes down anyway after about twenty-five seconds.
 - **The walls.** After that the trees either side of the old way come down as the player nears them, each in view, a wall on the left and then the right. Behind them, once they are past, more come down across the way they came, heard more than seen. None comes down within reach of the player.
 - **The woods wait for the player.** If they wander off, turn back or stand still, nothing goes on without them: the walls come down only while the player is on the way and looking, and never with the player on the wrong side of one. A player who strays off the way into the woods has a tree come down across their path in front of them, in view, and they pull up to watch it land. A player who comes at the way from the side, or goes round the standing fir, starts the walls all the same.
 - The fog keeps thickening all the way to the stairs. The way on is the only way, and it leads to the stairs.
@@ -100,7 +102,7 @@ R.H.'s camp: his tent, a cold fire ring and his pack. On a stump are the lantern
 
 > *"If you're reading this, it got you too. Don't stay out here after dark. There's an old cabin up the hollow. The needle knows the way. Past it there's a bunker. Steel door, four numbers. I put them on the trees on the way, in the ink only the lantern's black light shows. Look close. Not every mark out there is mine. Leave the lantern lit. - R.H."*
 
-There is no count of the code on the HUD: the player has to remember the numbers. Nothing is said.
+The code is 4729. Its four numbers stand on trees at fixed spots, the same every game: the first two on the walk from the camp to the cabin, the last two on the walk from the lookout to the bunker. There is no tracker of the code on the HUD: the player has to remember the numbers and dial them from memory at the bunker's door, with only the blacklight hints below to help. Nothing is said.
 
 **Lantern.** A radial light source:
 - F lights it and puts it out.
@@ -119,7 +121,7 @@ There is no count of the code on the HUD: the player has to remember the numbers
 **Leaving the safe zone.** After picking these up, the moment you step outside the camp's radius (the "safe zone"), the game goes dead silent under the rain, as if you were by the stairs. The rain that has fallen since the wake goes on, low thunder rumbles, and lightning crackles across the sky, distant but bright.
 
 All we hear is the patter of the rain while we follow the compass toward the cabin, following the man who wrote the note.
-- Beside the path on the way, the first two of R.H.'s numbers are brushed big on bare dead trunks in the blacklight's ink. Each is a few metres off the path and a little way round its trunk.
+- Beside the path on the way, the first two of R.H.'s numbers (4 and 7) are brushed big on bare dead trunks in the blacklight's ink, always on the same two trees. Each is a few metres off the path and a little way round its trunk.
 - Round each stand dead trees with marks that aren't his: handprints (most of them clawed), smears, tallies, an eye, struck-out digits. The ground is marked too. They are spread through the trees, not heaped in one spot.
 - Under the flame a number tree is just a dead tree. Only the blacklight on it, from close by, reads it: the number comes up big on screen for a moment, and nothing keeps it for them.
 
@@ -142,7 +144,7 @@ Now and then the dark makes a sound of its own, never seen and never the same tw
 - a twig snapping close behind;
 - three knocks on wood.
 
-(The giant is not seen here; it is saved for the lookout in Act 7.) The compass keeps pointing to the cabin.
+(The giant is not seen here; it is saved for the lookout in Act 7.) The first two of R.H.'s numbers stand on this walk (Act 3), seen only by the blacklight. The compass keeps pointing to the cabin.
 
 ## Act 5: Let Me In
 **Checkpoint 4**, on getting inside the cabin.
@@ -157,14 +159,14 @@ An old cabin stands beside the path in the hollow. Its door has been completely 
 
 > *"It came away in my hand at the top like it wanted to. The cap off the post. The hand hasn't been mine since. I kept the rest of me. The door won't open from in here. I didn't do that. Don't take it back up. Don't take it anywhere. If you get in and I'm gone, I went up."*
 
-On the table in front of his chair is a newel post bulb: the missing stone cap from the top of the stairs, with the same broken neck. The moment the player steps into the room, something pounds on the outside wall beside the table: three heavy blows that shake the view. Right after them the cabin door slams shut behind them on its own, the lantern guttering; E opens it again. The rain falls silent while they are inside. When they pick up the cap, the compass points in a new direction (across the footbridge), and the storm breaks, for good. The moment they open the slammed door to leave with the cap, the clearing beyond the creek (its stairs, its ring of deadfall) and the blood rain come into the world (Dan, 2026-10-13); none of it is seen from the cabin.
+On the table in front of his chair is a newel post bulb: the missing stone cap from the top of the stairs, with the same broken neck. The moment the player steps into the room, something pounds on the outside wall beside the table: three heavy blows that shake the view. Right after them the cabin door slams shut behind them on its own, the lantern guttering; E opens it again. The rain is shut out while they are inside. When they pick up the cap, the compass points in a new direction (across the footbridge), and the storm breaks there and then, for good: the rain stops while they are still inside the cabin (Dan, 2026-10-13), and the drips off the roof and the boughs die away about twelve seconds later. The moment they open the slammed door to leave with the cap, the clearing beyond the creek (its stairs, its ring of deadfall) and the blood rain come into the world (Dan, 2026-10-13); none of it is seen from the cabin.
 
-When they step outside with the cap, the rain has stopped; the boughs drip a little while and fall still. Nothing is said: the player never talks to himself (Dan, 2026-09-22).
+When they step outside with the cap, the rain is already over and the woods are still. Nothing is said: the player never talks to himself (Dan, 2026-09-22).
 
 ## Act 6: Mourning
 **Checkpoint 5**, on crossing the footbridge.
 
-**Outside.** Stepping outside, the rain has stopped. Still night, fog thick between the trees. The blood rain is already falling ahead, unseen by the cabin: it comes in over the walk to the footbridge and is all there once the creek is crossed (Dan, 2026-10-13: "the rain and everything should spawn in when you open the cabin door to leave, but the player won't see all the blood rain till he's over the bridge").
+**Outside.** The rain stopped while they were still in the cabin. Still night, fog thick between the trees. The blood rain is already falling ahead, unseen by the cabin: it comes in over the walk to the footbridge and is all there once the creek is crossed (Dan, 2026-10-13: "the rain and everything should spawn in when you open the cabin door to leave, but the player won't see all the blood rain till he's over the bridge").
 
 **The forest turns menacing.** After the newel post quest triggers, the whole forest shifts into a more menacing tone. The trees are noticeably thicker and taller, casting more shadows. The deeper you go, the ground turns veiny: first something that could be worms, then an interconnected, pulsating veiny mesh on the ground.
 
@@ -196,15 +198,16 @@ When they step outside with the cap, the rain has stopped; the boughs drip a lit
 - If the player comes to the bunker without standing at the lookout, the bunker is Checkpoint 6 instead; the cabin is burning all the same.
 - Before the clearing's loop is done, the bunker's door stays shut and sends them back: something is still calling across the creek.
 
-**Der Riese.** A beat after that, far beyond the burning cabin, a GIANT version of the stalker walks past behind the far tree line.
+**Der Riese.** A beat after that, far beyond the burning cabin, a GIANT version of the stalker walks the one open sky lane behind the far tree line, coming up out of the murk over seconds, never a pop.
 - The gap across the creek is just enough to see only its neck and head moving through the tops of the far trees, to add scale and dread.
-- Not a sound from it but the soft thud of its stride, felt more than heard.
+- It paces the lane, slow pass after slow pass, until the player has stood at the lookout watching the fire (or gone on past it). Then it makes its last pass and dissolves as it walks on out of the lane.
+- Its deep, distant rattle rides with it in bursts, with the soft thud of its stride, felt more than heard.
 - It is gone, never seen again until the last staircase.
 - The player keeps control the whole time; it is a glimpse while they stand looking at the fire.
 
 **No whispers on the walk.** The voice is only ever heard where staircases stand (the clearing behind them, the last staircase ahead); the walk to the bunker is silent of it.
 
-**The bunker.** The compass now points onward to a new structure, a bunker deep in the woods beyond the ridge. The last two of his numbers are on trees beside the path on the way, in the same ink, among the same decoys. Bare footprints in the ink lead from the lookout all the way to the bunker's door. At the bunker the dial on the door starts at nought; the player dials the four from memory, and the four in order open it.
+**The bunker.** The compass now points onward to a new structure, a bunker deep in the woods beyond the ridge. The last two of his numbers (2 and 9) are on trees beside the path on the way, always the same two, in the same ink, among the same decoys. Bare footprints in the ink lead from the lookout all the way to the bunker's door. At the bunker the dial on the door starts at 0000; with no tracker on screen, the player dials the four from memory, and 4729 in order opens it.
 
 ## Act 8: The Bunker
 **Checkpoint 7**, when entering the bunker. Chapter three: *Root of the Problem*.
@@ -247,7 +250,7 @@ With the screens done and the walkie-talkie in hand, the shut door gives: pushin
 ## Act 11: The Third Man
 **The radio.** Once you pick up the radio, a static-y voice begins to ask you questions for the rest of the game.
 - *"Did you see them?"* the radio scoffs out.
-- *"Who are you!"* the player says.
+- *"Who are you!"* the player shouts back: his own voice, dry and unfiltered, not through the radio. It is the only line the player ever says aloud.
 - Static. Radio silence follows.
 
 The compass points onward, deeper into the woods beyond the bunker, to the stairs: the first staircase is standing there again. On the walk the radio asks *"Are you alone out there?"*
@@ -258,7 +261,7 @@ The compass points onward, deeper into the woods beyond the bunker, to the stair
 - It cannot climb: at the foot of the flight it stops, to one side, and stands staring up after them, eyes glowing. It is gone once the cap is back on.
 
 **The climb.** This time the stairs are far bigger and go impossibly high up into the trees, their top lost in the fog.
-- The player climbs them on their own feet, no pull. It takes minutes, and there is no way back down (a couple of treads up, the way behind is closed).
+- The player climbs them on their own feet, no pull. The climb is short, about thirty-two seconds, and there is no way back down (a couple of treads up, the way behind is closed).
 - The hum rises with every step until it is very loud at the top.
 - The stairs themselves say *"come up and see"* only once or twice: once from somewhere up in the fog as the player comes under them, and once about half way up.
 - The radio keeps at them the whole way: *"Don't go up."* as they come under the stairs. Then on the climb: *"Who's there with you?"*, *"Don't. Don't go up there."*, *"Who's that behind you?"* and, near the top, *"Is someone with you?"*
@@ -284,6 +287,7 @@ Over the black, after a silence, the radio asks one last time: *"Did you see the
 - The fog closes in on the water as they go, and thins again over the last stretch so the station comes out of it.
 - Something passes under the boat and bumps the hull. A foghorn sounds far off. A limb covered in bloodshot eyes comes up out of the fog to watch them pass, and slides back under. Something knocks on the planks from below.
 - Then the hush, and an eye the size of a house opens under the water beside them.
+- Every crossing has one near miss, scripted: something surfaces right behind the boat, close enough to touch, and goes under again.
 - Short of halfway, limbs covered in bloodshot eyes breach the water all round, a foghorn blast under them, and the lake turns white-capped. A hundred eyes open and blink together. One limb arches over the boat, looking down into it.
 
 **The hunt.** From then on a limb hunts the boat.
@@ -317,7 +321,7 @@ A puzzle stretch through a station that starts kept and tidy and is left more wr
 ## Act 14: The Stairwell
 **Checkpoint 13**, through the iron door into Room 3: riveted steel, 42 portraits with their faces burnt out. The compass dies here and hunts on its own until the church's great door.
 
-**The descent.** A trench in the floor leads down into the longest descent in the game: square steel stairs round an open well, twenty turns, nearly black. The walls go from clean concrete to oily grime as it goes. Its own music plays from the top landing down.
+**The descent.** A trench in the floor leads down into the longest descent in the game: square steel stairs round an open well, twenty turns, nearly black. The walls go from clean concrete to oily grime as it goes. Its own music comes in partway down, timed so its build lands near the bottom, and fades as they arrive.
 - **The numbers.** The numbers on the landings go wrong: they stick, count back, turn to tallies, and read TURN BACK, YOU WERE TOLD, NEVER.
 - **Other things on the way down:**
   - footsteps across the well, keeping time;
@@ -390,7 +394,7 @@ Before that the dais does nothing: "Nothing. The ring stays red."
 **The ascent.** The dais rises up a shaft into a small room above (**Checkpoint 20**). Chapter six: *The Great Door*. "Up. Always up, from here." The lantern's flame takes again.
 
 ## Act 21: The Church
-**The long stair.** A long straight stair of sixteen flights climbs to the surface, concrete giving way to old timber. At the top a hatch opens into a church's crypt (**Checkpoint 21**); it drops shut behind them and won't lift again. It is winter everywhere now. One of R.H.'s pages lies in the crypt.
+**The long stair.** A long straight stair of 16 flights climbs to the surface, concrete giving way to old timber. At the top a hatch opens into a church's crypt (**Checkpoint 21**); it drops shut behind them and won't lift again. It is winter everywhere now. One of R.H.'s pages lies in the crypt.
 
 **The church.** The church is a Gothic cathedral standing alone in a snowy glade. The compass is still dead in here.
 - **The candles.** Four candles are to be lit with the lighter. When all four burn, a door opens across the church.
@@ -479,7 +483,7 @@ A record off the table falls to the nearest ending.
 After the last act come:
 1. The save that marks the story done (**GameFinished**), and the fade.
 2. The end card, DEAD SILENT.
-3. The player's pictures played back as polaroids, the best of them gathered last, and how many things they photographed.
+3. The player's pictures played back as polaroids, the best of them gathered last, and how many things they photographed ("N of 69").
 4. "GLHFDD", "Thanks for playing.", and the main menu.
 
 A Continue afterwards finds the player where the story ended, by the car.
