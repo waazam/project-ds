@@ -33,9 +33,10 @@ public enum HandPose
 /// <list type="bullet">
 /// <item><b>The socket is this node's origin</b>: put the held thing's grip there (as a child of this node, or at its
 /// transform). Each pose's grip runs along <see cref="GripAxis"/> through it. The node itself is never mirrored, so
-/// anything under it keeps its handedness; only the hand's mesh (the child "Mesh") is.</item>
-/// <item>The poses are modelled once, as the left hand (assets/models/player/fp_hand_L_&lt;pose&gt;.glb); the right is that mesh
-/// mirrored across X, so the two always match.</item>
+/// anything under it keeps its handedness.</item>
+/// <item>The poses are modelled once, as the left hand (assets/models/player/fp_hand_L_&lt;pose&gt;.glb); the right
+/// (fp_hand_R_&lt;pose&gt;.glb) is that mesh mirrored across X in the build, so the two always match (2026-10-14f: its own
+/// file, so its normal map lights it the right way; without one, the left's mesh is mirrored here).</item>
 /// <item>Its own life: set <see cref="Stride"/> (the walk's sway, -1..1, times how much you're moving) and
 /// <see cref="Tension"/> (0..1: sprinting, scared) each frame and it shifts a touch on the grip and tightens on it.
 /// <see cref="HeldItem"/> does this for the hands it builds.</item>
@@ -61,6 +62,7 @@ public partial class FirstPersonHand : Node3D
 	private Node3D _mesh;
 	private float _tension;
 	private float _scale = GloveScale;
+	private bool _mirror;
 
 	/// <summary>The way the pose's grip runs through the socket (this node's own frame; the same for either side).</summary>
 	public Vector3 GripAxis => Pose switch
@@ -81,15 +83,20 @@ public partial class FirstPersonHand : Node3D
 		_ => 0f,
 	};
 
-	public static string ModelPath(HandPose pose) => $"res://assets/models/player/fp_hand_L_{pose.ToString().ToLowerInvariant()}.glb";
+	/// <summary>The pose's model for that side (2026-10-14f: the right is its own mirrored mesh, so its normal map's frame
+	/// and its faces' winding are its own).</summary>
+	public static string ModelPath(HandPose pose, HandSide side = HandSide.Left) =>
+		$"res://assets/models/player/fp_hand_{(side == HandSide.Right ? "R" : "L")}_{pose.ToString().ToLowerInvariant()}.glb";
 
 	/// <summary>A hand in <paramref name="pose"/> for <paramref name="side"/>, its socket at its origin (null if the model's
 	/// missing). <paramref name="scale"/> is the glove's size (the models' own is right for a gloved hand).</summary>
 	public static FirstPersonHand Create(HandSide side, HandPose pose, float scale = GloveScale)
 	{
-		string path = ModelPath(pose);
+		string path = ModelPath(pose, side);
+		bool mirror = false;
+		if (!ResourceLoader.Exists(path)) { path = ModelPath(pose); mirror = side == HandSide.Right; }   // (no right-hand model: the left's, mirrored)
 		if (!ResourceLoader.Exists(path)) return null;
-		var hand = new FirstPersonHand { Name = $"Hand{side}{pose}", Side = side, Pose = pose, _scale = scale };
+		var hand = new FirstPersonHand { Name = $"Hand{side}{pose}", Side = side, Pose = pose, _scale = scale, _mirror = mirror };
 		hand._mesh = GD.Load<PackedScene>(path).Instantiate<Node3D>();
 		hand._mesh.Name = "Mesh";
 		hand.AddChild(hand._mesh);
@@ -108,36 +115,38 @@ public partial class FirstPersonHand : Node3D
 		Settle();
 	}
 
-	/// <summary>The mesh under the socket: mirrored for the right hand, rolled a hair over the grip with the stride, and
-	/// closed a touch tighter (a firm hand: small movements only).</summary>
+	/// <summary>The mesh under the socket: rolled a hair over the grip with the stride, and closed a touch tighter (a firm
+	/// hand: small movements only); mirrored only if the right hand had to borrow the left's model.</summary>
 	private void Settle()
 	{
-		float mirror = Side == HandSide.Right ? -1f : 1f;
+		float side = Side == HandSide.Right ? -1f : 1f;
+		float mirror = _mirror ? -1f : 1f;
 		float roll = 0.012f * Mathf.Clamp(Stride, -1f, 1f) + 0.035f * _tension;
-		var basis = new Basis(GripAxis, roll * mirror);
+		var basis = new Basis(GripAxis, roll * side);
 		float squeeze = 1f - 0.012f * _tension;
 		_mesh.Transform = new Transform3D(basis * Basis.FromScale(new Vector3(mirror * _scale * squeeze, _scale, _scale * squeeze)), Vector3.Zero);
 	}
 
-	private static NoiseTexture2D _grain, _grainRough;
-	private static FastNoiseLite GrainNoise() => new()
+	private static NoiseTexture2D _grain;
+	private static Shader _shader;
+	/// <summary>The glove leather's pebbled grain, as a seamless normal map (cellular noise, made once): the shader lays it
+	/// over the model's baked folds and seams at two sizes (and the sleeve's canvas takes its slubs from it).</summary>
+	private static NoiseTexture2D LeatherGrain => _grain ??= new NoiseTexture2D
 	{
-		NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular, Frequency = 0.11f, Seed = 913,
-		CellularReturnType = FastNoiseLite.CellularReturnTypeEnum.Distance2Sub, FractalType = FastNoiseLite.FractalTypeEnum.Fbm,
-		FractalOctaves = 2, FractalGain = 0.35f,
+		Width = 256, Height = 256, Seamless = true, AsNormalMap = true, BumpStrength = 5f, GenerateMipmaps = true,
+		Noise = new FastNoiseLite
+		{
+			NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular, Frequency = 0.11f, Seed = 913,
+			CellularReturnType = FastNoiseLite.CellularReturnTypeEnum.Distance2Sub, FractalType = FastNoiseLite.FractalTypeEnum.Fbm,
+			FractalOctaves = 2, FractalGain = 0.35f,
+		},
 	};
-	/// <summary>The glove leather's pebbled grain, about a millimetre a pebble (cellular noise as a normal map, seamless, made once).</summary>
-	private static NoiseTexture2D LeatherGrain => _grain ??= new NoiseTexture2D { Width = 256, Height = 256, Seamless = true, AsNormalMap = true, BumpStrength = 6f, Noise = GrainNoise() };
-	/// <summary>The leather's sheen broken up: duller in the grain's hollows (0.72..1 of the material's roughness).</summary>
-	private static NoiseTexture2D LeatherRough => _grainRough ??= new NoiseTexture2D
-	{
-		Width = 256, Height = 256, Seamless = true, Noise = GrainNoise(),
-		ColorRamp = new Gradient { Offsets = new[] { 0f, 1f }, Colors = new[] { new Color(1f, 1f, 1f), new Color(0.72f, 0.72f, 0.72f) } },
-	};
+	private static Shader ArmShader => _shader ??= GD.Load<Shader>("res://assets/shaders/fp_arm.gdshader");
 
-	/// <summary>The modelled arm's materials: coloured by vertex (the leather's wear, its creases and seams, the sleeve); the
-	/// glove worn dark-brown leather, its grain a fine normal mapped from its own three sides (one fused skin: no UVs) and its
-	/// sheen broken up with it; the sleeve matte and drawn both sides (its cuff is open). Nothing casts a shadow.</summary>
+	/// <summary>(2026-10-14f) The modelled arm's materials, all one shader (assets/shaders/fp_arm.gdshader), coloured by the
+	/// model's vertices (the leather's wear, its folds and seams, its baked occlusion; the cloths' tones): the glove worn,
+	/// dull brown leather over its own baked normal map and the shader's grain, its knuckles and fingertips handled
+	/// smooth; the jacket's knitted cuff; its canvas sleeve. Nothing casts a shadow.</summary>
 	public static void Dress(Node3D arm)
 	{
 		foreach (var n in arm.FindChildren("*", "MeshInstance3D", true, false))
@@ -145,35 +154,20 @@ public partial class FirstPersonHand : Node3D
 			var mi = (MeshInstance3D)n;
 			mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
 			for (int si = 0; si < mi.Mesh.GetSurfaceCount(); si++)
-				if (mi.Mesh.SurfaceGetMaterial(si) is StandardMaterial3D sm)
+			{
+				var src = mi.Mesh.SurfaceGetMaterial(si);
+				string name = src?.ResourceName ?? "";
+				int kind = name.StartsWith("fp_cuff") ? 1 : name.StartsWith("fp_sleeve") ? 2 : 0;
+				var m = new ShaderMaterial { Shader = ArmShader, ResourceName = "fp_arm_" + kind };
+				m.SetShaderParameter("kind", kind);
+				m.SetShaderParameter("grain", LeatherGrain);
+				if (kind == 0 && src is BaseMaterial3D bm && bm.NormalTexture != null)
 				{
-					var m = (StandardMaterial3D)sm.Duplicate();
-					bool cloth = sm.ResourceName.StartsWith("fp_sleeve");
-					m.VertexColorUseAsAlbedo = true;
-					m.AlbedoColor = Colors.White;
-					m.AlbedoTexture = null;
-					m.CullMode = cloth ? BaseMaterial3D.CullModeEnum.Disabled : BaseMaterial3D.CullModeEnum.Back;
-					// (2026-10-14e: worn work-glove leather, matte with a low sheen: a glossy one read as latex over bone)
-					m.Roughness = cloth ? 0.95f : 0.74f;
-					m.MetallicSpecular = cloth ? 0.15f : 0.3f;
-					if (!cloth)
-					{
-						m.RimEnabled = true; m.Rim = 0.12f; m.RimTint = 0.4f;
-						if (sm.NormalTexture != null)
-						{
-							// (the modelled hand's own baked map: its folds, seams and grain)
-							m.NormalEnabled = true; m.NormalTexture = sm.NormalTexture; m.NormalScale = 1f;
-							m.RoughnessTexture = null; m.Uv1Triplanar = false;
-						}
-						else
-						{
-							m.NormalEnabled = true; m.NormalTexture = LeatherGrain; m.NormalScale = 0.55f;
-							m.RoughnessTexture = LeatherRough; m.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red;
-							m.Uv1Triplanar = true; m.Uv1Scale = Vector3.One * 38f; m.Uv1TriplanarSharpness = 2f;
-						}
-					}
-					mi.SetSurfaceOverrideMaterial(si, m);
+					m.SetShaderParameter("baked_normal", bm.NormalTexture);
+					m.SetShaderParameter("has_baked", true);
 				}
+				mi.SetSurfaceOverrideMaterial(si, m);
+			}
 		}
 	}
 }
