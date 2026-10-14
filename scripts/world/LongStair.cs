@@ -103,6 +103,24 @@ public partial class LongStair : Node3D
 
 	public override void _Ready() => Build();
 
+	// ---- (2026-10-14c, the graphics pass: "its concrete walls past the arch are still pale and bright under bulbs/lantern")
+	/// <summary>The walls and the ceiling: the deep places' stained concrete, the top room's own tone.</summary>
+	private static StandardMaterial3D WallConcrete => _wallC ??= DeepConcrete.Stained("ls_wall", new Color(0.7f, 0.67f, 0.62f), 0.5f, 1.4f, 0.14f);
+	/// <summary>A second pour of it, darker and browner, at another scale (the old "stained" strips).</summary>
+	private static StandardMaterial3D WallConcreteB => _wallB ??= DeepConcrete.Stained("ls_wall_b", new Color(0.58f, 0.53f, 0.47f), 0.37f, 1.5f, 0.14f);
+	/// <summary>The treads and the landings: trodden concrete, worn paler down the middle by the scan's own wear.</summary>
+	private static StandardMaterial3D TreadConcrete => _tread ??= SurfaceSets.Scan(new StandardMaterial3D
+	{
+		ResourceName = "ls_tread", Roughness = 0.92f, MetallicSpecular = 0.22f, VertexColorUseAsAlbedo = true,
+		Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f,
+	}, "concrete_floor_worn_001", 1f, 1.1f, new Color(0.6f, 0.58f, 0.54f));
+	/// <summary>The steel nosings on the concrete steps: dark, scuffed bright where feet land.</summary>
+	private static StandardMaterial3D NosingMat => _nosing ??= new StandardMaterial3D
+	{
+		ResourceName = "ls_nosing", AlbedoColor = new Color(0.22f, 0.21f, 0.2f), Metallic = 0.6f, Roughness = 0.5f, MetallicSpecular = 0.5f, VertexColorUseAsAlbedo = true,
+	};
+	private static StandardMaterial3D _wallC, _wallB, _tread, _nosing;
+
 	private void Build()
 	{
 		_concrete = new StaticBody3D { Name = "Concrete", CollisionLayer = 1, CollisionMask = 0 };
@@ -150,11 +168,14 @@ public partial class LongStair : Node3D
 	private void BuildChunk(int f0, int f1)
 	{
 		var k = new MeshKit();
-		var concrete = StairwellTextures.CleanMat;
-		var stained = StairwellTextures.StainedMat;
+		// (2026-10-14c: the concrete was the stairwell's pale board-marked and stained sets, bright and flat under the
+		// bulbs and the lantern; now the deep places' stained scan, two pours of it, and the treads their own trodden floor)
+		var concrete = WallConcrete;
+		var stained = WallConcreteB;
+		var treadMat = TreadConcrete;
 		var plank = ChurchTextures.OldPlankMat;
 		var timber = PropTextures.PostMat;
-		var steel = StairwellTextures.SteelMat;
+		var steel = StairwellTextures.RailMat;   // (2026-10-14c: the black rail; the structural steel's 32 px rust chips were blotches on a 2 cm pipe)
 		for (int f = f0; f < f1; f++)
 		{
 			float wood = WoodAt(f);
@@ -164,19 +185,27 @@ public partial class LongStair : Node3D
 			{
 				bool w = Hash(f, i, 11) < wood * 1.1f - 0.05f;
 				float za = z0 + i * Run, top = y0 + (i + 1) * Rise;
-				k.Mat(w ? plank : (Hash(f, i, 12) < 0.3f ? stained : concrete));
-				k.Color = w ? new Color(0.9f, 0.88f, 0.86f) * (0.85f + 0.2f * Hash(f, i, 13)) : Colors.White * (0.8f + 0.12f * Hash(f, i, 14));
+				k.Mat(w ? plank : treadMat);
+				k.Color = w ? new Color(0.9f, 0.88f, 0.86f) * (0.85f + 0.2f * Hash(f, i, 13)) : Colors.White * (0.8f + 0.12f * Hash(f, i, 14)) * (Hash(f, i, 12) < 0.3f ? 0.85f : 1f);
 				// the tread: a slab under its top, from the riser to the next riser
 				BuildKit.Box(k, new Vector3(0, top - 0.06f, za + Run * 0.5f), new Vector3(HalfW * 2f, 0.12f, Run), 1f, BuildKit.Face.NY);
 				// the riser under its front edge, down to the tread below
 				k.Quad(new Vector3(-HalfW, top - 0.12f - Rise + 0.12f, za), new Vector3(HalfW, top - 0.12f - Rise + 0.12f, za), new Vector3(HalfW, top - 0.12f, za), new Vector3(-HalfW, top - 0.12f, za), Vector3.Back,
 					new Vector2(0, Rise), new Vector2(HalfW * 2f, Rise), new Vector2(HalfW * 2f, 0), new Vector2(0, 0));
+				// (2026-10-14c) a concrete step's worn steel nosing, its edge: the flight reads as steps, not a ramp of slabs
+				if (!w)
+				{
+					k.Mat(NosingMat);
+					k.Color = Colors.White * (0.7f + 0.3f * Hash(f, i, 15));
+					BuildKit.Box(k, new Vector3(0, top + 0.002f, za + 0.025f), new Vector3(HalfW * 2f - 0.06f, 0.006f, 0.05f), 1f, BuildKit.Face.NY);
+					BuildKit.Box(k, new Vector3(0, top - 0.02f, za - 0.002f), new Vector3(HalfW * 2f - 0.06f, 0.04f, 0.006f), 1f, BuildKit.Face.PZ);
+				}
 			}
 			// the underside of the flight isn't seen; the landing: a slab at the top of the flight
 			float yl = y0 + FlightRise;
 			bool last = f == Flights - 1;
 			float lz0 = z0 + FlightLen, lz1 = last ? lz0 + TopLanding : lz0 + Landing;
-			k.Mat(wood > 0.55f ? plank : concrete);
+			k.Mat(wood > 0.55f ? plank : treadMat);
 			k.Color = Colors.White * 0.86f;
 			BuildKit.Box(k, new Vector3(0, yl - 0.1f, (lz0 + lz1) * 0.5f), new Vector3(HalfW * 2f, 0.2f, lz1 - lz0), 1f, BuildKit.Face.NY);
 			// ---- collision: a ramp under the nosings, the landing, two walls

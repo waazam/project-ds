@@ -87,6 +87,25 @@ public partial class Act15Hallway : Node3D
 		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps, ResourceName = key,
 	};
 
+	/// <summary>(2026-10-14c) The closet's walls: painted concrete block (the scan's courses, about 20 cm), an old
+	/// institutional cream gone grey, rough.</summary>
+	private static StandardMaterial3D ClosetWallMat => _closetWall ??= SurfaceSets.Scan(new StandardMaterial3D
+	{
+		ResourceName = "hw_closet_wall", Roughness = 0.95f, MetallicSpecular = 0.25f, VertexColorUseAsAlbedo = true,
+		Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.45f,
+	}, "concrete_wall_004", 1f, 1.2f, new Color(0.78f, 0.74f, 0.62f));
+	/// <summary>The closet's floor: worn, stained concrete, darker than the walls.</summary>
+	private static StandardMaterial3D ClosetFloorMat => _closetFloor ??= SurfaceSets.Scan(new StandardMaterial3D
+	{
+		ResourceName = "hw_closet_floor", Roughness = 0.9f, MetallicSpecular = 0.3f, VertexColorUseAsAlbedo = true,
+		Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f,
+	}, "concrete_floor_worn_001", 1f, 1f, new Color(0.6f, 0.57f, 0.52f));
+	private static StandardMaterial3D CoveMat => _cove ??= new StandardMaterial3D
+	{
+		ResourceName = "hw_closet_cove", AlbedoColor = new Color(0.05f, 0.05f, 0.05f), Roughness = 0.7f, MetallicSpecular = 0.3f, VertexColorUseAsAlbedo = true,
+	};
+	private static StandardMaterial3D _closetWall, _closetFloor, _cove;
+
 	private static StandardMaterial3D Glow(Color c, float energy) => new()
 	{
 		AlbedoColor = c, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
@@ -320,20 +339,48 @@ public partial class Act15Hallway : Node3D
 	private void BuildCloset(StaticBody3D body)
 	{
 		float z0 = End + 0.2f, z1 = End + 0.2f + ClosetDepth, h = 2.6f;
+		// (2026-10-14c: painted block walls, a worn concrete floor and a rubber base where they meet; the walls, floor and
+		// ceiling were all one pale board-marked concrete, its pits blown up to the size of coins)
 		var k = new MeshKit();
-		k.Mat(SurfaceSets.Apply(Concrete("hw_closet", StairwellTextures.CleanConcrete, 0.6f), "concrete_clean"));
-		k.Color = new Color(0.75f, 0.73f, 0.68f);
-		void Slab(Vector3 c, Vector3 s)
+		k.Mat(ClosetWallMat);
+		k.Color = Colors.White;
+		var fk = new MeshKit();
+		fk.Mat(ClosetFloorMat);
+		fk.Color = Colors.White;
+		void Slab(MeshKit kit, Vector3 c, Vector3 s, float tint = 1f)
 		{
-			BuildKit.Box(k, c, s, 1f);
+			kit.Color = Colors.White * tint;
+			BuildKit.Box(kit, c, s, 1f);
 			body.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
 		}
-		Slab(new Vector3(-ClosetHalf - 0.1f, h * 0.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, h, ClosetDepth));
-		Slab(new Vector3(ClosetHalf + 0.1f, h * 0.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, h, ClosetDepth));
-		Slab(new Vector3(0, h * 0.5f, z1 + 0.1f), new Vector3(ClosetHalf * 2f + 0.4f, h, 0.2f));
-		Slab(new Vector3(0, h + 0.1f, (z0 + z1) * 0.5f), new Vector3(ClosetHalf * 2f + 0.4f, 0.2f, ClosetDepth));
-		Slab(new Vector3(0, -0.1f, (z0 + z1) * 0.5f), new Vector3(ClosetHalf * 2f + 0.4f, 0.2f, ClosetDepth + 0.2f));
+		Slab(k, new Vector3(-ClosetHalf - 0.1f, h * 0.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, h, ClosetDepth));
+		Slab(k, new Vector3(ClosetHalf + 0.1f, h * 0.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, h, ClosetDepth), 0.94f);
+		Slab(k, new Vector3(0, h * 0.5f, z1 + 0.1f), new Vector3(ClosetHalf * 2f + 0.4f, h, 0.2f), 0.97f);
+		Slab(k, new Vector3(0, h + 0.1f, (z0 + z1) * 0.5f), new Vector3(ClosetHalf * 2f + 0.4f, 0.2f, ClosetDepth), 0.6f);
+		Slab(fk, new Vector3(0, -0.1f, (z0 + z1) * 0.5f), new Vector3(ClosetHalf * 2f + 0.4f, 0.2f, ClosetDepth + 0.2f));
 		k.CommitTo(this, "Closet", true);
+		fk.CommitTo(this, "ClosetFloor", true);
+		// the black rubber base round the foot of the walls (not across the doorway)
+		var cove = new MeshKit();
+		cove.Mat(CoveMat);
+		cove.Color = Colors.White;
+		const float ch = 0.1f, ct = 0.012f;
+		BuildKit.Box(cove, new Vector3(-ClosetHalf + ct * 0.5f, ch * 0.5f, (z0 + z1) * 0.5f), new Vector3(ct, ch, ClosetDepth));
+		BuildKit.Box(cove, new Vector3(ClosetHalf - ct * 0.5f, ch * 0.5f, (z0 + z1) * 0.5f), new Vector3(ct, ch, ClosetDepth));
+		BuildKit.Box(cove, new Vector3(0, ch * 0.5f, z1 - ct * 0.5f), new Vector3(ClosetHalf * 2f - 2f * ct, ch, ct));
+		foreach (float s in new[] { -1f, 1f })
+			BuildKit.Box(cove, new Vector3(s * (DoorWidth * 0.5f + 0.06f + (ClosetHalf - DoorWidth * 0.5f - 0.06f) * 0.5f), ch * 0.5f, z0 + ct * 0.5f),
+				new Vector3(ClosetHalf - DoorWidth * 0.5f - 0.06f - ct, ch, ct));
+		cove.CommitTo(this, "ClosetBase", false);
+		// the door's wall from inside: the same painted block (it was the hall's raw concrete), round the frame
+		var face = new MeshKit();
+		face.Mat(ClosetWallMat);
+		face.Color = Colors.White * 0.97f;
+		float side = ClosetHalf - DoorWidth * 0.5f;
+		foreach (float s in new[] { -1f, 1f })
+			BuildKit.Box(face, new Vector3(s * (DoorWidth * 0.5f + side * 0.5f), h * 0.5f, z0 + 0.0035f), new Vector3(side, h, 0.005f));
+		BuildKit.Box(face, new Vector3(0, (h + 2.15f) * 0.5f, z0 + 0.0035f), new Vector3(DoorWidth, h - 2.15f, 0.005f));
+		face.CommitTo(this, "ClosetDoorWall", true);
 		// shelves down both sides and the back, crowded with bottles, tins and rags
 		var sk = new MeshKit();
 		sk.Mat(StairwellTextures.SteelMat);
@@ -408,17 +455,26 @@ public partial class Act15Hallway : Node3D
 		// the door: it opens into the closet, and shuts behind whoever goes in
 		_doorHinge = new Node3D { Name = "ClosetDoor", Position = new Vector3(-DoorWidth * 0.5f, 0, End + 0.1f) };
 		AddChild(_doorHinge);
+		// (2026-10-14c: its own painted leaf, frame and hardware; it was a box of the shelves' steel, polka-dotted with rust)
 		var dk = new MeshKit();
-		dk.Mat(StairwellTextures.SteelMat);
-		dk.Color = new Color(0.45f, 0.5f, 0.45f);
-		BuildKit.Box(dk, new Vector3(DoorWidth * 0.5f, 1.05f, 0), new Vector3(DoorWidth - 0.02f, 2.1f, 0.05f));
-		dk.Color = new Color(0.8f, 0.78f, 0.7f);
-		BuildKit.Box(dk, new Vector3(DoorWidth - 0.12f, 1.0f, -0.05f), new Vector3(0.1f, 0.03f, 0.04f));
+		dk.Mat(ServiceDoor.LeafMat);
+		var dh = new MeshKit();
+		dh.Mat(ServiceDoor.HardwareMat);
+		dk.Xf = dh.Xf = new Transform3D(Basis.Identity, new Vector3(0.012f, 0, 0));
+		ServiceDoor.Leaf(dk, dh, DoorWidth - 0.024f, 2.12f, 0.05f);
+		// the name plate the stencil's on
+		dh.Color = new Color(0.55f, 0.5f, 0.4f);
+		BuildKit.Box(dh, new Vector3(DoorWidth * 0.5f - 0.012f, 1.6f, -0.027f), new Vector3(0.3f, 0.075f, 0.003f));
 		dk.CommitTo(_doorHinge, "Door", true);
+		dh.CommitTo(_doorHinge, "DoorHardware", true);
+		var frame = new MeshKit();
+		frame.Mat(ServiceDoor.FrameMat);
+		ServiceDoor.Frame(frame, new Vector3(0, 0, 0), DoorWidth, 2.15f, End, End + 0.2f, 0.014f, 0.055f, End + 0.05f);   // (its stop on the hall side: it swings into the closet)
+		frame.CommitTo(this, "DoorFrame", true);
 		var plate = new Label3D
 		{
-			Text = "JANITOR", FontSize = 40, PixelSize = 0.004f, Modulate = new Color(0.85f, 0.83f, 0.75f), OutlineSize = 0,
-			Shaded = true, Position = new Vector3(DoorWidth * 0.5f, 1.6f, -0.035f), Rotation = new Vector3(0, Mathf.Pi, 0),
+			Text = "JANITOR", FontSize = 40, PixelSize = 0.0035f, Modulate = new Color(0.12f, 0.11f, 0.1f), OutlineSize = 0,
+			Shaded = true, Position = new Vector3(DoorWidth * 0.5f, 1.6f, -0.0295f), Rotation = new Vector3(0, Mathf.Pi, 0),
 		};
 		_doorHinge.AddChild(plate);
 		var db = new StaticBody3D { Name = "DoorBody", CollisionLayer = 1, CollisionMask = 0 };

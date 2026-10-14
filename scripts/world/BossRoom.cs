@@ -123,6 +123,17 @@ public partial class BossRoom : Node3D
 		GD.Print("[story] Act 18: the boss room - sixteen valves, the pit, the blood");
 	}
 
+	/// <summary>(2026-10-14c) The way out's plate: the pit's scanned steel, darker, the rust in its seams.</summary>
+	private static StandardMaterial3D DoorPlateMat => _doorPlate ??= SurfaceSets.Scan(new StandardMaterial3D
+	{
+		ResourceName = "pit_door_plate", Roughness = 0.8f, Metallic = 0.45f, VertexColorUseAsAlbedo = true,
+		Uv1Triplanar = true, Uv1WorldTriplanar = false, Uv1Scale = Vector3.One * 0.8f,
+	}, "metal_plate_02", 1f, 1f, new Color(0.62f, 0.6f, 0.57f));
+	/// <summary>(2026-10-14c) The pit's walls: the deep places' stained concrete with its relief (it was a flat drawn
+	/// stain at a big scale, no relief: smooth sheets behind the pipes).</summary>
+	private static StandardMaterial3D ShellMat => _shell ??= DeepConcrete.Stained("pit_shell", new Color(0.6f, 0.56f, 0.52f), 0.3f, 1.5f, 0.2f);
+	private static StandardMaterial3D _doorPlate, _shell;
+
 	private void Slab(MeshKit k, Vector3 c, Vector3 s, bool collide = true, float tint = 1f, float uv = 1f)
 	{
 		k.Color = Colors.White * tint;
@@ -135,11 +146,7 @@ public partial class BossRoom : Node3D
 	private void BuildShell()
 	{
 		var con = new MeshKit();
-		con.Mat(new StandardMaterial3D
-		{
-			AlbedoTexture = StairwellTextures.StainedConcrete, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.2f,
-			Roughness = 0.9f, VertexColorUseAsAlbedo = true, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
-		});
+		con.Mat(ShellMat);
 		float h = Ceil - PitFloor, cy = (Ceil + PitFloor) * 0.5f;
 		Slab(con, new Vector3(-Half - 0.3f, cy, 0), new Vector3(0.6f, h, Half * 2f + 1.2f), true, 0.8f);
 		Slab(con, new Vector3(Half + 0.3f, cy, 0), new Vector3(0.6f, h, Half * 2f + 1.2f), true, 0.8f);
@@ -627,11 +634,27 @@ public partial class BossRoom : Node3D
 		// a steel door in the north wall, shut; behind it, a small clean room with the light on
 		_door = new Node3D { Name = "Door", Position = new Vector3(0, 0, Half + 0.05f) };
 		AddChild(_door);
+		// (2026-10-14c: a heavy plate door, stiffened, in a steel frame; it was a flat box of the stairwell's steel, its rust
+		// chips blown up to spots, standing in a raw hole in the concrete)
 		var d = new MeshKit();
-		d.Mat(StairwellTextures.SteelMat);
-		d.Color = new Color(0.55f, 0.58f, 0.55f);
+		d.Mat(DoorPlateMat);
+		d.Color = Colors.White;
 		BuildKit.Box(d, new Vector3(0, 1.2f, 0), new Vector3(1.3f, 2.4f, 0.08f));
+		d.Color = Colors.White * 0.8f;
+		// on the pit's face: an angle round its edge and three flat stiffeners across it, a lifting lug at its foot
+		BuildKit.Box(d, new Vector3(-0.62f, 1.2f, -0.05f), new Vector3(0.06f, 2.4f, 0.02f));
+		BuildKit.Box(d, new Vector3(0.62f, 1.2f, -0.05f), new Vector3(0.06f, 2.4f, 0.02f));
+		BuildKit.Box(d, new Vector3(0, 2.37f, -0.05f), new Vector3(1.18f, 0.06f, 0.02f));
+		BuildKit.Box(d, new Vector3(0, 0.03f, -0.05f), new Vector3(1.18f, 0.06f, 0.02f));
+		foreach (float y in new[] { 0.62f, 1.22f, 1.82f })
+			BuildKit.Box(d, new Vector3(0, y, -0.055f), new Vector3(1.18f, 0.09f, 0.03f));
+		d.Color = Colors.White * 0.65f;
+		d.Cylinder(new Vector3(-0.08f, 0.2f, -0.06f), new Vector3(0.08f, 0.2f, -0.06f), 0.025f, 0.025f, 8, true);
 		d.CommitTo(_door, "Slab", true);
+		var frame = new MeshKit();
+		frame.Mat(HallwayParts.ServiceDoor.FrameMat);
+		HallwayParts.ServiceDoor.Frame(frame, Vector3.Zero, 1.3f, 2.4f, Half, Half + 0.02f, 0.04f, 0.11f);
+		frame.CommitTo(this, "DoorFrame", true);
 		var db = new StaticBody3D { Name = "DoorBody", CollisionLayer = 1, CollisionMask = 0 };
 		db.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.2f, 0), Shape = new BoxShape3D { Size = new Vector3(1.3f, 2.4f, 0.1f) } });
 		_door.AddChild(db);

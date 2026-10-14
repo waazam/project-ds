@@ -36,6 +36,16 @@ public partial class Act15Hallway
 		// a bare bulb on the ceiling
 		_closetBulb = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.19f, 0.16f), EmissionEnabled = true, Emission = Colors.Black };
 		AddChild(new MeshInstance3D { Name = "ClosetBulb", Mesh = new SphereMesh { Radius = 0.05f, Height = 0.11f }, Position = new Vector3(0, 2.5f, (z0 + z1) * 0.5f), MaterialOverride = _closetBulb });
+		// (2026-10-14c: on a porcelain batten holder; it hung under the ceiling on nothing)
+		var holder = new MeshKit();
+		holder.Mat(new StandardMaterial3D { ResourceName = "closet_porcelain", AlbedoColor = new Color(0.62f, 0.58f, 0.5f), Roughness = 0.45f, VertexColorUseAsAlbedo = true });
+		holder.Color = Colors.White;
+		float cz = (z0 + z1) * 0.5f;
+		holder.Cylinder(new Vector3(0, 2.6f, cz), new Vector3(0, 2.585f, cz), 0.055f, 0.052f, 16, true);
+		holder.Cylinder(new Vector3(0, 2.585f, cz), new Vector3(0, 2.545f, cz), 0.03f, 0.024f, 12, true);
+		holder.Color = new Color(0.4f, 0.34f, 0.2f);   // the brass shell of the socket
+		holder.Cylinder(new Vector3(0, 2.548f, cz), new Vector3(0, 2.535f, cz), 0.017f, 0.016f, 10, true);
+		holder.CommitTo(this, "ClosetBulbHolder", false);
 		_closetLight = new OmniLight3D
 		{
 			Name = "ClosetLight", Position = new Vector3(0, 2.35f, (z0 + z1) * 0.5f), LightEnergy = 0f, OmniRange = 4.5f,

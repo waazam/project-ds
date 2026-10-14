@@ -59,16 +59,28 @@ public partial class RoundRoom : Node3D
 	public static StandardMaterial3D TopStone => _topStone ??= MakeTopStone();
 	private static StandardMaterial3D _topStone;
 
-	private static StandardMaterial3D MakeTopStone()
+	// (2026-10-14c: the stained scan, as the drum below now is, a shade older and darker; it was the pale pitted concrete
+	// darkened, which still read as a print under the lantern)
+	private static StandardMaterial3D MakeTopStone() => DeepConcrete.Stained("roundroom_top_stone", new Color(0.66f, 0.63f, 0.58f), 0.55f, 1.5f, 0.12f);
+
+	/// <summary>(2026-10-14c, the graphics pass: "the round room's pale flat concrete") The drum's stone: the stained scan
+	/// with its relief, its pours and its tie holes, a grey-brown a step lighter than the room at the top. It was the pale
+	/// board-marked concrete at 0.8 with no relief at all: one flat, bright tone under the bulbs.</summary>
+	private static StandardMaterial3D DrumStone => _drumStone ??= DeepConcrete.Stained("roundroom_stone", new Color(0.86f, 0.82f, 0.76f), 0.42f, 1.4f, 0.16f);
+	/// <summary>The drum's floor: worn, trodden concrete, its own (the walls' was on the floor too).</summary>
+	private static StandardMaterial3D FloorStone => _floorStone ??= SurfaceSets.Scan(new StandardMaterial3D
 	{
-		var m = new StandardMaterial3D
-		{
-			ResourceName = "roundroom_top_stone", AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.5f, 0.47f, 0.42f),
-			Roughness = 1f, MetallicSpecular = 0.12f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f,
-		};
-		SurfaceSets.Apply(m, "concrete_b", 1.4f);
-		return m;
-	}
+		ResourceName = "roundroom_floor", Roughness = 0.95f, MetallicSpecular = 0.2f, VertexColorUseAsAlbedo = true,
+		Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.5f,
+	}, "concrete_floor_worn_001", 1f, 1.1f, new Color(0.62f, 0.6f, 0.56f));
+	/// <summary>The dais: a dressed pale stone, unlike the poured walls (it was the walls' concrete, paler).</summary>
+	private static StandardMaterial3D DaisStone => _daisStone ??= SurfaceSets.Relief(new StandardMaterial3D
+	{
+		ResourceName = "roundroom_dais", AlbedoTexture = SurfaceSets.Tex("limestone"), AlbedoColor = new Color(0.5f, 0.48f, 0.44f), Roughness = 0.9f,
+		MetallicSpecular = 0.25f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = false, Uv1Scale = Vector3.One * 0.7f,
+		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+	}, "limestone", 1.2f);
+	private static StandardMaterial3D _drumStone, _floorStone, _daisStone;
 
 	public override void _Ready() => Callable.From(Build).CallDeferred();
 
@@ -78,7 +90,7 @@ public partial class RoundRoom : Node3D
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		_body.SetMeta("surface", "stone");
 		AddChild(_body);
-		_stone = new StandardMaterial3D { AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.8f, 0.77f, 0.7f), Roughness = 0.88f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.6f };
+		_stone = DrumStone;
 		BuildWalls();
 		BuildWindows();
 		BuildSconces();
@@ -153,7 +165,7 @@ public partial class RoundRoom : Node3D
 		k.CommitTo(this, "Walls", true);
 		// the floor: flagstones in rings
 		var f = new MeshKit();
-		f.Mat(_stone);
+		f.Mat(FloorStone);
 		f.Color = new Color(0.75f, 0.72f, 0.66f);
 		f.Cylinder(new Vector3(0, -0.2f, 0), new Vector3(0, 0, 0), FloorR, FloorR, 48, true);
 		f.CommitTo(this, "Floor", true);
@@ -175,7 +187,9 @@ public partial class RoundRoom : Node3D
 		p.CommitTo(this, "Entry", true);
 		// the ceiling: a stone ring with the shaft through it, and the shaft up to the room above
 		var c = new MeshKit();
-		c.Mat(new StandardMaterial3D { AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.7f, 0.67f, 0.6f), Roughness = 0.9f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, CullMode = BaseMaterial3D.CullModeEnum.Disabled });
+		var ceilMat = DeepConcrete.Stained("roundroom_ceiling", new Color(0.66f, 0.63f, 0.58f), 0.42f, 1.3f, 0.12f);   // (2026-10-14c: was the pale board-marked concrete)
+		ceilMat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+		c.Mat(ceilMat);
 		for (int i = 0; i < 48; i++)
 		{
 			float a0 = Mathf.Tau * i / 48f, a1 = Mathf.Tau * (i + 1) / 48f;
@@ -299,7 +313,7 @@ public partial class RoundRoom : Node3D
 		Dais = new Node3D { Name = "Dais" };
 		AddChild(Dais);
 		var k = new MeshKit();
-		k.Mat(_stone);
+		k.Mat(DaisStone);
 		k.Color = new Color(0.85f, 0.82f, 0.75f);
 		k.Cylinder(new Vector3(0, 0, 0), new Vector3(0, DaisTop, 0), DaisFoot, DaisR, 48, true);
 		k.Cylinder(new Vector3(0, -4f, 0), new Vector3(0, 0.001f, 0), DaisFoot, DaisFoot, 48, false);   // the column under it, seen on the way up

@@ -513,6 +513,7 @@ public partial class Playtest
 			{
 				ct.ThrowIfCancellationRequested();
 				string what = Input.Enabled ? await BossStep(boss, ct) : "cutscene";
+				if (what != "evade") Trace18($"{what} at {boss.RingOf(boss.ToLocal(Player.GlobalPosition)):0.0}");
 				if (what == "evade" && last != "evade") evades++;
 				last = what;
 				await _bot.Frames(1, ct);
@@ -521,6 +522,7 @@ public partial class Playtest
 		_bot.Release();
 		if (PlayerDeath.Dying)
 		{
+			foreach (var line in _trace18) GD.Print($"[act18trace] {line}");
 			Check("the fight: never crushed", false, $"crushed at valve {boss.ValvesTurned}");
 			_s.ExpectReload = true;
 			await ExpectReload(ct, 30);
@@ -539,6 +541,14 @@ public partial class Playtest
 		await _bot.WalkTo(boss.TidyWorld, 0.6f, ct, () => boss.Finished, giveUp: 8f);
 		await _bot.WaitUntil(() => Story.Current == Checkpoint.Act18Finished, 5, ct);
 		Check("into the clean, lit room: checkpoint 18", Story.Current == Checkpoint.Act18Finished, $"{Story.Current}");
+	}
+
+	/// <summary>The fight's last frames (what the bot did, the threats round it), printed if it's crushed.</summary>
+	private readonly System.Collections.Generic.Queue<string> _trace18 = new();
+	private void Trace18(string s)
+	{
+		_trace18.Enqueue($"{Time.GetTicksMsec() % 100000:00000} {s}");
+		while (_trace18.Count > 400) _trace18.Dequeue();
 	}
 
 	/// <summary>One frame of the fight: get out from under a slam, else to the lit valve (jumped there if it's clear and far), else turn it.</summary>
@@ -566,6 +576,7 @@ public partial class Playtest
 				if (pathOk && Mathf.Abs(off) < best) { best = Mathf.Abs(off); bestOff = off; }
 			}
 			Vector3 target = boss.ToGlobal(boss.RingLocal(sp + Mathf.Sign(bestOff) * Mathf.Min(Mathf.Abs(bestOff) + 0.8f, 2.2f)));
+			Trace18($"evade sp {sp:0.0} off {bestOff:0.0} v {TestBot.Flat(Player.Velocity).Length():0.0} run {Player.Stamina?.CanRun} | " + string.Join("; ", threats.Select(th => $"{boss.RingOf(boss.ToLocal(th.Item1)):0.0}@{TestBot.Flat(th.Item1 - Player.GlobalPosition).Length():0.0}m r{th.Item3:0.0} {th.Item2:0.00}s")));
 			Input.ScriptedInteract = false;
 			_bot.Steer(target);
 			Input.ScriptedMove = new Vector2(0, 1);

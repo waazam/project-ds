@@ -113,6 +113,23 @@ public partial class Library : Node3D
 		Slab(plaster, new Vector3(0, (2.48f + Height) * 0.5f, 0.05f), new Vector3(1.44f, Height - 2.48f, 0.08f), false);
 		Slab(plaster, new Vector3(0, Height + 0.1f, Depth * 0.5f), new Vector3(HalfW * 2f, 0.2f, Depth), false, 0.95f);
 		plaster.CommitTo(this, "Plaster", true);
+		// (2026-10-14c) the door from the pit cased in the shelves' dark wood: a lining through the wall's thickness and a
+		// moulded casing on this side, with plinth blocks at its feet. It was the pit wall's raw cut, pale concrete,
+		// a bright frame round the dark doorway between the bookcases.
+		var casing = new MeshKit();
+		casing.Mat(_wood);
+		const float ow = 0.65f, oh = 2.4f;
+		foreach (float s in new[] { -1f, 1f })
+		{
+			Slab(casing, new Vector3(s * (ow - 0.012f), oh * 0.5f, -0.2f), new Vector3(0.024f, oh, 0.58f), false, 0.85f);
+			Slab(casing, new Vector3(s * (ow + 0.05f), (oh + 0.12f) * 0.5f, 0.1f), new Vector3(0.13f, oh + 0.12f, 0.028f), false);
+			Slab(casing, new Vector3(s * (ow + 0.035f), (oh + 0.12f) * 0.5f, 0.118f), new Vector3(0.05f, oh + 0.12f, 0.012f), false, 1.12f);
+			Slab(casing, new Vector3(s * (ow + 0.055f), 0.11f, 0.11f), new Vector3(0.15f, 0.22f, 0.05f), false, 0.9f);
+		}
+		Slab(casing, new Vector3(0, oh - 0.012f, -0.2f), new Vector3(ow * 2f, 0.024f, 0.58f), false, 0.85f);
+		Slab(casing, new Vector3(0, oh + 0.06f, 0.1f), new Vector3(ow * 2f + 0.26f, 0.13f, 0.028f), false);
+		Slab(casing, new Vector3(0, oh + 0.14f, 0.11f), new Vector3(ow * 2f + 0.34f, 0.04f, 0.05f), false, 1.1f);
+		casing.CommitTo(this, "DoorCasing", true);
 		// a parquet floor, beams across the ceiling
 		var floor = new MeshKit();
 		floor.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.4f, 0.29f, 0.21f), Roughness = 0.75f, MetallicSpecular = 0.35f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.8f }, "hinoki", 1f));
@@ -215,7 +232,9 @@ public partial class Library : Node3D
 	private Color BookColor()
 	{
 		Color[] cloth = { new(0.35f, 0.07f, 0.06f), new(0.1f, 0.18f, 0.1f), new(0.08f, 0.12f, 0.25f), new(0.3f, 0.22f, 0.12f), new(0.45f, 0.36f, 0.22f), new(0.15f, 0.1f, 0.08f), new(0.5f, 0.45f, 0.35f), new(0.22f, 0.05f, 0.1f) };
-		return cloth[_rng.RandiRange(0, cloth.Length - 1)] * _rng.RandfRange(0.75f, 1.2f);
+		// (2026-10-14c: faded and darkened toward an old brown, a little; under the warm lamps the cloths read as new candy colours)
+		var c = cloth[_rng.RandiRange(0, cloth.Length - 1)] * _rng.RandfRange(0.75f, 1.2f);
+		return c.Lerp(new Color(0.2f, 0.16f, 0.12f), 0.3f) * 0.85f;
 	}
 
 	private static void AddBooks(Node3D owner, List<Transform3D> xf, List<Color> colors, string name)
@@ -303,7 +322,41 @@ public partial class Library : Node3D
 		Slab(stone, new Vector3(x - 0.5f, 0.04f, z), new Vector3(1.0f, 0.08f, 2.2f), false);       // hearth
 		stone.Color = new Color(0.08f, 0.07f, 0.06f);
 		BuildKit.Box(stone, new Vector3(x - 0.05f, 0.6f, z), new Vector3(0.1f, 1.2f, 1.4f));        // the soot-black back
+		// (2026-10-14c) a mantel shelf over the stone with a moulded edge, and a step of a plinth at each jamb's foot
+		stone.Color = Colors.White * 0.9f;
+		BuildKit.Box(stone, new Vector3(x - 0.36f, 1.43f, z), new Vector3(0.82f, 0.06f, 2.36f));
+		BuildKit.Box(stone, new Vector3(x - 0.33f, 1.385f, z), new Vector3(0.74f, 0.03f, 2.28f));
+		foreach (float dz in new[] { -0.9f, 0.9f })
+			BuildKit.Box(stone, new Vector3(x - 0.31f, 0.09f, z + dz), new Vector3(0.66f, 0.18f, 0.46f));
 		stone.CommitTo(this, "Fireplace", true);
+		// what burns: split logs on a pair of iron fire dogs, embers glowing under them (the flames stood on the bare
+		// hearth on nothing)
+		var iron = new MeshKit();
+		iron.Mat(StairwellTextures.RailMat);
+		iron.Color = Colors.White;
+		foreach (float dz in new[] { -0.32f, 0.32f })
+		{
+			iron.Beam(new Vector3(x - 0.65f, 0.1f, z + dz), new Vector3(x - 0.12f, 0.1f, z + dz), 0.03f, 0.03f);
+			iron.Beam(new Vector3(x - 0.65f, 0.08f, z + dz), new Vector3(x - 0.65f, 0.26f, z + dz), 0.035f, 0.035f);
+			iron.Blob(new Vector3(x - 0.65f, 0.28f, z + dz), Vector3.One * 0.03f, 3, 0.05f);
+			foreach (float lx in new[] { -0.6f, -0.18f }) iron.Beam(new Vector3(x + lx, 0.08f, z + dz), new Vector3(x + lx, 0.1f, z + dz), 0.03f, 0.04f);
+		}
+		iron.CommitTo(this, "FireDogs", false);
+		var logs = new MeshKit();
+		logs.Mat(SurfaceSets.Apply(new StandardMaterial3D { ResourceName = "lib_logs", AlbedoColor = new Color(0.32f, 0.26f, 0.21f), Roughness = 1f, VertexColorUseAsAlbedo = true }, "wood_log", 1f));
+		logs.Color = Colors.White;
+		logs.Cylinder(new Vector3(x - 0.42f, 0.17f, z - 0.42f), new Vector3(x - 0.38f, 0.17f, z + 0.4f), 0.062f, 0.055f, 9, true, 2f);
+		logs.Cylinder(new Vector3(x - 0.24f, 0.17f, z - 0.38f), new Vector3(x - 0.27f, 0.18f, z + 0.42f), 0.055f, 0.06f, 9, true, 2f, 1.3f);
+		logs.Color = Colors.White * 0.5f;   // charred
+		logs.Cylinder(new Vector3(x - 0.34f, 0.27f, z - 0.3f), new Vector3(x - 0.3f, 0.25f, z + 0.28f), 0.05f, 0.045f, 9, true, 2f, 0.7f);
+		logs.CommitTo(this, "Logs", false);
+		var embers = new StandardMaterial3D { ResourceName = "lib_embers", AlbedoTexture = ProcTextures.Grime(), AlbedoColor = new Color(0.25f, 0.05f, 0.02f), EmissionEnabled = true, Emission = new Color(1f, 0.32f, 0.08f), EmissionEnergyMultiplier = 1.4f, EmissionTexture = ProcTextures.Grime(), Roughness = 1f, Uv1Scale = new Vector3(4f, 4f, 1f) };
+		var bed = new MeshKit();
+		bed.Mat(embers);
+		bed.Color = Colors.White;
+		for (int i = 0; i < 7; i++)
+			bed.Blob(new Vector3(x - 0.33f + Mathf.Sin(i * 2.3f) * 0.12f, 0.09f, z - 0.36f + i * 0.12f), new Vector3(0.1f, 0.025f, 0.08f), 40 + i, 0.25f);
+		bed.CommitTo(this, "Embers", false);
 		var fire = new FireVfx { Name = "Fire", Extent = new Vector3(0.5f, 0.45f, 0.8f), Seed = 19, LightRange = 9f, Smoke = false, SmokeAmount = 0.3f, LightShadows = false };
 		AddChild(fire);
 		fire.Position = new Vector3(x - 0.35f, 0.08f, z);
@@ -313,8 +366,54 @@ public partial class Library : Node3D
 		var brass = new MeshKit();
 		brass.Mat(ItemTextures.BrassMat);
 		brass.Color = new Color(0.85f, 0.7f, 0.42f);
-		foreach (float dz in new[] { -0.8f, 0.8f }) brass.Cylinder(new Vector3(x - 0.35f, 1.4f, z + dz), new Vector3(x - 0.35f, 1.62f, z + dz), 0.035f, 0.02f, 8, true);
+		foreach (float dz in new[] { -0.8f, 0.8f }) brass.Cylinder(new Vector3(x - 0.35f, 1.46f, z + dz), new Vector3(x - 0.35f, 1.68f, z + dz), 0.035f, 0.02f, 8, true);
 		brass.CommitTo(this, "Candlesticks", false);
+	}
+
+	/// <summary>(2026-10-14c) A leather club chair at <paramref name="at"/> (its feet), facing +Z times <paramref name="dir"/>:
+	/// a deep base, a domed seat cushion, rolled arms with scrolled fronts, a rolled back leaning a little, on four
+	/// turned wooden feet (into <paramref name="wood"/>).</summary>
+	private static void ClubChair(MeshKit k, MeshKit wood, Vector3 at, float dir, Color leather)
+	{
+		var xf = new Transform3D(new Basis(Vector3.Up, dir > 0 ? 0f : Mathf.Pi), at);
+		k.Xf = wood.Xf = xf;
+		var lean = new Basis(Vector3.Right, -0.1f);
+		k.Color = leather;
+		BuildKit.Box(k, new Vector3(0, 0.255f, 0.01f), new Vector3(0.82f, 0.31f, 0.8f));
+		// the seat cushion, its front edge rolled
+		k.Color = leather * 1.08f;
+		BuildKit.Box(k, new Vector3(0, 0.44f, 0.04f), new Vector3(0.56f, 0.07f, 0.6f));
+		k.Cylinder(new Vector3(-0.28f, 0.44f, 0.34f), new Vector3(0.28f, 0.44f, 0.34f), 0.035f, 0.035f, 10, true);
+		k.Cylinder(new Vector3(-0.28f, 0.475f, 0.04f), new Vector3(0.28f, 0.475f, 0.04f), 0.012f, 0.012f, 6, false);   // its welt
+		// the arms: a panel, a roll along the top, a scroll at the front
+		foreach (float s in new[] { -1f, 1f })
+		{
+			k.Color = leather * 0.95f;
+			BuildKit.Box(k, new Vector3(s * 0.35f, 0.53f, 0.0f), new Vector3(0.12f, 0.24f, 0.76f));
+			k.Color = leather * 1.12f;
+			k.Cylinder(new Vector3(s * 0.365f, 0.66f, -0.34f), new Vector3(s * 0.365f, 0.66f, 0.39f), 0.075f, 0.075f, 14, true);
+			k.Color = leather * 0.85f;
+			k.Cylinder(new Vector3(s * 0.355f, 0.62f, 0.39f), new Vector3(s * 0.355f, 0.62f, 0.405f), 0.1f, 0.1f, 16, true);
+			BuildKit.Box(k, new Vector3(s * 0.355f, 0.45f, 0.4f), new Vector3(0.14f, 0.3f, 0.015f));
+		}
+		// the back, leaning, rolled over the top, its cushion
+		k.Color = leather * 0.9f;
+		BuildKit.Box(k, new Vector3(0, 0.66f, -0.34f), new Vector3(0.84f, 0.52f, 0.15f), 1f, BuildKit.Face.None, lean);
+		k.Color = leather * 1.05f;
+		Vector3 top = new Vector3(0, 0.66f, -0.34f) + lean * new Vector3(0, 0.27f, 0);
+		k.Cylinder(top + new Vector3(-0.43f, 0, 0), top + new Vector3(0.43f, 0, 0), 0.085f, 0.085f, 14, true);
+		k.Color = leather * 1.1f;
+		BuildKit.Box(k, new Vector3(0, 0.68f, -0.25f), new Vector3(0.56f, 0.34f, 0.07f), 1f, BuildKit.Face.None, lean);
+		// turned feet
+		foreach (float fx in new[] { -0.36f, 0.36f })
+			foreach (float fz in new[] { -0.34f, 0.36f })
+			{
+				wood.Color = Colors.White * 0.8f;
+				wood.Cylinder(new Vector3(fx, 0f, fz), new Vector3(fx, 0.06f, fz), 0.022f, 0.032f, 8, true);
+				wood.Cylinder(new Vector3(fx, 0.06f, fz), new Vector3(fx, 0.1f, fz), 0.034f, 0.03f, 8, true);
+			}
+		k.Xf = wood.Xf = Transform3D.Identity;
+		k.Color = wood.Color = Colors.White;
 	}
 
 	private void BuildFurniture()
@@ -330,14 +429,13 @@ public partial class Library : Node3D
 		var chair = new MeshKit();
 		chair.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = SurfaceSets.Tex("leather"), AlbedoColor = Colors.White, Roughness = 0.85f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.5f }, "leather", 0.8f));
 		// either side of the fire, turned in towards it and each other
+		// (2026-10-14c: club chairs, rolled arms and back, a domed cushion, on turned feet; they were five boxes each)
 		foreach (var (cz, dir) in new[] { (4.75f, 1f), (8.25f, -1f) })
 		{
 			var leather = new Color(0.66f, 0.52f, 0.46f);   // (over the leather photo, itself a dark oxblood)
 			const float cx = 4.0f;
-			Slab(chair, new Vector3(cx, 0.25f, cz), new Vector3(0.8f, 0.5f, 0.8f), color: leather);
-			Slab(chair, new Vector3(cx, 0.8f, cz - dir * 0.36f), new Vector3(0.8f, 0.9f, 0.14f), false, color: leather * 0.9f);
-			foreach (float s in new[] { -0.36f, 0.36f }) Slab(chair, new Vector3(cx + s, 0.6f, cz), new Vector3(0.12f, 0.2f, 0.8f), false, color: leather * 1.1f);
-			Slab(chair, new Vector3(cx, 0.53f, cz + dir * 0.05f), new Vector3(0.6f, 0.07f, 0.62f), false, color: new Color(0.72f, 0.56f, 0.48f));   // the cushion
+			ClubChair(chair, k, new Vector3(cx, 0, cz), dir, leather);
+			_body.AddChild(new CollisionShape3D { Position = new Vector3(cx, 0.3f, cz), Shape = new BoxShape3D { Size = new Vector3(0.8f, 0.6f, 0.8f) } });
 		}
 		chair.CommitTo(this, "Armchairs", true);
 		// a globe, a grandfather clock, a rolling ladder, a floor lamp by the door
@@ -346,10 +444,35 @@ public partial class Library : Node3D
 		brass.Color = new Color(0.8f, 0.62f, 0.34f);
 		brass.Cylinder(new Vector3(-2.8f, 0, 10.8f), new Vector3(-2.8f, 0.9f, 10.8f), 0.03f, 0.03f, 8, true);
 		brass.CommitTo(this, "GlobeStand", false);
-		AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.3f, Height = 0.6f }, Position = new Vector3(-2.8f, 1.15f, 10.8f), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.48f, 0.3f), Roughness = 0.4f } });
-		Slab(k, new Vector3(4.7f, 1.05f, Depth - 0.75f), new Vector3(0.5f, 2.1f, 0.4f));
+		// (2026-10-14c: an old varnished globe, the brass meridian round it and a foot under its stand; it was a plain glossy ball on a rod)
+		AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.3f, Height = 0.6f, RadialSegments = 32, Rings = 16 }, Position = new Vector3(-2.8f, 1.15f, 10.8f), Rotation = new Vector3(0, 0, 0.41f), MaterialOverride = new StandardMaterial3D { AlbedoTexture = ProcTextures.Grime(), AlbedoColor = new Color(0.5f, 0.42f, 0.27f), Roughness = 0.62f, MetallicSpecular = 0.4f, Uv1Scale = new Vector3(3f, 2f, 1f) } });
+		AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.31f, OuterRadius = 0.335f, Rings = 32, RingSegments = 6 }, Position = new Vector3(-2.8f, 1.15f, 10.8f), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0.41f), MaterialOverride = ItemTextures.BrassMat });
+		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.12f, BottomRadius = 0.17f, Height = 0.05f, RadialSegments = 20 }, Position = new Vector3(-2.8f, 0.025f, 10.8f), MaterialOverride = ItemTextures.BrassMat });
+		// the grandfather clock (2026-10-14c: a plinth, a narrower trunk with its pendulum door, a hood with a moulded
+		// crown, its old ivory dial in a brass bezel with its hands; it was one box with a white disc on it)
+		float cz2 = Depth - 0.75f;
+		_body.AddChild(new CollisionShape3D { Position = new Vector3(4.7f, 1.05f, cz2), Shape = new BoxShape3D { Size = new Vector3(0.5f, 2.1f, 0.4f) } });
+		k.Color = Colors.White * 0.9f;
+		BuildKit.Box(k, new Vector3(4.7f, 0.2f, cz2), new Vector3(0.52f, 0.4f, 0.44f));
+		BuildKit.Box(k, new Vector3(4.7f, 0.42f, cz2), new Vector3(0.48f, 0.05f, 0.4f));
+		k.Color = Colors.White;
+		BuildKit.Box(k, new Vector3(4.72f, 0.92f, cz2), new Vector3(0.42f, 0.96f, 0.34f));
+		k.Color = Colors.White * 1.15f;
+		BuildKit.Box(k, new Vector3(4.505f, 0.95f, cz2), new Vector3(0.012f, 0.7f, 0.22f));   // the trunk's door
+		k.Color = Colors.White * 0.9f;
+		BuildKit.Box(k, new Vector3(4.7f, 1.42f, cz2), new Vector3(0.48f, 0.05f, 0.4f));
+		k.Color = Colors.White;
+		BuildKit.Box(k, new Vector3(4.7f, 1.66f, cz2), new Vector3(0.5f, 0.44f, 0.42f));
+		k.Color = Colors.White * 0.85f;
+		BuildKit.Box(k, new Vector3(4.69f, 1.91f, cz2), new Vector3(0.54f, 0.06f, 0.46f));
+		BuildKit.Box(k, new Vector3(4.7f, 1.99f, cz2), new Vector3(0.46f, 0.1f, 0.38f));
+		k.Color = Colors.White;
 		k.CommitTo(this, "Tables", true);
-		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.16f, BottomRadius = 0.16f, Height = 0.03f }, Position = new Vector3(4.47f, 1.6f, Depth - 0.75f), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.9f, 0.82f) } });
+		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.15f, BottomRadius = 0.15f, Height = 0.02f, RadialSegments = 24 }, Position = new Vector3(4.448f, 1.66f, cz2), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.66f, 0.6f, 0.47f), Roughness = 0.8f } });
+		AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.145f, OuterRadius = 0.17f, Rings = 24, RingSegments = 6 }, Position = new Vector3(4.445f, 1.66f, cz2), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = ItemTextures.BrassMat });
+		var hands = new StandardMaterial3D { AlbedoColor = new Color(0.05f, 0.04f, 0.035f), Roughness = 0.6f };
+		AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.004f, 0.1f, 0.01f) }, Position = new Vector3(4.436f, 1.7f, cz2 + 0.01f), Rotation = new Vector3(0.25f, 0, 0), MaterialOverride = hands });
+		AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.004f, 0.07f, 0.012f) }, Position = new Vector3(4.434f, 1.645f, cz2 - 0.025f), Rotation = new Vector3(-1.1f, 0, 0), MaterialOverride = hands });
 		Loop("res://assets/audio/sfx/clock_tick_loop.wav", new Vector3(4.5f, 1.5f, Depth - 0.75f), -12f, 2.5f);
 		var lad = new MeshKit();
 		lad.Mat(_wood);

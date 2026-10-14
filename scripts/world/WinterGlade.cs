@@ -55,7 +55,10 @@ public partial class WinterGlade : Node3D
 		if (_check > 0) return;
 		_check = 0.25;
 		var cam = GetViewport()?.GetCamera3D();
+		// (not from under the ground: Act 21's room at the top of the shaft and the long stair are inside the 120 m, and
+		// the snow's boxes round the camera fell through their ceilings)
 		bool near = cam != null && cam.GlobalPosition.DistanceTo(ToGlobal(new Vector3(Centre.X, 0, Centre.Y))) < Radius + 120f
+			&& ToLocal(cam.GlobalPosition).Y > Church.CryptFloor - 1f
 			&& (ForceSnow || (Systems.StoryManager.Instance?.Current ?? Systems.Checkpoint.None) >= Systems.Checkpoint.Act20Finished);
 		if (near != _snowing || near)
 		{

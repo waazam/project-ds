@@ -112,6 +112,12 @@ public partial class Sewer : Node3D
 		GD.Print("[story] Act 17: the sewer - the pipe, the cistern, the hole");
 	}
 
+	/// <summary>(2026-10-14c) The bulkhead at the door and the landing: old wet concrete, dark and stained.</summary>
+	private static StandardMaterial3D BulkheadMat => _bulkhead ??= DeepConcrete.Stained("sewer_bulkhead", new Color(0.62f, 0.6f, 0.55f), 0.55f, 1.4f, 0.3f);
+	/// <summary>The cistern's platform: the same concrete, a little paler, worn by the water.</summary>
+	private static StandardMaterial3D PlatformMat => _platform ??= DeepConcrete.Stained("sewer_platform", new Color(0.72f, 0.7f, 0.66f), 0.45f, 1.3f, 0.3f);
+	private static StandardMaterial3D _bulkhead, _platform;
+
 	private void Slab(MeshKit k, StaticBody3D body, Vector3 c, Vector3 s, float tint = 1f)
 	{
 		k.Color = Colors.White * tint;
@@ -129,8 +135,9 @@ public partial class Sewer : Node3D
 		// the round brick pipe
 		Tube(brick, 0, PipeCy, PipeR, 0, TunnelLen, 0, Mathf.Tau, 20, 2f);
 		// the end at the door: a concrete bulkhead, and the door they came through
+		// (2026-10-14c: stained wet concrete; it was the pipes' rust, so the wall round the door read as a rusted plate)
 		var con = new MeshKit();
-		con.Mat(SewerTextures.PipeMat);
+		con.Mat(BulkheadMat);
 		Slab(con, _stone, new Vector3(0, PipeCy, -0.1f), new Vector3(PipeR * 2f + 0.4f, PipeR * 2f + 0.4f, 0.2f), 0.8f);
 		// the landing and four steps down into the water
 		Slab(con, _stone, new Vector3(0, 0.4f, 0.6f), new Vector3(2.2f, 0.8f, 1.2f), 0.85f);
@@ -158,13 +165,21 @@ public partial class Sewer : Node3D
 		}
 		con.CommitTo(this, "Bulkhead", true);
 		// the door behind them, shut
+		// (2026-10-14c: the closet's own door, as it is from inside: the painted leaf, its frame, its hardware; it was a box
+		// of the stairwell's steel on the bare wall)
 		var door = new MeshKit();
-		door.Mat(StairwellTextures.SteelMat);
-		door.Color = new Color(0.45f, 0.5f, 0.45f);
-		BuildKit.Box(door, new Vector3(0, 0.8f + 1.05f, 0.03f), new Vector3(1.0f, 2.1f, 0.06f));
-		door.Color = new Color(0.8f, 0.78f, 0.7f);
-		BuildKit.Box(door, new Vector3(0.38f, 0.8f + 1.0f, 0.08f), new Vector3(0.1f, 0.03f, 0.04f));
+		door.Mat(HallwayParts.ServiceDoor.LeafMat);
+		var doorHw = new MeshKit();
+		doorHw.Mat(HallwayParts.ServiceDoor.HardwareMat);
+		// (hinged on the left seen from the landing: the leaf's hinge edge at +X, its face toward +Z)
+		door.Xf = doorHw.Xf = new Transform3D(new Basis(Vector3.Up, Mathf.Pi), new Vector3(0.488f, 0.8f, 0.035f));
+		HallwayParts.ServiceDoor.Leaf(door, doorHw, 0.976f, 2.12f, 0.05f);
 		MeshKit.Solidify(door.CommitTo(this, "Door", true), Vector3.One, "metal");
+		doorHw.CommitTo(this, "DoorHardware", true);
+		var frame = new MeshKit();
+		frame.Mat(HallwayParts.ServiceDoor.FrameMat);
+		HallwayParts.ServiceDoor.Frame(frame, new Vector3(0, 0.8f, 0), 1.0f, 2.15f, -0.2f, 0.0f, 0.075f, 0.06f);
+		frame.CommitTo(this, "DoorFrame", true);
 		brick.CommitTo(this, "Pipe", true);
 	}
 
@@ -323,7 +338,7 @@ public partial class Sewer : Node3D
 	private void BuildPlatform()
 	{
 		var con = new MeshKit();
-		con.Mat(StairwellTextures.CleanMat);
+		con.Mat(PlatformMat);   // (2026-10-14c: was the pale board-marked concrete)
 		float zc = HoleLocal.Z;
 		// the platform, as four slabs round the hole, and a step down on every side
 		float inner = HoleHalf, outer = PlatHalf;
@@ -359,6 +374,19 @@ public partial class Sewer : Node3D
 			MaterialOverride = new StandardMaterial3D { AlbedoColor = Colors.Black, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Front, DisableFog = true },
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
+		// (2026-10-14c) its lip: a rusted iron angle round the edge, its leg down the hole's sides (the hole was a cut in
+		// the slab, a black square with nothing round it)
+		var lip = new MeshKit();
+		lip.Mat(SewerTextures.PipeMat);
+		lip.Color = Colors.White * 0.6f;
+		foreach (int side in new[] { 0, 1, 2, 3 })
+		{
+			var b = new Basis(Vector3.Up, side * Mathf.Pi * 0.5f);
+			Vector3 Off(Vector3 v) => b * v + new Vector3(0, 0, zc);
+			lip.Beam(Off(new Vector3(-inner - 0.07f, PlatTop + 0.012f, -inner - 0.035f)), Off(new Vector3(inner + 0.07f, PlatTop + 0.012f, -inner - 0.035f)), 0.075f, 0.024f);
+			lip.Beam(Off(new Vector3(-inner, PlatTop - 0.09f, -inner + 0.006f)), Off(new Vector3(inner, PlatTop - 0.09f, -inner + 0.006f)), 0.012f, 0.2f, 1f, Vector3.Up);
+		}
+		lip.CommitTo(this, "HoleLip", false);
 		// nobody falls in by accident
 		_stone.AddChild(new CollisionShape3D { Position = new Vector3(0, PlatTop + 0.6f, zc), Shape = new BoxShape3D { Size = new Vector3(inner * 2f, 1.2f, inner * 2f) } });
 		// smoke, rising slowly out of it
