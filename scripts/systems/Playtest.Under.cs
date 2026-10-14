@@ -634,10 +634,12 @@ public partial class Playtest
 		using (Fast(2)) await _bot.WaitUntil(() => lib.BoxUse.Enabled, 8, ct);
 		Check("the sheet pulled off: a bamboo puzzle box, five pieces", lib.SheetOff && lib.BoxUse.Enabled && lib.Puzzle.Pieces.Count == 5);
 		await Control(ct, 5);
+		_mouseBeforePuzzle = Godot.Input.MouseMode;
 		await _bot.UseIt(lib.BoxUse, ct);
 		var o = PuzzleOverlay.Instance;
 		await _bot.WaitUntil(() => o is { IsOpen: true }, 3, ct);
 		Require("working the box opens its close-up", o is { IsOpen: true });
+		Check("the cursor out to work it with", Godot.Input.MouseMode == Godot.Input.MouseModeEnum.Visible, $"{Godot.Input.MouseMode}");
 		var plan = lib.Puzzle.Solve();
 		Check("the box has a solution", plan.Count == 5);
 		int longIdx = lib.Puzzle.Pieces.FindIndex(p => p.Name == "long");
@@ -649,8 +651,12 @@ public partial class Playtest
 		var c0 = o.Cursor;
 		await _bot.Key("move_left", ct);
 		Check("A moves the held piece a cell left", o.Cursor == c0 + new Vector2I(-1, 0), $"{c0} -> {o.Cursor}");
+		o.TestPutBack();
+		await _bot.Seconds(0.4, ct);
+		await PuzzleMouse(o, plan, ct);
 		foreach (var (p, rot, at) in plan)
 		{
+			if (p.At != null) continue;   // (put in with the mouse)
 			o.TestSelect(lib.Puzzle.Pieces.IndexOf(p));
 			o.TestHold(at, rot);
 			await _bot.Frames(2, ct);
@@ -658,6 +664,9 @@ public partial class Playtest
 			await _bot.Seconds(0.15, ct);
 		}
 		Check("every piece in: solved, the close-up shut", lib.Puzzle.IsSolved && !o.IsOpen);
+		Check("the cursor captured again", Godot.Input.MouseMode == Godot.Input.MouseModeEnum.Captured || _mouseBeforePuzzle == Godot.Input.MouseModeEnum.Visible, $"{Godot.Input.MouseMode}");
+		await _bot.Seconds(1.2, ct);
+		Shot("puzzle_solved");
 		using (Fast(3)) await _bot.WaitUntil(() => lib.Bookmark != null, 12, ct);
 		Check("it glows, goes, and leaves a red bookmark", lib.PuzzleSolved && lib.Bookmark != null);
 		await Control(ct, 10);
@@ -675,6 +684,66 @@ public partial class Playtest
 		await _bot.WaitUntil(() => Story.Current == Checkpoint.Act19Finished, 5, ct);
 		Check("down the passage into the round room: checkpoint 19", Story.Current == Checkpoint.Act19Finished);
 	}
+
+	private Godot.Input.MouseModeEnum _mouseBeforePuzzle;
+
+	/// <summary>Act 19's box worked with the mouse, through the overlay's own pointer path (the points it gets are the
+	/// viewport's, as a real mouse's are): a drag in, a blocked drop, a click out, a turn in hand.</summary>
+	private async Task PuzzleMouse(PuzzleOverlay o, System.Collections.Generic.List<(World.LibraryParts.PuzzleBox.Piece p, int rot, Vector2I at)> plan, CancellationToken ct)
+	{
+		var box = o.Box;
+		var (p0, rot0, at0) = plan[0];
+		Vector2 grab = o.ScreenOfCube(p0, 0);
+		bool down = o.PointerDown(grab);
+		Check("left-click on a piece picks it up by the cube under the cursor", down && o.Dragging && box.Pieces[o.Selected] == p0 && o.GrabbedCube == 0, $"down {down}, piece {box.Pieces[o.Selected].Name}, cube {o.GrabbedCube}");
+		if (!down || !o.Dragging) return;
+		int turns = 0;
+		while (o.HeldRot != rot0 && turns++ < 4) o.PointerTurn(grab, 1);
+		Check("right-click turns the held piece", o.HeldRot == rot0, $"{o.HeldRot} (want {rot0})");
+		var cells = World.LibraryParts.PuzzleBox.Rotated(p0.Shape, rot0);
+		// across the table first (it follows the cursor), then over its cell in the box
+		o.PointerMove(o.ScreenOf(new Vector3(0.45f, OverlayHeldY, 0.1f)));
+		await _bot.Seconds(0.25, ct);
+		Check("dragged over the table: no snap, no ghost", o.DragSnap == null && !o.GhostFits);
+		Vector2 drop = o.ScreenOfHeldCell(at0 + cells[0]);
+		for (int i = 1; i <= 6; i++) { o.PointerMove(grab.Lerp(drop, i / 6f)); await _bot.Frames(1, ct); }
+		await _bot.Seconds(0.35, ct);
+		Check("over the box it snaps to the cells, the ghost warm: it fits", o.DragSnap == at0 && o.GhostFits, $"{o.DragSnap} (want {at0}), fits {o.GhostFits}");
+		Shot("puzzle_drag_fits");
+		bool placed = o.PointerUp(drop);
+		Check("let go: it drops into the box", placed && p0.At == at0 && !o.Holding, $"{placed} at {p0.At}");
+		await _bot.Seconds(0.3, ct);
+		// a second piece dragged onto the first: red, and let go it goes back to the table
+		var (p1, _, _) = plan[1];
+		var restBefore = p1.Rest;
+		Vector2 g1 = o.ScreenOfCube(p1, 0);
+		bool down1 = o.PointerDown(g1);
+		Vector2 onto = o.ScreenOfHeldCell(at0 + cells[0]);
+		for (int i = 1; i <= 6; i++) { o.PointerMove(g1.Lerp(onto, i / 6f)); await _bot.Frames(1, ct); }
+		// (kept inside the box it may snap clear of the first piece: over each of its cells till one clashes)
+		foreach (var c in cells)
+		{
+			if (!o.GhostFits) break;
+			onto = o.ScreenOfHeldCell(at0 + c);
+			o.PointerMove(onto);
+			await _bot.Frames(2, ct);
+		}
+		await _bot.Seconds(0.35, ct);
+		Check("dragged onto a taken cell: the ghost red", o.Dragging && o.DragSnap != null && !o.GhostFits, $"{p1.Name} at {g1}: down {down1}, dragging {o.Dragging}, snap {o.DragSnap}, fits {o.GhostFits}");
+		Shot("puzzle_drag_blocked");
+		int bumps = o.Bumps;
+		bool wrong = o.PointerUp(onto);
+		Check("let go there: it knocks the rim and goes back to the table", !wrong && p1.At == null && o.Bumps == bumps + 1 && !o.Holding && p1.Rest == restBefore);
+		await _bot.Seconds(0.3, ct);
+		// a click on the piece in the box takes it out
+		Vector2 c0 = o.ScreenOfCube(p0, 0);
+		o.PointerDown(c0);
+		o.PointerUp(c0);
+		Check("a click on a piece in the box takes it out", p0.At == null && !o.Holding, $"{p0.At}");
+		await _bot.Seconds(0.3, ct);
+	}
+
+	private const float OverlayHeldY = PuzzleOverlay.HeldY;
 
 	private async Task Act20(CancellationToken ct)
 	{
