@@ -239,7 +239,13 @@ public partial class Act24Maze : Node3D
 			float a = Mathf.Pi * (0.14f + 0.72f * i / 12f);
 			float x = Mathf.Cos(a) * (r + 0.02f), y = cy + Mathf.Sin(a) * (r + 0.02f);
 			if (Face(x, y + 0.04f) is not { } f) continue;
-			var top = f + new Vector3(0, -0.02f, 0.05f);   // (from just inside the face: it grows out of the snow)
+			// (2026-10-14d) hung from the snow itself: straight up from inside the opening, just in from the face, to the
+			// underside of the rim (the cut isn't a true circle: off the circle they hung 5-15 cm under the edge, on nothing)
+			var probe = hole.ToGlobal(new Vector3(x * 0.85f, cy, f.Z + 0.06f));
+			var up = space.IntersectRay(PhysicsRayQueryParameters3D.Create(probe, probe + hole.GlobalBasis.Y * 2.2f, 1));
+			if (up.Count == 0) continue;
+			var rim = hole.ToLocal((Vector3)up["position"]);
+			var top = new Vector3(rim.X, rim.Y + 0.035f, rim.Z);   // (its root a few centimetres up in the snow)
 			float len = rng.RandfRange(0.14f, 0.5f) * Mathf.Sin(a);
 			ice.Cylinder(top + Vector3.Up * 0.05f, top + Vector3.Down * len, rng.RandfRange(0.025f, 0.045f), 0.003f, 5, false);
 			cicles++;

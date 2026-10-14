@@ -53,6 +53,9 @@ public partial class SkiLodge
 		return true;
 	}
 	public LodgeDoor MudroomDoor { get; private set; }
+	/// <summary>(2026-10-14d) The back-of-house doors (the mudroom's, the pantry's): old boards under a chipped oxblood paint, not
+	/// the guest rooms' dark wood (the mudroom's door read as its boarded walls).</summary>
+	private static Material BackDoorPaint => BuildingTextures.PaintedBoards("lodge_backdoor", new Color(0.3f, 0.11f, 0.08f), 0.92f, 0.12f, footHeight: 0.4f) ?? (Material)LodgeTextures.DarkWoodMat;
 	public LodgeDoor PantryDoor { get; private set; }
 	public LodgeDoor DiningDoorL { get; private set; }
 	public LodgeDoor DiningDoorR { get; private set; }
@@ -578,13 +581,13 @@ public partial class SkiLodge
 		LodgeKit.Solid(_inBody, new Vector3((-WingX1 + 0.35f + CorrX1) * 0.5f, (SlabY + UpperY) * 0.5f, 0), new Vector3(CorrX1 - (-WingX1 + 0.35f), UpperY - SlabY, InnerZ * 2f));
 		k.CommitTo(this, "WestGround", true);
 		// the doors: the mudroom's inner door (unlocked), the pantry's (the pantry key)
-		MudroomDoor = new LodgeDoor { Name = "MudroomDoor", Position = new Vector3(BackDoorX - 0.5f, 0, SvcZ0), Width = 1.0f, Height = 2.15f, OpenAngle = 1.5f, FrontSign = -1f, OpenPrompt = "Open the door" };
+		MudroomDoor = new LodgeDoor { Name = "MudroomDoor", LeafMat = BackDoorPaint, Position = new Vector3(BackDoorX - 0.5f, 0, SvcZ0), Width = 1.0f, Height = 2.15f, OpenAngle = 1.5f, FrontSign = -1f, OpenPrompt = "Open the door" };
 		AddChild(MudroomDoor);
 		MudroomDoor.Unlock();
 		Vector3 pa = HexVert(3), pb = HexVert(4), palong = (pb - pa).Normalized(), pout = ((pa + pb) * 0.5f).Normalized();
 		PantryDoor = new LodgeDoor
 		{
-			Name = "PantryDoor", WallHalf = 0.4f, Position = pa + palong * 3.3f, Width = 1.1f, Height = 2.25f, Needs = ToolKind.PantryKey, OpenAngle = -1.5f, FrontSign = -1f,
+			Name = "PantryDoor", LeafMat = BackDoorPaint, WallHalf = 0.4f, Position = pa + palong * 3.3f, Width = 1.1f, Height = 2.25f, Needs = ToolKind.PantryKey, OpenAngle = -1.5f, FrontSign = -1f,
 			LockedPrompt = "\"STAFF ONLY - PANTRY\". Locked.",
 		};
 		PantryDoor.Basis = new Basis(palong, Vector3.Up, pout);

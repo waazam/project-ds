@@ -135,7 +135,7 @@ public static class LodgeTextures
 	/// <summary>The bar's walls: deep red damask with gold (a repeating teardrop medallion).</summary>
 	public static Texture2D Damask => Make("lodge_damask", 256, 256, (u, v) =>
 	{
-		Color red = new(0.3f, 0.05f, 0.05f), deep = new(0.18f, 0.03f, 0.03f), gold = new(0.55f, 0.38f, 0.14f);
+		Color red = new(0.28f, 0.06f, 0.05f), deep = new(0.21f, 0.045f, 0.04f), gold = new(0.36f, 0.21f, 0.09f);   // (2026-10-14d: a quieter figure; the gold rings at full strength read as rows of eyes)
 		float cu = u * 2f, cv = v * 2f;
 		if (Mathf.FloorToInt(cv) % 2 == 1) cu += 0.5f;
 		float fu = cu - Mathf.Floor(cu) - 0.5f, fv = cv - Mathf.Floor(cv) - 0.5f;
@@ -386,7 +386,7 @@ public static class LodgeTextures
 		_mat[key] = m;
 		return m;
 	}
-	public static StandardMaterial3D DamaskMat => Std("lodge_m_damask", Damask, 0.8f, 0.25f, null, DetailKit.Kind.Fabric, "jacquard", 0.35f);
+	public static StandardMaterial3D DamaskMat => Std("lodge_m_damask", Damask, 0.8f, 0.25f, null, DetailKit.Kind.Fabric, "jacquard", 0.35f, 0.42f);   // (2026-10-14d: a hand-span figure, not half a metre)
 	public static StandardMaterial3D GreenTileMat => Std("lodge_m_greentile", GreenTile, 0.25f, 0.6f);
 	public static StandardMaterial3D FlagstoneMat => Std("lodge_m_flag", Flagstone, 0.8f, 0.25f, null, DetailKit.Kind.Stone, "flagstone", 0.8f);
 	public static StandardMaterial3D ParquetMat => _hParquetMat ??= World.SurfaceSets.Hinoki(Std("lodge_m_parquet", Parquet, 0.5f, 0.45f, null, DetailKit.Kind.Wood, "parquet", 0.5f), new Color(0.7f, 0.52f, 0.38f));
@@ -396,7 +396,10 @@ public static class LodgeTextures
 	public static StandardMaterial3D RugMat => Std("lodge_m_rug", Rug, 1f, 0.1f, null, DetailKit.Kind.Fabric);
 	// (baked at 1024 px since 2026-10-09: the owner, "the wood in ... the ski lodge looks pretty bad")
 	// (2026-10-10b: the hinoki, its woodwork a rich dark-stained tone of it, its walls the honey of the bare wood)
-	public static StandardMaterial3D DarkWoodMat => _darkM ??= World.SurfaceSets.Hinoki(Std("lodge_m_darkwood", DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f), new Color(0.6f, 0.42f, 0.3f), 8f);
+	/// <summary>(2026-10-14d) The guest rooms' doors: the same dark wood, but one smooth varnished leaf, no planks; the rooms'
+	/// doors drew the planked dark wood of the wainscot beside them, and read as more of the wall.</summary>
+	public static StandardMaterial3D DoorWoodMat => Std("lodge_m_doorwood", DarkWood, 0.42f, 0.42f, new Color(0.5f, 0.36f, 0.27f), DetailKit.Kind.Wood, "darkwood", 0.35f, 1.6f);
+	public static StandardMaterial3D DarkWoodMat =>_darkM ??= World.SurfaceSets.Hinoki(Std("lodge_m_darkwood", DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f), new Color(0.6f, 0.42f, 0.3f), 8f);
 	public static StandardMaterial3D LogWallMat => _logwallM ??= World.SurfaceSets.Hinoki(Std("lodge_m_logwall", LogWall, 0.8f, 0.25f, null, DetailKit.Kind.Wood), new Color(0.95f, 0.84f, 0.7f), 4f);
 	private static StandardMaterial3D _darkM, _logwallM;
 
@@ -513,7 +516,7 @@ public static class LodgeTextures
 	/// <summary>Daylight through a window's snow-dusted glass (inside faces): pale and grey-blue, dimmed by the storm.</summary>
 	public static StandardMaterial3D DayGlass => _day ??= new StandardMaterial3D
 	{
-		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.5f, 0.54f, 0.6f), EmissionEnabled = true, Emission = new Color(0.78f, 0.84f, 0.95f), EmissionEnergyMultiplier = 0.24f, Roughness = 0.1f,
+		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.36f, 0.39f, 0.45f), EmissionEnabled = true, Emission = new Color(0.62f, 0.7f, 0.82f), EmissionEnergyMultiplier = 0.13f, Roughness = 0.1f,   // (2026-10-14d: a storm's grey light, not a white sheet in the wall)
 		AlbedoTexture = PaneTex, EmissionTexture = PaneTex, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	};
 	/// <summary>A pane seen from inside: clear (top half) or with the snow drifted up it (bottom half).</summary>

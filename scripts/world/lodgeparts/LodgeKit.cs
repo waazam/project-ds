@@ -166,7 +166,7 @@ public static class LodgeKit
 		// the modelled chesterfield (deep-buttoned, rolled and pleated arms, piped cushions, bun feet), at its nearer width
 		string model = w > 2.25f ? "chesterfield_24" : "chesterfield_21";
 		float made = w > 2.25f ? 2.4f : 2.1f;
-		if (FurnitureKit.Add(k, model, c, yaw, new() { ["upholstery"] = mat, ["wood"] = LodgeTextures.DarkWoodMat }, new Vector3(w / made, 1f, 1f))) return;
+		if (FurnitureKit.Add(k, model, c, yaw, new() { ["upholstery"] = mat, ["wood"] = LodgeTextures.DoorWoodMat }, new Vector3(w / made, 1f, 1f))) return;
 		var b = new Basis(Vector3.Up, yaw);
 		k.Xf = new Transform3D(b, c);
 		k.Mat(mat);
@@ -185,7 +185,7 @@ public static class LodgeKit
 	/// <summary>A wing armchair facing -Z.</summary>
 	public static void Armchair(MeshKit k, Vector3 c, float yaw, Material mat)
 	{
-		if (FurnitureKit.Add(k, "wing_chair", c, yaw, new() { ["upholstery"] = mat, ["wood"] = LodgeTextures.DarkWoodMat })) return;
+		if (FurnitureKit.Add(k, "wing_chair", c, yaw, new() { ["upholstery"] = mat, ["wood"] = LodgeTextures.DoorWoodMat })) return;
 		k.Xf = new Transform3D(new Basis(Vector3.Up, yaw), c);
 		k.Mat(mat);
 		k.Color = Colors.White;
@@ -234,7 +234,7 @@ public static class LodgeKit
 	/// <summary>A dining chair facing -Z: a turned frame, an upholstered seat and back.</summary>
 	public static void Chair(MeshKit k, Vector3 c, float yaw, Material seat)
 	{
-		if (FurnitureKit.Add(k, "dining_chair", c, yaw, new() { ["wood"] = LodgeTextures.DarkWoodMat, ["upholstery"] = seat })) return;
+		if (FurnitureKit.Add(k, "dining_chair", c, yaw, new() { ["wood"] = LodgeTextures.DoorWoodMat, ["upholstery"] = seat })) return;
 		k.Xf = new Transform3D(new Basis(Vector3.Up, yaw), c);
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
@@ -253,7 +253,7 @@ public static class LodgeKit
 	{
 		if (FurnitureKit.Add(k, "bed_17", c, yaw, new()
 			{
-				["wood"] = LodgeTextures.DarkWoodMat, ["upholstery"] = head, ["linen"] = LodgeTextures.LinenMat, ["pillow"] = LodgeTextures.PillowMat, ["cover"] = cover,
+				["wood"] = LodgeTextures.DoorWoodMat, ["upholstery"] = head, ["linen"] = LodgeTextures.LinenMat, ["pillow"] = LodgeTextures.PillowMat, ["cover"] = cover,
 			}, new Vector3(w / 1.7f, 1f, 1f))) return;
 		k.Xf = new Transform3D(new Basis(Vector3.Up, yaw), c);
 		k.Mat(LodgeTextures.DarkWoodMat);

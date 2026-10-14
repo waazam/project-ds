@@ -83,7 +83,7 @@ public partial class SignPost : Node3D
 		const float postW = 0.17f, postH = 2.25f;
 		const float len = 1.55f, h = 0.27f, t = 0.05f, pitch = 0.32f;
 		_k.Color = new Color(0.9f, 0.88f, 0.85f);
-		_k.Mat(PropTextures.PaintedPostMat);
+		_k.Mat(BuildingTextures.SignPostBrownMat);
 		SignKit.FlatPost(_k, new Vector3(0, -0.4f, 0), postH + 0.4f, postW, 1.5f);
 		Col(new Vector3(0, postH * 0.5f, 0), new Vector3(postW + 0.02f, postH, postW + 0.02f));
 
@@ -100,7 +100,7 @@ public partial class SignPost : Node3D
 			var c = new Vector3(x, y, z);
 			float shade = Rand(i + 20, 0.8f, 1.05f);
 			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
-			_k.Mat(PropTextures.PaintedPlankMat);
+			_k.Mat(BuildingTextures.SignBrownMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, dir);
 			Col(c, new Vector3(len, h, t + 0.02f));
 			// bolt heads on the post
@@ -130,7 +130,7 @@ public partial class SignPost : Node3D
 		const float postW = 0.11f, postH = 0.95f;
 		const float len = 1.3f, h = 0.28f, t = 0.05f;
 		_k.Color = new Color(0.88f, 0.86f, 0.83f);
-		_k.Mat(PropTextures.PaintedPostMat);
+		_k.Mat(BuildingTextures.SignPostBrownMat);
 		foreach (float px in new[] { -0.48f, 0.48f })
 		{
 			SignKit.FlatPost(_k, new Vector3(px, -0.35f, 0), postH + 0.35f, postW, 1.8f);
@@ -146,7 +146,7 @@ public partial class SignPost : Node3D
 			var b = Basis.FromEuler(new Vector3(0, 0, Mathf.DegToRad(Rand(i, -3f, 3f))));
 			var c = new Vector3(0, y, postW * 0.5f + t * 0.5f + 0.003f);
 			_k.Color = new Color(0.95f, 0.93f, 0.9f);
-			_k.Mat(PropTextures.PaintedPlankMat);
+			_k.Mat(BuildingTextures.SignBrownMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, 0);
 			Col(c, new Vector3(len, h, t + 0.02f));
 			// the long crack down one board

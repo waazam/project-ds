@@ -42,15 +42,15 @@ public partial class Woodpile : Node3D
 				float x = x0 + i * r * 2.1f + rng.RandfRange(-0.01f, 0.01f);
 				float y = r + row * r * 1.8f + rng.RandfRange(-0.01f, 0.01f);
 				float z0 = -depth * 0.5f + rng.RandfRange(-0.05f, 0.05f), z1 = depth * 0.5f + rng.RandfRange(-0.05f, 0.05f);
-				float sh = rng.RandfRange(0.55f, 0.8f);
-				k.Mat(ProcTextures.BarkMat);
+				float sh = rng.RandfRange(0.75f, 1.0f);
+				k.Mat(BuildingTextures.BarkScanMat);   // (2026-10-14a: the bark scan, nine-sided: they were six-sided sticks in a flat bark)
 				k.Color = new Color(sh, sh * 0.95f, sh * 0.9f);
-				k.Cylinder(new Vector3(x, y, z0), new Vector3(x, y, z1), r * rng.RandfRange(0.85f, 1.05f), r * rng.RandfRange(0.85f, 1.05f), 6, false, 2f, rng.Randf());
+				k.Cylinder(new Vector3(x, y, z0), new Vector3(x, y, z1), r * rng.RandfRange(0.85f, 1.05f), r * rng.RandfRange(0.85f, 1.05f), 9, false, 1.2f, rng.Randf());
 				k.Mat(ProcTextures.EndGrainMat);
 				float g = rng.RandfRange(0.45f, 0.62f);   // old, grey end grain
 				k.Color = new Color(g, g * 0.95f, g * 0.88f);
-				ItemMeshes.Disc(k, new Vector3(x, y, z1), Vector3.Back, r * 0.95f, 6, rng.Randf());
-				ItemMeshes.Disc(k, new Vector3(x, y, z0), Vector3.Forward, r * 0.95f, 6, rng.Randf());
+				ItemMeshes.Disc(k, new Vector3(x, y, z1), Vector3.Back, r * 0.84f, 9, rng.Randf());
+				ItemMeshes.Disc(k, new Vector3(x, y, z0), Vector3.Forward, r * 0.84f, 9, rng.Randf());
 			}
 		}
 		// two stakes holding the ends
