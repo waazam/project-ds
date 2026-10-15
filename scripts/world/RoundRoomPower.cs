@@ -259,54 +259,6 @@ public partial class RoundRoom
 		}
 	}
 
-	/// <summary>The ring round the dais (on its sloped foot, so it rides up with it) and its glow on the floor round it.</summary>
-	private void BuildRing()
-	{
-		_ringMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/dais_ring.gdshader") };
-		_haloMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/dais_ring_halo.gdshader") };
-		const int n = 96;
-		// on the slope: r = DaisFoot - (DaisFoot - DaisR) * s, y = DaisTop * s
-		float Slope(float s, out float y) { y = DaisTop * s; return DaisFoot - (DaisFoot - DaisR) * s; }
-		var nrm = new Vector2(DaisTop, DaisFoot - DaisR).Normalized();   // (outward, up)
-		var st = new SurfaceTool();
-		st.Begin(Mesh.PrimitiveType.Triangles);
-		for (int i = 0; i < n; i++)
-		{
-			float u0 = (float)i / n, u1 = (float)(i + 1) / n;
-			float a0 = Mathf.Tau * u0, a1 = Mathf.Tau * u1;
-			float r0 = Slope(0.07f, out float y0), r1 = Slope(0.24f, out float y1);
-			Vector3 P(float a, float r, float y) => new Vector3(Mathf.Sin(a) * (r + nrm.X * 0.008f), y + nrm.Y * 0.008f, Mathf.Cos(a) * (r + nrm.X * 0.008f));
-			Vector3 a = P(a0, r0, y0), b = P(a1, r0, y0), c = P(a1, r1, y1), d = P(a0, r1, y1);
-			st.SetUV(new Vector2(u0, 0)); st.AddVertex(a);
-			st.SetUV(new Vector2(u1, 0)); st.AddVertex(b);
-			st.SetUV(new Vector2(u1, 1)); st.AddVertex(c);
-			st.SetUV(new Vector2(u0, 0)); st.AddVertex(a);
-			st.SetUV(new Vector2(u1, 1)); st.AddVertex(c);
-			st.SetUV(new Vector2(u0, 1)); st.AddVertex(d);
-		}
-		Dais.AddChild(new MeshInstance3D { Name = "Ring", Mesh = st.Commit(), MaterialOverride = _ringMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-		var h = new SurfaceTool();
-		h.Begin(Mesh.PrimitiveType.Triangles);
-		for (int i = 0; i < n; i++)
-		{
-			float u0 = (float)i / n, u1 = (float)(i + 1) / n;
-			float a0 = Mathf.Tau * u0, a1 = Mathf.Tau * u1;
-			const float ri = DaisFoot - 0.02f, ro = DaisFoot + 0.75f, y = 0.006f;
-			Vector3 a = new(Mathf.Sin(a0) * ri, y, Mathf.Cos(a0) * ri), b = new(Mathf.Sin(a1) * ri, y, Mathf.Cos(a1) * ri);
-			Vector3 c = new(Mathf.Sin(a1) * ro, y, Mathf.Cos(a1) * ro), d = new(Mathf.Sin(a0) * ro, y, Mathf.Cos(a0) * ro);
-			h.SetUV(new Vector2(u0, 0)); h.AddVertex(a);
-			h.SetUV(new Vector2(u1, 0)); h.AddVertex(b);
-			h.SetUV(new Vector2(u1, 1)); h.AddVertex(c);
-			h.SetUV(new Vector2(u0, 0)); h.AddVertex(a);
-			h.SetUV(new Vector2(u1, 1)); h.AddVertex(c);
-			h.SetUV(new Vector2(u0, 1)); h.AddVertex(d);
-		}
-		AddChild(new MeshInstance3D { Name = "RingGlow", Mesh = h.Commit(), MaterialOverride = _haloMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-		_ringLight = new OmniLight3D { Name = "RingLight", Position = new Vector3(0, 0.3f, 0), LightColor = Red, LightEnergy = 1.6f, OmniRange = 6.5f, OmniAttenuation = 1.4f, ShadowEnabled = false, LightCullMask = ~WebLayer };
-		Dais.AddChild(_ringLight);
-		SetRing(0f, 0f, 1f);
-	}
-
 	private void SetRing(float head, float tail, float intensity)
 	{
 		foreach (var m in new[] { _ringMat, _haloMat })
@@ -318,7 +270,7 @@ public partial class RoundRoom
 		if (_ringLight != null)
 		{
 			_ringLight.LightColor = Red.Lerp(Green, Mathf.Clamp(tail, 0f, 1f));
-			_ringLight.LightEnergy = 1.6f * intensity;
+			_ringLight.LightEnergy = 1.6f * intensity * (Arrived ? 0.3f : 1f);   // (2026-10-14h: up in the little room it flooded the place green)
 		}
 	}
 

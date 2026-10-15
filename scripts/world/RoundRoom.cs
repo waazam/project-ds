@@ -76,7 +76,7 @@ public partial class RoundRoom : Node3D
 	/// <summary>The dais: a dressed pale stone, unlike the poured walls (it was the walls' concrete, paler).</summary>
 	private static StandardMaterial3D DaisStone => _daisStone ??= SurfaceSets.Relief(new StandardMaterial3D
 	{
-		ResourceName = "roundroom_dais", AlbedoTexture = SurfaceSets.Tex("limestone"), AlbedoColor = new Color(0.42f, 0.4f, 0.37f), Roughness = 0.9f,
+		ResourceName = "roundroom_dais", AlbedoTexture = SurfaceSets.Tex("limestone"), AlbedoColor = new Color(0.29f, 0.27f, 0.24f), Roughness = 0.9f,
 		MetallicSpecular = 0.25f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = false, Uv1Scale = Vector3.One * 0.7f,
 		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
 	}, "limestone", 1.2f);
@@ -94,6 +94,7 @@ public partial class RoundRoom : Node3D
 		BuildWalls();
 		BuildWindows();
 		BuildSconces();
+		BuildFloorCandles();
 		BuildDais();
 		BuildRing();
 		BuildSwitches();
@@ -306,59 +307,6 @@ public partial class RoundRoom : Node3D
 		wax.CommitTo(this, "Candles", false);
 	}
 
-	/// <summary>The dais: a low round stone step, sloped at its foot, with iron posts round its rim. It
-	/// moves (an AnimatableBody) and carries the player up.</summary>
-	private void BuildDais()
-	{
-		Dais = new Node3D { Name = "Dais" };
-		AddChild(Dais);
-		var k = new MeshKit();
-		k.Mat(DaisStone);
-		k.Color = new Color(0.85f, 0.82f, 0.75f);
-		k.Cylinder(new Vector3(0, 0, 0), new Vector3(0, DaisTop, 0), DaisFoot, DaisR, 48, true);
-		k.Cylinder(new Vector3(0, -4f, 0), new Vector3(0, 0.001f, 0), DaisFoot, DaisFoot, 48, false);   // the column under it, seen on the way up
-		k.CommitTo(Dais, "Stone", true);
-		// a ring of inlay and a worn sigil in the middle
-		var inlay = new MeshKit();
-		inlay.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.5f, 0.4f, 0.25f), Roughness = 0.5f, MetallicSpecular = 0.6f, Metallic = 0.5f });
-		for (int i = 0; i < 48; i++)
-		{
-			float a0 = Mathf.Tau * i / 48f, a1 = Mathf.Tau * (i + 1) / 48f;
-			foreach (float r in new[] { 1.75f, 0.7f })
-				inlay.Beam(new Vector3(Mathf.Sin(a0) * r, DaisTop + 0.003f, Mathf.Cos(a0) * r), new Vector3(Mathf.Sin(a1) * r, DaisTop + 0.003f, Mathf.Cos(a1) * r), 0.05f, 0.006f);
-		}
-		for (int i = 0; i < 8; i++)
-		{
-			float a = Mathf.Tau * i / 8f;
-			inlay.Beam(new Vector3(Mathf.Sin(a) * 0.7f, DaisTop + 0.003f, Mathf.Cos(a) * 0.7f), new Vector3(Mathf.Sin(a) * 1.75f, DaisTop + 0.003f, Mathf.Cos(a) * 1.75f), 0.04f, 0.006f);
-		}
-		inlay.CommitTo(Dais, "Inlay", false);
-		// iron posts round the rim (the web's anchors)
-		var posts = new MeshKit();
-		posts.Mat(StairwellTextures.SteelMat);
-		posts.Color = new Color(0.25f, 0.24f, 0.23f);
-		for (int i = 0; i < 8; i++)
-		{
-			float a = Mathf.Tau * (i + 0.5f) / 8f;
-			Vector3 at = new(Mathf.Sin(a) * (DaisR - 0.12f), DaisTop, Mathf.Cos(a) * (DaisR - 0.12f));
-			posts.Cylinder(at, at + Vector3.Up * 1.05f, 0.035f, 0.03f, 8, true);
-			posts.Blob(at + Vector3.Up * 1.08f, Vector3.One * 0.05f, i, 0.05f);
-		}
-		posts.CommitTo(Dais, "Posts", true);
-		_daisBody = new AnimatableBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0, SyncToPhysics = false };
-		_daisBody.SetMeta("surface", "stone");
-		var pts = new List<Vector3>();
-		for (int i = 0; i < 32; i++)
-		{
-			float a = Mathf.Tau * i / 32f;
-			pts.Add(new Vector3(Mathf.Sin(a) * DaisFoot, 0, Mathf.Cos(a) * DaisFoot));
-			pts.Add(new Vector3(Mathf.Sin(a) * DaisR, DaisTop, Mathf.Cos(a) * DaisR));
-			pts.Add(new Vector3(Mathf.Sin(a) * DaisFoot, -0.4f, Mathf.Cos(a) * DaisFoot));
-		}
-		_daisBody.AddChild(new CollisionShape3D { Shape = new ConvexPolygonShape3D { Points = pts.ToArray() } });
-		Dais.AddChild(_daisBody);
-	}
-
 	/// <summary>The render layer the webs are on (layer 11), which the ring's red light skips.</summary>
 	public const uint WebLayer = 1u << 10;
 
@@ -483,35 +431,11 @@ public partial class RoundRoom : Node3D
 	private void BuildTopRoom()
 	{
 		float y0 = Rise + DaisTop;
-		var k = new MeshKit();
-		k.Mat(TopStone);
-		k.Color = Colors.White;
-		const int n = 28;
-		float segW = Mathf.Tau * (TopR + 0.3f) / n + 0.05f;
-		for (int i = 0; i < n; i++)
-		{
-			float a = Mathf.Tau * i / n;
-			Vector3 dir = new(Mathf.Sin(a), 0, Mathf.Cos(a));
-			bool way = Mathf.Abs(Mathf.AngleDifference(a, 0f)) < 0.3f;   // a wide arch on +Z: the way on, up the long stair
-			if (way) { Seg(k, dir * (TopR + 0.3f) + Vector3.Up * (y0 + (2.4f + TopH + 0.2f) * 0.5f), new Vector3(segW, TopH + 0.2f - 2.4f, 0.6f), a, true); continue; }
-			Seg(k, dir * (TopR + 0.3f) + Vector3.Up * (y0 + TopH * 0.5f), new Vector3(segW, TopH + 0.4f, 0.6f), a, true);
-		}
-		k.Color = Colors.White * 0.8f;
-		k.Cylinder(new Vector3(0, y0 + TopH, 0), new Vector3(0, y0 + TopH + 0.3f, 0), TopR + 0.6f, TopR + 0.6f, 32, true);
-		// the floor ring round the shaft
-		for (int i = 0; i < 48; i++)
-		{
-			float a0 = Mathf.Tau * i / 48f, a1 = Mathf.Tau * (i + 1) / 48f;
-			Vector3 d0 = new(Mathf.Sin(a0), 0, Mathf.Cos(a0)), d1 = new(Mathf.Sin(a1), 0, Mathf.Cos(a1));
-			Vector3 y = Vector3.Up * y0;
-			k.Color = new Color(0.72f, 0.69f, 0.63f);
-			k.Quad(y + d0 * (DaisR + 0.02f), y + d0 * (TopR + 0.4f), y + d1 * (TopR + 0.4f), y + d1 * (DaisR + 0.02f), Vector3.Up);
-		}
-		k.CommitTo(this, "TopRoom", true);
+		BuildTopShell(y0);
 		// the way on (Act 21): the long stair up to the surface, and the church at its top
 		Stair = new LongStair { Name = "LongStair", Position = new Vector3(0, y0, 0) };
 		AddChild(Stair);
-		AddChild(new OmniLight3D { Position = new Vector3(0, y0 + 2.8f, 0), LightColor = new Color(1f, 0.85f, 0.65f), LightEnergy = 1.3f, OmniRange = 8f, ShadowEnabled = true });
+		AddChild(new OmniLight3D { Position = new Vector3(0, y0 + 2.8f, 0), LightColor = new Color(1f, 0.85f, 0.65f), LightEnergy = 1.7f, OmniRange = 8f, ShadowEnabled = true });
 		AddChild(new OmniLight3D { Position = new Vector3(0, y0 + 2.2f, TopR + 2.5f), LightColor = new Color(0.75f, 0.8f, 0.95f), LightEnergy = 0.5f, OmniRange = 4f });
 		// the floor's collision (a box round the shaft's top; switched on once the dais is up, so it
 		// doesn't stop the dais on its way)
@@ -718,6 +642,7 @@ public partial class RoundRoom : Node3D
 		Sfx("lift_stop", ToGlobal(Dais.Position + Vector3.Up * 0.3f), 0f, 1f);
 		SetTopFloor(true);
 		Arrived = true;
+		SetRing(0f, 1f, 1f);
 		Rising = false;
 		_checkpointed = true;
 		player.Velocity = Vector3.Zero;
