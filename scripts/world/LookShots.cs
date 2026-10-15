@@ -125,6 +125,21 @@ public partial class LookShots : Node
 			p.CameraRig.SetPitch(Mathf.DegToRad(pitch));
 			await Hold(p, Mathf.DegToRad(yaw), Mathf.DegToRad(pitch), 2.5f);
 			Save($"{shot++:00}_pos_{pos.X:0}_{pos.Z:0}_{yaw:0}");
+			if (_perf > 0f)
+			{
+				await Perf(p, yaw, pitch, "with");
+				// --look-perfhide=A,B: the same again with those nodes hidden (what a room costs)
+				var hidden = new List<Node3D>();
+				foreach (var a in OS.GetCmdlineUserArgs())
+					if (a.StartsWith("--look-perfhide="))
+						foreach (var name in a["--look-perfhide=".Length..].Split(','))
+							if (tree.Root.FindChild(name, true, false) is Node3D hn && hn.Visible) { hn.Visible = false; hidden.Add(hn); }
+				if (hidden.Count > 0)
+				{
+					await Perf(p, yaw, pitch, "without " + string.Join("+", hidden.ConvertAll(h => h.Name.ToString())));
+					foreach (var hn in hidden) hn.Visible = true;
+				}
+			}
 			if (_ab)
 			{
 				SetTreeLook(false);
@@ -148,6 +163,38 @@ public partial class LookShots : Node
 	}
 
 	private Vector3? _pin;
+
+	/// <summary>--look-perf=S (2026-10-14g): at each pose, the frame time averaged over S seconds, the draw calls and
+	/// the primitives (a room's cost, with --look-perfhide).</summary>
+	private float _perf
+	{
+		get
+		{
+			foreach (var a in OS.GetCmdlineUserArgs())
+				if (a.StartsWith("--look-perf=")) return float.Parse(a["--look-perf=".Length..], CultureInfo.InvariantCulture);
+			return 0f;
+		}
+	}
+
+	private async System.Threading.Tasks.Task Perf(PlayerController p, float yaw, float pitch, string label)
+	{
+		await Hold(p, yaw, pitch, 0.6f);
+		double t = 0, worst = 0;
+		int frames = 0;
+		long draws = 0, prims = 0;
+		while (t < _perf)
+		{
+			await Hold(p, yaw, pitch, 0f);
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			double dt = GetProcessDeltaTime();
+			t += dt;
+			worst = Math.Max(worst, dt);
+			frames++;
+			draws += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame);
+			prims += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame);
+		}
+		GD.Print($"[look]   perf {label}: {t * 1000.0 / frames:0.00} ms/frame avg ({frames / t:0} fps), worst {worst * 1000.0:0.0} ms, draws {draws / frames}, prims {prims / frames}");
+	}
 	private bool _fogAb => Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-fogab") >= 0;
 	private ForestAtmosphere FindAtmo()
 	{

@@ -377,10 +377,7 @@ public partial class Church
 			var gaps = FacetHasChapel(i) ? new[] { (len * 0.5f - 1.2f, len * 0.5f + 1.2f) } : null;
 			BaseCourse(k, p0, p0 + along * len, inward, ChancelY, gaps);
 		}
-		// the vestry
-		BaseCourse(k, new Vector3(VestryX1, 0, VestryZ0), new Vector3(VestryX1, 0, VestryZ1), Vector3.Right, 0f, null, 0.4f, 0.12f);
-		BaseCourse(k, new Vector3(VestryX1, 0, VestryZ0), new Vector3(VestryX0, 0, VestryZ0), Vector3.Back, 0f, null, 0.4f, 0.12f);
-		BaseCourse(k, new Vector3(VestryX1, 0, VestryZ1), new Vector3(VestryX0, 0, VestryZ1), Vector3.Forward, 0f, null, 0.4f, 0.12f);
+		// (the vestry has its own skirting and wainscot: Church.Vestry.cs)
 		// the crypt, round the stairs' doorways
 		var cg = new List<(float, float)>();
 		foreach (var (x0, x1, _, _) in StairOpenings) cg.Add((x0 + CryptHalf, x1 + CryptHalf));

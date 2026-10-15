@@ -293,6 +293,216 @@ public partial class DecalDresser : Node3D
 		Placed++;
 	}
 
+	// ------------------------------------------------------------------ placed by rule (2026-10-14g, the interiors kit)
+
+	/// <summary>One decal, placed by hand: <paramref name="tex"/> one of assets/textures/decals (tide, streak, mould,
+	/// floor, wine, blood, puddle, seep, crack, peel, scuff, ghost, ceiling, soot), at <paramref name="at"/> on a surface
+	/// facing <paramref name="normal"/> (into the room), <paramref name="size"/> across and up it (its top toward the
+	/// ceiling on a wall; on a floor or ceiling turned by <paramref name="spin"/>). In <paramref name="parent"/>'s space.
+	/// It projects <paramref name="depth"/> deep, half each side of the surface: keep it shallow, or it stains the
+	/// things in front of the wall too.</summary>
+	public static Decal Place(Node3D parent, string tex, Vector3 at, Vector3 normal, Vector2 size, float alpha = 0.8f, float spin = 0f, float depth = 0.16f)
+	{
+		var (albedo, orm) = Load(tex);
+		if (albedo == null || parent == null) return null;
+		Vector3 y = normal.Normalized();
+		Basis basis;
+		if (Mathf.Abs(y.Y) > 0.7f)
+		{
+			Vector3 x = new Vector3(Mathf.Cos(spin), 0, Mathf.Sin(spin));
+			Vector3 z = x.Cross(y).Normalized();
+			x = y.Cross(z).Normalized();
+			basis = new Basis(x, y, z);
+		}
+		else
+		{
+			// the decal's -Y into the wall; its Z running down the wall (the texture's top at the top)
+			Vector3 x = Vector3.Up.Cross(y).Normalized(), z = x.Cross(y).Normalized();
+			if (z.Y > 0f) { z = -z; x = -x; }
+			basis = new Basis(x, y, z);
+		}
+		var d = new Decal
+		{
+			Name = $"{tex}_{parent.GetChildCount()}",
+			Size = new Vector3(size.X, depth, size.Y),
+			TextureAlbedo = albedo,
+			TextureOrm = orm,
+			Modulate = new Color(1f, 1f, 1f, alpha),
+			NormalFade = 0.5f,
+			UpperFade = 0.15f,
+			LowerFade = 0.15f,
+			DistanceFadeEnabled = true,
+			DistanceFadeBegin = 22f,
+			DistanceFadeLength = 8f,
+			Transform = new Transform3D(basis, at),
+		};
+		parent.AddChild(d);
+		return d;
+	}
+
+	/// <summary>What a room's rule-based dressing needs to know (<see cref="Room"/>), in its node's space.</summary>
+	public sealed class RoomSpec
+	{
+		/// <summary>The room's inside: floor at the bottom, ceiling at the top, walls its sides (axis-aligned).</summary>
+		public Aabb Box;
+		public int Seed = 1;
+		/// <summary>Windows: their middle at the sill, on the wall's face, and the wall's normal into the room; width, height.</summary>
+		public List<(Vector3 sill, Vector3 normal, float width, float height)> Windows = new();
+		/// <summary>Doorways: their middle at the floor on the wall's face, the wall's normal into the room; width, height.</summary>
+		public List<(Vector3 foot, Vector3 normal, float width, float height)> Doors = new();
+		/// <summary>Flames (lamps, candles, a stove): soot up the nearest wall within a metre.</summary>
+		public List<Vector3> Flames = new();
+		/// <summary>Spots kept clean (a puzzle's notice, a mural): centre and radius.</summary>
+		public List<(Vector3 at, float r)> Keep = new();
+		/// <summary>How much of everything (1 a typical neglected room: about a dozen to twenty).</summary>
+		public float Amount = 1f;
+		/// <summary>Painted plaster or paper (peeling paint, picture ghosts); off for bare stone, brick, concrete, logs.</summary>
+		public bool Painted = true;
+		/// <summary>Faces a decal may never land on: a wall (its inward normal) skipped entirely (a wall of shelves, glass).</summary>
+		public List<Vector3> SkipWalls = new();
+	}
+
+	/// <summary>
+	/// Dresses a room by rule rather than by ray (deterministic from <see cref="RoomSpec.Seed"/>, no physics needed,
+	/// placed at once): under each window a run of streaks and a seep; water risen in a tide at the walls' feet here and
+	/// there; black mould in an upper corner or two; a stain or two on the ceiling; cracks from the corners of the
+	/// openings' heads and down from the ceiling; on painted walls, flakes of peeling paint and the clean rectangles
+	/// where pictures hung; scuffs low by the doors and on the floor in their way; soot up the wall over every flame; a
+	/// dried stain on the floor. Returns the node holding them. About 15-25 decals a room at Amount 1.
+	/// </summary>
+	public static Node3D Room(Node3D parent, RoomSpec spec)
+	{
+		var root = new Node3D { Name = "RoomDecals" };
+		parent.AddChild(root);
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-decals") >= 0) return root;
+		var rng = new RandomNumberGenerator { Seed = (ulong)(spec.Seed * 7919 + 31) };
+		Vector3 lo = spec.Box.Position, hi = spec.Box.End;
+		float floorY = lo.Y, ceilY = hi.Y, h = ceilY - floorY;
+		// the four walls: a point on each face, its normal into the room, its run (along, from, to)
+		var walls = new List<(Vector3 n, Vector3 a, Vector3 b)>
+		{
+			(Vector3.Right, new Vector3(lo.X, floorY, lo.Z), new Vector3(lo.X, floorY, hi.Z)),
+			(Vector3.Left, new Vector3(hi.X, floorY, hi.Z), new Vector3(hi.X, floorY, lo.Z)),
+			(Vector3.Back, new Vector3(hi.X, floorY, lo.Z), new Vector3(lo.X, floorY, lo.Z)),
+			(Vector3.Forward, new Vector3(lo.X, floorY, hi.Z), new Vector3(hi.X, floorY, hi.Z)),
+		};
+		walls.RemoveAll(w => spec.SkipWalls.Exists(s => s.Normalized().Dot(w.n) > 0.9f));
+		const float lift = 0.01f;
+		bool Clear(Vector3 p, float r)
+		{
+			foreach (var (k, kr) in spec.Keep) if (k.DistanceTo(p) < kr + r) return false;
+			foreach (var (sill, n, w, wh) in spec.Windows)
+				if (Mathf.Abs((p - sill).Dot(n)) < 0.3f && Mathf.Abs(new Vector2(p.X - sill.X, p.Z - sill.Z).Length()) < w * 0.5f + r && p.Y > sill.Y - 0.05f && p.Y < sill.Y + wh) return false;
+			foreach (var (foot, n, w, dh) in spec.Doors)
+				if (Mathf.Abs((p - foot).Dot(n)) < 0.3f && new Vector2(p.X - foot.X, p.Z - foot.Z).Length() < w * 0.5f + r && p.Y < foot.Y + dh + r) return false;
+			return true;
+		}
+		void OnWall(string tex, float yCentre, Vector2 size, float alpha, float margin = 0.3f, int tries = 8)
+		{
+			if (walls.Count == 0) return;
+			for (int t = 0; t < tries; t++)
+			{
+				var (n, a, b) = walls[rng.RandiRange(0, walls.Count - 1)];
+				float len = a.DistanceTo(b);
+				if (len < size.X + margin * 2f) continue;
+				Vector3 p = a.Lerp(b, rng.RandfRange((margin + size.X * 0.5f) / len, 1f - (margin + size.X * 0.5f) / len));
+				p.Y = yCentre;
+				if (!Clear(p, size.X * 0.5f)) continue;
+				Place(root, tex, p + n * lift, n, size, alpha);
+				return;
+			}
+		}
+		float amt = spec.Amount;
+		int N(float x) => Mathf.Max(0, Mathf.RoundToInt(x * amt + rng.RandfRange(-0.4f, 0.4f)));
+		// under the windows: streaks run down from the sill, a seep
+		foreach (var (sill, n, w, wh) in spec.Windows)
+		{
+			float sh = Mathf.Max(0.4f, sill.Y - floorY);
+			Place(root, "streak", sill + n * lift + Vector3.Down * (sh * 0.5f), n, new Vector2(w * rng.RandfRange(0.8f, 1.2f), sh), 0.75f);
+			if (rng.Randf() < 0.7f) Place(root, "seep", sill + n * lift + Vector3.Down * (sh * 0.35f) + Vector3.Up.Cross(n).Normalized() * rng.RandfRange(-w * 0.3f, w * 0.3f), n, new Vector2(0.5f, sh * 0.7f), 0.7f);
+			// a crack from a corner of its head
+			if (rng.Randf() < 0.6f * amt)
+			{
+				Vector3 side = Vector3.Up.Cross(n).Normalized() * (rng.Randf() < 0.5f ? -1f : 1f);
+				Vector3 c = sill + side * (w * 0.5f + 0.2f);
+				c.Y = Mathf.Min(sill.Y + wh + 0.15f, ceilY - 0.4f);
+				Place(root, "crack", c + n * lift, n, new Vector2(0.45f, 0.7f), 0.85f);
+			}
+		}
+		// by the doors: cracks off the head, scuffs low on the wall beside, scuffs on the floor in the way
+		foreach (var (foot, n, w, dh) in spec.Doors)
+		{
+			Vector3 side = Vector3.Up.Cross(n).Normalized();
+			if (rng.Randf() < 0.6f * amt)
+			{
+				float s = rng.Randf() < 0.5f ? -1f : 1f;
+				Vector3 c = foot + side * s * (w * 0.5f + 0.25f) + Vector3.Up * Mathf.Min(dh + 0.35f, h - 0.35f);
+				Place(root, "crack", c + n * lift, n, new Vector2(0.4f, 0.7f), 0.85f);
+			}
+			foreach (float s in new[] { -1f, 1f })
+				if (rng.Randf() < 0.75f) Place(root, "scuff", foot + side * s * (w * 0.5f + rng.RandfRange(0.3f, 0.7f)) + Vector3.Up * rng.RandfRange(0.12f, 0.3f) + n * lift, n, new Vector2(rng.RandfRange(0.6f, 1.1f), 0.35f), 0.7f);
+			Place(root, "scuff", foot + n * rng.RandfRange(0.6f, 1.1f) + Vector3.Up * 0.02f, Vector3.Up, new Vector2(rng.RandfRange(0.9f, 1.4f), 0.7f), 0.55f, rng.RandfRange(0f, Mathf.Tau));
+		}
+		// soot up the wall over every flame within a metre of one
+		foreach (var f in spec.Flames)
+		{
+			(Vector3 n, float d) best = (Vector3.Zero, 99f);
+			foreach (var (n, a, _) in walls)
+			{
+				float d = (f - a).Dot(n);
+				if (d >= 0f && d < best.d) best = (n, d);
+			}
+			if (best.d < 1.1f)
+			{
+				float top = Mathf.Min(ceilY, f.Y + 1.8f);
+				Vector3 at = f - best.n * best.d + best.n * lift;
+				at.Y = (f.Y + top) * 0.5f + 0.1f;
+				Place(root, "soot", at, best.n, new Vector2(0.9f, top - f.Y), 0.7f);
+			}
+		}
+		// mould in an upper corner or two
+		var corners = new List<(Vector3 p, Vector3 n)>();
+		foreach (var (n, a, b) in walls) { corners.Add((a, n)); corners.Add((b, n)); }
+		for (int i = N(1.6f); i > 0 && corners.Count > 0; i--)
+		{
+			int ci = rng.RandiRange(0, corners.Count - 1);
+			var (p, n) = corners[ci];
+			corners.RemoveAt(ci);
+			Vector3 into = ((spec.Box.GetCenter() - p) with { Y = 0f }).Normalized();
+			Vector3 along = (into - n * into.Dot(n)).Normalized();
+			float s = rng.RandfRange(0.5f, 0.9f);
+			Vector3 at = p + along * (s * 0.4f) + Vector3.Up * (h - s * 0.4f) + n * lift;
+			if (Clear(at, s * 0.5f)) Place(root, "mould", at, n, new Vector2(s, s), 0.8f);
+		}
+		// water risen at the walls' feet, here and there
+		for (int i = N(2f); i > 0; i--) { float th = rng.RandfRange(0.45f, 0.9f); OnWall("tide", floorY + th * 0.5f - 0.02f, new Vector2(rng.RandfRange(1.0f, 2.2f), th), 0.7f); }
+		// streaks down from the ceiling
+		for (int i = N(1.5f); i > 0; i--) { float sh = rng.RandfRange(0.8f, Mathf.Min(2.2f, h * 0.6f)); OnWall("streak", ceilY - sh * 0.5f + 0.02f, new Vector2(rng.RandfRange(0.6f, 1.3f), sh), 0.7f); }
+		// a crack down from the ceiling
+		for (int i = N(1f); i > 0; i--) OnWall("crack", ceilY - 0.4f, new Vector2(0.45f, 0.8f), 0.85f);
+		if (spec.Painted)
+		{
+			for (int i = N(2f); i > 0; i--) { float s = rng.RandfRange(0.35f, 0.7f); OnWall("peel", floorY + rng.RandfRange(1.1f, h - 0.5f), new Vector2(s, s * rng.RandfRange(0.8f, 1.2f)), 0.85f); }
+			for (int i = N(2f); i > 0; i--) { float w = rng.RandfRange(0.4f, 0.8f); OnWall("ghost", floorY + rng.RandfRange(1.45f, 1.75f), new Vector2(w, w * rng.RandfRange(0.8f, 1.35f)), 0.6f, 0.5f); }
+		}
+		// the ceiling's stains
+		for (int i = N(1.5f); i > 0; i--)
+		{
+			float s = rng.RandfRange(0.8f, 1.6f);
+			var at = new Vector3(rng.RandfRange(lo.X + s * 0.5f, hi.X - s * 0.5f), ceilY - lift, rng.RandfRange(lo.Z + s * 0.5f, hi.Z - s * 0.5f));
+			Place(root, "ceiling", at, Vector3.Down, new Vector2(s, s * rng.RandfRange(0.8f, 1.2f)), 0.75f, rng.RandfRange(0f, Mathf.Tau));
+		}
+		// a stain on the floor
+		for (int i = N(1.2f); i > 0; i--)
+		{
+			float s = rng.RandfRange(0.6f, 1.2f);
+			var at = new Vector3(rng.RandfRange(lo.X + 0.5f, hi.X - 0.5f), floorY + lift, rng.RandfRange(lo.Z + 0.5f, hi.Z - 0.5f));
+			if (Clear(at, s * 0.5f)) Place(root, "floor", at, Vector3.Up, new Vector2(s, s), 0.65f, rng.RandfRange(0f, Mathf.Tau));
+		}
+		GD.Print($"[decals] {parent.Name}: {root.GetChildCount()} placed by rule");
+		return root;
+	}
+
 	private static (Texture2D, Texture2D) Load(string tex)
 	{
 		if (_tex.TryGetValue(tex, out var t)) return t;

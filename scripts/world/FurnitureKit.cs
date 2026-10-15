@@ -146,6 +146,10 @@ public static class FurnitureKit
 	/// <summary>Whether a piece exists (built and imported).</summary>
 	public static bool Has(string model) => Load(model).mesh != null;
 
+	/// <summary>(2026-10-14g) A piece's bounds as it stands (its origin on the floor), or null if it isn't there: what
+	/// <see cref="ClutterKit"/> fits it into the room by.</summary>
+	public static Aabb? Bounds(string model) => Load(model).mesh is { } m ? m.GetAabb() : null;
+
 	/// <summary>Puts a piece into <paramref name="k"/>: standing at <paramref name="c"/> (on the floor) turned by
 	/// <paramref name="yaw"/>, its front toward -Z before the turn, scaled by <paramref name="scale"/>; each role in
 	/// <paramref name="roles"/> given the room's material. Returns false if the piece isn't there (the caller builds its

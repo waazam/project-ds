@@ -15,8 +15,20 @@ public static class BuildKit
 	public enum Face { None = 0, PX = 1, NX = 2, PY = 4, NY = 8, PZ = 16, NZ = 32, All = 63 }
 
 	/// <summary>MeshKit.Box, minus the faces in <paramref name="skip"/>.</summary>
+	/// <remarks>With <see cref="MeshKit.Bevel"/> set, the edges are eased (2026-10-14g): all twelve when no face is
+	/// skipped and <see cref="MeshKit.BevelAxis"/> is -1; or only the four along BevelAxis, its two ends left open if
+	/// skipped (a wall slab standing on the floor, under the ceiling). Other skips draw it square.</remarks>
 	public static void Box(MeshKit k, Vector3 c, Vector3 s, float uv = 1f, Face skip = Face.None, Basis? rot = null)
 	{
+		if (k.Bevel > 0f)
+		{
+			if (k.BevelAxis < 0 && skip == Face.None) { k.BevelBox(c, s, k.Bevel, uv, rot); return; }
+			if (k.BevelAxis >= 0)
+			{
+				var (lo, hi) = k.BevelAxis switch { 0 => (Face.NX, Face.PX), 1 => (Face.NY, Face.PY), _ => (Face.NZ, Face.PZ) };
+				if ((skip & ~(lo | hi)) == 0) { k.ChamferBox(c, s, k.Bevel, uv, rot, k.BevelAxis, (skip & lo) == 0, (skip & hi) == 0); return; }
+			}
+		}
 		Basis b = rot ?? Basis.Identity;
 		Vector3 h = s * 0.5f;
 		Vector3 P(float x, float y, float z) => c + b * new Vector3(x * h.X, y * h.Y, z * h.Z);
