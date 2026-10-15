@@ -115,7 +115,7 @@ public partial class LobbyDecor : Node3D
 	private void BuildShade()
 	{
 		var desk = StationInterior.DeskAt;
-		_shade = new RoomShade(-IX, IX, -IZ, IZ, 0f, H) { Dim = 0.68f, Reach = 1.4f };
+		_shade = new RoomShade(-IX, IX, -IZ, IZ, 0f, H) { Dim = 0.74f, Reach = 1.4f };
 		_shade.Light(LampAt + Vector3.Down * 0.3f, 5.4f).Light(desk + new Vector3(0.55f, 1f, 0.1f), 2.2f, 0.7f)
 			.Under(desk, new Vector3(1.9f, 0.82f, 0.8f), 0.5f, 0.5f)
 			.Under(new Vector3(-3.4f, 0, D - 0.4f), new Vector3(1.6f, 0.46f, 0.42f), 0.4f, 0.4f)
@@ -917,7 +917,7 @@ public partial class LobbyDecor : Node3D
 		_ceiling = new OmniLight3D
 		{
 			Name = "LobbyLamp", LightColor = new Color(1f, 0.8f, 0.6f), LightEnergy = 2.3f,
-			OmniRange = 7.5f, OmniAttenuation = 1.55f, Position = LampAt, ShadowEnabled = true,
+			OmniRange = 8f, OmniAttenuation = 1.4f, Position = LampAt, ShadowEnabled = true,
 		};
 		AddChild(_ceiling);
 	}

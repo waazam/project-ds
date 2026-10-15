@@ -143,7 +143,8 @@ public partial class Stairwell : Node3D
 			_wallMat.SetShaderParameter("grime_rough", SurfaceSets.Tex("concrete_grime", "rough"));
 			_wallMat.SetShaderParameter("relief", 1.0f);
 		}
-		_wallMat.SetShaderParameter("macro_vary", 0.5f);
+		_wallMat.SetShaderParameter("macro_vary", 0.85f);
+		_wallMat.SetShaderParameter("top_stain", 0.28f);   // (2026-10-14h: the top already stained, not a clean pale pour)
 		// (the clean pour at the top went flat and white with the lantern a foot from it: a step darker, old concrete)
 		// (2026-10-14h, the station pass: still went pale at the top under the lantern, the brightest wall in Act 14; another
 		// step down, a touch warmer, old dirtied concrete)

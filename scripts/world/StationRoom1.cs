@@ -159,7 +159,7 @@ public partial class StationRoom1 : Node3D
 		});
 		AddChild(new OmniLight3D
 		{
-			Name = "RoomLamp", LightColor = new Color(1f, 0.66f, 0.48f), LightEnergy = 1.25f,
+			Name = "RoomLamp", LightColor = new Color(1f, 0.66f, 0.48f), LightEnergy = 1.6f,
 			OmniRange = 6f, OmniAttenuation = 1.45f, Position = lampAt - Vector3.Up * 0.1f,
 		});
 		// stains, cracks and scuffs by rule; not over the writing
