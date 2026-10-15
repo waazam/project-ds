@@ -115,6 +115,7 @@ public partial class SkiLodge : Node3D
 		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildInterior"); BuildInterior(); }
 		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildFurnishings"); BuildFurnishings(); }
 		StartAct23();
+		BuildKitPass();   // (2026-10-14h: the interiors kit, room by room, over everything built: SkiLodge.Kit)
 		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildIcicles"); BuildIcicles(); }
 		{ using var __t = Systems.BuildTimer.Time("SkiLodge.BuildDrifts"); BuildDrifts(); }
 		_frontMarker = new Node3D { Name = "FrontMarker", Position = new Vector3(0, 1.4f, Apothem + 1.2f) };
@@ -654,16 +655,71 @@ public partial class SkiLodge : Node3D
 		NormalEnabled = LodgeParts.LodgeTextures.LinenMat.NormalTexture != null, NormalTexture = LodgeParts.LodgeTextures.LinenMat.NormalTexture,
 	};
 
+	private static StandardMaterial3D _parkaNylon, _furTrim;
+
+	/// <summary>(2026-10-14h) A coat hung on a hook on the mudroom's east wall (the room's -X side): a brass hook, the
+	/// shoulders and the body draped from it in soft folds, the sleeves hanging, a collar or a hood. Kind 0 a long wool
+	/// coat, 1 a quilted parka with a fur-trimmed hood and a stripe, 2 a short jacket with a scarf over the hook.</summary>
+	private static void HangingCoat(MeshKit k, Vector3 hook, int kind, Material wool)
+	{
+		var keep = k.Color;
+		k.Color = Colors.White;
+		Vector3 o = hook + Vector3.Left * 0.13f;   // (its middle, out from the wall)
+		k.Mat(LodgeParts.LodgeTextures.BrassMat);
+		k.Cylinder(hook + Vector3.Right * 0.02f, hook + Vector3.Left * 0.1f + Vector3.Up * 0.04f, 0.009f, 0.009f, 5, true);
+		_parkaNylon ??= new StandardMaterial3D { ResourceName = "lodge_parka_nylon", AlbedoColor = new Color(0.1f, 0.12f, 0.2f), Roughness = 0.5f, MetallicSpecular = 0.45f, VertexColorUseAsAlbedo = true };
+		_furTrim ??= new StandardMaterial3D { ResourceName = "lodge_fur_trim", AlbedoColor = new Color(0.5f, 0.44f, 0.34f), Roughness = 1f, VertexColorUseAsAlbedo = true, AlbedoTexture = LodgeParts.LodgeTextures.LinenMat.AlbedoTexture, Uv1Scale = Vector3.One * 6f };
+		var cloth = kind == 1 ? _parkaNylon : wool;
+		float len = kind == 0 ? 1.05f : kind == 1 ? 0.78f : 0.7f, w = kind == 1 ? 0.27f : 0.24f, d = kind == 1 ? 0.14f : 0.11f;
+		int seed = 7700 + kind * 31;
+		k.Mat(cloth);
+		// the shoulders over the hook, the body falling from them (wider at the hem), a fold or two down it
+		k.Blob(o + new Vector3(0, -0.1f, 0), new Vector3(d * 0.9f, 0.085f, w * 0.95f), seed, 0.06f, false, 1f, 0.2f, 2);
+		k.Blob(o + new Vector3(0.01f, -0.12f - len * 0.5f, 0), new Vector3(d, len * 0.5f, w * 1.05f), seed + 1, 0.07f, false, 1f, 0.35f, 2);
+		k.Blob(o + new Vector3(-0.02f, -0.1f - len * 0.82f, 0.04f), new Vector3(d * 0.85f, len * 0.2f, w * 0.75f), seed + 2, 0.12f, false, 1f, 0.3f, 1);
+		// the sleeves, hanging down its sides a little forward
+		foreach (float s in new[] { -1f, 1f })
+			k.Cylinder(o + new Vector3(-0.02f, -0.15f, s * w * 0.92f), o + new Vector3(-0.07f, -0.15f - len * (kind == 0 ? 0.62f : 0.72f), s * w * 0.82f), 0.062f, 0.05f, 7, true);
+		if (kind == 1)
+		{
+			// the quilting's seams across it, a stripe across the chest, the hood fallen back with its fur
+			k.Mat(LodgeParts.LodgeTextures.BlackMat);
+			for (int i = 1; i < 4; i++)
+				k.Box(o + new Vector3(-d - 0.004f, -0.12f - len * 0.22f * i, 0), new Vector3(0.01f, 0.012f, w * 1.6f), 1f);
+			k.Mat(CoatWool(new Color(0.36f, 0.1f, 0.08f), 0));
+			k.Box(o + new Vector3(-d - 0.008f, -0.3f, 0), new Vector3(0.012f, 0.07f, w * 1.75f), 1f);
+			k.Mat(_furTrim);
+			k.Blob(o + new Vector3(0.03f, -0.02f, 0), new Vector3(0.09f, 0.1f, 0.15f), seed + 3, 0.22f, false, 1f, 0f, 1);
+		}
+		else if (kind == 0)
+		{
+			k.Mat(cloth);
+			k.Blob(o + new Vector3(-0.04f, -0.04f, 0), new Vector3(0.06f, 0.05f, 0.11f), seed + 4, 0.1f, false, 1f, 0f, 1);   // the collar turned up
+			k.Mat(LodgeParts.LodgeTextures.BrassMat);
+			for (int i = 0; i < 4; i++) k.Cylinder(o + new Vector3(-d - 0.005f, -0.25f - i * 0.17f, 0.04f), o + new Vector3(-d - 0.015f, -0.25f - i * 0.17f, 0.04f), 0.012f, 0.012f, 6, true);   // its buttons
+		}
+		else
+		{
+			// a scarf hung over the hook, its two ends down the jacket's front
+			k.Mat(CoatWool(new Color(0.36f, 0.1f, 0.08f), 0));
+			k.Box(hook + new Vector3(-0.12f, -0.03f, 0), new Vector3(0.13f, 0.05f, 0.16f), 1f);
+			k.Box(o + new Vector3(-d - 0.02f, -0.35f, -0.05f), new Vector3(0.025f, 0.6f, 0.13f), 1f, new Basis(Vector3.Right, 0.06f));
+			k.Box(o + new Vector3(-d - 0.03f, -0.3f, 0.08f), new Vector3(0.025f, 0.5f, 0.13f), 1f, new Basis(Vector3.Right, -0.08f));
+		}
+		k.Color = keep;
+	}
+
 	private void BuildMudroom()
 	{
-		var k = new MeshKit();
+		var k = new MeshKit { Tess = 0.6f };   // (its shell drawn finely for the kit pass's bake, SkiLodge.Kit; off again for the joinery)
 		float x0 = RoomX0 + 0.2f, x1 = RoomX1 - 0.2f, z0 = -WingHalfZ + 0.35f, z1 = RoomZ1, top = 2.9f;
 		// (2026-10-14d, the graphics pass: the mudroom was one orange pine box, floor, walls, ceiling and door alike, and
 		// its boards were the cabin's own. Now a working back room: a flagstone floor for wet boots, board wainscot to a
 		// rail, the corridor's painted plaster above it, a darker boarded ceiling on two beams, a skirting board)
 		k.Mat(LodgeParts.LodgeTextures.FlagstoneMat);
 		k.Color = new Color(0.62f, 0.6f, 0.58f);
-		k.Quad(new Vector3(x0, 0.02f, z0), new Vector3(x1, 0.02f, z0), new Vector3(x1, 0.02f, z1), new Vector3(x0, 0.02f, z1), Vector3.Up);
+		k.Quad(new Vector3(x0, 0.02f, z0), new Vector3(x1, 0.02f, z0), new Vector3(x1, 0.02f, z1), new Vector3(x0, 0.02f, z1), Vector3.Up,
+			new Vector2(x0, z0) * 0.6f, new Vector2(x1, z0) * 0.6f, new Vector2(x1, z1) * 0.6f, new Vector2(x0, z1) * 0.6f);   // (2026-10-14h: the flags a metre and a half, not one stretched over the room)
 		Col(new Vector3((x0 + x1) * 0.5f, -0.2f, (z0 + z1) * 0.5f), new Vector3(x1 - x0, 0.44f, z1 - z0));
 		k.Mat(LodgeParts.LodgeTextures.DarkWoodMat);
 		k.Color = new Color(0.62f, 0.58f, 0.56f);
@@ -693,6 +749,7 @@ public partial class SkiLodge : Node3D
 		Wall(new Vector3(d1, 0, zb), new Vector3(d0, 0, zb), BackDoorH, top, Vector3.Back);
 		Wall(new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), 0f, top, Vector3.Right);
 		Wall(new Vector3(x1, 0, z1), new Vector3(x1, 0, z0), 0f, top, Vector3.Left);
+		k.Tess = 0f;
 		// the rail and the skirting along the side walls and the back wall either side of the door; two ceiling beams
 		k.Mat(LodgeParts.LodgeTextures.DarkWoodMat);
 		k.Color = new Color(0.8f, 0.76f, 0.72f);
@@ -730,13 +787,18 @@ public partial class SkiLodge : Node3D
 			// (2026-10-14d: each its own wool, a faded red, a navy, a loden green; three of one dark brown read as one flat
 			// dark shape on the wall)
 			var wools = new[] { new Color(0.36f, 0.1f, 0.08f), new Color(0.11f, 0.13f, 0.2f), new Color(0.2f, 0.23f, 0.15f) };
+			// (2026-10-14h, the kit pass: the modelled coat read as three flat slabs on the wall) a hook rail, and on it a long
+			// red wool coat, a quilted navy parka with a fur-trimmed hood, a loden jacket with a scarf over its hook; each
+			// hung from its shoulders, its sleeves down its sides, its hem lifted where it falls over the bench
+			k.Mat(LodgeParts.LodgeTextures.DoorWoodMat);
+			k.Color = new Color(0.8f, 0.76f, 0.72f);
+			k.BevelBox(new Vector3(x1 - 0.02f, 1.98f, (z0 + z1) * 0.5f - 0.15f), new Vector3(0.025f, 0.11f, 2.3f), 0.008f);
+			k.Color = Colors.White;
 			int ci = 0;
-			foreach (float zz in new[] { (z0 + z1) * 0.5f - 1.0f, (z0 + z1) * 0.5f - 0.3f, (z0 + z1) * 0.5f + 0.7f })
+			foreach (float zz in new[] { (z0 + z1) * 0.5f - 1.0f, (z0 + z1) * 0.5f - 0.3f, (z0 + z1) * 0.5f + 0.55f })
 			{
-				var cr = Woodwork;
-				cr["cloth"] = CoatWool(wools[ci], ci);
+				HangingCoat(k, new Vector3(x1 - 0.04f, 1.95f, zz), ci, CoatWool(wools[ci], ci));
 				ci++;
-				FurnitureKit.Add(k, "coat_on_hook", new Vector3(x1 - 0.02f, 1.95f, zz), -Mathf.Pi * 0.5f + Mathf.Pi, cr);
 			}
 			FurnitureKit.Add(k, "boots", new Vector3(x1 - 0.35f, 0.02f, (z0 + z1) * 0.5f + 0.2f), 1.9f, roles);
 		}
@@ -751,6 +813,35 @@ public partial class SkiLodge : Node3D
 		k.Box(new Vector3(x1 - 0.3f, 0.45f, (z0 + z1) * 0.5f), new Vector3(0.45f, 0.08f, 3.2f), 1f);
 		k.Box(new Vector3(x1 - 0.3f, 0.22f, (z0 + z1) * 0.5f - 1.4f), new Vector3(0.4f, 0.45f, 0.08f), 1f);
 		k.Box(new Vector3(x1 - 0.3f, 0.22f, (z0 + z1) * 0.5f + 1.4f), new Vector3(0.4f, 0.45f, 0.08f), 1f);
+		// (2026-10-14h, the kit pass) the boot room's own: a slatted rack of rental boots by the back door, its sign, a
+		// peg rail of hats over it; the trail map framed by the door on into the lodge
+		{
+			float rx0 = x0 + 0.95f, rx1 = BackDoorX - BackDoorW * 0.5f - 0.45f, rz = z0 + 0.2f;
+			k.Mat(LodgeParts.LodgeTextures.DoorWoodMat);
+			k.Color = new Color(0.8f, 0.76f, 0.72f);
+			foreach (float ry in new[] { 0.12f, 0.5f })
+				for (int s = 0; s < 4; s++)
+					k.BevelBox(new Vector3((rx0 + rx1) * 0.5f, ry, rz - 0.13f + s * 0.09f), new Vector3(rx1 - rx0, 0.025f, 0.06f), 0.006f);
+			foreach (float ex in new[] { rx0, rx1 })
+				k.BevelBox(new Vector3(ex, 0.33f, rz), new Vector3(0.04f, 0.66f, 0.34f), 0.008f);
+			Col(new Vector3((rx0 + rx1) * 0.5f, 0.33f, rz), new Vector3(rx1 - rx0, 0.66f, 0.34f));
+			var br = Woodwork;
+			FurnitureKit.Add(k, "boots", new Vector3(rx0 + 0.3f, 0.135f, rz), 0.1f, br);
+			FurnitureKit.Add(k, "boots", new Vector3(rx1 - 0.32f, 0.515f, rz), -0.15f, br);
+			FurnitureKit.Add(k, "boots", new Vector3(rx0 + 0.32f, 0.515f, rz + 0.02f), 0.05f, br);
+			// the peg rail over it, a toque and a scarf hung on it
+			k.Mat(LodgeParts.LodgeTextures.DoorWoodMat);
+			k.BevelBox(new Vector3((rx0 + rx1) * 0.5f, 1.62f, z0 + 0.03f), new Vector3(rx1 - rx0 + 0.3f, 0.09f, 0.025f), 0.008f);
+			for (int p = 0; p < 4; p++)
+				k.Cylinder(new Vector3(rx0 - 0.1f + p * (rx1 - rx0 + 0.2f) / 3f, 1.62f, z0 + 0.04f), new Vector3(rx0 - 0.1f + p * (rx1 - rx0 + 0.2f) / 3f, 1.64f, z0 + 0.13f), 0.015f, 0.018f, 6, true);
+			k.Mat(CoatWool(new Color(0.36f, 0.1f, 0.08f), 0));
+			k.Blob(new Vector3(rx0 - 0.1f + (rx1 - rx0 + 0.2f) / 3f, 1.55f, z0 + 0.12f), new Vector3(0.11f, 0.12f, 0.07f), 6611, 0.12f, false, 1f);   // a toque
+			k.Mat(CoatWool(new Color(0.2f, 0.23f, 0.15f), 2));
+			k.Box(new Vector3(rx0 - 0.1f + 2f * (rx1 - rx0 + 0.2f) / 3f, 1.25f, z0 + 0.1f), new Vector3(0.16f, 0.72f, 0.025f), 1f);   // a scarf hung over a peg
+			SignKit.Text(this, "RENTAL BOOTS  -  RETURN HERE", new Vector3((rx0 + rx1) * 0.5f, 1.82f, z0 + 0.035f), Basis.Identity, 0.045f, new Color(0.6f, 0.5f, 0.32f), shadow: false);
+			// the trail map, by the door on into the lodge
+			TrailMap(k, new Vector3(-28.2f, 1.62f, z1 - 0.075f - 0.02f), Vector3.Forward, 1.05f, 0.78f);
+		}
 		k.CommitTo(this, "Mudroom", true);
 		foreach (var (c, s) in new[] { (new Vector3(x0 - 0.1f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0)), (new Vector3(x1 + 0.1f, 1.5f, (z0 + z1) * 0.5f), new Vector3(0.2f, 3f, z1 - z0)) })
 			Col(c, s);

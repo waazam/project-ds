@@ -155,7 +155,7 @@ public partial class SkiLodge
 		foreach (float dz in new[] { -1.0f, 1.0f })
 			if (FurnitureKit.Add(k, "club_chair", w + new Vector3(1.8f, 0, dz), Mathf.Pi * 0.5f + dz * 0.12f, x))
 				LodgeKit.Solid(_inBody, w + new Vector3(1.8f, 0.4f, dz), new Vector3(0.9f, 0.8f, 0.9f));
-		var velvet = new Dictionary<string, Material>(Woodwork) { ["upholstery"] = LodgeTextures.VelvetVioletMat };
+		var velvet = new Dictionary<string, Material>(Woodwork) { ["upholstery"] = LodgeTextures.Upholstery("olive") };
 		if (FurnitureKit.Add(k, "ottoman", w, Mathf.Pi * 0.5f, velvet))
 			LodgeKit.Solid(_inBody, w + new Vector3(0, 0.22f, 0), new Vector3(0.8f, 0.44f, 1.5f));
 		FurnitureKit.Add(k, "magazines", w + new Vector3(0.1f, 0.43f, 0.2f), 0.6f, Woodwork);
