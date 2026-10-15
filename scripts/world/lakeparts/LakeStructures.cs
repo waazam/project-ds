@@ -92,18 +92,23 @@ public static class LakeStructures
 	/// says where the player is meant to go.</summary>
 	private static void BuildDockSign(Node3D dock)
 	{
-		var k = new MeshKit();
-		k.Mat(PropTextures.PostMat);
-		k.Color = new Color(0.45f, 0.4f, 0.33f);
 		Vector3 post = new(-1.9f, LakeShape.Ground(-1.9f, 4.2f) - 0.2f, 4.2f);
-		SignKit.Post(k, post, 1.85f, 0.12f);
 		var b = new Basis(Vector3.Up, 0.35f);
 		Vector3 board = post + new Vector3(0.05f, 1.55f, 0.07f);
-		k.Mat(PropTextures.SignPlankMat);
-		k.Color = new Color(0.5f, 0.45f, 0.36f);
-		SignKit.ArrowBoard(k, board, b * new Basis(Vector3.Forward, 0.05f), 1.3f, 0.3f, 0.05f, 0);
-		k.Color = Colors.White;
-		k.CommitTo(dock, "DockSign");
+		// (2026-10-15) the post and board modelled in Blender (park_props.py), when it's there; the lettering stays here
+		if (PropModels.Place(dock, "dock_sign", new Transform3D(Basis.Identity, post)) is { } model) model.Name = "DockSign";
+		else
+		{
+			var k = new MeshKit();
+			k.Mat(PropTextures.PostMat);
+			k.Color = new Color(0.45f, 0.4f, 0.33f);
+			SignKit.Post(k, post, 1.85f, 0.12f);
+			k.Mat(PropTextures.SignPlankMat);
+			k.Color = new Color(0.5f, 0.45f, 0.36f);
+			SignKit.ArrowBoard(k, board, b * new Basis(Vector3.Forward, 0.05f), 1.3f, 0.3f, 0.05f, 0);
+			k.Color = Colors.White;
+			k.CommitTo(dock, "DockSign");
+		}
 		var faded = new Color(0.58f, 0.54f, 0.45f);
 		Vector3 face = board + b.Z * 0.03f;
 		SignKit.Text(dock, "RESCUE STATION 7", face + Vector3.Up * 0.05f, b * new Basis(Vector3.Forward, 0.05f), 0.11f, faded);

@@ -40,7 +40,7 @@ public partial class SignPost : Node3D
 		_k = new MeshKit();
 		_body = null;
 		if (Style == SignStyle.Directional) Directional(); else Low();
-		_k.CommitTo(_gen, "Mesh");
+		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");
 		if (ClearRadius > 0f && !Engine.IsEditorHint())
 			AddChild(new ClearZone { Name = "ClearZone", Radius = ClearRadius, ClearFoliage = true });
 	}
@@ -82,9 +82,15 @@ public partial class SignPost : Node3D
 	{
 		const float postW = 0.17f, postH = 2.25f;
 		const float len = 1.55f, h = 0.27f, t = 0.05f, pitch = 0.32f;
-		_k.Color = new Color(0.9f, 0.88f, 0.85f);
-		_k.Mat(BuildingTextures.SignPostBrownMat);
-		SignKit.FlatPost(_k, new Vector3(0, -0.4f, 0), postH + 0.4f, postW, 1.5f);
+		// (2026-10-15) the post and boards modelled in Blender (park_props.py), when they're there; the lettering stays here
+		bool model = PropModels.Has("sign_post_tall") && PropModels.Has("dir_board_r");
+		if (model) PropModels.Place(_gen, "sign_post_tall", Transform3D.Identity);
+		else
+		{
+			_k.Color = new Color(0.9f, 0.88f, 0.85f);
+			_k.Mat(BuildingTextures.SignPostBrownMat);
+			SignKit.FlatPost(_k, new Vector3(0, -0.4f, 0), postH + 0.4f, postW, 1.5f);
+		}
 		Col(new Vector3(0, postH * 0.5f, 0), new Vector3(postW + 0.02f, postH, postW + 0.02f));
 
 		int n = Boards?.Length ?? 0;
@@ -98,11 +104,22 @@ public partial class SignPost : Node3D
 			float z = postW * 0.5f + t * 0.5f + 0.003f;
 			var b = Basis.FromEuler(new Vector3(0, 0, Mathf.DegToRad(Rand(i, -2.5f, 2.5f))));
 			var c = new Vector3(x, y, z);
+			Col(c, new Vector3(len, h, t + 0.02f));
+			float face0 = t * 0.5f + 0.002f;
+			float usable0 = len - 0.22f - 0.22f - 0.08f;
+			if (model)
+			{
+				// the board (its routed arrow and bolt in the model), then only the lettering
+				PropModels.Place(_gen, dir > 0 ? "dir_board_r" : dir < 0 ? "dir_board_l" : "dir_board_0", new Transform3D(b, c));
+				float emM = Mathf.Min(0.135f, usable0 / Mathf.Max(4, Longest()) * 1.75f);
+				float txM = dir == 0 ? 0f : -dir * (len * 0.5f - 0.06f - usable0 * 0.5f);
+				SignKit.Text(_gen, text, c + b * new Vector3(txM, -emM * 0.04f, face0), b, emM, SignKit.Paint);
+				continue;
+			}
 			float shade = Rand(i + 20, 0.8f, 1.05f);
 			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
 			_k.Mat(BuildingTextures.SignBrownMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, dir);
-			Col(c, new Vector3(len, h, t + 0.02f));
 			// (2026-10-14) the weather on its face (over the square part: the film can't follow the point), and a split
 			// running in from its square end on some
 			{
@@ -138,15 +155,18 @@ public partial class SignPost : Node3D
 	{
 		const float postW = 0.11f, postH = 0.95f;
 		const float len = 1.3f, h = 0.28f, t = 0.05f;
+		// (2026-10-15) the frame and boards modelled in Blender (park_props.py), when they're there
+		bool model = PropModels.Has("sign_low_frame") && PropModels.Has("low_board_0");
+		if (model) PropModels.Place(_gen, "sign_low_frame", Transform3D.Identity);
 		_k.Color = new Color(0.88f, 0.86f, 0.83f);
 		_k.Mat(BuildingTextures.SignPostBrownMat);
 		foreach (float px in new[] { -0.48f, 0.48f })
 		{
-			SignKit.FlatPost(_k, new Vector3(px, -0.35f, 0), postH + 0.35f, postW, 1.8f);
+			if (!model) SignKit.FlatPost(_k, new Vector3(px, -0.35f, 0), postH + 0.35f, postW, 1.8f);
 			Col(new Vector3(px, postH * 0.5f, 0), new Vector3(postW + 0.02f, postH, postW + 0.02f));
 		}
 		// the header across the posts' tops, its tails cut away underneath
-		SignKit.Header(_k, new Vector3(0, postH + 0.065f, 0), Basis.Identity, 0.96f + postW, 0.2f, 0.11f, postW + 0.03f, 1.8f);
+		if (!model) SignKit.Header(_k, new Vector3(0, postH + 0.065f, 0), Basis.Identity, 0.96f + postW, 0.2f, 0.11f, postW + 0.03f, 1.8f);
 		int n = Mathf.Max(1, Boards?.Length ?? 0);
 		for (int i = 0; i < n; i++)
 		{
@@ -154,10 +174,20 @@ public partial class SignPost : Node3D
 			float y = postH - 0.2f - i * (h + 0.02f);
 			var b = Basis.FromEuler(new Vector3(0, 0, Mathf.DegToRad(Rand(i, -3f, 3f))));
 			var c = new Vector3(0, y, postW * 0.5f + t * 0.5f + 0.003f);
+			Col(c, new Vector3(len, h, t + 0.02f));
+			if (model)
+			{
+				// the board (its crack and routed arrow in the model), then only the lettering
+				PropModels.Place(_gen, dir > 0 ? "low_board_r" : dir < 0 ? "low_board_l" : "low_board_0", new Transform3D(b, c));
+				if (text.Length == 0) continue;
+				float emM = Mathf.Min(0.15f, (len - 0.2f - 0.28f) / Mathf.Max(4, Longest()) * 1.8f);
+				float txM = dir == 0 ? 0f : -dir * 0.28f * 0.5f;
+				SignKit.Text(_gen, text, c + b * new Vector3(txM, -emM * 0.04f, t * 0.5f + 0.002f), b, emM, SignKit.Paint);
+				continue;
+			}
 			_k.Color = new Color(0.95f, 0.93f, 0.9f);
 			_k.Mat(BuildingTextures.SignBrownMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, 0);
-			Col(c, new Vector3(len, h, t + 0.02f));
 			SignKit.Weather(_k, c + b * new Vector3(0, 0, t * 0.5f), b, len - 0.01f, h - 0.01f, Seed * 37 + i);   // (2026-10-14)
 			// the long crack down one board
 			_k.Color = new Color(0.02f, 0.02f, 0.02f);

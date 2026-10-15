@@ -27,6 +27,7 @@ public partial class TrailheadDressing : Node3D
 	private MeshKit _k;
 	private StaticBody3D _body;
 	private Node3D _gen;
+	private bool _m;
 
 	public override void _Ready()
 	{
@@ -38,6 +39,9 @@ public partial class TrailheadDressing : Node3D
 		_gen.TopLevel = true;
 		_gen.GlobalTransform = Transform3D.Identity;
 		_k = new MeshKit();
+		// (2026-10-15) the rails, the gate and the signs modelled in Blender (park_props.py), when the models are there
+		_m = PropModels.Has("rail_post") && PropModels.Has("rail_log_0") && PropModels.Has("pipe_gate")
+			&& PropModels.Has("gate_latch_post") && PropModels.Has("highway_sign") && PropModels.Has("curve_sign");
 		LogRails();
 		Gate();
 		HighwaySign();
@@ -102,6 +106,11 @@ public partial class TrailheadDressing : Node3D
 		{
 			Vector2 q = a.Lerp(b, (float)i / n);
 			float h = H(q.X, q.Y);
+			if (_m)
+			{
+				PropModels.Place(_gen, "rail_post", new Transform3D(Basis.FromEuler(new Vector3(0, Hash(salt * 13 + i) * Mathf.Tau, 0)), new Vector3(q.X, h, q.Y)));
+				continue;
+			}
 			_k.Color = new Color(0.78f, 0.72f, 0.64f) * (0.9f + 0.15f * Hash(salt * 31 + i));
 			_k.Mat(bark).Cylinder(new Vector3(q.X, h - 0.15f, q.Y), new Vector3(q.X, h + 0.42f, q.Y), 0.11f, 0.1f, 8, false, 1f);
 			_k.Mat(end).Cylinder(new Vector3(q.X, h + 0.42f, q.Y), new Vector3(q.X, h + 0.425f, q.Y), 0.1f, 0.1f, 8, true, 1f);
@@ -112,14 +121,25 @@ public partial class TrailheadDressing : Node3D
 			float r = 0.12f + 0.04f * Hash(salt * 17 + i);
 			var s = G(p0.X, p0.Y, 0.47f);
 			var e = G(p1.X, p1.Y, 0.47f);
+			Vector3 mid = (s + e) * 0.5f;
+			var dir = e - s;
+			Col(mid + Vector3.Down * 0.2f, new Vector3(0.3f, 0.75f, dir.Length()), Facing(dir));
+			if (_m)
+			{
+				// the 1 m log along X, stretched to the span and sized to this one's girth
+				var ax = dir.Normalized();
+				var az = ax.Cross(Vector3.Up).Normalized();
+				var ay = az.Cross(ax);
+				float g = r / 0.14f;
+				var lb = new Basis(ax * dir.Length(), ay * g, az * g) * Basis.FromEuler(new Vector3(Hash(salt * 5 + i) * Mathf.Tau, 0, 0));
+				PropModels.Place(_gen, $"rail_log_{(salt * 3 + i) % 3}", new Transform3D(lb, s));
+				continue;
+			}
 			_k.Color = new Color(0.82f, 0.76f, 0.68f) * (0.88f + 0.16f * Hash(salt * 7 + i));
 			_k.Mat(bark).Cylinder(s, e, r, r * 0.92f, 9, false, 1f);
 			_k.Color = Colors.White;
 			_k.Mat(end).Cylinder(s - (e - s).Normalized() * 0.01f, s, r - 0.004f, r - 0.004f, 9, true, 1.2f);
 			_k.Cylinder(e, e + (e - s).Normalized() * 0.01f, r * 0.92f - 0.004f, r * 0.92f - 0.004f, 9, true, 1.2f);
-			Vector3 mid = (s + e) * 0.5f;
-			var dir = e - s;
-			Col(mid + Vector3.Down * 0.2f, new Vector3(0.3f, 0.75f, dir.Length()), Facing(dir));
 		}
 	}
 
@@ -132,6 +152,20 @@ public partial class TrailheadDressing : Node3D
 		var yellow = ProcTextures.Flat("th_gate_yellow", new Color(0.74f, 0.57f, 0.13f), 0.75f, 0.3f);
 		var hinge = p + right * half;
 		var latch = p - right * half;
+		if (_m)
+		{
+			// the hinge post, the arm swung back and its chained stake are one model; the latch post its own
+			PropModels.Place(_gen, "pipe_gate", new Transform3D(Facing(dir), hinge));
+			PropModels.Place(_gen, "gate_latch_post", new Transform3D(Facing(dir), latch));
+			Col(hinge + Vector3.Up * 0.5f, new Vector3(0.16f, 1.2f, 0.16f), Facing(dir));
+			Col(latch + Vector3.Up * 0.45f, new Vector3(0.14f, 1.1f, 0.14f), Facing(dir));
+			var mTip = hinge + dir * 4.6f + right * 0.15f;
+			var mA0 = hinge + Vector3.Up * 0.9f;
+			var mA1 = mTip + Vector3.Up * 0.86f;
+			var mArm = mA1 - mA0;
+			Col((mA0 + mA1) * 0.5f + Vector3.Down * 0.2f, new Vector3(0.12f, 0.6f, mArm.Length()), Facing(new Vector3(mArm.X, 0, mArm.Z)));
+			return;
+		}
 		_k.Color = Colors.White;
 		// the posts: square steel, set in the verge
 		_k.Mat(yellow);
@@ -183,6 +217,14 @@ public partial class TrailheadDressing : Node3D
 		var at = p + right * side * (_t.RoadWidth * 0.5f + 1.3f);
 		at.Y = H(at.X, at.Z);
 		fb = Facing(dir);   // its face (+Z) toward the lot
+		face = at + Vector3.Up * boardY + fb.Z * 0.06f;
+		Col(at + Vector3.Up * (boardY * 0.5f + 0.2f), new Vector3(w, boardY + h * 0.5f, 0.15f), fb);
+		Clear(at, 1.4f);
+		if (_m)
+		{
+			PropModels.Place(_gen, "highway_sign", new Transform3D(fb, at));
+			return;
+		}
 		_k.Color = new Color(0.85f, 0.82f, 0.78f);
 		_k.Mat(post);
 		foreach (float px in new[] { -w * 0.32f, w * 0.32f })
@@ -191,17 +233,14 @@ public partial class TrailheadDressing : Node3D
 			pp.Y = H(pp.X, pp.Z);
 			_k.Box(pp + Vector3.Up * (boardY + h * 0.5f) * 0.5f, new Vector3(0.09f, boardY + h * 0.5f + 0.3f, 0.09f), 1.5f, fb);
 		}
-		face = at + Vector3.Up * boardY + fb.Z * 0.06f;
 		_k.Color = Colors.White;
 		_k.Mat(board).Box(at + Vector3.Up * boardY + fb.Z * 0.02f, new Vector3(w, h, 0.04f), 1.1f, fb);
-		Col(at + Vector3.Up * (boardY * 0.5f + 0.2f), new Vector3(w, boardY + h * 0.5f, 0.15f), fb);
-		Clear(at, 1.4f);
 	}
 
 	private void HighwaySign()
 	{
 		Signboard(HighwaySignAt, 1f, 1.5f, 0.75f, 1.55f, BuildingTextures.SignBrownMat, BuildingTextures.SignPostBrownMat, out var face, out var fb);
-		SignKit.Weather(_k, face - fb.Z * 0.02f, fb, 1.48f, 0.73f, Seed * 5);
+		if (!_m) SignKit.Weather(_k, face - fb.Z * 0.02f, fb, 1.48f, 0.73f, Seed * 5);
 		SignKit.Text(_gen, "STATE HWY 9", face + Vector3.Up * 0.17f, fb, 0.17f, SignKit.Paint);
 		SignKit.Text(_gen, "ASHFORD  11 >", face - Vector3.Up * 0.12f, fb, 0.14f, SignKit.Paint * 0.9f);
 	}
@@ -213,6 +252,13 @@ public partial class TrailheadDressing : Node3D
 		var at = p - right * (_t.RoadWidth * 0.5f + 1.1f);
 		at.Y = H(at.X, at.Z);
 		var fb = Facing(dir).Rotated(Vector3.Up, Mathf.DegToRad(-12f));
+		if (_m)
+		{
+			PropModels.Place(_gen, "curve_sign", new Transform3D(fb, at));
+			Col(at + Vector3.Up * 1.1f, new Vector3(0.1f, 2.2f, 0.1f), fb);
+			Clear(at, 1.2f);
+			return;
+		}
 		_k.Color = new Color(0.55f, 0.55f, 0.55f);
 		_k.Mat(ProcTextures.MetalMat).Box(at + Vector3.Up * 1.05f, new Vector3(0.07f, 2.4f, 0.04f), 1f, fb);
 		var tilt = fb * new Basis(Vector3.Right, Mathf.DegToRad(-6f));

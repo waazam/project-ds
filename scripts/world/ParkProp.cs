@@ -37,8 +37,43 @@ public partial class ParkProp : Node3D
 	private MeshKit _k;
 	private StaticBody3D _body;
 	private Node3D _gen;
+	/// <summary>(2026-10-15) The prop's Blender model (assets/models/park), when it has one: the builders below still run for
+	/// what the model doesn't carry (lettering, colliders, readables), and their code mesh is dropped.</summary>
+	private Node3D _model;
+	private bool UseModel => _model != null;
 
 	public override void _Ready() => Build();
+
+	/// <summary>The Blender model for this kind (null: built in code, as the flowers, mushrooms, car and camera are).</summary>
+	private string ModelName() => Kind switch
+	{
+		PropKind.TrailheadSign => "trailhead_sign",
+		PropKind.InfoBoard => "info_kiosk",
+		PropKind.TrashCan => "trash_can",
+		PropKind.VaultToilet => "vault_toilet",
+		PropKind.ParkingBumper => "bumper",
+		PropKind.TrailMarker => "trail_marker",
+		PropKind.Backpack => "backpack",
+		PropKind.Boot => "boot",
+		PropKind.WalkingStick => "walking_stick",
+		PropKind.CutLog => "cut_log",
+		PropKind.Boulder => $"boulder_{Mathf.PosMod(Seed, 3)}",
+		PropKind.TornMap => "torn_map",
+		PropKind.Tent => "tent",
+		PropKind.HoledStone => "holed_stone",
+		PropKind.TrailRegister => "trail_register",
+		_ => null,
+	};
+
+	/// <summary>The materials only this prop builds (the toilet's weathered block, its painted boards, its door's steel).</summary>
+	private Material ModelMaterial(string key) => key switch
+	{
+		"block" => Engine.IsEditorHint() || !IsInsideTree() ? ProcTextures.ConcreteMat : WeatheredBlock(2.45f, 1.15f, 1.2f),
+		"brown" => BuildingTextures.PaintedBoards("park_brown", new Color(0.3f, 0.2f, 0.13f), 0.95f, 0.18f, vertical: true, scale: 0.55f, footY: 2.45f, footHeight: 0.2f) ?? (Material)PropTextures.PaintedPostMat,
+		"brown_along" => BuildingTextures.PaintedBoards("park_brown_along", new Color(0.3f, 0.2f, 0.13f), 0.95f, 0.2f, vertical: false, scale: 0.8f, footY: -9f, footHeight: 0.1f, across: 0.12f) ?? (Material)PropTextures.PaintedPostMat,
+		"steel" => DoorSteelMat(),
+		_ => null,
+	};
 
 	public void Build()
 	{
@@ -48,6 +83,7 @@ public partial class ParkProp : Node3D
 		AddChild(_gen);
 		_k = new MeshKit();
 		_body = null;
+		_model = ModelName() is { } mn ? PropModels.Load(mn, ModelMaterial) : null;
 
 		switch (Kind)
 		{
@@ -71,7 +107,8 @@ public partial class ParkProp : Node3D
 			case PropKind.Car: Car(); break;
 			case PropKind.CameraItem: CameraItem(); break;
 		}
-		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");
+		if (UseModel) { _model.Name = "Model"; _gen.AddChild(_model); }
+		else if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");
 		if (ClearRadius > 0f && !Engine.IsEditorHint())
 			_gen.AddChild(new ClearZone { Name = "ClearZone", Radius = ClearRadius, ClearFoliage = ClearFoliage });
 	}
@@ -886,6 +923,11 @@ public partial class ParkProp : Node3D
 			var p = new Vector3(Mathf.Cos(a) * R(i * 3 + 201, 0.5f, 0.9f), 0, Mathf.Sin(a) * R(i * 3 + 202, 0.35f, 0.7f));
 			p.Y = GroundY(p);
 			float rr = R(i * 3 + 203, 0.08f, 0.16f);
+			if (UseModel)
+			{
+				PropModels.Place(_gen, $"pebble_{i}", new Transform3D(Basis.FromEuler(new Vector3(0, R(i * 3 + 204, 0f, Mathf.Tau), 0)).Scaled(Vector3.One * rr), p));
+				continue;
+			}
 			_k.Color = new Color(0.8f, 0.8f, 0.77f);
 			_k.Mat(ProcTextures.RockMat).Blob(p, new Vector3(rr * 1.3f, rr * 0.6f, rr), Seed * 5 + i, 0.2f, true, 1f);
 		}

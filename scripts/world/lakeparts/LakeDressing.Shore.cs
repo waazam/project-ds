@@ -369,12 +369,14 @@ public partial class LakeDressing
 		var foot = new Vector3(p.X, LakeShape.Ground(p.X, p.Y) - 0.15f, p.Y);
 		Add("cypress_c", foot, new Basis(Vector3.Up, 1.1f));
 		_trunks.Add((foot, 0.55f, 6f));
-		var k = new MeshKit();
-		k.Mat(BuildingTextures.BoardsMat);
 		var face = (new Vector3(0, 0, 9f) - foot) with { Y = 0 };
 		face = face.Normalized();
 		var b = Basis.LookingAt(-face, Vector3.Up);
 		Vector3 at = foot + face * 0.42f + Vector3.Up * 3.3f;
+		// (2026-10-15) modelled in Blender (park_props.py), when it's there
+		if (PropModels.Place(this, "birdhouse", new Transform3D(b, at)) is { } model) { model.Name = "Birdhouse"; return; }
+		var k = new MeshKit();
+		k.Mat(BuildingTextures.BoardsMat);
 		k.Color = new Color(0.62f, 0.55f, 0.46f);
 		k.Box(at, new Vector3(0.24f, 0.32f, 0.22f), 1f, b);
 		k.Box(at + b * new Vector3(0, -0.4f, -0.03f), new Vector3(0.12f, 0.5f, 0.06f), 1f, b);   // its post down the trunk
@@ -396,16 +398,21 @@ public partial class LakeDressing
 		var root = new Node3D { Name = "PipelineSign" };
 		AddChild(root);
 		root.GlobalTransform = new Transform3D(b * new Basis(Vector3.Forward, 0.04f), foot);
-		var k = new MeshKit();
-		k.Mat(ProcTextures.MetalMat);
-		k.Color = new Color(0.55f, 0.55f, 0.52f);
-		foreach (float x in new[] { -0.55f, 0.55f })
-			k.Cylinder(new Vector3(x, -0.6f, 0), new Vector3(x, 2.9f, 0), 0.04f, 0.04f, 8, true);
-		k.Mat(ProcTextures.Flat("pipeline_sign", new Color(0.78f, 0.77f, 0.72f), 0.8f));
-		k.Box(new Vector3(0, 2.2f, 0.06f), new Vector3(1.5f, 1.0f, 0.03f), 1f);
-		k.Mat(ProcTextures.Flat("pipeline_sign_rim", new Color(0.55f, 0.45f, 0.1f), 0.8f));
-		k.Box(new Vector3(0, 2.2f, 0.045f), new Vector3(1.58f, 1.08f, 0.02f), 1f);
-		k.CommitTo(root, "Mesh", true);
+		// (2026-10-15) the posts and plate modelled in Blender (park_props.py), when it's there; the lettering stays here
+		if (PropModels.Place(root, "pipeline_sign", Transform3D.Identity) is { } model) model.Name = "Mesh";
+		else
+		{
+			var k = new MeshKit();
+			k.Mat(ProcTextures.MetalMat);
+			k.Color = new Color(0.55f, 0.55f, 0.52f);
+			foreach (float x in new[] { -0.55f, 0.55f })
+				k.Cylinder(new Vector3(x, -0.6f, 0), new Vector3(x, 2.9f, 0), 0.04f, 0.04f, 8, true);
+			k.Mat(ProcTextures.Flat("pipeline_sign", new Color(0.78f, 0.77f, 0.72f), 0.8f));
+			k.Box(new Vector3(0, 2.2f, 0.06f), new Vector3(1.5f, 1.0f, 0.03f), 1f);
+			k.Mat(ProcTextures.Flat("pipeline_sign_rim", new Color(0.55f, 0.45f, 0.1f), 0.8f));
+			k.Box(new Vector3(0, 2.2f, 0.045f), new Vector3(1.58f, 1.08f, 0.02f), 1f);
+			k.CommitTo(root, "Mesh", true);
+		}
 		var ink = new Color(0.06f, 0.06f, 0.06f);
 		SignKit.Text(root, "WARNING", new Vector3(0, 2.55f, 0.08f), Basis.Identity, 0.12f, ink, shadow: false);
 		SignKit.Text(root, "DO NOT ANCHOR", new Vector3(0, 2.33f, 0.08f), Basis.Identity, 0.17f, ink, shadow: false);
