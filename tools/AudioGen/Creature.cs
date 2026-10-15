@@ -885,4 +885,87 @@ public static class Creature
 		LowPass(x, sr, 3600);
 		return FinishOneShot(Room(x, sr, 0.15, 0.45, 0.55), sr, -3, 60);
 	}
+
+	public enum RattleKind { Tick, Run, Long, Stutter }
+
+	/// <summary>
+	/// The stalker's rattle as short phrases (2026-10-15, the stalker pass: the one long loop with its own baked rests,
+	/// slowed by pitch to 0.55, gated again by the game, landed bursts in its own silence and turned far clicks into
+	/// low thumps). Each phrase starts ON a click and the game strings them together, its rate coming from which phrase
+	/// and the gaps, never from pitch. The click is the owner's (the throat knock through a closed-throat resonance,
+	/// 380-620 Hz) with a chitin tick added: a 1-3 ms band-passed transient at 2.5-5 kHz, 10-14 dB under, its band its
+	/// own per click, so it can be placed (left, right, behind) and the distance can dull it. No double-clicks or
+	/// triplets (they read as hooves). The 40 Hz chest only on the long ones, close.
+	/// <list type="bullet">
+	/// <item><b>Tick</b>: 2-5 clicks, 0.2-0.8 s (far off, building).</item>
+	/// <item><b>Run</b>: 6-14 single clicks speeding up then trailing off, 0.8-2 s.</item>
+	/// <item><b>Long</b>: 15-30 clicks, speeding up then winding down, 2-4 s (close, late in an episode).</item>
+	/// <item><b>Stutter</b>: 2-3 groups of 3-6 clicks with short gaps.</item>
+	/// </list>
+	/// </summary>
+	public static double[] RattlePhrase(Rng r, int sr, RattleKind kind)
+	{
+		var x = Buf(sr, 5.0);
+		double throat = r.R(380, 620), chest = r.R(36, 48);
+		bool withChest = kind == RattleKind.Long;
+		double end = 0;
+		void Click(double at, double amp)
+		{
+			double tau = r.R(0.004, 0.009);
+			var bp = Biquad.Bp(sr, throat * r.R(0.85, 1.15), 4);
+			var lp = Biquad.Lp(sr, 1400);
+			var chitin = Biquad.Bp(sr, r.R(2500, 5000), r.R(0.9, 1.6));   // (a broad band: a high Q rang like a struck pan)
+			double chitinGain = FromDb(-r.R(10, 14)) * 9, chitinTau = r.R(0.0006, 0.0015);
+			int s0 = (int)(at * sr), len = (int)(0.06 * sr);
+			AddEvent(x, s0, len, i =>
+			{
+				double tt = (double)i / sr;
+				double knock = lp.P(bp.P(r.W())) * Perc(tt, 0.0004, tau) * 5.5;
+				double tick = chitin.P(r.W()) * Perc(tt, 0.0001, chitinTau) * chitinGain;
+				double thump = withChest ? Math.Sin(TwoPi * chest * tt) * Perc(tt, 0.002, 0.018) * 0.8 : 0;
+				return (Math.Tanh(knock * 1.8) + tick + thump) * amp;
+			});
+			end = Math.Max(end, at + 0.06);
+		}
+		double t = 0.004, gain = r.R(0.75, 1.0);
+		void RunOf(int clicks, double gap, Func<int, double> gapMul)
+		{
+			for (int k = 0; k < clicks; k++)
+			{
+				double amp = gain * (0.7 + 0.3 * r.U()) * (k == 0 ? 0.85 : 1) * (k > clicks - 3 ? 0.6 : 1);
+				Click(t, amp);
+				t += gap; gap *= gapMul(k);
+			}
+		}
+		switch (kind)
+		{
+			case RattleKind.Tick:
+				RunOf(r.I(2, 6), r.R(0.12, 0.2), k => r.R(0.95, 1.05));
+				break;
+			case RattleKind.Run:
+			{
+				int c = r.I(6, 15);
+				RunOf(c, r.R(0.12, 0.17), k => k < c * 0.6 ? r.R(0.86, 0.95) : r.R(1.12, 1.35));
+				break;
+			}
+			case RattleKind.Long:
+			{
+				int c = r.I(15, 31);
+				RunOf(c, r.R(0.1, 0.13), k => k < c * 0.6 ? r.R(0.9, 0.96) : r.R(1.06, 1.16));
+				break;
+			}
+			default:
+			{
+				int groups = r.I(2, 4);
+				for (int g = 0; g < groups; g++)
+				{
+					RunOf(r.I(3, 7), r.R(0.09, 0.13), k => r.R(0.95, 1.02));
+					t += r.R(0.25, 0.5);
+				}
+				break;
+			}
+		}
+		var cut = x.Take((int)Math.Min(x.Length, (end + 0.05) * sr)).ToArray();
+		return FinishOneShot(Room(cut, sr, r.R(0.08, 0.16), r.R(0.3, 0.5), 0.5), sr, -3, 120);
+	}
 }

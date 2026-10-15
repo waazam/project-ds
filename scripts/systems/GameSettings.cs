@@ -212,6 +212,7 @@ public partial class GameSettings : Node
 		foreach (var a in args) if (a.StartsWith("--start-act=") && int.TryParse(a["--start-act=".Length..], out int sa)) StartAct = sa;
 		if (ContinueTest || PlaytestRun) AutoTest = true;   // same test save slots and defaults
 		RegisterInputActions();
+		FrameRecorder.StartIfAsked(GetTree());
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
 		ApplyMasterVolume();

@@ -32,7 +32,7 @@ public partial class PlayerBreathing : Node
 {
 	[Export] public bool Muted = false;
 	/// <summary>The hardest breath's level (winded, right after a long run).</summary>
-	[Export] public float MaxVolumeDb = -22f;
+	[Export] public float MaxVolumeDb = -27.5f;   // (2026-10-15b, the owner: "quieter and deeper": every mode ~5.5 dB down, pitched lower)
 	[Export] public float ExertionRise = 0.12f;   // per second while running
 	[Export] public float ExertionFall = 0.06f;   // per second otherwise (walking a little slower)
 
@@ -195,35 +195,35 @@ public partial class PlayerBreathing : Node
 			mode = "scared";
 			bpm = Mathf.Lerp(22f, 40f, fear);
 			jitter = 0.3f;
-			db = Mathf.Lerp(-30f, -22f, fear);
+			db = Mathf.Lerp(-35.5f, -27.5f, fear);
 		}
 		else if (Running)
 		{
 			mode = ex > 0.7f ? "winded" : "mouth";
 			bpm = Mathf.Lerp(26f, 44f, ex);
 			jitter = 0.1f;
-			db = Mathf.Lerp(-30f, MaxVolumeDb + 1f, ex);
+			db = Mathf.Lerp(-35.5f, MaxVolumeDb + 1f, ex);
 		}
 		else if (ex > 0.4f)
 		{
 			mode = "winded";
 			bpm = Mathf.Lerp(20f, 40f, (ex - 0.4f) / 0.6f);
 			jitter = 0.12f;
-			db = Mathf.Lerp(-29f, MaxVolumeDb, (ex - 0.4f) / 0.6f);
+			db = Mathf.Lerp(-34.5f, MaxVolumeDb, (ex - 0.4f) / 0.6f);
 		}
 		else if (ex > 0.15f)
 		{
 			mode = "mouth";
 			bpm = Mathf.Lerp(16f, 22f, (ex - 0.15f) / 0.25f);
 			jitter = 0.14f;
-			db = Mathf.Lerp(-36f, -30f, (ex - 0.15f) / 0.25f);
+			db = Mathf.Lerp(-41.5f, -35.5f, (ex - 0.15f) / 0.25f);
 		}
 		else
 		{
 			mode = "nose";
 			bpm = Moving ? 16f : 13f;
 			jitter = 0.16f;
-			db = Moving ? -37f : -40f;
+			db = Moving ? -42.5f : -45.5f;
 		}
 		db += -5f * _player.CrouchAmount;   // (crouched: quieter, deliberately)
 		Mode = mode;
@@ -239,7 +239,7 @@ public partial class PlayerBreathing : Node
 		var list = inhale ? set.In : set.Out;
 		if (list.Count == 0) return;
 		int idx = inhale ? set.InPick.Next(_rng, list.Count) : set.OutPick.Next(_rng, list.Count);
-		PlayStream(list[idx], db + _rng.RandfRange(-1.5f, 1f), _rng.RandfRange(0.96f, 1.04f));
+		PlayStream(list[idx], db + _rng.RandfRange(-1.5f, 1f), _rng.RandfRange(0.9f, 0.98f));
 	}
 
 	private void PlayStream(AudioStream s, float db, float pitch)
@@ -258,7 +258,7 @@ public partial class PlayerBreathing : Node
 	{
 		if (Holding || Muted || _gasps.Count == 0 || Now - _lastGaspAt < 1.5) return;
 		_lastGaspAt = Now;
-		PlayStream(_gasps[_gaspPick.Next(_rng, _gasps.Count)], Mathf.Lerp(-22f, -13f, amount), _rng.RandfRange(0.95f, 1.05f));
+		PlayStream(_gasps[_gaspPick.Next(_rng, _gasps.Count)], Mathf.Lerp(-27f, -18f, amount), _rng.RandfRange(0.9f, 0.98f));
 		Mode = "gasp";
 		_nextIsIn = false;
 		_timer = _rng.RandfRange(0.45f, 0.7f);
@@ -274,7 +274,7 @@ public partial class PlayerBreathing : Node
 			Holding = true;
 			HeldFor = 0f;
 			Holds++;
-			Play(_sets[Exertion > 0.4f ? "winded" : "mouth"], true, -24f);
+			Play(_sets[Exertion > 0.4f ? "winded" : "mouth"], true, -29.5f);
 		}
 		if (Holding)
 		{
@@ -289,11 +289,11 @@ public partial class PlayerBreathing : Node
 					_gaspAt = Now;
 					_recover = 3f;
 					Exertion = Mathf.Max(Exertion, 0.6f);
-					if (_gasps.Count > 0) PlayStream(_gasps[_gaspPick.Next(_rng, _gasps.Count)], -9f, 1.0f);
+					if (_gasps.Count > 0) PlayStream(_gasps[_gaspPick.Next(_rng, _gasps.Count)], -14f, 0.94f);
 					GD.Print("[breath] held too long - a gasp");
 					_nextIsIn = false;
 				}
-				else { Play(_sets[Fear > 0.3f ? "scared" : "mouth"], false, -28f); _nextIsIn = true; }
+				else { Play(_sets[Fear > 0.3f ? "scared" : "mouth"], false, -33.5f); _nextIsIn = true; }
 				_timer = 1.0f;
 			}
 		}

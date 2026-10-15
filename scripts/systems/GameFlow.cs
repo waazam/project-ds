@@ -112,7 +112,9 @@ public partial class GameFlow : Node
 		if (StoryManager.Instance is { ArrivedByTravel: true } story)
 		{
 			story.ConsumeArrival();
-			_ = Cutscene.Run(this, ct => WakeUp(quick, ct));
+			// (--real-timing: a test run that keeps the real wake's length, for watching the transition)
+			bool quickWake = quick && System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--real-timing") < 0;
+			_ = Cutscene.Run(this, ct => WakeUp(quickWake, ct));
 			return;
 		}
 		// A new game opens at the car: the intro cards, the fade-in at the trunk, the camera in hand.

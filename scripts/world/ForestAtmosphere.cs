@@ -144,6 +144,13 @@ public partial class ForestAtmosphere : Node
 	/// and is tinted toward the current fog colour, so dark moods stay readable. 0 disables it.
 	/// </summary>
 	[Export] public float AmbientFloorLuminance = 0.28f;
+	/// <summary>A pocket of extra light (2026-10-15, the owner: "way too dark on the first bridge"): within <see cref="PocketRadius"/>
+	/// m (level) of <see cref="PocketCentre"/> the ambient is lifted by up to <see cref="PocketLift"/> (x(1+lift)), easing in
+	/// over the outer 60 %. Radius 0: none.</summary>
+	[Export] public Vector3 PocketCentre;
+	[Export] public float PocketRadius = 0f;
+	[Export] public float PocketLift = 0.8f;
+	private float _pocket;
 	/// <summary>How much of the ambient light's hue comes from the fog colour (0 = keep the scene's ambient colour).</summary>
 	[Export] public float AmbientFogTint = 0.55f;
 
@@ -550,6 +557,7 @@ public partial class ForestAtmosphere : Node
 		Vector3 p = cam.GlobalPosition;
 		float deep = Mathf.Clamp((DeepStartZ - p.Z) / (DeepStartZ - DeepFullZ), 0, 1);
 		deep = deep * deep * (3 - 2 * deep);
+		_pocket = PocketRadius > 0f ? 1f - Mathf.SmoothStep(PocketRadius * 0.4f, PocketRadius, new Vector2(p.X - PocketCentre.X, p.Z - PocketCentre.Z).Length()) : 0f;
 		float inClearing = 1f - Mathf.Clamp((new Vector2(p.X - ClearingCenter.X, p.Z - ClearingCenter.Z).Length() - ClearingRadius * 0.5f) / (ClearingRadius * 0.5f), 0, 1);
 		float t = deep * (1f - ClearingRelief * inClearing);
 		_baseDensity = Mathf.Lerp(FogDensityOpen, FogDensityDeep, t) * (1f - 0.35f * ClearingRelief * inClearing);
@@ -747,6 +755,7 @@ public partial class ForestAtmosphere : Node
 		float lum = Lum(ambColor);
 		if (AmbientFloorLuminance > 0f && lum > 0.001f)
 			ambient = Mathf.Max(ambient, AmbientFloorLuminance / lum);
+		ambient *= 1f + PocketLift * _pocket;
 
 		// Lightning: the whole sky and the fog light up for an instant (the directional light is RainVfx's).
 		ambient += flash * 1.4f;

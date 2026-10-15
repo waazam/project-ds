@@ -66,14 +66,14 @@ public static class Breath
 		// --- the tract: formants (centre, bandwidth, level) -------------------------------------------------------------
 		(double f, double bw, double g)[] tract = kind switch
 		{
-			Kind.Nose => new[] { (r.R(250, 310), 120.0, 1.0), (r.R(950, 1150), 200.0, 0.7), (r.R(2200, 2600), 300.0, 0.45) },
-			Kind.Scared => new[] { (r.R(520, 640), 160.0, 1.0), (r.R(1400, 1800), 220.0, 0.6), (r.R(2600, 3000), 320.0, 0.3) },
-			_ => new[] { (r.R(600, 760), 180.0, 1.0), (r.R(1100, 1350), 230.0, 0.75), (r.R(2400, 2700), 320.0, 0.4) },
+			Kind.Nose => new[] { (r.R(210, 255), 110.0, 1.0), (r.R(790, 950), 180.0, 0.7), (r.R(1850, 2150), 280.0, 0.42) },
+			Kind.Scared => new[] { (r.R(430, 530), 150.0, 1.0), (r.R(1160, 1490), 210.0, 0.6), (r.R(2160, 2490), 300.0, 0.28) },
+			_ => new[] { (r.R(500, 630), 170.0, 1.0), (r.R(910, 1120), 215.0, 0.72), (r.R(2000, 2240), 300.0, 0.36) },
 		};
 		var form = tract.Select(t => new Biquad(sr)).ToArray();
 		var drift = tract.Select(_ => new Smooth(r.Fork(), total, 0.4)).ToArray();
 		// the frictive edge: the inhale past the teeth (mouth), the nose's faint whistle
-		var fric = Biquad.Bp(sr, kind == Kind.Nose ? r.R(3000, 3800) : r.R(3600, 5200), 1.1);
+		var fric = Biquad.Bp(sr, kind == Kind.Nose ? r.R(2500, 3200) : r.R(3000, 4300), 1.1);
 		var fricLp = Biquad.Lp(sr, kind == Kind.Nose ? 5000 : 7500);
 		double fricAmt = kind switch
 		{
@@ -83,16 +83,16 @@ public static class Breath
 			_ => 0.03 + 0.03 * effort,
 		};
 		// the chest under heavy breaths
-		var chest = Biquad.Lp(sr, 170);
-		double chestAmt = kind == Kind.Winded ? 0.35 : kind == Kind.Mouth ? 0.12 * effort : 0;
+		var chest = Biquad.Lp(sr, 150);   // (2026-10-15b: deeper, the chest more)
+		double chestAmt = kind == Kind.Winded ? 0.5 : kind == Kind.Mouth ? 0.08 + 0.16 * effort : kind == Kind.Nose ? 0.06 : 0.1;
 		// the nose's dip near 700 Hz (an anti-resonance, roughly: subtract a band)
-		var notch = Biquad.Bp(sr, r.R(650, 780), 2.0);
+		var notch = Biquad.Bp(sr, r.R(540, 650), 2.0);
 		var pink = new Pink();
 		var bright = Biquad.Lp(sr, 1000);
 
 		// voicing: winded exhales and scared ones carry a breathy voice under the air
 		bool voiced = !inhale && (kind == Kind.Winded && r.Chance(0.5 + 0.4 * effort) || kind == Kind.Scared && r.Chance(0.55));
-		double f0 = kind == Kind.Scared ? r.R(135, 175) : r.R(98, 122);
+		double f0 = kind == Kind.Scared ? r.R(110, 140) : r.R(85, 105);
 		double voiceAmt = voiced ? (kind == Kind.Scared ? r.R(0.02, 0.04) : r.R(0.025, 0.05)) : 0;
 		var vib = new Smooth(r.Fork(), total, kind == Kind.Scared ? 0.045 : 0.15);
 		var vForm = new[] { Biquad.Bp(sr, tract[0].f, 2.5), Biquad.Bp(sr, tract[1].f, 3.5) };

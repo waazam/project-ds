@@ -41,6 +41,8 @@ public partial class ForestDirector : Node
 	/// <summary>How much louder (dB) the ear-ringing and the pressure are at the foot of the first stairs, swelling over the
 	/// walk there (<see cref="World.FirstClimbEvent.Approach"/>).</summary>
 	[Export] public float ApproachRingingDb = 16f, ApproachPressureDb = 5f;
+	/// <summary>The peak before the cut, the last metres to the clearing (<see cref="World.FirstClimbEvent.Surge"/>).</summary>
+	[Export] public float SurgeRingingDb = 8f, SurgePressureDb = 4f;
 
 	[ExportGroup("Activity waves")]
 	[Export] public Vector2 BurstSeconds = new(15f, 40f);
@@ -219,8 +221,9 @@ public partial class ForestDirector : Node
 		// trail's end to the foot of the first stairs, the pressure and the ear-ringing swell with every metre (and no
 		// dropouts on that walk: it only builds)
 		float ap = World.FirstClimbEvent.Approach;
-		if (_pressure != null) { _pressure.ExtraDb = swell + ApproachPressureDb * ap; _pressure.Gain = Dropout; _pressure.FadeFloor = 0.6f * ap; }
-		if (_ringing != null) { _ringing.ExtraDb = swell + ApproachRingingDb * Mathf.Pow(ap, 1.4f); _ringing.Gain = Dropout; _ringing.FadeFloor = Mathf.Pow(ap, 0.7f); }
+		float sg = World.FirstClimbEvent.Surge;
+		if (_pressure != null) { _pressure.ExtraDb = swell + ApproachPressureDb * ap + SurgePressureDb * sg; _pressure.Gain = Dropout; _pressure.FadeFloor = 0.6f * ap; }
+		if (_ringing != null) { _ringing.ExtraDb = swell + ApproachRingingDb * Mathf.Pow(ap, 1.4f) + SurgeRingingDb * sg; _ringing.Gain = Dropout; _ringing.FadeFloor = Mathf.Pow(ap, 0.7f); }
 		if (_heartbeat != null)
 		{
 			// Your heartbeat is inside you: it carries on through the dropouts.

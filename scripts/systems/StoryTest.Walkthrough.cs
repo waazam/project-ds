@@ -58,3 +58,37 @@ public partial class StoryTest
 		return false;
 	}
 }
+
+public partial class StoryTest
+{
+	private static readonly bool SoundLog = OS.GetCmdlineUserArgs().Contains("--soundlog");
+	private readonly System.Collections.Generic.HashSet<ulong> _soundsOn = new();
+	private double _soundScan;
+
+	/// <summary>`--soundlog`: every sound that starts, with what it is, its bus, the node playing it and how far off.</summary>
+	private void LogSounds(double delta)
+	{
+		_soundScan -= delta;
+		if (_soundScan > 0) return;
+		_soundScan = 0.05;
+		var now = new System.Collections.Generic.HashSet<ulong>();
+		var stack = new System.Collections.Generic.Stack<Node>();
+		stack.Push(GetTree().Root);
+		while (stack.Count > 0)
+		{
+			var n = stack.Pop();
+			foreach (var c in n.GetChildren()) stack.Push(c);
+			string path = null, bus = null; bool playing = false; float db = 0; Vector3? at = null;
+			if (n is AudioStreamPlayer3D p3) { playing = p3.Playing; path = p3.Stream?.ResourcePath; bus = p3.Bus; db = p3.VolumeDb; at = p3.GlobalPosition; }
+			else if (n is AudioStreamPlayer p2) { playing = p2.Playing; path = p2.Stream?.ResourcePath; bus = p2.Bus; db = p2.VolumeDb; }
+			if (!playing) continue;
+			ulong id = n.GetInstanceId();
+			now.Add(id);
+			if (_soundsOn.Contains(id)) continue;
+			float d = at.HasValue && _player != null ? at.Value.DistanceTo(_player.GlobalPosition) : -1f;
+			GD.Print($"[sound] {Time.GetTicksMsec() / 1000.0:0.00} {System.IO.Path.GetFileNameWithoutExtension(path ?? "?")} bus={bus} db={db:0} dist={d:0.0} by={n.GetParent()?.Name}/{n.Name}");
+		}
+		_soundsOn.Clear();
+		foreach (var id in now) _soundsOn.Add(id);
+	}
+}

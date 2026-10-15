@@ -69,6 +69,8 @@ public partial class Act1TreeFalls : Node3D
 	/// wherever the player is by then; Dan, 2026-10-13), and the trees beside the way (only once the player is
 	/// alongside them). Wards out in the woods never fall unseen.</summary>
 	[Export] public float FirHoldMax = 25f, SideHoldMax = 12f;
+	/// <summary>Seconds the dead fir creaks (the stop already on, the view turning to it) before it cracks.</summary>
+	[Export] public float FirCreakBeforeFall = 1.8f;
 
 	[ExportGroup("The stop")]
 	/// <summary>How many of the walls' first trees come down after the fir while the player stands and watches.</summary>
@@ -348,13 +350,14 @@ public partial class Act1TreeFalls : Node3D
 		// (the owner, 2026-10-15: "once the tree falling is triggered they should all fall, instead of waiting for the
 		// player to walk further") once the fir is down and the stop is over, every wall tree still standing comes down
 		// after it, one after another along the way. The behind trees still wait to close the way behind them.
-		if (!_allGo && begun && !_watching && (_fir == null || _fir.Fallen || (_fir.Standing && !_fir.Held)))
+		// (2026-10-15, second pass: "some trees are still falling late") from the moment the fir lands, not once the stop is over
+		if (!_allGo && begun && (_fir == null || _fir.Fallen || (_fir.Standing && !_fir.Held)))
 		{
 			_allGo = true;
-			double at = _clock + 0.6;
+			double at = _clock + 0.4;
 			var rest = _trees.FindAll(e => e.Kind == Kind.Side && !e.Tree.Down && (!e.Tree.Falling || e.Tree.Held));
 			rest.Sort((a, b) => a.At.CompareTo(b.At));
-			foreach (var e in rest) { e.GoAt = at; at += _rng.RandfRange(1.1f, 1.7f); }
+			foreach (var e in rest) { e.GoAt = at; at += _rng.RandfRange(0.5f, 0.9f); }
 			GD.Print($"[story] Act 1: the rest of the walls come down ({rest.Count})");
 		}
 
@@ -378,7 +381,7 @@ public partial class Act1TreeFalls : Node3D
 					{
 						// (all of it begun: each in its turn, wherever they are; still never on them, nor shutting them out)
 						// (only now and then a creak: the rest come down on their cracks; 2026-10-15, "we dont need to hear every tree creak")
-						if (!t.Falling) { if (_clock >= e.GoAt) { t.QuietCreak = _rng.Randf() < 0.75f; Begin(e, 0.9f + 0.1f * (e.At % 3f)); } }
+						if (!t.Falling) { if (_clock >= e.GoAt) { t.QuietCreak = _rng.Randf() < 0.75f; Begin(e, 0.5f + 0.1f * (e.At % 3f)); } }
 						else if (t.Held && t.Motion.CreakTime >= t.Motion.CreakSeconds && Clear(pp, la, lb, 4.5f) && !Outside(e))
 						{
 							bool seen = Sees(player, t);
@@ -474,25 +477,28 @@ public partial class Act1TreeFalls : Node3D
 		float d = Flat(pp).DistanceTo(Flat(_fir.Foot));
 		if (_fir.Standing)
 		{
-			// its creak, as they come near: the sound that turns their head
-			if (d < FirCreakRange) { _fir.StartCreak(true); _firHeldAt = _clock; _nextGroan = Math.Max(_nextGroan, _clock + 4.5); }
+			// its creak, as they come near: and (2026-10-15, the owner: "fix tree falling trigger, i was able to run past it")
+			// the stop and the turn begin with it, so nobody runs on past before it comes down
+			if (d < FirCreakRange)
+			{
+				_fir.StartCreak(true);
+				_firHeldAt = _clock;
+				_nextGroan = Math.Max(_nextGroan, _clock + 4.5);
+				if (!_watching) BeginWatch(player);
+			}
 			return;
 		}
-		if (!_fir.Held || _fir.CreakTime < 2.8f) return;
+		if (!_fir.Held || _fir.CreakTime < FirCreakBeforeFall) return;
 		var (la, lb) = _fir.LieSegment;
-		// Dan, 2026-10-13: nobody gets stuck waiting on it. Once the long wait is over it comes down wherever they are
-		// (their back to it, or wandered off after its creak), with its whole crack and fall; only never on top of them.
-		bool waitOver = _clock - _firHeldAt >= FirHoldMax;
-		if ((d > FirFallRange && !waitOver) || !Clear(pp, la, lb, 6.5f)) { FirGroan(d); return; }
-		bool seen = d <= FirFallRange && SeesFir(player);
-		if (!seen && !waitOver) { FirGroan(d); return; }
+		// a short creak and it goes, wherever they are and wherever they look (the turn brings it into view); only never on
+		// top of them (Dan, 2026-10-13)
+		if (!Clear(pp, la, lb, 6.5f)) { FirGroan(d); return; }
+		bool seen = SeesFir(player);
 		_fir.Release();
 		FirSeen = seen;
 		if (seen) SeenFalls++; else UnseenFalls++;
-		GD.Print($"[story] Act 1: the dead fir cracks ({(seen ? "in view" : "unseen, the wait over")}, {d:0} m off)");
-		// (the owner, 2026-10-15: "when the trees first start falling it should make the user look towards them no
-		// matter where hes standing") the stop and the turn, wherever they are
-		BeginWatch(player);
+		GD.Print($"[story] Act 1: the dead fir cracks ({(seen ? "in view" : "turning to it")}, {d:0} m off)");
+		if (!_watching) BeginWatch(player);
 	}
 
 	private void FirGroan(float d)
@@ -531,7 +537,7 @@ public partial class Act1TreeFalls : Node3D
 		// the first trees of the walls that aren't down yet, in order along the way
 		foreach (var e in _trees)
 			if (e.Kind == Kind.Side && !e.Tree.Down && (!e.Tree.Falling || e.Tree.Held)
-				&& e.Tree.GlobalPosition.DistanceTo(player.GlobalPosition) < 27f && NearTheFir(player, e.Tree)) _cascade.Add(e);
+				&& (_fir == null ? e.Tree.GlobalPosition.DistanceTo(player.GlobalPosition) < 27f : Flat(e.Tree.GlobalPosition).DistanceTo(Flat(_fir.Foot)) < 30f) && NearTheFir(player, e.Tree)) _cascade.Add(e);
 		_cascade.Sort((a, b) => a.At.CompareTo(b.At));
 		if (_cascade.Count > CascadeCount) _cascade.RemoveRange(CascadeCount, _cascade.Count - CascadeCount);
 		GD.Print($"[story] Act 1: they stop to watch ({_cascade.Count} more to come down)");
@@ -557,12 +563,10 @@ public partial class Act1TreeFalls : Node3D
 			var (wa, wb) = _watchTree.LieSegment;
 			return _watchTree.TrunkPoint(0.45f).Lerp(wa.Lerp(wb, 0.45f) + Vector3.Up * 1.5f, 0.5f);
 		}
-		if (_cascadeAt < 0 || (_fir != null && !_fir.Fallen))
-			return _fir == null ? null : _fir.TrunkPoint(0.45f).Lerp(_fir.LieSegment.a.Lerp(_fir.LieSegment.b, 0.5f) + Vector3.Up * 1.5f, 0.5f);
-		if (_cascadeAt >= _cascade.Count) return null;
-		var t = _cascade[_cascadeAt].Tree;
-		var (a, b) = t.LieSegment;
-		return t.TrunkPoint(0.45f).Lerp(a.Lerp(b, 0.45f) + Vector3.Up * 1.5f, t.Held ? 0.15f : 0.5f);
+		// (2026-10-15, the owner: "only have him look in the direction of the falling trees not at each one") one way: toward
+		// the fir coming down across the trail, and the walls beyond it; held there while they fall, never swung tree to tree
+		if (_fir == null) return null;
+		return _fir.TrunkPoint(0.45f).Lerp(_fir.LieSegment.a.Lerp(_fir.LieSegment.b, 0.5f) + Vector3.Up * 1.5f, 0.5f);
 	}
 
 	private void UpdateWatch(PlayerController player, float dt)
@@ -648,13 +652,16 @@ public partial class Act1TreeFalls : Node3D
 			if (_fir != null && !_fir.Fallen) { _cascadeBegan = _clock; return; }
 			if (t.Motion.CreakTime < t.Motion.CreakSeconds) return;
 			var (la, lb) = t.LieSegment;
-			if (Sees(player, t) && Clear(player.GlobalPosition, la, lb, 4.5f) && !Outside(e))
+			// (2026-10-15, second pass: the view held one way, toward the falls) it goes once its short creak is over, whether
+			// or not it's in the middle of the view; never on them, nor shutting them out
+			if (Clear(player.GlobalPosition, la, lb, 4.5f) && !Outside(e))
 			{
+				bool seen = Sees(player, t);
 				t.Release();
 				_crackAt = _clock;
-				SeenFalls++;
+				if (seen) SeenFalls++; else UnseenFalls++;
 				LastWatchFalls++;
-				Log(e, "in view, while they watch");
+				Log(e, seen ? "in view, while they watch" : "while they watch");
 			}
 			else if (_clock - _cascadeBegan > 3.5)
 			{

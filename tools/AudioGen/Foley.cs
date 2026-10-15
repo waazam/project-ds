@@ -186,19 +186,21 @@ public static class Foley
 	/// spaced, with their small splash.</summary>
 	public static double[] CanopyDrip(Rng r, int sr)
 	{
-		var x = Buf(sr, 1.4);
+		// (2026-10-15, the owner: "still hearing those extra random footsteps in the rain that aren't the stalker's": these
+		// were 2-4 soft 300-1600 Hz pats 0.18-0.45 s apart, a step's thud at a step's pace beside you) one light drop onto a
+		// leaf, now and then a second right after it (a drop splitting, 40-110 ms): high and small, a plip, never a pat-pat
+		var x = Buf(sr, 0.8);
+		int n = r.Chance(0.35) ? 2 : 1;
 		double t = 0.0;
-		int n = r.I(2, 4);
 		for (int k = 0; k < n; k++)
 		{
-			double a = r.R(0.5, 1.0);
-			// a fat drop onto a leaf: a soft pat (the old one rang a Q-12 band at ~1.2 kHz: a woodblock in the rain)
-			Slap(x, r, sr, t, a * 0.7, 300, 1600, r.R(0.008, 0.014), 0.0008);
-			Slap(x, r, sr, t, a * 0.3, 1200, 5000, 0.003, 0.0002);
-			Crinkle(x, r, sr, t + 0.004, t + 0.05, 400, 2000, 6000, a * 0.15);
-			t += r.R(0.18, 0.45);
+			double a = r.R(0.6, 1.0) * (k == 0 ? 1.0 : 0.55);
+			Slap(x, r, sr, t, a * 0.45, 900, 3600, r.R(0.004, 0.008), 0.0005);
+			Slap(x, r, sr, t, a * 0.35, 2200, 7000, 0.002, 0.0002);
+			Crinkle(x, r, sr, t + 0.003, t + 0.03, 800, 3000, 7000, a * 0.12);
+			t += r.R(0.04, 0.11);
 		}
-		return FinishOneShot(Wet(x, sr, 1.0, 0.1, 0.45, 0.5, 0.4), sr, -3, 80);
+		return FinishOneShot(Wet(x, sr, 1.0, 0.1, 0.45, 0.5, 0.4), sr, -3, 60);
 	}
 
 	/// <summary>The lantern's blacklight coming on: a switch click and the tube's electric buzz swelling in (tonal).</summary>

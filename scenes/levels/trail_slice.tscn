@@ -36,7 +36,7 @@ TargetPath = NodePath("../ForestWorld/Footbridge")
 Radius = 2.5
 SoundPath = "res://assets/audio/sfx/rifle_distant_01.wav"
 Takes = 6
-VolumeDb = 14.0
+VolumeDb = 10.0
 FromDirection = Vector3(-0.85, 0, -0.5)
 
 [node name="Woodpecker" type="Node3D" parent="ForestAmbience"]
@@ -69,18 +69,5 @@ IntervalSeconds = Vector2(50, 120)
 DistanceRange = Vector2(12, 28)
 HeightRange = Vector2(3, 9)
 VolumeDb = -17.0
-UnitSize = 10.0
-Voices = 2
-
-[node name="Creaks" type="Node3D" parent="ForestAmbience"]
-script = ExtResource("11_emit")
-SamplePattern = "res://assets/audio/sfx/trunk_creak_{0:00}.wav"
-SampleCount = 4
-Bus = "Wind"
-LifeCategory = 3
-IntervalSeconds = Vector2(45, 110)
-DistanceRange = Vector2(10, 28)
-HeightRange = Vector2(4, 12)
-VolumeDb = -15.0
 UnitSize = 10.0
 Voices = 2

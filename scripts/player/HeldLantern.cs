@@ -201,8 +201,10 @@ public partial class HeldLantern : HeldItem
 		AmberGlass.Emission = _lantern.Blacklight ? new Color(0.4f, 0.15f, 0.9f) : new Color(1f, 0.52f, 0.2f);
 		// (2026-10-13, the owner: the flame brighter, the blacklight as it was: the glass glows and the hand is lit a little
 		// more by the flame; the blacklight's 0.9 and 1.1 unchanged)
-		AmberGlass.EmissionEnergyMultiplier = _lantern.Blacklight ? 0.9f : 1.2f;
-		_fill.LightEnergy = _lantern.Blacklight ? 1.1f : 1.3f;
+		// (2026-10-15, the owner: "the lantern prop itself is blinding bright, dim the actual prop slightly but leave the rest")
+		// the glass and the light on the hand a touch lower; the lantern's light on the world untouched
+		AmberGlass.EmissionEnergyMultiplier = _lantern.Blacklight ? 0.9f : 0.85f;
+		_fill.LightEnergy = _lantern.Blacklight ? 1.1f : 1.0f;
 		_fill.LightColor = _lantern.Blacklight ? new Color(0.5f, 0.3f, 1f) : new Color(1f, 0.66f, 0.36f);
 		if (_lantern.Ember)
 		{

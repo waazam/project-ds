@@ -652,6 +652,7 @@ public class MeshKit
 		var mesh = CommitArrays();
 		CommitMs += (Time.GetTicksUsec() - t1) / 1000.0;
 		Commits++;
+		Systems.LoadPump.Tick();   // (a long build keeps the window answering)
 		return mesh;
 	}
 

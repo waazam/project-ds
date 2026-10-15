@@ -38,7 +38,11 @@ public partial class StormSurprises : Node3D
 	public override void _Ready()
 	{
 		_rng.Randomize();
-		foreach (Kind k in System.Enum.GetValues(typeof(Kind))) _left.Add(k);
+		// (2026-10-15, the owner: "i am still hearing random footsteps even when the stalker is not stalking") every
+		// walker-like sound the player hears is the stalker's own now: no mud steps pacing beside them, no twig snap a few
+		// metres behind, no heavy thump behind (each read as a footstep). The falls, groans and far knocks stay.
+		foreach (Kind k in System.Enum.GetValues(typeof(Kind)))
+			if (k is not (Kind.MudSteps or Kind.TwigBehind or Kind.HeavyDrop or Kind.TrunkGroan)) _left.Add(k);   // (2026-10-15: and no tree creaks)
 		// (shuffled: each walk its own order)
 		for (int i = _left.Count - 1; i > 0; i--) { int j = _rng.RandiRange(0, i); (_left[i], _left[j]) = (_left[j], _left[i]); }
 		_wait = _rng.RandfRange(45f, 80f);

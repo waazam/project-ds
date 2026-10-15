@@ -258,7 +258,7 @@ public partial class Playtest
 			await _bot.Aim(firFoot + Vector3.Up * 6f, ct);
 			bool Cracked() => fir.Fallen || (fir.Falling && !fir.Held);
 			await _bot.WalkTo(terrain.TrailPoint(terrain.TrailLength, out _), 1.5f, ct, stopWhen: Cracked, giveUp: 20f);
-			Check("nearing it and looking, it comes down", Cracked() && falls is { FirSeen: true }, $"{TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(firFoot)):0} m from its foot");
+			Check("nearing it, it comes down (they are turned to it)", Cracked(), $"{TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(firFoot)):0} m from its foot");
 			Check("they stop to watch it fall", falls is { Watching: true });
 			// pressing on, they're held: their pace dies while the trees come down, then comes back
 			float slowest = 99f; ulong t0 = Time.GetTicksMsec();
@@ -283,16 +283,17 @@ public partial class Playtest
 		float apFar = FirstClimbEvent.Approach;
 		float humFar = Audio.StairsHum.Instance?.LevelDb ?? -80f;
 		Check("on the walk in: no title yet, the sound still on", !ChapterCard.Shown.Contains(0) && !climb.ReachedFoot && !Audio.StoryMute.On);
-		await _bot.WalkTo(climb.GlobalPosition, 6.5f, ct, stopWhen: () => climb.OnTheStairs || climb.ReachedFoot, giveUp: 12f);
+		// (2026-10-15, second pass) nearer: the hum and the ringing swell; into the clearing round the stairs, silence; no title
+		await _bot.WalkTo(climb.GlobalPosition, 6.5f, ct, stopWhen: () => climb.OnTheStairs || climb.ReachedFoot || FirstClimbEvent.Approach > apFar + 0.2f, giveUp: 12f);
 		await _bot.Aim(climb.GlobalPosition + Vector3.Up * 3f, ct);
 		await _bot.Seconds(1.0, ct);
 		Check("nearer the stairs: the hum and the ringing swell", FirstClimbEvent.Approach > apFar + 0.05f && (Audio.StairsHum.Instance?.LevelDb ?? -80f) > humFar + 1f,
 			$"approach {apFar:0.00} -> {FirstClimbEvent.Approach:0.00}, hum {humFar:0.0} -> {Audio.StairsHum.Instance?.LevelDb:0.0} dB");
-		Check("short of the foot: no title yet", !ChapterCard.Shown.Contains(0) && !Audio.StoryMute.On, $"foot {climb.ReachedFoot}");
 		await _bot.WalkTo(climb.FootPoint, 1.2f, ct, stopWhen: () => climb.ReachedFoot || climb.OnTheStairs, giveUp: 10f);
-		await _bot.WaitUntil(() => ChapterCard.Shown.Contains(0), 4, ct);
-		Check("at the foot of the stairs: every sound cut, then the DEAD SILENT title", climb.ReachedFoot && Audio.StoryMute.On && ChapterCard.Shown.Contains(0),
-			$"foot {climb.ReachedFoot} at {climb.ReachedFootAt:0.0} m, muted {Audio.StoryMute.On} ({Audio.StoryMute.Depth:0.00}), shown [{string.Join(",", ChapterCard.Shown)}]");
+		await _bot.WaitUntil(() => climb.ReachedFoot, 4, ct);
+		await _bot.Seconds(1.0, ct);
+		Check("into the clearing round the stairs: every sound cut, no title", climb.ReachedFoot && Audio.StoryMute.On && !ChapterCard.Shown.Contains(0),
+			$"in {climb.ReachedFoot} at {climb.ReachedFootAt:0.0} m, muted {Audio.StoryMute.On} ({Audio.StoryMute.Depth:0.00}), shown [{string.Join(",", ChapterCard.Shown)}]");
 		Check("by the stairs the forest is silent", (ForestAmbienceManager.Instance?.Silence ?? 0f) > 0.7f, $"silence {ForestAmbienceManager.Instance?.Silence:0.00}");
 		Check("not yet on them", !climb.OnTheStairs);
 		Shot("stairs_found");
@@ -315,18 +316,12 @@ public partial class Playtest
 		var firFoot = new Vector3(fir.Root.X, terrain.HeightAt(fir.Root.X, fir.Root.Y), fir.Root.Y);
 		float d = TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(firFoot));
 		bool Cracked() => fir.Fallen || (fir.Falling && !fir.Held);
-		using (Fast(3)) await _bot.WaitUntilGame(() => fir.Held, 4, ct);
-		Check("stood near it with their back to it: it creaks and waits", fir.Held && !Cracked(), $"{d:0} m from its foot");
-		using (Fast(3)) await _bot.WaitUntilGame(() => fir.CreakTime > 15f || Cracked(), 20, ct);
-		Check("15 s on, still waiting to be seen", !Cracked(), $"creaking {fir.CreakTime:0.0} s");
-		// and then they wander off back down the trail, still never looking (out past where it may fall when seen)
-		var off = stand - tan * 20f;
-		await _bot.Teleport(off, off - tan * 20f, ct);
-		await _bot.Aim(off - tan * 20f + Vector3.Up * 1.5f, ct);
-		float heldFor = 0f;
-		using (Fast(3)) await _bot.WaitUntilGame(() => { if (!Cracked()) heldFor = fir.CreakTime; return Cracked(); }, 20, ct);
-		Check("never looked at: it comes down anyway after about 25 s", Cracked() && falls.FirSeen == false && falls.UnseenFalls >= 1 && heldFor is > 22f and < 29f,
-			$"held {heldFor:0.0} s, seen {falls.FirSeen}, {TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(firFoot)):0} m off");
+		// (2026-10-15, second pass: "fix tree falling trigger, i was able to run past it") their back to it: it creaks, they're
+		// stopped and turned to it, and it comes down after its short creak; no waiting to be looked at
+		using (Fast(3)) await _bot.WaitUntilGame(() => fir.Held || Cracked(), 4, ct);
+		Check("stood near it with their back to it: it creaks, they're stopped", (fir.Held || Cracked()) && falls.Watching, $"{d:0} m from its foot");
+		using (Fast(3)) await _bot.WaitUntilGame(Cracked, 6, ct);
+		Check("it comes down after a short creak, wherever they look", Cracked(), $"seen {falls.FirSeen}");
 		using (Fast(3)) await _bot.WaitUntil(() => fir.Fallen && !falls.Watching && Player.WadeScale > 0.98f, 10, ct);
 		Check("it lies across the trail, and they're free to go on", fir.Fallen && !falls.Watching && Player.WadeScale > 0.98f, $"pace {Player.WadeScale:0.00}, watching {falls.Watching}");
 		Shot("fir_down_unseen");
@@ -423,14 +418,12 @@ public partial class Playtest
 		var stairs = climb.GetParent() as StaircaseBuilder;
 		var top = stairs?.GetNodeOrNull<Node3D>("TopTrigger");
 		await _bot.Teleport(RouteEnd(climb.GlobalPosition, 5f), climb.GlobalPosition, ct);
-		// the foot: silence, held looking up the flight while the game's title shows, then theirs again
+		// (2026-10-15, second pass) into the clearing round the stairs: silence; no game title, no hold
 		await _bot.WalkTo(climb.FootPoint, 1.0f, ct, stopWhen: () => climb.ReachedFoot || climb.OnTheStairs, giveUp: 8f);
-		await _bot.WaitUntil(() => climb.HeldAtFoot, 2, ct);
-		await _bot.Seconds(2.5, ct);
-		Check("at the foot: held, looking up the stairs, the sound gone, the title", climb.HeldAtFoot && !Input.Enabled && !Player.IsPhysicsProcessing() && Audio.StoryMute.On && climb.LookingUpTheFlight(Player), $"looking {climb.LookOffDegrees(Player):0} deg off the flight");
-		using (Fast(3)) await _bot.WaitUntil(() => !climb.HeldAtFoot && Input.Enabled, 20, ct);
-		Check("the title over: theirs again, and no chapter title yet", !climb.HeldAtFoot && Input.Enabled && ChapterCard.Shown.Contains(0) && !ChapterCard.Shown.Contains(2),
-			$"shown [{string.Join(",", ChapterCard.Shown)}]");
+		await _bot.WaitUntil(() => climb.ReachedFoot, 3, ct);
+		await _bot.Seconds(1.5, ct);
+		Check("into the clearing: the sound gone, no title, still theirs", climb.ReachedFoot && Audio.StoryMute.On && !ChapterCard.Shown.Contains(0) && !ChapterCard.Shown.Contains(2) && Input.Enabled && !climb.HeldAtFoot,
+			$"shown [{string.Join(",", ChapterCard.Shown)}], muted {Audio.StoryMute.On}");
 		await _bot.WalkTo(climb.GlobalPosition, 0.6f, ct, stopWhen: () => climb.OnTheStairs, giveUp: 10f);
 		await _bot.WaitUntil(() => climb.OnTheStairs, 4, ct);
 		Require("a step onto the stairs is noticed", climb.OnTheStairs);

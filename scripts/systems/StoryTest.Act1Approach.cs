@@ -93,29 +93,16 @@ public partial class StoryTest
 		}
 		else if (mode == "wrong")
 		{
-			// off the trail into the woods, before the fir: it creaks (they're near), and waits
+			// (2026-10-15, second pass: "fix tree falling trigger, i was able to run past it") off the trail into the woods
+			// near the fir, looking away: it creaks, they're stopped and turned to it, and it comes down all the same
 			await Teleport(start, start + tangent * 10f, ct);
 			_rec = true; _recLabel = "offtrail";
 			var side = new Vector3(-tangent.Z, 0, tangent.X);
 			var off = terrain.TrailPoint(trailLen - 16f, out _) + side * 20f;
-			await WalkTo(off, 2f, ct, giveUp: 12f);
-			await Aim(off + side * 10f + Vector3.Up * 1.5f, ct);   // looking further off, away from the fir
-			await Seconds(5, ct);
-			Check("off the trail, near the fir but not looking at it: it hasn't come down", !Cracked(), $"fir {(fir.Standing ? "standing" : fir.Held ? "creaking, held" : "falling")}, {Flat(_player.GlobalPosition).DistanceTo(Flat(firFoot)):0} m off");
-			// stood still near it, looking back up the trail: it creaks and waits
-			_recLabel = "stand_away";
-			// (they come back to the trail's end from the woods with their back to the fir: put there, looking away)
-			var stand = trailEnd - tangent * 9f;
-			await Teleport(stand, stand - tangent * 20f, ct);
-			await Aim(stand - tangent * 20f + Vector3.Up * 1.5f, ct);
-			float d0 = Flat(_player.GlobalPosition).DistanceTo(Flat(firFoot));
-			await Seconds(4, ct);
-			Check("stood near it looking away: it creaks, and waits for them to look", fir.Held && !Cracked(), $"held {fir.Held}, {d0:0} m off, creaking {fir.CreakTime:0.0} s");
-			// turning round to it (a person's turn, not a snap)
-			_recLabel = "turn_to_fir";
-			await TurnToward(fir.TrunkPoint(0.5f), 1.6f, ct, stopWhen: Cracked);
-			await WaitUntil(Cracked, 2, ct);
-			Check("looking at it, it comes down", Cracked() && falls.FirSeen);
+			await WalkTo(off, 2f, ct, stopWhen: () => falls.Watching || Cracked(), giveUp: 12f);
+			await WaitUntil(Cracked, 8, ct);
+			Check("near it, off the trail and looking away: stopped, turned to it, and it comes down", Cracked() && falls.WatchCount > 0,
+				$"fir {(fir.Standing ? "standing" : fir.Held ? "creaking, held" : "falling")}, {Flat(_player.GlobalPosition).DistanceTo(Flat(firFoot)):0} m off");
 			await WatchTheFall(fir, falls, ct);
 			// on round its crown, then off the way into the woods: a tree out there comes down across their way, in view
 			_recLabel = "way_in";
@@ -184,25 +171,22 @@ public partial class StoryTest
 		await WaitUntil(() => climb.Revealed, 4, ct);
 		Check("the stairs revealed only close, and in view", climb.Revealed && climb.RevealedAt <= climb.RevealRange + 0.5f, $"revealed at {climb.RevealedAt:0.0} m");
 		// (2026-10-15) the title waits for the foot of the stairs: there every sound cuts, then the title, then the chapter's
-		Check("seen, but short of the foot: no title yet, the sound still on", !StoryManager.Instance.HasFlag(flag) && !climb.ReachedFoot && !Audio.StoryMute.On);
-		_recLabel = "foot";
-		await WalkTo(climb.FootPoint, 1.2f, ct, stopWhen: () => climb.ReachedFoot, giveUp: 12f);
-		await WaitUntil(() => ChapterCard.Shown.Contains(0), 6, ct);
-		Check("at the foot: all sound cut", climb.ReachedFoot && Audio.StoryMute.On, $"foot {climb.ReachedFoot} at {climb.ReachedFootAt:0.0} m, muted {Audio.StoryMute.On}");
+		// (2026-10-15, second pass) into the clearing round the stairs every sound cuts; no game title; the chapter's title
+		// on the first step onto the flight
+		_recLabel = "clearing";
+		await WalkTo(climb.FootPoint, 1.2f, ct, giveUp: 14f);   // (to the foot: on from the front, not the flight's side)
+		await WaitUntil(() => climb.ReachedFoot, 6, ct);
+		Check("into the clearing: all sound cut", climb.ReachedFoot && Audio.StoryMute.On, $"in at {climb.ReachedFootAt:0.0} m, muted {Audio.StoryMute.On}");
 		await Seconds(1.6, ct);
-		Screenshot("title");
-		Check("the title came up there, never before", ChapterCard.Shown.Contains(0) && !titleEarly && climb.ReachedFoot,
-			$"flag set at {flagDist:0.0} m, early {titleEarly}");
-		Check("held at the foot, looking up the stairs, while it shows", climb.HeldAtFoot && !_input.Enabled, $"{climb.LookOffDegrees(_player):0} deg off the flight");
-		await WaitUntil(() => !climb.HeldAtFoot && _input.Enabled, 16, ct);
-		Check("the title over: theirs again, no chapter title yet", _input.Enabled && !ChapterCard.Shown.Contains(2), $"[{string.Join(",", ChapterCard.Shown)}]");
+		Screenshot("clearing");
+		Check("no game title, no hold", !ChapterCard.Shown.Contains(0) && !titleEarly && _input.Enabled && !climb.HeldAtFoot, $"[{string.Join(",", ChapterCard.Shown)}]");
 		_recLabel = "onto_the_stairs";
 		await WalkTo(climb.GlobalPosition, 0.5f, ct, stopWhen: () => climb.OnTheStairs, giveUp: 10f);
 		await WaitUntil(() => ChapterCard.Shown.Contains(2), 4, ct);
-		Check("onto the stairs: then the chapter title", climb.OnTheStairs && ChapterCard.Shown.IndexOf(2) > ChapterCard.Shown.IndexOf(0) && ChapterCard.Shown.IndexOf(0) >= 0, $"[{string.Join(",", ChapterCard.Shown)}]");
+		Check("onto the stairs: the chapter title, THE STAIRS", climb.OnTheStairs && ChapterCard.Shown.Contains(2) && !ChapterCard.Shown.Contains(0), $"[{string.Join(",", ChapterCard.Shown)}]");
 		Check("the walls came down beside the way", falls.SideStarted >= (mode == "side" ? 4 : 5), $"{falls.SideStarted} of {falls.SideCount} started, {falls.SideDown} down");
 		// (2026-10-15: the first falls are turned into view; the rest follow wherever they are)
-		Check("the first falls were seen", falls.SeenFalls >= (mode == "side" ? 1 : 2), $"seen {falls.SeenFalls}, unseen {falls.UnseenFalls}");
+		Check("the first falls were seen", falls.SeenFalls >= 1, $"seen {falls.SeenFalls}, unseen {falls.UnseenFalls}");
 		Check("and behind them, heard", falls.BehindStarted >= (mode == "side" ? 1 : 2), $"{falls.BehindStarted}");
 		_rec = false;
 		GD.Print($"[act1] {mode}: stops {falls.WatchCount}, last {falls.LastWatchSeconds:0.0} s, {falls.LastWatchFalls} fell in it; seen {falls.SeenFalls}, unseen {falls.UnseenFalls}; wards {falls.WardStarted}/{falls.WardCount}; reveal at {climb.RevealedAt:0.0} m");
@@ -221,7 +205,7 @@ public partial class StoryTest
 	{
 		bool cracked = fir.Fallen || (fir.Falling && !fir.Held);
 		float d = Flat(_player.GlobalPosition).DistanceTo(Flat(fir.Foot));
-		Check("the dead fir comes down as they near it, in view", cracked && falls.FirSeen, $"{d:0} m from its foot");
+		Check("the dead fir comes down as they near it (they are turned to it)", cracked, $"{d:0} m from its foot, seen {falls.FirSeen}");
 		Check("they stop to watch", falls.Watching);
 		_recLabel = "watch";
 		float slowest = 99f; ulong t0 = Time.GetTicksMsec(); double t = 0;

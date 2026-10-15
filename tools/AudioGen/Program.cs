@@ -47,6 +47,8 @@ for (int i = 0; i < 8; i++) { int k = i; jobs.Add(($"crawler_step_{k + 1:00}", s
 // The omen bird's old far-off scream: kept in storage for Alex (2026-10-15); the raven attack replaced it.
 jobs.Add(("distant_scream", storage, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
 for (int i = 1; i <= 5; i++) jobs.Add(($"raven_attack_{i:00}", sfx, false, Hi, (r, sr) => RavenAttack.Make(r, sr)));
+// The omen bird's scream (2026-10-15): Alex's saved scream, close, sudden and loud (AlexScream.cs).
+for (int i = 1; i <= 3; i++) jobs.Add(($"raven_alex_{i:00}", sfx, false, Hi, (r, sr) => AlexScream.Make(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"whisper_voice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WhisperVoice(r, sr)));
 for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"bird_{k:00}", sfx, false, Lo, (r, sr) => Sfx.Bird(k, r, sr))); }
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_dirt_{i:00}", sfx, false, Lo, (r, sr) => Steps.Dirt(r, sr)));
@@ -119,6 +121,9 @@ for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"creature_screech_{k:00}", 
 for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"creature_snarl_{k:00}", sfx, false, Lo, (r, sr) => Creature.Snarl(r, sr, k))); }
 // The one rattle take (Dan, 2026-09-22: the other beats read as hooves; the game varies its rate instead).
 for (int i = 1; i <= 1; i++) { int k = i; int len = new[] { 24, 28, 22, 26, 30, 25, 21, 29 }[k - 1]; jobs.Add(($"creature_rattle_loop_{k:00}", sfx, true, Lo, (r, sr) => Creature.RattleLoop(r, sr, len, k))); }
+// The stalker's rattle as phrases (2026-10-15, Creature.RattlePhrase): 48 one-shots in four families, each starting on a click.
+foreach (var (kind, tag, count) in new[] { (Creature.RattleKind.Tick, "tick", 12), (Creature.RattleKind.Run, "run", 16), (Creature.RattleKind.Long, "long", 12), (Creature.RattleKind.Stutter, "stutter", 8) })
+	for (int i = 1; i <= count; i++) { var k = kind; jobs.Add(($"creature_rattle_{tag}_{i:00}", sfx, false, Hi, (r, sr) => Creature.RattlePhrase(r, sr, k))); }
 jobs.Add(("creature_giant_rattle_loop_01", sfx, true, Lo, (r, sr) => Creature.GiantRattle(r, sr, 26)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_foghorn_{i:00}", sfx, false, Lo, (r, sr) => Creature.Foghorn(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_moan_{i:00}", sfx, false, Lo, (r, sr) => Creature.GiantMoan(r, sr)));

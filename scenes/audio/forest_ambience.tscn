@@ -118,7 +118,7 @@ bus = &"Weather"
 [node name="Loop" type="Node" parent="Rain"]
 script = ExtResource("2_loop")
 StreamPath = "res://assets/audio/ambient/rain_loop.wav"
-BaseVolumeDb = -6.0
+BaseVolumeDb = -9.0
 Gain = 0.0
 
 [node name="Thunder" type="AudioStreamPlayer" parent="."]

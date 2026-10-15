@@ -118,8 +118,14 @@ public partial class CameraTool : Node
 			// in the dark, the flash: a burst of light from the camera that lights the frame it takes, then fades (one
 			// soft flash, never a strobe; dimmer with "reduce flashing")
 			if (InTheDark()) Flash();
+			// (2026-10-15b, the owner: "should trigger as soon as the picture snaps") the omen in the frame: it comes at you
+			// and screams on the shutter itself, not when the print lands a frame or two later
+			if (FindSubject() is { IsOmen: true } omen) { _snapOmen = omen; TriggerScream(omen); }
 		}
 	}
+
+	/// <summary>The omen caught on this shutter (it has already screamed; Shoot only records it).</summary>
+	private Bird _snapOmen;
 
 	private OmniLight3D _flashLight;
 	/// <summary>For tests: flashes fired.</summary>
@@ -327,7 +333,7 @@ public partial class CameraTool : Node
 	{
 		var cam = _player.CameraRig?.Camera;
 		if (cam == null) return;
-		var best = FindSubject();
+		var best = _snapOmen != null && IsInstanceValid(_snapOmen) ? _snapOmen : FindSubject();
 		var other = best == null ? FindOtherSubject() : null;
 		_framesLeft--;
 
@@ -348,13 +354,16 @@ public partial class CameraTool : Node
 		if (best != null)
 		{
 			Vector3 eyes = best.GlobalPosition + Vector3.Up * 0.28f;
-			bool omen = best.IsOmen;
-			best.Capture();
-			if (omen) TriggerScream();
+			if (best != _snapOmen)
+			{
+				best.Capture();
+				if (best.IsOmen) TriggerScream(best);
+			}
 			log?.Record("bird_" + ColourName(best.Color), eyes, score);
 		}
 		else if (other != null) log?.Record(other.Id, null, score);
 		log?.EndShot();
+		_snapOmen = null;
 	}
 
 	private readonly System.Collections.Generic.List<GodotObject> _hidden = new();
@@ -416,13 +425,34 @@ public partial class CameraTool : Node
 	private static Audio.SamplePicker _ravenPick;
 	private static readonly RandomNumberGenerator _ravenRng = new();
 
-	private void TriggerScream()
+	private void TriggerScream(Bird omen)
 	{
+		// it comes at your face, and the rest of the flock goes with it
+		omen.Capture();
 		foreach (var node in GetTree().GetNodesInGroup("photo_birds"))
 			if (node is Bird b && !b.Photographed) b.Capture();
 		// (2026-10-15, the owner: a scary, loud raven as it flies at you; the old far-off scream is in assets/audio/storage)
-		PlayOneShot($"res://assets/audio/sfx/raven_attack_{1 + _ravenPick.Next(_ravenRng, 5):00}.wav", "Unnatural", _player, 8f, 60f, 500f);
+		// (2026-10-15b: "not loud, scary or sudden enough") it's in your face, so it's flat, not placed: no falloff, loud
+		// (+12 dB; the master's limiter holds the peak), the takes' hit in their first ~10 ms
+		// (2026-10-15c: "use alexs saved sound for the blackbird from earlier. but make it louder and more sudden like we have it
+		// now") Alex's scream, brought up close and sudden (AlexScream.cs); the raven_attack takes are kept, unused
+		PlayOneShot($"res://assets/audio/sfx/raven_alex_{1 + _ravenPick.Next(_ravenRng, 3):00}.wav", "Unnatural", _player, 12f);
+		Jolt();
 		GD.Print("[story] Act 1: the fourth bird screams and the flock is gone");
+	}
+
+	/// <summary>The view knocked back as it hits: a short, sharp shake, settling in a third of a second (none with head
+	/// motion off).</summary>
+	private void Jolt()
+	{
+		if (!(GameSettings.Instance?.HeadMotion ?? true) || _player.CameraRig is not { } rig) return;
+		var rng = new RandomNumberGenerator();
+		var tw = CreateTween();
+		tw.TweenMethod(Callable.From<float>(v =>
+		{
+			if (IsInstanceValid(rig)) rig.Shake = new Vector3(rng.RandfRange(-1f, 1f), rng.RandfRange(-1f, 1f), 0f) * 0.07f * v * v;
+		}), 1f, 0f, 0.35f);
+		tw.TweenCallback(Callable.From(() => { if (IsInstanceValid(rig)) rig.Shake = Vector3.Zero; }));
 	}
 
 	private static void PlayOneShot(string path, string bus, Node3D at, float volumeDb, float unitSize = 0f, float maxDistance = 0f)

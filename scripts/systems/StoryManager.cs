@@ -328,10 +328,13 @@ public partial class StoryManager : Node
 			Inventory = PendingInventory,
 		};
 		ArrivedByTravel = true;
-		// the black filled while the next level builds: the climb going on, up the stairs; the wind, elsewhere
 		string next = LevelFor(Current);
-		BlackBridge.Begin(GetTree(), next == HollowScene ? "res://assets/audio/ambient/climb_dark_loop.wav" : "res://assets/audio/ambient/winter_wind_loop.wav",
-			next == HollowScene ? -5f : -12f);
+		// (2026-10-15) the loading veil over the whole change, so nothing between the levels shows (no grey frame, no
+		// half-built level) and the window keeps answering through the build. Into the Hollow it also holds the sound:
+		// everything is muted from the stairs until the next act (the owner), and it comes back softly with the wake.
+		UI.LoadingVeil.Show(GetTree(), mute: next == HollowScene);
+		// the black filled while the next level builds: the wind, out of the Hollow (into it, the silence holds)
+		if (next != HollowScene) BlackBridge.Begin(GetTree(), "res://assets/audio/ambient/winter_wind_loop.wav", -12f);
 		ChangeScene(next);
 	}
 

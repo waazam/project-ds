@@ -21,6 +21,8 @@ public partial class StairsHum : Node
 	/// <summary>How much louder (dB) at the foot of the first stairs, swelling over the walk there
 	/// (<see cref="World.FirstClimbEvent.Approach"/>).</summary>
 	[Export] public float ApproachDb = 10f;
+	/// <summary>On top, the last few metres before the clearing (<see cref="World.FirstClimbEvent.Surge"/>): the peak before the cut.</summary>
+	[Export] public float SurgeDb = 6f;
 	/// <summary>Seconds for the level to cover ~63% of a change.</summary>
 	[Export] public float SmoothingTime = 0.5f;
 
@@ -76,7 +78,7 @@ public partial class StairsHum : Node
 			// (2026-10-15) the walk between the fallen trees to the first stairs: the hum swells all the way to the foot
 			// (where every sound cuts out, and the titles come: World.FirstClimbEvent)
 			float ap = World.FirstClimbEvent.Approach;
-			if (ap > 0f) target = Mathf.Max(target, EdgeDb) + ApproachDb * Mathf.Pow(ap, 1.3f);
+			if (ap > 0f) target = Mathf.Max(target, EdgeDb) + ApproachDb * Mathf.Pow(ap, 1.3f) + SurgeDb * World.FirstClimbEvent.Surge;
 		}
 		float k = 1f - Mathf.Exp(-(float)delta / Mathf.Max(SmoothingTime, 0.01f));
 		LevelDb = Mathf.Lerp(LevelDb, target, k);

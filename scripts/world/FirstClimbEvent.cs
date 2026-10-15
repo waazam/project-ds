@@ -73,6 +73,11 @@ public partial class FirstClimbEvent : StoryTrigger
 	/// <summary>Within this many metres (level) of the foot of the flight: every sound cuts out (<see cref="Audio.StoryMute"/>,
 	/// until the next act: the Hollow), and in that silence the game's title, then the chapter's.</summary>
 	[Export] public float FootRange = 2.2f;
+	/// <summary>(2026-10-15, the owner's second pass: "lets have the droning and tinnitus build up until you enter the forest
+	/// circle area by the stairs and everything will go quiet. dont display the title, only display the stairs title once you
+	/// walk on them") Within this many metres (level) of the clearing's centre (the treeless circle round the stairs:
+	/// ForestTerrain.ClearingCenter): every sound cuts out. No title there; the chapter's comes on the first step.</summary>
+	[Export] public float ClearingRange = 11f;
 
 	/// <summary>For the tests and the title drop: the stairs have been seen, close, by the player (this level).</summary>
 	public bool Revealed { get; private set; }
@@ -87,6 +92,11 @@ public partial class FirstClimbEvent : StoryTrigger
 	public static bool AtFoot => _active != null && IsInstanceValid(_active) && _active.ReachedFoot;
 	/// <summary>0 .. 1 over the walk from the trail's end to the foot of the first stairs (0 elsewhere, or once climbed).</summary>
 	public static float Approach { get; private set; }
+	/// <summary>(2026-10-15, the owner: "the cutting to silent should be more peaking then abrupt silence") 0 .. 1 over the
+	/// last <see cref="SurgeMetres"/> before the clearing: the hum, the ringing and the pressure surge to a peak on top of
+	/// <see cref="Approach"/>, and at the clearing's edge everything stops dead.</summary>
+	public static float Surge { get; private set; }
+	[Export] public float SurgeMetres = 6f;
 	private double _poll;
 
 	public override void _Ready()
@@ -99,7 +109,7 @@ public partial class FirstClimbEvent : StoryTrigger
 	public override void _ExitTree()
 	{
 		base._ExitTree();
-		if (_active == this) { _active = null; Approach = 0f; }
+		if (_active == this) { _active = null; Approach = 0f; Surge = 0f; }
 	}
 
 	/// <summary>Where the foot of the flight is (in front of its first step, on the ground).</summary>
@@ -108,15 +118,22 @@ public partial class FirstClimbEvent : StoryTrigger
 	public override void _Process(double delta)
 	{
 		var s = StoryManager.Instance;
-		if (s == null || s.Current >= Checkpoint.Act2StairsClimbed) { if (_active == this) Approach = 0f; return; }
+		if (s == null || s.Current >= Checkpoint.Act2StairsClimbed) { if (_active == this) { Approach = 0f; Surge = 0f; } return; }
 		if (GetParent() is not StaircaseBuilder stairs || StoryBeat.Player(this) is not { } player) return;
 		_active = this;
 		// the walk in: the hum and the ringing swell with every metre nearer the foot
 		var foot = FootPoint;
 		float d = new Vector2(player.GlobalPosition.X - foot.X, player.GlobalPosition.Z - foot.Z).Length();
-		float want = ReachedFoot ? 1f : Mathf.Clamp((ApproachFrom - d) / Mathf.Max(ApproachFrom - FootRange, 1f), 0f, 1f);
+		// into the clearing round the stairs (its centre, or the foot when there's no terrain clearing)
+		var terrain = GroundSnap.FindTerrain(this);
+		var centre = terrain != null ? terrain.ToGlobal(new Vector3(terrain.ClearingCenter.X, 0f, terrain.ClearingCenter.Y)) : foot;
+		float dc = new Vector2(player.GlobalPosition.X - centre.X, player.GlobalPosition.Z - centre.Z).Length();
+		float range = terrain != null ? ClearingRange : FootRange;
+		float want = ReachedFoot ? 1f : Mathf.Clamp((ApproachFrom - dc) / Mathf.Max(ApproachFrom - range, 1f), 0f, 1f);
 		Approach = Mathf.MoveToward(Approach, want, (float)delta * 0.5f);
-		if (!ReachedFoot && d <= FootRange) OnFoot(d);
+		float surge = ReachedFoot ? 1f : Mathf.Clamp((range + SurgeMetres - dc) / Mathf.Max(SurgeMetres, 0.5f), 0f, 1f);
+		Surge = Mathf.MoveToward(Surge, surge, (float)delta * 2.5f);
+		if (!ReachedFoot && dc <= range) OnFoot(dc);
 		if (Revealed) return;
 		_poll -= delta;
 		if (_poll > 0) return;
@@ -153,11 +170,9 @@ public partial class FirstClimbEvent : StoryTrigger
 		_active = this;
 		Approach = 1f;
 		GD.Print($"[story] Act 1: at the foot of the stairs ({d:0.0} m): silence");
-		Audio.StoryMute.Engage(this, 0.35f, "the foot of the first stairs");
-		if (onFlight) { ChapterCard.Title(this, 1.0f, thenChapter: true); return; }
-		var card = ChapterCard.Title(this, 1.0f);
-		if (card != null && GetParent() is StaircaseBuilder stairs && StoryBeat.Player(this) is { } player)
-			_ = Cutscene.Run(this, ct => HoldForTitle(player, stairs, card, ct), lockInput: true, freezeBody: true);
+		Audio.StoryMute.Engage(this, 0.02f, "the clearing round the first stairs");   // (dead, not faded: 2026-10-15)
+		// (2026-10-15: no game title any more, and no hold; the chapter's title comes on the first step, Fire)
+		if (onFlight) ChapterCard.Show(this, 2, 0.8f);
 	}
 
 	/// <summary>For the tests: held at the foot, looking up the flight, while the game's title shows.</summary>

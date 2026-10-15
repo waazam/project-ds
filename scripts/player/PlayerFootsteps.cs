@@ -46,6 +46,30 @@ public partial class PlayerFootsteps : Node
 
 	public int StepsPlayed { get; private set; }
 	public string LastSurface => _lastSurface;
+	/// <summary>The sample the last step played (the stalker never answers with the same one).</summary>
+	public AudioStream LastStep { get; private set; }
+	/// <summary>When the last step played (seconds, Time ticks), and the stride's period: a running average of the time
+	/// between steps (the stalker answers between your feet, not on them).</summary>
+	public double LastStepAt { get; private set; } = -10;
+	public float StepInterval { get; private set; } = 0.48f;
+
+	/// <summary>Seconds until the next footfall at the current pace (a large number standing still).</summary>
+	public float TimeToNextStep
+	{
+		get
+		{
+			float speed = _player?.GroundSpeed ?? 0f;
+			return speed > 0.3f ? (1f - StepPhase) * Stride / speed : 99f;
+		}
+	}
+
+	private void MarkStep()
+	{
+		double now = Time.GetTicksMsec() / 1000.0;
+		double gap = now - LastStepAt;
+		if (gap > 0.2 && gap < 1.2) StepInterval = Mathf.Lerp(StepInterval, (float)gap, 0.3f);
+		LastStepAt = now;
+	}
 	/// <summary>How deep the snow underfoot is, 0..1 (set by the winter woods: off the plowed road it's deep). Deep,
 	/// a snow step is the muffled, dragging one.</summary>
 	public float SnowDepth { get; set; }
@@ -117,7 +141,9 @@ public partial class PlayerFootsteps : Node
 		_lastSurface = surface;
 		if (!_sets.TryGetValue(surface, out var set) || set.Length == 0) set = _sets["dirt"];
 		if (set.Length == 0) return;
-		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.9f, 1.04f));
+		LastStep = set[_stepPicker.Next(_rng, set.Length)];
+		MarkStep();
+		Play(LastStep, StepVolumeDb + loudness, _rng.RandfRange(0.9f, 1.04f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
 			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.95f, 1.05f));
 		StepsPlayed++;
@@ -135,7 +161,9 @@ public partial class PlayerFootsteps : Node
 		float loudness = Mathf.Remap(Mathf.Clamp(speed, 1f, 5f), 1f, 5f, -2f, 3f) + CrouchQuietDb * _player.CrouchAmount + (deep ? -1.5f : 0f);
 		// (2026-10-13, the "bouncy" sweep: +-8 % put each step on a different note; the takes and the no-repeat picker carry
 		// the variety, the pitch only a hair)
-		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.965f, 1.035f));
+		LastStep = set[_stepPicker.Next(_rng, set.Length)];
+		MarkStep();
+		Play(LastStep, StepVolumeDb + loudness, _rng.RandfRange(0.965f, 1.035f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
 			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.95f, 1.05f));
 		Kit(loudness);
@@ -151,7 +179,9 @@ public partial class PlayerFootsteps : Node
 	{
 		float chance = (_player.IsRunning ? 0.4f : 0.18f) * (1f - 0.7f * _player.CrouchAmount);
 		if (_rng.Randf() >= chance) return;
-		bool creak = _rng.Randf() < 0.65f;
+		// (2026-10-15, the owner: "hearing a strange kitchen pan like noise now too randomly") no buckle or zip ticks at all:
+		// metallic, they read as a pan, and as the stalker's click. The strap's creak only.
+		bool creak = true;
 		var set = creak ? _gearCreak : _gearClink;
 		if (set.Length == 0) return;
 		int i = creak ? _creakPicker.Next(_rng, set.Length) : _clinkPicker.Next(_rng, set.Length);
