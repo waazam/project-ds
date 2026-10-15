@@ -141,7 +141,10 @@ public partial class Act15Hallway : Node3D
 		for (float z = 0; z < Part1; z += 36f)
 		{
 			float len = Mathf.Min(36f, Part1 - z), cz = z + len * 0.5f;
-			float tint = 0.8f + 0.3f * _rng.Randf();
+			// (2026-10-15: the draw is kept, so red light, green light's dice are as they were, but the tint isn't used: it
+			// stepped hard every 36 m. The wall shader drifts the paint's fade along the hall itself now)
+			_ = _rng.Randf();
+			const float tint = 0.93f;
 			Box(wall, new Vector3(-W1 * 0.5f - 0.2f, H1 * 0.5f, cz), new Vector3(0.4f, H1, len), null, true, tint);
 			Box(wall, new Vector3(W1 * 0.5f + 0.2f, H1 * 0.5f, cz), new Vector3(0.4f, H1, len), null, true, tint * 0.95f);
 			Box(dark, new Vector3(0, -0.1f, cz), new Vector3(W1 + 0.8f, 0.2f, len));
@@ -181,7 +184,8 @@ public partial class Act15Hallway : Node3D
 		for (float z = z1; z < End; z += 40f)
 		{
 			float len = Mathf.Min(40f, End - z), cz = z + len * 0.5f;
-			float tint = 0.75f + 0.3f * _rng.Randf();
+			_ = _rng.Randf();   // (the draw kept; the tint isn't used, see part 1)
+			const float tint = 0.9f;
 			Box(wall, new Vector3(-W2 * 0.5f - 0.2f, H2 * 0.5f, cz), new Vector3(0.4f, H2, len), null, true, tint);
 			Box(wall, new Vector3(W2 * 0.5f + 0.2f, H2 * 0.5f, cz), new Vector3(0.4f, H2, len), null, true, tint * 0.95f);
 			Box(dark, new Vector3(0, -0.1f, cz), new Vector3(W2 + 0.8f, 0.2f, len));
@@ -527,17 +531,19 @@ public partial class Act15Hallway : Node3D
 			return r < 0.3f ? JanitorShelf.Kind.Spray : r < 0.55f ? JanitorShelf.Kind.Bottle : r < 0.8f ? JanitorShelf.Kind.Quart : JanitorShelf.Kind.Pint;
 		}
 		// a row of them along a shelf from a to b, facing `face` (yaw), a gap here and there
-		void Row(float y, Vector3 a, Vector3 b, float faceYaw, float gaps = 0.12f)
+		// (2026-10-15: each thing pushed back or pulled forward a little, d0..d1 along the row's back; they stood ruled in line)
+		void Row(float y, Vector3 a, Vector3 b, float faceYaw, float gaps = 0.12f, float d0 = -0.015f, float d1 = 0.015f)
 		{
 			float len = a.DistanceTo(b), u = srng.RandfRange(0f, 0.04f);
 			var along = (b - a) / len;
+			var back = along.Cross(Vector3.Up);
 			while (true)
 			{
 				var kind = Pick(y);
 				float w = JanitorShelf.Footprint(kind);
 				if (u + w > len) break;
 				if (srng.Randf() < gaps) { u += srng.RandfRange(0.06f, 0.16f); continue; }
-				var at = a + along * (u + w * 0.5f) + Vector3.Up * (y + 0.015f);
+				var at = a + along * (u + w * 0.5f) + back * srng.RandfRange(d0, d1) + Vector3.Up * (y + 0.015f);
 				JanitorShelf.Add(stock, kind, at, faceYaw + srng.RandfRange(-0.45f, 0.45f), srng);
 				JanitorShelf.ShadowProxy(shadows, kind, at);
 				u += w + srng.RandfRange(0.005f, 0.04f);
@@ -554,10 +560,14 @@ public partial class Act15Hallway : Node3D
 			BuildKit.Box(sk, new Vector3(0, y, z1 - 0.2f), new Vector3(ClosetHalf * 2f, 0.03f, 0.36f));
 			BuildKit.Box(sk, new Vector3(-ClosetHalf + 0.18f, y, (z0 + z1) * 0.5f + 0.2f), new Vector3(0.36f, 0.03f, ClosetDepth - 0.8f));
 			// the back shelf two deep (the back row a little along, behind the gaps), the side shelf one
-			Row(y, new Vector3(-ClosetHalf + 0.4f, 0, z1 - 0.1f), new Vector3(ClosetHalf - 0.05f, 0, z1 - 0.1f), 0f, 0.4f);
-			Row(y, new Vector3(-ClosetHalf + 0.38f, 0, z1 - 0.28f), new Vector3(ClosetHalf - 0.05f, 0, z1 - 0.28f), 0f);
-			Row(y, new Vector3(-ClosetHalf + 0.18f, 0, z0 + 0.62f), new Vector3(-ClosetHalf + 0.18f, 0, z1 - 0.42f), -Mathf.Pi * 0.5f);
+			Row(y, new Vector3(-ClosetHalf + 0.4f, 0, z1 - 0.1f), new Vector3(ClosetHalf - 0.05f, 0, z1 - 0.1f), 0f, 0.4f, 0f, 0.008f);
+			Row(y, new Vector3(-ClosetHalf + 0.38f, 0, z1 - 0.28f), new Vector3(ClosetHalf - 0.05f, 0, z1 - 0.28f), 0f, 0.12f, -0.035f, 0f);
+			Row(y, new Vector3(-ClosetHalf + 0.18f, 0, z0 + 0.62f), new Vector3(-ClosetHalf + 0.18f, 0, z1 - 0.42f), -Mathf.Pi * 0.5f, 0.12f, -0.02f, 0.02f);
 		}
+		// (2026-10-15: the shelves and their stock can't be walked through: a box round each unit, out to the shelves' fronts;
+		// the floor between, the switch, the door and the trigger inside are all clear of them)
+		body.AddChild(new CollisionShape3D { Name = "BackShelves", Position = new Vector3(0, 1.15f, z1 - 0.2f), Shape = new BoxShape3D { Size = new Vector3(ClosetHalf * 2f, 2.3f, 0.4f) } });
+		body.AddChild(new CollisionShape3D { Name = "SideShelves", Position = new Vector3(-ClosetHalf + 0.19f, 1.15f, (z0 + z1) * 0.5f + 0.2f), Shape = new BoxShape3D { Size = new Vector3(0.38f, 2.3f, ClosetDepth - 0.8f) } });
 		foreach (float x in new[] { -ClosetHalf + 0.02f, ClosetHalf - 0.02f })
 			foreach (float z in new[] { z1 - 0.02f, z1 - 0.38f })
 				sk.Cylinder(new Vector3(x, 0, z), new Vector3(x, 2.2f, z), 0.012f, 0.012f, 4, false);

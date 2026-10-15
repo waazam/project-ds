@@ -189,17 +189,60 @@ public partial class Church
 		var modelled = FurnitureKit.Mesh("pew", new() { ["wood"] = ChurchTextures.OakMat, ["cushion"] = red, ["leather"] = new StandardMaterial3D { ResourceName = "ch_hymnal", AlbedoColor = new Color(0.12f, 0.05f, 0.04f), Roughness = 0.7f }, ["paper"] = new StandardMaterial3D { ResourceName = "ch_pages", AlbedoColor = new Color(0.6f, 0.56f, 0.45f), Roughness = 0.95f } });
 		var turn = modelled != null ? new Basis(Vector3.Up, Mathf.Pi) : Basis.Identity;
 		if (modelled != null) mesh = modelled;
+		// (2026-10-15, the repetition pass: 44 pews had stood in a perfect grid. Each now a little out of line and out of
+		// square, two shoved askew, the odd one pushed back; hymnals dropped on the floor and a kneeler cushion kicked out
+		// into the aisle. Their own dice)
+		var prng = new RandomNumberGenerator { Seed = 2266 };
 		var xf = new List<Transform3D>();
-		for (float z = 7.2f; z < 29.8f; z += 1.05f)
+		var spots = new List<(Vector3 at, float yaw, float s)>();
+		int row = 0;
+		for (float z = 7.2f; z < 29.8f; z += 1.05f, row++)
 			foreach (float s in new[] { -1f, 1f })
 			{
-				var at = new Vector3(s * (1.35f + len * 0.5f), 0, z);
-				xf.Add(new Transform3D(turn, at));
-				Collide(_wood, at + new Vector3(0, 0.55f, -0.04f), new Vector3(len + 0.1f, 1.1f, 0.7f));
+				float yaw = prng.RandfRange(-0.018f, 0.018f), dz = prng.RandfRange(-0.03f, 0.03f), dx = prng.RandfRange(-0.04f, 0.04f);
+				if ((row == 4 && s < 0) || (row == 15 && s > 0)) { yaw = s * 0.075f; dx += s * 0.12f; }   // shoved askew
+				else if (row == 10 && s > 0) dz -= 0.09f;                                                   // pushed back
+				var at = new Vector3(s * (1.35f + len * 0.5f) + dx, 0, z + dz);
+				var rot = new Basis(Vector3.Up, yaw);
+				xf.Add(new Transform3D(rot * turn, at));
+				_wood.AddChild(new CollisionShape3D { Transform = new Transform3D(rot, at + rot * new Vector3(0, 0.55f, -0.04f)), Shape = new BoxShape3D { Size = new Vector3(len + 0.1f, 1.1f, 0.7f) } });
+				spots.Add((at, yaw, s));
 			}
 		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh, InstanceCount = xf.Count };
 		for (int i = 0; i < xf.Count; i++) mm.SetInstanceTransform(i, xf[i]);
 		AddChild(new MultiMeshInstance3D { Name = "Pews", Multimesh = mm });
+		// what's been dropped between them: hymnals on the floor (shut, one splayed open on its face), a kneeler cushion
+		var loose = new MeshKit();
+		loose.Mat(new StandardMaterial3D { ResourceName = "ch_hymnal_loose", AlbedoColor = new Color(0.12f, 0.05f, 0.04f), Roughness = 0.7f, VertexColorUseAsAlbedo = true });
+		var pages = new MeshKit();
+		pages.Mat(new StandardMaterial3D { ResourceName = "ch_pages_loose", AlbedoColor = new Color(0.6f, 0.56f, 0.45f), Roughness = 0.95f });
+		pages.Color = Colors.White;
+		for (int i = 0; i < 9; i++)
+		{
+			var (at, yaw, s) = spots[prng.RandiRange(0, spots.Count - 1)];
+			// in the gap in front of the pew (toward the altar, under the next one's back), along it
+			Vector3 p = at + new Basis(Vector3.Up, yaw) * new Vector3(prng.RandfRange(-len * 0.45f, len * 0.45f), 0, 0.5f + prng.RandfRange(-0.05f, 0.08f));
+			var spin = new Basis(Vector3.Up, prng.RandfRange(0f, Mathf.Tau));
+			loose.Color = new Color(1f, 1f, 1f) * prng.RandfRange(0.7f, 1.3f) + (prng.Randf() < 0.3f ? new Color(0.05f, 0.08f, 0.02f) : new Color(0, 0, 0));
+			if (i == 0)
+			{
+				// open on its face: the two boards apart, the pages fanned between
+				BuildKit.Box(loose, p + new Vector3(0, 0.012f, 0), new Vector3(0.27f, 0.006f, 0.17f), 1f, BuildKit.Face.None, spin * new Basis(Vector3.Forward, 0.06f));
+				BuildKit.Box(pages, p + new Vector3(0, 0.006f, 0), new Vector3(0.25f, 0.008f, 0.16f), 1f, BuildKit.Face.None, spin);
+				continue;
+			}
+			BuildKit.Box(loose, p + new Vector3(0, 0.0125f, 0), new Vector3(0.135f, 0.025f, 0.2f), 1f, BuildKit.Face.None, spin);
+			BuildKit.Box(pages, p + new Vector3(0.004f, 0.0125f, 0), new Vector3(0.13f, 0.019f, 0.194f), 1f, BuildKit.Face.None, spin);
+		}
+		loose.CommitTo(this, "LooseHymnals", false);
+		pages.CommitTo(this, "LooseHymnalPages", false);
+		// the kneeler cushion, kicked out to the aisle's edge
+		var cushion = new MeshKit();
+		cushion.Mat(red);
+		cushion.Color = Colors.White * 0.8f;
+		var (ka, _, ks) = spots[13];
+		cushion.Blob(new Vector3(ks * 1.2f, 0.035f, ka.Z + 0.55f), new Vector3(0.21f, 0.035f, 0.13f), 41, 0.12f);
+		cushion.CommitTo(this, "LooseKneeler", false);
 	}
 
 	// ------------------------------------------------------------------ the font
@@ -369,10 +412,15 @@ public partial class Church
 				float ua = s * u, ub = s * Mathf.Min(u + 0.2f, 2.6f);
 				float ta = 5f + Pointed(ua, 2.6f, 2.6f * 2f * 0.6f), tb = 5f + Pointed(ub, 2.6f, 2.6f * 2f * 0.6f);
 				float x0 = Mathf.Min(ua, ub) - hx, x1 = Mathf.Max(ua, ub) - hx, t0 = ua < ub ? ta : tb, t1 = ua < ub ? tb : ta;
-				// a board, front and back, following the arch at its top
+				// a board, front and back, following the arch at its top (2026-10-15: each board its own shade, and the back
+				// grained too: it was a flat untextured slab, and it's the face the snow sees once the door stands open)
+				float bt = 0.78f + 0.16f * Mathf.PosMod(Mathf.Sin(u * 91.7f + s * 13.1f) * 43758.5453f, 1f);
+				k.Color = Colors.White * bt;
 				k.Quad(new Vector3(x0, 0, 0.08f), new Vector3(x1, 0, 0.08f), new Vector3(x1, t1, 0.08f), new Vector3(x0, t0, 0.08f), Vector3.Back,
 					new Vector2(x0 + hx, t0), new Vector2(x1 + hx, t1), new Vector2(x1 + hx, 0), new Vector2(x0 + hx, 0));
-				k.Quad(new Vector3(x1, 0, -0.08f), new Vector3(x0, 0, -0.08f), new Vector3(x0, t0, -0.08f), new Vector3(x1, t1, -0.08f), Vector3.Forward);
+				k.Color = Colors.White * (bt * 0.92f);
+				k.Quad(new Vector3(x1, 0, -0.08f), new Vector3(x0, 0, -0.08f), new Vector3(x0, t0, -0.08f), new Vector3(x1, t1, -0.08f), Vector3.Forward,
+					new Vector2(x1 + hx + 0.37f, t1), new Vector2(x0 + hx + 0.37f, t0), new Vector2(x0 + hx + 0.37f, 0), new Vector2(x1 + hx + 0.37f, 0));
 			}
 			// iron bands with scrolled ends, a great ring and its boss
 			k.Mat(ChurchTextures.IronMat);
@@ -381,6 +429,10 @@ public partial class Church
 			{
 				BuildKit.Box(k, new Vector3(s * 1.3f - hx, y, 0.1f), new Vector3(2.5f, 0.1f, 0.03f), 1f);
 				k.Cylinder(new Vector3(s * 0.2f - hx, y, 0.1f), new Vector3(s * 0.2f - hx, y, 0.14f), 0.07f, 0.07f, 8, true);
+				// (the back: the strap hinges' tails, a row of nail heads along each)
+				BuildKit.Box(k, new Vector3(-s * 0.87f, y, -0.095f), new Vector3(1.7f, 0.08f, 0.025f), 1f);
+				for (float nx = 0.15f; nx < 1.7f; nx += 0.24f)
+					k.Cylinder(new Vector3(-s * nx, y, -0.105f), new Vector3(-s * nx, y, -0.118f), 0.016f, 0.011f, 6, true);
 			}
 			k.Cylinder(new Vector3(s * 0.45f - hx, 3.2f, 0.1f), new Vector3(s * 0.45f - hx, 3.2f, 0.16f), 0.12f, 0.1f, 10, true);
 			for (int i = 0; i < 16; i++)

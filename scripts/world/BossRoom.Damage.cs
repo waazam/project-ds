@@ -58,7 +58,8 @@ public partial class BossRoom
 		MakeDentTextures();
 		dent.AddChild(new Decal
 		{
-			Size = new Vector3(size, 0.6f, size), TextureAlbedo = _dentAlbedo, TextureNormal = _dentNormal,
+			// (2026-10-15: 0.22 deep; at 0.6 it smeared the pipes and valves under the deck)
+			Size = new Vector3(size, 0.22f, size), TextureAlbedo = _dentAlbedo, TextureNormal = _dentNormal,
 			RotationDegrees = new Vector3(0, _rng.RandfRange(0, 360), 0), UpperFade = 0.2f, LowerFade = 0.2f,
 			CullMask = 1, NormalFade = 0.4f,
 		});

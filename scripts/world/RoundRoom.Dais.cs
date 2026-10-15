@@ -178,8 +178,11 @@ public partial class RoundRoom
 			float a = Mathf.Tau * (i + 0.5f) / 8f;
 			Vector3 d = new(Mathf.Sin(a), 0, Mathf.Cos(a));
 			Vector3 at = d * (DaisR - 0.12f) + Vector3.Up * DaisTop;
-			posts.Cylinder(at, at + Vector3.Up * 1.05f, 0.035f, 0.03f, 8, true);
-			posts.Blob(at + Vector3.Up * 1.08f, Vector3.One * 0.05f, i, 0.05f);
+			// (2026-10-15, the repetition pass: each its own height and lean, its own rust; they stood as eight identical sticks)
+			Vector3 tip = PostTip(i);
+			posts.Color = new Color(0.25f, 0.24f, 0.23f) * (0.8f + 0.35f * PostHash(i, 7.7f)) + new Color(0.05f, 0.02f, 0f) * PostHash(i, 3.3f);
+			posts.Cylinder(at, tip, 0.035f + 0.006f * PostHash(i, 1.9f), 0.03f, 8, true);
+			posts.Blob(tip + (tip - at).Normalized() * 0.03f, Vector3.One * (0.042f + 0.016f * PostHash(i, 5.1f)), i, 0.05f);
 			if (i % 3 != 0) continue;
 			Vector3 side = d.Cross(Vector3.Up);
 			Vector3 c = at - d * 0.2f;
@@ -282,6 +285,18 @@ public partial class RoundRoom
 		_ringLight = new OmniLight3D { Name = "RingLight", Position = new Vector3(0, 0.3f, 0), LightColor = Red, LightEnergy = 1.6f, OmniRange = 6.5f, OmniAttenuation = 1.4f, ShadowEnabled = false, LightCullMask = ~WebLayer };
 		Dais.AddChild(_ringLight);
 		SetRing(0f, 0f, 1f);
+	}
+
+	private static float PostHash(int i, float k) => Mathf.PosMod(Mathf.Sin(i * 12.9898f + k * 78.233f) * 43758.5453f, 1f);
+
+	/// <summary>(2026-10-15) Dais post <paramref name="i"/>'s top (the web's anchor): its own height, leant a little.</summary>
+	private static Vector3 PostTip(int i)
+	{
+		float a = Mathf.Tau * (i + 0.5f) / 8f;
+		Vector3 d = new(Mathf.Sin(a), 0, Mathf.Cos(a)), side = d.Cross(Vector3.Up);
+		float h = 1.05f * (0.86f + 0.22f * PostHash(i, 0.7f));
+		Vector3 lean = d * (PostHash(i, 2.3f) - 0.4f) * 0.12f + side * (PostHash(i, 4.6f) - 0.5f) * 0.1f;
+		return d * (DaisR - 0.12f) + Vector3.Up * (DaisTop + h) + lean;
 	}
 
 	/// <summary>Candles in clusters on the floor round the dais's foot, on their own pools of old wax: cold, until the

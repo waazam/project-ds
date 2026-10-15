@@ -518,8 +518,10 @@ public partial class Library : Node3D
 
 	private void BuildPassage()
 	{
+		// (2026-10-15, the repetition pass: dressed stone blocks, the story's candle-lit stone passage; it was a flat box of
+		// clean concrete, read as plaster, with two bare candle sticks stuck to its wall on nothing)
 		var stone = new MeshKit();
-		stone.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = StairwellTextures.CleanConcrete, AlbedoColor = new Color(0.6f, 0.58f, 0.54f), Roughness = 1f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.8f }, "concrete_clean", 1f));
+		stone.Mat(ChurchParts.ChurchTextures.AshlarMat);
 		// the round room's wall starts at its radius; its floor disc reaches just short of it
 		float z0 = Depth + 0.3f, zWall = RoundRoomAt.Z - RoundRoom.Radius - 0.6f, zc = (z0 + zWall) * 0.5f;   // up to the round wall's outer face
 		Slab(stone, new Vector3(-0.85f, 1.25f, zc), new Vector3(0.3f, 2.5f, zWall - z0));
@@ -528,11 +530,31 @@ public partial class Library : Node3D
 		float f0 = Depth, f1 = RoundRoomAt.Z - RoundRoom.FloorR;
 		Slab(stone, new Vector3(0, -0.05f, (f0 + f1) * 0.5f), new Vector3(1.8f, 0.1f, f1 - f0));
 		stone.CommitTo(this, "Passage", true);
-		foreach (float dz in new[] { 0.9f, 2.4f })
+		// a candle on an iron bracket on each wall, staggered: a plate on the stone, an arm out, a drip pan, the candle
+		// burnt down its own way, wax run over the pan's edge
+		var iron = new MeshKit();
+		iron.Mat(ItemTextures.BrassMat);
+		iron.Color = new Color(0.32f, 0.27f, 0.22f);
+		var wax = new MeshKit();
+		wax.Mat(WaxMaterial.Make(new Color(0.88f, 0.84f, 0.74f), 0.7f, "passage_wax"));
+		var flameMat = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.8f, 0.45f), EmissionEnabled = true, Emission = new Color(1f, 0.62f, 0.28f), EmissionEnergyMultiplier = 3f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+		foreach (var (dz, sx, ch) in new[] { (0.9f, 1f, 0.11f), (2.4f, -1f, 0.065f) })
 		{
-			AddChild(new OmniLight3D { Position = new Vector3(0.55f, 1.8f, Depth + dz), LightColor = new Color(1f, 0.75f, 0.45f), LightEnergy = 0.6f, OmniRange = 3.5f, ShadowEnabled = false });
-			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.02f, BottomRadius = 0.025f, Height = 0.15f }, Position = new Vector3(0.62f, 1.62f, Depth + dz), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.9f, 0.82f) } });
+			float wx = sx * 0.7f;   // (the wall's face)
+			Vector3 wall = new(wx, 1.5f, Depth + dz), cup = new(sx * 0.54f, 1.58f, Depth + dz);
+			var plate = new Transform3D(new Basis(Vector3.Forward, -sx * Mathf.Pi * 0.5f), wall + new Vector3(sx * 0.002f, 0, 0));
+			TurnedKit.Lathe(iron, plate, TurnedKit.P(0f, 0f, 0.045f, 0f, 0.045f, 0.007f, 0.03f, 0.014f, 0f, 0.016f), 8, 38f, 0.8f, 1.35f);
+			TurnedKit.Rod(iron, TurnedKit.Curve(wall + new Vector3(-sx * 0.01f, 0, 0), new Vector3(sx * 0.62f, 1.47f, Depth + dz), cup + Vector3.Down * 0.02f, 6), 0.009f, 5, true);
+			TurnedKit.Lathe(iron, cup + Vector3.Down * 0.025f, TurnedKit.P(0f, 0f, 0.012f, 0f, 0.02f, 0.02f, 0.058f, 0.035f, 0.062f, 0.045f, 0.055f, 0.042f, 0.022f, 0.04f, 0f, 0.04f), 12);
+			TurnedKit.Lathe(wax, cup + Vector3.Up * 0.015f, TurnedKit.P(0f, 0f, 0.024f, 0f, 0.023f, ch, 0.019f, ch + 0.007f, 0.009f, ch + 0.003f, 0f, ch + 0.004f), 8, 40f);
+			wax.Blob(cup + Vector3.Up * 0.017f + new Vector3(0.02f, 0, 0.012f * sx), new Vector3(0.03f, 0.006f, 0.025f), (int)(dz * 10), 0.3f);
+			wax.Blob(cup + new Vector3(0, 0.005f, 0.055f), new Vector3(0.008f, 0.02f, 0.008f), (int)(dz * 13), 0.25f);   // run over the pan's edge
+			var flame = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.014f, Height = 0.042f, RadialSegments = 6, Rings = 3 }, Position = cup + Vector3.Up * (0.015f + ch + 0.03f), MaterialOverride = flameMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+			AddChild(flame);
+			AddChild(new OmniLight3D { Position = cup + new Vector3(-sx * 0.1f, 0.2f, 0), LightColor = new Color(1f, 0.75f, 0.45f), LightEnergy = 0.6f, OmniRange = 3.5f, ShadowEnabled = false });
 		}
+		iron.CommitTo(this, "PassageSconces", false);
+		wax.CommitTo(this, "PassageCandles", false);
 	}
 
 	private void Loop(string path, Vector3 at, float db, float unit)

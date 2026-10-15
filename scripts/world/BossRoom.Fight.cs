@@ -415,8 +415,11 @@ public partial class BossRoom
 		float r = SlamRadius;
 		var marker = new Decal
 		{
-			Name = "Telegraph", Size = new Vector3(r * 2f, 3f, r * 2f), TextureAlbedo = Ring(), TextureEmission = Ring(),
-			EmissionEnergy = 2f, Modulate = new Color(1f, 0.1f, 0.05f, 0f), UpperFade = 0.1f, LowerFade = 0.1f,
+			// (2026-10-15: not on the hand, the lantern or the body: they're on their own layers, which the glow leaves out.
+			// And shallow, 0.9 m, the grating and what's just under it, not the pipes a metre down; it was 3 m deep)
+			Name = "Telegraph", Size = new Vector3(r * 2f, 0.9f, r * 2f), TextureAlbedo = Ring(), TextureEmission = Ring(),
+			EmissionEnergy = 2f, Modulate = new Color(1f, 0.1f, 0.05f, 0f), UpperFade = 0.25f, LowerFade = 0.3f,
+			CullMask = 0xFFFFFu & ~(ProjectDS.Player.HeldItem.HeldLayer | ProjectDS.Player.PlayerBody.BodyLayer),
 		};
 		AddChild(marker);
 		marker.GlobalPosition = world + Vector3.Up * 0.2f;

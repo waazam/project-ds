@@ -311,7 +311,12 @@ public partial class Sewer : Node3D
 				Modulate = new[] { new Color(0.8f, 0.2f, 0.15f, 0.85f), new Color(0.2f, 0.35f, 0.8f, 0.85f), new Color(0.15f, 0.15f, 0.15f, 0.85f) }[i % 3],
 			};
 			AddChild(l);
-			l.GlobalPosition = ToGlobal(at + n * 0.02f + Vector3.Up * (r + 0.6f) + new Vector3(n.Z, 0, -n.X) * _rng.RandfRange(-1f, 1f));
+			// (2026-10-15: beside the pipe's mouth at an arm's reach, 1.3-2.2 m up, where someone stood in the water could
+			// paint it; they stood over the mouths, one 5 m up the wall)
+			float v = _rng.RandfRange(-1f, 1f);
+			var tagAt = at + n * 0.02f + new Vector3(n.Z, 0, -n.X) * (Mathf.Sign(v + 0.001f) * (r + 0.45f + Mathf.Abs(v) * 0.7f));
+			tagAt.Y = 1.3f + Mathf.Abs(v) * 0.9f;
+			l.GlobalPosition = ToGlobal(tagAt);
 			l.LookAt(l.GlobalPosition - (ToGlobal(n) - ToGlobal(Vector3.Zero)), Vector3.Up);
 			l.RotateObjectLocal(Vector3.Back, _rng.RandfRange(-0.12f, 0.12f));
 		}
@@ -448,26 +453,50 @@ public partial class Sewer : Node3D
 		var wood = new StandardMaterial3D { AlbedoColor = new Color(0.28f, 0.22f, 0.16f), Roughness = 0.9f };
 		var trash = new StandardMaterial3D { AlbedoColor = new Color(0.08f, 0.08f, 0.09f), Roughness = 0.35f, MetallicSpecular = 0.6f };
 		var pale = new StandardMaterial3D { AlbedoColor = new Color(0.62f, 0.6f, 0.55f), Roughness = 0.6f };
-		Material[] mats = { wood, trash, pale };
-		void Floater(Vector3 at, int kind)
+		// (2026-10-15, the repetition pass: no glossy black balls; what floats is sodden: a slick of a bin bag, a lump of
+		// rag, a plank, a bottle. In the tunnel it's been pushed to the sides by the flow, not ruled down the middle; a plank
+		// near a wall lies along it. The hall's dice are drawn as before; the new choices are their own)
+		var sodden = new StandardMaterial3D { AlbedoColor = new Color(0.09f, 0.085f, 0.075f), Roughness = 0.78f, MetallicSpecular = 0.35f };
+		var drng = new RandomNumberGenerator { Seed = 1771 };
+		var lumps = new Mesh[3];
+		for (int i = 0; i < lumps.Length; i++)
+		{
+			var lk = new MeshKit();
+			lk.Mat(sodden);
+			lk.Color = Colors.White * (0.8f + 0.2f * i);
+			lk.Blob(Vector3.Down * 0.03f, new Vector3(0.2f + 0.08f * i, 0.07f, 0.15f + 0.05f * (2 - i)), 177 + i * 13, 0.3f, false);
+			if (i != 1) lk.Blob(new Vector3(0.1f, -0.01f, 0.05f), new Vector3(0.09f, 0.05f, 0.08f), 191 + i, 0.35f, false);   // a fold of it
+			lumps[i] = lk.Commit();
+		}
+		Material[] mats = { wood, sodden, pale };
+		void Floater(Vector3 at, int kind, bool tunnel = false)
 		{
 			var n = new Node3D { Position = at };
-			var mi = new MeshInstance3D { MaterialOverride = mats[kind % 3], CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+			var mi = new MeshInstance3D { MaterialOverride = kind == 1 ? null : mats[kind % 3], CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
 			mi.Mesh = kind switch
 			{
 				0 => new BoxMesh { Size = new Vector3(_rng.RandfRange(0.4f, 1.1f), 0.04f, _rng.RandfRange(0.08f, 0.16f)) },
-				1 => new SphereMesh { Radius = 0.15f, Height = 0.16f },
+				1 => lumps[drng.RandiRange(0, lumps.Length - 1)],
 				_ => FloatBottle,
 			};
 			if (kind == 2) mi.Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0);
 			n.AddChild(mi);
-			n.Rotation = new Vector3(0, _rng.RandfRange(0, Mathf.Tau), 0);
+			float yaw = _rng.RandfRange(0, Mathf.Tau);
+			// (a plank against a tunnel wall lies along the flow; it can't turn across the channel)
+			if (tunnel && kind == 0) yaw = drng.RandfRange(-0.25f, 0.25f) + (drng.Randf() < 0.5f ? 0f : Mathf.Pi) + Mathf.Pi * 0.5f;
+			n.Rotation = new Vector3(0, yaw, 0);
 			n.SetMeta("phase", _rng.RandfRange(0, Mathf.Tau));
 			AddChild(n);
 			_floaters.Add(n);
 		}
 		for (float z = 5f; z < TunnelLen; z += _rng.RandfRange(2f, 5f))
-			Floater(new Vector3(_rng.RandfRange(-0.9f, 0.9f), Water, z), _rng.RandiRange(0, 2));
+		{
+			float x = _rng.RandfRange(-0.9f, 0.9f);
+			int kind = _rng.RandiRange(0, 2);
+			// pushed off the middle, toward one side or the other
+			x = (x < 0f ? -1f : 1f) * Mathf.Lerp(0.25f, kind == 0 ? 0.82f : 0.95f, Mathf.Sqrt(Mathf.Abs(x) / 0.9f)) + drng.RandfRange(-0.05f, 0.05f);
+			Floater(new Vector3(x, Water, z + drng.RandfRange(-0.4f, 0.4f)), kind, true);
+		}
 		for (int i = 0; i < 70; i++)
 		{
 			Vector3 at = new(_rng.RandfRange(-RoomX + 1f, RoomX - 1f), Water, _rng.RandfRange(RoomZ0 + 1f, RoomZ1 - 1f));
@@ -480,25 +509,40 @@ public partial class Sewer : Node3D
 		var bags = new MeshKit();
 		bags.Mat(trash);
 		Vector3[] spots = { new(-19f, 0, RoomZ0 + 4f), new(18f, 0, RoomZ0 + 40f), new(-8f, 0, RoomZ1 - 3f), new(20f, 0, RoomZ0 + 18f), new(-20f, 0, RoomZ0 + 30f), new(9f, 0, RoomZ0 + 3f), new(-3f, 0, RoomZ0 + 36f) };
+		// (2026-10-15, the repetition pass: a heap is a mound now, rubble and silt over it, the bricks lying on its surface
+		// and in its skirt, the sacks slumped on it; the bricks had hung at any height up to 0.9 m over a bare floor)
+		var silt = new MeshKit();
+		silt.Mat(new StandardMaterial3D { ResourceName = "sewer_heap_silt", AlbedoColor = new Color(0.16f, 0.14f, 0.11f), Roughness = 0.92f, VertexColorUseAsAlbedo = true });
+		const float moundR = 1.5f, moundH = 0.5f;
+		float Surface(Vector3 p, Vector3 c)
+		{
+			float d = new Vector2(p.X - c.X, p.Z - c.Z).Length() / moundR;
+			return d >= 1f ? 0f : moundH * (1f - d * d) * (1f - 0.35f * d);
+		}
 		foreach (var c in spots)
 		{
+			silt.Color = Colors.White * drng.RandfRange(0.8f, 1.05f);
+			silt.Blob(c + Vector3.Down * 0.05f, new Vector3(moundR, moundH + 0.05f, moundR * drng.RandfRange(0.8f, 1f)), (int)(c.X * 13f + c.Z), 0.18f, false);
 			for (int i = 0; i < 26; i++)
 			{
 				Vector3 p = c + new Vector3(_rng.RandfRange(-1.8f, 1.8f), 0, _rng.RandfRange(-1.8f, 1.8f));
-				float h = Mathf.Max(0f, 0.9f - p.DistanceTo(c) * 0.4f);
 				var rot = new Basis(new Vector3(_rng.Randf(), _rng.Randf(), _rng.Randf()).Normalized(), _rng.RandfRange(0, 3f));
 				heap.Color = Colors.White * _rng.RandfRange(0.6f, 1f);
-				BuildKit.Box(heap, p + Vector3.Up * _rng.RandfRange(0f, h), new Vector3(0.24f, 0.08f, 0.12f), 1f, BuildKit.Face.None, rot);
+				float sink = _rng.RandfRange(0f, 1f);   // (the old height's draw: now how far it's bedded in)
+				// lying on the mound's face, a little bedded in (a brick's half-depth at most)
+				BuildKit.Box(heap, p + Vector3.Up * (Surface(p, c) + 0.035f - sink * 0.03f), new Vector3(0.24f, 0.08f, 0.12f), 1f, BuildKit.Face.None, rot);
 			}
 			for (int i = 0; i < 5; i++)
 			{
-				Vector3 p = c + new Vector3(_rng.RandfRange(-1.2f, 1.2f), 0.2f, _rng.RandfRange(-1.2f, 1.2f));
+				Vector3 p = c + new Vector3(_rng.RandfRange(-1.2f, 1.2f), 0f, _rng.RandfRange(-1.2f, 1.2f));
+				p.Y = Surface(p, c) + 0.06f;
 				// (2026-10-15: a sack slumped on the heap, lumpy, its neck tied off; it was an eight-sided cone)
 				bags.Blob(p + Vector3.Up * 0.02f, new Vector3(0.3f, 0.22f, 0.26f), (int)(c.X * 31f + c.Z * 7f) + i, 0.16f, false);
 				TurnedKit.Lathe(bags, p + new Vector3(0.04f, 0.2f, 0.02f), TurnedKit.P(0f, 0f, 0.06f, 0f, 0.025f, 0.05f, 0.02f, 0.08f, 0.045f, 0.12f, 0f, 0.13f), 6, 50f);
 			}
-			_stone.AddChild(new CollisionShape3D { Position = c + Vector3.Up * 0.3f, Shape = new CylinderShape3D { Radius = 1.4f, Height = 0.6f } });
+			_stone.AddChild(new CollisionShape3D { Position = c + Vector3.Up * 0.25f, Shape = new CylinderShape3D { Radius = 1.3f, Height = 0.5f } });
 		}
+		silt.CommitTo(this, "HeapMounds", true);
 		heap.CommitTo(this, "Heaps", true);
 		bags.CommitTo(this, "Bags", true);
 	}

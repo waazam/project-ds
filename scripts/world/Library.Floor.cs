@@ -263,17 +263,20 @@ public partial class Library
 		_body.AddChild(new CollisionShape3D { Position = t2 + new Vector3(0, 0.4f, 0), Shape = new BoxShape3D { Size = new Vector3(2.1f, 0.8f, 0.86f) } });
 		_floorUnder.Add(new Aabb(t2 - new Vector3(1.05f, 0, 0.43f), new Vector3(2.1f, 0.8f, 0.86f)));
 		float top = 0.79f;
-		FurnitureKit.Add(k, "books_stack", t2 + new Vector3(-0.62f, top, -0.12f), 0.4f, roles);
-		FurnitureKit.Add(k, "papers", t2 + new Vector3(0.3f, top, 0.12f), 1.0f, roles);
+		// (2026-10-15: spread so nothing lies in anything: the stack, the open book, the papers and the three books each their own patch of the top)
+		FurnitureKit.Add(k, "books_stack", t2 + new Vector3(-0.55f, top, -0.2f), 0.4f, roles);
+		FurnitureKit.Add(k, "papers", t2 + new Vector3(0.45f, top, 0.13f), 1.0f, roles);
 		FurnitureKit.Add(k, "candlestick", t2 + new Vector3(0.82f, top, -0.2f), 0f, roles);
 		// an open book, its pages fanned up
-		OpenBook(small, cardMat, t2 + new Vector3(-0.05f, top, 0.05f), 0.25f);
+		OpenBook(small, cardMat, t2 + new Vector3(-0.12f, top, 0.06f), 0.25f);
 		// and three more laid flat, one across the others
+		float onTop = top;   // (each on the last, by its own thickness: a thick one sank into the one under it)
 		for (int i = 0; i < 3; i++)
 		{
 			float t = BookThick(), h = 0.24f + i * 0.02f;
 			int kind = BookKind();
-			books.Add(Lie(t2 + new Vector3(-0.85f + i * 0.02f, top + t * 0.5f + i * 0.035f, 0.26f), Vector3.Back, t, h, h * 0.72f, i * 0.4f), BookColor(kind, 0.25f), kind);
+			books.Add(Lie(t2 + new Vector3(-0.86f + i * 0.02f, onTop + t * 0.5f + 0.001f, 0.27f), Vector3.Back, t, h, h * 0.72f, i * 0.4f), BookColor(kind, 0.25f), kind);
+			onTop += t + 0.001f;
 		}
 		// a chair pushed back, askew; the other knocked over on its back
 		FurnitureKit.Add(k, "dining_chair", t2 + new Vector3(-0.45f, 0, -0.85f), 0.38f, roles);

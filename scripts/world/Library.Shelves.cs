@@ -260,7 +260,9 @@ public partial class Library
 				float d = Mathf.Min(h * _rng.RandfRange(0.62f, 0.8f), ShelfDepth - 0.04f);
 				if (sRef + t > limit) break;
 				if (!inSet && !packed && _rng.Randf() < 0.025f) { sRef += _rng.RandfRange(0.05f, 0.16f); continue; }   // one taken out
-				float tilt = !packed && _rng.Randf() < 0.04f ? _rng.RandfRange(-0.06f, 0.06f) : 0f;
+				// (2026-10-15: the hinged case's packed books lean a hair too, now and then; they stood dead upright, every
+				// one, beside shelves that sag and lean: a giveaway)
+				float tilt = _rng.Randf() < (packed ? 0.16f : 0.04f) ? _rng.RandfRange(-0.06f, 0.06f) : 0f;
 				int kind = inSet ? setK : BookKind();
 				var c = inSet ? setC * _rng.RandfRange(0.94f, 1.04f) : BookColor(kind, fade);
 				bl.Add(Stand(a, along, inw, sRef, y, t, h, d, Dc(d), tilt, out float end), c, kind);
@@ -306,7 +308,7 @@ public partial class Library
 		{
 			case 0:   // packed, the end of it leaning over into whatever room is left
 				Upright(s1, ref s);
-				if (!packed && s1 - s > 0.05f) Leaners(1, ref s, s1);
+				if (s1 - s > 0.05f) Leaners(1, ref s, s1);
 				break;
 			case 1:   // part full, the last few leaning over
 			{
