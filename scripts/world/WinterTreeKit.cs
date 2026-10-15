@@ -215,8 +215,16 @@ public static class WinterTreeKit
 				k.Quad(o[j], o[n], lip[n], lip[j], outN.Normalized());
 			}
 		}
-		return k.Commit();
+		var mesh = k.Commit();
+		var tiers2 = new List<(Vector3 c, float r, float droop)>();
+		foreach (var (c, R, droop, _) in caps) tiers2.Add((c, R, droop));
+		FirTiers[mesh] = tiers2;
+		return mesh;
 	}
+
+	/// <summary>(2026-10-15) Each winter fir's tiers (centre, reach, droop), tree-local: so what hangs off them (the icicles)
+	/// hangs from a bough, not from the air between.</summary>
+	public static readonly Dictionary<Mesh, List<(Vector3 c, float r, float droop)>> FirTiers = new();
 
 	/// <summary>A bare broadleaf about <paramref name="height"/> tall (its base at the origin, sunk a little).</summary>
 	public static Mesh BareTree(int seed, float height, int bark = 0)
@@ -250,14 +258,24 @@ public static class WinterTreeKit
 			rings.Add((Axis(y), trunkR * Mathf.Lerp(0.98f, 0.12f, Mathf.Pow(f, 0.85f))));
 		}
 		Loft(k, rings, 9, 2f, 0.55f);
-		// a root or two showing through the snow
+		// a root or two showing through the snow. (2026-10-15, the scan: they stuck out over the snow as three to five thin,
+		// pale, flat spikes) Short, thick flares swelling out of the trunk's foot and diving under the snow within a hand or
+		// two, their ends buried well down; darker than the trunk (wet, in the snow's shadow).
 		int roots = rng.RandiRange(3, 5);
+		k.Color = new Color(tint * 0.72f, tint * 0.7f, tint * 0.68f);
 		for (int i = 0; i < roots; i++)
 		{
-			float a = Mathf.Tau * i / roots + rng.RandfRange(-0.3f, 0.3f);
+			float a = Mathf.Tau * i / roots + rng.RandfRange(-0.35f, 0.35f);
 			var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
-			Loft(k, new List<(Vector3, float)> { (Vector3.Up * 0.35f + d * trunkR * 0.6f, trunkR * 0.55f), (d * trunkR * 2.2f + Vector3.Up * 0.02f, trunkR * 0.35f), (d * trunkR * 4f + Vector3.Down * 0.2f, trunkR * 0.12f) }, 5, 1f, 0.55f);
+			float reach = rng.RandfRange(0.8f, 1.25f);
+			Loft(k, new List<(Vector3, float)>
+			{
+				(Vector3.Up * rng.RandfRange(0.28f, 0.4f) + d * trunkR * 0.45f, trunkR * 0.7f),
+				(d * trunkR * 1.45f * reach + Vector3.Down * 0.02f, trunkR * 0.55f),
+				(d * trunkR * 2.3f * reach + Vector3.Down * 0.36f, trunkR * 0.32f),
+			}, 6, 1f, 0.55f);
 		}
+		k.Color = new Color(tint, tint, tint);
 		// ---- the limbs: scaffold limbs spiralling up the trunk from the crown's start, shorter toward the top
 		void Branch(Vector3 from, Vector3 dir, float len, float r, int depth)
 		{

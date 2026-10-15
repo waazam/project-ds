@@ -141,10 +141,13 @@ void fragment() {
 	c *= 1.0 - COLOR.g * 0.35;
 	ALBEDO = c;
 	NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
-	vec3 n1 = texture(nor_snow, uv).rgb;
+	// (2026-10-15, the scan: under the lantern's low light the open snow read as a crumpled bedsheet, the photo's sharp
+	// creases all over it) The open snow's normal softened: blurred a mip or two and two scales of it averaged, and laid in
+	// shallower; the road keeps its own, crisp.
+	vec3 n1 = mix(texture(nor_snow, uv, 1.5).rgb, texture(nor_snow, uv * 0.37 + vec2(0.31, 0.17), 1.0).rgb, 0.45);
 	vec3 n2 = texture(nor_plowed, wpos.xz * road_tile).rgb;
 	NORMAL_MAP = mix(n1, n2, r);
-	NORMAL_MAP_DEPTH = 0.6;
+	NORMAL_MAP_DEPTH = mix(0.3, 0.6, r);
 	ROUGHNESS = mix(0.92, 0.38, ice);
 	SPECULAR = mix(0.15, 0.4, ice);
 	// a crystal here and there catching the eye as it moves (fresh_snow's): never on its own, never a glare

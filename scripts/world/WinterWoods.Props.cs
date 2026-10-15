@@ -112,6 +112,7 @@ public partial class WinterWoods
 	/// Its length along the road (the node faces the road: its local X runs along it).</summary>
 	private void Plow(Node3D n)
 	{
+		FitGround(n, -0.7f, 4.3f, 1.2f);
 		Model(n, "snowplow");
 		Solidify(n, new Vector3(-0.7f, 1.3f, 0), new Vector3(8.6f, 2.6f, 2.4f), "metal");
 	}
@@ -197,8 +198,30 @@ public partial class WinterWoods
 	{
 		Model(n, "lodge_sign");
 		SignKit.Text(n, "HOLLOW PEAK LODGE", new Vector3(0, 1.62f, -0.125f), new Basis(Vector3.Up, Mathf.Pi), 0.16f, new Color(0.85f, 0.8f, 0.7f));
-		SignKit.Text(n, "1/4 MI  ->   GUESTS CHECK IN AT FRONT", new Vector3(0, 1.35f, -0.125f), new Basis(Vector3.Up, Mathf.Pi), 0.075f, new Color(0.8f, 0.75f, 0.66f));
+		SignKit.Text(n, "1/4 MI  →   GUESTS CHECK IN AT FRONT", new Vector3(0, 1.35f, -0.125f), new Basis(Vector3.Up, Mathf.Pi), 0.075f, new Color(0.8f, 0.75f, 0.66f));
 		Solidify(n, new Vector3(0, 1.1f, 0), new Vector3(2.7f, 2.2f, 0.35f), "wood");
+	}
+
+	/// <summary>(2026-10-15, the scan: props were set at their centre's ground height only, so the 8.6 m plow floated or sank
+	/// at its ends where the road climbs) Sits a long prop on the ground under its four corners: pitched and rolled to the
+	/// ground's slope there (a little at most), at the height that slope gives its origin. Its footprint: centred at local
+	/// x <paramref name="cx"/>, half <paramref name="hx"/> long, half <paramref name="hz"/> deep.</summary>
+	private static void FitGround(Node3D n, float cx, float hx, float hz)
+	{
+		var bx = n.Basis.X.Normalized();
+		var bz = n.Basis.Z.Normalized();
+		var o = n.Position;
+		float G(float lx, float lz) { var q = o + bx * lx + bz * lz; return Height(q.X, q.Z); }
+		float x0 = (G(cx - hx, -hz) + G(cx - hx, hz)) * 0.5f, x1 = (G(cx + hx, -hz) + G(cx + hx, hz)) * 0.5f;
+		float z0 = (G(cx - hx, -hz) + G(cx + hx, -hz)) * 0.5f, z1 = (G(cx - hx, hz) + G(cx + hx, hz)) * 0.5f;
+		float sx = Mathf.Clamp((x1 - x0) / (2f * hx), -0.15f, 0.15f), sz = Mathf.Clamp((z1 - z0) / (2f * hz), -0.12f, 0.12f);
+		float mean = (x0 + x1) * 0.5f;
+		var X = (bx + Vector3.Up * sx).Normalized();
+		var Z0 = (bz + Vector3.Up * sz).Normalized();
+		var Y = Z0.Cross(X).Normalized();
+		var Z = X.Cross(Y).Normalized();
+		n.Basis = new Basis(X, Y, Z);
+		n.Position = o with { Y = mean - sx * cx };
 	}
 
 	private void Solidify(Node3D n, Vector3 c, Vector3 size, string surface)
