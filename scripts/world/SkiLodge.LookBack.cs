@@ -38,7 +38,7 @@ public partial class SkiLodge
 		// the wing chair, in the lobby by the west wall, its back to the wall
 		var at = new Vector3(-8.6f, FloorY, 1.4f);
 		var chair = FurnitureKit.Place(this, "wing_chair", new Transform3D(new Basis(Vector3.Up, Mathf.Pi * 0.5f), at),
-			new Dictionary<string, Material>(Woodwork) { ["upholstery"] = LodgeTextures.VelvetVioletMat }, "LookBackChair");
+			new Dictionary<string, Material>(Woodwork) { ["upholstery"] = LodgeTextures.Upholstery("rust") }, "LookBackChair");
 		if (chair != null) LodgeKit.Solid(_inBody, at + Vector3.Up * 0.45f, new Vector3(0.85f, 0.9f, 0.85f));
 		if (chair != null)
 			_lookBacks.Add(new LookBackThing

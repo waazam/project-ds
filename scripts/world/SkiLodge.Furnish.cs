@@ -104,8 +104,8 @@ public partial class SkiLodge
 		LodgeKit.Sofa(k, (sit - fout * 1.4f) with { Y = FloorY }, fyaw + Mathf.Pi, LodgeTextures.LeatherMat, 2.4f);
 		LodgeKit.Sofa(k, (sit + falong * 2.3f) with { Y = FloorY }, fyaw + Mathf.Pi + Mathf.Pi * 0.5f, LodgeTextures.LeatherMat, 2.1f);
 		// (spread further apart: the modelled wing chairs are broader than the old blocks, and the two overlapped)
-		LodgeKit.Armchair(k, (sit - falong * 2.1f + fout * 0.95f) with { Y = FloorY }, fyaw + Mathf.Pi - 0.9f, LodgeTextures.VelvetVioletMat);
-		LodgeKit.Armchair(k, (sit - falong * 2.45f - fout * 1.05f) with { Y = FloorY }, fyaw + Mathf.Pi - 1.4f, LodgeTextures.VelvetVioletMat);
+		LodgeKit.Armchair(k, (sit - falong * 2.1f + fout * 0.95f) with { Y = FloorY }, fyaw + Mathf.Pi - 0.9f, LodgeTextures.Upholstery("rust"));   // (2026-10-14h: rust corduroy, not violet velvet)
+		LodgeKit.Armchair(k, (sit - falong * 2.45f - fout * 1.05f) with { Y = FloorY }, fyaw + Mathf.Pi - 1.4f, LodgeTextures.Upholstery("rust"));
 		LodgeKit.Table(k, (sit + fout * 0.1f) with { Y = FloorY }, fyaw, new Vector2(1.4f, 0.8f), 0.42f, LodgeTextures.DarkWoodMat, LodgeTextures.DarkWoodMat);
 		foreach (var (p, sz) in new[] { (sit - fout * 1.4f, new Vector3(2.4f, 0.9f, 0.9f)), (sit + falong * 2.3f, new Vector3(0.9f, 0.9f, 2.1f)), (sit + fout * 0.1f, new Vector3(1.4f, 0.45f, 0.8f)) })
 			LodgeKit.Solid(_inBody, p with { Y = FloorY + sz.Y * 0.5f }, sz, Mathf.Atan2(-falong.Z, falong.X));
@@ -255,25 +255,39 @@ public partial class SkiLodge
 
 	// ------------------------------------------------------------------ the bar
 
-	/// <summary>The bar (ours, after the Gold Room): a long counter lit from within, gold on its lip; a mirrored back
-	/// bar of bottles; stools; small round tables with little lamps; a row of amber lights down the ceiling.</summary>
+	/// <summary>The bar (ours, after the Gold Room): a long panelled counter, a brass foot rail; a mirrored back
+	/// bar of bottles; stools; small round tables with little lamps; wagon wheels and enamel pendants (2026-10-14h).</summary>
 	private void BuildBar()
 	{
 		var k = new MeshKit();
 		k.Color = Colors.White;
 		float cx = BarCounterX, z0 = 1.6f, z1 = 6.6f;
-		// the counter: dark wood sides, a front that glows amber through frosted panels, a gold lip, a black top
+		// the counter: dark wood, its front in raised panels between pilasters (2026-10-14h, the kit pass: the front was a
+		// panel lit from within, and with the strip lights over it the bar read as an office), a brass foot rail, a worn
+		// bar top with a rounded nosing
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Box(new Vector3(cx - 0.35f, 0.55f, (z0 + z1) * 0.5f), new Vector3(0.7f, 1.1f, z1 - z0), 1f);
-		k.Mat(LodgeTextures.Glow("lodge_barfront", new Color(0.8f, 0.55f, 0.28f), 0.42f));   // (a warm amber, not a lightbox: up close it glared)
-		k.Box(new Vector3(cx + 0.005f, 0.6f, (z0 + z1) * 0.5f), new Vector3(0.02f, 0.8f, z1 - z0 - 0.2f), 1f);
-		k.Mat(LodgeTextures.GoldMat);
-		k.Box(new Vector3(cx - 0.3f, 1.12f, (z0 + z1) * 0.5f), new Vector3(0.9f, 0.04f, z1 - z0 + 0.1f), 1f);
-		k.Box(new Vector3(cx + 0.02f, 0.14f, (z0 + z1) * 0.5f), new Vector3(0.05f, 0.05f, z1 - z0), 1f);   // the foot rail
-		k.Mat(LodgeTextures.BlackMat);
-		k.Box(new Vector3(cx - 0.3f, 1.15f, (z0 + z1) * 0.5f), new Vector3(0.86f, 0.02f, z1 - z0 + 0.06f), 1f);
+		k.Mat(LodgeTextures.DoorWoodMat);
+		int panels = 5;
+		float pw = (z1 - z0) / panels;
+		var faceB = new Basis(Vector3.Forward, Vector3.Up, Vector3.Right);   // (a panel's face toward +X, the customers)
+		for (int i = 0; i < panels; i++)
+		{
+			float pz = z0 + pw * (i + 0.5f);
+			k.BevelBox(new Vector3(cx + 0.004f, 0.6f, pz), new Vector3(pw - 0.22f, 0.62f, 0.02f), 0.008f, 1f, faceB);       // the panel (its faces short of the blacklight ink on the front, 2.5 cm out)
+			k.BevelBox(new Vector3(cx + 0.009f, 0.6f, pz), new Vector3(pw - 0.36f, 0.48f, 0.02f), 0.008f, 1f, faceB);   // its raised field
+		}
+		for (int i = 0; i <= panels; i++)
+			k.ChamferBox(new Vector3(cx + 0.03f, 0.55f, z0 + pw * i), new Vector3(0.06f, 1.02f, 0.09f), 0.012f);   // the pilasters
+		k.BevelBox(new Vector3(cx + 0.02f, 0.06f, (z0 + z1) * 0.5f), new Vector3(0.06f, 0.12f, z1 - z0), 0.01f);    // the kick
+		k.Mat(LodgeTextures.BrassMat);
+		k.Cylinder(new Vector3(cx + 0.22f, 0.16f, z0 + 0.05f), new Vector3(cx + 0.22f, 0.16f, z1 - 0.05f), 0.025f, 0.025f, 8, true);   // the foot rail
+		foreach (float z in new[] { z0 + 0.3f, (z0 + z1) * 0.5f, z1 - 0.3f })
+			k.Cylinder(new Vector3(cx + 0.05f, 0.16f, z), new Vector3(cx + 0.22f, 0.16f, z), 0.012f, 0.012f, 5, false);
+		k.Mat(LodgeTextures.DoorWoodMat);
+		k.BevelBox(new Vector3(cx - 0.3f, 1.13f, (z0 + z1) * 0.5f), new Vector3(0.92f, 0.05f, z1 - z0 + 0.12f), 0.02f);
+		k.Cylinder(new Vector3(cx + 0.16f, 1.12f, z0 - 0.06f), new Vector3(cx + 0.16f, 1.12f, z1 + 0.06f), 0.035f, 0.035f, 8, true);   // the nosing, rounded
 		LodgeKit.Solid(_inBody, new Vector3(cx - 0.35f, 0.58f, (z0 + z1) * 0.5f), new Vector3(0.75f, 1.16f, z1 - z0));
-		Light(new Vector3(cx + 0.4f, 0.5f, (z0 + z1) * 0.5f), new Color(1f, 0.7f, 0.35f), 0.45f, 3f, "CounterGlow");
 		// under the lip, on the customers' side, where a card could be taped: a dark recess
 		BarCardSpot = new Node3D { Name = "BarCardSpot", Position = new Vector3(cx + 0.13f, 1.08f, 3.9f) };
 		AddChild(BarCardSpot);
@@ -325,16 +339,24 @@ public partial class SkiLodge
 			k.Cylinder(c + Vector3.Up * 0.74f, c + Vector3.Up * 0.84f, 0.035f, 0.03f, 8, true);
 			LodgeKit.Solid(_inBody, c + Vector3.Up * 0.4f, new Vector3(0.8f, 0.8f, 0.8f));
 		}
-		// a runner of red carpet from the arch to the counter
+		// a runner from the arch to the counter (a Navajo weave since 2026-10-14h)
 		k.Mat(LodgeTextures.RugMat);
 		k.Quad(new Vector3(-18.4f, FloorY + 0.005f, 5.2f), new Vector3(-10.6f, FloorY + 0.005f, 5.2f), new Vector3(-10.6f, FloorY + 0.005f, 3.6f), new Vector3(-18.4f, FloorY + 0.005f, 3.6f), Vector3.Up,
 			new Vector2(0, 0), new Vector2(3, 0), new Vector2(3, 1), new Vector2(0, 1));
-		// the ceiling's row of amber lights, and its name in gold over the arch
-		for (float x = -22f; x < -9f; x += 3.2f)
+		// (2026-10-14h, the kit pass) Its lights: there was a row of glowing strips flat on the ceiling, and they read as an
+		// office's fluorescent panels. Now two wagon wheels hung on chains over the room, their little amber shades dim, and
+		// three green enamel pendants low over the counter: pools of light on the bar top and the tables, dark between
+		var wheelGlow = LodgeTextures.Glow("lodge_wheel_shade", new Color(0.9f, 0.55f, 0.28f), 0.7f);
+		foreach (var wc in new[] { new Vector3(-16.2f, 0f, 3.9f), new Vector3(-12.6f, 0f, 4.6f) })
 		{
-			k.Mat(LodgeTextures.Glow("lodge_barceil", new Color(1f, 0.72f, 0.4f), 1.4f));
-			k.Box(new Vector3(x, SlabY - 0.02f, 4f), new Vector3(1.2f, 0.04f, 0.3f), 1f);   // (the joints pass: up against the ceiling, 1 cm under it)
-			Light(new Vector3(x, SlabY - 0.4f, 4f), new Color(1f, 0.74f, 0.45f), 0.75f, 6.5f);
+			LodgeKit.WagonWheel(k, wc with { Y = SlabY }, 1.25f, 0.62f, 8, wheelGlow);
+			Light(wc with { Y = SlabY - 1.45f }, new Color(1f, 0.7f, 0.42f), 0.85f, 6.5f, "WheelLight");
+		}
+		var pendant = LodgeTextures.Glow("lodge_pendant", new Color(1f, 0.8f, 0.55f), 0.8f);
+		foreach (float pz in new[] { 2.4f, 4.1f, 5.8f })
+		{
+			var bulbAt = LodgeKit.Pendant(k, new Vector3(cx - 0.3f, SlabY, pz), 1.75f, LodgeTextures.EnamelMat, pendant);
+			Light(bulbAt + Vector3.Down * 0.1f, new Color(1f, 0.76f, 0.5f), 0.55f, 3f, "PendantLight");
 		}
 		k.CommitTo(this, "Bar", true);
 		Vector3 aa = HexVert(4), ab = HexVert(5), aalong = (ab - aa).Normalized(), aout = ((aa + ab) * 0.5f).Normalized();
@@ -364,7 +386,7 @@ public partial class SkiLodge
 		Light(new Vector3(-27.6f, 2.6f, -0.7f), Warm, 0.7f, 6f);
 		k.Mat(Bulb);
 		k.Blob(new Vector3(-30f, 2.8f, -4.8f), Vector3.One * 0.05f, 972, 0f, false, 1f);
-		Light(new Vector3(-30f, 2.6f, -4.8f), Warm, 0.75f, 5.5f, "MudroomBulb");   // (a step up: the snowed-in moment read as black)
+		Light(new Vector3(-30f, 2.6f, -4.8f), Warm, 0.9f, 6f, "MudroomBulb");   // (a step up: the snowed-in moment read as black; 0.75 until the kit pass, 2026-10-14h, its bake a step darker)
 		// ---- the pantry: shelves of tins and jars on the back wall, a long run of drawer cabinets along the other
 		float px0 = BarX0 + 0.3f, px1 = -9.6f;
 		k.Mat(LodgeTextures.DarkWoodMat);
@@ -492,7 +514,7 @@ public partial class SkiLodge
 	}
 
 	/// <summary>A room: the bed against the outer wall between the windows, nightstands with a drawer each, a
-	/// wardrobe, a closet by the door, a violet sofa, a writing desk, lamps; the bathroom's arched tub alcove (green
+	/// wardrobe, a closet by the door, a corduroy sofa, a writing desk, lamps; the bathroom's arched tub alcove (green
 	/// with a mustard trim), a basin on a vanity with two drawers, the lavatory. 203 is wrecked with ice.</summary>
 	private void FurnishRoom(int num, float x0, float x1, bool front)
 	{
@@ -510,7 +532,7 @@ public partial class SkiLodge
 		var shade = LodgeTextures.Glow($"lodge_shade_{num}", new Color(0.95f, 0.78f, 0.52f), 0.9f);
 		// the bed, its head against the outer wall
 		var bedAt = new Vector3(cx, y, zOut - s * 1.15f);
-		LodgeKit.Bed(k, bedAt, front ? 0f : Mathf.Pi, LodgeTextures.VelvetVioletMat, LodgeTextures.VelvetVioletMat, 1.7f);
+		LodgeKit.Bed(k, bedAt, front ? 0f : Mathf.Pi, LodgeTextures.BedspreadMat, LodgeTextures.Upholstery("tobacco"), 1.7f);   // (2026-10-14h: a plaid spread, a tobacco headboard)
 		LodgeKit.Solid(_inBody, bedAt + new Vector3(0, 0.3f, 0), new Vector3(1.8f, 0.6f, 2.2f));
 		// nightstands either side, one drawer each, a lamp on each
 		var room = num == 202 ? Search202 : num == 204 ? Search204 : null;
@@ -549,7 +571,7 @@ public partial class SkiLodge
 		if (num != 204)
 		{
 			var sofaAt = new Vector3(x1 - 0.48f, y, zOut - s * 2.8f);   // against the side wall (its back to it), facing into the room
-			LodgeKit.Sofa(k, sofaAt, Mathf.Pi * 0.5f, LodgeTextures.VelvetVioletMat, 1.8f);
+			LodgeKit.Sofa(k, sofaAt, Mathf.Pi * 0.5f, LodgeTextures.Upholstery(num == 202 ? "olive" : num == 201 ? "mustard" : "rust"), 1.8f);
 			LodgeKit.Solid(_inBody, sofaAt + new Vector3(0, 0.45f, 0), new Vector3(0.9f, 0.9f, 1.8f));
 		}
 		k.Mat(LodgeTextures.RugMat);
@@ -560,7 +582,7 @@ public partial class SkiLodge
 		k.Cylinder(new Vector3(cx, RoomTop - 0.02f, (zIn + zOut) * 0.5f), new Vector3(cx, RoomTop - 0.12f, (zIn + zOut) * 0.5f), 0.22f, 0.26f, 12, true);
 		if (!wrecked) roomLights.Add(Light(new Vector3(cx, RoomTop - 0.5f, (zIn + zOut) * 0.5f), num == 202 ? new Color(0.72f, 0.78f, 1f) : Warm, 0.8f, 7f, $"Room{num}Light"));
 		// 202: the blue from the snow banked up the windows
-		if (num == 202) Light(new Vector3(cx, y + 1.6f, zOut - s * 0.8f), new Color(0.4f, 0.55f, 1f), 1.1f, 6f, "SnowBlue");
+		if (num == 202) Light(new Vector3(cx, y + 1.6f, zOut - s * 0.8f), new Color(0.48f, 0.58f, 0.82f), 0.45f, 5f, "SnowBlue");   // (2026-10-14h: was 1.1 of a saturated blue)
 		// ---- the bathroom: green tile, the tub in an arched alcove with a mustard trim, the vanity (two drawers)
 		float bx0 = x0 + 0.07f, bx1 = x0 + 2.7f, bz = zIn + s * 3.1f;
 		Vector3 tubAt = new(bx0 + 1.15f, y, bz - s * 0.45f);   // along the bathroom's far wall, in an arched alcove
@@ -744,8 +766,8 @@ public partial class SkiLodge
 		}
 		// the chairs (all 72 the same model): one instanced set, drawn once for all of them, rather than 72 copies
 		// merged into the room's mesh (the optimization pass, 2026-10-02)
-		var chairMesh = FurnitureKit.Mesh("dining_chair", new() { ["wood"] = LodgeTextures.DoorWoodMat, ["upholstery"] = LodgeTextures.VelvetVioletMat });
-		if (chairMesh == null) foreach (var xf in chairs) LodgeKit.Chair(k, xf.Origin, xf.Basis.GetEuler().Y, LodgeTextures.VelvetVioletMat);
+		var chairMesh = FurnitureKit.Mesh("dining_chair", new() { ["wood"] = LodgeTextures.DoorWoodMat, ["upholstery"] = LodgeTextures.Upholstery("oxblood") });
+		if (chairMesh == null) foreach (var xf in chairs) LodgeKit.Chair(k, xf.Origin, xf.Basis.GetEuler().Y, LodgeTextures.Upholstery("oxblood"));
 		foreach (float x in new[] { 17f, 27f, 37f })
 		{
 			var bulbs = LodgeKit.Chandelier(k, new Vector3(x, RoomTop - 0.3f, 0), 1.6f, 1.2f, 8, Bulb);

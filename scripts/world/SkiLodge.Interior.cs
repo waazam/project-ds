@@ -99,6 +99,7 @@ public partial class SkiLodge
 	/// timber above outside; inside, stone below and split logs above (the lobby).</summary>
 	private void BuildHallWalls(MeshKit k)
 	{
+		k.Tess = 0.6f;   // (2026-10-14h: for the kit pass's bake, SkiLodge.Kit; set back after)
 		for (int i = 0; i < 6; i++)
 		{
 			Vector3 a = HexVert(i), b = HexVert(i + 1);
@@ -177,6 +178,7 @@ public partial class SkiLodge
 		k.Quad(new Vector3(-12.9f, UpperY + 0.004f, 0), new Vector3(-11.54f, UpperY + 0.004f, 0), new Vector3(-11.54f, UpperY + 0.004f, -0.72f), new Vector3(-12.9f, UpperY + 0.004f, -0.72f), Vector3.Up,
 			new Vector2(u0, 0.5f), new Vector2(u1, 0.5f), new Vector2(u1, 0), new Vector2(u0, 0));
 		LodgeKit.Solid(_body, new Vector3(-12.2f, UpperY - 0.12f, 0), new Vector3(1.6f, 0.24f, 2.2f));
+		k.Tess = 0f;
 	}
 
 	/// <summary>A window's inner face: the daylight glass in a grid of panes, a painted frame and a sill. Each pane is its
@@ -256,6 +258,7 @@ public partial class SkiLodge
 		{
 			LodgeKit.Wall(k, null, a, b, y0, split, 0.04f, inward, lower, lower, LodgeTextures.DarkWoodMat, holes, floorY: y0, grime: 1, skirt: true);
 			LodgeKit.Wall(k, null, a, b, split, y1, 0.04f, inward, upper, upper, LodgeTextures.DarkWoodMat, holes, grime: 1, ceilingY: y1);
+			ChairRail(k, a, b, inward, 0.02f, holes, split - 0.03f);   // (2026-10-14h: the wainscot capped)
 		}
 		else LodgeKit.Wall(k, null, a, b, y0, y1, 0.04f, inward, upper, upper, LodgeTextures.DarkWoodMat, holes, floorY: y0, grime: 1, skirt: true, ceilingY: y1);
 		foreach (var (wx, wy, ww, wh) in wins)
@@ -277,14 +280,15 @@ public partial class SkiLodge
 
 	private void BuildLobbyShell()
 	{
-		var k = new MeshKit();
-		// the floor: wide warm planks (it was grey flagstone), a hexagon just under the walls
+		var k = new MeshKit { Tess = 0.8f };   // (the kit pass's bake: SkiLodge.Kit)
+		// the floor: wide warm planks (it was grey flagstone), a hexagon just under the walls (in a fine fan of
+		// triangles, for the bake: the wear from the doors, the dark round the walls and under the furniture)
 		k.Mat(LodgeTextures.LobbyFloorMat);
 		k.Color = Colors.White;
 		for (int i = 0; i < 6; i++)
 		{
 			Vector3 p = HexVert(i) * (HexIn + 0.05f) / Apothem, q = HexVert(i + 1) * (HexIn + 0.05f) / Apothem;
-			k.Tri(new Vector3(0, FloorY, 0), p + Vector3.Up * FloorY, q + Vector3.Up * FloorY, Vector3.Up, Vector2.Zero, new Vector2(p.X, p.Z) * 0.25f, new Vector2(q.X, q.Z) * 0.25f);
+			TriGrid(k, new Vector3(0, FloorY, 0), p + Vector3.Up * FloorY, q + Vector3.Up * FloorY, Vector3.Up, 0.25f, 16);
 		}
 		// the ceiling: the roof's inside, boarded, climbing to the lantern; log rafters on the corners
 		float top = 21f, topR = 1.6f;
@@ -540,7 +544,7 @@ public partial class SkiLodge
 
 	private void BuildWestGround()
 	{
-		var k = new MeshKit();
+		var k = new MeshKit { Tess = 0.6f };   // (the kit pass's bake: SkiLodge.Kit)
 		float barX1Front = FacetXAt(270f, 330f, InnerZ + 0.4f), barX1Back = FacetXAt(270f, 330f, BarZ0);
 		// ---- the bar: floor (dark boards with a red runner), ceiling, walls (dark wainscot, red damask above)
 		k.Mat(LodgeTextures.DarkWoodMat);
@@ -549,10 +553,10 @@ public partial class SkiLodge
 			new Vector2(BarX0, InnerZ) * 0.5f, new Vector2(barX1Front, InnerZ) * 0.5f, new Vector2(barX1Back, BarZ0) * 0.5f, new Vector2(BarX0, BarZ0) * 0.5f);
 		k.Mat(LodgeTextures.CeilingMat);
 		CeilQuad(k, new Vector3(BarX0, SlabY, BarZ0), new Vector3(barX1Back, SlabY, BarZ0), new Vector3(barX1Front, SlabY, InnerZ), new Vector3(BarX0, SlabY, InnerZ));
-		Lining(k, BarX0, barX1Front, InnerZ, FloorY, SlabY, LodgeTextures.DarkWoodMat, LodgeTextures.DamaskMat, 1.1f, true);
+		Lining(k, BarX0, barX1Front, InnerZ, FloorY, SlabY, LodgeTextures.DarkWoodMat, LodgeTextures.KnottyPineMat, 1.1f, true);   // (2026-10-14h: knotty pine above the wainscot; it was a red damask)
 		// the bar's back wall (west) and its south wall to the service corridor (a door near its west end)
-		Split(k, new Vector3(BarX0, 0, BarZ0), new Vector3(BarX0, 0, InnerZ), Vector3.Right, LodgeTextures.DamaskMat, LodgeTextures.PlasterMat, null);
-		Split(k, new Vector3(SvcX0, 0, BarZ0), new Vector3(barX1Back + 0.3f, 0, BarZ0), Vector3.Back, LodgeTextures.DamaskMat, LodgeTextures.PlasterMat,
+		Split(k, new Vector3(BarX0, 0, BarZ0), new Vector3(BarX0, 0, InnerZ), Vector3.Right, LodgeTextures.KnottyPineMat, LodgeTextures.PlasterMat, null);
+		Split(k, new Vector3(SvcX0, 0, BarZ0), new Vector3(barX1Back + 0.3f, 0, BarZ0), Vector3.Back, LodgeTextures.KnottyPineMat, LodgeTextures.PlasterMat,
 			new List<Hole> { new(SvcX1 - 1.2f - SvcX0, SvcX1 - 0.2f - SvcX0, 0f, 2.2f) });
 		// ---- the service corridor: from the mudroom's inner door to the bar
 		k.Mat(LodgeTextures.CheckerMat);
@@ -603,7 +607,9 @@ public partial class SkiLodge
 
 	private void BuildWestUpper()
 	{
-		var k = new MeshKit();
+		// (2026-10-14h, the kit pass: drawn finely, so the rooms' baked dark has vertices to sit on, SkiLodge.Kit)
+		var k = new MeshKit { Tess = 0.6f };
+		var k201 = new MeshKit { Tess = 0.6f, Color = Colors.White };
 		k.Color = Colors.White;
 		// the corridor: the carpet, a plaster ceiling, wallpaper over a dark wainscot
 		// (2026-10-10c, the owner: "the carpet in the hallway needs to properly aligned like how we have it on the stairs":
@@ -645,8 +651,9 @@ public partial class SkiLodge
 		CeilQuad(k, new Vector3(CorrX1 - 0.35f, 6.68f, -CorrHalf - 0.05f), new Vector3(DoorwayInX, 6.68f, -CorrHalf - 0.05f), new Vector3(DoorwayInX, 6.68f, CorrHalf + 0.05f), new Vector3(CorrX1 - 0.35f, 6.68f, CorrHalf + 0.05f));
 		// the rooms: 202 (front, east), 201 (front, west), 203 (back, east), 204 (back, west)
 		foreach (var (num, x0, x1, front) in new[] { (202, RoomSplitX, CorrX1, true), (201, CorrX0, RoomSplitX, true), (203, RoomSplitX, CorrX1, false), (204, CorrX0, RoomSplitX, false) })
-			RoomShell(k, num, x0, x1, front);
+			RoomShell(num == 201 ? k201 : k, num, x0, x1, front);
 		k.CommitTo(this, "WestUpper", true);
+		k201.CommitTo(this, "WestUpper201", true);   // (201, the perfect room, its own: the kit pass leaves it clean)
 		// webs up in the rooms' and the corridor's ceiling corners (the interiors pass, 2026-10-03: years after the party,
 		// nobody has been up here)
 		var wr = new RandomNumberGenerator { Seed = 2301 };
@@ -683,6 +690,40 @@ public partial class SkiLodge
 		var lB = tileB ? LodgeTextures.GreenTileMat : LodgeTextures.DarkWoodMat;
 		LodgeKit.Wall(k, _inBody, a, b, UpperY, UpperY + 1.0f, 0.14f, sideA, lA, lB, LodgeTextures.DarkWoodMat, holes, floorY: UpperY, grime: 2, skirt: true);
 		LodgeKit.Wall(k, _inBody, a, b, UpperY + 1.0f, RoomTop, 0.14f, sideA, wA, wB, LodgeTextures.DarkWoodMat, holes, grime: 2, ceilingY: RoomTop);
+		// (2026-10-14h, the kit pass) a moulded chair rail capping the wainscot, each side that isn't tiled, broken at
+		// the doors
+		var n = (sideA - (b - a).Normalized() * sideA.Dot((b - a).Normalized())).Normalized();
+		if (!tileA) ChairRail(k, a, b, n, 0.07f, holes);
+		if (!tileB) ChairRail(k, a, b, -n, 0.07f, holes);
+	}
+
+	/// <summary>(2026-10-14h) A chair rail along a wall's face at the wainscot's top (<see cref="UpperY"/> + 1), from a to b
+	/// (floor points on its centre line), <paramref name="half"/> its half-thickness, gaps where holes cross it.</summary>
+	private static void ChairRail(MeshKit k, Vector3 a, Vector3 b, Vector3 n, float half, List<Hole> holes, float y = UpperY + 0.97f)
+	{
+		float len = new Vector2(b.X - a.X, b.Z - a.Z).Length();
+		var along = ((b - a) with { Y = 0 }).Normalized();
+		var cuts = new List<(float, float)> { (0f, len) };
+		if (holes != null)
+			foreach (var h in holes)
+			{
+				if (h.V0 > y + 0.05f || h.V1 < y) continue;
+				var next = new List<(float, float)>();
+				foreach (var (u0, u1) in cuts)
+				{
+					if (h.U1 + 0.08f <= u0 || h.U0 - 0.08f >= u1) { next.Add((u0, u1)); continue; }
+					if (h.U0 - 0.08f > u0) next.Add((u0, h.U0 - 0.08f));
+					if (h.U1 + 0.08f < u1) next.Add((h.U1 + 0.08f, u1));
+				}
+				cuts = next;
+			}
+		var keep = k.Tess;
+		k.Tess = 0f;
+		k.Mat(LodgeTextures.DoorWoodMat);
+		foreach (var (u0, u1) in cuts)
+			if (u1 - u0 > 0.1f)
+				TrimKit.Along(k, (a with { Y = y }) + along * u0 + n * half, (a with { Y = y }) + along * u1 + n * half, n, TrimKit.ChairRail.Scaled(1.3f, 1.2f));
+		k.Tess = keep;
 	}
 
 	/// <summary>A hotel room's shell: the carpet, the ceiling, the outer wall's lining with its two windows, the walls
@@ -691,6 +732,25 @@ public partial class SkiLodge
 	/// stretched over a room showed as a blur).</summary>
 	private static void CeilQuad(MeshKit k, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
 		=> k.Quad(a, b, c, d, Vector3.Down, CeilUv(a), CeilUv(b), CeilUv(c), CeilUv(d));
+
+	/// <summary>(2026-10-14h) A flat triangle cut into <paramref name="n"/>² small ones, its UVs the plan's x, z times
+	/// <paramref name="uv"/> (a big fan of a floor drawn finely enough to take the kit pass's bake).</summary>
+	private static void TriGrid(MeshKit k, Vector3 a, Vector3 b, Vector3 c, Vector3 nrm, float uv, int n)
+	{
+		Vector3 P(int i, int j) => a + (b - a) * (i / (float)n) + (c - a) * (j / (float)n);
+		Vector2 U(Vector3 p) => new Vector2(p.X, p.Z) * uv;
+		for (int j = 0; j < n; j++)
+			for (int i = 0; i < n - j; i++)
+			{
+				Vector3 p0 = P(i, j), p1 = P(i + 1, j), p2 = P(i, j + 1);
+				k.Tri(p0, p1, p2, nrm, U(p0), U(p1), U(p2));
+				if (i + j < n - 1)
+				{
+					Vector3 p3 = P(i + 1, j + 1);
+					k.Tri(p1, p3, p2, nrm, U(p1), U(p3), U(p2));
+				}
+			}
+	}
 
 	private static void CeilTri(MeshKit k, Vector3 a, Vector3 b, Vector3 c)
 		=> k.Tri(a, b, c, Vector3.Down, CeilUv(a), CeilUv(b), CeilUv(c));
@@ -745,7 +805,7 @@ public partial class SkiLodge
 
 	private void BuildDiningShell()
 	{
-		var k = new MeshKit();
+		var k = new MeshKit { Tess = 0.6f };   // (the kit pass's bake: SkiLodge.Kit)
 		k.Color = Colors.White;
 		float fx = FacetXAt(30f, 90f, InnerZ + 0.4f);   // where the hall's east sides meet the wing's walls
 		// the floor: herringbone parquet, from the hall's corner to the far wall

@@ -329,4 +329,75 @@ public static class LodgeKit
 		k.Cylinder(s + Vector3.Down * 0.07f, s + Vector3.Up * 0.05f, 0.08f, 0.05f, 10, false);
 		return s;
 	}
+
+	/// <summary>(2026-10-14h) A wagon-wheel chandelier, the mountain bar's own: an old cart wheel hung flat on three chains
+	/// from <paramref name="ceiling"/>, <paramref name="drop"/> below it, its hub, spokes and felloe in dark wood, an iron
+	/// tyre round it, <paramref name="sockets"/> little amber chimneys standing on the rim. Returns their middles.</summary>
+	public static List<Vector3> WagonWheel(MeshKit k, Vector3 ceiling, float drop, float r, int sockets, Material glow)
+	{
+		var at = new List<Vector3>();
+		Vector3 hub = ceiling + Vector3.Down * drop;
+		var col = k.Color;
+		k.Color = Colors.White;
+		k.Mat(LodgeTextures.DarkWoodMat);
+		k.Cylinder(hub + Vector3.Down * 0.1f, hub + Vector3.Up * 0.1f, 0.09f, 0.09f, 10, true);
+		const int spokes = 12, segs = 24;
+		for (int i = 0; i < spokes; i++)
+		{
+			float a = Mathf.Tau * i / spokes;
+			var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+			k.Cylinder(hub + d * 0.08f, hub + d * (r - 0.04f), 0.024f, 0.017f, 5, false);
+		}
+		for (int i = 0; i < segs; i++)
+		{
+			float a0 = Mathf.Tau * i / segs, a1 = Mathf.Tau * (i + 1) / segs;
+			Vector3 p0 = hub + new Vector3(Mathf.Cos(a0), 0, Mathf.Sin(a0)) * r, p1 = hub + new Vector3(Mathf.Cos(a1), 0, Mathf.Sin(a1)) * r;
+			k.Mat(LodgeTextures.DarkWoodMat);
+			k.Beam(p0, p1, 0.075f, 0.09f, 1f, Vector3.Up);
+			k.Mat(LodgeTextures.IronMat);
+			k.Beam(p0 * 1f + (p0 - hub).Normalized() * 0.042f, p1 + (p1 - hub).Normalized() * 0.042f, 0.012f, 0.07f, 1f, Vector3.Up);
+		}
+		// the chains, from three points on the rim up to one hook, a ceiling plate
+		k.Mat(LodgeTextures.IronMat);
+		Vector3 hook = hub + Vector3.Up * (drop * 0.55f);
+		for (int i = 0; i < 3; i++)
+		{
+			float a = Mathf.Tau * i / 3f + 0.26f;
+			k.Cylinder(hub + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * (r * 0.92f) + Vector3.Up * 0.05f, hook, 0.008f, 0.008f, 4, false);
+		}
+		k.Cylinder(hook, ceiling, 0.01f, 0.01f, 4, false);
+		k.Cylinder(ceiling + Vector3.Down * 0.04f, ceiling + Vector3.Down * 0.005f, 0.09f, 0.11f, 10, true);
+		// the chimneys on the rim
+		for (int i = 0; i < sockets; i++)
+		{
+			float a = Mathf.Tau * (i + 0.5f) / sockets;
+			Vector3 p = hub + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r + Vector3.Up * 0.045f;
+			k.Mat(LodgeTextures.IronMat);
+			k.Cylinder(p, p + Vector3.Up * 0.035f, 0.035f, 0.04f, 7, true);
+			k.Mat(glow);
+			k.Cylinder(p + Vector3.Up * 0.035f, p + Vector3.Up * 0.15f, 0.038f, 0.032f, 8, true);
+			at.Add(p + Vector3.Up * 0.09f);
+		}
+		k.Color = col;
+		return at;
+	}
+
+	/// <summary>(2026-10-14h) A pendant lamp hung <paramref name="drop"/> on its flex from <paramref name="ceiling"/>: an
+	/// enamel cone shade, the light's disc under it. Returns the bulb.</summary>
+	public static Vector3 Pendant(MeshKit k, Vector3 ceiling, float drop, Material shade, Material glow)
+	{
+		var col = k.Color;
+		k.Color = Colors.White;
+		Vector3 top = ceiling + Vector3.Down * (drop - 0.2f), rim = ceiling + Vector3.Down * drop;
+		k.Mat(LodgeTextures.BlackMat);
+		k.Cylinder(ceiling, top, 0.006f, 0.006f, 4, false);
+		k.Cylinder(ceiling + Vector3.Down * 0.03f, ceiling + Vector3.Down * 0.003f, 0.05f, 0.06f, 8, true);
+		k.Mat(shade);
+		k.Cylinder(top + Vector3.Down * 0.02f, top + Vector3.Up * 0.03f, 0.04f, 0.035f, 8, true);
+		k.Cylinder(rim, top, 0.19f, 0.05f, 12, false);
+		k.Mat(glow);
+		k.Cylinder(rim + Vector3.Up * 0.05f, rim + Vector3.Up * 0.052f, 0.17f, 0.17f, 12, true);
+		k.Color = col;
+		return rim + Vector3.Up * 0.08f;
+	}
 }

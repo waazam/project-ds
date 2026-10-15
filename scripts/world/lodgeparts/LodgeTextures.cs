@@ -11,11 +11,12 @@ namespace ProjectDS.World.LodgeParts;
 /// <list type="bullet">
 /// <item><b>The corridor carpet</b>: ours, not the Overlook's hexagons: rows of nested pointed arches, like a
 /// procession of doorways, in oxblood, burnt orange and near-black.</item>
-/// <item><b>The rooms' carpet</b>: peacock scales, overlapping scallops in bottle green and bruise violet.</item>
-/// <item><b>Wallpaper</b>: cream, a fine gold pinstripe and a wider band; a darker damask for the bar.</item>
+/// <item><b>The rooms' carpet</b>: (since 2026-10-14h) tobacco brown with a quiet rust lattice (it was peacock scales in bottle green and bruise violet).</item>
+/// <item><b>Wallpaper</b>: cream, a fine gold pinstripe and a wider band (now painted plaster); a darker damask (the bar's, until 2026-10-14h).</item>
 /// <item><b>Bathroom tile</b>: mint-green squares, dark grout; a mustard trim.</item>
 /// <item><b>Floors</b>: flagstone (the lobby), herringbone parquet (the dining hall), chequered linoleum (the
-/// pantry), and rugs: a big medallion rug in red and navy.</item>
+/// pantry), and rugs: a Navajo-pattern wool (since 2026-10-14h; a red and navy medallion before).</item>
+/// <item><b>Knotty pine</b> panelling (the bar), a plaid bedspread and corduroy upholstery in 70s earth tones (2026-10-14h).</item>
 /// </list>
 /// </summary>
 public static class LodgeTextures
@@ -104,21 +105,23 @@ public static class LodgeTextures
 		return c * Wear(u, v, 11) * (0.93f + 0.07f * Fbm(u * 3f, v * 3f, 12)) * SurfaceKit.Grain("carpet", u, v, 0.55f, 2f);
 	});
 
-	/// <summary>The rooms' carpet: peacock scales, overlapping scallops in bottle green and bruise violet.</summary>
-	public static Texture2D RoomCarpet => Make("lodge_carpet_room", 256, 256, (u, v) =>
+	/// <summary>The rooms' carpet (2026-10-14h, the lodge's kit pass: it was peacock scales in bottle green and bruise
+	/// violet, which fought every bed and rug laid on it): a 70s hotel's low pile in tobacco brown, a quiet lattice of
+	/// rust and a harvest-gold dot where its lines cross. Low contrast: it reads as a carpet, not a pattern.</summary>
+	public static Texture2D RoomCarpet => Make("lodge_carpet_room_70s", 256, 256, (u, v) =>
 	{
-		Color green = new(0.1f, 0.28f, 0.18f), teal = new(0.14f, 0.4f, 0.3f), violet = new(0.3f, 0.12f, 0.36f), dark = new(0.06f, 0.05f, 0.07f);
-		float cu = u * 4f, cv = v * 4f;
-		int row = Mathf.FloorToInt(cv * 2f);
-		if (row % 2 == 1) cu += 0.5f;
-		float fu = cu - Mathf.Floor(cu) - 0.5f, fv = cv * 2f - Mathf.Floor(cv * 2f);
-		float r = new Vector2(fu, (fv - 1.0f) * 0.5f).Length();   // scales hang from the row above
-		float band = r * 10f;
-		int ring = (int)band;
-		Color c = ring % 3 == 0 ? violet : ring % 3 == 1 ? teal : green;
-		if (band - ring < 0.18f) c = dark;
-		if (r > 0.52f) c = green * 0.8f;
-		return c * Wear(u, v, 21) * SurfaceKit.Grain("carpet", u, v, 0.5f, 2f);
+		Color brown = new(0.2f, 0.13f, 0.08f), rust = new(0.3f, 0.15f, 0.08f), gold = new(0.38f, 0.28f, 0.12f), dark = new(0.13f, 0.085f, 0.06f);
+		// a diagonal lattice, four diamonds to the tile
+		float du = u * 4f + v * 4f, dv = u * 4f - v * 4f;
+		float fu = du - Mathf.Floor(du), fv = dv - Mathf.Floor(dv);
+		float line = Mathf.Min(Mathf.Min(fu, 1f - fu), Mathf.Min(fv, 1f - fv));
+		Color c = brown;
+		if (line < 0.07f) c = rust;
+		else if (line < 0.1f) c = dark;
+		float cu = Mathf.Abs(fu - 0.5f), cv = Mathf.Abs(fv - 0.5f);
+		if (cu > 0.42f && cv > 0.42f) c = gold;                         // where the lines cross
+		else if (cu + cv < 0.12f) c = rust.Lerp(brown, 0.4f);            // a small diamond in each
+		return c * Wear(u, v, 21) * (0.9f + 0.1f * Fbm(u * 2f, v * 2f, 23)) * SurfaceKit.Grain("carpet", u, v, 0.6f, 2f);
 	});
 
 	/// <summary>Cream wallpaper, a fine gold pinstripe and a wider soft band (rooms, the corridor).</summary>
@@ -172,28 +175,42 @@ public static class LodgeTextures
 		return c * (0.88f + 0.12f * Fbm(u, v, 81)) * SurfaceKit.Grain("plaster", u, v, 0.4f);   // scuffed
 	});
 
-	/// <summary>A big medallion rug: a red field, a navy border with a lozenge band, a medallion in the middle.</summary>
-	public static Texture2D Rug => Make("lodge_rug", 256, 256, (u, v) =>
+	/// <summary>The lodge's rugs (2026-10-14h, the kit pass; a red-and-navy medallion before): a Navajo-pattern wool rug, as
+	/// every mountain lodge of the 70s had: a worn oatmeal field, terracotta and charcoal stepped diamonds, bands across its
+	/// ends, a heart of faded turquoise. UVs 0..1 over the whole rug.</summary>
+	public static Texture2D Rug => Make("lodge_rug_navajo", 256, 256, (u, v) =>
 	{
-		Color red = new(0.42f, 0.08f, 0.06f), navy = new(0.1f, 0.12f, 0.25f), ivory = new(0.72f, 0.64f, 0.5f), gold = new(0.62f, 0.44f, 0.16f);
-		float bx = Mathf.Min(u, 1 - u), by = Mathf.Min(v, 1 - v), edge = Mathf.Min(bx, by);
-		Color c = red;
-		if (edge < 0.1f)
-		{
-			c = navy;
-			float t = (u + v) * 20f % 1f;
-			if (edge > 0.03f && edge < 0.08f && Mathf.Abs(t - 0.5f) < 0.2f) c = gold;
-			if (edge < 0.015f) c = ivory;
-		}
+		Color field = new(0.5f, 0.44f, 0.35f), terra = new(0.4f, 0.16f, 0.09f), coal = new(0.1f, 0.085f, 0.075f), teal = new(0.2f, 0.29f, 0.27f), cream = new(0.62f, 0.56f, 0.46f);
+		// stepped: quantised to the weave's rows and columns
+		float qx = Mathf.Floor(Mathf.Abs(u - 0.5f) * 32f) / 32f, qy = Mathf.Floor(Mathf.Abs(v - 0.5f) * 32f) / 32f;
+		float edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));
+		float ey = 0.5f - qy;
+		Color c = field;
+		// the bands across its ends
+		if (ey < 0.05f) c = coal;
+		else if (ey < 0.07f) c = cream;
+		else if (ey < 0.11f) c = terra;
+		else if (ey < 0.13f) c = cream;
+		else if (ey < 0.15f) c = coal;
 		else
 		{
-			float dx = u - 0.5f, dy = v - 0.5f;
-			float lz = Mathf.Abs(dx) * 1.4f + Mathf.Abs(dy);
-			if (lz < 0.22f) c = lz < 0.08f ? ivory : lz < 0.12f ? navy : lz > 0.2f ? gold : red * 1.2f;
-			float fx = u * 8f % 1f, fy = v * 8f % 1f;
-			if (lz > 0.25f && Mathf.Abs(fx - 0.5f) + Mathf.Abs(fy - 0.5f) < 0.12f) c = navy * 1.3f;
+			// the stepped diamond in the middle: rings of terracotta and charcoal round a turquoise heart
+			float d = qx * 1.5f + qy;
+			if (d < 0.06f) c = teal;
+			else if (d < 0.1f) c = cream;
+			else if (d < 0.17f) c = terra;
+			else if (d < 0.2f) c = coal;
+			else if (d < 0.23f) c = cream;
+			else if (d < 0.3f) c = terra;
+			// half-diamonds at the sides, a stepped zigzag inside each end band
+			float side = Mathf.Abs(qx - 0.5f) * 1.5f + qy;
+			if (side < 0.12f) c = coal;
+			else if (side < 0.16f) c = terra;
+			float zig = Mathf.PosMod(qx * 8f, 1f);
+			if (Mathf.Abs(ey - 0.19f - Mathf.Abs(zig - 0.5f) * 0.06f) < 0.012f) c = coal;
 		}
-		return c * (0.85f + 0.15f * Fbm(u, v, 91, 5, 16)) * SurfaceKit.Grain("carpet", u, v, 0.5f, 3f);
+		if (edge < 0.012f) c = coal;
+		return c * (0.82f + 0.18f * Fbm(u, v, 91, 5, 16)) * SurfaceKit.Grain("carpet", u, v, 0.55f, 3f);
 	});
 
 	/// <summary>Dark stained wood panelling (the bar, the front desk, doors): Poly Haven's dark wood, a shade deeper.</summary>
@@ -210,6 +227,109 @@ public static class LodgeTextures
 		float tone = (0.34f + 0.16f * round) * grain * chink;
 		return new Color(tone * 1.05f, tone * 0.82f, tone * 0.62f);   // weathered pine, not orange
 	});
+
+	/// <summary>(2026-10-14h, the kit pass) Knotty pine panelling, the 70s lodge's walls: tongue-and-groove boards set
+	/// upright, six to the tile, each its own tone, a V-groove between them, dark knots here and there, aged to amber.</summary>
+	public static Texture2D KnottyPine => Make("lodge_knottypine", 256, 256, (u, v) =>
+	{
+		float bu = u * 6f;
+		int b = Mathf.FloorToInt(bu);
+		float fu = bu - b;
+		float tone = 0.8f + 0.25f * Hash(b, 0, 1201);
+		float grain = SurfaceKit.Grain("pine", u * 0.5f + b * 0.137f, v * 0.6f, 0.75f);
+		grain *= 0.94f + 0.06f * Mathf.Sin((fu * 5f + Fbm(u * 2f, v, 1202) * 6f) * Mathf.Pi);
+		Color c = new Color(0.54f, 0.35f, 0.19f) * tone * grain;
+		// knots: one or two to a board, in its middle third
+		for (int kk = 0; kk < 2; kk++)
+		{
+			if (Hash(b, kk, 1203) > 0.62f) continue;
+			float kv = Hash(b, kk, 1204), ku = 0.3f + 0.4f * Hash(b, kk, 1205);
+			float dv = Mathf.PosMod(v - kv + 0.5f, 1f) - 0.5f;
+			float r = new Vector2((fu - ku) / 6f * 1.4f, dv * 1.1f).Length() / (0.012f + 0.012f * Hash(b, kk, 1206));
+			if (r < 1f) c *= 0.35f + 0.25f * r;
+			else if (r < 2.4f) c *= 0.82f + 0.07f * (r - 1f);   // the grain darkened round it
+		}
+		// the V-groove
+		float g = Mathf.Min(fu, 1f - fu);
+		if (g < 0.03f) c *= 0.3f + 10f * g;
+		return c * (0.92f + 0.08f * Fbm(u, v, 1207));
+	});
+
+	/// <summary>(2026-10-14h) The mountain's trail map, a printed poster gone yellow: a painted range under a grey sky, the
+	/// runs down it in green, blue and black, the chair lifts' straight lines, the woods' dark below; a paper border.</summary>
+	public static Texture2D TrailMap => Make("lodge_trailmap", 256, 192, (u, v) =>
+	{
+		Color sky = new Color(0.42f, 0.5f, 0.56f).Lerp(new Color(0.62f, 0.64f, 0.62f), v * 2.5f), snow = new(0.8f, 0.79f, 0.74f), rock = new(0.42f, 0.4f, 0.38f);
+		Color tree = new(0.13f, 0.2f, 0.15f), valley = new(0.55f, 0.56f, 0.48f), paper = new(0.78f, 0.72f, 0.58f);
+		float ridge = 0.2f + 0.13f * Mathf.Abs(Mathf.Sin(u * Mathf.Pi * 1.4f + 0.5f)) + 0.05f * Fbm(u * 2f, 0.3f, 1501);
+		Color c;
+		if (v < ridge) c = sky;
+		else
+		{
+			float depth = v - ridge;
+			float shade = 0.82f + 0.18f * Mathf.Sin(u * 40f + Fbm(u, v, 1502) * 9f);   // the painter's strokes down the slopes
+			c = snow * shade;
+			if (depth < 0.06f && Fbm(u * 3f, v * 3f, 1503) > 0.55f) c = rock;
+			float treeLine = 0.36f + 0.08f * Fbm(u * 2f, 0.7f, 1504);
+			if (depth > treeLine - ridge * 0.3f && Hash((int)(u * 128), (int)(v * 96), 1505) < 0.55f + (depth - treeLine) * 2f) c = tree * (0.8f + 0.4f * Hash((int)(u * 64), (int)(v * 48), 1506));
+			if (v > 0.88f) c = valley;
+			// the runs: winding down from the ridge
+			foreach (var (x0, col, k) in new[] { (0.18f, new Color(0.14f, 0.42f, 0.2f), 3f), (0.34f, new Color(0.12f, 0.2f, 0.5f), 5f), (0.5f, new Color(0.04f, 0.04f, 0.04f), 7f), (0.66f, new Color(0.12f, 0.2f, 0.5f), 4f), (0.82f, new Color(0.14f, 0.42f, 0.2f), 6f) })
+			{
+				float x = x0 + 0.04f * Mathf.Sin(v * k * 3f) + (v - 0.5f) * 0.06f;
+				if (Mathf.Abs(u - x) < 0.006f && v < 0.9f) c = col;
+			}
+			// two lifts, straight up from the valley
+			foreach (var (a, b) in new[] { (0.26f, 0.42f), (0.6f, 0.74f) })
+			{
+				float t = (0.9f - v) / (0.9f - 0.3f), x = Mathf.Lerp(a, b, t);
+				if (t > 0f && t < 1f && Mathf.Abs(u - x) < 0.003f) c = new Color(0.1f, 0.08f, 0.08f);
+			}
+		}
+		// the title band and the paper's border
+		if (v > 0.93f) c = new Color(0.36f, 0.12f, 0.08f);
+		float edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));
+		if (edge < 0.03f) c = paper;
+		// yellowed, faded, foxed
+		c = c.Lerp(paper, 0.25f) * (0.86f + 0.14f * Fbm(u, v, 1507)) * (Hash((int)(u * 256), (int)(v * 192), 1508) > 0.995f ? 0.7f : 1f);
+		return c;
+	});
+	public static StandardMaterial3D TrailMapMat => Std("lodge_m_trailmap", TrailMap, 0.75f, 0.2f, new Color(0.85f, 0.82f, 0.76f));
+
+	/// <summary>(2026-10-14h) A 70s bedspread: a muted plaid in rust, tobacco and oatmeal, a thread of olive.</summary>
+	public static Texture2D Bedspread => Make("lodge_bedspread", 128, 128, (u, v) =>
+	{
+		static float Band(float t)
+		{
+			float f = t * 2f % 1f;
+			return f < 0.32f ? 1f : f < 0.4f ? 0.2f : f < 0.46f ? 0.6f : f < 0.5f ? 0f : f < 0.56f ? 0.6f : 0f;
+		}
+		float a = Band(u), b = Band(v);
+		Color oat = new(0.48f, 0.4f, 0.3f), rust = new(0.36f, 0.15f, 0.08f), tob = new(0.2f, 0.12f, 0.07f), olive = new(0.26f, 0.27f, 0.14f);
+		Color c = oat.Lerp(rust, Mathf.Max(a, b) * 0.85f).Lerp(tob, a * b * 0.8f);
+		if (Mathf.Abs(u * 2f % 1f - 0.43f) < 0.012f || Mathf.Abs(v * 2f % 1f - 0.43f) < 0.012f) c = olive;
+		return c * (0.92f + 0.08f * Fbm(u, v, 1301)) * SurfaceKit.Grain("linen", u, v, 0.5f, 2f);
+	});
+
+	private static readonly Dictionary<string, StandardMaterial3D> _uph = new();
+	/// <summary>(2026-10-14h, the kit pass: the violet velvet everywhere read magenta against the green carpet) The lodge's
+	/// upholstery: a worn corduroy in one of the 70s' earth tones ("rust", "mustard", "olive", "oxblood", else tobacco).</summary>
+	public static StandardMaterial3D Upholstery(string tone)
+	{
+		if (_uph.TryGetValue(tone, out var m)) return m;
+		Color c = tone switch
+		{
+			"rust" => new Color(0.36f, 0.15f, 0.08f),
+			"mustard" => new Color(0.44f, 0.32f, 0.11f),
+			"olive" => new Color(0.24f, 0.25f, 0.13f),
+			"oxblood" => new Color(0.26f, 0.08f, 0.07f),
+			_ => new Color(0.24f, 0.15f, 0.09f),
+		};
+		var tex = Make("lodge_uph_" + tone, 256, 256, (u, v) => c * SurfaceKit.Grain("velvet", u, v, 0.7f) * (0.86f + 0.14f * Mathf.Abs(Mathf.Sin(u * 48f * Mathf.Pi))) * (0.9f + 0.1f * Fbm(u, v, 1401)));
+		m = Std("lodge_m_uph_" + tone, tex, 0.95f, 0.12f, null, DetailKit.Kind.Fabric, "velvet", 0.35f, 0.5f);
+		_uph[tone] = m;
+		return m;
+	}
 
 	// ---------------------------------------------------------------- the crawlspace (Act 23: the cavity between the walls)
 
@@ -362,7 +482,7 @@ public static class LodgeTextures
 	/// tools/textures/make_wallpapers.py, a metre to the tile with a flocked relief: the damask (the corridor, the dining
 	/// hall) and a paper of its own in each room.</summary>
 	public static StandardMaterial3D WallpaperMat => Paper("damask");
-	public static StandardMaterial3D RoomPaperMat(int room) => Paper(room switch { 201 => "stripe", 202 => "floral", 203 => "trellis", _ => "stripe" });
+	public static StandardMaterial3D RoomPaperMat(int room) => Paper(room switch { 201 => "stripe201", 202 => "floral", 203 => "trellis", _ => "stripe" });   // (201 its own: the perfect room is left unweathered, SkiLodge.Kit)
 
 	private static StandardMaterial3D Paper(string set)
 	{
@@ -374,8 +494,8 @@ public static class LodgeTextures
 		// 202, ochre in 203), the plaster's own faint texture all the wall shows
 		Color paint = set switch
 		{
-			"stripe" => new Color(0.46f, 0.49f, 0.39f),   // (2026-10-13: each a step darker and dirtier: in the lantern's glow the pale paint went flat white)
-			"floral" => new Color(0.53f, 0.4f, 0.36f),
+			"stripe" or "stripe201" => new Color(0.46f, 0.49f, 0.39f),   // (2026-10-13: each a step darker and dirtier: in the lantern's glow the pale paint went flat white)
+			"floral" => new Color(0.49f, 0.42f, 0.32f),   // (2026-10-14h: an oatmeal; the dusty rose read mauve beside the violet)
 			"trellis" => new Color(0.57f, 0.47f, 0.33f),
 			_ => new Color(0.6f, 0.52f, 0.4f),
 		};
@@ -400,6 +520,9 @@ public static class LodgeTextures
 	/// doors drew the planked dark wood of the wainscot beside them, and read as more of the wall.</summary>
 	public static StandardMaterial3D DoorWoodMat => Std("lodge_m_doorwood", DarkWood, 0.42f, 0.42f, new Color(0.5f, 0.36f, 0.27f), DetailKit.Kind.Wood, "darkwood", 0.35f, 1.6f);
 	public static StandardMaterial3D DarkWoodMat =>_darkM ??= World.SurfaceSets.Hinoki(Std("lodge_m_darkwood", DarkWood, 0.45f, 0.45f, null, DetailKit.Kind.Wood, "darkwood", 0.4f), new Color(0.6f, 0.42f, 0.3f), 8f);
+	/// <summary>(2026-10-14h) Knotty pine panelling (the bar, the mudroom): UVs in metres, 15 cm boards.</summary>
+	public static StandardMaterial3D KnottyPineMat => Std("lodge_m_knottypine", KnottyPine, 0.72f, 0.28f, null, DetailKit.Kind.Wood, "pine", 0.4f, 0.9f);
+	public static StandardMaterial3D BedspreadMat => Std("lodge_m_bedspread", Bedspread, 0.95f, 0.1f, null, DetailKit.Kind.Fabric, "linen", 0.5f, 0.7f);
 	public static StandardMaterial3D LogWallMat => _logwallM ??= World.SurfaceSets.Hinoki(Std("lodge_m_logwall", LogWall, 0.8f, 0.25f, null, DetailKit.Kind.Wood), new Color(0.95f, 0.84f, 0.7f), 4f);
 	private static StandardMaterial3D _darkM, _logwallM;
 
@@ -413,6 +536,8 @@ public static class LodgeTextures
 
 	public static StandardMaterial3D GoldMat => _plain("lodge_m_gold", new Color(0.72f, 0.54f, 0.24f), 0.3f, 0.8f, 0.8f);
 	public static StandardMaterial3D BrassMat => _plain("lodge_m_brass", new Color(0.62f, 0.48f, 0.24f), 0.35f, 0.7f, 0.7f);
+	/// <summary>(2026-10-14h) Old green enamel (the bar's pendant shades), chipped dull.</summary>
+	public static StandardMaterial3D EnamelMat => _plain("lodge_m_enamel_green", new Color(0.13f, 0.2f, 0.14f), 0.4f, 0.45f);
 	public static StandardMaterial3D MustardMat => _plain("lodge_m_mustard", new Color(0.72f, 0.54f, 0.2f), 0.6f, 0.3f);
 	public static StandardMaterial3D PorcelainMat => _plain("lodge_m_porcelain", new Color(0.84f, 0.86f, 0.82f), 0.15f, 0.6f);
 	public static StandardMaterial3D MintPorcelainMat => _plain("lodge_m_mint_porcelain", new Color(0.55f, 0.74f, 0.64f), 0.15f, 0.6f);
