@@ -209,6 +209,7 @@ public static class ItemMeshes
 		var k = new MeshKit();
 		var b = new Built { PickCenter = new Vector3(0, 0.08f, 0), PickRadius = 0.3f };
 		if (FromBlender(kind, parent, ref b)) return b;
+		if (ModelPickup(kind, parent, ref b)) return b;
 		switch (kind)
 		{
 			case ToolKind.Axe: Axe(k, ref b); break;
@@ -262,6 +263,63 @@ public static class ItemMeshes
 		b.PickCenter = pick;
 		b.PickRadius = radius;
 		b.Triangles = ItemModels.Triangles(mi);
+		return true;
+	}
+
+	/// <summary>(2026-10-15) The tools and the cap from their Blender models (<see cref="ToolModels"/>, in grip space): the axe
+	/// bitten into its stump as before, the rest laid down on the ground (the hammer and the knife on their sides, the walkie
+	/// on its back, its LED lit, the lighter upright), the cap set on its break. False when there's no model (the code builds).</summary>
+	private static bool ModelPickup(ToolKind kind, Node3D parent, ref Built b)
+	{
+		if (kind == ToolKind.NewelPost)
+		{
+			if (ToolModels.CapMesh is not { } cap) return false;
+			var basis = new Basis(Vector3.Up, 0.3f) * new Basis(Vector3.Right, 0.07f);
+			parent.AddChild(new MeshInstance3D { Name = "Mesh", Mesh = cap, Transform = new Transform3D(basis, basis * new Vector3(0, -StaircaseBuilder.NewelBreakLowY, 0) + new Vector3(0, 0.004f, 0)) });
+			b.PickCenter = new Vector3(0, 0.15f, 0);
+			b.PickRadius = 0.3f;
+			b.Triangles = CountTriangles(cap);
+			return true;
+		}
+		string name = kind switch { ToolKind.Axe => "axe", ToolKind.Hammer => "hammer", ToolKind.Knife => "knife", ToolKind.Lighter => "lighter", ToolKind.Radio => "walkie", _ => null };
+		if (name == null || ToolModels.Load(name) is not { } model) return false;
+		parent.AddChild(model);
+		if (kind == ToolKind.Axe)
+		{
+			// as the code's axe stood: tilted 55° and turned a little, its bit 3.5 cm into the stump's top (grip space turned so
+			// the bit, its -Z, lies along the old axe space's +X; the butt 11.5 cm below the grip)
+			var basis = new Basis(Vector3.Up, 0.35f) * new Basis(Vector3.Back, Mathf.DegToRad(-55f));
+			var toGrip = new Basis(Vector3.Up, -Mathf.Pi * 0.5f);
+			var edgeMid = new Vector3(0.1115f, 0.571f, 0f);
+			var origin = new Vector3(0.02f, StumpTop - 0.035f, 0) - basis * edgeMid + basis * new Vector3(0, 0.115f, 0);
+			model.Transform = new Transform3D(basis * toGrip, origin);
+			b.PickCenter = model.Transform * new Vector3(0, 0.335f, 0);
+			b.PickRadius = 0.42f;
+		}
+		else
+		{
+			var (lay, yaw, radius) = kind switch
+			{
+				ToolKind.Hammer => (new Basis(Vector3.Back, Mathf.Pi * 0.5f), -0.4f, 0.28f),
+				ToolKind.Knife => (new Basis(Vector3.Back, -Mathf.Pi * 0.5f), 0.4f, 0.28f),
+				ToolKind.Radio => (new Basis(Vector3.Right, -Mathf.Pi * 0.5f), 0.6f, 0.26f),
+				_ => (Basis.Identity, 0.3f, 0.2f),
+			};
+			var xf = new Transform3D(new Basis(Vector3.Up, yaw) * lay, Vector3.Zero);
+			var box = ToolModels.Bounds(model, xf);
+			xf.Origin = new Vector3(-(box.Position.X + box.Size.X * 0.5f), -box.Position.Y, -(box.Position.Z + box.Size.Z * 0.5f));
+			model.Transform = xf;
+			b.PickCenter = new Vector3(0, box.Size.Y * 0.5f + 0.02f, 0);
+			b.PickRadius = radius;
+			if (kind == ToolKind.Radio)
+			{
+				b.Led = ToolModels.Led(model, 2f);
+				var ledAt = model.FindChild("Led", true, false) is MeshInstance3D led ? xf * ToolModels.Under(model, led) * led.GetAabb().GetCenter() : new Vector3(0, 0.03f, 0);
+				b.Glow = new OmniLight3D { Name = "LedGlow", Position = ledAt + Vector3.Up * 0.02f, LightColor = new Color(1f, 0.1f, 0.05f), LightEnergy = 0.3f, OmniRange = 0.7f, ShadowEnabled = false };
+				parent.AddChild(b.Glow);
+			}
+		}
+		foreach (var n in model.FindChildren("*", nameof(MeshInstance3D), true, false)) b.Triangles += CountTriangles(((MeshInstance3D)n).Mesh);
 		return true;
 	}
 

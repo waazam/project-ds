@@ -131,6 +131,20 @@ public static class HeldModels
 	public static Node3D Build(ToolKind kind)
 	{
 		var root = new Node3D { Name = "Held" + kind };
+		// (2026-10-15) the Blender models (ToolModels, in this same grip space); the code builds below only if one is missing
+		string glb = kind switch { ToolKind.Axe => "axe", ToolKind.Hammer => "hammer", ToolKind.Knife => "knife", ToolKind.Lighter => "lighter", ToolKind.Radio => "walkie", _ => null };
+		if (glb != null && ToolModels.Load(glb) is { } model)
+		{
+			root.AddChild(model);
+			foreach (var n in model.FindChildren("*", nameof(GeometryInstance3D), true, false)) ((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+			if (kind == ToolKind.Radio) root.SetMeta("led", ToolModels.Led(model, 0f));
+			return root;
+		}
+		if (kind == ToolKind.NewelPost && ToolModels.CapMesh is { } cap)
+		{
+			root.AddChild(new MeshInstance3D { Name = "Mesh", Mesh = cap, Position = new Vector3(0, -0.126f, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+			return root;
+		}
 		var k = new MeshKit();
 		switch (kind)
 		{

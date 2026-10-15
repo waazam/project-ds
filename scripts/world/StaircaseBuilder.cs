@@ -766,6 +766,8 @@ public partial class StaircaseBuilder : Node3D
 		get
 		{
 			if (_capMesh != null) return _capMesh;
+			// (2026-10-15) the Blender cap (ToolModels: the same cap space, the same twelve-point break as the stump)
+			if (ToolModels.CapMesh is { } blender) return _capMesh = blender;
 			var k = new MeshKit();
 			BuildNewelCap(k);
 			_capMesh = k.Commit();
