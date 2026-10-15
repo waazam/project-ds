@@ -876,6 +876,8 @@ SPECS = {
     "palmetto_b": lambda: palmetto(2),
     "boardpile": lambda: board_pile(1),
     "giant_fir": giant_fir,
+    # (2026-10-15) a second, so the nine round the deep wood's heart aren't one tree turned about
+    "giant_fir_b": lambda: fir(43, 48.0, 1.35, 0.18, 17, 7.2, 0.08),
 }
 
 

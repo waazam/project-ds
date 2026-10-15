@@ -709,6 +709,8 @@ public partial class ParkProp : Node3D
 				capTan = Tint("mush_cap_brown", new Color(0.42f, 0.3f, 0.18f)); capRust = Tint("mush_cap_umber", new Color(0.34f, 0.23f, 0.14f));
 				break;
 		}
+		var fleck = Tint("mush_fleck", new Color(0.82f, 0.78f, 0.66f));
+		string model = Variety switch { 1 => "plant_mush_bell", 2 => "plant_mush_amanita", 3 => "plant_mush_button", _ => "plant_mush_dome" };
 		for (int i = 0; i < n; i++)
 		{
 			float a = Mathf.Tau * i / n + R(i * 5, -0.3f, 0.3f);
@@ -718,16 +720,27 @@ public partial class ParkProp : Node3D
 			float cr = R(i * 5 + 3, 0.035f, 0.07f) * (i == 0 ? 1.3f : 1f) * rs;
 			// stems lean a little, every one its own way
 			var top = foot + new Vector3(R(i * 5 + 4, -0.2f, 0.2f) * h, h, R(i * 7 + 9, -0.2f, 0.2f) * h);
+			var cap = i == 3 ? capBruised : i % 2 == 0 ? capRust : capTan;
+			// (2026-10-15, the owner: every model made in Blender) the mushroom itself is tools/Blender/plants.py's, one kind
+			// a clump, stood along its lean and scaled to its stem and cap (the cap kept near its own shape); built here
+			// only if the model is missing
+			float sx = cr / 0.05f, sy = Mathf.Clamp((top - foot).Length() / 0.1f, sx * 0.75f, sx * 1.4f);
+			if (FurnitureKit.Add(_k, model, Stood(foot, top - foot, R(i * 5 + 600, 0f, Mathf.Tau), new Vector3(sx, sy, sx)),
+				new Dictionary<string, (Material mat, Color tint)>
+				{
+					["stem"] = (stem, Colors.White), ["cap"] = (cap, Colors.White), ["gill"] = (gill, Colors.White), ["fleck"] = (fleck, Colors.White),
+				}))
+				continue;
 			_k.Color = Colors.White;
 			_k.Mat(stem).Cylinder(foot, top, cr * 0.3f, cr * 0.22f, 5, false);
 			// a small gill disc under the cap, then the cap: a squashed blob, one of them bruised dark
 			_k.Mat(gill).Cylinder(top - new Vector3(0, 0.004f, 0), top + new Vector3(0, 0.004f, 0), cr * 0.85f, cr * 0.85f, 7, true);
-			_k.Mat(i == 3 ? capBruised : i % 2 == 0 ? capRust : capTan);
+			_k.Mat(cap);
 			_k.Blob(top + new Vector3(0, cr * 0.28f, 0), new Vector3(cr, cr * 0.5f, cr * 0.95f), Seed * 13 + i, 0.08f, true, 1f);
 			if (Variety == 2)
 			{
 				// pale flecks on the big caps, old and washed out
-				_k.Mat(Tint("mush_fleck", new Color(0.82f, 0.78f, 0.66f)));
+				_k.Mat(fleck);
 				for (int f = 0; f < 6; f++)
 				{
 					float fa = R(i * 31 + f, 0f, Mathf.Tau), fd = R(i * 31 + f + 7, 0f, 0.7f);
@@ -747,6 +760,11 @@ public partial class ParkProp : Node3D
 			return lo + (hi - lo) * ((h & 0xFFFF) / 65535f);
 		}
 	}
+
+	/// <summary>A Blender plant's placing: its foot at <paramref name="at"/>, its +Y along <paramref name="up"/>, turned
+	/// <paramref name="yaw"/> about its own axis, scaled in its own frame.</summary>
+	private static Transform3D Stood(Vector3 at, Vector3 up, float yaw, Vector3 scale)
+		=> new(new Basis(new Quaternion(Vector3.Up, up.Normalized())) * new Basis(Vector3.Up, yaw) * Basis.FromScale(scale), at);
 
 	private static StandardMaterial3D _petalMat;
 	/// <summary>Flat, double-sided, vertex-coloured: petals and leaves are single quads seen from both sides.</summary>
@@ -776,6 +794,8 @@ public partial class ParkProp : Node3D
 		}
 		int n = Variety == 0 ? 150 : 90 + (int)R(901, 0f, 60f);
 		int clumps = Variety == 0 ? 3 : 2 + (int)R(902, 0f, 2.99f);
+		string head = Variety switch { 1 => "plant_flower_buttercup", 3 => "plant_flower_daisy", _ => "plant_flower_star" };
+		if (!FurnitureKit.Has(head) || !FurnitureKit.Has("plant_flower_stem") || !FurnitureKit.Has("plant_flower_leaves")) head = null;
 		for (int i = 0; i < n; i++)
 		{
 			// a few loose clumps, thinning at the edges
@@ -788,6 +808,27 @@ public partial class ParkProp : Node3D
 			foot.Y = GroundY(foot) - 0.02f;
 			float h = R(i * 7 + 2, 0.18f, 0.45f);
 			var top = foot + new Vector3(R(i * 7 + 3, -0.06f, 0.06f), h, R(i * 7 + 4, -0.06f, 0.06f));
+			bool isWhite = R(i * 7 + 6, 0f, 1f) < 0.38f;
+			Color pc = isWhite ? white : (R(i * 7 + 8, 0f, 1f) < 0.4f ? purpleDeep : purple);
+			float pr = R(i * 7 + 9, 0.045f, 0.068f) * (isWhite ? 0.85f : 1f);
+			var up = new Vector3(R(i * 7 + 10, -0.5f, 0.5f), 1f, R(i * 7 + 11, -0.5f, 0.5f)).Normalized();
+			float rot = R(i * 7 + 12, 0f, Mathf.Tau);
+			if (head != null)
+			{
+				// (2026-10-15, the owner: every model made in Blender) tools/Blender/plants.py's flower in three pieces, so
+				// stretching one to its height bends no petal: the stem stood from foot to top, the leaves at the foot, the
+				// head at the top, tipped and turned, sized to its petals
+				var petals = new Dictionary<string, (Material mat, Color tint)>
+				{
+					["petal"] = (PetalMat, pc * R(i * 7 + 13, 0.9f, 1.08f)), ["eye"] = (PetalMat, eye), ["stem"] = (stem, Colors.White),
+				};
+				FurnitureKit.Add(_k, "plant_flower_stem", Stood(foot, top - foot, R(i * 7 + 14, 0f, Mathf.Tau), new Vector3(1f, (top - foot).Length(), 1f)),
+					new Dictionary<string, (Material mat, Color tint)> { ["stem"] = (stem, Colors.White) });
+				FurnitureKit.Add(_k, "plant_flower_leaves", Stood(foot, Vector3.Up, R(i * 11, 0f, Mathf.Tau), Vector3.One * R(i * 11 + 5, 0.75f, 1.1f)),
+					new Dictionary<string, (Material mat, Color tint)> { ["leaf"] = (PetalMat, leaf * R(i * 7 + 5, 0.8f, 1.15f)) });
+				FurnitureKit.Add(_k, head, Stood(top, up, rot, Vector3.One * (pr * 2f / 0.05f)), petals);
+				continue;
+			}
 			_k.Color = Colors.White;
 			_k.Mat(stem).Cylinder(foot, top, 0.005f, 0.0035f, 3, false, 4f);
 			// a narrow leaf or two at the foot
@@ -802,13 +843,8 @@ public partial class ParkProp : Node3D
 				_k.Tri(foot - side, foot + side, tip, Vector3.Up, Vector2.Zero, Vector2.Right, Vector2.Down);
 			}
 			// the head: five petals round a tiny eye, tipped a little off the vertical
-			bool isWhite = R(i * 7 + 6, 0f, 1f) < 0.38f;
-			Color pc = isWhite ? white : (R(i * 7 + 8, 0f, 1f) < 0.4f ? purpleDeep : purple);
-			float pr = R(i * 7 + 9, 0.045f, 0.068f) * (isWhite ? 0.85f : 1f);
-			var up = new Vector3(R(i * 7 + 10, -0.5f, 0.5f), 1f, R(i * 7 + 11, -0.5f, 0.5f)).Normalized();
 			var ax = up.Cross(Vector3.Forward).Normalized();
 			var az = ax.Cross(up).Normalized();
-			float rot = R(i * 7 + 12, 0f, Mathf.Tau);
 			_k.Color = pc * R(i * 7 + 13, 0.9f, 1.08f);
 			for (int p = 0; p < 5; p++)
 			{

@@ -80,23 +80,37 @@ public partial class DeepZoneDressing : Node3D
 			parent.AddChild(tree);
 			tree.GlobalPosition = pos;
 
-			var k = new MeshKit();
-			k.Color = new Color(0.32f, 0.26f, 0.2f);
-			k.Mat(trunk).Cylinder(new Vector3(0, -0.3f, 0), new Vector3(0, height * 0.42f, 0), trunkR, trunkR * 0.6f, 7);
-			k.Color = new Color(0.07f, 0.11f, 0.075f);
-			k.Mat(needle);
-			int tiers = 8;
-			float crownStart = height * 0.16f;
-			for (int t = 0; t < tiers; t++)
+			// (2026-10-15, the owner: every model made in Blender) forest.py's giant firs, two of them turn about, each scaled
+			// from its 48 m to this one's height and turned its own way; a dark instance tint for the deep wood's gloom (the
+			// fir materials take it as the scatter's firs do). Built here only if the .glb is missing.
+			var model = ScatterModels.Get(i % 2 == 0 ? "giant_fir" : "giant_fir_b", () => null);
+			if (model != null)
 			{
-				float f = t / (float)(tiers - 1);
-				float y0 = Mathf.Lerp(crownStart, height * 0.98f, f);
-				float y1 = y0 + (height - crownStart) / tiers * 1.35f;
-				float r = Mathf.Lerp(trunkR * 7f, trunkR * 1.1f, f * f);
-				k.Cylinder(new Vector3(0, y0, 0), new Vector3(0, y1, 0), r, r * 0.15f, 7);
+				var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = model, InstanceCount = 1 };
+				mm.SetInstanceTransform(0, new Transform3D(new Basis(Vector3.Up, i * 2.39996f).Scaled(Vector3.One * (height / 48f)), Vector3.Zero));
+				mm.SetInstanceColor(0, new Color(0.62f, 0.6f, 0.58f));
+				tree.AddChild(new MultiMeshInstance3D { Name = "Mesh", Multimesh = mm });
 			}
-			k.Color = Colors.White;
-			k.CommitTo(tree, "Mesh", true);
+			else
+			{
+				var k = new MeshKit();
+				k.Color = new Color(0.32f, 0.26f, 0.2f);
+				k.Mat(trunk).Cylinder(new Vector3(0, -0.3f, 0), new Vector3(0, height * 0.42f, 0), trunkR, trunkR * 0.6f, 7);
+				k.Color = new Color(0.07f, 0.11f, 0.075f);
+				k.Mat(needle);
+				int tiers = 8;
+				float crownStart = height * 0.16f;
+				for (int t = 0; t < tiers; t++)
+				{
+					float f = t / (float)(tiers - 1);
+					float y0 = Mathf.Lerp(crownStart, height * 0.98f, f);
+					float y1 = y0 + (height - crownStart) / tiers * 1.35f;
+					float r = Mathf.Lerp(trunkR * 7f, trunkR * 1.1f, f * f);
+					k.Cylinder(new Vector3(0, y0, 0), new Vector3(0, y1, 0), r, r * 0.15f, 7);
+				}
+				k.Color = Colors.White;
+				k.CommitTo(tree, "Mesh", true);
+			}
 
 			var body = new StaticBody3D { CollisionLayer = 1, CollisionMask = 0 };
 			body.SetMeta("surface", "wood");
