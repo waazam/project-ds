@@ -35,7 +35,7 @@ public partial class ShadowMan : Node3D
 
 	public override void _Ready()
 	{
-		ProjectDS.Entities.CreatureRim.Apply(this);
+		// (2026-10-14h, the old-and-abandoned pass: no cold rim on him; he is a dark shape against the lit wall, not a glowing one)
 		PhotoSubject.Attach(this, "shadowman", new Vector3(0, 1.6f, 0), 1f, 45f, 12f, true, new Vector3(0, 1.0f, 0));
 		_ink = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ink_shadow.gdshader") };
 		_ink.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
@@ -218,14 +218,14 @@ public partial class ShadowMan : Node3D
 				ScaleMin = 0.4f, ScaleMax = 1f, AngleMin = 0f, AngleMax = 360f, AngularVelocityMin = -60f, AngularVelocityMax = 60f,
 				ColorRamp = Ramp(new Color(0, 0, 0, 0f), new Color(0, 0, 0, 0.95f), new Color(0, 0, 0, 0f)),
 			}, 0.035f, new Color(0.005f, 0.005f, 0.006f), null, false));
-		// specks of light deep in the black, swimming slowly in and out
+		// specks deep in the black, swimming slowly in and out (2026-10-14h: grey ash now, not points of light)
 		_aura.AddChild(Particles("Specks", 34, 3.2, new Vector3(0.2f, 0.9f, 0.12f), new Vector3(0, 1.3f, 0),
 			new ParticleProcessMaterial
 			{
 				Direction = Vector3.Up, Spread = 180f, InitialVelocityMin = 0.0f, InitialVelocityMax = 0.05f, Gravity = Vector3.Zero,
 				ScaleMin = 0.5f, ScaleMax = 1.2f,
-				ColorRamp = Ramp(new Color(1, 1, 1, 0f), new Color(0.85f, 0.88f, 1f, 0.7f), new Color(1, 1, 1, 0f)),
-			}, 0.016f, Colors.White, dot, true));
+				ColorRamp = Ramp(new Color(1, 1, 1, 0f), new Color(0.85f, 0.85f, 0.85f, 0.7f), new Color(1, 1, 1, 0f)),
+			}, 0.016f, new Color(0.09f, 0.085f, 0.08f), dot, false));
 	}
 
 	private static GradientTexture1D Ramp(Color a, Color b, Color c) =>
@@ -262,7 +262,8 @@ public partial class ShadowMan : Node3D
 		if (_veilMat != null) _veilMat.AlbedoColor = new Color(1, 1, 1, Mathf.Lerp(0.12f, 0.3f, 1f - breath));
 		if (_veil != null) _veil.Scale = Vector3.One * Mathf.Lerp(0.95f, 1.1f, 1f - breath);
 		if (_aura != null) foreach (var n in _aura.GetChildren()) if (n is GpuParticles3D gp && gp.Name == "Smoke") gp.SpeedScale = Mathf.Lerp(0.7f, 1.3f, breath);
-		_eyeMat.EmissionEnergyMultiplier = Mathf.Lerp(0.6f, 12f, Glare);
+		// (2026-10-14h: dimmer at rest, two pinpricks barely there; they still burn when he takes someone)
+		_eyeMat.EmissionEnergyMultiplier = Mathf.Lerp(0.15f, 12f, Glare * Glare);
 		_ink.SetShaderParameter("fray", Mathf.Lerp(0.5f, 0.8f, Glare));
 		// now and then the head snaps to a new angle (fast, then held): wrong, but never a flicker
 		_nextTwitch -= dt;

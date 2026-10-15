@@ -350,6 +350,7 @@ public partial class Playtest
 				_ = HallWalk(hw, Act15Hallway.End - 2f, false, ct, 120);
 				await _bot.WaitUntil(() => hw.State == Act15Hallway.Phase.Red, 40, ct);
 				Check("red: the lights change, he's behind them", hw.State == Act15Hallway.Phase.Red);
+				Shot("red_light");
 				await _bot.WaitUntil(() => PlayerDeath.Dying, 8, ct);
 				Check("moving in the red: taken", PlayerDeath.Dying);
 			}
@@ -470,7 +471,8 @@ public partial class Playtest
 		ChoicePrompt.Instance?.TestChoose(1);
 		int w0 = sewer.Whispers;
 		using (Fast(2)) await _bot.Seconds(8.0, ct);
-		Check("the second no: the teal haze, more whispers", sewer.Noes == 2 && sewer.Teal && sewer.Whispers >= w0 + 3, $"{sewer.Whispers - w0} more");
+		Check("the second no: the brown-out and its murk, more whispers", sewer.Noes == 2 && sewer.Teal && sewer.Whispers >= w0 + 3, $"{sewer.Whispers - w0} more");
+		Shot("brown_out");
 		await _bot.Aim(sewer.HoleWorld, ct);
 		await _bot.UseIt(sewer.HoleUse, ct);
 		await _bot.WaitUntil(() => ChoicePrompt.Instance is { IsOpen: true }, 3, ct);
