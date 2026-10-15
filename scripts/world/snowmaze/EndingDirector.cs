@@ -666,16 +666,8 @@ public partial class EndingDirector : Node3D
 		_stairs.GlobalBasis = Basis.LookingAt(-face.Normalized(), Vector3.Up);
 		await StoryBeat.PanTowards(this, player, CarAt + Vector3.Up * 2f, 1.5f, ct, pitch: true);
 		await Cutscene.Wait(this, 1.5, ct);
-		// the blood: down from the top step, a step at a time, to the bottom
-		var blood = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.02f, 0.02f), Roughness = 0.1f, MetallicSpecular = 0.8f };
-		for (int i = 11; i >= 0; i--)
-		{
-			var step = new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.7f, 0.01f, 0.32f) }, MaterialOverride = blood, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-			_stairs.AddChild(step);
-			step.Position = new Vector3(0, 0.2f + i * 0.2f, -0.3f - i * 0.3f);
-			AudioDirector.OneShot(this, "haunt_drip", 3, step.GlobalPosition, -10f, "Events", 2f, 0.1f);
-			await Cutscene.Wait(this, 0.45, ct);
-		}
+		// the blood: down from the top step, a step at a time, to the bottom (EndingDirector.Blood.cs)
+		await BleedStairs(ct);
 		await Cutscene.Wait(this, 1.0, ct);
 		// up them: slowly at first, faster and faster
 		var top = _stairs.GlobalPosition + _stairs.GlobalBasis * new Vector3(0, 2.6f, -3.6f);

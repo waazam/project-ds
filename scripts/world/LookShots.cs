@@ -18,7 +18,8 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class LookShots : Node
 {
-	private int _act = 1, _turns = 4;
+	private int _act = 1, _turns = 4, _seq;
+	private string _fx = "";
 	private float _wait = 8f;
 	private string _out = "res://test-output/look";
 	private readonly List<(Vector3 p, float yaw, float pitch)> _poses = new();
@@ -34,6 +35,8 @@ public partial class LookShots : Node
 			else if (a.StartsWith("--look-out=")) dir = V("--look-out=");
 			else if (a.StartsWith("--look-wait=")) _wait = float.Parse(V("--look-wait="), CultureInfo.InvariantCulture);
 			else if (a.StartsWith("--look-turns=")) _turns = int.Parse(V("--look-turns="));
+			else if (a.StartsWith("--look-seq=")) _seq = int.Parse(V("--look-seq="));
+			else if (a.StartsWith("--look-fx=")) _fx = V("--look-fx=");
 			else if (a.StartsWith("--look-pos="))
 				foreach (var pose in V("--look-pos=").Split(';', StringSplitOptions.RemoveEmptyEntries))
 				{
@@ -95,6 +98,8 @@ public partial class LookShots : Node
 		if (p == null) { GD.PrintErr("[look] no player"); tree.Quit(2); return; }
 		p.PlayerInput.Scripted = true;
 		await Wait(_wait);
+		// --look-fx=name: a water or blood effect an event makes, put on for the shots (FlowPreview)
+		if (_fx != "") await FlowPreview.Apply(this, _fx);
 		var start = p.GlobalPosition;
 		float yaw0 = p.CameraRig.Yaw;
 		GD.Print($"[look] act {_act} at {start} yaw {Mathf.RadToDeg(yaw0):0}");
@@ -137,6 +142,12 @@ public partial class LookShots : Node
 			p.CameraRig.SetPitch(Mathf.DegToRad(pitch));
 			await Hold(p, Mathf.DegToRad(yaw), Mathf.DegToRad(pitch), 2.5f);
 			Save($"{shot++:00}_pos_{pos.X:0}_{pos.Z:0}_{yaw:0}");
+			// --look-seq=N: N more frames of the same view, 0.12 s apart (motion: the water's flow)
+			for (int f = 1; f <= _seq; f++)
+			{
+				await Hold(p, Mathf.DegToRad(yaw), Mathf.DegToRad(pitch), 0.12f);
+				Save($"{shot - 1:00}_seq{f}");
+			}
 			if (_perf > 0f)
 			{
 				await Perf(p, yaw, pitch, "with");
