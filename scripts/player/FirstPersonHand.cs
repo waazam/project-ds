@@ -155,8 +155,10 @@ public partial class FirstPersonHand : Node3D
 	/// <summary>(2026-10-14f) The modelled arm's materials, all one shader (assets/shaders/fp_arm.gdshader): the glove's
 	/// worn brown leather in its own baked colour and normal maps (2026-10-14g: its grime, scuffs, scratches and the
 	/// seams' thread in the colour map; its occlusion and wear in the vertices) under the shader's grain, its knuckles and
-	/// fingertips polished smooth; the jacket's knitted cuff; its cotton duck sleeve (the colour the model's vertices',
-	/// the weave, seams, hem, fray and creases the shader's). Nothing casts a shadow.</summary>
+	/// fingertips polished smooth (2026-10-15: charcoal-black, a blacker grip palm, a low sheen and rim so it reads in the
+	/// dark); the jacket's cotton duck sleeve, its hem down over the glove's gauntlet (the colour, a very dark olive-brown,
+	/// the model's vertices'; the weave, seams, hem, fray and creases the shader's). (Models before 2026-10-15 also had a
+	/// knitted cuff, "fp_cuff", still dressed as kind 1.) Nothing casts a shadow.</summary>
 	public static void Dress(Node3D arm)
 	{
 		foreach (var n in arm.FindChildren("*", "MeshInstance3D", true, false))

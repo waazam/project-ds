@@ -22,6 +22,7 @@ heel, a fleshy ball of the thumb), posed joint by joint along the solved grip, a
 whole hand is one continuous, smooth skin with real knuckles, finger pads and creases. The glove's folds, seams and
 wrinkles are carved into a finer subdivision and baked onto the game's (two levels) through clean UVs; the leather's
 grain is the game's shader's. The glove ends in a short cuff under the jacket's knitted storm cuff, the sleeve over that.
+(2026-10-15: the glove charcoal-black, the cuff dark charcoal wool, the jacket a worn dark navy canvas.)
 
 Coordinates: the game's camera space (x right, y up, z back toward the eye), converted to Blender's (x, -z, y).
 """
@@ -742,24 +743,28 @@ def carve(ob, hand):
     return dark, stitch
 
 
-# (linear colours; 2026-10-14g, the owner: "the leather reads greyish-tan in daylight": a darker, warmer worn brown, enough
-# colour in it to stay brown under the cool rim light and the grade)
-GLOVE = np.array((0.050, 0.027, 0.013))         # (the leather: a dark, oiled brown)
-GLOVE_RED = np.array((0.058, 0.025, 0.010))     # (here and there a little redder, where the dye held)
-GLOVE_WORN = np.array((0.105, 0.062, 0.032))    # (rubbed paler where it's stretched: the knuckles, the fingertips)
-GLOVE_DIRT = np.array((0.022, 0.018, 0.013))    # (grime worked into the palm, the fingertips, the creases)
-GLOVE_SCUFF = np.array((0.080, 0.060, 0.043))   # (scuffed: the grain roughed up, paler and duller)
-GLOVE_SCRATCH = np.array((0.130, 0.092, 0.060))  # (a scratch through the finish to the pale leather under it)
-THREAD = np.array((0.110, 0.085, 0.052))        # (the waxed linen thread of the seams)
-CUFF = np.array((0.036, 0.032, 0.026))          # (the jacket's knitted storm cuff: a warm charcoal wool)
-CUFF_DIRT = np.array((0.030, 0.025, 0.018))
-# (2026-10-14g, the owner: "in some shots the sleeve reads dark navy-black") the jacket's cotton duck: an olive-brown
-# work canvas, sun-faded paler on top, darker and dirtier underneath; light enough to stay olive in the dark
-SLEEVE = np.array((0.080, 0.072, 0.036))
-SLEEVE_FADED = np.array((0.112, 0.100, 0.056))
-SLEEVE_UNDER = np.array((0.046, 0.040, 0.021))
-SLEEVE_DIRT = np.array((0.044, 0.034, 0.021))   # (mud, dried and rubbed in)
-SLEEVE_GREASE = np.array((0.034, 0.031, 0.022))
+# (linear colours; 2026-10-15, the owner: "make the gloves darker grey or black") a winter work glove: charcoal-black
+# leather over the back, rubbed to a worn grey over the knuckles and fingertips, a blacker synthetic grip palm, grey thread
+GLOVE = np.array((0.021, 0.020, 0.019))         # (the leather: a dyed charcoal-black)
+GLOVE_RED = np.array((0.026, 0.023, 0.020))     # (here and there a little warmer, where the dye's faded)
+GLOVE_WORN = np.array((0.060, 0.057, 0.052))    # (rubbed grey where it's stretched: the knuckles, the fingertips)
+GLOVE_DIRT = np.array((0.012, 0.011, 0.010))    # (grime worked into the palm, the fingertips, the creases)
+GLOVE_SCUFF = np.array((0.046, 0.044, 0.041))   # (scuffed: the grain roughed up, paler and duller)
+GLOVE_SCRATCH = np.array((0.095, 0.090, 0.082))  # (a scratch through the dye to the grey leather under it)
+GLOVE_PALM = np.array((0.011, 0.011, 0.011))    # (the palm's synthetic grip panel: blacker than the leather)
+THREAD = np.array((0.070, 0.068, 0.064))        # (the grey nylon thread of the seams)
+# (2026-10-15) the knitted storm cuff: a dark charcoal-grey wool, a shade lighter and warmer than the glove so the two
+# read apart, neutral beside the blue
+CUFF = np.array((0.042, 0.040, 0.037))
+CUFF_DIRT = np.array((0.032, 0.030, 0.026))
+# (2026-10-15, the owner: the jacket "DARK BLUE") the jacket's cotton duck: a worn dark navy-indigo work canvas, sun-faded
+# paler and greyer on top, darker underneath, mud and a grease mark; light and blue enough to read as blue (not black)
+# under the lantern and in daylight
+SLEEVE = np.array((0.016, 0.021, 0.040))
+SLEEVE_FADED = np.array((0.027, 0.032, 0.052))
+SLEEVE_UNDER = np.array((0.009, 0.011, 0.022))
+SLEEVE_DIRT = np.array((0.022, 0.021, 0.020))   # (mud, dried and rubbed in)
+SLEEVE_GREASE = np.array((0.010, 0.011, 0.015))
 
 
 def mesh_arrays(me):
@@ -822,7 +827,7 @@ def glove_colour(ob, hand, dark=None, stitch=None, smooth=3):
     wear *= 0.7 + 0.6 * np.clip(noise3(P, 300.0, 5), -0.5, 0.5)
     wear = np.clip(wear, 0, 1)
     palm = np.clip(-(nr @ B) * 1.4, 0, 1)
-    col = col * (1 - 0.1 * palm)[:, None]
+    col = _lerp(col, GLOVE_PALM, palm * 0.8)
     col = _lerp(col, GLOVE_WORN, wear * (1 - 0.6 * palm))
     # scuffs: the grain roughed up in patches, paler and duller (not on the palm: that's polished with handling)
     sc = np.clip(noise3(P, 190.0, 9) * 2.4 - 1.15, 0, 1) * np.clip(noise3(P, 600.0, 10) + 0.8, 0, 1) * (1 - 0.7 * palm)
