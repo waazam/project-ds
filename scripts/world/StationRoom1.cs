@@ -149,12 +149,12 @@ public partial class StationRoom1 : Node3D
 		var flex = new MeshKit();
 		flex.Mat(StationTextures.Flat("st_flex", new Color(0.05f, 0.05f, 0.05f)));
 		flex.Color = Colors.White;
-		flex.Cylinder(new Vector3(lampAt.X, Height, lampAt.Z), lampAt + Vector3.Up * 0.06f, 0.006f, 0.006f, 4, false);
-		flex.Cylinder(lampAt + Vector3.Up * 0.07f, lampAt + Vector3.Up * 0.02f, 0.02f, 0.022f, 8, true);
+		flex.Cylinder(new Vector3(lampAt.X, Height, lampAt.Z), lampAt + Vector3.Up * 0.09f, 0.0045f, 0.0045f, 5, false);
+		HollowProps.Socket(flex, lampAt + Vector3.Up * 0.02f);   // (2026-10-15: a lampholder and an A-shaped bulb, not a cylinder and a sphere)
 		flex.CommitTo(this, "Flex", false);
 		AddChild(new MeshInstance3D
 		{
-			Name = "Bulb", Mesh = new SphereMesh { Radius = 0.035f, Height = 0.09f }, Position = lampAt - Vector3.Up * 0.02f,
+			Name = "Bulb", Mesh = HollowProps.BulbMesh(), Position = lampAt + Vector3.Up * 0.02f,
 			MaterialOverride = StationTextures.Glow("st_bulb_r1", new Color(1f, 0.72f, 0.5f), 1.3f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
 		AddChild(new OmniLight3D

@@ -574,18 +574,41 @@ public partial class LobbyDecor : Node3D
 		sk.Color = Colors.White;
 		sk.BevelBox(s0 + new Vector3(-0.05f, 0.006f, 0), new Vector3(0.95f, 0.012f, 0.9f), 0.004f);
 		sk.Mat(iron);
-		foreach (int sx in new[] { -1, 1 }) foreach (int sz in new[] { -1, 1 })
-				sk.Cylinder(s0 + new Vector3(sx * 0.15f, 0.012f, sz * 0.15f), s0 + new Vector3(sx * 0.13f, 0.14f, sz * 0.13f), 0.03f, 0.02f, 6, true);
-		sk.Cylinder(s0 + Vector3.Up * 0.13f, s0 + Vector3.Up * 0.18f, 0.24f, 0.24f, 16, true);    // the base ring
-		sk.Cylinder(s0 + Vector3.Up * 0.18f, s0 + Vector3.Up * 0.32f, 0.2f, 0.26f, 16, false);      // the belly
-		sk.Cylinder(s0 + Vector3.Up * 0.32f, s0 + Vector3.Up * 0.52f, 0.26f, 0.25f, 16, false);
-		sk.Cylinder(s0 + Vector3.Up * 0.52f, s0 + Vector3.Up * 0.7f, 0.25f, 0.18f, 16, false);
-		sk.Cylinder(s0 + Vector3.Up * 0.7f, s0 + Vector3.Up * 0.74f, 0.21f, 0.21f, 16, true);      // the collar
-		sk.Cylinder(s0 + Vector3.Up * 0.74f, s0 + Vector3.Up * 0.82f, 0.16f, 0.14f, 14, true);     // the top
-		// the fire door, facing the room (-X), its handle; the ash door under it
-		sk.BevelBox(s0 + new Vector3(-0.255f, 0.42f, 0), new Vector3(0.03f, 0.17f, 0.2f), 0.008f);
-		sk.Cylinder(s0 + new Vector3(-0.27f, 0.42f, 0.07f), s0 + new Vector3(-0.31f, 0.42f, 0.07f), 0.012f, 0.012f, 6, true);
-		sk.BevelBox(s0 + new Vector3(-0.235f, 0.24f, 0), new Vector3(0.03f, 0.06f, 0.18f), 0.006f);
+		// (2026-10-15, the props' proportions pass) turned in one smooth profile, 16 sides, instead of five stacked drums:
+		// a cast base on three cabriole legs, the ash pit, the belly swelling out to 52 cm, its cast band, the shoulder in
+		// to the fire collar, a domed top with its finial and the flue's collar
+		for (int i = 0; i < 3; i++)
+		{
+			float a = Mathf.Pi / 3f + Mathf.Tau * i / 3f;
+			Vector3 d = new(Mathf.Cos(a), 0, Mathf.Sin(a));
+			var knee = s0 + d * 0.17f + Vector3.Up * 0.15f;
+			var ankle = s0 + d * 0.22f + Vector3.Up * 0.05f;
+			var foot = s0 + d * 0.235f + Vector3.Up * 0.012f;
+			sk.Cylinder(knee, ankle, 0.03f, 0.02f, 8, false);
+			sk.Cylinder(ankle, foot, 0.02f, 0.028f, 8, false);
+			sk.Cylinder(foot + Vector3.Down * 0.004f, foot + Vector3.Up * 0.008f, 0.032f, 0.03f, 8, true);
+		}
+		HollowProps.Lathe(sk, s0, new Vector2[]
+		{
+			new(0.19f, 0.13f), new(0.215f, 0.14f), new(0.215f, 0.17f), new(0.2f, 0.18f), new(0.205f, 0.2f),   // the base and its rim
+			new(0.23f, 0.24f), new(0.252f, 0.3f), new(0.262f, 0.36f), new(0.262f, 0.42f),                     // the belly
+			new(0.272f, 0.425f), new(0.272f, 0.445f), new(0.26f, 0.45f),                                        // its cast band
+			new(0.252f, 0.5f), new(0.232f, 0.56f), new(0.2f, 0.62f), new(0.172f, 0.67f),                        // the shoulder
+			new(0.2f, 0.68f), new(0.212f, 0.7f), new(0.212f, 0.73f), new(0.19f, 0.74f),                         // the fire collar
+			new(0.17f, 0.76f), new(0.13f, 0.79f), new(0.075f, 0.81f),                                          // the dome
+		}, 16, true, true);
+		sk.Cylinder(s0 + Vector3.Up * 0.8f, s0 + Vector3.Up * 0.83f, 0.085f, 0.078f, 12, false);   // the flue's collar
+		// the fire door on the belly, facing the room (-X): curved to it, a raised rim, hinge lugs, its latch; the ash door
+		// under the band
+		{
+			sk.BevelBox(s0 + new Vector3(-0.264f, 0.35f, 0), new Vector3(0.022f, 0.14f, 0.2f), 0.008f);
+			sk.BevelBox(s0 + new Vector3(-0.276f, 0.35f, 0), new Vector3(0.008f, 0.11f, 0.17f), 0.003f);
+			foreach (float dy in new[] { -0.045f, 0.045f })
+				sk.Cylinder(s0 + new Vector3(-0.272f, 0.35f + dy - 0.015f, 0.105f), s0 + new Vector3(-0.272f, 0.35f + dy + 0.015f, 0.105f), 0.01f, 0.01f, 6, true);
+			sk.Cylinder(s0 + new Vector3(-0.28f, 0.35f, -0.08f), s0 + new Vector3(-0.32f, 0.36f, -0.08f), 0.008f, 0.006f, 6, true);
+			sk.BevelBox(s0 + new Vector3(-0.21f, 0.2f, 0), new Vector3(0.02f, 0.05f, 0.15f), 0.005f);
+			sk.Cylinder(s0 + new Vector3(-0.222f, 0.2f, 0.05f), s0 + new Vector3(-0.245f, 0.2f, 0.05f), 0.007f, 0.007f, 6, true);
+		}
 		// the flue: up from the top, a damper, and a bend into the wall's thimble
 		float flueY = 2.25f;
 		sk.Cylinder(s0 + Vector3.Up * 0.82f, s0 + Vector3.Up * flueY, 0.07f, 0.07f, 12, false);
@@ -593,13 +616,12 @@ public partial class LobbyDecor : Node3D
 		sk.Cylinder(s0 + Vector3.Up * flueY, s0 + new Vector3(0.06f, flueY + 0.1f, 0), 0.07f, 0.07f, 12, false);
 		sk.Cylinder(s0 + new Vector3(0.06f, flueY + 0.1f, 0), new Vector3(IX + 0.02f, flueY + 0.12f, s0.Z), 0.07f, 0.07f, 12, false);
 		sk.Cylinder(new Vector3(IX - 0.01f, flueY + 0.12f, s0.Z), new Vector3(IX + 0.005f, flueY + 0.12f, s0.Z), 0.11f, 0.11f, 14, true);   // the thimble's plate
-		// a kettle on it, a poker against it
-		sk.Mat(StationTextures.Flat("st_enamel", new Color(0.2f, 0.24f, 0.22f), 0.45f, 0.4f));
-		sk.Cylinder(s0 + new Vector3(-0.05f, 0.82f, 0.05f), s0 + new Vector3(-0.05f, 0.95f, 0.05f), 0.09f, 0.07f, 12, true);
-		sk.Cylinder(s0 + new Vector3(-0.05f, 0.95f, 0.05f), s0 + new Vector3(-0.05f, 0.98f, 0.05f), 0.04f, 0.02f, 8, true);
-		sk.Cylinder(s0 + new Vector3(-0.12f, 0.88f, 0.05f), s0 + new Vector3(-0.2f, 0.94f, 0.05f), 0.015f, 0.01f, 6, true);
+		// a kettle set down on the mat (the stove is cold), a poker against it. (2026-10-15: a kettle's real shape, not a drum
+		// with a cone and a stick: HollowProps.Kettle)
+		HollowProps.Kettle(sk, s0 + new Vector3(-0.33f, 0.012f, 0.3f), 2.2f, StationTextures.Flat("st_enamel", new Color(0.2f, 0.24f, 0.22f), 0.45f, 0.4f), StationTextures.CasingMat);
 		sk.Mat(iron);
-		sk.Cylinder(s0 + new Vector3(-0.3f, 0.01f, -0.28f), s0 + new Vector3(-0.22f, 0.75f, -0.24f), 0.008f, 0.008f, 5, true);
+		sk.Cylinder(s0 + new Vector3(-0.3f, 0.01f, -0.28f), s0 + new Vector3(-0.22f, 0.75f, -0.24f), 0.008f, 0.008f, 6, true);
+		ItemMeshes.Torus(sk, s0 + new Vector3(-0.218f, 0.79f, -0.238f), new Vector3(0.1f, -0.05f, 0.99f), 0.035f, 0.006f, 10, 4);   // its handle's loop
 		body.AddChild(new CollisionShape3D { Position = s0 + new Vector3(0, 0.45f, 0), Shape = new CylinderShape3D { Radius = 0.27f, Height = 0.9f } });
 		// kindling stacked by it
 		if (!World.FurnitureKit.Add(sk, "log_pile", s0 + new Vector3(0.05f, 0.012f, -0.75f), Mathf.Pi * 0.5f + 0.1f, roles, Vector3.One * 0.6f))

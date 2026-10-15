@@ -172,7 +172,7 @@ public partial class StationRoom2 : Node3D
 		// one bare bulb on a flex over the table
 		var bulb = new MeshInstance3D
 		{
-			Mesh = new SphereMesh { Radius = 0.05f, Height = 0.12f }, Position = new Vector3(0, Height - 0.7f, 0),
+			Mesh = HollowProps.BulbMesh(1.15f), Position = new Vector3(0, Height - 0.66f, 0),   // (2026-10-15: A-shaped, in a lampholder)
 			MaterialOverride = StationTextures.Glow("st_bulb2", new Color(1f, 0.85f, 0.65f), 2f),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
@@ -180,7 +180,8 @@ public partial class StationRoom2 : Node3D
 		var flex = new MeshKit();
 		flex.Mat(StationTextures.Flat("st_flex", new Color(0.05f, 0.05f, 0.05f)));
 		flex.Color = Colors.White;
-		flex.Cylinder(new Vector3(0, Height, 0), new Vector3(0, Height - 0.65f, 0), 0.006f, 0.006f, 4, false);
+		flex.Cylinder(new Vector3(0, Height, 0), new Vector3(0, Height - 0.59f, 0), 0.0045f, 0.0045f, 5, false);
+		HollowProps.Socket(flex, new Vector3(0, Height - 0.66f, 0));
 		flex.CommitTo(this, "Flex", false);
 		AddChild(new OmniLight3D
 		{
@@ -370,9 +371,23 @@ public partial class StationRoom2 : Node3D
 		var k = new MeshKit();
 		k.Mat(PropTextures.DeckMat);
 		k.Color = new Color(0.16f, 0.1f, 0.07f);
-		BuildKit.Box(k, new Vector3(0, 0.86f, 0), new Vector3(1.2f, 0.06f, 0.7f), 1.2f);
+		// (2026-10-15, the props' proportions pass: a hall table, not a 6 cm slab on six-sided sticks) an eased top over a
+		// moulding, an apron, four turned legs; its top where it was (the box sits on it)
+		k.BevelBox(new Vector3(0, 0.87f, 0), new Vector3(1.2f, 0.04f, 0.7f), 0.012f, 1.2f);
+		k.BevelBox(new Vector3(0, 0.843f, 0), new Vector3(1.15f, 0.016f, 0.65f), 0.006f, 1.2f);
+		k.ChamferBox(new Vector3(0, 0.79f, 0.27f), new Vector3(0.98f, 0.09f, 0.022f), 0.004f, 1.2f, null, 0);
+		k.ChamferBox(new Vector3(0, 0.79f, -0.27f), new Vector3(0.98f, 0.09f, 0.022f), 0.004f, 1.2f, null, 0);
+		k.ChamferBox(new Vector3(0.51f, 0.79f, 0), new Vector3(0.022f, 0.09f, 0.5f), 0.004f, 1.2f, null, 2);
+		k.ChamferBox(new Vector3(-0.51f, 0.79f, 0), new Vector3(0.022f, 0.09f, 0.5f), 0.004f, 1.2f, null, 2);
 		foreach (var (x, z) in new[] { (-0.52f, -0.28f), (0.52f, -0.28f), (-0.52f, 0.28f), (0.52f, 0.28f) })
-			k.Cylinder(new Vector3(x, 0, z), new Vector3(x, 0.83f, z), 0.035f, 0.03f, 6, true);
+		{
+			HollowProps.Lathe(k, new Vector3(x, 0, z), new Vector2[]
+			{
+				new(0.024f, 0f), new(0.028f, 0.015f), new(0.022f, 0.04f), new(0.018f, 0.08f), new(0.026f, 0.5f), new(0.032f, 0.6f),
+				new(0.025f, 0.64f), new(0.03f, 0.68f), new(0.03f, 0.745f),
+			}, 10, false, false);
+			k.ChamferBox(new Vector3(x, 0.79f, z), new Vector3(0.056f, 0.1f, 0.056f), 0.006f, 1.2f);
+		}
 		// the brass plate in front of the box
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.85f, 0.7f, 0.42f);

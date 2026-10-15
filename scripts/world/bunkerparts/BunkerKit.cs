@@ -101,29 +101,36 @@ public static class BunkerKit
 	{
 		var old = metal.Xf;
 		metal.Xf = old * xf;
+		// (2026-10-15, the props' proportions pass) a round canopy (it was a 20 cm square plate), the conduit, the cast
+		// socket housing, a spun-steel reflector dish (an eight-sided cone before), seen from under it too; the guard's
+		// wires 7 mm, not 12 mm square bars
 		metal.Color = new Color(0.55f, 0.55f, 0.52f);
-		metal.Box(new Vector3(0, -0.015f, 0), new Vector3(0.2f, 0.03f, 0.2f));
-		metal.Cylinder(new Vector3(0, -0.02f, 0), new Vector3(0, -0.13f, 0), 0.018f, 0.018f, 6);
+		HollowProps.Lathe(metal, Vector3.Zero, new Vector2[] { new(0.07f, 0f), new(0.072f, -0.008f), new(0.06f, -0.02f), new(0.03f, -0.028f), new(0.016f, -0.03f) }, 12, false, true);
+		metal.Cylinder(new Vector3(0, -0.028f, 0), new Vector3(0, -0.115f, 0), 0.014f, 0.014f, 8, false);
+		HollowProps.Lathe(metal, Vector3.Zero, new Vector2[] { new(0.016f, -0.105f), new(0.03f, -0.112f), new(0.034f, -0.13f), new(0.036f, -0.152f), new(0.05f, -0.158f) }, 12, false, false);
 		metal.Color = new Color(0.4f, 0.42f, 0.4f);
-		metal.Cylinder(new Vector3(0, -0.12f, 0), new Vector3(0, -0.2f, 0), 0.06f, 0.13f, 8, true);
-		// Cage: four bent wires and a bottom ring.
+		var dish = new Vector2[] { new(0.05f, -0.158f), new(0.08f, -0.17f), new(0.108f, -0.186f), new(0.126f, -0.2f), new(0.131f, -0.206f) };
+		HollowProps.Lathe(metal, Vector3.Zero, dish, 14, false, false);
+		metal.Color = new Color(0.62f, 0.6f, 0.55f);   // the dish's white enamel inside, gone grey
+		var dishIn = new Vector2[dish.Length];
+		for (int i = 0; i < dish.Length; i++) dishIn[i] = dish[i] + new Vector2(-0.003f, -0.002f);
+		HollowProps.LatheInside(metal, Vector3.Zero, dishIn, 14);
+		// Cage: four bent wires down from the dish's rim and a ring round their waist.
 		metal.Color = new Color(0.3f, 0.3f, 0.28f);
 		for (int i = 0; i < 4; i++)
 		{
 			float a = Mathf.Tau * i / 4f + 0.4f;
 			Vector3 dir = new(Mathf.Cos(a), 0, Mathf.Sin(a));
-			Vector3 p0 = dir * 0.12f + new Vector3(0, -0.2f, 0);
-			Vector3 p1 = dir * 0.105f + new Vector3(0, -0.32f, 0);
-			Vector3 p2 = dir * 0.03f + new Vector3(0, -0.39f, 0);
-			metal.Beam(p0, p1, 0.012f, 0.012f);
-			metal.Beam(p1, p2, 0.012f, 0.012f);
+			Vector3 p0 = dir * 0.122f + new Vector3(0, -0.204f, 0);
+			Vector3 p1 = dir * 0.105f + new Vector3(0, -0.3f, 0);
+			Vector3 p2 = dir * 0.07f + new Vector3(0, -0.36f, 0);
+			Vector3 p3 = dir * 0.012f + new Vector3(0, -0.385f, 0);
+			metal.Cylinder(p0, p1, 0.0035f, 0.0035f, 4, false);
+			metal.Cylinder(p1, p2, 0.0035f, 0.0035f, 4, false);
+			metal.Cylinder(p2, p3, 0.0035f, 0.0035f, 4, false);
 		}
-		for (int i = 0; i < 8; i++)
-		{
-			float a0 = Mathf.Tau * i / 8f, a1 = Mathf.Tau * (i + 1) / 8f;
-			metal.Beam(new Vector3(Mathf.Cos(a0) * 0.105f, -0.32f, Mathf.Sin(a0) * 0.105f),
-				new Vector3(Mathf.Cos(a1) * 0.105f, -0.32f, Mathf.Sin(a1) * 0.105f), 0.01f, 0.01f);
-		}
+		ItemMeshes.Torus(metal, new Vector3(0, -0.3f, 0), Vector3.Up, 0.105f, 0.0035f, 12, 4);
+		ItemMeshes.Torus(metal, new Vector3(0, -0.385f, 0), Vector3.Up, 0.014f, 0.004f, 8, 4);
 		metal.Xf = old;
 	}
 
@@ -132,8 +139,12 @@ public static class BunkerKit
 	{
 		var k = new MeshKit();
 		k.Mat(mat);
-		k.Cylinder(new Vector3(0, -0.19f, 0), new Vector3(0, -0.31f, 0), 0.07f, 0.06f, 8, true);
-		k.Blob(new Vector3(0, -0.31f, 0), new Vector3(0.06f, 0.035f, 0.06f), 17, 0f, false);
+		// (2026-10-15: a pear-shaped work-light bulb in the dish, 10 cm across, not a 14 cm drum and a blob)
+		HollowProps.Lathe(k, Vector3.Zero, new Vector2[]
+		{
+			new(0f, -0.335f), new(0.018f, -0.331f), new(0.036f, -0.318f), new(0.048f, -0.296f), new(0.05f, -0.272f), new(0.044f, -0.244f),
+			new(0.03f, -0.218f), new(0.02f, -0.2f), new(0.019f, -0.16f),
+		}, 12, false, true);
 		var mi = k.CommitTo(parent, name, false);
 		mi.Transform = xf;
 		return mi;
@@ -187,7 +198,8 @@ public static class BunkerKit
 		body.Mat(BunkerTextures.PlasticMat);
 		body.Color = s.Body;
 		// Bezel slab and the tapered tube housing behind it.
-		body.Box(new Vector3(0, s.H * 0.5f, fz - 0.04f), new Vector3(s.W, s.H, 0.08f));
+		// (2026-10-15, the props' proportions pass: the moulded cabinet's corners rounded, not a sawn slab)
+		body.BevelBox(new Vector3(0, s.H * 0.5f, fz - 0.045f), new Vector3(s.W, s.H, 0.09f), Mathf.Min(0.03f, s.W * 0.05f));
 		Frustum(body, new Vector3(0, s.H * 0.5f, fz - 0.08f), new Vector2(s.W * 0.95f, s.H * 0.93f),
 			new Vector3(0, s.H * 0.42f, -fz), new Vector2(s.W * 0.52f, s.H * 0.55f));
 		// Tube aperture and its raised lip.
@@ -221,8 +233,8 @@ public static class BunkerKit
 		}
 		// Feet and the cable stub.
 		body.Color = new Color(0.1f, 0.1f, 0.1f);
-		body.Box(new Vector3(-s.W * 0.35f, 0.01f, fz - 0.1f), new Vector3(0.06f, 0.02f, 0.08f));
-		body.Box(new Vector3(s.W * 0.35f, 0.01f, fz - 0.1f), new Vector3(0.06f, 0.02f, 0.08f));
+		foreach (float fx in new[] { -s.W * 0.35f, s.W * 0.35f })
+			body.Cylinder(new Vector3(fx, 0f, fz - 0.1f), new Vector3(fx, 0.02f, fz - 0.1f), 0.03f, 0.026f, 8, true);
 		body.Mat(BunkerTextures.RubberMat);
 		body.Color = Colors.White;
 		body.Cylinder(new Vector3(s.W * 0.1f, s.H * 0.3f, -fz + 0.02f), new Vector3(s.W * 0.14f, s.H * 0.26f, -fz - 0.08f), 0.012f, 0.012f, 4, false);

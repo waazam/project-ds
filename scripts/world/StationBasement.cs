@@ -657,22 +657,51 @@ public partial class StationBasement : Node3D
 		var k = new MeshKit();
 		k.Mat(BuildingTextures.BoardsMat);
 		k.Color = new Color(0.2f, 0.12f, 0.08f);
-		k.Box(new Vector3(0, 1.0f, 0), new Vector3(0.6f, 1.7f, 0.32f), 1.2f);
-		k.Box(new Vector3(0, 0.15f, 0), new Vector3(0.72f, 0.3f, 0.4f), 1.2f);
-		k.Box(new Vector3(0, 1.95f, 0), new Vector3(0.7f, 0.3f, 0.4f), 1.2f);
+		// (2026-10-15, the props' proportions pass: a longcase clock's parts and proportions, not three stacked boxes) a
+		// plinth on bracket feet, the base with a raised panel, a waist moulding, the trunk, the hood with its columns and
+		// an arched top; 2.3 m tall as before, the trunk 46 cm across (it was 60)
+		k.BevelBox(new Vector3(0, 0.05f, 0), new Vector3(0.62f, 0.1f, 0.36f), 0.012f, 1.2f);                      // the plinth
+		k.BevelBox(new Vector3(0, 0.33f, 0), new Vector3(0.56f, 0.46f, 0.31f), 0.01f, 1.2f);                       // the base
+		k.BevelBox(new Vector3(0, 0.33f, 0.16f), new Vector3(0.4f, 0.32f, 0.02f), 0.006f, 1.2f);                   // its raised panel
+		k.BevelBox(new Vector3(0, 0.585f, 0), new Vector3(0.58f, 0.05f, 0.33f), 0.015f, 1.2f);                     // the waist moulding
+		k.ChamferBox(new Vector3(0, 1.08f, 0), new Vector3(0.46f, 0.94f, 0.27f), 0.012f, 1.2f, null, 1);         // the trunk
+		k.BevelBox(new Vector3(0, 1.575f, 0), new Vector3(0.58f, 0.05f, 0.33f), 0.015f, 1.2f);                     // the hood's moulding
+		k.BevelBox(new Vector3(0, 1.86f, 0), new Vector3(0.56f, 0.52f, 0.32f), 0.012f, 1.2f);                      // the hood
+		k.BevelBox(new Vector3(0, 2.145f, 0), new Vector3(0.6f, 0.05f, 0.35f), 0.015f, 1.2f);                      // its cornice
+		// the arched crest over the hood
+		{
+			var arch = new System.Collections.Generic.List<Vector2>();
+			for (int i = 0; i <= 8; i++)
+			{
+				float a = Mathf.Pi * i / 8f;
+				arch.Add(new Vector2(-Mathf.Cos(a) * 0.24f, 2.17f + Mathf.Sin(a) * 0.12f));
+			}
+			HollowProps.In(k, new Transform3D(new Basis(Vector3.Up, Mathf.Pi * 0.5f), Vector3.Zero), () => k.ExtrudeX(arch, -0.13f, 0.13f, 1.2f));
+		}
 		k.Color = new Color(0.14f, 0.09f, 0.06f);
-		k.Box(new Vector3(0, 2.22f, 0), new Vector3(0.5f, 0.16f, 0.3f), 1.4f);
+		foreach (int sx in new[] { -1, 1 })
+		{
+			k.Cylinder(new Vector3(sx * 0.25f, 1.61f, 0.168f), new Vector3(sx * 0.25f, 2.11f, 0.168f), 0.018f, 0.018f, 8, true);   // the hood's columns
+			foreach (int sz in new[] { -1, 1 })
+				k.BevelBox(new Vector3(sx * 0.26f, 0.0f, sz * 0.14f) + Vector3.Up * 0.03f, new Vector3(0.08f, 0.06f, 0.08f), 0.015f, 1.2f);   // bracket feet
+		}
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.7f, 0.6f, 0.4f);
-		ItemMeshes.Disc(k, new Vector3(0, 1.85f, 0.17f), Vector3.Back, 0.22f, 16);
+		ItemMeshes.Disc(k, new Vector3(0, 1.85f, 0.17f), Vector3.Back, 0.19f, 20);
+		ItemMeshes.Torus(k, new Vector3(0, 1.85f, 0.168f), Vector3.Back, 0.195f, 0.012f, 20, 6);   // the bezel
+		HollowProps.Lathe(k, new Vector3(0, 2.28f, 0), new Vector2[] { new(0.02f, 0f), new(0.028f, 0.012f), new(0.015f, 0.04f), new(0.022f, 0.06f), new(0f, 0.1f) }, 8, true, false);   // the finial
 		k.Mat(BuildingTextures.IronMat);
 		k.Color = new Color(0.08f, 0.08f, 0.08f);
 		// both hands at twelve
 		k.Box(new Vector3(0, 1.92f, 0.19f), new Vector3(0.02f, 0.15f, 0.01f), 4f);
 		k.Box(new Vector3(0.005f, 1.9f, 0.192f), new Vector3(0.015f, 0.11f, 0.01f), 4f);
-		k.Mat(ItemTextures.GlassMat);
-		k.Color = new Color(0.7f, 0.8f, 0.8f, 0.35f);
-		k.Box(new Vector3(0, 0.95f, 0.16f), new Vector3(0.42f, 1.3f, 0.02f), 1f);
+		// the trunk door: its frame, and old dark glass (the pale glass blew out white under the lantern)
+		k.Mat(BuildingTextures.BoardsMat);
+		k.Color = new Color(0.16f, 0.1f, 0.07f);
+		k.BevelBox(new Vector3(0, 1.1f, 0.142f), new Vector3(0.36f, 0.82f, 0.012f), 0.004f, 1.2f);
+		k.Mat(BuildingTextures.GlassMat);
+		k.Color = Colors.White;
+		k.Box(new Vector3(0, 1.1f, 0.149f), new Vector3(0.29f, 0.74f, 0.004f), 1f);
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.75f, 0.65f, 0.4f);
 		k.Cylinder(new Vector3(0, 1.6f, 0), new Vector3(0, 0.5f, 0), 0.012f, 0.012f, 6, false);
@@ -680,7 +709,7 @@ public partial class StationBasement : Node3D
 		// weed and a tide line of silt from the flood
 		k.Mat(StationTextures.Flat("st_silt", new Color(0.2f, 0.2f, 0.12f), 0.9f, 0.1f));
 		k.Color = Colors.White;
-		k.Box(new Vector3(0, 0.4f, 0.205f), new Vector3(0.74f, 0.8f, 0.003f));
+		k.Box(new Vector3(0, 0.36f, 0.172f), new Vector3(0.6f, 0.56f, 0.003f));
 		k.CommitTo(_clock, "ClockMesh", true);
 		_clockBody = new StaticBody3D { Name = "ClockBody", CollisionLayer = 1, CollisionMask = 0 };
 		_clockBody.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.1f, 0), Shape = new BoxShape3D { Size = new Vector3(0.72f, 2.3f, 0.4f) } });

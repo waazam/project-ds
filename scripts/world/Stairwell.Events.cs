@@ -302,10 +302,9 @@ public partial class Stairwell
 		var k = new MeshKit();
 		k.Mat(PropTextures.DeckMat);
 		k.Color = new Color(0.35f, 0.25f, 0.18f);
-		BuildKit.Box(k, new Vector3(0, 0.45f, 0), new Vector3(0.42f, 0.04f, 0.42f));
-		foreach (var (x, z) in new[] { (-0.18f, -0.18f), (0.18f, -0.18f), (-0.18f, 0.18f), (0.18f, 0.18f) })
-			BuildKit.Box(k, new Vector3(x, 0.22f, z), new Vector3(0.04f, 0.44f, 0.04f));
-		BuildKit.Box(k, new Vector3(0, 0.72f, 0.19f), new Vector3(0.42f, 0.5f, 0.03f));
+		// (2026-10-15, the props' proportions pass: a kitchen chair with turned legs, raked back posts and bowed rails, not a
+		// seat slab on square sticks with a board for a back) its back toward +Z, its front to -Z as before
+		HollowProps.In(k, new Transform3D(new Basis(Vector3.Up, Mathf.Pi), Vector3.Zero), () => HollowProps.Chair(k));
 		k.CommitTo(parent, "Chair", true);
 	}
 

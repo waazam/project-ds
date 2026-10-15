@@ -395,9 +395,10 @@ public partial class Shed : Node3D
 		// a tin of nails (some spilled), a coffee can, a rag on the bench (left side; the hammer spot is middle-right)
 		small.Mat(BuildingTextures.Plain("s_tin", new Color(0.42f, 0.38f, 0.32f), 0.5f));
 		small.Color = Colors.White;
-		small.Cylinder(new Vector3(-0.55f, BenchTop, bz - 0.1f), new Vector3(-0.55f, BenchTop + 0.14f, bz - 0.1f), 0.06f, 0.06f, 10, true);
+		// (2026-10-15: tins with their rolled rims and beads, open, not capped cylinders; a nail tin's 12 x 14 cm)
+		HollowProps.Can(small, new Vector3(-0.55f, BenchTop, bz - 0.1f), 0.06f, 0.14f);
 		small.Mat(BuildingTextures.Plain("s_can", new Color(0.28f, 0.3f, 0.34f), 0.5f));
-		small.Cylinder(new Vector3(-0.38f, BenchTop, bz + 0.05f), new Vector3(-0.38f, BenchTop + 0.1f, bz + 0.05f), 0.045f, 0.045f, 10, true);
+		HollowProps.Can(small, new Vector3(-0.38f, BenchTop, bz + 0.05f), 0.045f, 0.1f, true);
 		small.Mat(HollowLook.ToolSteel);
 		for (int i = 0; i < 6; i++)
 		{

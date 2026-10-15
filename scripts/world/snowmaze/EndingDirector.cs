@@ -585,6 +585,9 @@ public partial class EndingDirector : Node3D
 			// behind the wheel: the view from the driver's seat, the trail's trees through the windscreen, the engine
 			var seat = _car.GlobalPosition + _car.GlobalBasis * new Vector3(-0.38f, 1.15f, 0.25f);
 			player.GlobalPosition = seat + Vector3.Down * 1.0f;
+			// (2026-10-15, the car's rebuild: the eye at the seat's head height, inside the cabin behind the wheel and the
+			// dash; standing eye height put it 0.6 m over the roof)
+			player.CameraRig.EyeHeight = 1.0f;
 			var fwd = -_car.GlobalBasis.Z;
 			player.CameraRig.SnapBehind(Mathf.Atan2(-fwd.X, -fwd.Z));
 			player.CameraRig.SetPitch(-0.05f);

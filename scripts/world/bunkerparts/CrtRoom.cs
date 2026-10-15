@@ -329,11 +329,32 @@ public partial class CrtRoom : Node3D
 			frame.Color = new Color(0.9f, 0.92f, 0.9f) * rng.RandfRange(0.8f, 1f);
 			var oldXf = frame.Xf;
 			frame.Xf = xf;
-			foreach (float sx in new[] { -uw * 0.5f + 0.02f, uw * 0.5f - 0.02f })
-				foreach (float sz in new[] { -ud * 0.5f + 0.02f, ud * 0.5f - 0.02f })
-					frame.Box(new Vector3(sx, postH * 0.5f, sz), new Vector3(0.04f, postH, 0.04f));
+			// (2026-10-15, the props' proportions pass) slotted angle-iron uprights (an L of 4 cm flanges, 3 mm steel; they
+			// were 4 cm square bars), on foot plates; the shelves pressed steel with their edges turned down (a 3 cm slab
+			// before), a brace across each end
+			foreach (int ix in new[] { -1, 1 })
+				foreach (int iz in new[] { -1, 1 })
+				{
+					float sx = ix * (uw * 0.5f - 0.02f), sz = iz * (ud * 0.5f - 0.02f);
+					frame.Box(new Vector3(sx, postH * 0.5f, sz + iz * 0.0185f), new Vector3(0.04f, postH, 0.003f));
+					frame.Box(new Vector3(sx + ix * 0.0185f, postH * 0.5f, sz), new Vector3(0.003f, postH, 0.04f));
+					frame.Box(new Vector3(sx, 0.002f, sz), new Vector3(0.05f, 0.004f, 0.05f));
+				}
 			foreach (float y in shelves)
-				frame.Box(new Vector3(0, y, 0), new Vector3(uw, 0.03f, ud));
+			{
+				frame.Box(new Vector3(0, y + 0.01375f, 0), new Vector3(uw - 0.004f, 0.0025f, ud - 0.004f));
+				foreach (int iz in new[] { -1, 1 })
+					frame.Box(new Vector3(0, y - 0.004f, iz * (ud * 0.5f - 0.003f)), new Vector3(uw - 0.006f, 0.034f, 0.0025f));
+				foreach (int ix in new[] { -1, 1 })
+					frame.Box(new Vector3(ix * (uw * 0.5f - 0.003f), y - 0.004f, 0), new Vector3(0.0025f, 0.034f, ud - 0.006f));
+			}
+			foreach (int ix in new[] { -1, 1 })
+			{
+				float sx = ix * (uw * 0.5f - 0.0025f);
+				var a = new Vector3(sx, shelves[0] + 0.02f, -ud * 0.5f + 0.03f);
+				var b = new Vector3(sx, shelves[1] - 0.02f, ud * 0.5f - 0.03f);
+				frame.Beam(a, b, 0.025f, 0.003f, 1f, Vector3.Right);
+			}
 			frame.Xf = oldXf;
 			AddBox(xf * new Vector3(0, postH * 0.5f, 0), new Vector3(uw, postH, ud), xf.Basis);
 
@@ -428,15 +449,43 @@ public partial class CrtRoom : Node3D
 		k.Mat(BunkerTextures.PaintedMetalMat);
 		k.Color = new Color(0.75f, 0.78f, 0.76f);
 		// A steel console desk centred in front of the back wall.
-		k.Box(new Vector3(0, ConsoleTop - 0.02f, ConsoleZ), new Vector3(1.6f, 0.04f, 0.8f));
-		k.Box(new Vector3(0, ConsoleTop * 0.5f, ConsoleZ - 0.36f), new Vector3(1.56f, ConsoleTop - 0.04f, 0.03f));
-		foreach (float x in new[] { -0.76f, 0.76f })
-			k.Box(new Vector3(x, ConsoleTop * 0.5f, ConsoleZ), new Vector3(0.04f, ConsoleTop - 0.04f, 0.76f));
-		k.Box(new Vector3(0.5f, ConsoleTop - 0.2f, ConsoleZ + 0.05f), new Vector3(0.45f, 0.3f, 0.65f));   // drawer block
-		// Keyboard and a mug.
+		// (2026-10-15, the props' proportions pass) a steel tanker desk, not five slabs: a top with its edge rolled under
+		// and a black linoleum inset, slab ends on a recessed plinth, a modesty panel, a drawer pedestal with three drawers
+		// and their pulls; its top where it was
+		k.BevelBox(new Vector3(0, ConsoleTop - 0.0175f, ConsoleZ), new Vector3(1.6f, 0.035f, 0.8f), 0.012f);
+		foreach (float x in new[] { -0.765f, 0.765f })
+		{
+			k.ChamferBox(new Vector3(x, (ConsoleTop - 0.035f + 0.06f) * 0.5f, ConsoleZ), new Vector3(0.035f, ConsoleTop - 0.095f, 0.76f), 0.008f, 1f, null, 1);
+			k.BevelBox(new Vector3(x, 0.03f, ConsoleZ), new Vector3(0.03f, 0.06f, 0.7f), 0.006f);   // the plinth, set back
+		}
+		k.ChamferBox(new Vector3(0, ConsoleTop * 0.5f + 0.06f, ConsoleZ - 0.355f), new Vector3(1.5f, ConsoleTop - 0.3f, 0.02f), 0.004f, 1f, null, 0);
+		k.ChamferBox(new Vector3(0.48f, (ConsoleTop - 0.035f + 0.07f) * 0.5f, ConsoleZ + 0.02f), new Vector3(0.52f, ConsoleTop - 0.105f, 0.7f), 0.008f, 1f, null, 1);
+		k.Color = new Color(0.68f, 0.71f, 0.69f);
+		for (int d = 0; d < 3; d++)
+		{
+			float h = d == 2 ? 0.34f : 0.2f, y0 = d == 0 ? ConsoleTop - 0.06f - 0.1f : d == 1 ? ConsoleTop - 0.06f - 0.31f : ConsoleTop - 0.06f - 0.6f;
+			k.BevelBox(new Vector3(0.48f, y0, ConsoleZ + 0.375f), new Vector3(0.48f, h - 0.012f, 0.012f), 0.004f);
+			k.Mat(ProcTextures.MetalMat);
+			k.Color = new Color(0.55f, 0.53f, 0.48f);
+			k.Cylinder(new Vector3(0.4f, y0 + h * 0.25f, ConsoleZ + 0.392f), new Vector3(0.56f, y0 + h * 0.25f, ConsoleZ + 0.392f), 0.007f, 0.007f, 6, true);
+			foreach (float px in new[] { 0.4f, 0.56f })
+				k.Cylinder(new Vector3(px, y0 + h * 0.25f, ConsoleZ + 0.38f), new Vector3(px, y0 + h * 0.25f, ConsoleZ + 0.392f), 0.006f, 0.006f, 6, false);
+			k.Mat(BunkerTextures.PaintedMetalMat);
+			k.Color = new Color(0.68f, 0.71f, 0.69f);
+		}
+		k.Mat(new StandardMaterial3D { ResourceName = "bk_deskinset", AlbedoColor = new Color(0.07f, 0.075f, 0.07f), Roughness = 0.6f, VertexColorUseAsAlbedo = true });
+		k.Color = Colors.White;
+		k.Box(new Vector3(0, ConsoleTop + 0.0004f, ConsoleZ), new Vector3(1.5f, 0.001f, 0.7f));
+		// Keyboard (a sloped case, its keys in rows) and a mug.
 		k.Mat(BunkerTextures.PlasticMat);
 		k.Color = new Color(0.55f, 0.52f, 0.45f);
-		k.Box(new Vector3(-0.05f, ConsoleTop + 0.015f, ConsoleZ + 0.28f), new Vector3(0.46f, 0.03f, 0.16f), 1f, Basis.FromEuler(new Vector3(0, 0.08f, 0)));
+		var kb = Basis.FromEuler(new Vector3(0, 0.08f, 0));
+		var kc = new Vector3(-0.05f, ConsoleTop, ConsoleZ + 0.28f);
+		k.BevelBox(kc + kb * new Vector3(0, 0.014f, 0), new Vector3(0.46f, 0.028f, 0.17f), 0.008f, 1f, kb);
+		k.Color = new Color(0.4f, 0.38f, 0.33f);
+		for (int r = 0; r < 4; r++)
+			k.BevelBox(kc + kb * new Vector3(-0.02f, 0.031f + r * 0.0025f, 0.045f - r * 0.032f), new Vector3(0.38f, 0.008f, 0.024f), 0.003f, 1f, kb);
+		k.BevelBox(kc + kb * new Vector3(0.19f, 0.031f, 0.0f), new Vector3(0.06f, 0.008f, 0.11f), 0.003f, 1f, kb);
 		k.Color = new Color(0.25f, 0.3f, 0.35f);
 		if (!FurnitureKit.Add(k, "mug", new Vector3(0.55f, ConsoleTop, ConsoleZ + 0.2f), 2.6f, Roles))
 			k.Cylinder(new Vector3(0.55f, ConsoleTop, ConsoleZ + 0.2f), new Vector3(0.55f, ConsoleTop + 0.1f, ConsoleZ + 0.2f), 0.04f, 0.04f, 8);
@@ -551,20 +600,37 @@ public partial class CrtRoom : Node3D
 			AddBox(c, new Vector3(0.6f, 1.32f, 0.5f));
 		}
 		// Cardboard boxes of tapes stacked by the right wall.
-		k.Mat(BunkerTextures.PlasticMat);
+		// (2026-10-15: cartons with their flaps and tape, not plain blocks of plastic; same sizes and places)
+		var cardboard = new StandardMaterial3D { ResourceName = "bk_card", AlbedoColor = new Color(0.46f, 0.36f, 0.24f), Roughness = 0.95f, VertexColorUseAsAlbedo = true };
 		for (int i = 0; i < 5; i++)
 		{
 			var size = new Vector3(rng.RandfRange(0.4f, 0.6f), rng.RandfRange(0.3f, 0.45f), rng.RandfRange(0.35f, 0.5f));
-			float y = i < 3 ? size.Y * 0.5f : 0.45f + size.Y * 0.5f;
+			float y = i < 3 ? 0f : 0.45f;
 			var c = new Vector3(CrtRoomHalfWidth - 0.5f, y, CrtRoomFrontZ - 2.2f - (i % 3) * 0.6f);
-			k.Color = new Color(0.46f, 0.36f, 0.24f) * rng.RandfRange(0.8f, 1.05f);
-			k.Box(c, size, 1f, Basis.FromEuler(new Vector3(0, rng.RandfRange(-0.2f, 0.2f), 0)));
+			var tint = new Color(1f, 1f, 1f) * rng.RandfRange(0.8f, 1.05f);
+			ClutterKit.Carton(cardboard, size, tint).Build(k, new Transform3D(Basis.FromEuler(new Vector3(0, rng.RandfRange(-0.2f, 0.2f), 0)), c));
 		}
+		k.Mat(BunkerTextures.PlasticMat);
 		AddBox(new Vector3(CrtRoomHalfWidth - 0.5f, 0.45f, CrtRoomFrontZ - 2.8f), new Vector3(0.6f, 0.9f, 1.8f));
 		// A fuse box by the door with conduit up into the ceiling.
 		k.Mat(ProcTextures.MetalMat);
 		k.Color = new Color(0.55f, 0.56f, 0.5f);
-		k.Box(new Vector3(DoorHalfWidth + 0.9f, 1.5f, CrtRoomFrontZ - BulkheadThickness - 0.08f), new Vector3(0.5f, 0.65f, 0.16f));
+		// (2026-10-15: a pressed-steel cabinet with a door in its frame, hinges, a throw lever and its guard, not one block)
+		{
+			var fb = new Vector3(DoorHalfWidth + 0.9f, 1.5f, CrtRoomFrontZ - BulkheadThickness - 0.08f);
+			k.BevelBox(fb, new Vector3(0.5f, 0.65f, 0.15f), 0.012f);
+			k.Color = new Color(0.6f, 0.61f, 0.55f);
+			k.BevelBox(fb + new Vector3(-0.02f, 0, -0.078f), new Vector3(0.42f, 0.57f, 0.012f), 0.005f);   // the door
+			k.Color = new Color(0.4f, 0.4f, 0.37f);
+			foreach (float dy in new[] { -0.2f, 0.2f })
+				k.Cylinder(fb + new Vector3(-0.235f, dy - 0.03f, -0.085f), fb + new Vector3(-0.235f, dy + 0.03f, -0.085f), 0.008f, 0.008f, 6, true);
+			k.Cylinder(fb + new Vector3(0.12f, 0.02f, -0.084f), fb + new Vector3(0.12f, 0.02f, -0.1f), 0.018f, 0.018f, 8, true);   // the latch boss
+			// the throw lever on the side, up (on), and its guard
+			k.BevelBox(fb + new Vector3(0.262f, 0.05f, 0.0f), new Vector3(0.025f, 0.14f, 0.06f), 0.006f);
+			k.Cylinder(fb + new Vector3(0.275f, 0.05f, 0f), fb + new Vector3(0.29f, 0.2f, 0f), 0.009f, 0.008f, 6, false);
+			k.Cylinder(fb + new Vector3(0.29f, 0.2f, 0f), fb + new Vector3(0.29f, 0.245f, 0f), 0.016f, 0.014f, 8, true);
+			k.Color = new Color(0.55f, 0.56f, 0.5f);
+		}
 		k.Cylinder(new Vector3(DoorHalfWidth + 0.9f, 1.82f, CrtRoomFrontZ - BulkheadThickness - 0.06f), new Vector3(DoorHalfWidth + 0.9f, CrtRoomHeight, CrtRoomFrontZ - BulkheadThickness - 0.06f), 0.03f, 0.03f, 6, false);
 		k.CommitTo(this, "Dressing");
 	}
