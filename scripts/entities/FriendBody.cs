@@ -32,7 +32,7 @@ public partial class FriendBody : Node3D
 	public int TriangleCount { get; private set; }
 
 	/// <summary>Table top height (friend space), for anything placed on it.</summary>
-	public const float TableTop = 0.65f;
+	public const float TableTop = 0.74f;   // (2026-10-15: a kitchen table's 74 cm; it was 65, its top 18 cm over the chair's seat)
 
 	/// <summary>The friend's last page (P4) lies on the table from Act 5's checkpoint on, like the newel post.</summary>
 	[Export] public Checkpoint PageCheckpoint = Checkpoint.None;   // on the table from load (Dan, 2026-09-22: nothing pops in on entry)
@@ -216,24 +216,51 @@ public partial class FriendBody : Node3D
 		var k = new MeshKit();
 		k.Mat(ProcTextures.WoodMat);
 		k.Color = new Color(0.4f, 0.31f, 0.22f);
-		k.Box(new Vector3(0, 0.47f, 0), new Vector3(0.44f, 0.04f, 0.42f), 1.5f);
+		// (2026-10-15, the props' proportions pass: the same chair and its own wood, no longer a square slab on five-sided
+		// sticks.) A kitchen spindle-back: a 45 cm seat, eased and a little wider at the front; turned legs splayed out to
+		// the floor; back posts bent back into a curved crest rail at 93 cm; three spindles; turned stretchers.
+		const float seatY = 0.45f, seatT = 0.032f;
+		k.BevelBox(new Vector3(0, seatY - seatT * 0.5f, 0.005f), new Vector3(0.43f, seatT, 0.41f), 0.012f, 1.5f);
+		k.BevelBox(new Vector3(0, seatY - seatT - 0.025f, 0.005f), new Vector3(0.37f, 0.05f, 0.35f), 0.006f, 1.5f);   // the seat rails under it
+		var leg = new Vector2[]
+		{
+			new(0.017f, 0f), new(0.019f, 0.02f), new(0.016f, 0.14f), new(0.021f, 0.17f), new(0.021f, 0.19f), new(0.017f, 0.21f),
+			new(0.02f, 0.33f), new(0.022f, 0.36f),
+		};
 		foreach (float x in new[] { -1f, 1f })
-			foreach (float z in new[] { -1f, 1f })
-				k.Cylinder(new Vector3(x * 0.19f, 0f, z * 0.18f), new Vector3(x * 0.18f, 0.45f, z * 0.17f), 0.019f, 0.022f, 5, false, 2f);
-		// back posts leaning back, top rail, three spindles
-		foreach (float x in new[] { -1f, 1f })
-			k.Cylinder(new Vector3(x * 0.19f, 0.45f, -0.19f), new Vector3(x * 0.2f, 0.97f, -0.25f), 0.021f, 0.018f, 5, true, 2f);
-		k.Box(new Vector3(0, 0.92f, -0.243f), new Vector3(0.42f, 0.08f, 0.03f), 1.5f, new Basis(Vector3.Right, -0.11f));
+		{
+			// the front legs, splayed a little: turned, square where they meet the rails
+			var top = new Vector3(x * 0.175f, seatY - seatT - 0.05f, 0.165f);
+			var foot = new Vector3(x * 0.195f, 0f, 0.19f);
+			var up = (top - foot).Normalized();
+			var b = new Basis(up.Cross(Vector3.Back).Normalized(), up, up.Cross(Vector3.Back).Normalized().Cross(up)).Orthonormalized();
+			HollowProps.In(k, new Transform3D(b, foot), () => HollowProps.Lathe(k, Vector3.Zero, leg, 10, false, false));
+			k.ChamferBox(top + Vector3.Up * 0.025f, new Vector3(0.036f, 0.05f, 0.036f), 0.005f, 1.5f);
+			// the back posts: one piece from the floor, bent back above the seat
+			var pts = new[] { new Vector3(x * 0.185f, 0f, -0.2f), new Vector3(x * 0.18f, seatY - 0.03f, -0.185f), new Vector3(x * 0.185f, 0.7f, -0.215f), new Vector3(x * 0.19f, 0.93f, -0.26f) };
+			for (int i = 0; i + 1 < pts.Length; i++)
+				k.Cylinder(pts[i], pts[i + 1], i == 0 ? 0.019f : 0.02f, i == pts.Length - 2 ? 0.016f : 0.02f, 8, i == pts.Length - 2, 2f);
+			k.Cylinder(pts[3], pts[3] + new Vector3(0, 0.025f, -0.004f), 0.016f, 0.009f, 8, true, 2f);   // the finial
+		}
+		// the crest rail, curved back between the posts
+		for (int i = 0; i < 8; i++)
+		{
+			float a0 = -1f + i / 4f, a1 = -1f + (i + 1) / 4f;
+			Vector3 P(float a) => new(a * 0.185f, 0.875f + 0.006f * (1f - a * a), -0.245f - 0.03f * (1f - a * a));
+			k.Beam(P(a0), P(a1), 0.028f, 0.075f, 1.5f, Vector3.Up);
+		}
+		// three spindles from the seat's back into the crest
 		for (int i = -1; i <= 1; i++)
-			k.Cylinder(new Vector3(i * 0.08f, 0.49f, -0.2f), new Vector3(i * 0.085f, 0.88f, -0.238f), 0.011f, 0.011f, 4, false, 2f);
-		// stretchers
-		k.Box(new Vector3(0, 0.16f, 0.175f), new Vector3(0.36f, 0.025f, 0.02f), 1.5f);
-		k.Box(new Vector3(0, 0.16f, -0.18f), new Vector3(0.36f, 0.025f, 0.02f), 1.5f);
+			k.Cylinder(new Vector3(i * 0.075f, seatY, -0.175f), new Vector3(i * 0.078f, 0.84f, -0.266f + 0.025f * Mathf.Abs(i)), 0.011f, 0.009f, 6, false, 2f);
+		// stretchers between the legs: an H, turned
+		foreach (float x in new[] { -1f, 1f })
+			k.Cylinder(new Vector3(x * 0.186f, 0.17f, 0.178f), new Vector3(x * 0.184f, 0.17f, -0.196f), 0.011f, 0.011f, 6, true, 2f);
+		k.Cylinder(new Vector3(-0.185f, 0.2f, -0.01f), new Vector3(0.185f, 0.2f, -0.01f), 0.012f, 0.012f, 6, true, 2f);
 		// dark smears on the seat's front edge and down one leg
 		k.Mat(StainMat);
 		k.Color = Colors.White;
-		Stain(k, new Vector3(0.1f, 0.492f, 0.12f), 0.06f, 1.4f, 7111, 0.2f);
-		k.Box(new Vector3(0.19f, 0.3f, 0.195f), new Vector3(0.012f, 0.16f, 0.006f), 1f);
+		Stain(k, new Vector3(0.1f, seatY + 0.0015f, 0.12f), 0.06f, 1.4f, 7111, 0.2f);
+		k.Box(new Vector3(0.185f, 0.29f, 0.2f), new Vector3(0.012f, 0.14f, 0.006f), 1f, new Basis(Vector3.Forward, -0.05f));
 		var gen = new Node3D { Name = "Generated" };
 		chair.AddChild(gen);
 		var mi = k.CommitTo(gen, "ChairMesh");
@@ -247,15 +274,34 @@ public partial class FriendBody : Node3D
 		var k = new MeshKit();
 		k.Mat(ProcTextures.WoodMat);
 		k.Color = new Color(0.5f, 0.39f, 0.27f);
-		k.Box(new Vector3(0, TableTop - 0.03f, 0), new Vector3(1.1f, 0.06f, 0.7f), 1.2f);
+		// (2026-10-15, the props' proportions pass: the same table and its own wood, at a kitchen table's 74 cm, not 65.)
+		// A 3 cm top of two boards with its edges eased and a little overhang; an apron of rails under it; four legs,
+		// square where the apron joins them, turned below (a bead, a long taper, a foot).
+		const float topT = 0.03f, apron = 0.095f;
+		foreach (int s in new[] { -1, 1 })
+		{
+			k.Color = new Color(0.5f, 0.39f, 0.27f) * (s < 0 ? 1f : 0.93f);
+			k.BevelBox(new Vector3(0, TableTop - topT * 0.5f, s * 0.1755f), new Vector3(1.1f, topT, 0.347f), 0.007f, 1.2f);
+		}
 		k.Color = new Color(0.38f, 0.29f, 0.2f);
-		k.Box(new Vector3(0, TableTop - 0.1f, 0.3f), new Vector3(0.94f, 0.08f, 0.025f), 1.2f);
-		k.Box(new Vector3(0, TableTop - 0.1f, -0.3f), new Vector3(0.94f, 0.08f, 0.025f), 1.2f);
-		k.Box(new Vector3(0.46f, TableTop - 0.1f, 0), new Vector3(0.025f, 0.08f, 0.56f), 1.2f);
-		k.Box(new Vector3(-0.46f, TableTop - 0.1f, 0), new Vector3(0.025f, 0.08f, 0.56f), 1.2f);
+		float ay = TableTop - topT - apron * 0.5f;
+		k.ChamferBox(new Vector3(0, ay, 0.27f), new Vector3(0.88f, apron, 0.022f), 0.004f, 1.2f, null, 0);
+		k.ChamferBox(new Vector3(0, ay, -0.27f), new Vector3(0.88f, apron, 0.022f), 0.004f, 1.2f, null, 0);
+		k.ChamferBox(new Vector3(0.45f, ay, 0), new Vector3(0.022f, apron, 0.5f), 0.004f, 1.2f, null, 2);
+		k.ChamferBox(new Vector3(-0.45f, ay, 0), new Vector3(0.022f, apron, 0.5f), 0.004f, 1.2f, null, 2);
+		float blockLo = TableTop - topT - apron - 0.02f;
+		var turned = new Vector2[]
+		{
+			new(0.02f, 0f), new(0.023f, 0.012f), new(0.02f, 0.03f), new(0.017f, 0.05f), new(0.021f, 0.35f), new(0.024f, 0.47f),
+			new(0.029f, 0.5f), new(0.024f, 0.53f), new(0.026f, blockLo - 0.01f), new(0.03f, blockLo),
+		};
 		foreach (float x in new[] { -1f, 1f })
 			foreach (float z in new[] { -1f, 1f })
-				k.Beam(new Vector3(x * 0.48f, 0f, z * 0.28f), new Vector3(x * 0.48f, TableTop - 0.06f, z * 0.28f), 0.05f, 0.05f, 1.2f, Vector3.Forward);
+			{
+				var at = new Vector3(x * 0.47f, 0f, z * 0.29f);
+				HollowProps.Lathe(k, at, turned, 10, false, false);
+				k.ChamferBox(at + Vector3.Up * ((blockLo + TableTop - topT) * 0.5f), new Vector3(0.056f, TableTop - topT - blockLo, 0.056f), 0.006f, 1.2f);
+			}
 
 		// The dried stain where his left arm lay (table space), and a run of it over the near edge.
 		k.Mat(StainMat);

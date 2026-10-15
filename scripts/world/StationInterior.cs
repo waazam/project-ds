@@ -276,21 +276,31 @@ public partial class StationInterior : Node3D
 		BuildKit.Box(k, new Vector3(-0.1f, 0.795f, -0.05f), new Vector3(0.7f, 0.01f, 0.45f));
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = new Color(0.9f, 0.75f, 0.45f);
-		k.Cylinder(new Vector3(0.62f, 0.79f, -0.15f), new Vector3(0.62f, 0.85f, -0.15f), 0.05f, 0.02f, 10, true);
+		// (2026-10-15: a call bell, its dome on a round black foot and its plunger; it was a 6 cm cone)
+		HollowProps.Lathe(k, new Vector3(0.62f, 0.79f, -0.15f), new Vector2[]
+		{
+			new(0.033f, 0.012f), new(0.034f, 0.018f), new(0.03f, 0.036f), new(0.021f, 0.048f), new(0.01f, 0.054f), new(0.005f, 0.055f),
+			new(0.004f, 0.062f), new(0.008f, 0.064f), new(0.008f, 0.068f), new(0f, 0.069f),
+		}, 14, false, false);
+		k.Mat(StationTextures.Flat("st_bellfoot", new Color(0.07f, 0.065f, 0.06f), 0.5f, 0.4f));
+		HollowProps.Lathe(k, new Vector3(0.62f, 0.79f, -0.15f), new Vector2[] { new(0.04f, 0f), new(0.042f, 0.004f), new(0.04f, 0.01f), new(0.034f, 0.013f) }, 14, false, true);
 		k.Mat(StationTextures.Flat("st_logbook", new Color(0.35f, 0.12f, 0.08f), 0.8f, 0.2f));
 		k.Color = Colors.White;
 		BuildKit.Box(k, new Vector3(-0.55f, 0.81f, 0.05f), new Vector3(0.26f, 0.035f, 0.34f));
 		k.Color = Colors.White;
 		k.CommitTo(desk, "DeskMesh", true);
-		// a green-shaded banker's lamp, still warm
+		// a green-shaded banker's lamp, still warm. (2026-10-15, the props' proportions pass: it was a 30 x 18 cm closed
+		// green cylinder on a stick, the owner's example of a blocky prop. Now a real one's size and shape, 37 cm high:
+		// a stepped oval brass foot, a turned stem, a yoke, a 26 cm half-round of green cased glass, white inside, tipped
+		// to the chair, a pull chain; HollowProps.BankersLamp.)
 		var lamp = new MeshKit();
-		lamp.Mat(ItemTextures.BrassMat);
-		lamp.Color = new Color(0.85f, 0.7f, 0.42f);
-		lamp.Cylinder(new Vector3(0.55f, 0.79f, 0.2f), new Vector3(0.55f, 0.81f, 0.2f), 0.08f, 0.08f, 10, true);
-		lamp.Cylinder(new Vector3(0.55f, 0.81f, 0.2f), new Vector3(0.55f, 1.12f, 0.2f), 0.012f, 0.012f, 6, true);
-		lamp.Mat(StationTextures.Flat("st_lampshade", new Color(0.12f, 0.35f, 0.18f), 0.3f, 0.6f));
-		lamp.Color = Colors.White;
-		lamp.Cylinder(new Vector3(0.4f, 1.12f, 0.2f), new Vector3(0.7f, 1.12f, 0.2f), 0.09f, 0.07f, 10, true);
+		var glow = new MeshKit();
+		var lampAt = new Transform3D(new Basis(Vector3.Up, 0.12f), new Vector3(0.55f, 0.79f, 0.2f));
+		var brass = new StandardMaterial3D { ResourceName = "st_lampbrass", AlbedoTexture = ItemTextures.BrassMat.AlbedoTexture, AlbedoColor = new Color(0.62f, 0.5f, 0.32f), Roughness = 0.4f, Metallic = 0.55f, MetallicSpecular = 0.6f, VertexColorUseAsAlbedo = true };
+		var green = StationTextures.Flat("st_lampshade_glass", new Color(0.05f, 0.24f, 0.11f), 0.12f, 0.75f);
+		var inside = StationTextures.Flat("st_lampshade_in", new Color(0.62f, 0.6f, 0.52f), 0.5f, 0.3f);
+		var lit = StationTextures.Glow("st_lampshade_lit", new Color(1f, 0.86f, 0.62f), 1.1f);
+		HollowProps.BankersLamp(lamp, glow, lampAt, brass, green, inside, lit);
 		lamp.CommitTo(desk, "Lamp", false);
 		Decor.DeskLamp = new OmniLight3D
 		{
@@ -298,6 +308,10 @@ public partial class StationInterior : Node3D
 			Position = new Vector3(0.55f, 1.0f, 0.1f),
 		};
 		desk.AddChild(Decor.DeskLamp);
+		// the lit inside and the bulb hang under the light, so they go out with it (LobbyDecor hides it from stage 3)
+		var glowAt = new Node3D { Name = "LampGlow", Transform = Decor.DeskLamp.Transform.AffineInverse() };
+		Decor.DeskLamp.AddChild(glowAt);
+		glow.CommitTo(glowAt, "Glow", false);
 
 		var body = new StaticBody3D { Name = "DeskBody", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");

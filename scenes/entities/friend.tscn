@@ -18,7 +18,7 @@ script = ExtResource("3_body")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.7)
 
 [node name="NewelPostPickup" type="Area3D" parent="Table"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 0.65, -0.15)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 0.74, -0.15)
 script = ExtResource("2_pickup")
 Kind = 7
 Label = "Newel Post"

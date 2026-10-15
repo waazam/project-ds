@@ -118,7 +118,7 @@ public partial class Cabin : Node3D
 	/// <summary>Every paper prop in the cabin joins this group (the friend's page too); they all burn away with it.</summary>
 	public const string PapersGroup = "cabin_papers";
 	private OmniLight3D _lamp;
-	private MeshInstance3D _lampGlass, _litPane;
+	private MeshInstance3D _lampGlass, _lampGlassDark, _litPane;
 	private ShaderMaterial _char;
 	private readonly List<FireVfx> _fires = new();
 	private ForestTerrain _terrain;
@@ -775,18 +775,18 @@ public partial class Cabin : Node3D
 		float pz = -0.75f, lx = 0.3f;
 		float py = RoofBottomAt(pz) - 0.34f;
 		float ly = 1.95f;
+		// (2026-10-15, the props' proportions pass) a hurricane lamp on its bail, hung on a wire from the purlin: a fuel
+		// font, a pear of glass in its wire guard, the air tubes up its sides, a vented cap (HollowProps.HangingLamp). It
+		// was a disc, a 12 cm cylinder of glass and a cone: from the door it read as a jar on a string.
 		var k = new MeshKit();
-		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.4f, 0.38f, 0.35f);
-		k.Cylinder(new Vector3(lx, py, pz), new Vector3(lx, ly + 0.2f, pz), 0.008f, 0.008f, 4, false);
-		k.Cylinder(new Vector3(lx, ly - 0.02f, pz), new Vector3(lx, ly + 0.02f, pz), 0.07f, 0.07f, 8, true);
-		k.Cylinder(new Vector3(lx, ly + 0.14f, pz), new Vector3(lx, ly + 0.2f, pz), 0.05f, 0.02f, 8, true);
-		k.CommitTo(_gen, "LampFrame", false);
 		var g = new MeshKit();
-		g.Mat(BuildingTextures.LitGlassMat);
-		g.Color = Colors.White;
-		g.Cylinder(new Vector3(lx, ly + 0.02f, pz), new Vector3(lx, ly + 0.14f, pz), 0.05f, 0.04f, 8, false);
+		var gDark = new MeshKit();
+		var tin = new StandardMaterial3D { ResourceName = "cabin_lamptin", AlbedoColor = new Color(0.2f, 0.19f, 0.17f), Roughness = 0.55f, Metallic = 0.5f, MetallicSpecular = 0.5f, VertexColorUseAsAlbedo = true };
+		var flame = new StandardMaterial3D { ResourceName = "cabin_flame", AlbedoColor = new Color(1f, 0.85f, 0.55f), EmissionEnabled = true, Emission = new Color(1f, 0.78f, 0.45f), EmissionEnergyMultiplier = 2.2f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+		float flameUp = HollowProps.HangingLamp(k, g, gDark, new Vector3(lx, ly - 0.08f, pz), new Vector3(lx, py, pz), tin, BuildingTextures.LitGlassMat, BuildingTextures.GlassMat, flame);
+		k.CommitTo(_gen, "LampFrame", false);
 		_lampGlass = g.CommitTo(_gen, "LampGlass", false);
+		_lampGlassDark = gDark.CommitTo(_gen, "LampGlassDark", false);
 		_lamp = new OmniLight3D
 		{
 			Name = "Lamp",
@@ -795,7 +795,7 @@ public partial class Cabin : Node3D
 			OmniRange = 7.5f,
 			OmniAttenuation = 1.1f,
 			ShadowEnabled = true,
-			Position = new Vector3(lx, ly + 0.07f, pz),
+			Position = new Vector3(lx, ly - 0.08f + flameUp, pz),
 		};
 		_gen.AddChild(_lamp);
 		// the lit window's glow spills a little onto the porch
@@ -826,6 +826,7 @@ public partial class Cabin : Node3D
 		bool on = _lightOn && Burning <= 0f;
 		if (_lamp != null && IsInstanceValid(_lamp)) _lamp.Visible = on;
 		if (_lampGlass != null && IsInstanceValid(_lampGlass)) _lampGlass.Visible = on;
+		if (_lampGlassDark != null && IsInstanceValid(_lampGlassDark)) _lampGlassDark.Visible = !on;
 		var spill = _gen?.GetNodeOrNull<OmniLight3D>("WindowSpill");
 		if (spill != null) spill.Visible = on;
 		var fill = _gen?.GetNodeOrNull<OmniLight3D>("DoorFill");

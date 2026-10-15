@@ -20,28 +20,28 @@ public static class PortraitKit
 		var k = new MeshKit();
 		k.Mat(ItemTextures.BrassMat);
 		k.Color = Gilt[style];
-		// the frame: three stepped mouldings, each a ring of four bars
-		for (int step = 0; step < 3; step++)
-		{
-			float inset = step * fw * 0.33f, depth = 0.05f - step * 0.012f, z = depth * 0.5f;
-			float ow = w * 0.5f + fw - inset, oh = h * 0.5f + fw - inset, bw = fw * 0.36f;
-			if (step == 2) k.Color = Slip[style];
-			Bar(k, new Vector3(0, oh - bw * 0.5f, z), new Vector3(ow * 2f, bw, depth));
-			Bar(k, new Vector3(0, -oh + bw * 0.5f, z), new Vector3(ow * 2f, bw, depth));
-			Bar(k, new Vector3(-ow + bw * 0.5f, 0, z), new Vector3(bw, oh * 2f, depth));
-			Bar(k, new Vector3(ow - bw * 0.5f, 0, z), new Vector3(bw, oh * 2f, depth));
-		}
-		// corner bosses and a cartouche at the top middle for the gilt and walnut ones
+		// the frame: (2026-10-15, the props' proportions pass) one moulding run round the canvas with mitred corners: a
+		// sight-edge slip, a bead, a cove, the swelling top round, an ogee down to the wall (it was three rings of square
+		// bars butted at the corners); deeper and rounder for the gilt, flatter for the lacquer and the silver
+		const float d = 0.055f;
+		var prof = style is 0 or 2
+			? new Vector2[] { new(0f, 0.25f), new(0.04f, 0.3f), new(0.1f, 0.36f), new(0.16f, 0.3f), new(0.2f, 0.32f), new(0.3f, 0.5f), new(0.45f, 0.82f), new(0.58f, 0.96f), new(0.7f, 1f), new(0.8f, 0.94f), new(0.88f, 0.8f), new(0.94f, 0.62f), new(0.98f, 0.5f), new(1f, 0f) }
+			: new Vector2[] { new(0f, 0.25f), new(0.05f, 0.3f), new(0.14f, 0.28f), new(0.2f, 0.26f), new(0.3f, 0.5f), new(0.6f, 0.7f), new(0.8f, 0.72f), new(0.92f, 0.62f), new(1f, 0.55f), new(1f, 0f) };
+		for (int i = 0; i < prof.Length; i++) prof[i] = new Vector2(prof[i].X * fw, prof[i].Y * d);
+		var slip = Slip[style];
+		var gilt = Gilt[style];
+		HollowProps.Moulding(k, w, h, prof, i => i < 3 ? slip : (i % 2 == 0 ? gilt : gilt * 0.88f));
+		// corner bosses (rosettes) and a cartouche at the top middle for the gilt and walnut ones
 		k.Color = Gilt[style] * 1.1f;
 		if (style == 0 || style == 2)
 		{
+			var rosette = new Vector2[] { new(1f, 0f), new(0.95f, 0.35f), new(0.7f, 0.7f), new(0.35f, 0.9f), new(0.15f, 1f), new(0f, 1.05f) };
 			foreach (var (sx, sy) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
 			{
-				Vector3 c = new(sx * (w * 0.5f + fw * 0.6f), sy * (h * 0.5f + fw * 0.6f), 0.055f);
-				k.Cylinder(c + Vector3.Back * -0.02f, c + Vector3.Back * 0.02f, fw * 0.45f, fw * 0.3f, 8, true);
+				Vector3 c = new(sx * (w * 0.5f + fw * 0.58f), sy * (h * 0.5f + fw * 0.58f), d * 0.85f);
+				Rosette(k, c, fw * 0.32f, fw * 0.16f, rosette);
 			}
-			Vector3 top = new(0, h * 0.5f + fw, 0.05f);
-			k.Cylinder(top + Vector3.Back * -0.02f, top + Vector3.Back * 0.03f, fw * 0.9f, fw * 0.5f, 10, true);
+			Rosette(k, new Vector3(0, h * 0.5f + fw * 0.95f, d * 0.7f), fw * 0.75f, fw * 0.3f, rosette, 0.62f);
 		}
 		k.CommitTo(parent, "Frame", true);
 		// the canvas
@@ -69,5 +69,11 @@ public static class PortraitKit
 		parent.AddChild(soot);
 	}
 
-	private static void Bar(MeshKit k, Vector3 c, Vector3 s) => BuildKit.Box(k, c, s, 3f);
+	/// <summary>A domed boss lying on the frame's face (turned about +Z), squashed to <paramref name="sy"/> of its width.</summary>
+	private static void Rosette(MeshKit k, Vector3 c, float r, float h, Vector2[] prof, float sy = 1f)
+	{
+		var pts = new Vector2[prof.Length];
+		for (int i = 0; i < prof.Length; i++) pts[i] = new Vector2(prof[i].X * r, prof[i].Y * h);
+		HollowProps.In(k, new Transform3D(new Basis(Vector3.Right, Mathf.Pi * 0.5f), c), () => HollowProps.Lathe(k, Vector3.Zero, pts, 10, false, false, 1f, sy));
+	}
 }

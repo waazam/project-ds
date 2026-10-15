@@ -69,7 +69,11 @@ public partial class ParkProp : Node3D
 			case PropKind.Car: Car(); break;
 			case PropKind.CameraItem: CameraItem(); break;
 		}
-		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");
+		if (!_k.IsEmpty)
+		{
+			var mi = _k.CommitTo(_gen, "Mesh");
+			if (Kind == PropKind.Car && !Engine.IsEditorHint()) GD.Print($"[car] {ItemMeshes.CountTriangles(mi.Mesh)} triangles");
+		}
 		if (ClearRadius > 0f && !Engine.IsEditorHint())
 			_gen.AddChild(new ClearZone { Name = "ClearZone", Radius = ClearRadius, ClearFoliage = ClearFoliage });
 	}
@@ -250,10 +254,22 @@ public partial class ParkProp : Node3D
 	private void TrashCan()
 	{
 		var metal = ProcTextures.MetalMat;
-		_k.Mat(metal).Box(new Vector3(0, 0.5f, 0), new Vector3(0.75f, 1.0f, 0.6f), 1.5f);
-		_k.Box(new Vector3(0, 1.03f, 0.0f), new Vector3(0.8f, 0.06f, 0.66f), 1.5f);
+		// (2026-10-15, the props' proportions pass) a park's bear-resistant bin, not a box with a slab on it: the steel
+		// cabinet's corners rolled, a plinth, the lid's sloped top with a lip all round, its hinge along the back, the
+		// latch bar under the front lip with its paddle, a recessed kick plate
+		_k.Mat(metal);
+		_k.BevelBox(new Vector3(0, 0.52f, 0), new Vector3(0.75f, 0.96f, 0.6f), 0.03f, 1.5f);
+		_k.Color = new Color(0.62f, 0.62f, 0.6f);
+		_k.BevelBox(new Vector3(0, 0.03f, 0), new Vector3(0.7f, 0.06f, 0.55f), 0.01f, 1.5f);
+		_k.BevelBox(new Vector3(0, 0.16f, 0.301f), new Vector3(0.6f, 0.18f, 0.01f), 0.004f, 1.5f);
+		_k.Color = Colors.White;
+		var lidTilt = Basis.FromEuler(new Vector3(Mathf.DegToRad(4f), 0, 0));
+		_k.BevelBox(new Vector3(0, 1.03f, 0.005f), new Vector3(0.8f, 0.05f, 0.66f), 0.018f, 1.5f, lidTilt);
+		_k.BevelBox(new Vector3(0, 0.99f, 0.33f), new Vector3(0.8f, 0.06f, 0.02f), 0.006f, 1.5f);   // the lid's front lip
 		_k.Color = new Color(0.4f, 0.4f, 0.4f);
-		_k.Box(new Vector3(0, 0.95f, 0.32f), new Vector3(0.4f, 0.04f, 0.05f));
+		_k.Cylinder(new Vector3(-0.36f, 1.005f, -0.33f), new Vector3(0.36f, 1.005f, -0.33f), 0.014f, 0.014f, 8, true);   // the hinge
+		_k.BevelBox(new Vector3(0, 0.945f, 0.322f), new Vector3(0.4f, 0.035f, 0.035f), 0.008f, 1f);                          // the latch bar
+		_k.BevelBox(new Vector3(0, 0.935f, 0.345f), new Vector3(0.12f, 0.02f, 0.03f), 0.006f, 1f);                           // its paddle
 		_k.Color = Colors.White;
 		Col(new Vector3(0, 0.53f, 0), new Vector3(0.8f, 1.06f, 0.66f));
 		Text("PACK IT IN\nPACK IT OUT", new Vector3(0, 0.62f, 0.302f), 16, 0.003f, new Color(0.75f, 0.72f, 0.6f));
@@ -456,7 +472,16 @@ public partial class ParkProp : Node3D
 	private void Bumper()
 	{
 		_k.Color = new Color(0.9f, 0.9f, 0.88f);
-		_k.Mat(ProcTextures.ConcreteMat).Box(new Vector3(0, 0.05f, 0), new Vector3(1.8f, 0.15f, 0.2f), 2f);
+		// (2026-10-15: a precast wheel stop's section, chamfered to its 10 cm top, its ends cut back; it was a 15 x 20 cm box)
+		_k.Mat(ProcTextures.ConcreteMat);
+		var sec = new List<Vector2> { new(-0.1f, -0.02f), new(0.1f, -0.02f), new(0.1f, 0.06f), new(0.05f, 0.125f), new(-0.05f, 0.125f), new(-0.1f, 0.06f) };
+		_k.ExtrudeX(sec, -0.86f, 0.86f, 2f);
+		foreach (int s in new[] { -1, 1 })
+		{
+			var cut = new List<Vector2>(sec);
+			for (int i = 0; i < cut.Count; i++) cut[i] = new Vector2(cut[i].X * 0.8f, cut[i].Y * 0.92f - 0.0016f);
+			_k.ExtrudeX(cut, s < 0 ? -0.9f : 0.86f, s < 0 ? -0.86f : 0.9f, 2f);
+		}
 	}
 
 	private void TrailMarker()
@@ -526,11 +551,32 @@ public partial class ParkProp : Node3D
 		var sole = Tint("boot_sole", new Color(0.07f, 0.07f, 0.07f));
 		// build upright (toe toward -Z) then lay it on its side
 		_k.Xf = new Transform3D(Basis.FromEuler(new Vector3(0, 0.9f, 1.35f)), new Vector3(0, 0.05f, 0));
-		_k.Mat(sole).Box(new Vector3(0, 0.017f, 0), new Vector3(0.105f, 0.035f, 0.29f));
-		_k.Mat(leather).Box(new Vector3(0, 0.07f, -0.02f), new Vector3(0.1f, 0.075f, 0.26f));
-		_k.Box(new Vector3(0, 0.1f, -0.1f), new Vector3(0.09f, 0.03f, 0.1f), 1f, Basis.FromEuler(new Vector3(-0.35f, 0, 0)));
-		_k.Cylinder(new Vector3(0, 0.08f, 0.07f), new Vector3(0, 0.2f, 0.08f), 0.055f, 0.05f, 7);
-		_k.Mat(Tint("boot_lace", new Color(0.45f, 0.40f, 0.30f))).Box(new Vector3(0, 0.11f, -0.02f), new Vector3(0.03f, 0.01f, 0.14f));
+		// (2026-10-15, the props' proportions pass: a hiking boot's shape, not three boxes) the lugged sole a flat loft
+		// following the foot's outline, the upper rounded over the toe and up the instep, the padded ankle collar
+		_k.Mat(sole);
+		ItemMeshes.Loft(_k, new[]
+		{
+			new ItemMeshes.Ring(new Vector3(0, 0.018f, -0.15f), 0.03f, 0.016f), new ItemMeshes.Ring(new Vector3(0, 0.018f, -0.13f), 0.048f, 0.019f),
+			new ItemMeshes.Ring(new Vector3(0.003f, 0.018f, -0.07f), 0.054f, 0.019f), new ItemMeshes.Ring(new Vector3(-0.004f, 0.018f, 0.03f), 0.044f, 0.019f),
+			new ItemMeshes.Ring(new Vector3(0, 0.018f, 0.11f), 0.042f, 0.019f), new ItemMeshes.Ring(new Vector3(0, 0.02f, 0.14f), 0.03f, 0.017f),
+		}, 10, true, true, Vector3.Right, 4f, null, null, 1f, 0.3f);
+		_k.Mat(leather);
+		ItemMeshes.Loft(_k, new[]
+		{
+			new ItemMeshes.Ring(new Vector3(0, 0.045f, -0.142f), 0.026f, 0.014f), new ItemMeshes.Ring(new Vector3(0, 0.055f, -0.12f), 0.045f, 0.03f),
+			new ItemMeshes.Ring(new Vector3(0.002f, 0.07f, -0.07f), 0.05f, 0.04f), new ItemMeshes.Ring(new Vector3(-0.003f, 0.09f, -0.01f), 0.046f, 0.058f),
+			new ItemMeshes.Ring(new Vector3(0, 0.1f, 0.06f), 0.045f, 0.07f), new ItemMeshes.Ring(new Vector3(0, 0.09f, 0.115f), 0.038f, 0.055f),
+		}, 12, true, true, Vector3.Right, 4f, null, null, 1f, 0.5f);
+		_k.Cylinder(new Vector3(0, 0.1f, 0.06f), new Vector3(0, 0.2f, 0.075f), 0.05f, 0.046f, 10, false);
+		_k.Mat(Tint("boot_collar", new Color(0.16f, 0.1f, 0.06f)));
+		ItemMeshes.Torus(_k, new Vector3(0, 0.2f, 0.075f), new Vector3(0, 1f, 0.12f).Normalized(), 0.046f, 0.012f, 10, 5);
+		_k.Mat(Tint("boot_lace", new Color(0.45f, 0.40f, 0.30f)));
+		for (int i = 0; i < 5; i++)
+		{
+			float z = -0.06f + i * 0.035f;
+			float y = 0.104f + i * 0.018f + (i > 2 ? 0.02f : 0f);
+			_k.Cylinder(new Vector3(-0.022f, y, z), new Vector3(0.022f, y + 0.002f, z + 0.012f), 0.0035f, 0.0035f, 4, false);
+		}
 		_k.Xf = Transform3D.Identity;
 	}
 
@@ -859,210 +905,6 @@ public partial class ParkProp : Node3D
 		};
 		_carMats[key] = m;
 		return m;
-	}
-
-	/// <summary>
-	/// The player's own car, backed into a bay: a plain, slightly old mid-90s estate in faded dark
-	/// green. Boxy lower body, a glass house with body-colour pillars, black trim and bumpers, four
-	/// wheels, and the rear hatch lifted open over a carpeted load floor with a duffel and a water
-	/// bottle in it (the camera lying there is OpeningAtCar's TrunkCamera). Local frame: the hatch
-	/// end is +Z (the prop's front), the nose -Z; origin on the ground at the car's middle. Solid.
-	/// </summary>
-	private void Car()
-	{
-		var paint = CarMat("car_paint", new Color(0.2f, 0.29f, 0.24f).SrgbToLinear() * 1.9f, 0.5f, 0.45f);
-		var glass = CarMat("car_glass", new Color(0.07f, 0.09f, 0.1f), 0.12f, 0.8f, false);
-		var trim = CarMat("car_trim", new Color(0.07f, 0.07f, 0.075f), 0.8f, 0.25f, false);
-		var tyre = CarMat("car_tyre", new Color(0.035f, 0.035f, 0.035f), 0.95f, 0.1f, false);
-		var hub = CarMat("car_hub", new Color(0.45f, 0.46f, 0.47f), 0.45f, 0.6f, false);
-		var inner = CarMat("car_inner", new Color(0.13f, 0.13f, 0.14f), 0.95f, 0.15f, false);
-		var lamp = CarMat("car_lamp", new Color(0.55f, 0.08f, 0.06f), 0.3f, 0.6f, false);
-		var head = CarMat("car_head", new Color(0.75f, 0.74f, 0.66f), 0.25f, 0.7f, false);
-		const float L = 4.6f, W = 1.74f, zN = -L * 0.5f, zR = L * 0.5f;
-		const float sill = 0.3f, belt = 0.88f, roof = 1.43f;
-		float zWs = -0.95f, zRoofF = -0.12f, zRoofR = zR - 0.12f;
-		Color body = Colors.White;
-
-		// lower body: solid up to the rear seat; behind it the load space is open above its floor
-		float floorY = sill + 0.3f, zSeat = zR - 1.15f;
-		_k.Color = body;
-		_k.Mat(paint);
-		// (2026-10-14a, the early acts' look: it was boxes, the wheels sunk in its flat flanks) Sliced along its length
-		// so it can have a shape: the nose and tail rounded top and bottom, the bonnet falling to the nose, wheel arches
-		// cut round each wheel, and its flanks rolled in at the shoulder and the sill (a narrower skin outside a wider one).
-		const float axleY = 0.31f, archR = 0.385f;
-		float[] wheelZ = { -1.42f, 1.38f };
-		const float rNose = 0.16f, rTail = 0.12f;
-		float Round(float z, float z0, float z1, float rn, float rt)
-		{
-			if (z < z0 + rn) { float d = rn - (z - z0); return rn - Mathf.Sqrt(Mathf.Max(0f, rn * rn - d * d)); }
-			if (z > z1 - rt) { float d = rt - (z1 - z); return rt - Mathf.Sqrt(Mathf.Max(0f, rt * rt - d * d)); }
-			return 0f;
-		}
-		float TopAt(float z) => z < zWs ? Mathf.Lerp(belt - 0.07f, belt, Mathf.SmoothStep(0f, 1f, (z - zN) / (zWs - zN))) : belt;
-		float ArchAt(float z)
-		{
-			foreach (float wz in wheelZ)
-				if (Mathf.Abs(z - wz) < archR) return axleY + Mathf.Sqrt(archR * archR - (z - wz) * (z - wz));
-			return sill;
-		}
-		var zs = new List<float>();
-		for (float z = zN; z < zR - 0.001f; z += 0.06f) zs.Add(z);
-		foreach (float wz in wheelZ) for (int i = 0; i <= 12; i++) zs.Add(wz - archR + i * archR * 2f / 12f);
-		zs.Add(zSeat); zs.Add(zR);
-		zs.Sort();
-		void Slices(float xIn, float xOut, float inset, bool arches, System.Func<float, float> top, float zFrom, float zTo)
-		{
-			for (int i = 0; i + 1 < zs.Count; i++)
-			{
-				float za = zs[i], zb = zs[i + 1];
-				if (zb - za < 0.004f || za < zFrom - 0.001f || zb > zTo + 0.001f) continue;
-				float ra = Round(za, zN, zR, rNose, rTail) + inset, rb = Round(zb, zN, zR, rNose, rTail) + inset;
-				float ba = (arches ? ArchAt(za) : sill) + ra, bb = (arches ? ArchAt(zb) : sill) + rb;
-				float ta = top(za) - ra, tb = top(zb) - rb;
-				if (ta - ba < 0.01f || tb - bb < 0.01f) continue;
-				_k.ExtrudeX(new List<Vector2> { new(za, ba), new(zb, bb), new(zb, tb), new(za, ta) }, xIn, xOut, 1f);
-			}
-		}
-		const float coreX = 0.64f;
-		// the core between the wheels: full height in front of the rear seat, the load floor behind it
-		Slices(-coreX, coreX, 0f, false, TopAt, zN, zSeat);
-		Slices(-coreX, coreX, 0f, false, z => floorY, zSeat, zR);
-		foreach (float side in new[] { -1f, 1f })
-		{
-			float wIn = W * 0.5f - 0.035f;
-			// the flanks (thinner along the load space, so it keeps its width), then the rolled outer skin
-			Slices(side < 0 ? -wIn : coreX, side < 0 ? -coreX : wIn, 0f, true, TopAt, zN, zSeat);
-			Slices(side < 0 ? -wIn : W * 0.5f - 0.1f, side < 0 ? -(W * 0.5f - 0.1f) : wIn, 0f, true, TopAt, zSeat, zR);
-			Slices(side < 0 ? -W * 0.5f : wIn, side < 0 ? -wIn : W * 0.5f, 0.035f, true, TopAt, zN, zR);
-			// under the rear flanks, between the core and the skin, the floor's edge
-			Slices(side < 0 ? -(W * 0.5f - 0.1f) : coreX, side < 0 ? -coreX : W * 0.5f - 0.1f, 0f, true, z => floorY, zSeat, zR);
-		}
-		// greenhouse: glass all round with body-colour pillars and roof
-		float hw0 = W * 0.5f - 0.05f, hw1 = W * 0.5f - 0.13f;
-		Vector3 G(float side, float y, float z) => new(side * (y > belt + 0.01f ? hw1 : hw0), y, z);
-		_k.Mat(glass);
-		foreach (float side in new[] { -1f, 1f })
-		{
-			var n = new Vector3(side, 0.25f, 0).Normalized();
-			_k.Quad(G(side, belt, zWs), G(side, belt, zRoofR + 0.1f), G(side, roof, zRoofR), G(side, roof, zRoofF), n);
-		}
-		var wsN = new Vector3(0, zRoofF - zWs, -(roof - belt)).Normalized();
-		_k.Quad(G(-1, belt, zWs), G(1, belt, zWs), G(1, roof, zRoofF), G(-1, roof, zRoofF), wsN);
-		_k.Mat(paint);
-		_k.Box(new Vector3(0, roof + 0.02f, (zRoofF + zRoofR) * 0.5f), new Vector3(hw1 * 2f + 0.04f, 0.05f, zRoofR - zRoofF + 0.04f), 1f);
-		foreach (float side in new[] { -1f, 1f })
-		{
-			// A, B, C and D pillars, a hair outside the glass
-			float x = side * (hw1 + 0.035f);
-			foreach (float z in new[] { 0.55f, 1.55f })
-				_k.Box(new Vector3(side * ((hw0 + hw1) * 0.5f + 0.02f), (belt + roof) * 0.5f, z), new Vector3(0.06f, roof - belt, 0.09f), 1f);
-			_k.Box(new Vector3(side * ((hw0 + hw1) * 0.5f + 0.02f), (belt + roof) * 0.5f, zRoofR - 0.02f), new Vector3(0.06f, roof - belt, 0.16f), 1f);
-			var a0 = G(side, belt, zWs) + new Vector3(side * 0.02f, 0, 0); var a1 = G(side, roof, zRoofF) + new Vector3(side * 0.02f, 0, 0);
-			_k.Beam(a0, a1, 0.07f, 0.07f, 1f);
-			// roof rails, door seams, handles, mirror
-			_k.Mat(trim);
-			_k.Box(new Vector3(side * (hw1 - 0.1f), roof + 0.07f, (zRoofF + zRoofR) * 0.5f + 0.2f), new Vector3(0.04f, 0.04f, zRoofR - zRoofF - 0.4f), 1f);
-			foreach (float z in new[] { 0.52f, 1.52f })
-				_k.Box(new Vector3(side * (W * 0.5f + 0.002f), (sill + belt) * 0.5f + 0.05f, z), new Vector3(0.006f, belt - sill - 0.08f, 0.012f), 1f);
-			foreach (float z in new[] { 0.3f, 1.3f })
-				_k.Box(new Vector3(side * (W * 0.5f + 0.012f), belt - 0.1f, z), new Vector3(0.02f, 0.03f, 0.12f), 1f);
-			_k.Box(new Vector3(side * (W * 0.5f + 0.1f), belt + 0.12f, zWs + 0.2f), new Vector3(0.16f, 0.1f, 0.06f), 1f);
-			// rubbing strip along the side
-			_k.Box(new Vector3(side * (W * 0.5f + 0.008f), sill + 0.2f, 0.05f), new Vector3(0.02f, 0.05f, L - 0.6f), 1f);
-			_k.Mat(paint);
-		}
-		// bumpers, grille, lights
-		_k.Mat(trim);
-		_k.Box(new Vector3(0, sill + 0.08f, zN - 0.04f), new Vector3(W + 0.04f, 0.18f, 0.14f), 1f);
-		_k.Box(new Vector3(0, sill + 0.08f, zR + 0.04f), new Vector3(W + 0.04f, 0.18f, 0.14f), 1f);
-		_k.Box(new Vector3(0, belt - 0.2f, zN - 0.005f), new Vector3(0.7f, 0.16f, 0.02f), 1f);
-		_k.Mat(head);
-		foreach (float side in new[] { -1f, 1f })
-			_k.Box(new Vector3(side * 0.62f, belt - 0.2f, zN - 0.008f), new Vector3(0.32f, 0.14f, 0.02f), 1f);
-		_k.Mat(lamp);
-		foreach (float side in new[] { -1f, 1f })
-			_k.Box(new Vector3(side * (W * 0.5f - 0.1f), belt - 0.12f, zR + 0.005f), new Vector3(0.18f, 0.3f, 0.02f), 1f);
-		// plate on the rear bumper, blank
-		_k.Mat(Tint("car_plate", new Color(0.78f, 0.77f, 0.7f), 0.6f));
-		_k.Box(new Vector3(0, sill + 0.08f, zR + 0.115f), new Vector3(0.52f, 0.12f, 0.01f), 1f);
-
-		// the load space: needle-felt floor, the back of the rear seat, trim inside the pillars
-		_k.Mat(CarMat("car_carpet", new Color(0.2f, 0.2f, 0.21f), 1f, 0.05f));
-		_k.Color = Colors.White;
-		_k.Quad(new Vector3(-hw0 + 0.06f, floorY, zSeat), new Vector3(hw0 - 0.06f, floorY, zSeat), new Vector3(hw0 - 0.06f, floorY, zR - 0.02f), new Vector3(-hw0 + 0.06f, floorY, zR - 0.02f), Vector3.Up,
-			new Vector2(0, 0), new Vector2(2, 0), new Vector2(2, 1.5f), new Vector2(0, 1.5f));
-		_k.Mat(inner);
-		_k.Box(new Vector3(0, floorY + 0.3f, zSeat - 0.05f), new Vector3(hw0 * 2f - 0.12f, 0.6f, 0.1f), 2f);
-		foreach (float side in new[] { -1f, 1f })
-			_k.Box(new Vector3(side * (hw0 - 0.04f), (floorY + roof) * 0.5f, (zSeat + zR) * 0.5f), new Vector3(0.04f, roof - floorY, zR - zSeat), 1f);
-		_k.Box(new Vector3(0, roof - 0.02f, (zSeat + zR) * 0.5f), new Vector3(hw0 * 2f, 0.03f, zR - zSeat), 1f);
-		// what's in it: a duffel and a water bottle
-		_k.Mat(Tint("car_duffel", new Color(0.2f, 0.24f, 0.32f), 0.9f));
-		_k.Cylinder(new Vector3(-0.55f, floorY + 0.17f, zSeat + 0.25f), new Vector3(0.05f, floorY + 0.16f, zSeat + 0.3f), 0.17f, 0.16f, 8, true, 2f);
-		_k.Mat(trim);
-		_k.Box(new Vector3(-0.25f, floorY + 0.33f, zSeat + 0.28f), new Vector3(0.5f, 0.02f, 0.04f), 1f);
-		_k.Mat(Tint("car_bottle", new Color(0.3f, 0.45f, 0.5f), 0.4f));
-		_k.Cylinder(new Vector3(0.55f, floorY + 0.045f, zSeat + 0.45f), new Vector3(0.55f, floorY + 0.045f, zSeat + 0.72f), 0.042f, 0.042f, 8, true, 3f);
-
-		// the hatch: hinged at the roof's rear edge and lifted, glass above, body below
-		var hinge = new Vector3(0, roof, zR - 0.04f);
-		var open = Basis.FromEuler(new Vector3(Mathf.DegToRad(-128f), 0, 0));   // hangs down (-Y) when shut; swung back and up
-		Vector3 H(float x, float d, float t) => hinge + open * new Vector3(x, -d, t);
-		float hh = roof - sill - 0.25f;   // hatch height when shut
-		_k.Mat(glass);
-		_k.Quad(H(-hw1, 0.06f, 0.03f), H(hw1, 0.06f, 0.03f), H(hw1, hh * 0.55f, 0.03f), H(-hw1, hh * 0.55f, 0.03f), open * Vector3.Back);
-		_k.Mat(paint);
-		_k.Color = body;
-		_k.Box(hinge + open * new Vector3(0, -hh * 0.78f, 0.0f), new Vector3(hw0 * 2f, hh * 0.44f, 0.06f), 1f, open);
-		_k.Box(hinge + open * new Vector3(0, -0.03f, 0.0f), new Vector3(hw0 * 2f, 0.06f, 0.06f), 1f, open);
-		foreach (float side in new[] { -1f, 1f })
-			_k.Box(hinge + open * new Vector3(side * (hw1 + 0.02f), -hh * 0.3f, 0.0f), new Vector3(0.07f, hh * 0.6f, 0.06f), 1f, open);
-		_k.Mat(inner);
-		_k.Box(hinge + open * new Vector3(0, -hh * 0.78f, -0.035f), new Vector3(hw0 * 2f - 0.1f, hh * 0.4f, 0.01f), 1f, open);
-		// gas struts
-		_k.Mat(hub);
-		foreach (float side in new[] { -1f, 1f })
-			_k.Cylinder(new Vector3(side * (hw0 - 0.1f), belt - 0.05f, zR - 0.1f), hinge + open * new Vector3(side * (hw0 - 0.1f), -hh * 0.45f, -0.05f), 0.012f, 0.012f, 5, false, 1f);
-
-		// wheels
-		foreach (float side in new[] { -1f, 1f })
-			foreach (float z in new[] { -1.42f, 1.38f })
-			{
-				// (2026-10-14a) a round tyre with its sidewalls rolled, a dished steel wheel with a hub cap and its nuts,
-				// the dark liner up inside the arch (was a ten-sided drum and a flat bar over it)
-				Vector3 c = new(side * (W * 0.5f - 0.11f), 0.31f, z);
-				Vector3 ax = new(side, 0, 0);
-				_k.Mat(tyre);
-				_k.Cylinder(c - ax * 0.085f, c + ax * 0.085f, 0.31f, 0.31f, 22, false, 1f);
-				_k.Cylinder(c + ax * 0.085f, c + ax * 0.105f, 0.31f, 0.285f, 22, false, 1f);
-				_k.Cylinder(c - ax * 0.085f, c - ax * 0.105f, 0.31f, 0.285f, 22, false, 1f);
-				_k.Cylinder(c + ax * 0.105f, c + ax * 0.1f, 0.285f, 0.2f, 22, false, 1f);
-				_k.Cylinder(c - ax * 0.105f, c - ax * 0.1f, 0.285f, 0.2f, 22, false, 1f);
-				_k.Mat(CarMat("car_wheel", new Color(0.13f, 0.13f, 0.13f), 0.6f, 0.4f, false));   // painted steel, grimed
-				_k.Cylinder(c + ax * 0.06f, c + ax * 0.098f, 0.2f, 0.19f, 22, true, 1f);
-				_k.Cylinder(c + ax * 0.075f, c + ax * 0.09f, 0.15f, 0.15f, 22, true, 1f);
-				_k.Mat(hub);
-				_k.Cylinder(c + ax * 0.09f, c + ax * 0.11f, 0.065f, 0.05f, 14, true, 1f);
-				for (int nut = 0; nut < 5; nut++)
-				{
-					float a = nut * Mathf.Tau / 5f;
-					Vector3 np = c + new Vector3(0, Mathf.Sin(a) * 0.095f, Mathf.Cos(a) * 0.095f);
-					_k.Cylinder(np + ax * 0.09f, np + ax * 0.102f, 0.012f, 0.012f, 6, true, 1f);
-				}
-				_k.Mat(trim);
-				for (int s = 0; s < 12; s++)
-				{
-					float a0 = Mathf.Pi * s / 12f, a1 = Mathf.Pi * (s + 1) / 12f;
-					Vector3 p0 = new(c.X - side * 0.02f, axleY + Mathf.Sin(a0) * (archR - 0.012f), z + Mathf.Cos(a0) * (archR - 0.012f));
-					Vector3 p1 = new(c.X - side * 0.02f, axleY + Mathf.Sin(a1) * (archR - 0.012f), z + Mathf.Cos(a1) * (archR - 0.012f));
-					_k.Beam(p0, p1, 0.26f, 0.02f, 1f, (p0 + p1) * 0.5f - new Vector3((p0.X + p1.X) * 0.5f, axleY, z));
-				}
-			}
-		_k.Color = Colors.White;
-
-		Col(new Vector3(0, (0.15f + belt) * 0.5f, 0), new Vector3(W, belt - 0.15f, L));
-		Col(new Vector3(0, (belt + roof) * 0.5f, (zWs + zSeat) * 0.5f), new Vector3(W - 0.1f, roof - belt, zSeat - zWs));
 	}
 
 	/// <summary>The film camera on its own (the Act 1 camera, as ItemMeshes builds it), for the one lying in the car.</summary>
