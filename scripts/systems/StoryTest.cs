@@ -2156,7 +2156,7 @@ public partial class StoryTest : Node
 			// (each press held and released for a moment: a hitch here once swallowed one, and the flame looked lit)
 			_input.ScriptedLight = true; await Seconds(0.15, ct); _input.ScriptedLight = false; await Seconds(0.2, ct);
 			_input.ScriptedLight = true; await Seconds(0.15, ct); _input.ScriptedLight = false; await Seconds(0.3, ct);
-			Check("F won't light the flame again", lantern is { Shining: false }, $"shining {lantern?.Shining}");
+			Check("F won't light the flame again: the wick only smoulders", lantern is { Ember: true, Blacklight: false }, $"ember {lantern?.Ember}, shining {lantern?.Shining}");
 			await PressLanternMode(lantern, true, ct);
 			await Frames(4, ct);
 			Check("the blacklight still works", lantern is { Blacklight: true, Shining: true } && ProjectDS.Player.Lantern.Uv.on);

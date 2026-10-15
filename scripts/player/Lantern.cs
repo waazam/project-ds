@@ -26,6 +26,42 @@ public partial class Lantern : Node3D
 	[Export] public float GlowWhileFocused = 0.55f;
 	[Export] public Color LightColor = new(1.0f, 0.72f, 0.42f);
 
+	[ExportGroup("Indoors")]
+	// (2026-10-14, the interior pass: the 21 m woods lantern lit a 4x5 m cabin or a 10 m lobby edge to edge, one even orange
+	// wash with no falloff and no dark corners) Inside a room, a tunnel or underground (ForestAtmosphere.Indoors) its glow
+	// draws in to a pool: a shorter reach and a steeper falloff, so the floor at their feet and the near wall are lit and the
+	// far corners fall away into the dark. Eased over a doorway; outdoors it's exactly the woods' lantern above.
+	[Export] public float IndoorGlowRange = 7.5f;
+	[Export] public float IndoorGlowEnergy = 2.8f;
+	[Export] public float IndoorGlowAttenuation = 1.3f;
+	[Export] public float IndoorBeamRange = 15f;
+	[Export] public float IndoorBeamEnergy = 2.8f;
+	/// <summary>Seconds to ease most of the way between the woods' lantern and the pool indoors (a doorway).</summary>
+	[Export] public float IndoorEase = 0.5f;
+	/// <summary>0..1 how far the glow is drawn in to its indoor pool right now (tests, the look shots).</summary>
+	public float IndoorAmount => _indoor;
+	private float _indoor;
+	private World.ForestAtmosphere _atmo;
+	private double _atmoLook;
+
+	[ExportGroup("Ember (the flame dead)")]
+	// (2026-10-14, the interior pass: with the flame dead (Acts 14-20) the lantern used to switch itself to the blacklight, and
+	// every frame of six acts was violet) The flame won't take, but the wick still smoulders: a weak, guttering red-amber glow
+	// a few steps round them, the lantern's everyday light while the flame is dead. The blacklight is still B, for what's
+	// written in its ink.
+	[Export] public Color EmberColor = new(1f, 0.6f, 0.34f);
+	[Export] public float EmberRange = 8f;
+	[Export] public float EmberEnergy = 0.85f;
+	[Export] public float EmberAttenuation = 1.0f;
+	/// <summary>The flame is dead and the lantern is showing its smouldering wick (not the blacklight).</summary>
+	public bool Ember { get; private set; }
+	/// <summary>0..1 the ember's guttering brightness right now (the held lantern's glass follows it).</summary>
+	public float EmberLevel { get; private set; }
+	private float _emberIn = 1f;   // (a restore with the flame long dead: the ember's already there)
+	private double _uvHintAt;
+	private static readonly System.Collections.Generic.HashSet<Systems.Checkpoint> _uvHinted = new();
+	private bool _emberHinted;
+
 	[ExportGroup("Focused beam")]
 	[Export] public float BeamRange = 30f;   // (2026-10-13: 30 m, 3.6; was 24, 2.5)   // was 13 (the owner: throw it further)
 	[Export] public float BeamEnergy = 3.6f;   // was 2.2, 2.6, 2.9
@@ -69,15 +105,17 @@ public partial class Lantern : Node3D
 	}
 
 	[ExportGroup("Blacklight")]
-	[Export] public Color UvColor = new(0.38f, 0.12f, 1.0f);
+	// (2026-10-14, the interior pass: a cold, greyer violet, and a little less of it: the old (0.38, 0.12, 1) beam and its
+	// lilac glow turned whole rooms magenta, a nightclub, not a torch with a dying UV tube in it)
+	[Export] public Color UvColor = new(0.36f, 0.2f, 0.82f);
 	[Export] public float UvRange = 13f;
-	[Export] public float UvEnergy = 4.2f;   // enough violet on the bark and ground to see where it points (the polish pass: 2.6 left the stairwell black)
+	[Export] public float UvEnergy = 3.4f;   // enough violet on the bark and ground to see where it points (the polish pass: 2.6 left the stairwell black; 4.2 until the interior pass)
 	/// <summary>Half-angle of the violet cone (degrees).</summary>
 	[Export] public float UvAngle = 24f;
-	[Export] public float UvGlowEnergy = 1.1f;   // (2026-10-12: 0.55 lit nothing past arm's reach in Acts 14-20; 1.5 flooded the narrow hallway violet)
+	[Export] public float UvGlowEnergy = 0.9f;   // (2026-10-12: 0.55 lit nothing past arm's reach in Acts 14-20; 1.5 flooded the narrow hallway violet; 1.1 until the interior pass, when it stopped being the everyday light)
 	/// <summary>The glow round you with the blacklight on: a paler violet than the beam (the deep violet, at its brightness, still
-	/// left the walls black).</summary>
-	[Export] public Color UvGlowColor = new(0.62f, 0.5f, 1.0f);
+	/// left the walls black). (2026-10-14: a cold purple-grey, was a lilac (0.62, 0.5, 1).)</summary>
+	[Export] public Color UvGlowColor = new(0.52f, 0.5f, 0.72f);
 	[Export] public float UvGlowRange = 10f;   // a little violet round you: with the flame dead (Acts 14-20) it's all there is: enough to see the steps (the polish pass)
 
 	/// <summary>The blacklight is the lantern's mode (on or off, it keeps the mode).</summary>
@@ -143,7 +181,7 @@ public partial class Lantern : Node3D
 	[Export] public float FirstGutterAfter = 7f, FirstRelightAfter = 5f;
 	public static bool Guttered => Systems.StoryManager.Instance is { } s && s.HasFlag(FirstGutterFlag) && !s.HasFlag(FirstRelitFlag);
 	private float _firstLitT, _uvT;
-	private bool _gutterHinted, _autoUv;
+	private bool _gutterHinted;
 
 	private void FirstGutter(bool flameOn, bool uvOn, float dt)
 	{
@@ -342,7 +380,7 @@ public partial class Lantern : Node3D
 				// the flame won't take: the striker clicks, a spark, nothing
 				Audio.AudioDirector.OneShot(this, "lighter_flick", 1, null, -14f, "Player", 3f, 0.08f);
 				if (Guttered) { if (UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show($"It won't light.   {UI.KeyHint.Blacklight}: its blacklight.", 0.4f, 3f, 0.8f); }
-				else if (!_deadHinted && UI.Subtitle.Instance != null) { _deadHinted = true; _ = UI.Subtitle.Instance.Show($"The flame won't take.   {UI.KeyHint.Blacklight}: the blacklight still works.", 0.6f, 4f, 1f); }
+				else if (!_deadHinted && UI.Subtitle.Instance != null) { _deadHinted = true; _emberHinted = true; _ = UI.Subtitle.Instance.Show($"The flame won't take. The wick only smoulders.   {UI.KeyHint.Blacklight}: the blacklight still works.", 0.6f, 4.5f, 1f); }
 			}
 			else
 			{
@@ -365,36 +403,61 @@ public partial class Lantern : Node3D
 			if (!string.IsNullOrEmpty(HowToLine) && UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show(HowToLine.Replace("F:", UI.KeyHint.Lantern + ":").Replace("B:", UI.KeyHint.Blacklight + ":"), 1.0f, 5.5f, 1.4f);   // (the keys as bound)
 		}
 
-		// (2026-10-12) the flame dead (Acts 14-20) and the lantern on: it goes to its blacklight by itself, once, rather than
-		// carried dark (B still switches it; the flame's dead either way)
-		if (dead && FlameDead && !Blacklight && _lit && _inv.HasLantern && !_autoUv) { _autoUv = true; Blacklight = true; }
-		bool on = _inv.HasLantern && _lit && !(dead && !Blacklight) && !snuffed;
-		FirstGutter(on && !Blacklight, on && Blacklight, (float)delta);
+		// (2026-10-12) the flame dead (Acts 14-20): it used to go to its blacklight by itself here. (2026-10-14, the interior
+		// pass) It shows its smouldering wick instead (the ember), and B switches to the blacklight for what's in its ink.
+		float dt = (float)delta;
+		UpdateIndoor(dt);
+		bool ember = dead && FlameDead && !Blacklight && !snuffed && !Guttered;
+		bool on = _inv.HasLantern && _lit && (!dead || Blacklight || ember) && !snuffed;
+		Ember = on && ember;
+		FirstGutter(on && !Blacklight, on && Blacklight, dt);
 		_glow.Visible = on;
 		bool uv = on && Blacklight;
 		PublishUv(uv, cam);
-		if (!on) { _beam.Visible = false; return; }
+		if (Ember) EmberHints(cam);
+		if (!on) { _beam.Visible = false; EmberLevel = 0f; return; }
+		float pref = Systems.GameSettings.Instance?.LanternBrightness ?? 1f;   // (the player's own setting)
 		if (uv)
 		{
 			// the blacklight: a steady (electric, no flame) violet cone, and hardly any glow round the player
 			_glow.LightColor = UvGlowColor;
 			_glow.OmniRange = UvGlowRange;
-			_glow.LightEnergy = UvGlowEnergy * (Systems.GameSettings.Instance?.LanternBrightness ?? 1f);
+			_glow.OmniAttenuation = GlowAttenuation;
+			_glow.LightEnergy = UvGlowEnergy * pref;
 			_beam.Visible = true;
 			_beam.LightColor = UvColor;
 			_beam.SpotRange = UvRange;
 			_beam.SpotAngle = UvAngle;
 			_beam.LightEnergy = UvEnergy;
 			_focus = 0f;
+			EmberLevel = 0f;
 			return;
 		}
+		if (Ember)
+		{
+			// the wick smouldering: slow, uneven, never a strobe (three slow sines and a rare sag eased in and out)
+			float g = 0.78f + 0.12f * Mathf.Sin((float)_t * 1.7f) + 0.07f * Mathf.Sin((float)_t * 3.1f + 0.7f) + 0.04f * Mathf.Sin((float)_t * 5.3f + 2.1f);
+			if (_dip >= 0.999f && _rng.Randf() < 0.25f * dt) _dip = 0.55f;
+			_dip = Mathf.MoveToward(_dip, 1f, dt * 0.8f);
+			_emberIn = Mathf.MoveToward(_emberIn, 1f, dt * 0.6f);   // (it comes up out of the dying flame, never pops on)
+			EmberLevel = Mathf.Clamp(g * _dip, 0f, 1f) * (0.1f + 0.9f * _emberIn);
+			_glow.LightColor = EmberColor;
+			_glow.OmniRange = EmberRange;
+			_glow.OmniAttenuation = EmberAttenuation;
+			_glow.LightEnergy = EmberEnergy * EmberLevel * pref;
+			_beam.Visible = false;
+			_focus = 0f;
+			return;
+		}
+		EmberLevel = 0f;
+		_emberIn = 0f;
 		_glow.LightColor = LightColor;
-		_glow.OmniRange = GlowRange;
+		_glow.OmniRange = Mathf.Lerp(GlowRange, IndoorGlowRange, _indoor);
+		_glow.OmniAttenuation = Mathf.Lerp(GlowAttenuation, IndoorGlowAttenuation, _indoor);
 		_beam.LightColor = LightColor;
-		_beam.SpotRange = BeamRange;
+		_beam.SpotRange = Mathf.Lerp(BeamRange, IndoorBeamRange, _indoor);
 		_beam.SpotAngle = BeamAngle;
 
-		float dt = (float)delta;
 		// Two incommensurate sines (~6.5 Hz and ~11 Hz) plus a rare short dip; never below 80%.
 		float flicker = 1f + FlickerAmount * (0.6f * Mathf.Sin((float)_t * Mathf.Tau * 6.5f) + 0.4f * Mathf.Sin((float)_t * Mathf.Tau * 11f + 1.3f));
 		if (_dip >= 0.999f && _rng.Randf() < DipChance * dt) _dip = DipLevel;
@@ -413,9 +476,56 @@ public partial class Lantern : Node3D
 		float s = 1f - Mathf.Exp(-Sharpness * dt);
 		// (2026-10-13j) right mouse is the right hand's: the camera's, when that's in it; the beam's otherwise
 		_focus = Mathf.Lerp(_focus, _player.PlayerInput.Focus && PlayerHands.LanternCanGather(_player) ? 1f : 0f, s);
-		float pref = Systems.GameSettings.Instance?.LanternBrightness ?? 1f;   // (the player's own setting)
-		_glow.LightEnergy = GlowEnergy * Mathf.Lerp(1f, GlowWhileFocused, _focus) * k * pref;
+		float glowEnergy = Mathf.Lerp(GlowEnergy, IndoorGlowEnergy, _indoor), beamEnergy = Mathf.Lerp(BeamEnergy, IndoorBeamEnergy, _indoor);
+		_glow.LightEnergy = glowEnergy * Mathf.Lerp(1f, GlowWhileFocused, _focus) * k * pref;
 		_beam.Visible = _focus > 0.01f;
-		_beam.LightEnergy = BeamEnergy * _focus * k * pref;
+		_beam.LightEnergy = beamEnergy * _focus * k * pref;
+	}
+
+	/// <summary>Eases how far the glow is drawn in to its indoor pool toward where the eye is (ForestAtmosphere.Indoors):
+	/// a doorway crossed is half a second's change, never a pop; exactly 0 outdoors.</summary>
+	private void UpdateIndoor(float dt)
+	{
+		if ((_atmo == null || !IsInstanceValid(_atmo)) && _t >= _atmoLook)
+		{
+			_atmoLook = _t + 1.0;
+			_atmo = GetTree().GetFirstNodeInGroup("atmosphere") as World.ForestAtmosphere;
+		}
+		float want = _atmo != null && IsInstanceValid(_atmo) ? _atmo.Indoors : 0f;
+		_indoor = Mathf.Lerp(_indoor, want, 1f - Mathf.Exp(-dt / Mathf.Max(IndoorEase, 0.01f)));
+		if (Mathf.Abs(_indoor - want) < 0.002f) _indoor = want;
+	}
+
+	/// <summary>With the ember showing (the flame dead), the blacklight is what reads the ink: said once when the flame has
+	/// just died, and once in each place when they stand by something written in it (the stairwell's walls, the library's
+	/// shelves) without it on.</summary>
+	private void EmberHints(Camera3D cam)
+	{
+		if (UI.Subtitle.Instance == null || Dying || _t < _uvHintAt) return;
+		_uvHintAt = _t + 0.5;
+		string key = UI.KeyHint.Blacklight;
+		if (!_emberHinted && Systems.StoryManager.Instance?.HasFlag(Systems.StoryManager.Flag.LanternFlameDead) == true
+			&& Systems.StoryManager.Instance.Current < Systems.Checkpoint.Act14Finished)
+		{
+			// the flame has just died on the stair (Act 14): what's left
+			_emberHinted = true;
+			_deadHinted = true;
+			_ = UI.Subtitle.Instance.Show($"The flame won't take. The wick only smoulders.   {key}: the blacklight still works.", 0.6f, 4.5f, 1f);
+			_uvHintAt = _t + 8.0;
+			return;
+		}
+		if (Systems.StoryManager.Instance is not { } s || _uvHinted.Contains(s.Current)) return;
+		Vector3 eye = cam.GlobalPosition, fwd = -cam.GlobalBasis.Z;
+		foreach (var m in World.UvInk.Marks)
+		{
+			if (m.Node == null || !IsInstanceValid(m.Node) || !m.Node.IsVisibleInTree()) continue;
+			Vector3 to = m.Node.GlobalPosition - eye;
+			float d = to.Length();
+			if (d > 4.5f || d < 0.2f || (to / d).Dot(fwd) < 0.55f) continue;
+			_uvHinted.Add(s.Current);
+			_ = UI.Subtitle.Instance.Show($"Something's there the ember won't show.   {key}: the blacklight.", 0.6f, 4f, 1f);
+			_uvHintAt = _t + 8.0;
+			return;
+		}
 	}
 }

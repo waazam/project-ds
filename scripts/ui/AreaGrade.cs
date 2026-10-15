@@ -51,19 +51,33 @@ public static class AreaGrade
 		_ => Woods,
 	};
 
+	/// <summary>(2026-10-14, the interior pass: indoors the whole frame was orange, the lantern's warmth and the warm wood and
+	/// paper all at one mid value) Indoors, over whichever place's grade: a step less colour, the warm highlights pulled back
+	/// toward neutral, the shadows a touch cooler, and the mid-values a little lower (ps2_post's mid_gamma), so the lantern's
+	/// pool is the one warm accent in a dark, muted room, the way it is in the woods.</summary>
+	public static float IndoorSaturation = 0.74f, IndoorMidGamma = 1.12f, IndoorWarmPullback = 0.6f, IndoorCoolShadow = 0.5f;
+	private static readonly Vector3 NeutralHigh = new(1.0f, 0.99f, 0.96f), CoolShadow = new(0.9f, 0.95f, 1.03f);
+
 	private static Grade _now = Woods;
+	private static float _indoorNow;
 	private static bool _set;
 
-	/// <summary>Eases the finish toward the grade for <paramref name="cp"/> (call every frame).</summary>
-	public static void Apply(ShaderMaterial post, Checkpoint cp, float dt)
+	/// <summary>Eases the finish toward the grade for <paramref name="cp"/> (call every frame), indoors by
+	/// <paramref name="indoors"/> (0..1, ForestAtmosphere.Indoors).</summary>
+	public static void Apply(ShaderMaterial post, Checkpoint cp, float dt, float indoors = 0f)
 	{
 		var want = For(cp);
-		if (!_set) { _now = want; _set = true; }
+		if (!_set) { _now = want; _indoorNow = indoors; _set = true; }
 		float k = 1f - Mathf.Exp(-dt / 2.5f);
 		_now = new Grade(_now.Shadow.Lerp(want.Shadow, k), _now.High.Lerp(want.High, k), Mathf.Lerp(_now.Saturation, want.Saturation, k));
-		post.SetShaderParameter("shadow_tone", _now.Shadow);
-		post.SetShaderParameter("highlight_tone", _now.High);
-		post.SetShaderParameter("saturation", _now.Saturation);
+		// (indoors eases quicker: a doorway is a second's change)
+		_indoorNow = Mathf.Lerp(_indoorNow, Mathf.Clamp(indoors, 0f, 1f), 1f - Mathf.Exp(-dt / 0.8f));
+		if (Mathf.Abs(_indoorNow - indoors) < 0.002f) _indoorNow = indoors;
+		float i = _indoorNow;
+		post.SetShaderParameter("shadow_tone", _now.Shadow.Lerp(CoolShadow, IndoorCoolShadow * i));
+		post.SetShaderParameter("highlight_tone", _now.High.Lerp(NeutralHigh, IndoorWarmPullback * i));
+		post.SetShaderParameter("saturation", _now.Saturation * Mathf.Lerp(1f, IndoorSaturation, i));
+		post.SetShaderParameter("mid_gamma", Mathf.Lerp(1f, IndoorMidGamma, i));
 	}
 
 	/// <summary>Straight to the grade (a load: no easing in from wherever the last level left it).</summary>

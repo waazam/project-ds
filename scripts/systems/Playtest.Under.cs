@@ -244,7 +244,7 @@ public partial class Playtest
 		await _bot.LanternMode(false, ct);
 		await _bot.Tap(on => Input.ScriptedLight = on, ct);
 		await _bot.Tap(on => Input.ScriptedLight = on, ct);
-		Check("F won't light it again", lamp is { Shining: false });
+		Check("F won't light it again: the wick only smoulders (its ember)", lamp is { Ember: true, Blacklight: false });
 		await _bot.LanternMode(true, ct);
 		Check("the blacklight still works", lamp is { Blacklight: true, Shining: true });
 		await _bot.LanternMode(false, ct);
@@ -626,7 +626,7 @@ public partial class Playtest
 		await _bot.WaitUntil(() => lib?.Puzzle != null && lib.SheetUse != null, 10, ct);
 		Require("the library", lib?.Puzzle != null);
 		Check("Act 19 starts in the library", Story.Current == Checkpoint.Act18Finished && lib.PlayerInside(Player.GlobalPosition));
-		// (with the flame dead the lantern switches itself to the blacklight once: back to the dead flame, to look by lamplight)
+		// (with the flame dead the lantern shows its ember; this makes sure it isn't on the blacklight, to look by lamplight)
 		await _bot.LanternMode(false, ct);
 		await _bot.WalkTo(lib.BookcaseFrontWorld, 0.6f, ct, giveUp: 10f);
 		await _bot.Aim(lib.BookUse.GlobalPosition, ct);

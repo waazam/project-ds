@@ -45,11 +45,12 @@ public partial class SkiLodge
 		// the glass: a white-out of blowing snow beyond every broken pane
 		foreach (var g in new[] { LodgeTextures.DayGlass, LodgeTextures.IceGlass })
 		{
-			g.AlbedoColor = new Color(0.55f, 0.6f, 0.68f);
+			// (2026-10-14, the interior pass: a dim, cold grey whiteout, not a white glare: was albedo 0.55-0.68, glow 0.55)
+			g.AlbedoColor = new Color(0.36f, 0.4f, 0.46f);
 			g.AlbedoTexture = WinterWoods.SnowStd("whiteout", 1f, 1f).AlbedoTexture;
 			g.EmissionTexture = null;
-			g.Emission = new Color(0.52f, 0.57f, 0.65f);
-			g.EmissionEnergyMultiplier = 0.55f;
+			g.Emission = new Color(0.42f, 0.47f, 0.56f);
+			g.EmissionEnergyMultiplier = 0.22f;
 			g.Uv1Scale = new Vector3(0.6f, 0.6f, 1f);
 		}
 		var shards = new MeshKit();

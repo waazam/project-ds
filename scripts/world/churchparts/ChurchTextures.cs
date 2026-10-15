@@ -496,7 +496,10 @@ public static class ChurchTextures
 		bool lead = u < 1.5f || v < 1.5f;
 		if (lead) return new Color(0.04f, 0.04f, 0.04f, 1f);
 		float frost = Mathf.Clamp(1f - Mathf.Min(Mathf.Min(u, 32 - u), Mathf.Min(v, 32 - v)) / 6f, 0f, 1f);
-		return new Color(0.82f, 0.88f, 0.92f, 0.18f + 0.45f * frost + 0.1f * Fbm(x, y, 128, 6, 2, 641));
+		// (2026-10-14, the interior pass: grimier and more frosted: the snow glare through near-clear panes was the brightest
+		// thing in the nave)
+		float grime = Fbm(x, y, 128, 6, 2, 641);
+		return new Color(0.58f, 0.62f, 0.66f, 0.5f + 0.35f * frost + 0.12f * grime);
 	}, false);
 
 	public static StandardMaterial3D QuarryMat
@@ -508,7 +511,7 @@ public static class ChurchTextures
 			{
 				AlbedoTexture = Quarries, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.15f, MetallicSpecular = 0.8f,
 				// the frosted panes glow a little with the snow-light behind them
-				EmissionEnabled = true, Emission = new Color(0.5f, 0.56f, 0.66f), EmissionEnergyMultiplier = 0.35f,
+				EmissionEnabled = true, Emission = new Color(0.42f, 0.47f, 0.56f), EmissionEnergyMultiplier = 0.14f,   // (0.35 until the interior pass)
 				CullMode = BaseMaterial3D.CullModeEnum.Disabled, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps, Uv1Scale = new Vector3(2f, 2f, 1f),
 			};
 			_mat["ch_quarries"] = s;
