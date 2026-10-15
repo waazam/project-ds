@@ -13,7 +13,7 @@ namespace ProjectDS.Player;
 /// </summary>
 public partial class HeldFlare : HeldItem
 {
-	protected override Vector3 Rest => new(0.26f, -0.24f, -0.5f);
+	protected override Vector3 Rest => new(0.23f, -0.2f, -0.45f);   // (2026-10-14g: within the arm's reach; was (0.26, -0.24, -0.5))
 	protected override Vector3 Lowered => new(0.3f, -0.75f, -0.45f);
 
 	/// <summary>Seconds left to burn; 0 when there's none in hand.</summary>
@@ -50,13 +50,14 @@ public partial class HeldFlare : HeldItem
 		// (2026-10-13j) seated in the fist: the stick upright through the hand's grip (its Stick pose, along Y), the fist round
 		// its lower third, the burning end up; the hand and the flare tilted out together (the flare alone had been tilted,
 		// crossing the upright fist)
-		_tilt = new Node3D { Name = "Tilt", Rotation = new Vector3(Mathf.DegToRad(-28f), 0, Mathf.DegToRad(-8f)) };
+		// (2026-10-14g: in the held things' one convention (HeldModels): the hammer-grip Fist round its +Y stick, leaning
+		// forward by the lean the Fist's forearm is built for, so only the wrist cocks; was the Stick turned yaw -60)
+		_tilt = new Node3D { Name = "Tilt", Basis = new Basis(Vector3.Right, Mathf.DegToRad(-HeldModels.FistLean)) * new Basis(Vector3.Back, Mathf.DegToRad(-6f)) };
 		AddChild(_tilt);
 		_model = new Node3D { Name = "Model", Position = new Vector3(0, -0.075f, 0) };
 		_tilt.AddChild(_model);
 		Flare.BuildModel(_model, out _core);
-		if (BuildArm(_tilt, HandSide.Right, HandPose.Stick, Vector3.Zero) is { } hand) hand.RotationDegrees = new Vector3(0f, -60f, 0f);
-		else BuildFist(_tilt, Vector3.Zero, new Color(0.09f, 0.075f, 0.065f), new Color(0.07f, 0.075f, 0.07f));
+		if (BuildArm(_tilt, HandSide.Right, HandPose.Fist, Vector3.Zero) == null) BuildFist(_tilt, Vector3.Zero, new Color(0.09f, 0.075f, 0.065f), new Color(0.07f, 0.075f, 0.07f));
 		SetLayer(this);
 		_sparks = Flare.Sparks();
 		_sparks.Position = new Vector3(0, 0.27f, 0);

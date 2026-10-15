@@ -28,6 +28,15 @@ public partial class BodyPreview : Node3D
 		foreach (var a in OS.GetCmdlineUserArgs())
 			if (a == "--hand") hand = "now";
 			else if (a.StartsWith("--hand=")) hand = a.Substring(7);
+			else if (a.StartsWith("--stride="))
+			{
+				// (2026-10-14g) `-- --stride=<tag>`: the lantern and the axe in hand, a run of frames across a stride walking
+				// and then running; to test-output/stride/<tag>/
+				_dir = ProjectSettings.GlobalizePath($"res://test-output/stride/{a.Substring(9)}");
+				DirAccess.MakeDirRecursiveAbsolute(_dir);
+				_ = RunStride();
+				return;
+			}
 		_dir = ProjectSettings.GlobalizePath(hand != null ? $"res://test-output/hand/{hand}" : "res://test-output/body");
 		DirAccess.MakeDirRecursiveAbsolute(_dir);
 		if (hand == "poses") { _ = RunPoses(); return; }
@@ -142,6 +151,44 @@ public partial class BodyPreview : Node3D
 		await Set(false, false);
 		await Walk(new Vector2(0, 1), true, 1.9, 20f, "10_light_run_up", 1.6);
 		await Walk(new Vector2(0, -1), false, 1.7, -45f, "11_light_walk_down", 1.5);
+		GD.Print($"[body] done: {_fails} failed");
+		GetTree().Quit(_fails == 0 ? 0 : 1);
+	}
+
+	/// <summary>(`-- --stride=tag`) Frames across a stride, walking and running, the lantern up and the axe in the right hand:
+	/// to see how the arms move (the owner, 2026-10-14g: "the arm itself is too long and unrealistic, especially while
+	/// walking").</summary>
+	private async Task RunStride()
+	{
+		await Frames(10);
+		_p = GetTree().GetFirstNodeInGroup("player") as PlayerController;
+		_in = _p?.PlayerInput;
+		if (_p == null) { GetTree().Quit(1); return; }
+		_in.Scripted = true;
+		_p.Inventory?.TryPickup(ToolKind.Lantern);
+		_p.Inventory?.TryPickup(ToolKind.Axe);
+		_p.Inventory?.Select(ToolKind.Axe);
+		if (GetNodeOrNull<DirectionalLight3D>("../Sun") is { } sun) sun.LightEnergy = 0.6f;
+		foreach (var (name, move, run, frameGap) in new[] { ("walk", new Vector2(0, 1), false, 0.075), ("run", new Vector2(0, -1), true, 0.05) })
+		{
+			_p.Teleport(new Vector3(0, 0.05f, name == "walk" ? 9f : -3f), 0f);
+			Look(-8f);
+			await Seconds(1.0);
+			Shot($"{name}_00_still");
+			_in.ScriptedMove = move;
+			_in.ScriptedRun = run;
+			double t = 0;
+			while (t < 1.4) { Look(-8f); await Frames(1); t += GetProcessDeltaTime(); }
+			for (int i = 1; i <= 10; i++)
+			{
+				Shot($"{name}_{i:00}");
+				double w = 0;
+				while (w < frameGap) { Look(-8f); await Frames(1); w += GetProcessDeltaTime(); }
+			}
+			_in.ScriptedMove = Vector2.Zero;
+			_in.ScriptedRun = false;
+			await Seconds(0.4);
+		}
 		GD.Print($"[body] done: {_fails} failed");
 		GetTree().Quit(_fails == 0 ? 0 : 1);
 	}

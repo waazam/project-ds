@@ -152,18 +152,43 @@ def chain(hand, base, d, lengths, curl):
 #   curl    (optional) how much of the solved grip the fingers close (1 = round the grip)
 POSES = {
     "handle": dict(grip=0.0085, axis=G(1, 0, 0), back=G(0.0, 1.0, 0.3), thumb="over", toward=G(-0.12, -0.68, 0.72),
-                   eye=G(0.209, 0.064, 0.582)),
+                   eye=G(0.2, 0.115, 0.5)),
     "stick": dict(grip=0.016, axis=G(0, 1, 0), back=G(-0.8, 0.0, -0.45), thumb="over", toward=G(-0.3, -0.55, 0.78),
                   eye=G(0.2, 0.12, 0.5)),
-    "camera": dict(grip=0.021, axis=G(0, 1, 0), back=G(-0.9, 0.0, -0.3), thumb="along", toward=G(-0.3, -0.55, 0.78),
+    "camera": dict(grip=0.021, axis=G(0, 1, 0), back=G(-0.9, 0.0, -0.3), thumb="back", toward=G(-0.3, -0.55, 0.78),
                    eye=G(0.2, 0.08, 0.45)),
     "relaxed": dict(grip=None, axis=G(0.35, 0.9, 0.0), back=G(-1.0, 0.0, -0.4), thumb="relaxed", toward=G(-0.25, -0.6, 0.76),
                     eye=G(0.2, 0.12, 0.5)),
-    "wide": dict(grip=0.036, axis=G(0, 1, 0), back=G(-0.8, 0.0, -0.45), thumb="along", toward=G(-0.3, -0.55, 0.78),
+    # (2026-10-14g, "the cap hand shows more wrist than fingers": in the held things' convention, round the neck from
+    # behind it, the back of the hand ahead and the palm to the eye, so the fingers close round the neck's near side;
+    # the forearm off to the lower right past it)
+    "wide": dict(grip=0.036, axis=G(0, 1, 0), back=G(0.0, 0.0, -1.0), thumb="along", forearm=G(-0.55, -0.5, 0.67), lean=0.0,
                  eye=G(0.2, 0.12, 0.5)),
     "small": dict(grip=0.0095, axis=G(0, 1, 0), back=G(-0.8, 0.0, -0.45), thumb="over", toward=G(-0.3, -0.55, 0.78),
                   eye=G(0.2, 0.12, 0.5)),
 }
+
+# (2026-10-14g, the owner: "the items in hands still look funky and like they're facing the wrong way") ONE convention for
+# the hammer grip, shared by the hand and every item held in it, so a tool drops in with no turn of its own:
+#   the socket is the grip's centre; the grip runs up +Y; the knuckles (and so the tool's working end: the bit, the face,
+#   the claw, the edge) point -Z, ahead, away from the eye; the back of the (right) hand faces +X, out; the thumb closes
+#   over the first two fingers on top.
+# (The Stick pose's knuckles point forward and to the left and the game turned it yaw -66 besides, so its tools' working
+# ends were some 70 degrees off its knuckles.) The game then carries the fist and its tool leaning forward FIST_LEAN
+# degrees about the view's sideways axis (HeldModels' Lean); the forearm here is built turned back by as much about that
+# axis, so in the game it comes in from the lower right as `forearm` says while only the wrist cocks. (The axis is x,
+# which the right hand's mirroring leaves as it is.)
+FIST_LEAN = 30.0
+POSES["fist"] = dict(grip=0.016, axis=G(0, 1, 0), back=G(-1.0, 0.0, 0.0), thumb="over", forearm=G(-0.15, -0.5, 0.85), lean=FIST_LEAN,
+                     eye=G(0.2, 0.2, 0.45))
+# (2026-10-14g: the cap's stone is too broad to see a hand round its neck under the ball: it's carried on the open hand
+# under its plinth, palm up, the fingers ahead and cupped up round its edge. The same frame: palm up +Y, fingers -Z, the
+# right thumb out to +X (relaxed poses have no grip: their "axis" is the thumb's side), the socket the middle of the palm)
+POSES["cradle"] = dict(grip=None, axis=G(-1.0, 0.0, 0.0), back=G(0.0, -1.0, 0.1), thumb="relaxed", forearm=G(-0.2, -0.45, 0.87),
+                       lean=0.0, eye=G(0.2, 0.25, 0.45))
+# (the small fist round the lighter: the same frame, upright)
+POSES["small"] = dict(grip=0.0095, axis=G(0, 1, 0), back=G(-1.0, 0.0, 0.0), thumb="over", forearm=G(-0.15, -0.55, 0.82), lean=0.0,
+                      eye=G(0.2, 0.12, 0.5))
 RELAXED_CURL = {"index": (0.30, 0.45, 0.25), "middle": (0.36, 0.52, 0.3), "ring": (0.44, 0.58, 0.34), "little": (0.54, 0.66, 0.4)}
 
 
@@ -209,6 +234,13 @@ def skeleton(pose):
         via0 = (hand.fingers["index"][0] + hand.fingers["index"][1]) * 0.5 + hand.s * 0.024 - hand.b * 0.01
         via1 = outside("index", 1, 0.021) + hand.s * 0.008
         tip = outside("middle", 1, 0.020)
+    elif P_["thumb"] == "back":
+        # (2026-10-14g, the owner: the camera's thumb "lies over the top of the camera body; should go up the back") the
+        # ball of the thumb along the palm's side to the box's back face, the thumb then flat on that face, up and in
+        # toward the middle of the box, its tip a centimetre under the top plate
+        via0 = tb + hand.f * 0.031 - hand.b * 0.016 + hand.s * 0.002
+        via1 = via0 - hand.b * 0.025 + hand.s * 0.011 + hand.f * 0.009
+        tip = via1 - hand.b * 0.022 + hand.s * 0.008 + hand.f * 0.004
     elif P_["thumb"] == "along":
         # up the grip on the palm's side, opposite the fingers
         cT = T0 + gdir * ((FINGERS[0][2] + 0.012) / math.cos(gamma))
@@ -237,7 +269,11 @@ def skeleton(pose):
     hand.sides = {k: (R @ v).normalized() for k, v in hand.sides.items()}
     hand.thumb = [M @ p for p in hand.thumb]
     # (the owner: "less bendy at the wrist and more strong": the forearm nearly in line with the hand)
-    hand.toward = (-hand.f).lerp(P_["toward"].normalized(), 0.4).normalized()
+    if "toward" in P_:
+        hand.toward = (-hand.f).lerp(P_["toward"].normalized(), 0.4).normalized()
+    if "forearm" in P_:
+        # (the hammer-grip convention: the forearm as the game will show it, turned back against the lean it gives the fist)
+        hand.toward = (Matrix.Rotation(math.radians(P_["lean"]), 3, G(1, 0, 0)) @ P_["forearm"].normalized()).normalized()
     return hand
 
 
@@ -468,13 +504,15 @@ def finger(cg, hand, nm, root):
     secs.append(joint(pts[2], d[1], d[2], r[2], 0.0010))
     secs.append(section(pts[2] + d[2] * L[2] * 0.42, d[2], up_of(d[2]), r[2] * 0.95 * SH_F, r[2] * 0.76 * SH_F, r[2] * 1.02 * SH_F))
     tipc = pts[3] - d[2] * r[3] * 0.55
-    secs.append(section(tipc, d[2], up_of(d[2]), r[3] * 0.92 * SH_F, r[3] * 0.72 * SH_F, r[3] * 0.92 * SH_F))
+    # (2026-10-14g: "the fingertips of an empty fist look round and toe-like": the last section a little narrower and
+    # flatter over the nail, the cap's apex drawn further out and toward the pad, so the tip tapers to a fingertip)
+    secs.append(section(tipc, d[2], up_of(d[2]), r[3] * 0.87 * SH_F, r[3] * 0.66 * SH_F, r[3] * 0.88 * SH_F))
     prev = root
     for P in secs:
         R = cg.ring(P)
         cg.bridge(prev, R)
         prev = R
-    cg.cap(prev, pts[3] + d[2] * r[3] * 0.35 - up_of(d[2]) * r[3] * 0.12)
+    cg.cap(prev, pts[3] + d[2] * r[3] * 0.45 - up_of(d[2]) * r[3] * 0.2)
 
 
 def thumb(cg, hand, loop):
@@ -572,12 +610,27 @@ def carve(ob, hand):
         rl = np.linalg.norm(radial, axis=1) + 1e-9
         return d, tt, radial / rl[:, None], rl, L
 
-    def seam(dist, m, width=0.00055, depth=0.00028):
-        """A sewn seam: a groove, a raised welt either side, a little darker."""
-        nonlocal disp, dark
+    stitch = np.zeros(n)
+
+    def seam(dist, m, width=0.00055, depth=0.00028, along=None):
+        """A sewn seam: a groove, a raised welt either side, a little darker; and (2026-10-14g) its thread: short pale
+        stitches across the groove every few millimetres along it (`along`, metres)."""
+        nonlocal disp, dark, stitch
         w = m * (g(dist, width) * -depth + (g(dist - width * 2.2, width) + g(dist + width * 2.2, width)) * depth * 0.45)
         disp += w
         dark = np.maximum(dark, m * g(dist, width * 1.4) * 0.7)
+        if along is not None:
+            dash = np.clip(np.sin(along / 0.0032 * math.tau) * 2.0 - 0.3, 0, 1)
+            # (the thread lies over the welt, a little proud: a stitch catches the light)
+            stitch = np.maximum(stitch, m * g(dist, width * 1.7) * dash)
+            disp += m * g(dist, width * 1.5) * dash * depth * 0.6
+
+    def round_len(dn, d):
+        """Where round an axis `d` each vertex lies (radians times a typical radius: metres for a stitch's spacing)."""
+        a1 = np.cross(d, np.array((0.31, 0.77, 0.55)))
+        a1 /= np.linalg.norm(a1)
+        a2 = np.cross(d, a1)
+        return np.arctan2(dn @ a2, dn @ a1)
 
     rng = np.random.default_rng(11)
     allj = list(hand.fingers.items()) + [("thumb", hand.thumb)]
@@ -613,6 +666,12 @@ def carve(ob, hand):
                 wb = np.clip((-inside - 0.2) / 0.5, 0, 1) * near
                 wr = np.cos(along / (rads[i] * 0.33) * math.pi + ph) * g(np.abs(along) - rads[i] * 0.85, rads[i] * 0.35)
                 disp += wr * 0.00018 * wb
+                # (2026-10-14g) and the creases across the back of the knuckle, where the leather folds each time the
+                # fist opens: two or three, dark with the grime worked into them
+                kc = np.cos(along / (rads[i] * 0.42) * math.pi + ph * 0.5) * g(along, rads[i] * 0.75)
+                kc = kc * np.clip(1.0 + 0.6 * np.sin(np.arctan2(dirn @ _np(ax.cross(inner)), -inside) * 3 + ph), 0, 1.4)
+                disp -= np.clip(kc - 0.55, 0, 1) * 0.00045 * wb
+                dark = np.maximum(dark, np.clip(kc - 0.5, 0, 1) * 0.9 * wb * min(1.0, bent * 1.5))
             # the fingers' side seams (the fourchettes), from this joint to the next
             if name != "thumb":
                 dseg, tt, dn, rl2, L = seg_frame(pts[i], pts[i + 1])
@@ -620,12 +679,12 @@ def carve(ob, hand):
                 m = (rl2 < rads[i] * 1.8) & (tt > -0.002) & (tt < L + 0.002)
                 for sgn in (-1, 1):
                     ang = np.arccos(np.clip(dn @ (side * sgn), -1, 1))
-                    seam(ang * rads[i], m & (ang < 0.6))
+                    seam(ang * rads[i], m & (ang < 0.6), along=tt)
         # the fingertip's cap: a seam round the end of the last bone
         tip, prev = pts[-1], pts[-2]
         dseg, tt, dn, rl2, L = seg_frame(prev, tip)
         m = (rl2 < rads[-1] * 1.6)
-        seam(tt - L * 0.55, m & (tt > 0) & (tt < L * 1.2), 0.0005, 0.00022)
+        seam(tt - L * 0.55, m & (tt > 0) & (tt < L * 1.2), 0.0005, 0.00022)   # (no thread drawn round the tip: a dotted ring there read as a toe)
     # slack: worn leather lies in fine irregular wrinkles across the fingers, and is crumpled a little everywhere
     for name, pts in allj:
         rads = [r + GLOVE_T for r in hand.rads.get(name, hand.thumb_r)]
@@ -647,7 +706,7 @@ def carve(ob, hand):
     # the thumb's seam round its root (the glove's thumb is a separate piece)
     tp = hand.thumb
     dseg, tt, dn, rl2, L = seg_frame(tp[0], tp[1])
-    seam(tt - L * 0.7, (rl2 < 0.03) & (np.abs(tt - L * 0.7) < 0.003))
+    seam(tt - L * 0.7, (rl2 < 0.03) & (np.abs(tt - L * 0.7) < 0.003), along=round_len(dn, dseg) * 0.013)
     # the palm: folds bunched across it where the fingers close (two broad creases)
     for fpos, k_ in ((0.068, 1.0), (0.05, 0.7)):
         rel = co - _np(hand.w)
@@ -662,7 +721,8 @@ def carve(ob, hand):
         rel = co - _np(hand.w + t * at)
         along = rel @ _np(t)
         r2 = np.linalg.norm(rel - along[:, None] * _np(t), axis=1)
-        seam(along, (r2 < 0.06) & (np.abs(along) < 0.004), 0.0005, dep)
+        radn = (rel - along[:, None] * _np(t)) / (r2[:, None] + 1e-9)
+        seam(along, (r2 < 0.06) & (np.abs(along) < 0.004), 0.0005, dep, along=round_len(radn, _np(t)) * 0.03)
     # the back of the hand: two stitched lines from between the knuckles toward the wrist (the panel's darts)
     for k in range(3):
         sa, sb = FINGERS[k][2], FINGERS[k + 1][2]
@@ -675,31 +735,45 @@ def carve(ob, hand):
         tt = np.clip(((fs - a2) @ ab) / (ab @ ab), 0, 1)
         dist = np.linalg.norm(fs - (a2 + tt[:, None] * ab), axis=1)
         m = (nr @ B > 0.4) & (rel @ B > 0) & (tt > 0.001) & (tt < 0.999)
-        seam(dist, m, 0.0004, 0.00016)
+        seam(dist, m, 0.0004, 0.00016, along=tt * np.linalg.norm(ab))
     co += nr * disp[:, None]
     me.vertices.foreach_set("co", co.ravel())
     me.update()
-    return dark
+    return dark, stitch
 
 
-# (linear colours) worn, dull brown leather, greyed toward the early acts' cold; rubbed paler where it's stretched
-GLOVE = np.array((0.050, 0.038, 0.028))
-GLOVE_WORN = np.array((0.125, 0.104, 0.084))
-CUFF = np.array((0.030, 0.031, 0.032))        # (the jacket's knitted storm cuff: charcoal wool)
-SLEEVE = np.array((0.048, 0.056, 0.040))      # (the jacket: waxed olive canvas)
+# (linear colours; 2026-10-14g, the owner: "the leather reads greyish-tan in daylight": a darker, warmer worn brown, enough
+# colour in it to stay brown under the cool rim light and the grade)
+GLOVE = np.array((0.050, 0.027, 0.013))         # (the leather: a dark, oiled brown)
+GLOVE_RED = np.array((0.058, 0.025, 0.010))     # (here and there a little redder, where the dye held)
+GLOVE_WORN = np.array((0.105, 0.062, 0.032))    # (rubbed paler where it's stretched: the knuckles, the fingertips)
+GLOVE_DIRT = np.array((0.022, 0.018, 0.013))    # (grime worked into the palm, the fingertips, the creases)
+GLOVE_SCUFF = np.array((0.080, 0.060, 0.043))   # (scuffed: the grain roughed up, paler and duller)
+GLOVE_SCRATCH = np.array((0.130, 0.092, 0.060))  # (a scratch through the finish to the pale leather under it)
+THREAD = np.array((0.110, 0.085, 0.052))        # (the waxed linen thread of the seams)
+CUFF = np.array((0.036, 0.032, 0.026))          # (the jacket's knitted storm cuff: a warm charcoal wool)
+CUFF_DIRT = np.array((0.030, 0.025, 0.018))
+# (2026-10-14g, the owner: "in some shots the sleeve reads dark navy-black") the jacket's cotton duck: an olive-brown
+# work canvas, sun-faded paler on top, darker and dirtier underneath; light enough to stay olive in the dark
+SLEEVE = np.array((0.080, 0.072, 0.036))
+SLEEVE_FADED = np.array((0.112, 0.100, 0.056))
+SLEEVE_UNDER = np.array((0.046, 0.040, 0.021))
+SLEEVE_DIRT = np.array((0.044, 0.034, 0.021))   # (mud, dried and rubbed in)
+SLEEVE_GREASE = np.array((0.034, 0.031, 0.022))
 
 
-def paint_glove(ob, hand, ao=None):
-    """Worn leather: a slow mottle, rubbed paler over the knuckles, the fingertips and wherever it's stretched, darker in
-    its hollows (and by the baked occlusion)."""
-    me = ob.data
+def mesh_arrays(me):
     n = len(me.vertices)
     co = np.empty(n * 3)
     me.vertices.foreach_get("co", co)
-    co = co.reshape(-1, 3)
     nr = np.empty(n * 3)
     me.vertex_normals.foreach_get("vector", nr)
-    nr = nr.reshape(-1, 3)
+    return co.reshape(-1, 3), nr.reshape(-1, 3)
+
+
+def curvature(me, co, nr, smooth=3):
+    """Per vertex: + over a ridge (a knuckle, a fold's crest), - in a hollow; about -1..1."""
+    n = len(co)
     ev = np.empty(len(me.edges) * 2, dtype=np.int64)
     me.edges.foreach_get("vertices", ev)
     ev = ev.reshape(-1, 2)
@@ -710,34 +784,125 @@ def paint_glove(ob, hand, ao=None):
     np.add.at(cnt, ev[:, 0], 1)
     np.add.at(cnt, ev[:, 1], 1)
     curv = -((acc / np.maximum(cnt, 1)[:, None] - co) * nr).sum(1)
-    for _ in range(3):
+    for _ in range(smooth):
         s_ = np.zeros(n)
         np.add.at(s_, ev[:, 0], curv[ev[:, 1]])
         np.add.at(s_, ev[:, 1], curv[ev[:, 0]])
         curv = 0.5 * curv + 0.5 * s_ / np.maximum(cnt, 1)
-    curv = np.clip(curv / (np.percentile(np.abs(curv), 95) + 1e-12), -1, 1)
+    return np.clip(curv / (np.percentile(np.abs(curv), 95) + 1e-12), -1, 1)
+
+
+def _lerp(col, to, k):
+    return col + (np.asarray(to)[None, :] - col) * np.clip(k, 0, 1)[:, None]
+
+
+def glove_colour(ob, hand, dark=None, stitch=None, smooth=3):
+    """The worn work glove's colour: an oiled brown with a slow mottle, rubbed paler and warmer over the knuckles, the
+    fingertips and wherever it's stretched; grime worked into the palm, the fingertips and every crease; scuffed patches;
+    on the dense skin (`dark`, `stitch` from `carve`) its folds' dark crevices, fine scratches through the finish, and the
+    seams' pale thread. Returns the colours and how worn (smooth, a little polished) each vertex is."""
+    me = ob.data
+    co, nr = mesh_arrays(me)
+    n = len(co)
+    curv = curvature(me, co, nr, smooth)
     P = co.astype(np.float32)
+    B = _np(hand.b)
     mott = noise3(P, 140.0, 3) * 0.5 + noise3(P, 420.0, 4) * 0.5
-    base = GLOVE[None, :] * (0.9 + 0.14 * mott)[:, None]
-    wear = np.clip(curv - 0.35, 0, 1) ** 0.8 * 0.45
-    joints = [(pts[i], 1.0 if i == 0 else 0.75) for pts in hand.fingers.values() for i in range(1, 4)]
-    joints += [(hand.thumb[2], 0.7), (hand.thumb[3], 0.8)]
+    col = GLOVE[None, :] * (0.84 + 0.22 * mott)[:, None]
+    col = _lerp(col, GLOVE_RED, np.clip(noise3(P, 55.0, 6) * 1.5, 0, 1) * 0.5)
+    # worn: the ridges, the joints, the knuckles
+    wear = np.clip(curv - 0.3, 0, 1) ** 0.8 * 0.55
+    joints = [(pts[i], 1.0 if i == 0 else 0.8) for pts in hand.fingers.values() for i in range(1, 4)]
+    joints += [(hand.thumb[2], 0.7), (hand.thumb[3], 0.9)]
     for nm, pts in hand.fingers.items():
         joints.append((pts[0] + hand.b * 0.012, 1.0))   # (the knuckles)
     for p, kk in joints:
         d = np.linalg.norm(co - _np(p), axis=1)
-        wear = np.maximum(wear, np.clip(1 - d / 0.015, 0, 1) ** 1.5 * kk * 0.75)
-    # (the palm and the insides of the fingers worn smooth and dark with handling, a scuff here and there)
-    palm = np.clip(-(nr @ _np(hand.b)), 0, 1)
-    scuff = np.clip(noise3(P, 150.0, 9) * 1.6 - 0.7, 0, 1)
-    wear = np.maximum(wear, scuff * 0.22)
-    wear *= 0.75 + 0.5 * np.clip(noise3(P, 300.0, 5), -0.5, 0.5)
-    col = base * (1 - 0.12 * palm)[:, None]
-    col = col + (GLOVE_WORN[None, :] - col) * np.clip(wear, 0, 1)[:, None]
-    col *= (1 - 0.4 * np.clip(-curv - 0.1, 0, 1))[:, None]
-    if ao is not None:
-        col *= (0.3 + 0.7 * ao)[:, None]
-    set_colors(me, col)
+        wear = np.maximum(wear, np.clip(1 - d / 0.014, 0, 1) ** 1.4 * kk * 0.8)
+    wear *= 0.7 + 0.6 * np.clip(noise3(P, 300.0, 5), -0.5, 0.5)
+    wear = np.clip(wear, 0, 1)
+    palm = np.clip(-(nr @ B) * 1.4, 0, 1)
+    col = col * (1 - 0.1 * palm)[:, None]
+    col = _lerp(col, GLOVE_WORN, wear * (1 - 0.6 * palm))
+    # scuffs: the grain roughed up in patches, paler and duller (not on the palm: that's polished with handling)
+    sc = np.clip(noise3(P, 190.0, 9) * 2.4 - 1.15, 0, 1) * np.clip(noise3(P, 600.0, 10) + 0.8, 0, 1) * (1 - 0.7 * palm)
+    col = _lerp(col, GLOVE_SCUFF, sc * 0.75)
+    # grime: worked into the palm and the fingertips, broken up
+    tipd = np.full(n, 1e9)
+    for pts in list(hand.fingers.values()) + [hand.thumb]:
+        tipd = np.minimum(tipd, np.linalg.norm(co - _np(pts[-1]), axis=1))
+        tipd = np.minimum(tipd, np.linalg.norm(co - _np(pts[-2]), axis=1) + 0.006)
+    tips = np.clip(1 - tipd / 0.02, 0, 1)
+    brk = np.clip(0.45 + 1.1 * noise3(P, 95.0, 12) + 0.4 * noise3(P, 330.0, 13), 0, 1)
+    grime = np.clip(palm * 0.75 + tips * 0.9, 0, 1) * brk
+    col = _lerp(col, GLOVE_DIRT, grime * 0.7)
+    # the hollows dark (and the grime there)
+    hollow = np.clip(-curv - 0.05, 0, 1)
+    col *= (1 - 0.45 * hollow)[:, None]
+    if dark is not None:
+        col = _lerp(col, GLOVE_DIRT * 0.5, dark * 0.8)
+        # scratches: fine pale lines through the finish over the back and sides
+        rng = np.random.default_rng(41)
+        cand = np.nonzero((nr @ B > -0.35))[0]
+        scr = np.zeros(n)
+        for _ in range(90):
+            i = cand[rng.integers(len(cand))]
+            p0, n0 = co[i], nr[i]
+            t = np.cross(n0, rng.normal(size=3))
+            t /= np.linalg.norm(t) + 1e-12
+            L = rng.uniform(0.003, 0.013)
+            rel = co - p0
+            near = (np.abs(rel @ n0) < 0.0025) & (nr @ n0 > 0.6) & (np.abs(rel @ t) < L)
+            if not near.any():
+                continue
+            idx = np.nonzero(near)[0]
+            r_ = rel[idx]
+            tt = np.clip(r_ @ t, 0, L)
+            # (a scratch tapers off at its ends and wanders a little)
+            d = np.linalg.norm(r_ - tt[:, None] * t - (r_ @ n0)[:, None] * n0, axis=1)
+            w = np.exp(-(d / rng.uniform(0.00018, 0.0003)) ** 2) * np.sin(np.clip(tt / L, 0, 1) * math.pi) ** 0.5
+            scr[idx] = np.maximum(scr[idx], w * rng.uniform(0.5, 1.0))
+        col = _lerp(col, GLOVE_SCRATCH, scr * 0.85)
+        wear = np.maximum(wear, scr * 0.5)
+    if stitch is not None:
+        col = _lerp(col, THREAD, stitch * 0.9)
+    return col, wear, palm
+
+
+def cloth_colour(ob, hand, kind):
+    """The jacket's cloths: `kind` 1 the knitted cuff, 2 the canvas sleeve. The sleeve sun-faded paler on top (the side
+    the back of the hand faces), darker underneath; mud splashed and rubbed in, worst toward the hem and underneath; a
+    grease mark; the folds' hollows dark."""
+    me = ob.data
+    co, nr = mesh_arrays(me)
+    P = co.astype(np.float32)
+    T = hand.toward
+    up = hand.b - T * hand.b.dot(T)
+    up.normalize()
+    along = (co - _np(hand.w)) @ _np(T)
+    top = nr @ _np(up)
+    if kind == 1:
+        col = CUFF[None, :] * (0.88 + 0.2 * noise3(P, 60.0, 2))[:, None]
+        col = _lerp(col, CUFF_DIRT, np.clip(noise3(P, 120.0, 3) + 0.2, 0, 1) * 0.6)
+        return col
+    curv = curvature(me, co, nr, 2)
+    col = SLEEVE[None, :] * (0.9 + 0.16 * noise3(P, 22.0, 2) + 0.06 * noise3(P, 70.0, 4))[:, None]
+    col = _lerp(col, SLEEVE_FADED, np.clip(top, 0, 1) ** 1.3 * (0.65 + 0.25 * noise3(P, 30.0, 5)))
+    col = _lerp(col, SLEEVE_UNDER, np.clip(-top, 0, 1) * 0.7)
+    # mud: splashed on, worst near the hem and underneath, rubbed in
+    hem = np.exp(-np.clip(along - 0.058, 0, None) / 0.05)
+    splash = np.clip(noise3(P, 34.0, 15) * 2.0 - 0.55 + 0.5 * hem + 0.35 * np.clip(-top, 0, 1), 0, 1)
+    splash *= np.clip(0.4 + noise3(P, 140.0, 16) * 1.2, 0, 1)
+    col = _lerp(col, SLEEVE_DIRT, splash * 0.75)
+    # a grease mark where the forearm rests on things (a dark, soft-edged patch on the outside)
+    side = np.cross(_np(T), _np(up))
+    gp = _np(hand.w + T * 0.16) + side * 0.03
+    gd = np.linalg.norm(co - gp, axis=1)
+    col = _lerp(col, SLEEVE_GREASE, np.clip(1 - gd / 0.035, 0, 1) ** 0.7 * np.clip(0.6 + noise3(P, 90.0, 17), 0, 1) * 0.7)
+    # the folds: crests rubbed paler, hollows dark
+    col = _lerp(col, SLEEVE_FADED * 1.1, np.clip(curv - 0.35, 0, 1) * 0.5)
+    col *= (1 - 0.5 * np.clip(-curv - 0.1, 0, 1))[:, None]
+    return col
 
 
 def set_colors(me, col):
@@ -750,18 +915,20 @@ def set_colors(me, col):
 
 # ------------------------------------------------------------------ the jacket's cuff and sleeve
 
-def loft(name, rings_, closed_end=False):
-    """A tube through `rings_` (each a list of points, all the same count), open at the start; UVs u round, v along."""
+def loft(name, rings_, closed_end=False, vs=None):
+    """A tube through `rings_` (each a list of points, all the same count), open at the start; UVs u round (0..1), v
+    along (0..1, or `vs`: each ring's own v, e.g. metres along the arm, for the shader's seams and weave)."""
     bm = bmesh.new()
     nr = len(rings_[0])
     R = [[bm.verts.new(p) for p in ring] for ring in rings_]
     uv = bm.loops.layers.uv.new("UVMap")
     nv = len(R) - 1
+    V_ = vs if vs is not None else [i / nv for i in range(nv + 1)]
     for i in range(nv):
         for j in range(nr):
             f_ = bm.faces.new((R[i][j], R[i][(j + 1) % nr], R[i + 1][(j + 1) % nr], R[i + 1][j]))
             for lp, (uu, vv) in zip(f_.loops, ((j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1))):
-                lp[uv].uv = (uu / nr, vv / nv)
+                lp[uv].uv = (uu / nr, V_[vv])
     if closed_end:
         f_ = bm.faces.new(R[-1])
         for lp in f_.loops:
@@ -807,7 +974,7 @@ def knit_cuff(hand):
     return ob
 
 
-def sleeve(hand, length=0.42, seed=7):
+def sleeve(hand, length=0.25, seed=7):
     """The jacket's sleeve over the forearm: loose waxed canvas from just behind the wrist (the cuff showing out of it)
     back past the elbow, folds gathered toward its hem; a turned hem."""
     T, b = hand.toward, hand.b
@@ -815,27 +982,43 @@ def sleeve(hand, length=0.42, seed=7):
     up = (b - d * b.dot(d)).normalized()
     rng = np.random.default_rng(seed)
     phase = rng.uniform(0, math.tau, 6)
-    nr, n = 40, 22
+    nr = 56
     c0 = hand.w + T * 0.058 - up * 0.002
-    rings_ = []
-    # (the hem's turn-up: inside, round the edge, out)
-    for along, k in ((0.008, 0.86), (0.0015, 0.93), (0.0, 1.0)):
+    rings_, vs = [], []
+    # (the hem's turn-up: inside, round the edge, out; the edge a little ragged, worn through in places)
+    rag = rng.uniform(-1, 1, nr)
+    for along, k, v_ in ((0.008, 0.86, -0.0095), (0.0015, 0.93, -0.0015), (0.0, 1.0, 0.0)):
         rings_.append(ellipse_ring(c0 + T * along, d, up, 0.0372 * k, 0.0292 * k, nr,
-                                   lambda a: 1.0 + 0.03 * math.sin(a * 2 + phase[0])))
-    for i in range(1, n + 1):
-        t = i / n
-        along = 0.004 + length * t
+                                   lambda a: 1.0 + 0.03 * math.sin(a * 2 + phase[0]) + (0.012 * rag[int(round(a / math.tau * nr)) % nr] if k < 1 else 0)))
+        vs.append(v_)
+    # (2026-10-14g) the canvas bunched above the cuff: a few soft ridges stacked up the forearm, each only part of the way
+    # round and wandering, as a sleeve pushed back over a glove gathers; creases at the elbow on its inside
+    ridges = [(0.013, 0.075), (0.029, 0.07), (0.047, 0.06), (0.068, 0.045), (0.093, 0.03)]
+    rph = rng.uniform(0, math.tau, (len(ridges), 3))
+    alongs = [0.004 + 0.005 * i for i in range(20)] + [0.104 + (length - 0.104) * i / 15 for i in range(1, 16)]
+    for along in alongs:
+        t = along / length
         base = 1.0 + 0.12 * min(1, t * 2.2)
         gather = math.exp(-t * 4)
 
-        def fn(a, t=t, gather=gather):
+        def fn(a, t=t, gather=gather, along=along):
             fold = 0.0
             for k in range(3):
                 fold += math.sin(a * (2 + k) + phase[k] + t * (14 + 5 * k)) * (0.06 - 0.015 * k)
             fold += math.sin(t * 38 + phase[3] + a) * 0.05 * gather
-            return 1.0 + fold * (0.5 + gather) * min(1.0, 0.3 + t * 6) + 0.03 * math.sin(a * 2 + phase[0])
+            r = 1.0 + fold * (0.5 + gather) * min(1.0, 0.3 + t * 6) + 0.03 * math.sin(a * 2 + phase[0])
+            for (rc, amp), (p1, p2, p3) in zip(ridges, rph):
+                c_ = rc + 0.006 * math.sin(a + p1) + 0.003 * math.sin(a * 3 + p2)
+                part = max(0.0, 0.35 + 0.65 * math.sin(a + p3))
+                r += amp * part * math.exp(-((along - c_) / 0.0062) ** 2) * min(1.0, along / 0.01)
+            # (the elbow's creases, on the inside of the arm: underneath here)
+            inside = max(0.0, -math.sin(a - 0.3))
+            for ec in (0.19, 0.208, 0.226, 0.244):
+                r += 0.03 * inside * math.exp(-((along - ec - 0.008 * math.sin(a * 2 + phase[4])) / 0.006) ** 2)
+            return r
         rings_.append(ellipse_ring(c0 + T * along, d, up, 0.0372 * base, 0.0292 * base, nr, fn))
-    ob = loft("Sleeve", rings_, closed_end=True)
+        vs.append(along)
+    ob = loft("Sleeve", rings_, closed_end=True, vs=vs)
     add_mod(ob, "SUBSURF", levels=1)
     apply_mods(ob)
     for p in ob.data.polygons:
@@ -900,6 +1083,35 @@ def bake(high, low, img_name):
     img.file_format = "PNG"
     img.save()
     img.pack()
+    # (2026-10-14g) the dense skin's colours (its wear, grime, scuffs, scratches, the seams' thread: finer than the light
+    # mesh's vertices could hold) into the glove's own colour map
+    alb_name = img_name.replace("_normal", "_albedo")
+    alb = bpy.data.images.new(alb_name, TEX, TEX, alpha=False, float_buffer=False)
+    alb.colorspace_settings.name = "sRGB"
+    atex = nt.nodes.new("ShaderNodeTexImage")
+    atex.image = alb
+    hm = high.data.materials[0]
+    hm.use_nodes = True
+    hn = hm.node_tree
+    for nd in list(hn.nodes):
+        if nd.type != "OUTPUT_MATERIAL":
+            hn.nodes.remove(nd)
+    at_ = hn.nodes.new("ShaderNodeAttribute")
+    at_.attribute_name = "Col"
+    em = hn.nodes.new("ShaderNodeEmission")
+    hn.links.new(at_.outputs["Color"], em.inputs["Color"])
+    hn.links.new(em.outputs["Emission"], hn.nodes["Material Output"].inputs["Surface"])
+    nt.nodes.active = atex
+    select_only(high, low)
+    bpy.ops.object.bake(type="EMIT")
+    alb.filepath_raw = os.path.join(PREV, alb_name + ".png")
+    alb.file_format = "PNG"
+    alb.save()
+    alb.pack()
+    bsdf = nt.nodes["Principled BSDF"]
+    for l_ in list(bsdf.inputs["Base Color"].links):
+        nt.links.remove(l_)
+    nt.links.new(atex.outputs["Color"], bsdf.inputs["Base Color"])
     # occlusion into the light mesh's vertex colours (the cuff and sleeve there to shade the glove's wrist)
     high.hide_render = True
     sc.render.bake.use_selected_to_active = False
@@ -940,15 +1152,19 @@ def make_hand(pose):
         print(f"[fp-arm] {pose}: {tri_count(low)} glove triangles (look only)")
         return low
     high = make_skin(hand, 4, "High_" + pose)
-    dark = carve(high, hand)
+    dark, stitch = carve(high, hand)
+    hcol, _, _ = glove_colour(high, hand, dark, stitch, smooth=6)
+    set_colors(high.data, hcol)
     unwrap(low)
     ao = bake(high, low, "fp_hand_L_" + pose + "_normal")
     bpy.data.objects.remove(high)
-    paint_glove(low, hand, ao)
-    # the cuff and the sleeve: their own cloths, coloured with a little slow variation
-    for ob_, colr, mname, rough in ((cuff, CUFF, "fp_cuff", 0.95), (sl, SLEEVE, "fp_sleeve", 0.9)):
-        vv = np.array([v.co[:] for v in ob_.data.vertices], dtype=np.float32)
-        set_colors(ob_.data, colr[None, :] * (0.92 + 0.14 * noise3(vv, 40.0, 2))[:, None])
+    # (2026-10-14g) the glove's colour is its baked map now; its vertices carry what the shader needs besides: the
+    # occlusion (r), how worn and polished it is (g: a sheen on the knuckles and fingertips), the palm (b)
+    _, wear, palm = glove_colour(low, hand)
+    set_colors(low.data, np.stack((ao, wear, palm), 1))
+    # the cuff and the sleeve: their own cloths, coloured in their vertices (the weave, seams and stitching the shader's)
+    for ob_, kind, mname, rough in ((cuff, 1, "fp_cuff", 0.95), (sl, 2, "fp_sleeve", 0.9)):
+        set_colors(ob_.data, cloth_colour(ob_, hand, kind))
         ob_.data.materials.append(flat_material(mname, rough))
     select_only(cuff, sl, low)
     bpy.ops.object.join()
@@ -982,7 +1198,7 @@ def preview(ob, name, eye, grip):
     sc.render.engine = "BLENDER_WORKBENCH"
     sh = sc.display.shading
     sh.light = "STUDIO"
-    sh.color_type = "MATERIAL" if LOOK else "VERTEX"
+    sh.color_type = "MATERIAL" if LOOK else "TEXTURE"
     sh.show_cavity = True
     sc.render.resolution_x, sc.render.resolution_y = 700, 700
     if grip is not None:

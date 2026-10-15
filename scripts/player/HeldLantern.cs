@@ -23,16 +23,20 @@ public partial class HeldLantern : HeldItem
 	// hanging well down under it; was the fist right down on its cap, clamping it)
 	// (2026-10-13, the owner: "the lantern should be higher up on the screen, the handle is too long": a hurricane lantern's own
 	// bail, the fist just over its cap, and the whole lantern up in the lower left of the view instead of hanging off its bottom edge)
-	protected override Vector3 Rest => new(-0.23f, -0.07f, -0.64f);
-	protected override Vector3 Lowered => new(-0.3f, -0.85f, -0.5f);
-	/// <summary>The beam gathered: lifted, in toward the middle, out ahead.</summary>
-	private static readonly Vector3 Gathered = new(-0.14f, -0.02f, -0.68f);   // (2026-10-13: a touch lower with the shorter bail; was y 0.03)
+	// (2026-10-14g, the owner: "the arm itself is too long and unrealistic": the fist was 64 cm out from the eye and nearly at
+	// its height, the arm stretched straight out past its own length from a shoulder 25 cm below the eye. Held as a man
+	// holds a lantern up to see by: the elbow bent, the fist about half a metre out, low in the left of the view, the
+	// lantern's foot just under the view's edge; only the forearm in view, coming in from the lower left corner)
+	protected override Vector3 Rest => new(-0.22f, -0.085f, -0.48f);
+	protected override Vector3 Lowered => new(-0.27f, -0.8f, -0.4f);
+	/// <summary>The beam gathered: lifted, in toward the middle, out ahead (the arm reaching, not straight).</summary>
+	private static readonly Vector3 Gathered = new(-0.12f, -0.06f, -0.54f);   // (2026-10-14g: nearer, the arm's own reach; was (-0.14, -0.02, -0.68))
 	/// <summary>The bail standing up over the cap, and how far under the fist the lantern hangs on it.</summary>
 	private const float BailRise = 0.09f, ModelScale = 0.95f;   // (2026-10-13: 0.09, a normal bail; was 0.22, the lantern hung well down under the fist)
 	private static float HangDrop => (0.232f + BailRise) * ModelScale;
 	/// <summary>Thrust up at something in front of them (Act 23's end: held up into the wendigo's face): high, in the middle,
 	/// at arm's length.</summary>
-	private static readonly Vector3 ThrustPose = new(-0.03f, 0.1f, -0.5f);
+	private static readonly Vector3 ThrustPose = new(-0.04f, 0.06f, -0.5f);   // (2026-10-14g: within the arm's reach; was y 0.1)
 	/// <summary>0..1: how far it's thrust up (set by a cutscene, eased by it).</summary>
 	public float Thrust { get; set; }
 

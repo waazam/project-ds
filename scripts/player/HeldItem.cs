@@ -103,8 +103,15 @@ public abstract partial class HeldItem : Node3D
 			dip = 0.5f + 0.5f * Mathf.Cos(_stride * Mathf.Tau);
 			sway = Mathf.Sin(_stride * Mathf.Pi);
 		}
-		var bob = new Vector3(sway * 0.01f, -dip * 0.014f, sway * 0.012f * _run) * _amp
-			+ new Vector3(0.025f, -0.03f, 0.04f) * _run;   // (held in closer and lower at a run)
+		// (2026-10-14g, the owner: "the arm itself is too long and unrealistic, especially while walking") the arm swings from
+		// the shoulder (off the bottom of the view, beside and below the eye), not the fist sliding about in the air: the
+		// stride's dip and sway, the run's little fore-and-aft swing and the lag behind the view's turns are all small turns
+		// of the whole arm about the shoulder, so the hand moves on an arc, the forearm with it, and the sleeve going out of
+		// view hardly moves at all
+		float fore = Mathf.Sin((Player.Footsteps is { } st2 ? st2.Steps + st2.StepPhase : _stride) * Mathf.Pi);
+		float armPitch = (-dip * 0.024f + fore * 0.03f * _run) * _amp;
+		float armYaw = sway * 0.018f * _amp;
+		var runIn = new Vector3(0.02f, -0.025f, 0.03f) * _run;   // (held in closer and lower at a run)
 		// a touch of lag behind the view's turns (it has weight), eased back
 		var rig = Player.CameraRig;
 		float yaw = rig?.Yaw ?? 0f, pitch = rig?.Camera?.Rotation.X ?? 0f;
@@ -122,9 +129,16 @@ public abstract partial class HeldItem : Node3D
 			h.Tension = Mathf.Max(_run, Mathf.Clamp(tr * 1.5f, 0f, 1f));
 		}
 		var shake = tr > 0.001f ? new Vector3(Mathf.Sin(_shakeT * 13.1f) + 0.6f * Mathf.Sin(_shakeT * 21.7f), Mathf.Sin(_shakeT * 15.3f + 1f) + 0.5f * Mathf.Sin(_shakeT * 24.1f), 0f) * 0.0025f * tr : Vector3.Zero;
-		Position = Lowered.Lerp(Hold, r) + bob + shake + new Vector3(_lagYaw * 0.35f, _lagPitch * 0.3f, 0f);
-		Rotation = new Vector3(_lagPitch * 0.5f + shake.Y * 3f, _lagYaw * 0.6f, shake.X * 3f);
+		var at = Lowered.Lerp(Hold, r) + runIn;
+		var sh = Shoulder;
+		var arm = new Basis(Vector3.Up, armYaw + _lagYaw * 0.55f) * new Basis(Vector3.Right, armPitch + _lagPitch * 0.5f);
+		Position = sh + arm * (at - sh) + shake;
+		Basis = arm * Basis.FromEuler(new Vector3(shake.Y * 3f, 0f, shake.X * 3f));
 	}
+
+	/// <summary>(2026-10-14g) Where the arm holding this swings from: its shoulder, in the view's frame (about 20 cm out to the
+	/// side, 25 cm below the eye and a hand's breadth behind it), off the bottom of the view.</summary>
+	protected virtual Vector3 Shoulder => new(Rest.X < 0f ? -0.19f : 0.19f, -0.25f, 0.06f);
 
 	/// <summary>(Re)finds the hands under this held thing, to keep their stride and tension up to date (call after building new ones).</summary>
 	protected void TrackHands()
