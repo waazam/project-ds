@@ -19,7 +19,7 @@ namespace ProjectDS.World;
 /// about 45 s at a walk (2026-10-13). Then it tapers out into a stretched, cavernous version of
 /// itself, green lamps hanging on long cables out of the dark overhead.
 ///
-/// In the middle of it stands the shadow man (<see cref="ShadowMan"/>), frozen, because the lights
+/// In the middle of it stands the stalker (<see cref="HallStalker"/>; it replaced the shadow man, 2026-10-15), frozen, because the lights
 /// are green. Once the player is past him, the lights play red light, green light: every 20-30 s they
 /// flicker three times and turn red with a low siren, and he is right behind the player. Anyone still
 /// moving while it is red is taken, and wakes just past him. About three minutes of it at a walk to the door
@@ -49,7 +49,7 @@ public partial class Act15Hallway : Node3D
 	public bool DoorOpen { get; private set; }
 	public bool InCloset { get; private set; }
 	public bool Finished { get; private set; }
-	public ShadowMan Shadow => _shadow;
+	public HallStalker Shadow => _shadow;
 	public float PlayerZ { get; private set; }
 	public Vector3 DoorWorld => ToGlobal(new Vector3(0, 0.05f, End - 0.8f));
 	public Vector3 ClosetWorld => ToGlobal(ClosetCentre + Vector3.Up * 0.05f);
@@ -58,7 +58,7 @@ public partial class Act15Hallway : Node3D
 	/// <summary>Seconds until the lights next change (tests use it to play fair).</summary>
 	public float Timer => _timer;
 
-	private ShadowMan _shadow;
+	private HallStalker _shadow;
 	private StandardMaterial3D _lampMat, _stripMat2, _centreMat;
 	// the centre row's colour and level (the phase's), and its failing: a soft dip now and then (see CentreFlicker)
 	private Color _centreColor = Green;
@@ -211,7 +211,7 @@ public partial class Act15Hallway : Node3D
 		BuildDressing(body);
 		BuildCloset(body);
 
-		_shadow = new ShadowMan { Name = "ShadowMan" };
+		_shadow = new HallStalker { Name = "HallStalker" };
 		AddChild(_shadow);
 		_shadow.Position = new Vector3(0, 0, ShadowZ);   // facing -Z: the way the player comes
 		_hum = new AudioStreamPlayer { Name = "Hum", Bus = "Unnatural", VolumeDb = -80f };

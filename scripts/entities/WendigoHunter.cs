@@ -495,7 +495,8 @@ public partial class WendigoHunter : Node3D
 	private float _rearT;
 	private bool _clawLeft;
 	private Mode _prevMode = Mode.Off;
-	private string _gait;
+	private string _gait, _shownGait;
+	private float _stillFor;
 
 	/// <summary>Its legs at the pace it's really going: still, the idle (breathing, its head turning); slow, the walk; fast,
 	/// the run, each played at the rate its stride covers that ground (its full-size strides, 2.55 m a walk cycle, 3.5 m a
@@ -511,14 +512,30 @@ public partial class WendigoHunter : Node3D
 			"walk" => s > 3.3f ? "run" : s < 0.2f ? "idle" : "walk",
 			_ => s > 3.3f ? "run" : s > 0.35f ? "walk" : "idle",
 		};
-		float rate = clip switch
+		// (2026-10-15, the owner: "beef up some of the wendigo ... animations") it moves like a hunter now: stalking or lying
+		// in wait, its slow walk is the low approach and its stillness the lurk, folded down over itself; searching or
+		// investigating, when it stops it takes the air (sniff). Each only if the model has it (else the old clips).
+		bool prowl = State is Mode.Stalk or Mode.Ambush;
+		bool seek = State is Mode.Search or Mode.Investigate;
+		string shown = clip;
+		if (clip == "walk" && prowl && Body.ClipLength("approach") > 0f) shown = "approach";
+		else if (clip == "idle" && (prowl || seek))
+		{
+			_stillFor += dt;
+			string still = seek && (_stillFor % 9f) < 3f ? "sniff" : "lurk";
+			if (Body.ClipLength(still) > 0f) shown = still;
+		}
+		if (clip != "idle") _stillFor = 0f;
+		float rate = shown switch
 		{
 			"walk" => s / (2.55f * BodyScale) * Body.ClipLength("walk"),
+			"approach" => s / (2.1f * BodyScale) * Body.ClipLength("approach"),
 			"run" => s / (3.5f * BodyScale) * Body.ClipLength("run"),
 			_ => 1f,
 		};
-		Body.Gait(clip, rate, clip == _gait ? 0.0 : 0.35);
+		Body.Gait(shown, rate, shown == _shownGait ? 0.0 : 0.35);
 		_gait = clip;
+		_shownGait = shown;
 	}
 
 	private void Sound(float dt)

@@ -185,12 +185,24 @@ public partial class Church
 		Collide(_wood, new Vector3(ox, y0 + 1.2f, oz), new Vector3(2.4f, 2.4f, 1f));
 		// the hooded figure, stone, head bowed, looking at its hands
 		var fig = new Vector3(5.6f, y0, CryptZ1 - 1.2f);
-		k.Mat(stone);
-		k.Color = Colors.White * 0.8f;
-		k.Cylinder(fig, fig + Vector3.Up * 0.3f, 0.42f, 0.42f, 8, true);
-		k.Cylinder(fig + Vector3.Up * 0.3f, fig + Vector3.Up * 1.5f, 0.36f, 0.24f, 10, false);
-		k.Blob(fig + Vector3.Up * 1.7f + new Vector3(0, 0, -0.06f), new Vector3(0.2f, 0.25f, 0.22f), 7, 0.1f);
-		k.Blob(fig + Vector3.Up * 1.2f + new Vector3(0, 0, -0.3f), new Vector3(0.14f, 0.08f, 0.1f), 8, 0.1f);
+		// (2026-10-15, the owner: every model made in Blender) a sculpted statue: a deep hood over the bowed head, the robe
+		// falling in heavy worn folds, the hands cupped before it, on a worn plinth (tools/Blender/figures.py)
+		if (FigureModels.Load("crypt_figure") is { } statue)
+		{
+			statue.Name = "HoodedFigure";
+			statue.Position = fig;
+			AddChild(statue);
+			FigureModels.Paint(FigureModels.Mesh(statue, "CryptFigure"), stone);
+		}
+		else
+		{
+			k.Mat(stone);
+			k.Color = Colors.White * 0.8f;
+			k.Cylinder(fig, fig + Vector3.Up * 0.3f, 0.42f, 0.42f, 8, true);
+			k.Cylinder(fig + Vector3.Up * 0.3f, fig + Vector3.Up * 1.5f, 0.36f, 0.24f, 10, false);
+			k.Blob(fig + Vector3.Up * 1.7f + new Vector3(0, 0, -0.06f), new Vector3(0.2f, 0.25f, 0.22f), 7, 0.1f);
+			k.Blob(fig + Vector3.Up * 1.2f + new Vector3(0, 0, -0.3f), new Vector3(0.14f, 0.08f, 0.1f), 8, 0.1f);
+		}
 		Collide(_stone, fig + Vector3.Up * 0.9f, new Vector3(0.84f, 1.8f, 0.84f));
 		k.CommitTo(this, "Crypt", true);
 		// its light: two red glass votives burning by the altar, the cold spill down each stair

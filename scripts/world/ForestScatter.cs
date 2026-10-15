@@ -76,6 +76,7 @@ public partial class ForestScatter : Node3D
 		ScatterTrees();
 		ScatterUnderstory();
 		ScatterEdgeThicket();
+		ScatterCorridor();
 		PlaceBoardPiles();
 		ScatterRocksAndLogs();
 		ScatterBoulders();
@@ -244,7 +245,9 @@ public partial class ForestScatter : Node3D
 					if (H(s, 7.7f + y) < 0.18f) continue;   // a gap
 					Vector3 p0 = rim[s], p1 = rim[(s + 1) % cs];
 					Vector3 nn = (p0 + p1 - 2f * c).Normalized() + Vector3.Up;
-					k.Tri(apex, p0, p1, nn.Normalized(), new Vector2(0.5f, 0.99f), new Vector2(0.1f, 0.93f), new Vector2(0.9f, 0.93f));
+					// (2026-10-15, "lines around them": the rim sat in the texture's solid root band, so the cone's edges were
+					// straight lines; now it reaches into the needles, its rim as ragged as the boughs)
+					k.Tri(apex, p0, p1, nn.Normalized(), new Vector2(0.5f, 0.99f), new Vector2(0.15f, 0.55f), new Vector2(0.85f, 0.55f));
 				}
 			}
 			// (2026-10-13, the owner: "the lake shore firs look bad too": each bough was two huge frond-shaped cards, up to
@@ -269,11 +272,17 @@ public partial class ForestScatter : Node3D
 				float lum = ao * rng.RandfRange(0.85f, 1.1f);
 				// the limb itself, out of the trunk (three-sided: it's mostly hidden in its needles)
 				// (the upper crown's short boughs: their limb and their side pair can't be seen, so they're left out)
-				if (f < 0.65f)
+				if (f < 0.65f && L >= 1.0f)   // (a short bough is all needles: no bare stick to show past them)
 				{
 					k.Mat(ProcTextures.TreeBarkMat);
 					k.Color = new Color(0.5f, 0.48f, 0.46f) * Mathf.Lerp(0.8f, 1f, ao);
-					k.Cylinder(root - dir * trunkR * 0.2f, P(0.82f), Mathf.Clamp(trunkR * 0.16f, 0.025f, 0.09f), 0.015f, 3, false, 2f);
+					// (2026-10-15, "lines around them, like they look pieced together": one straight rod out to 0.82 of the bough
+					// ran on past its drooping needles as a bare stick, a straight line off the crown) the limb follows the bough's
+					// own curve in three pieces and ends inside its needles
+					float lr = Mathf.Clamp(trunkR * 0.16f, 0.025f, 0.09f);
+					k.Cylinder(root - dir * trunkR * 0.2f, P(0.2f), lr, lr * 0.75f, 4, false, 2f);
+					k.Cylinder(P(0.2f), P(0.35f), lr * 0.75f, lr * 0.5f, 4, false, 2f);
+					k.Cylinder(P(0.35f), P(0.48f), lr * 0.5f, 0.012f, 4, false, 2f);
 				}
 				k.Mat(spray);
 				float w = Mathf.Max(0.5f, L * 0.42f);

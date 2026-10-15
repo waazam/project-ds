@@ -69,9 +69,10 @@ public static class LakeFx
 			ScaleMin = 0.5f, ScaleMax = 1.4f,
 			ColorRamp = Fade(),
 		};
-		Burst(parent, "Column", at, pm, 70, 2.4f, SoftDot(), 0.6f);
+		// (2026-10-15, the lake creature: "less robotic") many finer drops, not a fountain of white pearls (each was 0.6 m)
+		Burst(parent, "Column", at, pm, 170, 2.4f, SoftDot(), 0.2f);
 		// a heavy skirt of spray at the base
-		Splash(parent, at, 3.2f, 40);
+		Splash(parent, at, 2.2f, 60);
 		Ripple(parent, at, 7f, 3f);
 	}
 

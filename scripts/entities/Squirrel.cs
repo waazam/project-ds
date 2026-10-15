@@ -158,8 +158,13 @@ public partial class Squirrel : Node3D
 		_model.Position = new Vector3(0, hop, 0);
 		_model.Rotation = Vector3.Zero;
 		_body.Rotation = new Vector3(Mathf.Sin(gait) * 0.25f, 0, 0);
+		// (2026-10-15) the bound: stretched long as it reaches, gathered short as the hind feet come up past the fore; the
+		// forearms reaching ahead to land; the plume rippling behind in an S, its tip a beat after its base
+		_body.Scale = new Vector3(1f, 1f, 1f + 0.12f * Mathf.Sin(gait + 0.4f));
+		_arms.Rotation = new Vector3(0.7f * Mathf.Sin(gait + 0.9f), 0, 0);
 		_tail.Rotation = new Vector3(-0.5f + Mathf.Sin(gait + 1f) * 0.15f, 0, 0);
-		_head.Rotation = new Vector3(0.1f, 0, 0);
+		_tailTip.Rotation = new Vector3(Mathf.Sin(gait + 2.4f) * 0.35f, 0, 0);
+		_head.Rotation = new Vector3(0.1f + 0.08f * Mathf.Sin(gait + 1.5f), 0, 0);
 	}
 
 	/// <summary>On the trunk at <paramref name="y"/> above the foot: head up climbing, head down clinging and coming down.</summary>
@@ -177,6 +182,36 @@ public partial class Squirrel : Node3D
 		_body.Rotation = new Vector3(scurry, 0, 0);
 		_head.Rotation = new Vector3(up ? 0f : -0.3f + 0.2f * Mathf.Sin(_phase * 2.3f), up ? 0f : 0.5f * Mathf.Sin(_phase * 0.9f), 0);
 		_tail.Rotation = new Vector3(-0.2f + 0.1f * Mathf.Sin(_phase * 4f), 0, 0);
+		_body.Scale = Vector3.One;
+		// the forearms reaching up the bark as it climbs, splayed to hold on head down; the plume flat to the trunk
+		_arms.Rotation = new Vector3(up ? 0.9f + 0.5f * Mathf.Sin(_phase * 18f) : 0.5f, 0, 0);
+		_tailTip.Rotation = new Vector3(up ? 0.1f : -0.2f + 0.15f * Mathf.Sin(_phase * 3.1f), 0, 0);
+	}
+
+	/// <summary>For the creature preview: hold a pose at <paramref name="phase"/> seconds into it (0 foraging, 1 sat up,
+	/// 2 mid-bound, 3 clinging head down), without moving it.</summary>
+	public void PreviewPose(int which, float phase)
+	{
+		SetProcess(false);
+		_phase = phase;
+		switch (which)
+		{
+			case 0: Pose(0f, -0.25f, 0f); break;
+			case 1: Pose(0f, 0.15f, 0.9f); break;
+			case 2:
+			{
+				float gait = phase * 3.2f * 2.6f;
+				_model.Position = new Vector3(0, Mathf.Max(0f, Mathf.Sin(gait)) * 0.06f * ModelScale, 0);
+				_model.Rotation = Vector3.Zero;
+				_body.Rotation = new Vector3(Mathf.Sin(gait) * 0.25f, 0, 0);
+				_body.Scale = new Vector3(1f, 1f, 1f + 0.12f * Mathf.Sin(gait + 0.4f));
+				_arms.Rotation = new Vector3(0.7f * Mathf.Sin(gait + 0.9f), 0, 0);
+				_tail.Rotation = new Vector3(-0.5f + Mathf.Sin(gait + 1f) * 0.15f, 0, 0);
+				_tailTip.Rotation = new Vector3(Mathf.Sin(gait + 2.4f) * 0.35f, 0, 0);
+				_head.Rotation = new Vector3(0.1f, 0, 0);
+				break;
+			}
+		}
 	}
 
 	private void Pose(float bodyPitch, float headPitch, float sitUp)
@@ -190,6 +225,13 @@ public partial class Squirrel : Node3D
 		_head.Rotation = new Vector3(headPitch - 0.6f * sitUp, look, 0);   // (reared up, the head tips back down to look ahead)
 		float flick = Mathf.Max(0f, Mathf.Sin(_phase * 3.1f + Seed * 2f) - 0.85f) * 3f;
 		_tail.Rotation = new Vector3(-0.7f + flick * 0.4f, 0, 0);
+		// the flick runs up the plume: the tip snaps after the base
+		float tipFlick = Mathf.Max(0f, Mathf.Sin(_phase * 3.1f + Seed * 2f - 0.5f) - 0.85f) * 3f;
+		_tailTip.Rotation = new Vector3(0.15f - tipFlick * 0.6f, 0, 0);
+		_body.Scale = Vector3.One;
+		// sitting up: the paws drawn up to the chest, nibbling at something held; foraging: the paws busy at the ground
+		float nibble = Mathf.Sin(_phase * 13f) * 0.12f;
+		_arms.Rotation = new Vector3(sitUp > 0.5f ? 1.15f * sitUp + nibble : 0.15f + 0.25f * Mathf.Max(0f, Mathf.Sin(_phase * 7f)), 0, 0);
 	}
 
 	// ------------------------------------------------------------------ the world
@@ -260,13 +302,40 @@ public partial class Squirrel : Node3D
 
 	private static StandardMaterial3D _fur;
 
+	/// <summary>For the preview: the triangles in the model.</summary>
+	public int TriangleCount { get; private set; }
+	private Node3D _arms, _tailTip;
+
+	private static float SS(float a, float b, float x) => Mathf.SmoothStep(a, b, x);
+	private static int Tris(MeshInstance3D mi) => mi?.Mesh == null ? 0 : mi.Mesh.GetFaces().Length / 3;
+
+	/// <summary>(2026-10-15, the owner: "the ... squirrels could use some graphic updates") A grey squirrel, not a few blobs:
+	/// a pear of a body (the narrow chest, the big haunches), long hind feet, forearms with paws on their own pivot (held to
+	/// the chest when it sits up), a round head with big dark eyes (a glint in each), a pale eye ring, rounded ears, a short
+	/// snout; the tail a two-jointed plume, flattened like a real one, a pale fringe of loose hair down both edges, so it
+	/// can ripple in an S. The coat painted per vertex: grey on the back, rusty along the flanks and feet, the belly pale.</summary>
 	private void BuildModel()
 	{
 		_fur ??= MakeFur();
 		Color grey = new Color(0.46f, 0.43f, 0.4f).SrgbToLinear(), rust = new Color(0.5f, 0.36f, 0.24f).SrgbToLinear();
-		Color belly = new Color(0.82f, 0.78f, 0.7f).SrgbToLinear(), dark = new Color(0.08f, 0.07f, 0.06f).SrgbToLinear();
+		Color belly = new Color(0.84f, 0.8f, 0.72f).SrgbToLinear(), dark = new Color(0.05f, 0.045f, 0.04f).SrgbToLinear();
+		Color white = new Color(0.95f, 0.95f, 0.92f).SrgbToLinear();
 		// some greyer, some browner
-		Color coat = grey.Lerp(rust, _rng.RandfRange(0.1f, 0.6f));
+		float warm = _rng.RandfRange(0.1f, 0.5f);
+		Color coat = grey.Lerp(rust, warm), side = grey.Lerp(rust, Mathf.Min(1f, warm + 0.35f));
+		int tris = 0;
+
+		// the coat per vertex (eyes, nose and glints keep their own colour)
+		void Coat(MeshKit k, bool tail = false) => k.Shade((Vector3 p, Vector3 n, ref Color c, ref Vector2 uv2) =>
+		{
+			if (c.R < 0.02f || c.R > 0.5f) return;   // (the eyes, the nose, the glints, the pale eye rings: as drawn)
+			float d = 0.5f + 0.5f * Mathf.Sin(p.X * 140f + p.Z * 97f) * Mathf.Sin(p.Y * 123f - p.Z * 61f);
+			if (tail) { c *= 0.9f + 0.16f * d; c.A = 1f; return; }   // (the plume and its pale fringe keep their colours)
+			Color col = coat.Lerp(side, SS(0.2f, 0.8f, Mathf.Abs(n.X)) * (1f - SS(0.3f, 0.8f, n.Y)));
+			col = col.Lerp(belly, SS(-0.2f, -0.65f, n.Y));
+			c = col * (0.9f + 0.16f * d);
+			c.A = 1f;
+		});
 
 		_model = new Node3D { Name = "Model", Scale = Vector3.One * ModelScale };
 		AddChild(_model);
@@ -276,53 +345,117 @@ public partial class Squirrel : Node3D
 		var k = new MeshKit();
 		k.Mat(_fur);
 		k.Color = coat;
-		k.Blob(new Vector3(0, 0.0f, -0.07f), new Vector3(0.05f, 0.05f, 0.1f), Seed * 3 + 1, 0.06f, false, 1f, 0f, 2);
-		k.Color = belly;
-		k.Blob(new Vector3(0, -0.02f, -0.08f), new Vector3(0.035f, 0.035f, 0.075f), Seed * 3 + 2, 0.05f, false, 1f, 0f, 1);
-		// haunches and small forelegs
-		k.Color = coat;
+		// the pear: the chest narrow and low, the haunch round and high
+		Loft.Tube(k, new[] { new Vector3(0, 0.0f, -0.165f), new Vector3(0, 0.005f, -0.12f), new Vector3(0, 0.012f, -0.06f), new Vector3(0, 0.015f, 0.0f), new Vector3(0, 0.01f, 0.045f) },
+			new[] { new Vector2(0.024f, 0.028f), new Vector2(0.034f, 0.038f), new Vector2(0.042f, 0.044f), new Vector2(0.05f, 0.05f), new Vector2(0.03f, 0.032f) }, 12, 3);
 		foreach (float s in new[] { -1f, 1f })
 		{
-			k.Blob(new Vector3(0.035f * s, -0.015f, -0.0f), new Vector3(0.03f, 0.04f, 0.045f), Seed * 5 + (int)s, 0.06f, false, 1f, 0f, 1);
-			k.Cylinder(new Vector3(0.025f * s, -0.02f, -0.12f), new Vector3(0.028f * s, -0.07f, -0.13f), 0.01f, 0.007f, 5, true, 2f);
-			k.Cylinder(new Vector3(0.035f * s, -0.04f, 0.01f), new Vector3(0.035f * s, -0.07f, -0.02f), 0.012f, 0.008f, 5, true, 2f);
+			// the haunch, and the long hind foot flat on the ground (heel to toes)
+			k.Blob(new Vector3(0.03f * s, -0.005f, -0.005f), new Vector3(0.026f, 0.042f, 0.048f), Seed * 5 + (int)s, 0.03f, false, 1f, 0f, 2);
+			// (round-ended tubes through a rounded heel, not faceted cylinders meeting at a crease)
+			Loft.Tube(k, new[] { new Vector3(0.034f * s, -0.04f, 0.012f), new Vector3(0.034f * s, -0.062f, 0.006f), new Vector3(0.033f * s, -0.07f, -0.02f), new Vector3(0.03f * s, -0.071f, -0.06f) },
+				new[] { new Vector2(0.012f, 0.012f), new Vector2(0.01f, 0.01f), new Vector2(0.008f, 0.006f), new Vector2(0.006f, 0.004f) }, 10, 4);
 		}
-		k.CommitTo(_body, "Mesh");
+		Coat(k);
+		tris += Tris(k.CommitTo(_body, "Mesh"));
+
+		// the forearms and paws on their own pivot at the chest: down to the ground running, held to the chest sitting up
+		_arms = new Node3D { Name = "Arms", Position = new Vector3(0, -0.005f, -0.14f) };
+		_body.AddChild(_arms);
+		var ak = new MeshKit();
+		ak.Mat(_fur);
+		ak.Color = coat;
+		foreach (float s in new[] { -1f, 1f })
+		{
+			// one smooth limb through a rounded elbow (round-ended, enough sides to read round)
+			Loft.Tube(ak, new[] { new Vector3(0.018f * s, 0.006f, 0.002f), new Vector3(0.02f * s, -0.035f, -0.012f), new Vector3(0.021f * s, -0.062f, -0.02f) },
+				new[] { new Vector2(0.011f, 0.011f), new Vector2(0.008f, 0.009f), new Vector2(0.006f, 0.006f) }, 10, 4);
+			ak.Color = dark * 4f;
+			ak.Blob(new Vector3(0.021f * s, -0.064f, -0.026f), new Vector3(0.008f, 0.005f, 0.01f), Seed * 13 + (int)s, 0.02f, false, 1f, 0f, 1);   // the paw
+			ak.Color = coat;
+		}
+		Coat(ak);
+		tris += Tris(ak.CommitTo(_arms, "Mesh"));
 
 		_head = new Node3D { Name = "Head", Position = new Vector3(0, 0.03f, -0.17f) };
 		_body.AddChild(_head);
 		var hk = new MeshKit();
 		hk.Mat(_fur);
 		hk.Color = coat;
-		hk.Blob(new Vector3(0, 0.0f, -0.025f), new Vector3(0.036f, 0.034f, 0.045f), Seed * 7 + 1, 0.05f, false, 1f, 0f, 2);
-		hk.Color = belly;
-		hk.Blob(new Vector3(0, -0.012f, -0.05f), new Vector3(0.02f, 0.016f, 0.02f), Seed * 7 + 2, 0.05f, false, 1f, 0f, 1);
-		hk.Color = coat;
+		// a round skull narrowing to a short blunt snout
+		Loft.Tube(hk, new[] { new Vector3(0, 0.0f, 0.015f), new Vector3(0, 0.004f, -0.015f), new Vector3(0, 0.0f, -0.045f), new Vector3(0, -0.006f, -0.068f) },
+			new[] { new Vector2(0.028f, 0.03f), new Vector2(0.036f, 0.034f), new Vector2(0.026f, 0.024f), new Vector2(0.012f, 0.011f) }, 12, 3);
 		foreach (float s in new[] { -1f, 1f })
 		{
-			// ears: small rounded points
-			hk.Cylinder(new Vector3(0.018f * s, 0.025f, -0.01f), new Vector3(0.022f * s, 0.05f, 0.0f), 0.011f, 0.002f, 5, true, 2f);
+			// big dark eyes set high on the sides, a pale ring round each, a glint
+			hk.Color = belly;
+			hk.Blob(new Vector3(0.026f * s, 0.009f, -0.028f), new Vector3(0.006f, 0.012f, 0.013f), Seed * 7 + 20 + (int)s, 0.0f, false, 1f, 0f, 1);
 			hk.Color = dark;
-			hk.Blob(new Vector3(0.026f * s, 0.008f, -0.045f), new Vector3(0.007f, 0.008f, 0.006f), Seed * 7 + 4 + (int)s, 0.0f, false, 1f, 0f, 1);
+			hk.Blob(new Vector3(0.029f * s, 0.009f, -0.028f), new Vector3(0.006f, 0.01f, 0.011f), Seed * 7 + 4 + (int)s, 0.0f, false, 1f, 0f, 1);
+			hk.Color = white;
+			hk.Blob(new Vector3(0.0335f * s, 0.013f, -0.031f), new Vector3(0.0018f, 0.0022f, 0.0022f), Seed * 7 + 30 + (int)s, 0.0f, false, 1f, 0f, 1);
+			// rounded ears up off the back of the skull, a little tuft at each tip
 			hk.Color = coat;
+			hk.Blob(new Vector3(0.018f * s, 0.036f, 0.002f), new Vector3(0.012f, 0.019f, 0.006f), Seed * 7 + 40 + (int)s, 0.0f, false, 1f, 0f, 2);
+			Loft.Tube(hk, new[] { new Vector3(0.017f * s, 0.044f, 0.0f), new Vector3(0.018f * s, 0.055f, 0.002f) }, new[] { new Vector2(0.004f, 0.003f), new Vector2(0.0015f, 0.001f) }, 6, 2);
 		}
+		hk.Color = coat;
+		hk.Blob(new Vector3(0, 0.002f, 0.008f), new Vector3(0.029f, 0.031f, 0.024f), Seed * 7 + 11, 0.0f, false, 1f, 0f, 2);   // the round back of the skull
 		hk.Color = dark;
-		hk.Blob(new Vector3(0, -0.002f, -0.07f), new Vector3(0.006f, 0.005f, 0.005f), Seed * 7 + 9, 0f, false, 1f, 0f, 1);
-		hk.CommitTo(_head, "Mesh");
+		hk.Blob(new Vector3(0, -0.004f, -0.071f), new Vector3(0.006f, 0.005f, 0.004f), Seed * 7 + 9, 0f, false, 1f, 0f, 1);   // the nose
+		Coat(hk);
+		tris += Tris(hk.CommitTo(_head, "Mesh"));
 
-		// the tail: up over the back in an S, big and bushy, pale at its fringe
+		// the tail in two pieces (the base, and the plume above it on its own joint) so it can ripple in an S: flattened
+		// like a real one (wider than deep), its fringe of loose pale hair down both edges
 		_tail = new Node3D { Name = "Tail", Position = new Vector3(0, 0.02f, 0.03f) };
 		_body.AddChild(_tail);
 		var tk = new MeshKit();
 		tk.Mat(_fur);
-		Vector3[] spine = { new(0, 0.0f, 0.0f), new(0, 0.06f, 0.05f), new(0, 0.15f, 0.06f), new(0, 0.23f, 0.02f), new(0, 0.27f, -0.04f) };
-		for (int i = 0; i < spine.Length; i++)
+		tk.Color = coat;
+		Vector3[] lowSpine = { new(0, 0.0f, 0.0f), new(0, 0.05f, 0.045f), new(0, 0.12f, 0.06f) };
+		Loft.Tube(tk, lowSpine, new[] { new Vector2(0.016f, 0.02f), new Vector2(0.03f, 0.042f), new Vector2(0.034f, 0.054f) }, 12, 3);
+		Fringe(tk, lowSpine, 0.048f, belly, coat, Seed * 17);
+		Coat(tk, tail: true);
+		tris += Tris(tk.CommitTo(_tail, "Mesh"));
+		_tailTip = new Node3D { Name = "TailTip", Position = new Vector3(0, 0.12f, 0.06f) };
+		_tail.AddChild(_tailTip);
+		tk = new MeshKit();
+		tk.Mat(_fur);
+		tk.Color = coat;
+		Vector3[] topSpine = { new(0, 0.0f, 0.0f), new(0, 0.07f, -0.01f), new(0, 0.13f, -0.05f), new(0, 0.16f, -0.1f) };
+		tk.Blob(Vector3.Zero, new Vector3(0.033f, 0.04f, 0.052f), Seed * 23, 0.0f, false, 1f, 0f, 2);   // (the joint: rounded, so bending it shows no seam)
+		Loft.Tube(tk, topSpine, new[] { new Vector2(0.034f, 0.054f), new Vector2(0.036f, 0.06f), new Vector2(0.03f, 0.05f), new Vector2(0.012f, 0.018f) }, 12, 3);
+		Fringe(tk, topSpine, 0.054f, belly, coat, Seed * 19);
+		tk.Color = coat.Lerp(belly, 0.25f);
+		tk.Blob(topSpine[^1] + new Vector3(0, 0.005f, -0.006f), new Vector3(0.02f, 0.026f, 0.028f), Seed * 29, 0.08f, false, 1f, 0f, 2);   // (the plume's tip: rounded, a little paler)
+		Coat(tk, tail: true);
+		tris += Tris(tk.CommitTo(_tailTip, "Mesh"));
+		TriangleCount = tris;
+	}
+
+	/// <summary>Loose hair down both edges of the tail's plume: small pale tufts just outside its edge.</summary>
+	private void Fringe(MeshKit k, Vector3[] spine, float width, Color pale, Color coat, int seed)
+	{
+		// (along the plume's broad edges, front and back, not round its thin sides: seen from the side the tail is its full
+		// width, ragged at both edges; the tufts of mixed size and only a little paler, so it reads as loose hair, not beads)
+		for (int i = 0; i < spine.Length - 1; i++)
 		{
-			float r = Mathf.Lerp(0.03f, 0.055f, Mathf.Sin(Mathf.Pi * (i + 0.5f) / spine.Length));
-			tk.Color = coat.Lerp(belly, 0.15f + 0.1f * i);
-			tk.Blob(spine[i], new Vector3(r * 0.9f, r, r), Seed * 11 + i, 0.18f, false, 1f, 0f, 1);
+			var along = (spine[i + 1] - spine[i]).Normalized();
+			var broad = Vector3.Right.Cross(along).Normalized();
+			for (int j = 0; j < 4; j++)
+			{
+				float t = (j + _rng.RandfRange(0.1f, 0.9f)) / 4f;
+				var p = spine[i].Lerp(spine[i + 1], t);
+				foreach (float s in new[] { -1f, 1f })
+				{
+					k.Color = coat.Lerp(pale, _rng.RandfRange(0.15f, 0.4f));
+					float r = _rng.RandfRange(0.011f, 0.02f);
+					var at = p + broad * s * width * _rng.RandfRange(0.72f, 0.9f) + new Vector3(_rng.RandfRange(-0.01f, 0.01f), 0, 0);
+					k.Blob(at, new Vector3(r * 1.1f, r * 1.4f, r), seed + i * 8 + j * 2 + (s > 0 ? 1 : 0), 0.05f, false, 1f, 0f, 1);
+				}
+			}
 		}
-		tk.CommitTo(_tail, "Mesh");
 	}
 
 	private static StandardMaterial3D MakeFur()

@@ -1230,7 +1230,7 @@ public partial class StoryTest : Node
 				if (giant == null || !IsInstanceValid(giant)) return true;
 				float off = (Flat(giant.GlobalPosition) - Flat(cabin.GlobalPosition)).Dot(across);
 				return Mathf.Abs(off) < 12f;
-			}, 10, ct);
+			}, 45, ct);   // (2026-10-15: its slow, feet-locked walk takes up to ~25 s from a turn back into the lane)
 			if (giant != null && IsInstanceValid(giant))
 			{
 				await Aim((giant as StalkerBody)?.EyesWorld ?? giant.GlobalPosition + Vector3.Up * 50f, ct);   // its head

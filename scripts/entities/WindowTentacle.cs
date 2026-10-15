@@ -37,6 +37,7 @@ public partial class WindowTentacle : Node3D
 	private RandomNumberGenerator _rng;
 	private double _t;
 	private float _segLen;
+	private Skeleton3D _skel;
 
 	public override void _Ready()
 	{
@@ -52,6 +53,12 @@ public partial class WindowTentacle : Node3D
 		_root = new Node3D { Name = "Limb" };
 		AddChild(_root);
 		_segLen = Length / Segments;
+		// (2026-10-15, "everything made in blender") one smooth limb from the Blender model (its cups shaped into its skin,
+		// painted in its vertex colour), skinned to a chain the joints below drive; the rigid code-built pieces only if the
+		// model is missing
+		skin.SetShaderParameter("vc_suckers", TentacleModels.Available);
+		var model = TentacleModels.Limb("Limb", Length, f => Radius(BaseRadius, f), skin, TentacleKit.SuckerRim, TentacleKit.SuckerHole);
+		if (model != null) _skel = AnimKit.ChainSkeleton(_root, AnimKit.SkinAlongY(model, _segLen, Segments), _segLen, Segments);
 		Node3D parent = _root;
 		for (int i = 0; i < Segments; i++)
 		{
@@ -59,17 +66,21 @@ public partial class WindowTentacle : Node3D
 			float r0 = Radius(BaseRadius, f0), r1 = Radius(BaseRadius, f1);
 			var joint = new Node3D { Name = $"J{i}", Position = i == 0 ? Vector3.Zero : Vector3.Up * _segLen };
 			parent.AddChild(joint);
-			var k = new MeshKit();
-			k.Mat(skin);
-			k.Color = Colors.White;
-			k.Cylinder(Vector3.Zero, Vector3.Up * _segLen, r0, r1, 12, false, 1.5f);
-			k.Blob(Vector3.Up * _segLen, Vector3.One * r1 * 1.04f, i * 7 + 3, 0.05f, false);
-			if (i < Segments - 1) TentacleKit.Suckers(k, _segLen, r0, r1, 2);
-			k.CommitTo(joint, "Seg", false);
+			if (model == null)
+			{
+				var k = new MeshKit();
+				k.Mat(skin);
+				k.Color = Colors.White;
+				k.Cylinder(Vector3.Zero, Vector3.Up * _segLen, r0, r1, 12, false, 1.5f);
+				k.Blob(Vector3.Up * _segLen, Vector3.One * r1 * 1.04f, i * 7 + 3, 0.05f, false);
+				if (i < Segments - 1) TentacleKit.Suckers(k, _segLen, r0, r1, 2);
+				k.CommitTo(joint, "Seg", false);
+			}
 			_joints.Add(joint);
 			parent = joint;
 		}
-		TentacleKit.Maw(_joints[Segments - 1], Radius(BaseRadius, 1f), BaseRadius * 1.4f, skin, Seed).Position = Vector3.Up * _segLen;
+		(TentacleModels.Maw(_joints[Segments - 1], BaseRadius * 1.4f, skin)
+			?? TentacleKit.Maw(_joints[Segments - 1], Radius(BaseRadius, 1f), BaseRadius * 1.4f, skin, Seed)).Position = Vector3.Up * _segLen;
 		// eyes up the part that comes in, crowded toward its thick end, never on the sucker side (+Z)
 		for (int e = 0; e < 9; e++)
 		{
@@ -115,6 +126,13 @@ public partial class WindowTentacle : Node3D
 				tip.GlobalBasis = new Basis(axis.Normalized(), ang) * tip.GlobalBasis;
 			}
 		}
+		// the Blender limb's bones follow the joints
+		if (_skel != null)
+			for (int i = 0; i < _joints.Count; i++)
+			{
+				_skel.SetBonePoseRotation(i, _joints[i].Quaternion);
+				_skel.SetBonePosePosition(i, _joints[i].Position);
+			}
 		// every eye stares at the camera
 		var cam = GetViewport().GetCamera3D();
 		if (cam != null)

@@ -127,7 +127,11 @@ public partial class FrogChorus : Node3D
 /// size of a real moth (2026-10-13, the owner: "make the bugs around the lantern smaller").</summary>
 public partial class LanternMoths : Node3D
 {
-	private readonly MeshInstance3D[] _moths = new MeshInstance3D[3];
+	private readonly Node3D[] _moths = new Node3D[3];
+	// (2026-10-15, the owner: every model made in Blender) each moth a small dusty model with its two wings on their own
+	// pivots (tools/Blender/figures.py → moth.glb), flapped here; the old flat card only if the model is missing
+	private readonly Node3D[] _wingL = new Node3D[3], _wingR = new Node3D[3];
+	private readonly Vector3[] _last = new Vector3[3];
 	private readonly float[] _phase = new float[3], _r = new float[3], _speed = new float[3];
 	private float _t, _shown;
 	private PlayerController _player;
@@ -147,7 +151,19 @@ public partial class LanternMoths : Node3D
 		};
 		for (int i = 0; i < _moths.Length; i++)
 		{
-			_moths[i] = new MeshInstance3D { Name = $"Moth{i}", Mesh = new QuadMesh { Size = new Vector2(0.018f, 0.013f) }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
+			if (FigureModels.Load("moth") is { } model)
+			{
+				model.Name = $"Moth{i}";
+				model.Visible = false;
+				_moths[i] = model;
+				_wingL[i] = model.FindChild("WingL", true, false) as Node3D;
+				_wingR[i] = model.FindChild("WingR", true, false) as Node3D;
+				foreach (var n in model.FindChildren("*", "MeshInstance3D", true, false))
+					if (n is MeshInstance3D mi) mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+				FigureModels.Paint(FigureModels.Mesh(model, "Body"), MothBody, false);
+			}
+			else
+				_moths[i] = new MeshInstance3D { Name = $"Moth{i}", Mesh = new QuadMesh { Size = new Vector2(0.018f, 0.013f) }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
 			AddChild(_moths[i]);
 			_phase[i] = i * 2.1f;
 			_r[i] = 0.13f + 0.05f * i;
@@ -180,6 +196,17 @@ public partial class LanternMoths : Node3D
 			float r = _r[i] * (1f - 0.6f * Mathf.Max(0f, Mathf.Sin(_t * 2.3f + i * 1.3f) - 0.8f) * 5f);
 			var p = centre + new Vector3(Mathf.Cos(a) * r, 0.05f + Mathf.Sin(_t * 3.1f + i) * 0.07f, Mathf.Sin(a) * r);
 			m.GlobalPosition = p;
+			if (_wingL[i] != null && _wingR[i] != null)
+			{
+				// the model: heading the way it flies, a little nose-up, the wings beating on their pivots
+				var vel = p - _last[i];
+				_last[i] = p;
+				if (vel.LengthSquared() > 1e-8f) m.LookAt(p + vel.Normalized() + Vector3.Up * 0.15f, Vector3.Up);
+				float beat = Mathf.Abs(Mathf.Sin(_t * 38f + i * 1.7f));
+				_wingL[i].Rotation = new Vector3(0, 0, -0.15f - 1.1f * beat);
+				_wingR[i].Rotation = new Vector3(0, 0, 0.15f + 1.1f * beat);
+				continue;
+			}
 			var cam = GetViewport().GetCamera3D();
 			if (cam != null && p.DistanceSquaredTo(cam.GlobalPosition) > 0.0001f)
 				m.LookAt(cam.GlobalPosition, Vector3.Up);
@@ -187,6 +214,10 @@ public partial class LanternMoths : Node3D
 			m.Scale = new Vector3(0.4f + 0.6f * Mathf.Abs(Mathf.Sin(_t * 38f + i)), 1f, 1f);
 		}
 	}
+
+	/// <summary>The moth's furry body: a dusty grey-brown (the model's own colour doesn't survive the export).</summary>
+	private static StandardMaterial3D _body;
+	private static StandardMaterial3D MothBody => _body ??= new StandardMaterial3D { ResourceName = "moth_body", AlbedoColor = new Color(0.4f, 0.34f, 0.26f), Roughness = 1f };
 
 	private static ImageTexture _tex;
 	private static ImageTexture MothTexture()

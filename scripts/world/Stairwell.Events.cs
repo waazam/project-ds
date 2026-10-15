@@ -231,17 +231,35 @@ public partial class Stairwell
 		Vector2 c = CornerXZ(k);
 		var fig = new Node3D { Name = "Figure", Position = new Vector3(Mathf.Sign(c.X) * (Inner + 0.25f), CornerY(k), Mathf.Sign(c.Y) * (Inner + 0.25f)) };
 		AddChild(fig);
-		var k1 = new MeshKit();
-		k1.Mat(StationParts.StationTextures.Flat("sw_figure", new Color(0.02f, 0.02f, 0.02f), 1f, 0f));
-		k1.Color = Colors.White;
-		k1.Cylinder(new Vector3(0, 0, 0), new Vector3(0, 1.55f, 0), 0.16f, 0.2f, 8, true);           // a long coat
-		k1.Cylinder(new Vector3(0, 1.55f, 0), new Vector3(0, 1.62f, 0), 0.07f, 0.07f, 6, false);     // neck
-		k1.Cylinder(new Vector3(0, 1.62f, 0), new Vector3(0, 1.9f, 0), 0.1f, 0.08f, 8, true);         // head, tipped back
-		foreach (float s in new[] { -1f, 1f })
-			k1.Cylinder(new Vector3(s * 0.2f, 1.45f, 0), new Vector3(s * 0.23f, 0.55f, 0), 0.04f, 0.03f, 5, true);   // arms, hanging long
-		k1.CommitTo(fig, "Body", false);
-		fig.LookAt(fig.GlobalPosition + new Vector3(-c.X, 0, -c.Y), Vector3.Up);
-		fig.RotateObjectLocal(Vector3.Right, 0.25f);
+		var black = StationParts.StationTextures.Flat("sw_figure", new Color(0.02f, 0.02f, 0.02f), 1f, 0f);
+		// (2026-10-15, the owner: every model made in Blender) the tall thin thing in a long coat, its head tipped back to look
+		// up the well, arms hanging past its knees (tools/Blender/figures.py); its eyes the only thing that catches the light
+		if (FigureModels.Load("rail_figure") is { } model)
+		{
+			model.Name = "Body";
+			fig.AddChild(model);
+			FigureModels.Paint(FigureModels.Mesh(model, "Figure"), black, false);
+			FigureModels.Paint(FigureModels.Mesh(model, "Eyes"), new StandardMaterial3D
+			{
+				ResourceName = "sw_figure_eyes", AlbedoColor = new Color(0.6f, 0.65f, 0.7f), EmissionEnabled = true,
+				Emission = new Color(0.55f, 0.6f, 0.68f), EmissionEnergyMultiplier = 0.6f, Roughness = 0.3f,
+			}, false);
+			fig.LookAt(fig.GlobalPosition + new Vector3(-c.X, 0, -c.Y), Vector3.Up);
+		}
+		else
+		{
+			var k1 = new MeshKit();
+			k1.Mat(black);
+			k1.Color = Colors.White;
+			k1.Cylinder(new Vector3(0, 0, 0), new Vector3(0, 1.55f, 0), 0.16f, 0.2f, 8, true);           // a long coat
+			k1.Cylinder(new Vector3(0, 1.55f, 0), new Vector3(0, 1.62f, 0), 0.07f, 0.07f, 6, false);     // neck
+			k1.Cylinder(new Vector3(0, 1.62f, 0), new Vector3(0, 1.9f, 0), 0.1f, 0.08f, 8, true);         // head, tipped back
+			foreach (float s in new[] { -1f, 1f })
+				k1.Cylinder(new Vector3(s * 0.2f, 1.45f, 0), new Vector3(s * 0.23f, 0.55f, 0), 0.04f, 0.03f, 5, true);   // arms, hanging long
+			k1.CommitTo(fig, "Body", false);
+			fig.LookAt(fig.GlobalPosition + new Vector3(-c.X, 0, -c.Y), Vector3.Up);
+			fig.RotateObjectLocal(Vector3.Right, 0.25f);
+		}
 		// a cold light behind it, just enough to stand it out against the dark
 		fig.AddChild(new OmniLight3D { Position = new Vector3(0, 1.3f, 0.6f), LightColor = new Color(0.7f, 0.8f, 0.9f), LightEnergy = 0.9f, OmniRange = 3f, ShadowEnabled = false });
 		_figure = fig;

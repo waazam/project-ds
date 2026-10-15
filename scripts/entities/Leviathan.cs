@@ -39,6 +39,8 @@ public partial class Leviathan : Node3D
 	{
 		public Node3D Root;
 		public readonly List<Node3D> Segs = new();
+		/// <summary>Its flesh is the Blender limb (its cups shaped into its skin: no separate suckers).</summary>
+		public bool Model;
 		public readonly List<Node3D> Eyes = new();
 		public float Angle, Phase, BaseR;
 		/// <summary>(2026-10-10) its build: a thick one, a middling one, or a skinny whip of a thing with no mouth;
@@ -113,6 +115,7 @@ public partial class Leviathan : Node3D
 		_bodySkin = TentacleKit.Flesh(Vector3.Up, 0.35f, 0.4f);
 		_tubeSkin = TentacleKit.Flesh(null, 0.8f, 0.55f);
 		_tubeSkin.SetShaderParameter("rest_space", true);
+		_tubeSkin.SetShaderParameter("vc_suckers", TentacleModels.Available);   // (the Blender limb paints its cups in)
 		_body = new Node3D { Name = "Body", Position = new Vector3(0, 5f, 0) };
 		AddChild(_body);
 		for (int i = 0; i < LimbCount; i++) BuildTentacle(i);
@@ -154,6 +157,35 @@ public partial class Leviathan : Node3D
 		}
 		_lobes = lobes;
 		_hideNoise = new FastNoiseLite { Seed = 1818, Frequency = 0.35f, FractalOctaves = 3 };
+		// (2026-10-15, "everything made in blender") the hide sculpted in Blender on this same layout (tools/Blender/tentacle.py:
+		// its folds, wrinkles and sores, a socket and a swollen lid for each eye below); the sphere pushed out to the lobes
+		// below only if the model is missing. (The lobes still place the eyes: the same rng, the same sockets.)
+		if (TentacleModels.Get("LeviathanHide") is { } hide)
+		{
+			var hmi = new MeshInstance3D { Name = "Hide", Mesh = hide };
+			for (int s = 0; s < hide.GetSurfaceCount(); s++) hmi.SetSurfaceOverrideMaterial(s, _bodySkin);
+			_body.AddChild(hmi);
+		}
+		else BuildHideSphere();
+		// eyes all over the upper half, big ones near the crown
+		for (int e = 0; e < 46; e++)
+		{
+			float a = _rng.RandfRange(0, Mathf.Tau), up = Mathf.Lerp(0.15f, 1f, Mathf.Pow(_rng.Randf(), 0.7f));
+			Vector3 dir = new Vector3(Mathf.Cos(a) * Mathf.Sqrt(1 - up * up), up, Mathf.Sin(a) * Mathf.Sqrt(1 - up * up)).Normalized();
+			Vector3 ed = new Vector3(dir.X * 10.2f, dir.Y * 7.8f, dir.Z * 10.2f).Normalized();
+			Vector3 at = ed * (HideRadius(ed) - 0.15f);   // (sat in the fused hide's own surface)
+			var socket = new Node3D { Name = $"Eye{e}", Position = at };
+			_body.AddChild(socket);
+			BuildEye(socket);
+			_bodyEyes.Add(socket);
+			_eyeSize.Add(Mathf.Lerp(0.6f, 2.3f, Mathf.Pow(up, 2f)) * _rng.RandfRange(0.7f, 1.1f));
+		}
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--dump-leviathan") >= 0) DumpHide();
+	}
+
+	/// <summary>The code-built hide (the fallback): a sphere pushed out to the lobes' soft union.</summary>
+	private void BuildHideSphere()
+	{
 		var sphere = new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 160, Rings = 80 }.GetMeshArrays();
 		var src = (Vector3[])sphere[(int)Mesh.ArrayType.Vertex];
 		var v = new Vector3[src.Length];
@@ -178,19 +210,39 @@ public partial class Leviathan : Node3D
 		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, sphere);
 		mesh.SurfaceSetMaterial(0, _bodySkin);
 		_body.AddChild(new MeshInstance3D { Name = "Hide", Mesh = mesh });
-		// eyes all over the upper half, big ones near the crown
-		for (int e = 0; e < 46; e++)
+	}
+
+	/// <summary>`--dump-leviathan` (dev): the hide's radius on a 2-degree grid and the eye sockets, for tools/Blender/tentacle.py
+	/// to sculpt the Blender hide on the game's own layout (tools/Blender/data/leviathan_hide.json).</summary>
+	private void DumpHide()
+	{
+		var sb = new System.Text.StringBuilder("{\"theta_step\":2,\"phi_step\":2,\"radius\":[");
+		for (int ti = 0; ti <= 90; ti++)
 		{
-			float a = _rng.RandfRange(0, Mathf.Tau), up = Mathf.Lerp(0.15f, 1f, Mathf.Pow(_rng.Randf(), 0.7f));
-			Vector3 dir = new Vector3(Mathf.Cos(a) * Mathf.Sqrt(1 - up * up), up, Mathf.Sin(a) * Mathf.Sqrt(1 - up * up)).Normalized();
-			Vector3 ed = new Vector3(dir.X * 10.2f, dir.Y * 7.8f, dir.Z * 10.2f).Normalized();
-			Vector3 at = ed * (HideRadius(ed) - 0.15f);   // (sat in the fused hide's own surface)
-			var socket = new Node3D { Name = $"Eye{e}", Position = at };
-			_body.AddChild(socket);
-			BuildEye(socket);
-			_bodyEyes.Add(socket);
-			_eyeSize.Add(Mathf.Lerp(0.6f, 2.3f, Mathf.Pow(up, 2f)) * _rng.RandfRange(0.7f, 1.1f));
+			if (ti > 0) sb.Append(',');
+			sb.Append('[');
+			float th = Mathf.DegToRad(ti * 2f);
+			for (int pi = 0; pi <= 180; pi++)
+			{
+				float ph = Mathf.DegToRad(pi * 2f);
+				var d = new Vector3(Mathf.Sin(th) * Mathf.Cos(ph), Mathf.Cos(th), Mathf.Sin(th) * Mathf.Sin(ph));
+				if (pi > 0) sb.Append(',');
+				sb.Append(HideRadius(d).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture));
+			}
+			sb.Append(']');
 		}
+		sb.Append("],\"eyes\":[");
+		for (int e = 0; e < _bodyEyes.Count; e++)
+		{
+			var p = _bodyEyes[e].Position;
+			if (e > 0) sb.Append(',');
+			sb.Append(System.FormattableString.Invariant($"[{p.X:0.####},{p.Y:0.####},{p.Z:0.####},{_eyeSize[e]:0.####}]"));
+		}
+		sb.Append("]}");
+		var path = ProjectSettings.GlobalizePath("res://tools/Blender/data/leviathan_hide.json");
+		System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+		System.IO.File.WriteAllText(path, sb.ToString());
+		GD.Print($"[leviathan] hide dumped to {path}");
 	}
 
 	private List<(Vector3 c, Vector3 r)> _lobes;
@@ -284,7 +336,8 @@ public partial class Leviathan : Node3D
 		}
 		// the mouth at the tip: jaws round a toothed throat (the skinny ones just taper to a curling point)
 		if (!t.Skinny)
-			TentacleKit.Maw(t.Segs[Segments - 1], Radius(t, 1f), t.BaseR * 1.5f, _skin, i * 7 + 3).Position = Vector3.Up * segLen;
+			(TentacleModels.Maw(t.Segs[Segments - 1], t.BaseR * 1.5f, _skin)
+				?? TentacleKit.Maw(t.Segs[Segments - 1], Radius(t, 1f), t.BaseR * 1.5f, _skin, i * 7 + 3)).Position = Vector3.Up * segLen;
 		_tentacles.Add(t);
 		t.Tip = IdleTip(t);
 		t.Ctrl = IdleCtrl(t, t.Tip);
@@ -303,6 +356,31 @@ public partial class Leviathan : Node3D
 			skel.SetBoneRest(r, new Transform3D(Basis.Identity, new Vector3(0, r / (float)(Rings - 1) * Length, 0)));
 		}
 		skel.ResetBonePoses();
+		// (2026-10-15, "everything made in blender") the Blender limb (tools/Blender/tentacle.py: its cups shaped into its
+		// skin, painted in its vertex colour), laid along this limb's length and radius and skinned to the rings; the
+		// code-built tube below only if the model is missing
+		var model = TentacleModels.Limb(t.Skinny ? "LimbWhip" : "LimbLong", Length, f => Radius(t, f), _tubeSkin, TentacleKit.SuckerRim,
+			TentacleKit.SuckerHole, rest: true, skin: p =>
+			{
+				float fr = Mathf.Clamp(p.Y / Length, 0f, 1f) * (Rings - 1);
+				int i0 = Mathf.Min((int)fr, Rings - 2);
+				float w = fr - i0;
+				return (new[] { i0, i0 + 1 }, new[] { 1f - w, w });
+			});
+		if (model != null)
+		{
+			var mmi = new MeshInstance3D
+			{
+				Name = "Flesh", Mesh = model,
+				CustomAabb = new Aabb(new Vector3(-45, -10, -45), new Vector3(90, 60, 90)),
+			};
+			skel.AddChild(mmi);
+			mmi.Skeleton = mmi.GetPathTo(skel);
+			mmi.Skin = skel.CreateSkinFromRestTransforms();
+			t.Skel = skel;
+			t.Model = true;
+			return;
+		}
 		var noise = new FastNoiseLite { Seed = seed * 31 + 7, Frequency = 0.9f };
 		int ringVerts = Sides + 1;
 		int n = Rings * ringVerts + 1;
@@ -391,6 +469,7 @@ public partial class Leviathan : Node3D
 	/// segment, and at every bend the rows broke apart: the limb read as a stack of pieces.)</summary>
 	private void BuildSuckers(Tentacle t)
 	{
+		if (t.Model) return;   // (the Blender limb has them in its skin)
 		float segLen = Length / Segments;
 		var k = new MeshKit();
 		for (int s = 0; s < Segments - 1; s++)

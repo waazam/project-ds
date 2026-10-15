@@ -45,7 +45,7 @@ public static class PhotoCatalog
 		// the things that hunt you: hard to get, worth double
 		new("stalker", "IT", 1.2f, true), new("giant", "the giant", 12f, true), new("room_thing", "the thing in the room", 1f, true),
 		new("bunker_creature", "it followed me", 1.2f, true), new("leviathan", "the lake thing", 9f, true), new("dead_eye", "the eye", 0.7f, true),
-		new("shadowman", "the shadow man", 1.1f, true), new("pit_beast", "the beast in the pit", 7f, true),
+		new("shadowman", "it, in the hall", 1.1f, true), new("pit_beast", "the beast in the pit", 7f, true),
 		new("lake_creature", "something in the water", 2f, true),
 		new("wendigo", "it wears antlers", 1.8f, true),
 	};
@@ -121,7 +121,7 @@ public static class PhotoCatalog
 		["bunker_creature"] = "It followed me. It's still following me.",
 		["leviathan"] = "The lake has a bottom. Something lives on it.",
 		["dead_eye"] = "The eye. It blinked after I took it.",
-		["shadowman"] = "Him. Red light, green light.",
+		["shadowman"] = "It. Red light, green light.",
 		["pit_beast"] = "The beast in the pit. Every eye was on me.",
 		["lake_creature"] = "Something in the water. Under the boat.",
 		["wendigo"] = "It wears antlers. It talks in voices.",

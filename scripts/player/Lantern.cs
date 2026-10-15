@@ -78,6 +78,8 @@ public partial class Lantern : Node3D
 	public float FocusAmount => _focus;
 	/// <summary>Carried and switched on.</summary>
 	public bool IsOn => _inv != null && _inv.HasLantern && _lit && !Snuffed && !Doused;
+	/// <summary>A scene's hold on the flame's light (1 = as it is): Act 6's fall drains it as the ground takes them (2026-10-15).</summary>
+	public float CutsceneDim { get; set; } = 1f;
 
 	/// <summary>(2026-10-10c, the owner: "We should have the lantern go out once you reach the christmas lights so they are
 	/// the only thing illuminating the way") Blown out for a while by a draught (the crawlspace's lights): it sputters and
@@ -334,6 +336,18 @@ public partial class Lantern : Node3D
 		RenderingServer.GlobalShaderParameterSet("uv_light_range", UvRange);
 	}
 
+	/// <summary>For the creature preview (no player, no lantern): a blacklight beam from <paramref name="pos"/> along
+	/// <paramref name="dir"/>, exactly as a held one publishes it (null: off).</summary>
+	public static void PreviewUv(Vector3? pos, Vector3 dir, float range = 9f, float angleDeg = 24f)
+	{
+		bool on = pos.HasValue;
+		Uv = (on, pos ?? Vector3.Zero, dir.Normalized(), range, Mathf.Cos(Mathf.DegToRad(angleDeg)));
+		RenderingServer.GlobalShaderParameterSet("uv_light_on", on ? 1f : 0f);
+		RenderingServer.GlobalShaderParameterSet("uv_light_pos", pos ?? Vector3.Zero);
+		RenderingServer.GlobalShaderParameterSet("uv_light_dir", dir.Normalized());
+		RenderingServer.GlobalShaderParameterSet("uv_light_range", range);
+	}
+
 	public override void _ExitTree()
 	{
 		Uv = (false, Vector3.Zero, Vector3.Forward, 0f, 1f);
@@ -462,7 +476,7 @@ public partial class Lantern : Node3D
 		float flicker = 1f + FlickerAmount * (0.6f * Mathf.Sin((float)_t * Mathf.Tau * 6.5f) + 0.4f * Mathf.Sin((float)_t * Mathf.Tau * 11f + 1.3f));
 		if (_dip >= 0.999f && _rng.Randf() < DipChance * dt) _dip = DipLevel;
 		_dip = Mathf.MoveToward(_dip, 1f, dt * 1.5f);
-		float k = Mathf.Max(0.8f, flicker * _dip);
+		float k = Mathf.Max(0.8f, flicker * _dip) * CutsceneDim;
 		// A jolt (the cabin door slamming): the flame gutters hard for a moment.
 		// (eased, not random per frame: a random value every frame strobed; the owner's comfort)
 		if (_t < _joltUntil) k *= 0.55f + 0.3f * Mathf.Sin((float)_t * 9f);

@@ -47,6 +47,9 @@ for (int i = 0; i < 8; i++) { int k = i; jobs.Add(($"crawler_step_{k + 1:00}", s
 // The omen bird's old far-off scream: kept in storage for Alex (2026-10-15); the raven attack replaced it.
 jobs.Add(("distant_scream", storage, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
 for (int i = 1; i <= 5; i++) jobs.Add(($"raven_attack_{i:00}", sfx, false, Hi, (r, sr) => RavenAttack.Make(r, sr)));
+// The fall through the ground at the end of the Act 6 loop (2026-10-15, FallVoid.cs).
+for (int i = 1; i <= 3; i++) jobs.Add(($"fall_void_{i:00}", sfx, false, Hi, (r, sr) => FallVoidSound.Rush(r, sr)));
+for (int i = 1; i <= 3; i++) jobs.Add(($"fall_wind_{i:00}", sfx, false, Hi, (r, sr) => FallVoidSound.Wind(r, sr)));
 // The omen bird's scream (2026-10-15): Alex's saved scream, close, sudden and loud (AlexScream.cs).
 for (int i = 1; i <= 3; i++) jobs.Add(($"raven_alex_{i:00}", sfx, false, Hi, (r, sr) => AlexScream.Make(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"whisper_voice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WhisperVoice(r, sr)));
@@ -55,8 +58,8 @@ for (int i = 1; i <= 6; i++) jobs.Add(($"step_dirt_{i:00}", sfx, false, Lo, (r, 
 for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"step_wood_{k:00}", sfx, false, Lo, (r, sr) => Sfx.StepWood(r, sr, k % 2 == 0))); }
 for (int i = 1; i <= 4; i++) jobs.Add(($"cloth_{i:00}", sfx, false, Lo, (r, sr) => Sfx.Cloth(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_stone_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepStone(r, sr)));
-// Act 1's far-off rifle (2026-10-15 rework, Gunshot.cs): six takes, SoundEvent picks one.
-for (int i = 1; i <= 6; i++) jobs.Add(($"rifle_distant_{i:00}", sfx, false, Lo, (r, sr) => Gunshot.RifleDistant(r, sr)));
+// Act 1's far-off rifle: the original (2026-10-15c, the owner chose it back over the reworks: Gunshot.RifleOriginal)
+// (the file is the original itself, restored from git: not regenerated, so nothing can change it)
 jobs.Add(("newel_seat", sfx, false, Lo, (r, sr) => Sfx.NewelSeat(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"knife_slice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.KnifeSlice(r, sr)));
 jobs.Add(("wheel_turn_01", sfx, false, Lo, (r, sr) => Sfx.WheelTurn(r, sr)));

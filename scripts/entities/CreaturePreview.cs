@@ -89,14 +89,19 @@ public partial class CreaturePreview : Node3D
 	{
 		await Frames(10);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--deer") >= 0) { await DeerShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--squirrel") >= 0) { await SquirrelShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--figures") >= 0) { await FigureShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--growth") >= 0) { await GrowthShots(); GetTree().Quit(); return; }
 		if (System.Array.Exists(OS.GetCmdlineUserArgs(), a => a.StartsWith("--trunks"))) { await TrunkShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lake") >= 0) { await LakeShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lakebeast") >= 0) { await LakeBeastShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--giant-grab") >= 0) { await GiantGrabShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--giant-walk") >= 0) { await GiantWalkMeasure(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler-uv") >= 0) { await CrawlerUvShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--crawler") >= 0) { await CrawlerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--weather") >= 0) { await WeatherShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--shelter") >= 0) { await ShelterTest(); GetTree().Quit(); return; }
@@ -109,6 +114,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.Exists(OS.GetCmdlineUserArgs(), a => a.StartsWith("--detail"))) { await DetailShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--leviathan") >= 0) { await LeviathanShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--window-tentacle") >= 0) { await WindowTentacleShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bench") >= 0) { await Bench(); GetTree().Quit(); return; }
 		// the crawler (Act 14), on a floor, walking a few metres so its gait shows
 		var floor = new StaticBody3D { Name = "Floor" };
@@ -142,7 +148,7 @@ public partial class CreaturePreview : Node3D
 		await Shot("lake_limbs_tips", new Vector3(300, 6f, 14f), new Vector3(300, 7.5f, 1f));
 
 		// the shadow man
-		var sm = new ShadowMan { Name = "ShadowMan", Position = new Vector3(600, 0, 0) };
+		var sm = new HallStalker { Name = "HallStalker", Position = new Vector3(600, 0, 0) };
 		AddChild(sm);
 		AddChild(new OmniLight3D { Position = new Vector3(600, 2.8f, 2f), LightColor = new Color(0.9f, 0.2f, 0.15f), LightEnergy = 2f, OmniRange = 8f });
 		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(8, 5) }, Position = new Vector3(600, 2.5f, -1.2f), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0),
@@ -165,7 +171,7 @@ public partial class CreaturePreview : Node3D
 		hall.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(4.2f, 0.2f, 60f) }, Position = new Vector3(0, -0.1f, 0), MaterialOverride = wallMat });
 		var hallLight = new OmniLight3D { Position = new Vector3(0, 5f, 3f), LightColor = new Color(1f, 0.08f, 0.05f), LightEnergy = 1.5f, OmniRange = 22f };
 		hall.AddChild(hallLight);
-		var sm2 = new ShadowMan { Name = "ShadowManHall" };
+		var sm2 = new HallStalker { Name = "ShadowManHall" };
 		hall.AddChild(sm2);
 		await Seconds(2.0);
 		sm2.StandAt(new Vector3(1200, 0, -2f), new Vector3(1200, 0, 10));

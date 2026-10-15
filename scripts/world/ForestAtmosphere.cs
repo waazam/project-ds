@@ -102,6 +102,9 @@ public partial class ForestAtmosphere : Node
 	public float Act1FogAmount => _act1On ? _act1 : -1f;
 	/// <summary>The trailer holds the Act 1 fog where it wants it (null: the fog follows the camera along the trail).</summary>
 	public float? Act1FogOverride { get; set; }
+	/// <summary>Scales the depth fog (1 = as the mood has it): Act 6's fall from high over the clearing thins it so the
+	/// ring of stairs shows far below (2026-10-15).</summary>
+	public float FallFogScale { get; set; } = 1f;
 	private float _act1, _act1Target;
 	private bool _act1On, _act1Applied;
 	/// <summary>Past the fallen fir the fog keeps thickening the nearer the staircase (the owner, 2026-10-04: "more dense the
@@ -743,7 +746,7 @@ public partial class ForestAtmosphere : Node
 		float flash = Mathf.Max(0f, Flash);
 
 		Color fog = _baseFog.Lerp(new Color(0.2f, 0.215f, 0.24f) * Mathf.Min(1f, Lum(_baseFog) / 0.2f + 0.3f), storm * 0.35f);
-		float density = _baseDensity * (1f + 0.22f * storm);
+		float density = _baseDensity * (1f + 0.22f * storm) * FallFogScale;
 		float sunEnergy = _baseSunEnergy * (1f - 0.45f * storm);
 
 		// Ambient floor: tint toward the fog's hue (at the ambient colour's brightness), then lift the

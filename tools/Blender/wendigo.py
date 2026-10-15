@@ -50,8 +50,11 @@ TEXSIZE = 2048
 H = V((0, 0.74, 3.9))                       # the head's joint (top of the neck)
 SPINE = [V((0, -0.04, 2.32)), V((0, -0.04, 2.7)), V((0, 0.02, 3.05)), V((0, 0.12, 3.38)), V((0, 0.26, 3.62)), V((0, 0.36, 3.78))]
 # torso rings along the spine: t, half-width, half-depth, how far the front is sunk (1 not at all)
-TORSO = [(0.0, 0.14, 0.11, 1.0), (0.1, 0.165, 0.125, 0.95), (0.24, 0.12, 0.1, 0.55), (0.36, 0.15, 0.12, 0.7),
-         (0.5, 0.25, 0.19, 1.0), (0.64, 0.28, 0.2, 1.0), (0.78, 0.29, 0.19, 1.0), (0.9, 0.25, 0.15, 1.0), (1.0, 0.13, 0.11, 1.0)]
+# (2026-10-15, the owner: "the wendigo need to be scarier and have more"; the stalker's lesson: a silhouette that's wrong
+# at a glance) hulking above, starved below: the ribcage and the shoulders a fifth broader and deeper, a great cage of
+# bone over a waist sunk to the spine
+TORSO = [(0.0, 0.14, 0.11, 1.0), (0.1, 0.165, 0.125, 0.95), (0.24, 0.115, 0.095, 0.5), (0.36, 0.155, 0.125, 0.68),
+         (0.5, 0.34, 0.24, 1.0), (0.64, 0.4, 0.26, 1.0), (0.78, 0.41, 0.25, 1.0), (0.9, 0.35, 0.2, 1.0), (1.0, 0.16, 0.12, 1.0)]
 
 
 def spine_at(t):
@@ -108,7 +111,7 @@ def t_at_z(z):
 
 # the limbs' joints, per side s (+1 its right)
 def arm_joints(s):
-    return dict(clav=V((s * 0.07, 0.26, 3.63)), shoulder=V((s * 0.46, 0.18, 3.66)), elbow=V((s * 0.6, 0.32, 2.55)),
+    return dict(clav=V((s * 0.08, 0.27, 3.63)), shoulder=V((s * 0.55, 0.18, 3.68)), elbow=V((s * 0.66, 0.32, 2.55)),
                 wrist=V((s * 0.66, 0.5, 1.5)), palm=V((s * 0.69, 0.55, 1.25)))
 
 
@@ -156,6 +159,8 @@ def materials():
         cavity=mat("w_cavity", (0.12, 0.03, 0.03), 0.4),
         hair=mat("w_hair", (0.07, 0.065, 0.065), 1.0),
         velvet=mat("w_velvet", (0.2, 0.15, 0.12), 0.95),
+        tongue=mat("w_tongue", (0.2, 0.03, 0.035), 0.25),
+        hide=mat("w_hide", (0.26, 0.24, 0.22), 0.85),
     )
 
 
@@ -255,8 +260,15 @@ def ribbon(bm, pts, widths, out):
         prev = (a, b)
 
 
-def chain(name, pts, radii, subdiv=1):
-    return skin_tree(name, pts, [(i - 1, i) for i in range(1, len(pts))], radii, None, subdiv=subdiv)
+# (2026-10-15, the owner: "a lot of the joints are too cylindrical and polygonal") the wendigo's own chains get two
+# subdivisions, not one: the skin modifier's four-sided tubes come out sixteen-sided and rounded at every bend and end, not
+# eight-sided and creased. Set only while this file builds its own models (the stalker and the crawler import chain and
+# talon from here and keep their own default).
+CHAIN_SUBDIV = 1
+
+
+def chain(name, pts, radii, subdiv=None):
+    return skin_tree(name, pts, [(i - 1, i) for i in range(1, len(pts))], radii, None, subdiv=CHAIN_SUBDIV if subdiv is None else subdiv)
 
 
 def talon(name, tip, d, curl, length, r0, turn=1.25, segs=7):
@@ -314,8 +326,10 @@ def build_flesh(m):
         # below the elbow and wasting to a knobbed wrist
         parts.append(chain(f"Arm{s}", [J["clav"], J["clav"].lerp(sh, 0.6) + V((0, 0, 0.03)), sh, sh.lerp(el, 0.3), sh.lerp(el, 0.7), el,
                                        el.lerp(wr, 0.2), el.lerp(wr, 0.6), wr, J["palm"]],
-                           [0.065, 0.07, 0.078, 0.06, 0.05, 0.055, 0.056, 0.04, 0.03, 0.045]))
-        parts.append(lumpy_sphere(f"Delt{s}", sh + V((s * 0.015, 0.02, -0.04)), (0.065, 0.07, 0.11), None, 11 + s, amp=0.06, subdiv=3))
+                           [0.075, 0.085, 0.092, 0.07, 0.055, 0.06, 0.06, 0.042, 0.03, 0.045]))   # (2026-10-15: heavier above, the wrists still wasted)
+        parts.append(lumpy_sphere(f"Delt{s}", sh + V((s * 0.02, 0.02, -0.03)), (0.085, 0.09, 0.13), None, 11 + s, amp=0.07, subdiv=3))
+        # (2026-10-15) the trapezius: a ridge of wasted muscle from the neck to each shoulder, hunching it
+        parts.append(chain(f"Trap{s}", [V((s * 0.05, 0.2, 3.82)), V((s * 0.28, 0.12, 3.78)), sh + V((-s * 0.04, 0.0, 0.06))], [0.05, 0.065, 0.05]))
         parts.append(lumpy_sphere(f"Bicep{s}", sh.lerp(el, 0.45) + V((0, 0.035, 0)), (0.04, 0.035, 0.12), None, 15 + s, amp=0.08, subdiv=3))
         parts.append(lumpy_sphere(f"Elbow{s}", el + V((0, -0.045, 0)), (0.045, 0.055, 0.06), None, 12 + s, amp=0.06, subdiv=3))
         parts.append(lumpy_sphere(f"Wrist{s}", wr + V((s * 0.015, -0.01, 0)), (0.03, 0.03, 0.032), None, 13 + s, amp=0.06, subdiv=2))
@@ -455,7 +469,7 @@ def build_parts(m):
         for k in range(10):
             a = k / 10 * math.tau
             ring.append(oc + (up_ * math.cos(a) + up2 * math.sin(a)) * 0.034 + out * 0.008)
-        rim = skin_tree(f"Orbit{sd}", ring, [(k, (k + 1) % 10) for k in range(10)], [0.009] * 10, m["bone"], subdiv=1)
+        rim = skin_tree(f"Orbit{sd}", ring, [(k, (k + 1) % 10) for k in range(10)], [0.009] * 10, m["bone"], subdiv=2)
         skull.append(rim)
         add(lumpy_sphere(f"Socket{sd}", oc - out * 0.004, (0.027, 0.027, 0.027), dark, 36 + sd, amp=0.12, subdiv=3), "head")
         add(lumpy_sphere(f"Eye{sd}", oc + out * 0.006, (0.007, 0.007, 0.007), m["eye"], 38 + sd, amp=0.02, subdiv=2), "head")
@@ -467,11 +481,11 @@ def build_parts(m):
         for k in range(8):
             u = k / 7
             base = H + V((s * (0.04 - u * 0.022), 0.24 + u * 0.37, -0.06 - u * 0.21))
-            L = rnd.uniform(0.035, 0.08)
+            L = rnd.uniform(0.05, 0.11)   # (2026-10-15: longer, a mouthful of fangs)
             tip = base + V((rnd.uniform(-0.01, 0.01), rnd.uniform(-0.005, 0.015), -L))
             # (2026-10-13, the joints pass) rooted up in the snout: the bases lay 1.5-2 cm under its underside from
             # the cheek to the middle of the face, a row of fangs hanging in the air under the skull
-            add(cylinder(f"ToothU{s}{k}", base + V((0, 0, 0.035)), tip, 0.0085, 0.0015, 6, m["bone"]), "head")
+            add(cylinder(f"ToothU{s}{k}", base + V((0, 0, 0.035)), tip, 0.0085, 0.0015, 10, m["bone"]), "head")   # (10 sides, not 6: round, not faceted)
     # a man's jaw hung under it, too big, its teeth long and uneven; torn lips between
     # (2026-10-13, the joints pass) its hinges carried on up into the skull's sides: the jaw's ends stopped 2-3 cm under
     # the skull, the whole jaw hanging in the air below the head
@@ -485,10 +499,10 @@ def build_parts(m):
         for k in range(7):
             u = k / 6
             base = H + V((s * (0.072 - u * 0.05), 0.15 + u * 0.15, -0.13 - u * 0.08))
-            L = rnd.uniform(0.035, 0.085)
+            L = rnd.uniform(0.05, 0.11)
             tip = base + V((rnd.uniform(-0.012, 0.012), rnd.uniform(-0.01, 0.01), L))
             # (the joints pass) the root sunk into the jaw's bar (some stood 6-8 mm proud of it)
-            add(cylinder(f"ToothL{s}{k}", base - V((0, 0, 0.015)), tip, 0.0095, 0.0015, 6, m["bone"]), "jaw")
+            add(cylinder(f"ToothL{s}{k}", base - V((0, 0, 0.015)), tip, 0.0095, 0.0015, 10, m["bone"]), "jaw")
     lip = mat("w_lip", (0.12, 0.035, 0.03), 0.4)
     for s in (1, -1):
         for k in range(2):
@@ -544,6 +558,46 @@ def build_parts(m):
     hj = obj_from_bmesh(bm, "Hair", m["hair"])
     m["hair"].use_backface_culling = False
     add(hj, "chest")
+    # ---- (2026-10-15, the owner: "scarier and have more"; the stalker's torn jaw and its rags the reference) a long
+    # tongue hanging out of the slack jaw over its teeth, swollen, black-red, wet
+    tongue = chain("Tongue", [H + V((0, 0.17, -0.12)), H + V((0.005, 0.27, -0.17)), H + V((0.015, 0.35, -0.23)),
+                              H + V((0.02, 0.39, -0.33)), H + V((0.012, 0.38, -0.44)), H + V((0.0, 0.35, -0.53))],
+                   [0.016, 0.019, 0.018, 0.015, 0.011, 0.005], subdiv=2)
+    tongue.data.materials.append(m["tongue"])
+    add(tongue, "jaw")
+    # ---- torn strips of its own hide hanging off it: round the waist (sloughed, ragged, to the knees), off the upper
+    # arms and from under the shoulder blades, each strip twisting and torn at its end, moving with its own bone
+    def strips(name, bone, roots, length, width, seed):
+        sb = bmesh.new()
+        sr = random.Random(seed)
+        for root, out in roots:
+            ln = length * sr.uniform(0.6, 1.15)
+            pts, cur = [root], root
+            ph = sr.uniform(0, 6.28)
+            for jj in range(7):
+                u = (jj + 1) / 7
+                cur = cur + out * (0.03 * (1 - u)) + V((math.sin(ph + u * 3) * 0.02, math.cos(ph + u * 2.5) * 0.02, -ln / 7))
+                pts.append(cur)
+            w0 = width * sr.uniform(0.7, 1.2)
+            # ragged: the strip narrows unevenly and ends in a tear
+            ws = [w0 * (1.0 - 0.6 * (k / 7) + 0.25 * sr.uniform(-1, 1) * (k / 7)) for k in range(7)] + [0.004]
+            ribbon(sb, pts, ws, out)
+        ob = obj_from_bmesh(sb, name, m["hide"])
+        add(ob, bone)
+    waist = []
+    for k in range(16):
+        th = -math.pi + k / 16 * math.tau + rnd.uniform(-0.1, 0.1)
+        root = torso_point(0.16, th, 0.012)
+        out = (root - spine_at(0.16))
+        out.z = 0
+        waist.append((root, out.normalized() if out.length > 1e-4 else V((0, 1, 0))))
+    strips("HideWaist", "hips", waist, 0.75, 0.07, 71)
+    for s, sx in ((1, "R"), (-1, "L")):
+        J = arm_joints(s)
+        roots = [(J["shoulder"].lerp(J["elbow"], u) + V((s * 0.07, rnd.uniform(-0.04, 0.04), 0)), V((s, 0, 0))) for u in (0.25, 0.45, 0.65)]
+        strips(f"HideArm{sx}", f"upper_{sx}", roots, 0.45, 0.045, 80 + s)
+        roots = [(torso_point(0.72, -math.pi / 2 + s * 0.6 + rnd.uniform(-0.15, 0.15), 0.01), V((s * 0.4, -1, 0)).normalized()) for _ in range(3)]
+        strips(f"HideBack{sx}", "chest", roots, 0.55, 0.06, 90 + s)
     return P
 
 
@@ -561,7 +615,8 @@ def skin_colour(co, nrm):
     bruise = max(0.0, fbm(co.x * 3 + 3, co.y * 3, co.z * 3, 3) - 0.1) * 1.6
     base = base.lerp(V((0.11, 0.085, 0.12)), min(bruise, 0.7))
     # frostbite: the hands and the feet going blue-black, the fingers and toes black
-    hands = frost_toward(co.z, 1.75, 0.95) if abs(co.x) > 0.45 else 0.0
+    # (2026-10-15) from higher up the forearm, the fingers coal-black to the claws
+    hands = frost_toward(co.z, 2.15, 1.15) if abs(co.x) > 0.45 else 0.0
     feet = frost_toward(co.z, 1.0, 0.1)
     fb = max(hands, feet)
     base = base.lerp(V((0.035, 0.04, 0.055)), fb ** 1.3 * 0.95)
@@ -569,6 +624,12 @@ def skin_colour(co, nrm):
     e = hole_e(co)
     if co.y > 0.05 and e < 1.8:
         base = base.lerp(V((0.16, 0.025, 0.02)), max(0.0, 1.0 - (e - 1.0) / 0.8) * 0.85)
+    # (2026-10-15) what it eats: old blood run down from the mouth over the throat and the chest in streaks, darker
+    # where it dried, and caked round the waist
+    if co.y > 0.05 and 2.7 < co.z < 3.85:
+        streak = max(0.0, noise.noise(V((co.x * 18, 0.0, co.z * 1.5))) - 0.05) * 3.0
+        fade = max(0.0, min(1.0, (co.z - 2.7) / 0.9))
+        base = base.lerp(V((0.1, 0.012, 0.01)), min(0.85, streak * fade))
     # grime, darker down its back
     base *= 0.92 + 0.12 * n2
     if nrm.y < -0.3:
@@ -616,6 +677,22 @@ def part_colour(name):
         return flat_colour((0.006, 0.005, 0.005))
     if name.startswith("Lip"):
         return flat_colour((0.09, 0.02, 0.018))
+    if name.startswith("Tongue"):
+        def tongue(co, nrm):
+            n = fbm(co.x * 30, co.y * 30, co.z * 30, 3)
+            c = V((0.34, 0.045, 0.05)).lerp(V((0.12, 0.015, 0.02)), max(0.0, min(1.0, (3.75 - co.z) / 0.3)) * 0.6)
+            return tuple(c * (0.8 + 0.4 * n))
+        return tongue
+    if name.startswith("Hide"):
+        def hide(co, nrm):
+            n = fbm(co.x * 9, co.y * 9, co.z * 9, 4)
+            c = V((0.2, 0.185, 0.17)) * (0.75 + 0.45 * n)
+            # the torn ends darker, frozen and filthy; old blood soaked into the waist's
+            c = c.lerp(V((0.05, 0.045, 0.05)), max(0.0, min(1.0, (1.9 - co.z) / 0.6)) * 0.6)
+            if co.z < 2.4 and fbm(co.x * 4 + 9, co.y * 4, co.z * 4, 2) > 0.15:
+                c = c.lerp(V((0.13, 0.02, 0.015)), 0.5)
+            return c.x, c.y, c.z
+        return hide
     if name.startswith("Velvet"):
         return flat_colour((0.07, 0.05, 0.04))
     return skin_colour
@@ -1173,8 +1250,66 @@ def animate(arm_obj, bones):
             arms[sx] = dict(reach=V((s_ * 0.2, 0.3 + sw, -reach_down + 0.1 * abs(sw))), curl=0.45, pole=V((s_ * 0.4, -1, 0)))
         hip = V((0, 0, -bob * (0.5 + 0.5 * math.cos(phase * 2 * math.tau))))
         return (hip, dict(bow=bow, neck_bow=0.05, head_pitch=-0.05, curl=0.45, leg=legs, arm=arms))
-    action("walk", [(f, *gait(f / 32, 0.9, 0.22, hang + 0.08, 0.28, 0.06, 1.9)) for f in range(0, 33, 4)])
-    action("run", [(f, *gait(f / 20, 1.6, 0.45, hang + 0.4, 0.65, 0.12, 1.5)) for f in range(0, 21, 2)])
+    # (2026-10-15, the owner: "beef up some of the wendigo and other animations as needed") the walk weightier: a deeper
+    # bob, more bow over it, the arms dragging lower
+    action("walk", [(f, *gait(f / 32, 0.9, 0.22, hang + 0.14, 0.24, 0.1, 2.0)) for f in range(0, 33, 4)])
+    action("run", [(f, *gait(f / 20, 1.6, 0.45, hang + 0.45, 0.65, 0.15, 1.5)) for f in range(0, 21, 2)])
+
+    # ---- (2026-10-15) the new clips: the stalker's lessons (it moves wrong, low, and too slow, then far too fast)
+    # lurk: folded down low over itself, the knees jutting, the knuckles of both hands resting on the snow, the head hung
+    # low and forward between the shoulders, breathing slow and deep; still as a dead tree
+    def lurk_pose(b):
+        foot = lambda L: (L["ball"] - L["hock"]).normalized().lerp(V((0, 0.5, -0.86)), 0.55)
+        return (V((0, -0.05, -0.42 + 0.025 * b)), dict(bow=hang + 0.62 + 0.03 * b, neck_bow=0.25, head_pitch=-0.35, curl=0.65,
+                leg=dict(R=dict(foot=foot(Lr)), L=dict(foot=foot(Ll))),
+                arm=dict(R=dict(wrist=V((0.55, 1.05, 0.12 + 0.02 * b)), pole=V((0.6, -0.4, 0.4))), L=dict(wrist=V((-0.55, 1.0, 0.12 - 0.02 * b)), pole=V((-0.6, -0.4, 0.4)))),
+                jaw=0.25))
+    action("lurk", [(0, *lurk_pose(0)), (40, *lurk_pose(1)), (80, *lurk_pose(0)), (120, *lurk_pose(-0.5)), (160, *lurk_pose(0))])
+    # sniff: the head up and thrust out, the skull turning in short jerks as it takes the air, the jaw working
+    sniff = []
+    for f, (hp, tw, jw) in ((0, (0.0, 0.0, 0.2)), (6, (-0.45, 0.15, 0.35)), (9, (-0.4, 0.2, 0.15)), (15, (-0.5, -0.1, 0.4)),
+                            (18, (-0.45, -0.15, 0.15)), (27, (-0.55, 0.05, 0.45)), (30, (-0.5, 0.1, 0.2)), (45, (0.0, 0.0, 0.2))):
+        sniff.append((f, V((0, 0.05, 0.03)), dict(bow=hang - 0.05, neck_bow=-0.25, head_pitch=hp, twist=tw, jaw=jw, curl=0.4)))
+    action("sniff", sniff)
+    # approach: the slow stalk, bent low, each step placed long and deliberate, the arms hanging to the ground and the
+    # claws trailing, the head held dead level on its prey
+    action("approach", [(f, *gait(f / 56, 0.75, 0.12, hang + 0.5, 0.06, 0.05, 2.3)) for f in range(0, 57, 4)])
+    # crawl: on all fours like a starved dog, the long arms reaching out ahead and planting, the haunches high
+    def crawl_pose(phase):
+        legs, arms = {}, {}
+        for sx, L, off in (("R", Lr, 0.0), ("L", Ll, 0.5)):
+            p = (phase + off) % 1.0
+            y = 0.5 * (0.5 - p / 0.6) if p < 0.6 else 0.5 * (-0.5 + (p - 0.6) / 0.4)
+            z = 0.0 if p < 0.6 else 0.15 * math.sin((p - 0.6) / 0.4 * math.pi)
+            legs[sx] = dict(ball=L["ball"] + V((0, y, z)), foot=(L["ball"] - L["hock"]).normalized().lerp(V((0, 0.5, -0.86)), 0.5))
+        for sx, s_, off in (("R", 1, 0.5), ("L", -1, 0.0)):
+            p = (phase + off) % 1.0
+            y = 1.25 + (0.45 * (0.5 - p / 0.6) if p < 0.6 else 0.45 * (-0.5 + (p - 0.6) / 0.4))
+            z = 0.06 if p < 0.6 else 0.06 + 0.2 * math.sin((p - 0.6) / 0.4 * math.pi)
+            arms[sx] = dict(wrist=V((s_ * 0.5, y, z)), curl=0.7, pole=V((s_ * 0.6, -0.3, 0.5)))
+        return (V((0, 0.1, -0.55)), dict(bow=hang + 0.95, neck_bow=-0.45, head_pitch=-0.25, curl=0.7, leg=legs, arm=arms, jaw=0.3))
+    action("crawl", [(f, *crawl_pose(f / 40)) for f in range(0, 41, 4)])
+    # lunge: startled into it: a jolt back, then thrown at its prey from where it stands, the arms flung out ahead, the
+    # jaw wide; held at the end of its reach
+    def lunge_pose(u):
+        arms = {}
+        for sx, A, s in (("R", Ar, 1), ("L", Al, -1)):
+            back = A["shoulder"] + V((s * 0.4, -0.2, -0.9))
+            out = A["shoulder"] + V((s * 0.55, 1.7, 0.1))
+            arms[sx] = dict(wrist=back.lerp(out, max(0.0, u)), curl=0.1 + 0.3 * (1 - u), pole=V((s, 0, 0.6)))
+        legs = dict(R=dict(ball=Lr["ball"] + V((0, -0.6 * u, 0))), L=dict(ball=Ll["ball"] + V((0, 0.5 * u, 0))))
+        return (V((0, 0.85 * u - 0.15 * (1 - u), -0.3 * u)), dict(bow=hang + 0.2 + 0.45 * u, neck_bow=-0.4 * u, head_pitch=-0.25 * u,
+                leg=legs, arm=arms, jaw=0.15 + 0.5 * u))
+    action("lunge", [(0, *lunge_pose(0.0)), (3, *lunge_pose(-0.1)), (6, *lunge_pose(0.55)), (9, *lunge_pose(1.0)), (16, *lunge_pose(1.0))])
+    # grab: both hands out at a person's height, the claws spread; closing on them; drawn back in to the jaw
+    def grab_pose(u, close):
+        arms = {}
+        for sx, s in (("R", 1), ("L", -1)):
+            out = V((s * 0.45, 1.45, 1.7))
+            inn = V((s * 0.12, 1.0, 3.05))
+            arms[sx] = dict(wrist=out.lerp(inn, u), curl=0.05 + 0.85 * close, pole=V((s * 0.8, -0.2, -0.5)))
+        return (V((0, 0.3 - 0.2 * u, -0.25)), dict(bow=hang + 0.35 - 0.15 * u, neck_bow=-0.2 + 0.3 * u, head_pitch=-0.2, arm=arms, jaw=0.2 + 0.45 * u))
+    action("grab", [(0, *grab_pose(0, 0)), (5, *grab_pose(0.05, 0.2)), (8, *grab_pose(0.1, 1.0)), (16, *grab_pose(0.85, 1.0)), (22, *grab_pose(1.0, 1.0))])
     # the rest pose for export (and the previews): the idle's first frame
     arm_obj.animation_data.action = actions["idle"]
     sc.frame_set(0)
@@ -1223,7 +1358,7 @@ def build_body():
     hf.data = flesh.data.copy()
     bpy.context.scene.collection.objects.link(hf)
     high = join([hf] + high_parts, "High")
-    target = 85000
+    target = 68000   # (2026-10-15: the strips, the tongue and the bigger frame cost; the flesh gives some back)
     ratio = min(1.0, target / max(tri_count(flesh), 1))
     add_mod(flesh, "DECIMATE", ratio=ratio)
     apply_mods(flesh)
@@ -1390,6 +1525,7 @@ def build_arm():
 
 
 if __name__ == "__main__":
+    CHAIN_SUBDIV = 2
     want = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ["body", "arm"]
     if "body" in want:
         build_body()

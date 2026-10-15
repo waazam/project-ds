@@ -47,6 +47,9 @@ public static class ItemMeshes
 		Func<int, float, Color> tone = null, float uScale = 1f, float dome = 0f)
 	{
 		int n = rings.Count;
+		// (2026-10-15: round enough for its girth, see MeshKit.Smooth)
+		float maxR = 0f; foreach (var rg in rings) maxR = Mathf.Max(maxR, Mathf.Max(rg.Rx, rg.Rz));
+		sides = k.SidesFor(sides, maxR);
 		var pts = new Vector3[n, sides + 1];
 		var nrm = new Vector3[n, sides + 1];
 		var ts = new Vector3[n];

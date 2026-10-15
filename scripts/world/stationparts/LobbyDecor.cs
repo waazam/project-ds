@@ -820,7 +820,8 @@ public partial class LobbyDecor : Node3D
 			(new Vector3(-2.3f, 2.7f, D - 0.07f), Vector3.Forward, 0.55f), (new Vector3(-1.5f, 2.85f, -D + 0.07f), Vector3.Back, 0.5f),
 		})
 		{
-			StationProps.Growth(k, at - n * size * 0.25f, n, size, (int)(at.X * 31 + at.Z * 17));
+			int gs = (int)(at.X * 31 + at.Z * 17);
+			if (!StationProps.GrowthModel(rot, at - n * 0.02f, n, size, gs)) StationProps.Growth(k, at - n * size * 0.25f, n, size, gs);
 			DecalDresser.Place(rot, "mould", at + n * 0.01f, n, new Vector2(size * 2.6f, size * 2.2f), 0.85f, rng.RandfRange(0f, 3f), 0.2f);
 		}
 		k.Color = Colors.White;

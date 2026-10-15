@@ -24,6 +24,7 @@ public partial class SkiLodge
 {
 	public readonly List<WardrobeHide> Hides = new();
 	public Node3D SheetFigure { get; private set; }
+	private MeshInstance3D[] _sheetPoses;
 	public int SheetMoves { get; private set; }
 	private bool _sheetDarkLast;
 
@@ -44,6 +45,19 @@ public partial class SkiLodge
 	{
 		var f = new Node3D { Name = "SheetFigure", Position = new Vector3(WingX1 - 3.5f, 0.02f, -WingHalfZ + 1.6f) };
 		AddChild(f);
+		// (2026-10-15, the owner: every model made in Blender) a dust sheet simulated as cloth over someone standing, in two
+		// poses (tools/Blender/figures.py): square, and its head dropped to one side with an arm a little forward; it changes
+		// between them each time it comes nearer in the dark
+		if (FigureModels.Load("sheet_figure") is { } model)
+		{
+			model.Name = "Sheet";
+			f.AddChild(model);
+			_sheetPoses = new[] { FigureModels.Mesh(model, "SheetA"), FigureModels.Mesh(model, "SheetB") };
+			foreach (var p in _sheetPoses) FigureModels.Paint(p, LodgeTextures.SheetLinenMat);
+			if (_sheetPoses[1] != null) _sheetPoses[1].Visible = false;
+			SheetFigure = f;
+			return;
+		}
 		var k = new MeshKit();
 		k.Mat(LodgeTextures.SheetLinenMat);
 		k.Color = Colors.White;
@@ -171,6 +185,13 @@ public partial class SkiLodge
 		f.Position = next;
 		f.Rotation = new Vector3(0, Mathf.Atan2(to.X, to.Z), 0);
 		SheetMoves++;
+		// and it isn't standing quite as it was
+		if (_sheetPoses is { Length: 2 } && _sheetPoses[0] != null && _sheetPoses[1] != null)
+		{
+			bool b = SheetMoves % 2 == 1;
+			_sheetPoses[0].Visible = !b;
+			_sheetPoses[1].Visible = b;
+		}
 		GD.Print($"[story] Act 23: the light went out - the standing sheet is nearer ({d:0.0} m -> {(playerLocal - next).Length():0.0} m)");
 		return true;
 	}

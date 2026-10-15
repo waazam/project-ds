@@ -61,6 +61,31 @@ public static class StationProps
 	}
 
 	/// <summary>A swollen lump of flesh bulging out of a surface (normal points out of the surface).</summary>
+	/// <summary>(2026-10-15, the owner: every model made in Blender) a growth from tools/Blender/figures.py (flesh_growth.glb:
+	/// three fused masses of flesh, budding, their roots spread on the wall like a stain), set on the wall at
+	/// <paramref name="at"/> growing out along <paramref name="normal"/>, about <paramref name="size"/> across, turned by the
+	/// seed. False when the model is missing (then <see cref="Growth"/> builds the old lumps).</summary>
+	public static bool GrowthModel(Node3D parent, Vector3 at, Vector3 normal, float size, int seed)
+	{
+		if (FigureModels.Load("flesh_growth") is not { } model) return false;
+		string keep = "Growth" + "ABC"[Mathf.PosMod(seed, 3)];
+		foreach (var n in model.FindChildren("*", "MeshInstance3D", true, false))
+			if (n is MeshInstance3D mi)
+			{
+				if (mi.Name != keep) { mi.QueueFree(); continue; }
+				FigureModels.Paint(mi, StationTextures.MeatMat);
+				mi.Position = Vector3.Zero;   // (each sits on its own root at its origin)
+			}
+		model.Name = "Growth";
+		parent.AddChild(model);
+		// its +Y (Blender's +Z: out of the wall) along the wall's normal, a turn of its own about it
+		var up = normal.Normalized();
+		var side = Mathf.Abs(up.Dot(Vector3.Up)) > 0.9f ? Vector3.Right : Vector3.Up;
+		var basis = Basis.LookingAt(side.Cross(up).Normalized(), up).Rotated(up, Mathf.PosMod(seed * 0.618f, Mathf.Tau));
+		model.Transform = new Transform3D(basis.Scaled(Vector3.One * size * 1.6f), at);
+		return true;
+	}
+
 	public static void Growth(MeshKit k, Vector3 at, Vector3 normal, float size, int seed)
 	{
 		k.Mat(StationTextures.MeatMat);

@@ -343,12 +343,12 @@ A puzzle stretch through a station that starts kept and tidy and is left more wr
 The crawler watches from above, and is gone when they jump. Either way they are in a chamber under the stairwell (**Checkpoint 14**).
 
 ## Act 15: The Long Hallway
-**The narrow hallway.** A red-lit concrete corridor a body's width across and lost in the dark overhead, about a hundred and twenty metres of it. Then a taller hall with green lamps on long cables, about three hundred and thirty metres long. The shadow man stands in it: a flat-black figure in a coat and brimmed hat, two points of white light for eyes, shards turning above him. Walking past him the first time saves the player's place.
+**The narrow hallway.** A red-lit concrete corridor a body's width across and lost in the dark overhead, about a hundred and twenty metres of it. Then a taller hall with green lamps on long cables, about three hundred and thirty metres long. The stalker stands in it (2026-10-15: it replaced the shadow man): the same black, rag-hung thing from the woods, its two ember eyes, frozen in the green, caught in a new pose wherever it is in the red, its head following the eye. Walking past it the first time saves the player's place.
 
 **Red light, green light.** The lamps flicker, go red with a clunk and a low siren, and stay red a few seconds.
-- In the first half he appears behind the player and jumps closer.
-- In the second half he is in front of them, coming at them in one of several ways: an inch at a time with his eyes and breath growing, in lunges from far down the hall, standing still until the red's last moment, looming taller, his eyes melting, out of the wall, or many of him.
-- Moving in the red means being taken: "The Shadowman Taketh". The player wakes just past where he first stood.
+- In the first half it appears behind the player and jumps closer, its rattle each time.
+- In the second half it is in front of them, coming at them in one of several ways: an inch at a time with its eyes and rattle growing, in lunges from far down the hall, standing still until the red's last moment, looming taller, its eyes melting, leaning out round the wall's edge as it does round a trunk, or three of it.
+- Moving in the red means being taken: it throws its arms at them, and "It Taketh". The player wakes just past where it first stood.
 
 **The end.** At the end, a janitor's closet; the door swings shut behind them (**Checkpoint 15**).
 
@@ -497,7 +497,7 @@ The game has six deaths. Each is black and one line, and then the latest save:
 |---|---|---|
 | "The lake took you." | Act 12 | The lake shore |
 | "You drowned." | Act 13, Room 2 | Room 1's button |
-| "The Shadowman Taketh" | Act 15 | Just past where he first stood |
+| "It Taketh" | Act 15 | Just past where it first stood |
 | "It crushed you." | Act 18 | The catwalk, still battered |
 | "It drove you down. You were too slow." | Act 24, the tunnel | The lodge's doorway |
 | "It found you." | Act 24, the maze | The maze's latest save |
@@ -543,4 +543,4 @@ The crawler in the stairwell and the arm in the lodge's walls never kill: the st
 | 34 | Act24Finished | The wendigo finished |
 | 1000 | GameFinished | The end |
 
-Two more saves are kept within a checkpoint: past the shadow man (within 14) and halfway down the road (within 22). Number 11 is retired.
+Two more saves are kept within a checkpoint: past the stalker in the hall (within 14) and halfway down the road (within 22). Number 11 is retired.

@@ -24,6 +24,10 @@ uniform float back_shade = 0.0;
 uniform float inner_ao = 0.0;
 /// Sun through the needles (seen from beneath against a lit sky, the boughs glow a little instead of going to black).
 uniform float translucency = 0.0;
+/// (2026-10-15, the owner: "some of the trees still have invisible lines around them, like they look pieced together")
+/// A flat card seen edge-on is a hairline: a straight dashed line off the crown. The card thins out as it turns edge-on
+/// (its true, unbent face against the view), gone below this facing.
+uniform float edge_fade = 0.22;
 global uniform float winter;
 
 void vertex() {
@@ -42,6 +46,10 @@ void fragment() {
 	vec2 d = UV * tex_size;
 	float lod = 0.5 * log2(max(dot(dFdx(d), dFdx(d)), dot(dFdy(d), dFdy(d))));
 	float a = c.a * (1.0 + max(lod, 0.0) * mip_boost);
+	if (edge_fade > 0.0) {
+		vec3 gn = normalize(cross(dFdx(VERTEX), dFdy(VERTEX)));
+		a *= smoothstep(edge_fade * 0.35, edge_fade, abs(dot(gn, VIEW)));
+	}
 	float back = FRONT_FACING ? 1.0 : 1.0 - back_shade;
 	ALBEDO = c.rgb * tint * COLOR.rgb * back * mix(1.0, texture(detail_tex, UV * detail_tile).r, 0.8);
 	if (winter > 0.001) {

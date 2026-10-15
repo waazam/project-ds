@@ -39,6 +39,73 @@ public class MeshKit
 	/// <summary>The material being drawn with (null before the first <see cref="Mat"/>).</summary>
 	public Material CurrentMaterial { get; private set; }
 
+	/// <summary>
+	/// (2026-10-15, the owner: "a lot of the joints are too cylindrical and polygonal for a lot of the characters and props,
+	/// can we clean that up") Round tubes: a <see cref="Cylinder"/> or <see cref="ItemMeshes.Loft"/> of 5 or more sides gets at
+	/// least as many as its girth needs to read round (<see cref="SidesFor"/>; 3- and 4-sided ones are left alone: those are
+	/// prisms on purpose, posts and beams), and where a cylinder carries straight on from the last one at an angle (an elbow,
+	/// a knuckle, a pipe's bend, a branch's kink), a smooth ball fills the joint instead of two cut ends crossing.
+	/// On by default; off for the builders whose meshes are instanced by the thousand (the forest scatter, the winter trees)
+	/// and the creatures with their own passes, named by the source file that makes the kit (<see cref="RoughCallers"/>).
+	/// </summary>
+	public bool Smooth = true;
+
+	/// <summary>Source files whose kits stay as they were (see <see cref="Smooth"/>).</summary>
+	public static readonly string[] RoughCallers =
+	{
+		"ForestScatter", "WinterTreeKit", "WinterWoods.Trees", "Deer.cs", "Squirrel.cs", "Crawler.cs", "LakeCreature.cs",
+		"Leviathan.cs", "TentacleKit.cs", "WindowTentacle.cs", "StalkerBody", "ShadowMan.cs",
+	};
+
+	/// <summary>`--rough-kit`: every kit as it was (for before/after comparisons).</summary>
+	public static readonly bool RoughAll = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--rough-kit") >= 0;
+
+	public MeshKit([System.Runtime.CompilerServices.CallerFilePath] string caller = "")
+	{
+		if (RoughAll) { Smooth = false; return; }
+		if (!string.IsNullOrEmpty(caller))
+			foreach (var r in RoughCallers)
+				if (caller.Replace('\\', '/').Contains(r)) { Smooth = false; break; }
+	}
+
+	/// <summary>The fewest sides a round tube of radius <paramref name="r"/> reads round with at the PS2 look's scale
+	/// (never fewer than asked; 3-4 sides stay: prisms on purpose).</summary>
+	public int SidesFor(int sides, float r)
+	{
+		if (!Smooth || sides < 5) return sides;
+		int min = r < 0.008f ? sides : r < 0.025f ? 6 : r < 0.07f ? 8 : r < 0.2f ? 12 : 16;
+		return Mathf.Max(sides, min);
+	}
+
+	// the last cylinder, for the joint ball where the next carries on from it
+	private bool _hasLast;
+	private Vector3 _lastEnd, _lastDir;
+	private float _lastR;
+	private Material _lastMat;
+	private Transform3D _lastXf;
+
+	/// <summary>A smooth ball at a joint (radius <paramref name="r"/>), its normals round, for where two tubes meet.</summary>
+	public void JointBall(Vector3 c, float r, int sides)
+	{
+		int rings = Mathf.Max(3, sides / 2);
+		Vector3 P(int i, int j, out Vector3 n)
+		{
+			float th = Mathf.Pi * i / rings, ph = Mathf.Tau * j / sides;
+			n = new Vector3(Mathf.Sin(th) * Mathf.Cos(ph), Mathf.Cos(th), Mathf.Sin(th) * Mathf.Sin(ph));
+			return c + n * r;
+		}
+		float circ = Mathf.Tau * r;
+		for (int i = 0; i < rings; i++)
+			for (int j = 0; j < sides; j++)
+			{
+				var a = P(i, j, out var na); var b = P(i, j + 1, out var nb);
+				var cc = P(i + 1, j + 1, out var nc); var d = P(i + 1, j, out var nd);
+				Vector2 U(int ii, int jj) => new((float)jj / sides * circ, (float)ii / rings * circ * 0.5f);
+				if (i > 0) Tri(a, cc, b, na, nc, nb, U(i, j), U(i + 1, j + 1), U(i, j + 1));
+				if (i < rings - 1) Tri(a, d, cc, na, nd, nc, U(i, j), U(i + 1, j), U(i + 1, j + 1));
+			}
+	}
+
 	public MeshKit Mat(Material m)
 	{
 		CurrentMaterial = m;
@@ -335,7 +402,14 @@ public class MeshKit
 	{
 		Vector3 axis = p1 - p0;
 		float len = axis.Length();
+		if (len < 1e-6f) return;
 		Vector3 z = axis / len;
+		sides = SidesFor(sides, Mathf.Max(r0, r1));
+		// carrying on from the last tube at an angle: a ball fills the joint (no crossed cut ends, no gap on the outside)
+		if (Smooth && sides >= 5 && _hasLast && ReferenceEquals(_lastMat, CurrentMaterial) && _lastXf == Xf
+			&& p0.DistanceTo(_lastEnd) < Mathf.Max(0.15f * r0, 0.002f) && _lastDir.Dot(z) < 0.985f)
+			JointBall(p0, Mathf.Min(r0, _lastR) * 1.0f, sides);
+		_hasLast = true; _lastEnd = p1; _lastDir = z; _lastR = r1; _lastMat = CurrentMaterial; _lastXf = Xf;
 		Vector3 refv = Mathf.Abs(z.Y) > 0.9f ? Vector3.Right : Vector3.Up;
 		Vector3 x = refv.Cross(z).Normalized();
 		Vector3 y = z.Cross(x);

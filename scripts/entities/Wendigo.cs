@@ -48,6 +48,12 @@ public partial class Wendigo : Node3D
 	private GpuParticles3D _breath;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 666 };
 	private double _time, _twitchAt = 1.2, _breathAt = 2.0;
+	// (2026-10-15) the owl's roll, the stop-motion jerks, the slack jaw, the lurk
+	private double _rollAt = 3.0, _rollUntil = -1, _stutterAt = 2.0, _stutterUntil = -1;
+	private float _roll, _rollGoal, _stutterAcc;
+	private const float StutterStep = 0.085f;
+	/// <summary>How far the jaw hangs open at rest (radians), and how far it hunches over its chest while standing.</summary>
+	[Export] public float JawSlack = 0.22f, Hunch = 0.12f;
 	private Vector3 _twitch, _twitchGoal;
 	private Vector3 _headRest = new(0.1f, 0f, 0.25f);
 	private float _leapT = -1f, _leapDur, _speakUntil = -1f;
@@ -101,7 +107,7 @@ public partial class Wendigo : Node3D
 		if (_anim != null)
 		{
 			_anim.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual;
-			foreach (var loop in new[] { "idle", "walk", "run" })
+			foreach (var loop in new[] { "idle", "walk", "run", "lurk", "approach", "crawl", "sniff" })
 				if (_anim.GetAnimation(loop) is { } a) a.LoopMode = Animation.LoopModeEnum.Linear;
 			_anim.Play("idle");
 		}
@@ -148,9 +154,26 @@ public partial class Wendigo : Node3D
 					}
 					else if (name.StartsWith("w_eye"))
 					{
+						// (2026-10-15, "scarier": the stalker's eyeshine the reference) a cold pinprick deep in each socket
+						// that reads from across the dark: unshaded and over-bright, so it glows in the fog and the bloom
 						m.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
 						m.AlbedoColor = new Color(0.75f, 0.88f, 1f);
 						m.AlbedoTexture = null;
+						m.EmissionEnabled = true;
+						m.Emission = new Color(0.7f, 0.85f, 1f);
+						m.EmissionEnergyMultiplier = 3.5f;
+						m.DisableFog = true;
+					}
+					else if (name.StartsWith("w_tongue"))
+					{
+						// wet: a hard sheen on it
+						m.Roughness = 0.12f;
+						m.MetallicSpecular = 0.8f;
+					}
+					else if (name.StartsWith("w_hide"))
+					{
+						// the strips of hide are single sheets: both faces drawn
+						m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
 					}
 					else if (name.StartsWith("w_heart"))
 					{
@@ -423,6 +446,20 @@ public partial class Wendigo : Node3D
 			return;
 		}
 		PulseHeart();
+		// (2026-10-15, the owner: "scarier"; the stalker's lessons) now and then the head rolls over too far, as an owl's
+		// does, and holds there; and now and then the body moves in stop-motion, as if frames were missing
+		if (_time >= _rollAt)
+		{
+			_rollAt = _time + _rng.RandfRange(4f, 9f);
+			_rollUntil = _time + _rng.RandfRange(0.8f, 1.8f);
+			_rollGoal = (_rng.Randf() < 0.5f ? -1f : 1f) * _rng.RandfRange(0.65f, 1.05f);
+		}
+		_roll = Mathf.Lerp(_roll, _time < _rollUntil ? _rollGoal : 0f, 1f - Mathf.Exp(-dt * (_time < _rollUntil ? 3.5f : 14f)));
+		if (_time >= _stutterAt)
+		{
+			_stutterAt = _time + _rng.RandfRange(4f, 10f);
+			_stutterUntil = _time + _rng.RandfRange(0.45f, 0.9f);
+		}
 		// standing: breathing (the idle), the head hanging to one side and now and then snapping to a new angle
 		if (_time >= _twitchAt)
 		{
@@ -481,21 +518,41 @@ public partial class Wendigo : Node3D
 			return;
 		}
 		if (_anim == null || _skel == null) return;
-		_anim.Advance(dt);
+		// (2026-10-15) stop-motion: the clip advanced in jerks, about twelve a second, frames missing between them
+		if (_time < _stutterUntil)
+		{
+			_stutterAcc += dt;
+			if (_stutterAcc >= StutterStep) { _anim.Advance(_stutterAcc); _stutterAcc = 0f; }
+		}
+		else
+		{
+			if (_stutterAcc > 0f) { _anim.Advance(_stutterAcc); _stutterAcc = 0f; }
+			_anim.Advance(dt);
+		}
 		// (2026-10-12, the animation overhaul) weight over the clip: leaning into its starts, stops and turns, the long arms
 		// swinging behind, the hooves planted on the ground under them
 		_dyn ??= new AnimKit.BodyDynamics(_skel, "hips", new[] { "spine", "chest" }, "head", new[] { "upper_R", "upper_L" },
 			new[] { ("thigh_R", "shin_R", "foot_R", "toe_R"), ("thigh_L", "shin_L", "foot_L", "toe_L") }) { LeanPerAccel = 0.03f, MaxLean = 0.28f };
 		_dyn.Weight = _leapT >= 0f ? 0f : 1f;
 		_dyn.Apply(_body, dt, _leapT < 0f);
+		// (2026-10-15) the lurk: hunched lower over the chest while it stands
+		if (_chest >= 0 && _leapT < 0f && Hunch > 0f)
+			_skel.SetBonePoseRotation(_chest, _skel.GetBonePoseRotation(_chest) * new Quaternion(Vector3.Right, Hunch));
 		if (_headBone >= 0 && _leapT < 0f)
 		{
 			_skel.SetBonePoseRotation(_headBone, _skel.GetBonePoseRotation(_headBone) * Quaternion.FromEuler(_twitch * Mathf.Lerp(1f, 0.45f, LookWeight)));
 			TrackHead(dt);
+			// the owl's roll on top of everything (looking at you, the head turned over on its side)
+			if (Mathf.Abs(_roll) > 0.01f)
+				_skel.SetBonePoseRotation(_headBone, _skel.GetBonePoseRotation(_headBone) * new Quaternion(Vector3.Up, _roll));
 		}
-		if (_jawBone >= 0 && _time < _speakUntil)
+		if (_jawBone >= 0)
 		{
-			float open = 0.12f + 0.2f * Mathf.Abs(Mathf.Sin((float)_time * 7.3f) * Mathf.Sin((float)_time * 2.9f + 1f));
+			// (2026-10-15, the stalker's torn jaw the reference) the jaw never closes: it hangs slack, quivering; it gapes
+			// on the lunge; and it works when it speaks
+			float open = JawSlack + 0.03f * Mathf.Sin((float)_time * 23f) * Mathf.Sin((float)_time * 3.1f);
+			if (_leapT >= 0f) open = Mathf.Max(open, 0.55f);
+			if (_time < _speakUntil) open += 0.12f + 0.2f * Mathf.Abs(Mathf.Sin((float)_time * 7.3f) * Mathf.Sin((float)_time * 2.9f + 1f));
 			_skel.SetBonePoseRotation(_jawBone, _skel.GetBonePoseRotation(_jawBone) * new Quaternion(Vector3.Right, open));
 		}
 	}

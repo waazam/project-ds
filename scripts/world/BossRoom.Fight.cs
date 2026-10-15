@@ -530,7 +530,7 @@ public partial class BossRoom
 	// ------------------------------------------------------------------ the end
 
 	/// <summary>The death's eye pops: the first gap and the last (seconds).</summary>
-	[Export] public float EyePopFirstGap = 0.75f, EyePopLastGap = 0.012f;
+	[Export] public float EyePopFirstGap = 0.4f, EyePopLastGap = 0.01f;   // (2026-10-15, the owner: "pop slightly quicker": was 0.75 / 0.012)
 
 	/// <summary>The last valve: the pit empties, every eye it has bursts in turn from the crown down, it
 	/// shrieks and dies; then the far door opens on a lit room.</summary>
@@ -553,7 +553,7 @@ public partial class BossRoom
 			player.GlobalPosition = from.Lerp(toRail, Mathf.SmoothStep(0f, 1f, (float)(tt / 1.4)));
 		}
 		await Look(player, Beast.GlobalPosition + Vector3.Up * 10f, 2.0f, ct);
-		await Cutscene.Wait(this, 3.2, ct);   // the last of the blood going
+		await Cutscene.Wait(this, 2.2, ct);   // the last of the blood going (2026-10-15: was 3.2)
 		Sfx("creature_giant_rattle_loop", 1, Beast.GlobalPosition + Vector3.Up * 10f, 2f, 30f);
 		// the eyes, one after another: slow at first, each pop on its own, then faster and faster until they go in a
 		// rush (the owner, 2026-10-03: "they should start off popping slow then progressively get faster"); the gap
@@ -563,7 +563,7 @@ public partial class BossRoom
 		for (int i = 0; i < n; )
 		{
 			float u = i / (float)Mathf.Max(n - 1, 1);
-			float gap = Mathf.Exp(Mathf.Lerp(Mathf.Log(EyePopFirstGap), Mathf.Log(EyePopLastGap), Mathf.Pow(u, 0.55f)));
+			float gap = Mathf.Exp(Mathf.Lerp(Mathf.Log(EyePopFirstGap), Mathf.Log(EyePopLastGap), Mathf.Pow(u, 0.42f)));
 			int together = Mathf.Max(1, Mathf.RoundToInt(0.03f / gap));
 			for (int j = 0; j < together && i < n; j++, i++)
 			{

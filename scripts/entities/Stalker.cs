@@ -463,8 +463,15 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	/// story window covers the admit fade, when IsIndoor is briefly false while the player already stands in the
 	/// interior 300 m away. The bunker's own scripted scares (BunkerFlow / BunkerRooms) are the only stalker in there.
 	/// </summary>
-	public static bool Inert => Indoors
+	public static bool Inert => Indoors || UnderOrInside
 		|| (StoryManager.Instance is { } s && s.Current >= Checkpoint.Act8BunkerEntered && s.Current < Checkpoint.Act10WalkieFound);
+
+	/// <summary>(2026-10-15, the owner in Act 15's hall: "the rattling ... is too loud and constant": the woods' stalker,
+	/// Hunted from checkpoint 8, went on rattling under the station, where the ambience's indoor flag isn't set) inside or
+	/// underground by the atmosphere's own reckoning (the station, the stairwell, the hall, the sewer, the pit, the
+	/// library, the lodge, the maze): it is the woods' thing, and it stays out there.</summary>
+	private static bool UnderOrInside => _atmo != null && IsInstanceValid(_atmo) && _atmo.Indoors > 0.5f;
+	private static World.ForestAtmosphere _atmo;
 
 	/// <summary>Whether the story lets it follow yet: only in the Hollow, and only once the lantern and the compass
 	/// are both in hand (Dan, 2026-09-22: it starts stalking soon after those pickups, not before).</summary>
@@ -491,6 +498,7 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 			_listening = true;
 		}
 
+		if (_atmo == null || !IsInstanceValid(_atmo)) _atmo = GetTree().GetFirstNodeInGroup("atmosphere") as World.ForestAtmosphere;
 		float speed = TrackSpeed(dt);
 		// Indoors, or in the bunker, there is nothing of it at all: no sound, no body, until you come back out.
 		if (Inert)

@@ -173,7 +173,7 @@ def build_body(m):
             y, w, h = torso_at(z)
             # round the side just under the skin, sloping back toward the hips
             pts = [P(s * w * 0.35, y + h * 0.92, z), P(s * w * 0.9, y + h * 0.45, z + 0.012), P(s * w * 1.0, y - h * 0.15, z + 0.025), P(s * w * 0.75, y - h * 0.6, z + 0.04)]
-            parts.append(chain(f"Rib{s}{i}", pts, [0.008] * 4, subdiv=0))
+            parts.append(chain(f"Rib{s}{i}", pts, [0.011, 0.011, 0.01, 0.008], subdiv=0))   # (2026-10-15: standing out a little more)
     # the neck, hung down and forward, its cords standing out
     parts.append(chain("Neck", [NECK0 + P(0, 0.02, 0.04), NECK0, NECK0.lerp(NECK1, 0.5) + P(0, 0.01, 0), NECK1, HEAD + P(0, 0.03, 0.03)], [0.06, 0.05, 0.042, 0.04, 0.045]))
     for s in (-1, 1):
@@ -184,15 +184,29 @@ def build_body(m):
         thick = 0.046 if L["kind"] == "arm" else 0.058
         parts.append(chain(f"Limb{L['kind']}{L['s']}", [r0, r0.lerp(kn, 0.25), r0.lerp(kn, 0.6), r0.lerp(kn, 0.9), kn, kn.lerp(ft, 0.2), kn.lerp(ft, 0.55), kn.lerp(ft, 0.9), ft + P(0, 0.02, 0)],
                            [thick * 1.15, thick, thick * 0.82, thick * 0.62, thick * 0.66, thick * 0.72, thick * 0.6, thick * 0.42, thick * 0.4]))
-        # the joint's bone under the skin (not a ball: a knob on the outside of it)
+        # the joint's bone under the skin (not a ball: a knob on the outside of it); (2026-10-15, slight pass: a point,
+        # the elbow's olecranon or the kneecap, standing out further, longer than wide)
         out = (kn - (r0 + ft) * 0.5).normalized()
-        parts.append(lumpy_sphere(f"Joint{L['kind']}{L['s']}", kn + out * thick * 0.25, R(thick * 0.62, thick * 0.6, thick * 0.66), None, 40 + L["s"], amp=0.12, subdiv=3))
+        # (the owner: no balls on tubes at the joints) a low point, narrower than the limb, fused into the bend
+        parts.append(lumpy_sphere(f"Joint{L['kind']}{L['s']}", kn + out * thick * 0.2, R(thick * 0.5, thick * 0.5, thick * 0.72), None, 40 + L["s"], amp=0.1, subdiv=3))
+        # (2026-10-15) bone under skin, not a tube: the shin's (or the forearm's) ridge down its outside, two knobs of
+        # the wrist (or the ankle) above the hand, and the last of a wasted muscle swelling just below the root
+        ridge = out * thick * 0.5
+        parts.append(chain(f"Ridge{L['kind']}{L['s']}", [kn.lerp(ft, 0.1) + ridge, kn.lerp(ft, 0.45) + ridge * 0.85, kn.lerp(ft, 0.8) + ridge * 0.55],
+                           [thick * 0.26, thick * 0.22, thick * 0.17]))
+        across = (ft - kn).normalized().cross(out).normalized()
+        for k2, sgn in enumerate((-1, 1)):
+            parts.append(lumpy_sphere(f"Wrist{L['kind']}{L['s']}{k2}", kn.lerp(ft, 0.9) + across * sgn * thick * 0.42, R(thick * 0.3, thick * 0.28, thick * 0.3), None, 48 + L["s"] * 2 + k2, amp=0.1, subdiv=2))
+        parts.append(lumpy_sphere(f"Wasted{L['kind']}{L['s']}", r0.lerp(kn, 0.3) - out * thick * 0.15, R(thick * 1.02, thick * 0.95, thick * 1.6), None, 52 + L["s"], amp=0.1, subdiv=3))
         # the root's mass: the shoulder (or the haunch) the limb comes out of
-        parts.append(lumpy_sphere(f"Root{L['kind']}{L['s']}", r0.lerp(kn, 0.08) + P(0, 0.02, 0), R(thick * 1.5, thick * 1.3, thick * 1.5), None, 44 + L["s"], amp=0.08, subdiv=3))
+        # (2026-10-15: smaller and longer along the limb, so the shoulder or haunch flows into it, not a ball on it)
+        parts.append(lumpy_sphere(f"Root{L['kind']}{L['s']}", r0.lerp(kn, 0.1) + P(0, 0.015, 0), R(thick * 1.2, thick * 1.05, thick * 1.55), None, 44 + L["s"], amp=0.06, subdiv=3))
         for k, off in enumerate((P(0.012, 0.01, 0), P(-0.012, 0.012, 0))):
             parts.append(chain(f"Tendon{L['kind']}{L['s']}{k}", [kn.lerp(ft, 0.12) + off, kn.lerp(ft, 0.8) + off * 0.6], [0.008, 0.006]))
     body = join(parts, "Body")
-    remesh(body, 0.0055)
+    # (2026-10-15, the owner: joints "too cylindrical and polygonal") a finer voxel and more smoothing: the knobs, the
+    # wasted muscle and the ridges fillet into the limb (elbows and knees were balls stuck on tubes)
+    remesh(body, 0.005, 7)
     body.data.materials.clear()
     body.data.materials.append(m["skin"])
     print(f"[crawler] body remeshed: {len(body.data.polygons)} faces")
@@ -211,7 +225,7 @@ def build_hands(m):
             for q in pts[1:-1]:
                 parts.append(lumpy_sphere("Knuckle", q + P(0, 0.004, 0), (0.0138, 0.0128, 0.0138), None, 60 + k, amp=0.1, subdiv=2))
         hand = join(parts, f"Hand{L['kind']}{L['s']}")
-        remesh(hand, 0.0028, 3)
+        remesh(hand, 0.0028, 5)
         hand.data.materials.clear()
         hand.data.materials.append(m["skin"])
         nails = []
@@ -243,6 +257,11 @@ def build_head(m):
         v.co = H(c.x, c.z, c.y)
     parts = [skull]
     parts.append(lumpy_sphere("Cheeks", H(0, -0.045, 0.06), R(0.065, 0.045, 0.05), None, 34, amp=0.05, subdiv=3))
+    # (2026-10-15, slight pass, the stalker's skull for reference) a heavy brow over the sockets, and the cheekbones
+    # standing out over hollows
+    parts.append(lumpy_sphere("Brow", H(0, 0.036, 0.088), R(0.074, 0.018, 0.026), None, 37, amp=0.08, subdiv=3))
+    for sx in (-1, 1):
+        parts.append(lumpy_sphere(f"Cheekbone{sx}", H(sx * 0.058, -0.012, 0.07), R(0.02, 0.014, 0.022), None, 38 + sx, amp=0.08, subdiv=2))
     head = join(parts, "Head")
     remesh(head, 0.003, 3)
     # the sockets: pushed deep
@@ -257,6 +276,10 @@ def build_head(m):
             d = ((lx - sx) / 0.025) ** 2 + ((ly - 0.012) / 0.021) ** 2
             if d < 1.0:
                 v.co = V(v.co) - face * 0.03 * (1 - d) ** 0.5
+            # (2026-10-15) the hollow under each cheekbone, sucked in
+            d2 = ((lx - sx * 1.35) / 0.024) ** 2 + ((ly + 0.05) / 0.028) ** 2
+            if d2 < 1.0 and lz < 0.11:
+                v.co = V(v.co) - face * 0.012 * (1 - d2) + side * (-1 if sx > 0 else 1) * 0.008 * (1 - d2)
     bm.to_mesh(head.data)
     bm.free()
     head.data.materials.clear()
@@ -265,15 +288,15 @@ def build_head(m):
     # (a mandible: a curved shelf of bone under skin, hinged far back, hanging open far too low)
     jparts = []
     for sx in (-1, 1):
-        jparts.append(chain(f"Ramus{sx}", [H(sx * 0.062, -0.03, -0.01), H(sx * 0.06, -0.1, 0.02), H(sx * 0.05, -0.16, 0.06)], [0.016, 0.018, 0.02]))
-    jparts.append(lumpy_sphere("Chin", H(0, -0.19, 0.07), R(0.05, 0.03, 0.04), None, 36, amp=0.06, subdiv=3))
+        jparts.append(chain(f"Ramus{sx}", [H(sx * 0.062, -0.03, -0.01), H(sx * 0.06, -0.1, 0.02), H(sx * 0.05, -0.18, 0.06)], [0.016, 0.018, 0.02]))
+    jparts.append(lumpy_sphere("Chin", H(0, -0.21, 0.07), R(0.05, 0.03, 0.04), None, 36, amp=0.06, subdiv=3))
     jaw = join(jparts, "Jaw")
     remesh(jaw, 0.003, 3)
     jaw.data.materials.clear()
     jaw.data.materials.append(m["skin"])
-    mouth = lumpy_sphere("Mouth", H(0, -0.11, 0.04), R(0.042, 0.06, 0.03), m["dark"], 35, amp=0.1, subdiv=3)
+    mouth = lumpy_sphere("Mouth", H(0, -0.12, 0.04), R(0.042, 0.07, 0.03), m["dark"], 35, amp=0.1, subdiv=3)
     teeth = []
-    for row, (ya, za, ln) in (("upper", (-0.045, 0.085, -1)), ("lower", (-0.185, 0.085, 1))):
+    for row, (ya, za, ln) in (("upper", (-0.045, 0.085, -1)), ("lower", (-0.205, 0.085, 1))):
         for i in range(11):
             x = -0.042 + 0.084 * i / 10 + rnd.uniform(-0.003, 0.003)
             curve = 0.02 * (x / 0.042) ** 2
@@ -409,6 +432,10 @@ def main():
         add_mod(o, "DECIMATE", ratio=min(1.0, target / max(W.tri_count(o), 1)))
         apply_mods(o)
     low = join([body] + flesh_hands + rigid, "CrawlerMesh")
+    # (2026-10-15) the joined, decimated mesh can come out with invalid faces (glTF then drops it whole: "Mesh ... is not
+    # valid ... has no primitives"); repaired before it's unwrapped, baked and exported
+    if low.data.validate(verbose=True, clean_customdata=False):
+        print("[crawler] the joined mesh needed repairs (validated)")
     bpy.ops.object.select_all(action="DESELECT")
     low.select_set(True)
     bpy.context.view_layer.objects.active = low

@@ -43,12 +43,34 @@ uniform float throb = 1.0;
 /// limb's rest pose (CUSTOM0 position, CUSTOM1 normal), so it stays on the flesh as the limb bends instead of swimming.
 uniform bool rest_space = false;
 
+/// (2026-10-15, the lake's limbs: "less robotic") a slow swallowing bulge travelling up a skinned limb (rest space only;
+/// 0 = off), each limb its own phase; and the thin flesh toward the tips letting more red through when lit from behind.
+uniform float pulse_amp = 0.0;
+uniform float pulse_speed = 1.4;
+instance uniform float pulse_phase = 0.0;
+uniform float thin_glow = 0.0;
+
+/// (2026-10-15) the Blender limb (tools/Blender/tentacle.py) paints its sucker cups into the vertex colour: red the raised
+/// rim, green the wet pit. Off for everything else (a mesh with no colours reads as white, which would be all cup).
+uniform bool vc_suckers = false;
+uniform vec4 sucker_rim : source_color = vec4(0.5, 0.17, 0.19, 1.0);
+uniform vec4 sucker_pit : source_color = vec4(0.12, 0.01, 0.025, 1.0);
+
 varying vec3 v_obj;
 varying vec3 v_nrm;
+varying float v_rad;
+varying vec2 v_cup;
 
 void vertex() {
+	v_cup = vc_suckers ? COLOR.rg : vec2(0.0);
 	v_obj = rest_space ? CUSTOM0.xyz : VERTEX;
 	v_nrm = rest_space ? CUSTOM1.xyz : NORMAL;
+	v_rad = rest_space ? length(CUSTOM0.xz) : 1.0;
+	if (rest_space && pulse_amp > 0.0) {
+		float w = sin(CUSTOM0.y * 0.9 - TIME * pulse_speed + pulse_phase);
+		float bulge = pow(max(w, 0.0), 3.0);
+		VERTEX += NORMAL * pulse_amp * v_rad * bulge * 2.0;
+	}
 	cd_p = v_obj; cd_n = v_nrm; cd_k = 0.0; cd_t = vec4(0.0);
 }
 
@@ -136,6 +158,10 @@ void fragment() {
 	col = mix(grime.rgb * 0.6, col, mix(0.55, 1.0, d.occ));
 	slime = max(slime * (0.7 + 0.6 * d.wet), (1.0 - d.occ) * 0.6 * (1.0 - r1 * 0.7));
 
+	// the sucker cups painted in by the Blender limb: a paler, wet rim round a dark pit (rotting with the rest)
+	col = mix(col, mix(sucker_rim.rgb, rotted, r1 * 0.6) * (0.85 + 0.3 * n4), clamp(v_cup.r, 0.0, 1.0));
+	col = mix(col, sucker_pit.rgb, clamp(v_cup.g, 0.0, 1.0));
+	slime = max(slime, clamp(v_cup.r + v_cup.g, 0.0, 1.0));
 	ALBEDO = col;
 	ROUGHNESS = mix(0.42, 0.06, slime) + r1 * 0.3;
 	SPECULAR = 0.6 + sorePat * 0.3;
@@ -144,6 +170,6 @@ void fragment() {
 	RIM = mix(0.7, 0.2, r1);
 	RIM_TINT = 0.6;
 	// thin flesh: a little light comes through, red
-	BACKLIGHT = flesh.rgb * 0.45 * (1.0 - dorsal) * (1.0 - r1 * 0.6);
+	BACKLIGHT = flesh.rgb * 0.45 * (1.0 - dorsal) * (1.0 - r1 * 0.6) * (1.0 + thin_glow * 1.6 * (1.0 - smoothstep(0.18, 0.6, v_rad)));
 	EMISSION = vec3(0.35, 0.03, 0.03) * veins * beat * 0.05 * (1.0 - dorsal * 0.7) * (1.0 - r1 * 0.5);
 }

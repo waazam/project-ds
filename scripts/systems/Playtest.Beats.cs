@@ -78,7 +78,7 @@ public partial class Playtest
 			new("13a", 13, "Act 13: the knife, the tape, the basement wheel, the clock's key, Room 1's box and button", At(13), 170, Act13a),
 			new("13b", 13, "Act 13: Room 2 flooded (reload), the cryptex, the lighter, the web, the step, the hand, the eye, the iron door", At(Checkpoint.Act13Room1Solved, room1Solved, Gear + ";tools=Knife"), 240, Act13b),
 			new("14", 14, "Act 14: the stairwell, the flame dies, the gap: across; Continue; down", At(14), 200, Act14),
-			new("15", 15, "Act 15: the shadow man, red light green light (taken: reload), the closet", At(15), 260, Act15),
+			new("15", 15, "Act 15: the stalker in the hall, red light green light (taken: reload), the closet", At(15), 260, Act15),
 			new("16", 16, "Act 16: the closet's switch and door, into the sewer", At(16), 80, Act16),
 			new("17", 17, "Act 17: the sewer: wading, the hole: no, yes-no, yes-yes", At(17), 110, Act17),
 			new("18", 18, "Act 18: the pit: crushed by a slam (reload), ten valves, the door", At(18), 300, Act18),

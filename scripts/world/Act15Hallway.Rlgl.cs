@@ -152,7 +152,7 @@ public partial class Act15Hallway
 		la.X = Mathf.Clamp(la.X, -W2 * 0.5f + 0.45f, W2 * 0.5f - 0.45f);
 		la.Y = 0f;
 		_shadow.StandAt(ToGlobal(la), player.GlobalPosition);
-		Sfx("shadow_breath", 2, _shadow.GlobalPosition + Vector3.Up * 1.8f, _step == ApproachDist.Length - 1 ? -4f : -12f, 2f);
+		Rattle(_step == ApproachDist.Length - 1 ? -4f : -12f);
 	}
 
 	private void GoGreen(PlayerController player)
@@ -183,9 +183,9 @@ public partial class Act15Hallway
 	private async Task Taken(PlayerController player, CancellationToken ct)
 	{
 		PlayerDeath.Begin();
-		GD.Print("[story] Act 15: moved in the red - the shadow man takes them");
+		GD.Print("[story] Act 15: moved in the red - it takes them");
 		var rig = player.CameraRig;
-		Vector3 head = _shadow.GlobalPosition + Vector3.Up * 1.9f;
+		Vector3 head = _shadow.EyesAt;
 		Sfx("shadow_strike", 1, head, 2f, 4f);
 		double t = 0;
 		while (t < 0.45)
@@ -208,7 +208,7 @@ public partial class Act15Hallway
 			_shadow.GlobalPosition = from.Lerp(toward, u * 0.6f);
 		}
 		StoryBeat.Fader(this)?.SetBlack(true);
-		await PlayerDeath.Reload(this, "The Shadowman Taketh", ct);
+		await PlayerDeath.Reload(this, "It Taketh", ct);   // (2026-10-15: it is the stalker now, not the shadow man)
 	}
 
 	private void OnDoorUsed(PlayerController player)

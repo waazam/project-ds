@@ -38,12 +38,20 @@ public partial class GiantStalkerEvent : Node
 	/// <summary>How far past the cabin (from the lookout's side) it crosses: about 150 m from the lookout.</summary>
 	[Export] public float BeyondCabin = 70f;
 	[Export] public float SweepWidth = 60f;   // within about 11 degrees of the fire's bearing: the one open sky lane from the lookout (2026-09-22)
-	[Export] public float DurationSeconds = 50f;   // one slow pass of the lane; it repeats until the player has reached the lookout (2026-09-22)
+	/// <summary>(2026-10-15) One step of its walk, in seconds: ponderous (a 55 m thing's step is 15 m; at 6 s a step it walks
+	/// 2.5 m/s, a slow, heavy third of a human-scaled pace for its size, and stays in the lookout's sky gap ~12 s a pass).
+	/// Its speed follows from this and the clip's stride, so the feet never slide.</summary>
+	[Export] public float StepSeconds = 6f;
+	/// <summary>The radius of its slow half-turns at the ends of the lane (away from the lookout, into the murk).</summary>
+	[Export] public float TurnRadius = 14f;
+	/// <summary>Once the player is at the lookout, how long it walks on in sight before it may turn away and dissolve.</summary>
+	[Export] public float WatchSeconds = 30f;
+	/// <summary>How much of the giant's own build it takes (0 = the stalker scaled up; 1 = its giant proportions: StalkerBody.GiantForm).</summary>
+	[Export] public float GiantForm = 1f;
 	/// <summary>Dither-in over this many seconds as it walks in out of the murk (never a pop).</summary>
 	[Export] public float EmergeSeconds = 7f;
 	/// <summary>Dither-out over this many seconds as it walks on out of the lane, once released.</summary>
 	[Export] public float DissolveSeconds = 5f;
-	[Export] public Vector2 ThudInterval = new(1.3f, 1.9f);
 	/// <summary>Fog over its hide (giant_skin haze): 0.75 = a shadow in the murk, barely more than a shape.</summary>
 	[Export] public float Haze = 0.75f;
 	/// <summary>Shading left in the shape (0 = a flat cut-out).</summary>
@@ -340,11 +348,27 @@ public partial class GiantStalkerEvent : Node
 		fwd = fwd.LengthSquared() > 0.01f ? fwd.Normalized() : Vector3.Forward;
 		Vector3 centre = cabin.GlobalPosition + fwd * BeyondCabin;
 		Vector3 right = fwd.Cross(Vector3.Up).Normalized();
-		Vector3 start = centre - right * SweepWidth * 0.5f;
-		Vector3 end = centre + right * SweepWidth * 0.5f;
-		Vector3 walkDir = right;
+		// (2026-10-15, the owner: "its giant walk not in sync with its speed") a loop it walks round, never a pivot: the lane
+		// across the sky behind the fire, a slow half-turn away into the murk, back along a lane behind it, and a half-turn
+		// back into the first (a stadium: two straights, two half-circles of TurnRadius).
+		float R = TurnRadius, W = SweepWidth;
+		Vector3 a0 = centre - right * W * 0.5f, a1 = centre + right * W * 0.5f;
+		Vector3 back = fwd * (2f * R);
+		float loop = 2f * W + 2f * Mathf.Pi * R;
 		float Ground(Vector3 p) => terrain?.HeightAt(p.X, p.Z) ?? p.Y;
-		start.Y = Ground(start); end.Y = Ground(end);
+		// where it is s metres round the loop, which way it faces, and which of the four pieces it's on (0, 2 straights)
+		(Vector3 p, Vector3 t, int seg) At(float s)
+		{
+			s = Mathf.PosMod(s, loop);
+			float arc = Mathf.Pi * R;
+			if (s < W) return (a0 + right * s, right, 0);
+			s -= W;
+			if (s < arc) { float th = s / R; return (a1 + fwd * R + (-fwd * Mathf.Cos(th) + right * Mathf.Sin(th)) * R, (fwd * Mathf.Sin(th) + right * Mathf.Cos(th)).Normalized(), 1); }
+			s -= arc;
+			if (s < W) return (a1 + back - right * s, -right, 2);
+			s -= W;
+			{ float th = s / R; return (a0 + fwd * R + (fwd * Mathf.Cos(th) - right * Mathf.Sin(th)) * R, (-fwd * Mathf.Sin(th) - right * Mathf.Cos(th)).Normalized(), 3); }
+		}
 
 		var skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/giant_skin.gdshader") };
 		// A shadow in the murk (Dan, 2026-09-22: "way more foggy, more like a shadow, less visible"): most of
@@ -356,26 +380,29 @@ public partial class GiantStalkerEvent : Node
 		skin.SetShaderParameter("face_tint", new Color(0.14f, 0.14f, 0.15f));
 		skin.SetShaderParameter("visibility", 0f);   // it walks in out of the murk: the dither brings it up over EmergeSeconds
 		skin.SetShaderParameter("wetness", 0.1f);
-		skin.SetShaderParameter("eye_glow", 0f);
-		var body = new StalkerBody { Name = "Act7Giant", Skin = skin, Size = BodyScale, SwaySeconds = 22f, SwayDegrees = 0.8f, HeadDriftDegrees = 1.5f, WalkAmount = 1f };
+		// (2026-10-15) the eyes the one crisp thing in the murk: a dull ember, not a beacon
+		skin.SetShaderParameter("eye_glow", 0.55f);
+		skin.SetShaderParameter("eye_color", new Color(0.85f, 0.32f, 0.12f));
+		var body = new StalkerBody { Name = "Act7Giant", Skin = skin, Size = BodyScale, SwaySeconds = 22f, SwayDegrees = 0.8f, HeadDriftDegrees = 1.5f, WalkAmount = 1f, GiantForm = GiantForm };
 		// Must be in the tree before GlobalPosition/LookAt: Godot can't resolve a global transform
 		// for an orphan node, and silently no-ops (with a console warning) instead.
 		Cutscene.SceneRoot(this).AddChild(body);
 		Body = body;
 		// the camera can take it: a speck on the skyline unless you zoom right in
 		World.PhotoSubject.Attach(body, "giant", new Vector3(0, 1.2f * BodyScale, 0), 10f, 700f, 18f, false, new Vector3(0, 1.8f * BodyScale, 0));
+		var air = AttachAir(body, skin, fwd);
 		try
 		{
-			body.GlobalPosition = start;
-			// StalkerBody faces +Z: LookAt aims -Z, so look away from the walk to face along it.
-			body.LookAt(body.GlobalPosition - walkDir, Vector3.Up);
-			Basis facing = body.GlobalBasis;
+			var (p0, t0, _) = At(0f);
+			p0.Y = Ground(p0);
+			body.GlobalPosition = p0;
+			body.GlobalBasis = Basis.LookingAt(-t0, Vector3.Up);
 
 			var steps = new List<AudioStream>();
 			foreach (var name in new[] { "giant_step_01", "giant_step_02", "giant_step_03" })
 			{
-				string p = $"res://assets/audio/sfx/{name}.wav";
-				if (ResourceLoader.Exists(p)) steps.Add(GD.Load<AudioStream>(p));
+				string sp = $"res://assets/audio/sfx/{name}.wav";
+				if (ResourceLoader.Exists(sp)) steps.Add(GD.Load<AudioStream>(sp));
 			}
 			var voice = new AudioStreamPlayer3D { Bus = "Unnatural", UnitSize = 40f, MaxDistance = 400f, TopLevel = true };
 			body.AddChild(voice);
@@ -384,82 +411,89 @@ public partial class GiantStalkerEvent : Node
 			GD.Print("[story] Act 7: the giant crosses beyond the burning cabin");
 			// Its rattle from its head as it walks: deep, loud, distant, in bursts; fades out over 3 s as it goes.
 			var rattle = StartRattle(Cutscene.SceneRoot(this), body.EyesWorld, RattleDb, 2f);
-			// The stride: the gait phase advances pi per step; a step's length in time is rolled at each
-			// footfall (ThudInterval), and the thud plays exactly where the phase crosses a footfall, so the
-			// sound lands when the foot does. The body dips onto each planted foot and rises between.
-			double t = 0, phase = 0, stepSeconds = _rng.RandfRange(ThudInterval.X, ThudInterval.Y);
-			int footfalls = 0;
+			// The gait locked to the ground it covers: the walk clip's step is StepLength (0.6 m a unit of size, measured from
+			// its feet: creature_preview --giant-walk), a footfall at every pi of the phase (the right foot at 0, the left at pi),
+			// so the phase is pi per StepLength walked and the feet never slide. A step takes StepSeconds (ponderous), which sets
+			// its speed. Each thud is the planted foot's, heard when its sound has crossed the distance (343 m/s).
+			float stepLen = body.StepLength;
+			float speed = stepLen / Mathf.Max(StepSeconds, 0.5f);
+			double walked = 0, life = 0;
+			int footfalls = 0, turns = 0, lastSeg = 0;
+			var pending = new List<(double at, Vector3 where)>();
 			float height = BodyScale * 2.2f;
 			float bobAmp = height * BobFraction, rollAmp = Mathf.DegToRad(RollDegrees), leanAmp = Mathf.DegToRad(LeanDegrees);
 			// Where the soles sit under the origin: the feet are authored around y = 0, so sink them a little
 			// into the undergrowth rather than letting a toe hover on it.
 			float sink = BodyScale * SoleSink;
-			// The timeline (Dan, 2026-09-22: it must already be seen from a distance, never flash in): it is walking the
-			// lane from the moment checkpoint 6 arms it, dithering IN over EmergeSeconds as it comes out of the murk; each
-			// pass of the lane takes DurationSeconds and the passes repeat (turning at each end) until the player has
-			// stood at the lookout (Released); the pass under way then finishes, and it dithers OUT over DissolveSeconds
-			// as it walks on out of the lane. Every appearance and disappearance is a fade, never a jump.
-			int pass = 0;
+			// The timeline (Dan, 2026-09-22: it must already be seen from a distance, never flash in): it is walking from the
+			// moment checkpoint 6 arms it, dithering IN over EmergeSeconds as it comes out of the murk, round its loop until the
+			// player has stood at the lookout (Released); then, as it next turns away into the murk, it dithers OUT over
+			// DissolveSeconds. Every appearance and disappearance is a fade, never a jump.
 			bool dissolving = false;
-			double dissolveT = 0;
+			double dissolveT = 0, releasedFor = 0;
 			float vis = 0f;
-			double life = 0;
 			while (true)
 			{
 				float dt = (float)GetProcessDeltaTime();
-				t += dt; life += dt;
-				if (t >= DurationSeconds)
-				{
-					if (_released || dissolving) break;
-					// Turn at the end of the lane and walk back (a new pass); the player has not reached the lookout yet.
-					t = 0; pass++;
-					(start, end) = (end, start);
-					walkDir = -walkDir;
-					body.LookAt(body.GlobalPosition - walkDir, Vector3.Up);
-					facing = body.GlobalBasis;
-				}
-				// Released: begin dissolving so that it is gone by the time this pass ends (or after DissolveSeconds at least).
-				if (_released && !dissolving && (DurationSeconds - t) <= DissolveSeconds) { dissolving = true; dissolveT = 0; }
+				life += dt;
+				double before = walked;
+				walked += speed * dt;
+				var (p, tangent, seg) = At((float)walked);
+				bool turning = seg != lastSeg && seg is 1 or 3;
+				if (turning) turns++;
+				// Released: it walks on a while for them to watch (WatchSeconds), then dissolves as it next turns away into the
+				// murk (or WatchSeconds + 25 s at the latest)
+				if (_released) releasedFor += dt;
+				if (_released && !dissolving && ((turning && releasedFor >= WatchSeconds) || releasedFor > WatchSeconds + 25.0)) { dissolving = true; dissolveT = 0; }
+				lastSeg = seg;
 				if (dissolving) { dissolveT += dt; if (dissolveT >= DissolveSeconds) break; }
 				vis = dissolving
 					? Visibility * Mathf.Clamp(1f - (float)(dissolveT / DissolveSeconds), 0f, 1f)
 					: Visibility * Mathf.Clamp((float)(life / EmergeSeconds), 0f, 1f);
 				skin.SetShaderParameter("visibility", vis);
-				double before = phase;
-				phase += Mathf.Pi * dt / stepSeconds;
-				bool footDown = (int)(phase / Mathf.Pi) > (int)(before / Mathf.Pi);
-				float u = (float)(t / DurationSeconds);
-				Vector3 p = start.Lerp(end, u);
+				double phase = Mathf.Pi * walked / stepLen, phaseBefore = Mathf.Pi * before / stepLen;
+				int k0 = (int)System.Math.Floor(phaseBefore / Mathf.Pi), k1 = (int)System.Math.Floor(phase / Mathf.Pi);
 				// Feet on the ground: the lowest of the two soles' ground heights, so a foot never hangs over a dip.
-				Vector3 side = fwd * (0.15f * BodyScale);   // across the walk (the walk runs along right)
-				float ground = Mathf.Min(Ground(p - side), Ground(p + side));
+				Vector3 across = tangent.Cross(Vector3.Up).Normalized() * (0.15f * BodyScale);
+				float ground = Mathf.Min(Ground(p - across), Ground(p + across));
 				float land = Mathf.Abs(Mathf.Sin((float)phase));   // 0 at each footfall, 1 mid-stride
 				p.Y = ground - sink + bobAmp * land;
 				body.GlobalPosition = p;
 				// Roll onto the planted foot (alternating sides), lean into the walk, a breath of yaw with the swing.
 				float swing = Mathf.Sin((float)phase);
-				body.GlobalBasis = facing * Basis.FromEuler(new Vector3(leanAmp, 0.02f * swing, rollAmp * swing));
-				body.WalkPhase = (float)phase;
-				voice.GlobalPosition = p;
+				body.GlobalBasis = Basis.LookingAt(-tangent, Vector3.Up) * Basis.FromEuler(new Vector3(leanAmp, 0.02f * swing, rollAmp * swing));
+				body.WalkPhase = Mathf.PosMod((float)phase, Mathf.Tau);
 				TickRattle(rattle, body.EyesWorld, dt);
 				if (dissolving && rattle != null) { StopRattle(rattle, DissolveSeconds); rattle = null; }
-				if (footDown && steps.Count > 0)
+				TickAir(air, body, vis, dt);
+				// a footfall: the foot that came down (the right on even steps), heard when its sound arrives
+				for (int k = k0 + 1; k <= k1; k++)
 				{
 					footfalls++;
-					stepSeconds = _rng.RandfRange(ThudInterval.X, ThudInterval.Y);
+					Vector3 foot = body.BoneWorld(k % 2 == 0 ? "foot_R" : "foot_L");
+					var cam = GetViewport()?.GetCamera3D();
+					double delay = cam != null ? cam.GlobalPosition.DistanceTo(foot) / 343.0 : 0.0;
+					pending.Add((life + delay, foot));
+				}
+				for (int i = pending.Count - 1; i >= 0; i--)
+				{
+					if (pending[i].at > life || steps.Count == 0) continue;
+					voice.GlobalPosition = pending[i].where;
 					voice.Stream = steps[_rng.RandiRange(0, steps.Count - 1)];
 					voice.VolumeDb = _rng.RandfRange(-4f, 0f);   // felt more than heard: never a gunshot
-					voice.PitchScale = _rng.RandfRange(0.85f, 1.0f);
+					voice.PitchScale = _rng.RandfRange(0.8f, 0.95f);
 					voice.Play();
+					pending.RemoveAt(i);
 				}
 				await Cutscene.Frame(this, ct);
 			}
-			GD.Print($"[story] Act 7: the giant is gone ({footfalls} footfalls, {pass + 1} pass(es), {life:0} s out there)");
+			GD.Print($"[story] Act 7: the giant is gone ({footfalls} footfalls, {turns} turn(s), {walked:0} m at {speed:0.0} m/s, a step {stepLen:0.0} m every {StepSeconds:0.0} s, {life:0} s out there)");
 			StopRattle(rattle, 3f);
 		}
 		finally
 		{
 			Body = null;
+			if (IsInstanceValid(air)) air.QueueFree();
 			if (IsInstanceValid(body)) body.QueueFree();
 		}
 		StoryManager.Instance?.MarkGiantEventDone();

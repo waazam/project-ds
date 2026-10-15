@@ -207,7 +207,7 @@ public partial class CreaturePreview
 
 		if (DetailWants("shadow"))
 		{
-			var sm = new ShadowMan { Name = "ShadowMan" };
+			var sm = new HallStalker { Name = "HallStalker" };
 			AddChild(sm);
 			await Seconds(1.0);
 			sm.StandAt(new Vector3(320, 0, 0), new Vector3(320, 0, 10));

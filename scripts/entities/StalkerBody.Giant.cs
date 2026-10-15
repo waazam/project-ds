@@ -103,11 +103,37 @@ public partial class StalkerBody
 		_jawReady = true;
 	}
 
+	/// <summary>(2026-10-15, the owner: "the giant stalker could use some work") 0 .. 1: the giant's own build over the
+	/// stalker's (a 2.4 m thing scaled x25 reads as a small thing made big: stick limbs, a small thing's carriage): hunched
+	/// heavy over its chest, the neck drawn out and the head carried low and forward, the arms longer and heavier, the
+	/// shoulders broader. Uniform bone scales only (a squashed bone shears every joint under it). 0 for every normal stalker.</summary>
+	public float GiantForm { get; set; }
+
+	private void GiantBuild(float g, Vector3 side)
+	{
+		int spine = Bone("spine"), neck = Bone("neck");
+		// the hunch: bowed over its chest (the head comes back up to look ahead, below)
+		if (spine >= 0) TurnBone(spine, side, 0.12f * g);
+		if (_bChest >= 0) TurnBone(_bChest, side, 0.2f * g);
+		// the neck drawn out, the head carried low and forward
+		if (_bNeck2 >= 0) _skel.SetBonePosePosition(_bNeck2, _skel.GetBonePosePosition(_bNeck2) * (1f + 0.35f * g));
+		if (_bHead >= 0) _skel.SetBonePosePosition(_bHead, _skel.GetBonePosePosition(_bHead) * (1f + 0.25f * g));
+		if (neck >= 0) TurnBone(neck, side, -0.16f * g);
+		if (_bHead >= 0) TurnBone(_bHead, side, -0.12f * g);
+		// the shoulders broader, the arms longer and heavier (whole chains, uniformly)
+		foreach (var (bone, s) in new[] { ("clav_R", 0.16f), ("clav_L", 0.16f), ("upper_R", 0.2f), ("upper_L", 0.2f) })
+		{
+			int b = Bone(bone);
+			if (b >= 0) _skel.SetBonePoseScale(b, Vector3.One * (1f + s * g));
+		}
+	}
+
 	/// <summary>Before the look: the spine bowed, the shoulder hitched, the neck drawn out.</summary>
 	private void GiantPre()
 	{
 		Vector3 side = _skel.GlobalBasis.Inverse() * GlobalBasis.X;
 		Vector3 fwd = _skel.GlobalBasis.Inverse() * GlobalBasis.Z;
+		if (GiantForm > 1e-4f) GiantBuild(GiantForm, side);
 		int spine = Bone("spine");
 		if (Mathf.Abs(SpineBow) > 1e-4f)
 		{
@@ -192,5 +218,32 @@ public partial class StalkerBody
 				Vector3 fwd = _skel.GetBoneGlobalPose(c).Basis.Z.Normalized();
 				TurnBone(c, fwd, 0.03f * b * (c == cr ? 1f : -1f));
 			}
+	}
+
+	/// <summary>One sample of the walk clip: its phase (0..2pi over the clip, a step per pi) and each foot in the body's own
+	/// space at Size 1 (+Z ahead, +Y up).</summary>
+	public readonly record struct WalkSample(float Phase, Vector3 FootR, Vector3 FootL);
+
+	/// <summary>(2026-10-15) Samples the "walk" clip over one cycle (the pose read straight from the clip, nothing layered
+	/// on it), for walking it at any size without the feet sliding; empty when it isn't rigged.</summary>
+	public System.Collections.Generic.List<WalkSample> SampleWalk(int samples = 64)
+	{
+		var list = new System.Collections.Generic.List<WalkSample>();
+		if (_anim == null || _skel == null || _anim.GetAnimation("walk") is not { } walk) return list;
+		int fr = Bone("foot_R"), fl = Bone("foot_L");
+		if (fr < 0 || fl < 0) return list;
+		float len = (float)walk.Length;
+		var toBody = GlobalTransform.AffineInverse() * _skel.GlobalTransform;
+		float k = 1f / Mathf.Max(Size, 1e-4f);
+		for (int i = 0; i < samples; i++)
+		{
+			float u = (float)i / samples;
+			_skel.ResetBonePoses();
+			_anim.Play("walk", 0.0);
+			_anim.Seek(u * len, true);
+			_anim.Advance(0.0);
+			list.Add(new WalkSample(u * Mathf.Tau, toBody * _skel.GetBoneGlobalPose(fr).Origin * k, toBody * _skel.GetBoneGlobalPose(fl).Origin * k));
+		}
+		return list;
 	}
 }

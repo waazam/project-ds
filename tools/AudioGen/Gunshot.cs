@@ -22,9 +22,60 @@ public static class Gunshot
 {
 	static double[] Buf(int sr, double sec) => new double[(int)(sec * sr)];
 
-	public static double[] RifleDistant(Rng r, int sr)
+	/// <summary>One of the owner's options (2026-10-15c, "we only need 1 but give me options"): how far, how many echoes off the
+	/// hills and how soon, how long the roll, how much knock under the pop.</summary>
+	public sealed record Style(double Metres, int Echoes, double EchoAt, double EchoGap, double Tail, double Room, double Boom);
+
+	/// <summary>The far rifle as it was before 2026-10-15 (Sfx.RifleDistant, the owner's favourite: "use our original sound
+	/// before we changed it today and try to mimic it"): a hard crack, a punchy boom with mid-range to carry, one soft
+	/// smeared reflection off the far ridge, a dark diffuse roll, the whole soft-clipped loud. The knobs make its close
+	/// variations: crack (gain and top), echo time, roll length and darkness, boom weight.</summary>
+	public static double[] RifleOriginal(Rng r, int sr, double crackGain = 3.0, double crackTop = 4200, double echoAt = 0.55,
+		double rollSec = 1.3, double rollTop = 420, double boomGain = 9.0)
 	{
-		double dist = r.R(400, 900), km = dist / 1000.0;
+		var x = Buf(sr, 6.5);
+		var shot = new double[(int)(0.6 * sr)];
+		var crackLp = Biquad.Lp(sr, crackTop); var crackHp = Biquad.Hp(sr, 500);
+		var boomBp = Biquad.Bp(sr, 260, 0.7); var boomLp = Biquad.Lp(sr, 1100);
+		var body = Biquad.Lp(sr, 160);
+		for (int i = 0; i < shot.Length; i++)
+		{
+			double t = (double)i / sr;
+			double crack = crackHp.P(crackLp.P(r.W())) * Perc(t, 0.0002, 0.005) * crackGain;
+			double tb = t - 0.012;
+			double boom = boomLp.P(boomBp.P(r.W())) * Perc(tb, 0.0015, 0.09) * boomGain
+				+ body.P(r.W()) * Perc(tb, 0.002, 0.14) * boomGain * 5.0 / 9.0;
+			shot[i] = crack + boom;
+		}
+		void Stamp(double at, double gain, double cutoff)
+		{
+			var lp = Biquad.Lp(sr, cutoff); var lp2 = Biquad.Lp(sr, cutoff * 1.2);
+			int s0 = (int)(at * sr);
+			for (int i = 0; i < shot.Length && s0 + i < x.Length; i++) x[s0 + i] += lp2.P(lp.P(shot[i])) * gain;
+		}
+		Stamp(0.02, 1.0, 7000);
+		Stamp(echoAt + r.R(-0.05, 0.05), 0.22, 900);
+		var roll = Biquad.Lp(sr, rollTop); var roll2 = Biquad.Lp(sr, rollTop * 1.2);
+		double swellPh = r.R(0, TwoPi);
+		for (int i = (int)(0.2 * sr); i < x.Length; i++)
+		{
+			double t = (double)i / sr;
+			double env = (1 - Math.Exp(-(t - 0.2) / 0.12)) * Math.Exp(-(t - 0.2) / rollSec);
+			double swell = 0.85 + 0.15 * Math.Sin(TwoPi * 0.4 * t + swellPh);
+			x[i] += roll2.P(roll.P(r.W())) * env * swell * 2.4;
+		}
+		HighPass(x, sr, 45);
+		double pk = 0; foreach (var v in x) pk = Math.Max(pk, Math.Abs(v));
+		double drive = 5.0 / Math.Max(pk, 1e-9);
+		for (int i = 0; i < x.Length; i++) x[i] = Math.Tanh(x[i] * drive);
+		return FinishOneShot(x, sr, -3, 400);
+	}
+
+	public static double[] RifleDistant(Rng r, int sr) => RifleDistant(r, sr, null);
+
+	public static double[] RifleDistant(Rng r, int sr, Style s)
+	{
+		double dist = s?.Metres ?? r.R(400, 900), km = dist / 1000.0;
 		var x = Buf(sr, 5.5);
 		double start = 0.02;
 
@@ -52,11 +103,11 @@ public static class Gunshot
 
 		// the boom: the blast's low end, a short heavy thump (it carries furthest)
 		var boom = new double[(int)(0.4 * sr)];
-		double bf = r.R(62, 95);
+		double bf = r.R(95, 135);   // (2026-10-15c, "too deep": a short knock, not a boom)
 		for (int i = 0; i < boom.Length; i++)
 		{
 			double t = (double)i / sr;
-			boom[i] = Math.Sin(TwoPi * bf * t * (1 - 0.18 * Math.Min(1, t / 0.25))) * Perc(t, 0.003, 0.05);
+			boom[i] = Math.Sin(TwoPi * bf * t * (1 - 0.18 * Math.Min(1, t / 0.25))) * Perc(t, 0.002, 0.03);
 		}
 		// the body: a 300-900 Hz "pop" of noise under the front (what makes it a gunshot and not a click)
 		var body = new double[(int)(0.15 * sr)];
@@ -67,7 +118,7 @@ public static class Gunshot
 		var hit = new double[(int)(0.45 * sr)];
 		Add(hit, report, 0, 1.0);
 		Add(hit, body, 0, r.R(0.7, 0.95));
-		Add(hit, boom, 0, r.R(0.22, 0.34));
+		Add(hit, boom, 0, s?.Boom ?? r.R(0.06, 0.1));
 		Normalize(hit);
 		Add(x, hit, (int)(start * sr), 1.0);
 
@@ -75,8 +126,8 @@ public static class Gunshot
 		// (2026-10-15, the owner: "the gunshot echo does not match the gunshot") the shot itself, off the hills: the same
 		// report, body and boom, only a little smeared (a hillside, 15-35 ms) and dulled by the extra air of the trip there
 		// and back, so it's plainly the same bang returning (it was low-passed to 0.7-2.4 kHz: a different, dull thud)
-		int echoes = r.I(1, 4);
-		double at = r.R(0.35, 0.7);
+		int echoes = s?.Echoes ?? r.I(1, 4);
+		double at = s?.EchoAt ?? r.R(0.35, 0.7);
 		for (int k = 0; k < echoes; k++)
 		{
 			int len = (int)(r.R(0.015, 0.035) * sr);
@@ -90,21 +141,21 @@ public static class Gunshot
 			Normalize(e);
 			double gain = (k == 0 ? r.R(0.38, 0.5) : r.R(0.2, 0.3)) * Math.Pow(0.8, k);
 			Add(x, e, (int)((start + at) * sr), gain);
-			at += r.R(0.35, 0.8);
+			at += s?.EchoGap ?? r.R(0.35, 0.8);
 		}
 
 		// --- the roll: the same shot ringing on through the woods (the shot and its echoes reverberated, not a separate noise),
 		// its highs dying first ---------------------------------------------------------------------------------------------
 		var dry = (double[])x.Clone();
-		var rv = new Reverb(sr, r.R(0.8, 0.88), r.R(0.45, 0.6));
+		var rv = new Reverb(sr, s?.Room ?? r.R(0.55, 0.7), r.R(0.55, 0.7));   // (2026-10-15c, "too reverby": a short roll, not a hall)
 		var wet = new double[x.Length];
 		for (int i = 0; i < x.Length; i++) wet[i] = rv.P(dry[i]);
 		LowPass(wet, sr, 2600);
-		HighPass(wet, sr, 160);   // (the woods ring in the mids; the boom stays the direct shot's own)
+		HighPass(wet, sr, 300);   // (the woods ring in the mids; the boom stays the direct shot's own)
 		double wetGain = r.R(0.5, 0.75) / Math.Max(Peak(wet), 1e-9) * Peak(dry);
-		for (int i = 0; i < x.Length; i++) x[i] += wet[i] * wetGain * 0.22;
+		for (int i = 0; i < x.Length; i++) x[i] += wet[i] * wetGain * (s?.Tail ?? 0.1);
 
-		HighPass(x, sr, 35);
+		HighPass(x, sr, 110);
 		// loud: the report's first milliseconds stop setting the level of everything after (clean look-ahead limiter), then
 		// levelled to an RMS that carries
 		Limit(x, sr, ceilingDb: -14);

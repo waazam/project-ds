@@ -207,6 +207,7 @@ script = ExtResource("2_scatter")
 DeepStart = 330.0
 DeepEnd = 470.0
 EdgeThicket = true
+Corridor = true
 
 [node name="PlayerSpawn" type="Marker3D" parent="." groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 19)

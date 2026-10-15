@@ -88,7 +88,9 @@ public partial class Crawler : Node3D
 				string mn = m.ResourceName ?? "";
 				t.Roughness = mn.StartsWith("c_tooth") ? 0.35f : 0.62f;
 				t.RimEnabled = true; t.Rim = 0.22f; t.RimTint = 0.3f;
-				t.NextPass = _uvGlow;
+				// (2026-10-15, slight pass) under the blacklight: the teeth glow (as teeth do), the black nails only faintly,
+				// the wet black hair not at all (it lit up as flat lavender strands)
+				t.NextPass = mn.StartsWith("c_hair") ? null : mn.StartsWith("c_tooth") ? _uvTeeth : mn.StartsWith("c_nail") ? _uvNails : _uvGlow;
 				if (mn.StartsWith("c_hair")) { t.CullMode = BaseMaterial3D.CullModeEnum.Disabled; t.Roughness = 0.3f; t.MetallicSpecular = 0.6f; }
 				t.SetMeta("detail_kind", -1);
 				mi.SetSurfaceOverrideMaterial(s, t);
@@ -136,6 +138,7 @@ public partial class Crawler : Node3D
 	private Vector3 _heading = Vector3.Forward;
 	private bool _placed;
 	private StandardMaterial3D _uvGlow, _limbSkin;
+	private StandardMaterial3D _uvTeeth, _uvNails;
 	private Vector3 _lastPos;
 	private float _speed;
 	private AudioStreamPlayer3D _voice;
@@ -167,6 +170,8 @@ public partial class Crawler : Node3D
 			EmissionEnabled = false,
 		};
 		_skin.NextPass = _uvGlow;
+		_uvTeeth = (StandardMaterial3D)_uvGlow.Duplicate();
+		_uvNails = (StandardMaterial3D)_uvGlow.Duplicate();
 		// the limbs: the same pale skin, plain (the body's mottling would stretch along the long bones into bands)
 		_limbSkin = new StandardMaterial3D { AlbedoColor = new Color(0.52f, 0.5f, 0.46f), Roughness = 0.7f, RimEnabled = true, Rim = 0.3f, RimTint = 0.2f, NextPass = _uvGlow };
 		_voice = new AudioStreamPlayer3D { Name = "Voice", Bus = "Events", UnitSize = 3.5f, MaxDistance = 30f };
@@ -395,6 +400,8 @@ public partial class Crawler : Node3D
 		// the blacklight on it: a cold violet-white glow where the lantern's cone falls
 		float uv = ProjectDS.Player.Lantern.UvOn(GlobalPosition);
 		_uvGlow.AlbedoColor = new Color(0.55f, 0.5f, 0.75f, 0.55f * uv);
+		if (_uvTeeth != null) _uvTeeth.AlbedoColor = new Color(0.78f, 0.82f, 1f, 0.95f * uv);   // teeth fluoresce: bright, bluish
+		if (_uvNails != null) _uvNails.AlbedoColor = new Color(0.4f, 0.36f, 0.55f, 0.18f * uv);
 	}
 
 	/// <summary>Two bones from the shoulder/hip to the planted hand/foot, the elbow/knee thrown up and out.</summary>

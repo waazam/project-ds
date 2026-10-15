@@ -1230,31 +1230,31 @@ public partial class Act6ClearingEvent : Node3D
 			DetachOneWay();
 			var hum = Audio.StairsHum.Instance;
 			hum?.SetOverrideDb(hum.MaxDb);
-			// Smooth, not snappy (Dan, 2026-09-22): no jolt. Rebuilt 2026-10-13 (Dan: "looks funky, like he falls through
-			// the top": the old tweens all ran at once, so the drop began at the front of the landing and the eye sank
-			// down through the stone). Now one path in three parts, planned ahead and swept against the world: a stumble to
-			// the edge, gathering pace, as the landing sags under them; a tip over it, the body pivoting on the edge (or on
-			// a side wall's coping) so the view goes over and down onto the drop; and the drop itself, falling free from
-			// there with a slow roll. The black comes in over the last 0.6 s of it; a soft body thump in the dark.
+			// (2026-10-15, the owner's design: "instead of falling off the top of the staircase on the last loop, it will
+			// teleport you about 100 yds above the scene and then you fall and hit the ground and then cue the trippy stuff")
+			// A blink to high over the clearing, a long free fall onto it, and the ground giving way under them into the void
+			// (SkyFall, ThroughTheGround). The old fall off the back of the landing (PlanFall/PlayFall) is kept for reference.
 			StoryBeat.PlayAt(this, "res://assets/audio/sfx/breath_in_02.wav", "Events", Vector3.Zero, -8f, pitch: 0.9f);
 			_falling = true;
 			StopDaze();
-			var plan = PlanFall(from, terrain);
-			FallClearOfFlight = plan.ClearOfFlight;
-			GD.Print($"[story] Act 6: the fall goes off the {plan.Side} of {from.Name}: {plan.Duration:0.00} s (the tip at {plan.TipAt * FallStep:0.00} s, the drop at {plan.DropAt * FallStep:0.00} s), {plan.Drop:0.0} m, eye path {(plan.Hit < 0 ? "clear" : $"BLOCKED at {plan.Hit * FallStep:0.00} s")}");
-			_ = Cutscene.Run(this, async ct2 =>
-			{
-				await Cutscene.Wait(this, Mathf.Max(0f, plan.Duration - 0.6f), ct2);
-				if (fader != null) await fader.Fade(1f, 0.6f, ct2);
-			});
-			await PlayFall(plan, ct);
-			if (fader != null && fader.BlackAlpha < 0.99f) await fader.Fade(1f, 0.1f, ct);
-			// Landing in the dark: a proper body thump, flat at the ear, and the breath going out of them.
-			PlayFlat($"res://assets/audio/sfx/body_thump_{_rng.RandiRange(1, 2):00}.wav", 8f);
-			StoryBeat.PlayAt(this, "res://assets/audio/sfx/breath_out_04.wav", "Events", Vector3.Zero, -4f, pitch: 0.85f);
-			hum?.SetOverrideDb(null);
-			StopBlood(0.5f);
+			// the void's materials drawn once now (they're needed in a few seconds), so entering it never stalls
+			var warmCam = _player.CameraRig?.Camera;
+			var warm = warmCam != null ? FallVoid.Prewarm(warmCam) : null;
+			_ = Cutscene.Run(this, async ct2 => { for (int f = 0; f < 4; f++) await Cutscene.Frame(this, ct2); if (IsInstanceValid(warm)) warm.QueueFree(); });
+			// where they come down: open ground in the clearing, clear of its stairs and trees
+			var land = FindLanding(terrain);
+			float groundY = terrain?.HeightAt(land.X, land.Z) ?? land.Y;
+			FallClearOfFlight = true;   // (open air, a cutscene path: nothing in the way by construction)
+			FallPathClear = true;
+			await SkyFall(groundY, land, ct);
+			await ThroughTheGround(groundY, ct);
+			// the black: everything cut off at once, and nothing to hear
+			fader?.SetBlack(true);
+			EndVoid();
+			hum?.SetOverrideDb(-80f);
+			StopBlood(0.1f);
 			await Cutscene.Wait(this, 3.0f, ct);
+			hum?.SetOverrideDb(null);
 
 			// Out cold. It is the same night (Dan, 2026-09-22: nothing in the Hollow happens by day; the
 			// Act6NightFell flag stays for old saves and the compass, the mood does not change).
@@ -1280,13 +1280,325 @@ public partial class Act6ClearingEvent : Node3D
 			var atmo = StoryBeat.Atmosphere(this);
 			atmo?.SetHeightFog(wake.Y - 4f, WakeFogDensity, 0.3f);
 			await Cutscene.Wait(this, 1.2f, ct);
+			Audio.ForestAmbienceManager.Instance?.ReleaseSilence(this);
 			if (fader != null) await fader.Fade(0f, 3.0f, ct);
 			// Nothing is said on waking (Dan, 2026-09-22): the night, the fog and the compass say it. The fog
 			// only thins slowly, over the walk up to the lookout.
 			atmo?.SetHeightFog(wake.Y - 4f, 0.03f, WakeFogClearSeconds);
 			GD.Print("[story] Act 6: woke on the trail; night, fog");
 		}
-		finally { _loopBusy = false; _falling = false; ShowBody(); }
+		finally { _loopBusy = false; _falling = false; ShowBody(); EndVoid(); Audio.ForestAmbienceManager.Instance?.ReleaseSilence(this); }
+	}
+
+	// ------------------------------------------------------------------ through the ground
+
+	/// <summary>For tests: the fall went on through the ground into the void, and how long it lasted there.</summary>
+	public bool FellThrough { get; private set; }
+	public float VoidSeconds { get; private set; }
+	public int VoidFlashes { get; private set; }
+
+	private MeshInstance3D _sink;
+	private FallVoid.TunnelRig _tunnel;
+	private ColorRect _flash;
+	private readonly List<AudioStreamPlayer> _voidVoices = new();
+	private readonly List<CanvasLayer> _voidHidden = new();
+	private Camera3D _voidCam;
+	private uint _voidCullWas;
+
+
+	/// <summary>(2026-10-15, the owner's design) The fall: on the last loop's top landing a blink puts them high over the
+	/// clearing (<see cref="SkyFallMetres"/>), looking down at the ring of stairs far below in the fog; a long free fall,
+	/// the wind rising, the view turning slowly over; and where they hit, the ground doesn't stop them (see
+	/// <see cref="ThroughTheGround"/>). A cutscene path in open air: nothing to collide with on the way down.</summary>
+	private async Task SkyFall(float groundY, Vector3 land, CancellationToken ct)
+	{
+		var rig = _player?.CameraRig;
+		var fader = StoryBeat.Fader(this);
+		if (rig == null) return;
+		bool motion = GameSettings.Instance?.HeadMotion ?? true;
+		float eyeH = rig.EyeHeight;
+		// the blink: a black frame, and they're up there
+		fader?.SetBlack(true);
+		await Cutscene.Frame(this, ct);
+		HideBody();
+		if (rig.Camera is { } c) HideForVoid(c);   // (nothing of theirs in view from here to the black)
+		// the fog thinned for the fall, so the ring of stairs shows far below and the clearing comes up out of it
+		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.FallFogScale = 0.35f;
+		var top = new Vector3(land.X, groundY + SkyFallMetres, land.Z);
+		_player.Teleport(top - Vector3.Up * eyeH, rig.Yaw);
+		rig.SetPitch(Mathf.DegToRad(-62f));
+		rig.RollSwim = 0f;
+		await Cutscene.Frame(this, ct);
+		await Cutscene.Frame(this, ct);
+		fader?.SetBlack(false);
+		VoidVoice($"res://assets/audio/sfx/fall_wind_{_rng.RandiRange(1, 3):00}.wav", -2f, false, 1f);
+		// down: a free fall with a little air in it (about 4.6 s for 90 m), the view easing down onto the clearing and
+		// turning slowly over as it comes
+		const float g = 8.5f;
+		double t = 0;
+		float lastY = _player.GlobalPosition.Y, pitchApplied = 0f;
+		float pitchWant = Mathf.DegToRad(-84f) - rig.Pitch;
+		float spinDir = _rng.Randf() < 0.5f ? -1f : 1f;
+		while (IsInstanceValid(_player))
+		{
+			float dt = (float)GetProcessDeltaTime();
+			float drop = 0.5f * g * (float)(t * t);
+			float eyeY = top.Y - drop;
+			bool landed = eyeY <= groundY + FallEyeAtImpact;
+			if (landed) eyeY = groundY + FallEyeAtImpact;
+			var p = _player.GlobalPosition; p.Y = eyeY - eyeH; _player.GlobalPosition = p;
+			rig.ShiftBy(new Vector3(0f, p.Y - lastY, 0f));
+			lastY = p.Y;
+			float u = Mathf.Clamp(drop / SkyFallMetres, 0f, 1f);
+			float pw = pitchWant * Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, (float)t / 2.2f));
+			if (motion) pw += Mathf.Sin((float)t * 1.1f) * 0.08f * u;
+			_player.PlayerInput?.AddCutsceneLook(new Vector2(motion ? spinDir * dt * (0.15f + 0.35f * u) : 0f, pw - pitchApplied));
+			pitchApplied = pw;
+			rig.RollSwim = motion ? spinDir * 0.35f * Mathf.Sin((float)t * 0.6f) * u : 0f;
+			rig.FovSwim = 18f * u * u;
+			if (landed) break;
+			await Cutscene.Frame(this, ct);
+			t += dt;
+		}
+		// the hit: a dull thud under them, and the ground already giving
+		PlayFlat($"res://assets/audio/sfx/body_thump_{_rng.RandiRange(1, 2):00}.wav", 2f);
+		SkyFallSeconds = (float)t;
+		GD.Print($"[story] Act 6: fell {SkyFallMetres:0} m from over the clearing in {t:0.0} s");
+	}
+
+	/// <summary>Open ground for the landing: the clearing's middle if nothing stands within a few metres of it, else the
+	/// nearest spot out from it that's clear (a sphere 2.4 m round, 3 m up: stairs, trunks and stones, not the ground).</summary>
+	private Vector3 FindLanding(ForestTerrain terrain)
+	{
+		var space = GetWorld3D().DirectSpaceState;
+		var q = new PhysicsShapeQueryParameters3D { Shape = new SphereShape3D { Radius = 2.4f }, CollisionMask = 1 };
+		if (_player != null) q.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+		var c = GlobalPosition;
+		for (float r = 0f; r <= 24f; r += 3f)
+			for (int k = 0; k < (r == 0f ? 1 : 12); k++)
+			{
+				float a = k * Mathf.Tau / 12f + r * 0.37f;
+				var p = c + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+				float gy = terrain?.HeightAt(p.X, p.Z) ?? p.Y;
+				q.Transform = new Transform3D(Basis.Identity, new Vector3(p.X, gy + 3f, p.Z));
+				if (space.IntersectShape(q, 1).Count == 0) return new Vector3(p.X, gy, p.Z);
+			}
+		return c;
+	}
+
+	/// <summary>How high over the clearing the last loop's blink puts them (about a hundred yards).</summary>
+	[Export] public float SkyFallMetres = 90f;
+	/// <summary>For tests: how long the free fall took.</summary>
+	public float SkyFallSeconds { get; private set; }
+
+	/// <summary>Where they hit, the ground doesn't stop them (the owner, 2026-10-15: "right when you hit the ground after the
+	/// long fall from the sky it should immediately show the flashing lights and swirls and THEN get slow and trippy, fade
+	/// to black"): the instant of impact cuts straight into the void at full force (streaks rushing, flashing, the view
+	/// swirling); then it slows, and slows, into the dark: the lights sparse and cold and smearing, the tube breathing and
+	/// twisting one way then the other, eyes going by in the black, the stairs' hum stretched under a smeared voice and the
+	/// rattle far below; and a slow fade to black, which the caller holds.</summary>
+	private async Task ThroughTheGround(float groundY, CancellationToken ct)
+	{
+		var rig = _player?.CameraRig;
+		var cam = rig?.Camera;
+		var fader = StoryBeat.Fader(this);
+		if (rig == null || cam == null) return;
+		bool reduce = GameSettings.Instance?.ReduceFlashing ?? false;
+		bool motion = GameSettings.Instance?.HeadMotion ?? true;
+		FellThrough = true;
+		Audio.ForestAmbienceManager.Instance?.RequestSilence(this, 1f, 100);
+		StopBlood(0.2f);
+		StopVoidVoices();
+		HideForVoid(cam);
+		if (_player.GetNodeOrNull<Lantern>("Lantern") is { } lantern) lantern.CutsceneDim = 0f;
+
+		// the instant of impact: straight through, far below the world, into the light at full force
+		float down = -1500f - _player.GlobalPosition.Y;
+		_player.GlobalPosition += Vector3.Up * down;
+		rig.ShiftBy(Vector3.Up * down);
+		rig.RollSwim = 0f;
+		_tunnel = FallVoid.Tunnel(cam);
+		_flash = FallVoid.Flash(Cutscene.SceneRoot(this));
+		_flash.Color = new Color(1f, 0.55f, 0.18f, 0f);   // (a warm flash, with the orange streaks)
+		DeepBlack(true);
+		_warp = FallVoid.Warp(Cutscene.SceneRoot(this));
+		var rush = VoidVoice($"res://assets/audio/sfx/fall_void_{_rng.RandiRange(1, 3):00}.wav", 0f, false, 1.15f);
+		var drone = VoidVoice("res://assets/audio/ambient/pressure_loop.wav", -40f, true, 0.6f);
+		var humV = VoidVoice("res://assets/audio/ambient/stairs_hum_loop.wav", -40f, true, 0.55f);
+		var ring = VoidVoice("res://assets/audio/ambient/ringing_loop.wav", -40f, true, 0.85f);
+
+		// the shape of it: a burst (full force, ~3 s), the slowing (~2.5 s), the slow dark (~7 s), the fade (the last 3 s)
+		double burst = 3.0, slowing = 2.5, total = _rng.RandfRange(12f, 14f), fadeAt = total - 3.0;
+		double t = 0, nextFlash = 0.05, nextMode = 0, nextEyes = burst + slowing + _rng.RandfRange(0.5f, 1.5f);
+		float travel = 0f, spin = 0f, flash = 0f, speed = 34f, slowGoal = 2.5f;
+		bool voiceDone = false, rattleDone = false, fading = false;
+		var eyes = new List<(Node3D n, double born, float vx)>();
+		while (t < total)
+		{
+			float dt = (float)GetProcessDeltaTime();
+			// 0 in the burst .. 1 once it's slow and dark
+			float calm = Mathf.SmoothStep(0f, 1f, (float)((t - burst) / slowing));
+			// the speed: rushing, then slowing; in the slow part, lulls with the odd sudden surge
+			if (calm >= 1f && t >= nextMode)
+			{
+				bool surge = _rng.Randf() < 0.25f;
+				slowGoal = surge ? _rng.RandfRange(9f, 14f) : _rng.RandfRange(0.8f, 3f);
+				nextMode = t + (surge ? _rng.RandfRange(0.4f, 0.7f) : _rng.RandfRange(1.4f, 2.6f));
+			}
+			float goal = Mathf.Lerp(34f, slowGoal, calm);
+			speed = Mathf.Lerp(speed, goal, 1f - Mathf.Exp(-dt * (calm < 1f ? 1.5f : 2.5f)));
+			travel += speed * dt;
+			// the flashes: rapid in the burst, then sparse and dim, then none in the fade (Reduce Flashing: few and soft)
+			if (t >= nextFlash && t < fadeAt)
+			{
+				float strong = Mathf.Lerp(1f, 0.45f, calm);
+				flash = (reduce ? 0.3f : _rng.RandfRange(0.7f, 1f)) * strong;
+				nextFlash = t + (reduce ? _rng.RandfRange(0.9f, 1.6f) : Mathf.Lerp(_rng.RandfRange(0.12f, 0.35f), _rng.RandfRange(1.6f, 3.2f), calm));
+				VoidFlashes++;
+			}
+			flash = Mathf.MoveToward(flash, 0f, dt * Mathf.Lerp(5f, 2.4f, calm));
+			_flash.Color = _flash.Color with { A = flash * (reduce ? 0.06f : Mathf.Lerp(0.38f, 0.14f, calm)) };
+			// the tube: bright and crowded in the burst, sparse, dim and smearing after; twisting, breathing, the colour drifting
+			float twist = Mathf.Lerp(3.5f, 2.4f, calm) * Mathf.Sin((float)t * Mathf.Lerp(0.9f, 0.33f, calm));
+			spin += dt * Mathf.Lerp(1.6f, 0.5f * Mathf.Sin((float)t * 0.27f + 0.6f), calm);
+			_tunnel.Set(travel, flash * (reduce ? 0.3f : 1f), Mathf.Lerp(1.15f, 0.45f + 0.15f * Mathf.Sin((float)t * 0.5f), calm),
+				twist, Mathf.Lerp(0.25f, 0.65f, calm), 0.5f + 0.5f * Mathf.Sin((float)t * 0.21f), Mathf.Lerp(0.5f, 0.76f, calm), Mathf.Lerp(0.2f, 0.75f, calm));
+			_tunnel.Root.Rotation = new Vector3(0f, 0f, spin);
+			_tunnel.Root.Position = motion ? new Vector3(_rng.RandfRange(-1f, 1f), _rng.RandfRange(-1f, 1f), 0f) * (0.008f + 0.0012f * speed) : Vector3.Zero;
+			// the view itself swirled: hard in the burst, a slow drunk drift after
+			_warp.SetShaderParameter("swirl", (motion ? 1f : 0.4f) * Mathf.Lerp(2.6f * Mathf.Sin((float)t * 2.1f), 0.7f * Mathf.Sin((float)t * 0.4f), calm));
+			_warp.SetShaderParameter("pinch", Mathf.Lerp(0.5f, 0.25f + 0.2f * Mathf.Sin((float)t * 0.3f), calm));
+			_warp.SetShaderParameter("dark", Mathf.Lerp(0f, 0.35f, calm));
+			_warp.SetShaderParameter("flash", flash * (reduce ? 0.3f : 0.6f));
+			rig.FovSwim = motion ? Mathf.Lerp(40f, 22f + 9f * Mathf.Sin((float)t * 0.6f), calm) + 0.4f * speed : 26f;
+			// the sound: the rush loud through the burst then sinking away; the drone, the stretched hum and the warped ringing
+			// coming up under the slow part
+			if (IsInstanceValid(rush)) { rush.VolumeDb = Mathf.Lerp(0f, -14f, calm); rush.PitchScale = Mathf.Lerp(1.15f, 0.75f, calm); }
+			if (IsInstanceValid(drone)) drone.VolumeDb = Mathf.Lerp(-40f, -7f, calm);
+			if (IsInstanceValid(humV)) { humV.VolumeDb = Mathf.Lerp(-40f, -10f, calm); humV.PitchScale = Mathf.Lerp(0.55f, 0.42f, calm); }
+			if (IsInstanceValid(ring)) { ring.VolumeDb = Mathf.Lerp(-40f, -18f, calm); ring.PitchScale = 0.82f + 0.1f * Mathf.Sin((float)t * 0.9f); }
+			if (!voiceDone && t > burst + slowing + 0.8) { voiceDone = true; VoidVoice("res://assets/audio/voice/come_and_see_distant.mp3", -7f, false, 0.55f); }
+			if (!rattleDone && t > burst + slowing + 3.4) { rattleDone = true; VoidVoice($"res://assets/audio/sfx/creature_rattle_run_0{_rng.RandiRange(1, 3)}.wav", -15f, false, 0.6f); }
+			// eyes going by in the dark, in the slow part
+			if (t >= nextEyes && t < fadeAt)
+			{
+				var e = FallVoid.Eyes(cam);
+				float side = _rng.Randf() < 0.5f ? -1f : 1f;
+				e.Position = new Vector3(side * _rng.RandfRange(1.4f, 2.4f), _rng.RandfRange(-1.2f, 1.2f), -45f);
+				eyes.Add((e, t, side * _rng.RandfRange(0.2f, 0.6f)));
+				nextEyes = t + _rng.RandfRange(2.5f, 4f);
+			}
+			for (int i = eyes.Count - 1; i >= 0; i--)
+			{
+				var (n, born, vx) = eyes[i];
+				if (!IsInstanceValid(n)) { eyes.RemoveAt(i); continue; }
+				n.Position += new Vector3(vx * dt, 0f, (10f + speed * 1.5f) * dt);
+				if (n.Position.Z > 1.5f || t - born > 6) { n.QueueFree(); eyes.RemoveAt(i); }
+			}
+			// the slow fade to black, everything going quiet with it
+			if (!fading && t >= fadeAt)
+			{
+				fading = true;
+				if (fader != null) _ = Cutscene.Run(this, ct2 => fader.Fade(1f, 3.0f, ct2));
+			}
+			if (fading)
+			{
+				float f = (float)((t - fadeAt) / 3.0);
+				foreach (var v in _voidVoices) if (IsInstanceValid(v)) v.VolumeDb -= dt * 12f * f;
+			}
+			await Cutscene.Frame(this, ct);
+			t += dt;
+		}
+		foreach (var (n, _, _) in eyes) if (IsInstanceValid(n)) n.QueueFree();
+		VoidSeconds = (float)total;
+		GD.Print($"[story] Act 6: through the ground: {total:0.0} s in the void ({burst:0} s at full force, slowing over {slowing:0.0} s), {VoidFlashes} flashes{(reduce ? " (reduced)" : "")}");
+	}
+
+	private ShaderMaterial _warp;
+
+	private void FreeWarp()
+	{
+		foreach (var n in GetTree().Root.FindChildren("FallWarp", nameof(CanvasLayer), true, false)) n.QueueFree();
+		_warp = null;
+	}
+
+	/// <summary>The hands and what they hold, the compass, the item readout and the prompts put away until the black.</summary>
+	private void HideForVoid(Camera3D cam)
+	{
+		if (_voidCam != null) return;
+		_voidCam = cam;
+		_voidCullWas = cam.CullMask;
+		cam.CullMask &= ~HeldItem.HeldLayer;
+		foreach (var n in GetTree().Root.FindChildren("*", nameof(CanvasLayer), true, false))
+			if (n is CanvasLayer { Visible: true } cl && cl is UI.Compass or UI.EquippedItemHud or UI.InteractPrompt or UI.StaminaBar) { cl.Visible = false; _voidHidden.Add(cl); }
+	}
+
+	private void StopVoidVoices()
+	{
+		foreach (var v in _voidVoices) if (IsInstanceValid(v)) { v.Stop(); v.QueueFree(); }
+		_voidVoices.Clear();
+	}
+
+	private AudioStreamPlayer VoidVoice(string path, float db, bool loop, float pitch)
+	{
+		if (!ResourceLoader.Exists(path)) return null;
+		var stream = GD.Load<AudioStream>(path);
+		if (loop && stream is AudioStreamWav wav)
+		{
+			wav = (AudioStreamWav)wav.Duplicate();
+			wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
+			wav.LoopEnd = (int)(wav.GetLength() * wav.MixRate);
+			stream = wav;
+		}
+		var p = new AudioStreamPlayer { Stream = stream, Bus = "Events", VolumeDb = db, PitchScale = pitch };
+		Cutscene.SceneRoot(this).AddChild(p);
+		p.Play();
+		_voidVoices.Add(p);
+		return p;
+	}
+
+	/// <summary>The void gone at once (the blackout): its tube, its flashes, its sounds, the stretch.</summary>
+	/// <summary>(2026-10-15, the owner: "the background darker black") while in the void the finish's blue shadow lift and most of
+	/// its grain go, and the vignette closes in, so the black between the streaks is truly black; restored after.</summary>
+	private Godot.Collections.Dictionary _postSaved;
+	private void DeepBlack(bool on)
+	{
+		var post = StoryBeat.PostMaterial(this);
+		if (post == null) return;
+		if (on)
+		{
+			_postSaved ??= new Godot.Collections.Dictionary { ["shadow_tint"] = post.GetShaderParameter("shadow_tint"), ["grain"] = post.GetShaderParameter("grain"), ["contrast"] = post.GetShaderParameter("contrast") };
+			post.SetShaderParameter("shadow_tint", Vector3.Zero);
+			post.SetShaderParameter("grain", 0.01f);
+			post.SetShaderParameter("contrast", 1.22f);
+			post.SetShaderParameter("vignette", 0.62f);
+		}
+		else if (_postSaved != null)
+		{
+			foreach (var k in _postSaved.Keys) post.SetShaderParameter(k.AsStringName(), _postSaved[k]);
+			_postSaved = null;
+		}
+	}
+
+	private void EndVoid()
+	{
+		if (_tunnel != null && IsInstanceValid(_tunnel.Root)) _tunnel.Root.QueueFree();
+		_tunnel = null;
+		DeepBlack(false);
+		if (_flash != null && IsInstanceValid(_flash)) _flash.GetParent()?.QueueFree();
+		_flash = null;
+		if (_sink != null && IsInstanceValid(_sink)) _sink.QueueFree();
+		_sink = null;
+		foreach (var v in _voidVoices) if (IsInstanceValid(v)) { v.Stop(); v.QueueFree(); }
+		_voidVoices.Clear();
+		if (_voidCam != null && IsInstanceValid(_voidCam)) _voidCam.CullMask = _voidCullWas;
+		_voidCam = null;
+		foreach (var cl in _voidHidden) if (IsInstanceValid(cl)) cl.Visible = true;
+		_voidHidden.Clear();
+		FreeWarp();
+		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.FallFogScale = 1f;
+		if (_player?.GetNodeOrNull<Lantern>("Lantern") is { } lantern) lantern.CutsceneDim = 1f;
+		if (_player?.CameraRig is { } rig) { rig.FovSwim = 0f; rig.RollSwim = 0f; }
 	}
 
 	/// <summary>For tests: the fall's landing point lay clear of the flight (behind its back wall or off its side).</summary>
@@ -1493,7 +1805,7 @@ public partial class Act6ClearingEvent : Node3D
 
 	/// <summary>Plays a planned fall: the body carried along the path (the stumble walked, its footsteps and stride
 	/// real), the eye kept on it with no lag, the view set from the plan through the cutscene look.</summary>
-	private async Task PlayFall(FallPlan plan, CancellationToken ct)
+	private async Task PlayFall(FallPlan plan, CancellationToken ct, bool standUp = true)
 	{
 		var rig = _player.CameraRig;
 		float eyeH = rig?.EyeHeight ?? 1.62f;
@@ -1529,7 +1841,7 @@ public partial class Act6ClearingEvent : Node3D
 			await Cutscene.Frame(this, ct);
 			t += GetProcessDeltaTime();
 		}
-		if (IsInstanceValid(_player))
+		if (standUp && IsInstanceValid(_player))
 		{
 			// Down: lying on the ground in the dark (the body is put back on its feet there; it's black, and it wakes elsewhere).
 			Vector3 end = plan.Eye[^1];

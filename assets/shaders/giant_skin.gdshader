@@ -13,8 +13,19 @@ uniform sampler2D detail_albedo : source_color, hint_default_black, filter_linea
 uniform sampler2D detail_normal : hint_normal, filter_linear_mipmap;
 uniform bool use_maps = false;
 
+// (2026-10-15, "blend more with the background") in the scene's air: its edges go over to the haze (and thin out in a
+// dither at the very rim) so no hard cut-out line meets the sky; it lifts a little toward the air with height (aerial
+// perspective); the eyes keep most of their glow through the haze, the one crisp thing on it. GiantStalkerEvent.Air.
+uniform float edge_soft : hint_range(0.0, 1.0) = 0.0;
+uniform float height_lift : hint_range(0.0, 1.0) = 0.0;
+uniform float eye_keep : hint_range(0.0, 1.0) = 0.0;
+uniform float base_y = 0.0;
+uniform float top_y = 50.0;
+varying float world_y;
+
 void vertex() {
 	CD_VERTEX;
+	world_y = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;
 }
 
 uniform vec3 albedo : source_color = vec3(0.026, 0.028, 0.034);
@@ -48,6 +59,9 @@ void fragment() {
 	ivec2 p = ivec2(mod(FRAGCOORD.xy, 4.0));
 	float threshold = (BAYER[p.y * 4 + p.x] + 0.5) / 16.0;
 	if (visibility < threshold) discard;
+	float graze = 1.0 - clamp(abs(dot(normalize(NORMAL), normalize(VIEW))), 0.0, 1.0);
+	// the very rim thinned to a dither: the silhouette frays into the air instead of cutting it
+	if (pow(graze, 4.0) * edge_soft * 0.9 > threshold) discard;
 	if (!FRONT_FACING) NORMAL = -NORMAL;
 	vec3 base = mix(albedo, face_tint, COLOR.r) * COLOR.g;
 	// (2026-10-13i) its hide's detail: the skin stretched paler over its bones, black down in the creases between them,
@@ -56,7 +70,9 @@ void fragment() {
 	float occ = d.occ * cd_crease_occ(d);
 	float ridge = smoothstep(0.1, 0.9, -d.curv);
 	base *= (0.55 + 0.45 * occ) * (1.0 + 0.9 * ridge);
-	ALBEDO = mix(base, haze_color, haze);
+	float hgt = clamp((world_y - base_y) / max(top_y - base_y, 1.0), 0.0, 1.0);
+	float hz = clamp(haze + (1.0 - haze) * height_lift * hgt + (1.0 - haze) * edge_soft * pow(graze, 1.5), 0.0, 1.0);
+	ALBEDO = mix(base, haze_color, hz);
 	// A shadow in the murk: most of the lighting is flattened away, so it reads as a shape, not a model.
 	ALBEDO = mix(haze_color * 0.9, ALBEDO, contrast);
 	if (use_maps && FRONT_FACING) {
@@ -72,6 +88,6 @@ void fragment() {
 	ROUGHNESS = mix(0.78, 0.32, clamp(wet, 0.0, 1.0));
 	SPECULAR = (0.22 + 0.3 * clamp(wet, 0.0, 1.0)) * (1.0 - haze);
 	float eye = 1.0 - COLOR.a;
-	EMISSION = eye_color * eye_glow * eye * (1.0 - haze) + haze_color * haze * (0.35 + 0.35 * contrast);
+	EMISSION = eye_color * eye_glow * eye * (1.0 - hz * (1.0 - eye_keep)) + haze_color * hz * (0.35 + 0.35 * contrast);
 	EMISSION += rim_color * rim_term(NORMAL, VIEW, VERTEX);
 }

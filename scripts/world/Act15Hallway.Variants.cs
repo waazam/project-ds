@@ -57,7 +57,7 @@ public partial class Act15Hallway
 	private bool _turnActive;
 	private float _turnSide = 1f, _lungeT = -1f;
 	private Vector3 _lungeFrom, _lungeTo;
-	private readonly List<ShadowMan> _copies = new();
+	private readonly List<HallStalker> _copies = new();
 
 	private Turn PickTurn()
 	{
@@ -123,7 +123,8 @@ public partial class Act15Hallway
 		// the melting eyes: through four colours over the red, each eased into the next
 		if (CurrentTurn == Turn.MeltingEyes)
 		{
-			Color[] cs = { new(0.95f, 0.95f, 1f), new(1f, 0.62f, 0.2f), new(0.85f, 0.06f, 0.05f), new(0.55f, 0.15f, 0.8f), new(0.35f, 0.8f, 0.3f) };
+			// (from its own ember red, 2026-10-15: through orange and a white heat, to violet and a sick green)
+			Color[] cs = { HallStalker.EyeDefault, new(1f, 0.62f, 0.2f), new(1f, 0.95f, 0.85f), new(0.55f, 0.15f, 0.8f), new(0.35f, 0.8f, 0.3f) };
 			float f = Mathf.Clamp(u, 0f, 0.999f) * (cs.Length - 1);
 			int i = (int)f;
 			var c = cs[i].Lerp(cs[i + 1], Mathf.SmoothStep(0f, 1f, f - i));
@@ -153,7 +154,34 @@ public partial class Act15Hallway
 		_shadow.StandAt(ToGlobal(local + Vector3.Up * yLift), player.GlobalPosition with { Y = ToGlobal(local).Y });
 	}
 
-	private void Breath(float db) => Sfx("shadow_breath", 2, _shadow.GlobalPosition + Vector3.Up * 1.8f, db, 2f);
+	private void Breath(float db) => Rattle(db);
+
+	/// <summary>Its sound (2026-10-15: the stalker's rattle, its only sound; the owner: "the rattling for red light green light
+	/// is too loud and constant"): only now and then as it comes nearer, never two within 5 s, a short phrase from the bank
+	/// (no take again soon), a few ticks when it's further off, a run when it's on them; well under the hall's siren and
+	/// clunks.</summary>
+	private void Rattle(float db)
+	{
+		double now = Time.GetTicksMsec() / 1000.0;
+		bool close = db > -9f;
+		if (now - _lastRattle < 5.0 || (!close && _rattleRng.Randf() > 0.35f)) return;
+		_lastRattle = now;
+		string fam = close ? "creature_rattle_run" : "creature_rattle_tick";
+		int n = close ? 16 : 12;
+		int take = 1 + (close ? _runPick : _tickPick).Next(_rattleRng, n);
+		string path = $"res://assets/audio/sfx/{fam}_{take:00}.wav";
+		if (!ResourceLoader.Exists(path)) return;
+		var s = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(path), Bus = "Events", VolumeDb = (close ? -10f : -18f), UnitSize = 3f, MaxDistance = 40f,
+			PitchScale = _rattleRng.RandfRange(0.95f, 1.05f) };
+		Systems.Cutscene.SceneRoot(this).AddChild(s);
+		s.GlobalPosition = _shadow.EyesAt;
+		s.Finished += s.QueueFree;
+		s.Play();
+	}
+
+	private double _lastRattle = -10;
+	private readonly RandomNumberGenerator _rattleRng = NewTurnRng();
+	private Audio.RecentPicker _tickPick, _runPick;
 
 	private void TurnStep(PlayerController player, int i)
 	{
@@ -189,6 +217,8 @@ public partial class Act15Hallway
 				var look = across.Lerp(toward, i / 3f) - _shadow.GlobalPosition;
 				look.Y = 0;
 				if (look.LengthSquared() > 0.001f) _shadow.GlobalBasis = Basis.LookingAt(look.Normalized(), Vector3.Up);
+				// (the stalker, 2026-10-15) leaning out round the wall's edge the way it leans out round a trunk, then clear of it
+				_shadow.Pose(i < 3 ? (_turnSide > 0f ? "peek_L" : "peek_R") : "loom");
 				Breath(i == 3 ? -5f : -13f);
 				break;
 			}
@@ -223,7 +253,7 @@ public partial class Act15Hallway
 				Stand(Ahead(near[i], -0.3f * _turnSide), player);
 				while (_copies.Count < 2)
 				{
-					var c = new ShadowMan { Name = $"ShadowCopy{_copies.Count}" };
+					var c = new HallStalker { Name = $"ShadowCopy{_copies.Count}" };
 					AddChild(c);
 					_copies.Add(c);
 				}
@@ -246,7 +276,7 @@ public partial class Act15Hallway
 				// face down, head first toward them (his feet the far end), dragged a jerk at a time
 				float[] heads = { 7.5f, 5.2f, 3.4f, 1.9f };
 				var head = Ahead(heads[i]);
-				var feet = head + new Vector3(0, 0.18f, ShadowMan.Height);
+				var feet = head + new Vector3(0, 0.18f, HallStalker.Height);
 				_shadow.GlobalPosition = ToGlobal(feet);
 				_shadow.GlobalBasis = GlobalBasis * new Basis(Vector3.Right, -Mathf.Pi * 0.5f);   // (his head toward them, his face to the floor)
 				Breath(i == 3 ? -4f : -13f);
@@ -283,7 +313,7 @@ public partial class Act15Hallway
 	{
 		var l = ToLocal(_shadow.GlobalPosition);
 		bool odd = CurrentTurn is Turn.FromAbove or Turn.Slither or Turn.FromFloor || _lungeT >= 0f;
-		if (CurrentTurn == Turn.Slither) l.Z -= ShadowMan.Height * 0.6f;
+		if (CurrentTurn == Turn.Slither) l.Z -= HallStalker.Height * 0.6f;
 		if (odd)
 		{
 			if (CurrentTurn == Turn.FromAbove) Sfx("body_thump", 2, _shadow.GlobalPosition, -6f, 3f);
@@ -291,7 +321,7 @@ public partial class Act15Hallway
 		}
 		_lungeT = -1f;
 		foreach (var c in _copies) c.Visible = false;
-		_shadow.EyeColor(new Color(0.95f, 0.95f, 1f));
+		_shadow.EyeColor(HallStalker.EyeDefault);
 		_shadow.EyeDrips(false, Colors.White);
 	}
 
@@ -301,7 +331,7 @@ public partial class Act15Hallway
 		_shadow.Scale = Vector3.One;
 		_shadow.Rotation = new Vector3(0, _shadow.Rotation.Y, 0);
 		foreach (var c in _copies) c.Visible = false;
-		_shadow.EyeColor(new Color(0.95f, 0.95f, 1f));
+		_shadow.EyeColor(HallStalker.EyeDefault);
 		_shadow.EyeDrips(false, Colors.White);
 		_shadow.Glare = 0.3f;
 	}

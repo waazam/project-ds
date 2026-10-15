@@ -35,8 +35,7 @@ script = ExtResource("7_event")
 TargetPath = NodePath("../ForestWorld/Footbridge")
 Radius = 2.5
 SoundPath = "res://assets/audio/sfx/rifle_distant_01.wav"
-Takes = 6
-VolumeDb = 10.0
+VolumeDb = 16.0
 FromDirection = Vector3(-0.85, 0, -0.5)
 
 [node name="Woodpecker" type="Node3D" parent="ForestAmbience"]

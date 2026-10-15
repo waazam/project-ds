@@ -71,6 +71,13 @@ public partial class LakeCreature : Node3D
 		public float SinkAfter = -1f, StrikeAfter = -1f;
 		public bool Struck;
 		public Skeleton3D Skel;
+		public MeshInstance3D Flesh;
+		/// <summary>Per eye: its gaze now (it turns to you at its own pace), its rate, its next blink, its wander.</summary>
+		public readonly List<Quaternion> EyeLook = new();
+		public readonly List<float> EyeRate = new(), EyeBlink = new();
+		public readonly List<Vector3> EyeOff = new();
+		/// <summary>Its own tempo (two waves of unrelated speed down it), so no two limbs move in step.</summary>
+		public float FreqA = 1f, FreqB = 1f, Phase2, Twist, NextRipple;
 		/// <summary>The follow-through: each joint's bend lagging a little behind the one before (secondary motion).</summary>
 		public Vector3[] Lag;
 	}
@@ -110,6 +117,8 @@ public partial class LakeCreature : Node3D
 		{
 			Length = length, Phase = _rng.RandfRange(0, Mathf.Tau), Curl = _rng.RandfRange(0.09f, 0.17f),
 			Speed = _rng.RandfRange(0.8f, 1.25f),
+			FreqA = _rng.RandfRange(0.8f, 1.2f), FreqB = _rng.RandfRange(1.35f, 1.9f), Phase2 = _rng.RandfRange(0, Mathf.Tau),
+			Twist = _rng.RandfRange(0.04f, 0.1f),
 		};
 		limb.Root = new Node3D { Name = $"Tentacle{_limbs.Count}", Position = localRoot + Vector3.Down * (length + 1.5f) };
 		AddChild(limb.Root);
@@ -118,32 +127,62 @@ public partial class LakeCreature : Node3D
 		// (2026-10-12, the model overhaul: the owner's "chunked" tentacles) the flesh is one smooth tube skinned to the joints'
 		// chain, not a rigid cylinder to each joint with a knuckle over the seam: it bends as one thing, the suckers with it
 		var k = new MeshKit();
+		// (2026-10-15, the owner: "less robotic and blocky") one lofted tube up the whole limb, many rings and more sides, its
+		// section a little flattened on the sucker side (+Z) as an octopus arm's is, and lumpy: slow swellings and pinches
+		// along it and a soft lobing round it, each limb its own, so no two rings are the same and nothing reads turned
+		int seed = limb.Joints.Count + _limbs.Count * 101 + (int)(length * 37f);
+		var lump = new FastNoiseLite { Seed = seed, Frequency = 0.9f / Mathf.Max(length, 1f) * 6f, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth };
+		float lobePh = _rng.RandfRange(0, Mathf.Tau), lobe2 = _rng.RandfRange(0, Mathf.Tau);
+		int ringsN = Segments * 6, sides = baseR > 1.2f ? 30 : 22;
+		var rings = new List<ItemMeshes.Ring>(ringsN + 1);
+		var fs = new float[ringsN + 1];
+		for (int q = 0; q <= ringsN; q++)
+		{
+			float f = (float)q / ringsN;
+			fs[q] = f;
+			float r = Radius(baseR, f) * (1f + 0.07f * lump.GetNoise1D(f * 10f) * (1f - f * 0.5f));
+			rings.Add(new ItemMeshes.Ring(Vector3.Up * f * length, r, r * 0.9f));
+		}
+		// (2026-10-15, "everything made in blender") the flesh is the Blender limb (tools/Blender/tentacle.py), its cups shaped
+		// into its skin, laid along this limb's own length and radius; the code-built tube below only if the model is missing
+		var modelFlesh = TentacleModels.Limb("Limb", length, f => Radius(baseR, f), Skin(), TentacleKit.SuckerRim, TentacleKit.SuckerHole);
+		k.Mat(Skin());
+		k.Color = Colors.White;
+		if (modelFlesh == null)
+		ItemMeshes.Loft(k, rings, sides, false, false, Vector3.Right, 1.5f / Mathf.Max(baseR, 0.3f),
+			radial: (ri, a) =>
+			{
+				float f = fs[ri];
+				// soft lobes round it, drifting along it; the sucker face a little flatter
+				float m = 1f + 0.045f * Mathf.Sin(3f * a + lobePh + f * 5f) + 0.03f * Mathf.Sin(5f * a + lobe2 - f * 7f);
+				float under = Mathf.Max(0f, Mathf.Sin(a));
+				return m * (1f - 0.07f * under * under);
+			});
 		for (int i = 0; i < Segments; i++)
 		{
 			var joint = new Node3D { Name = $"J{i}", Position = i == 0 ? Vector3.Zero : Vector3.Up * segLen };
 			parent.AddChild(joint);
-			k.Xf = Transform3D.Identity;
-			k.Mat(Skin());
-			k.Color = Colors.White;
-			// four rings to each joint's length, so a bend is spread round the joint, never a crease at it
-			for (int q = 0; q < 4; q++)
-			{
-				float fa = (i + q / 4f) / Segments, fb = (i + (q + 1) / 4f) / Segments;
-				k.Cylinder(Vector3.Up * fa * length, Vector3.Up * fb * length, Radius(baseR, fa), Radius(baseR, fb), 16, false, 1.5f);
-			}
-			// ring suckers in two staggered rows down the inner face (the side it curls toward, +Z)
-			if (i < Segments - 1)
+			// suckers in two loose rows down the inner face (the side it curls toward, +Z)
+			if (i < Segments - 1 && modelFlesh == null)
 			{
 				k.Xf = new Transform3D(Basis.Identity, Vector3.Up * i * segLen);
-				TentacleKit.Suckers(k, segLen, Radius(baseR, (float)i / Segments), Radius(baseR, (float)(i + 1) / Segments), i < 3 ? 2 : 3);
+				TentacleKit.Suckers(k, segLen, Radius(baseR, (float)i / Segments), Radius(baseR, (float)(i + 1) / Segments), i < 3 ? 2 : 3, 0.42f, seed * 13 + i);
 			}
 			limb.Joints.Add(joint);
 			parent = joint;
 		}
 		k.Xf = Transform3D.Identity;
-		limb.Skel = AnimKit.ChainSkeleton(limb.Root, AnimKit.SkinAlongY(k.Commit(), segLen, Segments), segLen, Segments);
+		limb.Skel = AnimKit.ChainSkeleton(limb.Root, AnimKit.SkinAlongY(modelFlesh ?? k.Commit(), segLen, Segments), segLen, Segments);
+		// its skin's detail and pattern read from the rest pose, so they ride the flesh as it bends instead of swimming over it
+		if (limb.Skel.GetNodeOrNull<MeshInstance3D>("Flesh") is { } fleshMi)
+		{
+			CreatureDetail.Prepare(fleshMi);
+			fleshMi.SetInstanceShaderParameter("pulse_phase", _rng.RandfRange(0f, 50f));
+			limb.Flesh = fleshMi;
+		}
 		// the mouth at the tip (the owner's references): jaws flaring round a toothed throat
-		TentacleKit.Maw(limb.Joints[Segments - 1], Radius(baseR, 1f), baseR * 1.45f, Skin(), limb.Joints.Count * 31 + _limbs.Count).Position = Vector3.Up * segLen;
+		(TentacleModels.Maw(limb.Joints[Segments - 1], baseR * 1.45f, MawSkin())
+			?? TentacleKit.Maw(limb.Joints[Segments - 1], Radius(baseR, 1f), baseR * 1.45f, MawSkin(), limb.Joints.Count * 31 + _limbs.Count)).Position = Vector3.Up * segLen;
 		// eyes all the way up it, crowded and huge at the root where it meets the body, shrinking to
 		// small ones toward the tip (never on the sucker side)
 		for (int e = 0; e < eyes; e++)
@@ -154,12 +193,19 @@ public partial class LakeCreature : Node3D
 			float r = Radius(baseR, f);
 			float ang = Mathf.Pi * 0.5f + _rng.RandfRange(0.75f, Mathf.Tau - 0.75f);
 			float size = Mathf.Min(TentacleKit.EyeSize(baseR * 0.9f, baseR * 0.14f, f) * _rng.RandfRange(0.85f, 1.15f), r * 0.95f);
-			var socket = new Node3D { Name = $"Eye{e}", Position = new Vector3(Mathf.Cos(ang) * r * 1.0f, local, Mathf.Sin(ang) * r * 1.0f) };
+			// (2026-10-15) sunk into the limb by a third of its size, so the flesh closes round it instead of it sitting on top
+			float sink = Mathf.Max(r * 0.7f, r - size * 0.18f);
+			var socket = new Node3D { Name = $"Eye{e}", Position = new Vector3(Mathf.Cos(ang) * sink, local, Mathf.Sin(ang) * sink) };
 			limb.Joints[seg].AddChild(socket);
-			BuildEye(socket);
+			BuildEye(socket, 1 + _rng.RandiRange(0, 11));
 			socket.Scale = Vector3.One * 0.001f;
 			limb.Eyes.Add(socket);
 			limb.EyeSize.Add(size);
+			// each eye its own: how quickly it turns to you, where it wanders off to, when it blinks
+			limb.EyeLook.Add(Quaternion.Identity);
+			limb.EyeRate.Add(_rng.RandfRange(2.5f, 9f));
+			limb.EyeBlink.Add(_rng.RandfRange(2f, 12f));
+			limb.EyeOff.Add(new Vector3(_rng.RandfRange(-1f, 1f), _rng.RandfRange(-0.6f, 0.6f), 0f));
 		}
 		limb.Drips = Drips(limb.Joints[Mathf.Min(3, Segments - 1)], baseR);
 		_limbs.Add(limb);
@@ -179,11 +225,11 @@ public partial class LakeCreature : Node3D
 			Gravity = new Vector3(0, -9.8f, 0),
 			ScaleMin = 0.6f, ScaleMax = 1.3f,
 		};
-		var draw = new QuadMesh { Size = Vector2.One * 0.07f };
+		var draw = new QuadMesh { Size = Vector2.One * 0.03f };   // (2026-10-15: fine drops, not white pearls)
 		draw.Material = new StandardMaterial3D
 		{
 			AlbedoTexture = LakeFx.SoftDot(),
-			AlbedoColor = new Color(0.95f, 0.88f, 0.8f, 0.7f),
+			AlbedoColor = new Color(0.78f, 0.8f, 0.82f, 0.4f),
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
@@ -204,7 +250,21 @@ public partial class LakeCreature : Node3D
 	private static float Radius(float baseR, float f) => Mathf.Lerp(baseR, Mathf.Max(0.12f, baseR * 0.3f), Mathf.Pow(f, 1.7f));   // thick enough at the tip to carry its mouth
 
 	/// <summary>Gooey, grimy octopus flesh (<see cref="TentacleKit.Flesh"/>): maroon underneath, green-teal down the back.</summary>
-	private static ShaderMaterial Skin() => _skin ??= TentacleKit.Flesh(null, 1.1f);
+	private static ShaderMaterial Skin()
+	{
+		if (_skin != null) return _skin;
+		_skin = TentacleKit.Flesh(null, 1.1f);
+		// (2026-10-15) read from the rest pose (the pattern rides the flesh as it bends), a slow swallowing pulse travelling up
+		// each limb (each its own phase), and the thin flesh toward the tips glowing red when lit from behind
+		_skin.SetShaderParameter("rest_space", true);
+		_skin.SetShaderParameter("pulse_amp", 0.035f);
+		_skin.SetShaderParameter("thin_glow", 1f);
+		_skin.SetShaderParameter("vc_suckers", TentacleModels.Available);   // (the Blender limb paints its cups in)
+		return _skin;
+	}
+	private static ShaderMaterial _mawSkin;
+	/// <summary>The mouths aren't skinned (no rest pose in them): the same flesh, read from where it is.</summary>
+	private static ShaderMaterial MawSkin() => _mawSkin ??= TentacleKit.Flesh(null, 1.1f);
 
 	private static SphereMesh _ball;
 	private static TorusMesh _lidMesh;
@@ -214,6 +274,57 @@ public partial class LakeCreature : Node3D
 	/// faces the camera): a yellowed, veined white ball; on its front, a domed dark-red iris with a faint
 	/// glow of its own, and a black pupil. Real geometry, so it reads the same from any angle and at the
 	/// game's low resolution.</summary>
+	internal static void BuildEye(Node3D socket, int variant)
+	{
+		if (variant <= 0) { BuildEye(socket); return; }
+		// (2026-10-15, the owner: "less robotic") the lake's eyes aren't stamped from one: each its own iris (blood red, amber,
+		// a sick yellow-green, a milky blind one), its own pupil (a slit, a round black, a goat's bar), set in a thin swollen
+		// lid of the flesh's own colour rather than a dark ring round it
+		_ball ??= new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 12, Rings = 8 };
+		_irisVar ??= new StandardMaterial3D[4];
+		// (dull, dark, sick colours: a lit eye in the dark, not a sweet)
+		Color[] iris = { new(0.3f, 0.035f, 0.03f), new(0.3f, 0.16f, 0.04f), new(0.17f, 0.18f, 0.06f), new(0.42f, 0.4f, 0.35f) };
+		Color[] glow = { new(0.45f, 0.04f, 0.02f), new(0.3f, 0.12f, 0.02f), new(0.12f, 0.14f, 0.03f), new(0.12f, 0.11f, 0.09f) };
+		int vi = (variant - 1) % 4;
+		_irisVar[vi] ??= new StandardMaterial3D
+		{
+			AlbedoColor = iris[vi], Roughness = 0.08f, MetallicSpecular = 0.85f,
+			EmissionEnabled = true, Emission = glow[vi], EmissionEnergyMultiplier = vi == 3 ? 0.15f : 0.35f,
+			ClearcoatEnabled = true, Clearcoat = 1f, ClearcoatRoughness = 0.03f,
+		};
+		_pupilMat ??= new StandardMaterial3D { AlbedoColor = new Color(0.01f, 0.005f, 0.005f), Roughness = 0.05f, MetallicSpecular = 0.9f };
+		MeshInstance3D Part(Material m, Vector3 pos, Vector3 scale) => new()
+		{
+			Mesh = _ball, MaterialOverride = m, Position = pos, Scale = scale,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		};
+		// the white duller and darker than the stock eye's (in the dark a turned-away ball read as a lit bulb)
+		_dimWhite ??= (StandardMaterial3D)EyeMat().Duplicate();
+		_dimWhite.AlbedoColor = new Color(0.62f, 0.5f, 0.42f);
+		_dimWhite.Emission = new Color(0.05f, 0.03f, 0.02f);
+		_dimWhite.Roughness = 0.18f;
+		float irisR = 0.42f + 0.1f * ((variant * 7) % 3);
+		// (2026-10-15) the Blender eye's parts (tools/Blender/tentacle.py), in the same order: the white, the iris, the pupil
+		if (TentacleModels.EyePart(socket, "Ball", _dimWhite) != null)
+		{
+			TentacleModels.EyePart(socket, "Iris", _irisVar[vi], new Vector3(irisR / 0.5f, irisR / 0.5f, 1f));
+			if (vi != 3) TentacleModels.EyePart(socket, ((variant * 5) % 3) switch { 0 => "Pupil_Slit", 1 => "Pupil_Round", _ => "Pupil_Bar" }, _pupilMat);
+			return;
+		}
+		socket.AddChild(Part(_dimWhite, Vector3.Zero, Vector3.One));
+		socket.AddChild(Part(_irisVar[vi], new Vector3(0, 0, -0.86f), new Vector3(irisR, irisR, 0.18f)));
+		if (vi != 3)
+		{
+			int pk = (variant * 5) % 3;
+			var ps = pk == 0 ? new Vector3(0.1f, 0.3f, 0.08f) : pk == 1 ? new Vector3(0.18f, 0.18f, 0.08f) : new Vector3(0.3f, 0.09f, 0.08f);
+			socket.AddChild(Part(_pupilMat, new Vector3(0, 0, -0.99f), ps));
+		}
+		// no lid ring: the ball sits sunk in the limb, the flesh closing round it (a torus round it read as a band cut across it)
+	}
+
+	private static StandardMaterial3D[] _irisVar;
+	private static StandardMaterial3D _dimWhite;
+
 	internal static void BuildEye(Node3D socket)
 	{
 		_ball ??= new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 12, Rings = 8 };
@@ -229,6 +340,14 @@ public partial class LakeCreature : Node3D
 			Mesh = _ball, MaterialOverride = m, Position = pos, Scale = scale,
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
+		// (2026-10-15) the Blender eye's parts, in the same order (the white, the iris, the pupil, the lid)
+		if (TentacleModels.EyePart(socket, "Ball", EyeMat()) != null)
+		{
+			TentacleModels.EyePart(socket, "Iris", _irisMat);
+			TentacleModels.EyePart(socket, "Pupil_Slit", _pupilMat);
+			TentacleModels.EyePart(socket, "Lid", TentacleKit.Lid);
+			return;
+		}
 		socket.AddChild(Part(EyeMat(), Vector3.Zero, Vector3.One));
 		socket.AddChild(Part(_irisMat, new Vector3(0, 0, -0.84f), new Vector3(0.5f, 0.5f, 0.2f)));
 		socket.AddChild(Part(_pupilMat, new Vector3(0, 0, -0.99f), new Vector3(0.14f, 0.3f, 0.08f)));
@@ -640,9 +759,11 @@ public partial class LakeCreature : Node3D
 			l.SlamT += dt;
 			// wind up (rear back, 0.7 s), strike (0.28 s), hold down a moment, come back up (1.2 s)
 			float s = l.SlamT;
+			// (2026-10-15, "less robotic") eased, not linear: a slow gathering wind-up, a strike that accelerates into the
+			// water (cubic in) and overshoots a little down into it, a heavy settle, a lazy rise back
 			if (s < 0.7f) rear = Mathf.SmoothStep(0f, 1f, s / 0.7f);
-			else if (s < 0.98f) { rear = 1f - (s - 0.7f) / 0.28f; strike = (s - 0.7f) / 0.28f; }
-			else if (s < 1.5f) strike = 1f;
+			else if (s < 0.98f) { float u = (s - 0.7f) / 0.28f; float e = u * u * u; rear = 1f - e; strike = e * 1.12f; }
+			else if (s < 1.5f) strike = 1f + 0.12f * Mathf.Exp(-(s - 0.98f) * 7f) * Mathf.Cos((s - 0.98f) * 14f);
 			else if (s < 2.7f) strike = 1f - Mathf.SmoothStep(0f, 1f, (s - 1.5f) / 1.2f);
 			else l.SlamT = -1f;
 			if (!l.SlamHit && s >= 0.98f)
@@ -657,18 +778,23 @@ public partial class LakeCreature : Node3D
 		for (int i = 0; i < l.Joints.Count; i++)
 		{
 			float f = (float)i / Segments;
-			float wave = Mathf.Sin(t * 2.1f + l.Phase - i * 0.62f) * amp * (0.4f + f);
-			float side = Mathf.Cos(t * 1.6f + l.Phase * 1.3f - i * 0.5f) * amp * 0.8f * (0.3f + f);
+			// (2026-10-15, "less robotic") two waves of unrelated speed travelling up it (each limb its own pair), so the sway
+			// never repeats and no two limbs move in step; a slow breathing of its curl; and a slow roll round its own length
+			float wave = (Mathf.Sin(t * 2.1f * l.FreqA + l.Phase - i * 0.62f) * 0.75f
+				+ Mathf.Sin(t * 2.1f * l.FreqB + l.Phase2 - i * 0.95f) * 0.35f) * amp * (0.4f + f);
+			float side = (Mathf.Cos(t * 1.6f * l.FreqA + l.Phase * 1.3f - i * 0.5f) * 0.7f
+				+ Mathf.Sin(t * 1.1f * l.FreqB + l.Phase2 * 0.7f - i * 0.8f) * 0.4f) * amp * 0.8f * (0.3f + f);
+			float twist = Mathf.Sin(t * 0.9f * l.FreqA + l.Phase2 - i * 0.45f) * l.Twist * f * (1f - 0.7f * loom);
 			// lean toward the boat as it rises; the slam rears back past vertical, then curls hard over
-			float curl = l.Curl * l.Rise * (0.5f + f);
+			float curl = l.Curl * l.Rise * (0.5f + f) * (1f + 0.25f * Mathf.Sin(t * 0.55f * l.FreqB + l.Phase));
 			curl += -0.16f * rear + 0.34f * strike * Mathf.SmoothStep(0.1f, 0.6f, f + 0.2f);
 			// looming: stand up straight, then bend over at the top to hang above the boat
 			curl += loom * (-0.08f + 0.62f * Mathf.SmoothStep(0.25f, 0.75f, f));
 			// (2026-10-12, secondary motion) each joint eases toward its bend, the further out the looser: the tip trails the
 			// root through a sway and whips on past it, as flesh does, not a stiff rod turned in one piece
 			l.Lag ??= new Vector3[l.Joints.Count];
-			var goal = new Vector3(curl + wave, 0f, side);
-			float follow = Mathf.Lerp(16f, 5f, f);
+			var goal = new Vector3(curl + wave, twist, side);
+			float follow = Mathf.Lerp(16f, 5f, f) * (0.4f + 0.5f * l.FreqA);   // (each limb its own stiffness)
 			l.Lag[i] = l.Lag[i].Lerp(goal, 1f - Mathf.Exp(-dt * follow));
 			l.Joints[i].Rotation = l.State == State.Rising && l.Rise < 0.05f ? goal : l.Lag[i];
 		}
@@ -678,6 +804,12 @@ public partial class LakeCreature : Node3D
 				l.Skel.SetBonePoseRotation(i, l.Joints[i].Quaternion);
 				l.Skel.SetBonePosePosition(i, l.Joints[i].Position);
 			}
+		// where it meets the water: rings spreading off it now and then while it's up and moving
+		if (l.State is State.Up or State.Rising && l.Rise > 0.3f && _time >= l.NextRipple && GetParent() != null)
+		{
+			l.NextRipple = (float)_time + _rng.RandfRange(0.7f, 1.6f) / Mathf.Max(0.5f, l.Speed);
+			LakeFx.Ripple(GetParent(), l.Root.GlobalPosition with { Y = GlobalPosition.Y + 0.02f }, l.Colossus ? 4.5f : 2.2f, _rng.RandfRange(1.3f, 2.2f), 0.4f);
+		}
 		UpdateEyes(l, dt);
 	}
 
@@ -700,11 +832,45 @@ public partial class LakeCreature : Node3D
 			var eye = l.Eyes[e];
 			float size = l.EyeSize[e] * Mathf.Max(0.001f, s);
 			Vector3 at = eye.GlobalPosition;
-			if (at.DistanceSquaredTo(target) > 0.01f)
+			if (at.DistanceSquaredTo(target) <= 0.01f) continue;
+			// (2026-10-15, "less robotic") each eye its own: it turns onto you at its own pace (some snap, some roll round
+			// slowly), now and then darts off and back (a saccade), and blinks on its own clock, as well as all together
+			bool perEye = e < l.EyeLook.Count;
+			Vector3 aim = target;
+			float blink = 1f;
+			if (perEye)
 			{
-				var basis = Basis.LookingAt(target - at, Vector3.Up);
-				eye.GlobalBasis = basis * Basis.FromScale(new Vector3(size, size * lid, size));
+				l.EyeBlink[e] -= dt;
+				if (l.EyeBlink[e] < -0.22f) { l.EyeBlink[e] = _rng.RandfRange(3f, 14f); if (_rng.Randf() < 0.3f) l.EyeOff[e] = new Vector3(_rng.RandfRange(-1f, 1f), _rng.RandfRange(-0.6f, 0.6f), 0f); }
+				if (l.EyeBlink[e] < 0f) blink = Mathf.Clamp(Mathf.Abs(l.EyeBlink[e] + 0.11f) / 0.11f, 0.08f, 1f);
+				// the wander: a little off you, held a while, mostly on you
+				float off = Mathf.Max(0f, Mathf.Sin((float)_time * 0.37f + e * 1.7f)) * 0.9f;
+				aim = target + (_cam != null && IsInstanceValid(_cam) ? (_cam.GlobalBasis.X * l.EyeOff[e].X + _cam.GlobalBasis.Y * l.EyeOff[e].Y) * off : Vector3.Zero);
 			}
+			// an eye can't look through its own limb: past ~70 degrees off the way its socket faces out of the flesh, it strains
+			// as far round as it can instead (an eye on the far side shows you its iris at the edge, not its back)
+			Vector3 dir = (aim - at).Normalized();
+			if (perEye && eye.GetParent() is Node3D jnt)
+			{
+				Vector3 outward = (jnt.GlobalBasis * (eye.Position with { Y = 0f })).Normalized();
+				float ang = outward.AngleTo(dir);
+				const float maxAng = 1.22f;
+				if (ang > maxAng && outward.LengthSquared() > 0.5f)
+				{
+					Vector3 axis = outward.Cross(dir);
+					if (axis.LengthSquared() > 1e-6f) dir = outward.Rotated(axis.Normalized(), maxAng);
+				}
+			}
+			var want = Basis.LookingAt(dir, Mathf.Abs(dir.Y) > 0.98f ? Vector3.Forward : Vector3.Up).Orthonormalized().GetRotationQuaternion().Normalized();
+			Quaternion q = want;
+			if (perEye)
+			{
+				var cur = l.EyeLook[e];
+				if (cur == Quaternion.Identity) cur = want;
+				q = cur.Normalized().Slerp(want, 1f - Mathf.Exp(-dt * l.EyeRate[e])).Normalized();
+				l.EyeLook[e] = q;
+			}
+			eye.GlobalBasis = new Basis(q) * Basis.FromScale(new Vector3(size, size * lid * blink, size));
 		}
 	}
 }

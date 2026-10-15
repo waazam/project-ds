@@ -70,7 +70,7 @@ public partial class SaveLamp : Node3D
 	private OmniLight3D _light;
 	private Node3D _bulb;
 	private float _under, _t;
-	private ShadowMan _figure;
+	private HallStalker _figure;
 	private float _figureT;
 
 	private float _retry;
@@ -155,7 +155,7 @@ public partial class SaveLamp : Node3D
 		float d = hit.Count > 0 ? chest.DistanceTo((Vector3)hit["position"]) - 0.6f : 4.6f;
 		if (d < 2.4f) { Watched = true; return; }   // (a wall right behind: nowhere for it to stand)
 		Watched = true;
-		_figure = new ShadowMan { Name = "BehindYou", Scale = Vector3.One * 0.72f, Glare = 0f };
+		_figure = new HallStalker { Name = "BehindYou", Scale = Vector3.One * 0.72f, Glare = 0f };
 		(GetTree().CurrentScene ?? GetTree().Root).AddChild(_figure);
 		var feet = player.GlobalPosition + back * d;
 		var down = GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(feet + Vector3.Up, feet + Vector3.Down * 3f, 1));
