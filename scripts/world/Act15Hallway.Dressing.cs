@@ -7,10 +7,10 @@ namespace ProjectDS.World;
 /// <summary>
 /// (2026-10-14h, the old-and-abandoned pass; Dan: "old and abandoned ... not sci-fi") Act 15's hall dressed as an old
 /// institutional service corridor gone to ruin, decades shut (2026-10-15, Dan: not a hospital, nor any particular kind
-/// of building: its signs and door plates are a service corridor's): the walls' two-tone paint on block
+/// of building, and no signs anywhere in it): the walls' two-tone paint on block
 /// (<c>corridor_wall.gdshader</c>), a bump rail down both sides on its brackets (a length missing here, one hanging off), a perished rubber base, steel
-/// service doors with wired-glass panels and their number plates, fire cabinets with their glass gone and their extinguishers
-/// missing, enamel signs, paper trodden into the floor, vinyl tiles lifted, and stains, peel and scuffs by rule.
+/// service doors with wired-glass panels, fire cabinets with their glass gone and their extinguishers
+/// missing, paper trodden into the floor, vinyl tiles lifted, and stains, peel and scuffs by rule.
 /// <para>None of it is in anyone's way (no collision: the hall is a body's width), and none of it touches the hall's own
 /// dice: everything here is drawn from its own (red light, green light's timings come from the hall's; see Build).</para>
 /// </summary>
@@ -49,28 +49,12 @@ public partial class Act15Hallway
 		var hw = new MeshKit(); hw.Mat(CorridorTextures.PlateMat);
 		var frame = new MeshKit(); frame.Mat(ServiceDoor.FrameMat);
 		var glass = new MeshKit(); glass.Mat(CorridorTextures.GlassMat);
-		var signs = new MeshKit(); signs.Mat(CorridorTextures.EnamelMat);
-		var backs = new MeshKit(); backs.Mat(CorridorTextures.SignBackMat);
 		var red = new MeshKit(); red.Mat(CorridorTextures.RedMat);
 		var rail = new MeshKit(); rail.Mat(CorridorTextures.RailMat);
 		var cove = new MeshKit(); cove.Mat(CorridorTextures.CoveMat);
 		var floorBits = new MeshKit(); floorBits.Mat(CorridorTextures.PaperMat);
 		var tiles = new MeshKit(); tiles.Mat(CorridorTextures.CoveMat);
-		foreach (var k in new[] { leaf, hw, frame, glass, signs, backs, red, rail, cove, floorBits, tiles }) k.Color = Colors.White;
-		var labels = new Node3D { Name = "Signs" };
-		AddChild(labels);
-		var font = new SystemFont { FontNames = new[] { "Arial Narrow", "Arial", "Liberation Sans" }, FontWeight = 700 };
-		void Text(string t, Vector3 at, Vector3 n, float px, Color c)
-		{
-			var l = new Label3D
-			{
-				Text = t, Font = font, FontSize = 48, PixelSize = px, Modulate = c, OutlineSize = 0, Shaded = true,
-				Position = at, DoubleSided = false,
-			};
-			labels.AddChild(l);
-			// (a Label3D faces +Z: turned to face out of its wall)
-			l.Basis = Basis.LookingAt(-n, Vector3.Up);
-		}
+		foreach (var k in new[] { leaf, hw, frame, glass, red, rail, cove, floorBits, tiles }) k.Color = Colors.White;
 
 		// ---- the doors
 		int room = 101;
@@ -103,9 +87,7 @@ public partial class Act15Hallway
 			BuildKit.Box(frame, new Vector3(fx, h * 0.5f + 0.03f, zc - w * 0.5f - 0.03f), new Vector3(0.05f, h + 0.06f, 0.07f));
 			BuildKit.Box(frame, new Vector3(fx, h * 0.5f + 0.03f, zc + w * 0.5f + 0.03f), new Vector3(0.05f, h + 0.06f, 0.07f));
 			BuildKit.Box(frame, new Vector3(fx, h + 0.035f, zc), new Vector3(0.05f, 0.07f, w + 0.13f));
-			// its number on a plate over it
-			BuildKit.Box(hw, new Vector3(s * (hwid - 0.006f), h + 0.22f, zc), new Vector3(0.012f, 0.09f, 0.22f));
-			Text($"S{room - 100:00}", new Vector3(s * (hwid - 0.0135f), h + 0.22f, zc), n, 0.0016f, new Color(0.1f, 0.09f, 0.07f));
+			// (2026-10-15: no number plate over it, Dan: no signs in the hall)
 			room += rng.RandiRange(1, 3);
 			cuts.Add((s, zc - w * 0.5f - 0.1f, zc + w * 0.5f + 0.1f));
 		}
@@ -165,7 +147,7 @@ public partial class Act15Hallway
 				// its glass on the floor under it, in pieces
 				for (int i = 0; i < 6; i++)
 					BuildKit.Box(cg, new Vector3(wx - s * rng.RandfRange(0.05f, 0.45f), 0.003f, zc + rng.RandfRange(-0.3f, 0.3f)), new Vector3(rng.RandfRange(0.03f, 0.1f), 0.004f, rng.RandfRange(0.03f, 0.12f)), 1f, BuildKit.Face.NY, new Basis(Vector3.Up, rng.RandfRange(0f, 3f)));
-			Text("FIRE", new Vector3(wx - s * 0.003f, cy + ch * 0.5f + 0.1f, zc), new Vector3(-s, 0, 0), 0.0028f, new Color(0.45f, 0.08f, 0.05f, 0.85f));
+			// (2026-10-15: no FIRE lettering over it, Dan: no signs in the hall)
 			cuts.Add((s, zc - cw * 0.5f - 0.05f, zc + cw * 0.5f + 0.05f));
 		}
 
@@ -227,49 +209,13 @@ public partial class Act15Hallway
 			}
 		}
 
-		// ---- the signs: enamel, some out from the wall to be read down the hall
-		(string text, float z)[] hung =
+		// ---- (2026-10-15: no signs in the hall, Dan.) The ten enamel signs are gone; their draws are still spent so
+		// the paper and lifted tiles below land where they did.
+		for (int i = 0; i < 10; i++)
 		{
-			("NO ENTRY", 30f), ("NO SMOKING", 62f), ("BOILER ROOM  >", 96f), ("KEEP CLEAR", 178f), ("< FIRE EXIT", 214f), ("ELECTRICAL", 262f),
-			("STAFF ONLY", 305f), ("STORES  >", 350f), ("NO ADMITTANCE", 402f), ("SERVICE C", 446f),
-		};
-		foreach (var (text, z0) in hung)
-		{
-			bool p1 = z0 < Part1;
-			float hwid = p1 ? W1 * 0.5f : W2 * 0.5f;
-			float zc = p1 ? Mathf.Round(z0 / 6f) * 6f + 0.6f : Mathf.Round((z0 - z1) / 8f) * 8f + z1 + 0.9f;
-			float s = rng.Randf() < 0.5f ? -1f : 1f;
-			bool flag = rng.Randf() < 0.55f;
-			Color ink = new(0.12f, 0.11f, 0.09f);
-			if (flag)
-			{
-				// a flag sign out from the wall on a bracket, both faces lettered; one or two hang crooked off a broken bracket
-				float tilt = rng.Randf() < 0.25f ? rng.RandfRange(0.12f, 0.35f) : 0f;
-				float y = 2.45f, wout = 0.62f;
-				Vector3 c = new(s * (hwid - 0.05f - wout * 0.5f), y, zc);
-				var rot = new Basis(Vector3.Forward, s * tilt);
-				backs.Color = Colors.White * 0.7f;
-				backs.Cylinder(new Vector3(s * hwid, y + 0.12f, zc), new Vector3(s * (hwid - wout - 0.06f), y + 0.12f, zc), 0.008f, 0.008f, 4, false);
-				signs.Color = Colors.White * rng.RandfRange(0.65f, 0.95f);
-				BuildKit.Box(signs, c, new Vector3(wout, 0.16f, 0.018f), 1f, BuildKit.Face.None, rot);
-				foreach (float side in new[] { -1f, 1f })
-				{
-					var l = new Label3D
-					{
-						Text = text, Font = font, FontSize = 48, PixelSize = 0.0024f, Modulate = ink, OutlineSize = 0, Shaded = true,
-					};
-					labels.AddChild(l);
-					l.Transform = new Transform3D(rot * new Basis(Vector3.Up, side > 0 ? 0f : Mathf.Pi), c + rot * new Vector3(0, 0, side * 0.0105f));
-				}
-			}
-			else
-			{
-				float y = rng.RandfRange(1.75f, 2.2f);
-				Vector3 at = new(s * (hwid - 0.006f), y, zc);
-				signs.Color = Colors.White * rng.RandfRange(0.65f, 0.95f);
-				BuildKit.Box(signs, at, new Vector3(0.012f, 0.15f, 0.56f));
-				Text(text, at + new Vector3(-s * 0.0075f, 0, 0), new Vector3(-s, 0, 0), 0.0022f, ink);
-			}
+			rng.Randf();
+			if (rng.Randf() < 0.55f) { if (rng.Randf() < 0.25f) rng.RandfRange(0.12f, 0.35f); rng.RandfRange(0.65f, 0.95f); }
+			else { rng.RandfRange(1.75f, 2.2f); rng.RandfRange(0.65f, 0.95f); }
 		}
 
 		// ---- the floor: paper trodden into it along the walls, tiles lifted to the black adhesive
@@ -311,8 +257,6 @@ public partial class Act15Hallway
 		hw.CommitTo(this, "ServiceDoorHardware", false);
 		frame.CommitTo(this, "ServiceDoorFrames", false);
 		glass.CommitTo(this, "ServiceDoorGlass", false);
-		signs.CommitTo(this, "SignPlates", false);
-		backs.CommitTo(this, "SignBrackets", false);
 		red.CommitTo(this, "FireCabinets", false);
 		dark.CommitTo(this, "FireCabinetBacks", false);
 		cg.CommitTo(this, "FireCabinetGlass", false);

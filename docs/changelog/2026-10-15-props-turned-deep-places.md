@@ -75,3 +75,7 @@ looking. For example the green lamp in the room." And then, for the Act 15 hall:
 - The hall's dice after its build: `8407554524482128862`, as before.
 - Frame rate in the look shots the same or a little better: the banker's lamp no longer casts a 7 m omni shadow (the
   library's primitives went from 11.6 M to 7.1 M a frame).
+
+## Later the same day: no signs in the hall
+
+Dan: remove the signs from the red light, green light tunnel. The ten enamel wall and flag signs, the door number plates and the FIRE lettering over the fire cabinets are gone from `Act15Hallway.Dressing.cs`. Their random draws are still spent (the dressing has its own generator), so the paper and lifted tiles lie where they did; red light, green light is untouched (hall dice after build still `8407554524482128862`; beats 15 and 16 pass).
