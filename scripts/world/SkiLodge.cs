@@ -182,11 +182,20 @@ public partial class SkiLodge : Node3D
 		for (int j = 1; j < rows; j++) k.Box(c + o * 1.4f + Vector3.Up * (h / rows * j - h * 0.5f + 0.03f), new Vector3(w - 0.04f, 0.025f, 0.06f), 1f, basis);
 		// a low window: the snow drifted up against it outside, to a little under halfway up its bottom panes
 		float bottom = c.Y - h * 0.5f;
+		// (2026-10-15, the scan pass: three like lumps at every low window, the same height, a row of pillows down each
+		// wall. Now each window's own: none at some, one to three lumps at others, each its own size and place, banked to
+		// its own height, shaded soft)
 		if (bottom < 1.6f)
 		{
-			float top = bottom + h / rows * 0.55f;
-			for (int s = 0; s < 3; s++)
-				k.Blob(c + outward * (0.22f + s * 0.06f) + along * ((s - 1) * w * 0.32f) + Vector3.Up * (bottom - c.Y - 0.1f), new Vector3(w * 0.26f, (top - bottom) * 0.8f + 0.1f, 0.32f), 4100 + s + (int)(c.X * 7f), 0.12f, true, 1f, 0f, 2);
+			var wr = new RandomNumberGenerator { Seed = (ulong)(4100 + Mathf.Abs((int)(c.X * 7f)) * 3 + (c.Z > 0 ? 1 : 0)) };
+			if (wr.Randf() < 0.3f) return;   // scoured clear
+			float top = bottom + h / rows * wr.RandfRange(0.25f, 0.7f);
+			int n = wr.RandiRange(1, 3);
+			for (int s = 0; s < n; s++)
+			{
+				float off = wr.RandfRange(-0.45f, 0.45f) * w, sz = wr.RandfRange(0.6f, 1.25f);
+				k.Blob(c + outward * wr.RandfRange(0.2f, 0.34f) + along * off + Vector3.Up * (bottom - c.Y - 0.1f), new Vector3(w * 0.3f * sz, ((top - bottom) * 0.8f + 0.1f) * wr.RandfRange(0.7f, 1.1f), 0.32f * sz), 4100 + s + (int)(c.X * 7f), 0.14f, false, 1f, 0f, 2);
+			}
 		}
 	}
 
@@ -383,12 +392,23 @@ public partial class SkiLodge : Node3D
 		k.Box(new Vector3(0, -0.05f, (z0 + z1) * 0.5f), new Vector3(7.4f, 0.3f, z1 - z0), 0.5f);   // a low stone landing, one easy step
 		Col(new Vector3(0, -0.05f, (z0 + z1) * 0.5f), new Vector3(7.4f, 0.3f, z1 - z0));
 		// two squat stone piers and a heavy timber beam, a steep little snow roof over them
+		// (2026-10-15, the scan pass: the cobble tile at half a metre read as a checkerboard up their 4.6 m, seen close from
+		// Act 24's vault. Now the stair pier's laid river stone (a photographed wall, 1.6 m to the tile), each pier at its
+		// own scale so the two don't match, on a dressed plinth under a timber cap)
 		foreach (float x in new[] { -3.1f, 3.1f })
 		{
+			k.Mat(LodgeParts.LodgeTextures.RiverStoneMat);
+			k.Color = new Color(0.78f, 0.76f, 0.74f);
+			k.Box(new Vector3(x, 2.3f, z1 - 0.5f), new Vector3(0.9f, 4.6f, 0.9f), x < 0 ? 0.83f : 1.07f);
 			k.Mat(BuildingTextures.StoneMat);
-			k.Box(new Vector3(x, 2.3f, z1 - 0.5f), new Vector3(0.9f, 4.6f, 0.9f), 0.5f);
+			k.Color = new Color(0.55f, 0.55f, 0.58f);
+			k.Box(new Vector3(x, 0.14f, z1 - 0.5f), new Vector3(1.02f, 0.28f, 1.02f), 0.5f);   // the plinth
+			k.Mat(LodgeTrim);
+			k.Color = Colors.White;
+			k.Box(new Vector3(x, 4.52f, z1 - 0.5f), new Vector3(1.0f, 0.12f, 1.0f), 1f);   // the cap, under the beam
 			Col(new Vector3(x, 2.3f, z1 - 0.5f), new Vector3(0.9f, 4.6f, 0.9f));
 		}
+		k.Color = new Color(0.58f, 0.58f, 0.62f);
 		k.Mat(LodgeTrim);
 		k.Box(new Vector3(0, 4.8f, z1 - 0.5f), new Vector3(7.6f, 0.45f, 0.5f), 1f);
 		k.Mat(RoofSnow);
@@ -684,8 +704,13 @@ public partial class SkiLodge : Node3D
 		{
 			// the quilting's seams across it, a stripe across the chest, the hood fallen back with its fur
 			k.Mat(LodgeParts.LodgeTextures.BlackMat);
+			// (2026-10-15, the scan pass: on the body's face, not a straight bar standing off it)
 			for (int i = 1; i < 4; i++)
-				k.Box(o + new Vector3(-d - 0.004f, -0.12f - len * 0.22f * i, 0), new Vector3(0.01f, 0.012f, w * 1.6f), 1f);
+			{
+				float sy = -0.12f - len * 0.22f * i, ry = (sy - (-0.12f - len * 0.5f)) / (len * 0.5f);
+				float face = 0.01f - d * Mathf.Sqrt(Mathf.Max(0.05f, 1f - ry * ry)) * 0.96f;
+				k.Box(o + new Vector3(face - 0.001f, sy, 0), new Vector3(0.01f, 0.012f, w * 0.9f), 1f);
+			}
 			k.Mat(CoatWool(new Color(0.36f, 0.1f, 0.08f), 0));
 			k.Box(o + new Vector3(-d - 0.008f, -0.3f, 0), new Vector3(0.012f, 0.07f, w * 1.75f), 1f);
 			k.Mat(_furTrim);
@@ -696,7 +721,14 @@ public partial class SkiLodge : Node3D
 			k.Mat(cloth);
 			k.Blob(o + new Vector3(-0.04f, -0.04f, 0), new Vector3(0.06f, 0.05f, 0.11f), seed + 4, 0.1f, false, 1f, 0f, 1);   // the collar turned up
 			k.Mat(LodgeParts.LodgeTextures.BrassMat);
-			for (int i = 0; i < 4; i++) k.Cylinder(o + new Vector3(-d - 0.005f, -0.25f - i * 0.17f, 0.04f), o + new Vector3(-d - 0.015f, -0.25f - i * 0.17f, 0.04f), 0.012f, 0.012f, 6, true);   // its buttons
+			// its buttons, on the body's face where it curves in toward the hem (2026-10-15, the scan pass: they stood in a
+			// straight line 1-5 cm off it, the gap audit's)
+			for (int i = 0; i < 4; i++)
+			{
+				float by = -0.25f - i * 0.17f, ry = (by - (-0.12f - len * 0.5f)) / (len * 0.5f), rz = 0.04f / (w * 1.05f);
+				float face = 0.01f - d * Mathf.Sqrt(Mathf.Max(0.05f, 1f - ry * ry - rz * rz)) * 0.96f;
+				k.Cylinder(o + new Vector3(face + 0.003f, by, 0.04f), o + new Vector3(face - 0.007f, by, 0.04f), 0.012f, 0.012f, 6, true);
+			}
 		}
 		else
 		{
@@ -776,12 +808,64 @@ public partial class SkiLodge : Node3D
 		k.Color = Colors.White;
 		k.BevelBox(new Vector3(x0 + 0.2f, 1.6f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 0.015f);
 		k.BevelBox(new Vector3(x0 + 0.2f, 0.3f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 0.015f);
-		// the skis in it: the modelled pairs (their poles with them), leant back against the wall
+		// (2026-10-15, the scan pass) the rails stand out from the wall on blocks screwed to it, every metre or so (they
+		// stood 15 cm off the plaster on nothing: the gap audit's worst); the skis' tips lean on the rails, clear of the wall
+		for (float bz = z0 + 0.45f; bz < z1 - 0.3f; bz += 1.32f)
+			foreach (float by in new[] { 1.6f, 0.3f })
+			{
+				k.BevelBox(new Vector3(x0 + 0.08f, by, bz), new Vector3(0.15f, 0.075f, 0.055f), 0.008f);
+				// (two screw heads in the block's face, toward the room)
+				k.Mat(LodgeParts.LodgeTextures.IronMat);
+				foreach (float sy in new[] { -0.018f, 0.018f })
+					k.Cylinder(new Vector3(x0 + 0.1f, by + sy, bz + 0.028f), new Vector3(x0 + 0.1f, by + sy, bz + 0.031f), 0.007f, 0.007f, 6, true);
+				k.Mat(LodgeTrim);
+			}
+		// the skis in it: the modelled pairs (their poles with them), leant back against the rail
 		var roles = Woodwork;
 		roles["ski"] = SkiPaint;
-		bool modelled = true;
-		for (int i = 0; i < 4 && modelled; i++)
-			modelled = FurnitureKit.Add(k, "skis", new Vector3(x0 + 0.47f, 0.02f, z0 + 0.8f + i * 0.85f), Mathf.Pi * 0.5f, roles);
+		// (2026-10-15, the scan pass: four of one pair, one paint, square, at an even 0.85 m. Now as they were left: the
+		// modelled pairs in three paints, each its own length and lean and a little turned; an older pair of wooden skis
+		// with cable bindings; a pair of poles on their own; an empty place and a crowded one)
+		bool modelled = FurnitureKit.Has("skis");
+		if (modelled)
+		{
+			foreach (var (z, paint, len, yaw, lean) in new[]
+			{
+				(z0 + 0.72f, SkiPaint, 1.0f, 0.04f, 0f), (z0 + 2.38f, SkiPaintBlue, 0.93f, -0.07f, 0.035f), (z0 + 2.86f, SkiPaintBlack, 1.06f, 0.02f, -0.03f),
+				(z0 + 4.62f, SkiPaintBlue, 0.97f, 0.1f, 0.05f),
+			})
+			{
+				roles["ski"] = paint;
+				// (lean: turned about the wall's line, the tips' height kept on the rail; length: a longer or shorter pair)
+				var b = new Basis(Vector3.Up, Mathf.Pi * 0.5f + yaw) * new Basis(Vector3.Right, lean) * Basis.FromScale(new Vector3(1f, len, 1f));
+				FurnitureKit.Add(k, "skis", new Transform3D(b, new Vector3(x0 + 0.47f + lean * 1.6f, 0.02f, z)), roles);
+			}
+			roles["ski"] = SkiPaint;
+			// an older pair, wooden, longer, their tips turned up, on the rail between
+			OldWoodSkis(k, new Vector3(x0 + 0.5f, 0.02f, z0 + 1.42f), x0 + 0.26f);
+			// a pair of poles on their own, hung from the upper rail by their wrist straps (the rail's face at x0 + 0.25, its
+			// top at 1.65; the lower rail's face clear of them by a centimetre)
+			foreach (var (dz, tipDz) in new[] { (0f, -0.025f), (0.055f, 0.03f) })
+			{
+				float pz = z0 + 3.72f + dz;
+				var grip = new Vector3(x0 + 0.272f, 1.54f, pz);
+				var tip = new Vector3(x0 + 0.272f, 0.3f, pz + tipDz);
+				var dir = (tip - grip).Normalized();
+				k.Mat(LodgeParts.LodgeTextures.LeatherMat);
+				k.Cylinder(grip, grip + dir * 0.17f, 0.015f, 0.013f, 8, true);   // the grip
+				k.Mat(LodgeParts.LodgeTextures.IronMat);
+				k.Cylinder(grip + dir * 0.17f, tip, 0.008f, 0.006f, 6, true);   // the shaft
+				k.Mat(LodgeParts.LodgeTextures.DarkWoodMat);
+				var basket = tip - dir * 0.09f;
+				k.Cylinder(basket, basket - dir * 0.012f, 0.05f, 0.05f, 10, true);   // the basket
+				// the strap: up from the grip's top, over the rail, a hand down behind it
+				k.Mat(LodgeParts.LodgeTextures.LeatherMat);
+				k.Beam(grip + new Vector3(0, 0.01f, 0), new Vector3(x0 + 0.258f, 1.662f, pz), 0.018f, 0.004f);
+				k.Beam(new Vector3(x0 + 0.258f, 1.662f, pz), new Vector3(x0 + 0.142f, 1.662f, pz), 0.018f, 0.004f);
+				k.Beam(new Vector3(x0 + 0.142f, 1.662f, pz), new Vector3(x0 + 0.142f, 1.58f, pz + 0.01f), 0.018f, 0.004f);
+			}
+			k.Mat(LodgeTrim);
+		}
 		// coats on hooks over the bench on the other wall, boots kicked off under it
 		if (modelled)
 		{
@@ -899,12 +983,29 @@ public partial class SkiLodge : Node3D
 		var k = new MeshKit();
 		k.Mat(RoofSnow);
 		k.Color = Colors.White;
+		// (2026-10-15, the scan pass: it was one pillow every 4.5 m along both long walls of both wings, every one 2.6 x 0.55
+		// x 1.1, faceted. Now a drift the wind built: a chain of soft lumps at uneven steps, each its own length and depth,
+		// rising and falling along the wall in long swells, bare in places, deepest at the wings' far corners and on the
+		// north side (the wind's from the south). Each lump's back stays outside the wall (inside, the rooms' linings are
+		// 0.37 m in from it))
+		var drng = new RandomNumberGenerator { Seed = 9020 };
 		foreach (float s in new[] { -1f, 1f })
-			for (float x = WingX0 + 3f; x < WingX1; x += 4.5f)
+			foreach (float zs in new[] { 1f, -1f })
 			{
-				k.Blob(new Vector3(s * x, 0f, WingHalfZ + 0.9f), new Vector3(2.6f, 0.55f, 1.1f), (int)(x * 7 + s * 3 + 100), 0.2f, true, 1f);
-				if (s < 0 && Mathf.Abs(-x - BackDoorX) < 3f) continue;
-				k.Blob(new Vector3(s * x, 0f, -WingHalfZ - 0.9f), new Vector3(2.6f, 0.75f, 1.2f), (int)(x * 5 + s * 3 + 200), 0.2f, true, 1f);
+				float ph = drng.Randf() * Mathf.Tau, lee = zs < 0 ? 1.3f : 1f;
+				for (float x = WingX0 + 3f + drng.RandfRange(0f, 1.5f); x < WingX1 + 0.6f; x += drng.RandfRange(1.1f, 2.4f))
+				{
+					// the swell along the wall (two waves), and the far corner's heap
+					float swell = 0.5f + 0.32f * Mathf.Sin(x * 0.29f + ph) + 0.18f * Mathf.Sin(x * 0.83f + ph * 1.7f);
+					if (swell < 0.22f) continue;   // a bare stretch, scoured
+					float corner = Mathf.Clamp(1f - (WingX1 - x) / 5f, 0f, 1f);
+					if (zs < 0 && s < 0 && Mathf.Abs(-x - BackDoorX) < 3f) continue;   // (the back door's own, below)
+					float h = (0.18f + 0.6f * swell + 0.55f * corner) * lee * drng.RandfRange(0.85f, 1.15f);
+					float depth = (0.7f + 0.6f * swell + 0.5f * corner) * drng.RandfRange(0.9f, 1.1f);
+					float len = drng.RandfRange(1.3f, 2.4f);
+					var c = new Vector3(s * x, 0f, zs * (WingHalfZ + depth * 1.18f));
+					k.Blob(c, new Vector3(len, h, depth), (int)(x * 7 + s * 3 + zs * 50 + 100), 0.12f, false, 1f);
+				}
 			}
 		// at the back door: shoulder-deep either side, a trough trodden to it (by whom?)
 		k.Blob(new Vector3(BackDoorX - 1.6f, 0f, -WingHalfZ - 1f), new Vector3(1.2f, 1.1f, 1.1f), 311, 0.2f, true, 1f);
@@ -916,6 +1017,53 @@ public partial class SkiLodge : Node3D
 
 	private static StandardMaterial3D _timber, _trim, _door, _glass, _lit, _roofSnow, _ski;
 	private static StandardMaterial3D SkiPaint => _ski ??= new StandardMaterial3D { ResourceName = "lodge_ski", AlbedoColor = new Color(0.33f, 0.12f, 0.09f), Roughness = 0.72f };   // (2026-10-13g: old, chalky red lacquer, was a bright glossy red)
+	// (2026-10-15, the scan pass: the rack's other pairs: a faded navy and a black, both as chalky as the red)
+	private static StandardMaterial3D _skiBlue, _skiBlack, _skiHickory;
+	private static StandardMaterial3D SkiPaintBlue => _skiBlue ??= new StandardMaterial3D { ResourceName = "lodge_ski_blue", AlbedoColor = new Color(0.1f, 0.13f, 0.2f), Roughness = 0.7f };
+	private static StandardMaterial3D SkiPaintBlack => _skiBlack ??= new StandardMaterial3D { ResourceName = "lodge_ski_black", AlbedoColor = new Color(0.05f, 0.05f, 0.055f), Roughness = 0.55f };
+	/// <summary>Varnished hickory, gone amber (the old wooden skis).</summary>
+	private static StandardMaterial3D SkiWood => _skiHickory ??= Tinted(BuildingTextures.BoardsMat, new Color(0.62f, 0.42f, 0.24f), "lodge_ski_hickory");
+
+	/// <summary>(2026-10-15, the scan pass) An old pair of wooden skis stood on their tails, leant back onto the rack's rail
+	/// (<paramref name="railX"/>, its face): long and narrow, the tips turned up in a curl, a cable binding on each, a leather
+	/// strap. <paramref name="foot"/> is between the tails, on the floor; the wall is toward -X.</summary>
+	private static void OldWoodSkis(MeshKit k, Vector3 foot, float railX)
+	{
+		const float len = 2.05f, w = 0.068f, th = 0.022f;
+		// leant so the ski's back touches the rail's face at 1.6
+		float lean = Mathf.Atan2(foot.X - railX, 1.6f);
+		k.Mat(SkiWood);
+		k.Color = Colors.White;
+		foreach (var (dz, yaw) in new[] { (-0.045f, 0.015f), (0.05f, -0.02f) })
+		{
+			var b = new Basis(Vector3.Up, yaw) * new Basis(Vector3.Back, lean);   // up the ski: tilted toward -X
+			var up = b * Vector3.Up;
+			var o = foot + new Vector3(0, 0, dz);
+			// the board (its tail on the floor), in two runs so the tip can turn up off it
+			float run = len - 0.28f;
+			k.BevelBox(o + up * (run * 0.5f) + b * new Vector3(th * 0.5f, 0, 0), new Vector3(th, run, w), 0.006f, 1f, b);
+			// the tip's curl: three short pieces bending out from the wall (+X) and back
+			var p = o + up * run;
+			float bend = 0f;
+			for (int i = 0; i < 3; i++)
+			{
+				bend += 0.32f;
+				var bi = b * new Basis(Vector3.Back, -bend);
+				var d = bi * Vector3.Up;
+				k.BevelBox(p + d * 0.05f + bi * new Vector3(th * 0.5f, 0, 0), new Vector3(th * (1f - i * 0.15f), 0.1f, w * (1f - i * 0.12f)), 0.005f, 1f, bi);
+				p += d * 0.095f;
+			}
+			// the binding: a toe iron, a cable round the heel, a strap
+			k.Mat(LodgeParts.LodgeTextures.IronMat);
+			var bind = o + up * 0.78f;
+			k.Box(bind + b * new Vector3(th + 0.012f, 0, 0), new Vector3(0.024f, 0.09f, w + 0.012f), 1f, b);
+			k.Cylinder(bind - up * 0.2f + b * new Vector3(th + 0.006f, 0, -w * 0.5f - 0.004f), bind + b * new Vector3(th + 0.006f, 0, -w * 0.5f - 0.004f), 0.004f, 0.004f, 4, false);
+			k.Cylinder(bind - up * 0.2f + b * new Vector3(th + 0.006f, 0, w * 0.5f + 0.004f), bind + b * new Vector3(th + 0.006f, 0, w * 0.5f + 0.004f), 0.004f, 0.004f, 4, false);
+			k.Mat(LodgeParts.LodgeTextures.LeatherMat);
+			k.Box(bind + up * 0.07f + b * new Vector3(th + 0.008f, 0, 0), new Vector3(0.012f, 0.03f, w + 0.02f), 1f, b);
+			k.Mat(SkiWood);
+		}
+	}
 	/// <summary>Dark-stained board-and-batten, the lodge's upper storeys.</summary>
 	public static StandardMaterial3D LodgeTimber => _timber ??= Tinted(BuildingTextures.BoardsMat, new Color(0.62f, 0.48f, 0.38f), "lodge_timber");
 	public static StandardMaterial3D LodgeTrim => _trim ??= Tinted(BuildingTextures.BoardsMat, new Color(0.45f, 0.34f, 0.27f), "lodge_trim");

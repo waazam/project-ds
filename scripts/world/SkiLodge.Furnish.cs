@@ -123,15 +123,50 @@ public partial class SkiLodge
 		// ---- the front desk, by the front doors: a panelled counter, pigeonholes and the room keys' hooks behind
 		Vector3 d0 = new(5.1f, FloorY, 7.3f);   // (east of the doors: on the west, the balcony's corner post came down through it)
 		FrontDesk(k, d0);
+		// (2026-10-15, the scan pass) the pigeonholes' case open-fronted: a back, a header and a plinth, sides, the shelves
+		// and the uprights between the holes, a key or a slip left in some (they were 32 black plates standing proud of a
+		// solid box). And a board on its cornice for the keys' hooks and the sign (they hung 24 cm out from the wall on
+		// nothing)
 		k.Mat(LodgeTextures.DoorWoodMat);
-		k.BevelBox(new Vector3(4.3f, 1.9f, HexIn - 0.12f), new Vector3(2.8f, 1.6f, 0.24f), 0.012f);   // the pigeonholes' case
+		const float phX0 = 2.95f, phPitch = 0.34f, phY0 = 1.12f, phRow = 0.36f, phD = 0.24f;
+		float phZ = HexIn - phD * 0.5f;
+		k.Color = new Color(0.45f, 0.42f, 0.4f);   // (the back, in the holes' shade)
+		k.Box(new Vector3(4.3f, 1.9f, HexIn - 0.01f), new Vector3(2.8f, 1.6f, 0.02f), 1f);
+		k.Color = Colors.White;
+		k.BevelBox(new Vector3(4.3f, (1.1f + phY0) * 0.5f, phZ), new Vector3(2.8f, phY0 - 1.1f + 0.02f, phD), 0.006f);   // the plinth's top board
+		k.BevelBox(new Vector3(4.3f, (phY0 + 4 * phRow + 2.7f) * 0.5f, phZ), new Vector3(2.8f, 2.7f - phY0 - 4 * phRow, phD), 0.012f);   // the header
+		foreach (float sx in new[] { 2.9f + 0.03f, 5.7f - 0.03f })
+			k.BevelBox(new Vector3(sx, 1.9f, phZ), new Vector3(0.06f, 1.6f, phD), 0.008f);   // the sides
+		for (int r = 1; r < 4; r++)
+			k.BevelBox(new Vector3(4.3f, phY0 + r * phRow, phZ - 0.005f), new Vector3(2.74f, 0.02f, phD - 0.02f), 0.004f);   // the shelves
+		for (int c = 1; c < 8; c++)
+			k.BevelBox(new Vector3(phX0 + c * phPitch, phY0 + 2f * phRow, phZ - 0.005f), new Vector3(0.02f, 4f * phRow, phD - 0.02f), 0.004f);   // the uprights
 		k.BevelBox(new Vector3(4.3f, 2.72f, HexIn - 0.13f), new Vector3(2.88f, 0.05f, 0.27f), 0.012f);   // its cornice
-		k.Mat(LodgeTextures.BlackMat);
-		for (int r = 0; r < 4; r++) for (int c = 0; c < 8; c++)
-			k.Box(new Vector3(3.12f + c * 0.34f, 1.3f + r * 0.36f, HexIn - 0.245f), new Vector3(0.28f, 0.28f, 0.01f), 1f);
+		k.BevelBox(new Vector3(4.3f, 2.875f, HexIn - 0.235f), new Vector3(2.8f, 0.26f, 0.03f), 0.008f);   // the key board, on the cornice
+		// in some of the holes: a room key on its tag, a folded slip, a letter (the rest empty)
+		var phr = new RandomNumberGenerator { Seed = 1301 };
+		for (int r = 0; r < 4; r++)
+			for (int c = 0; c < 8; c++)
+			{
+				float roll = phr.Randf();
+				var cell = new Vector3(phX0 + (c + 0.5f) * phPitch + phr.RandfRange(-0.05f, 0.05f), phY0 + r * phRow + 0.011f, HexIn - 0.12f);   // (on the shelf's top, or the plinth's)
+				if (roll < 0.22f)
+				{
+					k.Mat(LodgeTextures.BrassMat);
+					k.Box(cell + new Vector3(0, 0.004f, -0.05f), new Vector3(0.035f, 0.008f, 0.07f), 1f, new Basis(Vector3.Up, phr.RandfRange(-0.6f, 0.6f)));
+					k.Cylinder(cell + new Vector3(0.01f, 0.008f, 0.0f), cell + new Vector3(0.01f, 0.008f, 0.06f), 0.004f, 0.004f, 4, true);
+				}
+				else if (roll < 0.45f)
+				{
+					k.Mat(Paper);
+					k.Color = new Color(1.3f, 1.25f, 1.1f) * phr.RandfRange(0.8f, 1f);
+					k.Box(cell + new Vector3(0, 0.003f, 0), new Vector3(phr.RandfRange(0.12f, 0.2f), 0.005f, phr.RandfRange(0.1f, 0.16f)), 1f, new Basis(Vector3.Up, phr.RandfRange(-0.3f, 0.3f)));
+					k.Color = Colors.White;
+				}
+			}
 		k.Mat(LodgeTextures.BrassMat);
 		foreach (var (num, x) in new[] { ("201", 5.35f), ("202", 5.0f), ("203", 4.65f), ("204", 4.3f) })
-			k.Cylinder(new Vector3(x, 2.85f, HexIn - 0.24f), new Vector3(x, 2.85f, HexIn - 0.3f), 0.01f, 0.01f, 5, true);
+			k.Cylinder(new Vector3(x, 2.85f, HexIn - 0.249f), new Vector3(x, 2.85f, HexIn - 0.3f), 0.01f, 0.01f, 5, true);
 		// the bell, the ledger open, a green-shaded banker's lamp (2026-10-15: it was the bedside lamp in green, a pleated
 		// shade on a stick; the owner: "the green lamp")
 		k.Mat(LodgeTextures.BlackMat);
@@ -142,9 +177,10 @@ public partial class SkiLodge
 		var deskBulb = LodgeProps.BankersLamp(k, d0 + new Vector3(-1.2f, 1.13f, 0.12f), Mathf.Pi + 0.25f, LodgeTextures.Glow("lodge_greenshade", new Color(0.12f, 0.4f, 0.2f), 0.7f));
 		Light(deskBulb, Warm, 0.5f, 3.5f);
 		LodgeKit.Solid(_inBody, d0 + new Vector3(0, 0.55f, 0), new Vector3(3.2f, 1.1f, 0.6f));
-		SignKit.Text(this, "RECEPTION", new Vector3(4.3f, 2.95f, HexIn - 0.26f), new Basis(Vector3.Up, Mathf.Pi), 0.11f, new Color(0.75f, 0.58f, 0.3f), shadow: false);
+		// (on the key board: the sign at its left, the numbers over the hooks)
+		SignKit.Text(this, "RECEPTION", new Vector3(3.45f, 2.875f, HexIn - 0.252f), new Basis(Vector3.Up, Mathf.Pi), 0.11f, new Color(0.75f, 0.58f, 0.3f), shadow: false);
 		foreach (var (num, x) in new[] { ("201", 5.35f), ("202", 5.0f), ("203", 4.65f), ("204", 4.3f) })
-			SignKit.Text(this, num, new Vector3(x, 2.72f, HexIn - 0.245f), new Basis(Vector3.Up, Mathf.Pi), 0.04f, new Color(0.8f, 0.7f, 0.45f), shadow: false);
+			SignKit.Text(this, num, new Vector3(x, 2.94f, HexIn - 0.252f), new Basis(Vector3.Up, Mathf.Pi), 0.04f, new Color(0.8f, 0.7f, 0.45f), shadow: false);
 		// ---- the front doors, from inside (their own nodes: they're pushed, and then they're gone: SkiLodge.Finale.cs)
 		BuildFrontDoorsInside();
 		// ---- the chandelier: iron and antler, three rings of candle bulbs, hanging over the middle of it all
@@ -218,6 +254,10 @@ public partial class SkiLodge
 		["ski"] = LodgeTextures.DarkWoodMat,
 	};
 	private static StandardMaterial3D _bottleGlass, _paper, _wool, _wax;
+	private static readonly Dictionary<string, StandardMaterial3D> _shelfGlass = new();
+	/// <summary>(2026-10-15, the scan pass) A back-bar bottle's glass: unlit, dark and glossy, a little rim of light.</summary>
+	private static StandardMaterial3D ShelfGlass(string name, Color c) => _shelfGlass.TryGetValue(name, out var m) ? m
+		: _shelfGlass[name] = new StandardMaterial3D { ResourceName = name, AlbedoColor = c, Roughness = 0.1f, MetallicSpecular = 0.75f, RimEnabled = true, Rim = 0.2f };
 	private static StandardMaterial3D BottleGlass => _bottleGlass ??= new StandardMaterial3D { ResourceName = "lodge_bottle_glass", AlbedoColor = new Color(0.16f, 0.2f, 0.12f), Roughness = 0.12f, MetallicSpecular = 0.7f, RimEnabled = true, Rim = 0.25f };
 	private static StandardMaterial3D Paper => _paper ??= new StandardMaterial3D { ResourceName = "lodge_paper", AlbedoColor = new Color(0.62f, 0.58f, 0.48f), Roughness = 0.95f };
 	private static StandardMaterial3D Wool => _wool ??= new StandardMaterial3D { ResourceName = "lodge_wool", AlbedoColor = new Color(0.2f, 0.16f, 0.13f), Roughness = 1f, AlbedoTexture = LodgeTextures.LinenMat.AlbedoTexture, Uv1Scale = Vector3.One * 2f };
@@ -366,9 +406,21 @@ public partial class SkiLodge
 		BarCardSpot = new Node3D { Name = "BarCardSpot", Position = new Vector3(cx + 0.13f, 1.08f, 3.9f) };
 		AddChild(BarCardSpot);
 		// stools
-		for (float z = z0 + 0.4f; z < z1; z += 0.8f)
+		// (2026-10-15, the scan pass: they stood on a dead-straight line every 0.8 m. Now each pushed back its own way, and
+		// one knocked over, lying on its side out from the counter)
+		var srng = new RandomNumberGenerator { Seed = 3690 };
+		int si = 0;
+		for (float z0s = z0 + 0.4f; z0s < z1; z0s += 0.8f, si++)
 		{
-			if (FurnitureKit.Add(k, "bar_stool", new Vector3(cx + 0.6f, FloorY, z), (z * 1.7f) % 6.28f, Woodwork)) continue;
+			float z = z0s + srng.RandfRange(-0.1f, 0.1f);
+			if (si == 3 && FurnitureKit.Has("bar_stool"))
+			{
+				// over on its side (the seat's rim and the foot ring on the floor)
+				var over = new Basis(Vector3.Up, 0.7f) * new Basis(Vector3.Back, Mathf.Pi * 0.5f - 0.04f);
+				FurnitureKit.Add(k, "bar_stool", new Transform3D(over, new Vector3(cx + 1.25f, FloorY + 0.205f, z + 0.2f)), Woodwork);
+				continue;
+			}
+			if (FurnitureKit.Add(k, "bar_stool", new Vector3(cx + 0.6f + srng.RandfRange(-0.04f, 0.16f), FloorY, z), (z * 1.7f) % 6.28f, Woodwork)) continue;
 			k.Mat(LodgeTextures.BrassMat);
 			k.Cylinder(new Vector3(cx + 0.6f, FloorY, z), new Vector3(cx + 0.6f, 0.72f, z), 0.025f, 0.025f, 6, false);
 			k.Cylinder(new Vector3(cx + 0.6f, FloorY, z), new Vector3(cx + 0.6f, 0.03f, z), 0.2f, 0.18f, 10, true);
@@ -399,7 +451,9 @@ public partial class SkiLodge
 			}
 		}
 		var brng = new RandomNumberGenerator { Seed = 4242 };
-		var bottleMats = new[] { LodgeTextures.Glow("lodge_bottle_amber", new Color(0.6f, 0.32f, 0.08f), 0.15f), LodgeTextures.Glow("lodge_bottle_green", new Color(0.1f, 0.32f, 0.12f), 0.12f), LodgeTextures.Glow("lodge_bottle_clear", new Color(0.55f, 0.55f, 0.5f), 0.1f) };
+		// (2026-10-15, the scan pass: the glass was the lodge's glow, and the bottles read lit from inside. Plain glass now: dark,
+		// coloured, glossy, the lamps in their shoulders)
+		var bottleMats = new[] { ShelfGlass("lodge_bottle_amber", new Color(0.34f, 0.17f, 0.05f)), ShelfGlass("lodge_bottle_green", new Color(0.06f, 0.18f, 0.07f)), ShelfGlass("lodge_bottle_clear", new Color(0.36f, 0.36f, 0.33f)) };
 		var kinds = new[] { "bottle_wine", "bottle_whiskey", "bottle_liqueur" };
 		var bw = Woodwork;
 		foreach (float y in new[] { 1.47f, 1.97f, 2.47f })
@@ -422,8 +476,14 @@ public partial class SkiLodge
 		{
 			var c = p with { Y = FloorY };
 			LodgeKit.Table(k, c, 0f, new Vector2(0.8f, 0.8f), 0.74f, LodgeTextures.BlackMat, LodgeTextures.BrassMat, round: true);
-			LodgeKit.Chair(k, c + new Vector3(0.62f, 0, 0), -Mathf.Pi * 0.5f, LodgeTextures.LeatherMat);
-			LodgeKit.Chair(k, c + new Vector3(-0.62f, 0, 0), Mathf.Pi * 0.5f, LodgeTextures.LeatherMat);
+			// (2026-10-15, the scan pass: both chairs square at exactly 0.62 m, every table. Now each pushed back from it by
+			// its own amount, round it a little, and turned)
+			foreach (float side in new[] { 1f, -1f })
+			{
+				float a = srng.RandfRange(-0.4f, 0.4f), r = srng.RandfRange(0.6f, 0.82f);
+				var dir = new Vector3(side * Mathf.Cos(a), 0, Mathf.Sin(a));
+				LodgeKit.Chair(k, c + dir * r, Mathf.Atan2(dir.X, dir.Z) + srng.RandfRange(-0.25f, 0.25f), LodgeTextures.LeatherMat);
+			}
 			// (2026-10-15) a net-glass candle globe, not a glowing tube
 			LodgeProps.TableCandle(k, c + Vector3.Up * 0.742f, LodgeTextures.Glow("lodge_candleglass", new Color(1f, 0.6f, 0.3f), 1.2f));
 			LodgeKit.Solid(_inBody, c + Vector3.Up * 0.4f, new Vector3(0.8f, 0.8f, 0.8f));
@@ -502,7 +562,10 @@ public partial class SkiLodge
 			}
 		LodgeKit.Solid(_inBody, new Vector3((px0 + px1) * 0.5f - 0.6f, 1.4f, -InnerZ + 0.2f), new Vector3(px1 - px0 - 1.2f, 2.8f, 0.36f));
 		// the drawers: eight cabinets along the north wall, each a stack of two drawers (the second of each searchable)
-		float cz = PantryZ1 - 0.3f;
+		// (2026-10-15, the scan pass: that pass brought the cupboards' fronts out to the drawers, and left their backs 11 cm
+		// off the wall, the worktop run back over the gap. Now cupboards and drawers stand back against the skirting: the
+		// partition's face at PantryZ1 - 0.075, the skirting 1.6 cm proud of it)
+		float cz = PantryZ1 - 0.3f + 0.114f;
 		// (2026-10-15, the props pass) a run of base cupboards, a drawer over a panelled door in each, under one worktop run
 		// back to the wall (they were boxes under a plaster slab, the drawers standing 25 cm out of them; the drawers
 		// don't move: the cupboards' fronts come out to them)
@@ -541,6 +604,19 @@ public partial class SkiLodge
 		}
 		m.CommitTo(Mop, "Mesh", false);
 		Mop.Rotation = new Vector3(0.22f, 0, -0.15f);   // leaning on the wall
+	}
+
+	/// <summary>(2026-10-15, the scan pass) Whether a piece <paramref name="half"/> wide either side of x, against a room's
+	/// outer wall (its lining at <paramref name="zOut"/>, from x0 to x1), stands under one of that wall's windows: their
+	/// sills come 11 cm into the room at 0.33 m (the windows as <see cref="Lining"/> cuts them).</summary>
+	private static bool UnderSill(float x0, float x1, float zOut, float x, float half)
+	{
+		foreach (float wx in WingWindows(Mathf.Sign(zOut), true))
+		{
+			if (wx < Mathf.Min(x0, x1) + 0.6f || wx > Mathf.Max(x0, x1) - 0.6f) continue;
+			if (Mathf.Abs(x - wx) < 1.1f * 0.5f + 0.12f + half) return true;
+		}
+		return false;
 	}
 
 	/// <summary>A drawer (a front with a brass pull, an open box behind it) as a Searchable; returns it.</summary>
@@ -623,11 +699,15 @@ public partial class SkiLodge
 		var room = num == 202 ? Search202 : num == 204 ? Search204 : null;
 		foreach (float side in new[] { -1f, 1f })
 		{
-			var ns = new Vector3(cx + side * 1.6f, y, zOut - s * 0.35f);   // a clear half-metre from the bed, room to stand at it
 			// (2026-10-15, the props pass) a nightstand on turned legs, its drawer flush in its front and an open shelf under
-			// it, 50 x 60 x 48 (it was a plank-textured box, the drawer standing 15 cm out of it). Its front is where the
-			// drawer's is (the drawer doesn't move): its middle 14 cm out from where the box's was.
-			var nsC = ns - new Vector3(0, 0, s * 0.14f);
+			// it, 50 x 60 x 48 (it was a plank-textured box, the drawer standing 15 cm out of it).
+			// (2026-10-15, the scan pass: that pass brought the case's front out to the drawer, and left its back 21 cm off the
+			// wall. Now case, drawer, lamp and all stand back against the skirting (the lining's face 2 cm in from zOut, the
+			// skirting 1.6 cm proud of it), or against the window's sill where one's over it: the sill comes 11 cm into the
+			// room, under the nightstand's top)
+			float back = UnderSill(x0, x1, zOut, cx + side * 1.6f, 0.27f) ? 0.125f : 0.04f;
+			var nsC = new Vector3(cx + side * 1.6f, y, zOut - s * (back + 0.24f));
+			var ns = nsC + new Vector3(0, 0, s * 0.14f);   // (where the drawer and the lamp were set from)
 			LodgeProps.Carcass(k, new Transform3D(new Basis(Vector3.Up, front ? 0f : Mathf.Pi), nsC), 0.5f, 0.6f, 0.48f, LodgeTextures.DoorWoodMat, new[] { (0.36f, 0.52f) }, openW: 0.42f, legH: 0.12f, legs: true, cubby: true);
 			LodgeKit.Solid(_inBody, nsC + new Vector3(0, 0.3f, 0), new Vector3(0.5f, 0.6f, 0.48f));
 			var d = MakeDrawer($"Room{num}Night{(side < 0 ? "L" : "R")}", ns + new Vector3(0, 0.44f, -s * 0.2f), new Basis(Vector3.Up, front ? Mathf.Pi : 0f), new Vector3(0.42f, 0.16f, 0.38f), "nightstand's drawer");
@@ -635,10 +715,10 @@ public partial class SkiLodge
 			room?.Add(d);
 			if (!wrecked)
 			{
-				var bulb = LodgeKit.Lamp(k, ns + new Vector3(0, 0.6f, 0), 0.6f, shade);   // (60 cm: was 50)
+				var bulb = LodgeKit.Lamp(k, nsC + new Vector3(side * -0.04f, 0.6f, s * 0.03f), 0.6f, shade);   // (60 cm: was 50)
 				roomLights.Add(Light(bulb, Warm, 0.35f, 3.5f));
 				// on the nightstand beside the lamp: a mug on one, a glass on the other (somebody stayed here)
-				if (num != 201) FurnitureKit.Add(k, side < 0 ? "mug" : "wine_glass", ns + new Vector3(side * 0.16f, 0.6f, s * 0.06f), side * 0.7f, Woodwork);
+				if (num != 201) FurnitureKit.Add(k, side < 0 ? "mug" : "wine_glass", nsC + new Vector3(side * 0.15f, 0.6f, -s * 0.12f), side * 0.7f, Woodwork);
 			}
 		}
 		// books stacked on the floor by the bed's foot (not in 201: it's perfect)
@@ -697,15 +777,20 @@ public partial class SkiLodge
 		Vector3 van = new(bx1 - 0.8f, y, zIn + s * 0.35f);
 		// (2026-10-15, the props pass) the vanity a case round its two drawers (flush now: they stood 18 cm out of a box),
 		// on a plinth, its top run back to the wall with an oval basin let into it, its taps; the mirror framed
+		// (2026-10-15, the scan pass: that pass brought the case out to the drawers and left its back 12 cm off the wall,
+		// the top run back over the gap. Now the case, its drawers with it, stands against the skirting: the wall's face at
+		// zIn + 0.07, the skirting 1.6 cm proud of it; the top from the wall to a hand over the front)
+		const float vanShift = 0.12f;
+		van -= new Vector3(0, 0, s * vanShift);
 		var vanC = van + new Vector3(0, 0, s * 0.14f);
 		var vanB = new Basis(Vector3.Up, front ? Mathf.Pi : 0f);
 		LodgeProps.Carcass(k, new Transform3D(vanB, vanC), 0.9f, 0.9f, 0.56f, LodgeTextures.DoorWoodMat, new[] { (0.51f, 0.73f), (0.21f, 0.43f) }, openW: 0.8f, legH: 0.1f, legs: false, topThick: 0.035f, drawTop: false);
-		LodgeProps.BasinTop(k, new Transform3D(vanB, vanC + new Vector3(0, 0, -s * 0.06f)), 0.94f, 0.72f, 0.9f, LodgeTextures.PorcelainMat, LodgeTextures.MintPorcelainMat, 0f, -0.04f);
+		LodgeProps.BasinTop(k, new Transform3D(vanB, vanC + new Vector3(0, 0, -s * 0.0f)), 0.94f, 0.6f, 0.9f, LodgeTextures.PorcelainMat, LodgeTextures.MintPorcelainMat, 0f, -0.04f);
 		k.Mat(LodgeTextures.DoorWoodMat);
 		k.BevelBox(new Vector3(van.X, y + 1.6f, zIn + s * 0.078f), new Vector3(0.7f, 0.8f, 0.016f), 0.006f);
 		k.Mat(LodgeTextures.MirrorMat);
 		k.Box(new Vector3(van.X, y + 1.6f, zIn + s * 0.089f), new Vector3(0.6f, 0.7f, 0.006f), 1f);   // (the joints pass: flat on the wall, it stood 1 cm off)
-		LodgeKit.Solid(_inBody, vanC + new Vector3(0, 0.45f, -s * 0.06f), new Vector3(0.9f, 0.9f, 0.68f));
+		LodgeKit.Solid(_inBody, vanC + new Vector3(0, 0.45f, 0f), new Vector3(0.9f, 0.9f, 0.58f));
 		foreach (int di in new[] { 0, 1 })
 		{
 			var d = MakeDrawer($"Room{num}Vanity{di}", van + new Vector3(0, 0.62f - di * 0.3f, s * 0.24f), new Basis(Vector3.Up, front ? 0f : Mathf.Pi), new Vector3(0.8f, 0.22f, 0.4f), "vanity drawer");
@@ -750,7 +835,8 @@ public partial class SkiLodge
 			var dd = MakeDrawer("Room204Desk", desk + new Vector3(-0.1f, 0.64f, 0), new Basis(Vector3.Up, -Mathf.Pi * 0.5f), new Vector3(0.9f, 0.12f, 0.45f), "desk drawer");
 			dd.Flag = "lodge_204_desk";
 			Search204.Add(dd);
-			var dr = new Vector3(-23.9f, y, zIn - 0.33f);   // against the corridor wall, facing into the room
+			// (2026-10-15, the scan pass: 0.204 nearer the wall, case and drawers together: the case's back stood 20 cm off it)
+			var dr = new Vector3(-23.9f, y, zIn - 0.33f + 0.204f);   // against the corridor wall (its face at zIn - 0.07, the skirting 1.6 cm proud), facing into the room
 			// (2026-10-15) a chest on turned feet round its two drawers, flush (they stood 22 cm out of a box)
 			var drC = dr - new Vector3(0, 0, 0.214f);
 			LodgeProps.Carcass(k, new Transform3D(Basis.Identity, drC), 1.2f, 1.1f, 0.5f, LodgeTextures.DoorWoodMat, new[] { (0.66f, 0.98f), (0.26f, 0.58f) }, openW: 1.1f, legH: 0.1f, legs: true);
@@ -797,10 +883,13 @@ public partial class SkiLodge
 		// ice: sheets on the floor near the window, icicles off the rail, frost on the bed's end
 		k.Mat(WinterWoods.IceMat);
 		k.Blob(new Vector3(wx - 0.6f, y + 0.02f, zOut - s * 1.6f), new Vector3(1.4f, 0.03f, 1.0f), 9304, 0.4f, true, 1f);
-		for (int i = 0; i < 16; i++)
+		// (2026-10-15, the scan pass: they hung every 0.13 m like a comb; now in clumps and gaps, each its own girth)
+		var irng = new RandomNumberGenerator { Seed = 2031 };
+		for (float x = wx - 1.02f; x < wx + 1.05f; x += irng.Randf() < 0.25f ? irng.RandfRange(0.18f, 0.32f) : irng.RandfRange(0.04f, 0.11f))
 		{
-			float x = wx - 1f + i * 0.13f;
-			k.Cylinder(new Vector3(x, 6.45f, zOut - s * 0.1f), new Vector3(x, 6.45f - 0.08f - (i * 37 % 9) * 0.04f, zOut - s * 0.1f), 0.012f, 0.002f, 4, false);
+			float r = irng.RandfRange(0.008f, 0.016f), len = irng.RandfRange(0.05f, 0.4f);
+			float xz = zOut - s * (0.1f + irng.RandfRange(-0.008f, 0.008f));
+			k.Cylinder(new Vector3(x, 6.45f, xz), new Vector3(x + irng.RandfRange(-0.01f, 0.01f), 6.45f - len, xz), r, 0.002f, 4, false);
 		}
 		// (2026-10-13, the joints pass) the rail they hang off, on its two brackets: there wasn't one, the icicles hung
 		// 4-7 cm under nothing
@@ -850,19 +939,14 @@ public partial class SkiLodge
 	{
 		var k = new MeshKit();
 		k.Color = Colors.White;
-		var chairs = new System.Collections.Generic.List<Transform3D>();
-		for (int t = 0; t < 6; t++)
-		{
-			var c = TableCentre(t);
-			// (the tables themselves are Act 23's, each its own node so one can fall apart: BuildTable)
-			for (float x = -TableLen * 0.5f + 0.6f; x < TableLen * 0.5f - 0.3f; x += 0.9f)
-				foreach (float sz in new[] { -1f, 1f })
-					chairs.Add(new Transform3D(new Basis(Vector3.Up, sz > 0 ? 0f : Mathf.Pi), new Vector3(c.X + x, FloorY, c.Z + sz * (TableW * 0.5f + 0.25f))));
-		}
-		// the chairs (all 72 the same model): one instanced set, drawn once for all of them, rather than 72 copies
-		// merged into the room's mesh (the optimization pass, 2026-10-02)
+		var chairs = DiningChairs(out var sheeted);
+		// the chairs (one model): one instanced set, drawn once for all of them, rather than 80-odd copies merged into the
+		// room's mesh (the optimization pass, 2026-10-02)
 		var chairMesh = FurnitureKit.Mesh("dining_chair", new() { ["wood"] = LodgeTextures.DoorWoodMat, ["upholstery"] = LodgeTextures.Upholstery("oxblood") });
 		if (chairMesh == null) foreach (var xf in chairs) LodgeKit.Chair(k, xf.Origin, xf.Basis.GetEuler().Y, LodgeTextures.Upholstery("oxblood"));
+		// (2026-10-15, the scan pass) the chairs at one end of a table or two under dust sheets of their own, as the tables
+		// are: the house shut for the winter by someone who ran out of sheets
+		for (int i = 0; i < sheeted.Count; i++) ChairDustSheet(k, sheeted[i], 4100 + i);
 		foreach (float x in new[] { 17f, 27f, 37f })
 		{
 			var bulbs = LodgeKit.Chandelier(k, new Vector3(x, RoomTop - 0.3f, 0), 1.6f, 1.2f, 8, Bulb);
@@ -903,6 +987,148 @@ public partial class SkiLodge
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
 		AddChild(_diningCold);
+	}
+
+	/// <summary>(2026-10-15, the scan pass) The dining hall's chairs, as people left them: it was 84 of one chair in a
+	/// perfect grid, 0.9 m apart, every one tucked square. Now each is pushed in or left out by its own amount and turned a
+	/// little; about one in five pulled well out and swung; a few gone from their places (carried off to the
+	/// end wall, where they stand in a huddle, one tipped over) and one knocked onto its back. The run at one end of a
+	/// table or two is under dust sheets of its own (<paramref name="sheeted"/>: drawn by <see cref="ChairDustSheet"/>).
+	/// Seeded: the same every game.</summary>
+	private static List<Transform3D> DiningChairs(out List<Transform3D> sheeted)
+	{
+		var chairs = new List<Transform3D>();
+		sheeted = new List<Transform3D>();
+		var rng = new RandomNumberGenerator { Seed = 23084 };
+		// which tables have a sheeted run, and at which end and side (a run of three from that end)
+		var sheetRuns = new Dictionary<int, (float end, float side)> { [1] = (1f, 1f), [3] = (-1f, -1f), [5] = (1f, -1f) };
+		for (int t = 0; t < 6; t++)
+		{
+			var c = TableCentre(t);
+			// (the tables themselves are Act 23's, each its own node so one can fall apart: BuildTable)
+			foreach (float sz in new[] { -1f, 1f })
+			{
+				int slot = 0;
+				for (float x0 = -TableLen * 0.5f + 0.6f; x0 < TableLen * 0.5f - 0.3f; x0 += 0.9f, slot++)
+				{
+					float x = x0 + rng.RandfRange(-0.07f, 0.07f), yaw0 = sz > 0 ? 0f : Mathf.Pi;
+					// under a dust sheet: square to the table, tucked (whoever sheeted them set them straight first)
+					bool sheet = sheetRuns.TryGetValue(t, out var run) && run.side == sz && (run.end > 0 ? slot >= 4 : slot <= 2);
+					if (sheet)
+					{
+						var xf = new Transform3D(new Basis(Vector3.Up, yaw0 + rng.RandfRange(-0.03f, 0.03f)), new Vector3(c.X + x0 + (x - x0) * 0.25f, FloorY, c.Z + sz * (TableW * 0.5f + 0.27f)));   // (their sheets near touching: barely shifted)
+						chairs.Add(xf);
+						sheeted.Add(xf);
+						continue;
+					}
+					float roll = rng.Randf();
+					if (roll < 0.06f) continue;   // gone from its place (to the huddle by the end wall)
+					float push, turn;
+					if (roll < 0.24f) { push = rng.RandfRange(0.32f, 0.6f); turn = rng.RandfRange(0.18f, 0.55f) * (rng.Randf() < 0.5f ? -1f : 1f); }   // pulled out, swung
+					else if (roll < 0.52f) { push = rng.RandfRange(0.1f, 0.24f); turn = rng.RandfRange(-0.15f, 0.15f); }   // left out a little
+					else { push = rng.RandfRange(0.0f, 0.06f); turn = rng.RandfRange(-0.05f, 0.05f); }   // tucked in, not quite square
+					chairs.Add(new Transform3D(new Basis(Vector3.Up, yaw0 + turn), new Vector3(c.X + x, FloorY, c.Z + sz * (TableW * 0.5f + 0.25f + push))));
+				}
+			}
+		}
+		// one knocked over onto its back, behind its place at the second table's aisle side (its back and back legs on
+		// the floor, the front legs up)
+		{
+			var c = TableCentre(1);
+			var fallen = new Basis(Vector3.Up, Mathf.Pi + 0.35f) * new Basis(Vector3.Right, Mathf.Pi * 0.5f);
+			chairs.Add(new Transform3D(fallen, new Vector3(c.X - 1.1f, FloorY + 0.31f, c.Z - (TableW * 0.5f + 0.95f))));
+		}
+		// the huddle by the end wall (near the door from the hall, clear of the open window): two against the wall, one
+		// turned out from them, one tipped onto its side in front
+		{
+			float hx = 14.2f, hz = -InnerZ + 0.42f;
+			chairs.Add(new Transform3D(new Basis(Vector3.Up, Mathf.Pi + 0.06f), new Vector3(hx, FloorY, hz)));
+			chairs.Add(new Transform3D(new Basis(Vector3.Up, Mathf.Pi - 0.1f), new Vector3(hx + 0.58f, FloorY, hz + 0.02f)));
+			chairs.Add(new Transform3D(new Basis(Vector3.Up, Mathf.Pi * 0.5f + 0.4f), new Vector3(hx + 1.35f, FloorY, hz + 0.25f)));
+			// on its side: its right side down (the seat's edge and two legs on the floor)
+			var side = new Basis(Vector3.Up, 2.2f) * new Basis(Vector3.Back, Mathf.Pi * 0.5f);
+			chairs.Add(new Transform3D(side, new Vector3(hx + 0.5f, FloorY + 0.23f, hz + 0.95f)));
+		}
+		return chairs;
+	}
+
+	/// <summary>(2026-10-15, the scan pass) A dust sheet thrown over a dining chair (standing at <paramref name="xf"/>):
+	/// lying on the seat, over the top of the back and down behind it, falling at the sides and the front to a hem a hand or
+	/// two above the floor, the legs showing under it. A ring of the chair's outline (its seat, its back), drawn out from the
+	/// middle of the seat to the rim and on down to the hem, folded as it falls.</summary>
+	private static void ChairDustSheet(MeshKit k, Transform3D xf, int seed)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)seed };
+		const int na = 40, nIn = 6, nOut = 7;
+		// (the model: the seat's top 0.495 from the front to z 0.15, the back z 0.2 to 0.31 and 0.98 high, 0.46 wide)
+		const float seatY = 0.515f, backY = 1.02f, backZ = 0.2f, cz = 0.03f, ax = 0.285f, az = 0.34f;   // (the rim a squircle round the frame: its corners clear the back's)
+		float ph = rng.Randf() * Mathf.Tau, hem0 = rng.RandfRange(0.12f, 0.22f), slew = rng.RandfRange(-0.04f, 0.04f);
+		// the chair's top under the cloth: the seat, the back rising behind it (the cloth drawn from its top to the seat)
+		float Top(float x, float z) => Mathf.Max(seatY - x * x * 0.3f, backY - Mathf.Max(0f, backZ - z) * 3.2f - x * x * 0.7f - Mathf.Max(0f, z - 0.3f) * 1.5f);
+		var pts = new Vector3[na, nIn + nOut + 1];
+		for (int i = 0; i < na; i++)
+		{
+			float a = Mathf.Tau * i / na;
+			float ca = Mathf.Cos(a), sa = Mathf.Sin(a);
+			// a rounded rectangle (a superellipse) a little outside the chair's frame
+			var rim = new Vector2(ax * Mathf.Sign(ca) * Mathf.Pow(Mathf.Abs(ca), 0.5f), cz + az * Mathf.Sign(sa) * Mathf.Pow(Mathf.Abs(sa), 0.5f));
+			float rimY = Top(rim.X, rim.Y);
+			for (int j = 0; j <= nIn; j++)
+			{
+				float s = j / (float)nIn;
+				var p = new Vector2(0, cz).Lerp(rim, s);
+				pts[i, j] = new Vector3(p.X, Top(p.X, p.Y) + 0.004f * Mathf.Sin(a * 3f + ph) * s, p.Y);
+			}
+			// the fall: out a little (flaring), down to the hem, in folds that deepen toward the hem
+			// (longer behind, where it was thrown over from the front; uneven all round)
+			float hem = Mathf.Max(0.06f, hem0 + 0.08f * Mathf.Sin(a * 2f + ph) + 0.04f * Mathf.Sin(a * 5f + ph * 2f) - 0.08f * Mathf.Max(0f, sa));
+			var outward = new Vector2(rim.X, rim.Y - cz).Normalized();
+			for (int j = 1; j <= nOut; j++)
+			{
+				float r = j / (float)nOut;
+				// the folds: a few big ones and smaller between, deepening toward the hem; the cloth flaring as it falls
+				float fold = (0.028f * Mathf.Sin(a * 7f + ph + r * 1.3f) + 0.012f * Mathf.Sin(a * 13f + ph * 3f)) * r;
+				var p = rim + outward * (0.08f * r * r + 0.015f * r + fold + 0.012f * Mathf.Sin(r * Mathf.Pi));
+				float y = Mathf.Lerp(rimY, hem, r);
+				pts[i, nIn + j] = new Vector3(p.X + slew * r, y, p.Y);
+			}
+		}
+		// smooth normals from the grid's neighbours; uv in metres along the ring and down from the middle
+		int nr = nIn + nOut + 1;
+		var nrm = new Vector3[na, nr];
+		var uv = new Vector2[na, nr];
+		for (int i = 0; i < na; i++)
+		{
+			float d = 0f;
+			for (int j = 0; j < nr; j++)
+			{
+				if (j > 0) d += pts[i, j].DistanceTo(pts[i, j - 1]);
+				var du = pts[(i + 1) % na, j] - pts[(i + na - 1) % na, j];
+				var dv = pts[i, Mathf.Min(j + 1, nr - 1)] - pts[i, Mathf.Max(j - 1, 0)];
+				var n = du.Cross(dv);
+				var outv = pts[i, j] - new Vector3(0, 0.25f, cz);
+				if (n.LengthSquared() < 1e-10f) n = Vector3.Up;
+				if (n.Dot(outv) < 0f) n = -n;
+				nrm[i, j] = j == 0 ? Vector3.Up : n.Normalized();
+				uv[i, j] = new Vector2(i / (float)na * 1.9f, d);   // (metres: the ring's about 1.9 round)
+			}
+		}
+		var was = k.Xf;
+		k.Xf = xf;
+		k.Mat(LodgeTextures.ChairSheetMat);
+		k.Color = Colors.White;
+		for (int i = 0; i < na; i++)
+		{
+			int i1 = (i + 1) % na;
+			for (int j = 0; j < nr - 1; j++)
+			{
+				var u0 = uv[i, j]; var u1 = uv[i1, j]; var u2 = uv[i1, j + 1]; var u3 = uv[i, j + 1];
+				if (i1 == 0) { u1.X += 1.9f; u2.X += 1.9f; }
+				k.Tri(pts[i, j], pts[i1, j], pts[i1, j + 1], nrm[i, j], nrm[i1, j], nrm[i1, j + 1], u0, u1, u2);
+				k.Tri(pts[i, j], pts[i1, j + 1], pts[i, j + 1], nrm[i, j], nrm[i1, j + 1], nrm[i, j + 1], u0, u2, u3);
+			}
+		}
+		k.Xf = was;
 	}
 
 	private GpuParticles3D _diningCold;

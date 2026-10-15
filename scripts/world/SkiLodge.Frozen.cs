@@ -125,13 +125,38 @@ public partial class SkiLodge
 			AddChild(snow);
 		}
 		// the tables: glazed, and dripping icicles off both long edges
+		// (2026-10-15, the scan pass: one every 0.17 m, all one width, square (908 of them in a perfect comb). Now where the
+		// drips ran: in clusters with bare runs between, each its own length and girth and turned its own way; short over a
+		// chair tucked in under the edge, so none runs into its seat)
+		var irng = new RandomNumberGenerator { Seed = 1291 };
+		var seats = DiningChairs(out _);
 		for (int t = 0; t < 6; t++)
 		{
 			if (t == Collapsed) continue;
 			var tc = TableCentre(t);
 			foreach (float sz in new[] { -1f, 1f })
-				for (float x = -TableLen * 0.48f; x <= TableLen * 0.48f; x += 0.17f)
-					ice.Add(new Transform3D(Basis.Identity.Scaled(new Vector3(0.7f, rng.RandfRange(0.1f, 0.42f), 0.7f)), new Vector3(tc.X + x + rng.RandfRange(-0.04f, 0.04f), FloorY + TableH - 0.02f, tc.Z + sz * (TableW * 0.5f + 0.012f))));
+			{
+				float x = -TableLen * 0.48f + irng.RandfRange(0f, 0.2f);
+				while (x <= TableLen * 0.48f)
+				{
+					// a cluster: two to six, close; then a gap
+					int n = irng.RandiRange(2, 6);
+					for (int i = 0; i < n && x <= TableLen * 0.48f; i++)
+					{
+						float len = irng.RandfRange(0.06f, 0.45f) * (irng.Randf() < 0.15f ? 1.6f : 1f), girth = irng.RandfRange(0.5f, 0.95f);
+						var at = new Vector3(tc.X + x, FloorY + TableH - 0.02f, tc.Z + sz * (TableW * 0.5f + 0.012f));
+						// a seat under this edge? (its front within a few cm of it: keep the drip over the seat)
+						foreach (var ch in seats)
+						{
+							var d = ch.Origin - at;
+							if (Mathf.Abs(d.X) < 0.3f && Mathf.Abs(d.Z) < 0.3f && ch.Basis.Y.Y > 0.9f) len = Mathf.Min(len, 0.2f);
+						}
+						ice.Add(new Transform3D(new Basis(Vector3.Up, irng.RandfRange(-0.26f, 0.26f)).Scaled(new Vector3(girth, len, girth)), at + new Vector3(0, 0, sz * irng.RandfRange(0f, 0.006f))));
+						x += irng.RandfRange(0.05f, 0.13f);
+					}
+					x += irng.RandfRange(0.2f, 0.75f);
+				}
+			}
 		}
 		// frost over the floors of the lobby and the dining hall: thin patches of rime
 		// (a few soft drifts of blown snow across the floors, low and lumpy; the frost does the rest)

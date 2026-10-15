@@ -435,6 +435,36 @@ public partial class SkiLodge
 		var bucket = ClutterKit.Bucket(LodgeTextures.IronMat);
 		var broom = ClutterKit.Broom(LodgeTextures.DoorWoodMat, card);
 		var shovel = SnowShovel(card);
+		// (2026-10-15, the scan pass) the rooms' own things: a leather suitcase, a breakfast tray, a ski bag, a chair with
+		// clothes thrown over it
+		var suitcase = ClutterKit.Carton(LodgeTextures.LeatherMat, new Vector3(0.66f, 0.21f, 0.44f), new Color(0.75f, 0.55f, 0.42f)) with { CanStackOn = true };
+		var tray = new ClutterKit.Item("tray", (tk, xf) =>
+		{
+			tk.Mat(LodgeTextures.DoorWoodMat);
+			tk.BevelBox(xf * new Vector3(0, 0.012f, 0), new Vector3(0.44f, 0.024f, 0.3f), 0.006f, 1f, xf.Basis);
+			FurnitureKit.Add(tk, "mug", xf * new Vector3(0.11f, 0.024f, 0.05f), xf.Basis.GetEuler().Y + 0.6f, Woodwork);
+			FurnitureKit.Add(tk, "tumbler", xf * new Vector3(-0.12f, 0.024f, -0.06f), xf.Basis.GetEuler().Y, Woodwork);
+			tk.Mat(LodgeTextures.PorcelainMat);
+			tk.Cylinder(xf * new Vector3(-0.05f, 0.024f, 0.06f), xf * new Vector3(-0.05f, 0.032f, 0.06f), 0.09f, 0.1f, 14, true);   // a plate
+		}, new Vector3(0.44f, 0.1f, 0.3f), false, false, false);
+		var skiBag = new ClutterKit.Item("skibag", (tk, xf) =>
+		{
+			tk.Mat(CoatWool(new Color(0.11f, 0.13f, 0.2f), 1));
+			tk.Cylinder(xf * new Vector3(0, 0.06f, 0), xf * new Vector3(0, 1.66f, 0), 0.085f, 0.07f, 8, true);
+			tk.Mat(LodgeTextures.LeatherMat);
+			foreach (float sy in new[] { 0.5f, 1.2f })
+				tk.Cylinder(xf * new Vector3(0, sy, 0), xf * new Vector3(0, sy + 0.04f, 0), 0.089f, 0.088f, 8, false);   // its straps
+		}, new Vector3(0.18f, 1.7f, 0.18f), false, true, false);
+		var chairClothes = new ClutterKit.Item("chair_clothes", (tk, xf) =>
+		{
+			FurnitureKit.Add(tk, "dining_chair", new Transform3D(xf.Basis, xf * new Vector3(0, 0, -0.03f)), new Dictionary<string, Material>(roles) { ["upholstery"] = LodgeTextures.Upholstery("oxblood") });
+			// a loden cardigan over the back, a shirt left on the seat
+			tk.Mat(CoatWool(new Color(0.2f, 0.23f, 0.15f), 2));   // (the loden of the mudroom's jacket: CoatWool keeps one per index)
+			tk.Blob(xf * new Vector3(0, 0.975f, 0.225f), new Vector3(0.24f, 0.05f, 0.09f), 6811, 0.15f, false, 1f);
+			tk.BevelBox(xf * new Vector3(0.02f, 0.78f, 0.326f), new Vector3(0.36f, 0.36f, 0.02f), 0.008f, 1f, xf.Basis * new Basis(Vector3.Right, -0.08f));
+			tk.Mat(LodgeTextures.LinenMat);
+			tk.Blob(xf * new Vector3(-0.03f, 0.51f, -0.06f), new Vector3(0.17f, 0.03f, 0.14f), 6812, 0.2f, true, 1f);
+		}, new Vector3(0.46f, 1.0f, 0.56f));
 		var keep = KeepSpots();
 		ClutterKit Kit(KitRoom r, float keepR = 0.9f)
 		{
@@ -478,12 +508,14 @@ public partial class SkiLodge
 					big.BevelBox(nb, new Vector3(0.95f, 0.65f, 0.025f), 0.008f, 1f, nbb);
 					small.Mat(card);
 					small.Color = new Color(0.62f, 0.42f, 0.26f);   // (cork)
-					small.Box(nb + Vector3.Right * 0.014f, new Vector3(0.012f, 0.56f, 0.86f), 1f);
+					// (2026-10-15, the scan pass: the cork and the notes were inside each other and the board, the notes buried.
+					// Now in layers off the board's face, 0.0245 from the wall: the cork 0.026 to 0.034, each note on the one before)
+					small.Box(nb + Vector3.Right * 0.018f, new Vector3(0.008f, 0.56f, 0.86f), 1f);
 					var prng = new RandomNumberGenerator { Seed = 2306 };
 					for (int i = 0; i < 6; i++)
 					{
 						small.Color = new Color(1.6f, 1.55f, 1.4f) * prng.RandfRange(0.75f, 1f);
-						small.Box(nb + new Vector3(0.022f + i * 0.001f, prng.RandfRange(-0.15f, 0.15f), prng.RandfRange(-0.3f, 0.3f)), new Vector3(0.003f, prng.RandfRange(0.18f, 0.28f), prng.RandfRange(0.14f, 0.21f)), 1f, new Basis(Vector3.Right, prng.RandfRange(-0.1f, 0.1f)));
+						small.Box(nb + new Vector3(0.0235f + i * 0.0015f, prng.RandfRange(-0.15f, 0.15f), prng.RandfRange(-0.3f, 0.3f)), new Vector3(0.001f, prng.RandfRange(0.18f, 0.28f), prng.RandfRange(0.14f, 0.21f)), 1f, new Basis(Vector3.Right, prng.RandfRange(-0.1f, 0.1f)));
 					}
 					small.Color = Colors.White;
 					big.Mat(LodgeTextures.IronMat);
@@ -529,17 +561,37 @@ public partial class SkiLodge
 					placed += c.All.Count;
 					break;
 				}
+				// (2026-10-15, the scan pass: the three rooms had one recipe, a footlocker with papers on it, boots, magazines,
+				// books, in each. Each guest's own now)
 				case "Room202":
-				case "Room204":
+				{
+					// a skier's: a suitcase against the wall with a tray of breakfast things on it, a ski bag leant by it, boots
+					var c = Kit(r, 1.0f);
+					var sc = c.AgainstWall(big, suitcase, -1);
+					c.On(small, sc, tray);
+					c.Lean(small, skiBag, -1);
+					c.AgainstWall(small, boots, -1);
+					placed += c.All.Count;
+					break;
+				}
 				case "Room203":
 				{
-					// a guest's luggage, a stack of books, magazines, boots kicked off
+					// the wrecked room: a suitcase knocked over, magazines blown about
+					var c = Kit(r, 1.0f);
+					c.Topple(big, suitcase);
+					c.Free(small, mags);
+					c.Free(small, mags);
+					placed += c.All.Count;
+					break;
+				}
+				case "Room204":
+				{
+					// a reader's: the footlocker with papers on it, books, clothes thrown over a chair
 					var c = Kit(r, 1.0f);
 					var lk = c.AgainstWall(big, locker, -1);
 					c.On(small, lk, papers);
-					c.AgainstWall(small, boots, -1);
-					c.Free(small, mags);
-					if (r.Name != "Room203") c.Free(small, books);
+					c.Free(small, books);
+					c.AgainstWall(big, chairClothes, -1);
 					placed += c.All.Count;
 					break;
 				}

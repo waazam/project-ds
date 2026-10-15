@@ -550,7 +550,7 @@ public static class LodgeTextures
 	public static StandardMaterial3D LeatherMat => Std("lodge_m_leather", Leather, 0.55f, 0.35f, null, DetailKit.Kind.Leather, "leather", 0.5f, 0.6f);
 	public static StandardMaterial3D VelvetVioletMat => Std("lodge_m_velvet", Velvet, 0.9f, 0.15f, null, DetailKit.Kind.Fabric, "velvet", 0.4f, 0.5f);
 	public static StandardMaterial3D LinenMat => Std("lodge_m_linen", Linen, 0.95f, 0.1f, null, DetailKit.Kind.Fabric, "linen", 0.5f, 0.6f);
-	/// <summary>The dining tables' sheets (their UVs run 0..1 over the whole sheet: the linen repeats across it).</summary>
+	/// <summary>The sheet figure's linen (once the dining tables' sheets).</summary>
 	public static StandardMaterial3D SheetLinenMat => _sheet ??= SheetFrom(LinenMat);
 	/// <summary>The tablecloths (the owner chose it: Poly Haven's Quatrefoil Jacquard Fabric, CC0): a crimson jacquard,
 	/// its quatrefoil figure in the weave's relief, a little sheen. Two-sided (a cloth's underside shows as it falls).
@@ -577,7 +577,21 @@ public static class LodgeTextures
 	{
 		var s = (StandardMaterial3D)m.Duplicate();
 		s.ResourceName = "lodge_m_linen_sheet";
-		s.Uv1Scale = new Vector3(14f, 4f, 1f);
+		// (2026-10-15, the scan pass: it was 14 x 4, for a sheet whose UVs ran 0..1 across it; its one user now, the sheet
+		// figure, has UVs in metres, and the weave stretched 3.5 : 1. The linen's own scale, the same both ways)
+		s.Uv1Scale = new Vector3(1f / 0.6f, 1f / 0.6f, 1f);
+		return s;
+	}
+	/// <summary>(2026-10-15, the scan pass) The dust sheets over the dining hall's chairs: the linen, a little dingier,
+	/// two-sided (the inside of the hem shows from low down). UVs in metres.</summary>
+	public static StandardMaterial3D ChairSheetMat => _chairSheet ??= ChairSheetFrom(LinenMat);
+	private static StandardMaterial3D _chairSheet;
+	private static StandardMaterial3D ChairSheetFrom(StandardMaterial3D m)
+	{
+		var s = (StandardMaterial3D)m.Duplicate();
+		s.ResourceName = "lodge_m_linen_dust_sheet";
+		s.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+		s.AlbedoColor = new Color(0.86f, 0.84f, 0.79f);
 		return s;
 	}
 	public static StandardMaterial3D PillowMat => _plain("lodge_m_pillow", new Color(0.8f, 0.78f, 0.72f), 0.95f, 0.1f);
