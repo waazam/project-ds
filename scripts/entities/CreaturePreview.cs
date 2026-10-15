@@ -98,6 +98,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--growth") >= 0) { await GrowthShots(); GetTree().Quit(); return; }
 		if (System.Array.Exists(OS.GetCmdlineUserArgs(), a => a.StartsWith("--trunks"))) { await TrunkShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--forest-models") >= 0) { await ForestModelShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lake") >= 0) { await LakeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lakebeast") >= 0) { await LakeBeastShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--giant-grab") >= 0) { await GiantGrabShots(); GetTree().Quit(); return; }

@@ -160,7 +160,7 @@ public partial class ForestScatter
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 9973) };
 		var k = new MeshKit();
 		// the dark core: a few overlapping lumps, the deep shade under the leaves
-		k.Mat(_moundCore ??= new StandardMaterial3D { ResourceName = "vine_core", AlbedoColor = new Color(0.05f, 0.08f, 0.035f), Roughness = 1f, VertexColorUseAsAlbedo = true });
+		k.Mat(MoundCoreMat);
 		k.Color = Colors.White;
 		var lumps = new System.Collections.Generic.List<(Vector3 c, Vector3 r)>();
 		// (2026-10-15, the scan: "round green topiary balls") lopsided, not a dome: the lumps run off to one side and fall
@@ -221,6 +221,13 @@ public partial class ForestScatter
 	}
 
 	private static StandardMaterial3D _palmMat;
+	/// <summary>The vine mounds' dark core and the palmettos' leaves (by name for the Blender meshes too: ScatterModels).</summary>
+	internal static StandardMaterial3D MoundCoreMat => _moundCore ??= new StandardMaterial3D { ResourceName = "vine_core", AlbedoColor = new Color(0.05f, 0.08f, 0.035f), Roughness = 1f, VertexColorUseAsAlbedo = true };
+	internal static StandardMaterial3D PalmMat => _palmMat ??= new StandardMaterial3D
+	{
+		ResourceName = "palmetto", AlbedoColor = new Color(0.3f, 0.38f, 0.2f), VertexColorUseAsAlbedo = true, Roughness = 0.7f,
+		CullMode = BaseMaterial3D.CullModeEnum.Disabled, MetallicSpecular = 0.35f,
+	};
 
 	/// <summary>A saw palmetto (the owner's photo of the woods off the trail): a low clump of stems, each holding up a
 	/// fan of stiff, narrow leaflets, the old ones gone brown and drooping.</summary>
@@ -228,11 +235,7 @@ public partial class ForestScatter
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 4421) };
 		var k = new MeshKit();
-		_palmMat ??= new StandardMaterial3D
-		{
-			ResourceName = "palmetto", AlbedoColor = new Color(0.3f, 0.38f, 0.2f), VertexColorUseAsAlbedo = true, Roughness = 0.7f,
-			CullMode = BaseMaterial3D.CullModeEnum.Disabled, MetallicSpecular = 0.35f,
-		};
+		_ = PalmMat;
 		int fans = rng.RandiRange(6, 10);
 		for (int f = 0; f < fans; f++)
 		{

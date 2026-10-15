@@ -89,43 +89,43 @@ public partial class ForestScatter : Node3D
 	private void BuildMeshes()
 	{
 		// tall straight firs: bare lower trunk, drooping bough tiers (alpha cards)
-		_meshes["fir_giant"] = FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f);
-		_meshes["fir_tall"] = FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f);
-		_meshes["fir_mid"] = FirMesh(13, 18f, 0.31f, 0.26f, 11, 3.0f, 0.15f);
-		_meshes["fir_spire"] = FirMesh(14, 22f, 0.34f, 0.30f, 15, 2.4f, 0.08f);
-		_meshes["fir_young"] = FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f);
-		_meshes["decid_a"] = DeciduousMesh(4);
-		_meshes["decid_b"] = DeciduousMesh(5);
-		_meshes["snag"] = SnagMesh(6, 9.5f);
-		_meshes["snag_tall"] = SnagMesh(16, 19f);
-		_meshes["stump"] = StumpMesh();
-		_meshes["rock_a"] = RockMesh(7);
-		_meshes["rock_b"] = RockMesh(8);
-		_meshes["boulder_a"] = BoulderMesh(21);
-		_meshes["boulder_b"] = BoulderMesh(22);
-		_meshes["log"] = LogMesh();
-		_meshes["branch"] = BranchMesh();
+		_meshes["fir_giant"] = ScatterModels.Get("fir_giant", () => FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f));
+		_meshes["fir_tall"] = ScatterModels.Get("fir_tall", () => FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f));
+		_meshes["fir_mid"] = ScatterModels.Get("fir_mid", () => FirMesh(13, 18f, 0.31f, 0.26f, 11, 3.0f, 0.15f));
+		_meshes["fir_spire"] = ScatterModels.Get("fir_spire", () => FirMesh(14, 22f, 0.34f, 0.30f, 15, 2.4f, 0.08f));
+		_meshes["fir_young"] = ScatterModels.Get("fir_young", () => FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f));
+		_meshes["decid_a"] = ScatterModels.Get("decid_a", () => DeciduousMesh(4));
+		_meshes["decid_b"] = ScatterModels.Get("decid_b", () => DeciduousMesh(5));
+		_meshes["snag"] = ScatterModels.Get("snag", () => SnagMesh(6, 9.5f));
+		_meshes["snag_tall"] = ScatterModels.Get("snag_tall", () => SnagMesh(16, 19f));
+		_meshes["stump"] = ScatterModels.Get("stump", () => StumpMesh());
+		_meshes["rock_a"] = ScatterModels.Get("rock_a", () => RockMesh(7));
+		_meshes["rock_b"] = ScatterModels.Get("rock_b", () => RockMesh(8));
+		_meshes["boulder_a"] = ScatterModels.Get("boulder_a", () => BoulderMesh(21));
+		_meshes["boulder_b"] = ScatterModels.Get("boulder_b", () => BoulderMesh(22));
+		_meshes["log"] = ScatterModels.Get("log", () => LogMesh());
+		_meshes["branch"] = ScatterModels.Get("branch", () => BranchMesh());
 		// (2026-10-15, the repetition pass) a second of each: one stump, one log and one branch were every one of them
-		_meshes["stump_b"] = StumpBrokenMesh();
-		_meshes["log_b"] = LogBrokenMesh();
-		_meshes["branch_b"] = BranchForkMesh();
-		_meshes["fern"] = FernMesh();
-		_meshes["grass"] = GrassMesh();
-		_meshes["litter"] = LitterMesh();
+		_meshes["stump_b"] = ScatterModels.Get("stump_b", () => StumpBrokenMesh());
+		_meshes["log_b"] = ScatterModels.Get("log_b", () => LogBrokenMesh());
+		_meshes["branch_b"] = ScatterModels.Get("branch_b", () => BranchForkMesh());
+		_meshes["fern"] = ScatterModels.Get("fern", () => FernMesh());
+		_meshes["grass"] = ScatterModels.Get("grass", () => GrassMesh());
+		_meshes["litter"] = ScatterModels.Get("litter", () => LitterMesh());
 		// the undergrowth pass (2026-10-03): moss-hung variants, saplings, vine mounds
-		_meshes["fir_giant_moss"] = FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f, 0.55f);
-		_meshes["fir_tall_moss"] = FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f, 0.55f);
-		_meshes["snag_moss"] = SnagMesh(6, 9.5f, 0.6f);
-		_meshes["snag_tall_moss"] = SnagMesh(16, 19f, 0.6f);
-		_meshes["sapling_a"] = SaplingMesh(1, 5.5f);
-		_meshes["sapling_b"] = SaplingMesh(2, 7f);
-		_meshes["sapling_c"] = SaplingMesh(3, 4.2f);
-		_meshes["vinemound_a"] = VineMoundMesh(1, new Vector3(1.6f, 1.5f, 1.4f));
-		_meshes["vinemound_b"] = VineMoundMesh(2, new Vector3(2.2f, 2.1f, 1.8f));
-		_meshes["vinemound_c"] = VineMoundMesh(3, new Vector3(2.6f, 1.3f, 1.7f));   // (2026-10-15) a long low one
-		_meshes["palmetto_a"] = PalmettoMesh(1);
-		_meshes["palmetto_b"] = PalmettoMesh(2);
-		_meshes["boardpile"] = BoardPileMesh(1);
+		_meshes["fir_giant_moss"] = ScatterModels.Get("fir_giant_moss", () => FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f, 0.55f));
+		_meshes["fir_tall_moss"] = ScatterModels.Get("fir_tall_moss", () => FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f, 0.55f));
+		_meshes["snag_moss"] = ScatterModels.Get("snag_moss", () => SnagMesh(6, 9.5f, 0.6f));
+		_meshes["snag_tall_moss"] = ScatterModels.Get("snag_tall_moss", () => SnagMesh(16, 19f, 0.6f));
+		_meshes["sapling_a"] = ScatterModels.Get("sapling_a", () => SaplingMesh(1, 5.5f));
+		_meshes["sapling_b"] = ScatterModels.Get("sapling_b", () => SaplingMesh(2, 7f));
+		_meshes["sapling_c"] = ScatterModels.Get("sapling_c", () => SaplingMesh(3, 4.2f));
+		_meshes["vinemound_a"] = ScatterModels.Get("vinemound_a", () => VineMoundMesh(1, new Vector3(1.6f, 1.5f, 1.4f)));
+		_meshes["vinemound_b"] = ScatterModels.Get("vinemound_b", () => VineMoundMesh(2, new Vector3(2.2f, 2.1f, 1.8f)));
+		_meshes["vinemound_c"] = ScatterModels.Get("vinemound_c", () => VineMoundMesh(3, new Vector3(2.6f, 1.3f, 1.7f)));   // (2026-10-15) a long low one
+		_meshes["palmetto_a"] = ScatterModels.Get("palmetto_a", () => PalmettoMesh(1));
+		_meshes["palmetto_b"] = ScatterModels.Get("palmetto_b", () => PalmettoMesh(2));
+		_meshes["boardpile"] = ScatterModels.Get("boardpile", () => BoardPileMesh(1));
 	}
 
 	/// <summary>
@@ -661,10 +661,20 @@ public partial class ForestScatter : Node3D
 			return m;
 		});
 
+	/// <summary>The fern's, the grass's and the leaf litter's materials (the code meshes' and the Blender ones', by name: ScatterModels).</summary>
+	internal static ShaderMaterial FernMat => FoliageMat("fern_mat", ProcTextures.Fern(), new Color(0.95f, 1f, 0.9f), 0.04f);
+	internal static ShaderMaterial GrassMat => FoliageMat("grass_mat", ProcTextures.GrassTuft(), new Color(0.95f, 0.95f, 0.85f), 0.07f);
+	internal static ShaderMaterial LitterMat => (ShaderMaterial)ProcTextures.Cached("litter_mat", () =>
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ground_litter.gdshader") };
+		m.SetShaderParameter("albedo_tex", GD.Load<Texture2D>("res://assets/textures/surfaces/forest_floor_albedo.png"));
+		return m;
+	});
+
 	internal static Mesh FernMesh()
 	{
 		var k = new MeshKit();
-		k.Mat(FoliageMat("fern_mat", ProcTextures.Fern(), new Color(0.95f, 1f, 0.9f), 0.04f));
+		k.Mat(FernMat);
 		int fronds = 7;
 		for (int i = 0; i < fronds; i++)
 		{
@@ -691,12 +701,7 @@ public partial class ForestScatter : Node3D
 	internal static Mesh LitterMesh()
 	{
 		var k = new MeshKit();
-		k.Mat(ProcTextures.Cached("litter_mat", () =>
-		{
-			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/ground_litter.gdshader") };
-			m.SetShaderParameter("albedo_tex", GD.Load<Texture2D>("res://assets/textures/surfaces/forest_floor_albedo.png"));
-			return m;
-		}));
+		k.Mat(LitterMat);
 		const int N = 4;
 		const float S = 1.6f;
 		Vector3 P(int i, int j)
@@ -716,7 +721,7 @@ public partial class ForestScatter : Node3D
 	internal static Mesh GrassMesh()
 	{
 		var k = new MeshKit();
-		k.Mat(FoliageMat("grass_mat", ProcTextures.GrassTuft(), new Color(0.95f, 0.95f, 0.85f), 0.07f));
+		k.Mat(GrassMat);
 		for (int i = 0; i < 3; i++)
 		{
 			float a = Mathf.Pi * i / 3f;
