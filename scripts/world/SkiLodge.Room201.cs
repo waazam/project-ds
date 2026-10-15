@@ -78,7 +78,8 @@ public partial class SkiLodge
 		k.Box(new Vector3(cx + 0.35f, y + 0.6f, zOut - 2.05f), new Vector3(0.36f, 0.06f, 0.24f), 1f);
 		k.Box(new Vector3(cx + 0.35f, y + 0.66f, zOut - 2.05f), new Vector3(0.34f, 0.06f, 0.22f), 1f);
 		// roses on the right nightstand: a vase, stems, seven dark red heads
-		var ns = new Vector3(cx + 1.6f, y + 0.6f, zOut - 0.35f);
+		// (2026-10-15: beside the lamp's crock, toward the room; at 10 cm out it stood in the new lamp's base)
+		var ns = new Vector3(cx + 1.6f + 0.06f, y + 0.6f, zOut - 0.35f - 0.15f);
 		k.Mat(LodgeTextures.PorcelainMat);
 		k.Cylinder(ns + new Vector3(0.1f, 0, 0), ns + new Vector3(0.1f, 0.22f, 0), 0.05f, 0.065f, 10, true);
 		var stem = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.22f, 0.1f), Roughness = 0.8f };

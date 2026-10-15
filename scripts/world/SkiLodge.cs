@@ -702,9 +702,10 @@ public partial class SkiLodge : Node3D
 		{
 			// a scarf hung over the hook, its two ends down the jacket's front
 			k.Mat(CoatWool(new Color(0.36f, 0.1f, 0.08f), 0));
-			k.Box(hook + new Vector3(-0.12f, -0.03f, 0), new Vector3(0.13f, 0.05f, 0.16f), 1f);
-			k.Box(o + new Vector3(-d - 0.02f, -0.35f, -0.05f), new Vector3(0.025f, 0.6f, 0.13f), 1f, new Basis(Vector3.Right, 0.06f));
-			k.Box(o + new Vector3(-d - 0.03f, -0.3f, 0.08f), new Vector3(0.025f, 0.5f, 0.13f), 1f, new Basis(Vector3.Right, -0.08f));
+			// (2026-10-15: soft-edged, a fold over the hook; they were three sharp slabs)
+			k.Blob(hook + new Vector3(-0.1f, -0.03f, 0), new Vector3(0.07f, 0.035f, 0.085f), seed + 5, 0.1f, false, 1f);
+			k.BevelBox(o + new Vector3(-d - 0.02f, -0.35f, -0.05f), new Vector3(0.025f, 0.6f, 0.13f), 0.01f, 1f, new Basis(Vector3.Right, 0.06f));
+			k.BevelBox(o + new Vector3(-d - 0.03f, -0.3f, 0.08f), new Vector3(0.025f, 0.5f, 0.13f), 0.01f, 1f, new Basis(Vector3.Right, -0.08f));
 		}
 		k.Color = keep;
 	}
@@ -773,8 +774,8 @@ public partial class SkiLodge : Node3D
 		// a ski rack along one wall with the skis still in it, a bench, boots under it
 		k.Mat(LodgeTrim);
 		k.Color = Colors.White;
-		k.Box(new Vector3(x0 + 0.2f, 1.6f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 1f);
-		k.Box(new Vector3(x0 + 0.2f, 0.3f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 1f);
+		k.BevelBox(new Vector3(x0 + 0.2f, 1.6f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 0.015f);
+		k.BevelBox(new Vector3(x0 + 0.2f, 0.3f, (z0 + z1) * 0.5f), new Vector3(0.1f, 0.1f, z1 - z0 - 0.6f), 0.015f);
 		// the skis in it: the modelled pairs (their poles with them), leant back against the wall
 		var roles = Woodwork;
 		roles["ski"] = SkiPaint;
@@ -809,10 +810,20 @@ public partial class SkiLodge : Node3D
 			k.Box(new Vector3(x0 + 0.26f, 1.05f, zz), new Vector3(0.03f, 1.8f, 0.08f), 1f, new Basis(Vector3.Forward, 0.12f));
 			k.Box(new Vector3(x0 + 0.26f, 1.05f, zz + 0.1f), new Vector3(0.03f, 1.8f, 0.08f), 1f, new Basis(Vector3.Forward, 0.12f));
 		}
+		// (2026-10-15, the props pass) the bench: three slats on two trestle ends (legs, a foot and a rail each), a stretcher
+		// between them low down; it was a plank on two blocks. Its seat at 45 cm, 3.2 m long, 42 deep
 		k.Mat(LodgeTrim);
-		k.Box(new Vector3(x1 - 0.3f, 0.45f, (z0 + z1) * 0.5f), new Vector3(0.45f, 0.08f, 3.2f), 1f);
-		k.Box(new Vector3(x1 - 0.3f, 0.22f, (z0 + z1) * 0.5f - 1.4f), new Vector3(0.4f, 0.45f, 0.08f), 1f);
-		k.Box(new Vector3(x1 - 0.3f, 0.22f, (z0 + z1) * 0.5f + 1.4f), new Vector3(0.4f, 0.45f, 0.08f), 1f);
+		float bxc = x1 - 0.3f, bzc = (z0 + z1) * 0.5f;
+		for (int sl = 0; sl < 3; sl++)
+			k.BevelBox(new Vector3(bxc - 0.14f + sl * 0.14f, 0.435f, bzc), new Vector3(0.12f, 0.035f, 3.2f), 0.008f);
+		foreach (float ez in new[] { bzc - 1.4f, bzc + 1.4f })
+		{
+			foreach (float lx in new[] { -0.15f, 0.15f })
+				k.BevelBox(new Vector3(bxc + lx, 0.21f, ez), new Vector3(0.055f, 0.42f, 0.055f), 0.008f);
+			k.BevelBox(new Vector3(bxc, 0.4f, ez), new Vector3(0.42f, 0.04f, 0.07f), 0.008f);   // the rail under the slats
+			k.BevelBox(new Vector3(bxc, 0.08f, ez), new Vector3(0.36f, 0.035f, 0.05f), 0.006f);   // the foot rail
+		}
+		k.BevelBox(new Vector3(bxc + 0.15f, 0.3f, bzc), new Vector3(0.04f, 0.06f, 2.75f), 0.008f);   // the stretcher, at the back (clear of the boots kicked off under it)
 		// (2026-10-14h, the kit pass) the boot room's own: a slatted rack of rental boots by the back door, its sign, a
 		// peg rail of hats over it; the trail map framed by the door on into the lodge
 		{

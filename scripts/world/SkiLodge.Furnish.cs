@@ -71,7 +71,10 @@ public partial class SkiLodge
 		k.Mat(LodgeTextures.RiverStoneMat);
 		k.Box(fc - fout * 0.4f + Vector3.Up * 0.15f, new Vector3(3.6f, 0.3f, 0.8f), 0.6f, fbasis);                 // the hearth
 		k.Mat(BuildingTextures.LogMat);
-		k.Box(fc - fout * 0.12f + Vector3.Up * 1.95f, new Vector3(3.8f, 0.24f, 0.36f), 0.5f, fbasis);              // the mantel, a split log
+		// the mantel, a split log: its split face the shelf (at 2.07), the round of it under (2026-10-15: it was a box)
+		LodgeProps.SplitLog(k, fc - fout * 0.12f + Vector3.Up * 2.07f, falong, -fout, 3.8f, 0.36f, 0.24f);
+		// the fire irons on their stand, at the hearth's other end from the logs
+		LodgeProps.FireTools(k, (fc - fout * 0.5f - falong * 1.45f) with { Y = 0.3f }, Mathf.Atan2(-fout.X, -fout.Z) + Mathf.Pi);
 		LodgeKit.Solid(_inBody, fc + fout * 0.2f + Vector3.Up * 1.5f, new Vector3(4.2f, 3f, 1.4f), Mathf.Atan2(-falong.Z, falong.X));
 		// the fire: a low one, burning in an empty lodge (logs, embers; its light moves slowly, never flickers hard)
 		k.Mat(BuildingTextures.RoundLogMat);
@@ -119,24 +122,24 @@ public partial class SkiLodge
 		}
 		// ---- the front desk, by the front doors: a panelled counter, pigeonholes and the room keys' hooks behind
 		Vector3 d0 = new(5.1f, FloorY, 7.3f);   // (east of the doors: on the west, the balcony's corner post came down through it)
-		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Box(d0 + new Vector3(0, 0.55f, 0), new Vector3(3.2f, 1.1f, 0.6f), 1f);
-		k.Mat(LodgeTextures.GoldMat);
-		k.Box(d0 + new Vector3(0, 1.11f, 0), new Vector3(3.3f, 0.04f, 0.7f), 1f);
-		k.Box(d0 + new Vector3(0, 0.55f, -0.31f), new Vector3(3.2f, 0.06f, 0.02f), 1f);
-		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Box(new Vector3(4.3f, 1.9f, HexIn - 0.12f), new Vector3(2.8f, 1.6f, 0.24f), 1f);   // the pigeonholes' case
+		FrontDesk(k, d0);
+		k.Mat(LodgeTextures.DoorWoodMat);
+		k.BevelBox(new Vector3(4.3f, 1.9f, HexIn - 0.12f), new Vector3(2.8f, 1.6f, 0.24f), 0.012f);   // the pigeonholes' case
+		k.BevelBox(new Vector3(4.3f, 2.72f, HexIn - 0.13f), new Vector3(2.88f, 0.05f, 0.27f), 0.012f);   // its cornice
 		k.Mat(LodgeTextures.BlackMat);
 		for (int r = 0; r < 4; r++) for (int c = 0; c < 8; c++)
 			k.Box(new Vector3(3.12f + c * 0.34f, 1.3f + r * 0.36f, HexIn - 0.245f), new Vector3(0.28f, 0.28f, 0.01f), 1f);
 		k.Mat(LodgeTextures.BrassMat);
 		foreach (var (num, x) in new[] { ("201", 5.35f), ("202", 5.0f), ("203", 4.65f), ("204", 4.3f) })
 			k.Cylinder(new Vector3(x, 2.85f, HexIn - 0.24f), new Vector3(x, 2.85f, HexIn - 0.3f), 0.01f, 0.01f, 5, true);
-		// the bell, the ledger open, a green-shaded desk lamp
-		k.Cylinder(d0 + new Vector3(0.9f, 1.13f, 0), d0 + new Vector3(0.9f, 1.2f, 0), 0.05f, 0.02f, 10, true);
-		k.Mat(LodgeTextures.LinenMat);
-		k.Box(d0 + new Vector3(-0.3f, 1.14f, 0.05f), new Vector3(0.5f, 0.02f, 0.36f), 1f, new Basis(Vector3.Up, 0.1f));
-		var deskBulb = LodgeKit.Lamp(k, d0 + new Vector3(-1.2f, 1.13f, 0.1f), 0.45f, LodgeTextures.Glow("lodge_greenshade", new Color(0.2f, 0.5f, 0.3f), 0.8f));
+		// the bell, the ledger open, a green-shaded banker's lamp (2026-10-15: it was the bedside lamp in green, a pleated
+		// shade on a stick; the owner: "the green lamp")
+		k.Mat(LodgeTextures.BlackMat);
+		LodgeProps.Lathe(k, d0 + new Vector3(0.9f, 1.13f, 0), new[] { new Vector2(0.045f, 0f), new Vector2(0.046f, 0.008f), new Vector2(0.04f, 0.012f), new Vector2(0.04f, 0.018f) }, 12, capBottom: true);
+		k.Mat(LodgeTextures.BrassMat);
+		LodgeProps.Lathe(k, d0 + new Vector3(0.9f, 1.148f, 0), new[] { new Vector2(0.042f, 0f), new Vector2(0.04f, 0.018f), new Vector2(0.03f, 0.04f), new Vector2(0.014f, 0.052f), new Vector2(0.006f, 0.056f), new Vector2(0.006f, 0.066f), new Vector2(0.009f, 0.068f), new Vector2(0f, 0.072f) }, 12);
+		Ledger(k, d0 + new Vector3(-0.3f, 1.13f, 0.05f), 0.1f);
+		var deskBulb = LodgeProps.BankersLamp(k, d0 + new Vector3(-1.2f, 1.13f, 0.12f), Mathf.Pi + 0.25f, LodgeTextures.Glow("lodge_greenshade", new Color(0.12f, 0.4f, 0.2f), 0.7f));
 		Light(deskBulb, Warm, 0.5f, 3.5f);
 		LodgeKit.Solid(_inBody, d0 + new Vector3(0, 0.55f, 0), new Vector3(3.2f, 1.1f, 0.6f));
 		SignKit.Text(this, "RECEPTION", new Vector3(4.3f, 2.95f, HexIn - 0.26f), new Basis(Vector3.Up, Mathf.Pi), 0.11f, new Color(0.75f, 0.58f, 0.3f), shadow: false);
@@ -176,7 +179,28 @@ public partial class SkiLodge
 		}
 		LobbyClutter(k, fc, fout, falong, sit, fyaw, d0);
 		LodgeKit.Solid(_inBody, new Vector3(6.5f, 1.05f, -6.6f), new Vector3(0.6f, 2.1f, 0.45f), 0.52f);
-		k.CommitTo(this, "LobbyFurniture", true);
+		var lobby = k.CommitTo(this, "LobbyFurniture", true);
+		CurioPieces(lobby);
+	}
+
+	private readonly List<(Curio c, string model, Vector3 at, float yaw)> _curioPieces = new();
+
+	/// <summary>(2026-10-15) The curios' own meshes, each under the lobby's furniture (so the freeze glazes them with it),
+	/// each its curio's highlight root: the white outline finds it (drawn into the room's one mesh, it found nothing of its
+	/// own, and was off).</summary>
+	private void CurioPieces(Node3D under)
+	{
+		foreach (var (c, model, at, yaw) in _curioPieces)
+		{
+			var mk = new MeshKit();
+			if (!FurnitureKit.Add(mk, model, at, yaw, Woodwork)) continue;
+			var holder = new Node3D { Name = c.Name + "_Piece" };
+			under.AddChild(holder);
+			mk.CommitTo(holder, "Mesh", false);
+			c.Outline = true;
+			c.HighlightRoot = c.GetPathTo(holder);
+		}
+		_curioPieces.Clear();
 	}
 
 	public PickupInteractable FrontInsideUse { get; private set; }
@@ -212,30 +236,80 @@ public partial class SkiLodge
 		float my = 2.07f;
 		FurnitureKit.Add(k, "mantel_clock", (fc - fout * 0.12f) with { Y = my }, fy, w);
 		foreach (float a in new[] { -1.1f, 1.1f }) FurnitureKit.Add(k, "candlestick", (fc - fout * 0.12f + falong * a) with { Y = my }, fy, w);
-		FurnitureKit.Add(k, "books_stack", (fc - fout * 0.1f - falong * 1.6f) with { Y = my }, fy + 0.3f, w);
 		// the low table before the fire (its top at 0.42): a stack of books, magazines fanned, two glasses, a bottle
 		var t = (sit + fout * 0.1f) with { Y = 0.42f };
 		FurnitureKit.Add(k, "magazines", t + falong * 0.3f, fyaw + 0.4f, w);
-		FurnitureKit.Add(k, "books_stack", t - falong * 0.4f + fout * 0.1f, fyaw - 0.2f, w);
 		FurnitureKit.Add(k, "tumbler", t + falong * 0.05f - fout * 0.22f, 0f, w);
 		FurnitureKit.Add(k, "tumbler", t - falong * 0.12f - fout * 0.18f, 0f, w);
-		FurnitureKit.Add(k, "bottle_whiskey", t - falong * 0.02f - fout * 0.05f, 0.5f, w);
 		// by the wing chairs, on the floor: an ashtray and a glass left beside one, a mug by the other
 		FurnitureKit.Add(k, "ashtray", (sit - falong * 2.75f + fout * 0.1f) with { Y = FloorY }, 0.3f, w);
 		FurnitureKit.Add(k, "wine_glass", (sit - falong * 2.6f + fout * 0.25f) with { Y = FloorY }, 0f, w);
-		FurnitureKit.Add(k, "mug", (sit - falong * 2.85f - fout * 1.35f) with { Y = FloorY }, 1f, w);
-		// some of it can be picked up and looked at (the detail pass)
-		Curios.Add(Curio.Add(this, t - falong * 0.02f - fout * 0.05f + Vector3.Up * 0.16f, "Pick up the bottle", Curio.Kind.Glass,
-			"Whiskey. Two glasses poured beside it, and neither one touched.", "The glasses are still cold."));
-		Curios.Add(Curio.Add(this, t - falong * 0.4f + fout * 0.1f + Vector3.Up * 0.08f, "Look at the books", Curio.Kind.Book,
-			"Paperbacks, their spines cracked. Each one is dog-eared at the same page.", "Page 202."));
-		Curios.Add(Curio.Add(this, (sit - falong * 2.85f - fout * 1.35f) with { Y = FloorY + 0.06f }, "Pick up the mug", Curio.Kind.Ceramic,
-			"Coffee, with a skin of ice across it.", "Whoever left it was sitting right here."));
-		Curios.Add(Curio.Add(this, (fc - fout * 0.1f - falong * 1.6f) with { Y = my + 0.1f }, "Look at the books", Curio.Kind.Book,
-			"Trail guides from the season the lodge opened. Every run is circled in pencil but one.", "That one goes up into the trees, behind the lodge."));
+		// some of it can be picked up and looked at (the detail pass); (2026-10-15) each drawn as its own small mesh, not
+		// into the room's, so its white outline finds it (CurioPieces, after the room's mesh is made)
+		_curioPieces.Clear();
+		void Piece(Curio c, string model, Vector3 at, float yaw) { Curios.Add(c); _curioPieces.Add((c, model, at, yaw)); }
+		Piece(Curio.Add(this, t - falong * 0.02f - fout * 0.05f + Vector3.Up * 0.16f, "Pick up the bottle", Curio.Kind.Glass,
+			"Whiskey. Two glasses poured beside it, and neither one touched.", "The glasses are still cold."), "bottle_whiskey", t - falong * 0.02f - fout * 0.05f, 0.5f);
+		Piece(Curio.Add(this, t - falong * 0.4f + fout * 0.1f + Vector3.Up * 0.08f, "Look at the books", Curio.Kind.Book,
+			"Paperbacks, their spines cracked. Each one is dog-eared at the same page.", "Page 202."), "books_stack", t - falong * 0.4f + fout * 0.1f, fyaw - 0.2f);
+		Piece(Curio.Add(this, (sit - falong * 2.85f - fout * 1.35f) with { Y = FloorY + 0.06f }, "Pick up the mug", Curio.Kind.Ceramic,
+			"Coffee, with a skin of ice across it.", "Whoever left it was sitting right here."), "mug", (sit - falong * 2.85f - fout * 1.35f) with { Y = FloorY }, 1f);
+		Piece(Curio.Add(this, (fc - fout * 0.1f - falong * 1.6f) with { Y = my + 0.1f }, "Look at the books", Curio.Kind.Book,
+			"Trail guides from the season the lodge opened. Every run is circled in pencil but one.", "That one goes up into the trees, behind the lodge."), "books_stack", (fc - fout * 0.1f - falong * 1.6f) with { Y = my }, fy + 0.3f);
 		// the front desk (its top at 1.13): a few books at its end, an ashtray
 		FurnitureKit.Add(k, "books_row_b", d0 + new Vector3(1.05f, 1.13f, 0.15f), Mathf.Pi, w);
 		FurnitureKit.Add(k, "ashtray", d0 + new Vector3(0.45f, 1.13f, -0.1f), 0.2f, w);
+	}
+
+	/// <summary>(2026-10-15, the props pass) The front desk at <paramref name="d0"/> (its front toward the doors, -Z): a
+	/// plinth, raised panels between pilasters, a brass rail, a thick top with its edge rounded (it was a box under a
+	/// gilt slab). 3.2 m long, its top at 1.13.</summary>
+	private static void FrontDesk(MeshKit k, Vector3 d0)
+	{
+		const float L = 3.2f, D = 0.6f, top = 1.13f;
+		k.Mat(LodgeTextures.DoorWoodMat);
+		k.Color = Colors.White;
+		k.BevelBox(d0 + new Vector3(0, 0.06f, 0.015f), new Vector3(L - 0.04f, 0.12f, D - 0.03f), 0.01f);                  // the plinth
+		k.Box(d0 + new Vector3(0, 0.6f, 0.01f), new Vector3(L - 0.06f, 0.96f, D - 0.04f), 1f);                             // the body
+		int panels = 6;
+		float pw = (L - 0.1f) / panels, zf = d0.Z - D * 0.5f + 0.02f;
+		var faceB = new Basis(Vector3.Right, Vector3.Up, Vector3.Back);
+		for (int i = 0; i < panels; i++)
+		{
+			float px = d0.X - (L - 0.1f) * 0.5f + pw * (i + 0.5f);
+			k.BevelBox(new Vector3(px, 0.6f, zf + 0.004f), new Vector3(pw - 0.05f, 0.92f, 0.02f), 0.006f, 1f, faceB);   // the frame
+			k.BevelBox(new Vector3(px, 0.6f, zf - 0.006f), new Vector3(pw - 0.18f, 0.66f, 0.012f), 0.006f, 1f, faceB);   // the panel
+			k.BevelBox(new Vector3(px, 0.6f, zf - 0.012f), new Vector3(pw - 0.28f, 0.54f, 0.012f), 0.008f, 1f, faceB);   // its raised field
+		}
+		for (int i = 0; i <= panels; i++)
+			k.ChamferBox(new Vector3(d0.X - (L - 0.1f) * 0.5f + pw * i, 0.6f, zf - 0.01f), new Vector3(0.07f, 0.96f, 0.05f), 0.012f);   // the pilasters
+		foreach (float s in new[] { -1f, 1f })
+			k.BevelBox(d0 + new Vector3(s * (L * 0.5f - 0.02f), 0.6f, 0.02f), new Vector3(0.04f, 0.96f, D - 0.04f), 0.008f);   // the ends
+		// the top: thick, its edges rounded, a hand over the front
+		LodgeProps.RoundSlab(k, d0 + new Vector3(0, top, -0.02f), L * 0.5f + 0.05f, D * 0.5f + 0.04f, 0.05f, 0.03f, 0.018f, 3);
+		k.Mat(LodgeTextures.BrassMat);
+		k.Cylinder(new Vector3(d0.X - L * 0.5f, 1.05f, zf - 0.05f), new Vector3(d0.X + L * 0.5f, 1.05f, zf - 0.05f), 0.012f, 0.012f, 8, true);   // the brass rail under it
+	}
+
+	/// <summary>The register lying open on the desk at <paramref name="at"/> (its top), turned by <paramref name="yaw"/>:
+	/// leather boards, its pages fanning up from the spine, a ribbon.</summary>
+	private static void Ledger(MeshKit k, Vector3 at, float yaw)
+	{
+		var b = new Basis(Vector3.Up, yaw);
+		k.Mat(LodgeTextures.LeatherMat);
+		k.Color = new Color(0.5f, 0.2f, 0.16f);
+		foreach (float s in new[] { -1f, 1f })
+			k.BevelBox(at + b * new Vector3(s * 0.13f, 0.004f, 0), new Vector3(0.26f, 0.008f, 0.37f), 0.003f, 1f, b * new Basis(Vector3.Back, -s * 0.03f));
+		k.Color = Colors.White;
+		k.Mat(Paper);
+		foreach (float s in new[] { -1f, 1f })
+		{
+			// the block of pages, thick at the spine and curling down to the edge
+			var pb = b * new Basis(Vector3.Back, -s * 0.07f);
+			k.BevelBox(at + b * new Vector3(s * 0.12f, 0.018f, 0), new Vector3(0.235f, 0.016f, 0.35f), 0.006f, 1f, pb);
+		}
+		k.Mat(LodgeTextures.BlackMat);
+		k.Box(at + b * new Vector3(0.02f, 0.03f, 0.05f), new Vector3(0.006f, 0.002f, 0.38f), 1f, b * new Basis(Vector3.Up, 0.1f));   // its ribbon
 	}
 
 	/// <summary>A low fire's flames: a few soft orange billboards rising slowly (no flicker: they drift).</summary>
@@ -302,13 +376,28 @@ public partial class SkiLodge
 			k.Cylinder(new Vector3(cx + 0.6f, 0.72f, z), new Vector3(cx + 0.6f, 0.8f, z), 0.2f, 0.19f, 12, true);
 		}
 		// the back bar on the west wall: shelves of bottles in front of a mirror, a gilt frame
+		// (2026-10-15, the props pass) the mirror in a gilt frame, a moulded cornice over it; the base a run of panelled
+		// cupboards under a bar top; the shelves on brackets, each with a lip (they were a box and three planks)
 		k.Mat(LodgeTextures.MirrorMat);
 		k.Box(new Vector3(BarX0 + 0.1f, 2.0f, (z0 + z1) * 0.5f), new Vector3(0.02f, 1.6f, z1 - z0), 1f);
 		k.Mat(LodgeTextures.GoldMat);
-		k.Box(new Vector3(BarX0 + 0.12f, 2.84f, (z0 + z1) * 0.5f), new Vector3(0.05f, 0.08f, z1 - z0 + 0.2f), 1f);
-		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Box(new Vector3(BarX0 + 0.35f, 0.5f, (z0 + z1) * 0.5f), new Vector3(0.6f, 1.0f, z1 - z0), 1f);
-		foreach (float y in new[] { 1.45f, 1.95f, 2.45f }) k.Box(new Vector3(BarX0 + 0.25f, y, (z0 + z1) * 0.5f), new Vector3(0.3f, 0.04f, z1 - z0), 1f);
+		k.BevelBox(new Vector3(BarX0 + 0.12f, 2.82f, (z0 + z1) * 0.5f), new Vector3(0.05f, 0.06f, z1 - z0 + 0.16f), 0.012f);
+		k.BevelBox(new Vector3(BarX0 + 0.135f, 2.87f, (z0 + z1) * 0.5f), new Vector3(0.08f, 0.05f, z1 - z0 + 0.24f), 0.015f);
+		foreach (float fz in new[] { z0 - 0.04f, z1 + 0.04f })
+			k.BevelBox(new Vector3(BarX0 + 0.12f, 2.0f, fz), new Vector3(0.05f, 1.66f, 0.08f), 0.012f);
+		var backBar = new Transform3D(new Basis(Vector3.Up, -Mathf.Pi * 0.5f), new Vector3(BarX0 + 0.35f, FloorY, (z0 + z1) * 0.5f));
+		LodgeProps.Carcass(k, backBar, z1 - z0, 1.0f, 0.6f, LodgeTextures.DoorWoodMat, System.Array.Empty<(float, float)>(), legH: 0.1f, legs: false, topThick: 0.04f, bays: 8);
+		k.Mat(LodgeTextures.DoorWoodMat);
+		foreach (float y in new[] { 1.45f, 1.95f, 2.45f })
+		{
+			k.BevelBox(new Vector3(BarX0 + 0.25f, y, (z0 + z1) * 0.5f), new Vector3(0.3f, 0.035f, z1 - z0), 0.008f);
+			k.BevelBox(new Vector3(BarX0 + 0.395f, y + 0.02f, (z0 + z1) * 0.5f), new Vector3(0.012f, 0.03f, z1 - z0), 0.004f);   // the lip
+			for (float bz = z0 + 0.25f; bz < z1; bz += 1.5f)
+			{
+				k.BevelBox(new Vector3(BarX0 + 0.12f, y - 0.09f, bz), new Vector3(0.03f, 0.15f, 0.03f), 0.006f);
+				k.Beam(new Vector3(BarX0 + 0.12f, y - 0.15f, bz), new Vector3(BarX0 + 0.33f, y - 0.02f, bz), 0.024f, 0.024f, 1f, Vector3.Forward);
+			}
+		}
 		var brng = new RandomNumberGenerator { Seed = 4242 };
 		var bottleMats = new[] { LodgeTextures.Glow("lodge_bottle_amber", new Color(0.6f, 0.32f, 0.08f), 0.15f), LodgeTextures.Glow("lodge_bottle_green", new Color(0.1f, 0.32f, 0.12f), 0.12f), LodgeTextures.Glow("lodge_bottle_clear", new Color(0.55f, 0.55f, 0.5f), 0.1f) };
 		var kinds = new[] { "bottle_wine", "bottle_whiskey", "bottle_liqueur" };
@@ -335,8 +424,8 @@ public partial class SkiLodge
 			LodgeKit.Table(k, c, 0f, new Vector2(0.8f, 0.8f), 0.74f, LodgeTextures.BlackMat, LodgeTextures.BrassMat, round: true);
 			LodgeKit.Chair(k, c + new Vector3(0.62f, 0, 0), -Mathf.Pi * 0.5f, LodgeTextures.LeatherMat);
 			LodgeKit.Chair(k, c + new Vector3(-0.62f, 0, 0), Mathf.Pi * 0.5f, LodgeTextures.LeatherMat);
-			k.Mat(LodgeTextures.Glow("lodge_candleglass", new Color(1f, 0.6f, 0.3f), 1.2f));
-			k.Cylinder(c + Vector3.Up * 0.74f, c + Vector3.Up * 0.84f, 0.035f, 0.03f, 8, true);
+			// (2026-10-15) a net-glass candle globe, not a glowing tube
+			LodgeProps.TableCandle(k, c + Vector3.Up * 0.742f, LodgeTextures.Glow("lodge_candleglass", new Color(1f, 0.6f, 0.3f), 1.2f));
 			LodgeKit.Solid(_inBody, c + Vector3.Up * 0.4f, new Vector3(0.8f, 0.8f, 0.8f));
 		}
 		// a runner from the arch to the counter (a Navajo weave since 2026-10-14h)
@@ -414,18 +503,24 @@ public partial class SkiLodge
 		LodgeKit.Solid(_inBody, new Vector3((px0 + px1) * 0.5f - 0.6f, 1.4f, -InnerZ + 0.2f), new Vector3(px1 - px0 - 1.2f, 2.8f, 0.36f));
 		// the drawers: eight cabinets along the north wall, each a stack of two drawers (the second of each searchable)
 		float cz = PantryZ1 - 0.3f;
+		// (2026-10-15, the props pass) a run of base cupboards, a drawer over a panelled door in each, under one worktop run
+		// back to the wall (they were boxes under a plaster slab, the drawers standing 25 cm out of them; the drawers
+		// don't move: the cupboards' fronts come out to them)
+		float cfront = cz - 0.28f - 0.24f + 0.011f, cback = PantryZ1 - 0.01f;
 		for (int i = 0; i < 8; i++)
 		{
 			float x = px0 + 0.45f + i * 0.95f;
-			k.Mat(LodgeTextures.DarkWoodMat);
-			k.Box(new Vector3(x, 0.45f, cz), new Vector3(0.9f, 0.9f, 0.55f), 1f);
-			k.Mat(LodgeTextures.PlasterMat);
-			k.Box(new Vector3(x, 0.92f, cz), new Vector3(0.92f, 0.04f, 0.58f), 1f);
+			LodgeProps.Carcass(k, new Transform3D(Basis.Identity, new Vector3(x, FloorY, cfront + 0.3f)), 0.93f, 0.94f, 0.6f, LodgeTextures.DoorWoodMat, new[] { (0.51f, 0.81f) }, openW: 0.8f, legH: 0.1f, legs: false, topThick: 0.04f, drawTop: false);
 			var d = MakeDrawer($"PantryDrawer{i}", new Vector3(x, 0.66f, cz - 0.28f), new Basis(Vector3.Up, Mathf.Pi), new Vector3(0.8f, 0.3f, 0.5f), "drawer");
 			d.Flag = $"lodge_pantry_drawer_{i}";
 			SearchPantry.Add(d);
 		}
-		LodgeKit.Solid(_inBody, new Vector3(px0 + 0.45f + 3.5f * 0.95f, 0.47f, cz), new Vector3(8f * 0.95f, 0.94f, 0.55f));
+		float wx0 = px0 + 0.45f - 0.47f, wx1 = px0 + 0.45f + 7f * 0.95f + 0.47f;
+		k.Mat(LodgeTextures.DoorWoodMat);
+		k.Color = new Color(0.85f, 0.8f, 0.74f);
+		LodgeProps.RoundSlab(k, new Vector3((wx0 + wx1) * 0.5f, 0.94f, (cfront - 0.025f + cback) * 0.5f), (wx1 - wx0) * 0.5f + 0.01f, (cback - cfront + 0.025f) * 0.5f, 0.04f, 0.01f, 0.012f, 2);
+		k.Color = Colors.White;
+		LodgeKit.Solid(_inBody, new Vector3(px0 + 0.45f + 3.5f * 0.95f, 0.47f, (cfront + cback) * 0.5f), new Vector3(8f * 0.95f, 0.94f, cback - cfront));
 		// one bare bulb, and the mop leaning by the door (it falls)
 		Flex(new Vector3(-15f, 2.85f, -6.4f));
 		k.Mat(Bulb);
@@ -454,15 +549,17 @@ public partial class SkiLodge
 		var s = new Searchable { Name = name, Position = at, Basis = facing, Type = Searchable.Kind.Drawer, Travel = size.Z * 0.75f, What = what, Grip = new Vector3(0, 0, size.Z * 0.5f + 0.03f) };
 		AddChild(s);
 		var k = new MeshKit();
-		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
-		k.Box(new Vector3(0, 0, size.Z * 0.5f - 0.01f), new Vector3(size.X, size.Y, 0.025f), 1f);            // the front
+		// (2026-10-15, the props pass: the front eased, a raised field on a deep one, turned knobs; the furniture's smooth
+		// varnish, not the wainscot's planks. The case round it stands flush with it now: LodgeProps.Carcass)
+		LodgeProps.DrawerFront(k, new Vector3(0, 0, size.Z * 0.5f - 0.01f), size.X, size.Y, LodgeTextures.DoorWoodMat);
+		k.Mat(LodgeTextures.DoorWoodMat);
+		k.Color = new Color(0.7f, 0.66f, 0.62f);
 		k.Box(new Vector3(0, -size.Y * 0.5f + 0.01f, 0), new Vector3(size.X - 0.06f, 0.015f, size.Z - 0.04f), 1f);   // the bottom
 		k.Box(new Vector3(-size.X * 0.5f + 0.04f, -0.02f, 0), new Vector3(0.015f, size.Y - 0.06f, size.Z - 0.04f), 1f);
 		k.Box(new Vector3(size.X * 0.5f - 0.04f, -0.02f, 0), new Vector3(0.015f, size.Y - 0.06f, size.Z - 0.04f), 1f);
 		k.Box(new Vector3(0, -0.02f, -size.Z * 0.5f + 0.03f), new Vector3(size.X - 0.06f, size.Y - 0.06f, 0.015f), 1f);
-		k.Mat(LodgeTextures.BrassMat);
-		k.Box(new Vector3(0, 0, size.Z * 0.5f + 0.015f), new Vector3(0.14f, 0.025f, 0.02f), 1f);
+		k.Color = Colors.White;
 		k.CommitTo(s.Part, "Mesh", false);
 		return s;
 	}
@@ -470,30 +567,18 @@ public partial class SkiLodge
 	/// <summary>A tall cabinet (wardrobe or closet) with one door as a Searchable (the door swings on its left edge).</summary>
 	private Searchable MakeCabinet(string name, Vector3 at, Basis facing, Vector3 size, string what)
 	{
+		// (2026-10-15, the props pass) a case of boards with a moulded cornice and a base rail, its sides panelled, a rail
+		// inside; the door frame-and-panel (it was a box under a gilt slab, a plank for a door)
 		var body = new MeshKit();
-		body.Mat(LodgeTextures.DarkWoodMat);
 		body.Color = Colors.White;
-		var xf = new Transform3D(facing, at);
-		body.Xf = xf;
-		body.Box(new Vector3(0, size.Y * 0.5f, -0.02f), new Vector3(size.X, size.Y, size.Z - 0.04f), 1f, null);
-		body.Mat(LodgeTextures.BlackMat);
-		body.Box(new Vector3(0, size.Y * 0.5f, size.Z * 0.5f - 0.05f), new Vector3(size.X - 0.08f, size.Y - 0.08f, 0.01f), 1f);   // the dark inside, seen when open
-		body.Mat(LodgeTextures.GoldMat);
-		body.Box(new Vector3(0, size.Y + 0.02f, 0), new Vector3(size.X + 0.06f, 0.05f, size.Z + 0.04f), 1f);
-		body.Xf = Transform3D.Identity;
+		LodgeProps.CabinetCase(body, new Transform3D(facing, at), size, LodgeTextures.DoorWoodMat, true);
 		body.CommitTo(this, name + "Body", true);
 		var solid = LodgeKit.Solid(_inBody, at + facing * new Vector3(0, size.Y * 0.5f, 0), new Vector3(size.X, size.Y, size.Z), facing.GetEuler().Y);
 		// the door, hinged on its left edge
 		var s = new Searchable { Name = name, Position = at + facing * new Vector3(-size.X * 0.5f, 0, size.Z * 0.5f), Basis = facing, Type = Searchable.Kind.Door, Travel = -1.8f, What = what, Grip = new Vector3(size.X - 0.08f, 1.1f, 0.05f), PickRadius = 0.35f };
 		AddChild(s);
 		var d = new MeshKit();
-		d.Mat(LodgeTextures.DarkWoodMat);
-		d.Color = Colors.White;
-		d.Box(new Vector3(size.X * 0.5f, size.Y * 0.5f, 0.012f), new Vector3(size.X - 0.02f, size.Y - 0.02f, 0.025f), 1f);
-		d.Box(new Vector3(size.X * 0.5f, size.Y * 0.7f, 0.03f), new Vector3(size.X - 0.2f, size.Y * 0.36f, 0.012f), 1f);
-		d.Box(new Vector3(size.X * 0.5f, size.Y * 0.26f, 0.03f), new Vector3(size.X - 0.2f, size.Y * 0.3f, 0.012f), 1f);
-		d.Mat(LodgeTextures.BrassMat);
-		d.Cylinder(new Vector3(size.X - 0.08f, 1.1f, 0.03f), new Vector3(size.X - 0.08f, 1.1f, 0.06f), 0.015f, 0.015f, 6, true);
+		LodgeProps.CabinetDoor(d, size.X, 0.1f, size.Y - 0.008f, new Vector3(size.X - 0.08f, 1.1f, 0.025f), LodgeTextures.DoorWoodMat);
 		d.CommitTo(s.Part, "Door", true);
 		// the door's own collider, swinging with it (open, it stood out into the room and could be walked through)
 		var db = new StaticBody3D { Name = "DoorBody", CollisionLayer = 1, CollisionMask = 0 };
@@ -539,15 +624,18 @@ public partial class SkiLodge
 		foreach (float side in new[] { -1f, 1f })
 		{
 			var ns = new Vector3(cx + side * 1.6f, y, zOut - s * 0.35f);   // a clear half-metre from the bed, room to stand at it
-			k.Mat(LodgeTextures.DarkWoodMat);
-			k.Box(ns + new Vector3(0, 0.3f, 0), new Vector3(0.5f, 0.6f, 0.45f), 1f);
-			LodgeKit.Solid(_inBody, ns + new Vector3(0, 0.3f, 0), new Vector3(0.5f, 0.6f, 0.45f));
+			// (2026-10-15, the props pass) a nightstand on turned legs, its drawer flush in its front and an open shelf under
+			// it, 50 x 60 x 48 (it was a plank-textured box, the drawer standing 15 cm out of it). Its front is where the
+			// drawer's is (the drawer doesn't move): its middle 14 cm out from where the box's was.
+			var nsC = ns - new Vector3(0, 0, s * 0.14f);
+			LodgeProps.Carcass(k, new Transform3D(new Basis(Vector3.Up, front ? 0f : Mathf.Pi), nsC), 0.5f, 0.6f, 0.48f, LodgeTextures.DoorWoodMat, new[] { (0.36f, 0.52f) }, openW: 0.42f, legH: 0.12f, legs: true, cubby: true);
+			LodgeKit.Solid(_inBody, nsC + new Vector3(0, 0.3f, 0), new Vector3(0.5f, 0.6f, 0.48f));
 			var d = MakeDrawer($"Room{num}Night{(side < 0 ? "L" : "R")}", ns + new Vector3(0, 0.44f, -s * 0.2f), new Basis(Vector3.Up, front ? Mathf.Pi : 0f), new Vector3(0.42f, 0.16f, 0.38f), "nightstand's drawer");
 			d.Flag = $"lodge_{num}_night_{side}";
 			room?.Add(d);
 			if (!wrecked)
 			{
-				var bulb = LodgeKit.Lamp(k, ns + new Vector3(0, 0.6f, 0), 0.5f, shade);
+				var bulb = LodgeKit.Lamp(k, ns + new Vector3(0, 0.6f, 0), 0.6f, shade);   // (60 cm: was 50)
 				roomLights.Add(Light(bulb, Warm, 0.35f, 3.5f));
 				// on the nightstand beside the lamp: a mug on one, a glass on the other (somebody stayed here)
 				if (num != 201) FurnitureKit.Add(k, side < 0 ? "mug" : "wine_glass", ns + new Vector3(side * 0.16f, 0.6f, s * 0.06f), side * 0.7f, Woodwork);
@@ -578,18 +666,17 @@ public partial class SkiLodge
 		k.Quad(new Vector3(cx - 1.6f, y + 0.005f, zOut - s * 2.4f), new Vector3(cx + 1.6f, y + 0.005f, zOut - s * 2.4f), new Vector3(cx + 1.6f, y + 0.005f, zOut - s * 4.6f), new Vector3(cx - 1.6f, y + 0.005f, zOut - s * 4.6f), Vector3.Up,
 			new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1));
 		// the ceiling light
-		k.Mat(LodgeTextures.GoldMat);
-		k.Cylinder(new Vector3(cx, RoomTop - 0.02f, (zIn + zOut) * 0.5f), new Vector3(cx, RoomTop - 0.12f, (zIn + zOut) * 0.5f), 0.22f, 0.26f, 12, true);
+		// (2026-10-15) a frosted dome on a brass canopy, lit with the lamps on the switch (it was a gilt drum, never lit)
+		LodgeProps.CeilingDome(k, new Vector3(cx, RoomTop - 0.01f, (zIn + zOut) * 0.5f), wrecked ? LodgeTextures.PorcelainMat : shade);
 		if (!wrecked) roomLights.Add(Light(new Vector3(cx, RoomTop - 0.5f, (zIn + zOut) * 0.5f), num == 202 ? new Color(0.72f, 0.78f, 1f) : Warm, 0.8f, 7f, $"Room{num}Light"));
 		// 202: the blue from the snow banked up the windows
 		if (num == 202) Light(new Vector3(cx, y + 1.6f, zOut - s * 0.8f), new Color(0.48f, 0.58f, 0.82f), 0.45f, 5f, "SnowBlue");   // (2026-10-14h: was 1.1 of a saturated blue)
 		// ---- the bathroom: green tile, the tub in an arched alcove with a mustard trim, the vanity (two drawers)
 		float bx0 = x0 + 0.07f, bx1 = x0 + 2.7f, bz = zIn + s * 3.1f;
 		Vector3 tubAt = new(bx0 + 1.15f, y, bz - s * 0.45f);   // along the bathroom's far wall, in an arched alcove
-		k.Mat(LodgeTextures.MintPorcelainMat);
-		k.Box(tubAt + new Vector3(0, 0.28f, 0), new Vector3(1.8f, 0.56f, 0.8f), 1f);
-		k.Mat(LodgeTextures.BlackMat);
-		k.Box(tubAt + new Vector3(0, 0.53f, 0), new Vector3(1.6f, 0.02f, 0.62f), 1f);
+		// (2026-10-15, the props pass) a built-in tub: its apron rounded, a rolled rim, the basin sloping in, its taps
+		// (it was a mint box with a black lid)
+		LodgeProps.Tub(k, new Transform3D(Basis.Identity, tubAt), 0.9f, 0.4f, 0.56f, LodgeTextures.MintPorcelainMat);
 		// the alcove's arch (a mustard band over the tub)
 		k.Mat(LodgeTextures.MustardMat);
 		float az = tubAt.Z - s * 0.48f;
@@ -608,13 +695,17 @@ public partial class SkiLodge
 		k.Box(new Vector3(tubAt.X + 0.75f, y + 1.5f, az + s * 0.04f), new Vector3(0.3f, 1.2f, 0.02f), 1f);
 		// the vanity against the corridor wall, a basin on it, a mirror
 		Vector3 van = new(bx1 - 0.8f, y, zIn + s * 0.35f);
-		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Box(van + new Vector3(0, 0.42f, 0), new Vector3(0.9f, 0.84f, 0.5f), 1f);
-		k.Mat(LodgeTextures.MintPorcelainMat);
-		k.Box(van + new Vector3(0, 0.88f, 0), new Vector3(0.7f, 0.08f, 0.45f), 1f);
+		// (2026-10-15, the props pass) the vanity a case round its two drawers (flush now: they stood 18 cm out of a box),
+		// on a plinth, its top run back to the wall with an oval basin let into it, its taps; the mirror framed
+		var vanC = van + new Vector3(0, 0, s * 0.14f);
+		var vanB = new Basis(Vector3.Up, front ? Mathf.Pi : 0f);
+		LodgeProps.Carcass(k, new Transform3D(vanB, vanC), 0.9f, 0.9f, 0.56f, LodgeTextures.DoorWoodMat, new[] { (0.51f, 0.73f), (0.21f, 0.43f) }, openW: 0.8f, legH: 0.1f, legs: false, topThick: 0.035f, drawTop: false);
+		LodgeProps.BasinTop(k, new Transform3D(vanB, vanC + new Vector3(0, 0, -s * 0.06f)), 0.94f, 0.72f, 0.9f, LodgeTextures.PorcelainMat, LodgeTextures.MintPorcelainMat, 0f, -0.04f);
+		k.Mat(LodgeTextures.DoorWoodMat);
+		k.BevelBox(new Vector3(van.X, y + 1.6f, zIn + s * 0.078f), new Vector3(0.7f, 0.8f, 0.016f), 0.006f);
 		k.Mat(LodgeTextures.MirrorMat);
-		k.Box(new Vector3(van.X, y + 1.6f, zIn + s * 0.08f), new Vector3(0.6f, 0.7f, 0.02f), 1f);   // (the joints pass: flat on the wall, it stood 1 cm off)
-		LodgeKit.Solid(_inBody, van + new Vector3(0, 0.45f, 0), new Vector3(0.9f, 0.9f, 0.5f));
+		k.Box(new Vector3(van.X, y + 1.6f, zIn + s * 0.089f), new Vector3(0.6f, 0.7f, 0.006f), 1f);   // (the joints pass: flat on the wall, it stood 1 cm off)
+		LodgeKit.Solid(_inBody, vanC + new Vector3(0, 0.45f, -s * 0.06f), new Vector3(0.9f, 0.9f, 0.68f));
 		foreach (int di in new[] { 0, 1 })
 		{
 			var d = MakeDrawer($"Room{num}Vanity{di}", van + new Vector3(0, 0.62f - di * 0.3f, s * 0.24f), new Basis(Vector3.Up, front ? 0f : Mathf.Pi), new Vector3(0.8f, 0.22f, 0.4f), "vanity drawer");
@@ -624,10 +715,9 @@ public partial class SkiLodge
 		// the lavatory, against the side wall (not in 203: that wall's broken through)
 		if (!wrecked)
 		{
-			k.Mat(LodgeTextures.MintPorcelainMat);
-			Vector3 wc = new(bx0 + 0.35f, y, zIn + s * 1.9f);
-			k.Box(wc + new Vector3(0, 0.22f, 0), new Vector3(0.5f, 0.44f, 0.38f), 1f);
-			k.Box(wc + new Vector3(-0.2f, 0.62f, 0), new Vector3(0.14f, 0.36f, 0.42f), 1f);
+			// (2026-10-15) a close-coupled pan: a pedestal flaring to its bowl, a wooden seat and lid, the cistern (two boxes)
+			Vector3 wc = new(bx0 + 0.235f, y, zIn + s * 1.9f);
+			LodgeProps.Lavatory(k, new Transform3D(new Basis(Vector3.Up, -Mathf.Pi * 0.5f), wc), LodgeTextures.MintPorcelainMat, LodgeTextures.DoorWoodMat);
 		}
 		// (201's bathroom: its bulb throws a deep red, and only just reaches the hacked-through wall)
 		var bathLight = num == 201
@@ -653,16 +743,18 @@ public partial class SkiLodge
 		if (num == 204)
 		{
 			var desk = new Vector3(x1 - 0.5f, y, zIn - 3.4f);
-			k.Mat(LodgeTextures.DarkWoodMat);
-			k.Box(desk + new Vector3(0, 0.74f, 0), new Vector3(0.6f, 0.05f, 1.2f), 1f);
-			foreach (float dz in new[] { -0.55f, 0.55f }) k.Box(desk + new Vector3(0, 0.37f, dz), new Vector3(0.55f, 0.74f, 0.05f), 1f);
-			LodgeKit.Solid(_inBody, desk + new Vector3(0, 0.4f, 0), new Vector3(0.6f, 0.8f, 1.2f));
+			// (2026-10-15, the props pass) a writing desk on tapered legs, its drawer in the apron (it was a plank on two
+			// slabs, the drawer hanging under it); its top 76.5 cm, a hand over the drawer's front
+			LodgeProps.WritingDesk(k, new Transform3D(new Basis(Vector3.Up, Mathf.Pi * 0.5f), desk - new Vector3(0.015f, 0, 0)), 1.2f, 0.64f, 0.765f, 0.9f, 0.58f, 0.7f, LodgeTextures.DoorWoodMat, 0.031f);
+			LodgeKit.Solid(_inBody, desk + new Vector3(-0.015f, 0.4f, 0), new Vector3(0.64f, 0.8f, 1.2f));
 			var dd = MakeDrawer("Room204Desk", desk + new Vector3(-0.1f, 0.64f, 0), new Basis(Vector3.Up, -Mathf.Pi * 0.5f), new Vector3(0.9f, 0.12f, 0.45f), "desk drawer");
 			dd.Flag = "lodge_204_desk";
 			Search204.Add(dd);
 			var dr = new Vector3(-23.9f, y, zIn - 0.33f);   // against the corridor wall, facing into the room
-			k.Box(dr + new Vector3(0, 0.55f, 0), new Vector3(1.2f, 1.1f, 0.5f), 1f);
-			LodgeKit.Solid(_inBody, dr + new Vector3(0, 0.55f, 0), new Vector3(1.2f, 1.1f, 0.5f));
+			// (2026-10-15) a chest on turned feet round its two drawers, flush (they stood 22 cm out of a box)
+			var drC = dr - new Vector3(0, 0, 0.214f);
+			LodgeProps.Carcass(k, new Transform3D(Basis.Identity, drC), 1.2f, 1.1f, 0.5f, LodgeTextures.DoorWoodMat, new[] { (0.66f, 0.98f), (0.26f, 0.58f) }, openW: 1.1f, legH: 0.1f, legs: true);
+			LodgeKit.Solid(_inBody, drC + new Vector3(0, 0.55f, 0), new Vector3(1.2f, 1.1f, 0.5f));
 			foreach (int di in new[] { 0, 1 })
 			{
 				var d = MakeDrawer($"Room204Dresser{di}", dr + new Vector3(0, 0.82f - di * 0.4f, -0.26f), new Basis(Vector3.Up, Mathf.Pi), new Vector3(1.1f, 0.32f, 0.45f), "dresser drawer");
@@ -695,7 +787,10 @@ public partial class SkiLodge
 		k.Blob(new Vector3(wx, y, zOut - s * 0.6f), new Vector3(1.2f, 0.5f, 0.8f), 9301, 0.3f, true, 1f);
 		k.Blob(new Vector3(wx - 1.5f, y, zOut - s * 2.2f), new Vector3(1.6f, 0.2f, 1.4f), 9302, 0.3f, true, 1f);
 		k.Blob(new Vector3(wx + 0.5f, y, zOut - s * 3.8f), new Vector3(1.3f, 0.1f, 1.2f), 9303, 0.3f, true, 1f);
-		k.Box(new Vector3(wx, y + 0.95f + 4.59f - UpperY - 0.1f, zOut - s * 0.12f), new Vector3(1.2f, 0.12f, 0.28f), 1f);   // snow on the sill
+		// snow on the sill (its top at 4.586), heaped toward the hinge side, the key's end left clear (2026-10-15: it was a
+		// slab of snow floating 0.85 m over the sill)
+		k.Blob(new Vector3(wx - 0.22f, 4.586f, zOut - s * 0.05f), new Vector3(0.42f, 0.075f, 0.1f), 9306, 0.25f, false, 1f);
+		k.Blob(new Vector3(wx + 0.12f, 4.586f, zOut - s * 0.04f), new Vector3(0.14f, 0.03f, 0.08f), 9307, 0.25f, false, 1f);
 		// the raised sash (the window's lower half open to the storm: a dark gap)
 		k.Mat(LodgeTextures.BlackMat);
 		k.Box(new Vector3(wx, 4.59f + 0.35f, zOut - s * 0.005f), new Vector3(1.0f, 0.6f, 0.01f), 1f);
