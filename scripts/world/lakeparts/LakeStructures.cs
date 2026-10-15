@@ -11,6 +11,76 @@ namespace ProjectDS.World.LakeParts;
 /// </summary>
 public static class LakeStructures
 {
+	// ------------------------------------------------------------------ the Blender models
+	// (2026-10-15, the owner's rule: every model made in Blender) tools/Blender/lake.py builds the dock, the rescue
+	// station, its mast, flagpole, upturned boat and life rings on the same layout as the code below (the ground heights it
+	// needs from DumpGround, `creature_preview -- --dump-lake-winter` → tools/Blender/data/lake.json); each surface carries
+	// the name of the game's material it takes. The code still runs (its colliders, its random draws) and only its mesh is
+	// swapped when the model is there.
+
+	public static Material BlenderMat(string name) => name switch
+	{
+		"deck" => PropTextures.DeckMat, "wetpost" => PropTextures.WetPostMat, "post" => PropTextures.PostMat,
+		"rope" => ProcTextures.Flat("lake_rope", new Color(0.5f, 0.44f, 0.33f)),
+		"concrete" => ProcTextures.ConcreteMat, "floor" => BuildingTextures.FloorMat,
+		"log" => BuildingTextures.LogMat, "logend" => BuildingTextures.LogEndMat,
+		"void" => ProcTextures.Flat("station_void", new Color(0.01f, 0.01f, 0.012f), 1f, 0f),
+		"boards" => BuildingTextures.BoardsMat, "shingle" => BuildingTextures.ShingleMat, "sign" => PropTextures.SignPlankMat,
+		"glass" => ProcTextures.Flat("station_glass", new Color(0.45f, 0.5f, 0.5f), 0.1f, 0.6f),
+		"ring_red" => ProcTextures.Flat("life_ring_red", new Color(0.55f, 0.1f, 0.07f), 0.8f, 0.3f),
+		"ring_white" => ProcTextures.Flat("life_ring_white", new Color(0.72f, 0.7f, 0.64f), 0.8f, 0.3f),
+		"metal" => ProcTextures.MetalMat, "wire" => ProcTextures.Flat("mast_wire", new Color(0.18f, 0.17f, 0.16f)),
+		"flag" => ProcTextures.Flat("flag_rag", new Color(0.4f, 0.3f, 0.25f), 1f, 0.1f),
+		_ => null,
+	};
+
+	/// <summary>The code's mesh, or the Blender model <paramref name="model"/> in its place when there is one.</summary>
+	private static MeshInstance3D Commit(MeshKit k, Node parent, string name, string model, bool shadows = true)
+	{
+		if (BlenderMeshes.Get("lake", model, BlenderMat) is not { } m) return k.CommitTo(parent, name, shadows);
+		var mi = new MeshInstance3D { Name = name, Mesh = m, CastShadow = shadows ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off };
+		parent.AddChild(mi);
+		return mi;
+	}
+
+	/// <summary>The ground heights the Blender models are built on (Lake-local; the station's things station-local).</summary>
+	public static string DumpGround()
+	{
+		static Godot.Collections.Array V(Vector3 v) => new() { v.X, v.Y, v.Z };
+		var d = new Godot.Collections.Dictionary();
+		var planks = new Godot.Collections.Array();
+		for (float z = LakeShape.DockStartZ; z > LakeShape.DockEndZ; z -= 0.26f)
+			planks.Add(new Godot.Collections.Array { z, LakeShape.Ground(0f, z) });
+		d["dock"] = new Godot.Collections.Dictionary
+		{
+			["z0"] = LakeShape.DockStartZ, ["z1"] = LakeShape.DockEndZ, ["hw"] = LakeShape.DockHalfWidth, ["top"] = LakeShape.DockDeck,
+			["mooring"] = new Godot.Collections.Array { LakeShape.BoatMooring.X, LakeShape.BoatMooring.Y }, ["ground"] = planks,
+		};
+		float w = StationW, dd = StationD, hw = w * 0.5f, hd = dd * 0.5f, floor = LakeShape.StationFloor;
+		float G(float x, float z) => LakeShape.Ground(x, LakeShape.StationSite.Y + z) - floor;
+		var piers = new Godot.Collections.Array();
+		for (float x = -hw + 0.3f; x <= hw - 0.2f; x += (w - 0.6f) / 4f)
+			foreach (float z in new[] { -hd + 0.3f, 0f, hd - 0.3f }) piers.Add(new Godot.Collections.Array { x, z, G(x, z) });
+		var anchors = new Godot.Collections.Array();
+		var mast = new Vector3(hw + 3.2f, 0f, -1.5f);
+		for (int i = 0; i < 3; i++)
+		{
+			float a = Mathf.Tau * i / 3f + 0.6f;
+			var an = mast + new Vector3(Mathf.Cos(a) * 6f, 0, Mathf.Sin(a) * 6f);
+			an.Y = G(an.X, an.Z);
+			anchors.Add(V(an));
+		}
+		var flag = new Vector3(-5.5f, 0f, hd + 2.4f + 5.5f);
+		var boat = new Vector3(-hw - 3.4f, 0f, 1.2f);
+		d["station"] = new Godot.Collections.Dictionary
+		{
+			["piers"] = piers, ["step_gy"] = G(0f, hd + 2.4f + 0.6f),
+			["mast"] = V(mast with { Y = G(mast.X, mast.Z) }), ["anchors"] = anchors,
+			["flag"] = V(flag with { Y = G(flag.X, flag.Z) }), ["boat"] = V(boat with { Y = G(boat.X, boat.Z) }),
+		};
+		return Json.Stringify(d);
+	}
+
 	// ------------------------------------------------------------------ the dock
 
 	/// <summary>A narrow plank dock on posts, grey and gapped, with a cleat and a line out to the
@@ -51,7 +121,7 @@ public static class LakeStructures
 		Vector3 cleat = new(hw - 0.15f, top + 0.05f, LakeShape.BoatMooring.Y - 1.3f);
 		BuildKit.Box(k, cleat, new Vector3(0.1f, 0.07f, 0.34f));
 		k.Color = Colors.White;
-		k.CommitTo(root, "DockMesh");
+		Commit(k, root, "DockMesh", "dock");
 
 		var body = new StaticBody3D { Name = "DockBody", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");
@@ -316,7 +386,7 @@ public static class LakeStructures
 			LifeRing(k, new Vector3(x, 1.55f, postZ + 0.12f), rng);
 
 		k.Color = Colors.White;
-		k.CommitTo(gen, "StationMesh");
+		Commit(k, gen, "StationMesh", "rescue_station");
 
 		// the sign's lettering, faded almost to the grain
 		var letters = new Color(0.72f, 0.66f, 0.54f);
@@ -463,7 +533,7 @@ public static class LakeStructures
 			}
 		}
 		k.Color = Colors.White;
-		k.CommitTo(gen, "RadioMast");
+		Commit(k, gen, "RadioMast", "radio_mast");
 	}
 
 	private static void BuildFlagpole(Node3D gen, Vector3 at)
@@ -487,7 +557,7 @@ public static class LakeStructures
 			k.Tri(prev, inner, top + e, Vector3.Forward, Vector2.Zero, Vector2.Down, Vector2.Right);
 			prev = top + e;
 		}
-		MeshKit.Solidify(k.CommitTo(gen, "Flagpole"), new Vector3(0.25f, 1f, 1f), "metal");
+		MeshKit.Solidify(Commit(k, gen, "Flagpole", "flagpole"), new Vector3(0.25f, 1f, 1f), "metal");
 	}
 
 	/// <summary>An old aluminium rescue boat, upturned on two sawhorses, a hole stove in its bottom.</summary>
@@ -516,7 +586,7 @@ public static class LakeStructures
 		k.Color = Colors.White;
 		k.Quad(c + new Vector3(-0.25f, 0.34f, -0.8f), c + new Vector3(0.2f, 0.34f, -0.7f), c + new Vector3(0.15f, 0.34f, -0.25f), c + new Vector3(-0.2f, 0.34f, -0.35f), Vector3.Up);
 		k.Color = Colors.White;
-		MeshKit.Solidify(k.CommitTo(gen, "UpturnedBoat"));
+		MeshKit.Solidify(Commit(k, gen, "UpturnedBoat", "upturned_boat"));
 	}
 
 	// ------------------------------------------------------------------ fences

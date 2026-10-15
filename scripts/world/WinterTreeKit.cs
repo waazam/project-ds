@@ -65,6 +65,7 @@ public static class WinterTreeKit
 	/// twice round, v up it at <paramref name="vScale"/> per metre.</summary>
 	public static void Loft(MeshKit k, IList<(Vector3 c, float r)> rings, int sides, float uRound, float vScale, float v0 = 0f)
 	{
+		_rec?.Branch(k.Color, rings);
 		int n = rings.Count;
 		var tan = new Vector3[n];
 		for (int i = 0; i < n; i++)
@@ -115,6 +116,61 @@ public static class WinterTreeKit
 		}
 	}
 
+	// ------------------------------------------------------------------ the Blender trees
+	// (2026-10-15, the owner's rule: every model made in Blender) tools/Blender/winter_trees.py builds each tree on the
+	// skeleton the code below lays out (its limbs' centre lines and radii, its card sprays, its snow caps), dumped by
+	// `creature_preview -- --dump-winter-trees` to tools/Blender/data/winter_trees.json: one sculpted skin with real forks
+	// where the code had tubes crossing, the same reach and silhouette, so what hangs off the tiers (the icicles) still hangs
+	// off a bough. Its surfaces carry the game's material names (bark0-2, twigs, boughs, firsnow).
+
+	public static Material BlenderMat(string name) => name switch
+	{
+		"bark0" => Bark(0), "bark1" => Bark(1), "bark2" => Bark(2),
+		"twigs" => Twigs, "boughs" => Boughs, "firsnow" => FirSnow,
+		_ => null,
+	};
+
+	private sealed class Recipe
+	{
+		public string Mat = "bark0";
+		public readonly Godot.Collections.Array Branches = new(), Cards = new(), Caps = new();
+		static Godot.Collections.Array V(Vector3 v) => new() { v.X, v.Y, v.Z };
+		public void Branch(Color c, IList<(Vector3 c, float r)> rings)
+		{
+			var pts = new Godot.Collections.Array();
+			foreach (var (p, r) in rings) pts.Add(new Godot.Collections.Array { p.X, p.Y, p.Z, r });
+			Branches.Add(new Godot.Collections.Dictionary { ["mat"] = Mat, ["col"] = new Godot.Collections.Array { c.R, c.G, c.B }, ["rings"] = pts });
+		}
+		public void Card(Color c, Vector3 b0, Vector3 b1, Vector3 t1, Vector3 t0, Vector3 n) =>
+			Cards.Add(new Godot.Collections.Dictionary { ["mat"] = Mat, ["col"] = new Godot.Collections.Array { c.R, c.G, c.B }, ["quad"] = new Godot.Collections.Array { V(b0), V(b1), V(t1), V(t0) }, ["n"] = V(n) });
+		public void Cap(Vector3[] o, Vector3[] i0, Vector3[] lip)
+		{
+			var d = new Godot.Collections.Dictionary { ["o"] = new Godot.Collections.Array(), ["in"] = new Godot.Collections.Array(), ["lip"] = new Godot.Collections.Array() };
+			for (int j = 0; j < o.Length; j++) { ((Godot.Collections.Array)d["o"]).Add(V(o[j])); ((Godot.Collections.Array)d["in"]).Add(V(i0[j])); ((Godot.Collections.Array)d["lip"]).Add(V(lip[j])); }
+			Caps.Add(d);
+		}
+	}
+
+	private static Recipe _rec;
+
+	/// <summary>The trees the game uses (WinterWoods.Trees, WinterWoods.Props): their skeletons as JSON, for Blender.</summary>
+	public static string DumpRecipes()
+	{
+		var all = new Godot.Collections.Dictionary();
+		void One(string key, System.Action build)
+		{
+			_rec = new Recipe();
+			build();
+			all[key] = new Godot.Collections.Dictionary { ["branches"] = _rec.Branches, ["cards"] = _rec.Cards, ["caps"] = _rec.Caps };
+			_rec = null;
+		}
+		foreach (var (s, h, b) in new[] { (501, 15f, 0), (502, 19f, 0), (503, 12f, 1), (504, 22f, 1), (505, 16f, 1), (506, 9f, 0), (507, 17f, 0), (508, 13f, 1), (509, 20f, 1), (510, 11f, 0), (511, 24f, 0) })
+			One($"bare_{s}", () => BareTreeCode(s, h, b));
+		foreach (var (s, h, r) in new[] { (601, 20f, 3.6f), (602, 14f, 2.8f), (603, 26f, 4.2f), (604, 17f, 3.1f), (611, 20f, 3.4f) })
+			One($"fir_{s}", () => WinterFirCode(s, h, r));
+		return Json.Stringify(all);
+	}
+
 	/// <summary>One tree on its own (a MultiMesh of one, so the bark's shader gets its custom data: no ice).</summary>
 	public static MultiMeshInstance3D Single(Mesh mesh, string name, float ice = 0f)
 	{
@@ -130,6 +186,14 @@ public static class WinterTreeKit
 	/// cap over its boughs with a lip at its edge (the owner's references: dark green under white).</summary>
 	public static Mesh WinterFir(int seed, float height, float maxR)
 	{
+		var code = WinterFirCode(seed, height, maxR);
+		if (BlenderMeshes.Get("winter_trees", $"fir_{seed}", BlenderMat) is not { } m) return code;
+		FirTiers[m] = FirTiers[code];   // (the Blender tree is built on this one's own skeleton: the same tiers)
+		return m;
+	}
+
+	private static Mesh WinterFirCode(int seed, float height, float maxR)
+	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7717 + 3) };
 		var k = new MeshKit();
 		float trunkR = 0.12f + height * 0.013f;
@@ -137,6 +201,7 @@ public static class WinterTreeKit
 		Vector3 Axis(float y) { float f = y / height; return new Vector3(Mathf.Sin(f * 2.1f + ph) * 0.14f * f, y, Mathf.Cos(f * 1.8f + ph) * 0.12f * f); }
 		// ---- the trunk
 		k.Mat(Bark(2));
+		if (_rec != null) _rec.Mat = "bark2";
 		k.Color = Colors.White;
 		var rings = new List<(Vector3, float)> { (new Vector3(0, -0.5f, 0), trunkR * 1.6f), (new Vector3(0, -0.1f, 0), trunkR * 1.45f), (Axis(0.3f), trunkR * 1.15f), (Axis(1.2f), trunkR) };
 		for (int i = 1; i <= 6; i++) { float y = Mathf.Lerp(1.2f, height * 0.97f, i / 6f); rings.Add((Axis(y), trunkR * Mathf.Lerp(0.95f, 0.06f, i / 6f))); }
@@ -155,6 +220,7 @@ public static class WinterTreeKit
 		int tiers = Mathf.Clamp(Mathf.RoundToInt((height - crownStart) / 1.15f), 7, 18);
 		var caps = new List<(Vector3 c, float r, float droop, float rot)>();
 		k.Mat(Boughs);
+		if (_rec != null) _rec.Mat = "boughs";
 		for (int t = 0; t < tiers; t++)
 		{
 			float f = (float)t / (tiers - 1);
@@ -183,6 +249,7 @@ public static class WinterTreeKit
 					Vector3 t0 = b0 + along * len, t1 = b1 + along * len;
 					var nrm = (sv.Cross(along).Normalized() * 0.4f + Vector3.Up).Normalized();
 					if (nrm.Y < 0) nrm = -nrm;
+					_rec?.Card(k.Color, b0, b1, t1, t0, nrm);
 					k.Tri(b0, b1, t1, nrm, nrm, nrm, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
 					k.Tri(b0, t1, t0, nrm, nrm, nrm, new Vector2(0, 1), new Vector2(1, 0), new Vector2(0, 0));
 				}
@@ -207,6 +274,7 @@ public static class WinterTreeKit
 				i0[j] = c + d * inner + Vector3.Up * 0.3f;
 				lip[j] = o[j] + Vector3.Down * rng.RandfRange(0.08f, 0.16f) - d * 0.03f;
 			}
+			_rec?.Cap(o, i0, lip);
 			for (int j = 0; j < seg; j++)
 			{
 				int n = (j + 1) % seg;
@@ -228,11 +296,15 @@ public static class WinterTreeKit
 
 	/// <summary>A bare broadleaf about <paramref name="height"/> tall (its base at the origin, sunk a little).</summary>
 	public static Mesh BareTree(int seed, float height, int bark = 0)
+		=> BlenderMeshes.Get("winter_trees", $"bare_{seed}", BlenderMat) ?? BareTreeCode(seed, height, bark);
+
+	private static Mesh BareTreeCode(int seed, float height, int bark = 0)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 9173 + 17) };
 		var k = new MeshKit();
 		var twigs = new List<(Vector3 at, Vector3 dir, float size)>();
 		k.Mat(Bark(bark));
+		if (_rec != null) _rec.Mat = "bark" + Mathf.Clamp(bark, 0, 2);
 		float tint = rng.RandfRange(0.82f, 1f);
 		k.Color = new Color(tint, tint, tint);
 		float trunkR = 0.11f + height * 0.015f * rng.RandfRange(0.85f, 1.2f);
@@ -328,6 +400,7 @@ public static class WinterTreeKit
 		Branch(Axis(leaderTop), (Axis(leaderTop) - Axis(leaderTop - 1f)).Normalized(), height * 0.16f, trunkR * 0.14f, 2);
 		// ---- the twig sprays: two crossed cards along each tip's direction, the base toward the branch
 		k.Mat(Twigs);
+		if (_rec != null) _rec.Mat = "twigs";
 		k.Color = new Color(tint, tint, tint);
 		foreach (var (at, dir, size) in twigs)
 		{
@@ -339,6 +412,7 @@ public static class WinterTreeKit
 				Vector3 b0 = at - d * size * 0.12f - s * size * 0.5f, b1 = at - d * size * 0.12f + s * size * 0.5f;
 				Vector3 t0 = b0 + d * size, t1 = b1 + d * size;
 				var nrm = (d.Cross(s).Normalized() * 0.3f + Vector3.Up).Normalized();
+				_rec?.Card(k.Color, b0, b1, t1, t0, nrm);
 				k.Tri(b0, b1, t1, nrm, nrm, nrm, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0));
 				k.Tri(b0, t1, t0, nrm, nrm, nrm, new Vector2(0, 1), new Vector2(1, 0), new Vector2(0, 0));
 			}

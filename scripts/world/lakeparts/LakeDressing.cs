@@ -170,6 +170,12 @@ public partial class LakeDressing : Node3D
 
 	// ------------------------------------------------------------------ lily pads
 
+	private static StandardMaterial3D _lilyBud;
+	private static StandardMaterial3D LilyBudMat => _lilyBud ??= new StandardMaterial3D
+	{
+		ResourceName = "lake_lily_bud", AlbedoColor = new Color(0.78f, 0.74f, 0.62f), Roughness = 0.6f, VertexColorUseAsAlbedo = true,
+	};
+
 	private void BuildPads()
 	{
 		var k = new MeshKit();
@@ -194,7 +200,9 @@ public partial class LakeDressing : Node3D
 			float s = _rng.RandfRange(0.6f, 1.25f);
 			_padRest.Add(new Transform3D(new Basis(Vector3.Up, _rng.RandfRange(0, Mathf.Tau)).Scaled(new Vector3(s, 1f, s)), new Vector3(x, 0.03f, z)));
 		}
-		_pads = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = k.Commit(), InstanceCount = _padRest.Count };
+		// (2026-10-15: made in Blender: a cupped pad with its notch, veins and a curled edge, a few with a bud)
+		var padMesh = BlenderMeshes.Get("lake", "lily_pad", n => n == "lily" ? mat : n == "lily_bud" ? LilyBudMat : null) ?? k.Commit();
+		_pads = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = padMesh, InstanceCount = _padRest.Count };
 		for (int i = 0; i < _padRest.Count; i++) _pads.SetInstanceTransform(i, _padRest[i]);
 		AddChild(new MultiMeshInstance3D { Name = "LilyPads", Multimesh = _pads, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 	}
@@ -323,6 +331,13 @@ public partial class LakeDressing : Node3D
 	/// (<see cref="ReedTex"/>) crossed at uneven angles round the root, each its own width, height, lean and slice of the
 	/// texture, so no two clumps (and no two of a clump's faces) read the same. Lit from above, glowing a little when the
 	/// sky is behind them instead of going black.</summary>
+	private static StandardMaterial3D _cattail;
+	/// <summary>The tall reeds' cattail heads (the Blender reeds): a dark brown velvet.</summary>
+	private static StandardMaterial3D CattailMat => _cattail ??= new StandardMaterial3D
+	{
+		ResourceName = "lake_cattail", AlbedoColor = new Color(0.26f, 0.17f, 0.1f), Roughness = 0.95f, VertexColorUseAsAlbedo = true,
+	};
+
 	public static Mesh ReedMesh(int variant, bool tall)
 	{
 		var k = new MeshKit();
@@ -341,6 +356,8 @@ public partial class LakeDressing : Node3D
 			m.SetShaderParameter("inner_ao", 0.35f);
 			return m;
 		});
+		// (2026-10-15: made in Blender, tools/Blender/lake.py: curved, twisting blade cards round a root, cattail heads on the tall)
+		if (BlenderMeshes.Get("lake", tall ? $"reed_tall{variant}" : $"reed{variant}", n => n == "reed" ? mat : n == "cattail" ? CattailMat : null) is { } blend) return blend;
 		k.Mat(mat);
 		var rng = new RandomNumberGenerator { Seed = (ulong)(1240 + variant * 17 + (tall ? 500 : 0)) };
 		int cards = rng.RandiRange(5, 8);

@@ -29,6 +29,14 @@ public partial class LakeDressing
 		return p;
 	}
 
+	/// <summary>For the preview: one of the shore's pieces by its key.</summary>
+	internal static Mesh PreviewMesh(string key) => key switch
+	{
+		"cypress_a" => CypressMesh(1, 13f), "cypress_b" => CypressMesh(2, 17f), "reed0" => ReedMesh(0, false), "reed_tall0" => ReedMesh(0, true),
+		"reed_tall1" => ReedMesh(1, true), "marsh_mat" => MarshMatMesh(), "wrack" => WrackMesh(), "drift" => DriftMesh(5), "rootwad" => RootWadMesh(6),
+		"lily_pad" => BlenderMeshes.Get("lake", "lily_pad", null), _ => null,
+	};
+
 	private bool NearLanding(Vector2 p) => Mathf.Abs(p.X) < 7f && (p.Y > LakeShape.DockEndZ - 4f || p.Y < LakeShape.FarShoreZ + 6f);
 
 	/// <summary>For tests and previews: where the cypresses stand (world), and how many of each of the shore's pieces.</summary>
@@ -116,6 +124,35 @@ public partial class LakeDressing
 	/// <summary>A bald cypress: its trunk flaring out wide toward its foot (fluted), its roots heaved up in a tangle and
 	/// running off into the mud and the water, knees round it, a crown of feathery drooping boughs, moss hanging thick.</summary>
 	private static Mesh CypressMesh(int seed, float height)
+		=> BlenderMeshes.Get("lake", $"cypress_{seed}", n => n switch
+		   {
+			   "bark" => ProcTextures.TreeBarkMat, "branch" => ProcTextures.FirBranchMat, "spray" => CypressFoliage, "moss" => ForestScatter.MossMat, _ => null,
+		   }) ?? CypressMeshCode(seed, height);
+
+	/// <summary>(dev, `--dump-lake-winter`) The code cypresses' crowns (the woods' fir crown: its dark cores and sprays) and
+	/// moss, which tools/Blender/lake.py carries over onto the trunks it models.</summary>
+	internal static Godot.Collections.Dictionary DumpCypressCrowns()
+	{
+		var all = new Godot.Collections.Dictionary();
+		foreach (var (seed, h) in new[] { (1, 13f), (2, 17f), (3, 10f) })
+			all[$"cypress_{seed}"] = new Godot.Collections.Dictionary
+			{
+				["height"] = h,
+				["lean"] = Lean(seed),
+				["surfaces"] = BlenderMeshes.DumpSurfaces(CypressMeshCode(seed, h), m =>
+					m == ProcTextures.TreeBarkMat ? "limbs" : m == ProcTextures.FirBranchMat ? "branch" : m == CypressFoliage ? "spray" : m == ForestScatter.MossMat ? "moss" : null),
+			};
+		return all;
+	}
+
+	/// <summary>The trunk's lean (CypressMeshCode's first draws).</summary>
+	private static float[] Lean(int seed)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7717) };
+		return new[] { rng.RandfRange(-0.3f, 0.3f), rng.RandfRange(-0.3f, 0.3f) };
+	}
+
+	private static Mesh CypressMeshCode(int seed, float height)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 7717) };
 		var k = new MeshKit();
@@ -208,20 +245,23 @@ public partial class LakeDressing
 
 	/// <summary>A mat of marsh grass lying out over the water: blades fanning out from a root, bent down so the tips
 	/// trail on the surface.</summary>
-	private static Mesh MarshMatMesh()
+	private static Mesh MarshMatMesh() => BlenderMeshes.Get("lake", "marsh_mat", n => n == "marsh" ? MarshMat : null) ?? MarshMatMeshCode();
+
+	private static ShaderMaterial MarshMat => (ShaderMaterial)ProcTextures.Cached("lake_marsh", () =>
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+		DetailKit.Hook(m, DetailKit.Kind.Foliage);
+		m.SetShaderParameter("albedo_tex", ProcTextures.GrassTuft());
+		m.SetShaderParameter("tint", new Color(0.5f, 0.72f, 0.3f));
+		m.SetShaderParameter("sway", 0.03f);
+		m.SetShaderParameter("normal_up", 0.6f);
+		return m;
+	});
+
+	private static Mesh MarshMatMeshCode()
 	{
 		var k = new MeshKit();
-		var mat = (ShaderMaterial)ProcTextures.Cached("lake_marsh", () =>
-		{
-			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
-			DetailKit.Hook(m, DetailKit.Kind.Foliage);
-			m.SetShaderParameter("albedo_tex", ProcTextures.GrassTuft());
-			m.SetShaderParameter("tint", new Color(0.5f, 0.72f, 0.3f));
-			m.SetShaderParameter("sway", 0.03f);
-			m.SetShaderParameter("normal_up", 0.6f);
-			return m;
-		});
-		k.Mat(mat);
+		k.Mat(MarshMat);
 		var rng = new RandomNumberGenerator { Seed = 4731 };
 		for (int i = 0; i < 14; i++)
 		{
@@ -301,7 +341,9 @@ public partial class LakeDressing
 	}
 
 	/// <summary>A patch of the wrack, lying flat (two layers, the top one a hair higher and turned, so it has thickness).</summary>
-	private static Mesh WrackMesh()
+	private static Mesh WrackMesh() => BlenderMeshes.Get("lake", "wrack", n => n == "straw" ? StrawMat() : null) ?? WrackMeshCode();
+
+	private static Mesh WrackMeshCode()
 	{
 		var k = new MeshKit();
 		k.Mat(StrawMat());
@@ -317,7 +359,9 @@ public partial class LakeDressing
 	}
 
 	/// <summary>A bleached branch washed up: forked, lying half on the sand.</summary>
-	private static Mesh DriftMesh(int seed)
+	private static Mesh DriftMesh(int seed) => BlenderMeshes.Get("lake", $"drift_{seed}", n => n == "drift" ? ProcTextures.BarkMat : null) ?? DriftMeshCode(seed);
+
+	private static Mesh DriftMeshCode(int seed)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 977) };
 		var k = new MeshKit();
@@ -334,7 +378,9 @@ public partial class LakeDressing
 	}
 
 	/// <summary>A root wad: the torn-up roots of something the water took, tangled, stranded on the shore.</summary>
-	private static Mesh RootWadMesh(int seed)
+	private static Mesh RootWadMesh(int seed) => BlenderMeshes.Get("lake", $"rootwad_{seed}", n => n == "drift" ? ProcTextures.BarkMat : null) ?? RootWadMeshCode(seed);
+
+	private static Mesh RootWadMeshCode(int seed)
 	{
 		var rng = new RandomNumberGenerator { Seed = (ulong)(seed * 977) };
 		var k = new MeshKit();
