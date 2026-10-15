@@ -250,8 +250,10 @@ public partial class WinterWoods : Node3D
 				if (!inside[i, j] || !inside[i + 1, j] || !inside[i + 1, j + 1] || !inside[i, j + 1]) continue;
 				float x = x0 + i * Cell, z = z0 + j * Cell;
 				// under the church (its nave floor and its crypt) there is no snow
-				if (WinterGlade.OutsideChurch(x, z) <= 0f && WinterGlade.OutsideChurch(x + Cell, z + Cell) <= 0f
-					&& WinterGlade.OutsideChurch(x + Cell, z) <= 0f && WinterGlade.OutsideChurch(x, z + Cell) <= 0f) continue;
+				// (2026-10-15: the church's own outline, not the rectangle round its transepts, which left a hole beside the
+				// aisles and the chancel with a flat grey floor showing through)
+				if (Church.InsideFootprint(x, z) && Church.InsideFootprint(x + Cell, z + Cell)
+					&& Church.InsideFootprint(x + Cell, z) && Church.InsideFootprint(x, z + Cell)) continue;
 				Vector3 a = new(x, h[i, j], z), b = new(x + Cell, h[i + 1, j], z), c = new(x + Cell, h[i + 1, j + 1], z + Cell), d = new(x, h[i, j + 1], z + Cell);
 				Vector3 na = nrm[i, j], nb = nrm[i + 1, j], nc = nrm[i + 1, j + 1], nd = nrm[i, j + 1];
 				k.Color = col[i, j];

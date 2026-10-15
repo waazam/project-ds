@@ -301,6 +301,106 @@ public partial class Church
 		k.CommitTo(this, "Walls", true).CastShadow = GeometryInstance3D.ShadowCastingSetting.DoubleSided;
 		BuildBaseCourses();
 		BuildDrift();
+		BuildOutsideFoot();
+	}
+
+	/// <summary>(2026-10-15, the repetition pass) Where the church meets the snow outside: a plinth of the same stone round
+	/// the outer walls, its foot sunk well into the ground, and the snow banked up against it, deeper in places, thinner at
+	/// the corners and clear of the doors. The walls had stood on the snow as bare flat faces, a grey slab showing at
+	/// their foot wherever the ground fell away.</summary>
+	/// <summary>(2026-10-15) Whether a church-local (x, z) is under the church itself: the nave and aisles, the transepts,
+	/// the vestry, the chancel, the apse and its chapels. The woods' ground leaves only these cells out; it had left out the
+	/// whole rectangle round the transepts, so beside the narrower aisles and chancel there was no snow at all, a flat grey
+	/// floor showing through the hole.</summary>
+	public static bool InsideFootprint(float x, float z)
+	{
+		float ax = Mathf.Abs(x);
+		if (ax <= AisleOuter + WallT && z >= -1.5f && z <= NaveEnd) return true;
+		if (ax <= TransHalf + WallT && z >= NaveEnd - TransWestT && z <= CrossEnd + WallT) return true;
+		if (x >= VestryX1 && x <= VestryX0 && z >= VestryZ0 && z <= VestryZ1) return true;
+		if (ax <= NaveHalf + 0.45f && z >= CrossEnd && z <= ChancelEnd) return true;
+		if (z >= ChancelEnd - 0.5f && new Vector2(x, z - ChancelEnd).Length() <= ApseR + 0.45f + ChapelDepth + 1.2f) return true;
+		return false;
+	}
+
+	private void BuildOutsideFoot()
+	{
+		var k = new MeshKit();
+		var snow = new MeshKit();
+		snow.Mat(ChurchTextures.SnowMat);
+		snow.Color = Colors.White;
+		var rng = new RandomNumberGenerator { Seed = 2244 };
+		float ao = AisleOuter + WallT, to = TransHalf + WallT, mid = (NaveEnd + CrossEnd) * 0.5f;
+		var runs = new List<(Vector3 a, Vector3 b, Vector3 outward, (float, float)[] gaps)>();
+		foreach (float s in new[] { -1f, 1f })
+		{
+			runs.Add((new Vector3(s * ao, 0, -1.5f), new Vector3(s * ao, 0, NaveEnd - TransWestT), new Vector3(s, 0, 0), null));
+			runs.Add((new Vector3(s * ao, 0, NaveEnd - TransWestT), new Vector3(s * to, 0, NaveEnd - TransWestT), Vector3.Forward, null));
+			runs.Add((new Vector3(s * (NaveHalf + 0.45f), 0, CrossEnd + WallT), new Vector3(s * to, 0, CrossEnd + WallT), Vector3.Back, null));
+			runs.Add((new Vector3(s * (NaveHalf + 0.45f), 0, CrossEnd + WallT), new Vector3(s * (NaveHalf + 0.45f), 0, ChancelEnd), new Vector3(s, 0, 0), null));
+		}
+		// the right transept's end, round its door (the left's is the vestry's wall)
+		runs.Add((new Vector3(to, 0, NaveEnd - TransWestT), new Vector3(to, 0, CrossEnd + WallT), Vector3.Right, new[] { (mid - 1.4f - (NaveEnd - TransWestT), mid + 1.4f - (NaveEnd - TransWestT)) }));
+		// the west front, round the great door and the tower's door
+		runs.Add((new Vector3(-ao, 0, -1.5f), new Vector3(ao, 0, -1.5f), Vector3.Forward, new[] { (ao - 2.8f, ao + 2.8f), (ao + 10.7f, ao + 12.3f) }));
+		// the apse's two end facets (the five between have their chapels against them)
+		for (int i = 0; i < 7; i++)
+		{
+			if (FacetHasChapel(i)) continue;
+			ApseFacet(i, out var p0, out var along, out var inward, out float len);
+			runs.Add((p0 - inward * 0.9f, p0 - inward * 0.9f + along * len, -inward, null));
+		}
+		foreach (var (a, b, outward, gaps) in runs)
+		{
+			Vector3 along = (b - a).Normalized();
+			float len = (b - a).Length();
+			if (len < 0.3f) continue;
+			// the ground along it (the woods' one ground): the plinth's foot a good way under its lowest point
+			float lo = 99f, hi = -99f;
+			for (float u = 0f; u <= len; u += 1f)
+			{
+				var p = a + along * u + outward * 0.4f;
+				float g = WinterWoods.Height(p.X, p.Z);
+				lo = Mathf.Min(lo, g); hi = Mathf.Max(hi, g);
+			}
+			float y0 = lo - 0.6f, top = Mathf.Max(0.42f, hi + 0.35f);
+			BaseCourse(k, a, b, outward, y0, gaps, top - y0, 0.22f);
+			// the snow banked against it: one continuous drift along the wall, its height wandering (deeper here, thin there,
+			// thinner to the corners where the wind scours), falling away to the ground a metre or so out; none across doors
+			float ph = rng.RandfRange(0f, 100f);
+			float Bank(float u)
+			{
+				float edge = Mathf.Min(u, len - u);
+				float b = 0.22f + 0.14f * Mathf.Sin(u * 0.41f + ph) + 0.08f * Mathf.Sin(u * 1.13f + ph * 1.7f);
+				if (gaps != null) foreach (var (g0, g1) in gaps) b *= Mathf.SmoothStep(0f, 0.8f, Mathf.Max(g0 - u, u - g1));
+				return Mathf.Max(0f, b * Mathf.Clamp(0.35f + edge * 0.3f, 0.35f, 1f));
+			}
+			float Width(float u) => 0.9f + 0.35f * Mathf.Sin(u * 0.27f + ph * 0.6f);
+			Vector3 Pt(float u, float t)
+			{
+				// t 0 at the plinth's face, 1 out on the ground: a convex fall-off
+				var p = a + along * u + outward * (0.2f + Width(u) * t);
+				float g = WinterWoods.Height(p.X, p.Z);
+				p.Y = g - 0.06f + Bank(u) * (1f - t * t) + (t > 0.99f ? -0.08f : 0f);
+				return p;
+			}
+			float[] ts = { 0f, 0.35f, 0.65f, 1f };
+			const float du = 0.5f;
+			for (float u = 0f; u < len - 0.01f; u += du)
+			{
+				float u1 = Mathf.Min(u + du, len);
+				if (Bank(u) < 0.01f && Bank(u1) < 0.01f) continue;
+				for (int ti = 0; ti < ts.Length - 1; ti++)
+				{
+					Vector3 p00 = Pt(u, ts[ti]), p10 = Pt(u1, ts[ti]), p11 = Pt(u1, ts[ti + 1]), p01 = Pt(u, ts[ti + 1]);
+					var n = (p01 - p00).Cross(p10 - p00).Normalized();
+					if (n.Y < 0f) n = -n;
+					snow.Quad(p00, p10, p11, p01, n, new Vector2(p00.X, p00.Z), new Vector2(p10.X, p10.Z), new Vector2(p11.X, p11.Z), new Vector2(p01.X, p01.Z));
+				}
+			}
+		}
+		k.CommitTo(this, "OutsideFoot", true);
+		snow.CommitTo(this, "SnowBank", false);
 	}
 
 	/// <summary>
@@ -343,10 +443,12 @@ public partial class Church
 			Vector3 e0 = m - along * (l * 0.5f), e1 = m + along * (l * 0.5f);
 			Vector3 lo = Vector3.Up * h + inward * d, hi = Vector3.Up * (h + 0.14f);
 			Vector3 n = (inward * 0.14f + Vector3.Up * d).Normalized();
-			k.Quad(e0 + lo, e1 + lo, e1 + hi, e0 + hi, n);
+			// (2026-10-15: the slope and its ends textured like the rest of the stone; they had no UVs and drew flat grey)
+			float u0 = s0 + a.X + a.Z, u1 = s1 + a.X + a.Z;
+			k.Quad(e0 + lo, e1 + lo, e1 + hi, e0 + hi, n, new Vector2(u0, 0.2f), new Vector2(u1, 0.2f), new Vector2(u1, 0f), new Vector2(u0, 0f));
 			// the ends of the slope, where it stops at a door
-			k.Tri(e0 + lo, e0 + hi, e0 + Vector3.Up * h, -along, Vector2.Zero, Vector2.Zero, Vector2.Zero);
-			k.Tri(e1 + lo, e1 + Vector3.Up * h, e1 + hi, along, Vector2.Zero, Vector2.Zero, Vector2.Zero);
+			k.Tri(e0 + lo, e0 + hi, e0 + Vector3.Up * h, -along, new Vector2(0f, 0.2f), new Vector2(0.16f, 0f), new Vector2(0.16f, 0.2f));
+			k.Tri(e1 + lo, e1 + Vector3.Up * h, e1 + hi, along, new Vector2(0f, 0.2f), new Vector2(0.16f, 0.2f), new Vector2(0.16f, 0f));
 			// the roll under the slope, and a thin fillet at the plinth's foot
 			k.Cylinder(e0 + Vector3.Up * (h - 0.03f) + inward * (d + 0.01f), e1 + Vector3.Up * (h - 0.03f) + inward * (d + 0.01f), 0.045f, 0.045f, 8, true);
 			BuildKit.Box(k, m + Vector3.Up * 0.05f + inward * (d + 0.025f), new Vector3(l, 0.1f, 0.05f), 1f, BuildKit.Face.NY, basis);
