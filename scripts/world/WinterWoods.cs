@@ -134,6 +134,13 @@ public partial class WinterWoods : Node3D
 
 	// ------------------------------------------------------------------ materials
 
+	private static NoiseTexture2D _reliefNoise;
+	private static NoiseTexture2D ReliefNoise => _reliefNoise ??= new NoiseTexture2D
+	{
+		Width = 512, Height = 512, Seamless = true, GenerateMipmaps = true,
+		Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.012f, FractalOctaves = 3, FractalGain = 0.45f, Seed = 2214 },
+	};
+
 	public static ShaderMaterial GroundMat()
 	{
 		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/winter_ground.gdshader") };
@@ -143,6 +150,9 @@ public partial class WinterWoods : Node3D
 		m.SetShaderParameter("nor_snow", GD.Load<Texture2D>("res://assets/textures/snow/snow_normal.png"));
 		m.SetShaderParameter("nor_plowed", GD.Load<Texture2D>("res://assets/textures/snow/plowed_normal.png"));
 		m.SetShaderParameter("detail_tex", DetailKit.Albedo(DetailKit.Kind.Snow));
+		// (2026-10-14, the forest pass) the wind's relief: drifts, sastrugi, ripples, the mottle (smooth, seamless)
+		m.SetShaderParameter("relief_tex", ReliefNoise);
+		m.SetShaderParameter("wind_dir", new Vector2(0.9f, 0.42f));
 		return m;
 	}
 
@@ -332,6 +342,7 @@ public partial class WinterWoods : Node3D
 					}
 					row[a] = v;
 					rc[a] = GroundColor(q.X, q.Y);
+					rc[a].B = 1f;   // (the ribbon: its UV is across and along)
 				}
 				rows[i - r0] = row; cols[i - r0] = rc;
 			}
@@ -355,8 +366,10 @@ public partial class WinterWoods : Node3D
 				for (int a = 0; a < n - 1; a++)
 				{
 					Vector3 v0 = prev[a], v1 = prev[a + 1], v2 = row[a + 1], v3 = row[a];
-					TriC(k, v0, v1, v2, prevN[a], prevN[a + 1], rn[a + 1], prevC[a], prevC[a + 1], rc[a + 1]);
-					TriC(k, v0, v2, v3, prevN[a], rn[a + 1], rn[a], prevC[a], rc[a + 1], rc[a]);
+					// (UV: across and along the road in metres, for the ground shader's ruts and prints)
+					Vector2 u0 = new(Across[a], (i - 1) * Step), u1 = new(Across[a + 1], (i - 1) * Step), u2 = new(Across[a + 1], i * Step), u3 = new(Across[a], i * Step);
+					k.TriC(v0, v1, v2, prevN[a], prevN[a + 1], rn[a + 1], u0, u1, u2, prevC[a], prevC[a + 1], rc[a + 1]);
+					k.TriC(v0, v2, v3, prevN[a], rn[a + 1], rn[a], u0, u2, u3, prevC[a], rc[a + 1], rc[a]);
 					if (Mathf.Abs(Across[a]) < RibbonHalf - 1f || Mathf.Abs(Across[a + 1]) < RibbonHalf - 1f)
 					{
 						faces.Add(v0); faces.Add(v1); faces.Add(v2);

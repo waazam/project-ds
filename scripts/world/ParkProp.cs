@@ -136,6 +136,9 @@ public partial class ParkProp : Node3D
 			float shade = 0.86f + 0.1f * Mathf.Abs(Mathf.Sin(i * 7.1f + Seed));
 			_k.Color = new Color(shade, shade * 0.98f, shade * 0.95f);
 			_k.Mat(i == 0 ? BuildingTextures.SignGreenMat : plank).Box(new Vector3(0, cy, z), new Vector3(bw, ph[i] - 0.014f, pt), 1.1f);
+			// (2026-10-14, the forest pass: crisp and clean) grime, streaks and moss over each plank's face; a split in one
+			SignKit.Weather(_k, new Vector3(0, cy, z + pt * 0.5f), Basis.Identity, bw - 0.01f, ph[i] - 0.024f, Seed * 13 + i);
+			if (i == 1) SignKit.Split(_k, new Vector3(0, cy, z + pt * 0.5f), Basis.Identity, 0.7f, -0.08f, bw * 0.5f, -1);
 			y -= ph[i];
 		}
 		Col(new Vector3(0, 2.1f - 0.48f, z), new Vector3(bw, 0.96f, pt + 0.02f));
@@ -290,6 +293,34 @@ public partial class ParkProp : Node3D
 		return _doorSteelMat = m;
 	}
 
+	/// <summary>The toilet's walls (weathered_block.gdshader), in world space: its eave and foot, the shaded back, and the
+	/// rust sources at its steel (the side vents, the door frame's head and hinges).</summary>
+	private ShaderMaterial WeatheredBlock(float eave, float hw, float hd)
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/weathered_block.gdshader"), ResourceName = "toilet_block" };
+		m.SetShaderParameter("tex_a", SurfaceSets.Tex("concrete_a"));
+		m.SetShaderParameter("nor_a", SurfaceSets.Tex("concrete_a", "normal"));
+		m.SetShaderParameter("rough_a", SurfaceSets.Tex("concrete_a", "rough"));
+		m.SetShaderParameter("noise_tex", new NoiseTexture2D
+		{
+			Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true,
+			Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.03f, FractalOctaves = 4, Seed = 7071 + Seed },
+		});
+		var g = GlobalTransform;
+		m.SetShaderParameter("top_y", g.Origin.Y + eave);
+		m.SetShaderParameter("floor_y", g.Origin.Y);
+		var back = -g.Basis.Z;
+		m.SetShaderParameter("shade_dir", new Vector2(back.X, back.Z));
+		Vector4 R(Vector3 local, float width) { var p = g * local; return new Vector4(p.X, p.Y, p.Z, width); }
+		m.SetShaderParameter("rust_src", new[]
+		{
+			R(new Vector3(-(hw + 0.02f), 1.97f, 0.12f), 0.07f), R(new Vector3(hw + 0.02f, 1.97f, -0.18f), 0.06f),
+			R(new Vector3(0.15f + 0.49f, 2.1f, hd + 0.03f), 0.05f), R(new Vector3(0.15f - 0.49f, 2.1f, hd + 0.03f), 0.04f),
+		});
+		m.SetShaderParameter("rust_count", 4);
+		return m;
+	}
+
 	private void VaultToilet()
 	{
 		// (2026-10-14a, the early acts' look: it was one pale concrete cube with a flat lid and a steel slab for a door)
@@ -298,21 +329,23 @@ public partial class ParkProp : Node3D
 		// screened vent high in each side, and the vault's black vent stack with its cap behind.
 		const float hw = 1.15f, hd = 1.2f, eave = 2.45f, ridge = 3.05f, ov = 0.32f;
 		// poured concrete walls (the varied concrete: pours of different tones, rain streaks from the eave, grime at the foot)
+		// (2026-10-14, the forest pass: the poured walls still read as a pale, clean box; now old painted cinder block, park
+		// brown gone chalky and flaking, streaked from the eave, rust bled from the vents and the door, moss at the foot)
 		Material block = Engine.IsEditorHint() || !IsInsideTree() ? ProcTextures.ConcreteMat
-			: SurfaceSets.VariedConcrete("toilet_concrete", 0.45f, GlobalPosition.Y + eave, GlobalPosition.Y, new Color(0.5f, 0.48f, 0.43f), 1f, 2f);
+			: WeatheredBlock(eave, hw, hd);
 		// the pad: poured, its edge chipped into the dirt, the apron out in front
-		_k.Color = new Color(0.62f, 0.6f, 0.56f);
+		_k.Color = new Color(0.44f, 0.43f, 0.4f);
 		_k.Mat(ProcTextures.ConcreteMat);
 		BuildKit.Box(_k, new Vector3(0, -0.26f, 0.25f), new Vector3(hw * 2f + 0.5f, 0.58f, hd * 2f + 1.0f), 1.2f, BuildKit.Face.NY);
 		// walls on a darker splash course
 		_k.Color = Colors.White;
 		_k.Mat(block);
 		BuildKit.Box(_k, new Vector3(0, (eave + 0.03f) * 0.5f, 0), new Vector3(hw * 2f, eave - 0.03f, hd * 2f), 1f, BuildKit.Face.NY);
-		_k.Color = new Color(0.5f, 0.48f, 0.44f);
+		_k.Color = new Color(0.34f, 0.33f, 0.3f);
 		_k.Mat(ProcTextures.ConcreteMat);
 		BuildKit.Box(_k, new Vector3(0, 0.12f, 0), new Vector3(hw * 2f + 0.04f, 0.24f, hd * 2f + 0.04f), 1f, BuildKit.Face.NY | BuildKit.Face.PY);
 		// a cap course under the eave
-		_k.Color = new Color(0.72f, 0.69f, 0.64f);
+		_k.Color = new Color(0.42f, 0.4f, 0.36f);
 		BuildKit.Box(_k, new Vector3(0, eave - 0.06f, 0), new Vector3(hw * 2f + 0.05f, 0.12f, hd * 2f + 0.05f), 1f, BuildKit.Face.NY);
 		Col(new Vector3(0, 1.3f, 0), new Vector3(hw * 2f, 2.6f, hd * 2f));
 
@@ -416,7 +449,8 @@ public partial class ParkProp : Node3D
 		_k.Mat(brownAlong);
 		_k.Color = new Color(0.8f, 0.78f, 0.74f);
 		BuildKit.Box(_k, new Vector3(0, eave + 0.2f, hd + 0.04f), new Vector3(0.9f, 0.2f, 0.03f), 1f);
-		Text("RESTROOM", new Vector3(0f, eave + 0.2f, hd + 0.057f), 20, 0.0034f, new Color(0.7f, 0.64f, 0.5f));
+		Text("RESTROOM", new Vector3(0f, eave + 0.2f, hd + 0.057f), 20, 0.0034f, new Color(0.56f, 0.52f, 0.42f));
+		SignKit.Weather(_k, new Vector3(0, eave + 0.2f, hd + 0.055f), Basis.Identity, 0.89f, 0.19f, Seed * 17 + 3);
 	}
 
 	private void Bumper()

@@ -780,14 +780,16 @@ public partial class CreaturePreview : Node3D
 		// the atlas
 		var atlas = await Render(512, vp =>
 		{
-			int[] kinds = { 0, 1, 4, 0, 3, 1, 5, 0 };   // (no plain plate: a hexagon with spokes and a ring reads as a spider's web)
+			// (2026-10-14, the forest pass: the eight sharp six-armed crystals that were 0-7 read as clip-art stars in the
+			// air, the owner's survey; a flake falling past the eye is a small soft clot, not a crystal on a card. So 0-7 are
+			// soft aggregates, a little sharper or softer each, and 8-11 the near-lens blur, plain soft discs.)
 			for (int i = 0; i < 16; i++)
 			{
 				var cell = new Vector2((i % 4) * 128, (i / 4) * 128);
 				ShaderMaterial m;
 				float scale = 1f;
-				if (i < 8) m = Flake(11f + i * 7.3f, kinds[i]);
-				else if (i < 12) m = Flake(91f + i * 5.1f, new[] { 0, 1, 3, 4 }[i - 8], 0.45f, false, 0.9f);
+				if (i < 8) { m = Flake(11f + i * 7.3f, 0, 0.12f + 0.06f * (i % 4)); m.SetShaderParameter("aggregate", 1f); scale = 0.9f + 0.05f * (i % 3); }
+				else if (i < 12) { m = Flake(91f + i * 5.1f, 0, 0.6f, false, 0.85f); m.SetShaderParameter("soft_disc", 1f); }
 				else if (i < 14) m = Flake(200f + i, 0, 0.35f, true);
 				else { m = Flake(300f + i, 0, i == 14 ? 0.6f : 0.4f, true); scale = i == 14 ? 0.55f : 0.32f; }
 				float sz = 128f * scale;
@@ -803,13 +805,15 @@ public partial class CreaturePreview : Node3D
 		var rng = new RandomNumberGenerator { Seed = 2026 };
 		var curtain = await Render(512, vp =>
 		{
-			for (int k = 0; k < 900; k++)
+			// (2026-10-14: no crystals here either, small soft clots and specks, more of them)
+			for (int k = 0; k < 1500; k++)
 			{
 				float u = rng.Randf();
-				float sz = u < 0.4f ? rng.RandfRange(3f, 5f) : u < 0.8f ? rng.RandfRange(5f, 9f) : rng.RandfRange(9f, 14f);
+				float sz = u < 0.5f ? rng.RandfRange(2.5f, 4f) : u < 0.88f ? rng.RandfRange(4f, 6.5f) : rng.RandfRange(6.5f, 9f);
 				var at = new Vector2(rng.RandfRange(0, 512), rng.RandfRange(0, 512));
-				bool round = rng.Randf() < 0.45f || sz < 5f;
-				var m = Flake(rng.RandfRange(0f, 1000f), rng.RandiRange(0, 5), sz < 7f ? 0.5f : 0.2f, round, rng.RandfRange(0.45f, 1f));
+				bool round = rng.Randf() < 0.55f || sz < 4f;
+				var m = Flake(rng.RandfRange(0f, 1000f), 0, round ? 0.5f : 0.3f, round, rng.RandfRange(0.4f, 0.95f));
+				if (!round) m.SetShaderParameter("aggregate", 1f);
 				foreach (var off in new[] { Vector2.Zero, new Vector2(512, 0), new Vector2(-512, 0), new Vector2(0, 512), new Vector2(0, -512), new Vector2(512, 512), new Vector2(-512, -512), new Vector2(512, -512), new Vector2(-512, 512) })
 				{
 					var pos = at + off - Vector2.One * sz * 0.5f;

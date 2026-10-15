@@ -98,6 +98,10 @@ public partial class LookShots : Node
 		var start = p.GlobalPosition;
 		float yaw0 = p.CameraRig.Yaw;
 		GD.Print($"[look] act {_act} at {start} yaw {Mathf.RadToDeg(yaw0):0}");
+		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-noshafts") >= 0 && FindAtmo() is { } atS) atS.ShaftScale = 0f;
+		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-nosky") >= 0 && GetViewport().World3D?.Environment is { } envS) { envS.BackgroundMode = Godot.Environment.BGMode.Color; envS.BackgroundColor = Colors.Black; }
+		if (GetViewport().World3D?.Environment is { } env0)
+			GD.Print($"[look]   sky energy {env0.BackgroundEnergyMultiplier:0.00} exposure {env0.TonemapExposure:0.00} fog {env0.FogMode} sky-fog {env0.FogSkyAffect:0.00} horizon {(env0.Sky?.SkyMaterial as ShaderMaterial)?.GetShaderParameter("horizon_color")}");
 		int shot = 0;
 		for (int i = 0; i < _turns; i++)
 		{
