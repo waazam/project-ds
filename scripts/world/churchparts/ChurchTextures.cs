@@ -393,7 +393,7 @@ public static class ChurchTextures
 	/// <summary>A tall lancet's glass: small pieces of deep blue, ruby, gold and green in black lead, round a
 	/// standing figure (a pale robe, a gold halo, a darker face) with a border of small squares. <paramref name="seed"/>
 	/// changes the palette's balance and the figure.</summary>
-	public static Texture2D Lancet(int seed) => Make($"ch_lancet{seed}", 96, 288, (x, y) =>
+	public static Texture2D Lancet(int seed) => Make($"ch_lancet_aged{seed}", 96, 288, (x, y) =>
 	{
 		// cells: a jittered grid of small pieces
 		float cw = 12f;
@@ -422,9 +422,23 @@ public static class ChurchTextures
 		var head = new Vector2(fx, (fy - 0.24f) * 3f);
 		if (head.Length() < 0.36f) c = new Color(0.8f, 0.58f, 0.12f);          // the halo
 		if (head.Length() < 0.2f) c = new Color(0.62f, 0.5f, 0.42f);           // the face
+		// (2026-10-14h, the interiors pass: "a rainbow of saturated pixels". Old glass now, as the rose window: the colours
+		// sunk and smoky, each piece its own shade and flaw, some replaced long ago with plain amber or grey, a few
+		// cracked; grime thick at the bottom and the edges, where the rain ran and the soot settled; the leading broad.)
+		float ph = Hash(bi, bj, 660 + seed);
+		if (!border && ph < 0.12f) c = new Color(0.5f, 0.4f, 0.2f);               // a later repair in amber
+		else if (!border && ph > 0.93f) c = new Color(0.32f, 0.33f, 0.34f);       // or in plain grey
+		float grey = (c.R + c.G + c.B) / 3f;
+		c = c.Lerp(new Color(grey, grey, grey), 0.38f);
+		c *= 0.5f + 0.4f * Hash(bi, bj, 661 + seed);
+		float grime = Mathf.SmoothStep(0.55f, 1f, y / 288f) * 0.45f + Mathf.SmoothStep(0.6f, 1f, Mathf.Abs(x - 47.5f) / 48f) * 0.35f;
+		c *= Mathf.Clamp(1f - grime, 0.35f, 1f) * (0.78f + 0.3f * Fbm(x, y, 96, 4, 3, 662 + seed));
+		c = c.Lerp(new Color(0.16f, 0.14f, 0.11f), 0.15f);                          // the film of dirt on it all
+		// a crack across a piece here and there
+		if (!border && Hash(bi, bj, 663 + seed) > 0.85f && Mathf.Abs((gx - bi) - (gy - bj) * 0.6f - 0.2f) < 0.03f) c *= 0.3f;
 		// the lead: black cames between the pieces and round the figure
-		if (lead < 0.08f && !border) c = new Color(0.02f, 0.02f, 0.02f);
-		if (x % 48 == 0 || y % 72 == 0) c = new Color(0.02f, 0.02f, 0.02f);   // the iron saddle bars
+		if (lead < 0.1f && !border) c = new Color(0.02f, 0.02f, 0.02f);
+		if (x % 48 == 0 || x % 48 == 1 || y % 72 == 0) c = new Color(0.02f, 0.02f, 0.02f);   // the iron saddle bars
 		return c;
 	}, false);
 
@@ -480,7 +494,8 @@ public static class ChurchTextures
 		if (_mat.TryGetValue(key, out var m)) return (StandardMaterial3D)m;
 		var s = new StandardMaterial3D
 		{
-			AlbedoTexture = tex, EmissionEnabled = true, EmissionTexture = tex, EmissionEnergyMultiplier = energy,
+			// (2026-10-14h: the light through it a little lower, as old glass dirty on both faces passes)
+			AlbedoTexture = tex, EmissionEnabled = true, EmissionTexture = tex, EmissionEnergyMultiplier = energy * 0.8f,
 			Roughness = 0.2f, MetallicSpecular = 0.7f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 			CullMode = BaseMaterial3D.CullModeEnum.Disabled,
 		};
@@ -511,7 +526,7 @@ public static class ChurchTextures
 			{
 				AlbedoTexture = Quarries, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.15f, MetallicSpecular = 0.8f,
 				// the frosted panes glow a little with the snow-light behind them
-				EmissionEnabled = true, Emission = new Color(0.42f, 0.47f, 0.56f), EmissionEnergyMultiplier = 0.14f,   // (0.35 until the interior pass)
+				EmissionEnabled = true, Emission = new Color(0.42f, 0.47f, 0.56f), EmissionEnergyMultiplier = 0.1f,   // (0.35 until the interior pass; 0.14 until 2026-10-14h)
 				CullMode = BaseMaterial3D.CullModeEnum.Disabled, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps, Uv1Scale = new Vector3(2f, 2f, 1f),
 			};
 			_mat["ch_quarries"] = s;

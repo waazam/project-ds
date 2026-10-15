@@ -72,6 +72,8 @@ public partial class Library : Node3D
 		BuildFireplace();
 		BuildFurniture();
 		BuildSideTable();
+		BuildRug();
+		BuildMiddle();
 		BuildPassage();
 		// webs up in the corners, over the shelves
 		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1901 }, -HalfW, HalfW, 0f, Depth, 0f, Height, 1.2f, 0.75f);
@@ -112,7 +114,8 @@ public partial class Library : Node3D
 		Slab(plaster, new Vector3(0.86f, Height * 0.5f, 0.05f), new Vector3(0.28f, Height, 0.08f), false);
 		Slab(plaster, new Vector3(0, (2.48f + Height) * 0.5f, 0.05f), new Vector3(1.44f, Height - 2.48f, 0.08f), false);
 		Slab(plaster, new Vector3(0, Height + 0.1f, Depth * 0.5f), new Vector3(HalfW * 2f, 0.2f, Depth), false, 0.95f);
-		plaster.CommitTo(this, "Plaster", true);
+		// (2026-10-14h: weathered, the ceiling's coffers stained, as everything else in the place)
+		RoomSurface.ApplyTo(plaster.CommitTo(this, "Plaster", true), RoomSurface.Plaster with { CeilingStains = 0.7f }, null, 19);
 		// (2026-10-14c) the door from the pit cased in the shelves' dark wood: a lining through the wall's thickness and a
 		// moulded casing on this side, with plinth blocks at its feet. It was the pit wall's raw cut, pale concrete,
 		// a bright frame round the dark doorway between the bookcases.
@@ -130,11 +133,8 @@ public partial class Library : Node3D
 		Slab(casing, new Vector3(0, oh + 0.06f, 0.1f), new Vector3(ow * 2f + 0.26f, 0.13f, 0.028f), false);
 		Slab(casing, new Vector3(0, oh + 0.14f, 0.11f), new Vector3(ow * 2f + 0.34f, 0.04f, 0.05f), false, 1.1f);
 		casing.CommitTo(this, "DoorCasing", true);
-		// a parquet floor, beams across the ceiling
-		var floor = new MeshKit();
-		floor.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = PropTextures.DeckMat.AlbedoTexture, AlbedoColor = new Color(0.4f, 0.29f, 0.21f), Roughness = 0.75f, MetallicSpecular = 0.35f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 1.8f }, "hinoki", 1f));
-		Slab(floor, new Vector3(0, -0.05f, Depth * 0.5f), new Vector3(HalfW * 2f, 0.1f, Depth));
-		floor.CommitTo(this, "Floor", true);
+		// (the parquet floor: BuildFloor, once the furniture it lies under is placed) beams across the ceiling
+		_body.AddChild(new CollisionShape3D { Position = new Vector3(0, -0.05f, Depth * 0.5f), Shape = new BoxShape3D { Size = new Vector3(HalfW * 2f, 0.1f, Depth) } });
 		var beams = new MeshKit();
 		beams.Mat(_wood);
 		for (float z = 1.2f; z < Depth; z += 2.2f) Slab(beams, new Vector3(0, Height - 0.12f, z), new Vector3(HalfW * 2f, 0.24f, 0.22f), false);
@@ -143,135 +143,7 @@ public partial class Library : Node3D
 		foreach (float x in new[] { -HalfW / 3f, HalfW / 3f })
 			Slab(beams, new Vector3(x, Height - 0.1f - 0.003f, Depth * 0.5f), new Vector3(0.18f, 0.2f, Depth - 0.3f), false);
 		beams.CommitTo(this, "Beams", true);
-		// a big rug
-		var rug = new MeshKit();
-		rug.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoColor = Colors.White, Roughness = 1f, VertexColorUseAsAlbedo = true, Uv1Scale = Vector3.One * 2f }, "carpet", 0.8f));
-		rug.Color = new Color(0.3f, 0.12f, 0.1f);
-		BuildKit.Box(rug, new Vector3(0.6f, 0.006f, 6.5f), new Vector3(5.2f, 0.012f, 7f));
-		rug.Color = new Color(0.42f, 0.35f, 0.22f);
-		BuildKit.Box(rug, new Vector3(0.6f, 0.008f, 6.5f), new Vector3(4.6f, 0.012f, 6.4f));
-		rug.Color = new Color(0.18f, 0.15f, 0.2f);
-		BuildKit.Box(rug, new Vector3(0.6f, 0.01f, 6.5f), new Vector3(4.2f, 0.012f, 6.0f));
-		rug.CommitTo(this, "Rug", false);
-	}
-
-	/// <summary>Bookcases on every wall, floor to ceiling, packed with hardbacks.</summary>
-	private void BuildShelves()
-	{
-		var runs = new List<(Vector3 a, Vector3 b, Vector3 inward)>
-		{
-			(new Vector3(-HalfW, 0, 0.3f), new Vector3(-HalfW, 0, Depth - 0.3f), Vector3.Right),
-			(new Vector3(HalfW, 0, 0.3f), new Vector3(HalfW, 0, 5.4f), Vector3.Left),
-			(new Vector3(HalfW, 0, 7.6f), new Vector3(HalfW, 0, Depth - 0.3f), Vector3.Left),
-			(new Vector3(-HalfW + 0.3f, 0, Depth), new Vector3(-0.66f, 0, Depth), Vector3.Forward),
-			(new Vector3(0.66f, 0, Depth), new Vector3(HalfW - 0.3f, 0, Depth), Vector3.Forward),
-			(new Vector3(-HalfW + 0.3f, 0, 0), new Vector3(-0.95f, 0, 0), Vector3.Back),
-			(new Vector3(0.95f, 0, 0), new Vector3(HalfW - 0.3f, 0, 0), Vector3.Back),
-		};
-		var frame = new MeshKit();
-		frame.Mat(_wood);
-		var books = new List<Transform3D>();
-		var colors = new List<Color>();
-		foreach (var (a, b, inw) in runs)
-		{
-			Shelves(frame, books, colors, a, b, inw, this, _body);
-		}
-		frame.CommitTo(this, "Bookcases", true);
-		// the gap where the journal lies
-		for (int i = books.Count - 1; i >= 0; i--)
-			if (InJournalSlot(books[i].Origin)) { books.RemoveAt(i); colors.RemoveAt(i); }
-		AddBooks(this, books, colors, "Books");
-	}
-
-	private const float ShelfDepth = 0.34f;
-	private static readonly float[] Rows = { 0.08f, 0.52f, 0.96f, 1.4f, 1.84f, 2.28f, 2.72f, 3.16f };
-
-	/// <summary>One run of bookcase from a to b against a wall (inw points into the room), and its books.</summary>
-	private void Shelves(MeshKit frame, List<Transform3D> books, List<Color> colors, Vector3 a, Vector3 b, Vector3 inw, Node3D owner, StaticBody3D body)
-	{
-		Vector3 along = (b - a).Normalized();
-		float len = (b - a).Length();
-		Vector3 mid = (a + b) * 0.5f + inw * ShelfDepth * 0.5f;
-		Vector3 alongSize = along.Abs() * len, depthSize = inw.Abs() * ShelfDepth;
-		frame.Color = Colors.White;
-		BuildKit.Box(frame, mid + Vector3.Up * (Height * 0.5f - 0.1f) - inw * (ShelfDepth * 0.5f - 0.01f), alongSize + inw.Abs() * 0.02f + Vector3.Up * (Height - 0.2f));   // the back
-		foreach (float y in Rows)
-			BuildKit.Box(frame, mid + Vector3.Up * (y - 0.012f), alongSize + depthSize + Vector3.Up * 0.024f);
-		BuildKit.Box(frame, mid + Vector3.Up * (Height - 0.2f), alongSize + depthSize + inw.Abs() * 0.05f + Vector3.Up * 0.12f);   // the crown
-		int uprights = Mathf.Max(1, Mathf.RoundToInt(len / 1.0f));
-		for (int u = 0; u <= uprights; u++)
-		{
-			Vector3 p = a + along * (len * u / uprights) + inw * ShelfDepth * 0.5f + Vector3.Up * ((Height - 0.2f) * 0.5f);
-			BuildKit.Box(frame, p, along.Abs() * 0.045f + depthSize + Vector3.Up * (Height - 0.2f));
-		}
-		body?.AddChild(new CollisionShape3D { Position = mid + Vector3.Up * (Height * 0.5f), Shape = new BoxShape3D { Size = alongSize + depthSize + Vector3.Up * Height } });
-		// the books, row by row, packed in, a few leaning, now and then a gap
-		for (int r = 0; r < Rows.Length - 1; r++)
-		{
-			float s = 0.03f;
-			while (s < len - 0.05f)
-			{
-				float t = _rng.RandfRange(0.022f, 0.06f), h = _rng.RandfRange(0.22f, 0.37f), d = _rng.RandfRange(0.16f, 0.25f);
-				if (_rng.Randf() < 0.025f) { s += _rng.RandfRange(0.08f, 0.2f); continue; }
-				if (s + t > len - 0.03f) break;
-				// don't push through an upright
-				float seg = len / uprights, inSeg = (s % seg);
-				if (inSeg < 0.03f || inSeg > seg - 0.03f - t) { s += 0.035f; continue; }
-				float lean = _rng.Randf() < 0.04f ? _rng.RandfRange(0.12f, 0.3f) : 0f;
-				Vector3 c = a + along * (s + t * 0.5f) + inw * (0.03f + d * 0.5f) + Vector3.Up * (Rows[r] + h * 0.5f);
-				var basis = Basis.LookingAt(inw, Vector3.Up) * new Basis(Vector3.Forward, lean);
-				// a unit box scaled to the book: its local X is along the shelf, Z is depth
-				var bb = new Basis(basis.X * t, basis.Y * h, basis.Z * d);
-				books.Add(new Transform3D(bb, c));
-				colors.Add(BookColor());
-				s += t + (lean > 0 ? 0.02f : 0.002f);
-			}
-		}
-	}
-
-	private Color BookColor()
-	{
-		Color[] cloth = { new(0.35f, 0.07f, 0.06f), new(0.1f, 0.18f, 0.1f), new(0.08f, 0.12f, 0.25f), new(0.3f, 0.22f, 0.12f), new(0.45f, 0.36f, 0.22f), new(0.15f, 0.1f, 0.08f), new(0.5f, 0.45f, 0.35f), new(0.22f, 0.05f, 0.1f) };
-		// (2026-10-14c: faded and darkened toward an old brown, a little; under the warm lamps the cloths read as new candy colours)
-		var c = cloth[_rng.RandiRange(0, cloth.Length - 1)] * _rng.RandfRange(0.75f, 1.2f);
-		return c.Lerp(new Color(0.2f, 0.16f, 0.12f), 0.3f) * 0.85f;
-	}
-
-	private static void AddBooks(Node3D owner, List<Transform3D> xf, List<Color> colors, string name)
-	{
-		var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = BookMesh, InstanceCount = xf.Count };
-		for (int i = 0; i < xf.Count; i++) { mm.SetInstanceTransform(i, xf[i]); mm.SetInstanceColor(i, colors[i]); }
-		owner.AddChild(new MultiMeshInstance3D { Name = name, Multimesh = mm });
-	}
-
-	private static Mesh _bookMesh;
-
-	/// <summary>A hardback in a unit box (scaled per book: X its thickness, Y its height, Z its depth; its spine toward -Z,
-	/// the room): the cover's two boards and the spine rounded over the page block, a pair of raised bands across the spine,
-	/// the cream page block set in from the boards' edges. The cloth takes the book's own colour (the instance colour); the
-	/// pages don't. (The owner, 2026-09-30: the fidelity pass; they were plain coloured boxes.)</summary>
-	public static Mesh BookMesh
-	{
-		get
-		{
-			if (_bookMesh != null) return _bookMesh;
-			var cloth = new StandardMaterial3D { ResourceName = "book_cloth", VertexColorUseAsAlbedo = true, AlbedoColor = Colors.White, Roughness = 0.72f, MetallicSpecular = 0.3f, AlbedoTexture = ProcTextures.Grime() };
-			var pages = new StandardMaterial3D { ResourceName = "book_pages", AlbedoColor = new Color(0.6f, 0.55f, 0.43f), Roughness = 0.95f };
-			var k = new MeshKit();
-			k.Color = Colors.White;
-			k.Mat(pages);
-			k.Box(new Vector3(0, 0, 0.03f), new Vector3(0.82f, 0.94f, 0.92f), 1f);
-			k.Mat(cloth);
-			foreach (float sx in new[] { -0.45f, 0.45f })
-				k.Box(new Vector3(sx, 0, 0.0f), new Vector3(0.1f, 1f, 1f), 1f);
-			// the spine: a half round across the page block's front (squashed flat: a book's spine bulges only a little)
-			k.Xf = new Transform3D(Basis.FromScale(new Vector3(1f, 1f, 0.12f)), new Vector3(0, 0, -0.5f));
-			k.Cylinder(new Vector3(0, -0.5f, 0), new Vector3(0, 0.5f, 0), 0.5f, 0.5f, 10, true);
-			foreach (float y in new[] { -0.28f, 0.28f })
-				k.Cylinder(new Vector3(0, y - 0.025f, 0), new Vector3(0, y + 0.025f, 0), 0.53f, 0.53f, 10, false);
-			k.Xf = Transform3D.Identity;
-			return _bookMesh = k.Commit();
-		}
+		// (the rug: BuildRug)
 	}
 
 	/// <summary>The bookcase in the middle of the back wall: hinged at its right edge, one book on the
@@ -282,16 +154,14 @@ public partial class Library : Node3D
 		AddChild(_bookcase);
 		var frame = new MeshKit();
 		frame.Mat(_wood);
-		var books = new List<Transform3D>();
-		var colors = new List<Color>();
+		var books = new BookList();
 		var hinged = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		_bookcase.AddChild(hinged);
-		Shelves(frame, books, colors, new Vector3(-1.24f, 0, 0), new Vector3(0f, 0, 0), Vector3.Forward, _bookcase, hinged);
+		Shelves(frame, books, new Vector3(-1.24f, 0, 0), new Vector3(0f, 0, 0), Vector3.Forward, hinged, true);
 		frame.CommitTo(_bookcase, "Frame", true);
 		// leave a slot for the one that sticks out
-		for (int i = books.Count - 1; i >= 0; i--)
-			if (Mathf.Abs(books[i].Origin.X + 0.55f) < 0.08f && Mathf.Abs(books[i].Origin.Y - (Rows[3] + 0.15f)) < 0.2f) { books.RemoveAt(i); colors.RemoveAt(i); }
-		AddBooks(_bookcase, books, colors, "Books");
+		books.RemoveWhere(o => Mathf.Abs(o.X + 0.55f) < 0.08f && Mathf.Abs(o.Y - (Rows[3] + 0.15f)) < 0.2f);
+		AddBooks(_bookcase, books, "Books");
 		// the one sticking out: an old tome, only just proud of the rest; nothing on it to see by lamplight, but under
 		// the blacklight a handprint glows on its spine, where someone has pulled it before
 		_jutting = new Node3D { Name = "JuttingBook", Position = new Vector3(-0.55f, Rows[3] + 0.16f, -(0.03f + 0.12f) - 0.04f) };

@@ -14,13 +14,16 @@ public partial class Church
 	private void BuildShafts()
 	{
 		_shaftMat = WindowShafts.Material(new Color(0.74f, 0.8f, 0.92f), 0.035f);
+		// (2026-10-14h: the dust in it soft and broad, a haze, not a fine grain that read as static; fewer motes)
+		_shaftMat.SetShaderParameter("dust_contrast", 0.28f);
+		_shaftMat.SetShaderParameter("dust_scale", 0.45f);
 		var dir = new Vector3(-0.55f, -0.8f, 0.12f);
 		float x = NaveHalf - 0.6f;
 		for (int b = 0; b < NaveBays; b++)
 		{
 			float c = (b + 0.5f) * BayLen;
 			foreach (float dz in new[] { -1.1f, 1.1f })
-				WindowShafts.Add(this, _shaftMat, new Vector3(x, 20.3f, c + dz), Vector3.Back, Vector3.Up, 1.2f, 3.6f, dir, 24f, b % 2 == 0 && dz < 0 ? 26 : 0);
+				WindowShafts.Add(this, _shaftMat, new Vector3(x, 20.3f, c + dz), Vector3.Back, Vector3.Up, 1.2f, 3.6f, dir, 24f, b % 2 == 0 && dz < 0 ? 12 : 0);
 		}
 	}
 }

@@ -186,12 +186,28 @@ public partial class Church
 		Collide(_stone, fig + Vector3.Up * 0.9f, new Vector3(0.84f, 1.8f, 0.84f));
 		k.CommitTo(this, "Crypt", true);
 		// its light: two red glass votives burning by the altar, the cold spill down each stair
-		foreach (float x in new[] { -0.8f, 0.8f })
+		// (2026-10-14h, the interiors pass: they were red emissive tips under a red light. Now ordinary candles burning low in
+		// old ruby votive glasses, the glass shaded like glass (a little of the flame's warmth through it), the light the
+		// flames' own warm one; the red is the glass's and the altar cloth's.)
+		var votive = new MeshKit();
+		votive.Mat(new StandardMaterial3D { ResourceName = "ch_votive_glass", AlbedoColor = new Color(0.45f, 0.06f, 0.05f, 0.72f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.15f, MetallicSpecular = 0.7f, EmissionEnabled = true, Emission = new Color(0.5f, 0.1f, 0.04f), EmissionEnergyMultiplier = 0.35f, CullMode = BaseMaterial3D.CullModeEnum.Disabled });
+		var vwax = new MeshKit();
+		vwax.Mat(WaxMaterial.Make(new Color(0.75f, 0.7f, 0.6f), 0.6f, "ch_votive_wax"));
+		var vflame = new MeshKit();
+		vflame.Mat(new StandardMaterial3D { ResourceName = "ch_votive_flame", AlbedoColor = new Color(1f, 0.8f, 0.42f), EmissionEnabled = true, Emission = new Color(1f, 0.62f, 0.26f), EmissionEnergyMultiplier = 3.5f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded });
+		foreach (float x in new[] { -0.8f, -0.62f, 0.7f, 0.86f })
 		{
-			var v = new Vector3(x, y0 + 1.1f, CryptZ1 - 1.4f);
-			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.04f, Height = 0.1f }, Position = v, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.7f, 0.05f, 0.05f), EmissionEnabled = true, Emission = new Color(1f, 0.15f, 0.08f), EmissionEnergyMultiplier = 2.5f }, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+			var v = new Vector3(x, y0 + 1.02f, CryptZ1 - 1.4f + (x < 0 ? 0.05f : -0.04f));
+			float vh = Mathf.Abs(x) > 0.75f ? 0.11f : 0.08f;
+			votive.Cylinder(v, v + Vector3.Up * vh, 0.042f, 0.05f, 10, false);
+			votive.Cylinder(v, v + Vector3.Up * 0.01f, 0.042f, 0.042f, 10, true);
+			vwax.Cylinder(v + Vector3.Up * 0.01f, v + Vector3.Up * (vh * 0.45f), 0.036f, 0.036f, 8, true);
+			vflame.Blob(v + Vector3.Up * (vh * 0.45f + 0.03f), new Vector3(0.01f, 0.024f, 0.01f), 4, 0f, false);
 		}
-		AddChild(new OmniLight3D { Position = new Vector3(0, y0 + 1.6f, CryptZ1 - 1.8f), LightColor = new Color(1f, 0.35f, 0.2f), LightEnergy = 1.1f, OmniRange = 9f, ShadowEnabled = true });
+		votive.CommitTo(this, "Votives", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		vwax.CommitTo(this, "VotiveWax", false);
+		vflame.CommitTo(this, "VotiveFlames", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		AddChild(new OmniLight3D { Position = new Vector3(0, y0 + 1.35f, CryptZ1 - 1.75f), LightColor = new Color(1f, 0.62f, 0.38f), LightEnergy = 1.1f, OmniRange = 9f, ShadowEnabled = true });
 		foreach (var (x0, x1, z0, z1) in StairOpenings)
 			AddChild(new OmniLight3D { Position = new Vector3((x0 + x1) * 0.5f, -1.2f, z1 - 1f), LightColor = new Color(0.7f, 0.78f, 0.92f), LightEnergy = 0.9f, OmniRange = 9f, ShadowEnabled = false });
 		AddChild(new OmniLight3D { Position = HatchLocal + new Vector3(0, 1.8f, 0), LightColor = new Color(0.8f, 0.8f, 0.85f), LightEnergy = 0.35f, OmniRange = 6f, ShadowEnabled = false });

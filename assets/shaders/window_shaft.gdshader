@@ -8,6 +8,10 @@ render_mode blend_add, depth_draw_never, cull_disabled, unshaded, shadows_disabl
 
 uniform vec3 shaft_color : source_color = vec3(0.78, 0.82, 0.9);
 uniform float strength = 0.05;
+// how much the dust breaks the light up, and how coarse its drifts are (2026-10-14h: the church wants it soft: at full
+// contrast its fine noise read as dithered static at the PS2 resolution)
+uniform float dust_contrast = 0.7;
+uniform float dust_scale = 1.0;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
 
@@ -15,7 +19,7 @@ void fragment() {
 	float side = smoothstep(0.0, 0.3, UV.x) * smoothstep(1.0, 0.7, UV.x);
 	float along = smoothstep(0.0, 0.06, UV.y) * pow(1.0 - UV.y, 1.6);
 	float face = smoothstep(0.08, 0.55, abs(dot(normalize(NORMAL), normalize(VIEW))));
-	float dust = 0.65 + 0.7 * texture(noise_tex, vec2(UV.x * 1.7 + TIME * 0.004, UV.y * 2.4 - TIME * 0.012)).r;
+	float dust = 1.0 - dust_contrast * 0.5 + dust_contrast * texture(noise_tex, vec2(UV.x * 1.7 + TIME * 0.004, UV.y * 2.4 - TIME * 0.012) * dust_scale).r;
 	// soft where it passes into a surface
 	float depth = texture(depth_tex, SCREEN_UV).r;
 	vec4 up = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth, 1.0);

@@ -325,10 +325,13 @@ public partial class Church
 		Vector3 c = new(0, ChancelY + 0.012f, ChancelEnd - 0.4f);
 		const float r = 5.6f;
 		var k = new MeshKit();
+		// (2026-10-14h, the interiors pass: it glowed, an unshaded red emissive disc with a red light over it, a neon sign on
+		// the floor. Now it's what it would be: old blood and paint gone brown-red, soaked into the stone, dull, seen only
+		// by the candles left burning round it and by the lantern.)
 		k.Mat(new StandardMaterial3D
 		{
-			AlbedoTexture = ChurchTextures.Sigil, EmissionEnabled = true, EmissionTexture = ChurchTextures.Sigil, EmissionEnergyMultiplier = 2.2f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+			ResourceName = "ch_sigil_paint", AlbedoTexture = ChurchTextures.Sigil, AlbedoColor = new Color(0.4f, 0.07f, 0.05f), Roughness = 0.8f, MetallicSpecular = 0.3f,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		});
 		k.Color = Colors.White;
 		const int n = 48;
@@ -339,7 +342,31 @@ public partial class Church
 			Vector2 U(Vector3 p) => new(0.5f + (p.X - c.X) / (2f * r), 0.5f + (p.Z - c.Z) / (2f * r));
 			k.Tri(c, p0, p1, Vector3.Up, U(c), U(p0), U(p1));
 		}
-		k.CommitTo(this, "Sigil", false);
-		AddChild(new OmniLight3D { Name = "SigilLight", Position = c + Vector3.Up * 1.2f, LightColor = new Color(1f, 0.08f, 0.05f), LightEnergy = 2.4f, OmniRange = 11f, OmniAttenuation = 1.1f, ShadowEnabled = false });
+		k.CommitTo(this, "Sigil", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		// candles left burning at the star's five points, low, in their own wax; one warm light for them all
+		var wax = new MeshKit();
+		wax.Mat(WaxMaterial.Make(new Color(0.6f, 0.55f, 0.45f), 0.6f, "ch_sigil_wax"));
+		var flames = new MeshKit();
+		flames.Mat(new StandardMaterial3D { ResourceName = "ch_sigil_flame", AlbedoColor = new Color(1f, 0.8f, 0.42f), EmissionEnabled = true, Emission = new Color(1f, 0.62f, 0.26f), EmissionEnergyMultiplier = 3.5f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded });
+		var rng = new RandomNumberGenerator { Seed = 3301 };
+		for (int i = 0; i < 5; i++)
+		{
+			float a = Mathf.Tau * i / 5f - Mathf.Pi * 0.5f;
+			// (the texture's star points, on the 0.7 ring; its u runs with x, its v with z)
+			Vector3 p = c + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * (r * 0.7f);
+			wax.Blob(p + Vector3.Up * 0.004f, new Vector3(0.14f, 0.008f, 0.12f), 90 + i, 0.3f);
+			for (int s = 0; s < 3; s++)
+			{
+				if (s > 0 && rng.Randf() < 0.3f) continue;
+				Vector3 q = p + new Vector3(rng.RandfRange(-0.08f, 0.08f), 0, rng.RandfRange(-0.08f, 0.08f));
+				float h = s == 0 ? rng.RandfRange(0.12f, 0.2f) : rng.RandfRange(0.04f, 0.1f), rr = rng.RandfRange(0.025f, 0.04f);
+				wax.Cylinder(q, q + Vector3.Up * h, rr * 1.1f, rr, 8, true);
+				wax.Blob(q + Vector3.Up * h, new Vector3(rr, 0.01f, rr), i * 5 + s, 0.3f);
+				if (s == 0 || rng.Randf() < 0.5f) flames.Blob(q + Vector3.Up * (h + 0.035f), new Vector3(0.011f, 0.026f, 0.011f), 2, 0f, false);
+			}
+		}
+		wax.CommitTo(this, "SigilCandles", false);
+		flames.CommitTo(this, "SigilFlames", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		AddChild(new OmniLight3D { Name = "SigilLight", Position = c + Vector3.Up * 0.7f, LightColor = new Color(1f, 0.66f, 0.38f), LightEnergy = 1.3f, OmniRange = 8f, OmniAttenuation = 1.3f, ShadowEnabled = false });
 	}
 }
