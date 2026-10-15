@@ -69,6 +69,7 @@ public partial class HandsPreview : Node3D
 		await Seconds(0.5);
 		if (OS.GetCmdlineUserArgs().Contains("--hands-studio")) { await Studio(); GetTree().Quit(0); return; }
 		if (OS.GetCmdlineUserArgs().Contains("--grips")) { await GripShots(); GetTree().Quit(0); return; }
+		if (OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--fit")) is { } fit) { await FitShots(fit.Contains('=') ? fit.Split('=')[1].Split(',') : null); GetTree().Quit(0); return; }
 		if (only == null) await Logic();
 		await LookBook(only);
 		GD.Print($"[hands] done: {_checks - _fails}/{_checks} passed");

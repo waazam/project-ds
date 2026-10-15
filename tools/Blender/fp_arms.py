@@ -190,6 +190,14 @@ POSES["cradle"] = dict(grip=None, axis=G(-1.0, 0.0, 0.0), back=G(0.0, -1.0, 0.1)
 # (the small fist round the lighter: the same frame, upright)
 POSES["small"] = dict(grip=0.0095, axis=G(0, 1, 0), back=G(-1.0, 0.0, 0.0), thumb="over", forearm=G(-0.15, -0.55, 0.82), lean=0.0,
                       eye=G(0.2, 0.12, 0.5))
+# (2026-10-15, the owner: "make sure items are properly placed in the palm of the hands when needed and the thumb is correct
+# and not bent wrong") the key pinch: a flat small thing (a key's bow, a card's end, a bookmark) held between the pad of the
+# thumb and the side of the first finger's middle bone, the other fingers curled loosely under it. The same frame as the
+# fist (the thumb's side up +Y, the back of the right hand out +X, the knuckles ahead -Z); the socket is the pinch itself,
+# the held thing lying flat (in XZ) between the thumb and the finger
+POSES["pinch"] = dict(grip=None, axis=G(0, 1, 0), back=G(-1.0, 0.0, 0.0), thumb="pinch", forearm=G(-0.15, -0.5, 0.85), lean=0.0,
+                      eye=G(0.2, 0.12, 0.5),
+                      curls={"index": (0.92, 1.0, 0.55), "middle": (0.95, 1.02, 0.64), "ring": (0.86, 1.0, 0.66), "little": (0.94, 1.05, 0.72)})
 RELAXED_CURL = {"index": (0.30, 0.45, 0.25), "middle": (0.36, 0.52, 0.3), "ring": (0.44, 0.58, 0.34), "little": (0.54, 0.66, 0.4)}
 
 
@@ -224,7 +232,7 @@ def skeleton(pose):
     else:
         for (name, bones, s0, f0, r), spread in zip(FINGERS, (0.05, 0.0, -0.045, -0.1)):
             d = (Matrix.Rotation(spread, 3, hand.b) @ hand.f).normalized()
-            hand.fingers[name], hand.sides[name] = chain(hand, hand.P(f0, 0.0, s0), d, bones, RELAXED_CURL[name])
+            hand.fingers[name], hand.sides[name] = chain(hand, hand.P(f0, 0.0, s0), d, bones, P_.get("curls", RELAXED_CURL)[name])
             hand.rads[name] = [r * t for t in TAPER]
         gdir = hand.s
         Tc = hand.P(0.05, -0.024, -0.002)
@@ -256,13 +264,41 @@ def skeleton(pose):
         via0 = tb + hand.s * 0.026 + hand.f * 0.024 - hand.b * 0.016
         tip = cT - hand.f * (gr + 0.0115) + hand.b * 0.002
         via1 = via0.lerp(tip, 0.55) - hand.f * 0.006 - hand.b * 0.004
+    elif P_["thumb"] == "pinch":
+        # the pad of the thumb down on the side of the first finger's middle bone (the thing between them), the thumb's
+        # last joint flexed a little toward it (a pinch never bends the thumb back)
+        idx = hand.fingers["index"]
+        mid = idx[1].lerp(idx[2], 0.15)   # (by the middle knuckle, where a key grip meets it)
+        side_out = mid + hand.s * (hand.rads["index"][1] + gT)            # (the finger's thumb-side surface)
+        press = side_out + hand.s * (0.003 + gT + 0.0098)                 # (the thumb's tip, a 3 mm thing between)
+        # the metacarpal toward the pinch, a little outward; then the two bones solved to reach it, the joint between them
+        # bowed out (+s, the back of the thumb) so the thumb is flexed toward the pinch, never bent back
+        tb = tb + hand.f * 0.009 + hand.s * 0.003   # (the pinch: the thumb rolled forward at its root, as it is in a key grip)
+        reach = press - tb
+        print(f"[fp-arm] pinch: the pinch {reach.length * 1000:.1f} mm from the thumb's root (it reaches 100)")
+        d0 = (reach.normalized() + hand.s * 0.35 - hand.b * 0.05).normalized()
+        via0 = tb + d0 * 0.042
+        L1, L2 = 0.031, 0.027
+        to = press - via0
+        dist = min(to.length, L1 + L2 - 1e-4)
+        u = to.normalized()
+        pole = (hand.s + hand.b * 0.3)
+        pole = (pole - u * pole.dot(u)).normalized()
+        a = math.acos(max(-1.0, min(1.0, (L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist))))
+        via1 = via0 + u * (L1 * math.cos(a)) + pole * (L1 * math.sin(a))
+        tip = via1 + (via0 + u * dist - via1).normalized() * L2
     else:
         via0 = tb + hand.f * 0.026 + hand.s * 0.024 - hand.b * 0.014
         via1 = via0 + hand.f * 0.024 + hand.s * 0.006 - hand.b * 0.01
         tip = via1 + hand.f * 0.018 - hand.s * 0.002 - hand.b * 0.009
-    via0 = tb + (via0 - tb).normalized() * 0.042
-    via1 = via0 + (via1 - via0).normalized() * 0.031
-    tip = via1 + (tip - via1).normalized() * 0.027
+    if P_["thumb"] != "pinch":
+        via0 = tb + (via0 - tb).normalized() * 0.042
+        via1 = via0 + (via1 - via0).normalized() * 0.031
+        tip = via1 + (tip - via1).normalized() * 0.027
+    if P_["thumb"] == "pinch":
+        # the socket: the pinch as the thumb really closes it (half way between its pad and the finger's side)
+        Tc = (tip - hand.s * (gT + 0.0098) + side_out) * 0.5
+        print(f"[fp-arm] pinch: the thumb's pad {((tip - hand.s * (gT + 0.0098)) - side_out).length * 1000:.1f} mm from the finger's side")
     hand.thumb_r = [0.0135, 0.0118, 0.0109, 0.0098]
     # (2026-10-15d) for every round grip: no part of the thumb inside the handle. Each joint is pushed out from the grip's
     # axis (it runs on past the fist both ways) to lie on the handle's surface at most, the glove's thickness and the

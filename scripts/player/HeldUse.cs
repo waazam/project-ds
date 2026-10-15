@@ -53,7 +53,7 @@ public partial class HeldUse : HeldItem
 	{
 		_pivot = new Node3D { Name = "Pivot" };
 		AddChild(_pivot);
-		BuildFist(_pivot, Vector3.Zero, new Color(0.09f, 0.075f, 0.065f), new Color(0.07f, 0.075f, 0.07f));
+		Arm(PoseFor(_kind));
 		AddChild(new OmniLight3D { Name = "HandLight", LightColor = new Color(1f, 0.8f, 0.6f), LightEnergy = 0.35f, OmniRange = 0.6f, ShadowEnabled = false, LightCullMask = HeldLayer, Position = new Vector3(-0.1f, 0.1f, 0.1f) });
 		SetLayer(this);
 		if (_kind != ToolKind.None) Dress();
@@ -86,16 +86,104 @@ public partial class HeldUse : HeldItem
 		if (_pivot != null) Dress();
 	}
 
+	/// <summary>(2026-10-15, the owner: "make sure items are properly placed in the palm of the hands when needed and the thumb
+	/// is correct and not bent wrong") How the hand takes each thing: the flat small ones (keys, cards, the bookmark) pinched
+	/// between the thumb's pad and the side of the first finger, as a key is; the ones with no handle (the compass, the
+	/// station's three) carried on the open palm; the rest in the fist round their grip (the chalice round its stem).</summary>
+	private static HandPose PoseFor(ToolKind kind) => kind switch
+	{
+		ToolKind.Key or ToolKind.FontKey or ToolKind.PantryKey or ToolKind.DiningKey or ToolKind.Bookmark
+			or ToolKind.Keycard201 or ToolKind.Keycard202 or ToolKind.Keycard203 => HandPose.Pinch,
+		ToolKind.Compass or ToolKind.DeadEye or ToolKind.PaleHand or ToolKind.StairTread => HandPose.Cradle,
+		_ => HandPose.Stick,
+	};
+
+	/// <summary>Where each pinched thing is pinched, in its own model's frame (as it lies on its shelf, before its turn and
+	/// lift there), and which way its working end runs from there: its bow (or a card's, the bookmark's end) between the
+	/// thumb and the finger, the rest out ahead.</summary>
+	private static (Vector3 grip, Vector3 ahead) PinchOf(ToolKind kind) => kind switch
+	{
+		ToolKind.Key => (new Vector3(-0.047f, 0f, 0f), Vector3.Right),            // (the bow's near side, by the collar)
+		ToolKind.PantryKey => (new Vector3(-0.066f, 0f, 0.01f), Vector3.Right),   // (its bow, out of the envelope's fold)
+		ToolKind.FontKey => (new Vector3(0f, 0f, -0.088f), Vector3.Back),         // (the trefoil bow's near lobe)
+		ToolKind.DiningKey => (new Vector3(0f, 0f, -0.088f), Vector3.Back),
+		ToolKind.Bookmark => (new Vector3(0f, 0f, -0.068f), Vector3.Back),        // (the end away from its tassel)
+		_ => (new Vector3(-0.034f, 0f, 0f), Vector3.Right),                       // (a card, by one short end)
+	};
+
+	private HandPose _armPose;
+	private Basis _grip = Basis.Identity;
+
+	/// <summary>The hand in <paramref name="pose"/> (rebuilt only when that changes), its socket at the pivot.</summary>
+	private void Arm(HandPose pose)
+	{
+		var old = _pivot.GetNodeOrNull<Node3D>("Arm");
+		if (old != null && _armPose == pose) return;
+		if (old != null) { old.Name = "ArmGone"; old.QueueFree(); }
+		_armPose = pose;
+		if (BuildArm(_pivot, HandSide.Right, pose, Vector3.Zero) is { } arm) SetLayer(arm);
+		else if (_pivot.GetNodeOrNull("Hand") == null) BuildFist(_pivot, Vector3.Zero, new Color(0.09f, 0.075f, 0.065f), new Color(0.07f, 0.075f, 0.07f));
+		TrackHands();
+	}
+
 	/// <summary>The tool in the fist, held the way it's used.</summary>
 	private void Dress()
 	{
 		_tool?.QueueFree();
 		_flame = null; _flameMesh = null;
+		var pose = PoseFor(_kind);
+		Arm(pose);
+		_grip = Basis.Identity;
 		_tool = new Node3D { Name = "Tool" };
 		_pivot.AddChild(_tool);
 		var mesh = new Node3D { Name = "Mesh" };
 		_tool.AddChild(mesh);
 		ItemMeshes.Build(_kind, mesh);
+		if (mesh.GetChildCount() == 0)
+		{
+			// (the station's three aren't pickups' meshes: their own props, at a size for the palm)
+			switch (_kind)
+			{
+				case ToolKind.DeadEye: World.StationParts.StationProps.DeadEye(mesh, 0.04f); break;
+				case ToolKind.PaleHand: World.StationParts.StationProps.PaleHand(mesh); break;
+				case ToolKind.StairTread: World.StationParts.StationProps.StairTread(mesh); break;
+			}
+		}
+		if (pose == HandPose.Pinch)
+		{
+			// flat between the thumb and the finger, its working end ahead and a little in, toward the middle of the view;
+			// the thing's own shelf turn and lift (its model's transform) undone first
+			var shelf = mesh.GetChildCount() > 0 && mesh.GetChild(0) is Node3D m0 ? m0.Transform : Transform3D.Identity;
+			var (grip, ahead) = PinchOf(_kind);
+			float yaw = Mathf.Atan2(ahead.Z, ahead.X) + Mathf.Pi * 0.5f + 0.28f;   // (its +ahead to -Z, 16 degrees in)
+			var turn = new Basis(Vector3.Up, yaw);
+			mesh.Transform = new Transform3D(turn, -(turn * grip)) * shelf.AffineInverse();
+			// a card goes into the reader's upright slot: the hand turned over (palm down, the thumb in), the card upright
+			if (_motion == Motion.Swipe)
+				_grip = new Basis(new Vector3(0.15f, -0.5f, 0.85f).Normalized(), 1.25f);
+			SetLayer(_tool);
+			foreach (var n in _tool.FindChildren("*", "GeometryInstance3D", true, false))
+				((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+			return;
+		}
+		if (pose == HandPose.Cradle)
+		{
+			// on the open palm (its surface 6 mm over the socket), the bottom of the thing down on it
+			switch (_kind)
+			{
+				case ToolKind.Compass: mesh.Position = new Vector3(0f, 0.006f, 0.005f); break;
+				case ToolKind.DeadEye: mesh.Position = new Vector3(0f, 0.046f, 0f); break;
+				case ToolKind.PaleHand: mesh.Position = new Vector3(0f, 0.01f, 0.01f); break;
+				case ToolKind.StairTread:   // (the board along the forearm, balanced on the palm)
+					mesh.Position = new Vector3(0f, 0.029f, 0f);
+					mesh.Rotation = new Vector3(0f, Mathf.Pi * 0.5f, 0f);
+					break;
+			}
+			SetLayer(_tool);
+			foreach (var n in _tool.FindChildren("*", "GeometryInstance3D", true, false))
+				((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+			return;
+		}
 		// (each lies as it does on its shelf: turned here to how a hand holds it)
 		switch (_motion)
 		{
@@ -133,7 +221,8 @@ public partial class HeldUse : HeldItem
 				mesh.Position = new Vector3(0.04f, -0.035f, 0f);
 				break;
 			default:
-				_tool.Position = new Vector3(0.0f, 0.03f, -0.04f);
+				// the chalice by its stem, the knot in the middle of the fist (it stood on top of the fist by its foot)
+				_tool.Position = _kind == ToolKind.Chalice ? new Vector3(0f, -0.071f, 0f) : new Vector3(0.0f, 0.03f, -0.04f);
 				break;
 		}
 		SetLayer(_tool);
@@ -212,6 +301,6 @@ public partial class HeldUse : HeldItem
 				break;
 		}
 		Hold = Rest + off;
-		_pivot.Rotation = rot;
+		_pivot.Basis = Basis.FromEuler(rot) * _grip;
 	}
 }

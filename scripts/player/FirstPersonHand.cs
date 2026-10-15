@@ -33,6 +33,11 @@ public enum HandPose
 	/// <summary>(2026-10-14g) The open hand palm up, the fingers ahead and cupped a little: something broad carried on it (the
 	/// newel cap, under its plinth). The socket is the middle of the palm; up out of the palm is +Y.</summary>
 	Cradle,
+	/// <summary>(2026-10-15) The key pinch: a flat small thing (a key's bow, a card's end, a bookmark) held between the pad of
+	/// the thumb and the side of the first finger's middle bone, the other fingers curled loosely under it. The
+	/// <see cref="Fist"/>'s frame (the thumb up +Y, the back of the right hand out +X, the knuckles ahead -Z); the socket is
+	/// the pinch itself, the thing lying flat in XZ through it (made for one 3 mm thick).</summary>
+	Pinch,
 }
 
 /// <summary>
@@ -77,7 +82,7 @@ public partial class FirstPersonHand : Node3D
 	public Vector3 GripAxis => Pose switch
 	{
 		HandPose.Handle => Vector3.Right,
-		HandPose.Stick or HandPose.Fist or HandPose.Camera or HandPose.Wide or HandPose.Small => Vector3.Up,
+		HandPose.Stick or HandPose.Fist or HandPose.Camera or HandPose.Wide or HandPose.Small or HandPose.Pinch => Vector3.Up,
 		_ => Vector3.Right,
 	};
 
