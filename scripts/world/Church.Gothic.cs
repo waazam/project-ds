@@ -48,11 +48,17 @@ public partial class Church
 	/// <summary>A candle standing at <paramref name="at"/> (its foot), lit.
 	/// (2026-10-15, the props pass: turned, 8 sides, its top burnt down into a hollow round the wick and a lip of wax
 	/// run over at its foot; it was a six-sided stick with a flat top)</summary>
-	private void Candle(MeshKit wax, Vector3 at, float h, float r)
+	private void Candle(MeshKit wax, Vector3 at, float h, float r, bool lit = true)
 	{
 		TurnedKit.Lathe(wax, at, TurnedKit.P(0f, 0f, r * 1.12f, 0f, r * 1.08f, Mathf.Min(0.012f, h * 0.15f), r, Mathf.Min(0.02f, h * 0.25f), r * 0.96f, h - 0.006f,
 			r * 0.84f, h, r * 0.45f, h - 0.005f, 0f, h - 0.004f), 8, 40f);
-		_flames.Add(new Transform3D(Basis.Identity, at + Vector3.Up * (h + 0.025f)));
+		if (!lit) return;
+		// (2026-10-15, the repetition pass: each flame its own size and lean, from the candle's place; they were one bead,
+		// one size, all 259 of them)
+		float H(float k) => Mathf.PosMod(Mathf.Sin(at.X * 12.9898f + at.Z * 78.233f + at.Y * 37.719f + k) * 43758.5453f, 1f);
+		float sxz = 0.75f + 0.45f * H(1f), sy = 0.7f + 0.65f * H(2f);
+		var b = new Basis(Vector3.Up, H(3f) * Mathf.Tau) * new Basis(Vector3.Right, (H(4f) - 0.5f) * 0.2f) * Basis.FromScale(new Vector3(sxz, sy, sxz));
+		_flames.Add(new Transform3D(b, at + Vector3.Up * (h + 0.025f * sy)));
 	}
 
 	private void Warm(Vector3 at, float energy, float range, bool shadows = false)
@@ -123,11 +129,21 @@ public partial class Church
 		wax.Mat(Wax);
 		wax.Color = Colors.White;
 		var rng = new RandomNumberGenerator { Seed = 2177 };
+		// (2026-10-15, the repetition pass: every bay had the same rack under the same window, the same eight-a-tier rows
+		// burning. Now each bay its own: some racks full and burning, some sparse, one gone cold and burnt down to stubs, one
+		// bay with no rack at all (its marks on the floor); each rack a little along the bay, its candles out of line, gaps
+		// where some have burnt away, one lying where it fell)
+		var cold = new HashSet<(float, int)> { (-1f, 5), (1f, 1) };
+		var bare = new HashSet<(float, int)> { (-1f, 2) };
 		foreach (float s in new[] { -1f, 1f })
 			for (int b = 0; b < NaveBays; b++)
 			{
 				if (s > 0 && b == BrokenBay) continue;
-				float z = (b + 0.5f) * BayLen, x = s * (AisleOuter - 0.55f);
+				if (bare.Contains((s, b))) continue;
+				bool isCold = cold.Contains((s, b));
+				float sparse = isCold ? 0.35f : rng.Randf() < 0.4f ? rng.RandfRange(0.3f, 0.5f) : rng.RandfRange(0.08f, 0.2f);
+				float z = (b + 0.5f) * BayLen + rng.RandfRange(-0.6f, 0.6f), x = s * (AisleOuter - 0.55f);
+				int lit = 0;
 				// the rack: three stepped shelves on legs, the lowest nearest
 				for (int t = 0; t < 3; t++)
 				{
@@ -135,15 +151,26 @@ public partial class Church
 					BuildKit.Box(iron, new Vector3(xx, y, z), new Vector3(0.2f, 0.025f, 1.6f), 1f);
 					for (int c = 0; c < 8; c++)
 					{
-						if (rng.Randf() < 0.18f) continue;
-						Candle(wax, new Vector3(xx, y + 0.012f, z - 0.7f + c * 0.2f), rng.RandfRange(0.05f, 0.14f), 0.022f);
+						if (rng.Randf() < sparse) continue;
+						float h = isCold ? rng.RandfRange(0.02f, 0.06f) : rng.RandfRange(0.05f, 0.14f);
+						bool on = isCold ? rng.Randf() < 0.08f : rng.Randf() < 0.88f;
+						Candle(wax, new Vector3(xx + rng.RandfRange(-0.04f, 0.04f), y + 0.012f, z - 0.7f + c * 0.2f + rng.RandfRange(-0.04f, 0.04f)), h, 0.022f, on);
+						if (on) lit++;
 					}
+				}
+				// now and then one fallen off, lying on the floor under the rack
+				if (rng.Randf() < 0.35f)
+				{
+					float h = rng.RandfRange(0.06f, 0.13f), fz = z + rng.RandfRange(-0.6f, 0.6f);
+					var lie = new Transform3D(new Basis(Vector3.Up, rng.RandfRange(0f, Mathf.Tau)) * new Basis(Vector3.Forward, Mathf.Pi * 0.5f), new Vector3(x - s * rng.RandfRange(0.25f, 0.45f), 0.024f, fz));
+					TurnedKit.Lathe(wax, lie, TurnedKit.P(0f, -h * 0.5f, 0.023f, -h * 0.5f, 0.022f, h * 0.5f, 0.01f, h * 0.5f + 0.004f, 0f, h * 0.5f + 0.004f), 8);
 				}
 				foreach (float dz in new[] { -0.78f, 0.78f })
 					foreach (float dx in new[] { 0f, 0.32f })
 						iron.Beam(new Vector3(x + s * dx, 0, z + dz), new Vector3(x + s * dx, 1.2f, z + dz), 0.025f, 0.025f);
 				Collide(_stone, new Vector3(x + s * 0.16f, 0.6f, z), new Vector3(0.55f, 1.2f, 1.7f));
-				Warm(new Vector3(x - s * 0.35f, 1.3f, z), 1.1f, 8.5f);
+				// (its glow as bright as what's burning on it)
+				if (lit > 0) Warm(new Vector3(x - s * 0.35f, 1.3f, z), 1.1f * Mathf.Clamp(0.25f + lit / 18f, 0.25f, 1f), 8.5f);
 			}
 		iron.CommitTo(this, "VotiveRacks", true);
 		wax.CommitTo(this, "Votives", false);

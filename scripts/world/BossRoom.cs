@@ -363,26 +363,35 @@ public partial class BossRoom : Node3D
 				}
 			}
 			// cable bundles sagging between brackets, like the service tunnels in the references
+			// (2026-10-15, the repetition pass: brackets at uneven spacings, each cable its own slack and each span its own
+			// sag, a loose loop hanging here and there; every cable had sagged in the same arc every 2.4 m. Its own dice:
+			// the pit's are as they were)
 			foreach (float by in new[] { 3.6f, 7.9f, 11.6f })
 			{
+				var cr = new RandomNumberGenerator { Seed = (ulong)(18077 + w * 131 + (int)(by * 10f)) };
+				var stations = new List<float>();
+				for (float s = -len * 0.5f; s < len * 0.5f - 0.9f; s += cr.RandfRange(1.7f, 3.2f)) stations.Add(s);
+				stations.Add(len * 0.5f);
 				int n = _rng.RandiRange(7, 11);
 				for (int c = 0; c < n; c++)
 				{
-					float cy = by + (c % 4) * 0.045f, cd = 0.3f + (c / 4) * 0.05f;
-					for (float s = -len * 0.5f; s < len * 0.5f - 0.1f; s += 2.4f)
+					float cy = by + (c % 4) * 0.045f, cd = 0.3f + (c / 4) * 0.05f, slack = cr.RandfRange(0.75f, 1.35f);
+					for (int si = 0; si < stations.Count - 1; si++)
 					{
-						float e = Mathf.Min(s + 2.4f, len * 0.5f);
+						float s = stations[si], e = stations[si + 1];
+						float sag = 0.075f * (e - s) * slack * cr.RandfRange(0.7f, 1.3f);
+						if (cr.Randf() < 0.035f) sag += cr.RandfRange(0.25f, 0.6f);   // (come out of its ties: a loop hanging)
 						Vector3 prev = o + along * s + inw * cd + Vector3.Up * cy;
 						for (int q = 1; q <= 6; q++)
 						{
 							float u = q / 6f;
-							Vector3 p = o + along * Mathf.Lerp(s, e, u) + inw * cd + Vector3.Up * (cy - 0.18f * 4f * u * (1f - u) * (1f + 0.15f * (c % 3)));
+							Vector3 p = o + along * Mathf.Lerp(s, e, u) + inw * cd + Vector3.Up * (cy - sag * 4f * u * (1f - u));
 							cable.Cylinder(prev, p, 0.016f, 0.016f, 4, false);
 							prev = p;
 						}
 					}
 				}
-				for (float s = -len * 0.5f; s <= len * 0.5f; s += 2.4f)
+				foreach (float s in stations)
 					bracket.Cylinder(o + along * s + inw * 0.05f + Vector3.Up * (by - 0.05f), o + along * s + inw * 0.55f + Vector3.Up * (by - 0.05f), 0.012f, 0.012f, 4, false);
 			}
 			// gauges and small handwheels scattered over the front pipes
@@ -441,7 +450,10 @@ public partial class BossRoom : Node3D
 	/// <summary>A run of pipe along a wall from s0 to s1, flanged every few metres, bracketed back to the wall.</summary>
 	private void Run(MeshKit k, Vector3 centre, Vector3 along, float s0, float s1, float r, MeshKit bracket, Vector3 inward, int layer)
 	{
-		Vector3 a = centre + along * s0, b = centre + along * s1;
+		// (2026-10-15: each end cut back its own few millimetres to centimetres, so no two caps share a plane and flicker)
+		static float H(float x) => Mathf.PosMod(Mathf.Sin(x) * 43758.5453f, 1f);
+		float ea = 0.004f + 0.035f * H(centre.Y * 12.9898f + r * 78.233f + s0 * 3.1f), eb = 0.004f + 0.035f * H(centre.Y * 39.346f + r * 11.135f + s1 * 5.7f);
+		Vector3 a = centre + along * (s0 + ea), b = centre + along * (s1 - eb);
 		k.Cylinder(a, b, r, r, r > 0.15f ? 14 : 10, true);
 		_runs.Add((centre, along, s0, s1, r, k.CurrentMaterial, inward, layer));
 		for (float s = s0 + 1.5f; s < s1 - 0.5f; s += _rng.RandfRange(3f, 5f))

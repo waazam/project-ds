@@ -47,7 +47,8 @@ public partial class Library
 		root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.24f, 0.035f, 0.32f) }, Position = new Vector3(0, 0.0175f, 0), Rotation = new Vector3(0, 0.06f, 0), MaterialOverride = ledger });
 		root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.22f, 0.03f, 0.3f) }, Position = new Vector3(0.005f, 0.05f, 0.01f), Rotation = new Vector3(0, -0.08f, 0), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 0.12f, 0.1f), Roughness = 0.8f } });
 		// the journal: worn brown leather, a strap round it, its pages showing
-		var book = new Node3D { Name = "Book", Position = new Vector3(0, 0.075f, 0), Rotation = new Vector3(0, 0.12f, 0) };
+		// (2026-10-15: on the ledger, not 4 mm into it)
+		var book = new Node3D { Name = "Book", Position = new Vector3(0, 0.0795f, 0), Rotation = new Vector3(0, 0.12f, 0) };
 		root.AddChild(book);
 		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.15f, 0.028f, 0.21f) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.19f, 0.1f), Roughness = 0.55f, MetallicSpecular = 0.3f } });
 		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.14f, 0.022f, 0.2f) }, Position = new Vector3(0.006f, 0, 0), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.76f, 0.6f), Roughness = 0.9f } });

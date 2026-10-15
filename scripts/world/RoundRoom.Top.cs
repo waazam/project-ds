@@ -46,8 +46,14 @@ public partial class RoundRoom
 			Vector3 d0 = new(Mathf.Sin(a0), 0, Mathf.Cos(a0)), d1 = new(Mathf.Sin(a1), 0, Mathf.Cos(a1));
 			float r = TopR - 0.005f;
 			lk.Color = Colors.White * rng.RandfRange(0.8f, 1f);
+			// (2026-10-15: each face its own patch of the stone, shifted and now and then turned over; the faces either side
+			// of the arch showed the same cracks, mirrored)
+			float uo = i * 0.618f * 3.1f, vo = (i * 0.414f) % 1f * 2.3f;
+			bool flip = i % 3 == 1;
+			float ua = a0 * r + uo, ub = a1 * r + uo;
+			if (flip) (ua, ub) = (ub, ua);
 			lk.Quad(d0 * r + Vector3.Up * y0, d1 * r + Vector3.Up * y0, d1 * r + Vector3.Up * (y0 + TopH), d0 * r + Vector3.Up * (y0 + TopH), -dir,
-				new Vector2(a0 * r, TopH), new Vector2(a1 * r, TopH), new Vector2(a1 * r, 0), new Vector2(a0 * r, 0));
+				new Vector2(ua, TopH + vo), new Vector2(ub, TopH + vo), new Vector2(ub, vo), new Vector2(ua, vo));
 		}
 		lk.Tess = 0f;
 		// the stone cap over it all (it keeps the lamp's light in); the boards and joists hang under it

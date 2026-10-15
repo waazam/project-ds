@@ -294,9 +294,14 @@ public partial class RoundRoom : Node3D
 				TurnedKit.Lathe(k, plate, TurnedKit.P(0f, 0f, 0.055f, 0f, 0.055f, 0.008f, 0.04f, 0.016f, 0.02f, 0.022f, 0f, 0.024f), 10, 38f, 0.75f, 1f);
 				TurnedKit.Rod(k, TurnedKit.Curve(wall, wall - d * 0.16f + Vector3.Down * 0.02f, at + Vector3.Down * 0.03f, 8), 0.011f, 6, true);
 				TurnedKit.Lathe(k, at + Vector3.Down * 0.035f, TurnedKit.P(0f, 0f, 0.014f, 0f, 0.022f, 0.03f, 0.07f, 0.055f, 0.085f, 0.07f, 0.08f, 0.075f, 0.06f, 0.07f, 0.03f, 0.07f, 0.03f, 0.075f, 0f, 0.075f), 12);
-				TurnedKit.Lathe(wax, at + Vector3.Up * 0.04f, TurnedKit.P(0f, 0f, 0.026f, 0f, 0.025f, 0.172f, 0.021f, 0.18f, 0.01f, 0.176f, 0f, 0.177f), 8, 40f);
+				// (2026-10-15, the repetition pass: each candle burnt down its own way, a stub to nearly new, its wax its own
+				// shade; they were all one stick at one height)
+				float hh(float k) => Mathf.PosMod(Mathf.Sin((y * 7.1f + i) * 12.9898f + k * 78.233f) * 43758.5453f, 1f);
+				float ch = 0.172f * (0.38f + 0.72f * hh(1f)), cr = 0.026f * (0.85f + 0.3f * hh(2f));
+				wax.Color = Colors.White * (0.82f + 0.18f * hh(3f));
+				TurnedKit.Lathe(wax, at + Vector3.Up * 0.04f, TurnedKit.P(0f, 0f, cr, 0f, cr * 0.96f, ch, cr * 0.8f, ch + 0.008f, cr * 0.4f, ch + 0.004f, 0f, ch + 0.005f), 8, 40f, 1f, 1f, y + i);
 				// (unlit until the power comes back: then they light themselves)
-				var flame = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.018f, Height = 0.05f, RadialSegments = 6, Rings = 3 }, Position = at + Vector3.Up * 0.25f, MaterialOverride = flameMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+				var flame = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.018f, Height = 0.05f, RadialSegments = 6, Rings = 3 }, Position = at + Vector3.Up * (0.04f + ch + 0.035f), MaterialOverride = flameMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
 				AddChild(flame);
 				var light = new OmniLight3D { Position = at + Vector3.Up * 0.3f - d * 0.1f, LightColor = CandleColour, LightEnergy = energy, OmniRange = 7.5f, OmniAttenuation = 1.3f, ShadowEnabled = shadows };
 				AddChild(light);
@@ -354,11 +359,7 @@ public partial class RoundRoom : Node3D
 		k.Color = Colors.White;
 		void W(MeshKit kit, WebKit.Kind kind) => kit.Mat(BurnMat(WebKit.Pick(kind, wr)));
 		var anchors = new List<Vector3>();
-		for (int i = 0; i < 8; i++)
-		{
-			float a = Mathf.Tau * (i + 0.5f) / 8f;
-			anchors.Add(new Vector3(Mathf.Sin(a) * (DaisR - 0.12f), DaisTop + 1.05f, Mathf.Cos(a) * (DaisR - 0.12f)));
-		}
+		for (int i = 0; i < 8; i++) anchors.Add(PostTip(i));   // (each post's own top: they vary, 2026-10-15)
 		for (int i = 0; i < 8; i++)
 		{
 			Vector3 a = anchors[i], b = anchors[(i + 1) % 8];
@@ -394,11 +395,23 @@ public partial class RoundRoom : Node3D
 			W(f, i % 4 == 0 ? WebKit.Kind.Sheet : WebKit.Kind.Tangle);
 			FlatCard(f, new Vector3(Mathf.Sin(a) * r, 0.02f + (i % 5) * 0.003f, Mathf.Cos(a) * r), wr.RandfRange(2.0f, 3.2f), wr.RandfRange(0f, Mathf.Tau));
 		}
+		// (2026-10-15, the repetition pass) the six switches' angles: the banked and hanging cards keep off them (the same
+		// photographed web had hung over four of the six), and each switch gets its own scrap of web, or none
+		var switchAngles = new List<float>();
+		foreach (float c in new[] { Mathf.Pi * 0.5f, Mathf.Pi * 1.5f })
+			foreach (int slot in new[] { -1, 0, 1 }) switchAngles.Add(c - slot * Mathf.Pi * 0.25f);
+		bool NearSwitch(float a, float margin)
+		{
+			foreach (float sa in switchAngles) if (Mathf.Abs(Mathf.AngleDifference(a, sa)) < margin) return true;
+			return false;
+		}
 		// banked up where the floor meets the wall: a card leaning from the floor to the wall all the way round
 		for (int i = 0; i < 20; i++)
 		{
 			float a0 = Mathf.Tau * i / 20f + wr.RandfRange(-0.05f, 0.05f), a1 = a0 + Mathf.Tau / 20f * wr.RandfRange(1.1f, 1.5f);
 			float rin = Radius - wr.RandfRange(0.8f, 1.3f), h = wr.RandfRange(0.7f, 1.4f), rw = Radius - 0.08f;
+			// (under a switch: banked low, its top well under the plate's foot)
+			if (NearSwitch(a0, 0.12f) || NearSwitch(a1, 0.12f) || NearSwitch((a0 + a1) * 0.5f, 0.2f)) h = Mathf.Min(h, wr.RandfRange(0.32f, 0.62f));
 			Vector3 da = new(Mathf.Sin(a0), 0, Mathf.Cos(a0)), db = new(Mathf.Sin(a1), 0, Mathf.Cos(a1));
 			W(f, WebKit.Kind.Corner);
 			f.Card(da * rin + Vector3.Up * 0.03f, db * rin + Vector3.Up * 0.03f, db * rw + Vector3.Up * h, da * rw + Vector3.Up * h, -(da + db).Normalized(),
@@ -408,13 +421,43 @@ public partial class RoundRoom : Node3D
 		for (int i = 0; i < 12; i++)
 		{
 			float a = Mathf.Tau * (i + 0.5f) / 12f;
-			if (Mathf.Abs(Mathf.AngleDifference(a, Mathf.Pi)) < 0.6f || Mathf.Abs(Mathf.AngleDifference(a, Mathf.Pi * 0.5f)) < 0.55f || Mathf.Abs(Mathf.AngleDifference(a, -Mathf.Pi * 0.5f)) < 0.55f) continue;
+			if (Mathf.Abs(Mathf.AngleDifference(a, Mathf.Pi)) < 0.6f || NearSwitch(a, 0.3f)) continue;
 			Vector3 d = new(Mathf.Sin(a), 0, Mathf.Cos(a));
 			Vector3 side = d.Cross(Vector3.Up);
 			float w = wr.RandfRange(1.4f, 2.2f), y0 = wr.RandfRange(0.6f, 1.0f), y1 = y0 + wr.RandfRange(1.3f, 2.0f), rw = Radius - 0.07f;
 			W(f, i % 2 == 0 ? WebKit.Kind.Corner : WebKit.Kind.Sheet);
 			f.Card(d * rw - side * w * 0.5f + Vector3.Up * y0, d * rw + side * w * 0.5f + Vector3.Up * y0, d * rw + side * w * 0.5f + Vector3.Up * y1, d * rw - side * w * 0.5f + Vector3.Up * y1, -d,
 				new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+		}
+		// a scrap of web by each switch, each its own: which side of the plate, how high, how big, which way up and which
+		// web; one switch clean (the plate is 0.5 m across at 0.94-1.76 m: none of it over the plate or the lever's swing)
+		var webRng = new RandomNumberGenerator { Seed = 2027 };
+		int clean = webRng.RandiRange(0, switchAngles.Count - 1);
+		for (int i = 0; i < switchAngles.Count; i++)
+		{
+			if (i == clean) continue;
+			float sa = switchAngles[i];
+			Vector3 d = new(Mathf.Sin(sa), 0, Mathf.Cos(sa));
+			Vector3 side = d.Cross(Vector3.Up);
+			float rw = Radius - 0.06f - 0.004f * i;
+			int place = webRng.RandiRange(0, 2);
+			float sz = webRng.RandfRange(0.32f, 0.7f), sx = (webRng.Randf() < 0.5f ? -1f : 1f);
+			// 0: up by the plate's top corner; 1: down beside its foot, reaching the floor; 2: a strand-web from the plate's side out along the wall
+			Vector3 c0 = place switch
+			{
+				0 => d * rw + side * sx * (0.3f + sz * 0.4f) + Vector3.Up * (1.8f + sz * 0.45f),
+				1 => d * rw + side * sx * (0.32f + sz * 0.45f) + Vector3.Up * (sz * 0.55f + 0.05f),
+				_ => d * rw + side * sx * (0.36f + sz * 0.7f) + Vector3.Up * webRng.RandfRange(1.0f, 1.6f),
+			};
+			float w = place == 2 ? sz * 1.4f : sz, h = place == 2 ? sz * 0.6f : sz * 1.1f;
+			float spin = webRng.RandfRange(-0.3f, 0.3f);
+			Vector3 ax = side * Mathf.Cos(spin) + Vector3.Up * Mathf.Sin(spin), ay = Vector3.Up * Mathf.Cos(spin) - side * Mathf.Sin(spin);
+			// (not a corner web: its anchor lines run straight to the card's edge, a cut line on a flat wall)
+			W(f, new[] { WebKit.Kind.Orb, WebKit.Kind.Sheet, WebKit.Kind.Tangle }[webRng.RandiRange(0, 2)]);
+			bool fu = webRng.Randf() < 0.5f, fv = webRng.Randf() < 0.3f;
+			float u0 = fu ? 1f : 0f, u1 = 1f - u0, v0 = fv ? 0f : 1f, v1 = 1f - v0;
+			f.Card(c0 - ax * w * 0.5f - ay * h * 0.5f, c0 + ax * w * 0.5f - ay * h * 0.5f, c0 + ax * w * 0.5f + ay * h * 0.5f, c0 - ax * w * 0.5f + ay * h * 0.5f, -d,
+				new Vector2(u0, v0), new Vector2(u1, v0), new Vector2(u1, v1), new Vector2(u0, v1));
 		}
 		var floor = f.CommitTo(_floorWebs, "FloorWeb", false);
 		if (floor != null) floor.Layers = WebLayer;

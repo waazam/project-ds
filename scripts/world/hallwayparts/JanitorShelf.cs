@@ -73,7 +73,7 @@ public static class JanitorShelf
 
 	private static StandardMaterial3D Glass => _glass ??= Mark(new StandardMaterial3D
 	{
-		ResourceName = "closet_amber", AlbedoTexture = Grime(), AlbedoColor = new Color(0.3f, 0.14f, 0.05f), Roughness = 0.14f, MetallicSpecular = 0.5f,
+		ResourceName = "closet_amber", AlbedoTexture = Grime(), AlbedoColor = new Color(0.3f, 0.14f, 0.05f), Roughness = 0.42f, MetallicSpecular = 0.22f,   // (2026-10-15: filmed with dust; glossier, the foot's rim sparkled in single pixels)
 		VertexColorUseAsAlbedo = true, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
 	});
 
@@ -279,15 +279,12 @@ public static class JanitorShelf
 				};
 				var bodies = new[] { new Color(0.74f, 0.76f, 0.7f), new Color(0.32f, 0.5f, 0.38f), new Color(0.7f, 0.58f, 0.32f) };
 				s.BodyColor = bodies[rng.RandiRange(0, bodies.Length - 1)] * shade;
-				s.CapColor = rng.Randf() < 0.6f ? new Color(0.07f, 0.07f, 0.07f) : new Color(0.62f, 0.6f, 0.55f);
+				// (2026-10-15, the repetition pass: the heads in real trigger-sprayer colours, none of them pale; the light
+				// grey boxes read as white paper flags stuck up over the bottles)
+				var heads = new[] { new Color(0.06f, 0.06f, 0.06f), new Color(0.07f, 0.13f, 0.32f), new Color(0.36f, 0.08f, 0.05f), new Color(0.1f, 0.22f, 0.12f), new Color(0.24f, 0.23f, 0.21f) };
+				s.CapColor = heads[rng.RandiRange(0, heads.Length - 1)] * rng.RandfRange(0.85f, 1.1f);
 				Lathe(k, s);
-				// the trigger head: its body over the cap, the nozzle, the shroud down its front, the trigger
-				k.Mat(Plastic);
-				k.Color = s.CapColor;
-				k.Box(new Vector3(0f, 0.234f, -0.012f), new Vector3(0.026f, 0.026f, 0.062f), 1f);
-				k.Box(new Vector3(0f, 0.236f, -0.047f), new Vector3(0.014f, 0.014f, 0.012f), 1f);
-				k.Box(new Vector3(0f, 0.218f, -0.036f), new Vector3(0.02f, 0.03f, 0.01f), 1f, new Basis(Vector3.Right, 0.15f));
-				k.Box(new Vector3(0f, 0.2f, -0.038f), new Vector3(0.012f, 0.038f, 0.008f), 1f, new Basis(Vector3.Right, -0.35f));
+				SprayHead(k, s.CapColor, rng.Randf() < 0.3f ? new Color(0.5f, 0.45f, 0.36f) * 0.6f : s.CapColor * 0.8f);
 				break;
 			}
 			default:
@@ -308,6 +305,37 @@ public static class JanitorShelf
 			}
 		}
 		k.Xf = keepXf;
+	}
+
+	/// <summary>(2026-10-15) A trigger sprayer's head over its cap (front toward local -Z): a collar, the rounded body
+	/// tapering forward to its nozzle, the shroud down its front, and the trigger curled under it.</summary>
+	private static void SprayHead(MeshKit k, Color body, Color nozzle)
+	{
+		k.Mat(Plastic);
+		k.Color = body;
+		k.Cylinder(new Vector3(0f, 0.2205f, 0f), new Vector3(0f, 0.2275f, 0f), 0.0125f, 0.0108f, 12, true);
+		// the body: a rounded run from the back of the head to the nozzle, a little higher at the back
+		var prof = new (float z, float y, float r)[]
+		{
+			(0.021f, 0.2365f, 0.004f), (0.018f, 0.2365f, 0.0105f), (0.011f, 0.2362f, 0.0138f), (-0.006f, 0.2355f, 0.013f),
+			(-0.026f, 0.2348f, 0.0108f), (-0.039f, 0.2345f, 0.0094f), (-0.044f, 0.2345f, 0.0062f),
+		};
+		for (int i = 0; i < prof.Length - 1; i++)
+			k.Cylinder(new Vector3(0f, prof[i].y, prof[i].z), new Vector3(0f, prof[i + 1].y, prof[i + 1].z), prof[i].r, prof[i + 1].r, 10, i == 0 || i == prof.Length - 2);
+		// the shroud: a curved hood hanging from the front of the body, over the trigger's top
+		for (int i = 0; i < 3; i++)
+		{
+			float a = -0.55f + i * 0.55f;
+			var p = new Vector3(Mathf.Sin(a) * 0.0075f, 0.2205f, -0.031f - Mathf.Cos(a) * 0.0045f);
+			k.Box(p, new Vector3(0.0085f, 0.024f, 0.004f), 1f, new Basis(Vector3.Up, -a) * new Basis(Vector3.Right, 0.18f));
+		}
+		// the nozzle, its tip a different plastic now and then
+		k.Color = nozzle;
+		k.Cylinder(new Vector3(0f, 0.2345f, -0.043f), new Vector3(0f, 0.2345f, -0.0545f), 0.0068f, 0.006f, 8, true);
+		// the trigger: a curled finger under the shroud
+		k.Color = body * 0.9f;
+		var tr = new[] { new Vector3(0f, 0.2265f, -0.036f), new Vector3(0f, 0.214f, -0.0425f), new Vector3(0f, 0.202f, -0.041f), new Vector3(0f, 0.1955f, -0.0345f) };
+		for (int i = 0; i < tr.Length - 1; i++) k.Cylinder(tr[i], tr[i + 1], 0.0048f, 0.0042f, 6, i == tr.Length - 2);
 	}
 
 	private static StandardMaterial3D _proxy;
