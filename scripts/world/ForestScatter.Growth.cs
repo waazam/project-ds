@@ -163,13 +163,18 @@ public partial class ForestScatter
 		k.Mat(_moundCore ??= new StandardMaterial3D { ResourceName = "vine_core", AlbedoColor = new Color(0.05f, 0.08f, 0.035f), Roughness = 1f, VertexColorUseAsAlbedo = true });
 		k.Color = Colors.White;
 		var lumps = new System.Collections.Generic.List<(Vector3 c, Vector3 r)>();
-		for (int i = 0; i < 5; i++)
+		// (2026-10-15, the scan: "round green topiary balls") lopsided, not a dome: the lumps run off to one side and fall
+		// away (what's smothered leans), lower and flatter, one standing taller where a stem holds the ivy up
+		float leanA = rng.RandfRange(0, Mathf.Tau);
+		var lean = new Vector3(Mathf.Cos(leanA), 0, Mathf.Sin(leanA));
+		for (int i = 0; i < 6; i++)
 		{
-			float a = rng.RandfRange(0, Mathf.Tau), d = i == 0 ? 0f : rng.RandfRange(0.25f, 0.5f);
-			var c = new Vector3(Mathf.Cos(a) * size.X * d, size.Y * rng.RandfRange(0.3f, 0.5f) * (i == 0 ? 1.2f : 0.8f), Mathf.Sin(a) * size.Z * d);
-			var r = new Vector3(size.X, size.Y, size.Z) * rng.RandfRange(0.45f, 0.62f) * (i == 0 ? 1.15f : 0.85f);
+			float a = i == 0 ? 0f : leanA + rng.RandfRange(-1.4f, 1.4f) + (i % 3 == 0 ? Mathf.Pi : 0f), d = i == 0 ? 0f : rng.RandfRange(0.3f, 0.65f);
+			float hy = i == 1 ? rng.RandfRange(0.5f, 0.7f) : rng.RandfRange(0.18f, 0.38f) * (i == 0 ? 1.2f : 0.85f);
+			var c = new Vector3(Mathf.Cos(a) * size.X * d, size.Y * hy, Mathf.Sin(a) * size.Z * d) - lean * size.X * 0.12f;
+			var r = new Vector3(size.X, size.Y * (i == 1 ? 0.75f : 0.62f), size.Z) * rng.RandfRange(0.38f, 0.58f) * (i == 0 ? 1.1f : 0.85f);
 			lumps.Add((c, r));
-			k.Blob(c, r * 0.9f, seed * 7 + i, 0.25f, false, 0.6f, 0.6f);
+			k.Blob(c, r * 0.9f, seed * 7 + i, 0.32f, false, 0.6f, 0.6f);
 		}
 		// the shroud: ivy leaves over every lump's skin, turned out from it, hanging a little
 		var leafMat = BunkerParts.BunkerTextures.IvyMat;
@@ -195,10 +200,22 @@ public partial class ForestScatter
 			Vector3 top = b0 + t * sz;
 			int cell = rng.Randf() < 0.5f ? 0 : rng.Randf() < 0.6f ? 1 : rng.Randf() < 0.7f ? 3 : 2;
 			float u0 = (cell % 2) * 0.5f, v0 = (cell / 2) * 0.5f;
-			float l = rng.RandfRange(0.75f, 1.08f);
+			float l = rng.RandfRange(0.55f, 0.92f);   // (2026-10-15: darker, the shade of the woods; it glowed)
+			// a ragged hem: leaves thin out low on the sides, so the skirt isn't a clean line
+			if (at.Y < size.Y * 0.25f && rng.Randf() < 0.45f) continue;
 			k.Color = new Color(l, l * rng.RandfRange(0.95f, 1.08f), l * 0.9f);
 			k.Quad(b0 - side * hs, b0 + side * hs, top + side * hs + nrm * 0.03f, top - side * hs + nrm * 0.03f, nrm,
 				new Vector2(u0, v0 + 0.5f), new Vector2(u0 + 0.5f, v0 + 0.5f), new Vector2(u0 + 0.5f, v0), new Vector2(u0, v0));
+		}
+		// (2026-10-15) a few dead stems of whatever it smothered poking out of the top, breaking the outline
+		k.Mat(ProcTextures.BarkMat);
+		k.Color = new Color(0.42f, 0.38f, 0.33f);
+		for (int i = 0; i < 4; i++)
+		{
+			var (c, r) = lumps[rng.RandiRange(0, lumps.Count - 1)];
+			Vector3 b = c + Vector3.Up * r.Y * 0.6f;
+			var d = new Vector3(rng.RandfRange(-0.6f, 0.6f), 1f, rng.RandfRange(-0.6f, 0.6f)).Normalized();
+			k.Cylinder(b, b + d * rng.RandfRange(0.5f, 1.0f) * size.Y * 0.6f, 0.02f, 0.004f, 3, false, 2f);
 		}
 		return k.Commit();
 	}
@@ -325,7 +342,7 @@ public partial class ForestScatter
 				if (kind < 0.22f)
 				{
 					if (dT < 4.2f || dA < 3.6f || roll > 0.12f + 0.32f * edge * clump) continue;
-					string mesh = kind < 0.11f ? "vinemound_a" : "vinemound_b";
+					string mesh = kind < 0.075f ? "vinemound_a" : kind < 0.15f ? "vinemound_b" : "vinemound_c";
 					float s = rng.RandfRange(0.8f, 1.25f);
 					var basis = Basis.FromEuler(new Vector3(0, yaw, 0)).Scaled(new Vector3(s, s * rng.RandfRange(0.85f, 1.2f), s));
 					var pos = new Vector3(px, Mathf.Min(h, Mathf.Min(_terrain.HeightAt(px + 1f, pz), _terrain.HeightAt(px - 1f, pz))) - 0.1f, pz);

@@ -23,6 +23,14 @@ public partial class DetailSweep : Node
 
 	private static void Sweep(GeometryInstance3D g)
 	{
+		// (2026-10-15) a pickup, a loose thing that moves, a piece of furniture marked so: out of the stains' reach
+		// (DecalDresser.NoDecalLayer; the floor and wall stains stained what stood on them)
+		if (g.Layers == 1u)
+		{
+			Node a = g;
+			for (int i = 0; i < 6 && a != null; i++, a = a.GetParent())
+				if (a is Pickup or RigidBody3D || a.HasMeta("furniture")) { g.Layers = DecalDresser.NoDecalLayer; break; }
+		}
 		DetailKit.Kind? kind = null;
 		Node p = g;
 		for (int i = 0; i < 4 && p != null && kind == null; i++, p = p.GetParent()) kind = DetailKit.Classify(p.Name);

@@ -3,7 +3,8 @@
 // map, roughness, the detail grain, the vertex colour), and over it a world-space breakup so a big plane never reads as
 // one tiled print: broad mottling; on walls water streaks run down from the ceiling (and from wherever RoomShade marked
 // damp), a ragged tide line of rising damp at the foot; on ceilings ring-edged water stains; on floors dirt and the
-// rubbed-pale paths where feet went. All of it from one small noise texture, a few samples a pixel.
+// rubbed-pale paths where feet went. All of it from arithmetic value noise (no tile, no period) and a few turned taps of
+// one small noise texture, each face hashed to its own pattern.
 // RoomShade's bake feeds it: COLOR.rgb its occlusion, COLOR.a (1 - wet) on walls, (1 - wear) on floors, UV2 the height
 // above the floor and the depth under the ceiling (zero when not baked: those parts then fall back to plain mottling).
 // No tangents needed (MeshKit writes none): the normal map's frame comes from the projection, or from screen derivatives.
@@ -76,11 +77,25 @@ vec3 two_channel(vec4 t) {
 
 float nz(vec2 p) { return texture(grime_noise, p).r; }
 
+// (2026-10-15, the repetition pass: the 256 px noise sampled at world scale repeated on a fixed period, the streaks every
+// 0.476 m: a comb of identical drips along every wall.) Arithmetic value noise has no tile: the streaks, the tide, the
+// mottling and the stains are drawn from it, and from the texture only at turned, incommensurate scales, for grain.
+float h11(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
+float h21(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float vn(vec2 p) {
+	vec2 i = floor(p), f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float vn1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h11(i), h11(i + 1.0), f); }
+vec2 rot(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
+
 void fragment() {
 	vec3 w = tri_weights(tnrm);
 	vec3 c = albedo.rgb;
 	if (use_albedo_tex) c *= projection == 0 ? texture(albedo_tex, UV).rgb : tri_sample(albedo_tex, tpos, w).rgb;
-	if (use_detail) c *= projection == 0 ? texture(detail_tex, UV).rgb : tri_sample(detail_tex, tpos, w).rgb;
+	// the grain at its own scale and turn (at the albedo's it locked to its tiling: the same marks at every repeat)
+	if (use_detail) c *= projection == 0 ? texture(detail_tex, rot(UV, 0.52) * 1.37 + 0.31).rgb : tri_sample(detail_tex, tpos * 1.37 + vec3(0.31, 0.17, 0.53), w).rgb;
 	float r = roughness;
 	if (use_roughness_tex) r *= projection == 0 ? texture(roughness_tex, UV).r : tri_sample(roughness_tex, tpos, w).r;
 	vec4 vc = use_vertex_color ? COLOR : vec4(1.0);
@@ -93,31 +108,63 @@ void fragment() {
 	float is_ceil = smoothstep(0.6, 0.85, -n.y);
 	float along = abs(n.x) > abs(n.z) ? wpos.z : wpos.x;
 	vec2 sd = vec2(seed * 0.137, seed * 0.291);
-	vec2 plane = mix(wpos.xz, vec2(along, wpos.y), is_wall) + sd;
+	// each face its own pattern: a hash of its plane (the axis it faces, which way, how far along it), so two walls of one
+	// room, or the two sides of a corridor, never stain alike
+	vec3 an = abs(n);
+	float axis = an.x > an.z ? (an.x > an.y ? 1.0 : 2.0) : (an.z > an.y ? 3.0 : 2.0);
+	float face_d = dot(n, wpos);
+	float fs = h21(vec2(floor(face_d * 2.3 + 0.37) + axis * 17.0 + step(0.0, n.x + n.y + n.z) * 5.0, seed * 1.618 + 3.1));
+	vec2 plane = mix(wpos.xz, vec2(along, wpos.y), is_wall) + sd + fs * 23.0;
 	bool baked = UV2.x + UV2.y > 0.0005;
 	float up = UV2.x, down = UV2.y;
-	// broad mottling: patches a metre or three across, darker and lighter
-	float m = nz(plane * 0.07) * 0.6 + nz(plane * 0.29 + 0.37) * 0.4;
-	float g = mottle * smoothstep(0.38, 0.78, m);
+	// broad mottling: patches a metre or three across, darker and lighter (two value-noise octaves at odd turns and a
+	// slow texture tap: nothing lines up, nothing repeats)
+	float m = vn(rot(plane, 0.61) * 0.31) * 0.45 + vn(rot(plane, -0.93) * 0.83 + 11.0) * 0.3 + nz(rot(plane, 1.7) * 0.047 + fs) * 0.25;
+	float g = mottle * smoothstep(0.36, 0.72, m);
 	// walls: streaks down from the top (or from the damp), a tide line at the foot
 	float wet = (1.0 - vc.a) * is_wall;
-	float src = smoothstep(0.42, 0.72, nz(vec2(along * 0.09 + sd.x, 0.71)));
-	float runs = smoothstep(0.52, 0.68, nz(vec2(along * 2.1 + sd.y, wpos.y * 0.04)));
-	runs *= 0.6 + 0.4 * nz(vec2(along * 3.1, wpos.y * 0.2));
-	float from_top = baked ? exp(-down / max(streak_len, 0.1)) : 0.35;
-	float streak = streaks * runs * clamp(src * from_top + wet * 1.3, 0.0, 1.0) * is_wall;
-	float tide_top = 0.22 + 0.55 * nz(vec2(along * 0.19 + sd.x, 0.13)) + wet * 0.35;
+	float a = along + fs * 41.0 + sd.x;
+	// where along the wall the water got in: whole bays wet, whole bays dry
+	float src = smoothstep(0.32, 0.72, vn1(a * 0.21 + 3.7) * 0.6 + vn1(a * 0.077 + 9.1) * 0.4);
+	// the streaks: a chance of one in each cell of about 0.38 m (the cells themselves wandering), each with its own place,
+	// width, length and strength, its edges ragged and its line drifting as it runs down
+	float aw = a + (vn1(a * 0.43 + 1.3) - 0.5) * 0.5;
+	const float CW = 0.38;
+	float ci = floor(aw / CW);
+	float dens = mix(0.45, 0.9, src);
+	float cols = 0.0;
+	for (int k = -1; k <= 1; k++) {
+		float id = ci + float(k);
+		if (h11(id * 1.37 + fs * 91.3) < dens) {
+			float hB = h11(id * 2.11 + 17.3 + fs * 13.0), hC = h11(id * 0.73 + 41.9 + fs * 7.0), hD = h11(id * 5.3 + 2.0 + fs * 3.0);
+			float cx = (id + 0.12 + 0.76 * hB) * CW;
+			float wid = mix(0.035, 0.16, hC);
+			float dx = abs(aw - cx - (vn1(wpos.y * 1.1 + id * 7.1) - 0.5) * wid * 1.6);
+			float edge = wid * (0.6 + 0.8 * vn1(wpos.y * 5.0 + id * 3.3));
+			float prof = max(1.0 - smoothstep(edge * 0.25, edge, dx), (1.0 - smoothstep(0.0, edge * 1.8, dx)) * 0.4);
+			float len = max(streak_len * mix(0.35, 1.6, hD), 0.1);
+			float fall = baked ? exp(-down / len) : 0.35 * mix(0.5, 1.0, hD);
+			float str = mix(0.45, 1.0, h11(id * 3.9 + 8.0 + fs));
+			cols = max(cols, prof * str * clamp(fall * (0.6 + 0.4 * src) + wet * 1.3, 0.0, 1.0));
+		}
+	}
+	cols *= 0.65 + 0.35 * nz(rot(vec2(aw * 0.9, wpos.y * 0.23), 0.3) + fs);
+	float streak = streaks * cols * is_wall;
+	float tide_top = 0.22 + 0.55 * (vn1(a * 0.37 + 2.0) * 0.65 + vn1(a * 1.31 + 5.0) * 0.35) + wet * 0.35;
 	float below = baked ? smoothstep(tide_top + 0.015, tide_top - 0.06, up) : 0.0;
 	float line = baked ? 1.0 - smoothstep(0.0, 0.022, abs(up - tide_top)) : 0.0;
-	float tide_amt = tide * is_wall * (below * (0.35 + 0.3 * nz(vec2(along * 0.8, up * 2.0))) + line * 0.9) * (0.5 + 0.5 * src);
+	float tide_amt = tide * is_wall * (below * (0.35 + 0.3 * vn(vec2(a * 0.83, up * 2.3))) + line * 0.9) * (0.5 + 0.5 * src);
 	// ceilings: blotches with darker rims where water stood and dried
-	float cs = nz(wpos.xz * 0.21 + sd + 0.5);
-	float ceil_amt = ceiling_stains * is_ceil * (smoothstep(0.6, 0.66, cs) * 0.35 + (1.0 - smoothstep(0.0, 0.025, abs(cs - 0.62))) * 0.55);
+	float cs = nz(rot(wpos.xz, 0.7) * 0.137 + fs * 13.0 + sd + 0.5) * 0.5 + vn(rot(wpos.xz, -0.4) * 0.53 + fs * 31.0) * 0.5;
+	float ceil_amt = ceiling_stains * is_ceil * (smoothstep(0.58, 0.64, cs) * 0.35 + (1.0 - smoothstep(0.0, 0.022, abs(cs - 0.6))) * 0.55);
 	// floors: dirt in drifts, scuffs; worn paths rubbed pale and dull
-	float fd = smoothstep(0.45, 0.8, nz(wpos.xz * 0.55 + sd)) * (0.6 + 0.4 * nz(wpos.xz * 4.0));
+	float fd = smoothstep(0.36, 0.72, nz(rot(wpos.xz, 0.9) * 0.21 + fs * 5.0 + sd) * 0.5 + vn(rot(wpos.xz, -0.5) * 0.77 + fs * 9.0) * 0.5)
+		* (0.6 + 0.4 * nz(rot(wpos.xz, 2.1) * 2.3 + fs));
 	float worn = is_floor * (1.0 - vc.a) * wear;
 	float floor_amt = floor_dirt * is_floor * fd * (1.0 - worn * 0.6);
-	float amount = clamp((g + streak * 1.1 + tide_amt + ceil_amt + floor_amt * 0.5 + wet * 0.25) * grime, 0.0, 0.88);
+	// specks and flecks (they were baked into the detail grain, and tiled with it)
+	float spk = smoothstep(0.8, 0.94, vn(rot(plane, 1.1) * 29.0 + fs * 3.0)) * 0.2 * (1.0 - is_ceil * 0.5);
+	float amount = clamp((g + streak * 1.3 + tide_amt + ceil_amt + floor_amt * 0.5 + wet * 0.25 + spk) * grime, 0.0, 0.88);
 	float lum = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(c, vec3(lum), desaturate + amount * 0.3);
 	c *= mix(vec3(1.0), grime_tint, amount);

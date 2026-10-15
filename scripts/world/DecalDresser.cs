@@ -38,6 +38,21 @@ public partial class DecalDresser : Node3D
 
 	private static readonly Dictionary<string, (Texture2D albedo, Texture2D orm)> _tex = new();
 
+	/// <summary>(2026-10-15) The render layer of things a stain never lands on (furniture built as its own instance, the
+	/// pickups, anything that moves): every decal here leaves it out, with the player's hands and body.</summary>
+	public const uint NoDecalLayer = 1u << 12;
+	/// <summary>What the decals here project onto: everything but <see cref="NoDecalLayer"/>, the held item and the body.</summary>
+	public const uint DecalMask = 0xFFFFFu & ~(NoDecalLayer | Player.HeldItem.HeldLayer | Player.PlayerBody.BodyLayer);
+
+	/// <summary>Puts <paramref name="n"/>'s drawn parts (all of them under it) on <see cref="NoDecalLayer"/>: a piece of
+	/// furniture or a pickup the stains must stop at. Only those still on the default layer (the held item's, the
+	/// weather's, the webs' own layers are left be).</summary>
+	public static void Shield(Node n)
+	{
+		if (n is VisualInstance3D v && n is not Light3D && n is not Decal && v.Layers == 1u) v.Layers = NoDecalLayer;
+		foreach (var c in n.GetChildren()) Shield(c);
+	}
+
 	/// <summary>Dresses <paramref name="root"/>'s interior (its bounds: its own meshes', unless given). Safe to call
 	/// more than once: a root is dressed once.</summary>
 	public static void Dress(Node3D root, Theme theme, int seed, Aabb? bounds = null, System.Func<Vector3, bool> skipAt = null)
@@ -125,12 +140,55 @@ public partial class DecalDresser : Node3D
 	}
 
 	/// <summary>A static, fixed surface (not a door, a hatch, a moving thing, or a place left clean).</summary>
+	/// <remarks>(2026-10-15) Nor a piece of furniture: a body or shape marked "furniture" or built by the
+	/// <see cref="ClutterKit"/> ("Clutter_" shapes in the room's own body), or a pickup's.</remarks>
 	private bool Fixed(Godot.Collections.Dictionary hit)
 	{
 		if (hit["collider"].AsGodotObject() is not StaticBody3D body) return false;
 		string path = body.GetPath();
 		foreach (var w in new[] { "Door", "door", "Hatch", "Gate", "Leaf" }) if (path.Contains(w)) return false;
+		if (IsFurniture(body)) return false;
+		if (hit.TryGetValue("shape", out var si))
+		{
+			uint owner = body.ShapeFindOwner((int)si);
+			if (body.ShapeOwnerGetOwner(owner) is Node shape && (shape.Name.ToString().StartsWith("Clutter_") || shape.HasMeta("furniture"))) return false;
+		}
 		return true;
+	}
+
+	/// <summary>Whether <paramref name="n"/> or one of its parents (up to four) is marked furniture.</summary>
+	private static bool IsFurniture(Node n)
+	{
+		for (int i = 0; i < 5 && n != null; i++, n = n.GetParent())
+			if (n.HasMeta("furniture") || n is Pickup) return true;
+		return false;
+	}
+
+	/// <summary>(2026-10-15) A floor that is really a raised top (a table, a bench, a crate, a shelf: their tops took
+	/// "floor" puddles sized for the room): two or more of four probes 0.9 m round it find the ground well below.</summary>
+	private bool Raised(PhysicsDirectSpaceState3D space, Vector3 p)
+	{
+		int lower = 0;
+		foreach (var d in new[] { Vector3.Right, Vector3.Left, Vector3.Forward, Vector3.Back })
+		{
+			var q = p + d * 0.9f;
+			var h = Ray(space, q + Vector3.Up * 0.05f, q + Vector3.Down * 1.6f);
+			if (h.Count > 0 && ((Vector3)h["normal"]).Y > 0.6f && ((Vector3)h["position"]).Y < p.Y - 0.25f) lower++;
+		}
+		return lower >= 2;
+	}
+
+	/// <summary>(2026-10-15) Whether a wall struck at <paramref name="at"/> (from <paramref name="from"/>, along
+	/// <paramref name="dir"/>) runs on up: a ray the same way higher up meets it again about as far off. A wardrobe's or a
+	/// cabinet's front doesn't (the wall is behind it), and neither does a counter's side.</summary>
+	private bool WallGoesUp(PhysicsDirectSpaceState3D space, Vector3 from, Vector3 dir, Vector3 at, float ceiling)
+	{
+		float d0 = (at - from).Dot(dir);
+		float hy = Mathf.Min(ceiling - 0.25f, from.Y + 1.2f);
+		if (hy < from.Y + 0.4f) return true;
+		var hi = new Vector3(from.X, hy, from.Z);
+		var h = Ray(space, hi, hi + dir * (d0 + 0.6f));
+		return h.Count > 0 && ((Vector3)h["position"] - hi).Dot(dir) < d0 + 0.12f;
 	}
 
 	private void Column(PhysicsDirectSpaceState3D space, Vector2 xz)
@@ -164,7 +222,7 @@ public partial class DecalDresser : Node3D
 			}
 			if (ceiling - p.Y < 1.8f) { _why[4]++; continue; }   // (under a table, a stair: not a room's floor)
 			_why[5]++;
-			if (!stair && _rng.Randf() < set.Floor) FloorDecal(p, set);
+			if (!stair && _rng.Randf() < set.Floor && !Raised(space, p)) FloorDecal(p, set);
 			// the walls round it
 			float a0 = _rng.RandfRange(0f, Mathf.Tau);
 			for (int k = 0; k < 4; k++)
@@ -176,7 +234,7 @@ public partial class DecalDresser : Node3D
 				var w = Ray(space, from, from + dir * 1.3f);
 				if (w.Count == 0) continue;
 				Vector3 wn = (Vector3)w["normal"];
-				if (Mathf.Abs(wn.Y) > 0.25f || !Fixed(w)) continue;
+				if (Mathf.Abs(wn.Y) > 0.25f || !Fixed(w) || !WallGoesUp(space, from, dir, (Vector3)w["position"], ceiling)) continue;
 				WallDecal((Vector3)w["position"], wn.Normalized(), p.Y, ceiling, set);
 			}
 		}
@@ -234,7 +292,8 @@ public partial class DecalDresser : Node3D
 		float s = tex switch { "wine" => _rng.RandfRange(0.45f, 0.8f), "puddle" => _rng.RandfRange(0.9f, 2.0f), "blood" => _rng.RandfRange(0.8f, 1.4f), _ => _rng.RandfRange(0.6f, 1.4f) };
 		if (Crowded(p, tex, 2.2f)) return;
 		var basis = new Basis(Vector3.Up, _rng.RandfRange(0f, Mathf.Tau));
-		Add(tex, new Transform3D(basis, p + Vector3.Up * 0.05f), new Vector3(s, 0.3f, s * _rng.RandfRange(0.75f, 1.2f)));
+		// (2026-10-15) shallow, on the floor's face: it projected 0.3 m from 5 cm up, staining chair legs, crates and pickups
+		Add(tex, new Transform3D(basis, p + Vector3.Up * 0.01f), new Vector3(s, 0.1f, s * _rng.RandfRange(0.75f, 1.2f)));
 	}
 
 	private void WallDecal(Vector3 at, Vector3 n, float floorY, float ceilY, Set set)
@@ -259,7 +318,9 @@ public partial class DecalDresser : Node3D
 		Vector3 c = new(at.X, cy, at.Z);
 		// a little along the wall, so they don't all sit where the rays struck
 		c += x * _rng.RandfRange(-0.4f, 0.4f);
-		Add(tex, new Transform3D(basis, c + n * 0.04f), new Vector3(w, 0.25f, h));
+		// (2026-10-15) shallow, on the wall's face (it reached 0.25 m out from 4 cm off it), and now and then mirrored
+		if (_rng.Randf() < 0.5f) basis = new Basis(-basis.X, basis.Y, basis.Z);
+		Add(tex, new Transform3D(basis, c + n * 0.006f), new Vector3(w, 0.08f, h));
 	}
 
 	private void Add(string tex, Transform3D xf, Vector3 size)
@@ -280,6 +341,7 @@ public partial class DecalDresser : Node3D
 			DistanceFadeEnabled = true,
 			DistanceFadeBegin = 24f,
 			DistanceFadeLength = 8f,
+			CullMask = DecalMask,
 		};
 		Node3D parent = this;
 		if (_theme == Theme.Station && StationInterior.Instance is { } st && st.InLobby(xf.Origin))
@@ -301,7 +363,9 @@ public partial class DecalDresser : Node3D
 	/// ceiling on a wall; on a floor or ceiling turned by <paramref name="spin"/>). In <paramref name="parent"/>'s space.
 	/// It projects <paramref name="depth"/> deep, half each side of the surface: keep it shallow, or it stains the
 	/// things in front of the wall too.</summary>
-	public static Decal Place(Node3D parent, string tex, Vector3 at, Vector3 normal, Vector2 size, float alpha = 0.8f, float spin = 0f, float depth = 0.16f)
+	/// <remarks>(2026-10-15) <paramref name="mirror"/> flips it left for right (one texture a kind: mirrored, it isn't the
+	/// same mark twice). Every decal leaves out <see cref="NoDecalLayer"/>, the held item and the body.</remarks>
+	public static Decal Place(Node3D parent, string tex, Vector3 at, Vector3 normal, Vector2 size, float alpha = 0.8f, float spin = 0f, float depth = 0.16f, bool mirror = false)
 	{
 		var (albedo, orm) = Load(tex);
 		if (albedo == null || parent == null) return null;
@@ -321,6 +385,7 @@ public partial class DecalDresser : Node3D
 			if (z.Y > 0f) { z = -z; x = -x; }
 			basis = new Basis(x, y, z);
 		}
+		if (mirror) basis = new Basis(-basis.X, basis.Y, basis.Z);
 		var d = new Decal
 		{
 			Name = $"{tex}_{parent.GetChildCount()}",
@@ -334,6 +399,7 @@ public partial class DecalDresser : Node3D
 			DistanceFadeEnabled = true,
 			DistanceFadeBegin = 22f,
 			DistanceFadeLength = 8f,
+			CullMask = DecalMask,
 			Transform = new Transform3D(basis, at),
 		};
 		parent.AddChild(d);
@@ -360,6 +426,9 @@ public partial class DecalDresser : Node3D
 		public bool Painted = true;
 		/// <summary>Faces a decal may never land on: a wall (its inward normal) skipped entirely (a wall of shelves, glass).</summary>
 		public List<Vector3> SkipWalls = new();
+		/// <summary>(2026-10-15) What stands in the room (furniture's boxes, in the same space): no wall stain behind it, no
+		/// floor stain under it.</summary>
+		public List<Aabb> Furniture = new();
 	}
 
 	/// <summary>
@@ -395,7 +464,19 @@ public partial class DecalDresser : Node3D
 				if (Mathf.Abs((p - sill).Dot(n)) < 0.3f && Mathf.Abs(new Vector2(p.X - sill.X, p.Z - sill.Z).Length()) < w * 0.5f + r && p.Y > sill.Y - 0.05f && p.Y < sill.Y + wh) return false;
 			foreach (var (foot, n, w, dh) in spec.Doors)
 				if (Mathf.Abs((p - foot).Dot(n)) < 0.3f && new Vector2(p.X - foot.X, p.Z - foot.Z).Length() < w * 0.5f + r && p.Y < foot.Y + dh + r) return false;
+			// (2026-10-15) not behind or under what stands in the room
+			foreach (var f in spec.Furniture)
+				if (f.Grow(r * 0.6f + 0.15f).HasPoint(p)) return false;
 			return true;
+		}
+		// (2026-10-15, the repetition pass) one texture a kind: each one a little bigger or smaller, fainter or stronger, and
+		// mirrored half the time, so no two windows, doors or corners carry the same mark; shallow (0.08 m, half each side
+		// of the face: it stained what stood in front at the old 0.16)
+		Decal Put(string tex, Vector3 at, Vector3 n, Vector2 size, float alpha, float spin = 0f)
+		{
+			bool hangs = tex is "streak" or "seep" or "tide" or "soot";
+			float sx = rng.RandfRange(0.8f, 1.2f), sy = hangs ? 1f : sx * rng.RandfRange(0.9f, 1.1f);
+			return Place(root, tex, at, n, new Vector2(size.X * sx, size.Y * sy), Mathf.Min(1f, alpha * rng.RandfRange(0.82f, 1.08f)), spin, 0.08f, rng.Randf() < 0.5f);
 		}
 		void OnWall(string tex, float yCentre, Vector2 size, float alpha, float margin = 0.3f, int tries = 8)
 		{
@@ -408,7 +489,7 @@ public partial class DecalDresser : Node3D
 				Vector3 p = a.Lerp(b, rng.RandfRange((margin + size.X * 0.5f) / len, 1f - (margin + size.X * 0.5f) / len));
 				p.Y = yCentre;
 				if (!Clear(p, size.X * 0.5f)) continue;
-				Place(root, tex, p + n * lift, n, size, alpha);
+				Put(tex, p + n * lift, n, size, alpha);
 				return;
 			}
 		}
@@ -418,15 +499,15 @@ public partial class DecalDresser : Node3D
 		foreach (var (sill, n, w, wh) in spec.Windows)
 		{
 			float sh = Mathf.Max(0.4f, sill.Y - floorY);
-			Place(root, "streak", sill + n * lift + Vector3.Down * (sh * 0.5f), n, new Vector2(w * rng.RandfRange(0.8f, 1.2f), sh), 0.75f);
-			if (rng.Randf() < 0.7f) Place(root, "seep", sill + n * lift + Vector3.Down * (sh * 0.35f) + Vector3.Up.Cross(n).Normalized() * rng.RandfRange(-w * 0.3f, w * 0.3f), n, new Vector2(0.5f, sh * 0.7f), 0.7f);
+			if (rng.Randf() < 0.75f) Put("streak", sill + n * lift + Vector3.Down * (sh * 0.5f), n, new Vector2(w * rng.RandfRange(0.8f, 1.2f), sh), 0.75f);
+			if (rng.Randf() < 0.7f) Put("seep", sill + n * lift + Vector3.Down * (sh * 0.35f) + Vector3.Up.Cross(n).Normalized() * rng.RandfRange(-w * 0.3f, w * 0.3f), n, new Vector2(0.5f, sh * 0.7f), 0.7f);
 			// a crack from a corner of its head
 			if (rng.Randf() < 0.6f * amt)
 			{
 				Vector3 side = Vector3.Up.Cross(n).Normalized() * (rng.Randf() < 0.5f ? -1f : 1f);
 				Vector3 c = sill + side * (w * 0.5f + 0.2f);
 				c.Y = Mathf.Min(sill.Y + wh + 0.15f, ceilY - 0.4f);
-				Place(root, "crack", c + n * lift, n, new Vector2(0.45f, 0.7f), 0.85f);
+				Put("crack", c + n * lift, n, new Vector2(0.45f, 0.7f), 0.85f);
 			}
 		}
 		// by the doors: cracks off the head, scuffs low on the wall beside, scuffs on the floor in the way
@@ -437,11 +518,11 @@ public partial class DecalDresser : Node3D
 			{
 				float s = rng.Randf() < 0.5f ? -1f : 1f;
 				Vector3 c = foot + side * s * (w * 0.5f + 0.25f) + Vector3.Up * Mathf.Min(dh + 0.35f, h - 0.35f);
-				Place(root, "crack", c + n * lift, n, new Vector2(0.4f, 0.7f), 0.85f);
+				Put("crack", c + n * lift, n, new Vector2(0.4f, 0.7f), 0.85f);
 			}
 			foreach (float s in new[] { -1f, 1f })
-				if (rng.Randf() < 0.75f) Place(root, "scuff", foot + side * s * (w * 0.5f + rng.RandfRange(0.3f, 0.7f)) + Vector3.Up * rng.RandfRange(0.12f, 0.3f) + n * lift, n, new Vector2(rng.RandfRange(0.6f, 1.1f), 0.35f), 0.7f);
-			Place(root, "scuff", foot + n * rng.RandfRange(0.6f, 1.1f) + Vector3.Up * 0.02f, Vector3.Up, new Vector2(rng.RandfRange(0.9f, 1.4f), 0.7f), 0.55f, rng.RandfRange(0f, Mathf.Tau));
+				if (rng.Randf() < 0.75f) Put("scuff", foot + side * s * (w * 0.5f + rng.RandfRange(0.3f, 0.7f)) + Vector3.Up * rng.RandfRange(0.12f, 0.3f) + n * lift, n, new Vector2(rng.RandfRange(0.6f, 1.1f), 0.35f), 0.7f);
+			Put("scuff", foot + n * rng.RandfRange(0.6f, 1.1f) + Vector3.Up * lift, Vector3.Up, new Vector2(rng.RandfRange(0.9f, 1.4f), 0.7f), 0.55f, rng.RandfRange(0f, Mathf.Tau));
 		}
 		// soot up the wall over every flame within a metre of one
 		foreach (var f in spec.Flames)
@@ -457,7 +538,7 @@ public partial class DecalDresser : Node3D
 				float top = Mathf.Min(ceilY, f.Y + 1.8f);
 				Vector3 at = f - best.n * best.d + best.n * lift;
 				at.Y = (f.Y + top) * 0.5f + 0.1f;
-				Place(root, "soot", at, best.n, new Vector2(0.9f, top - f.Y), 0.7f);
+				Put("soot", at, best.n, new Vector2(0.9f, top - f.Y), 0.7f);
 			}
 		}
 		// mould in an upper corner or two
@@ -472,7 +553,7 @@ public partial class DecalDresser : Node3D
 			Vector3 along = (into - n * into.Dot(n)).Normalized();
 			float s = rng.RandfRange(0.5f, 0.9f);
 			Vector3 at = p + along * (s * 0.4f) + Vector3.Up * (h - s * 0.4f) + n * lift;
-			if (Clear(at, s * 0.5f)) Place(root, "mould", at, n, new Vector2(s, s), 0.8f);
+			if (Clear(at, s * 0.5f)) Put("mould", at, n, new Vector2(s, s), 0.8f);
 		}
 		// water risen at the walls' feet, here and there
 		for (int i = N(2f); i > 0; i--) { float th = rng.RandfRange(0.45f, 0.9f); OnWall("tide", floorY + th * 0.5f - 0.02f, new Vector2(rng.RandfRange(1.0f, 2.2f), th), 0.7f); }
@@ -490,14 +571,14 @@ public partial class DecalDresser : Node3D
 		{
 			float s = rng.RandfRange(0.8f, 1.6f);
 			var at = new Vector3(rng.RandfRange(lo.X + s * 0.5f, hi.X - s * 0.5f), ceilY - lift, rng.RandfRange(lo.Z + s * 0.5f, hi.Z - s * 0.5f));
-			Place(root, "ceiling", at, Vector3.Down, new Vector2(s, s * rng.RandfRange(0.8f, 1.2f)), 0.75f, rng.RandfRange(0f, Mathf.Tau));
+			Put("ceiling", at, Vector3.Down, new Vector2(s, s * rng.RandfRange(0.8f, 1.2f)), 0.75f, rng.RandfRange(0f, Mathf.Tau));
 		}
 		// a stain on the floor
 		for (int i = N(1.2f); i > 0; i--)
 		{
 			float s = rng.RandfRange(0.6f, 1.2f);
 			var at = new Vector3(rng.RandfRange(lo.X + 0.5f, hi.X - 0.5f), floorY + lift, rng.RandfRange(lo.Z + 0.5f, hi.Z - 0.5f));
-			if (Clear(at, s * 0.5f)) Place(root, "floor", at, Vector3.Up, new Vector2(s, s), 0.65f, rng.RandfRange(0f, Mathf.Tau));
+			if (Clear(at, s * 0.5f)) Put("floor", at, Vector3.Up, new Vector2(s, s), 0.65f, rng.RandfRange(0f, Mathf.Tau));
 		}
 		GD.Print($"[decals] {parent.Name}: {root.GetChildCount()} placed by rule");
 		return root;

@@ -76,25 +76,43 @@ public static class WebKit
 	public static MeshInstance3D Corner(Node3D parent, RandomNumberGenerator rng, Vector3 corner, Vector3 outA, Vector3 outB, float size, bool ceiling = true)
 	{
 		Vector3 a = outA.Normalized(), b = outB.Normalized();
-		Vector3 n = (a + b + (ceiling ? Vector3.Down * 0.8f : Vector3.Zero)).Normalized();
+		// (2026-10-15, the repetition pass) not always square across the angle: leaning to one wall or the other, more or
+		// less down from the ceiling, its card longer one way than the other and mirrored half the time
+		float lean = rng.RandfRange(-0.35f, 0.35f);
+		Vector3 n = (a * (1f + lean) + b * (1f - lean) + (ceiling ? Vector3.Down * rng.RandfRange(0.55f, 1.05f) : Vector3.Zero)).Normalized();
 		Vector3 at = corner + n * size * 0.28f;
 		var kind = rng.Randf() < 0.55f ? Kind.Corner : rng.Randf() < 0.5f ? Kind.Tangle : Kind.Orb;
-		return Card(parent, kind, rng, at, n, Vector2.One * size * rng.RandfRange(0.85f, 1.15f), rng.RandfRange(0f, Mathf.Tau), "CornerWeb");
+		float s = size * rng.RandfRange(0.8f, 1.15f), aspect = rng.RandfRange(0.75f, 1.3f);
+		var mi = Card(parent, kind, rng, at, n, new Vector2(s * aspect, s / aspect), rng.RandfRange(0f, Mathf.Tau), "CornerWeb");
+		if (rng.Randf() < 0.5f) mi.Transform = mi.Transform with { Basis = mi.Transform.Basis * Basis.FromScale(new Vector3(-1f, 1f, 1f)) };
+		return mi;
 	}
 
 	/// <summary>Webs in the corners of a box-shaped room (floor y0 to ceiling y1, x and z between the given
 	/// bounds): up in each top corner, and now and then one low down.</summary>
-	public static void DressRoom(Node3D parent, RandomNumberGenerator rng, float x0, float x1, float z0, float z1, float y0, float y1, float size = 1.1f, float chance = 0.8f)
+	/// <remarks>(2026-10-15) Never all four top corners (one at least is left bare, two now and then), each its own size;
+	/// none where a box in <paramref name="avoid"/> (furniture standing in the corner: a bookcase's crown, in the
+	/// parent's space) would put the web through it.</remarks>
+	public static void DressRoom(Node3D parent, RandomNumberGenerator rng, float x0, float x1, float z0, float z1, float y0, float y1, float size = 1.1f, float chance = 0.8f, IList<Aabb> avoid = null)
 	{
 		var corners = new[]
 		{
 			(new Vector3(x0, 0, z0), Vector3.Right, Vector3.Back), (new Vector3(x1, 0, z0), Vector3.Left, Vector3.Back),
 			(new Vector3(x0, 0, z1), Vector3.Right, Vector3.Forward), (new Vector3(x1, 0, z1), Vector3.Left, Vector3.Forward),
 		};
-		foreach (var (c, a, b) in corners)
+		int bare = rng.RandiRange(0, 3), bare2 = rng.Randf() < 0.35f ? rng.RandiRange(0, 3) : -1;
+		bool Blocked(Vector3 at, float s)
 		{
-			if (rng.Randf() < chance) Corner(parent, rng, c + Vector3.Up * y1, a, b, size, true);
-			if (rng.Randf() < chance * 0.3f) Corner(parent, rng, c + Vector3.Up * (y0 + 0.05f), a, b, size * 0.6f, false);
+			if (avoid == null) return false;
+			foreach (var box in avoid) if (box.Grow(s * 0.45f).HasPoint(at)) return true;
+			return false;
+		}
+		for (int i = 0; i < corners.Length; i++)
+		{
+			var (c, a, b) = corners[i];
+			float s = size * rng.RandfRange(0.7f, 1.2f);
+			if (i != bare && i != bare2 && rng.Randf() < chance && !Blocked(c + Vector3.Up * y1, s)) Corner(parent, rng, c + Vector3.Up * y1, a, b, s, true);
+			if (rng.Randf() < chance * 0.3f && !Blocked(c + Vector3.Up * (y0 + 0.05f), s * 0.6f)) Corner(parent, rng, c + Vector3.Up * (y0 + 0.05f), a, b, s * 0.6f, false);
 		}
 	}
 }
