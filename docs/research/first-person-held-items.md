@@ -89,6 +89,67 @@ pose gallery, `--stride`).
   - The crowbar is held by its straight end, just above the chisel; the gooseneck's claw is up at the far end, forward
     and down.
 
+### 2026-10-15: the grip pass (axe, hammer, knife, crowbar, walkie)
+The owner: the axe and hammer are "STILL not held right — look up references on how a human holds an axe in that
+position". The knife, the crowbar and the walkie weren't right either.
+
+**How real hands hold them (sourced).**
+- **Hammer:** grip near the end of the handle, not choked up near the head, for leverage and balance. Make a fist with
+  the thumb wrapped across the index and middle fingers, firm but not rigid
+  ([Bob Vila](https://www.bobvila.com/articles/978-how-to-use-a-hammer/),
+  [Bunnings](https://workshop.bunnings.com.au/t5/How-To/How-to-choose-and-use-a-claw-hammer/ba-p/229659)).
+  Choking up toward the head is only for starting a nail. A variant has the thumb and index finger toward the head
+  ([Apex](https://www.apexinds.com/blog/hammer-safety/)).
+- **Hatchet:** the swinging hand goes at the end of the handle, just above the knob
+  ([Crate Club](https://crateclub.com/blogs/loadout/how-to-use-a-hatchet-safely-a-comprehensive-guide-for-outdoor-enthusiasts),
+  [Tools Trunk](https://thetoolstrunk.com/how-to-use-a-hatchet/)). Carried one-handed, the same hand stays there, the
+  little finger against the swell of the knob.
+- **Knife, hammer grip:** the fingers wrap the handle's belly and the thumb presses against the forefinger, locking the
+  wrist. A variant lays the thumb along the spine
+  ([Recoil](https://www.recoilweb.com/knife-hands-avoid-these-common-grip-mistakes-to-sharpen-your-edge-weapon-skills-153220.html),
+  [Personal Defense Network](https://www.personaldefensenetwork.com/post/conventional-and-unconventional-knife-grips)).
+  The guard or bolster sits against the index finger, the edge opposes the little finger (down when the blade points
+  forward), and only the pommel shows below.
+- **Walkie (consumer FRS/GMRS):**
+  - Size: a Motorola Talkabout T55-series is 160 × 60 × 30 mm and a TLKR T5 is 140 × 55 × 30 mm
+    ([manual](https://www.manualsdir.com/manuals/116305/motorola-t5522.html),
+    [icecat](https://icecat.co.uk/p/vendorName/mpn/desc-1343018.html)).
+  - Use: held a couple of inches from the mouth to talk, the push-to-talk held down throughout
+    ([Outdoor Empire](https://outdoorempire.com/how-to-use-a-walkie-talkie),
+    [Hytera](https://www.hytera.com/en/blog/how-to-talk-on-a-walkie-talkie)).
+  - Hold (seen in photos): upright in the palm, the palm behind or beside the case, the fingers round it, a thumb or
+    finger on the side's push-to-talk, the speaker toward the face and the antenna up.
+- **Crowbar:** no source describes a carry; product pages only describe the parts (a flattened chisel end, a gooseneck
+  with a claw). Seen: held one-handed near the straight end like a long hammer, the hook up top.
+- **First-person games (seen, not sourced).** No page describing the viewmodels could be found (the searches turned up
+  store pages only), so these are from memory of The Long Dark, Sons of the Forest, The Forest, Dying Light, Green Hell,
+  RE7/8 and Half-Life:
+  - Axes and hatchets are carried low right in a hammer grip, the hand near the butt, the head up and forward. The
+    blade points away into the scene; the poll and the top of the head face the eye, never the cheek turned side-on.
+  - Knives point forward and up out of the fist, the edge down.
+  - Radios are held up and close, the face toward the eye.
+
+**What ours did, against that (before → after).**
+| | Before | After |
+|---|---|---|
+| Axe, hammer: head | Yawed 30–35° in: the bit's cheek and the hammer's side faced the middle of the screen | Yaw 8°: the bit and the face point forward; the eye sees the poll and the top of the head |
+| Axe, hammer, bar: fist | At or under the bottom edge, only the top knuckles showing | Raised about 4 cm into the lower right, the knuckles and fingers round the handle in view; the same place for all three |
+| Axe, hammer: grip height | Little finger at the knob / butt flare, only the knob below | Unchanged (it was right: knob centre 5 cm below the socket, the fist ±4.5 cm) |
+| Handle angle | 30° forward, no roll | 30° forward (the Fist forearm's own lean, so only the wrist cocks) and rolled 10° in toward the middle, as a relaxed wrist holds it |
+| Hand | Back of the hand out to the right, palm in, thumb over the index and middle fingers (the `Fist` pose) | Unchanged, now visible |
+| Crowbar | Yawed 30° in: the gooseneck curled toward the middle | Yaw 0°: the hook up top, curling forward and down; fist on the tape, only the chisel below |
+| Knife | Guard 2.5 cm above the index finger; 40° forward | Guard against the index finger; 45° forward, edge down. 55° was tried: it swung the forearm and cuff up into the view |
+| Walkie | In the round-handle `Fist` by its bottom 6 cm, the case standing on the fist, the fingers through the 6 × 3.4 cm case | In the palm by its side (the `Camera` pose's box hold): the fingers round its back and clip, the thumb up the front edge, the lower half in the hand, the grille clear; a little higher and nearer (0.2, −0.19, −0.38) |
+
+- **Walkie model:** 6 × 3.4 × 15.2 cm with a 12 cm antenna. It matches a Talkabout (6 × 3 × 16) and is unchanged. Its
+  push-to-talk is on the left side, where a right hand's fingertips would reach round to it.
+- **Placement across the set:**
+  - The axe, hammer and bar fists sit at (0.235–0.24, −0.225 to −0.235, −0.41 to −0.42), all at 30° forward lean.
+  - The knife is 1–2 cm higher, its shorter blade leaning further forward.
+  - The walkie is higher and nearer still, as a radio is held up to be heard.
+- **Checked** from the eye (`--grips` and the look-book, day and dark, ahead, up and down, walking) and square on
+  (`--hands-studio`).
+
 ## Lighter and matches
 - **Seen** (The Long Dark, Amnesia, RE7):
   - One hand, held close (30–40 cm from the eye) and fairly high, so the flame sits at about 55–65% down the screen.
