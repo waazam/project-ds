@@ -90,6 +90,7 @@ public partial class Sewer : Node3D
 		BuildRoom();
 		BuildPlatform();
 		BuildWater();
+		BuildOutflows();
 		BuildDebris();
 		BuildLights();
 		BuildHole();
@@ -425,9 +426,11 @@ public partial class Sewer : Node3D
 		_waterMat.SetShaderParameter("drain", new Vector2(9999f, 9999f));
 		_waterMat.SetShaderParameter("water_color", new Color(0.13f, 0.14f, 0.13f));
 		_waterMat.SetShaderParameter("scum_color", new Color(0.3f, 0.3f, 0.27f));
+		// (the gushy-water pass, 2026-10-15) it runs on down the pipe toward the cistern, murky, rippling (Sewer.Flow.cs)
+		_waterMat.SetShaderParameter("flow", new Vector2(0f, 0.32f));
 		AddChild(new MeshInstance3D
 		{
-			Name = "TunnelWater", Mesh = new PlaneMesh { Size = new Vector2(2.5f, TunnelLen - 2.3f), SubdivideDepth = 20 }, Position = new Vector3(0, Water, 2.3f + (TunnelLen - 2.3f) * 0.5f),
+			Name = "TunnelWater", Mesh = new PlaneMesh { Size = new Vector2(2.5f, TunnelLen - 2.3f), SubdivideWidth = 3, SubdivideDepth = 160 }, Position = new Vector3(0, Water, 2.3f + (TunnelLen - 2.3f) * 0.5f),
 			MaterialOverride = _waterMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
 		int n = 0;

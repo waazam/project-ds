@@ -56,7 +56,8 @@ public partial class StationRoom2 : Node3D
 	private Node3D _table, _stairs, _windowPane, _shards;
 	private Entities.WindowTentacle _tentacle;
 	private Interactable _boxUse;
-	private MeshInstance3D _water, _torrent;
+	private MeshInstance3D _water;
+	private Node3D _torrent;
 	private ShaderMaterial _waterMat, _torrentMat;
 	private StandardMaterial3D _wallMat;
 	private AudioStreamPlayer3D _rush;
@@ -231,23 +232,9 @@ public partial class StationRoom2 : Node3D
 			shard.SetMeta("rest", new Vector3(_rng.RandfRange(-2.4f, 1.8f), 0.02f, _rng.RandfRange(-Half + 0.5f, 1.2f)));
 		}
 		// the torrent (hidden until then)
-		_torrentMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/torrent.gdshader") };
-		_torrentMat.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
-		var tk = new MeshKit();
-		tk.Mat(_torrentMat);
-		tk.Color = Colors.White;
-		// a sheet out over the sill and curving down onto the floor
-		Vector3 prevL = new(cx - 0.75f, 1.02f, -Half + 0.05f), prevR = new(cx + 0.75f, 1.02f, -Half + 0.05f);
-		for (int i = 1; i <= 8; i++)
-		{
-			float t = i / 8f;
-			float z = -Half + 0.05f + t * 1.4f, y = Mathf.Lerp(1.02f, 0f, t * t);
-			Vector3 l = new(cx - 0.75f - t * 0.2f, y, z), r = new(cx + 0.75f + t * 0.2f, y, z);
-			tk.Quad(prevL, prevR, r, l, Vector3.Back, new Vector2(0, (i - 1) / 8f), new Vector2(1, (i - 1) / 8f), new Vector2(1, t), new Vector2(0, t));
-			prevL = l; prevR = r;
-		}
-		_torrent = tk.CommitTo(this, "Torrent", false);
-		_torrent.Visible = false;
+		// (the gushy-water pass, 2026-10-15: was a flat sheet with streaks; now FlowFx's pour, its own file Room2.Pour)
+		_torrentMat = FlowFx.PourMat(FlowFx.Liquid.Lake, speed: 3.2f, strands: 7f, wobble: 0.07f, aerateLen: 1.2f);
+		BuildTorrent(cx);
 		BuildCurtains(cx);
 		// what breaks it (the owner): a limb of the thing in the lake, waiting outside, hidden behind the wall
 		_tentacle = new Entities.WindowTentacle { Name = "WindowTentacle", ReachMetres = 3.2f };
@@ -425,6 +412,7 @@ public partial class StationRoom2 : Node3D
 			}
 		}
 		if (Flooding && !_winning) Flood(dt);
+		TorrentTick();
 		MoveDrapes(dt);
 		// the scavenger staircase: only ever appears (or goes) while the player isn't in here to see it
 		if (s != null && Solved && !_stepSequence)
@@ -494,6 +482,7 @@ public partial class StationRoom2 : Node3D
 		_torrent.Visible = true;
 		_torrentMat.SetShaderParameter("tint", Lake);
 		_torrentMat.SetShaderParameter("flow", 1f);
+		TorrentViscous(0f, Lake);
 		_billowTarget = 1f;
 		_rush = Loop("res://assets/audio/ambient/water_torrent_loop.wav", ToGlobal(new Vector3(-0.4f, 0.6f, -Half + 0.8f)), -2f);
 		LakeParts.LakeFx.Splash(Cutscene.SceneRoot(this), ToGlobal(new Vector3(-0.4f, 0.3f, -Half + 1.3f)), 3f, 40, Vector3.Back);
@@ -551,6 +540,7 @@ public partial class StationRoom2 : Node3D
 				_waterMat.SetShaderParameter("water_color", c);
 				_waterMat.SetShaderParameter("scum_color", c.Lerp(new Color(0.5f, 0.06f, 0.05f), 0.5f));
 				_torrentMat.SetShaderParameter("tint", c);
+				TorrentViscous(u, c);
 			}), 0f, 1f, 3f);
 			GD.Print("[story] Act 13, room 2: the water turns to blood");
 		}
@@ -575,7 +565,7 @@ public partial class StationRoom2 : Node3D
 		_waterMat.SetShaderParameter("water_color", Lake);
 		_water = new MeshInstance3D
 		{
-			Name = "Flood", Mesh = new PlaneMesh { Size = new Vector2(Half * 2f - 0.1f, Half * 2f - 0.1f), SubdivideWidth = 4, SubdivideDepth = 4 },
+			Name = "Flood", Mesh = new PlaneMesh { Size = new Vector2(Half * 2f - 0.1f, Half * 2f - 0.1f), SubdivideWidth = 24, SubdivideDepth = 24 },
 			MaterialOverride = _waterMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false,
 		};
 		AddChild(_water);

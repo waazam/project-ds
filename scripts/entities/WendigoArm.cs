@@ -155,8 +155,9 @@ public partial class WendigoArm : Node3D
 		_drip = new GpuParticles3D
 		{
 			Name = "Drip", Amount = 6 + (int)(Bloodiness * 18), Lifetime = 0.8f, LocalCoords = false, Emitting = false,
-			ProcessMaterial = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.05f, Gravity = new Vector3(0, -7f, 0), ScaleMin = 0.6f, ScaleMax = 1.2f },
-			DrawPass1 = new SphereMesh { Radius = 0.008f, Height = 0.016f, RadialSegments = 4, Rings = 2, Material = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 0.02f, 0.02f), Roughness = 0.1f, MetallicSpecular = 0.8f } },
+			// (the gushy-water pass, 2026-10-15: drops that stretch as they let go, not beads)
+			ProcessMaterial = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.05f, Gravity = new Vector3(0, -7f, 0), ScaleMin = 0.6f, ScaleMax = 1.2f, ParticleFlagAlignY = true, ScaleCurve = World.FlowFx.StretchCurve() },
+			DrawPass1 = World.FlowFx.DropQuad(World.FlowFx.Liquid.Blood, new Vector2(0.016f, 0.05f)),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
 		_fore.AddChild(_drip);

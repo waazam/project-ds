@@ -718,45 +718,64 @@ public partial class ForestTerrain : Node3D
 		}
 	}
 
+	/// <summary>(the gushy-water pass, 2026-10-15) The creek's water: a ribbon nine vertices across and one row every 0.75 m
+	/// down it (so its surface can heave; it was two across, a row every 1.5 m), UV.x across (0..1), UV.y metres down it, and
+	/// in the vertex colour's red how steep the bed runs there (the shader runs it faster and whiter on the steep).
+	/// <c>stream_water.gdshader</c>.</summary>
 	private void BuildWater()
 	{
 		if (_stream.Points.Count < 2) return;
-		var verts = new List<Vector3>(); var uvs = new List<Vector2>(); var norms = new List<Vector3>(); var idx = new List<int>();
-		float half = 1.85f;
+		var verts = new List<Vector3>(); var uvs = new List<Vector2>(); var norms = new List<Vector3>(); var cols = new List<Color>(); var idx = new List<int>();
+		const float half = 1.85f, step = 0.75f;
+		const int across = 8;
 		int rows = 0;
-		for (float s = 0; s <= _stream.Length + 0.01f; s += 1.5f, rows++)
+		for (float s = 0; s <= _stream.Length + 0.01f; s += step, rows++)
 		{
 			Vector2 p = _stream.At(s, out Vector2 t);
 			Vector2 nrm = new(-t.Y, t.X);
 			float y = Bed(s) + 0.3f;
-			for (int side = 0; side < 2; side++)
+			float steep = Mathf.Clamp((Bed(s - 1.5f) - Bed(s + 1.5f)) / 3f * 2.5f, 0f, 1f);
+			for (int k = 0; k <= across; k++)
 			{
-				Vector2 q = p + nrm * (side == 0 ? -half : half);
+				float u = k / (float)across;
+				Vector2 q = p + nrm * Mathf.Lerp(-half, half, u);
 				verts.Add(new Vector3(q.X, y, q.Y));
 				norms.Add(Vector3.Up);
-				uvs.Add(new Vector2(side, s / (half * 2f)));
+				uvs.Add(new Vector2(u, s));
+				cols.Add(new Color(steep, s / Mathf.Max(1f, _stream.Length), 0f));
 			}
 		}
+		const int w = across + 1;
 		for (int r = 0; r < rows - 1; r++)
-		{
-			int a = r * 2, b = a + 1, c = a + 2, d = a + 3;
-			// wind so +Y is the front face
-			AddUpTri(verts, idx, a, b, d);
-			AddUpTri(verts, idx, a, d, c);
-		}
+			for (int k = 0; k < across; k++)
+			{
+				int a = r * w + k, b = a + 1, c = a + w, d = c + 1;
+				// wind so +Y is the front face
+				AddUpTri(verts, idx, a, b, d);
+				AddUpTri(verts, idx, a, d, c);
+			}
 		var arr = new Godot.Collections.Array();
 		arr.Resize((int)Mesh.ArrayType.Max);
 		arr[(int)Mesh.ArrayType.Vertex] = verts.ToArray();
 		arr[(int)Mesh.ArrayType.Normal] = norms.ToArray();
 		arr[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+		arr[(int)Mesh.ArrayType.Color] = cols.ToArray();
 		arr[(int)Mesh.ArrayType.Index] = idx.ToArray();
 		var mesh = new ArrayMesh();
 		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arr);
-		var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/terrain_water.gdshader") };
-		mat.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
-		mesh.SurfaceSetMaterial(0, mat);
+		_waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/stream_water.gdshader") };
+		_waterMat.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
+		_waterMat.SetShaderParameter("width", half * 2f);
+		mesh.SurfaceSetMaterial(0, _waterMat);
 		AddChild(new MeshInstance3D { Name = "Water", Mesh = mesh, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+		// the pours, churns and drips events make later (the gushy-water pass): drawn once in the load's warm-up
+		if (!Engine.IsEditorHint()) FlowFx.Prewarm(this);
 	}
+
+	private ShaderMaterial _waterMat;
+
+	/// <summary>How much of the creek runs red (0..1): Act 6's blood rain draining into it.</summary>
+	public void SetStreamBlood(float v) => _waterMat?.SetShaderParameter("blood", Mathf.Clamp(v, 0f, 1f));
 
 	private static void AddUpTri(List<Vector3> v, List<int> idx, int a, int b, int c)
 	{
