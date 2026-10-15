@@ -101,9 +101,11 @@ public partial class StationRoom2 : Node3D
 		var body = new StaticBody3D { Name = "Walls", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "stone");
 		AddChild(body);
+		// (2026-10-14h, the station pass, with the interiors kit: the red paper muted to an old oxblood at real paper's scale
+		// and weathered; the room drawn finely for its bake, dark in its corners and seams, the bulb's light a pool)
 		_wallMat = StationTextures.RedWallpaperMat;
-		var k = new MeshKit();
-		k.Mat(_wallMat);
+		var k = new MeshKit { Tess = 0.6f };
+		k.Mat(RoomSurface.Of(_wallMat, RoomSurface.Paper with { Streaks = 0.7f, Tide = 0.6f, Desaturate = 0.25f }, 151));
 		k.Color = Colors.White;
 		// the wall shared with the lobby: a thin skin just inside the lobby's own wall (never in the same
 		// plane, or the two wallpapers fight), no collision of its own (the lobby's wall has it)
@@ -117,24 +119,56 @@ public partial class StationRoom2 : Node3D
 		k.Box(new Vector3((wx0 + wx1) * 0.5f, (wy1 + Height) * 0.5f, -Half), new Vector3(wx1 - wx0, Height - wy1, 0.14f), 1.1f);
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, Height * 0.5f, -Half), Shape = new BoxShape3D { Size = new Vector3(Half * 2f, Height, 0.14f) } });
 		StationKit.WallAlongZ(k, body, -Half, -Half, Half, Height, 0, null, trimSide: 1);
+		float ix1 = Half - 0.095f, ix0 = -Half + 0.07f, iz = Half - 0.07f;
+		var bulbAt = new Vector3(0, Height - 0.7f, 0);
+		var shade = new RoomShade(ix0, ix1, -iz, iz, 0f, Height) { Dim = 0.72f, Reach = 1.3f };
+		shade.Light(bulbAt, 4f).Under(Vector3.Zero, new Vector3(1.2f, 0.9f, 0.7f), 0.45f, 0.45f)
+			.Under(new Vector3(-0.4f, 0, -iz + 0.1f), new Vector3(1.1f, 0.65f, 0.2f), 0.4f, 0.35f)
+			.Damp(new Vector3(-0.4f, 1.0f, -iz), 1.6f, 0.9f).Damp(new Vector3(ix0, Height, iz), 1.4f, 0.6f)
+			.Path(new Vector3(ix1, 0, 0), new Vector3(0.6f, 0, 0), 0.9f, 0.6f);
+		// a cast-iron radiator under the window, cold, its paint gone; nothing else (the room is bare but for the table)
+		var rad = new MeshKit();
+		rad.Mat(StationTextures.CastIronMat);
+		rad.Color = new Color(0.8f, 0.78f, 0.75f);
+		for (int i = 0; i < 12; i++)
+		{
+			float x = -0.4f - 0.5f + i * 0.09f;
+			rad.BevelBox(new Vector3(x, 0.38f, -iz + 0.11f), new Vector3(0.06f, 0.56f, 0.14f), 0.02f);
+		}
+		foreach (float y in new[] { 0.14f, 0.62f }) rad.Cylinder(new Vector3(-0.97f, y, -iz + 0.11f), new Vector3(0.17f, y, -iz + 0.11f), 0.022f, 0.022f, 8, true);
+		foreach (float x in new[] { -0.88f, 0.08f }) rad.Cylinder(new Vector3(x, 0, -iz + 0.11f), new Vector3(x, 0.1f, -iz + 0.11f), 0.03f, 0.025f, 8, true);
+		body.AddChild(new CollisionShape3D { Position = new Vector3(-0.4f, 0.33f, -iz + 0.11f), Shape = new BoxShape3D { Size = new Vector3(1.1f, 0.66f, 0.16f) } });
+		shade.Apply(k);
+		shade.Apply(rad);
 		k.CommitTo(this, "Walls", true);
+		rad.CommitTo(this, "Radiator", true);
 		// webs up in its corners (the interiors pass, 2026-10-03)
 		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1321 }, -Half + 0.07f, Half - 0.1f, -Half + 0.07f, Half - 0.07f, 0f, Height, 0.9f, 0.75f);
 		DebrisKit.Scatter(this, new RandomNumberGenerator { Seed = 1322 }, -Half + 0.07f, Half - 0.1f, -Half + 0.07f, Half - 0.07f, 0f, new Color(0.62f, 0.58f, 0.5f), 50, 3,
 			new[] { (new Vector3(Half, 0, 0), 1.1f), (Vector3.Zero, 1.3f) });
 		// the floor: black and white marble, on the diagonal
-		var f = new MeshKit();
-		f.Mat(StationTextures.MarbleMat);
-		f.Color = Colors.White;
+		// (2026-10-14h: a step darker and dirtied, the pale tile was the brightest floor in the station)
+		var f = new MeshKit { Tess = 0.6f };
+		f.Mat(RoomSurface.Of(StationTextures.MarbleMat, RoomSurface.Stone with { FloorDirt = 0.75f, Wear = 0.5f }, 152));
+		f.Color = new Color(0.62f, 0.6f, 0.56f);
 		BuildKit.Box(f, new Vector3(0, -0.05f, 0), new Vector3(Half * 2f, 0.1f, Half * 2f), 0.5f);
+		shade.Apply(f);
 		f.CommitTo(this, "Floor", true);
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, -0.05f, 0), Shape = new BoxShape3D { Size = new Vector3(Half * 2f, 0.1f, Half * 2f) } });
-		var c = new MeshKit();
+		var c = new MeshKit { Tess = 0.6f };
 		// (2026-10-14b: the station's plaster ceiling; it was a flat, untextured off-white, the brightest thing in the room)
-		c.Mat(StationTextures.CeilingMat);
+		c.Mat(RoomSurface.Of(StationTextures.CeilingMat, RoomSurface.Plaster with { CeilingStains = 0.8f }, 153));
 		c.Color = new Color(0.85f, 0.82f, 0.78f);
 		BuildKit.Box(c, new Vector3(0, Height + 0.05f, 0), new Vector3(Half * 2f, 0.1f, Half * 2f), 1f, BuildKit.Face.PY);
+		shade.Apply(c);
 		c.CommitTo(this, "Ceiling", false);
+		DecalDresser.Room(this, new DecalDresser.RoomSpec
+		{
+			Box = new Aabb(new Vector3(ix0, 0, -iz), new Vector3(ix1 - ix0, Height, iz * 2f)), Seed = 151, Painted = true, Amount = 0.9f,
+			Windows = { (new Vector3(-0.4f, 1.0f, -iz), Vector3.Back, 1.8f, 1.5f) },
+			Doors = { (new Vector3(ix1, 0, 0), Vector3.Left, 2.2f, 2.2f) },
+			Keep = { (Vector3.Zero, 1.4f) },
+		});
 		// one bare bulb on a flex over the table
 		var bulb = new MeshInstance3D
 		{
@@ -150,8 +184,8 @@ public partial class StationRoom2 : Node3D
 		flex.CommitTo(this, "Flex", false);
 		AddChild(new OmniLight3D
 		{
-			Name = "Bulb", LightColor = new Color(1f, 0.82f, 0.62f), LightEnergy = 1.8f, OmniRange = 8f,
-			OmniAttenuation = 1.1f, Position = new Vector3(0, Height - 0.8f, 0), ShadowEnabled = true,
+			Name = "Bulb", LightColor = new Color(1f, 0.74f, 0.52f), LightEnergy = 2.1f, OmniRange = 7f,
+			OmniAttenuation = 1.25f, Position = new Vector3(0, Height - 0.8f, 0), ShadowEnabled = true,
 		});
 	}
 
@@ -178,7 +212,7 @@ public partial class StationRoom2 : Node3D
 		_windowPane.AddChild(new MeshInstance3D
 		{
 			Mesh = new QuadMesh { Size = new Vector2(1.6f, 1.4f) },
-			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.5f, 0.6f, 0.6f, 0.28f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.05f, MetallicSpecular = 0.9f },
+			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.24f, 0.22f, 0.5f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.3f, MetallicSpecular = 0.6f },
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
 		// the shards it breaks into (hidden until then): they fly in, and later fly back
@@ -231,7 +265,7 @@ public partial class StationRoom2 : Node3D
 		float rodZ = -Half + 0.17f;
 		var hw = new MeshKit();
 		hw.Mat(ItemTextures.BrassMat);
-		hw.Color = new Color(0.8f, 0.62f, 0.34f);
+		hw.Color = new Color(0.5f, 0.4f, 0.24f);
 		hw.Cylinder(new Vector3(cx - 1.38f, rodY, rodZ), new Vector3(cx + 1.38f, rodY, rodZ), 0.018f, 0.018f, 8, true);
 		foreach (int s in new[] { -1, 1 })
 		{
@@ -252,7 +286,7 @@ public partial class StationRoom2 : Node3D
 			v.Quad(VBot(i), VBot(i + 1), VTop(i + 1), VTop(i), Vector3.Back,
 				new Vector2(i / (float)vn * 2f, 0.4f), new Vector2((i + 1) / (float)vn * 2f, 0.4f), new Vector2((i + 1) / (float)vn * 2f, 0), new Vector2(i / (float)vn * 2f, 0));
 		v.Mat(ItemTextures.BrassMat);
-		v.Color = new Color(0.85f, 0.66f, 0.3f);
+		v.Color = new Color(0.46f, 0.37f, 0.2f);
 		for (int i = 0; i < vn; i++)
 		{
 			Vector3 a = VBot(i), b = VBot(i + 1);
@@ -308,7 +342,7 @@ public partial class StationRoom2 : Node3D
 		float gx = Mathf.Lerp(xo, xi, 0.36f);
 		var t = new MeshKit();
 		t.Mat(ItemTextures.BrassMat);
-		t.Color = new Color(0.9f, 0.7f, 0.3f);
+		t.Color = new Color(0.5f, 0.4f, 0.22f);
 		t.Cylinder(new Vector3(xo, tieY, 0.07f), new Vector3(gx, tieY, 0.07f), 0.016f, 0.016f, 6, true);
 		t.Cylinder(new Vector3(gx * 0.5f + xo * 0.5f, tieY, 0.075f), new Vector3(gx * 0.5f + xo * 0.5f, tieY - 0.16f, 0.075f), 0.012f, 0.03f, 8, true);
 		t.CommitTo(pivot, "TieBack", false);

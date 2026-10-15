@@ -32,6 +32,8 @@ uniform sampler2D grime_rough : filter_linear_mipmap, repeat_enable;
 uniform float relief = 0.0;
 // a second, larger, rotated sample of the grime breaks the 2.5 m repeat of the scans
 uniform float macro_vary = 0.0;
+// (2026-10-14h) how stained the walls are at their cleanest (the top): never the bare pale pour
+uniform float top_stain = 0.0;
 
 varying float v_g;
 
@@ -68,7 +70,7 @@ void fragment() {
 	vec3 k = texture(grime_tex, UV * 0.8 + vec2(0.13, 0.52)).rgb;
 	// grime creeps in patchily, not as a level line
 	float n = texture(grime_tex, UV * 0.23 + vec2(0.5)).r;
-	float g = v_g + (n - 0.3) * 0.3;
+	float g = max(v_g, top_stain) + (n - 0.3) * 0.3;
 	float g1 = smoothstep(0.0, 0.5, g);
 	float g2 = smoothstep(0.45, 1.0, g);
 	vec3 col = mix(mix(c, s, g1), k, g2);

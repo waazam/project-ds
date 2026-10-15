@@ -322,7 +322,7 @@ public partial class StationInterior : Node3D
 		// slits round a shut leaf)
 		var frames = new MeshKit();
 		// (2026-10-14b: their own dark stained wood, not the floor's and the walls' boards)
-		frames.Mat(StationTextures.CasingMat);
+		frames.Mat(RoomSurface.Of(StationTextures.CasingMat, RoomSurface.Wood, 139));
 		frames.Color = Colors.White;
 		StationKit.DoorFrame(frames, new Vector3(HalfWidth, 0, 0), Vector3.Back, 2.2f, 2.2f);
 		StationKit.DoorFrame(frames, new Vector3(-HalfWidth, 0, 0), Vector3.Back, 2.2f, 2.2f);
@@ -340,7 +340,7 @@ public partial class StationInterior : Node3D
 		AddChild(front);
 		var k = new MeshKit();
 		// (2026-10-14b: a panelled door in its own paint; it was a slab of the wall's boards with four boxes on it)
-		k.Mat(StationTextures.DoorPaintMat);
+		k.Mat(RoomSurface.Of(StationTextures.DoorPaintMat, RoomSurface.Wood with { Streaks = 0.4f, Mottle = 0.45f, Tide = 0.4f }, 138));
 		k.Color = new Color(0.82f, 0.8f, 0.78f);
 		StationKit.PanelDoor(k, new Vector3(0, 1.08f, 0), 2.12f, 2.16f, 0.06f, Basis.Identity, 2);
 		k.Mat(ItemTextures.BrassMat);
@@ -365,7 +365,7 @@ public partial class StationInterior : Node3D
 		door.Setup(new Vector3(1.05f, 1.1f, 0), new Vector3(2.1f, 2.2f, 0.3f), new Vector3(1.05f, 1.1f, 0));
 		var k = new MeshKit();
 		// (2026-10-14b: panelled and painted, not a slab of the wall's boards)
-		k.Mat(StationTextures.DoorPaintMat);
+		k.Mat(RoomSurface.Of(StationTextures.DoorPaintMat, RoomSurface.Wood with { Streaks = 0.4f, Mottle = 0.45f, Tide = 0.4f }, 138));
 		k.Color = Colors.White;
 		StationKit.PanelDoor(k, new Vector3(1.05f, 1.08f, 0), 2.08f, 2.16f, 0.05f, Basis.Identity, 2);
 		k.Mat(ItemTextures.BrassMat);

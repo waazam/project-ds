@@ -71,7 +71,8 @@ public static class StationProps
 			Vector3 off = new Vector3(rng.RandfRange(-1, 1), rng.RandfRange(-1, 1), rng.RandfRange(-1, 1)) * size * 0.5f;
 			off -= normal * off.Dot(normal);
 			float s = size * rng.RandfRange(0.45f, 0.8f);
-			k.Blob(at + off + normal * s * 0.2f, new Vector3(s, s, s) * rng.RandfRange(0.8f, 1.2f), seed + i, 0.25f, false, 0.8f);
+			// (2026-10-14h: rounder, the facets gone: one more subdivision)
+			k.Blob(at + off + normal * s * 0.2f, new Vector3(s, s, s) * rng.RandfRange(0.8f, 1.2f), seed + i, 0.22f, false, 0.8f, 0f, 2);
 		}
 	}
 
