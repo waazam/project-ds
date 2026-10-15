@@ -56,6 +56,11 @@ def skin(t, s, side):
     gw = gunwale_half(t)
     bw = gw * 0.55
     x = bw + (gw - bw) * (max(s, 0.0) ** 0.7) + math.sin(max(s, 0.0) * math.pi) * 0.05 * gw / (BEAM * 0.5)
+    # (2026-10-15, the owner: "a hole in the front of it") the bow closes: over its last ~0.25 m the planks pinch in to land
+    # in the stem's rabbet, 1.5 cm off the centre line, instead of stopping 10-20 cm apart with nothing between
+    f = min(max((-0.87 - t) / 0.13, 0.0), 1.0)
+    f = f * f * (3 - 2 * f)
+    x = x * (1 - f) + 0.015 * f
     y = keel_y(t) + (sheer_y(t) - keel_y(t)) * s
     return (side * x, y, t * HALF)
 
@@ -161,7 +166,7 @@ def rowboat():
         # the lining inside: the same five strakes, bare wood, set in by the frames' depth
         for s in range(5):
             s0, s1 = s / 5 + 0.004, (s + 1) / 5 - 0.004
-            rows = [[(skin(t, sv, side)[0] - side * 0.035, skin(t, sv, side)[1], t * HALF) for t in T[2:-1]] for sv in (s0, s1)]
+            rows = [[(side * max(abs(skin(t, sv, side)[0]) - 0.035, 0.03), skin(t, sv, side)[1], t * HALF) for t in T[1:-1]] for sv in (s0, s1)]
             ln = grid(f"lining{side}{s}", rows, wood)
             solidify(ln, 0.01, 1.0 if side > 0 else -1.0)
             parts.append(ln)
@@ -197,7 +202,15 @@ def rowboat():
     # the stem post at the bow, the frames inside, and the rubbing rails along the gunwales
     stem = [(0.0, keel_y(-1) - 0.03 + 0.02 * k, -HALF - 0.02 - 0.03 * k * k) for k in range(0, 2)]
     stem = [(0.0, keel_y(-1.0) - 0.02, -HALF + 0.02), (0.0, (keel_y(-1) + sheer_y(-1)) * 0.5, -HALF - 0.03), (0.0, sheer_y(-1.0) + 0.1, -HALF - 0.06)]
-    parts.append(tube("stem", stem, 0, post, rect=(0.07, 0.09)))
+    parts.append(tube("stem", stem, 0, post, rect=(0.07, 0.11)))
+    # the apron inside the stem: the planks' ends land on it (the rabbet), closing the bow from inside
+    apron = [(0.0, keel_y(-0.93) + 0.03, -HALF * 0.93), (0.0, (keel_y(-0.97) + sheer_y(-0.97)) * 0.5, -HALF * 0.97),
+             (0.0, sheer_y(-0.97) - 0.02, -HALF * 0.975)]
+    parts.append(tube("apron", apron, 0, post, rect=(0.09, 0.08)))
+    # the breasthook: a knee of wood across the bow at the top, tying the two gunwales to the stem
+    bh = [skin(-0.86, 1.0, -1), (0.0, sheer_y(-0.97) - 0.01, -HALF * 0.97), skin(-0.86, 1.0, 1)]
+    bh = [(p[0] * 0.92, p[1] - 0.03, p[2]) for p in bh]
+    parts.append(tube("breasthook", bh, 0, post, rect=(0.05, 0.11)))
     for side in (-1, 1):
         pts = [(skin(t, 1.0, side)[0] + side * 0.012, skin(t, 1.0, side)[1] + 0.012, t * HALF) for t in T]
         parts.append(tube(f"rail{side}", pts, 0, post, rect=(0.05, 0.045)))

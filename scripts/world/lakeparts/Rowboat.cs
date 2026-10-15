@@ -86,7 +86,7 @@ public partial class Rowboat : Node3D
 
 	private static Material MaterialFor(string name) => name switch
 	{
-		"paint" => _paint ??= ProcTextures.Std("boat_paint", ProcTextures.WeatheredWood(), new Color(0.46f, 0.56f, 0.5f), 0.85f, vertexColor: true),
+		"paint" => _paint ??= Tinted(ProcTextures.Std("boat_paint", ProcTextures.WeatheredWood(), new Color(0.46f, 0.56f, 0.5f), 0.85f, vertexColor: true), 1f),
 		"wood" => _wood ??= Tinted(PropTextures.DeckMat, 0.62f),
 		"bronze" => _bronze ??= Tinted(ProcTextures.MetalMat, 1f, new Color(0.55f, 0.42f, 0.25f)),
 		"leather" => _leather ??= ProcTextures.Flat("oar_leather", new Color(0.3f, 0.22f, 0.16f), 0.7f, 0f),
@@ -99,6 +99,9 @@ public partial class Rowboat : Node3D
 	{
 		var m = (StandardMaterial3D)src.Duplicate();
 		m.AlbedoColor = (tint ?? m.AlbedoColor) * new Color(shade, shade, shade, 1f);
+		// (2026-10-15, "a hole in the front of it") both faces drawn: no plank, board or frame can be looked through from
+		// the wrong side, inside the boat or out
+		m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
 		return m;
 	}
 
