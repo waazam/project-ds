@@ -72,6 +72,7 @@ public partial class Flare : Node3D
 			_take = new Interactable { Name = "Take", Prompt = "Take the flare", PickRadius = 0.5f, MaxDistance = 2.4f, Position = new Vector3(0, 0.15f, 0) };
 			_take.Interacted += Take;
 			AddChild(_take);
+			ItemOutline.Attach(this, _model, () => !Out);   // the pickups' thin white line (2026-10-14)
 		}
 	}
 

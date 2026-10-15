@@ -317,6 +317,25 @@ public sealed class TestBot
 		await Frames(2, ct);
 	}
 
+	/// <summary>`--pickup-shots` (the pickup audit, 2026-10-14): each pickup the bot takes is photographed first, from
+	/// where the bot was when it went for it and again from where it takes it, to test-output/pickshots/.</summary>
+	private static readonly bool PickShots = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--pickup-shots") >= 0;
+	private static int _pickShotN;
+
+	private async Task PickShot(Node3D obj, Vector3 aim, string label, CancellationToken ct)
+	{
+		if (DisplayServer.GetName() == "headless") return;
+		await Aim(aim, ct);
+		for (int i = 0; i < 20; i++) await _host.ToSignal(Tree, SceneTree.SignalName.ProcessFrame);
+		string dir = ProjectSettings.GlobalizePath("res://test-output/pickshots");
+		DirAccess.MakeDirRecursiveAbsolute(dir);
+		var img = _host.GetViewport().GetTexture().GetImage();
+		if (img.GetWidth() > 1280) img.Resize(1280, img.GetHeight() * 1280 / img.GetWidth(), Image.Interpolation.Bilinear);
+		string file = $"{dir}/{_pickShotN++:00}_{obj.Name}_{label}.png";
+		img.SavePng(file);
+		GD.Print($"[pickshot] {obj.Name} {label} from {Player.GlobalPosition} dist {Player.CameraRig.Camera.GlobalPosition.DistanceTo(aim):0.0} -> {file}");
+	}
+
 	/// <summary>Looks at an object's Interactable and presses (or holds) E. Returns the prompt it was focused on.</summary>
 	public async Task<string> UseIt(Node3D obj, CancellationToken ct)
 	{
@@ -324,8 +343,11 @@ public sealed class TestBot
 		var use = obj as Interactable ?? obj.FindChildren("*", "", true, false).OfType<Interactable>().FirstOrDefault()
 			?? FindUnder<Interactable>(obj);
 		var aim = use != null ? use.ToGlobal(use.PickOffset) : obj.GlobalPosition + Vector3.Up * 0.15f;
+		bool pickShots = PickShots && World.ItemOutline.Find(obj.GetNodeOrNull("Item")) is { } || PickShots && World.ItemOutline.Find(obj) is { };
+		if (pickShots) await PickShot(obj, aim, "approach", ct);
 		if (Flat(Player.GlobalPosition).DistanceTo(Flat(aim)) > 2.2f) await WalkTo(aim, 1.6f, ct);
 		await Aim(aim, ct);
+		if (pickShots) await PickShot(obj, aim, "at", ct);
 		var focus = Player.Interaction?.Focused;
 		if (focus == null && Flat(Player.GlobalPosition).DistanceTo(Flat(aim)) > 1.2f)
 		{

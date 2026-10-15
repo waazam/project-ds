@@ -49,6 +49,9 @@ public partial class Pickup : Area3D
 	[Export] public bool UseSpot = true;
 	/// <summary>A thought captioned a moment after the player takes it (never on a restore), e.g. the newel post's "It's warm."</summary>
 	[Export] public string TakenLine = "";
+	/// <summary>Build the scenery it rests on (the key's flat stone in the Hollow). Off for a key that isn't lying out in
+	/// the woods: the station clock's key flew out of the clock with a stone under it (the pickup audit, 2026-10-14).</summary>
+	[Export] public bool WithRest = true;
 
 	public const string TakenFlagPrefix = "pickup_taken_";
 	/// <summary>Set when more than one pickup of the same kind exists in the story (Act 4's key and the
@@ -56,6 +59,9 @@ public partial class Pickup : Area3D
 	[Export] public string TakenId = "";
 	public string TakenFlag => TakenFlagPrefix + (string.IsNullOrEmpty(TakenId) ? Kind.ToString().ToLowerInvariant() : TakenId);
 	public bool Taken { get; private set; }
+	/// <summary>When its white outline (<see cref="ItemOutline"/>) may show, beyond being there to take: a thing the story
+	/// hides until it's found (202's keycard, only under the blacklight). Null: always.</summary>
+	public System.Func<bool> OutlineWhen;
 	public PickupInteractable Use => _use;
 
 	private Node3D _item, _rest;
@@ -107,6 +113,8 @@ public partial class Pickup : Area3D
 		};
 		_use.Interacted += OnInteract;
 		AddChild(_use);
+		// the thin white line round it while it's there to take (2026-10-14)
+		ItemOutline.Attach(_item, _item, () => _revealed && !Taken && _use is { Enabled: true } && (OutlineWhen?.Invoke() ?? true));
 	}
 
 	/// <summary>Shows the item now regardless of checkpoint (dev previews only; the story reveals it normally).</summary>
@@ -153,6 +161,8 @@ public partial class Pickup : Area3D
 		ToolKind.Keycard202 or ToolKind.Keycard203 or ToolKind.Keycard201 => "keycard",
 		ToolKind.PantryKey => "pantry key",
 		ToolKind.DiningKey => "dining room key",
+		ToolKind.Crowbar => "crowbar",   // (it read "Take the item")
+		ToolKind.Flamethrower => "flamethrower",
 		_ => "item",
 	};
 
@@ -364,7 +374,7 @@ public partial class Pickup : Area3D
 		}
 		_rest = new Node3D { Name = "Rest" };
 		AddChild(_rest);
-		if (!ItemMeshes.BuildRest(Kind, _rest, (int)Kind * 17))
+		if (!WithRest || !ItemMeshes.BuildRest(Kind, _rest, (int)Kind * 17))
 		{
 			RemoveChild(_rest);
 			_rest.QueueFree();

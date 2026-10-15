@@ -352,7 +352,7 @@ public partial class StationInterior : Node3D
 		body.SetMeta("surface", "wood");
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.1f, 0), Shape = new BoxShape3D { Size = new Vector3(2.2f, 2.2f, 0.14f) } });
 		front.AddChild(body);
-		front.AddChild(new Interactable { Name = "Use", Prompt = "It won't open.", PickRadius = 0.8f, MaxDistance = 2.4f, Position = new Vector3(0, 1.1f, 0.1f) });
+		front.AddChild(new Interactable { Name = "Use", Prompt = "It won't open.", Outline = false, PickRadius = 0.8f, MaxDistance = 2.4f, Position = new Vector3(0, 1.1f, 0.1f) });
 	}
 
 	/// <summary>Room 2's door (it slams shut behind the player, then lets them out when they win).</summary>

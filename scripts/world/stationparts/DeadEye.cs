@@ -40,6 +40,8 @@ public partial class DeadEye : Node3D
 		_take = new Interactable { Name = "Take", Prompt = "Take the eye", PickRadius = 0.3f, MaxDistance = 2.2f, Enabled = false };
 		_take.Interacted += OnTaken;
 		AddChild(_take);
+		// the pickups' thin white line (2026-10-14): only once it's loose to be hunted and taken
+		ItemOutline.Attach(this, _model, () => Wandering && !Taken);
 	}
 
 	public override void _Process(double delta)

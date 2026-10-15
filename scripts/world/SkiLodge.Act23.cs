@@ -216,6 +216,8 @@ public partial class SkiLodge
 	private void BuildBarCard()
 	{
 		Card202Pickup = new Pickup { Name = "Card202", Kind = ToolKind.Keycard202, TakenId = LodgeFlag.Card202, UseSpot = false, SnapToSurface = false, Position = BarCardSpot.Position, Rotation = new Vector3(Mathf.Pi, 0.4f, 0) };
+		// its white outline only under the blacklight: nothing gives it away before the light finds it
+		Card202Pickup.OutlineWhen = () => UvLit(Card202Pickup);
 		AddChild(Card202Pickup);
 		// only the blacklight finds it: a smeared handprint and an arrow on the counter's front, pointing under, and the
 		// card's edge glowing where it's taped
@@ -333,7 +335,9 @@ public partial class SkiLodge
 		d.Opened += _ => StoryManager.Instance?.SetFlag(LodgeFlag.Room203Open);
 		if (!Taken(LodgeFlag.DiningKey))
 		{
-			var key = new Pickup { Name = "DiningKey", Kind = ToolKind.DiningKey, TakenId = LodgeFlag.DiningKey, UseSpot = false, SnapToSurface = false, Position = SillSpot203.Position };
+			// (2026-10-14, the pickup audit: on the sill's own height it lay 9 cm down inside the snow heaped in from the
+			// window, out of sight with only its prompt to find; now on top of the snow)
+			var key = new Pickup { Name = "DiningKey", Kind = ToolKind.DiningKey, TakenId = LodgeFlag.DiningKey, UseSpot = false, SnapToSurface = false, Position = SillSpot203.Position + Vector3.Up * 0.1f };
 			AddChild(key);
 		}
 		// 204: the note in one of its drawers, smudged
@@ -397,6 +401,8 @@ public partial class SkiLodge
 			};
 			SheetUses[t].Interacted += p => { if (_sheets[idx] != null && !_pulling) _ = Cutscene.Run(this, ct => PullSheet(idx, p, ct), lockInput: true); };
 			AddChild(SheetUses[t]);
+			// its white outline round the sheet itself (not the long table under it)
+			SheetUses[t].HighlightRoot = SheetUses[t].GetPathTo(_sheets[t]);
 		}
 	}
 

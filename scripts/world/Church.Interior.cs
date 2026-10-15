@@ -403,6 +403,10 @@ public partial class Church
 				Name = $"Niche{i}", PickRadius = 0.28f, MaxDistance = 2.6f, Position = new Vector3(NicheX[i], NicheY, z + 0.3f),
 				PromptFor = p => idx == 0 && ChalicePlaced ? "" : idx == 0 && p?.Inventory is { } inv && inv.HasTool(ToolKind.Chalice) ? "Set the chalice in its place" : $"An empty niche, the shape of a {NicheNames[idx]} worked in gold at its back.",
 				CanUse = p => idx == 0 && !ChalicePlaced && p?.Inventory is { } inv && inv.HasTool(ToolKind.Chalice),
+				// its white outline (2026-10-14) round the carved frame: the niche is part of the door's one mesh, so a
+				// stand-in the frame's size, at its face
+				OutlineProxy = new BoxMesh { Size = new Vector3(0.56f, 0.72f, 0.02f) },
+				OutlineProxyAt = new Transform3D(Basis.Identity, new Vector3(0, 0, -0.11f)),
 			};
 			n.Interacted += p => OnNiche(idx, p);
 			AddChild(n);

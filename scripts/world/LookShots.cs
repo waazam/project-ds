@@ -152,6 +152,24 @@ public partial class LookShots : Node
 					foreach (var hn in hidden) hn.Visible = true;
 				}
 			}
+			if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-outline-perf") >= 0)
+			{
+				// the white outlines' cost here: frame time with them, then without, then with again
+				int lit = 0;
+				foreach (var n in tree.GetNodesInGroup(ItemOutline.Group)) if (n is ItemOutline io && io.Showing) lit++;
+				var ms = new double[3];
+				for (int k = 0; k < 3; k++)
+				{
+					ItemOutline.AllOff = k == 1;
+					await Hold(p, Mathf.DegToRad(yaw), Mathf.DegToRad(pitch), 1.0f);
+					ulong t0 = Time.GetTicksUsec();
+					int frames = 0;
+					while (Time.GetTicksUsec() - t0 < 3_000_000) { await ToSignal(tree, SceneTree.SignalName.ProcessFrame); frames++; }
+					ms[k] = (Time.GetTicksUsec() - t0) / 1000.0 / frames;
+				}
+				ItemOutline.AllOff = false;
+				GD.Print($"[perf-outline] {lit} outlines showing: {ms[0]:0.00} ms on, {ms[1]:0.00} ms off, {ms[2]:0.00} ms on again");
+			}
 			if (_ab)
 			{
 				SetTreeLook(false);
@@ -170,8 +188,171 @@ public partial class LookShots : Node
 				atmo.EnclosedClearsFog = true;
 			}
 		}
+		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-pickups") >= 0) await ShootPickups(p, start);
 		GD.Print("[look] done");
 		tree.Quit(0);
+	}
+
+	/// <summary>
+	/// The pickup audit (2026-10-14): every item with a white outline (<see cref="ItemOutline"/>) that is there to take in
+	/// this act, photographed from a standing spot about 3.5 m off (the side nearest the spawn, with a clear line to it,
+	/// on a floor near its own) and from 1.5 m, the outline on; with --look-ab also the far shot without it. Each is
+	/// logged with what's under it (the gap to the surface below: floating, sunk) and its size.
+	/// </summary>
+	private async System.Threading.Tasks.Task ShootPickups(PlayerController p, Vector3 spawn)
+	{
+		var tree = GetTree();
+		float eyeH = p.CameraRig.Camera.GlobalPosition.Y - p.GlobalPosition.Y;
+		var space = p.GetWorld3D().DirectSpaceState;
+		var self = new Godot.Collections.Array<Rid> { p.GetRid() };
+		string only = null;
+		float[] dists = { 3.5f, 1.5f };
+		Vector3? from = null;
+		int around = 0;
+		foreach (var a in OS.GetCmdlineUserArgs())
+		{
+			if (a.StartsWith("--look-around=")) around = int.Parse(a["--look-around=".Length..]);
+			if (a.StartsWith("--look-only=")) only = a["--look-only=".Length..];
+			// --look-dists=2.5,1: the shot distances; --look-from=dx,dz: the side of the item to stand on (not the spawn's)
+			else if (a.StartsWith("--look-dists=")) dists = Array.ConvertAll(a["--look-dists=".Length..].Split(','), s => float.Parse(s, CultureInfo.InvariantCulture));
+			else if (a.StartsWith("--look-from="))
+			{
+				var f = Array.ConvertAll(a["--look-from=".Length..].Split(','), s => float.Parse(s, CultureInfo.InvariantCulture));
+				from = new Vector3(f[0], 0, f[1]);
+			}
+		}
+
+		// every interactable, and whether it has the white outline (doors and the like don't): the scope's audit
+		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-interactables") >= 0)
+			foreach (var n in tree.GetNodesInGroup("interactables"))
+				if (n is Interactable it && IsInstanceValid(it))
+				{
+					string prompt;
+					try { prompt = it.GetPrompt(p); } catch (Exception) { prompt = "(throws)"; }
+					var ol = it.GetNodeOrNull<ItemOutline>(ItemOutline.NodeName)
+						?? ItemOutline.Find(it.HighlightRoot.IsEmpty ? it.GetParent() : it.GetNodeOrNull(it.HighlightRoot));
+					GD.Print($"[ia] {it.GetParent()?.Name}/{it.Name} ({it.GetType().Name} in {it.GetParent()?.GetType().Name}) '{prompt}' enabled {it.Enabled} opening {it.IsOpening()} outline {(ol == null ? "none" : $"{ol.MeshCount} meshes active {ol.IsActive}")} at {it.GlobalPosition.X:0.0},{it.GlobalPosition.Y:0.0},{it.GlobalPosition.Z:0.0}");
+				}
+		int shot = 100;
+		foreach (var n in tree.GetNodesInGroup(ItemOutline.Group))
+		{
+			if (n is not ItemOutline o || !IsInstanceValid(o) || !o.TryBounds(out Aabb box)) continue;
+			string name = o.GetParent()?.Name ?? "?";
+			if (o.GetParent() is Node par && par.Name == "Item") name = par.GetParent()?.Name ?? name;
+			else if (o.GetParent() is Interactable ip && ip.GetParent() is Node ipp) name = $"{ipp.Name}.{ip.Name}".Replace("@", "");
+			if (only != null && !Array.Exists(only.Split(','), s => name.ToString().Contains(s))) continue;
+			Vector3 c = box.GetCenter();
+			var down = space.IntersectRay(new PhysicsRayQueryParameters3D { From = c, To = c + Vector3.Down * 3f, CollisionMask = 1u, Exclude = self });
+			float floorY = down.Count > 0 ? ((Vector3)down["position"]).Y : float.NaN;
+			string under = down.Count > 0 && down["collider"].As<Node>() is { } col ? col.Name : "-";
+			string vis = o.GetParent() is Interactable ? "" : VisualCover(tree.Root, o, box);
+			GD.Print($"[pick] {name} at {c.X:0.00},{c.Y:0.00},{c.Z:0.00} size {box.Size.X:0.00}x{box.Size.Y:0.00}x{box.Size.Z:0.00} active {o.IsActive} gap {box.Position.Y - floorY:0.000} on {under}{vis}");
+			if (!o.IsActive) continue;
+			// --look-around=N: the first distance from N sides (an item whose way in isn't the spawn's side)
+			var shots = new List<(float dist, Vector3 toward)>();
+			if (around > 0)
+				for (int k = 0; k < around; k++)
+				{
+					float ang = Mathf.Tau * k / around;
+					shots.Add((dists[0], c + new Vector3(Mathf.Cos(ang), 0, Mathf.Sin(ang)) * 10f));
+				}
+			else foreach (float dd in dists) shots.Add((dd, from is Vector3 fd ? c + fd * 10f : spawn));
+			foreach (var (dist, toward) in shots)
+			{
+				var pose = Pose(space, self, c, box, dist, toward, eyeH, around > 0);
+				if (pose == null) { GD.Print($"[pick]   no standing spot {dist} m from {name}"); continue; }
+				var (at, eye) = pose.Value;
+				Vector3 d = c - eye;
+				float yaw = Mathf.Atan2(-d.X, -d.Z), pitch = Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length());
+				_pin = null;
+				p.Teleport(at + Vector3.Up * 0.05f, yaw);
+				await Hold(p, yaw, pitch, 2.2f);
+				string label = $"{shot++:000}_{name}_{dist:0.0}m";
+				Save(label);
+				GD.Print($"[pick]   shot {label} from {at.X:0.0},{at.Y:0.0},{at.Z:0.0} dist {eye.DistanceTo(c):0.0}");
+				if (_ab && dist > 2f)
+				{
+					ItemOutline.AllOff = true;
+					await Hold(p, yaw, pitch, 0.6f);
+					Save(label + "_OFF");
+					ItemOutline.AllOff = false;
+					await Hold(p, yaw, pitch, 0.6f);
+				}
+			}
+		}
+	}
+
+	/// <summary>What the eye sees above and below the item (not the colliders: the drawn meshes): the first surface a ray
+	/// from 0.6 m over its centre meets coming down, and the one under its centre. " covered by X" when something drawn
+	/// lies over it (a snow drift heaped on a key), " visual gap N" to the drawn surface under it.</summary>
+	private static string VisualCover(Node root, ItemOutline o, Aabb box)
+	{
+		Vector3 c = box.GetCenter();
+		float top = box.End.Y, bottom = box.Position.Y;
+		float coverY = float.MinValue, underY = float.MinValue;
+		string coverName = "", underName = "";
+		foreach (var n in root.FindChildren("*", "MeshInstance3D", true, false))
+		{
+			if (n is not MeshInstance3D mi || mi.Mesh == null || !mi.IsVisibleInTree() || mi.HasMeta(ItemOutline.Meta)) continue;
+			if (o.MeshRoot != null && (o.MeshRoot.IsAncestorOf(mi) || mi == o.MeshRoot)) continue;
+			Aabb b = mi.GlobalTransform * mi.GetAabb();
+			if (c.X < b.Position.X || c.X > b.End.X || c.Z < b.Position.Z || c.Z > b.End.Z || b.Position.Y > c.Y + 0.6f || b.End.Y < c.Y - 0.6f) continue;
+			var tm = mi.Mesh.GenerateTriangleMesh();
+			if (tm == null) continue;
+			var inv = mi.GlobalTransform.AffineInverse();
+			foreach (float start in new[] { c.Y + 0.6f, c.Y })
+			{
+				Vector3 from = inv * (c with { Y = start }), dir = (inv.Basis * Vector3.Down).Normalized();
+				var hit = tm.IntersectRay(from, dir);
+				if (hit.Count == 0) continue;
+				float y = (mi.GlobalTransform * (Vector3)hit["position"]).Y;
+				if (start > c.Y) { if (y > top - 0.002f && y > coverY && y < start) { coverY = y; coverName = mi.Name; } }
+				else if (y > underY && y < c.Y + 0.001f) { underY = y; underName = mi.Name; }
+			}
+		}
+		string s = "";
+		if (coverY > float.MinValue && coverY < top + 0.6f && coverY - top < 0.25f) s += $" covered by {coverName} {coverY - top:+0.000;-0.000} over its top";
+		if (underY > float.MinValue) s += $" visual gap {bottom - underY:0.000} on {underName}";
+		return s;
+	}
+
+	/// <summary>A standing spot <paramref name="dist"/> m from the item with a clear view of it: floor under it near the
+	/// item's own level, room to stand, nothing between the eye and the item. Toward the spawn first.</summary>
+	private static (Vector3 at, Vector3 eye)? Pose(PhysicsDirectSpaceState3D space, Godot.Collections.Array<Rid> self, Vector3 c, Aabb box, float dist, Vector3 spawn, float eyeH, bool strict = false)
+	{
+		Vector3 toSpawn = (spawn - c) with { Y = 0 };
+		toSpawn = toSpawn.LengthSquared() > 0.01f ? toSpawn.Normalized() : Vector3.Back;
+		// a thin upright thing (a key hung on a wall) is seen face on, not edge on
+		int thinAxis = (int)box.GetShortestAxisIndex();
+		Vector3 thin = Vector3.Zero;
+		if (thinAxis != 1 && box.Size[thinAxis] < 0.3f * box.Size[(int)box.GetLongestAxisIndex()]) thin[thinAxis] = 1f;
+		(Vector3, Vector3)? best = null;
+		float bestScore = float.MinValue;
+		foreach (float dd in new[] { dist, dist * 0.75f, dist * 1.25f, dist * 0.5f })
+		{
+			for (int i = 0; i < 24; i++)
+			{
+				float a = Mathf.Tau * i / 24f;
+				var dir = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+				Vector3 xz = c + dir * dd;
+				var hit = space.IntersectRay(new PhysicsRayQueryParameters3D { From = xz with { Y = c.Y + 1.2f }, To = xz with { Y = c.Y - 2.6f }, CollisionMask = 1u, Exclude = self });
+				if (hit.Count == 0 || ((Vector3)hit["normal"]).Y < 0.7f) continue;
+				Vector3 at = (Vector3)hit["position"];
+				Vector3 eye = at + Vector3.Up * eyeH;
+				// room to stand
+				if (space.IntersectRay(new PhysicsRayQueryParameters3D { From = at + Vector3.Up * 0.25f, To = eye + Vector3.Up * 0.15f, CollisionMask = 1u, Exclude = self }).Count > 0) continue;
+				// a clear line to it (stopping just short of it)
+				Vector3 to = c - eye;
+				// (a thing with its own collider, the font, a candle stand: meeting it is seeing it)
+				var los = space.IntersectRay(new PhysicsRayQueryParameters3D { From = eye, To = eye + to * (1f - 0.12f / Mathf.Max(to.Length(), 0.2f)), CollisionMask = 1u, Exclude = self });
+				if (los.Count > 0 && !box.Grow(0.1f).HasPoint((Vector3)los["position"])) continue;
+				if (strict && dir.Dot(toSpawn) < 0.5f) continue;
+				float score = dir.Dot(toSpawn) * 0.6f - Mathf.Abs(eye.Y - (c.Y + 1.0f)) * 0.8f - Mathf.Abs(dd - dist) * 0.3f + Mathf.Abs(dir.Dot(thin)) * 0.8f;
+				if (score > bestScore) { bestScore = score; best = (at, eye); }
+			}
+			if (best != null) return best;
+		}
+		return best;
 	}
 
 	private Vector3? _pin;

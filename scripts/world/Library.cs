@@ -177,6 +177,11 @@ public partial class Library : Node3D
 		UvInk.OnSurface(_jutting, new Vector3(0, 0.16f, -0.06f), Vector3.Up, new Vector2(0.08f, 0.1f), UvInk.Hand(HandKind.Fingertips, 4), UvInk.Pale, 1.4f, Mathf.Pi + 0.2f, false, true, 0.04f);
 		BookUse = new PickupInteractable { Name = "Book", PickRadius = 0.2f, MaxDistance = 2.4f, PromptFor = p => p?.Inventory is { } inv && inv.HasTool(ToolKind.Bookmark) ? "Slide the bookmark in" : "One of the books sticks out.", CanUse = _ => !BookcaseOpen, Position = _jutting.Position + new Vector3(0, 0, -0.12f) };
 		BookUse.Interacted += OnBook;
+		// its white outline only once it's found (the blacklight on its palm print) or the bookmark is in hand: the story
+		// hides it among the books
+		bool seen = false;
+		BookUse.OutlineWhen = () => seen |= Lantern.UvOn(_jutting.GlobalPosition) > 0.3f
+			|| StoryBeat.Player(this)?.Inventory?.HasTool(ToolKind.Bookmark) == true;
 		_bookcase.AddChild(BookUse);
 	}
 
