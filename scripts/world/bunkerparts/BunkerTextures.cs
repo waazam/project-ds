@@ -440,9 +440,59 @@ public static partial class BunkerTextures
 	/// <summary>(2026-10-10c) A Poly Haven scan's albedo for the concrete shader, if it's there; else the drawn one.</summary>
 	private static Texture2D ScanOr(string id, Texture2D drawn) => SurfaceSets.Tex("ph_" + id) ?? drawn;
 
-	public static ShaderMaterial HallWallMat => Concrete("bk_m_hallwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.05f, 0.5f, 0.35f, new Color(1f, 1f, 1f));
+	// (2026-10-14h, the bunker pass: the vault was a blotchy pink-orange, the scan's own colour) The hall's concrete under
+	// the institutional coat it was given in the fifties: a dark green dado, a black stripe, pale grey-green over the
+	// vault, all of it chalked, flaked, rust-bled from the ribs' fixings and tide-marked at the foot (bunker_concrete's
+	// painted mode). Its floor the same concrete taken to grey, two faded yellow lines down it.
+	public static ShaderMaterial HallWallMat => Painted(Concrete("bk_m_hallwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.05f, 0.4f, 0.25f, new Color(1f, 1f, 1f)),
+		ceiling: true, top: 99f, seed: 3f);
 	// (2026-10-13g: the hall's floor was the palest, cleanest surface down here; a step darker, more grime trodden into it)
-	public static ShaderMaterial HallFloorMat => Concrete("bk_m_hallfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.04f, 0.6f, 0f, new Color(0.72f, 0.68f, 0.62f));   // (2026-10-14b: warmer, toward the walls' own concrete: a cold blue-grey strip under brown walls, it didn't belong to them)
+	public static ShaderMaterial HallFloorMat => Greyed(Concrete("bk_m_hallfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.04f, 0.6f, 0f, new Color(0.72f, 0.7f, 0.66f)), 1.55f, lines: 1.55f);
+	/// <summary>(2026-10-14h) The CRT room's and the looping rooms' walls: the hall's coat, the ceiling left bare and
+	/// ring-stained.</summary>
+	public static ShaderMaterial PaintedRoomWallMat => Painted(Concrete("bk_m_roomwall_painted", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.06f, 0.5f, 0.3f, new Color(0.95f, 0.95f, 0.95f)),
+		ceiling: false, top: 3.97f, seed: 7f);
+	/// <summary>(2026-10-14h) The CRT room's floor: old linoleum tiles laid on the slab, worn, whole patches of them gone
+	/// to the concrete and its black adhesive.</summary>
+	public static ShaderMaterial LinoFloorMat => Lino(Concrete("bk_m_lino", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.05f, 0.45f, 0f, new Color(0.9f, 0.9f, 0.88f)));
+	/// <summary>(2026-10-14h) The looping rooms' floor: the slab, grey.</summary>
+	public static ShaderMaterial GreyRoomFloorMat => Greyed(Concrete("bk_m_roomfloor_grey", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.05f, 0.6f, 0f, new Color(0.7f, 0.7f, 0.67f)), 1.5f);
+
+	private static readonly HashSet<ShaderMaterial> _bunkerPass = new();
+
+	private static ShaderMaterial Greyed(ShaderMaterial m, float gain, float lines = 0f)
+	{
+		if (!_bunkerPass.Add(m)) return m;
+		m.SetShaderParameter("concrete_desat", 0.8f);
+		m.SetShaderParameter("concrete_tint", new Color(0.5f, 0.52f, 0.5f) * gain);
+		m.SetShaderParameter("paint_noise", RoomSurface.Noise);
+		m.SetShaderParameter("floor_lines", lines);
+		return m;
+	}
+
+	private static ShaderMaterial Painted(ShaderMaterial m, bool ceiling, float top, float seed)
+	{
+		if (!_bunkerPass.Add(m)) return m;
+		m.SetShaderParameter("concrete_desat", 0.85f);
+		m.SetShaderParameter("concrete_tint", new Color(0.78f, 0.8f, 0.76f));
+		m.SetShaderParameter("paint_noise", RoomSurface.Noise);
+		m.SetShaderParameter("painted", true);
+		m.SetShaderParameter("paint_ceiling", ceiling);
+		m.SetShaderParameter("paint_top", top);
+		m.SetShaderParameter("seed", seed);
+		return m;
+	}
+
+	private static ShaderMaterial Lino(ShaderMaterial m)
+	{
+		if (!_bunkerPass.Add(m)) return m;
+		m.SetShaderParameter("concrete_desat", 0.85f);
+		m.SetShaderParameter("concrete_tint", new Color(0.72f, 0.73f, 0.7f));
+		m.SetShaderParameter("paint_noise", RoomSurface.Noise);
+		m.SetShaderParameter("lino", true);
+		m.SetShaderParameter("seed", 5f);
+		return m;
+	}
 	public static ShaderMaterial RoomWallMat => Concrete("bk_m_roomwall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.06f, 0.65f, 0.45f, new Color(0.78f, 0.78f, 0.8f));
 	public static ShaderMaterial RoomFloorMat => Concrete("bk_m_roomfloor", ScanOr("concrete_floor_worn_001", FloorConcrete()), 0.45f, 0.05f, 0.6f, 0f, new Color(0.68f, 0.65f, 0.6f));   // (2026-10-14b: warmer, as the hall's)
 	public static ShaderMaterial MazeWallMat => Concrete("bk_m_mazewall", ScanOr("concrete_wall_006", WallConcrete()), 0.5f, 0.09f, 0.6f, 0.4f, new Color(0.85f, 0.83f, 0.8f), 0.035f);
