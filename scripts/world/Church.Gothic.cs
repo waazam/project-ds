@@ -270,6 +270,7 @@ public partial class Church
 			Splat(p, Mathf.Lerp(0.42f, 0.16f, t), 0.006f + 0.0005f * (i % 3));
 		}
 		blood.CommitTo(this, "Blood", false);
+		BleedingAltar(pool, new Vector3(-18.5f, 0, CrossEnd - 1.0f));   // still wet: Church.Blood.cs
 	}
 
 	// ------------------------------------------------------------------ the apse's chapels

@@ -570,7 +570,7 @@ public partial class SkiLodge
 		switch (n)
 		{
 			case 1: Dishes(k); break;
-			case 2: BloodStreak(k); break;
+			case 2: BloodStreak(k); BloodRunOff(holder); break;
 			case 3: Skeleton(k); Flies(holder); break;
 			case 4: Platter(k, holder, instant); break;
 			case 5: if (instant) { _tables[t].Visible = false; Wreckage(k); } break;
@@ -668,22 +668,21 @@ public partial class SkiLodge
 		k.Quad(new Vector3(0.9f, 0.004f, 0.3f), new Vector3(1.3f, 0.004f, 0.3f), new Vector3(1.3f, 0.004f, -0.05f), new Vector3(0.9f, 0.004f, -0.05f), Vector3.Up);
 	}
 
-	private static StandardMaterial3D _wetBlood;
-	private static StandardMaterial3D WetBlood => _wetBlood ??= new StandardMaterial3D { ResourceName = "lodge_wetblood", AlbedoColor = new Color(0.42f, 0.02f, 0.015f), Roughness = 0.12f, MetallicSpecular = 0.9f, AlbedoTexture = ProcTextures.Grime() };
-
 	private static void BloodStreak(MeshKit k)
 	{
-		k.Mat(WetBlood);
+		// (the gushy-water pass, 2026-10-15: wet running blood, creeping along to the end, SkiLodge.Blood.cs; UV.x across, UV.y metres along)
+		k.Mat(BloodRunMat);
 		var rng = new RandomNumberGenerator { Seed = 5201 };
 		float prevZ = 0f;
 		for (float x = -TableLen * 0.5f; x < TableLen * 0.5f - 0.2f; x += 0.3f)
 		{
 			float z = Mathf.Clamp(prevZ + rng.RandfRange(-0.05f, 0.05f), -0.2f, 0.2f), w = 0.2f + 0.07f * Mathf.Sin(x * 3f) + rng.RandfRange(-0.02f, 0.02f);
+			float v0 = x + TableLen * 0.5f, v1 = v0 + 0.3f;
 			k.Quad(new Vector3(x, 0.004f, prevZ + w), new Vector3(x + 0.3f, 0.004f, z + w), new Vector3(x + 0.3f, 0.004f, z - w), new Vector3(x, 0.004f, prevZ - w), Vector3.Up,
-				new Vector2(0, 0), new Vector2(0.3f, 0), new Vector2(0.3f, 1), new Vector2(0, 1));
+				new Vector2(0, v0), new Vector2(0, v1), new Vector2(1, v1), new Vector2(1, v0));
 			prevZ = z;
 		}
-		// it runs off the end and down to the floor
+		// it runs off the end and down to the floor (BloodRunOff: a pour, drips and a pool; this sheet stays under it as the stain)
 		k.Mat(StationParts.StationTextures.BloodDripMat);
 		k.Quad(new Vector3(TableLen * 0.5f - 0.01f, 0.0f, 0.12f), new Vector3(TableLen * 0.5f - 0.01f, 0.0f, -0.12f), new Vector3(TableLen * 0.5f + 0.01f, -TableH, -0.12f), new Vector3(TableLen * 0.5f + 0.01f, -TableH, 0.12f), Vector3.Right);
 	}
@@ -809,19 +808,9 @@ public partial class SkiLodge
 		PlatterSkull.ShowOnlyHead();
 		PlatterSkull.Rotation = new Vector3(0, 0.6f, 0);
 		if (instant) return;
-		var blood = new GpuParticles3D
-		{
-			Name = "Blood", Amount = 80, Lifetime = 0.9f, LocalCoords = false,
-			ProcessMaterial = new ParticleProcessMaterial
-			{
-				Direction = new Vector3(0, -1, -0.2f), Spread = 10f, InitialVelocityMin = 0.2f, InitialVelocityMax = 0.5f, Gravity = new Vector3(0, -6f, 0),
-				ScaleMin = 0.6f, ScaleMax = 1.4f, Color = new Color(0.35f, 0.02f, 0.02f),
-			},
-			DrawPass1 = new SphereMesh { Radius = 0.012f, Height = 0.024f, RadialSegments = 4, Rings = 2, Material = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.02f, 0.02f), Roughness = 0.1f, MetallicSpecular = 0.8f } },
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-		};
-		holder.AddChild(blood);
-		Callable.From(() => { if (IsInstanceValid(PlatterSkull) && IsInstanceValid(blood)) blood.GlobalPosition = PlatterSkull.MouthWorld; }).CallDeferred();
+		// the blood out of its jaw, and the pool spreading over the platter (SkiLodge.Blood.cs; was red beads falling)
+		bool kit = FurnitureKit.Has("silver_platter");
+		BleedingMouth(holder, kit ? new Vector3(0.05f, 0.019f, -0.03f) : new Vector3(0.05f, 0.028f, -0.1f), kit ? 0.16f : 0.2f, kit ? 0.3f : 0.42f);
 		AudioDirector.OneShot(this, "blood_drain", 1, holder.GlobalPosition, -10f, "Events", 3f, 0.05f);
 	}
 
@@ -1022,7 +1011,7 @@ public partial class SkiLodge
 		bool melted = Taken(LodgeFlag.Card201);
 		s.Mat(melted ? StationParts.StationTextures.BloodPoolMat : WinterWoods.SoftSnow);
 		s.Color = Colors.White;
-		if (melted) s.Cylinder(new Vector3(0, 0.08f, 0), new Vector3(0, 0.085f, 0), 0.135f, 0.135f, 20, true);
+		if (melted) s.Cylinder(new Vector3(0, 0.104f, 0), new Vector3(0, 0.109f, 0), 0.15f, 0.15f, 20, true);   // (up to where the melt leaves it: the bowl's base is thick)
 		else s.Blob(new Vector3(0, 0.1f, 0), new Vector3(0.14f, 0.07f, 0.14f), 5600, 0.2f, true, 1f);
 		s.CommitTo(_bowlSnow, "Snow", false);
 		if (melted) return;
@@ -1036,15 +1025,10 @@ public partial class SkiLodge
 		GD.Print("[story] Act 23: 201's keycard taken - the snow in the bowl melts into blood");
 		if (_bowlSnow == null || !IsInstanceValid(_bowlSnow)) return;
 		var snow = _bowlSnow.GetNodeOrNull<MeshInstance3D>("Snow");
-		var blood = new MeshInstance3D
-		{
-			Name = "Blood", Mesh = new CylinderMesh { TopRadius = 0.135f, BottomRadius = 0.09f, Height = 0.05f, RadialSegments = 20 }, Position = new Vector3(0, 0.06f, 0),
-			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 0.02f, 0.02f), Roughness = 0.08f, MetallicSpecular = 0.9f }, Scale = new Vector3(1f, 0.05f, 1f),
-		};
-		_bowlSnow.AddChild(blood);
+		// (the gushy-water pass, 2026-10-15: welling up from under the snow and spreading to the rim, SkiLodge.Blood.cs)
+		BowlBlood(_bowlSnow, out _);
 		var tw = CreateTween().SetParallel();
 		if (snow != null) tw.TweenProperty(snow, "scale", new Vector3(0.8f, 0.05f, 0.8f), 2.4f).SetTrans(Tween.TransitionType.Sine);
-		tw.TweenProperty(blood, "scale", Vector3.One, 2.6f).SetTrans(Tween.TransitionType.Sine);
 		AudioDirector.OneShot(this, "haunt_drip", 3, _bowlSnow.GlobalPosition, -8f, "Events", 2f, 0.1f);
 		await Wait(1.2);
 		AudioDirector.OneShot(this, "blood_suck", 1, _bowlSnow.GlobalPosition, -10f, "Events", 2f, 0.05f);

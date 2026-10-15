@@ -68,20 +68,9 @@ public partial class BossRoom
 		}
 		flaps.CommitTo(this, "LaggingFlaps", false);
 		calcite.CommitTo(this, "Calcite", false);
-		// the drips: a drop now and then off a joint, falling past the catwalk into the dark
-		var dropMat = new StandardMaterial3D
-		{
-			ResourceName = "pit_drip", AlbedoColor = new Color(0.55f, 0.52f, 0.45f, 0.7f), Roughness = 0.1f, MetallicSpecular = 0.9f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.FixedY,
-		};
-		foreach (var p in drips)
-			AddChild(new GpuParticles3D
-			{
-				Name = "Drip", Position = p, Amount = 3, Lifetime = 2.2, Randomness = 0.8f, Preprocess = 2.0,
-				VisibilityAabb = new Aabb(new Vector3(-1, -26, -1), new Vector3(2, 28, 2)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-				ProcessMaterial = new ParticleProcessMaterial { Gravity = new Vector3(0, -9.8f, 0), InitialVelocityMin = 0f, InitialVelocityMax = 0.05f, Spread = 3f, Direction = Vector3.Down },
-				DrawPass1 = new QuadMesh { Size = new Vector2(0.008f, 0.03f), Material = dropMat },
-			});
+		// the drips: a drop now and then off a joint, falling past the catwalk into the dark (the gushy-water pass,
+		// 2026-10-15: FlowFx's drips, which swell on the joint and stretch long as they let go)
+		foreach (var p in drips) FlowFx.Drips(this, p, FlowFx.Liquid.Sewer, 1.2f, 22f, 0.01f, "Drip");
 
 		// the old stencils: red paint, faded, flaking, on the pipes and the frames (a little red that isn't light)
 		string[] words = { "DANGER", "KEEP CLEAR", "No 3 SUMP", "DRAIN", "DANGER  HIGH PRESSURE", "NO ENTRY", "OUTFALL", "No 7 MAIN" };

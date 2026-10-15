@@ -36,7 +36,10 @@ void vertex() {
 
 float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 
-vec3 tri_w(vec3 n) { vec3 w = pow(abs(n), vec3(4.0)); return w / (w.x + w.y + w.z + 1e-4); }
+// (2026-10-15, the scan: long horizontal smears down the vault's walls) The weights come from the surface's own facet (its
+// world-space derivatives), not the interpolated normal: the CSG's smoothed normals swing well off the true face at its
+// seams and ribs, and a projection laid edge-on to the face it lands on stretches into streaks. Sharper, too.
+vec3 tri_w(vec3 n) { vec3 w = pow(abs(n), vec3(8.0)); return w / (w.x + w.y + w.z + 1e-4); }
 
 // the scallops' height at a point of one projection: ridged noise (sharp rims where the gouges meet, round hollows)
 float gouge(vec2 p) {
@@ -64,7 +67,10 @@ vec3 tnormal(vec2 p, out float h) {
 }
 
 void fragment() {
-	vec3 w = tri_w(w_nrm);
+	vec3 gn = cross(dFdx(w_pos), dFdy(w_pos));
+	gn = dot(gn, gn) > 1e-12 ? normalize(gn) : w_nrm;
+	if (dot(gn, w_nrm) < 0.0) gn = -gn;
+	vec3 w = tri_w(gn);
 	vec3 n = w_nrm;
 	float hx, hy, hz;
 	vec3 nx = tnormal(w_pos.zy, hx);
@@ -90,7 +96,10 @@ void fragment() {
 	float grit = smoothstep(0.45, 0.75, texture(noise_tex, w_pos.xz * 0.6 + vec2(w_pos.y * 0.3)).r);
 	col = mix(col, col * grit_color * 1.4, grit * 0.35);
 	// the glaze: streaks down the walls (stretched along y) and patches on the roof, where it thawed and froze
-	float streak = texture(noise_tex, vec2(w_pos.x * 0.45 + w_pos.z * 0.45, w_pos.y * 0.2)).r;
+	// (per projection: one diagonal x + z sample went flat along any wall running across that diagonal, and the glaze there
+	// came out as bands the whole length of the wall)
+	float streak = texture(noise_tex, vec2(w_pos.z * 0.45, w_pos.y * 0.2)).r * w.x + texture(noise_tex, w_pos.xz * 0.3 + vec2(0.13, 0.58)).r * w.y
+		+ texture(noise_tex, vec2(w_pos.x * 0.45, w_pos.y * 0.2) + vec2(0.61, 0.27)).r * w.z;
 	float glaze = smoothstep(0.62, 0.74, streak * 0.75 + broad * 0.35) * (1.0 - w.y * 0.6);
 	col = mix(col, glaze_color * (0.7 + 0.4 * lum), glaze * 0.6);
 	ALBEDO = col;

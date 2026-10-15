@@ -194,21 +194,62 @@ public partial class Act24Maze : Node3D
 		AddChild(hole);
 		hole.GlobalTransform = _lodge.GlobalTransform * new Transform3D(Basis.Identity, new Vector3(0, ge, zEnd));
 		_holeWorld = hole.GlobalPosition;
-		for (int i = 1; i <= 3; i++)
-		{
-			float u = i / 4f;
-			hole.AddChild(new MeshInstance3D
-			{
-				Name = $"Dark{i}", Mesh = new QuadMesh { Size = new Vector2(2.3f, 2.3f) },
-				Position = new Vector3(0, Mathf.Lerp(0.9f, 0.4f, u), Mathf.Lerp(0.9f, 5.0f, u)),
-				MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0, 0, 0, 0.42f + 0.15f * i), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled },
-				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-			});
-		}
+		BuildHoleThroat(hole);
 		var t = GetTree().CreateTimer(0.4);
 		t.Timeout += () => { if (IsInstanceValid(hole)) DressMouth(hole); };
 		_holeTrigger = StoryBeat.MakeTrigger(hole, new BoxShape3D { Size = new Vector3(2.0f, 3f, 2.6f) }, new Vector3(0, 1f, 0.9f), p => _ = Cutscene.Run(this, ct => GoDown(p, ct), lockInput: true), "HoleTrigger");
 		GD.Print($"[story] Act 24: the snow tunnel from the lodge's door to the way down ({zEnd - z0:0} m)");
+	}
+
+	/// <summary>(2026-10-15, the scan: the hole's dark was three flat black cards stacked in it, plain cards from any angle) The
+	/// throat of the way down: a tube lining the bore (hole-local, along the Entrance cut: in along +Z, dropping a little),
+	/// flared at its start so it comes out of the cut's own wall a metre in, its packed ice going grey and then black the
+	/// deeper it goes (no shine in it), closed by black at the end. Real depth: the lantern lights its first metre and no
+	/// more.</summary>
+	private static void BuildHoleThroat(Node3D hole)
+	{
+		var mat = new StandardMaterial3D
+		{
+			ResourceName = "maze_hole_throat", VertexColorUseAsAlbedo = true, Roughness = 1f, SpecularMode = BaseMaterial3D.SpecularModeEnum.Disabled,
+			NormalEnabled = true, NormalTexture = GD.Load<Texture2D>("res://assets/textures/snow/snow_normal.png"), NormalScale = 0.7f,
+			Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.7f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+		};
+		var k = new MeshKit();
+		k.Mat(mat);
+		const int seg = 22, rings = 20;
+		const float z0 = 0.35f, z1 = 5.6f;
+		var wob = new FastNoiseLite { Frequency = 0.9f, Seed = 2441 };
+		static float AxisY(float z) => 0.56f - 0.1055f * (z - 2.7f);   // (the Entrance cylinder's axis: 96 degrees off the vertical)
+		var p = new Vector3[rings, seg + 1];
+		var n = new Vector3[rings, seg + 1];
+		var col = new Color[rings];
+		for (int r = 0; r < rings; r++)
+		{
+			float z = Mathf.Lerp(z0, z1, r / (rings - 1f));
+			float rad = Mathf.Lerp(1.3f, 1.02f, Mathf.SmoothStep(0.4f, 1.5f, z)) - 0.12f * Mathf.SmoothStep(3f, 5.6f, z);
+			float g = Mathf.Lerp(0.34f, 0f, Mathf.SmoothStep(0.9f, 3.4f, z));
+			col[r] = new Color(g * 0.9f, g * 0.95f, g, 1f);
+			for (int s = 0; s <= seg; s++)
+			{
+				float th = Mathf.Tau * (s % seg) / seg;
+				float w = 1f + 0.07f * wob.GetNoise2D(z * 2f, s % seg * 0.8f);
+				var d = new Vector3(Mathf.Cos(th), Mathf.Sin(th), 0f);
+				p[r, s] = new Vector3(0f, AxisY(z), z) + d * rad * w;
+				n[r, s] = -d;
+			}
+		}
+		for (int r = 0; r < rings - 1; r++)
+			for (int s = 0; s < seg; s++)
+			{
+				k.TriC(p[r, s], p[r + 1, s], p[r + 1, s + 1], n[r, s], n[r + 1, s], n[r + 1, s + 1], Vector2.Zero, Vector2.Zero, Vector2.Zero, col[r], col[r + 1], col[r + 1]);
+				k.TriC(p[r, s], p[r + 1, s + 1], p[r, s + 1], n[r, s], n[r + 1, s + 1], n[r, s + 1], Vector2.Zero, Vector2.Zero, Vector2.Zero, col[r], col[r + 1], col[r]);
+			}
+		// the black at the end of it
+		k.Color = Colors.Black;
+		var c = new Vector3(0f, AxisY(z1), z1 + 0.4f);
+		for (int s = 0; s < seg; s++)
+			k.Tri(c, p[rings - 1, s], p[rings - 1, s + 1], Vector3.Back, Vector2.Zero, Vector2.Zero, Vector2.Zero);
+		k.CommitTo(hole, "Throat", false);
 	}
 
 	/// <summary>Round the mouth, on the drift's face: a crusted lip of packed snow along the cut's edge (so it reads as a
@@ -431,7 +472,7 @@ public partial class Act24Maze : Node3D
 		// the crowbar
 		Crowbar = new Pickup { Name = "Crowbar", Kind = ToolKind.Crowbar, Label = "Crowbar", TakenId = FlagCrowbar, UseSpot = false, SnapToSurface = false };
 		Cave.AddChild(Crowbar);
-		Crowbar.Position = crowbarAt + Vector3.Up * 0.03f;
+		Crowbar.Position = crowbarAt;   // (2026-10-15: on the duckboards' slats; it hung 3 cm over them)
 		Crowbar.Rotation = new Vector3(0, 0.7f, 0);
 		// the crate
 		_crate = new Node3D { Name = "FlameCrate", Position = crateAt, Rotation = new Vector3(0, crateYaw, 0) };

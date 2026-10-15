@@ -90,8 +90,9 @@ public partial class WinterGlade : Node3D
 			int kind = 0;
 			for (; kind < kinds.Count - 1; kind++) { pick -= kinds[kind].weight; if (pick <= 0) break; }
 			float s = _rng.RandfRange(0.8f, 1.2f);
-			var basis = new Basis(Vector3.Up, _rng.RandfRange(0, Mathf.Tau)).Scaled(Vector3.One * s);
-			byKind[kind].Add(new Transform3D(basis, new Vector3(p.X, HeightAt(p.X, p.Y) - 0.1f, p.Y)));
+			// (2026-10-15: its own width and depth; set down to the lowest of the ground round its foot, not its centre's)
+			var basis = WinterWoods.TreeBasis(_rng.RandfRange(0, Mathf.Tau), s, (ulong)placed.Count + 5000UL);
+			byKind[kind].Add(new Transform3D(basis, new Vector3(p.X, WinterWoods.FootHeight(p.X, p.Y, 0.55f * s) - 0.1f, p.Y)));
 			WinterWoods.TreeSpots.Add((p, kinds[kind].h * s, kinds[kind].fir));   // the wendigo leaps into these too
 		}
 		for (int i = 0; i < kinds.Count; i++)

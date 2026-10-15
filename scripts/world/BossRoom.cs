@@ -710,6 +710,8 @@ public partial class BossRoom : Node3D
 		_bloodMat.SetShaderParameter("drain", Vector2.Zero);
 		_bloodMat.SetShaderParameter("water_color", new Color(0.16f, 0.005f, 0.008f));
 		_bloodMat.SetShaderParameter("scum_color", new Color(0.3f, 0.03f, 0.03f));
+		// (the gushy-water pass, 2026-10-15) blood, not water: slow heavy swells, glossy, clotting, dark in the deep
+		_bloodMat.SetShaderParameter("viscous", 1f);
 		_blood = new MeshInstance3D
 		{
 			Name = "Blood", Mesh = new PlaneMesh { Size = new Vector2(Half * 2f, Half * 2f), SubdivideWidth = 24, SubdivideDepth = 24 },
