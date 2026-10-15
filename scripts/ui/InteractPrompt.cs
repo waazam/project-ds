@@ -13,20 +13,23 @@ namespace ProjectDS.UI;
 /// it fades out while the player has no control (cutscenes) or the screen is
 /// blacked out.
 ///
-/// Prompts never carry the key hint themselves: this layer prepends "[E]" or
-/// "[Hold E]" to a usable interactable's text, and shows a blocked one's text
-/// ("Hands full...") plain.
+/// Prompts never carry the key hint themselves: this layer puts the use key's
+/// cap (E, or the pad's A; "HOLD" before it for a held one) in front of a
+/// usable interactable's text, and shows a blocked one's text ("Hands full...")
+/// plain. (2026-10-15) In the hints' look (<see cref="HintStyle"/>), just under
+/// the crosshair: close enough to read with the thing looked at, clear of the
+/// held lantern low at the left and of the low hint band.
 /// </summary>
 public partial class InteractPrompt : CanvasLayer
 {
 	public static InteractPrompt Instance { get; private set; }
 
-	/// <summary>Prompt band, below centre and clear of the ScreenFader caption band.</summary>
-	public const float PromptTop = 64f;   // px below screen centre
+	/// <summary>Prompt band: its top, this far below the screen centre (clear of the hold ring round the dot).</summary>
+	public const float PromptTop = 22f;   // px below screen centre
 
 	private Control _root;
 	private Control _dot;
-	private RichTextLabel _label;
+	private HintText _label;
 	private string _shownKey, _shownText;
 	private PlayerController _player;
 	private PlayerInteraction _interaction;
@@ -49,29 +52,18 @@ public partial class InteractPrompt : CanvasLayer
 		_dot.Draw += DrawDot;
 		_root.AddChild(_dot);
 
-		_label = new RichTextLabel
-		{
-			BbcodeEnabled = true,
-			FitContent = true,
-			ScrollActive = false,
-			AutowrapMode = TextServer.AutowrapMode.Off,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			Modulate = new Color(1, 1, 1, 0),
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-		};
-		_label.AddThemeFontOverride("normal_font", UiKit.Serif);
-		_label.AddThemeFontSizeOverride("normal_font_size", UiKit.BodySize);
-		_label.AddThemeFontSizeOverride("mono_font_size", UiKit.SmallSize + 1);
-		_label.AddThemeFontOverride("mono_font", UiKit.Mono);
-		_label.AddThemeColorOverride("default_color", UiKit.Bone);
-		_label.AddThemeColorOverride("font_shadow_color", UiKit.Shadow);
-		_label.AddThemeConstantOverride("shadow_offset_x", 1);
-		_label.AddThemeConstantOverride("shadow_offset_y", 1);
-		_label.AddThemeConstantOverride("shadow_outline_size", 1);
-		_label.AnchorLeft = 0.5f; _label.AnchorRight = 0.5f; _label.AnchorTop = 0.5f; _label.AnchorBottom = 0.5f;
-		_label.OffsetLeft = -180; _label.OffsetRight = 180; _label.OffsetTop = PromptTop; _label.OffsetBottom = PromptTop + 16;
+		// (a long examine line wraps to two short lines rather than running across the view)
+		_label = new HintText { MaxWidth = 250f, Modulate = new Color(1, 1, 1, 0), Backing = 0.42f };
+		_label.SetAnchorsPreset(Control.LayoutPreset.Center);
+		_label.OffsetTop = PromptTop; _label.OffsetBottom = PromptTop;
+		_label.OffsetLeft = 0; _label.OffsetRight = 0;
 		_root.AddChild(_label);
 	}
+
+	public override void _Input(InputEvent e) => HintStyle.Note(e);
+
+	/// <summary>For tests and the preview: the prompt as shown ("key|text").</summary>
+	public string Shown => _label?.Text ?? "";
 
 	public override void _Process(double delta)
 	{
@@ -87,7 +79,7 @@ public partial class InteractPrompt : CanvasLayer
 		string text = focused != null ? _interaction.PromptText : null;
 		// Usable interactables get the key hint; blocked ones ("Hands full...") read as plain text.
 		string key = focused != null && !string.IsNullOrEmpty(text) && focused.CanInteract(_player)
-			? (focused.HoldSeconds > 0f ? "[Hold E]" : "[E]")
+			? (focused.HoldSeconds > 0f ? "hold " : "") + KeyHint.Use
 			: null;
 		bool hasControl = _player != null && _player.PlayerInput != null && _player.PlayerInput.Enabled;
 		_fader ??= GetNodeOrNull<ScreenFader>("../ScreenFader");
@@ -100,18 +92,14 @@ public partial class InteractPrompt : CanvasLayer
 		_dot.QueueRedraw();
 
 		bool showLabel = !string.IsNullOrEmpty(text) && hasControl;
-		if (showLabel && (text != _shownText || key != _shownKey)) { _shownText = text; _shownKey = key; _label.Text = Format(key, text); }
-		_labelAlpha = Mathf.MoveToward(_labelAlpha, showLabel ? 1f : 0f, dt * (showLabel ? 10f : 6f));
+		if (showLabel && (text != _shownText || key != _shownKey))
+		{
+			_shownText = text; _shownKey = key;
+			bool held = key != null && key.StartsWith("hold ");
+			_label.SetPrompt(held ? key[5..] : key, held, text);
+		}
+		_labelAlpha = Mathf.MoveToward(_labelAlpha, showLabel ? 1f : 0f, dt * (showLabel ? 8f : 5f));
 		_label.Modulate = new Color(1, 1, 1, _labelAlpha);
-	}
-
-	/// <summary>The prompt as BBCode: the key hint ("[E]" / "[Hold E]", if any) in quiet eye-yellow
-	/// monospace, the text in bone serif. The text itself is shown verbatim.</summary>
-	private static string Format(string key, string text)
-	{
-		static string Esc(string s) => s.Replace("[", "[lb]");
-		if (string.IsNullOrEmpty(key)) return Esc(text);
-		return $"[code][color=#{UiKit.Eye.ToHtml(false)}c0]{Esc(key)}[/color][/code] {Esc(text)}";
 	}
 
 	private void DrawDot()

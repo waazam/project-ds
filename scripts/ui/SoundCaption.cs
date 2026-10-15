@@ -75,5 +75,12 @@ public partial class SoundCaption : CanvasLayer
 		_hold -= (float)delta;
 		_alpha = Mathf.MoveToward(_alpha, _hold > 0 ? 1f : 0f, (float)delta * 3f);
 		_label.Modulate = new Color(1, 1, 1, _alpha);
+		if (_alpha <= 0.001f) return;
+		// (2026-10-15) over whatever shows in the low band (a hint, a thought, a spoken line), never across it
+		float screenY = _label.GetViewportRect().Size.Y;
+		float bottom = -64f;
+		if (!float.IsNaN(HintStyle.SubtitleTop)) bottom = Mathf.Min(bottom, HintStyle.SubtitleTop - screenY - 2f);
+		if (!float.IsNaN(HintStyle.ThoughtTop)) bottom = Mathf.Min(bottom, HintStyle.ThoughtTop - screenY - 2f);
+		_label.OffsetBottom = Mathf.Round(bottom); _label.OffsetTop = _label.OffsetBottom - 14f;
 	}
 }

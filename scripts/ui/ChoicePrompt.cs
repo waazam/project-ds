@@ -21,7 +21,8 @@ public partial class ChoicePrompt : CanvasLayer
 
 	private PlayerController _player;
 	private Control _root;
-	private Label _a, _b, _hint, _question;
+	private Label _a, _b, _question;
+	private HintText _hint;
 	private string _textA = "", _textB = "";
 	private TaskCompletionSource<int> _tcs;
 	private float _fade;
@@ -46,15 +47,8 @@ public partial class ChoicePrompt : CanvasLayer
 		_root.AddChild(_question);
 		_a = Option(-1);
 		_b = Option(1);
-		_hint = new Label { HorizontalAlignment = HorizontalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
-		_hint.AddThemeFontOverride("font", UiKit.Mono);
-		_hint.AddThemeFontSizeOverride("font_size", 11);
-		_hint.AddThemeColorOverride("font_color", new Color(0.7f, 0.68f, 0.62f));
-		_hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
-		_hint.AddThemeConstantOverride("shadow_offset_x", 1);
-		_hint.AddThemeConstantOverride("shadow_offset_y", 1);
-		_hint.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
-		_hint.OffsetTop = -44; _hint.OffsetBottom = -16;
+		// (2026-10-15) the controls in the hints' look, low in the bar, the keys as key caps
+		_hint = new HintText { LowBand = true };
 		_root.AddChild(_hint);
 	}
 
@@ -77,7 +71,10 @@ public partial class ChoicePrompt : CanvasLayer
 	public Task<int> Ask(PlayerController player, string a, string b, string question = null, string hint = null)
 	{
 		_question.Text = question ?? "";
-		_hint.Text = hint ?? "A / D  choose      E  jump      S  step back";
+		hint ??= "A / D  choose      E  jump      S  step back";
+		// a pad: the stick or the d-pad chooses, A takes it, B steps back (ui_cancel)
+		if (HintStyle.UsingPad) hint = hint.Replace("A / D  ", "LS  ").Replace("E  ", "A  ").Replace("S  step", "B  step");
+		_hint.SetText(hint);
 		if (IsOpen) Close(-1);
 		_player = player;
 		_textA = a; _textB = b;

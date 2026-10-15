@@ -125,7 +125,7 @@ public partial class RowingPrompt : CanvasLayer
 	{
 		float a = _alpha;
 		float h = 20f + 3f * _urgent;
-		var font = UiKit.Mono;
+		var font = HintStyle.Font;   // (2026-10-15: the hints' face, the inventory's)
 		int fs = UiKit.SmallSize + 3;
 		var textSize = font.GetStringSize(key, HorizontalAlignment.Center, -1, fs);
 		float w = Mathf.Max(h, textSize.X + 10f);
@@ -144,7 +144,7 @@ public partial class RowingPrompt : CanvasLayer
 
 	private void DrawLabel(Vector2 c, string label, float lit, float danger)
 	{
-		var serif = UiKit.Serif;
+		var serif = HintStyle.Font;
 		int ls = UiKit.SmallSize;
 		var lsz = serif.GetStringSize(label, HorizontalAlignment.Center, -1, ls);
 		var col = new Color(UiKit.Muted, (0.5f + 0.3f * lit) * _alpha).Lerp(new Color(Blood, 0.9f * _alpha), danger * 0.8f);

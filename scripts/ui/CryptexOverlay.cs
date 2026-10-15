@@ -20,7 +20,7 @@ public partial class CryptexOverlay : CanvasLayer
 	private PlayerController _player;
 	private Camera3D _cam;
 	private Control _root;
-	private Label _hint;
+	private HintText _hint;
 	private System.Action _onClose;
 
 	public override void _EnterTree() => Instance = this;
@@ -32,16 +32,8 @@ public partial class CryptexOverlay : CanvasLayer
 		_root = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
 		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_root);
-		_hint = new Label { HorizontalAlignment = HorizontalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
-		_hint.AddThemeFontOverride("font", UiKit.Mono);
-		_hint.AddThemeFontSizeOverride("font_size", 11);
-		_hint.AddThemeColorOverride("font_color", new Color(0.85f, 0.82f, 0.74f));
-		_hint.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
-		_hint.AddThemeConstantOverride("shadow_offset_x", 1);
-		_hint.AddThemeConstantOverride("shadow_offset_y", 1);
-		_hint.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
-		_hint.OffsetTop = -44; _hint.OffsetBottom = -16;
-		_hint.Text = "A / D  choose a ring      W / S  turn it      E  straighten up";
+		// (2026-10-15) the controls in the hints' look, low in the bar, the keys as key caps (set on opening: keys or pad)
+		_hint = new HintText { LowBand = true };
 		_root.AddChild(_hint);
 	}
 
@@ -52,6 +44,9 @@ public partial class CryptexOverlay : CanvasLayer
 		Box = box;
 		_onClose = onClose;
 		IsOpen = true;
+		_hint.SetText(HintStyle.UsingPad
+			? "LS  choose a ring and turn it      A / B  straighten up"
+			: "A / D  choose a ring      W / S  turn it      E  straighten up");
 		player.PlayerInput.BeginModal();
 		var playerCam = player.CameraRig?.Camera;
 		if (playerCam != null) playerCam.Current = false;

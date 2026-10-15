@@ -14,6 +14,8 @@ namespace ProjectDS.UI;
 public partial class CinemaFrame : CanvasLayer
 {
 	public const float Aspect = 2.2f;
+	/// <summary>The bottom bar's height now, in the 640x360 canvas's pixels (0: none), for the hints that sit on it (HintStyle).</summary>
+	public static float Bar { get; private set; }
 	private ColorRect _top, _bottom;
 	private float _amount;
 
@@ -37,6 +39,7 @@ public partial class CinemaFrame : CanvasLayer
 		float e = _amount * _amount * (3f - 2f * _amount);
 		var size = GetViewport().GetVisibleRect().Size;
 		float bar = Mathf.Max(0f, (size.Y - size.X / Aspect) * 0.5f) * e;
+		Bar = bar;
 		_top.Visible = _bottom.Visible = bar > 0.01f;
 		// (each bar runs well past its edge of the screen: drawn at the game's 640x360 and scaled to a window that isn't a
 		// whole multiple of it, a bar sized to the edge exactly could stop a fraction of a pixel short, a hairline of the

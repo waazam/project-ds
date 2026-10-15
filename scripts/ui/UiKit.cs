@@ -269,6 +269,8 @@ public static class UiKit
 		AddToggle(box, "Reduce flashing", s.ReduceFlashing, on => s.ReduceFlashing = on);
 		AddSlider(box, "Screen shake", 0.0, 1.0, s.ScreenShake, v => s.ScreenShake = (float)v, 0.05, v => $"{Mathf.RoundToInt((float)v * 100f)}%");
 		AddToggle(box, "Sound captions", s.SoundCaptions, on => s.SoundCaptions = on);
+		AddSlider(box, "Hint text", 0, HintStyle.SizeNames.Length - 1, s.HintSize, v => s.HintSize = Mathf.RoundToInt(v), 1,
+			v => HintStyle.SizeNames[Mathf.Clamp(Mathf.RoundToInt(v), 0, HintStyle.SizeNames.Length - 1)]);
 		AddToggle(box, "Hold to crouch", s.HoldToCrouch, on => s.HoldToCrouch = on);
 		AddToggle(box, "Body in view", s.BodyInView, on => s.BodyInView = on);
 		AddToggle(box, "Head motion", s.HeadMotion, on => s.HeadMotion = on);
