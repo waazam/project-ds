@@ -21,21 +21,52 @@ public partial class WinterWoods
 
 	/// <summary>The kinds of tree, their share, height, crown radius (firs), crown start (firs), whether a fir, and whether
 	/// it takes its ice from its instance's custom data (all but the snag, which takes the glassy overlay).</summary>
+	/// <summary>(2026-10-15, the scan: only ten tree shapes, the glade and the road both drawing the same ones, their silhouettes
+	/// repeating along the road) Sixteen now, built once and shared by the glade and the road (they were built twice); each
+	/// placed tree also takes its own width and depth (<see cref="TreeBasis"/>).</summary>
 	public static List<(Mesh mesh, float weight, float h, float maxR, float crown, bool fir, bool bare)> WinterTreeKinds()
 	{
-		return new()
+		return _treeKinds ??= new()
 		{
-			(WinterTreeKit.BareTree(501, 15f, 0), 1.5f, 15f, 4f, 0.4f, false, true),
-			(WinterTreeKit.BareTree(502, 19f, 0), 1.3f, 19f, 5f, 0.4f, false, true),
-			(WinterTreeKit.BareTree(503, 12f, 1), 1.2f, 12f, 3.5f, 0.4f, false, true),
-			(WinterTreeKit.BareTree(504, 22f, 1), 1.0f, 22f, 5.5f, 0.4f, false, true),
-			(WinterTreeKit.BareTree(505, 16f, 1), 1.3f, 16f, 4f, 0.4f, false, true),
-			(WinterTreeKit.BareTree(506, 9f, 0), 1.1f, 9f, 2.8f, 0.4f, false, true),
-			(WinterTreeKit.WinterFir(601, 20f, 3.6f), 0.7f, 20f, 3.6f, 0.2f, true, true),
-			(WinterTreeKit.WinterFir(602, 14f, 2.8f), 0.6f, 14f, 2.8f, 0.2f, true, true),
-			(WinterTreeKit.WinterFir(603, 26f, 4.2f), 0.35f, 26f, 4.2f, 0.2f, true, true),
+			(WinterTreeKit.BareTree(501, 15f, 0), 1.0f, 15f, 4f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(502, 19f, 0), 0.9f, 19f, 5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(503, 12f, 1), 0.8f, 12f, 3.5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(504, 22f, 1), 0.7f, 22f, 5.5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(505, 16f, 1), 0.9f, 16f, 4f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(506, 9f, 0), 0.8f, 9f, 2.8f, 0.4f, false, true),
+			(WinterTreeKit.WinterFir(601, 20f, 3.6f), 0.5f, 20f, 3.6f, 0.2f, true, true),
+			(WinterTreeKit.WinterFir(602, 14f, 2.8f), 0.45f, 14f, 2.8f, 0.2f, true, true),
+			(WinterTreeKit.WinterFir(603, 26f, 4.2f), 0.3f, 26f, 4.2f, 0.2f, true, true),
 			(ForestScatter.SnagMesh(224, 15f, 0.6f), 0.8f, 15f, 0.5f, 0.9f, false, false),   // frosted moss off its limbs (2026-10-03)
+			(WinterTreeKit.BareTree(507, 17f, 0), 0.9f, 17f, 4.5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(508, 13f, 1), 0.8f, 13f, 3.6f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(509, 20f, 1), 0.7f, 20f, 5f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(510, 11f, 0), 0.8f, 11f, 3.2f, 0.4f, false, true),
+			(WinterTreeKit.BareTree(511, 24f, 0), 0.5f, 24f, 5.8f, 0.4f, false, true),
+			(WinterTreeKit.WinterFir(604, 17f, 3.1f), 0.4f, 17f, 3.1f, 0.2f, true, true),
 		};
+	}
+	private static List<(Mesh mesh, float weight, float h, float maxR, float crown, bool fir, bool bare)> _treeKinds;
+
+	/// <summary>A placed tree's basis: its yaw and size, and (2026-10-15) its own width and depth, a little each way, so no two
+	/// of one shape stand alike.</summary>
+	public static Basis TreeBasis(float yaw, float sc, ulong seed)
+	{
+		var r = new RandomNumberGenerator { Seed = seed * 2654435761UL + 99 };
+		return new Basis(Vector3.Up, yaw).Scaled(new Vector3(sc * r.RandfRange(0.86f, 1.15f), sc, sc * r.RandfRange(0.86f, 1.15f)));
+	}
+
+	/// <summary>(2026-10-15, the scan: on a slope the tree stood at its centre's height, its downhill side over nothing and its
+	/// roots in the air) The lowest of the ground round a trunk's foot.</summary>
+	public static float FootHeight(float x, float z, float r)
+	{
+		float h = Height(x, z);
+		for (int i = 0; i < 6; i++)
+		{
+			float a = i * Mathf.Tau / 6f;
+			h = Mathf.Min(h, Height(x + Mathf.Cos(a) * r, z + Mathf.Sin(a) * r));
+		}
+		return h;
 	}
 
 	private void BuildTrees()
@@ -84,8 +115,8 @@ public partial class WinterWoods
 					for (; kind < kinds.Count - 1; kind++) { pick -= kinds[kind].weight; if (pick <= 0) break; }
 					float sc = rng.RandfRange(0.8f, 1.2f);
 					float yaw = rng.RandfRange(0, Mathf.Tau);
-					var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * sc);
-					var at = new Vector3(p.X, Height(p.X, p.Y) - 0.1f, p.Y);
+					var basis = TreeBasis(yaw, sc, (ulong)(uint)(gx * 7919 + gz * 104729));
+					var at = new Vector3(p.X, FootHeight(p.X, p.Y, 0.55f * sc) - 0.1f, p.Y);
 					var ch = ChunkAt(p);
 					float frozen = FrozenAt(s);
 					float ice = kinds[kind].bare ? Mathf.Clamp(frozen * rng.RandfRange(0.75f, 1.15f), 0f, 1f) : (rng.Randf() < frozen * 0.95f ? 1f : 0f);
@@ -98,10 +129,13 @@ public partial class WinterWoods
 					{
 						var lee = new Vector3(0.9f, 0f, 0.42f).Normalized();
 						float ms = sc * rng.RandfRange(0.8f, 1.25f);
-						var mb = new Basis(Vector3.Up, Mathf.Atan2(lee.X, lee.Z) + rng.RandfRange(-0.3f, 0.3f)).Scaled(new Vector3(ms * 0.95f, ms * rng.RandfRange(0.7f, 1f), ms * 1.5f));
+						// (2026-10-15, the scan: every drift turned one way, the same shape at every tree) Its own turn, most of
+						// them still leaning downwind, and its own stretch
+						float turn = rng.Randf() < 0.7f ? rng.RandfRange(-0.9f, 0.9f) : rng.RandfRange(0f, Mathf.Tau);
+						var mb = new Basis(Vector3.Up, Mathf.Atan2(lee.X, lee.Z) + turn).Scaled(new Vector3(ms * rng.RandfRange(0.75f, 1.1f), ms * rng.RandfRange(0.6f, 1f), ms * rng.RandfRange(1.1f, 1.7f)));
 						var key2 = new Vector2I(Mathf.FloorToInt(p.X / TreeChunk), Mathf.FloorToInt(p.Y / TreeChunk));
 						if (!mounds.TryGetValue(key2, out var ml)) mounds[key2] = ml = new List<Transform3D>();
-						ml.Add(new Transform3D(mb, at + lee * 0.3f * ms + Vector3.Down * 0.02f));
+						ml.Add(new Transform3D(mb, (at with { Y = Height(p.X, p.Y) - 0.1f }) + lee * 0.3f * ms + Vector3.Down * 0.02f));
 					}
 					if (ice > 0.5f && kinds[kind].fir)
 					{
@@ -114,7 +148,16 @@ public partial class WinterWoods
 							float r = R * (1f - (f - cs) / (1f - cs)) * rng.RandfRange(0.75f, 0.98f);
 							float a = rng.RandfRange(0, Mathf.Tau);
 							float len = Mathf.Pow(rng.Randf(), 2f) * 0.9f + 0.15f;
-							ch.icicles.Add(new Transform3D(Basis.Identity.Scaled(new Vector3(1f, len, 1f)), at + new Vector3(Mathf.Cos(a) * r, H * f - 0.1f, Mathf.Sin(a) * r)));
+							var hang = at + new Vector3(Mathf.Cos(a) * r, H * f - 0.1f, Mathf.Sin(a) * r);
+							// (2026-10-15, the scan: at a random reach and height, with nothing over some of them) from the underside of
+							// one of the tree's own boughs, in from its tip
+							if (WinterTreeKit.FirTiers.TryGetValue(kinds[kind].mesh, out var tiers) && tiers.Count > 2)
+							{
+								var (tc, tr, td) = tiers[Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(0f, tiers.Count * 0.7f, (f - cs) / (0.8f - cs))), 0, tiers.Count - 1)];
+								float rr = tr * 0.82f * rng.RandfRange(0.55f, 0.95f);
+								hang = at + basis * (tc + new Vector3(Mathf.Cos(a) * rr, -rr * Mathf.Tan(td) - 0.01f, Mathf.Sin(a) * rr));
+							}
+							ch.icicles.Add(new Transform3D(new Basis(Vector3.Up, a * 3.7f).Scaled(new Vector3(1f, len, 1f)), hang));
 						}
 					}
 					TreeCount++;
