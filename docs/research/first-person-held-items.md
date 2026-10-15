@@ -141,6 +141,14 @@ position". The knife, the crowbar and the walkie weren't right either.
 | Knife | Guard 2.5 cm above the index finger; 40° forward | Guard against the index finger; 45° forward, edge down. 55° was tried: it swung the forearm and cuff up into the view |
 | Walkie | In the round-handle `Fist` by its bottom 6 cm, the case standing on the fist, the fingers through the 6 × 3.4 cm case | In the palm by its side (the `Camera` pose's box hold): the fingers round its back and clip, the thumb up the front edge, the lower half in the hand, the grille clear; a little higher and nearer (0.2, −0.19, −0.38) |
 
+- **Follow-up (2026-10-15c).**
+  - **Axe and hammer:** with the bit straight ahead (8°) the head read as a sliver from the eye. POV photos show the head
+    at about three-quarters, because the wrist rolls and the tool is carried a little across the body. Now yaw 32° (the
+    bar's hook 20°): the bit and face point forward and to the left, the flat of the bit partly seen, never side-on
+    facing the eye. The fist, grip height and lean are unchanged.
+  - **Walkie:** the thumb no longer crosses the front face. The radio is turned in the hand so the palm is against its
+    back, the fingers round its left side and the thumb on its right side, and the push-to-talk moved to the right
+    (the thumb's) side. The hand is turned 55° so the speaker faces the eye.
 - **Walkie model:** 6 × 3.4 × 15.2 cm with a 12 cm antenna. It matches a Talkabout (6 × 3 × 16) and is unchanged. Its
   push-to-talk is on the left side, where a right hand's fingertips would reach round to it.
 - **Placement across the set:**

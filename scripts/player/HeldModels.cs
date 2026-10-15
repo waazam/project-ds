@@ -74,7 +74,9 @@ public static class HeldModels
 	/// the axe's bit, the hammer's head) and roll (degrees).</summary>
 	public readonly record struct Carry(Vector3 At, float Lean, float Yaw, float Roll);
 
-	private sealed record Grip(HandPose Pose, Vector3 ItemAt, Carry Carry);
+	/// <summary>(2026-10-15) <paramref name="ItemTurn"/>: the thing turned in the grip (degrees), for the one that isn't held
+	/// in the convention's frame (the walkie, held by its back and sides).</summary>
+	private sealed record Grip(HandPose Pose, Vector3 ItemAt, Carry Carry, Vector3 ItemTurn = default);
 
 	/// <summary>The table: each held thing's grip pose, where it sits in the grip (held near the butt of a handle: the axe
 	/// by its knob, the hammer by its butt, the bar by its straight end above the chisel; the knife's guard on the fist),
@@ -85,21 +87,22 @@ public static class HeldModels
 		// docs/research/first-person-held-items.md): held low on the handle, the little finger at the knob or the butt, the
 		// back of the hand out to the right and the palm in, the thumb over the first fingers; the handle up and a little
 		// forward out of the fist (30°, the Fist pose's own forearm lean, so only the wrist cocks) and rolled 10° in toward
-		// the middle as a relaxed wrist holds it; the working end (the bit, the face, the claw) pointing FORWARD, away from
-		// the eye (yaw 0-8°, was 30-35°: the head showed side-on to the middle), so the eye sees the poll and the top of the
-		// head. The fist itself in the lower right, its knuckles in view (was at or under the bottom edge), the same place
-		// for the axe, the hammer and the bar so switching between them doesn't jump
-		[ToolKind.Axe] = new(HandPose.Fist, new(0f, 0.05f, 0f), new(new(0.24f, -0.235f, -0.42f), 30f, 8f, 10f)),
-		[ToolKind.Hammer] = new(HandPose.Fist, new(0f, 0.045f, 0f), new(new(0.235f, -0.225f, -0.41f), 30f, 8f, 10f)),
-		[ToolKind.Crowbar] = new(HandPose.Fist, new(0f, 0.128f, 0f), new(new(0.24f, -0.235f, -0.42f), 30f, 0f, 10f)),
+		// the middle as a relaxed wrist holds it; the working end (the bit, the face, the claw) forward and across the body
+		// to the left at a three-quarter angle (yaw 32°, the bar's hook 20°), as in POV photos where the wrist rolls and the
+		// tool is carried a little across: the bit's flat partly seen, the head reading as an axe or a hammer (straight
+		// ahead, 8°, it was a sliver). The fist itself in the lower right, its knuckles in view, the same place for the
+		// axe, the hammer and the bar so switching between them doesn't jump
+		[ToolKind.Axe] = new(HandPose.Fist, new(0f, 0.05f, 0f), new(new(0.24f, -0.235f, -0.42f), 30f, 32f, 10f)),
+		[ToolKind.Hammer] = new(HandPose.Fist, new(0f, 0.045f, 0f), new(new(0.235f, -0.225f, -0.41f), 30f, 32f, 10f)),
+		[ToolKind.Crowbar] = new(HandPose.Fist, new(0f, 0.128f, 0f), new(new(0.24f, -0.235f, -0.42f), 30f, 20f, 10f)),
 		// the knife: in a hammer grip, the guard down against the index finger (was 2.5 cm clear of it), the blade forward
 		// and up out of the top of the fist (45°; more swung the forearm and cuff up into the view), the edge underneath
 		[ToolKind.Knife] = new(HandPose.Fist, new(0f, 0.004f, 0f), new(new(0.225f, -0.215f, -0.41f), 45f, 5f, 8f)),
-		// the walkie upright, its speaker to the eye, turned a little toward it: (2026-10-15) held as a radio is, in the palm
-		// by its side (the Camera pose's hold on a box: the fingers round its back and the clip, the thumb up the front edge),
-		// its lower half in the hand and the grille clear above the thumb, a little higher and nearer than the tools. It was
-		// in the round-handle Fist by its bottom 6 cm, the case standing on the fist
-		[ToolKind.Radio] = new(HandPose.Camera, new(-0.0185f, 0.035f, 0f), new(new(0.2f, -0.19f, -0.38f), 4f, -15f, 3f)),
+		// the walkie upright, its speaker to the eye: (2026-10-15) held as a radio is, the palm against its back (the Camera
+		// pose's hold on a box's end, the radio turned so its back is that end), the fingers round its left side, the thumb
+		// on its right side by the push-to-talk, its lower half in the hand and the grille clear; then the hand turned 55° so
+		// the speaker faces the eye; a little higher and nearer than the tools
+		[ToolKind.Radio] = new(HandPose.Camera, new(-0.0095f, 0.035f, -0.006f), new(new(0.2f, -0.19f, -0.38f), 4f, 55f, 3f), new(0f, -90f, 0f)),
 		// the lighter upright in the fingers, its lid up, close in
 		[ToolKind.Lighter] = new(HandPose.Small, new(0f, 0.026f, 0f), new(new(0.17f, -0.155f, -0.36f), 0f, 0f, 0f)),
 		// the camera by its right end, the lens away, the thumb up its back
@@ -115,7 +118,7 @@ public static class HeldModels
 	{
 		if (!Grips.TryGetValue(kind, out var g)) return new Spec();
 		var c = g.Carry;
-		return new Spec { Pose = g.Pose, HandAt = c.At, HandTurn = new Vector3(0f, c.Yaw, c.Roll), Lean = c.Lean, ItemAt = g.ItemAt };
+		return new Spec { Pose = g.Pose, HandAt = c.At, HandTurn = new Vector3(0f, c.Yaw, c.Roll), Lean = c.Lean, ItemAt = g.ItemAt, ItemTurn = g.ItemTurn };
 	}
 	/// <summary>Builds <paramref name="kind"/> in grip space under a new node (null if it has no held model here).</summary>
 	public static Node3D Build(ToolKind kind)
@@ -766,9 +769,10 @@ public static class HeldModels
 		k.Mat(led); k.Color = Colors.White;
 		k.Box(new Vector3(0.006f, y1 + 0.0012f, 0.01f), new Vector3(0.004f, 0.003f, 0.004f), 20f);
 		root.SetMeta("led", led);
-		// the push-to-talk bar on the left side (the thumb's), and the belt clip on the back
+		// the push-to-talk bar on the right side (2026-10-15: the thumb's, held in the right hand by its back), and the belt
+		// clip on the back
 		k.Mat(Rubber);
-		RBox(k, new Vector3(-W * 0.5f - 0.002f, y0 + 0.095f, 0.0f), new Vector3(0.006f, 0.018f, 0.04f), Vector3.Up, Vector3.Right, 4f, 0.002f, 18);
+		RBox(k, new Vector3(W * 0.5f + 0.002f, y0 + 0.095f, 0.0f), new Vector3(0.006f, 0.018f, 0.04f), Vector3.Up, Vector3.Right, 4f, 0.002f, 18);
 		k.Mat(RadioPlastic); k.Color = new Color(0.75f, 0.78f, 0.72f);
 		RBox(k, new Vector3(0, y0 + 0.085f, -D * 0.5f - 0.0035f), new Vector3(0.03f, 0.004f, 0.075f), Vector3.Up, Vector3.Right, 5f, 0.0015f, 20);
 		k.Color = Colors.White;
