@@ -44,29 +44,71 @@ public static class HeldModels
 		public Vector3 HandTurn;
 		public Vector3 ItemAt;
 		public Vector3 ItemTurn;
+		/// <summary>(2026-10-14g) How far (degrees) the hand and what's in it lean forward, away from the eye, about the view's
+		/// own sideways axis: a tool carried ready, its head out ahead of the fist, not stood upright.</summary>
+		public float Lean;
 	}
 
-	/// <summary>The hand's Stick pose closes with its knuckles toward its own -X (the forearm off along +X, the back of the
-	/// hand to +Z): a tool's working end (the bit, the face, the claw, the edge) turned that way leads with the knuckles, as
-	/// in a real grip. The hand's turn (yaw -60) then brings the knuckles round to forward and a little in, the forearm
-	/// back to the lower right, and the back of the hand (never the palm) to the eye.</summary>
-	private static readonly Vector3 KnucklesWay = new(0f, 90f, 0f);
+	/// <summary>
+	/// (2026-10-14g, the owner: "the items in hands still look funky and like they're facing the wrong way") ONE convention,
+	/// shared by every item's model and the hand's grip poses, so a thing drops into the hand with no turn of its own:
+	/// <list type="bullet">
+	/// <item><b>The socket</b> (the hand node's origin) is the middle of the grip.</item>
+	/// <item><b>+Y</b> runs up the handle through the fist (the butt below, the head above).</item>
+	/// <item><b>-Z</b> is the working end's way, ahead, away from the eye: the axe's bit, the hammer's face, the bar's claw,
+	/// the knife's edge, the camera's lens. The walkie's speaker faces +Z, back to the eye.</item>
+	/// <item><b>The hand's grip poses</b> (tools/Blender/fp_arms.py) close their knuckles toward -Z round a +Y grip, the back
+	/// of the right hand out to +X, the thumb over on top; <see cref="HandPose.Fist"/> for the hammer grip,
+	/// <see cref="HandPose.Small"/> round the lighter, <see cref="HandPose.Camera"/> at the camera's end, <see cref="HandPose.Cradle"/> (palm up)
+	/// under something broad.</item>
+	/// <item>Placed in the view by <see cref="Carry"/> only: where the fist is, how far it leans forward (the Fist pose's
+	/// forearm is built turned back by <see cref="FistLean"/>, so near that lean only the wrist cocks), a small yaw (+ turns
+	/// the working end in toward the middle) and roll.</item>
+	/// </list>
+	/// The carries follow how first-person games hold each kind of thing (docs/research/first-person-held-items.md).
+	/// </summary>
+	public const float FistLean = 30f;
 
-	public static Spec SpecOf(ToolKind kind) => kind switch
+	/// <summary>Where and how a thing is carried in the view: the fist's place (camera space), its forward lean (in the hand's
+	/// own frame, toward the working end), then its yaw (+ turns the working end in toward the middle, so its profile reads:
+	/// the axe's bit, the hammer's head) and roll (degrees).</summary>
+	public readonly record struct Carry(Vector3 At, float Lean, float Yaw, float Roll);
+
+	private sealed record Grip(HandPose Pose, Vector3 ItemAt, Carry Carry);
+
+	/// <summary>The table: each held thing's grip pose, where it sits in the grip (held near the butt of a handle: the axe
+	/// by its knob, the hammer by its butt, the bar by its straight end above the chisel; the knife's guard on the fist),
+	/// and how it's carried.</summary>
+	private static readonly Dictionary<ToolKind, Grip> Grips = new()
 	{
-		ToolKind.Camera => new Spec { Pose = HandPose.Camera, HandAt = new(0.2f, -0.22f, -0.42f), HandTurn = new(-6f, -10f, 4f), ItemAt = new(-0.06f, 0.01f, 0f) },
-		// (2026-10-14f: the tools' fists a little higher and less pitched toward the eye, so the forearm's sleeve doesn't
-		// hide the fingers round the handle)
-		ToolKind.Axe => new Spec { HandAt = new(0.25f, -0.24f, -0.46f), HandTurn = new(-14f, -66f, 8f), ItemTurn = KnucklesWay },
-		ToolKind.Hammer => new Spec { HandAt = new(0.24f, -0.225f, -0.44f), HandTurn = new(-12f, -66f, 8f), ItemTurn = KnucklesWay },
-		ToolKind.Crowbar => new Spec { HandAt = new(0.25f, -0.25f, -0.46f), HandTurn = new(-10f, -66f, 8f), ItemTurn = KnucklesWay },
-		ToolKind.Knife => new Spec { HandAt = new(0.23f, -0.23f, -0.44f), HandTurn = new(-20f, -56f, 6f), ItemTurn = KnucklesWay },
-		ToolKind.Lighter => new Spec { Pose = HandPose.Small, HandAt = new(0.19f, -0.21f, -0.4f), HandTurn = new(-6f, -60f, 4f), ItemAt = new(0f, 0.026f, 0f), ItemTurn = KnucklesWay },
-		ToolKind.Radio => new Spec { Pose = HandPose.Stick, HandAt = new(0.21f, -0.22f, -0.44f), HandTurn = new(-8f, -60f, 6f), ItemAt = new(0f, 0.045f, 0f), ItemTurn = new(0f, -30f, 0f) },   // (its speaker turned to the eye)
-		ToolKind.NewelPost => new Spec { Pose = HandPose.Wide, HandAt = new(0.25f, -0.28f, -0.6f), HandTurn = new(-10f, -66f, 6f), ItemTurn = KnucklesWay },
-		_ => new Spec(),
+		// the long tools: framed as first-person melee tools are (the owner's suggestion for the axe): the fist down at the
+		// view's bottom edge (its top knuckles at most), the handle rising out of the lower right and the head up in view,
+		// leaning forward out of the fist (the head out ahead of the hand) and turned in toward the middle so its profile
+		// reads; the hammer, shorter, a touch higher
+		[ToolKind.Axe] = new(HandPose.Fist, new(0f, 0.05f, 0f), new(new(0.25f, -0.275f, -0.42f), 30f, 35f, 0f)),
+		[ToolKind.Hammer] = new(HandPose.Fist, new(0f, 0.045f, 0f), new(new(0.24f, -0.25f, -0.4f), 30f, 30f, 0f)),
+		[ToolKind.Crowbar] = new(HandPose.Fist, new(0f, 0.128f, 0f), new(new(0.25f, -0.28f, -0.42f), 30f, 30f, 0f)),
+		// the knife: its blade forward and up out of the top of the fist, the edge underneath
+		[ToolKind.Knife] = new(HandPose.Fist, new(0f, 0.008f, 0f), new(new(0.21f, -0.19f, -0.4f), 40f, 25f, 0f)),
+		// the walkie upright, its speaker to the eye, turned a little toward it
+		[ToolKind.Radio] = new(HandPose.Fist, new(-0.012f, 0.045f, 0f), new(new(0.21f, -0.2f, -0.42f), 8f, -10f, 0f)),
+		// the lighter upright in the fingers, its lid up, close in
+		[ToolKind.Lighter] = new(HandPose.Small, new(0f, 0.026f, 0f), new(new(0.17f, -0.155f, -0.36f), 0f, 0f, 0f)),
+		// the camera by its right end, the lens away, the thumb up its back
+		[ToolKind.Camera] = new(HandPose.Camera, new(-0.06f, 0.015f, 0f), new(new(0.2f, -0.22f, -0.42f), 6f, -10f, 4f)),
+		// the cap carried on the open hand under its plinth (its base 12.6 cm under the neck), the ball up
+		[ToolKind.NewelPost] = new(HandPose.Cradle, new(-0.05f, 0.132f, 0.02f), new(new(0.24f, -0.24f, -0.5f), 0f, 10f, 0f)),
 	};
 
+	/// <summary>The things with a grip in the table.</summary>
+	public static IEnumerable<ToolKind> GripKinds => Grips.Keys;
+
+	public static Spec SpecOf(ToolKind kind)
+	{
+		if (!Grips.TryGetValue(kind, out var g)) return new Spec();
+		var c = g.Carry;
+		return new Spec { Pose = g.Pose, HandAt = c.At, HandTurn = new Vector3(0f, c.Yaw, c.Roll), Lean = c.Lean, ItemAt = g.ItemAt };
+	}
 	/// <summary>Builds <paramref name="kind"/> in grip space under a new node (null if it has no held model here).</summary>
 	public static Node3D Build(ToolKind kind)
 	{
@@ -500,7 +542,7 @@ public static class HeldModels
 		// the head: sections from the poll (+Z) to the bit (-Z), each a rounded rectangle across X (thickness) and Y
 		const float hy = 0.468f;
 		var hc = new List<Vector3>(); var hh = new List<Vector2>();
-		const float g = 1.15f;   // (a touch over a 26" axe's own head: at arm's length it read small)
+		const float g = 1.0f;   // (2026-10-14g: a 26" axe's own head, about 16 cm poll to bit and an 11.5 cm bit; was 1.15, oversized)
 		void S(float z, float t, float h, float dy = 0f) { hc.Add(new Vector3(0, hy + dy * g, z * g)); hh.Add(new Vector2(t * g, h * g)); }
 		S(0.05f, 0.0125f, 0.028f);
 		S(0.047f, 0.0148f, 0.032f);
@@ -583,9 +625,9 @@ public static class HeldModels
 		for (int i = 0; i <= n; i++)
 		{
 			float t = i / (float)n;
-			float y = 0.067f + t * 0.118f;
-			float spineZ = t < 0.72f ? 0.0105f : Mathf.Lerp(0.0105f, -0.001f, Mathf.Pow((t - 0.72f) / 0.28f, 1.3f));
-			float edgeZ = t < 0.65f ? -0.0145f + t * 0.004f : Mathf.Lerp(-0.012f, -0.001f, Mathf.Pow((t - 0.65f) / 0.35f, 0.7f));
+			float y = 0.067f + t * 0.16f;   // (2026-10-14g, the owner: "the knife blade is too short": a 16 cm blade, was 11.8)
+			float spineZ = t < 0.72f ? 0.0125f : Mathf.Lerp(0.0125f, -0.001f, Mathf.Pow((t - 0.72f) / 0.28f, 1.3f));
+			float edgeZ = t < 0.65f ? -0.0175f + t * 0.005f : Mathf.Lerp(-0.01425f, -0.001f, Mathf.Pow((t - 0.65f) / 0.35f, 0.7f));
 			if (i == n) { spineZ = edgeZ = -0.001f; }
 			spine[i] = new Vector3(0, y, spineZ);
 			edge[i] = new Vector3(0, y, edgeZ);
@@ -630,27 +672,28 @@ public static class HeldModels
 		{
 			// the chisel end: flattened across X, bent a touch toward -Z
 			new(new Vector3(0, -0.215f, -0.03f), 0.013f, 0.0028f),
-			new(new Vector3(0, -0.2f, -0.022f), 0.0118f, 0.0055f),
-			new(new Vector3(0, -0.175f, -0.01f), 0.0102f, 0.0092f),
-			new(new Vector3(0, -0.14f, -0.002f), 0.0098f, 0.0098f),
+			new(new Vector3(0, -0.205f, -0.022f), 0.0118f, 0.0055f),
+			new(new Vector3(0, -0.195f, -0.012f), 0.0102f, 0.0092f),
+			new(new Vector3(0, -0.185f, -0.004f), 0.0098f, 0.0098f),
 			new(new Vector3(0, 0.0f, 0f), 0.0098f, 0.0098f),
-			new(new Vector3(0, 0.3f, 0f), 0.0098f, 0.0098f),
+			new(new Vector3(0, 0.345f, 0f), 0.0098f, 0.0098f),   // (2026-10-14g: a 24" bar end to end, 61 cm; was 57)
 		};
 		// the gooseneck: round the bend forward and down, flattening toward the claw
 		for (int i = 1; i <= 8; i++)
 		{
 			float a = i / 8f * Mathf.Pi * 0.95f;
 			float flat = Mathf.SmoothStep(0.5f, 1f, i / 8f);
-			rings.Add(new(new Vector3(0, 0.3f + Mathf.Sin(a) * 0.045f, -(1f - Mathf.Cos(a)) * 0.045f), Mathf.Lerp(0.0098f, 0.012f, flat), Mathf.Lerp(0.0098f, 0.0058f, flat)));
+			rings.Add(new(new Vector3(0, 0.345f + Mathf.Sin(a) * 0.045f, -(1f - Mathf.Cos(a)) * 0.045f), Mathf.Lerp(0.0098f, 0.012f, flat), Mathf.Lerp(0.0098f, 0.0058f, flat)));
 		}
 		var last = rings[^1].C;
 		rings.Add(new(last + new Vector3(0, -0.016f, -0.002f), 0.0124f, 0.004f));
 		ItemMeshes.Loft(k, rings, 6, true, false, Vector3.Right, 6f);
-		// where it's held: a wrap of old black friction tape, fat enough for the fist to close round (the bar alone is 2 cm)
+		// where it's held: a wrap of old black friction tape, fat enough for the fist to close round (the bar alone is 2 cm);
+		// (2026-10-14g) by its straight end, just above the chisel, as a wrecking bar is held
 		k.Mat(Rubber); k.Color = new Color(1.3f, 1.25f, 1.2f);
-		for (int i = 0; i < 9; i++)
+		for (int i = 0; i < 7; i++)
 		{
-			float y0 = -0.072f + i * 0.016f;
+			float y0 = -0.184f + i * 0.016f;
 			Turn(k, Vector3.Zero, Vector3.Up, new[] { new Vector2(0.0098f, y0 - 0.001f), new Vector2(0.0142f, y0 + 0.001f), new Vector2(0.0146f, y0 + 0.009f), new Vector2(0.0141f, y0 + 0.0165f), new Vector2(0.0098f, y0 + 0.0175f) }, 12, false, false, 20f);
 		}
 		k.Mat(RustIron); k.Color = Colors.White;

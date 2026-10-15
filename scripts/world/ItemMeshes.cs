@@ -223,7 +223,7 @@ public static class ItemMeshes
 			case ToolKind.Keycard202: case ToolKind.Keycard203: case ToolKind.Keycard201: Keycard(k, ref b, kind); break;
 			case ToolKind.PantryKey: PantryKey(k, ref b); break;
 			case ToolKind.DiningKey: DiningKey(k, ref b); break;
-			case ToolKind.Crowbar: FurnitureKit.Add(k, "crowbar", Vector3.Zero, 0f, World.SnowMaze.SnowMazeDressing.Roles); b.PickRadius = 0.45f; break;
+			case ToolKind.Crowbar: FurnitureKit.Add(k, "crowbar", Vector3.Zero, 0f, World.SnowMaze.SnowMazeDressing.Roles, Vector3.One * 0.75f); b.PickRadius = 0.45f; break;   // (2026-10-14g: a 24" bar, 61 cm, as the one in the hand; the model is 81)
 		}
 		if (!k.IsEmpty)
 		{
@@ -292,7 +292,7 @@ public static class ItemMeshes
 		var tilt = new Basis(Vector3.Back, Mathf.DegToRad(-55f));
 		var yaw = new Basis(Vector3.Up, 0.35f);
 		var basis = yaw * tilt;
-		Vector3 edgeMid = new(0.15f, 0.672f, 0f);
+		Vector3 edgeMid = new(0.13f, 0.598f, 0f);   // (2026-10-14g: a 26" axe, 66 cm, its bit 12 cm; was 74 cm with a 17 cm bit)
 		var xf = new Transform3D(basis, Vector3.Zero);
 		xf.Origin = new Vector3(0.02f, StumpTop - 0.035f, 0) - xf * edgeMid;
 		k.Xf = xf;
@@ -300,18 +300,18 @@ public static class ItemMeshes
 		// Handle: oval, swelling to a knob at the butt, ash-pale so it reads against the leaves.
 		k.Color = new Color(0.78f, 0.66f, 0.5f);
 		k.Mat(ItemTextures.AshMat);
-		Lathe(k, new[] { V(0.019f, 0f), V(0.024f, 0.025f), V(0.017f, 0.07f), V(0.015f, 0.35f), V(0.017f, 0.6f), V(0.018f, 0.7f), V(0.016f, 0.74f) },
+		Lathe(k, new[] { V(0.019f, 0f), V(0.024f, 0.022f), V(0.017f, 0.062f), V(0.015f, 0.31f), V(0.017f, 0.535f), V(0.018f, 0.623f), V(0.016f, 0.66f) },
 			6, true, true, 1f, 0.72f, 3f);
 
 		// Head: cross-sections along X (x, yBottom, yTop, half-thickness), poll to edge.
-		float hy = 0.68f;
+		float hy = 0.605f;
 		var secs = new (float x, float y0, float y1, float t)[]
 		{
-			(-0.05f, -0.04f, 0.04f, 0.021f),
-			(0.025f, -0.048f, 0.048f, 0.022f),
-			(0.1f, -0.062f, 0.052f, 0.008f),
-			(0.13f, -0.078f, 0.064f, 0.0035f),
-			(0.152f, -0.092f, 0.074f, 0.0006f),
+			(-0.042f, -0.03f, 0.03f, 0.019f),
+			(0.021f, -0.036f, 0.036f, 0.02f),
+			(0.085f, -0.047f, 0.039f, 0.008f),
+			(0.11f, -0.058f, 0.048f, 0.0035f),
+			(0.13f, -0.069f, 0.055f, 0.0006f),
 		};
 		Vector3[] Corners(int i)
 		{
@@ -437,10 +437,11 @@ public static class ItemMeshes
 		k.Cylinder(new Vector3(0.012f, 0, 0), new Vector3(0.026f, 0, 0), 0.017f, 0.013f, 6, true);
 		k.Color = new Color(0.8f, 0.82f, 0.84f);
 		k.Mat(ItemTextures.ChromeMat);
-		k.Box(new Vector3(0.115f, 0, 0), new Vector3(0.18f, 0.004f, 0.026f), 8f);
-		Vector3 tl = new(0.205f, 0.002f, 0.013f), bl = new(0.205f, -0.002f, 0.013f);
-		Vector3 tr = new(0.205f, 0.002f, -0.013f), br = new(0.205f, -0.002f, -0.013f);
-		Vector3 tip = new(0.26f, 0f, -0.002f);
+		// (2026-10-14g: a 16 cm blade, 3 cm deep, as the one in the hand; was 23.5 cm)
+		k.Box(new Vector3(0.083f, 0, 0), new Vector3(0.114f, 0.004f, 0.03f), 8f);
+		Vector3 tl = new(0.14f, 0.002f, 0.015f), bl = new(0.14f, -0.002f, 0.015f);
+		Vector3 tr = new(0.14f, 0.002f, -0.015f), br = new(0.14f, -0.002f, -0.015f);
+		Vector3 tip = new(0.186f, 0f, -0.004f);
 		k.Tri(tl, tip, tr, Vector3.Up, V(0, 0), V(1, 0.5f), V(0, 1));
 		k.Tri(bl, br, tip, Vector3.Down, V(0, 0), V(0, 1), V(1, 0.5f));
 		k.Xf = Transform3D.Identity;
@@ -639,7 +640,8 @@ public static class ItemMeshes
 
 	private static void Compass(MeshKit k, ref Built b)
 	{
-		var xf = new Transform3D(new Basis(Vector3.Up, -0.5f), Vector3.Zero);
+		// (2026-10-14g: a pocket compass, 6 cm across; was 10)
+		var xf = new Transform3D(new Basis(Vector3.Up, -0.5f).Scaled(Vector3.One * 0.6f), Vector3.Zero);
 		k.Xf = xf;
 		k.Color = new Color(0.95f, 0.78f, 0.48f);
 		k.Mat(ItemTextures.BrassMat);

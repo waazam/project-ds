@@ -123,7 +123,10 @@ public partial class HeldTool : HeldItem
 		float e = Mathf.SmoothStep(0f, 1f, eye);
 		Hold = Rest.Lerp(new Vector3(0.05f, -0.06f, -0.2f), e);
 		turn = turn.Lerp(new Vector3(0f, 0f, 0f), e);
-		_grip.RotationDegrees = turn;
+		// (2026-10-14g) carried ready: leaning forward in the hand's own frame (toward the knuckles and the working end, about
+		// the axis the Fist pose's forearm is built turned back on, so only the wrist cocks), then turned as the spec says
+		float lean = Mathf.DegToRad(_spec.Lean) * (1f - e);
+		_grip.Basis = Basis.FromEuler(turn * (Mathf.Pi / 180f)) * new Basis(Vector3.Right, -lean);
 		_grip.Visible = eye < 0.55f;
 		// the walkie's LED: alive from the bunker's door on
 		if (_shown == ToolKind.Radio && _model != null)

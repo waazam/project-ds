@@ -22,8 +22,17 @@ public enum HandPose
 	/// socket: the fingers half round it, the thumb opposite.</summary>
 	Wide,
 	/// <summary>(2026-10-14e) A tight fist round a small upright thing (the lighter) along Y through the socket, 1.9 cm across,
-	/// the thumb over the fingers.</summary>
+	/// the thumb over the fingers (2026-10-14g: in the <see cref="Fist"/>'s frame, upright).</summary>
 	Small,
+	/// <summary>(2026-10-14g) The hammer grip, in the held things' one convention (<see cref="HeldModels"/>): a fist round a
+	/// +Y grip, its knuckles (and the tool's working end) toward -Z, the back of the right hand out to +X, the thumb over
+	/// on top; the forearm built turned back against the <see cref="HeldModels.FistLean"/> the tools are carried at, so
+	/// they lean out ahead of the fist while the forearm comes in from the lower right. The axe, hammer, bar, knife,
+	/// walkie and flare.</summary>
+	Fist,
+	/// <summary>(2026-10-14g) The open hand palm up, the fingers ahead and cupped a little: something broad carried on it (the
+	/// newel cap, under its plinth). The socket is the middle of the palm; up out of the palm is +Y.</summary>
+	Cradle,
 }
 
 /// <summary>
@@ -68,7 +77,7 @@ public partial class FirstPersonHand : Node3D
 	public Vector3 GripAxis => Pose switch
 	{
 		HandPose.Handle => Vector3.Right,
-		HandPose.Stick or HandPose.Camera or HandPose.Wide or HandPose.Small => Vector3.Up,
+		HandPose.Stick or HandPose.Fist or HandPose.Camera or HandPose.Wide or HandPose.Small => Vector3.Up,
 		_ => Vector3.Right,
 	};
 
@@ -76,7 +85,7 @@ public partial class FirstPersonHand : Node3D
 	public float GripRadius => Pose switch
 	{
 		HandPose.Handle => 0.0085f,
-		HandPose.Stick => 0.016f,
+		HandPose.Stick or HandPose.Fist => 0.016f,
 		HandPose.Camera => 0.021f,
 		HandPose.Wide => 0.036f,
 		HandPose.Small => 0.0095f,
@@ -143,10 +152,11 @@ public partial class FirstPersonHand : Node3D
 	};
 	private static Shader ArmShader => _shader ??= GD.Load<Shader>("res://assets/shaders/fp_arm.gdshader");
 
-	/// <summary>(2026-10-14f) The modelled arm's materials, all one shader (assets/shaders/fp_arm.gdshader), coloured by the
-	/// model's vertices (the leather's wear, its folds and seams, its baked occlusion; the cloths' tones): the glove worn,
-	/// dull brown leather over its own baked normal map and the shader's grain, its knuckles and fingertips handled
-	/// smooth; the jacket's knitted cuff; its canvas sleeve. Nothing casts a shadow.</summary>
+	/// <summary>(2026-10-14f) The modelled arm's materials, all one shader (assets/shaders/fp_arm.gdshader): the glove's
+	/// worn brown leather in its own baked colour and normal maps (2026-10-14g: its grime, scuffs, scratches and the
+	/// seams' thread in the colour map; its occlusion and wear in the vertices) under the shader's grain, its knuckles and
+	/// fingertips polished smooth; the jacket's knitted cuff; its cotton duck sleeve (the colour the model's vertices',
+	/// the weave, seams, hem, fray and creases the shader's). Nothing casts a shadow.</summary>
 	public static void Dress(Node3D arm)
 	{
 		foreach (var n in arm.FindChildren("*", "MeshInstance3D", true, false))
@@ -161,10 +171,19 @@ public partial class FirstPersonHand : Node3D
 				var m = new ShaderMaterial { Shader = ArmShader, ResourceName = "fp_arm_" + kind };
 				m.SetShaderParameter("kind", kind);
 				m.SetShaderParameter("grain", LeatherGrain);
-				if (kind == 0 && src is BaseMaterial3D bm && bm.NormalTexture != null)
+				if (kind == 0 && src is BaseMaterial3D bm)
 				{
-					m.SetShaderParameter("baked_normal", bm.NormalTexture);
-					m.SetShaderParameter("has_baked", true);
+					if (bm.NormalTexture != null)
+					{
+						m.SetShaderParameter("baked_normal", bm.NormalTexture);
+						m.SetShaderParameter("has_baked", true);
+					}
+					// (2026-10-14g) the glove's own colour map: its wear, grime, scuffs, scratches and the seams' thread
+					if (bm.AlbedoTexture != null)
+					{
+						m.SetShaderParameter("baked_albedo", bm.AlbedoTexture);
+						m.SetShaderParameter("has_albedo", true);
+					}
 				}
 				mi.SetSurfaceOverrideMaterial(si, m);
 			}

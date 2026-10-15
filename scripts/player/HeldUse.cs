@@ -111,12 +111,12 @@ public partial class HeldUse : HeldItem
 			case Motion.Prise:   // the bar along the forearm, its claw forward and down
 				_tool.Position = new Vector3(0.0f, -0.01f, -0.02f);
 				_tool.Rotation = new Vector3(-0.35f, Mathf.Pi * 0.5f, 0f);
-				_tool.Scale = Vector3.One * 0.9f;
+				_tool.Scale = Vector3.One;   // (2026-10-14g: its own 61 cm, as picked up; was 0.9 of an 81 cm bar)
 				break;
 			case Motion.Flick:   // the lighter upright, lid up
 				_tool.Position = new Vector3(0.0f, 0.03f, -0.03f);
 				_tool.Rotation = new Vector3(0f, -0.3f, 0f);
-				_tool.Scale = Vector3.One * 1.25f;   // (held near the eye it read as a speck)
+				_tool.Scale = Vector3.One;   // (2026-10-14g: its own size, as in the hand day to day; was 1.25)
 				_flame = new OmniLight3D { Name = "Flame", LightColor = new Color(1f, 0.62f, 0.3f), LightEnergy = 0f, OmniRange = 2.2f, ShadowEnabled = false, Position = new Vector3(0, 0.08f, 0) };
 				_tool.AddChild(_flame);
 				_flameMesh = new MeshInstance3D

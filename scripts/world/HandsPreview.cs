@@ -68,6 +68,7 @@ public partial class HandsPreview : Node3D
 		var only = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--hands-shots="))?.Split('=')[1].Split(',');
 		await Seconds(0.5);
 		if (OS.GetCmdlineUserArgs().Contains("--hands-studio")) { await Studio(); GetTree().Quit(0); return; }
+		if (OS.GetCmdlineUserArgs().Contains("--grips")) { await GripShots(); GetTree().Quit(0); return; }
 		if (only == null) await Logic();
 		await LookBook(only);
 		GD.Print($"[hands] done: {_checks - _fails}/{_checks} passed");
@@ -178,7 +179,38 @@ public partial class HandsPreview : Node3D
 		Check("switches counted", PlayerHands.Instance?.Switches > 5, $"{PlayerHands.Instance?.Switches}");
 	}
 
-	/// <summary>Each model alone in front of the eye, turned (front, side, from above): to check its shape and which way it faces.</summary>
+	/// <summary>(2026-10-14g, `-- --grips`) Each held thing as it's carried (<see cref="HeldModels"/>' table), from the
+	/// eye, in daylight and by the lantern in the dark: test-output/grips/&lt;item&gt;[_dark].png.</summary>
+	private async Task GripShots()
+	{
+		string dir = ProjectSettings.GlobalizePath("res://test-output/grips");
+		DirAccess.MakeDirRecursiveAbsolute(dir);
+		foreach (var k in HeldModels.GripKinds) _inv.TryPickup(k);
+		_inv.TryPickup(ToolKind.Lantern);
+		var sun = GetNodeOrNull<DirectionalLight3D>("../Sun");
+		var env = GetNodeOrNull<WorldEnvironment>("../WorldEnvironment")?.Environment;
+		foreach (var k in HeldModels.GripKinds)
+			{
+				_inv.Select(ToolKind.None);
+				await Seconds(0.45);
+				_inv.Select(k);
+				if (sun != null) sun.Visible = true;
+				if (env != null) env.AmbientLightEnergy = 0.55f;
+				Look(0f);
+				await Seconds(0.9);
+				string n = k.ToString().ToLowerInvariant();
+				GetViewport().GetTexture().GetImage().SavePng($"{dir}/{n}.png");
+				if (sun != null) sun.Visible = false;
+				if (env != null) env.AmbientLightEnergy = 0.02f;
+				await Seconds(0.4);
+				GetViewport().GetTexture().GetImage().SavePng($"{dir}/{n}_dark.png");
+				GD.Print($"[hands] grip {n}");
+			}
+	}
+
+	/// <summary>Each model alone in front of the eye, turned (front, side, from above): to check its shape and which way it
+	/// faces. (2026-10-14g) Drawn in the held things' convention with no turn (the hand's and the item's frames as built)
+	/// and its axes beside it: +X red, +Y green (up the handle), -Z blue (the working end's way).</summary>
 	private async Task Studio()
 	{
 		var cam = _p.CameraRig.Camera;
