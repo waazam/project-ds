@@ -201,6 +201,8 @@ public partial class LookShots : Node
 		}
 		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-pickups") >= 0) await ShootPickups(p, start);
 		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-endings") >= 0) await ShootEndings(p, shot);
+		foreach (var a in OS.GetCmdlineUserArgs())
+			if (a.StartsWith("--look-walk=")) await WalkOut(p, a["--look-walk=".Length..]);
 		GD.Print("[look] done");
 		tree.Quit(0);
 	}
@@ -365,6 +367,56 @@ public partial class LookShots : Node
 			if (best != null) return best;
 		}
 		return best;
+	}
+
+	/// <summary>`--look-walk="x,z,yawDeg,seconds;..."`: from each x,z (dropped onto the ground) the player holds forward
+	/// (running) at that heading for that long, sidestepping a little when stuck, as someone trying to get out would; then
+	/// where they ended up, and whether that's still on the playable ground (<see cref="ForestTerrain.PlayRect"/> less its
+	/// walls' inset), is logged as "[walk] ... inside True/False". A shot at the end of each.</summary>
+	private async System.Threading.Tasks.Task WalkOut(PlayerController p, string spec)
+	{
+		var tree = GetTree();
+		var terrain = GroundSnap.FindTerrain(this);
+		int n = 0;
+		foreach (var leg in spec.Split(';', StringSplitOptions.RemoveEmptyEntries))
+		{
+			var f = Array.ConvertAll(leg.Split(','), s => float.Parse(s, CultureInfo.InvariantCulture));
+			var from = new Vector3(f[0], 0, f[1]);
+			from.Y = (terrain?.HeightAt(from.X, from.Z) ?? 0f) + 0.3f;
+			float yaw = Mathf.DegToRad(f[2]);
+			_pin = null;
+			p.Teleport(from, yaw);
+			await Hold(p, yaw, 0f, 0.6f);
+			_pin = null;
+			var input = p.PlayerInput;
+			double t = 0;
+			float side = 1f;
+			Vector3 last = p.GlobalPosition;
+			double stuck = 0;
+			while (t < f[3])
+			{
+				p.CameraRig.SnapBehind(yaw);
+				input.ScriptedRun = true;
+				input.ScriptedMove = stuck > 0.6 ? new Vector2(side, 0.6f) : new Vector2(0, 1);
+				await ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
+				double dt = 1.0 / Engine.PhysicsTicksPerSecond;
+				t += dt;
+				if (p.GlobalPosition.DistanceTo(last) < 0.02f) stuck += dt; else if (stuck > 1.6) { stuck = 0; side = -side; }
+				if (stuck > 2.2) { stuck = 0; side = -side; }
+				last = p.GlobalPosition;
+			}
+			input.ScriptedMove = Vector2.Zero;
+			input.ScriptedRun = false;
+			var end = p.GlobalPosition;
+			bool inside = true;
+			if (terrain != null)
+			{
+				var r = terrain.PlayRect.Grow(-terrain.EdgeWallInset + 0.6f);
+				inside = r.HasPoint(new Vector2(end.X, end.Z)) && end.Y > -100f;
+			}
+			GD.Print($"[walk] {n} from ({f[0]:0}, {f[1]:0}) heading {f[2]:0}: ended at {end.Round()} after {from.DistanceTo(end):0} m, inside {inside}");
+			Save($"walk_{n++:00}_end");
+		}
 	}
 
 	private Vector3? _pin;

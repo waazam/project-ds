@@ -232,16 +232,24 @@ def skeleton(pose):
     tb = hand.P(0.020, -0.011, 0.019)
     if P_["thumb"] == "over":
         # out beside the first finger's first bone, then across the front of its middle bone, the tip on the middle finger
-        via0 = (hand.fingers["index"][0] + hand.fingers["index"][1]) * 0.5 + hand.s * 0.024 - hand.b * 0.01
-        via1 = outside("index", 1, 0.021) + hand.s * 0.008
-        tip = outside("middle", 1, 0.020)
+        # (2026-10-15d, the owner: "fix thumb for holding all objects") it went out 2.4 cm past the first finger and
+        # closed over the top of the fist, where the handle goes on up: through the handle, or a cap on it. A hammer grip's
+        # thumb wraps the handle's near side across the first two fingers' middle bones, between them, the index finger
+        # the top ring of the fist above it
+        via0 = (hand.fingers["index"][0] + hand.fingers["index"][1]) * 0.5 + hand.s * 0.013 - hand.b * 0.01
+        via1 = outside("index", 1, 0.021) + hand.s * 0.001
+        tip = outside("middle", 1, 0.020) - hand.s * 0.002
     elif P_["thumb"] == "back":
         # (2026-10-14g, the owner: the camera's thumb "lies over the top of the camera body; should go up the back") the
         # ball of the thumb along the palm's side to the box's back face, the thumb then flat on that face, up and in
         # toward the middle of the box, its tip a centimetre under the top plate
-        via0 = tb + hand.f * 0.031 - hand.b * 0.016 + hand.s * 0.002
-        via1 = via0 - hand.b * 0.025 + hand.s * 0.011 + hand.f * 0.009
-        tip = via1 - hand.b * 0.022 + hand.s * 0.008 + hand.f * 0.004
+        # (2026-10-15, the owner: "fix the thumb for holding the camera": it lay straight and flat across the back toward
+        # the middle, a stick across the body. A hand on a camera's right end rests the thumb diagonally up the back,
+        # bent at its joint, the pad on the leatherette under the advance lever: up and in at about 45 degrees, the last
+        # bone curling a little more upright)
+        via0 = tb + hand.f * 0.031 - hand.b * 0.012 + hand.s * 0.004
+        via1 = via0 - hand.b * 0.021 + hand.s * 0.010 + hand.f * 0.004
+        tip = via1 - hand.b * 0.015 + hand.s * 0.007 + hand.f * 0.002
     elif P_["thumb"] == "along":
         # up the grip on the palm's side, opposite the fingers
         cT = T0 + gdir * ((FINGERS[0][2] + 0.012) / math.cos(gamma))
@@ -255,8 +263,18 @@ def skeleton(pose):
     via0 = tb + (via0 - tb).normalized() * 0.042
     via1 = via0 + (via1 - via0).normalized() * 0.031
     tip = via1 + (tip - via1).normalized() * 0.027
-    hand.thumb = [tb, via0, via1, tip]
     hand.thumb_r = [0.0135, 0.0118, 0.0109, 0.0098]
+    # (2026-10-15d) for every round grip: no part of the thumb inside the handle. Each joint is pushed out from the grip's
+    # axis (it runs on past the fist both ways) to lie on the handle's surface at most, the glove's thickness and the
+    # thumb's own radius clear: the thumb rests on what it holds, never through it
+    if gr is not None and P_["thumb"] in ("over", "along"):
+        def clear_of_grip(p, rad):
+            rel = p - T0
+            radial = rel - gdir * rel.dot(gdir)
+            need = gr + gT + rad + 0.0005
+            return p if radial.length >= need or radial.length < 1e-6 else p + radial.normalized() * (need - radial.length)
+        via0, via1, tip = (clear_of_grip(p, r) for p, r in zip((via0, via1, tip), hand.thumb_r[1:]))
+    hand.thumb = [tb, via0, via1, tip]
     # into the game's frame: the grip (or the thumb's side, open) along the pose's axis, the back of the hand its way
     A = P_["axis"].normalized()
     back = (P_["back"] - A * P_["back"].dot(A)).normalized()

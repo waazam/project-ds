@@ -5,6 +5,9 @@ namespace ProjectDS.World;
 
 public enum BirdColor { Red, Blue, Purple, BlackOmen }
 
+/// <summary>What a bird sits on (scenes store the number: append only).</summary>
+public enum BirdPerch { Auto, Snag, Ground, Branch, Stump, Rock }
+
 /// <summary>
 /// Act 1's optional photo-minigame subject (STORY.md): a bird that resembles a
 /// cardinal, in red, blue or purple, all muted toward the forest's palette, and
@@ -26,6 +29,9 @@ public enum BirdColor { Red, Blue, Purple, BlackOmen }
 public partial class Bird : Node3D
 {
 	[Export] public BirdColor Color = BirdColor.Red;
+	/// <summary>Where it sits (2026-10-15, the owner: "all the colored birds shouldnt be standing on a post ... they should
+	/// be in trees on the ground on post etc"). Auto: a snag if its anchor lifts it, else the ground.</summary>
+	[Export] public BirdPerch Perch = BirdPerch.Auto;
 	/// <summary>Height of the occasional hop when standing on the ground.</summary>
 	[Export] public float BobHeight = 0.02f;
 	/// <summary>Average seconds between body turns.</summary>
@@ -276,8 +282,17 @@ public partial class Bird : Node3D
 		Vector3 p = GlobalPosition;
 		float ground = terrain.HeightAt(p.X, p.Z);
 		float elev = p.Y - ground;
+		switch (Perch)
+		{
+			case BirdPerch.Ground: elev = 0f; break;
+			case BirdPerch.Stump: BuildStump(p, ground); return;
+			case BirdPerch.Rock: BuildRock(p, ground); return;
+			case BirdPerch.Branch: BuildBranch(p, ground, Mathf.Max(elev, 1.5f)); return;
+			case BirdPerch.Snag: elev = Mathf.Max(elev, 0.5f); GlobalPosition = new Vector3(p.X, ground + elev, p.Z); break;
+		}
 		if (elev < 0.15f)
 		{
+			// on the ground: pecking about (see _Process)
 			GlobalPosition = new Vector3(p.X, ground + 0.005f, p.Z);
 			return;
 		}
@@ -328,6 +343,111 @@ public partial class Bird : Node3D
 		k.CommitTo(perch, "PerchMesh");
 	}
 
+	/// <summary>A cut stump, knee high: rough bark sides flaring into the ground, a pale ringed top the bird stands on.</summary>
+	private void BuildStump(Vector3 p, float ground)
+	{
+		float h = _rng.RandfRange(0.38f, 0.55f), r = _rng.RandfRange(0.2f, 0.27f);
+		GlobalPosition = new Vector3(p.X, ground + h, p.Z);
+		Perched = true;
+		var perch = new Node3D { Name = "Perch" };
+		AddChild(perch);
+		var k = new MeshKit();
+		k.Mat(ProcTextures.BarkMat);
+		k.Color = new Color(0.58f, 0.52f, 0.46f);
+		const int sides = 9;
+		ItemMeshes.Loft(k, new[]
+		{
+			new ItemMeshes.Ring(new Vector3(0, -h - 0.15f, 0), r * 1.45f, r * 1.4f),
+			new ItemMeshes.Ring(new Vector3(0.01f, -h + 0.06f, 0), r * 1.2f, r * 1.15f),
+			new ItemMeshes.Ring(new Vector3(0.005f, -h * 0.45f, -0.005f), r * 1.02f, r),
+			new ItemMeshes.Ring(new Vector3(0, -0.01f, 0), r, r * 0.97f),
+		}, sides, false, false, Vector3.Right, 2f);
+		// the saw-cut top, a shade proud of the bark so it reads as end grain
+		k.Mat(ProcTextures.EndGrainMat);
+		k.Color = new Color(0.86f, 0.78f, 0.64f);
+		k.Cylinder(new Vector3(0, -0.012f, 0), new Vector3(0, -0.002f, 0), r * 0.97f, r * 0.95f, sides, true, 1f);
+		k.CommitTo(perch, "PerchMesh");
+		Solid(perch, new CylinderShape3D { Radius = r * 1.05f, Height = h }, new Vector3(0, -h * 0.5f, 0));
+	}
+
+	/// <summary>A mossy rock, its top just under the bird's feet.</summary>
+	private void BuildRock(Vector3 p, float ground)
+	{
+		var radii = new Vector3(_rng.RandfRange(0.42f, 0.55f), _rng.RandfRange(0.28f, 0.36f), _rng.RandfRange(0.36f, 0.48f));
+		GlobalPosition = new Vector3(p.X, ground + radii.Y * 0.82f, p.Z);
+		Perched = true;
+		var perch = new Node3D { Name = "Perch" };
+		AddChild(perch);
+		var k = new MeshKit();
+		k.Color = new Color(0.86f, 0.86f, 0.82f);
+		// its top flattened a little where the bird stands (the blob's jitter kept small so the feet meet it)
+		k.Mat(ProcTextures.RockMat).Blob(new Vector3(0, -radii.Y * 0.98f, 0), radii, Seed() + 5, 0.06f, true, 0.8f);
+		k.CommitTo(perch, "PerchMesh");
+		Solid(perch, new SphereShape3D { Radius = Mathf.Min(radii.X, radii.Z) * 0.9f }, new Vector3(0, -radii.Y, 0));
+	}
+
+	/// <summary>A young tree beside the way, the bird out on its low limb: a leaning trunk, a limb reaching out to it, a few
+	/// twigs past the bird and a light crown of leaves above, so it sits in a tree and is still easy to frame.</summary>
+	private void BuildBranch(Vector3 p, float ground, float height)
+	{
+		GlobalPosition = new Vector3(p.X, ground + height, p.Z);
+		Perched = true;
+		var perch = new Node3D { Name = "Perch" };
+		AddChild(perch);
+		var k = new MeshKit();
+		// the trunk stands a metre off to one side (local -X), leaning a hair
+		float side = _rng.Randf() < 0.5f ? -1f : 1f;
+		var foot = new Vector3(-0.95f * side, -height - 0.2f, _rng.RandfRange(-0.15f, 0.15f));
+		var top = foot + new Vector3(_rng.RandfRange(-0.15f, 0.15f), height + _rng.RandfRange(1.4f, 2.0f), _rng.RandfRange(-0.15f, 0.15f));
+		k.Mat(ProcTextures.BarkMat);
+		k.Color = new Color(0.6f, 0.55f, 0.5f);
+		ItemMeshes.Loft(k, new[]
+		{
+			new ItemMeshes.Ring(foot, 0.16f, 0.15f),
+			new ItemMeshes.Ring(foot.Lerp(top, 0.15f), 0.11f, 0.105f),
+			new ItemMeshes.Ring(foot.Lerp(top, 0.6f), 0.085f, 0.08f),
+			new ItemMeshes.Ring(top, 0.03f, 0.03f),
+		}, 8, false, false, Vector3.Right, 2f);
+		// the limb: from the trunk a little above the bird, sagging out under its feet, on past it
+		Vector3 Along(float t) => foot + (top - foot) * t;
+		float tAt = (height + 0.2f + 0.18f) / (top.Y - foot.Y);
+		var root = Along(tAt);
+		var under = new Vector3(0, -0.025f, 0);
+		var tip = new Vector3(0.45f * side, 0.06f, _rng.RandfRange(-0.1f, 0.1f));
+		k.Cylinder(root, under, 0.045f, 0.028f, 6, false, 2f);
+		k.Cylinder(under, tip, 0.028f, 0.008f, 5, true, 2f);
+		// twigs off the limb and the trunk
+		for (int i = 0; i < 5; i++)
+		{
+			float t = _rng.RandfRange(0.2f, 0.9f);
+			var a = i < 3 ? under.Lerp(tip, t) : Along(_rng.RandfRange(0.55f, 0.9f));
+			var b = a + new Vector3(_rng.RandfRange(-0.25f, 0.25f), _rng.RandfRange(0.1f, 0.3f), _rng.RandfRange(-0.25f, 0.25f));
+			k.Cylinder(a, b, 0.012f, 0.004f, 4, true, 3f);
+		}
+		// a light crown, well above the bird: it never hides it
+		k.Mat(ProcTextures.LeafMat);
+		for (int i = 0; i < 4; i++)
+		{
+			var c = top + new Vector3(_rng.RandfRange(-0.45f, 0.45f), _rng.RandfRange(-0.3f, 0.15f), _rng.RandfRange(-0.45f, 0.45f));
+			k.Color = new Color(0.55f, 0.66f, 0.42f) * _rng.RandfRange(0.85f, 1.1f);
+			k.Blob(c, new Vector3(0.55f, 0.42f, 0.5f) * _rng.RandfRange(0.8f, 1.15f), Seed() + 20 + i, 0.25f, true, 1.5f);
+		}
+		// a few leaves on the limb's end
+		k.Color = new Color(0.5f, 0.62f, 0.38f);
+		k.Blob(tip + new Vector3(0.05f * side, 0.06f, 0), new Vector3(0.16f, 0.1f, 0.14f), Seed() + 31, 0.3f, true, 1.5f);
+		k.CommitTo(perch, "PerchMesh");
+		var mid = foot.Lerp(top, 0.5f);
+		Solid(perch, new CylinderShape3D { Radius = 0.13f, Height = top.Y - foot.Y }, mid);
+	}
+
+	/// <summary>The perch is solid to walk into (on the world layer), so the player stands beside it, not in it.</summary>
+	private static void Solid(Node3D perch, Shape3D shape, Vector3 at)
+	{
+		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
+		perch.AddChild(body);
+		body.AddChild(new CollisionShape3D { Shape = shape, Position = at });
+	}
+
 	// ───────────────────────────── idle ─────────────────────────────
 
 	public override void _Process(double delta)
@@ -343,6 +463,13 @@ public partial class Bird : Node3D
 			_headTimer = _rng.RandfRange(0.35f, 1.8f);
 			_headYawTarget = Mathf.DegToRad(_rng.RandfRange(-65f, 65f));
 			_headTiltTarget = Mathf.DegToRad(_rng.RandfRange(-12f, 18f));
+			// on the ground it feeds: now and then a quick peck down at the litter
+			if (!Perched && _rng.Randf() < 0.4f)
+			{
+				_headTimer = _rng.RandfRange(0.18f, 0.32f);
+				_headYawTarget = Mathf.DegToRad(_rng.RandfRange(-15f, 15f));
+				_headTiltTarget = Mathf.DegToRad(_rng.RandfRange(55f, 70f));
+			}
 		}
 		_bodyTimer -= dt;
 		if (_bodyTimer <= 0f)

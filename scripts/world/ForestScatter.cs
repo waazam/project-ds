@@ -75,6 +75,7 @@ public partial class ForestScatter : Node3D
 		BuildMeshes();
 		ScatterTrees();
 		ScatterUnderstory();
+		ScatterEdgeThicket();
 		PlaceBoardPiles();
 		ScatterRocksAndLogs();
 		ScatterBoulders();
@@ -160,7 +161,7 @@ public partial class ForestScatter : Node3D
 			float y = topY * fy;
 			rings.Add((Axis(y), trunkR * Mathf.Lerp(1.02f, 0.08f, y / topY), new Color(0.62f, 0.6f, 0.58f).Lerp(new Color(0.68f, 0.66f, 0.63f), fy)));   // (was to 0.8 at the top: the pale upper trunks read as paper)
 		}
-		TrunkLoft(k, rings, 12, 1f);
+		TrunkLoft(k, rings, 16, 1f, 0.07f, seed);   // (2026-10-15, "too blocky": sixteen sides, not twelve, and lobed)
 		Roots(k, trunkR * 1.42f, seed, rings[1].col);
 		// dead stubs on the bare trunk
 		var mossRng = new RandomNumberGenerator { Seed = (ulong)(seed * 977 + 13) };
@@ -181,19 +182,18 @@ public partial class ForestScatter : Node3D
 
 		// ---- bough tiers (FirCrown: shared with the lake's cypresses)
 		FirCrown(k, rng, Axis, height, trunkR, crownStart, tiers, maxR, ragged, ProcTextures.FirSprayMat);
-		k.Mat(ProcTextures.FirBranchMat);
-		// leader: two crossed vertical cards at the very top
+		// leader (2026-10-15, "spikey": two crossed cards tapering to a point made a spearhead on every top): three sprays
+		// of needles up from the top whorl, leaning a little apart, the middle one tallest, so the top is a soft tuft
+		k.Mat(ProcTextures.FirSprayMat);
 		{
-			float lh = Mathf.Max(1.4f, height * 0.09f), lw = lh * 0.35f;
-			Vector3 b = Axis(height * 0.86f), top = Axis(height * 0.86f) + Vector3.Up * lh;
-			k.Color = new Color(0.9f, 0.9f, 0.9f);
-			for (int i = 0; i < 2; i++)
+			float lh = Mathf.Max(1.4f, height * 0.09f);
+			Vector3 b = Axis(height * 0.86f);
+			for (int i = 0; i < 3; i++)
 			{
-				float a = i * Mathf.Pi * 0.5f + seed;
-				Vector3 sd = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * lw;
-				Vector3 nn = new Vector3(-sd.Z, 0, sd.X).Normalized();
-				k.Quad(b - sd, b + sd, top + sd * 0.2f, top - sd * 0.2f, nn,
-					new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+				float a = i * Mathf.Tau / 3f + seed;
+				Vector3 lean = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * (i == 0 ? 0.12f : 0.4f);
+				float lum = i == 0 ? 0.9f : 0.8f;
+				Spray(k, b + Vector3.Up * (i == 0 ? 0.1f : 0f), Vector3.Up + lean, lh * (i == 0 ? 1f : 0.7f), lh * 0.42f, a, 0f, new Color(lum, lum, lum), i == 0);
 			}
 		}
 		return k.Commit();
@@ -224,7 +224,9 @@ public partial class ForestScatter : Node3D
 			// under or beside, a wide shallow cone is a dark disc hung on the trunk.) Low tiers (within reach of the eye:
 			// under 3.4 m) have none, their boughs alone; higher ones a narrower, steeper skirt with a ragged rim and a gap
 			// or two, so it reads as needles massed round the trunk, not a plate. (No draws on rng: the tree's shape holds.)
-			if (y > 3.4f)
+			// (2026-10-15, "blocky": on the narrow whorls of a young fir or a crown's top, the skirt was a little dark spinning
+			// top threaded on the trunk, a bead under every tier; only the wider whorls have one now)
+			if (y > 3.4f && R > 1.4f)
 			{
 				float cr = R * 0.42f, drop = cr * Mathf.Max(Mathf.Tan(droop * 0.7f), 0.8f);
 				const int cs = 9;
@@ -253,7 +255,8 @@ public partial class ForestScatter : Node3D
 			for (int i = 0; i < n; i++)
 			{
 				if (rng.Randf() < ragged * 0.5f && t < tiers - 2) continue;
-				float a = rot + Mathf.Tau * i / n + rng.RandfRange(-0.25f, 0.25f);
+				// (2026-10-15, less of a regular star: the boughs wander further off even spacing round the whorl)
+				float a = rot + Mathf.Tau * i / n + rng.RandfRange(-0.25f, 0.25f) * 1.7f;
 				float L = R * rng.RandfRange(0.78f, 1.12f);
 				Vector3 dir = new(Mathf.Cos(a), 0, Mathf.Sin(a));
 				Vector3 side = new(-dir.Z, 0, dir.X);
@@ -275,7 +278,7 @@ public partial class ForestScatter : Node3D
 				k.Mat(spray);
 				float w = Mathf.Max(0.5f, L * 0.42f);
 				// the leading spray, carrying on from the limb's end, and the pair off its sides
-				Spray(k, P(0.42f), Dir(0.5f), L * 0.62f, w, rng.RandfRange(-0.3f, 0.3f), sag, new Color(lum, lum, lum));
+				Spray(k, P(0.42f), Dir(0.5f), L * 0.58f, w * 1.1f, rng.RandfRange(-0.3f, 0.3f), sag, new Color(lum, lum, lum), f < 0.3f && L > 1.6f);   // (crossed only low on the big trees, at eye height: across every spray it cost a quarter of the frame rate in alpha overdraw)
 				if (L < 1.1f) continue;
 				float lum2 = lum * 0.85f;
 				Vector3 d0 = Dir(0.3f);
@@ -288,19 +291,29 @@ public partial class ForestScatter : Node3D
 
 	/// <summary>One spray of needles (FirSprayMat): a card from <paramref name="at"/> out along <paramref name="d"/>, its tip
 	/// hanging by the bough's sag, rolled <paramref name="roll"/> radians about its length.</summary>
-	internal static void Spray(MeshKit k, Vector3 at, Vector3 d, float len, float w, float roll, float sag, Color col)
+	internal static void Spray(MeshKit k, Vector3 at, Vector3 d, float len, float w, float roll, float sag, Color col, bool crossed = false)
 	{
 		d = d.Normalized();
 		Vector3 s = d.Cross(Vector3.Up);
 		s = s.LengthSquared() < 1e-4f ? Vector3.Right : s.Normalized();
 		Vector3 up = s.Cross(d).Normalized();
-		Vector3 sr = s * Mathf.Cos(roll) + up * Mathf.Sin(roll);
 		Vector3 tip = at + d * len + Vector3.Down * len * (0.15f + 0.3f * sag);
-		Vector3 n = (tip - at).Cross(sr).Normalized();
-		if (n.Y < 0) n = -n;
 		k.Color = col;
-		k.Quad(at - sr * w * 0.5f, at + sr * w * 0.5f, tip + sr * w * 0.5f, tip - sr * w * 0.5f, n,
-			new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+		// (2026-10-15, "spikey": the photographed spray's pointed end on a card as wide at its tip as at its root made a
+		// spearhead; hundreds of them, level and evenly round each whorl, a star of spikes) the card now fans out, narrower
+		// at the root and wider at the tip, so the spray's end spreads and blunts as a bough's does; and the leading spray
+		// can carry a second card across it, so edge-on it's a soft tuft and not a hairline against the sky.
+		void Card(float r, float wk)
+		{
+			Vector3 sr = s * Mathf.Cos(r) + up * Mathf.Sin(r);
+			Vector3 n = (tip - at).Cross(sr).Normalized();
+			if (n.Y < 0) n = -n;
+			float wb = w * wk * 0.8f, wt = w * wk * 1.2f;
+			k.Quad(at - sr * wb * 0.5f, at + sr * wb * 0.5f, tip + sr * wt * 0.5f, tip - sr * wt * 0.5f, n,
+				new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
+		}
+		Card(roll, 1f);
+		if (crossed) Card(roll + Mathf.Pi * 0.5f, 0.7f);
 	}
 
 	/// <summary>The root flare (the fidelity pass, 2026-10-02): four to six roots spreading from the trunk's foot, each
@@ -321,45 +334,116 @@ public partial class ForestScatter : Node3D
 			float reach = r * rng.RandfRange(2.2f, 3.4f) + 0.3f;
 			float bend = rng.RandfRange(-0.25f, 0.25f);
 			float rr = r * rng.RandfRange(0.32f, 0.45f);
+			// (2026-10-15, "spikey": each root came to a point lying on the ground, a claw round the foot) it now sinks as it
+			// thins, its end well under the ground, so it reads as a root going in, not a spike laid on top
 			TrunkLoft(k, new System.Collections.Generic.List<(Vector3, float, Color)>
 			{
 				(d * r * 0.55f + Vector3.Up * 0.42f, rr * 0.9f, col),
 				(d * r * 1.05f + Vector3.Up * 0.16f, rr, col),
-				(d * reach * 0.55f + side * bend * reach * 0.3f + Vector3.Up * 0.02f, rr * 0.65f, dark),
-				(d * reach + side * bend * reach * 0.6f + Vector3.Down * 0.14f, rr * 0.25f, dark),
+				(d * reach * 0.5f + side * bend * reach * 0.3f + Vector3.Down * 0.02f, rr * 0.72f, dark),
+				(d * reach * 0.85f + side * bend * reach * 0.5f + Vector3.Down * rr * 0.75f, rr * 0.5f, dark),
+				(d * reach + side * bend * reach * 0.6f + Vector3.Down * (rr + 0.25f), rr * 0.3f, dark),
 			}, 6, 1f);
 		}
 	}
 
 	/// <summary>A trunk as one smooth tube through <paramref name="rings"/> (bottom to top): per-vertex
 	/// normals round and along it, bark UVs running on unbroken, vertex colours blended ring to ring.</summary>
-	internal static void TrunkLoft(MeshKit k, System.Collections.Generic.List<(Vector3 c, float r, Color col)> rings, int sides, float uvScale)
+	internal static void TrunkLoft(MeshKit k, System.Collections.Generic.List<(Vector3 c, float r, Color col)> rings, int sides, float uvScale, float lobes = 0f, int lobeSeed = 0)
 	{
-		float v0 = 0f;
-		for (int i = 0; i < rings.Count - 1; i++)
+		// (2026-10-15, the owner: "fix the line cutting on the tree trunks") Each ring is now worked out once and shared by
+		// the segments either side of it. Each segment used to make its own ring frame from its own axis, so wherever the
+		// trunk bent the two rings at a joint didn't line up: a hairline crack the sky showed through. Each segment also
+		// had its own taper normals and one flat colour, so every joint was a hard line in the shading and the tint. Now
+		// the frame is carried up the trunk from ring to ring (it turns only as much as the trunk bends), each ring's
+		// normals take the tangent and taper of both segments it joins, and the colour blends from one ring to the next.
+		int n = rings.Count;
+		if (n < 2) return;
+		var tan = new Vector3[n];
+		var slope = new float[n];
+		var dirs = new Vector3[n][];
+		for (int i = 0; i < n; i++)
 		{
-			var (c0, r0, col0) = rings[i];
-			var (c1, r1, col1) = rings[i + 1];
-			float len = c0.DistanceTo(c1);
-			float v1 = v0 + len * uvScale * 0.5f;
-			Vector3 ax = (c1 - c0).Normalized();
-			Vector3 side = Mathf.Abs(ax.Y) > 0.9f ? Vector3.Right : Vector3.Up;
-			Vector3 bx = ax.Cross(side).Normalized(), bz = bx.Cross(ax).Normalized();
-			// slope of the taper, for the normals
-			float slope = (r0 - r1) / Mathf.Max(len, 0.001f);
+			var t = (rings[Mathf.Min(i + 1, n - 1)].c - rings[Mathf.Max(i - 1, 0)].c).Normalized();
+			tan[i] = t;
+			float sum = 0f; int cnt = 0;
+			if (i > 0) { sum += (rings[i - 1].r - rings[i].r) / Mathf.Max(rings[i - 1].c.DistanceTo(rings[i].c), 0.001f); cnt++; }
+			if (i < n - 1) { sum += (rings[i].r - rings[i + 1].r) / Mathf.Max(rings[i].c.DistanceTo(rings[i + 1].c), 0.001f); cnt++; }
+			slope[i] = sum / cnt;
+		}
+		// the first ring's frame as before (so the bark sits where it did), then carried along: each ring's x is the last
+		// one's with its component along this ring's tangent taken out
+		Vector3 bx = tan[0].Cross(Mathf.Abs(tan[0].Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
+		for (int i = 0; i < n; i++)
+		{
+			if (i > 0)
+			{
+				var x = bx - tan[i] * bx.Dot(tan[i]);
+				bx = x.LengthSquared() > 1e-8f ? x.Normalized() : tan[i].Cross(Mathf.Abs(tan[i].Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
+			}
+			Vector3 bz = bx.Cross(tan[i]).Normalized();
+			dirs[i] = new Vector3[sides + 1];
+			for (int s = 0; s <= sides; s++)
+			{
+				float a = Mathf.Tau * s / sides;
+				dirs[i][s] = bx * Mathf.Cos(a) + bz * Mathf.Sin(a);
+			}
+		}
+		// (2026-10-15, "too blocky": a perfect cylinder) the cross-section made irregular: a few low lobes round the trunk
+		// (a buttress, a flat side, a bulge), strongest at the foot and fading up it, the same at every ring so it runs on
+		// unbroken. Its normals are then the surface's own (from the neighbouring points round and along), so the lobes
+		// shade as the trunk's shape and the taper and flare need no separate term.
+		var ph = new float[3];
+		{
+			var lr = new RandomNumberGenerator { Seed = (ulong)(lobeSeed * 2654435761L + 977) };
+			for (int j = 0; j < 3; j++) ph[j] = lr.RandfRange(0f, Mathf.Tau);
+		}
+		float Lobe(int i, float a)
+		{
+			if (lobes <= 0f) return 0f;
+			float up = n > 1 ? (float)i / (n - 1) : 0f;
+			float amp = lobes * (0.3f + 0.7f * Mathf.Pow(1f - up, 2f));
+			return amp * (0.5f * Mathf.Sin(3f * a + ph[0]) + 0.3f * Mathf.Sin(5f * a + ph[1]) + 0.35f * Mathf.Sin(2f * a + ph[2]));
+		}
+		var pts = new Vector3[n, sides + 1];
+		for (int i = 0; i < n; i++)
+			for (int s = 0; s <= sides; s++)
+			{
+				float a = Mathf.Tau * (s % sides) / sides;
+				pts[i, s] = rings[i].c + dirs[i][s % sides] * rings[i].r * (1f + Lobe(i, a));
+			}
+		var nrm = new Vector3[n, sides + 1];
+		for (int i = 0; i < n; i++)
+			for (int s = 0; s <= sides; s++)
+			{
+				int sm = (s - 1 + sides) % sides, sp = (s + 1) % sides;
+				Vector3 round = pts[i, sp] - pts[i, sm];
+				Vector3 along = pts[Mathf.Min(i + 1, n - 1), s % sides] - pts[Mathf.Max(i - 1, 0), s % sides];
+				Vector3 nn = along.Cross(round);
+				Vector3 fallback = (dirs[i][s % sides] + tan[i] * slope[i]).Normalized();
+				if (nn.LengthSquared() < 1e-12f) nn = fallback;
+				nn = nn.Normalized();
+				if (nn.Dot(dirs[i][s % sides]) < 0f) nn = -nn;
+				// (a sliver of the old analytic normal keeps a ring that's nearly a point from going wild)
+				nrm[i, s] = (nn * 0.85f + fallback * 0.15f).Normalized();
+			}
+		float v0 = 0f;
+		for (int i = 0; i < n - 1; i++)
+		{
+			var col0 = rings[i].col;
+			var col1 = rings[i + 1].col;
+			float v1 = v0 + rings[i].c.DistanceTo(rings[i + 1].c) * uvScale * 0.5f;
 			for (int s = 0; s < sides; s++)
 			{
-				float a0 = Mathf.Tau * s / sides, a1 = Mathf.Tau * (s + 1) / sides;
-				Vector3 d0 = bx * Mathf.Cos(a0) + bz * Mathf.Sin(a0), d1 = bx * Mathf.Cos(a1) + bz * Mathf.Sin(a1);
-				Vector3 p00 = c0 + d0 * r0, p01 = c0 + d1 * r0, p10 = c1 + d0 * r1, p11 = c1 + d1 * r1;
-				Vector3 n0 = (d0 + ax * slope).Normalized(), n1 = (d1 + ax * slope).Normalized();
+				Vector3 p00 = pts[i, s], p01 = pts[i, s + 1], p10 = pts[i + 1, s], p11 = pts[i + 1, s + 1];
+				Vector3 n00 = nrm[i, s], n01 = nrm[i, s + 1], n10 = nrm[i + 1, s], n11 = nrm[i + 1, s + 1];
 				float u0 = (float)s / sides * 2f, u1 = (float)(s + 1) / sides * 2f;
-				k.Color = col0;
-				k.Tri(p00, p10, p11, n0, n0, n1, new Vector2(u0, v0), new Vector2(u0, v1), new Vector2(u1, v1));
-				k.Tri(p00, p11, p01, n0, n1, n1, new Vector2(u0, v0), new Vector2(u1, v1), new Vector2(u1, v0));
+				k.TriC(p00, p10, p11, n00, n10, n11, new Vector2(u0, v0), new Vector2(u0, v1), new Vector2(u1, v1), col0, col1, col1);
+				k.TriC(p00, p11, p01, n00, n11, n01, new Vector2(u0, v0), new Vector2(u1, v1), new Vector2(u1, v0), col0, col1, col0);
 			}
 			v0 = v1;
 		}
+		k.Color = rings[n - 2].col;   // (as the old loft left it, for whatever is drawn after)
 	}
 
 	internal static Mesh BoulderMesh(int seed)
@@ -384,7 +468,7 @@ public partial class ForestScatter : Node3D
 		{
 			(new Vector3(0, -0.4f, 0), 0.34f, k.Color), (new Vector3(0, 0.0f, 0), 0.29f, k.Color), (new Vector3(0, 0.35f, 0), 0.245f, k.Color),
 			(top * 0.35f + new Vector3(0, 0.1f, 0), 0.2f, k.Color), (top, 0.13f, k.Color),
-		}, 10, 1f);
+		}, 14, 1f, 0.06f, seed);   // (2026-10-15: fourteen sides, lobed)
 		Roots(k, 0.29f, seed, k.Color);
 		for (int b = 0; b < 3; b++)
 		{
@@ -407,7 +491,9 @@ public partial class ForestScatter : Node3D
 			float s = rng.RandfRange(0.7f, 1.0f);
 			k.Color = new Color(s, s, s * 0.95f);
 			float r = rng.RandfRange(0.7f, 1.15f);
-			k.Blob(c, new Vector3(r, r * rng.RandfRange(0.9f, 1.25f), r * rng.RandfRange(0.8f, 1.1f)), seed * 13 + i, 0.34f, false, 0.6f, 0.6f);
+			// (2026-10-15, "blocky": each clump was an 80-face ball knocked 34 % out of round, a cluster of faceted rocks
+			// against the sky) four times the faces and a gentler knock, so the clumps are round and lumpy, not cut
+			k.Blob(c, new Vector3(r, r * rng.RandfRange(0.9f, 1.25f), r * rng.RandfRange(0.8f, 1.1f)), seed * 13 + i, 0.2f, false, 0.6f, 0.6f, 2);
 		}
 		return k.Commit();
 	}
@@ -427,7 +513,7 @@ public partial class ForestScatter : Node3D
 			(new Vector3(0, -0.4f, 0), r * 1.5f, new Color(0.56f, 0.55f, 0.54f)), (new Vector3(0, 0.0f, 0), r * 1.3f, new Color(0.58f, 0.57f, 0.56f)),
 			(new Vector3(0, 0.4f, 0), r * 1.1f, new Color(0.58f, 0.57f, 0.56f)), (top * 0.5f, r * 0.7f, new Color(0.62f, 0.61f, 0.59f)),
 			(top, r * 0.25f, new Color(0.66f, 0.65f, 0.62f)),
-		}, 10, 1f);
+		}, 14, 1f, 0.06f, seed);   // (2026-10-15: fourteen sides, lobed)
 		Roots(k, r * 1.3f, seed, new Color(0.56f, 0.55f, 0.54f));
 		k.Color = new Color(0.62f, 0.6f, 0.56f);
 		k.Mat(ProcTextures.TreeEndGrainMat).Cylinder(top, top + new Vector3(0.05f, 0.08f, 0), r * 0.25f, 0.02f, 6, false, 1f);   // broken top

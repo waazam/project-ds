@@ -416,6 +416,16 @@ public partial class FallenTree : Node3D
 				ring[i][s] = x * Mathf.Cos(a) + z * Mathf.Sin(a);
 			}
 		}
+		// each ring's taper is the mean of the two segments it joins (one per segment drew a shading line at every ring:
+		// the trunk-line fix, 2026-10-15)
+		var taper = new float[n];
+		for (int i = 0; i < n; i++)
+		{
+			float sum = 0f; int cnt = 0;
+			if (i > 0) { sum += (rings[i - 1].r - rings[i].r) / Mathf.Max(rings[i - 1].c.DistanceTo(rings[i].c), 0.001f); cnt++; }
+			if (i < n - 1) { sum += (rings[i].r - rings[i + 1].r) / Mathf.Max(rings[i].c.DistanceTo(rings[i + 1].c), 0.001f); cnt++; }
+			taper[i] = sum / Mathf.Max(cnt, 1);
+		}
 		float v0 = 0f;
 		for (int i = 0; i < n - 1; i++)
 		{
@@ -423,13 +433,12 @@ public partial class FallenTree : Node3D
 			var (c1, r1, _) = rings[i + 1];
 			float len = c0.DistanceTo(c1);
 			float v1 = v0 + len * 0.5f;
-			float slope = (r0 - r1) / Mathf.Max(len, 0.001f);
 			for (int s = 0; s < sides; s++)
 			{
 				Vector3 d00 = ring[i][s], d01 = ring[i][s + 1], d10 = ring[i + 1][s], d11 = ring[i + 1][s + 1];
 				Vector3 p00 = c0 + d00 * r0, p01 = c0 + d01 * r0, p10 = c1 + d10 * r1, p11 = c1 + d11 * r1;
-				Vector3 n00 = (d00 + tan[i] * slope).Normalized(), n01 = (d01 + tan[i] * slope).Normalized();
-				Vector3 n10 = (d10 + tan[i + 1] * slope).Normalized(), n11 = (d11 + tan[i + 1] * slope).Normalized();
+				Vector3 n00 = (d00 + tan[i] * taper[i]).Normalized(), n01 = (d01 + tan[i] * taper[i]).Normalized();
+				Vector3 n10 = (d10 + tan[i + 1] * taper[i + 1]).Normalized(), n11 = (d11 + tan[i + 1] * taper[i + 1]).Normalized();
 				float u0 = (float)s / sides * 2f, u1 = (float)(s + 1) / sides * 2f;
 				k.TriC(p00, p10, p11, n00, n10, n11, new Vector2(u0, v0), new Vector2(u0, v1), new Vector2(u1, v1), col0, rings[i + 1].col, rings[i + 1].col);
 				k.TriC(p00, p11, p01, n00, n11, n01, new Vector2(u0, v0), new Vector2(u1, v1), new Vector2(u1, v0), col0, rings[i + 1].col, col0);

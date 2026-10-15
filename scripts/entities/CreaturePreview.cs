@@ -93,6 +93,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--growth") >= 0) { await GrowthShots(); GetTree().Quit(); return; }
+		if (System.Array.Exists(OS.GetCmdlineUserArgs(), a => a.StartsWith("--trunks"))) { await TrunkShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lake") >= 0) { await LakeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--giant-grab") >= 0) { await GiantGrabShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lantern") >= 0) { await LanternShots(); GetTree().Quit(); return; }
@@ -418,6 +419,69 @@ public partial class CreaturePreview : Node3D
 			await Seconds(0.25);
 			GetViewport().GetTexture().GetImage().SavePng($"{_out}/stalker_motion_body_{i:00}.png");
 		}
+	}
+
+	/// <summary>The trunks close up (2026-10-15, the owner: "fix the line cutting on the tree trunks"): the woods' firs (their
+	/// wandering axes), a broadleaf and a sapling, a pace off and looking up them against a bright sky, so a crack or a
+	/// band where one ring of the trunk meets the next shows (trunk_*.png; --trunks=tag adds the tag to the names).</summary>
+	private async Task TrunkShots()
+	{
+		string tag = "";
+		foreach (var a in OS.GetCmdlineUserArgs()) if (a.StartsWith("--trunks=")) tag = "_" + a[9..];
+		// what each of the woods' trees costs to draw (triangles per surface: bark, needles, leaves)
+		static string Cost(Mesh m)
+		{
+			var parts = new System.Collections.Generic.List<string>();
+			int all = 0;
+			for (int s = 0; s < m.GetSurfaceCount(); s++)
+			{
+				var arr = m.SurfaceGetArrays(s);
+				var idx = arr[(int)Mesh.ArrayType.Index].AsInt32Array();
+				int tris = (idx.Length > 0 ? idx.Length : arr[(int)Mesh.ArrayType.Vertex].AsVector3Array().Length) / 3;
+				all += tris;
+				parts.Add(tris.ToString());
+			}
+			return $"{all} tris ({string.Join(" + ", parts)})";
+		}
+		GD.Print($"[trunks] fir_giant {Cost(World.ForestScatter.FirMesh(11, 33f, 0.52f, 0.42f, 14, 4.3f, 0.10f))}");
+		GD.Print($"[trunks] fir_tall {Cost(World.ForestScatter.FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f))}");
+		GD.Print($"[trunks] fir_mid {Cost(World.ForestScatter.FirMesh(13, 18f, 0.31f, 0.26f, 11, 3.0f, 0.15f))}");
+		GD.Print($"[trunks] fir_young {Cost(World.ForestScatter.FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f))}");
+		GD.Print($"[trunks] decid_a {Cost(World.ForestScatter.DeciduousMesh(4))}");
+		GD.Print($"[trunks] snag {Cost(World.ForestScatter.SnagMesh(6, 9.5f))}");
+		GD.Print($"[trunks] sapling_b {Cost(World.ForestScatter.SaplingMesh(2, 7f))}");
+		env.BackgroundColor = new Color(0.82f, 0.86f, 0.9f);
+		env.AmbientLightEnergy = 0.7f;
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(60, 60) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.17f, 0.12f) } });
+		void Put(Mesh m, Vector3 at) => AddChild(new MeshInstance3D { Mesh = m, Position = at });
+		Put(World.ForestScatter.FirMesh(13, 18f, 0.31f, 0.26f, 11, 3.0f, 0.15f, 0.4f), new Vector3(0, 0, 0));
+		Put(World.ForestScatter.FirMesh(12, 26f, 0.42f, 0.36f, 13, 3.7f, 0.12f, 0.4f), new Vector3(8, 0, 0));
+		Put(World.ForestScatter.DeciduousMesh(4), new Vector3(-8, 0, 0));
+		Put(World.ForestScatter.SaplingMesh(2, 7f), new Vector3(-14, 0, 0));
+		await Seconds(0.5);
+		foreach (var (name, x, r) in new[] { ("fir_a", 0f, 0.31f), ("fir_b", 8f, 0.42f), ("decid", -8f, 0.3f), ("sapling", -14f, 0.07f) })
+		{
+			float d = Mathf.Max(1.4f, r * 5f);
+			await Shot($"trunk_{name}_base{tag}", new Vector3(x + d * 0.7f, 1.3f, d), new Vector3(x, 0.6f, 0));
+			await Shot($"trunk_{name}_up{tag}", new Vector3(x + d * 0.5f, 1.2f, d * 0.8f), new Vector3(x, 5f, 0));
+			await Shot($"trunk_{name}_round{tag}", new Vector3(x - d * 0.8f, 1.6f, -d * 0.6f), new Vector3(x, 2.2f, 0));
+		}
+		// the foliage as the trail sees it (2026-10-15, "too blocky and spikey"): the crowns from 12 and 25 m, the
+		// undergrowth from a few metres, at eye height, against the sky
+		Put(World.ForestScatter.FirMesh(14, 22f, 0.34f, 0.30f, 15, 2.4f, 0.08f), new Vector3(16, 0, 0));
+		Put(World.ForestScatter.FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f), new Vector3(22, 0, 0));
+		Put(World.ForestScatter.SnagMesh(6, 9.5f), new Vector3(-20, 0, 0));
+		Put(World.ForestScatter.PalmettoMesh(1), new Vector3(-4, 0, 9));
+		Put(World.ForestScatter.VineMoundMesh(2, new Vector3(2.2f, 2.1f, 1.8f)), new Vector3(2, 0, 9));
+		Put(World.ForestScatter.FernMesh(), new Vector3(-1, 0, 11));
+		Put(World.ForestScatter.SaplingMesh(1, 5.5f), new Vector3(5, 0, 10));
+		await Seconds(0.5);
+		await Shot($"foliage_firs_mid{tag}", new Vector3(10f, 1.6f, 13f), new Vector3(10f, 9f, 0));
+		await Shot($"foliage_firs_far{tag}", new Vector3(4f, 1.6f, 26f), new Vector3(4f, 9f, 0));
+		await Shot($"foliage_young_close{tag}", new Vector3(24f, 1.6f, 6f), new Vector3(22f, 4f, 0));
+		await Shot($"foliage_broadleaf{tag}", new Vector3(-8f, 1.6f, 12f), new Vector3(-8f, 5f, 0));
+		await Shot($"foliage_saplings_snag{tag}", new Vector3(-15f, 1.6f, 10f), new Vector3(-16f, 4f, 0));
+		await Shot($"foliage_under{tag}", new Vector3(1f, 1.6f, 16f), new Vector3(1f, 0.6f, 9.5f));
 	}
 
 	/// <summary>The undergrowth pass's pieces (2026-10-03): a moss-hung fir and snag, the saplings, the vine mounds.</summary>

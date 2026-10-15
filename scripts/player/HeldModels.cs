@@ -83,6 +83,11 @@ public static class HeldModels
 	/// and how it's carried.</summary>
 	private static readonly Dictionary<ToolKind, Grip> Grips = new()
 	{
+		// (2026-10-15d, the owner: "the player should hold the axe halfway up the handle and more relaxed, same for the
+		// hammer") the axe and the hammer now held halfway up the handle (the axe 19 cm up from its socket, the hammer 5),
+		// carried lower and looser: the fist 2-3 cm down, the forward lean 30 -> 22 (the wrist less cocked), the roll 10 -> 18
+		// so the handle lies across the view on a slack diagonal, the head nearer and resting rather than raised. (Below, as
+		// it was for the long tools before that; the bar keeps it.)
 		// the long tools (2026-10-15, the owner: "look up references on how a human holds an axe in that position";
 		// docs/research/first-person-held-items.md): held low on the handle, the little finger at the knob or the butt, the
 		// back of the hand out to the right and the palm in, the thumb over the first fingers; the handle up and a little
@@ -92,8 +97,8 @@ public static class HeldModels
 		// tool is carried a little across: the bit's flat partly seen, the head reading as an axe or a hammer (straight
 		// ahead, 8°, it was a sliver). The fist itself in the lower right, its knuckles in view, the same place for the
 		// axe, the hammer and the bar so switching between them doesn't jump
-		[ToolKind.Axe] = new(HandPose.Fist, new(0f, 0.05f, 0f), new(new(0.24f, -0.235f, -0.42f), 30f, 32f, 10f)),
-		[ToolKind.Hammer] = new(HandPose.Fist, new(0f, 0.045f, 0f), new(new(0.235f, -0.225f, -0.41f), 30f, 32f, 10f)),
+		[ToolKind.Axe] = new(HandPose.Fist, new(0f, -0.19f, 0f), new(new(0.25f, -0.255f, -0.44f), 22f, 32f, 18f)),
+		[ToolKind.Hammer] = new(HandPose.Fist, new(0f, -0.05f, 0f), new(new(0.245f, -0.245f, -0.43f), 22f, 32f, 18f)),
 		[ToolKind.Crowbar] = new(HandPose.Fist, new(0f, 0.128f, 0f), new(new(0.24f, -0.235f, -0.42f), 30f, 20f, 10f)),
 		// the knife: in a hammer grip, the guard down against the index finger (was 2.5 cm clear of it), the blade forward
 		// and up out of the top of the fist (45°; more swung the forearm and cuff up into the view), the edge underneath
@@ -102,7 +107,9 @@ public static class HeldModels
 		// pose's hold on a box's end, the radio turned so its back is that end), the fingers round its left side, the thumb
 		// on its right side by the push-to-talk, its lower half in the hand and the grille clear; then the hand turned 55° so
 		// the speaker faces the eye; a little higher and nearer than the tools
-		[ToolKind.Radio] = new(HandPose.Camera, new(-0.0095f, 0.035f, -0.006f), new(new(0.2f, -0.19f, -0.38f), 4f, 55f, 3f), new(0f, -90f, 0f)),
+		// (2026-10-15d, the owner: "the walkie talkie should be more down in the hand too": the hand round its middle, not
+		// its foot (the radio 2 cm lower in the grip), and the whole 3 cm lower in the view; the thumb still by the PTT)
+		[ToolKind.Radio] = new(HandPose.Camera, new(-0.0095f, 0.015f, -0.006f), new(new(0.2f, -0.22f, -0.38f), 4f, 55f, 3f), new(0f, -90f, 0f)),
 		// the lighter upright in the fingers, its lid up, close in
 		[ToolKind.Lighter] = new(HandPose.Small, new(0f, 0.026f, 0f), new(new(0.17f, -0.155f, -0.36f), 0f, 0f, 0f)),
 		// the camera by its right end, the lens away, the thumb up its back

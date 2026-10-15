@@ -723,55 +723,7 @@ public static class Sfx
 		return FinishOneShot(x, sr, -3, 350, dur);
 	}
 
-	/// <summary>
-	/// A hunting rifle, far off but unmistakable: a hard crack, a punchy boom
-	/// with enough mid-range to carry on any speaker, then the report rolling
-	/// back off the ridges for seconds. The mix is compressed so the whole event
-	/// is loud, not just its first millisecond.
-	/// </summary>
-	public static double[] RifleDistant(Rng r, int sr)
-	{
-		var x = Buf(sr, 6.5);
-		var shot = new double[(int)(0.6 * sr)];
-		var crackLp = Biquad.Lp(sr, 4200); var crackHp = Biquad.Hp(sr, 500);
-		var boomBp = Biquad.Bp(sr, 260, 0.7); var boomLp = Biquad.Lp(sr, 1100);
-		var body = Biquad.Lp(sr, 160);
-		for (int i = 0; i < shot.Length; i++)
-		{
-			double t = (double)i / sr;
-			double crack = crackHp.P(crackLp.P(r.W())) * Perc(t, 0.0002, 0.005) * 3.0;
-			double tb = t - 0.012;
-			double boom = boomLp.P(boomBp.P(r.W())) * Perc(tb, 0.0015, 0.09) * 9.0
-				+ body.P(r.W()) * Perc(tb, 0.002, 0.14) * 5.0;
-			shot[i] = crack + boom;
-		}
-		void Stamp(double at, double gain, double cutoff)
-		{
-			var lp = Biquad.Lp(sr, cutoff); var lp2 = Biquad.Lp(sr, cutoff * 1.2);
-			int s0 = (int)(at * sr);
-			for (int i = 0; i < shot.Length && s0 + i < x.Length; i++) x[s0 + i] += lp2.P(lp.P(shot[i])) * gain;
-		}
-		Stamp(0.02, 1.0, 7000);
-		// One shot only: a single soft, smeared reflection off the far ridge. Distinct
-		// slap-backs sounded like more shots, so the rest of the echo is the diffuse roll.
-		Stamp(0.55 + r.R(-0.05, 0.05), 0.22, 900);
-		// The diffuse roll between them.
-		var roll = Biquad.Lp(sr, 420); var roll2 = Biquad.Lp(sr, 500);
-		double swellPh = r.R(0, TwoPi);
-		for (int i = (int)(0.2 * sr); i < x.Length; i++)
-		{
-			double t = (double)i / sr;
-			double env = (1 - Math.Exp(-(t - 0.2) / 0.12)) * Math.Exp(-(t - 0.2) / 1.3);
-			double swell = 0.85 + 0.15 * Math.Sin(TwoPi * 0.4 * t + swellPh);   // gentle, so it never pulses like more shots
-			x[i] += roll2.P(roll.P(r.W())) * env * swell * 2.4;
-		}
-		HighPass(x, sr, 45);
-		// Compress: soft-clip so the body and echoes sit close to the peak.
-		double pk = 0; foreach (var v in x) pk = Math.Max(pk, Math.Abs(v));
-		double drive = 5.0 / Math.Max(pk, 1e-9);
-		for (int i = 0; i < x.Length; i++) x[i] = Math.Tanh(x[i] * drive);
-		return FinishOneShot(x, sr, -3, 400);
-	}
+	// (the far rifle moved to Gunshot.cs, 2026-10-15)
 
 	/// <summary>
 	/// Rolling thunder and nothing else (Dan, 2026-09-22: the continuous rumble bed after the first boom

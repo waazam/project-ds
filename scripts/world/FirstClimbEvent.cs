@@ -56,20 +56,37 @@ public partial class FirstClimbEvent : StoryTrigger
 	protected override bool CanFire(StoryManager s, PlayerController p) => s.Current < Checkpoint.Act2StairsClimbed;
 
 	[ExportGroup("The reveal")]
-	/// <summary>The game's title over the stairs (2026-10-13, the owner: "I don't want to see the stairs text on the screen
-	/// until the player is close to the stairs and can see them in view"): within this many metres of the flight
-	/// (from the eye), and some point of it on screen within <see cref="RevealCone"/> degrees of the middle of the view,
-	/// nothing solid between.</summary>
+	/// <summary>The stairs seen, close (2026-10-13, the owner: "I don't want to see the stairs text on the screen until the
+	/// player is close to the stairs and can see them in view"): within this many metres of the flight (from the eye), and
+	/// some point of it on screen within <see cref="RevealCone"/> degrees of the middle of the view, nothing solid between.
+	/// Logged and kept for the tests; the title itself now waits for the foot of the stairs (<see cref="AtFoot"/>).</summary>
 	[Export] public float RevealRange = 18f;
 	[Export] public float RevealCone = 36f;
+
+	[ExportGroup("The walk to the stairs")]
+	/// <summary>(2026-10-15, the owner: "the droning and tinnitus should intensify on the walk through the fallen trees but all
+	/// audio mutes once you reach the staircase, right before the title and chapter title appear one after the other")
+	/// From this many metres off the foot of the flight (about where the trail ends by the dead fir) the stairs' hum and the
+	/// ear-ringing swell (<see cref="Approach"/>, read by <see cref="Audio.StairsHum"/> and <see cref="Audio.ForestDirector"/>),
+	/// all the way to the foot.</summary>
+	[Export] public float ApproachFrom = 78f;
+	/// <summary>Within this many metres (level) of the foot of the flight: every sound cuts out (<see cref="Audio.StoryMute"/>,
+	/// until the next act: the Hollow), and in that silence the game's title, then the chapter's.</summary>
+	[Export] public float FootRange = 2.2f;
 
 	/// <summary>For the tests and the title drop: the stairs have been seen, close, by the player (this level).</summary>
 	public bool Revealed { get; private set; }
 	/// <summary>For the tests: how far the player's eye was from the flight when it was revealed.</summary>
 	public float RevealedAt { get; private set; }
-	private static FirstClimbEvent _revealed;
-	/// <summary>The stairs are in view, close (<see cref="ChapterCard.TitleThenStairs"/> waits for this).</summary>
-	public static bool StairsRevealed => _revealed != null && IsInstanceValid(_revealed) && _revealed.Revealed;
+	/// <summary>For the tests: the player reached the foot of the stairs (the silence and the titles).</summary>
+	public bool ReachedFoot { get; private set; }
+	/// <summary>For the tests: how far (level) from the foot point they were when it counted.</summary>
+	public float ReachedFootAt { get; private set; }
+	private static FirstClimbEvent _active;
+	/// <summary>At the foot of the first stairs (the silence and the game's title come there).</summary>
+	public static bool AtFoot => _active != null && IsInstanceValid(_active) && _active.ReachedFoot;
+	/// <summary>0 .. 1 over the walk from the trail's end to the foot of the first stairs (0 elsewhere, or once climbed).</summary>
+	public static float Approach { get; private set; }
 	private double _poll;
 
 	public override void _Ready()
@@ -82,18 +99,28 @@ public partial class FirstClimbEvent : StoryTrigger
 	public override void _ExitTree()
 	{
 		base._ExitTree();
-		if (_revealed == this) _revealed = null;
+		if (_active == this) { _active = null; Approach = 0f; }
 	}
+
+	/// <summary>Where the foot of the flight is (in front of its first step, on the ground).</summary>
+	public Vector3 FootPoint => GetParent() is StaircaseBuilder st ? st.GlobalTransform * new Vector3(0f, 0f, 0.6f) : GlobalPosition;
 
 	public override void _Process(double delta)
 	{
-		if (Revealed) { SetProcess(false); return; }
 		var s = StoryManager.Instance;
-		if (s == null || s.Current >= Checkpoint.Act2StairsClimbed || s.HasFlag(ChapterCard.Flag(2))) return;
+		if (s == null || s.Current >= Checkpoint.Act2StairsClimbed) { if (_active == this) Approach = 0f; return; }
+		if (GetParent() is not StaircaseBuilder stairs || StoryBeat.Player(this) is not { } player) return;
+		_active = this;
+		// the walk in: the hum and the ringing swell with every metre nearer the foot
+		var foot = FootPoint;
+		float d = new Vector2(player.GlobalPosition.X - foot.X, player.GlobalPosition.Z - foot.Z).Length();
+		float want = ReachedFoot ? 1f : Mathf.Clamp((ApproachFrom - d) / Mathf.Max(ApproachFrom - FootRange, 1f), 0f, 1f);
+		Approach = Mathf.MoveToward(Approach, want, (float)delta * 0.5f);
+		if (!ReachedFoot && d <= FootRange) OnFoot(d);
+		if (Revealed) return;
 		_poll -= delta;
 		if (_poll > 0) return;
 		_poll = 0.1;
-		if (GetParent() is not StaircaseBuilder stairs || StoryBeat.Player(this) is not { } player) return;
 		var eye = player.CameraRig?.Camera?.GlobalPosition ?? player.GlobalPosition;
 		// up the middle of the flight, and the post at the top
 		var xf = stairs.GlobalTransform;
@@ -113,9 +140,70 @@ public partial class FirstClimbEvent : StoryTrigger
 	{
 		Revealed = true;
 		RevealedAt = d;
-		_revealed = this;
 		GD.Print($"[story] Act 1: the stairs, in view, {d:0.0} m off");
-		ChapterCard.TitleThenStairs(this);
+	}
+
+	/// <summary>The foot of the stairs: every sound cut, and in the silence the game's title, then the chapter's.</summary>
+	/// <param name="onFlight">Already on the flight (came on from the side, past the foot): no hold, and the chapter's title
+	/// follows the game's straight away.</param>
+	private void OnFoot(float d, bool onFlight = false)
+	{
+		ReachedFoot = true;
+		ReachedFootAt = d;
+		_active = this;
+		Approach = 1f;
+		GD.Print($"[story] Act 1: at the foot of the stairs ({d:0.0} m): silence");
+		Audio.StoryMute.Engage(this, 0.35f, "the foot of the first stairs");
+		if (onFlight) { ChapterCard.Title(this, 1.0f, thenChapter: true); return; }
+		var card = ChapterCard.Title(this, 1.0f);
+		if (card != null && GetParent() is StaircaseBuilder stairs && StoryBeat.Player(this) is { } player)
+			_ = Cutscene.Run(this, ct => HoldForTitle(player, stairs, card, ct), lockInput: true, freezeBody: true);
+	}
+
+	/// <summary>For the tests: held at the foot, looking up the flight, while the game's title shows.</summary>
+	public bool HeldAtFoot { get; private set; }
+	/// <summary>The point up the flight the view is drawn to while held.</summary>
+	public Vector3 HoldLookPoint => GetParent() is StaircaseBuilder st
+		? st.GlobalTransform * new Vector3(0f, st.TotalHeight * 0.55f + 1.2f, -st.Steps * st.Run * 0.55f) : GlobalPosition;
+
+	/// <summary>For the tests: how far (degrees) the view is off <see cref="HoldLookPoint"/>.</summary>
+	public float LookOffDegrees(PlayerController p)
+	{
+		if (p?.CameraRig?.Camera is not { } cam) return 180f;
+		return Mathf.RadToDeg((-cam.GlobalBasis.Z).AngleTo((HoldLookPoint - cam.GlobalPosition).Normalized()));
+	}
+
+	public bool LookingUpTheFlight(PlayerController p) => LookOffDegrees(p) < 15f;
+
+	/// <summary>Held where they stand, the view eased round and up the flight, until the title has come and gone; then
+	/// theirs again. The chapter's title waits for the first step onto the flight (<see cref="Fire"/>).</summary>
+	private async Task HoldForTitle(PlayerController player, StaircaseBuilder stairs, ChapterCard card, CancellationToken ct)
+	{
+		HeldAtFoot = true;
+		player.Velocity = Vector3.Zero;
+		double t = 0;
+		try
+		{
+			while (IsInstanceValid(card) && card.IsInsideTree() && t < 16.0)
+			{
+				float dt = (float)GetProcessDeltaTime();
+				t += dt;
+				var rig = player.CameraRig;
+				if (rig?.Camera is { } cam)
+				{
+					var dir = HoldLookPoint - cam.GlobalPosition;
+					float wantYaw = Mathf.Atan2(-dir.X, -dir.Z);
+					float wantPitch = Mathf.Clamp(Mathf.Atan2(dir.Y, new Vector2(dir.X, dir.Z).Length()), -0.3f, 0.6f);
+					float dy = Mathf.AngleDifference(rig.Yaw, wantYaw), dp = wantPitch - rig.Pitch;
+					// a soft turn: quick at first, settling (never a snap)
+					float k = 1f - Mathf.Exp(-2.4f * dt);
+					player.PlayerInput.AddCutsceneLook(new Vector2(dy * k, dp * k));
+				}
+				await Cutscene.Frame(this, ct);
+			}
+		}
+		finally { HeldAtFoot = false; }
+		GD.Print("[story] Act 1: the title gone; theirs again at the foot of the stairs");
 	}
 
 	/// <summary>
@@ -146,6 +234,10 @@ public partial class FirstClimbEvent : StoryTrigger
 	protected override void Fire(PlayerController player)
 	{
 		OnTheStairs = true;
+		// the first step onto the flight: the stairs' chapter (2026-10-15). (On from the side, past the foot point: the silence,
+		// and the game's title with the chapter's after it.)
+		if (!ReachedFoot) OnFoot(new Vector2(player.GlobalPosition.X - FootPoint.X, player.GlobalPosition.Z - FootPoint.Z).Length(), onFlight: true);
+		else ChapterCard.Show(this, 2, 0.8f);
 		if (GetParent() is StaircaseBuilder stairs)
 		{
 			OneWay = OneWayFlight.Attach(stairs);

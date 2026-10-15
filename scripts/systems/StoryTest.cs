@@ -257,6 +257,8 @@ public partial class StoryTest : Node
 	{
 		// Quit() only schedules the exit; a frame or two can still land after Finish() nulls the session.
 		if (_s == null || _player == null || !IsInstanceValid(_player)) return;
+		// (--walkthrough: the game at its real speed, whatever a step asked for)
+		if (Walkthrough && Engine.TimeScale != 1.0) Engine.TimeScale = 1.0;
 		// Walked distance (teleports are counted separately by Teleport()).
 		float moved = Flat(_player.GlobalPosition).DistanceTo(Flat(_lastPos));
 		if (moved < 3f) _s.Walked += moved;
@@ -511,21 +513,36 @@ public partial class StoryTest : Node
 		Check("no title over the stairs from the fallen fir (they can't see the stairs yet)", !titleEarly && !StoryManager.Instance.HasFlag(ChapterCard.Flag(2)));
 		var route = RouteFrom(_player.GlobalPosition);
 		bool ok = true;
+		float apFrom = FirstClimbEvent.Approach, humFrom = StairsHum.Instance?.LevelDb ?? -80f, apMid = -1f, humMid = -80f;
 		foreach (var p in route)
 		{
 			if (Flat(p).DistanceTo(Flat(climb.GlobalPosition)) < 4f) break;
 			if (!await WalkTo(p, 2.2f, ct)) { ok = false; break; }
+			if (apMid < 0f && FirstClimbEvent.Approach > 0.5f) { apMid = FirstClimbEvent.Approach; humMid = StairsHum.Instance?.LevelDb ?? -80f; }
 		}
 		Check("walked from the fallen fir to the stairs", ok, $"{_player.GlobalPosition}");
+		Check("no title on the walk in (it waits for the foot of the stairs)", !StoryManager.Instance.HasFlag(ChapterCard.Flag(2)) && !climb.ReachedFoot);
+		Check("the hum swells on the walk to the stairs", apMid > 0.5f && humMid > humFrom + 3f && !Audio.StoryMute.On,
+			$"approach {apFrom:0.00} -> {apMid:0.00}, hum {humFrom:0.0} -> {humMid:0.0} dB");
+		// the foot of the stairs: every sound cut, then the title, then the chapter's
+		await WalkTo(climb.FootPoint, 1.2f, ct, stopWhen: () => climb.ReachedFoot, giveUp: 10f);
+		await WaitUntil(() => ChapterCard.Shown.Contains(0), 4, ct);
+		Check("at the foot of the stairs: all sound cut, then the DEAD SILENT title", climb.ReachedFoot && Audio.StoryMute.On && ChapterCard.Shown.Contains(0),
+			$"foot {climb.ReachedFoot} at {climb.ReachedFootAt:0.0} m, muted {Audio.StoryMute.On}, shown [{string.Join(",", ChapterCard.Shown)}]");
+		await Seconds(2.5, ct);
+		Check("held there, looking up the stairs, while it shows", climb.HeldAtFoot && !_input.Enabled && climb.LookingUpTheFlight(_player), $"{climb.LookOffDegrees(_player):0} deg off the flight");
+		await WaitUntil(() => !climb.HeldAtFoot && _input.Enabled, 16, ct);
+		Check("the title over: theirs again, the chapter title still to come", _input.Enabled && !ChapterCard.Shown.Contains(2));
 		if (falls != null)
 		{
 			Check("trees came down beside the way, left and right, as they went", falls.SideStarted >= 5, $"{falls.SideStarted} of {falls.SideCount}");
 			Check("and across it behind them", falls.BehindStarted >= 2, $"{falls.BehindStarted}");
-			Check("the falls ahead of them came down in view", falls.SeenFalls >= 5 && falls.UnseenFalls <= 1, $"seen {falls.SeenFalls}, unseen {falls.UnseenFalls}");
+			// (2026-10-15: the fir and the first walls are turned into view; the rest follow wherever they are)
+			Check("the first falls came down in view", falls.SeenFalls >= 3, $"seen {falls.SeenFalls}, unseen {falls.UnseenFalls}");
 			Check("they come down flat on the ground, not propped on their branches", falls.MaxRestTip < 0.5f, $"highest {falls.MaxRestTip:0.00} m");
 		}
 		Screenshot("stairs_found");
-		Check("the stairs' title only once they're close and the stairs in view", climb.Revealed && climb.RevealedAt <= climb.RevealRange + 0.5f,
+		Check("the stairs seen close, and in view", climb.Revealed && climb.RevealedAt <= climb.RevealRange + 0.5f,
 			$"revealed {climb.Revealed} at {climb.RevealedAt:0.0} m");
 		if (StoryBeat.Atmosphere(this) is { } atm)
 			Check("the fog thickest by the stairs: a third denser again than at the fallen fir", atm.Act1StairsFog > 0.6f && atm.VisibilityMetres < atm.Act1NearEnd * 0.85f,
@@ -614,6 +631,8 @@ public partial class StoryTest : Node
 		Check("woke at the Hollow's wake spot", spawn != null && Flat(_player.GlobalPosition).DistanceTo(Flat(spawn.GlobalPosition)) < 3f,
 			$"{_player.GlobalPosition} vs {spawn?.GlobalPosition}");
 		Check("the camera came along", _inv.HasCamera);
+		Check("the sound is back in the Hollow (the stairs' silence ended with Act 1)", !Audio.StoryMute.On && FirstClimbEvent.Approach == 0f);
+		Check("the stairs' chapter title came once they were on the flight", ChapterCard.Shown.Contains(2), $"[{string.Join(",", ChapterCard.Shown)}]");
 		Check("no compass yet", StoryManager.Instance.ObjectivePosition == null);
 		Check("the save says checkpoint 2", SaveSystem.Load()?.Checkpoint == Checkpoint.Act2StairsClimbed);
 		Check("the rain is already falling when they wake", StormController.Instance is { Active: true });
@@ -4421,6 +4440,7 @@ public partial class StoryTest : Node
 	/// <summary>Teleport inside the station (no terrain snap: the forest's ground means nothing out here).</summary>
 	private async Task Inside(Vector3 at, Vector3 faceToward, CancellationToken ct)
 	{
+		if (Walkthrough && await WalkThere(at, faceToward, ct)) { await Frames(4, ct); return; }
 		_s.Jumped += Flat(at).DistanceTo(Flat(_player.GlobalPosition));
 		var d = Flat(faceToward - at);
 		_player.Teleport(at + Vector3.Up * 0.08f, d.LengthSquared() > 0.01f ? Mathf.Atan2(-d.X, -d.Z) : _player.CameraRig.Yaw);
@@ -4568,6 +4588,7 @@ public partial class StoryTest : Node
 		var terrain = GroundSnap.FindTerrain(this);
 		// (onto the ground if it's under it; not when it's far under it, in a cave: Act 24's maze is 160 m down)
 		if (terrain != null && at.Y > terrain.HeightAt(at.X, at.Z) - 20f) at.Y = Mathf.Max(at.Y, terrain.HeightAt(at.X, at.Z));
+		if (Walkthrough && await WalkThere(at, faceToward, ct)) { await Frames(3, ct); return; }
 		if (count) _s.Jumped += Flat(at).DistanceTo(Flat(_player.GlobalPosition));
 		var d = Flat(faceToward - at);
 		_player.Teleport(at + Vector3.Up * 0.2f, d.LengthSquared() > 0.01f ? Mathf.Atan2(-d.X, -d.Z) : _player.CameraRig.Yaw);
@@ -4817,7 +4838,7 @@ public partial class StoryTest : Node
 
 	private async Task WaitUntil(Func<bool> cond, double seconds, CancellationToken ct = default)
 	{
-		ulong end = Time.GetTicksMsec() + (ulong)(seconds * 1000);
+		ulong end = Time.GetTicksMsec() + (ulong)(seconds * (Walkthrough ? 4000 : 1000));
 		while (!cond() && Time.GetTicksMsec() < end)
 		{
 			ct.ThrowIfCancellationRequested();

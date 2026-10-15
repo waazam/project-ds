@@ -18,8 +18,9 @@ namespace ProjectDS.Player;
 /// whatever it shows. Besides the birds (judged first, by the unchanged rule) any
 /// <see cref="PhotoSubject"/> in group "photo_subjects" can be recognised: that only drives
 /// the viewfinder's focus square, the print's caption and the subject's story flag. The
-/// frame is read back one render frame after the press, with the viewfinder's marks hidden
-/// for that frame, so the print holds only what the camera saw.
+/// frame is read back one render frame after the press, with the viewfinder's marks and every
+/// on-screen word (titles, subtitles, prompts, hints, the HUD) hidden for that frame, so the print
+/// holds only what the camera saw.
 /// </summary>
 public partial class CameraTool : Node
 {
@@ -89,7 +90,7 @@ public partial class CameraTool : Node
 			c.A = Mathf.MoveToward(c.A, 0f, (float)delta * 3.5f);
 			_flash.Color = c;
 		}
-		if (_pendingShot) { _pendingShot = false; _viewfinder.HideMarks = false; Shoot(); }
+		if (_pendingShot) { _pendingShot = false; _viewfinder.HideMarks = false; Shoot(); ShowOverlays(); }
 		var input = _player.PlayerInput;
 		// (2026-10-13j) only with the camera in the right hand (and up there): otherwise right mouse gathers the lantern's beam
 		bool raising = _inv.HasCamera && PlayerHands.CameraReady(_player) && input.Enabled && input.Focus;
@@ -113,6 +114,7 @@ public partial class CameraTool : Node
 			// The readback in Shoot returns the last rendered frame: draw one without the marks first.
 			_pendingShot = true;
 			_viewfinder.HideMarks = true;
+			HideOverlays();
 			// in the dark, the flash: a burst of light from the camera that lights the frame it takes, then fades (one
 			// soft flash, never a strobe; dimmer with "reduce flashing")
 			if (InTheDark()) Flash();
@@ -312,6 +314,35 @@ public partial class CameraTool : Node
 		log?.EndShot();
 	}
 
+	private readonly System.Collections.Generic.List<GodotObject> _hidden = new();
+
+	/// <summary>The screen's words and HUD (not its look: the post-process, fades, frost and letterbox stay), hidden for
+	/// the frame the print is read from. A layer that's only words goes whole; in any other (the fader's thoughts) just
+	/// its text does.</summary>
+	private void HideOverlays()
+	{
+		_hidden.Clear();
+		foreach (var n in GetTree().Root.FindChildren("*", nameof(CanvasLayer), true, false))
+		{
+			if (n is not CanvasLayer { Visible: true } cl || cl == _viewfinder) continue;
+			if (IsWords(cl)) { cl.Visible = false; _hidden.Add(cl); continue; }
+			foreach (var c in cl.FindChildren("*", nameof(Control), true, false))
+				if (c is UI.HintText or Label or RichTextLabel && c is CanvasItem { Visible: true } ci) { ci.Visible = false; _hidden.Add(ci); }
+		}
+	}
+
+	private void ShowOverlays()
+	{
+		foreach (var o in _hidden)
+			if (IsInstanceValid(o)) { if (o is CanvasLayer cl) cl.Visible = true; else if (o is CanvasItem ci) ci.Visible = true; }
+		_hidden.Clear();
+	}
+
+	private static bool IsWords(CanvasLayer cl) => cl is UI.ChapterCard or UI.Subtitle or UI.SoundCaption or UI.InteractPrompt
+		or UI.ChoicePrompt or UI.NoteOverlay or UI.Compass or UI.StaminaBar or UI.EquippedItemHud or UI.SaveIndicator
+		or UI.DebugOverlay or UI.PhotoThumb or UI.FlamethrowerGauge or UI.RowingPrompt or UI.TapeCutOverlay
+		or UI.PolaroidMontage;
+
 	private static string ColourName(BirdColor c) => c switch
 	{
 		BirdColor.Red => "red",
@@ -339,11 +370,15 @@ public partial class CameraTool : Node
 		return cut;
 	}
 
+	private static Audio.SamplePicker _ravenPick;
+	private static readonly RandomNumberGenerator _ravenRng = new();
+
 	private void TriggerScream()
 	{
 		foreach (var node in GetTree().GetNodesInGroup("photo_birds"))
 			if (node is Bird b && !b.Photographed) b.Capture();
-		PlayOneShot("res://assets/audio/sfx/distant_scream.wav", "Unnatural", _player, 8f, 60f, 500f);
+		// (2026-10-15, the owner: a scary, loud raven as it flies at you; the old far-off scream is in assets/audio/storage)
+		PlayOneShot($"res://assets/audio/sfx/raven_attack_{1 + _ravenPick.Next(_ravenRng, 5):00}.wav", "Unnatural", _player, 8f, 60f, 500f);
 		GD.Print("[story] Act 1: the fourth bird screams and the flock is gone");
 	}
 

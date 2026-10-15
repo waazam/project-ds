@@ -18,6 +18,9 @@ public partial class StairsHum : Node
 	[Export] public float EdgeDb = -30f;
 	[Export] public float CloseDb = -14f;
 	[Export] public float MaxDb = 6f;
+	/// <summary>How much louder (dB) at the foot of the first stairs, swelling over the walk there
+	/// (<see cref="World.FirstClimbEvent.Approach"/>).</summary>
+	[Export] public float ApproachDb = 10f;
 	/// <summary>Seconds for the level to cover ~63% of a change.</summary>
 	[Export] public float SmoothingTime = 0.5f;
 
@@ -70,11 +73,10 @@ public partial class StairsHum : Node
 		{
 			float prox = _zone.SilenceAt(_listener.GlobalPosition) / Mathf.Max(_zone.Strength, 0.01f);
 			if (prox > 0.001f) target = Mathf.Lerp(EdgeDb, CloseDb, prox);
-			// the first time the forest goes dead silent round them, before they've ever climbed: the game's name, and the
-			// second chapter (UI.ChapterCard)
-			if (prox > 0.3f && Systems.StoryManager.Instance is { Current: < Systems.Checkpoint.Act2StairsClimbed and >= Systems.Checkpoint.Act1Start } s
-				&& !s.HasFlag(UI.ChapterCard.Flag(2)))
-				UI.ChapterCard.TitleThenStairs(this);
+			// (2026-10-15) the walk between the fallen trees to the first stairs: the hum swells all the way to the foot
+			// (where every sound cuts out, and the titles come: World.FirstClimbEvent)
+			float ap = World.FirstClimbEvent.Approach;
+			if (ap > 0f) target = Mathf.Max(target, EdgeDb) + ApproachDb * Mathf.Pow(ap, 1.3f);
 		}
 		float k = 1f - Mathf.Exp(-(float)delta / Mathf.Max(SmoothingTime, 0.01f));
 		LevelDb = Mathf.Lerp(LevelDb, target, k);

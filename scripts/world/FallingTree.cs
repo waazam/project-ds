@@ -112,7 +112,9 @@ public sealed class TreeFallMotion
 		switch (ev)
 		{
 			case "creak":
-				Systems.StoryBeat.PlayAt(owner, $"res://assets/audio/sfx/tree_fall_creak_{v(3):00}.wav", "Events", owner.ToLocal(foot + Vector3.Up * 2f), 6f, 14f, 140f);
+				if (owner is FallingTree { QuietCreak: true }) break;
+				Systems.StoryBeat.PlayAt(owner, $"res://assets/audio/sfx/tree_fall_creak_{NextCreak():00}.wav", "Events", owner.ToLocal(foot + Vector3.Up * 2f),
+					_groanRng.RandfRange(2f, 6f), 14f, 140f, _groanRng.RandfRange(0.88f, 1.08f));
 				break;
 			case "crack":
 				Systems.StoryBeat.PlayAt(owner, $"res://assets/audio/sfx/tree_fall_crack_{v(2):00}.wav", "Events", owner.ToLocal(foot + Vector3.Up * 1.5f), 8f, 16f, 180f);
@@ -127,16 +129,18 @@ public sealed class TreeFallMotion
 	}
 
 	private static readonly RandomNumberGenerator _groanRng = new();
-	private static int _lastGroanTake = -1;
+	private static Audio.RecentPicker _creakPick;
+	public const int CreakTakes = 8;
+
+	/// <summary>The next creak take (1-based), never one of the last three heard.</summary>
+	private static int NextCreak() => 1 + _creakPick.Next(_groanRng, CreakTakes);
 
 	/// <summary>A held tree groaning again while it waits to be seen (2026-10-13): another of the creak takes each time
 	/// (never the one just heard, the owner's no-repeats rule), its pitch a little different, a little quieter the more
 	/// it has groaned.</summary>
 	public static void Groan(Node3D owner, Vector3 foot, int seed, int count)
 	{
-		int take;
-		do take = 1 + _groanRng.RandiRange(0, 2); while (take == _lastGroanTake);
-		_lastGroanTake = take;
+		int take = NextCreak();
 		float db = 5f - Mathf.Min(count, 4) * 1.2f;
 		Systems.StoryBeat.PlayAt(owner, $"res://assets/audio/sfx/tree_fall_creak_{take:00}.wav", "Events", owner.ToLocal(foot + Vector3.Up * 2.5f), db, 14f, 140f,
 			_groanRng.RandfRange(0.86f, 1.06f));
@@ -206,6 +210,9 @@ public partial class FallingTree : Node3D
 	public float Height = 22f;
 	public float TrunkR = 0.4f;
 	public int Seed = 1;
+	/// <summary>Comes down without its creak (2026-10-15, the owner: "we dont need to hear every tree creak"): only the
+	/// crack, the rush and the landing.</summary>
+	public bool QuietCreak;
 	public bool Down => _m.State == TreeFallMotion.Phase.Down;
 	public bool Falling => _m.State is TreeFallMotion.Phase.Creak or TreeFallMotion.Phase.Fall or TreeFallMotion.Phase.Settle;
 	public TreeFallMotion Motion => _m;

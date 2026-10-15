@@ -21,10 +21,15 @@ public static class TreeFall
 
 	public static double[] Creak(Rng r, int sr)
 	{
-		double dur = r.R(2.6, 3.2);
-		var x = Buf(sr, dur + 0.6);
+		// (2026-10-15, the owner: "we dont need to hear every tree creak it gets repetitive make it sound better and less
+		// triggered": eight takes now, and no two alike: long slow groans, short strains, deep moans and dry ticking, each
+		// with its own trunk, its own pace and its own room)
+		double dur = r.R(1.4, 3.4);
+		var x = Buf(sr, dur + 0.9);
+		double deep = r.R(0.75, 1.3);   // the trunk's size: a deep moan .. a thinner strain
 		// the groan: impulses through the trunk's low modes, the slip rate climbing as it gives
-		(double f, double q, double a)[] modes = { (r.R(70, 95), 9, 1.0), (r.R(150, 190), 8, 0.7), (r.R(290, 360), 7, 0.45), (r.R(560, 680), 6, 0.2) };
+		(double f, double q, double a)[] modes = { (r.R(70, 95) * deep, r.R(7, 11), 1.0), (r.R(150, 190) * deep, r.R(6, 10), r.R(0.5, 0.9)), (r.R(290, 360) * deep, 7, r.R(0.25, 0.6)), (r.R(560, 680) * deep, 6, r.R(0.1, 0.3)) };
+		double rate0 = r.R(5, 14), climb = r.R(20, 70), groan = r.R(0.5, 1.0), tickDensity = r.R(0.5, 1.6);
 		var res = new Biquad[modes.Length];
 		for (int k = 0; k < modes.Length; k++) res[k] = Biquad.Bp(sr, modes[k].f, modes[k].q);
 		var wob = new Smooth(r, dur + 1, r.R(0.08, 0.16));
@@ -36,18 +41,20 @@ public static class TreeFall
 			if (i < n)
 			{
 				double u = (double)i / n;
-				double rate = 9 + 55 * u * u + 18 * wob.At((double)i / sr);   // slips a second
+				double rate = rate0 + climb * u * u + 18 * wob.At((double)i / sr);   // slips a second
 				ph += rate / sr;
-				if (ph >= 1) { ph -= 1; imp = r.R(0.4, 1.0) * Env(u, 0.12, 0.08); }
+				if (ph >= 1) { ph -= 1; imp = r.R(0.4, 1.0) * Env(u, r.R(0.08, 0.3), 0.08) * groan; }
 			}
 			double v = 0;
 			for (int k = 0; k < res.Length; k++) v += modes[k].a * res[k].P(imp);
 			x[i] += v * 6.0;
 		}
-		// the fibres: ticks and pops, sparse at first, then crowding in
-		for (double t = 0.2; t < dur; t += r.R(0.03, 0.3) * (1.2 - 0.9 * t / dur))
+		// the fibres: ticks and pops, sparse at first, then crowding in (some takes all but none)
+		for (double t = r.R(0.1, 0.5); t < dur; t += r.R(0.03, 0.3) * (1.2 - 0.9 * t / dur) / tickDensity)
 			Slap(x, r, sr, t, r.R(0.02, 0.09) * (0.3 + t / dur), 700, r.R(2500, 5000), r.R(0.002, 0.008));
-		return FinishOneShot(Wet(x, sr, 1.0, 0.25, 1.2, 0.5, 0.8), sr, -3, 120);
+		// now and then a fibre gives with a pop near the end
+		if (r.Chance(0.4)) Slap(x, r, sr, dur * r.R(0.7, 0.95), r.R(0.2, 0.4), 300, r.R(1800, 3500), r.R(0.006, 0.014));
+		return FinishOneShot(Wet(x, sr, 1.0, r.R(0.15, 0.35), r.R(0.9, 1.6), 0.5, 0.8), sr, -3, 120);
 	}
 
 	public static double[] Crack(Rng r, int sr)

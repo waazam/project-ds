@@ -101,6 +101,7 @@ public static class Verify
 		_ when name.StartsWith("branch_drop") => (1.2, 2.2),
 		_ when name.StartsWith("trunk_creak") => (1.0, 2.5),
 		_ when name.StartsWith("cricket_chirp") => (0.3, 0.8),
+		_ when name.StartsWith("raven_attack") => (1.5, 2.8),
 		_ when name.StartsWith("raven") => (0.8, 1.8),
 		_ when name.StartsWith("rustle") => (0.4, 1.2),
 		_ when name.StartsWith("oarlock_creak") => (0.15, 0.7),
@@ -122,7 +123,9 @@ public static class Verify
 		if (name == "heartbeat_loop" && b[0] < 0.85) yield return "heartbeat not mostly <100";
 		if (name.StartsWith("cricket_chirp") && b[3] + b[4] < 0.85) yield return "cricket not mostly >3k";
 		if (name.StartsWith("trunk_creak") && (b[1] < 0.6 || centroid > 800)) yield return "creak not low/woody";
-		if (name.StartsWith("raven") && (centroid > 1500 || b[4] > 0.01)) yield return "raven not dull/distant";
+		if (name.StartsWith("raven") && !name.StartsWith("raven_attack") && (centroid > 1500 || b[4] > 0.01)) yield return "raven not dull/distant";
+		// the omen's attack is close: its throat and rasp up in the 1-3k band, not dulled by distance
+		if (name.StartsWith("raven_attack") && b[2] < 0.12) yield return "raven attack not close/harsh";
 		if (name.StartsWith("twig_snap") && b[2] + b[3] < 0.4) yield return "twig not broadband";
 		if (name.StartsWith("rustle") && b[2] + b[3] + b[4] < 0.5) yield return "rustle not crunchy";
 		if (name.StartsWith("underwater_thoom") && b[0] + b[1] < 0.9) yield return "thoom not low";

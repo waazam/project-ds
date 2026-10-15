@@ -24,9 +24,12 @@ namespace ProjectDS.World;
 ///   (on screen, near the middle of it, in range, nothing solid between): the creak is what turns their head, and the
 ///   crack comes when they're looking. The dead fir directs this too (<see cref="FallenTree.Directed"/>).
 /// - The dead fir's crack stops them (<see cref="Watching"/>): their pace dies away as if startled, the view is drawn
-///   gently toward the falling tree (a soft pull they can look away from, never a lock), and the first trees of the
+///   toward the falling tree wherever they stand (2026-10-15: a firm, eased turn that holds while it falls; it used to
+///   be a soft pull they could look away from), and the first trees of the
 ///   walls come down after it one by one, the view drawn to each, before the pace comes back. A few seconds; nothing
 ///   is taken from them but their legs, and nothing falls near them.
+/// - Once the fir is down and the stop is over, the rest of the walls come down after it one by one, wherever the player
+///   is (2026-10-15): nothing waits for them to walk on.
 /// - Behind them the falls stay what they were: heard more than seen, a surprise.
 /// - The wrong way: nothing goes on without them. The walls come down only while they're on the way (near the line)
 ///   and looking; if they stray off it, a tree out in the woods ahead of them comes down across their way, when seen;
@@ -73,7 +76,7 @@ public partial class Act1TreeFalls : Node3D
 	/// <summary>Seconds to stop (as if startled), and to get going again.</summary>
 	[Export] public float HaltSeconds = 0.6f, ResumeSeconds = 1.3f;
 	/// <summary>The look's pull toward the falling tree: how quickly, and its top speed (rad/s).</summary>
-	[Export] public float AssistRate = 1.8f, AssistMax = 0.6f;
+	[Export] public float AssistRate = 3.0f, AssistMax = 2.2f;
 	/// <summary>The stop never lasts longer than this (s).</summary>
 	[Export] public float WatchMax = 13f;
 
@@ -90,6 +93,7 @@ public partial class Act1TreeFalls : Node3D
 		public Kind Kind;
 		public int Side;            // which side of the line it stands (+1 left of travel, -1 right)
 		public double HeldAt = -1;  // when its creak began
+		public double GoAt = -1;    // (once it has all begun) when it starts to come down, wherever the player is
 		public bool Counted;
 	}
 	private readonly List<Entry> _trees = new();
@@ -341,6 +345,19 @@ public partial class Act1TreeFalls : Node3D
 		// it all begins with the dead fir (or with a player who went round it while it stood)
 		bool begun = _fir == null || !(_fir.Standing || _fir.Held) || (sp > 18f && onTheWay);
 
+		// (the owner, 2026-10-15: "once the tree falling is triggered they should all fall, instead of waiting for the
+		// player to walk further") once the fir is down and the stop is over, every wall tree still standing comes down
+		// after it, one after another along the way. The behind trees still wait to close the way behind them.
+		if (!_allGo && begun && !_watching && (_fir == null || _fir.Fallen || (_fir.Standing && !_fir.Held)))
+		{
+			_allGo = true;
+			double at = _clock + 0.6;
+			var rest = _trees.FindAll(e => e.Kind == Kind.Side && !e.Tree.Down && (!e.Tree.Falling || e.Tree.Held));
+			rest.Sort((a, b) => a.At.CompareTo(b.At));
+			foreach (var e in rest) { e.GoAt = at; at += _rng.RandfRange(1.1f, 1.7f); }
+			GD.Print($"[story] Act 1: the rest of the walls come down ({rest.Count})");
+		}
+
 		SideDown = BehindDown = WardDown = 0;
 		Entry groaner = null; float groanerD = 30f;
 		foreach (var e in _trees)
@@ -354,9 +371,23 @@ public partial class Act1TreeFalls : Node3D
 			{
 				case Kind.Behind:
 					// heard more than seen: once they're well past, on the way
-					if (onTheWay && sp >= e.At + BehindTrigger && Clear(pp, la, lb, 5f)) { t.Fall(); BehindStarted++; Log(e, "behind them"); }
+					if (onTheWay && sp >= e.At + BehindTrigger && Clear(pp, la, lb, 5f)) { t.QuietCreak = _rng.Randf() < 0.6f; t.Fall(); BehindStarted++; Log(e, "behind them"); }
 					break;
 				case Kind.Side:
+					if (e.GoAt >= 0)
+					{
+						// (all of it begun: each in its turn, wherever they are; still never on them, nor shutting them out)
+						// (only now and then a creak: the rest come down on their cracks; 2026-10-15, "we dont need to hear every tree creak")
+						if (!t.Falling) { if (_clock >= e.GoAt) { t.QuietCreak = _rng.Randf() < 0.75f; Begin(e, 0.9f + 0.1f * (e.At % 3f)); } }
+						else if (t.Held && t.Motion.CreakTime >= t.Motion.CreakSeconds && Clear(pp, la, lb, 4.5f) && !Outside(e))
+						{
+							bool seen = Sees(player, t);
+							t.Release();
+							if (seen) SeenFalls++; else UnseenFalls++;
+							Log(e, seen ? "in view, the rest following" : "the rest following");
+						}
+						break;
+					}
 					if (!t.Falling)
 					{
 						// (not one already well behind them: come in from the side, they never saw it, and it stays standing)
@@ -388,10 +419,10 @@ public partial class Act1TreeFalls : Node3D
 			}
 		}
 		// a held tree groans again now and then while it waits (only the nearest, and not on and on)
-		if (groaner != null && _clock >= _nextGroan && _groans < 14)
+		if (groaner != null && _clock >= _nextGroan && _groans < MaxGroans)
 		{
 			TreeFallMotion.Groan(groaner.Tree, groaner.Tree.GlobalPosition, groaner.Tree.Seed, _groans++);
-			_nextGroan = _clock + _rng.RandfRange(3.4f, 5.2f);
+			_nextGroan = _clock + _rng.RandfRange(6.5f, 11f);
 		}
 		UpdateWatch(player, dt);
 	}
@@ -432,6 +463,9 @@ public partial class Act1TreeFalls : Node3D
 	// ------------------------------------------------------------------ the dead fir
 
 	private double _firHeldAt = -1;
+	private bool _allGo;
+	/// <summary>How many groans a waiting tree gives in all (it was 14 every ~4 s: the owner heard every one, 2026-10-15).</summary>
+	private const int MaxGroans = 4;
 
 	private void UpdateFir(PlayerController player, float sp, bool onTheWay)
 	{
@@ -456,14 +490,16 @@ public partial class Act1TreeFalls : Node3D
 		FirSeen = seen;
 		if (seen) SeenFalls++; else UnseenFalls++;
 		GD.Print($"[story] Act 1: the dead fir cracks ({(seen ? "in view" : "unseen, the wait over")}, {d:0} m off)");
-		if (d < 34f) BeginWatch(player);
+		// (the owner, 2026-10-15: "when the trees first start falling it should make the user look towards them no
+		// matter where hes standing") the stop and the turn, wherever they are
+		BeginWatch(player);
 	}
 
 	private void FirGroan(float d)
 	{
-		if (d > 34f || _clock < _nextGroan || _groans >= 14) return;
+		if (d > 34f || _clock < _nextGroan || _groans >= MaxGroans) return;
 		TreeFallMotion.Groan(_fir, _fir.Foot, _fir.Seed, _groans++);
-		_nextGroan = _clock + _rng.RandfRange(3.2f, 4.6f);
+		_nextGroan = _clock + _rng.RandfRange(6f, 10f);
 	}
 
 	// ------------------------------------------------------------------ the stop
@@ -561,7 +597,7 @@ public partial class Act1TreeFalls : Node3D
 			// turning hard away from it: they want to look elsewhere, and it lets them
 			if (Mathf.Abs(own) > 1.1f * dt && Mathf.Sign(own) != Mathf.Sign(dy) && Mathf.Abs(dy) > 0.2f) _fighting++;
 			else _fighting = Mathf.Max(0, _fighting - 1);
-			if (_fighting > 10) { _assist = false; GD.Print("[story] Act 1: they look away from the falls; the pull lets go"); }
+			// (no letting go any more: the first fall turns them to it wherever they stand, 2026-10-15)
 			float ang = Mathf.Sqrt(dy * dy + dp * dp);
 			if (ang > Mathf.DegToRad(3f))
 			{

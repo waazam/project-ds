@@ -29,6 +29,8 @@ public partial class ParkProp : Node3D
 	[Export] public float ClearRadius = 0f;
 	[Export] public bool ClearFoliage = true;
 	[Export] public int Seed = 1;
+	/// <summary>Mushrooms and Wildflowers: which kind (0 the first, as it was; others their own colours and habit).</summary>
+	[Export] public int Variety = 0;
 	/// <summary>TrailheadSign only: trail distance of the directional signpost it places (&lt; 0 = none).</summary>
 	[Export] public float DirectionSignDistance = 9f;
 
@@ -649,14 +651,34 @@ public partial class ParkProp : Node3D
 				return lo + (hi - lo) * ((h & 0xFFFF) / 65535f);
 			}
 		}
-		const int n = 7;
+		// (2026-10-15: more than one clump along the way, each its own kind: Variety 1 slender pale caps in a tuft, 2 a few
+		// big caps, rust-red with pale flecks, 3 a spill of tiny brown ones; 0 is the first clump, as it was)
+		int n = 7;
+		float hs = 1f, rs = 1f, spread = 1f;
+		switch (Variety)
+		{
+			case 1:
+				n = 9 + (int)R(900, 0f, 3f); hs = 1.6f; rs = 0.7f; spread = 0.8f;
+				capTan = Tint("mush_cap_pale", new Color(0.82f, 0.78f, 0.68f)); capRust = Tint("mush_cap_ivory", new Color(0.88f, 0.85f, 0.76f));
+				capBruised = Tint("mush_cap_fawn", new Color(0.62f, 0.55f, 0.44f));
+				break;
+			case 2:
+				n = 3 + (int)R(900, 0f, 2f); hs = 1.35f; rs = 1.7f; spread = 1.6f;
+				capTan = Tint("mush_cap_red", new Color(0.56f, 0.16f, 0.1f)); capRust = Tint("mush_cap_red2", new Color(0.62f, 0.22f, 0.12f));
+				capBruised = Tint("mush_cap_orange", new Color(0.66f, 0.34f, 0.14f));
+				break;
+			case 3:
+				n = 12 + (int)R(900, 0f, 4f); hs = 0.7f; rs = 0.6f; spread = 1.9f;
+				capTan = Tint("mush_cap_brown", new Color(0.42f, 0.3f, 0.18f)); capRust = Tint("mush_cap_umber", new Color(0.34f, 0.23f, 0.14f));
+				break;
+		}
 		for (int i = 0; i < n; i++)
 		{
 			float a = Mathf.Tau * i / n + R(i * 5, -0.3f, 0.3f);
-			float d = i == 0 ? 0f : R(i * 5 + 1, 0.07f, 0.2f);
+			float d = i == 0 ? 0f : R(i * 5 + 1, 0.07f, 0.2f) * spread;
 			var foot = new Vector3(Mathf.Cos(a) * d, -0.01f, Mathf.Sin(a) * d);
-			float h = R(i * 5 + 2, 0.05f, 0.12f) * (i == 0 ? 1.25f : 1f);
-			float cr = R(i * 5 + 3, 0.035f, 0.07f) * (i == 0 ? 1.3f : 1f);
+			float h = R(i * 5 + 2, 0.05f, 0.12f) * (i == 0 ? 1.25f : 1f) * hs;
+			float cr = R(i * 5 + 3, 0.035f, 0.07f) * (i == 0 ? 1.3f : 1f) * rs;
 			// stems lean a little, every one its own way
 			var top = foot + new Vector3(R(i * 5 + 4, -0.2f, 0.2f) * h, h, R(i * 7 + 9, -0.2f, 0.2f) * h);
 			_k.Color = Colors.White;
@@ -665,6 +687,17 @@ public partial class ParkProp : Node3D
 			_k.Mat(gill).Cylinder(top - new Vector3(0, 0.004f, 0), top + new Vector3(0, 0.004f, 0), cr * 0.85f, cr * 0.85f, 7, true);
 			_k.Mat(i == 3 ? capBruised : i % 2 == 0 ? capRust : capTan);
 			_k.Blob(top + new Vector3(0, cr * 0.28f, 0), new Vector3(cr, cr * 0.5f, cr * 0.95f), Seed * 13 + i, 0.08f, true, 1f);
+			if (Variety == 2)
+			{
+				// pale flecks on the big caps, old and washed out
+				_k.Mat(Tint("mush_fleck", new Color(0.82f, 0.78f, 0.66f)));
+				for (int f = 0; f < 6; f++)
+				{
+					float fa = R(i * 31 + f, 0f, Mathf.Tau), fd = R(i * 31 + f + 7, 0f, 0.7f);
+					var at = top + new Vector3(Mathf.Cos(fa) * cr * fd, cr * 0.28f + cr * 0.5f * Mathf.Sqrt(1f - fd * fd) - 0.002f, Mathf.Sin(fa) * cr * fd * 0.95f);
+					_k.Blob(at, new Vector3(0.012f, 0.005f, 0.011f) * R(i * 31 + f + 3, 0.7f, 1.3f), Seed * 17 + i * 7 + f, 0.2f, true, 1f);
+				}
+			}
 		}
 	}
 
@@ -696,12 +729,23 @@ public partial class ParkProp : Node3D
 		var stem = Tint("flower_stem", new Color(0.27f, 0.36f, 0.16f));
 		Color purple = new Color(0.62f, 0.38f, 0.86f).SrgbToLinear() * 1.6f, purpleDeep = new Color(0.5f, 0.28f, 0.74f).SrgbToLinear() * 1.6f, white = new Color(0.96f, 0.95f, 0.9f);
 		Color leaf = new(0.25f, 0.38f, 0.14f), eye = new(0.95f, 0.78f, 0.2f);
-		const int n = 150;
+		// (2026-10-15: more than one patch along the way, so not all alike: Variety 1 buttercup yellow, 2 pink, 3 white
+		// daisies with a little blue; 0 is the first patch, purple and white, as it was)
+		switch (Variety)
+		{
+			case 1: purple = new Color(0.95f, 0.78f, 0.18f).SrgbToLinear() * 1.5f; purpleDeep = new Color(0.9f, 0.66f, 0.12f).SrgbToLinear() * 1.5f; eye = new(0.8f, 0.55f, 0.1f); break;
+			case 2: purple = new Color(0.86f, 0.42f, 0.66f).SrgbToLinear() * 1.5f; purpleDeep = new Color(0.72f, 0.3f, 0.55f).SrgbToLinear() * 1.5f; break;
+			case 3: purple = new Color(0.98f, 0.97f, 0.93f); purpleDeep = new Color(0.55f, 0.66f, 0.92f).SrgbToLinear() * 1.5f; break;
+		}
+		int n = Variety == 0 ? 150 : 90 + (int)R(901, 0f, 60f);
+		int clumps = Variety == 0 ? 3 : 2 + (int)R(902, 0f, 2.99f);
 		for (int i = 0; i < n; i++)
 		{
-			// three loose clumps, thinning at the edges
-			int clump = i % 3;
-			Vector2 cc = clump switch { 0 => new Vector2(-0.8f, 0.1f), 1 => new Vector2(0.5f, -0.35f), _ => new Vector2(0.9f, 0.55f) };
+			// a few loose clumps, thinning at the edges
+			int clump = i % clumps;
+			Vector2 cc = Variety == 0
+				? clump switch { 0 => new Vector2(-0.8f, 0.1f), 1 => new Vector2(0.5f, -0.35f), _ => new Vector2(0.9f, 0.55f) }
+				: new Vector2(R(910 + clump * 2, -1.1f, 1.1f), R(911 + clump * 2, -0.7f, 0.7f));
 			float a = R(i * 7, 0f, Mathf.Tau), d = Mathf.Sqrt(R(i * 7 + 1, 0f, 1f)) * (clump == 0 ? 1.0f : 0.8f);
 			var foot = new Vector3(cc.X + Mathf.Cos(a) * d, 0, cc.Y + Mathf.Sin(a) * d * 0.8f);
 			foot.Y = GroundY(foot) - 0.02f;

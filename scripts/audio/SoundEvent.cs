@@ -31,6 +31,9 @@ public partial class SoundEvent : Node
 	[Export] public NodePath TargetPath;
 	[Export] public float Radius = 3f;
 	[Export] public string SoundPath = "";
+	/// <summary>How many numbered takes there are (SoundPath ending _01; _02, _03 ... beside it): one is picked each time,
+	/// never the one last heard (2026-10-15, the far rifle's six takes).</summary>
+	[Export] public int Takes = 1;
 	[Export] public string Bus = "Events";
 	[Export] public float VolumeDb = 0f;
 	/// <summary>World direction the sound comes from (y ignored).</summary>
@@ -71,6 +74,23 @@ public partial class SoundEvent : Node
 		if (target != null) Callable.From(() => Restore(target)).CallDeferred();
 	}
 
+	private static readonly System.Collections.Generic.Dictionary<string, int> _lastTake = new();
+
+	/// <summary>One of the numbered takes beside <see cref="SoundPath"/> (not the last one this session played), or null.</summary>
+	private AudioStream PickTake()
+	{
+		if (Takes <= 1 || !SoundPath.EndsWith("_01.wav")) return null;
+		string stem = SoundPath[..^"01.wav".Length];
+		var have = new System.Collections.Generic.List<int>();
+		for (int i = 1; i <= Takes; i++) if (ResourceLoader.Exists($"{stem}{i:00}.wav")) have.Add(i);
+		if (have.Count == 0) return null;
+		_lastTake.TryGetValue(stem, out int last);
+		if (have.Count > 1) have.Remove(last);
+		int pick = have[(int)(GD.Randi() % (uint)have.Count)];
+		_lastTake[stem] = pick;
+		return GD.Load<AudioStream>($"{stem}{pick:00}.wav");
+	}
+
 	private bool TooLate => OnlyBefore != Checkpoint.None && StoryManager.Instance is { } s && s.Current >= OnlyBefore;
 
 	private void Restore(Node3D target)
@@ -104,6 +124,7 @@ public partial class SoundEvent : Node
 			GD.Print($"[event] {Name} fired ({how})");
 			var dir = new Vector3(FromDirection.X, 0f, FromDirection.Z).Normalized();
 			_voice.GlobalPosition = player.GlobalPosition + dir * 60f + Vector3.Up * 4f;
+			if (PickTake() is { } take) _voice.Stream = take;
 			_voice.Play();
 			if (StartleStrength > 0f) ForestAmbienceManager.Instance?.Startle(StartleStrength, StartleSeconds);
 		});

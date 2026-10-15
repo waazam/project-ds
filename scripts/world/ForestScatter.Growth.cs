@@ -114,7 +114,7 @@ public partial class ForestScatter
 			float lich = rng.Randf() < 0.55f ? rng.RandfRange(1.15f, 1.5f) : rng.RandfRange(0.62f, 0.8f);
 			rings.Add((Axis(f) + (i == 0 ? Vector3.Down * 0.3f : Vector3.Zero), r * Mathf.Lerp(1.15f, 0.25f, f), new Color(0.62f * lich, 0.66f * lich, 0.58f * lich)));
 		}
-		TrunkLoft(k, rings, 6, 1f);
+		TrunkLoft(k, rings, 8, 1f);   // (2026-10-15: eight sides, not six: a sapling read as a hexagonal stick)
 		// twigs, and leaves in loose clusters along their ends and round the top: green, a share yellowing
 		var leafMat = BunkerParts.BunkerTextures.IvyMat;
 		var tips = new System.Collections.Generic.List<(Vector3 at, Vector3 dir)>();

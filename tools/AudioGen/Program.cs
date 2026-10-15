@@ -17,6 +17,7 @@ string root = FindRoot();
 string ambient = Path.Combine(root, "assets", "audio", "ambient");
 string sfx = Path.Combine(root, "assets", "audio", "sfx");
 string music = Path.Combine(root, "assets", "audio", "music");
+string storage = Path.Combine(root, "assets", "audio", "storage");   // (kept, not used in the game: see its README)
 
 // name, folder, loop?, sample rate, generator
 var jobs = new List<(string name, string dir, bool loop, int sr, Func<Rng, int, double[]> gen)>
@@ -43,14 +44,17 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"squelch_close_{i:00}", sfx, false, Lo, 
 for (int i = 1; i <= 4; i++) jobs.Add(($"radio_tick_{i:00}", sfx, false, Lo, (r, sr) => Sfx.RadioTick(r, sr)));
 jobs.Add(("camera_shutter", sfx, false, Lo, (r, sr) => Sfx.CameraShutter(r, sr)));
 for (int i = 0; i < 8; i++) { int k = i; jobs.Add(($"crawler_step_{k + 1:00}", sfx, false, Hi, (r, sr) => Sfx.CrawlerStep(r, sr, k % 4))); }
-jobs.Add(("distant_scream", sfx, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
+// The omen bird's old far-off scream: kept in storage for Alex (2026-10-15); the raven attack replaced it.
+jobs.Add(("distant_scream", storage, false, Lo, (r, sr) => Sfx.DistantScream(r, sr)));
+for (int i = 1; i <= 5; i++) jobs.Add(($"raven_attack_{i:00}", sfx, false, Hi, (r, sr) => RavenAttack.Make(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"whisper_voice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.WhisperVoice(r, sr)));
 for (int i = 1; i <= 8; i++) { int k = i; jobs.Add(($"bird_{k:00}", sfx, false, Lo, (r, sr) => Sfx.Bird(k, r, sr))); }
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_dirt_{i:00}", sfx, false, Lo, (r, sr) => Steps.Dirt(r, sr)));
 for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"step_wood_{k:00}", sfx, false, Lo, (r, sr) => Sfx.StepWood(r, sr, k % 2 == 0))); }
 for (int i = 1; i <= 4; i++) jobs.Add(($"cloth_{i:00}", sfx, false, Lo, (r, sr) => Sfx.Cloth(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_stone_{i:00}", sfx, false, Lo, (r, sr) => Sfx.StepStone(r, sr)));
-jobs.Add(("rifle_distant_01", sfx, false, Lo, (r, sr) => Sfx.RifleDistant(r, sr)));
+// Act 1's far-off rifle (2026-10-15 rework, Gunshot.cs): six takes, SoundEvent picks one.
+for (int i = 1; i <= 6; i++) jobs.Add(($"rifle_distant_{i:00}", sfx, false, Lo, (r, sr) => Gunshot.RifleDistant(r, sr)));
 jobs.Add(("newel_seat", sfx, false, Lo, (r, sr) => Sfx.NewelSeat(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"knife_slice_{i:00}", sfx, false, Lo, (r, sr) => Sfx.KnifeSlice(r, sr)));
 jobs.Add(("wheel_turn_01", sfx, false, Lo, (r, sr) => Sfx.WheelTurn(r, sr)));
@@ -65,9 +69,15 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"steel_door_open_{i:00}", sfx, false, Lo
 for (int i = 1; i <= 2; i++) jobs.Add(($"steel_door_slam_{i:00}", sfx, false, Lo, (r, sr) => Sfx.SteelDoorSlam(r, sr)));
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_in_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, true, (k - 1) / 4.0))); }
 for (int i = 1; i <= 5; i++) { int k = i; jobs.Add(($"breath_out_{k:00}", sfx, false, Lo, (r, sr) => Sfx.BreathOne(r, sr, false, (k - 1) / 4.0))); }
+// The player's breath, reworked 2026-10-15 (Breath.cs): ten takes of each, a breath per file.
+foreach (var (kind, tag, count) in new[] { (Breath.Kind.Nose, "nose", 10), (Breath.Kind.Mouth, "mouth", 10), (Breath.Kind.Winded, "winded", 10), (Breath.Kind.Scared, "scared", 10) })
+	for (int i = 1; i <= count; i++)
+		foreach (bool inhale in new[] { true, false })
+		{ var (k, ii, inh) = (kind, i, inhale); jobs.Add(($"pbreath_{tag}_{(inh ? "in" : "out")}_{ii:00}", sfx, false, Hi, (r, sr) => Breath.One(r, sr, k, inh, (ii - 1) / (double)(count - 1)))); }
+for (int i = 1; i <= 8; i++) jobs.Add(($"pbreath_gasp_{i:00}", sfx, false, Hi, (r, sr) => Breath.One(r, sr, Breath.Kind.Gasp, true, 1)));
 jobs.Add(("stalker_seen_01", sfx, false, Lo, (r, sr) => Sfx.StalkerSeen(r, sr)));
 // Act 1's falling trees (2026-10-03): the creak, the crack, the rush of the crown, the impact.
-for (int i = 1; i <= 3; i++) jobs.Add(($"tree_fall_creak_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Creak(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"tree_fall_creak_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Creak(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"tree_fall_crack_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Crack(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"tree_fall_rush_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Rush(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"tree_fall_impact_{i:00}", sfx, false, Lo, (r, sr) => TreeFall.Impact(r, sr)));
@@ -116,10 +126,17 @@ for (int i = 1; i <= 2; i++) jobs.Add(($"creature_giant_bellow_{i:00}", sfx, fal
 for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"creature_jumpscare_{k:00}", sfx, false, Hi, (r, sr) => Creature.Jumpscare(r, sr, k))); }
 for (int i = 1; i <= 4; i++) jobs.Add(($"twig_snap_{i:00}", sfx, false, Lo, (r, sr) => Forest.TwigSnap(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"branch_drop_{i:00}", sfx, false, Lo, (r, sr) => Forest.BranchDrop(r, sr)));
-for (int i = 1; i <= 3; i++) jobs.Add(($"trunk_creak_{i:00}", sfx, false, Lo, (r, sr) => Forest.TrunkCreak(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"trunk_creak_{i:00}", sfx, false, Lo, (r, sr) => Forest.TrunkCreak(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"cricket_chirp_{i:00}", sfx, false, Hi, (r, sr) => Forest.CricketChirp(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"raven_{i:00}", sfx, false, Lo, (r, sr) => Forest.Raven(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"rustle_{i:00}", sfx, false, Lo, (r, sr) => Forest.Rustle(r, sr)));
+// Act 1's trail walk, livened (2026-10-15, Trail.cs): far wildlife, the walker's kit, the brush off the trail.
+for (int i = 1; i <= 8; i++) jobs.Add(($"woodpecker_{i:00}", sfx, false, Lo, (r, sr) => Trail.Woodpecker(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"crow_{i:00}", sfx, false, Lo, (r, sr) => Trail.Crow(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"squirrel_{i:00}", sfx, false, Hi, (r, sr) => Trail.Squirrel(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"gear_creak_{i:00}", sfx, false, Lo, (r, sr) => Trail.GearCreak(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"gear_clink_{i:00}", sfx, false, Hi, (r, sr) => Trail.GearClink(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"brush_{i:00}", sfx, false, Hi, (r, sr) => Trail.Brush(r, sr)));
 jobs.Add(("heartbeat_loop", ambient, true, Lo, (r, sr) => Forest.Heartbeat(r, sr, 20)));
 // Act 12: the lake crossing (the rowboat, the water, the creature, the dawn).
 // the audio sweep: Foley that was missing, and the interiors' haunting

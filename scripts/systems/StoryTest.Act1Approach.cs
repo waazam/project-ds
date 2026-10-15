@@ -73,7 +73,7 @@ public partial class StoryTest
 				if (_s == null) return;
 				float d = _player.CameraRig.Camera.GlobalPosition.DistanceTo(stairs.GlobalPosition + Vector3.Up * 2f);
 				if (revealDist < 0 && climb.Revealed) revealDist = climb.RevealedAt;
-				if (flagDist < 0 && StoryManager.Instance.HasFlag(flag)) { flagDist = d; titleEarly = !climb.Revealed; }
+				if (flagDist < 0 && StoryManager.Instance.HasFlag(flag)) { flagDist = d; titleEarly = !climb.ReachedFoot; }
 			}
 		}
 		_ = WatchTitle();
@@ -134,7 +134,9 @@ public partial class StoryTest
 			var ward = falls.GetChildren().OfType<FallingTree>().FirstOrDefault(t => t.Name.ToString().StartsWith("Ward") && t.Down);
 			float clear = ward == null ? -1f : Act1DistToSeg(Flat(_player.GlobalPosition), Flat(ward.LieSegment.a), Flat(ward.LieSegment.b));
 			Check("and it came down in view, never near them", ward != null && falls.UnseenFalls == unseen && clear > 3.5f, $"{clear:0.0} m from where it lies; unseen falls {falls.UnseenFalls - unseen}");
-			Check("no wall came down with them outside it", falls.SideDown < falls.SideCount, $"{falls.SideDown} of {falls.SideCount} down");
+			// (2026-10-15: once the fir is down the walls all come down without waiting for them; none ever with them on its
+			// far side, which "back on the way" below proves: they can still get in)
+			Check("the walls came down after the fir without waiting for them", falls.SideStarted >= falls.SideCount - 1, $"{falls.SideStarted} of {falls.SideCount} started, {falls.SideDown} down");
 			Screenshot("stray_tree_down");
 			// back to the way
 			_recLabel = "back";
@@ -154,7 +156,7 @@ public partial class StoryTest
 		// on to the stairs along the way (seen falls, the title only close and in view)
 		_recLabel = "way";
 		bool titleBefore = StoryManager.Instance.HasFlag(flag);
-		Check("no title over the stairs while they're far off", !titleBefore && !climb.Revealed);
+		Check("no title over the stairs while they're far off", !titleBefore && !climb.Revealed && !climb.ReachedFoot);
 		var route = RouteFrom(_player.GlobalPosition);
 		float sideStop = mode == "side" ? 22f : 4f;
 		foreach (var p in route)
@@ -181,13 +183,26 @@ public partial class StoryTest
 		}
 		await WaitUntil(() => climb.Revealed, 4, ct);
 		Check("the stairs revealed only close, and in view", climb.Revealed && climb.RevealedAt <= climb.RevealRange + 0.5f, $"revealed at {climb.RevealedAt:0.0} m");
+		// (2026-10-15) the title waits for the foot of the stairs: there every sound cuts, then the title, then the chapter's
+		Check("seen, but short of the foot: no title yet, the sound still on", !StoryManager.Instance.HasFlag(flag) && !climb.ReachedFoot && !Audio.StoryMute.On);
+		_recLabel = "foot";
+		await WalkTo(climb.FootPoint, 1.2f, ct, stopWhen: () => climb.ReachedFoot, giveUp: 12f);
 		await WaitUntil(() => ChapterCard.Shown.Contains(0), 6, ct);
+		Check("at the foot: all sound cut", climb.ReachedFoot && Audio.StoryMute.On, $"foot {climb.ReachedFoot} at {climb.ReachedFootAt:0.0} m, muted {Audio.StoryMute.On}");
 		await Seconds(1.6, ct);
 		Screenshot("title");
-		Check("the title came up after that, never before", ChapterCard.Shown.Contains(0) && !titleEarly && flagDist <= climb.RevealRange + 3f,
+		Check("the title came up there, never before", ChapterCard.Shown.Contains(0) && !titleEarly && climb.ReachedFoot,
 			$"flag set at {flagDist:0.0} m, early {titleEarly}");
+		Check("held at the foot, looking up the stairs, while it shows", climb.HeldAtFoot && !_input.Enabled, $"{climb.LookOffDegrees(_player):0} deg off the flight");
+		await WaitUntil(() => !climb.HeldAtFoot && _input.Enabled, 16, ct);
+		Check("the title over: theirs again, no chapter title yet", _input.Enabled && !ChapterCard.Shown.Contains(2), $"[{string.Join(",", ChapterCard.Shown)}]");
+		_recLabel = "onto_the_stairs";
+		await WalkTo(climb.GlobalPosition, 0.5f, ct, stopWhen: () => climb.OnTheStairs, giveUp: 10f);
+		await WaitUntil(() => ChapterCard.Shown.Contains(2), 4, ct);
+		Check("onto the stairs: then the chapter title", climb.OnTheStairs && ChapterCard.Shown.IndexOf(2) > ChapterCard.Shown.IndexOf(0) && ChapterCard.Shown.IndexOf(0) >= 0, $"[{string.Join(",", ChapterCard.Shown)}]");
 		Check("the walls came down beside the way", falls.SideStarted >= (mode == "side" ? 4 : 5), $"{falls.SideStarted} of {falls.SideCount} started, {falls.SideDown} down");
-		Check("the falls ahead were seen", falls.SeenFalls >= 4, $"seen {falls.SeenFalls}, unseen {falls.UnseenFalls}");
+		// (2026-10-15: the first falls are turned into view; the rest follow wherever they are)
+		Check("the first falls were seen", falls.SeenFalls >= (mode == "side" ? 1 : 2), $"seen {falls.SeenFalls}, unseen {falls.UnseenFalls}");
 		Check("and behind them, heard", falls.BehindStarted >= (mode == "side" ? 1 : 2), $"{falls.BehindStarted}");
 		_rec = false;
 		GD.Print($"[act1] {mode}: stops {falls.WatchCount}, last {falls.LastWatchSeconds:0.0} s, {falls.LastWatchFalls} fell in it; seen {falls.SeenFalls}, unseen {falls.UnseenFalls}; wards {falls.WardStarted}/{falls.WardCount}; reveal at {climb.RevealedAt:0.0} m");

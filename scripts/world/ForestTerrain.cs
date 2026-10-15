@@ -91,6 +91,26 @@ public partial class ForestTerrain : Node3D
 	[ExportGroup("Build")]
 	[Export] public bool BuildBoundaryWalls = true;
 	[Export] public float BoundaryInset = 2f;
+	/// <summary>The walls' far edge at +Z (world): the ground and the woods run on past it (2026-10-15: the trailhead's road
+	/// leaves round a bend into trees that go on, not off the edge of the world), but the player stops here.</summary>
+	[Export] public float WalkMaxZ = float.PositiveInfinity;
+	/// <summary>How far inside <see cref="PlayRect"/>'s edge the walls stand (2026-10-15, the owner: the woods "always get
+	/// too thick ... to reach the end of the map"): inside the edge thicket (<see cref="ForestScatter.EdgeThicket"/>), never
+	/// out in the open.</summary>
+	[Export] public float EdgeWallInset = 0f;
+
+	/// <summary>The playable ground (world x,z): the terrain less its inset, its +Z side at <see cref="WalkMaxZ"/>. The edge
+	/// thicket grows inward from its edge; the walls stand <see cref="EdgeWallInset"/> inside it.</summary>
+	public Rect2 PlayRect
+	{
+		get
+		{
+			var o = GlobalPosition;
+			float x0 = MinXZ.X + BoundaryInset + o.X, x1 = MaxXZ.X - BoundaryInset + o.X;
+			float z0 = MinXZ.Y + BoundaryInset + o.Z, z1 = Mathf.Min(MaxXZ.Y - BoundaryInset + o.Z, WalkMaxZ);
+			return new Rect2(x0, z0, x1 - x0, z1 - z0);
+		}
+	}
 	[Export] public int ChunkCells = 48;
 
 	// ---- data ----
@@ -112,6 +132,8 @@ public partial class ForestTerrain : Node3D
 	public int BranchCount { get { EnsureData(); return _branches.Count; } }
 	public Polyline2 Branch(int i) { EnsureData(); return _branches[i]; }
 	public Polyline2 Stream { get { EnsureData(); return _stream; } }
+	/// <summary>The access road (local x,z), for the trailhead's dressing.</summary>
+	public Polyline2 Road { get { EnsureData(); return _road; } }
 	public float TrailLength { get { EnsureData(); return _trail.Length; } }
 
 	public override void _EnterTree() => AddToGroup("terrain");
@@ -788,8 +810,11 @@ public partial class ForestTerrain : Node3D
 	{
 		var body = new StaticBody3D { Name = "BoundaryWalls", CollisionLayer = 1, CollisionMask = 0 };
 		AddChild(body);
-		float x0 = MinXZ.X + BoundaryInset, x1 = MaxXZ.X - BoundaryInset;
-		float z0 = MinXZ.Y + BoundaryInset, z1 = MaxXZ.Y - BoundaryInset;
+		// (local: the body is the terrain's child)
+		var pr = PlayRect;
+		var o = GlobalPosition;
+		float x0 = pr.Position.X - o.X + EdgeWallInset, x1 = pr.End.X - o.X - EdgeWallInset;
+		float z0 = pr.Position.Y - o.Z + EdgeWallInset, z1 = pr.End.Y - o.Z - EdgeWallInset;
 		float cy = 20f, hy = 200f, th = 2f;
 		void Wall(Vector3 c, Vector3 s) => body.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
 		Wall(new Vector3(x0 - th / 2, cy, (z0 + z1) / 2), new Vector3(th, hy, z1 - z0 + 2 * th));

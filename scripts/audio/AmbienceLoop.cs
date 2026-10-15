@@ -41,6 +41,9 @@ public partial class AmbienceLoop : Node
 	[Export] public float Gain = 1f;
 	/// <summary>dB offset set by ForestDirector (gusts, activity).</summary>
 	public float ExtraDb = 0f;
+	/// <summary>The least the silence fade lets through (0..1), whatever the silence: a director bringing a layer in ahead
+	/// of the silence (ForestDirector: the ear-ringing on the walk to the first stairs).</summary>
+	public float FadeFloor = 0f;
 
 	private const float WriteThresholdDb = 0.05f;
 	private const float WriteThresholdPitch = 0.0005f;
@@ -138,6 +141,7 @@ public partial class AmbienceLoop : Node
 			float s = ForestAmbienceManager.Instance?.Silence ?? 0f;
 			float t = Mathf.SmoothStep(SilenceFade.X, SilenceFade.Y, s);
 			if (!RisesWithSilence) t = 1f - t;
+			t = Mathf.Max(t, FadeFloor);
 			db += Mathf.LinearToDb(Mathf.Max(t, 0.0001f));
 		}
 		db += Mathf.LinearToDb(Mathf.Max(Gain, 0.0001f));

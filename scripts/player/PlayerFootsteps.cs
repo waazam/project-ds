@@ -6,7 +6,7 @@ namespace ProjectDS.Player;
 /// <summary>
 /// Plays a footstep every stride, with the sample set chosen from the floor's
 /// "surface" metadata (defaults to dirt). Adds a quiet clothing rustle on some
-/// steps. Everything goes to the Player bus. Sounds are loaded by naming
+/// steps, the kit they carry now and then, and brush off the trail. Everything goes to the Player bus. Sounds are loaded by naming
 /// convention, so real recordings can drop in over the placeholders.
 /// </summary>
 public partial class PlayerFootsteps : Node
@@ -17,7 +17,14 @@ public partial class PlayerFootsteps : Node
 	[Export] public float CrouchQuietDb = -6f;
 	[Export] public float StepVolumeDb = -26f;
 	[Export] public float ClothVolumeDb = -32f;
-	[Export] public int Voices = 4;
+	/// <summary>The kit's creaks and ticks, and the brush off the trail (2026-10-15).</summary>
+	[Export] public float GearVolumeDb = -38f;
+	[Export] public float BrushVolumeDb = -30f;
+	[Export] public int Voices = 6;
+	/// <summary>For tests: steps that brushed through the undergrowth.</summary>
+	public int BrushSteps { get; private set; }
+	private AudioStream[] _gearCreak = System.Array.Empty<AudioStream>(), _gearClink = System.Array.Empty<AudioStream>(), _brush = System.Array.Empty<AudioStream>();
+	private Audio.RecentPicker _creakPicker, _clinkPicker, _brushPicker;
 
 	private PlayerController _player;
 	private readonly Dictionary<string, AudioStream[]> _sets = new();
@@ -67,6 +74,9 @@ public partial class PlayerFootsteps : Node
 		// in deep snow: muffled, the leg dragged through (the detail pass)
 		_sets["snow_deep"] = LoadSet("res://assets/audio/sfx/step_snow_deep_{0:00}.wav", 6);
 		_cloth = LoadSet("res://assets/audio/sfx/cloth_{0:00}.wav", 4);
+		_gearCreak = LoadSet("res://assets/audio/sfx/gear_creak_{0:00}.wav", 8);
+		_gearClink = LoadSet("res://assets/audio/sfx/gear_clink_{0:00}.wav", 8);
+		_brush = LoadSet("res://assets/audio/sfx/brush_{0:00}.wav", 8);
 		for (int i = 0; i < Voices; i++)
 		{
 			var p = new AudioStreamPlayer { Bus = "Player" };
@@ -128,8 +138,41 @@ public partial class PlayerFootsteps : Node
 		Play(set[_stepPicker.Next(_rng, set.Length)], StepVolumeDb + loudness, _rng.RandfRange(0.965f, 1.035f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
 			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.95f, 1.05f));
+		Kit(loudness);
+		Brush(loudness);
 		StepsPlayed++;
 		EmitSignal(SignalName.Stepped);
+	}
+
+	/// <summary>The kit they carry (2026-10-15, the trail walk livened: hiking games carry a lot of the walk on the
+	/// walker's own Foley): now and then a strap or the pack creaks as it shifts, a buckle or a zip pull ticks; more often
+	/// running, hardly at all crouched.</summary>
+	private void Kit(float loudness)
+	{
+		float chance = (_player.IsRunning ? 0.4f : 0.18f) * (1f - 0.7f * _player.CrouchAmount);
+		if (_rng.Randf() >= chance) return;
+		bool creak = _rng.Randf() < 0.65f;
+		var set = creak ? _gearCreak : _gearClink;
+		if (set.Length == 0) return;
+		int i = creak ? _creakPicker.Next(_rng, set.Length) : _clinkPicker.Next(_rng, set.Length);
+		Play(set[i], GearVolumeDb + loudness + (creak ? 0f : -3f) + _rng.RandfRange(-3f, 0f), _rng.RandfRange(0.94f, 1.06f));
+	}
+
+	private static FastNoiseLite _brushPatch;
+
+	/// <summary>Off the trail, through the woods' floor: ferns and low brush against the legs, in patches (fixed by place,
+	/// so the same thicket always brushes), not on the beaten trail and not in snow, mud or indoors.</summary>
+	private void Brush(float loudness)
+	{
+		if (_brush.Length == 0 || _lastSurface is not ("leaves_dry" or "leaves" or "twig")) return;
+		_terrain ??= ProjectDS.World.GroundSnap.FindTerrain(_player);
+		var p = _player.GlobalPosition;
+		if (_terrain == null || _terrain.TrailDistance(p.X, p.Z, out _) < 2.2f) return;
+		_brushPatch ??= new FastNoiseLite { Frequency = 0.12f, Seed = 731 };
+		float thick = _brushPatch.GetNoise2D(p.X, p.Z);
+		if (thick < -0.15f || _rng.Randf() > Mathf.Remap(thick, -0.15f, 0.5f, 0.35f, 0.85f)) return;
+		BrushSteps++;
+		Play(_brush[_brushPicker.Next(_rng, _brush.Length)], BrushVolumeDb + loudness + _rng.RandfRange(-3f, 1f), _rng.RandfRange(0.92f, 1.08f));
 	}
 
 	private void Play(AudioStream stream, float db, float pitch)

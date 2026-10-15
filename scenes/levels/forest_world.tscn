@@ -23,6 +23,8 @@
 [ext_resource type="Script" path="res://scripts/entities/Frog.cs" id="32_frog"]
 [ext_resource type="Script" path="res://scripts/world/Waterfall.cs" id="33_waterfall"]
 [ext_resource type="Script" path="res://scripts/world/OpeningAtCar.cs" id="34_opening"]
+[ext_resource type="Script" path="res://scripts/entities/Squirrel.cs" id="35_squirrel"]
+[ext_resource type="Script" path="res://scripts/world/TrailheadDressing.cs" id="42_thdress"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -57,10 +59,10 @@ point_count = 22
 
 [sub_resource type="Curve3D" id="Curve_road"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0.0833, 0, 1.6667, 0, 0, 36, -0.5, 0, -3.6667, 0.5, 0, 3.6667, 0.5, 0, 46, -0.75, 0, -3.3333, 0.75, 0, 3.3333, 3, 0, 58, -0.3333, 0, -1.3333, 0, 0, 0, 5, 0, 66),
-"tilts": PackedFloat32Array(0, 0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 36, 0, 0, 0, 0, 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 2, 0, 55, 0, 0, 0, 0, 0, 0, 7, 0, 65, 0, 0, 0, 0, 0, 0, 16, 0, 77, 0, 0, 0, 0, 0, 0, 30, 0, 89, 0, 0, 0, 0, 0, 0, 48, 0, 99, 0, 0, 0, 0, 0, 0, 70, 0, 107, 0, 0, 0, 0, 0, 0, 95, 0, 113, 0, 0, 0, 0, 0, 0, 125, 0, 117, 0, 0, 0, 0, 0, 0, 165, 0, 121),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
-point_count = 4
+point_count = 11
 
 [sub_resource type="Curve3D" id="Curve_overlook"]
 _data = {
@@ -105,7 +107,7 @@ script = ExtResource("26_rainvfx")
 [node name="Terrain" type="Node3D" parent="."]
 script = ExtResource("1_terrain")
 MinXZ = Vector2(-160, -650)
-MaxXZ = Vector2(180, 60)
+MaxXZ = Vector2(180, 170)
 NarrowStart = 380.0
 NarrowEnd = 500.0
 BranchPaths = Array[NodePath]([NodePath("Branches/Overlook")])
@@ -117,9 +119,12 @@ ClearingCenter = Vector2(30, -540)
 ClearingRadius = 10.0
 ClearingGrass = false
 Basin = Vector3(5, -540, 80)
-Hills = Array[Vector4]([Vector4(77, -267, 22, 30)])
+Hills = Array[Vector4]([Vector4(77, -267, 22, 30), Vector4(-22, 122, 16, 26), Vector4(-70, 95, 12, 30), Vector4(20, 160, 18, 32)])
 DeepShadeZ = Vector2(-280, -440)
 GravelTrailZ = -125.0
+WalkMaxZ = 80.0
+EdgeWallInset = 7.0
+BoundaryInset = 14.0
 
 [node name="Trail" type="Path3D" parent="Terrain" groups=["trail"]]
 curve = SubResource("Curve_trail")
@@ -198,6 +203,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126, -0.48, -172.2)
 script = ExtResource("2_scatter")
 DeepStart = 330.0
 DeepEnd = 470.0
+EdgeThicket = true
 
 [node name="PlayerSpawn" type="Marker3D" parent="." groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 19)
@@ -213,39 +219,53 @@ Radius = 2.0
 [node name="Bird1" type="Node3D" parent="."]
 script = ExtResource("17_bird")
 Color = 0
+Perch = 3
 
 [node name="TrailAnchor" type="Node" parent="Bird1"]
 script = ExtResource("6_anchor")
 Distance = 55.0
-Offset = 3.2
+Offset = 3.6
 YawDegrees = 0.0
-HeightOffset = 0.7
+HeightOffset = 1.75
 
 [node name="Bird2" type="Node3D" parent="."]
 script = ExtResource("17_bird")
 Color = 1
+Perch = 2
 
 [node name="TrailAnchor" type="Node" parent="Bird2"]
 script = ExtResource("6_anchor")
 Distance = 170.0
-Offset = -4.5
+Offset = -3.6
 YawDegrees = 0.0
-HeightOffset = 0.5
+HeightOffset = 0.0
+
+[node name="Clearing" type="Node3D" parent="Bird2"]
+script = ExtResource("9_clear")
+Radius = 1.6
+ClearFoliage = true
 
 [node name="Bird3" type="Node3D" parent="."]
 script = ExtResource("17_bird")
 Color = 2
+Perch = 5
 
 [node name="TrailAnchor" type="Node" parent="Bird3"]
 script = ExtResource("6_anchor")
 Distance = 290.0
-Offset = 5.0
+Offset = 4.6
 YawDegrees = 0.0
-HeightOffset = 0.6
+HeightOffset = 0.0
+
+[node name="Clearing" type="Node3D" parent="Bird3"]
+script = ExtResource("9_clear")
+Radius = 1.2
+ClearFoliage = true
 
 [node name="Bird4Omen" type="Node3D" parent="."]
 script = ExtResource("17_bird")
 Color = 3
+Perch = 1
 
 [node name="TrailAnchor" type="Node" parent="Bird4Omen"]
 script = ExtResource("6_anchor")
@@ -284,10 +304,88 @@ ClearFoliage = false
 [node name="Frog" type="Node3D" parent="."]
 script = ExtResource("32_frog")
 
+[node name="Frog2" type="Node3D" parent="."]
+script = ExtResource("32_frog")
+Upstream = -6.5
+Side = -1
+ModelScale = 1.05
+Seed = 11
+
+[node name="Frog3" type="Node3D" parent="."]
+script = ExtResource("32_frog")
+Upstream = 12.0
+Side = -1
+Seed = 17
+
+[node name="Frog4" type="Node3D" parent="."]
+script = ExtResource("32_frog")
+Upstream = 21.0
+Side = 1
+ModelScale = 1.2
+Seed = 23
+
+[node name="Squirrel1" type="Node3D" parent="."]
+script = ExtResource("35_squirrel")
+Seed = 1
+
+[node name="TrailAnchor" type="Node" parent="Squirrel1"]
+script = ExtResource("6_anchor")
+Distance = 64.0
+Offset = 6.0
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="Squirrel2" type="Node3D" parent="."]
+script = ExtResource("35_squirrel")
+Seed = 2
+
+[node name="TrailAnchor" type="Node" parent="Squirrel2"]
+script = ExtResource("6_anchor")
+Distance = 142.0
+Offset = -7.0
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="Squirrel3" type="Node3D" parent="."]
+script = ExtResource("35_squirrel")
+Seed = 3
+
+[node name="TrailAnchor" type="Node" parent="Squirrel3"]
+script = ExtResource("6_anchor")
+Distance = 226.0
+Offset = 7.0
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="Squirrel4" type="Node3D" parent="."]
+script = ExtResource("35_squirrel")
+Seed = 4
+
+[node name="TrailAnchor" type="Node" parent="Squirrel4"]
+script = ExtResource("6_anchor")
+Distance = 306.0
+Offset = -6.5
+YawDegrees = 0.0
+HeightOffset = 0.0
+
+[node name="Squirrel5" type="Node3D" parent="."]
+script = ExtResource("35_squirrel")
+Seed = 5
+
+[node name="TrailAnchor" type="Node" parent="Squirrel5"]
+script = ExtResource("6_anchor")
+Distance = 362.0
+Offset = 7.5
+YawDegrees = 0.0
+HeightOffset = 0.0
+
 [node name="Waterfall" type="Node3D" parent="."]
 script = ExtResource("33_waterfall")
 
 [node name="Trailhead" type="Node3D" parent="."]
+
+[node name="Dressing" type="Node3D" parent="Trailhead"]
+script = ExtResource("42_thdress")
 
 [node name="TrailheadSign" type="Node3D" parent="Trailhead"]
 transform = Transform3D(0.9063, 0, 0.4226, 0, 1, 0, -0.4226, 0, 0.9063, -2.6, 0, 15.5)
@@ -559,6 +657,288 @@ MinDistance = 1.0
 MaxDistance = 12.0
 ConeDegrees = 16.0
 RequireLineOfSight = false
+
+[node name="Wildflowers2" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 14
+ClearRadius = 2.0
+ClearFoliage = true
+Seed = 21
+Variety = 1
+
+[node name="TrailAnchor" type="Node" parent="Props/Wildflowers2"]
+script = ExtResource("6_anchor")
+Distance = 96
+Offset = -5.2
+YawDegrees = 94.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Wildflowers2"]
+script = ExtResource("29_photo")
+Id = "wildflowers"
+LookPoints = PackedVector3Array(-0.6, 0.25, 0.1, 0.4, 0.25, -0.3, 0.7, 0.25, 0.45)
+MinDistance = 1.0
+MaxDistance = 12.0
+ConeDegrees = 16.0
+RequireLineOfSight = false
+
+[node name="Wildflowers3" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 14
+ClearRadius = 2.0
+ClearFoliage = true
+Seed = 22
+Variety = 2
+
+[node name="TrailAnchor" type="Node" parent="Props/Wildflowers3"]
+script = ExtResource("6_anchor")
+Distance = 152
+Offset = 5.6
+YawDegrees = 141.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Wildflowers3"]
+script = ExtResource("29_photo")
+Id = "wildflowers"
+LookPoints = PackedVector3Array(-0.6, 0.25, 0.1, 0.4, 0.25, -0.3, 0.7, 0.25, 0.45)
+MinDistance = 1.0
+MaxDistance = 12.0
+ConeDegrees = 16.0
+RequireLineOfSight = false
+
+[node name="Wildflowers4" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 14
+ClearRadius = 2.0
+ClearFoliage = true
+Seed = 23
+Variety = 3
+
+[node name="TrailAnchor" type="Node" parent="Props/Wildflowers4"]
+script = ExtResource("6_anchor")
+Distance = 203
+Offset = -4.6
+YawDegrees = 188.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Wildflowers4"]
+script = ExtResource("29_photo")
+Id = "wildflowers"
+LookPoints = PackedVector3Array(-0.6, 0.25, 0.1, 0.4, 0.25, -0.3, 0.7, 0.25, 0.45)
+MinDistance = 1.0
+MaxDistance = 12.0
+ConeDegrees = 16.0
+RequireLineOfSight = false
+
+[node name="Wildflowers5" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 14
+ClearRadius = 2.0
+ClearFoliage = true
+Seed = 24
+Variety = 1
+
+[node name="TrailAnchor" type="Node" parent="Props/Wildflowers5"]
+script = ExtResource("6_anchor")
+Distance = 262
+Offset = 5.8
+YawDegrees = 235.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Wildflowers5"]
+script = ExtResource("29_photo")
+Id = "wildflowers"
+LookPoints = PackedVector3Array(-0.6, 0.25, 0.1, 0.4, 0.25, -0.3, 0.7, 0.25, 0.45)
+MinDistance = 1.0
+MaxDistance = 12.0
+ConeDegrees = 16.0
+RequireLineOfSight = false
+
+[node name="Wildflowers6" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 14
+ClearRadius = 2.0
+ClearFoliage = true
+Seed = 25
+Variety = 2
+
+[node name="TrailAnchor" type="Node" parent="Props/Wildflowers6"]
+script = ExtResource("6_anchor")
+Distance = 312
+Offset = -5.4
+YawDegrees = 282.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Wildflowers6"]
+script = ExtResource("29_photo")
+Id = "wildflowers"
+LookPoints = PackedVector3Array(-0.6, 0.25, 0.1, 0.4, 0.25, -0.3, 0.7, 0.25, 0.45)
+MinDistance = 1.0
+MaxDistance = 12.0
+ConeDegrees = 16.0
+RequireLineOfSight = false
+
+[node name="Wildflowers7" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 14
+ClearRadius = 2.0
+ClearFoliage = true
+Seed = 26
+Variety = 3
+
+[node name="TrailAnchor" type="Node" parent="Props/Wildflowers7"]
+script = ExtResource("6_anchor")
+Distance = 392
+Offset = 6.2
+YawDegrees = 329.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Wildflowers7"]
+script = ExtResource("29_photo")
+Id = "wildflowers"
+LookPoints = PackedVector3Array(-0.6, 0.25, 0.1, 0.4, 0.25, -0.3, 0.7, 0.25, 0.45)
+MinDistance = 1.0
+MaxDistance = 12.0
+ConeDegrees = 16.0
+RequireLineOfSight = false
+
+[node name="Mushrooms2" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 13
+ClearRadius = 0.9
+ClearFoliage = true
+Seed = 31
+Variety = 1
+
+[node name="TrailAnchor" type="Node" parent="Props/Mushrooms2"]
+script = ExtResource("6_anchor")
+Distance = 74
+Offset = -4.2
+YawDegrees = 142.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Mushrooms2"]
+script = ExtResource("29_photo")
+Id = "mushrooms"
+LookPoints = PackedVector3Array(0, 0.14, 0)
+MinDistance = 0.8
+MaxDistance = 5.0
+ConeDegrees = 12.0
+
+[node name="Mushrooms3" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 13
+ClearRadius = 0.9
+ClearFoliage = true
+Seed = 32
+Variety = 3
+
+[node name="TrailAnchor" type="Node" parent="Props/Mushrooms3"]
+script = ExtResource("6_anchor")
+Distance = 136
+Offset = 3.8
+YawDegrees = 213.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Mushrooms3"]
+script = ExtResource("29_photo")
+Id = "mushrooms"
+LookPoints = PackedVector3Array(0, 0.14, 0)
+MinDistance = 0.8
+MaxDistance = 5.0
+ConeDegrees = 12.0
+
+[node name="Mushrooms4" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 13
+ClearRadius = 0.9
+ClearFoliage = true
+Seed = 33
+Variety = 2
+
+[node name="TrailAnchor" type="Node" parent="Props/Mushrooms4"]
+script = ExtResource("6_anchor")
+Distance = 188
+Offset = -5.0
+YawDegrees = 284.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Mushrooms4"]
+script = ExtResource("29_photo")
+Id = "mushrooms"
+LookPoints = PackedVector3Array(0, 0.14, 0)
+MinDistance = 0.8
+MaxDistance = 5.0
+ConeDegrees = 12.0
+
+[node name="Mushrooms5" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 13
+ClearRadius = 0.9
+ClearFoliage = true
+Seed = 34
+Variety = 3
+
+[node name="TrailAnchor" type="Node" parent="Props/Mushrooms5"]
+script = ExtResource("6_anchor")
+Distance = 233
+Offset = 3.4
+YawDegrees = 355.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Mushrooms5"]
+script = ExtResource("29_photo")
+Id = "mushrooms"
+LookPoints = PackedVector3Array(0, 0.14, 0)
+MinDistance = 0.8
+MaxDistance = 5.0
+ConeDegrees = 12.0
+
+[node name="Mushrooms6" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 13
+ClearRadius = 0.9
+ClearFoliage = true
+Seed = 35
+Variety = 2
+
+[node name="TrailAnchor" type="Node" parent="Props/Mushrooms6"]
+script = ExtResource("6_anchor")
+Distance = 301
+Offset = -4.4
+YawDegrees = 66.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Mushrooms6"]
+script = ExtResource("29_photo")
+Id = "mushrooms"
+LookPoints = PackedVector3Array(0, 0.14, 0)
+MinDistance = 0.8
+MaxDistance = 5.0
+ConeDegrees = 12.0
+
+[node name="Mushrooms7" type="Node3D" parent="Props"]
+script = ExtResource("5_prop")
+Kind = 13
+ClearRadius = 0.9
+ClearFoliage = true
+Seed = 36
+Variety = 1
+
+[node name="TrailAnchor" type="Node" parent="Props/Mushrooms7"]
+script = ExtResource("6_anchor")
+Distance = 352
+Offset = 4.0
+YawDegrees = 137.0
+HeightOffset = 0.0
+
+[node name="PhotoSubject" type="Node3D" parent="Props/Mushrooms7"]
+script = ExtResource("29_photo")
+Id = "mushrooms"
+LookPoints = PackedVector3Array(0, 0.14, 0)
+MinDistance = 0.8
+MaxDistance = 5.0
+ConeDegrees = 12.0
 
 [node name="WeirdStone" type="Node3D" parent="Props"]
 script = ExtResource("5_prop")

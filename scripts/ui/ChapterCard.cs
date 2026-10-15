@@ -58,23 +58,29 @@ public partial class ChapterCard : CanvasLayer
 		Spawn(from, n, delay);
 	}
 
-	/// <summary>The game's name (the trailer's title) and then chapter 2: at the stairs, as the forest goes dead silent.
-	/// Only once the player is close to the stairs and has them in view (2026-10-13, the owner: "I don't want to see the
-	/// stairs text on the screen until the player is close to the stairs and can see them in view";
-	/// <see cref="World.FirstClimbEvent.StairsRevealed"/>): before that, a call is let go and comes again.</summary>
-	public static void TitleThenStairs(Node from)
+	/// <summary>The game's name (the trailer's title), once in the playthrough: at the foot of the first stairs, in the dead
+	/// silence there, the player held looking up the flight (2026-10-15, the owner: "when you get to the stairs it shows the
+	/// title right after all sound stops ... the character to be frozen looking at the stairs when the title shows then once
+	/// he goes on the stairs it will say the chapter title"; <see cref="World.FirstClimbEvent"/>). With
+	/// <paramref name="thenChapter"/> the stairs' chapter follows it (for a player already on the flight). Returns the card,
+	/// or null when it has been shown already.</summary>
+	public static ChapterCard Title(Node from, float delay = 1.0f, bool thenChapter = false)
 	{
 		var s = StoryManager.Instance;
-		if (from == null || !from.IsInsideTree() || (s != null && s.HasFlag(Flag(2)))) return;
-		if (!World.FirstClimbEvent.StairsRevealed) return;
-		s?.SetFlag(Flag(2));
-		Spawn(from, 0, 1.6f, then: 2);
+		if (from == null || !from.IsInsideTree() || (s != null && s.HasFlag(Flag(0)))) return null;
+		s?.SetFlag(Flag(0));
+		if (thenChapter) s?.SetFlag(Flag(2));
+		return Spawn(from, 0, delay, then: thenChapter ? 2 : -1);
 	}
 
-	private static void Spawn(Node from, int n, float delay, int then = -1)
+	/// <summary>For the stairs' hold: this card is the game's title (0) or chapter n.</summary>
+	public int Number => _n;
+
+	private static ChapterCard Spawn(Node from, int n, float delay, int then = -1)
 	{
 		var card = new ChapterCard { _n = n, _wait = delay, _then = then, Name = n == 0 ? "TitleDrop" : $"Chapter{n}" };
 		(from.GetTree().Root).AddChild(card);
+		return card;
 	}
 
 	private int _n, _then;
