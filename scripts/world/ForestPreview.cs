@@ -75,6 +75,66 @@ public partial class ForestPreview : Node3D
 		Log($"side tree down {tree.Down}");
 	}
 
+	/// <summary>The dead fir's base (2026-10-15, "doesn't look so fake"): its foot standing, held leaning, frozen mid-fall
+	/// and down, each from the trail, close and round the side (test-output/forest/fir_*.png, or --fir-out=dir).</summary>
+	private async Task FirBaseShots()
+	{
+		await Frames(30);
+		var fir = GetTree().Root.FindChild("FallenTree", true, false) as FallenTree;
+		if (fir == null) { Log("no fir"); return; }
+		string dir = _out;
+		foreach (var a in OS.GetCmdlineUserArgs()) if (a.StartsWith("--fir-out=")) dir = _out + "/" + a[10..];
+		DirAccess.MakeDirRecursiveAbsolute(dir);
+		Vector3 G(float x, float z) => new(x, _terrain.HeightAt(x, z), z);
+		Vector3 f = fir.Foot;
+		var lie = (fir.LieSegment.b - fir.LieSegment.a); lie.Y = 0; lie = lie.Normalized();
+		Vector3 sd = Vector3.Up.Cross(lie).Normalized();
+		// (name, eye, look-at): from the trail, close by the foot, round the far side, low at the roots
+		var views = new List<(string, Vector3, Vector3)>
+		{
+			("trail", G(f.X + 6f, f.Z + 16f) + Vector3.Up * 1.6f, f + Vector3.Up * 3f),
+			("near", G(f.X + 3.5f, f.Z + 5f) + Vector3.Up * 1.6f, f + Vector3.Up * 0.6f),
+			("side", G(f.X - 6f, f.Z + 4f) + Vector3.Up * 1.6f, f + Vector3.Up * 1.2f),
+			("hole", G(f.X - lie.X * 3.5f, f.Z - lie.Z * 3.5f + 5f) + Vector3.Up * 1.6f, f - lie * 1.6f + Vector3.Up * 0.8f),
+			("low", G(f.X + 2.5f, f.Z + 2.6f) + Vector3.Up * 0.9f, f + Vector3.Up * 0.2f),
+		};
+		async Task Shoot(string phase)
+		{
+			foreach (var (name, eye, at) in views)
+			{
+				_cam.GlobalTransform = new Transform3D(Basis.LookingAt(at - eye, Vector3.Up), eye);
+				// from above, the woods' own trees out of the way (it is the hole and the plate that are looked at)
+				var forest = GetTree().Root.FindChild("Forest", true, false) as Node3D;
+				if (name == "above" && forest != null) forest.Visible = false;
+				await Frames(6);
+				GetViewport().GetTexture().GetImage().SavePng($"{dir}/fir_{phase}_{name}.png");
+				if (forest != null) forest.Visible = true;
+			}
+		}
+		await Shoot("1stand");
+		fir.StartCreak(true);
+		while (fir.CreakTime < 3.6f) await Frames(1);
+		await Shoot("2lean");
+		fir.Release();
+		// frozen mid-fall, about 35 degrees over
+		while (fir.TrunkPoint(1f).Y - f.Y > fir.LieSegment.a.DistanceTo(fir.LieSegment.b) * 0.8f) await Frames(1);
+		fir.ProcessMode = ProcessModeEnum.Disabled;
+		await Shoot("3fall");
+		fir.ProcessMode = ProcessModeEnum.Inherit;
+		while (!fir.Fallen) await Frames(1);
+		// the moment it lands (dust)
+		views.Insert(0, ("trail_impact", views[0].Item2, views[0].Item3));
+		_cam.GlobalTransform = new Transform3D(Basis.LookingAt(views[0].Item3 - views[0].Item2, Vector3.Up), views[0].Item2);
+		await Frames(3);
+		GetViewport().GetTexture().GetImage().SavePng($"{dir}/fir_4down_impact.png");
+		views.RemoveAt(0);
+		await ToSignal(GetTree().CreateTimer(4.5), SceneTreeTimer.SignalName.Timeout);
+		views.Add(("above", f - lie * 1.7f + new Vector3(0.5f, 6.5f, 4.5f), f - lie * 1.9f));
+		views.Add(("across", G(f.X + 9f, f.Z + 6f) + Vector3.Up * 1.6f, f + lie * 4f + Vector3.Up * 0.5f));
+		await Shoot("5down");
+		Log($"fir shots in {dir}");
+	}
+
 	private async Task Frames(int n)
 	{
 		for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -106,6 +166,7 @@ public partial class ForestPreview : Node3D
 		foreach (var n in GetTree().GetNodesInGroup("trail"))
 			if (n is Path3D p) Log($"trail path points {p.Curve.PointCount}, first {p.GlobalTransform * p.Curve.GetPointPosition(0)} last {p.GlobalTransform * p.Curve.GetPointPosition(p.Curve.PointCount - 1)}");
 
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--fir-shots") >= 0) { await FirBaseShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--falls") >= 0) { await FallShots(); GetTree().Quit(); return; }
 		if (TakeShots)
 		{

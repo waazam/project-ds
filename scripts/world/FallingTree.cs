@@ -158,15 +158,16 @@ public sealed class TreeFallMotion
 		tw.TweenCallback(Callable.From(() => { if (GodotObject.IsInstanceValid(rig)) rig.Shake = Vector3.Zero; }));
 	}
 
-	/// <summary>A low burst of dust and needles where it landed, settling.</summary>
-	private static void Dust(Node3D owner, Vector3 at)
+	/// <summary>A low burst of dust and needles where it landed, settling (or, given a colour and a spread, another burst:
+	/// the dead fir's earth tearing up with its roots, 2026-10-15).</summary>
+	internal static void Dust(Node3D owner, Vector3 at, Color? color = null, float spread = 3f, int amount = 28, float lift = 2.6f)
 	{
 		var mat = new ParticleProcessMaterial
 		{
-			Direction = Vector3.Up, Spread = 80f, InitialVelocityMin = 0.8f, InitialVelocityMax = 2.6f, Gravity = new Vector3(0, -0.6f, 0),
+			Direction = Vector3.Up, Spread = 80f, InitialVelocityMin = 0.8f, InitialVelocityMax = lift, Gravity = new Vector3(0, -0.6f, 0),
 			DampingMin = 1.2f, DampingMax = 2.2f, ScaleMin = 0.8f, ScaleMax = 1.8f,
-			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(3f, 0.2f, 3f),
-			Color = new Color(0.28f, 0.25f, 0.2f, 0.4f),
+			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(spread, 0.2f, spread),
+			Color = color ?? new Color(0.28f, 0.25f, 0.2f, 0.4f),
 		};
 		var quad = new QuadMesh
 		{
@@ -182,7 +183,7 @@ public sealed class TreeFallMotion
 		mat.AnimSpeedMin = mat.AnimSpeedMax = 1f;
 		var p = new GpuParticles3D
 		{
-			Amount = 28, Lifetime = 3.2f, OneShot = true, Explosiveness = 0.9f, ProcessMaterial = mat, DrawPass1 = quad,
+			Amount = amount, Lifetime = 3.2f, OneShot = true, Explosiveness = 0.9f, ProcessMaterial = mat, DrawPass1 = quad,
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
 		owner.AddChild(p);
