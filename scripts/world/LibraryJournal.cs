@@ -44,15 +44,27 @@ public partial class Library
 		AddChild(root);
 		// two old ledgers under it, a little askew
 		var ledger = new StandardMaterial3D { AlbedoColor = new Color(0.22f, 0.16f, 0.1f), Roughness = 0.8f };
+		var ledger2 = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 0.12f, 0.1f), Roughness = 0.8f };
+		var pages = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.76f, 0.6f), Roughness = 0.9f };
+		// (2026-10-15) the ledgers and the journal modelled in Blender (tools/Blender/church_props.py lib_ledgers, lib_journal);
+		// the boxes are their fallback
+		if (FurnitureKit.Place(root, "lib_ledgers", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["calf"] = ledger, ["cloth"] = ledger2, ["pages"] = pages }, "Ledgers") == null)
+		{
 		root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.24f, 0.035f, 0.32f) }, Position = new Vector3(0, 0.0175f, 0), Rotation = new Vector3(0, 0.06f, 0), MaterialOverride = ledger });
-		root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.22f, 0.03f, 0.3f) }, Position = new Vector3(0.005f, 0.05f, 0.01f), Rotation = new Vector3(0, -0.08f, 0), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 0.12f, 0.1f), Roughness = 0.8f } });
+		root.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.22f, 0.03f, 0.3f) }, Position = new Vector3(0.005f, 0.05f, 0.01f), Rotation = new Vector3(0, -0.08f, 0), MaterialOverride = ledger2 });
+		}
 		// the journal: worn brown leather, a strap round it, its pages showing
 		// (2026-10-15: on the ledger, not 4 mm into it)
 		var book = new Node3D { Name = "Book", Position = new Vector3(0, 0.0795f, 0), Rotation = new Vector3(0, 0.12f, 0) };
 		root.AddChild(book);
-		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.15f, 0.028f, 0.21f) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.19f, 0.1f), Roughness = 0.55f, MetallicSpecular = 0.3f } });
-		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.14f, 0.022f, 0.2f) }, Position = new Vector3(0.006f, 0, 0), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.76f, 0.6f), Roughness = 0.9f } });
-		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.155f, 0.03f, 0.018f) }, Position = new Vector3(0, 0, 0.03f), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.08f, 0.05f), Roughness = 0.6f } });
+		var leather = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.19f, 0.1f), Roughness = 0.55f, MetallicSpecular = 0.3f };
+		var strap = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.08f, 0.05f), Roughness = 0.6f };
+		if (FurnitureKit.Place(book, "lib_journal", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["leather"] = leather, ["pages"] = pages, ["strap"] = strap, ["brass"] = ItemTextures.BrassMat }, "Cover") == null)
+		{
+		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.15f, 0.028f, 0.21f) }, MaterialOverride = leather });
+		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.14f, 0.022f, 0.2f) }, Position = new Vector3(0.006f, 0, 0), MaterialOverride = pages });
+		book.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.155f, 0.03f, 0.018f) }, Position = new Vector3(0, 0, 0.03f), MaterialOverride = strap });
+		}
 		// what the blacklight shows: a hand on the cover, and "READ" on the shelf's back above it
 		UvInk.OnSurface(book, new Vector3(-0.005f, 0.014f, -0.015f), Vector3.Up, new Vector2(0.12f, 0.15f), UvInk.Hand(HandKind.Pressed, 5), UvInk.Pale, 2f, 0.3f, false, true, 0.02f);
 		UvInk.Write(this, new Vector3(-HalfW + 0.022f, 1.66f, JournalZ), Vector3.Right, "READ", 0.26f, UvInk.Cyan);

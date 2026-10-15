@@ -81,8 +81,18 @@ public partial class Library
 		float len = (b - a).Length();
 		Vector3 mid = (a + b) * 0.5f + inw * ShelfDepth * 0.5f;
 		Vector3 alongSize = along.Abs() * len, depthSize = inw.Abs() * ShelfDepth;
+		// (2026-10-15) the crown, plinth, uprights and shelves modelled in Blender (church_props.py lib_cornice, lib_upright,
+		// lib_shelf: a metre of moulding or board scaled along its run; X along, the face to -Z, turned to face the room);
+		// the boxes are their fallback. The back stays a board.
+		var face = new Basis(Vector3.Up.Cross(-inw), Vector3.Up, -inw);
+		bool model = FixtureModels.Have("lib_cornice", "lib_upright", "lib_shelf");
 		frame.Color = Colors.White;
 		BuildKit.Box(frame, mid + Vector3.Up * (Height * 0.5f - 0.1f) - inw * (ShelfDepth * 0.5f - 0.01f), alongSize + inw.Abs() * 0.02f + Vector3.Up * (Height - 0.2f));   // the back
+		if (model)
+			FurnitureKit.Add(frame, "lib_cornice", new Transform3D(face * Basis.FromScale(new Vector3(len, 1, 1)), (a + b) * 0.5f + inw * ShelfDepth * 0.5f),
+				new Dictionary<string, (Material, Color)> { ["wood"] = (_wood, Colors.White), ["lip"] = (_wood, Colors.White * 0.85f), ["plinth"] = (_wood, Colors.White * 0.7f) });
+		else
+		{
 		BuildKit.Box(frame, mid + Vector3.Up * (Height - 0.2f), alongSize + depthSize + inw.Abs() * 0.05f + Vector3.Up * 0.12f);   // the crown
 		// a moulded lip under the crown and a plinth along the foot
 		frame.Color = Colors.White * 0.85f;
@@ -90,11 +100,18 @@ public partial class Library
 		frame.Color = Colors.White * 0.7f;
 		BuildKit.Box(frame, mid + inw * (ShelfDepth * 0.5f - 0.012f) + Vector3.Up * 0.045f, alongSize + inw.Abs() * 0.024f + Vector3.Up * 0.09f);
 		frame.Color = Colors.White;
+		}
 		int uprights = Mathf.Max(1, Mathf.RoundToInt(len / 1.0f));
 		float seg = len / uprights;
 		for (int u = 0; u <= uprights; u++)
 		{
 			Vector3 p = a + along * (seg * u) + inw * ShelfDepth * 0.5f + Vector3.Up * ((Height - 0.2f) * 0.5f);
+			if (model)
+			{
+				FurnitureKit.Add(frame, "lib_upright", new Transform3D(face, p with { Y = 0 }),
+					new Dictionary<string, (Material, Color)> { ["wood"] = (_wood, Colors.White), ["rubbed"] = (_wood, Colors.White * 1.08f) });
+				continue;
+			}
 			BuildKit.Box(frame, p, along.Abs() * 0.045f + depthSize + Vector3.Up * (Height - 0.2f));
 			// the upright's front face, a shade paler where hands have rubbed it
 			frame.Color = Colors.White * 1.08f;
@@ -113,7 +130,11 @@ public partial class Library
 			// the shelves: each bay's its own boards, a hair different in tone
 			frame.Color = Colors.White * (0.88f + 0.16f * _rng.Randf());
 			foreach (float y in rows)
-				BuildKit.Box(frame, bayMid + Vector3.Up * (y - 0.012f), along.Abs() * w + depthSize + Vector3.Up * 0.024f);
+				if (model)
+					FurnitureKit.Add(frame, "lib_shelf", new Transform3D(face * Basis.FromScale(new Vector3(w, 1, 1)), bayMid + Vector3.Up * (y - 0.012f)),
+						new Dictionary<string, (Material, Color)> { ["wood"] = (_wood, frame.Color) });
+				else
+					BuildKit.Box(frame, bayMid + Vector3.Up * (y - 0.012f), along.Abs() * w + depthSize + Vector3.Up * 0.024f);
 			frame.Color = Colors.White;
 			if (layout == 3) Cupboard(frame, bayMid, along, inw, w, rows[0], doorBasis);
 			// the books, a shelf at a time
@@ -421,6 +442,10 @@ public partial class Library
 			_bookMeshes = new Mesh[3];
 			for (int kind = 0; kind < 3; kind++)
 			{
+				// (2026-10-15) the bindings modelled in Blender (tools/Blender/church_props.py lib_book_0..2, the same unit
+				// box); the code below is their fallback
+				var model = FurnitureKit.Mesh($"lib_book_{kind}", new Dictionary<string, Material> { ["cloth"] = BookMat(false), ["pages"] = BookMat(true) });
+				if (model != null) { _bookMeshes[kind] = model; continue; }
 				var k = new MeshKit();
 				k.Color = Colors.White;
 				k.Mat(BookMat(true));

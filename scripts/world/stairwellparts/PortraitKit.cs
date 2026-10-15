@@ -54,6 +54,8 @@ public static class PortraitKit
 		var k = new MeshKit();
 		k.Mat(metal ? ItemTextures.BrassMat : WoodMat);
 		k.Color = body;
+		if (!Modelled(k, style, w, h, fw, d, body, slipCol * tone, metal, which))
+		{
 		// the moulding: (2026-10-15, the props' proportions pass) one run round the canvas with mitred corners; its profile by style
 		Vector2[] prof = style switch
 		{
@@ -81,6 +83,7 @@ public static class PortraitKit
 				Rosette(k, c, fw * 0.32f, fw * 0.16f, rosette);
 			}
 			if (H(which, 7) < 0.6f) Rosette(k, new Vector3(0, h * 0.5f + fw * 0.95f, d * 0.7f), fw * 0.75f, fw * 0.3f, rosette, 0.62f);
+		}
 		}
 		if (backed)
 		{
@@ -133,6 +136,38 @@ public static class PortraitKit
 			};
 			parent.AddChild(soot);
 		}
+	}
+
+	/// <summary>(2026-10-15) The frame from its Blender pieces (tools/Blender/church_props.py pf_*): the style's moulding
+	/// nine-sliced, a mitred corner scaled (rim, rim, depth) at each corner of the canvas and a straight rail scaled along
+	/// each side, so the mitres stay true whatever the picture's shape; the carved styles' bosses and cartouche the carved
+	/// pf_rosette. False if the pieces aren't there (the code's moulding is built instead).</summary>
+	private static bool Modelled(MeshKit k, int style, float w, float h, float fw, float d, Color body, Color slip, bool metal, int which)
+	{
+		string p = style switch { 0 or 2 or 5 => "a", 1 => "b", 3 => "c", _ => "d" };
+		string rail = "pf_rail_" + p, corner = "pf_corner_" + p;
+		if (!FixtureModels.Have(rail, corner, "pf_rosette")) return false;
+		var mat = metal ? (Material)ItemTextures.BrassMat : WoodMat;
+		var roles = new System.Collections.Generic.Dictionary<string, (Material, Color)> { ["slip"] = (mat, slip), ["body"] = (mat, body), ["shade"] = (mat, body * 0.86f) };
+		foreach (var (ang, pos, len) in new[] { (0f, new Vector3(0, h * 0.5f, 0), w), (Mathf.Pi, new Vector3(0, -h * 0.5f, 0), w), (-Mathf.Pi * 0.5f, new Vector3(w * 0.5f, 0, 0), h), (Mathf.Pi * 0.5f, new Vector3(-w * 0.5f, 0, 0), h) })
+			FurnitureKit.Add(k, rail, new Transform3D(new Basis(Vector3.Back, ang) * Basis.FromScale(new Vector3(len, fw, d)), pos), roles);
+		foreach (var (ang, pos) in new[] { (0f, new Vector3(w * 0.5f, h * 0.5f, 0)), (Mathf.Pi * 0.5f, new Vector3(-w * 0.5f, h * 0.5f, 0)), (Mathf.Pi, new Vector3(-w * 0.5f, -h * 0.5f, 0)), (-Mathf.Pi * 0.5f, new Vector3(w * 0.5f, -h * 0.5f, 0)) })
+			FurnitureKit.Add(k, corner, new Transform3D(new Basis(Vector3.Back, ang) * Basis.FromScale(new Vector3(fw, fw, d)), pos), roles);
+		if (style is 0 or 2 or 5)
+		{
+			var boss = new System.Collections.Generic.Dictionary<string, (Material, Color)> { ["body"] = (mat, body * 1.08f) };
+			int lost = H(which, 5) < 0.35f ? (int)(H(which, 6) * 4) : -1;
+			int c4 = 0;
+			foreach (var (sx, sy) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
+			{
+				if (c4++ == lost) continue;
+				Vector3 c = new(sx * (w * 0.5f + fw * 0.58f), sy * (h * 0.5f + fw * 0.58f), d * 0.85f);
+				FurnitureKit.Add(k, "pf_rosette", new Transform3D(Basis.FromScale(new Vector3(fw * 0.32f, fw * 0.32f, fw * 0.16f)), c), boss);
+			}
+			if (H(which, 7) < 0.6f)
+				FurnitureKit.Add(k, "pf_rosette", new Transform3D(Basis.FromScale(new Vector3(fw * 0.75f, fw * 0.75f * 0.62f, fw * 0.3f)), new Vector3(0, h * 0.5f + fw * 0.95f, d * 0.7f)), boss);
+		}
+		return true;
 	}
 
 	/// <summary>A domed boss lying on the frame's face (turned about +Z), squashed to <paramref name="sy"/> of its width.</summary>

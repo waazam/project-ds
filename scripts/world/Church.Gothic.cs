@@ -144,11 +144,14 @@ public partial class Church
 				float sparse = isCold ? 0.35f : rng.Randf() < 0.4f ? rng.RandfRange(0.3f, 0.5f) : rng.RandfRange(0.08f, 0.2f);
 				float z = (b + 0.5f) * BayLen + rng.RandfRange(-0.6f, 0.6f), x = s * (AisleOuter - 0.55f);
 				int lit = 0;
+				// (2026-10-15) the rack modelled in Blender (tools/Blender/church_props.py ch_votive_rack: east-side, the west's
+				// turned round); the boxes and beams below are its fallback
+				bool rack = FurnitureKit.Add(iron, "ch_votive_rack", new Transform3D(new Basis(Vector3.Up, s > 0 ? 0f : Mathf.Pi), new Vector3(x, 0, z)), new System.Collections.Generic.Dictionary<string, Material>() { ["iron"] = ChurchTextures.IronMat });
 				// the rack: three stepped shelves on legs, the lowest nearest
 				for (int t = 0; t < 3; t++)
 				{
 					float y = 0.7f + t * 0.22f, xx = x + s * t * 0.16f;
-					BuildKit.Box(iron, new Vector3(xx, y, z), new Vector3(0.2f, 0.025f, 1.6f), 1f);
+					if (!rack) BuildKit.Box(iron, new Vector3(xx, y, z), new Vector3(0.2f, 0.025f, 1.6f), 1f);
 					for (int c = 0; c < 8; c++)
 					{
 						if (rng.Randf() < sparse) continue;
@@ -165,6 +168,7 @@ public partial class Church
 					var lie = new Transform3D(new Basis(Vector3.Up, rng.RandfRange(0f, Mathf.Tau)) * new Basis(Vector3.Forward, Mathf.Pi * 0.5f), new Vector3(x - s * rng.RandfRange(0.25f, 0.45f), 0.024f, fz));
 					TurnedKit.Lathe(wax, lie, TurnedKit.P(0f, -h * 0.5f, 0.023f, -h * 0.5f, 0.022f, h * 0.5f, 0.01f, h * 0.5f + 0.004f, 0f, h * 0.5f + 0.004f), 8);
 				}
+				if (!rack)
 				foreach (float dz in new[] { -0.78f, 0.78f })
 					foreach (float dx in new[] { 0f, 0.32f })
 						iron.Beam(new Vector3(x + s * dx, 0, z + dz), new Vector3(x + s * dx, 1.2f, z + dz), 0.025f, 0.025f);
@@ -207,22 +211,28 @@ public partial class Church
 		Vector3 cc = at + Vector3.Up * 5.2f;
 		crown.Cylinder(cc + Vector3.Up * 1.2f, new Vector3(cc.X, NaveVaultY(0) - 0.4f, cc.Z), 0.03f, 0.03f, 4, false);
 		// (2026-10-15: round iron hoops, a band of uprights between them, a cup under every candle; the hoops were
-		// rings of square bars)
+		// rings of square bars) (2026-10-15, later: the crown modelled in Blender, church_props.py ch_crown; the code
+		// below its fallback, the candles still the code's)
+		bool model = FurnitureKit.Add(crown, "ch_crown", new Transform3D(Basis.Identity, cc), new System.Collections.Generic.Dictionary<string, Material>() { ["iron"] = ChurchTextures.IronMat });
+		if (!model)
 		foreach (var (rr, yy) in new[] { (1.7f, 0f), (1.7f, 0.35f) })
 			ItemMeshes.Torus(crown, cc + Vector3.Up * yy, Vector3.Up, rr, 0.03f, 36, 5);
-		for (int i = 0; i < 24; i++)
+		for (int i = 0; i < 24 && !model; i++)
 		{
 			float a = Mathf.Tau * (i + 0.5f) / 24f;
 			Vector3 d = new(Mathf.Cos(a) * 1.7f, 0, Mathf.Sin(a) * 1.7f);
 			crown.Cylinder(cc + d, cc + d + Vector3.Up * 0.35f, 0.012f, 0.012f, 4, false);
 		}
-		crown.Cylinder(cc + Vector3.Up * 1.12f, cc + Vector3.Up * 1.28f, 0.07f, 0.05f, 8, true);   // the boss the chains meet at
+		if (!model) crown.Cylinder(cc + Vector3.Up * 1.12f, cc + Vector3.Up * 1.28f, 0.07f, 0.05f, 8, true);   // the boss the chains meet at
 		for (int i = 0; i < 12; i++)
 		{
 			float a = Mathf.Tau * i / 12f;
 			Vector3 p = cc + new Vector3(Mathf.Cos(a) * 1.7f, 0.35f, Mathf.Sin(a) * 1.7f);
-			crown.Cylinder(p, cc + Vector3.Up * 1.2f, 0.012f, 0.012f, 4, false);
-			TurnedKit.Lathe(crown, p, TurnedKit.P(0f, 0f, 0.025f, 0f, 0.03f, 0.012f, 0.06f, 0.025f, 0.065f, 0.04f, 0.055f, 0.042f, 0.035f, 0.035f, 0f, 0.036f), 8);
+			if (!model)
+			{
+				crown.Cylinder(p, cc + Vector3.Up * 1.2f, 0.012f, 0.012f, 4, false);
+				TurnedKit.Lathe(crown, p, TurnedKit.P(0f, 0f, 0.025f, 0f, 0.03f, 0.012f, 0.06f, 0.025f, 0.065f, 0.04f, 0.055f, 0.042f, 0.035f, 0.035f, 0f, 0.036f), 8);
+			}
 			Candle(wax, p + Vector3.Up * 0.036f, 0.2f, 0.035f);
 		}
 		crown.CommitTo(this, "Crown", false);
@@ -242,12 +252,16 @@ public partial class Church
 		foreach (float s in new[] { -1f, 1f })
 		{
 			Vector3 at = new(s * 18.5f, 0, CrossEnd - 1.0f);
+			Collide(_stone, at + new Vector3(0, 0.6f, 0.1f), new Vector3(3f, 1.2f, 1.8f));
+			var cloth = new StandardMaterial3D { AlbedoColor = s < 0 ? new Color(0.62f, 0.56f, 0.5f) : new Color(0.7f, 0.66f, 0.6f), Roughness = 0.9f };
+			// (2026-10-15) the altar, its cloth and cross modelled in Blender (church_props.py ch_trans_altar); the code is its fallback
+			if (!FurnitureKit.Add(k, "ch_trans_altar", new Transform3D(Basis.Identity, at), new System.Collections.Generic.Dictionary<string, Material>() { ["stone"] = ChurchTextures.AshlarDampMat, ["cloth"] = cloth, ["iron"] = ChurchTextures.IronMat }))
+			{
 			k.Mat(ChurchTextures.AshlarDampMat);
 			k.Color = Colors.White;
 			BuildKit.Box(k, at + new Vector3(0, 0.1f, 0), new Vector3(3f, 0.2f, 1.8f), 1f, BuildKit.Face.NY);
 			BuildKit.Box(k, at + new Vector3(0, 0.7f, 0.2f), new Vector3(2.1f, 1f, 0.9f), 1f, BuildKit.Face.NY);
-			Collide(_stone, at + new Vector3(0, 0.6f, 0.1f), new Vector3(3f, 1.2f, 1.8f));
-			k.Mat(new StandardMaterial3D { AlbedoColor = s < 0 ? new Color(0.62f, 0.56f, 0.5f) : new Color(0.7f, 0.66f, 0.6f), Roughness = 0.9f });
+			k.Mat(cloth);
 			BuildKit.Box(k, at + new Vector3(0, 1.21f, 0.2f), new Vector3(2.2f, 0.02f, 1f), 1f);
 			BuildKit.Box(k, at + new Vector3(0, 1.0f, -0.27f), new Vector3(2.2f, 0.42f, 0.02f), 1f);
 			k.Mat(ChurchTextures.IronMat);
@@ -257,6 +271,7 @@ public partial class Church
 			foreach (var (c, sz) in new[] { (new Vector3(-0.25f, 2.05f, 0.5f), new Vector3(0.03f, 0.09f, 0.08f)), (new Vector3(0.25f, 2.05f, 0.5f), new Vector3(0.03f, 0.09f, 0.08f)), (new Vector3(0, 2.35f, 0.5f), new Vector3(0.09f, 0.03f, 0.08f)) })
 				k.BevelBox(at + c, sz, 0.008f);
 			k.BevelBox(at + new Vector3(0, 1.27f, 0.5f), new Vector3(0.16f, 0.06f, 0.12f), 0.012f);
+			}
 			// and its two candles in tall iron candlesticks (they stood on the cloth with nothing under them)
 			var sticks = new MeshKit();
 			sticks.Mat(ChurchTextures.IronMat);

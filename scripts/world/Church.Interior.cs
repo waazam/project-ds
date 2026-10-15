@@ -62,16 +62,27 @@ public partial class Church
 		// the altar: on two steps, a block of white marble with a gilded front, a white cloth, a tall gold
 		// cross and two candlesticks on it
 		float az = ChancelEnd - 0.4f;
+		// (2026-10-15) the altar with its steps, cloth, cross and candlesticks, and the canopy over it, modelled in Blender
+		// (tools/Blender/church_props.py ch_high_altar, ch_baldachin); the code below is their fallback
+		var altarAt = new Transform3D(Basis.Identity, new Vector3(0, ChancelY, az));
+		bool altarModel = FurnitureKit.Add(k, "ch_high_altar", altarAt, new System.Collections.Generic.Dictionary<string, Material>()
+		{
+			["red"] = red, ["marble"] = ChurchTextures.MarbleMat, ["gold"] = ChurchTextures.GoldMat, ["cloth"] = LodgeParts.LodgeTextures.TableclothMat,
+			["wax"] = new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.9f, 0.82f), Roughness = 0.6f },
+		});
+		bool canopyModel = FurnitureKit.Add(k, "ch_baldachin", altarAt, new System.Collections.Generic.Dictionary<string, Material>() { ["gold"] = ChurchTextures.GoldMat });
+		Collide(_marbleBody, new Vector3(0, ChancelY + 0.18f, az), new Vector3(5.2f, 0.36f, 3.6f));
+		float ay = ChancelY + 0.36f;
+		Collide(_marbleBody, new Vector3(0, ay + 0.53f, az), new Vector3(3.4f, 1.06f, 1.35f));
+		if (!altarModel)
+		{
 		k.Mat(red);
 		BuildKit.Box(k, new Vector3(0, ChancelY + 0.09f, az), new Vector3(5.2f, 0.18f, 3.6f), 1f, BuildKit.Face.NY);
 		BuildKit.Box(k, new Vector3(0, ChancelY + 0.27f, az), new Vector3(4.4f, 0.18f, 2.8f), 1f, BuildKit.Face.NY);
-		Collide(_marbleBody, new Vector3(0, ChancelY + 0.18f, az), new Vector3(5.2f, 0.36f, 3.6f));
-		float ay = ChancelY + 0.36f;
 		k.Mat(ChurchTextures.MarbleMat);   // the altar itself is marble
 		k.Color = Colors.White;
 		BuildKit.Box(k, new Vector3(0, ay + 0.5f, az), new Vector3(3.2f, 1f, 1.2f), 1f, BuildKit.Face.NY);
 		BuildKit.Box(k, new Vector3(0, ay + 1.03f, az), new Vector3(3.4f, 0.06f, 1.35f), 1f);
-		Collide(_marbleBody, new Vector3(0, ay + 0.53f, az), new Vector3(3.4f, 1.06f, 1.35f));
 		k.Mat(ChurchTextures.GoldMat);
 		BuildKit.Box(k, new Vector3(0, ay + 0.5f, az - 0.61f), new Vector3(2.8f, 0.7f, 0.03f), 1f);
 		for (int i = 0; i < 5; i++)
@@ -94,6 +105,7 @@ public partial class Church
 		}
 		k.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.92f, 0.9f, 0.82f), Roughness = 0.6f });
 		foreach (float x in new[] { -1.2f, 1.2f }) k.Cylinder(new Vector3(x, ay + 1.67f, az + 0.1f), new Vector3(x, ay + 1.92f, az + 0.1f), 0.03f, 0.03f, 6, true);
+		}
 		// the canopy over it: four gilded columns, pointed arches on every side under steep gables, a
 		// pinnacle at each corner and a spire in the middle
 		k.Mat(ChurchTextures.GoldMat);
@@ -102,10 +114,11 @@ public partial class Church
 			foreach (float z in new[] { -cz, cz })
 			{
 				Vector3 b = new(x, ChancelY + 0.36f, az + z);
+				_stone.AddChild(new CollisionShape3D { Position = b + Vector3.Up * (ch * 0.5f), Shape = new CylinderShape3D { Radius = 0.26f, Height = ch } });
+				if (canopyModel) continue;
 				k.Cylinder(b, b + Vector3.Up * 0.3f, 0.26f, 0.22f, 8, true);
 				k.Cylinder(b + Vector3.Up * 0.3f, b + Vector3.Up * ch, 0.13f, 0.13f, 10, false);
 				k.Cylinder(b + Vector3.Up * ch, b + Vector3.Up * (ch + 0.25f), 0.2f, 0.26f, 8, true);
-				_stone.AddChild(new CollisionShape3D { Position = b + Vector3.Up * (ch * 0.5f), Shape = new CylinderShape3D { Radius = 0.26f, Height = ch } });
 				// its pinnacle
 				Vector3 p = b + Vector3.Up * (ch + 0.25f);
 				k.Box(p + Vector3.Up * 0.5f, new Vector3(0.36f, 1f, 0.36f));
@@ -113,6 +126,8 @@ public partial class Church
 			}
 		float cy = ChancelY + 0.36f + ch + 0.25f;
 		// the canopy's cornice, and on each face a pointed arch between the columns under a gable
+		if (!canopyModel)
+		{
 		foreach (var (a, b) in new[] { (new Vector3(-cx, cy, az - cz), new Vector3(cx, cy, az - cz)), (new Vector3(-cx, cy, az + cz), new Vector3(cx, cy, az + cz)), (new Vector3(-cx, cy, az - cz), new Vector3(-cx, cy, az + cz)), (new Vector3(cx, cy, az - cz), new Vector3(cx, cy, az + cz)) })
 		{
 			k.Beam(a, b, 0.3f, 0.35f);
@@ -134,7 +149,9 @@ public partial class Church
 		}
 		k.Box(new Vector3(0, cy + 0.2f, az), new Vector3(cx * 2f, 0.1f, cz * 2f));
 		k.Cylinder(new Vector3(0, cy, az), new Vector3(0, cy + 6.5f, az), 0.75f, 0.02f, 8, false, 1f, Mathf.Pi / 8f);
-		// choir stalls either side of the chancel
+		}
+		// choir stalls either side of the chancel (2026-10-15: modelled in Blender, church_props.py ch_choir_stall, the
+		// east run's; the west's turned round; the boxes are the fallback)
 		k.Mat(ChurchTextures.OakMat);
 		k.Color = Colors.White;
 		foreach (float s in new[] { -1f, 1f })
@@ -142,6 +159,12 @@ public partial class Church
 			for (int row = 0; row < 2; row++)
 			{
 				float x = s * (w - 0.5f - row * 1.05f), y = ChancelY + row * 0.25f;
+				if (FurnitureKit.Add(k, "ch_choir_stall", new Transform3D(new Basis(Vector3.Up, s > 0 ? 0f : Mathf.Pi), new Vector3(x, y, (CrossEnd + 2.8f + ChancelEnd - 3.2f) * 0.5f)),
+					new System.Collections.Generic.Dictionary<string, Material>() { ["oak"] = ChurchTextures.OakMat }))
+				{
+					Collide(_wood, new Vector3(x, y + 0.5f, (CrossEnd + 2.8f + ChancelEnd - 3.2f) * 0.5f), new Vector3(0.9f, 1f, ChancelEnd - CrossEnd - 6f));
+					continue;
+				}
 				BuildKit.Box(k, new Vector3(x, y + 0.13f, (CrossEnd + 2.8f + ChancelEnd - 3.2f) * 0.5f), new Vector3(0.9f, 0.26f, ChancelEnd - CrossEnd - 6f), 1f, BuildKit.Face.NY);
 				BuildKit.Box(k, new Vector3(x, y + 0.45f, (CrossEnd + 2.8f + ChancelEnd - 3.2f) * 0.5f), new Vector3(0.5f, 0.06f, ChancelEnd - CrossEnd - 6f), 1f);
 				BuildKit.Box(k, new Vector3(x + s * 0.28f, y + 0.9f, (CrossEnd + 2.8f + ChancelEnd - 3.2f) * 0.5f), new Vector3(0.06f, 0.9f, ChancelEnd - CrossEnd - 6f), 1f);
@@ -293,6 +316,9 @@ public partial class Church
 		_fontLid = new Node3D { Name = "FontLid", Position = at + Vector3.Up * 1.22f };
 		AddChild(_fontLid);
 		var l = new MeshKit();
+		// (2026-10-15) the lid, its straps, chain and padlock modelled in Blender (church_props.py ch_font_lid); the code its fallback
+		if (!FurnitureKit.Add(l, "ch_font_lid", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["oak"] = FixtureModels.Tint(ChurchTextures.OakMat, Colors.White * 0.9f), ["iron"] = ChurchTextures.IronMat }))
+		{
 		l.Mat(ChurchTextures.OakMat);
 		l.Color = Colors.White * 0.9f;
 		l.Cylinder(Vector3.Zero, Vector3.Up * 0.09f, 0.78f, 0.74f, 8, true, 1f, Mathf.Pi / 8f);
@@ -324,6 +350,7 @@ public partial class Church
 		}
 		l.BevelBox(new Vector3(0.74f, -0.15f, 0), new Vector3(0.1f, 0.11f, 0.045f), 0.012f);
 		ItemMeshes.Torus(l, new Vector3(0.74f, -0.085f, 0), Vector3.Back, 0.032f, 0.008f, 10, 4);
+		}
 		l.CommitTo(_fontLid, "Lid", true);
 		_fontUse = new PickupInteractable
 		{
