@@ -46,11 +46,114 @@ public partial class StationRoom1 : Node3D
 	private readonly List<List<Drip>> _drips = new();
 	private readonly List<Node3D> _puddleDecals = new();
 
+	/// <summary>
+	/// A run of paint-thick blood down a wall (2026-10-15, the scan: they were straight stretched decals, dozens to a
+	/// wall, that read as red neon). A strip mesh of its own: a blob where it leaves the letter, then a thin run that
+	/// wanders and kinks a little and swells and thins as it goes, ending in a heavier teardrop bead. Its shape is fixed
+	/// in metres down the wall, so growing it (<see cref="Set"/>) lengthens the run without stretching it. Dried: dark,
+	/// browned, matte, its edges soft.
+	/// </summary>
 	private sealed class Drip
 	{
-		public MeshInstance3D Run, Bead;
-		public Vector3 Top, N;
-		public float Len, Width;
+		public float Len { get; private set; }
+		public readonly float Final;
+		private readonly MeshInstance3D _mi;
+		private readonly ArrayMesh _mesh = new();
+		private readonly float _w, _a1, _f1, _p1, _a2, _f2, _p2, _f3, _p3, _drop, _shade;
+		private readonly (float at, float by)[] _kinks;
+		private static StandardMaterial3D _mat;
+
+		private static StandardMaterial3D Mat => _mat ??= new StandardMaterial3D
+		{
+			VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.82f, MetallicSpecular = 0.18f,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel,
+		};
+
+		public Drip(Node3D parent, Vector3 top, Vector3 n, float off, float width, float final, int seed, string name)
+		{
+			var r = new RandomNumberGenerator { Seed = (ulong)(uint)seed };
+			Final = final;
+			_w = width;
+			_a1 = r.RandfRange(0.0015f, 0.004f); _f1 = r.RandfRange(5f, 11f); _p1 = r.RandfRange(0f, 6.3f);
+			_a2 = r.RandfRange(0.0005f, 0.0015f); _f2 = r.RandfRange(23f, 41f); _p2 = r.RandfRange(0f, 6.3f);
+			_f3 = r.RandfRange(9f, 19f); _p3 = r.RandfRange(0f, 6.3f);
+			_drop = r.RandfRange(1.5f, 2.1f);
+			_shade = r.RandfRange(0.85f, 1.1f);
+			int k = r.RandiRange(0, 2);
+			_kinks = new (float, float)[k];
+			for (int i = 0; i < k; i++) _kinks[i] = (r.RandfRange(0.08f, Mathf.Max(0.1f, final - 0.05f)), r.RandfRange(-0.012f, 0.012f));
+			Vector3 right = Vector3.Up.Cross(n).Normalized();
+			_mi = new MeshInstance3D
+			{
+				Name = name, Mesh = _mesh, MaterialOverride = Mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+				Transform = new Transform3D(new Basis(right, Vector3.Up, n), top + n * off),
+			};
+			parent.AddChild(_mi);
+		}
+
+		private float Offset(float t)
+		{
+			float x = _a1 * Mathf.Sin(t * _f1 + _p1) + _a2 * Mathf.Sin(t * _f2 + _p2);
+			foreach (var (at, by) in _kinks) x += by * Mathf.SmoothStep(at, at + 0.035f, t);
+			return x;
+		}
+
+		/// <summary>Its half-width <paramref name="t"/> metres down a run <paramref name="len"/> long.</summary>
+		private float Half(float t, float len)
+		{
+			float hw = _w * 0.5f * (0.8f + 0.28f * Mathf.Sin(t * _f3 + _p3));
+			hw *= 1f + 0.9f * Mathf.Exp(-t / 0.018f);                       // the blob where it leaves the letter
+			float dl = Mathf.Min(len * 0.55f, _w * 4.2f);                    // the bead: swelling, then a round foot
+			float u = (t - (len - dl)) / Mathf.Max(dl, 1e-4f);
+			if (u > 0f)
+			{
+				float R = _w * 0.5f * _drop;
+				if (u < 0.62f) hw = Mathf.Lerp(hw * 0.85f, R, Mathf.SmoothStep(0f, 1f, u / 0.62f));
+				else { float v = (u - 0.62f) / 0.38f; hw = R * Mathf.Sqrt(Mathf.Max(0f, 1f - v * v)); }
+			}
+			return hw;
+		}
+
+		public void Set(float len)
+		{
+			Len = len = Mathf.Max(len, 0.012f);
+			var verts = new List<Vector3>();
+			var cols = new List<Color>();
+			var idx = new List<int>();
+			float dl = Mathf.Min(len * 0.55f, _w * 4.2f);
+			var ts = new List<float>();
+			for (float t = 0f; t < len - dl; t += 0.012f) ts.Add(t);
+			for (int i = 0; i <= 8; i++) ts.Add(len - dl + dl * i / 8f);
+			float[] across = { -1f, -0.45f, 0.45f, 1f };
+			float[] alpha = { 0f, 0.95f, 0.95f, 0f };
+			foreach (float t in ts)
+			{
+				float hw = Half(t, len), c = Offset(t);
+				float wet = Mathf.SmoothStep(len - dl * 1.2f, len - dl * 0.3f, t);   // the bead holds more, darker
+				var col = new Color(0.25f, 0.03f, 0.022f).Lerp(new Color(0.15f, 0.012f, 0.01f), wet * 0.9f) * (_shade * (0.92f + 0.12f * Mathf.Sin(t * 31f + _p2)));
+				for (int j = 0; j < 4; j++)
+				{
+					verts.Add(new Vector3(c + across[j] * hw, -t, wet * 0.0012f * (j is 1 or 2 ? 1f : 0f)));
+					cols.Add(new Color(col.R, col.G, col.B, alpha[j]));
+				}
+			}
+			for (int row = 0; row + 1 < ts.Count; row++)
+				for (int j = 0; j < 3; j++)
+				{
+					int a = row * 4 + j, b = a + 1, c = a + 4, d = a + 5;
+					idx.AddRange(new[] { a, b, c, b, d, c });   // (clockwise from the room: Godot's front)
+				}
+			var norms = new Vector3[verts.Count];
+			System.Array.Fill(norms, Vector3.Back);
+			var arr = new Godot.Collections.Array();
+			arr.Resize((int)Mesh.ArrayType.Max);
+			arr[(int)Mesh.ArrayType.Vertex] = verts.ToArray();
+			arr[(int)Mesh.ArrayType.Normal] = norms;
+			arr[(int)Mesh.ArrayType.Color] = cols.ToArray();
+			arr[(int)Mesh.ArrayType.Index] = idx.ToArray();
+			_mesh.ClearSurfaces();
+			_mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arr);
+		}
 	}
 
 	/// <summary>How each wall's words are broken over it: three lines, filling the wall.</summary>
@@ -173,9 +276,12 @@ public partial class StationRoom1 : Node3D
 		});
 
 		// the writing (the owner: scrawled over the whole wall): three huge, hurried lines to a wall, each a
-		// little crooked, with blood running from under the letters
-		var red = new Color(0.62f, 0.03f, 0.02f);
+		// little crooked, with blood running from under the letters. (2026-10-15, the scan: letter by letter now, each
+		// at its own lean, size and height, the brush's second pass off it, the red browned as old blood dries; and a
+		// few runs to a line, not a comb of them: see Drip)
+		var red = new Color(0.44f, 0.035f, 0.025f);
 		var rng = new RandomNumberGenerator { Seed = 1331 };
+		var drng = new RandomNumberGenerator { Seed = 1334 };
 		float[] lineY = { 2.42f, 1.52f, 0.66f };
 		for (int i = 0; i < 3; i++)
 		{
@@ -187,31 +293,62 @@ public partial class StationRoom1 : Node3D
 			AddChild(ghost);
 			var labels = new List<Label3D>();
 			var drips = new List<Drip>();
+			int reachFloor = 0;
 			for (int li = 0; li < 3; li++)
 			{
 				string line = Scrawls[i][li];
 				float target = line.Length <= 4 ? rng.RandfRange(3.0f, 3.8f) : rng.RandfRange(4.4f, 5.1f);
 				float px = Mathf.Max(1f, Scrawl.GetStringSize(line, HorizontalAlignment.Left, -1, 96).X);
 				float em = Mathf.Min(target * 96f / px, 1.15f);
-				float width = px * em / 96f;
 				float shift = rng.RandfRange(-0.25f, 0.25f);
 				var b = Basis.LookingAt(-n, Vector3.Up) * new Basis(Vector3.Back, rng.RandfRange(-0.07f, 0.07f));
 				Vector3 at = foot + n * 0.075f + right * shift + Vector3.Up * lineY[li];
-				labels.Add(Scrawled(wall, line, at, b, em, red));
-				// a second pass of the brush, a hair off the first: thick, smeared strokes
-				labels.Add(Scrawled(wall, line, at + n * 0.001f + right * em * 0.02f + Vector3.Down * em * 0.025f, b, em, new Color(0.45f, 0.02f, 0.015f, 0.6f)));
-				Scrawled(ghost, line, at - n * 0.002f, b, em, new Color(0.35f, 0.08f, 0.06f, 0.14f));
-				// drips from under the letters
-				int count = 3 + (int)(width * 1.4f);
+				// letter by letter: where each sits along the line (its centre, in metres) and its own jitter
+				var letters = new List<(string ch, float x, float y, float spin, float size)>();
+				for (int c = 0; c < line.Length; c++)
+				{
+					if (line[c] == ' ') continue;
+					float x0 = c == 0 ? 0f : Scrawl.GetStringSize(line[..c], HorizontalAlignment.Left, -1, 96).X;
+					float cw = Scrawl.GetStringSize(line[c].ToString(), HorizontalAlignment.Left, -1, 96).X;
+					letters.Add((line[c].ToString(), (x0 + cw * 0.5f - px * 0.5f) * em / 96f, rng.RandfRange(-0.035f, 0.035f) * em,
+						rng.RandfRange(-0.09f, 0.09f), rng.RandfRange(0.9f, 1.1f)));
+				}
+				foreach (var (ch, x, y, spin, size) in letters)
+				{
+					var lb = b * new Basis(Vector3.Back, spin);
+					Vector3 la = at + b * new Vector3(x, y, 0f);
+					labels.Add(Scrawled(wall, ch, la, lb, em * size, red));
+					// a second pass of the brush, a hair off the first: thick, smeared strokes
+					labels.Add(Scrawled(wall, ch, la + n * 0.001f + right * em * rng.RandfRange(0.01f, 0.03f) + Vector3.Down * em * rng.RandfRange(0.015f, 0.035f),
+						lb * new Basis(Vector3.Back, rng.RandfRange(-0.03f, 0.03f)), em * size * rng.RandfRange(0.97f, 1.04f), new Color(0.3f, 0.02f, 0.015f, 0.6f)));
+					Scrawled(ghost, ch, la - n * 0.002f, lb, em * size, new Color(0.3f, 0.07f, 0.05f, 0.14f));
+				}
+				// a few runs from under the letters (a line's worth of wet paint, not a comb): most short, one or two
+				// a wall going on to the skirting once the writing lets go
+				int count = li == 1 ? drng.RandiRange(1, 3) : drng.RandiRange(2, 4);
+				var used = new List<float>();
 				for (int d = 0; d < count; d++)
 				{
-					Vector3 top = at + right * rng.RandfRange(-width * 0.45f, width * 0.45f) + Vector3.Down * em * rng.RandfRange(0.22f, 0.34f);
+					var (_, lx, ly, _, lsize) = letters[drng.RandiRange(0, letters.Count - 1)];
+					float x = lx + drng.RandfRange(-0.18f, 0.18f) * em;
+					bool near = false;
+					foreach (var u in used) near |= Mathf.Abs(u - x) < 0.12f;
+					if (near) continue;
+					used.Add(x);
+					Vector3 top = at + b * new Vector3(x, ly - em * lsize * drng.RandfRange(0.2f, 0.3f), 0f);
 					top.Y = Mathf.Max(top.Y, 0.2f);
-					float len = Mathf.Min(rng.RandfRange(0.06f, 0.42f), top.Y - 0.05f);
-					var drip = new Drip { Top = top, N = n, Len = len, Width = rng.RandfRange(0.03f, 0.06f) };
-					drip.Run = StationProps.Decal(this, StationTextures.BloodDripMat, top, n, new Vector2(drip.Width, 1f), 0f, $"Drip{i}_{li}_{d}");
-					drip.Bead = StationProps.Decal(this, StationTextures.BloodMat, top, n, Vector2.One * drip.Width * 1.5f, rng.RandfRange(0, 3f), "Bead");
-					SetDrip(drip, len);
+					// where it can run to: the bottom line's down the panels to the skirting; the others stop on the dado
+					// rail (its nosing at 0.97 m) or short of it
+					float floorAt = li == 2 ? 0.14f : 0.985f;
+					float room = Mathf.Max(top.Y - floorAt, 0.02f);
+					float final;
+					if (li == 2 && reachFloor < 2 && drng.Randf() < 0.55f) { final = room; reachFloor++; }
+					else if (li != 2 && drng.Randf() < 0.3f) final = room;
+					else final = Mathf.Min(room, drng.RandfRange(0.12f, 0.75f) * (li == 0 ? 1.4f : 1f));
+					float start = Mathf.Min(drng.RandfRange(0.05f, 0.26f), final);
+					// the bottom line's runs stand just off the panel mouldings (12 mm proud); the rest lie on the paper
+					var drip = new Drip(this, top, n, li == 2 ? 0.009f : 0.002f, drng.RandfRange(0.022f, 0.042f), final, (int)drng.Randi(), $"Drip{i}_{li}_{d}");
+					drip.Set(start);
 					drips.Add(drip);
 				}
 			}
@@ -235,21 +372,12 @@ public partial class StationRoom1 : Node3D
 			_lid.Rotation = new Vector3(Mathf.DegToRad(-100f), 0, 0);
 			_boxUse.Enabled = false;
 			foreach (var w in _writing) w.Visible = false;
-			// the runs stay on the walls, all the way down to the pools
-			foreach (var wall in _drips) foreach (var d in wall) { SetDrip(d, d.Top.Y - 0.01f); d.Bead.Visible = false; }
+			// the runs stay on the walls as they stopped, dried
+			foreach (var wall in _drips) foreach (var d in wall) d.Set(d.Final);
 			foreach (var g in _ghosts) g.Visible = true;
 			foreach (var p in _puddleDecals) { p.Visible = true; p.Scale = Vector3.One; }
 		}
 		SetProcess(true);
-	}
-
-	/// <summary>A drip's run from its top down <paramref name="len"/> metres, the bead at its foot.</summary>
-	private static void SetDrip(Drip d, float len)
-	{
-		len = Mathf.Max(len, 0.01f);
-		d.Run.Scale = new Vector3(1f, len, 1f);
-		d.Run.Position = d.Top + d.N * 0.006f + Vector3.Down * len * 0.5f;
-		d.Bead.Position = d.Top + d.N * 0.007f + Vector3.Down * len;
 	}
 
 	private Label3D Scrawled(Node3D parent, string text, Vector3 at, Basis b, float em, Color c)
@@ -307,9 +435,10 @@ public partial class StationRoom1 : Node3D
 			tk.Box(pos, size, 3f);
 			_tapes[i] = tk.CommitTo(_box, $"Tape{i}", false);
 		}
-		Tape(0, new Vector3(-hw - 0.004f, hh * 1.4f, 0), new Vector3(0.012f, hh * 1.4f, hd * 1.9f));
-		Tape(1, new Vector3(hw + 0.004f, hh * 1.4f, 0), new Vector3(0.012f, hh * 1.4f, hd * 1.9f));
-		Tape(2, new Vector3(0, hh * 1.4f, hd + 0.006f), new Vector3(hw * 1.9f, hh * 1.4f, 0.012f));
+		// (their tops 4 mm over the lid's, not in its plane: they z-fought; the scan's clip audit, 2026-10-15)
+		Tape(0, new Vector3(-hw - 0.004f, hh * 1.4f + 0.002f, 0), new Vector3(0.012f, hh * 1.4f + 0.004f, hd * 1.9f));
+		Tape(1, new Vector3(hw + 0.004f, hh * 1.4f + 0.002f, 0), new Vector3(0.012f, hh * 1.4f + 0.004f, hd * 1.9f));
+		Tape(2, new Vector3(0, hh * 1.4f + 0.002f, hd + 0.006f), new Vector3(hw * 1.9f, hh * 1.4f + 0.004f, 0.012f));
 
 		var body = new StaticBody3D { Name = "BoxBody", CollisionLayer = 1, CollisionMask = 0 };
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, hh, 0), Shape = new BoxShape3D { Size = new Vector3(hw * 2f, hh * 2f, hd * 2f) } });
@@ -410,14 +539,13 @@ public partial class StationRoom1 : Node3D
 			var (foot, n) = Walls[i];
 			PlayOneShotAt("res://assets/audio/sfx/blood_drain_01.wav", foot + n * 0.3f + Vector3.Up * 1.2f, -3f, 0.8f + i * 0.08f, delay + 0.3f);
 			var tw = CreateTween().SetParallel();
-			// each run lets go and runs down to the floor, faster as it goes, its bead at its foot
+			// each run lets go and creeps on down the wall, its bead at its foot, slowing as its paint gives out
 			foreach (var d in _drips[i])
 			{
 				var drip = d;
-				float from = drip.Len, to = drip.Top.Y - 0.01f;
-				float start = delay + rng.RandfRange(0f, 1.8f), time = rng.RandfRange(1.6f, 3.6f) * Mathf.Sqrt(Mathf.Max(to, 0.1f) / 2f);
-				tw.TweenMethod(Callable.From<float>(len => SetDrip(drip, len)), from, to, time).SetDelay(start).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
-				tw.TweenCallback(Callable.From(() => drip.Bead.Visible = false)).SetDelay(start + time);
+				float from = drip.Len, to = drip.Final;
+				float start = delay + rng.RandfRange(0f, 1.8f), time = rng.RandfRange(1.6f, 3.6f) * Mathf.Sqrt(Mathf.Max(to - from, 0.1f) / 2f);
+				tw.TweenMethod(Callable.From<float>(drip.Set), from, to, time).SetDelay(start).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
 			}
 			// the words sag and slide down after them, stretching, and thin away
 			tw.TweenProperty(wall, "position:y", -0.9f, 5.5f).SetDelay(delay + 0.6f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);

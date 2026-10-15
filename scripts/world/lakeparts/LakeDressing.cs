@@ -39,7 +39,7 @@ public partial class LakeDressing : Node3D
 		_meshes["boulder"] = ForestScatter.BoulderMesh(21);
 		_meshes["log"] = ForestScatter.LogMesh();
 		_meshes["grass"] = ForestScatter.GrassMesh();
-		_meshes["reed"] = ReedMesh();
+		for (int v = 0; v < ReedVariants; v++) _meshes[$"reed{v}"] = ReedMesh(v, false);
 
 		ScatterTrees();
 		ScatterShoreline();
@@ -123,7 +123,7 @@ public partial class LakeDressing : Node3D
 			if (d > -2.6f && d < 0.8f && c > 0.05f && !nearDock && !farLanding)
 			{
 				float s = _rng.RandfRange(0.8f, 1.3f);
-				Add("reed", new Vector3(x, gy - 0.05f, z), new Basis(Vector3.Up, _rng.RandfRange(0, Mathf.Tau)).Scaled(new Vector3(s, s * _rng.RandfRange(0.8f, 1.35f), s)));
+				Add($"reed{ReedVariant(x, z)}", new Vector3(x, gy - 0.05f, z), new Basis(Vector3.Up, _rng.RandfRange(0, Mathf.Tau)).Scaled(new Vector3(s, s * _rng.RandfRange(0.8f, 1.35f), s)));
 				continue;
 			}
 			// grass tufts up the bank
@@ -213,36 +213,156 @@ public partial class LakeDressing : Node3D
 
 	// ------------------------------------------------------------------ meshes, commit, collision
 
-	/// <summary>Tall, thin reed/cattail cards (the grass texture stretched upward), a few seed heads.</summary>
-	private static Mesh ReedMesh()
+	/// <summary>How many shapes of each reed clump there are (picked by place, not by the scatter's dice).</summary>
+	public const int ReedVariants = 3;
+
+	/// <summary>Which of the clump shapes stands at (x, z).</summary>
+	public static int ReedVariant(float x, float z) => (int)(Mathf.Abs(Mathf.Sin(x * 12.9898f + z * 78.233f) * 43758.547f) % 1f * ReedVariants) % ReedVariants;
+
+	private static readonly Dictionary<bool, Texture2D> _reedTex = new();
+
+	/// <summary>
+	/// A reed bed's blades, drawn (2026-10-15, the scan: the reeds were the grass tuft stretched four times upward, black
+	/// cut-outs with a jagged, cactus-like edge, one clump everywhere): 128 x 512, thirty-odd thin tapered blades rising
+	/// from the foot, each its own height, lean and curve, olive green going to straw at the tips, some dead and pale all
+	/// through, a midrib down the wider ones, their edges anti-aliased; dark at the foot where they stand in the wet. The
+	/// short reeds carry a few bulrush heads, the tall ones feathery seed plumes. y = 0 is the tips (the shader sways by it).
+	/// </summary>
+	private static Texture2D ReedTex(bool tall)
+	{
+		if (_reedTex.TryGetValue(tall, out var t)) return t;
+		const int W = 128, H = 512;
+		var px = new Color[W * H];
+		var rng = new RandomNumberGenerator { Seed = tall ? 1225u : 1224u };
+		void Over(int x, int y, Color c, float a)
+		{
+			if (x < 0 || x >= W || y < 0 || y >= H || a <= 0.003f) return;
+			ref var d = ref px[y * W + x];
+			float oa = a + d.A * (1f - a);
+			if (oa <= 0f) return;
+			d = new Color((c.R * a + d.R * d.A * (1f - a)) / oa, (c.G * a + d.G * d.A * (1f - a)) / oa, (c.B * a + d.B * d.A * (1f - a)) / oa, oa);
+		}
+		int blades = tall ? 30 : 36;
+		var heads = new List<(float x, float y, float lean)>();
+		for (int b = 0; b < blades; b++)
+		{
+			float x0 = rng.RandfRange(10f, W - 10f);
+			float top = H * (1f - rng.RandfRange(tall ? 0.55f : 0.4f, 0.98f));   // the tip's row
+			float lean = rng.RandfRange(-22f, 22f), bow = rng.RandfRange(-10f, 10f);
+			float w0 = rng.RandfRange(1.3f, tall ? 2.6f : 3.2f);
+			bool dead = rng.Randf() < 0.28f;
+			var green = new Color(0.3f, 0.36f, 0.14f).Lerp(new Color(0.4f, 0.42f, 0.18f), rng.Randf());
+			var straw = new Color(0.5f, 0.45f, 0.29f) * rng.RandfRange(0.8f, 1.05f);
+			var foot = new Color(0.16f, 0.15f, 0.08f);
+			float dim = rng.RandfRange(0.75f, 1.05f);   // the ones behind a little darker
+			for (int y = (int)top; y < H; y++)
+			{
+				float u = (y - top) / (H - top);            // 0 at the tip .. 1 at the foot
+				float cx = x0 + lean * (1f - u) * (1f - u) + bow * Mathf.Sin(u * Mathf.Pi);
+				float hw = w0 * Mathf.Pow(Mathf.Clamp(u * 1.6f, 0f, 1f), 0.6f) * (0.55f + 0.45f * u);
+				Color c = dead ? straw.Lerp(foot, Mathf.SmoothStep(0.75f, 1f, u) * 0.6f)
+					: straw.Lerp(green, Mathf.SmoothStep(0.02f, 0.22f, u)).Lerp(foot, Mathf.SmoothStep(0.8f, 1f, u) * 0.7f);
+				c *= dim;
+				for (int x = (int)(cx - hw - 1.5f); x <= (int)(cx + hw + 1.5f); x++)
+				{
+					float dx = Mathf.Abs(x + 0.5f - cx);
+					float a = Mathf.Clamp(hw + 0.5f - dx, 0f, 1f);
+					// a lighter midrib down the wide ones, the edges a shade darker
+					var cc = hw > 1.6f && dx < 0.6f ? c * 1.15f : (dx > hw - 0.7f ? c * 0.85f : c);
+					Over(x, y, cc, a);
+				}
+			}
+			if (b % (tall ? 4 : 7) == 0) heads.Add((x0 + lean, top, lean));
+		}
+		foreach (var (hx, hy, lean) in heads)
+		{
+			if (tall)
+			{
+				// a feathery plume: a loose, drooping spray of fine light-brown seed hairs over the stem's tip
+				// (hairs, not dots: each a short drooping stroke off the stem's last hand-span)
+				float side = lean >= 0f ? 1f : -1f;
+				for (int s = 0; s < 26; s++)
+				{
+					float a = rng.RandfRange(0f, 1f);
+					float sx = hx + side * a * 6f, sy = hy - 6f + a * 40f;
+					float len = rng.RandfRange(8f, 18f), ang = rng.RandfRange(0.6f, 1.3f);
+					var col = new Color(0.4f, 0.33f, 0.27f) * rng.RandfRange(0.8f, 1.1f);
+					for (float q = 0f; q < len; q += 0.5f)
+					{
+						float qx = sx + side * Mathf.Cos(ang) * q, qy = sy + Mathf.Sin(ang) * q + q * q * 0.02f;
+						Over((int)qx, (int)qy, col, 0.75f * (1f - q / len * 0.5f));
+					}
+				}
+			}
+			else
+			{
+				// a bulrush head: a dark brown velvet cylinder a little under the tip, the bare spike above it
+				float y0 = hy + 26f, y1 = y0 + rng.RandfRange(26f, 38f);
+				for (int y = (int)y0; y < (int)y1; y++)
+				{
+					float u = (y - y0) / (y1 - y0), hw = 3.4f * Mathf.Sqrt(Mathf.Sin(u * Mathf.Pi));
+					float cx = hx - lean * ((y - hy) / H) * 2f;
+					for (int x = (int)(cx - hw - 1f); x <= (int)(cx + hw + 1f); x++)
+						Over(x, y, new Color(0.24f, 0.15f, 0.08f) * (0.85f + 0.3f * (1f - Mathf.Abs(x + 0.5f - cx) / (hw + 0.5f))), Mathf.Clamp(hw + 0.5f - Mathf.Abs(x + 0.5f - cx), 0f, 1f));
+				}
+			}
+		}
+		var img = Image.CreateEmpty(W, H, false, Image.Format.Rgba8);
+		for (int y = 0; y < H; y++)
+			for (int x = 0; x < W; x++)
+			{
+				var c = px[y * W + x];
+				// the colour bled out under the transparent edge, so the mips don't fringe dark
+				img.SetPixel(x, y, c.A > 0f ? c : new Color(0.3f, 0.32f, 0.16f, 0f));
+			}
+		img.GenerateMipmaps();
+		return _reedTex[tall] = ImageTexture.CreateFromImage(img);
+	}
+
+	/// <summary>A clump of reed (<paramref name="tall"/>: a bed's tall common reed): five to eight cards of the drawn blades
+	/// (<see cref="ReedTex"/>) crossed at uneven angles round the root, each its own width, height, lean and slice of the
+	/// texture, so no two clumps (and no two of a clump's faces) read the same. Lit from above, glowing a little when the
+	/// sky is behind them instead of going black.</summary>
+	public static Mesh ReedMesh(int variant, bool tall)
 	{
 		var k = new MeshKit();
-		var mat = (ShaderMaterial)ProcTextures.Cached("lake_reed", () =>
+		var mat = (ShaderMaterial)ProcTextures.Cached(tall ? "lake_reed_tall2" : "lake_reed2", () =>
 		{
 			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
 			DetailKit.Hook(m, DetailKit.Kind.Foliage);
-			m.SetShaderParameter("albedo_tex", ProcTextures.GrassTuft());
-			m.SetShaderParameter("tint", new Color(0.78f, 0.74f, 0.52f));
-			m.SetShaderParameter("sway", 0.09f);
-			m.SetShaderParameter("sway_speed", 0.9f);
+			m.SetShaderParameter("albedo_tex", ReedTex(tall));
+			m.SetShaderParameter("tex_size", new Vector2(128f, 512f));
+			m.SetShaderParameter("tint", new Color(0.92f, 0.95f, 0.85f));
+			m.SetShaderParameter("sway", tall ? 0.14f : 0.09f);
+			m.SetShaderParameter("sway_speed", tall ? 0.8f : 0.9f);
+			m.SetShaderParameter("normal_up", 0.45f);
+			m.SetShaderParameter("alpha_cut", 0.4f);
+			m.SetShaderParameter("translucency", 0.25f);
+			m.SetShaderParameter("inner_ao", 0.35f);
 			return m;
 		});
 		k.Mat(mat);
-		for (int i = 0; i < 4; i++)
+		var rng = new RandomNumberGenerator { Seed = (ulong)(1240 + variant * 17 + (tall ? 500 : 0)) };
+		int cards = rng.RandiRange(5, 8);
+		float a = rng.RandfRange(0f, Mathf.Pi);
+		for (int i = 0; i < cards; i++)
 		{
-			float a = Mathf.Pi * i / 4f + 0.2f;
-			Vector3 d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.3f;
-			Vector3 n = new Vector3(-d.Z, 0.4f, d.X).Normalized();
-			float h = 1.3f + 0.25f * (i % 2);
-			k.Quad(-d, d, d * 1.3f + new Vector3(0, h, 0), -d * 1.3f + new Vector3(0, h, 0), n,
-				new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0));
-		}
-		k.Mat(ProcTextures.BarkMat);
-		k.Color = new Color(0.35f, 0.24f, 0.16f);
-		foreach (var p in new[] { new Vector3(0.08f, 0, 0.05f), new Vector3(-0.12f, 0, -0.06f) })
-		{
-			k.Cylinder(p, p + new Vector3(0.02f, 1.35f, 0), 0.008f, 0.006f, 3, false);
-			k.Cylinder(p + new Vector3(0.02f, 1.35f, 0), p + new Vector3(0.025f, 1.58f, 0), 0.028f, 0.024f, 5, true);
+			a += Mathf.Pi / cards * rng.RandfRange(0.5f, 1.5f);
+			float half = (tall ? 0.42f : 0.28f) * rng.RandfRange(0.65f, 1.25f);
+			float h = (tall ? 2.6f : 1.45f) * rng.RandfRange(0.7f, 1.15f);
+			var off = new Vector3(rng.RandfRange(-0.12f, 0.12f), 0, rng.RandfRange(-0.12f, 0.12f)) * (tall ? 1.6f : 1f);
+			Vector3 d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * half;
+			Vector3 n = new Vector3(-d.Z, 0f, d.X).Normalized();
+			Vector3 leanTo = n * rng.RandfRange(-0.18f, 0.18f) * h;
+			// a slice of the texture's width, at its own place
+			float uw = rng.RandfRange(0.45f, 0.8f), u0 = rng.RandfRange(0f, 1f - uw);
+			bool flip = rng.Randf() < 0.5f;
+			float ua = flip ? u0 + uw : u0, ub = flip ? u0 : u0 + uw;
+			float l = rng.RandfRange(0.82f, 1.12f);
+			k.Color = new Color(l, l, l * rng.RandfRange(0.92f, 1.05f));
+			Vector3 top = Vector3.Up * h + leanTo;
+			k.Quad(off - d, off + d, off + d * 1.25f + top, off - d * 1.25f + top, (n + Vector3.Up * 0.3f).Normalized(),
+				new Vector2(ua, 1), new Vector2(ub, 1), new Vector2(ub, 0), new Vector2(ua, 0));
 		}
 		return k.Commit();
 	}
@@ -259,7 +379,7 @@ public partial class LakeDressing : Node3D
 	{
 		foreach (var (meshKey, byChunk) in _inst)
 		{
-			bool small = meshKey is "grass" or "reed" or "wrack" or "marsh_mat" or "drift" or "rootwad";
+			bool small = meshKey is "grass" or "wrack" or "marsh_mat" or "drift" or "rootwad" || (meshKey.StartsWith("reed") && !meshKey.StartsWith("reed_tall"));
 			foreach (var (key, list) in byChunk)
 			{
 				var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = _meshes[meshKey], InstanceCount = list.Count };

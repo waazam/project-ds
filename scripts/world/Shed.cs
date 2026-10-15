@@ -437,11 +437,15 @@ public partial class Shed : Node3D
 			["label"] = BuildingTextures.Plain("b_label", new Color(0.55f, 0.5f, 0.4f)), ["paper"] = BuildingTextures.Plain("b_label", new Color(0.55f, 0.5f, 0.4f)),
 			["*"] = BuildingTextures.Plain("s_tin2", new Color(0.44f, 0.38f, 0.28f), 0.45f),
 		};
+		var sr = new RandomNumberGenerator { Seed = 5071 };
 		for (int i = 0; i < 5; i++)
 		{
 			float z = -0.35f + i * 0.2f + rng.RandfRange(-0.03f, 0.03f);
 			float y = i < 3 ? 1.215f : 1.635f;
-			if (FurnitureKit.Add(small, i % 2 == 0 ? "jar" : "tin", new Vector3(sx, y, z), i * 1.7f, jroles)) continue;
+			// (2026-10-15, the scan: jar, tin, jar in a line at one depth: their own kinds, depths and turns now, one taken)
+			if (i == 1) continue;
+			string kind = i is 0 or 3 or 4 ? "jar" : "tin";
+			if (FurnitureKit.Add(small, kind, new Vector3(sx + sr.RandfRange(-0.05f, 0.03f), y, z + sr.RandfRange(-0.04f, 0.04f)), sr.RandfRange(0f, Mathf.Tau), jroles)) continue;
 			small.Mat(BuildingTextures.Plain(i % 2 == 0 ? "s_jar" : "s_tin2", i % 2 == 0 ? new Color(0.3f, 0.34f, 0.28f) : new Color(0.44f, 0.38f, 0.28f), 0.45f));
 			small.Color = Colors.White;
 			small.Cylinder(new Vector3(sx, y, z), new Vector3(sx, y + rng.RandfRange(0.1f, 0.18f), z), 0.05f, 0.05f, 10, true);

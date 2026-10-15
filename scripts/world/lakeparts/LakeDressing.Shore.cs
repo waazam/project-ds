@@ -41,7 +41,7 @@ public partial class LakeDressing
 		_meshes["cypress_a"] = CypressMesh(1, 13f);
 		_meshes["cypress_b"] = CypressMesh(2, 17f);
 		_meshes["cypress_c"] = CypressMesh(3, 10f);
-		_meshes["reed_tall"] = TallReedMesh();
+		for (int v = 0; v < ReedVariants; v++) _meshes[$"reed_tall{v}"] = ReedMesh(v, true);
 		_meshes["marsh_mat"] = MarshMatMesh();
 		_meshes["wrack"] = WrackMesh();
 		_meshes["drift"] = DriftMesh(5);
@@ -77,7 +77,7 @@ public partial class LakeDressing
 			{
 				float s = rng.RandfRange(0.8f, 1.25f);
 				ReedBedCount++;
-				Add("reed_tall", new Vector3(x, gy - 0.05f, z), new Basis(Vector3.Up, rng.RandfRange(0, Mathf.Tau)).Scaled(new Vector3(s, s * rng.RandfRange(0.85f, 1.2f), s)));
+				Add($"reed_tall{ReedVariant(x, z)}", new Vector3(x, gy - 0.05f, z), new Basis(Vector3.Up, rng.RandfRange(0, Mathf.Tau)).Scaled(new Vector3(s, s * rng.RandfRange(0.85f, 1.2f), s)));
 			}
 			else if (c < -0.35f && d > -4.5f && d < -0.3f && rng.Randf() < 0.35f)
 			{
@@ -95,10 +95,12 @@ public partial class LakeDressing
 			if (NearLanding(p) && rng.Randf() < 0.5f) continue;
 			float gy = LakeShape.Ground(p.X, p.Y);
 			var tang = new Vector3(Mathf.Cos(th), 0, -Mathf.Sin(th));
-			var basis = Basis.LookingAt(tang, Vector3.Up) * new Basis(Vector3.Up, rng.RandfRange(-0.4f, 0.4f));
+			// (2026-10-15, the scan: along the near shore's straight run they all lay one way, one size: turned more, some
+			// end for end, sized and heaped each its own)
+			var basis = Basis.LookingAt(tang, Vector3.Up) * new Basis(Vector3.Up, rng.RandfRange(-0.6f, 0.6f) + (rng.Randf() < 0.5f ? Mathf.Pi : 0f));
 			float s = rng.RandfRange(0.8f, 1.4f);
 			WrackCount++;
-			Add("wrack", new Vector3(p.X, gy + 0.012f, p.Y), basis.Scaled(new Vector3(s, 1f, s * rng.RandfRange(0.7f, 1.1f))));
+			Add("wrack", new Vector3(p.X, gy + 0.012f, p.Y), basis * Basis.FromScale(new Vector3(s * rng.RandfRange(0.75f, 1.2f), rng.RandfRange(0.7f, 1.4f), s * rng.RandfRange(0.65f, 1.15f))));
 			if (rng.Randf() < 0.07f)
 				Add(rng.Randf() < 0.65f ? "drift" : "rootwad", new Vector3(p.X, gy - 0.02f, p.Y),
 					new Basis(Vector3.Up, rng.RandfRange(0, Mathf.Tau)).Scaled(Vector3.One * rng.RandfRange(0.7f, 1.3f)));
@@ -202,50 +204,6 @@ public partial class LakeDressing
 			m.SetShaderParameter("translucency", 0.45f);
 			return _cypressFoliage = m;
 		}
-	}
-
-	/// <summary>Tall reed: a dense stand of thin stems, crossed cards higher than a man, gone gold at their tops, plumes.</summary>
-	private static Mesh TallReedMesh()
-	{
-		var k = new MeshKit();
-		var mat = (ShaderMaterial)ProcTextures.Cached("lake_reed_tall", () =>
-		{
-			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
-			DetailKit.Hook(m, DetailKit.Kind.Foliage);
-			m.SetShaderParameter("albedo_tex", ProcTextures.GrassTuft());
-			m.SetShaderParameter("tint", new Color(0.62f, 0.68f, 0.36f));
-			m.SetShaderParameter("sway", 0.14f);
-			m.SetShaderParameter("sway_speed", 0.8f);
-			m.SetShaderParameter("normal_up", 0.35f);
-			return m;
-		});
-		k.Mat(mat);
-		for (int i = 0; i < 6; i++)
-		{
-			float a = Mathf.Pi * i / 6f + 0.13f;
-			Vector3 d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.45f;
-			Vector3 n = new Vector3(-d.Z, 0.3f, d.X).Normalized();
-			float h = 2.3f + 0.4f * (i % 3) * 0.5f;
-			// lower half green, upper half gold (vertex colour over the tint)
-			k.Color = new Color(0.85f, 0.9f, 0.7f);
-			k.Quad(-d, d, d * 1.15f + new Vector3(0, h * 0.5f, 0), -d * 1.15f + new Vector3(0, h * 0.5f, 0), n,
-				new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0.5f), new Vector2(0, 0.5f));
-			k.Color = new Color(1.35f, 1.15f, 0.7f);
-			k.Quad(-d * 1.15f + new Vector3(0, h * 0.5f, 0), d * 1.15f + new Vector3(0, h * 0.5f, 0), d * 1.3f + new Vector3(0, h, 0), -d * 1.3f + new Vector3(0, h, 0), n,
-				new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0), new Vector2(0, 0));
-		}
-		// plumes
-		k.Mat(ProcTextures.BarkMat);
-		k.Color = new Color(0.42f, 0.32f, 0.22f);
-		var rng = new RandomNumberGenerator { Seed = 4721 };
-		for (int i = 0; i < 7; i++)
-		{
-			var p = new Vector3(rng.RandfRange(-0.4f, 0.4f), 0, rng.RandfRange(-0.4f, 0.4f));
-			float h = rng.RandfRange(2.3f, 2.8f);
-			k.Cylinder(p, p + new Vector3(0.03f, h, 0), 0.009f, 0.006f, 3, false);
-			k.Cylinder(p + new Vector3(0.03f, h, 0), p + new Vector3(0.12f, h + 0.32f, 0.04f), 0.035f, 0.01f, 4, false);
-		}
-		return k.Commit();
 	}
 
 	/// <summary>A mat of marsh grass lying out over the water: blades fanning out from a root, bent down so the tips

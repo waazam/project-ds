@@ -9,6 +9,8 @@
 // - power: 1 = on; tweening to 0 collapses the picture to a bright line, then
 //   black glass, like a real tube switching off (and back the other way).
 // - COLOR.r: per-screen seed so screens don't snow in lockstep.
+// - COLOR.b: the set's own state (2026-10-15, the scan: every set alike, all bright): 0 = working, up to 0.5 = a
+//   weaker tube (dimmer, down to 0.4), 0.5-0.85 = dead (black glass), over 0.85 = its glass cracked in a star (and on).
 shader_type spatial;
 render_mode unshaded, cull_back;
 
@@ -66,5 +68,19 @@ void fragment() {
 	float on = inside * step(0.002, power);
 	float flash = 1.0 + (1.0 - power) * 2.5;
 	vec3 glass = vec3(0.010, 0.012, 0.014) + vec3(0.03) * (1.0 - smoothstep(0.0, 0.35, length(c - vec2(-0.2, -0.22))));
-	ALBEDO = glass + col * on * brightness * flash;
+	float state = COLOR.b;
+	float dead = step(0.5, state) * step(state, 0.85);
+	float weak = 1.0 - clamp(state, 0.0, 0.5) * 1.2 * (1.0 - step(0.5, state));
+	// a star crack in the glass: rays out from a point off the middle, and a ring round it
+	float crack = 0.0;
+	if (state > 0.85) {
+		vec2 p0 = (vec2(hash(vec2(seed * 977.0, 3.0)), hash(vec2(seed * 641.0, 7.0))) - 0.5) * 0.5;
+		vec2 d = c - p0;
+		float r = length(d);
+		float a = atan(d.y, d.x) / 6.2831 * 9.0 + seed * 3.0;
+		float ray = abs(fract(a) - 0.5) * 6.2831 / 9.0 * r;
+		float reach = 0.18 + 0.3 * hash(vec2(floor(a), seed * 211.0));
+		crack = (1.0 - smoothstep(0.0015, 0.004, ray)) * step(r, reach) + (1.0 - smoothstep(0.0, 0.003, abs(r - 0.07))) * 0.7;
+	}
+	ALBEDO = glass + col * on * brightness * flash * weak * (1.0 - dead) + vec3(0.16) * clamp(crack, 0.0, 1.0);
 }

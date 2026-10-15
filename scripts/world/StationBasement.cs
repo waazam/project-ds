@@ -499,7 +499,9 @@ public partial class StationBasement : Node3D
 		foreach (var (node, home, _) in _debris)
 		{
 			Vector2 toward = (Drain - new Vector2(home.X, home.Z)) * rng.RandfRange(0.3f, 0.7f);
-			node.Position = new Vector3(home.X + toward.X, Floor + 0.03f, home.Z + toward.Y);
+			// (on the floor by its own underside: the papers lay 3 cm up in the air, the planks a centimetre; 2026-10-15)
+			float under = node.GetNodeOrNull<MeshInstance3D>("Mesh")?.GetAabb().Position.Y ?? -0.03f;
+			node.Position = new Vector3(home.X + toward.X, Floor - under + 0.002f, home.Z + toward.Y);
 			node.Rotation = new Vector3(0, rng.RandfRange(0, Mathf.Tau), 0);
 		}
 		if (StoryManager.Instance?.HasFlag(StoryManager.Flag.StationEyeTaken) != true)
@@ -590,11 +592,11 @@ public partial class StationBasement : Node3D
 		PlayOneShot("res://assets/audio/sfx/drain_gurgle_01.wav", drainW, 2f, 1f);
 		var rig = player.CameraRig;
 		float startY = _water.Position.Y;
-		var starts = new List<(Node3D n, Vector3 p, float ang, float r)>();
+		var starts = new List<(Node3D n, Vector3 p, float ang, float r, float under)>();
 		foreach (var (node, _, _) in _debris)
 		{
 			Vector2 d = new Vector2(node.Position.X, node.Position.Z) - Drain;
-			starts.Add((node, node.Position, Mathf.Atan2(d.Y, d.X), d.Length()));
+			starts.Add((node, node.Position, Mathf.Atan2(d.Y, d.X), d.Length(), node.GetNodeOrNull<MeshInstance3D>("Mesh")?.GetAabb().Position.Y ?? -0.03f));
 		}
 		double t = 0;
 		bool eyeIn = false;
@@ -608,11 +610,13 @@ public partial class StationBasement : Node3D
 			float level = Mathf.Lerp(startY, Floor + 0.01f, Mathf.SmoothStep(0.1f, 1f, u));
 			_water.Position = _water.Position with { Y = level };
 			// debris: round and in, lower with the water
-			foreach (var (n, p, ang, r) in starts)
+			foreach (var (n, p, ang, r, under) in starts)
 			{
 				float rr = r * (1f - 0.75f * Mathf.SmoothStep(0.1f, 1f, u));
 				float a = ang + u * u * 9f / (0.4f + rr * 0.3f);
-				n.Position = new Vector3(Drain.X + Mathf.Cos(a) * rr, Mathf.Max(level, Floor + 0.03f), Drain.Y + Mathf.Sin(a) * rr);
+				// (settling on the floor by its underside, level: 2026-10-15)
+				n.Position = new Vector3(Drain.X + Mathf.Cos(a) * rr, Mathf.Max(level, Floor - under + 0.002f), Drain.Y + Mathf.Sin(a) * rr);
+				if (level < Floor - under + 0.01f) n.Rotation = n.Rotation with { X = 0f, Z = 0f };
 				n.RotateY(dt * 2f * (1f - rr / Mathf.Max(r, 0.01f)));
 			}
 			// the eye comes round in the last of it
@@ -745,15 +749,21 @@ public partial class StationBasement : Node3D
 			var pk = new MeshKit();
 			pk.Mat(BuildingTextures.BoardsMat);
 			pk.Color = new Color(0.18f, 0.11f, 0.08f);
-			pk.Box(Vector3.Zero, new Vector3(rng.RandfRange(0.12f, 0.4f), rng.RandfRange(0.08f, 0.3f), rng.RandfRange(0.03f, 0.08f)), 1.5f);
+			float thick = rng.RandfRange(0.03f, 0.08f);
+			pk.Box(Vector3.Zero, new Vector3(rng.RandfRange(0.12f, 0.4f), rng.RandfRange(0.08f, 0.3f), thick), 1.5f);
 			pk.Color = Colors.White;
 			var mi = pk.CommitTo(frag, $"Piece{i}", false);
-			Vector3 dest = new Vector3(rng.RandfRange(-1.4f, 1.4f), 0.05f, rng.RandfRange(-0.2f, 1.6f));
-			if (!live) { mi.Position = dest; mi.Rotation = new Vector3(rng.RandfRange(-3f, 3f), rng.RandfRange(-3f, 3f), 0); continue; }
+			// (2026-10-15, the scan: they were flung 1.4 m either way from a clock standing in the corner, a third of them into
+			// the walls, and lay at any angle half through the floor. Out into the room now, flat on the floor, never on the key.)
+			Vector3 dest = new Vector3(rng.RandfRange(-0.2f, 1.6f), thick * 0.5f + 0.004f, rng.RandfRange(-0.25f, 1.6f));
+			if (new Vector2(dest.X - 1.3f, dest.Z - 1.2f).Length() < 0.35f) dest += new Vector3(0.4f, 0, -0.45f);
+			var lie = new Vector3(Mathf.Pi * 0.5f * (rng.Randf() < 0.5f ? 1f : -1f) + rng.RandfRange(-0.04f, 0.04f), rng.RandfRange(-3f, 3f), rng.RandfRange(-0.04f, 0.04f));
+			dest.Y += 0.009f;   // (the slight tilt's low corner on the floor, not in it)
+			if (!live) { mi.Position = dest; mi.Rotation = new Vector3(lie.X, lie.Y, lie.Z); continue; }
 			mi.Position = new Vector3(rng.RandfRange(-0.2f, 0.2f), rng.RandfRange(0.4f, 1.9f), 0);
 			var tw = CreateTween().SetParallel();
 			tw.TweenProperty(mi, "position", dest, rng.RandfRange(0.45f, 0.8f)).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
-			tw.TweenProperty(mi, "rotation", new Vector3(rng.RandfRange(-6f, 6f), rng.RandfRange(-6f, 6f), rng.RandfRange(-6f, 6f)), 0.7f);
+			tw.TweenProperty(mi, "rotation", lie + new Vector3(Mathf.Tau * rng.RandiRange(-1, 1), Mathf.Tau * rng.RandiRange(-1, 1), 0f), 0.7f);   // (tumbling, and down flat)
 		}
 		// the key, clear of the wreck, out on the floor toward the room
 		// (on the floor itself: it lay 10 cm over it once the flat stone that came with every key was gone; the pickup audit)

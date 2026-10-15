@@ -104,7 +104,17 @@ public partial class Cabin
 		if (modelled)
 		{
 			// the modelled jars and tins, a row of books, a mug on the stove's top, boots by the door, a coat on a peg
-			for (int i = 0; i < 4; i++) FurnitureKit.Add(small, i % 2 == 0 ? "jar" : "tin", new Vector3(shx - 0.02f, 1.065f, shz0 + 0.15f + i * 0.14f), i * 1.3f, roles);
+			// (2026-10-15, the scan: jar, tin, jar, tin, 14 cm apart in a line; now set down as they were last put back:
+			// uneven gaps, a gap where one was taken, some pushed to the back, turned any way)
+			var jr = new RandomNumberGenerator { Seed = 5063 };
+			string[] kinds = { "jar", "jar", "tin", "jar", "tin" };
+			float jz = shz0 + 0.1f;
+			for (int i = 0; i < kinds.Length && jz < shz0 + 0.72f; i++)
+			{
+				if (i == 2) { jz += 0.13f; continue; }   // (the one taken)
+				FurnitureKit.Add(small, kinds[(i + 1) % kinds.Length], new Vector3(shx - 0.02f + jr.RandfRange(-0.04f, 0.03f), 1.065f, jz), jr.RandfRange(0f, Mathf.Tau), roles);
+				jz += jr.RandfRange(0.1f, 0.17f);
+			}
 			FurnitureKit.Add(small, "books_row_b", new Vector3(shx - 0.01f, 1.515f, shz0 + 0.85f), Mathf.Pi * 0.5f, roles);
 			FurnitureKit.Add(small, "tin", new Vector3(shx - 0.02f, 1.515f, shz0 + 0.2f), 0.4f, roles);
 			FurnitureKit.Add(small, "mug", new Vector3(sx + 0.12f, 0.765f, sz + 0.18f), 2.2f, roles);

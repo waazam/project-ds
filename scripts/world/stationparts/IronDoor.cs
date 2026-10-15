@@ -205,17 +205,30 @@ public partial class IronDoor : Node3D
 			Vector3 at = new(rng.RandfRange(-0.4f, 0.4f), 1.3f + rng.RandfRange(-0.2f, 0.25f), -0.12f - i * 0.05f);
 			World.WebKit.Card(_web, i % 3 == 1 ? World.WebKit.Kind.Sheet : World.WebKit.Kind.Tangle, rng, at, Vector3.Forward, new Vector2(3.2f, 2.8f) * rng.RandfRange(0.9f, 1.15f), rng.RandfRange(0, 3f));
 		}
-		var sheet = StationProps.Decal(_web, StationTextures.Flat("st_websheet", new Color(0.55f, 0.54f, 0.5f), 1f, 0.05f), new Vector3(0, 1.25f, -0.06f), Vector3.Forward, new Vector2(2.5f, 2.6f));
-		sheet.Transparency = 0.25f;
-		// strands out to the walls and down to the desk's corner
+		// (2026-10-15, the scan: behind the cards hung a flat grey rectangle, 2.5 x 2.6, that read as a sheet of cloth in the
+		// middle of the room. Now the mass of old silk is a sagging drape of its own: an irregular, ragged outline, thick and
+		// grey with dust in its belly, thinning to strands at its edges, bellied out toward the room and slack at the foot;
+		// its edges pulled out to the ceiling, the walls and the desk by guy lines.)
+		BuildSilk(_web, rng);
+		// strands out to the walls, up to the ceiling and down to the desk's corner, from the web's edge
 		var k = new MeshKit();
-		k.Mat(StationTextures.Flat("st_strand", new Color(0.8f, 0.8f, 0.76f), 1f, 0.05f));
+		k.Mat(StationTextures.Flat("st_strand", new Color(0.7f, 0.7f, 0.66f), 1f, 0.05f));
 		k.Color = Colors.White;
-		for (int i = 0; i < 16; i++)
+		for (int i = 0; i < 22; i++)
 		{
-			Vector3 a = new(rng.RandfRange(-1f, 1f), rng.RandfRange(0.5f, 2.3f), -0.15f);
-			Vector3 b = a + new Vector3(rng.RandfRange(-1.4f, 1.4f), rng.RandfRange(-0.6f, 0.8f), rng.RandfRange(-0.9f, -0.2f));
-			k.Cylinder(a, b, 0.002f, 0.002f, 3, false);
+			float t = rng.RandfRange(0f, Mathf.Tau);
+			Vector3 a = new(Mathf.Cos(t) * rng.RandfRange(0.8f, 1.25f), 1.3f + Mathf.Sin(t) * rng.RandfRange(0.9f, 1.25f), -0.18f);
+			Vector3 b = (i % 3) switch
+			{
+				0 => new Vector3(a.X + rng.RandfRange(-0.6f, 0.6f), 3.17f, rng.RandfRange(-0.9f, -0.1f)),          // the ceiling
+				1 => new Vector3(Mathf.Sign(a.X) * rng.RandfRange(1.5f, 2.6f), a.Y + rng.RandfRange(-0.5f, 0.5f), -0.02f),   // along the back wall
+				_ => a + new Vector3(rng.RandfRange(-1.2f, 1.2f), rng.RandfRange(-0.6f, 0.5f), rng.RandfRange(-0.9f, -0.3f)),
+			};
+			b.Y = Mathf.Clamp(b.Y, 0.05f, 3.17f);
+			// a little slack in each, sagging at its middle
+			Vector3 mid = (a + b) * 0.5f + Vector3.Down * a.DistanceTo(b) * rng.RandfRange(0.02f, 0.07f);
+			k.Cylinder(a, mid, 0.0018f, 0.0015f, 3, false);
+			k.Cylinder(mid, b, 0.0015f, 0.0018f, 3, false);
 		}
 		k.CommitTo(_web, "Strands", false);
 		// and its maker, dead in the middle of it
@@ -236,10 +249,118 @@ public partial class IronDoor : Node3D
 		_webUse = new PickupInteractable
 		{
 			Name = "WebUse", Prompt = "Thick with web", PickRadius = 0.9f, MaxDistance = 3.2f, Position = new Vector3(0, 1.3f, -0.3f), Outline = true,   // (the web is the thing, not the door)
+			// (2026-10-15: drawn round the web's own ragged shape; it had found the door's leaf behind it, a lit rectangle through the silk)
+			OutlineProxy = SilkOutline(), OutlineProxyAt = new Transform3D(Basis.Identity, new Vector3(0, 0.1f, 0.02f)),
 			PromptFor = p => p?.Inventory is { } inv && inv.HasTool(ToolKind.Lighter) ? "Burn the web" : "Thick with web. It won't tear.",
 		};
 		_webUse.Interacted += OnWebUsed;
 		AddChild(_webUse);
+	}
+
+	private static Texture2D _silkTex;
+
+	/// <summary>Dense old web, 256 px: an irregular, lobed outline that frays into loose strands; inside it a felt of fine
+	/// threads running every way (more of them across than up), grey with dust in its middle.</summary>
+	private static Texture2D SilkTex()
+	{
+		if (_silkTex != null) return _silkTex;
+		const int S = 256;
+		var rng = new RandomNumberGenerator { Seed = 3133 };
+		var a = new float[S * S];
+		// the threads: hundreds of slightly curved strokes, most near the middle
+		for (int i = 0; i < 900; i++)
+		{
+			float r = Mathf.Sqrt(rng.Randf()) * 0.62f, th = rng.RandfRange(0f, Mathf.Tau);
+			float cx = S * (0.5f + Mathf.Cos(th) * r), cy = S * (0.5f + Mathf.Sin(th) * r);
+			float ang = rng.Randf() < 0.6f ? rng.RandfRange(-0.5f, 0.5f) : rng.RandfRange(0f, Mathf.Pi);
+			float len = rng.RandfRange(20f, 90f), bend = rng.RandfRange(-0.008f, 0.008f), str = rng.RandfRange(0.12f, 0.4f);
+			for (float t = -len * 0.5f; t < len * 0.5f; t += 0.7f)
+			{
+				float aa = ang + bend * t;
+				int x = (int)(cx + Mathf.Cos(aa) * t), y = (int)(cy + Mathf.Sin(aa) * t);
+				if (x < 0 || y < 0 || x >= S || y >= S) continue;
+				a[y * S + x] = Mathf.Min(1f, a[y * S + x] + str);
+			}
+		}
+		var img = Image.CreateEmpty(S, S, false, Image.Format.Rgba8);
+		for (int y = 0; y < S; y++)
+			for (int x = 0; x < S; x++)
+			{
+				float dx = (x - S * 0.5f) / (S * 0.5f), dy = (y - S * 0.5f) / (S * 0.5f);
+				float r = Mathf.Sqrt(dx * dx + dy * dy), th = Mathf.Atan2(dy, dx);
+				// the ragged outline: lobes and notches round it
+				float edge = 0.78f + 0.09f * Mathf.Sin(th * 3f + 0.7f) + 0.06f * Mathf.Sin(th * 7f + 2.1f) + 0.04f * Mathf.Sin(th * 13f);
+				float body = Mathf.SmoothStep(edge, edge - 0.3f, r);
+				// the felt: a dusty haze in the belly, the threads over it
+				float haze = body * 0.55f * Mathf.SmoothStep(edge, 0.1f, r);
+				float al = Mathf.Clamp(haze + a[y * S + x] * Mathf.SmoothStep(edge + 0.18f, edge - 0.1f, r), 0f, 0.92f);
+				float dust = Mathf.SmoothStep(0.7f, 0f, r);
+				var c = new Color(0.66f, 0.65f, 0.6f).Lerp(new Color(0.46f, 0.44f, 0.39f), dust * 0.7f);
+				img.SetPixel(x, y, new Color(c.R, c.G, c.B, al));
+			}
+		img.GenerateMipmaps();
+		return _silkTex = ImageTexture.CreateFromImage(img);
+	}
+
+	/// <summary>The web's outline for its white line: a flat lobed disc the size of the silk's thick part (both faces).</summary>
+	private static Mesh SilkOutline()
+	{
+		var st = new SurfaceTool();
+		st.Begin(Mesh.PrimitiveType.Triangles);
+		const int N = 28;
+		Vector3 R(int i)
+		{
+			float th = Mathf.Tau * i / N;
+			float r = 0.88f + 0.09f * Mathf.Sin(th * 3f + 0.7f) + 0.06f * Mathf.Sin(th * 7f + 2.1f);
+			return new Vector3(Mathf.Cos(th) * 1.3f * r, -Mathf.Sin(th) * 1.25f * r, 0f);
+		}
+		for (int i = 0; i < N; i++)
+			foreach (var v in new[] { Vector3.Zero, R(i), R(i + 1), Vector3.Zero, R(i + 1), R(i) })
+			{
+				st.SetNormal(Vector3.Back);
+				st.AddVertex(v);
+			}
+		return st.Commit();
+	}
+
+	/// <summary>The drape of silk over the doorway: a grid bellied out toward the room and slack at its foot.</summary>
+	private static void BuildSilk(Node3D parent, RandomNumberGenerator rng)
+	{
+		const int N = 10;
+		float w = 3.1f, h = 3.0f, cy = 1.4f;
+		var st = new SurfaceTool();
+		st.Begin(Mesh.PrimitiveType.Triangles);
+		Vector3 P(int i, int j)
+		{
+			float u = i / (float)N, v = j / (float)N;   // v: 0 top .. 1 foot
+			float belly = Mathf.Sin(u * Mathf.Pi) * Mathf.Pow(Mathf.Sin(v * Mathf.Pi * 0.9f + 0.1f), 0.7f);
+			float x = (u - 0.5f) * w, y = cy + (0.5f - v) * h - 0.22f * v * v * Mathf.Sin(u * Mathf.Pi);
+			return new Vector3(x, y, -0.1f - 0.32f * belly);
+		}
+		for (int j = 0; j < N; j++)
+			for (int i = 0; i < N; i++)
+			{
+				var q = new[] { (i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1) };
+				foreach (int idx in new[] { 0, 1, 2, 0, 2, 3 })
+				{
+					var (qi, qj) = q[idx];
+					st.SetUV(new Vector2(qi / (float)N, qj / (float)N));
+					st.SetNormal(Vector3.Back);
+					st.AddVertex(P(qi, qj));
+				}
+			}
+		st.GenerateNormals();
+		var mi = new MeshInstance3D
+		{
+			Name = "Silk", Mesh = st.Commit(), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			MaterialOverride = new StandardMaterial3D
+			{
+				AlbedoTexture = SilkTex(), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+				Roughness = 1f, MetallicSpecular = 0.1f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
+			},
+			Rotation = new Vector3(0, 0, rng.RandfRange(-0.08f, 0.08f)),
+		};
+		parent.AddChild(mi);
 	}
 
 	private void OnWebUsed(PlayerController player)
