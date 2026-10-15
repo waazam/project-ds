@@ -127,15 +127,20 @@ public partial class TitleTv : Control
 		var spec = BunkerKit.RandomCrt(rng, 2);
 		spec.KnobsRight = true;
 		spec.Body = new Color(0.2f, 0.13f, 0.08f);   // dark wood-grain
-		var body = new MeshKit();
-		var screen = new MeshKit();
 		_tube = new ShaderMaterial { Shader = GD.Load<Shader>(ShaderPath) };
 		_tube.SetShaderParameter("picture", _screen.GetTexture());
-		screen.Mat(_tube);
 		var tv = new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(-26f)), Vector3.Zero);
-		Vector3 tube = BunkerKit.Crt(body, screen, tv, spec, Colors.White);
-		body.CommitTo(root, "TvBody");
-		screen.CommitTo(root, "TvScreen", false);
+		Vector3 tube;
+		bool modelled = BuildModelledTv(root, tv, spec, out tube);
+		if (!modelled)
+		{
+			var body = new MeshKit();
+			var screen = new MeshKit();
+			screen.Mat(_tube);
+			tube = BunkerKit.Crt(body, screen, tv, spec, Colors.White);
+			body.CommitTo(root, "TvBody");
+			screen.CommitTo(root, "TvScreen", false);
+		}
 
 		// Floor and the wall behind, bare concrete; a couple of cables snaking off into the dark.
 		var room = new MeshKit();
@@ -144,10 +149,13 @@ public partial class TitleTv : Control
 		room.Box(new Vector3(0, -0.05f, 0), new Vector3(12f, 0.1f, 12f));
 		room.Mat(BunkerTextures.RoomWallMat);
 		room.Box(new Vector3(0, 2f, -1.1f), new Vector3(12f, 4f, 0.2f));
-		room.Mat(BunkerTextures.RubberMat);
-		room.Color = Colors.White;
-		BunkerKit.Tube(room, new[] { new Vector3(0.08f, 0.17f, -0.36f), new Vector3(0.3f, 0.01f, -0.6f), new Vector3(1.1f, 0.01f, -0.4f), new Vector3(2.2f, 0.01f, 0.3f) }, 0.012f, 0.012f, 4);
-		BunkerKit.Tube(room, new[] { new Vector3(-0.1f, 0.15f, -0.36f), new Vector3(-0.5f, 0.01f, -0.7f), new Vector3(-1.6f, 0.01f, -0.5f), new Vector3(-2.6f, 0.01f, 0.4f) }, 0.01f, 0.01f, 4);
+		if (!modelled)
+		{
+			room.Mat(BunkerTextures.RubberMat);
+			room.Color = Colors.White;
+			BunkerKit.Tube(room, new[] { new Vector3(0.08f, 0.17f, -0.36f), new Vector3(0.3f, 0.01f, -0.6f), new Vector3(1.1f, 0.01f, -0.4f), new Vector3(2.2f, 0.01f, 0.3f) }, 0.012f, 0.012f, 4);
+			BunkerKit.Tube(room, new[] { new Vector3(-0.1f, 0.15f, -0.36f), new Vector3(-0.5f, 0.01f, -0.7f), new Vector3(-1.6f, 0.01f, -0.5f), new Vector3(-2.6f, 0.01f, 0.4f) }, 0.01f, 0.01f, 4);
+		}
 		room.CommitTo(root, "Room");
 
 		// The only light: the tube's glow, spilling onto the floor in front and up the bezel.
@@ -165,6 +173,38 @@ public partial class TitleTv : Control
 		root.AddChild(cam);
 		cam.Position = new Vector3(-0.46f, 0.43f, 1.13f);
 		cam.LookAt(new Vector3(-0.19f, 0.33f, 0f), Vector3.Up);
+	}
+
+	/// <summary>The set modelled in Blender (tools/Blender/title_tv.py → assets/models/title/title_tv.glb, 2026-10-15: the
+	/// owner's rule, every model made in Blender): a wood-grain tube TV, knobs on the right, rabbit ears, its cable, and the two
+	/// cables across the floor. Built at 0.72 x 0.6 x 0.6 m and scaled to <paramref name="spec"/>; the tube ("TvScreen") gets
+	/// the tape's shader, the rest the game's own materials by name. False when the file is missing (the code-built set
+	/// stands in).</summary>
+	private bool BuildModelledTv(Node3D root, Transform3D tv, BunkerKit.CrtSpec spec, out Vector3 tube)
+	{
+		tube = tv * new Vector3(-spec.W * 0.11f, spec.H * 0.53f, spec.D * 0.5f + 0.002f);
+		const string path = "res://assets/models/title/title_tv.glb";
+		if (!ResourceLoader.Exists(path) || GD.Load<PackedScene>(path)?.Instantiate<Node3D>() is not { } model) return false;
+		root.AddChild(model);
+		if (model.FindChild("TV", true, false) is Node3D set)
+			set.Transform = tv * new Transform3D(Basis.FromScale(new Vector3(spec.W / 0.72f, spec.H / 0.6f, spec.D / 0.6f)), Vector3.Zero);
+		var cabinet = (StandardMaterial3D)BunkerTextures.PlasticMat.Duplicate();
+		cabinet.AlbedoColor = spec.Body;
+		Material Pick(string name) => name switch
+		{
+			"screen" => _tube,
+			"cabinet" => cabinet,
+			"rubber" => BunkerTextures.RubberMat,
+			"metal" => ProcTextures.MetalMat,
+			"grille" => ProcTextures.Flat("tv_grille", new Color(0.05f, 0.05f, 0.05f), 0.8f, 0.1f),
+			"knob" => ProcTextures.Flat("tv_knob", new Color(0.08f, 0.08f, 0.08f), 0.45f, 0.4f),
+			_ => ProcTextures.Flat("tv_trim", new Color(0.06f, 0.055f, 0.05f), 0.5f, 0.3f),
+		};
+		foreach (var n in model.FindChildren("*", nameof(MeshInstance3D), true, false))
+			if (n is MeshInstance3D mi)
+				for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+					mi.SetSurfaceOverrideMaterial(i, Pick(mi.Mesh.SurfaceGetMaterial(i)?.ResourceName ?? ""));
+		return true;
 	}
 
 	// ---------------------------------------------------------------- the tape playing

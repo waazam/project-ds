@@ -52,8 +52,54 @@ public partial class Rowboat : Node3D
 	{
 		Hull = new Node3D { Name = "Hull" };
 		AddChild(Hull);
+		_model = LoadModel();
 		BuildHull();
 		for (int i = 0; i < 2; i++) _oars[i] = BuildOar(i == 0 ? -1 : 1);
+		_model?.QueueFree();
+	}
+
+	// ------------------------------------------------------------------ the Blender model
+
+	/// <summary>The boat and its oars modelled in Blender (tools/Blender/rowboat.py → assets/models/boat/rowboat.glb,
+	/// 2026-10-15: the owner's rule, every model made in Blender), on the same lines as <see cref="Skin"/>: the planks lapping,
+	/// frames, bottom boards, thwarts and knees, bronze oarlocks, bilge water. Null when the file is missing (the code-built
+	/// boat below then stands in).</summary>
+	private Node3D _model;
+	private const string ModelPath = "res://assets/models/boat/rowboat.glb";
+
+	private static Node3D LoadModel() => ResourceLoader.Exists(ModelPath) ? GD.Load<PackedScene>(ModelPath)?.Instantiate<Node3D>() : null;
+
+	/// <summary>Takes one of the model's meshes out of it, painted with the game's own materials by each surface's
+	/// material name.</summary>
+	private MeshInstance3D TakeMesh(string name, Node3D into)
+	{
+		if (_model?.FindChild(name, true, false) is not MeshInstance3D mi) return null;
+		mi.GetParent().RemoveChild(mi);
+		mi.Transform = Transform3D.Identity;
+		into.AddChild(mi);
+		for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+			mi.SetSurfaceOverrideMaterial(i, MaterialFor(mi.Mesh.SurfaceGetMaterial(i)?.ResourceName ?? ""));
+		return mi;
+	}
+
+	private static Material _paint, _wood, _post, _bronze, _leather, _tip, _bilge;
+
+	private static Material MaterialFor(string name) => name switch
+	{
+		"paint" => _paint ??= ProcTextures.Std("boat_paint", ProcTextures.WeatheredWood(), new Color(0.46f, 0.56f, 0.5f), 0.85f, vertexColor: true),
+		"wood" => _wood ??= Tinted(PropTextures.DeckMat, 0.62f),
+		"bronze" => _bronze ??= Tinted(ProcTextures.MetalMat, 1f, new Color(0.55f, 0.42f, 0.25f)),
+		"leather" => _leather ??= ProcTextures.Flat("oar_leather", new Color(0.3f, 0.22f, 0.16f), 0.7f, 0f),
+		"tip" => _tip ??= ProcTextures.Flat("oar_tip", new Color(0.52f, 0.14f, 0.1f), 0.8f, 0.2f),
+		"bilge" => _bilge ??= new StandardMaterial3D { ResourceName = "boat_bilge", AlbedoColor = new Color(0.07f, 0.065f, 0.045f), Roughness = 0.06f, Metallic = 0.3f },
+		_ => _post ??= Tinted(PropTextures.PostMat, 0.72f),
+	};
+
+	private static Material Tinted(StandardMaterial3D src, float shade, Color? tint = null)
+	{
+		var m = (StandardMaterial3D)src.Duplicate();
+		m.AlbedoColor = (tint ?? m.AlbedoColor) * new Color(shade, shade, shade, 1f);
+		return m;
 	}
 
 	// ------------------------------------------------------------------ hull
@@ -75,6 +121,13 @@ public partial class Rowboat : Node3D
 	}
 
 	private void BuildHull()
+	{
+		if (TakeMesh("Hull", Hull) is { } hullMesh) hullMesh.Name = "HullMesh";
+		else BuildHullCode();
+		Labels();
+	}
+
+	private void BuildHullCode()
 	{
 		var k = new MeshKit();
 		var paint = ProcTextures.Std("boat_paint", ProcTextures.WeatheredWood(), new Color(0.46f, 0.56f, 0.5f), 0.85f, vertexColor: true);
@@ -186,7 +239,10 @@ public partial class Rowboat : Node3D
 		}
 		k.Color = Colors.White;
 		k.CommitTo(Hull, "HullMesh");
+	}
 
+	private void Labels()
+	{
 		// "STATION 7", painted on both sides of the bow, faded almost to nothing
 		foreach (int side in new[] { -1, 1 })
 		{
@@ -222,6 +278,14 @@ public partial class Rowboat : Node3D
 	{
 		var pivot = new Node3D { Name = side < 0 ? "OarLeft" : "OarRight", Position = OarlockLocal(side) };
 		Hull.AddChild(pivot);
+		if (TakeMesh(side < 0 ? "OarL" : "OarR", pivot) is { } modelled)
+		{
+			modelled.Name = "OarMesh";
+			var mo = new Oar { Side = side, Pivot = pivot };
+			Pose(mo, RestYaw, RestPitch);
+			mo.Yaw = RestYaw; mo.Pitch = RestPitch;
+			return mo;
+		}
 		var k = new MeshKit();
 		k.Mat(PropTextures.PostMat);
 		k.Color = new Color(0.62f, 0.55f, 0.44f);
