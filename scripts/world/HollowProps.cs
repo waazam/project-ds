@@ -115,6 +115,13 @@ public static class HollowProps
 	/// </summary>
 	public static void BankersLamp(MeshKit k, MeshKit glow, Transform3D at, Material brass, Material shadeOut, Material shadeIn, Material lit)
 	{
+		// (2026-10-15) the Blender lamp, in this same frame (fixtures.py); the code below is its fallback
+		if (FixtureModels.Have("fx_banker_lamp", "fx_banker_lamp_glow"))
+		{
+			FurnitureKit.Add(k, "fx_banker_lamp", at, new System.Collections.Generic.Dictionary<string, Material>() { ["brass"] = brass, ["shade_out"] = shadeOut, ["shade_in"] = shadeIn });
+			FurnitureKit.Add(glow, "fx_banker_lamp_glow", at, new System.Collections.Generic.Dictionary<string, Material>() { ["lit"] = lit });
+			return;
+		}
 		In(k, at, () =>
 		{
 			k.Mat(brass);
@@ -317,6 +324,10 @@ public static class HollowProps
 	/// open and its inside dark unless <paramref name="lidded"/>. Foot at <paramref name="at"/>.</summary>
 	public static void Can(MeshKit k, Vector3 at, float r, float h, bool lidded = false)
 	{
+		// (2026-10-15) the Blender tin (fixtures.py, 5 cm by 12 cm), scaled to this one
+		if (k.CurrentMaterial != null && FurnitureKit.Add(k, lidded ? "fx_tin_can_lidded" : "fx_tin_can",
+			new Transform3D(Basis.FromScale(new Vector3(r / 0.05f, h / 0.12f, r / 0.05f)), at), new System.Collections.Generic.Dictionary<string, Material>() { ["tin"] = k.CurrentMaterial, ["inside"] = FixtureModels.Dark }))
+			return;
 		Lathe(k, at, new Vector2[]
 		{
 			new(r - 0.003f, 0f), new(r + 0.0015f, 0.003f), new(r, 0.008f), new(r, h * 0.33f - 0.004f), new(r - 0.002f, h * 0.33f), new(r, h * 0.33f + 0.004f),
@@ -339,6 +350,8 @@ public static class HollowProps
 	/// Its back toward -Z, standing on the origin, in the kit's current material and colour.</summary>
 	public static void Chair(MeshKit k)
 	{
+		// (2026-10-15) the Blender chair (fixtures.py), in this frame, in the kit's current material
+		if (k.CurrentMaterial != null && FurnitureKit.Add(k, "fx_kitchen_chair", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["wood"] = k.CurrentMaterial })) return;
 		const float seatY = 0.45f;
 		k.BevelBox(new Vector3(0, seatY - 0.016f, 0.01f), new Vector3(0.42f, 0.032f, 0.4f), 0.01f, 1.4f);
 		k.BevelBox(new Vector3(0, seatY - 0.06f, 0.01f), new Vector3(0.36f, 0.05f, 0.34f), 0.005f, 1.4f);
@@ -368,6 +381,8 @@ public static class HollowProps
 	/// spout toward local -X turned by <paramref name="yaw"/>.</summary>
 	public static void Kettle(MeshKit k, Vector3 at, float yaw, Material enamel, Material wood)
 	{
+		// (2026-10-15) the Blender kettle (fixtures.py), spout to -X as here
+		if (FurnitureKit.Add(k, "fx_kettle", new Transform3D(new Basis(Vector3.Up, yaw), at), new System.Collections.Generic.Dictionary<string, Material>() { ["enamel"] = enamel, ["wood"] = wood })) return;
 		In(k, new Transform3D(new Basis(Vector3.Up, yaw), at), () =>
 		{
 			k.Mat(enamel);

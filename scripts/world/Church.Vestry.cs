@@ -211,6 +211,16 @@ public partial class Church
 	private static void Wardrobe(MeshKit k, Vector3 foot, float w, float h, float d)
 	{
 		var oak = ChurchTextures.OakMat;
+		// (2026-10-15) modelled in Blender at the vestry's size (tools/Blender/fixtures.py fx_vestry_wardrobe: 2.2 x 2.45 x
+		// 0.66, its doors to -Z; another size is scaled to it); the code below is its fallback
+		if (FurnitureKit.Add(k, "fx_vestry_wardrobe", new Transform3D(Basis.FromScale(new Vector3(w / 2.2f, h / 2.45f, d / 0.66f)), foot), new System.Collections.Generic.Dictionary<string, Material>()
+		{
+			["oak"] = FixtureModels.Tint(oak, k.Color), ["door"] = FixtureModels.Tint(oak, k.Color * 0.92f), ["iron"] = ChurchTextures.IronMat,
+		}))
+		{
+			k.Mat(oak);
+			return;
+		}
 		k.Mat(oak);
 		var col = k.Color;
 		k.BevelBox(foot + new Vector3(0, 0.06f, 0.01f), new Vector3(w - 0.04f, 0.12f, d - 0.06f), 0.01f);             // the plinth

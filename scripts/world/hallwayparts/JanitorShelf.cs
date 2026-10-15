@@ -369,6 +369,13 @@ public static class JanitorShelf
 	/// <summary>The mop bucket: yellow plastic, tapered, a rolled lip, its bail, grey water a third up.</summary>
 	public static void Bucket(MeshKit k, Vector3 at, float yaw)
 	{
+		// (2026-10-15) modelled in Blender (tools/Blender/fixtures.py fx_mop_bucket); the code below is its fallback
+		if (FurnitureKit.Add(k, "fx_mop_bucket", new Transform3D(new Basis(Vector3.Up, yaw), at), new System.Collections.Generic.Dictionary<string, Material>()
+		{
+			["plastic"] = FixtureModels.Tint(Plastic, new Color(0.62f, 0.5f, 0.12f)), ["murk"] = Murk,
+			["wire"] = FixtureModels.Tint(Tin, Colors.White * 0.75f), ["grip"] = FixtureModels.Tint(Plastic, new Color(0.12f, 0.12f, 0.11f)),
+		}))
+			return;
 		var keepXf = k.Xf;
 		k.Xf = keepXf * new Transform3D(new Basis(Vector3.Up, yaw), at);
 		var s = new Spec
@@ -394,6 +401,12 @@ public static class JanitorShelf
 	public static void MopHead(MeshKit k, Vector3 head, Vector3 dir, RandomNumberGenerator rng)
 	{
 		dir = new Vector3(dir.X, 0, dir.Z).Normalized();
+		// (2026-10-15) modelled in Blender (fx_mop_head, lying toward -Z); the strands below are its fallback
+		if (FurnitureKit.Add(k, "fx_mop_head", new Transform3D(new Basis(Vector3.Up, Mathf.Atan2(-dir.X, -dir.Z)), head), new System.Collections.Generic.Dictionary<string, Material>()
+		{
+			["tin"] = FixtureModels.Tint(Tin, Colors.White * 0.6f), ["cotton"] = FixtureModels.Tint(Plastic, new Color(0.5f, 0.48f, 0.42f) * 0.68f),
+		}))
+			return;
 		var side = dir.Cross(Vector3.Up).Normalized();
 		k.Mat(Tin);
 		k.Color = Colors.White * 0.6f;

@@ -57,6 +57,16 @@ public static class LampKit
 	/// <paramref name="parent"/>. Returns its pool of light (a spot under the shade).</summary>
 	public static SpotLight3D Banker(Node3D parent, Transform3D xf, float energy = 2.4f, string name = "BankerLamp")
 	{
+		// (2026-10-15) the body modelled in Blender (tools/Blender/fixtures.py fx_lk_banker); the code below is its fallback
+		if (FurnitureKit.Has("fx_lk_banker"))
+			FurnitureKit.Place(parent, "fx_lk_banker", xf, new() { ["brass"] = FixtureModels.Tint(ItemTextures.BrassMat, BrassTone), ["shade_out"] = GreenGlass, ["shade_in"] = Opal }, name + "Body");
+		else
+			BankerBody(parent, xf, name);
+		return BankerLight(parent, xf, energy, name);
+	}
+
+	private static void BankerBody(Node3D parent, Transform3D xf, string name)
+	{
 		var brass = new MeshKit();
 		brass.Mat(ItemTextures.BrassMat);
 		brass.Color = BrassTone;
@@ -155,7 +165,10 @@ public static class LampKit
 			}
 		}
 		glass.CommitTo(parent, name + "Shade", true);
+	}
 
+	private static SpotLight3D BankerLight(Node3D parent, Transform3D xf, float energy, string name)
+	{
 		// the bulb, lying in the shade along the socket
 		var bulb = new MeshKit();
 		bulb.Mat(Bulb);
@@ -187,12 +200,10 @@ public static class LampKit
 	public static Vector3 Candlestick(MeshKit metal, MeshKit wax, Vector3 at, float h = 0.22f, float candle = 0.16f, int seed = 0)
 	{
 		float f = h / 0.22f;
-		var prof = new List<Vector2>();
-		foreach (var p in TurnedKit.P(0f, 0f, 0.05f, 0f, 0.05f, 0.006f, 0.044f, 0.014f, 0.032f, 0.026f, 0.016f, 0.036f, 0.011f, 0.046f, 0.015f, 0.054f,
-			0.011f, 0.062f, 0.008f, 0.09f, 0.012f, 0.13f, 0.017f, 0.15f, 0.012f, 0.172f, 0.008f, 0.186f, 0.011f, 0.194f, 0.032f, 0.2f, 0.034f, 0.204f,
-			0.016f, 0.206f, 0.015f, 0.22f, 0.012f, 0.22f, 0.012f, 0.212f, 0f, 0.212f))
-			prof.Add(new Vector2(p.X * Mathf.Sqrt(f), p.Y * f));
-		TurnedKit.Lathe(metal, at, prof, 12, 40f);
+		// (2026-10-15) the brass modelled in Blender (fx_lk_candlestick, at h 0.22); the lathe below is its fallback
+		if (!FurnitureKit.Add(metal, "fx_lk_candlestick", new Transform3D(Basis.FromScale(new Vector3(Mathf.Sqrt(f), f, Mathf.Sqrt(f))), at),
+			new System.Collections.Generic.Dictionary<string, Material>() { ["metal"] = FixtureModels.Tint(metal.CurrentMaterial ?? ItemTextures.BrassMat, metal.Color) }))
+			CandlestickBody(metal, at, f);
 		Vector3 top = at + Vector3.Up * (h - 0.008f * f);
 		if (wax == null) return top;
 		float r = 0.0115f * Mathf.Sqrt(f);
@@ -205,15 +216,46 @@ public static class LampKit
 		return top + Vector3.Up * candle;
 	}
 
+	private static void CandlestickBody(MeshKit metal, Vector3 at, float f)
+	{
+		var prof = new List<Vector2>();
+		foreach (var p in TurnedKit.P(0f, 0f, 0.05f, 0f, 0.05f, 0.006f, 0.044f, 0.014f, 0.032f, 0.026f, 0.016f, 0.036f, 0.011f, 0.046f, 0.015f, 0.054f,
+			0.011f, 0.062f, 0.008f, 0.09f, 0.012f, 0.13f, 0.017f, 0.15f, 0.012f, 0.172f, 0.008f, 0.186f, 0.011f, 0.194f, 0.032f, 0.2f, 0.034f, 0.204f,
+			0.016f, 0.206f, 0.015f, 0.22f, 0.012f, 0.22f, 0.012f, 0.212f, 0f, 0.212f))
+			prof.Add(new Vector2(p.X * Mathf.Sqrt(f), p.Y * f));
+		TurnedKit.Lathe(metal, at, prof, 12, 40f);
+	}
+
 	/// <summary>A standard lamp at <paramref name="xf"/> (its foot on the floor), its shade's bottom at
 	/// <paramref name="height"/> less 0.26 m, coloured <paramref name="shade"/>. Returns its light.</summary>
 	public static OmniLight3D Floor(Node3D parent, Transform3D xf, Color shade, float energy, float height = 1.62f, string name = "FloorLamp")
+	{
+		float top = height - 0.3f;   // the pole's top, under the shade's middle
+		// (2026-10-15) the body and shade modelled in Blender (fx_lk_floor, at height 1.7: another height stretches it)
+		if (FurnitureKit.Has("fx_lk_floor"))
+			FurnitureKit.Place(parent, "fx_lk_floor", xf * new Transform3D(Basis.FromScale(new Vector3(1f, height / 1.7f, 1f)), Vector3.Zero), new()
+			{
+				["brass"] = FixtureModels.Tint(ItemTextures.BrassMat, BrassTone * 0.92f), ["binding"] = FixtureModels.Tint(ItemTextures.BrassMat, BrassTone * 0.8f),
+				["shade"] = FixtureModels.Tint(Fabric, shade), ["lining"] = FixtureModels.Tint(Opal, new Color(1f, 0.85f, 0.65f)),
+			}, name + "Body");
+		else
+			FloorBody(parent, xf, shade, top, name);
+		var bulb = new MeshKit();
+		bulb.Mat(Bulb);
+		TurnedKit.Lathe(bulb, xf * new Vector3(0, top + 0.055f, 0), TurnedKit.P(0f, 0f, 0.012f, 0f, 0.014f, 0.016f, 0.03f, 0.05f, 0.025f, 0.075f, 0f, 0.085f), 8);
+		bulb.CommitTo(parent, name + "Bulb", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		var light = new OmniLight3D { Name = name + "Light", LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = false };
+		parent.AddChild(light);
+		light.Transform = xf * new Transform3D(Basis.Identity, new Vector3(0, top + 0.02f, 0));
+		return light;
+	}
+
+	private static void FloorBody(Node3D parent, Transform3D xf, Color shade, float top, string name)
 	{
 		var brass = new MeshKit();
 		brass.Mat(ItemTextures.BrassMat);
 		brass.Color = BrassTone * 0.92f;
 		brass.Xf = xf;
-		float top = height - 0.3f;   // the pole's top, under the shade's middle
 		// a weighted foot: a domed disc, a step, a turned boss
 		TurnedKit.Lathe(brass, Vector3.Zero, TurnedKit.P(0f, 0f, 0.15f, 0f, 0.15f, 0.012f, 0.14f, 0.022f, 0.11f, 0.034f, 0.07f, 0.042f, 0.045f, 0.05f,
 			0.04f, 0.07f, 0.05f, 0.085f, 0.035f, 0.1f, 0.018f, 0.11f, 0f, 0.11f), 16);
@@ -249,14 +291,6 @@ public static class LampKit
 		foreach (var (r, y) in new[] { (0.215f, y0), (0.135f, y1) })
 			TurnedKit.Lathe(cloth, Vector3.Zero, TurnedKit.P(r - 0.006f, y - 0.004f, r + 0.004f, y - 0.004f, r + 0.006f, y, r + 0.004f, y + 0.005f, r - 0.006f, y + 0.005f), 18);
 		cloth.CommitTo(parent, name + "Shade", true);
-		var bulb = new MeshKit();
-		bulb.Mat(Bulb);
-		TurnedKit.Lathe(bulb, xf * new Vector3(0, top + 0.055f, 0), TurnedKit.P(0f, 0f, 0.012f, 0f, 0.014f, 0.016f, 0.03f, 0.05f, 0.025f, 0.075f, 0f, 0.085f), 8);
-		bulb.CommitTo(parent, name + "Bulb", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-		var light = new OmniLight3D { Name = name + "Light", LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = false };
-		parent.AddChild(light);
-		light.Transform = xf * new Transform3D(Basis.Identity, new Vector3(0, top + 0.02f, 0));
-		return light;
 	}
 
 	/// <summary>A wall sconce: <paramref name="at"/> the shade's middle, <paramref name="toWall"/> the way to the wall it's
@@ -264,6 +298,28 @@ public static class LampKit
 	public static OmniLight3D Sconce(Node3D parent, Vector3 at, Vector3 toWall, Color shade, float energy, float reach = 0.3f, string name = "Sconce")
 	{
 		Vector3 n = toWall.Normalized();
+		Vector3 cupFoot = at + Vector3.Down * 0.11f;
+		// (2026-10-15) the body and shade modelled in Blender (fx_lk_sconce: the wall toward +Z, reach 0.5; another reach
+		// stretches it toward the wall)
+		if (FurnitureKit.Has("fx_lk_sconce"))
+			FurnitureKit.Place(parent, "fx_lk_sconce", new Transform3D(new Basis(Vector3.Up, Mathf.Atan2(n.X, n.Z)) * Basis.FromScale(new Vector3(1f, 1f, reach / 0.5f)), at), new()
+			{
+				["brass"] = FixtureModels.Tint(ItemTextures.BrassMat, BrassTone * 0.95f),
+				["shade"] = FixtureModels.Tint(Fabric, shade), ["lining"] = FixtureModels.Tint(Opal, new Color(1f, 0.85f, 0.65f)),
+			}, name + "Body");
+		else
+			SconceBody(parent, at, n, shade, reach, name);
+		var bulb = new MeshKit();
+		bulb.Mat(Bulb);
+		TurnedKit.Lathe(bulb, cupFoot, TurnedKit.P(0f, 0f, 0.012f, 0f, 0.013f, 0.03f, 0.02f, 0.06f, 0.016f, 0.085f, 0f, 0.1f), 8);
+		bulb.CommitTo(parent, name + "Bulb", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+		var light = new OmniLight3D { Name = name + "Light", Position = at + Vector3.Down * 0.02f, LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = false };
+		parent.AddChild(light);
+		return light;
+	}
+
+	private static void SconceBody(Node3D parent, Vector3 at, Vector3 n, Color shade, float reach, string name)
+	{
 		var brass = new MeshKit();
 		brass.Mat(ItemTextures.BrassMat);
 		brass.Color = BrassTone * 0.95f;
@@ -287,12 +343,5 @@ public static class LampKit
 		cloth.Color = new Color(1f, 0.85f, 0.65f);
 		TurnedKit.Lathe(cloth, at, TurnedKit.P(0.056f, y1 - 0.002f, 0.071f, y1 - 0.02f, 0.096f, y0 + 0.05f, 0.106f, y0 + 0.002f), 14, 60f);
 		cloth.CommitTo(parent, name + "Shade", true);
-		var bulb = new MeshKit();
-		bulb.Mat(Bulb);
-		TurnedKit.Lathe(bulb, cupFoot, TurnedKit.P(0f, 0f, 0.012f, 0f, 0.013f, 0.03f, 0.02f, 0.06f, 0.016f, 0.085f, 0f, 0.1f), 8);
-		bulb.CommitTo(parent, name + "Bulb", false).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-		var light = new OmniLight3D { Name = name + "Light", Position = at + Vector3.Down * 0.02f, LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = false };
-		parent.AddChild(light);
-		return light;
 	}
 }

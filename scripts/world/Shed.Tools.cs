@@ -27,6 +27,28 @@ public partial class Shed
 			k.Cylinder(new Vector3(x, y, face + 0.045f), new Vector3(x, y + 0.015f, face + 0.05f), 0.003f, 0.003f, 5, true);
 		}
 
+		// (2026-10-15) the Blender tools (fixtures.py), each in the frame its code below used; that code is their fallback
+		if (FixtureModels.Have("fx_hand_saw", "fx_wrench", "fx_pliers", "fx_screwdriver", "fx_rope_coil", "fx_block_plane"))
+		{
+			var roles = ToolRoles;
+			var sb = new Basis(Vector3.Back, 0.1f);
+			Vector3 so = new(-0.42f, 1.36f, z);
+			FurnitureKit.Add(k, "fx_hand_saw", new Transform3D(sb, so), roles);
+			Peg(so.X - 0.21f, so.Y + 0.02f);
+			Vector3 wo = new(0.03f, 1.33f, z);
+			FurnitureKit.Add(k, "fx_wrench", new Transform3D(Basis.Identity, wo), roles);
+			Peg(wo.X, wo.Y - 0.1f);
+			Vector3 piv = new(0.17f, 1.44f, z);
+			FurnitureKit.Add(k, "fx_pliers", new Transform3D(Basis.Identity, piv), roles);
+			Peg(piv.X, piv.Y + 0.065f);
+			Vector3 dro = new(0.3f, 1.4f, z + 0.004f);
+			FurnitureKit.Add(k, "fx_screwdriver", new Transform3D(Basis.Identity, dro), roles);
+			Peg(dro.X + 0.022f, dro.Y - 0.01f);
+			FurnitureKit.Add(k, "fx_rope_coil", new Transform3D(Basis.Identity, new Vector3(0.5f, 1.34f, face)), roles);
+			FurnitureKit.Add(k, "fx_block_plane", new Transform3D(new Basis(Vector3.Up, 0.35f), new Vector3(-0.8f, BenchTop, -1.05f + 0.22f)), roles);
+			return;
+		}
+
 		// ---- the hand saw: a tapered blade, its toothed edge down, the closed wooden grip at the heel
 		{
 			var b = new Basis(Vector3.Back, 0.1f);
@@ -142,8 +164,17 @@ public partial class Shed
 
 	/// <summary>The shovel and the rake leaning in the corner at <paramref name="c0"/>: turned ash handles, a dished
 	/// steel blade on its socket, a rake's head of tines.</summary>
+	/// <summary>The roles of the Blender tools (fixtures.py): the materials the code below used.</summary>
+	private static System.Collections.Generic.Dictionary<string, Material> ToolRoles => new()
+	{
+		["steel"] = FixtureModels.Tint(HollowLook.ToolSteel, new Color(0.8f, 0.78f, 0.76f)), ["wood"] = FixtureModels.Tint(HollowLook.Handle, new Color(0.8f, 0.64f, 0.46f)),
+		["brass"] = BuildingTextures.Plain("h_brass", new Color(0.45f, 0.36f, 0.18f), 0.4f), ["grip"] = HollowLook.Grip,
+		["rope"] = BuildingTextures.Plain("s_rope", new Color(0.5f, 0.44f, 0.3f)), ["paint"] = BuildingTextures.Plain("s_gascan", new Color(0.42f, 0.08f, 0.06f), 0.6f),
+	};
+
 	private static void LongTools(MeshKit k, Vector3 c0)
 	{
+		if (FurnitureKit.Add(k, "fx_long_tools", new Transform3D(Basis.Identity, c0), ToolRoles)) return;
 		k.Mat(HollowLook.Handle);
 		k.Color = new Color(0.85f, 0.8f, 0.75f);
 		Vector3 shTop = c0 + new Vector3(-0.28f, 1.25f, -0.12f), shFoot = c0 + new Vector3(0.0f, 0.28f, 0.0f);
@@ -185,6 +216,7 @@ public partial class Shed
 	private static void GasCan(MeshKit k, Vector3 at, float yaw)
 	{
 		var b = new Basis(Vector3.Up, yaw);
+		if (FurnitureKit.Add(k, "fx_gas_can", new Transform3D(b, at), ToolRoles)) return;
 		k.Mat(BuildingTextures.Plain("s_gascan", new Color(0.42f, 0.08f, 0.06f), 0.6f));
 		k.Color = Colors.White;
 		k.BevelBox(at + b * new Vector3(0, 0.15f, 0), new Vector3(0.2f, 0.3f, 0.3f), 0.025f, 2f, b);

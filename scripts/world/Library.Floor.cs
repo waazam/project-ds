@@ -327,6 +327,15 @@ public partial class Library
 		var xf = new Transform3D(rot, at);
 		var brass = ItemTextures.BrassMat;
 		k.Xf = small.Xf = xf;
+		// (2026-10-15) the cabinet, its drawers (the pulled one, the ajar one, the gone one's slot) and the dropped drawer
+		// modelled in Blender (tools/Blender/fixtures.py fx_card_catalogue); the code below is the fallback; the fanned
+		// cards stay
+		if (!FurnitureKit.Add(k, "fx_card_catalogue", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>()
+		{
+			["wood"] = _wood, ["dark"] = FixtureModels.Dark, ["brass"] = FixtureModels.Tint(brass, new Color(0.75f, 0.75f, 0.75f)), ["cards"] = cards,
+		}))
+			for (int i = 0; i < 29; i++) _rng.Randf();   // (the drawers' tints the code drew: the room's later picks stay as they were)
+		else {
 		k.Mat(_wood);
 		k.Color = Colors.White * 0.85f;
 		foreach (float sx in new[] { -0.46f, 0.46f })
@@ -378,6 +387,7 @@ public partial class Library
 		k.Color = Colors.White * 0.9f;
 		k.Box(new Vector3(0.12f, 0.06f, 0.78f), new Vector3(0.18f, 0.11f, 0.42f), 1f, drop);
 		k.Color = Colors.White;
+		}
 		small.Mat(cards);
 		var rng = new RandomNumberGenerator { Seed = 1977 };
 		for (int i = 0; i < 46; i++)
@@ -400,6 +410,8 @@ public partial class Library
 		var rot = new Basis(Vector3.Up, yaw);
 		var xf = new Transform3D(rot, at);
 		k.Xf = small.Xf = xf;
+		// (2026-10-15) the frame modelled in Blender (fx_book_cart); the code below is the fallback; the books stay
+		if (!FurnitureKit.Add(k, "fx_book_cart", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["wood"] = _wood, ["metal"] = FixtureModels.Tint(StairwellTextures.RailMat, new Color(0.6f, 0.6f, 0.6f)) })) {
 		k.Mat(_wood);
 		k.Color = Colors.White * 0.9f;
 		foreach (float sx in new[] { -0.4f, 0.4f }) k.BevelBox(new Vector3(sx, 0.46f, 0), new Vector3(0.03f, 0.72f, 0.42f), 0.008f);
@@ -417,6 +429,7 @@ public partial class Library
 			}
 		small.Cylinder(new Vector3(0.43f, 0.82f, -0.17f), new Vector3(0.43f, 0.82f, 0.17f), 0.014f, 0.014f, 6, true);
 		foreach (float sz in new[] { -0.17f, 0.17f }) small.Cylinder(new Vector3(0.41f, 0.82f, sz), new Vector3(0.43f, 0.82f, sz), 0.01f, 0.01f, 5, false);
+		}
 		k.Xf = small.Xf = Transform3D.Identity;
 		k.Color = small.Color = Colors.White;
 		Vector3 ax = rot.X, az = rot.Z;

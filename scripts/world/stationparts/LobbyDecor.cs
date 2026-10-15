@@ -367,11 +367,22 @@ public partial class LobbyDecor : Node3D
 		k.Color = new Color(0.6f, 0.5f, 0.42f);
 		var b = Basis.LookingAt(-n, Vector3.Up) * new Basis(Vector3.Back, rng.RandfRange(-0.04f, 0.04f));
 		k.Xf = new Transform3D(b, at);
-		k.BevelBox(Vector3.Zero, new Vector3(0.46f, 0.36f, 0.03f), 0.008f);
-		// (2026-10-14h: a sepia print under old glass, a step under the paper's value)
-		k.Mat(StationTextures.Flat("st_photo2", new Color(0.36f, 0.31f, 0.24f), 0.35f, 0.45f));
-		k.Color = new Color(rng.RandfRange(0.8f, 1f), rng.RandfRange(0.75f, 0.9f), 0.7f);
-		BuildKit.Box(k, new Vector3(0, 0, 0.017f), new Vector3(0.36f, 0.26f, 0.004f));
+		var print = StationTextures.Flat("st_photo2", new Color(0.36f, 0.31f, 0.24f), 0.35f, 0.45f);
+		var tone = new Color(rng.RandfRange(0.8f, 1f), rng.RandfRange(0.75f, 0.9f), 0.7f);
+		// (2026-10-15) the frame, its mat and the print modelled in Blender (tools/Blender/fixtures.py fx_photo_frame, its
+		// face to +Z); the boxes are the fallback; the figures stay, printed on it
+		if (!World.FurnitureKit.Add(k, "fx_photo_frame", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>()
+		{
+			["frame"] = World.FixtureModels.Tint(StationTextures.CasingMat, new Color(0.6f, 0.5f, 0.42f)), ["mat"] = StationTextures.Flat("st_photomat", new Color(0.55f, 0.5f, 0.4f), 0.9f, 0.05f),
+			["print"] = World.FixtureModels.Tint(print, tone),
+		}))
+		{
+			k.BevelBox(Vector3.Zero, new Vector3(0.46f, 0.36f, 0.03f), 0.008f);
+			// (2026-10-14h: a sepia print under old glass, a step under the paper's value)
+			k.Mat(print);
+			k.Color = tone;
+			BuildKit.Box(k, new Vector3(0, 0, 0.017f), new Vector3(0.36f, 0.26f, 0.004f));
+		}
 		// a figure or two: dark smudges standing in a row, a treeline behind them
 		k.Mat(StationTextures.Flat("st_photofig", new Color(0.18f, 0.15f, 0.12f), 0.5f, 0.3f));
 		k.Color = Colors.White;
@@ -419,6 +430,16 @@ public partial class LobbyDecor : Node3D
 	private void PlantPot(Node3D parent, Vector3 at, bool dead)
 	{
 		var k = new MeshKit();
+		var leaves = StationTextures.Flat(dead ? "st_leaf_dead" : "st_leaf2", dead ? new Color(0.3f, 0.23f, 0.12f) : new Color(0.15f, 0.25f, 0.11f), 0.7f, 0.2f);
+		// (2026-10-15) the pot and the plant (standing green, or fallen over brown) modelled in Blender (tools/Blender/
+		// fixtures.py fx_plant_pot, fx_plant_live/_dead); the code below is the fallback
+		if (World.FixtureModels.Have("fx_plant_pot", dead ? "fx_plant_dead" : "fx_plant_live"))
+		{
+			World.FurnitureKit.Add(k, "fx_plant_pot", at, 0f, new() { ["pot"] = StationTextures.Flat("st_pot2", new Color(0.4f, 0.24f, 0.17f), 0.85f, 0.15f), ["soil"] = World.FixtureModels.Dark });
+			World.FurnitureKit.Add(k, dead ? "fx_plant_dead" : "fx_plant_live", at, 0f, new() { ["leaf"] = leaves, ["stalk"] = World.FixtureModels.Tint(leaves, new Color(0.85f, 0.85f, 0.75f)) });
+			Commit(k, parent, "Plant", true);
+			return;
+		}
 		k.Mat(StationTextures.Flat("st_pot2", new Color(0.4f, 0.24f, 0.17f), 0.85f, 0.15f));
 		k.Color = Colors.White;
 		k.Cylinder(at, at + Vector3.Up * 0.4f, 0.16f, 0.2f, 12, true);

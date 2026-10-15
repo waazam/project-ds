@@ -251,6 +251,9 @@ public partial class Church
 	{
 		var at = FontLocal;
 		var k = new MeshKit();
+		// (2026-10-15) the stone modelled in Blender (tools/Blender/fixtures.py fx_font); the code below is its fallback;
+		// the water, the lid and its lock stay
+		if (!FurnitureKit.Add(k, "fx_font", at, 0f, new() { ["stone"] = ChurchTextures.AshlarMat, ["inner"] = FixtureModels.Tint(ChurchTextures.AshlarMat, new Color(0.7f, 0.7f, 0.7f)) })) {
 		k.Mat(ChurchTextures.AshlarMat);
 		k.Color = Colors.White;
 		k.Cylinder(at, at + Vector3.Up * 0.18f, 0.95f, 0.9f, 8, true, 1f, Mathf.Pi / 8f);
@@ -274,6 +277,7 @@ public partial class Church
 			Vector3 A(float a, float r, float y) => at + new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
 			k.Color = Colors.White;
 			k.Quad(A(a0, 0.6f, 1.22f), A(a1, 0.6f, 1.22f), A(a1, 0.74f, 1.22f), A(a0, 0.74f, 1.22f), Vector3.Up);
+		}
 		}
 		k.CommitTo(this, "Font", true);
 		// (solid only up to below the water, so nothing in the bowl is hidden from the hand reaching in)

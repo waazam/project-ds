@@ -531,27 +531,37 @@ public partial class StationBasement : Node3D
 		_wheel = new Node3D { Name = "Wheel", Position = at };
 		AddChild(_wheel);
 		var k = new MeshKit();
-		k.Mat(ItemTextures.SteelMat);
-		k.Color = new Color(0.33f, 0.3f, 0.28f);
-		k.Cylinder(new Vector3(0, 0, -0.1f), new Vector3(0, 0, 0.1f), 0.1f, 0.1f, 8, true);
-		// the pump housing it sits on, with pipes running down into the floor
-		k.Mat(StationTextures.RustPlateMat);
-		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(0, -0.2f, -0.2f), new Vector3(1.0f, 1.3f, 0.3f), 1.5f);
-		k.CommitTo(_wheel, "Housing", true);
 		_wheelSpokes = new Node3D { Name = "Spokes" };
 		_wheel.AddChild(_wheelSpokes);
 		var sk = new MeshKit();
-		sk.Mat(ItemTextures.SteelMat);
-		sk.Color = new Color(0.4f, 0.14f, 0.1f);   // painted red once
-		const float rimR = 0.55f;
-		for (int i = 0; i < 6; i++)
+		// (2026-10-15) the housing and the wheel modelled in Blender (tools/Blender/fixtures.py fx_pump_housing/
+		// fx_valve_wheel; the wheel stays on its own Spokes node to turn); the code below is the fallback
+		if (FixtureModels.Have("fx_pump_housing", "fx_valve_wheel"))
 		{
-			float a = Mathf.Tau * i / 6f;
-			sk.Cylinder(new Vector3(0, 0, 0.12f), new Vector3(Mathf.Cos(a) * rimR, Mathf.Sin(a) * rimR, 0.12f), 0.035f, 0.03f, 5, false);
+			FurnitureKit.Add(k, "fx_pump_housing", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["plate"] = StationTextures.RustPlateMat, ["steel"] = FixtureModels.Tint(ItemTextures.SteelMat, new Color(0.33f, 0.3f, 0.28f)) });
+			FurnitureKit.Add(sk, "fx_valve_wheel", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["paint"] = FixtureModels.Tint(ItemTextures.SteelMat, new Color(0.4f, 0.14f, 0.1f)) });
 		}
-		ItemMeshes.Torus(sk, new Vector3(0, 0, 0.12f), Vector3.Back, rimR, 0.05f, 16, 6);
-		sk.Color = Colors.White;
+		else
+		{
+			k.Mat(ItemTextures.SteelMat);
+			k.Color = new Color(0.33f, 0.3f, 0.28f);
+			k.Cylinder(new Vector3(0, 0, -0.1f), new Vector3(0, 0, 0.1f), 0.1f, 0.1f, 8, true);
+			// the pump housing it sits on, with pipes running down into the floor
+			k.Mat(StationTextures.RustPlateMat);
+			k.Color = Colors.White;
+			BuildKit.Box(k, new Vector3(0, -0.2f, -0.2f), new Vector3(1.0f, 1.3f, 0.3f), 1.5f);
+			sk.Mat(ItemTextures.SteelMat);
+			sk.Color = new Color(0.4f, 0.14f, 0.1f);   // painted red once
+			const float rimR = 0.55f;
+			for (int i = 0; i < 6; i++)
+			{
+				float a = Mathf.Tau * i / 6f;
+				sk.Cylinder(new Vector3(0, 0, 0.12f), new Vector3(Mathf.Cos(a) * rimR, Mathf.Sin(a) * rimR, 0.12f), 0.035f, 0.03f, 5, false);
+			}
+			ItemMeshes.Torus(sk, new Vector3(0, 0, 0.12f), Vector3.Back, rimR, 0.05f, 16, 6);
+			sk.Color = Colors.White;
+		}
+		k.CommitTo(_wheel, "Housing", true);
 		sk.CommitTo(_wheelSpokes, "Wheel", true);
 
 		var body = new StaticBody3D { Name = "WheelBody", CollisionLayer = 1, CollisionMask = 0 };
@@ -659,6 +669,16 @@ public partial class StationBasement : Node3D
 		_clock = new Node3D { Name = "Clock", Position = at, Rotation = new Vector3(0, Mathf.Pi * 0.25f, 0) };
 		AddChild(_clock);
 		var k = new MeshKit();
+		// (2026-10-15) the Blender longcase clock (grandfather_clock.glb, the lodge's and the library's), its face to +Z as
+		// the code's, its wood the flood-blackened brown; the code below is its fallback
+		bool modelled = FurnitureKit.Add(k, "grandfather_clock", Vector3.Zero, Mathf.Pi, new()
+		{
+			["wood"] = FixtureModels.Tint(BuildingTextures.BoardsMat, new Color(0.2f, 0.12f, 0.08f)), ["metal"] = FixtureModels.Tint(ItemTextures.BrassMat, new Color(0.7f, 0.6f, 0.4f)),
+			["face"] = new StandardMaterial3D { AlbedoColor = new Color(0.5f, 0.46f, 0.36f), Roughness = 0.85f },
+			["black"] = new StandardMaterial3D { AlbedoColor = new Color(0.05f, 0.04f, 0.035f), Roughness = 0.6f }, ["glass"] = BuildingTextures.GlassMat,
+			["*"] = FixtureModels.Tint(BuildingTextures.BoardsMat, new Color(0.2f, 0.12f, 0.08f)),
+		});
+		if (!modelled) {
 		k.Mat(BuildingTextures.BoardsMat);
 		k.Color = new Color(0.2f, 0.12f, 0.08f);
 		// (2026-10-15, the props' proportions pass: a longcase clock's parts and proportions, not three stacked boxes) a
@@ -714,6 +734,7 @@ public partial class StationBasement : Node3D
 		k.Mat(StationTextures.Flat("st_silt", new Color(0.2f, 0.2f, 0.12f), 0.9f, 0.1f));
 		k.Color = Colors.White;
 		k.Box(new Vector3(0, 0.36f, 0.172f), new Vector3(0.6f, 0.56f, 0.003f));
+		}
 		k.CommitTo(_clock, "ClockMesh", true);
 		_clockBody = new StaticBody3D { Name = "ClockBody", CollisionLayer = 1, CollisionMask = 0 };
 		_clockBody.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.1f, 0), Shape = new BoxShape3D { Size = new Vector3(0.72f, 2.3f, 0.4f) } });

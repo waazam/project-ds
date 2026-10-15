@@ -407,22 +407,32 @@ public partial class StationRoom1 : Node3D
 		AddChild(_box);
 		const float hw = 0.22f, hd = 0.14f, hh = 0.075f;
 		var k = new MeshKit();
-		k.Mat(BuildingTextures.BoardsMat);
-		k.Color = new Color(0.4f, 0.26f, 0.14f);
-		BuildKit.Box(k, new Vector3(0, hh, 0), new Vector3(hw * 2f, hh * 2f, hd * 2f), 3f, BuildKit.Face.PY);
-		// a paper band round it, gold and red, the brand long gone
-		k.Mat(StationTextures.Flat("st_cigarband", new Color(0.7f, 0.5f, 0.2f), 0.6f, 0.4f));
-		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(0, hh * 1.2f, hd + 0.002f), new Vector3(hw * 1.2f, hh * 0.5f, 0.004f));
-		k.CommitTo(_box, "BoxMesh", true);
-
 		_lid = new Node3D { Name = "Lid", Position = new Vector3(0, hh * 2f, -hd) };
 		_box.AddChild(_lid);
 		var lk = new MeshKit();
-		lk.Mat(BuildingTextures.BoardsMat);
-		lk.Color = new Color(0.42f, 0.27f, 0.15f);
-		BuildKit.Box(lk, new Vector3(0, 0, hd), new Vector3(hw * 2f + 0.01f, 0.015f, hd * 2f + 0.01f), 3f);
-		lk.Color = Colors.White;
+		// (2026-10-15) the box and its lid modelled in Blender (tools/Blender/fixtures.py fx_cigar_box/_lid; the lid keeps
+		// its hinge node); the code below is the fallback
+		var band = StationTextures.Flat("st_cigarband", new Color(0.7f, 0.5f, 0.2f), 0.6f, 0.4f);
+		if (FixtureModels.Have("fx_cigar_box", "fx_cigar_lid"))
+		{
+			FurnitureKit.Add(k, "fx_cigar_box", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["wood"] = FixtureModels.Tint(BuildingTextures.BoardsMat, new Color(0.4f, 0.26f, 0.14f)), ["band"] = band });
+			FurnitureKit.Add(lk, "fx_cigar_lid", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["wood"] = FixtureModels.Tint(BuildingTextures.BoardsMat, new Color(0.42f, 0.27f, 0.15f)) });
+		}
+		else
+		{
+			k.Mat(BuildingTextures.BoardsMat);
+			k.Color = new Color(0.4f, 0.26f, 0.14f);
+			BuildKit.Box(k, new Vector3(0, hh, 0), new Vector3(hw * 2f, hh * 2f, hd * 2f), 3f, BuildKit.Face.PY);
+			// a paper band round it, gold and red, the brand long gone
+			k.Mat(band);
+			k.Color = Colors.White;
+			BuildKit.Box(k, new Vector3(0, hh * 1.2f, hd + 0.002f), new Vector3(hw * 1.2f, hh * 0.5f, 0.004f));
+			lk.Mat(BuildingTextures.BoardsMat);
+			lk.Color = new Color(0.42f, 0.27f, 0.15f);
+			BuildKit.Box(lk, new Vector3(0, 0, hd), new Vector3(hw * 2f + 0.01f, 0.015f, hd * 2f + 0.01f), 3f);
+			lk.Color = Colors.White;
+		}
+		k.CommitTo(_box, "BoxMesh", true);
 		lk.CommitTo(_lid, "LidMesh", true);
 
 		var tapeMat = BuildingTextures.Plain("s_tape2", new Color(0.62f, 0.6f, 0.56f), 0.6f);

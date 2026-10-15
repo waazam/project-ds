@@ -222,6 +222,13 @@ public partial class Cabin
 		var dark = new Color(0.62f, 0.6f, 0.58f);
 		k.Color = dark;
 		var c = new Vector3(sx, 0, sz);
+		// (2026-10-15) the Blender stove (fixtures.py: door to +X, as here), the pipe still drawn below; the code is its fallback
+		bool modelled = FurnitureKit.Add(k, "fx_box_stove", c, 0f, new()
+		{
+			["iron"] = FixtureModels.Tint(iron, dark), ["rust"] = FixtureModels.Tint(iron, new Color(0.72f, 0.66f, 0.6f)),
+		});
+		if (!modelled)
+		{
 		k.BevelBox(c + new Vector3(0, 0.47f, 0), new Vector3(0.5f, 0.5f, 0.62f), 0.025f, 2f);              // the firebox
 		k.BevelBox(c + new Vector3(0, 0.215f, 0), new Vector3(0.56f, 0.03f, 0.68f), 0.01f, 2f);            // the ash lip
 		k.Color = new Color(0.72f, 0.66f, 0.6f);
@@ -263,6 +270,7 @@ public partial class Cabin
 			k.Cylinder(ankle, foot, 0.022f, 0.03f, 7, false);
 			k.Cylinder(foot + Vector3.Down * 0.012f, foot + Vector3.Up * 0.004f, 0.034f, 0.034f, 8, true);
 		}
+		}
 		// the pipe: collar on the stove, up, a joint, the damper's handle, the elbow, along into the wall's thimble
 		k.Mat(BuildingTextures.IronMat);
 		k.Color = new Color(0.33f, 0.31f, 0.3f);
@@ -281,6 +289,14 @@ public partial class Cabin
 	/// a soft dented pillow.</summary>
 	private void BuildCot(MeshKit k, float cx, float cz0, float cz1, float cw)
 	{
+		// (2026-10-15) the Blender cot (fixtures.py: half-width 0.36, 1.9 m long, centred), fitted to this one
+		if (FurnitureKit.Add(k, "fx_cot", new Transform3D(Basis.FromScale(new Vector3(cw / 0.36f, 1f, (cz1 - cz0) / 1.9f)), new Vector3(cx, 0, (cz0 + cz1) * 0.5f)), new System.Collections.Generic.Dictionary<string, Material>()
+		{
+			["wood"] = FixtureModels.Tint(HollowLook.CotWood, new Color(0.9f, 0.88f, 0.86f)), ["canvas"] = FixtureModels.Tint(BuildingTextures.CanvasMat, new Color(0.62f, 0.6f, 0.52f)),
+			["ticking"] = FixtureModels.Tint(BuildingTextures.CanvasMat, new Color(0.55f, 0.52f, 0.44f)), ["blanket"] = HollowLook.Blanket,
+			["pillow"] = BuildingTextures.Plain("b_pillow", new Color(0.5f, 0.48f, 0.43f)),
+		}))
+			return;
 		k.Mat(HollowLook.CotWood);
 		k.Color = new Color(0.9f, 0.88f, 0.86f);
 		float zm = (cz0 + cz1) * 0.5f, len = cz1 - cz0;

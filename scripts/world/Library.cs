@@ -190,6 +190,26 @@ public partial class Library : Node3D
 		var stone = new MeshKit();
 		stone.Mat(SurfaceSets.Relief(new StandardMaterial3D { AlbedoTexture = SurfaceSets.Tex("fireplace_stone"), AlbedoColor = new Color(0.62f, 0.58f, 0.53f), Roughness = 1f, VertexColorUseAsAlbedo = true, Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.8f }, "fireplace_stone", 1.1f));   // (2026-10-13g: sooted stone, was a pale clean concrete)
 		float z = 6.5f, x = HalfW;
+		// (2026-10-15) the stone, the fire dogs and the logs modelled in Blender (tools/Blender/fixtures.py fx_lib_fireplace/
+		// fx_lib_firedogs, in a frame at (HalfW, 0, 6.5)); the code below is the fallback; the embers, the fire and its
+		// sound, and the mantel's candlesticks stay
+		bool modelled = FixtureModels.Have("fx_lib_fireplace", "fx_lib_firedogs");
+		if (modelled)
+		{
+			var at = new Transform3D(Basis.Identity, new Vector3(x, 0, z));
+			FurnitureKit.Add(stone, "fx_lib_fireplace", at, new System.Collections.Generic.Dictionary<string, Material>() { ["stone"] = stone.CurrentMaterial, ["soot"] = FixtureModels.Tint(stone.CurrentMaterial, new Color(0.08f, 0.07f, 0.06f)) });
+			stone.CommitTo(this, "Fireplace", true);
+			foreach (var (c, s) in new[] { (new Vector3(x - 0.3f, 0.6f, z - 0.9f), new Vector3(0.6f, 1.2f, 0.4f)), (new Vector3(x - 0.3f, 0.6f, z + 0.9f), new Vector3(0.6f, 1.2f, 0.4f)),
+				(new Vector3(x - 0.3f, 1.3f, z), new Vector3(0.7f, 0.2f, 2.2f)), (new Vector3(x - 0.2f, (1.4f + Height) * 0.5f, z), new Vector3(0.4f, Height - 1.4f, 1.9f)) })
+				_body.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
+			var dogs = new MeshKit();
+			var logMat0 = SurfaceSets.Apply(new StandardMaterial3D { ResourceName = "lib_logs", AlbedoColor = new Color(0.32f, 0.26f, 0.21f), Roughness = 1f, VertexColorUseAsAlbedo = true }, "wood_log", 1f);
+			logMat0.Uv1Triplanar = true;
+			logMat0.Uv1Scale = Vector3.One * 2f;
+			FurnitureKit.Add(dogs, "fx_lib_firedogs", at, new System.Collections.Generic.Dictionary<string, Material>() { ["iron"] = StairwellTextures.RailMat, ["log"] = logMat0, ["char"] = FixtureModels.Tint(logMat0, Colors.White * 0.5f) });
+			dogs.CommitTo(this, "FireDogs", false);
+		}
+		if (!modelled) {
 		Slab(stone, new Vector3(x - 0.3f, 0.6f, z - 0.9f), new Vector3(0.6f, 1.2f, 0.4f));
 		Slab(stone, new Vector3(x - 0.3f, 0.6f, z + 0.9f), new Vector3(0.6f, 1.2f, 0.4f));
 		Slab(stone, new Vector3(x - 0.3f, 1.3f, z), new Vector3(0.7f, 0.2f, 2.2f));                 // mantel
@@ -228,6 +248,7 @@ public partial class Library : Node3D
 		logs.Color = Colors.White * 0.5f;   // charred
 		logs.Cylinder(new Vector3(x - 0.34f, 0.27f, z - 0.3f), new Vector3(x - 0.3f, 0.25f, z + 0.28f), 0.05f, 0.045f, 9, true, 2f, 0.7f);
 		logs.CommitTo(this, "Logs", false);
+		}
 		var embers = new StandardMaterial3D { ResourceName = "lib_embers", AlbedoTexture = ProcTextures.Grime(), AlbedoColor = new Color(0.25f, 0.05f, 0.02f), EmissionEnabled = true, Emission = new Color(1f, 0.32f, 0.08f), EmissionEnergyMultiplier = 1.4f, EmissionTexture = ProcTextures.Grime(), Roughness = 1f, Uv1Scale = new Vector3(4f, 4f, 1f) };
 		var bed = new MeshKit();
 		bed.Mat(embers);
@@ -260,6 +281,10 @@ public partial class Library : Node3D
 	/// turned wooden feet (into <paramref name="wood"/>).</summary>
 	private static void ClubChair(MeshKit k, MeshKit wood, Vector3 at, float dir, Color leather)
 	{
+		// (2026-10-15) the Blender club chair (club_chair.glb, the lodge's own; its front to -Z, so turned round for +Z)
+		if (k.CurrentMaterial != null && wood.CurrentMaterial != null && FurnitureKit.Add(k, "club_chair", new Transform3D(new Basis(Vector3.Up, dir > 0 ? Mathf.Pi : 0f), at),
+			new System.Collections.Generic.Dictionary<string, Material>() { ["upholstery"] = FixtureModels.Tint(k.CurrentMaterial, leather), ["wood"] = wood.CurrentMaterial, ["metal"] = ItemTextures.BrassMat, ["*"] = wood.CurrentMaterial }))
+			return;
 		var xf = new Transform3D(new Basis(Vector3.Up, dir > 0 ? 0f : Mathf.Pi), at);
 		k.Xf = wood.Xf = xf;
 		var lean = new Basis(Vector3.Right, -0.1f);
@@ -361,6 +386,16 @@ public partial class Library : Node3D
 		// crown, its old ivory dial in a brass bezel with its hands; it was one box with a white disc on it)
 		float cz2 = Depth - 0.75f;
 		_body.AddChild(new CollisionShape3D { Position = new Vector3(4.7f, 1.05f, cz2), Shape = new BoxShape3D { Size = new Vector3(0.5f, 2.1f, 0.4f) } });
+		// (2026-10-15) the Blender grandfather clock (grandfather_clock.glb, the lodge's own), its face to -X as the code's dial;
+		// the code below (the boxes, the dial and hands) is its fallback
+		var dialMat = new StandardMaterial3D { AlbedoColor = new Color(0.66f, 0.6f, 0.47f), Roughness = 0.8f };
+		bool clock = FurnitureKit.Add(k, "grandfather_clock", new Vector3(4.7f, 0, cz2), Mathf.Pi * 0.5f, new()
+		{
+			["wood"] = _wood, ["metal"] = ItemTextures.BrassMat, ["face"] = dialMat, ["black"] = new StandardMaterial3D { AlbedoColor = new Color(0.05f, 0.04f, 0.035f), Roughness = 0.6f },
+			["glass"] = new StandardMaterial3D { AlbedoColor = new Color(0.1f, 0.11f, 0.1f), Roughness = 0.15f, MetallicSpecular = 0.7f }, ["*"] = _wood,
+		});
+		if (!clock)
+		{
 		k.Color = Colors.White * 0.9f;
 		k.BevelBox(new Vector3(4.7f, 0.2f, cz2), new Vector3(0.52f, 0.4f, 0.44f), 0.012f);
 		k.BevelBox(new Vector3(4.7f, 0.42f, cz2), new Vector3(0.48f, 0.05f, 0.4f), 0.012f);
@@ -375,13 +410,17 @@ public partial class Library : Node3D
 		k.Color = Colors.White * 0.85f;
 		k.BevelBox(new Vector3(4.69f, 1.91f, cz2), new Vector3(0.54f, 0.06f, 0.46f), 0.012f);
 		k.BevelBox(new Vector3(4.7f, 1.99f, cz2), new Vector3(0.46f, 0.1f, 0.38f), 0.012f);
+		}
 		k.Color = Colors.White;
 		k.CommitTo(this, "Tables", true);
+		if (!clock)
+		{
 		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.15f, BottomRadius = 0.15f, Height = 0.02f, RadialSegments = 24 }, Position = new Vector3(4.448f, 1.66f, cz2), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.66f, 0.6f, 0.47f), Roughness = 0.8f } });
 		AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.145f, OuterRadius = 0.17f, Rings = 24, RingSegments = 6 }, Position = new Vector3(4.445f, 1.66f, cz2), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = ItemTextures.BrassMat });
 		var hands = new StandardMaterial3D { AlbedoColor = new Color(0.05f, 0.04f, 0.035f), Roughness = 0.6f };
 		AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.004f, 0.1f, 0.01f) }, Position = new Vector3(4.436f, 1.7f, cz2 + 0.01f), Rotation = new Vector3(0.25f, 0, 0), MaterialOverride = hands });
 		AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.004f, 0.07f, 0.012f) }, Position = new Vector3(4.434f, 1.645f, cz2 - 0.025f), Rotation = new Vector3(-1.1f, 0, 0), MaterialOverride = hands });
+		}
 		Loop("res://assets/audio/sfx/clock_tick_loop.wav", new Vector3(4.5f, 1.5f, Depth - 0.75f), -12f, 2.5f);
 		var lad = new MeshKit();
 		lad.Mat(_wood);
@@ -408,6 +447,10 @@ public partial class Library : Node3D
 	/// <paramref name="leg"/> square at their tops.</summary>
 	private static void ReadingTable(MeshKit k, Vector3 foot, Vector3 size, float leg)
 	{
+		// (2026-10-15) the Blender table (fixtures.py: 1.6 x 0.77 x 0.9), fitted to this one, in the kit's wood
+		if (k.CurrentMaterial != null && FurnitureKit.Add(k, "fx_reading_table",
+			new Transform3D(Basis.FromScale(new Vector3(size.X / 1.6f, size.Y / 0.77f, size.Z / 0.9f)), foot), new System.Collections.Generic.Dictionary<string, Material>() { ["wood"] = k.CurrentMaterial }))
+			return;
 		float topT = Mathf.Clamp(size.Y * 0.055f, 0.03f, 0.045f);
 		float yTop = size.Y - topT * 0.5f;
 		k.Color = Colors.White * 0.95f;
