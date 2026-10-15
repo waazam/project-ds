@@ -88,22 +88,31 @@ public partial class SaveLamp : Node3D
 		AddChild(_bulb);
 		_bulb.GlobalPosition = ceil - Vector3.Up * drop;
 		var k = new MeshKit();
-		k.Mat(new StandardMaterial3D { ResourceName = "lamp_cord", AlbedoColor = new Color(0.06f, 0.06f, 0.06f), Roughness = 0.8f });
+		var cord = new StandardMaterial3D { ResourceName = "lamp_cord", AlbedoColor = new Color(0.06f, 0.06f, 0.06f), Roughness = 0.8f };
+		k.Mat(cord);
 		k.Color = Colors.White;
-		k.Cylinder(Vector3.Zero, Vector3.Up * drop, 0.006f, 0.006f, 5, false);
-		// the cage: a few wires round the bulb, a cap
-		k.Cylinder(new Vector3(0, 0.02f, 0), new Vector3(0, 0.07f, 0), 0.03f, 0.028f, 8, true);
-		for (int i = 0; i < 6; i++)
+		k.Cylinder(Vector3.Zero, Vector3.Up * drop, 0.006f, 0.006f, 5, false);   // (the cord, to the ceiling: its length is the room's)
+		// the cage: a few wires round the bulb, a cap ((2026-10-15) modelled in Blender, tools/Blender/kits.py sl_cage; the
+		// wires below are its fallback)
+		if (!FurnitureKit.Add(k, "sl_cage", Transform3D.Identity, new System.Collections.Generic.Dictionary<string, Material>() { ["cord"] = cord }))
 		{
-			float a = i / 6f * Mathf.Tau;
-			var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
-			k.Cylinder(new Vector3(0, 0.02f, 0) + d * 0.03f, new Vector3(0, -0.07f, 0) + d * 0.055f, 0.003f, 0.003f, 4, false);
-			k.Cylinder(new Vector3(0, -0.07f, 0) + d * 0.055f, new Vector3(0, -0.15f, 0) + d * 0.01f, 0.003f, 0.003f, 4, false);
+			k.Mat(cord);
+			k.Cylinder(new Vector3(0, 0.02f, 0), new Vector3(0, 0.07f, 0), 0.03f, 0.028f, 8, true);
+			for (int i = 0; i < 6; i++)
+			{
+				float a = i / 6f * Mathf.Tau;
+				var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+				k.Cylinder(new Vector3(0, 0.02f, 0) + d * 0.03f, new Vector3(0, -0.07f, 0) + d * 0.055f, 0.003f, 0.003f, 4, false);
+				k.Cylinder(new Vector3(0, -0.07f, 0) + d * 0.055f, new Vector3(0, -0.15f, 0) + d * 0.01f, 0.003f, 0.003f, 4, false);
+			}
 		}
 		k.CommitTo(_bulb, "Cage", false);
+		// (the glass: the failing bulb's pear from Blender, fb_glass, 0.1 tall here; a sphere if it's missing)
+		var glassMesh = FurnitureKit.Raw("fb_glass");
 		_bulb.AddChild(new MeshInstance3D
 		{
-			Name = "Glass", Mesh = new SphereMesh { Radius = 0.045f, Height = 0.1f, RadialSegments = 12, Rings = 6 }, Position = new Vector3(0, -0.05f, 0),
+			Name = "Glass", Mesh = glassMesh ?? new SphereMesh { Radius = 0.045f, Height = 0.1f, RadialSegments = 12, Rings = 6 }, Position = new Vector3(0, -0.05f, 0),
+			Scale = glassMesh != null ? new Vector3(1f, 0.1f / 0.1035f, 1f) : Vector3.One,
 			MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.85f, 0.6f), EmissionEnabled = true, Emission = new Color(1f, 0.72f, 0.42f), EmissionEnergyMultiplier = 1.4f },
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});

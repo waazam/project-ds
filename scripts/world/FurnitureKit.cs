@@ -231,6 +231,14 @@ public static class FurnitureKit
 		return true;
 	}
 
+	/// <summary>(2026-10-15) Roles for the tinted Add: (role, material, vertex tint) each.</summary>
+	public static Dictionary<string, (Material mat, Color tint)> Tinted(params (string role, Material mat, Color tint)[] roles)
+	{
+		var d = new Dictionary<string, (Material mat, Color tint)>();
+		foreach (var (role, mat, tint) in roles) d[role] = (mat, tint);
+		return d;
+	}
+
 	/// <summary>As <see cref="Add(MeshKit, string, Vector3, float, Dictionary{string, Material}, Vector3?)"/>, with any
 	/// transform (a chair knocked over on its side).</summary>
 	public static bool Add(MeshKit k, string model, Transform3D xf, Dictionary<string, Material> roles)

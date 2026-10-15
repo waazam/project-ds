@@ -224,6 +224,20 @@ public static class HollowProps
 		Material tin, Material litGlass, Material darkGlass, Material flame)
 	{
 		var f = frame;
+		// (2026-10-15) modelled in Blender (tools/Blender/kits.py hl_frame, hl_globe, hl_flame; its foot at the origin); the
+		// hanging wire stays here (its length is the room's); the code below is the fallback
+		if (FurnitureKit.Has("hl_frame") && FurnitureKit.Has("hl_globe") && FurnitureKit.Has("hl_flame"))
+		{
+			var xf = new Transform3D(Basis.Identity, at);
+			FurnitureKit.Add(f, "hl_frame", xf, FurnitureKit.Tinted(("tin", tin, Colors.White), ("grip", tin, Colors.White * 0.3f)));
+			f.Mat(tin);
+			f.Color = Colors.White;
+			f.Cylinder(at + Vector3.Up * 0.36f, hangFrom, 0.0035f, 0.0035f, 4, false);
+			FurnitureKit.Add(glassDark, "hl_globe", xf, FurnitureKit.Tinted(("glass", darkGlass, Colors.White)));
+			FurnitureKit.Add(glassLit, "hl_globe", xf, FurnitureKit.Tinted(("glass", litGlass, Colors.White)));
+			FurnitureKit.Add(glassLit, "hl_flame", xf, FurnitureKit.Tinted(("flame", flame, Colors.White)));
+			return 0.14f;
+		}
 		f.Mat(tin);
 		f.Color = Colors.White;
 		// the fuel font: a squat drum, rolled at its shoulder, the burner's collar on it

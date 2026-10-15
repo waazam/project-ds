@@ -179,6 +179,23 @@ public static class JanitorShelf
 		k.Color = keep;
 	}
 
+	/// <summary>(2026-10-15) A Blender piece's roles: (role, material, vertex tint).</summary>
+	private static Dictionary<string, (Material mat, Color tint)> Roles(params (string role, Material mat, Color tint)[] r) => FurnitureKit.Tinted(r);
+
+	private static readonly Dictionary<int, StandardMaterial3D> _labels = new();
+	/// <summary>(2026-10-15) The label material for a modelled piece: its label band's own UVs (u across the front, v down
+	/// the band) onto atlas row <paramref name="row"/>, turned round by <paramref name="u0"/> (in sixths).</summary>
+	private static StandardMaterial3D LabelMat(int row, float u0)
+	{
+		int b = Mathf.PosMod(Mathf.RoundToInt(u0 * 6f), 6), key = row * 8 + b;
+		if (_labels.TryGetValue(key, out var m)) return m;
+		m = (StandardMaterial3D)Label.Duplicate();
+		m.ResourceName = $"closet_labels_{row}_{b}";
+		m.Uv1Scale = new Vector3(1f, 0.96f / Rows, 1f);
+		m.Uv1Offset = new Vector3(b / 6f, (row + 0.02f) / Rows, 0f);
+		return _labels[key] = Mark(m);
+	}
+
 	private static Vector2[] Scaled(Vector2[] prof, float sr, float sy)
 	{
 		var o = new Vector2[prof.Length];
@@ -227,6 +244,20 @@ public static class JanitorShelf
 				int dents = rng.Randf() < 0.45f ? rng.RandiRange(1, 2) : 0;
 				for (int i = 0; i < dents; i++)
 					s.Dents.Add((rng.RandfRange(-Mathf.Pi, Mathf.Pi), rng.RandfRange(0.05f, 0.14f) * sy, rng.RandfRange(0.05f, 0.1f), rng.RandfRange(0.2f, 0.4f), rng.RandfRange(0.012f, 0.025f) * sy));
+				// (2026-10-15) modelled in Blender (tools/Blender/kits.py js_can_<dents>, the quart and the pint it scaled; the bail
+				// js_can_bail, leant about its ears); the lathe below is the fallback
+				if (FurnitureKit.Add(k, "js_can_" + dents, new Transform3D(Basis.FromScale(Vector3.One * sr), Vector3.Zero),
+					Roles(("tin", Tin, Colors.White * shade), ("label", LabelMat(s.Row, s.U0), Colors.White))))
+				{
+					if (kind == Kind.Gallon)
+					{
+						float lean = rng.RandfRange(-0.5f, 0.5f);
+						if (!FurnitureKit.Add(k, "js_can_bail", new Transform3D(new Basis(Vector3.Right, lean), new Vector3(0f, 0.158f, 0f)),
+							Roles(("wire", Tin, Colors.White * 0.7f), ("grip", Plastic, new Color(0.06f, 0.055f, 0.05f)))))
+							Bail(k, 0.0875f, 0.158f, lean, Tin, Colors.White * 0.7f, 0.0016f, new Color(0.06f, 0.055f, 0.05f));
+					}
+					break;
+				}
 				Lathe(k, s);
 				if (kind == Kind.Gallon) Bail(k, 0.0875f, 0.158f, rng.RandfRange(-0.5f, 0.5f), Tin, Colors.White * 0.7f, 0.0016f, new Color(0.06f, 0.055f, 0.05f));
 				break;
@@ -250,6 +281,10 @@ public static class JanitorShelf
 				s.BodyColor = bodies[rng.RandiRange(0, bodies.Length - 1)] * shade;
 				s.CapColor = caps[rng.RandiRange(0, caps.Length - 1)];
 				if (rng.Randf() < 0.3f) s.Dents.Add((rng.RandfRange(-2.5f, 2.5f), rng.RandfRange(0.06f, 0.15f), 0.06f, 0.5f, 0.03f));   // (a squeezed side)
+				// (2026-10-15) modelled in Blender (js_jug_0, js_jug_1 squeezed, its handle and cap); the lathe below is the fallback
+				if (FurnitureKit.Add(k, s.Dents.Count > 0 ? "js_jug_1" : "js_jug_0", Transform3D.Identity,
+					Roles(("plastic", Plastic, s.BodyColor), ("cap", Plastic, s.CapColor), ("label", LabelMat(s.Row, s.U0), Colors.White))))
+					break;
 				Lathe(k, s);
 				// the handle, moulded out of the back of the shoulder
 				k.Mat(Plastic);
@@ -283,8 +318,13 @@ public static class JanitorShelf
 				// grey boxes read as white paper flags stuck up over the bottles)
 				var heads = new[] { new Color(0.06f, 0.06f, 0.06f), new Color(0.07f, 0.13f, 0.32f), new Color(0.36f, 0.08f, 0.05f), new Color(0.1f, 0.22f, 0.12f), new Color(0.24f, 0.23f, 0.21f) };
 				s.CapColor = heads[rng.RandiRange(0, heads.Length - 1)] * rng.RandfRange(0.85f, 1.1f);
+				var nozzle = rng.Randf() < 0.3f ? new Color(0.5f, 0.45f, 0.36f) * 0.6f : s.CapColor * 0.8f;
+				// (2026-10-15) modelled in Blender (js_spray, its head); the lathe below is the fallback
+				if (FurnitureKit.Add(k, "js_spray", Transform3D.Identity, Roles(("plastic", Plastic, s.BodyColor), ("cap", Plastic, s.CapColor),
+					("nozzle", Plastic, nozzle), ("trigger", Plastic, s.CapColor * 0.9f), ("label", LabelMat(s.Row, s.U0), Colors.White))))
+					break;
 				Lathe(k, s);
-				SprayHead(k, s.CapColor, rng.Randf() < 0.3f ? new Color(0.5f, 0.45f, 0.36f) * 0.6f : s.CapColor * 0.8f);
+				SprayHead(k, s.CapColor, nozzle);
 				break;
 			}
 			default:
@@ -300,6 +340,10 @@ public static class JanitorShelf
 					Sides = 16, Body = Glass, BodyColor = Colors.White * shade, CapY = 0.1972f, CapColor = new Color(0.08f, 0.075f, 0.07f),
 					Row = RowAmmonia, L0 = 0.03f, L1 = 0.13f, LHalf = 1.25f,
 				};
+				// (2026-10-15) modelled in Blender (js_bottle); the lathe below is the fallback
+				if (FurnitureKit.Add(k, "js_bottle", Transform3D.Identity, Roles(("glass", Glass, s.BodyColor), ("cap", Plastic, s.CapColor),
+					("label", LabelMat(s.Row, s.U0), Colors.White))))
+					break;
 				Lathe(k, s);
 				break;
 			}
@@ -454,6 +498,9 @@ public static class JanitorShelf
 		// the tin, lying along the spill's way, its mouth toward it
 		float sr = 0.66f;
 		var xf = new Transform3D(new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, -Mathf.Pi * 0.5f), at + Vector3.Up * (0.087f * sr));
+		// (2026-10-15) modelled in Blender (js_can_open, standing; laid down here); the lathe below is the fallback
+		if (FurnitureKit.Add(k, "js_can_open", xf, Roles(("tin", Tin, Colors.White * 0.85f), ("label", LabelMat(RowLatex, 0.3f), Colors.White))))
+			return;
 		var keepXf = k.Xf;
 		k.Xf = keepXf * xf;
 		// (its own profile: no lid, the inside of it dark and its rim crusted with the paint)

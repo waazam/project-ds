@@ -55,9 +55,18 @@ public static class DebrisKit
 			{
 				float s = rng.RandfRange(0.012f, 0.05f) * (j == 0 ? 1f : 0.7f);
 				var q = p + new Vector3(rng.RandfRange(-0.06f, 0.06f), 0, rng.RandfRange(-0.06f, 0.06f)) * (j == 0 ? 0f : 1f);
-				k.Color = crumb * rng.RandfRange(0.75f, 1.1f);
-				k.Box(q + Vector3.Up * (s * 0.32f + 0.002f), new Vector3(s, s * 0.6f, s * rng.RandfRange(0.7f, 1.3f)), 1f,
-					Basis.FromEuler(new Vector3(rng.RandfRange(-0.3f, 0.3f), rng.RandfRange(0f, Mathf.Tau), rng.RandfRange(-0.3f, 0.3f))));
+				var col = crumb * rng.RandfRange(0.75f, 1.1f);
+				float zr = rng.RandfRange(0.7f, 1.3f);
+				var bs = Basis.FromEuler(new Vector3(rng.RandfRange(-0.3f, 0.3f), rng.RandfRange(0f, Mathf.Tau), rng.RandfRange(-0.3f, 0.3f)));
+				var at = q + Vector3.Up * (s * 0.32f + 0.002f);
+				// (2026-10-15) a broken lump modelled in Blender (tools/Blender/kits.py db_crumb_0..3, about 1 x 0.6 x 1, sized
+				// here); the box is its fallback
+				if (FurnitureKit.Add(k, "db_crumb_" + ((i * 3 + j) & 3), new Transform3D(bs * Basis.FromScale(new Vector3(s, s, s * zr)), at),
+					FurnitureKit.Tinted(("crumb", CrumbMat, col))))
+					continue;
+				k.Mat(CrumbMat);
+				k.Color = col;
+				k.Box(at, new Vector3(s, s * 0.6f, s * zr), 1f, bs);
 			}
 		}
 		// (2026-10-15) the scraps keep out from under what stands in the room (they sat inside bed and table legs): the

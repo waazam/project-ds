@@ -71,6 +71,12 @@ public sealed class ClutterKit
 	/// <summary>A carton or a wooden box, its lid's seam and its edges eased.</summary>
 	public static Item Carton(Material m, Vector3 size, Color? tint = null) => new("carton", (k, xf) =>
 	{
+		// (2026-10-15) modelled in Blender (tools/Blender/kits.py cl_carton, at 0.4 x 0.3 x 0.32 and scaled to the size);
+		// the boxes below are its fallback
+		Color c = tint ?? Colors.White;
+		if (FurnitureKit.Add(k, "cl_carton", xf * new Transform3D(Basis.FromScale(size / new Vector3(0.4f, 0.3f, 0.32f)), Vector3.Zero),
+			FurnitureKit.Tinted(("body", m, c), ("flap", m, c * 0.8f))))
+			return;
 		k.Mat(m);
 		var keep = k.Color;
 		k.Color = tint ?? Colors.White;
@@ -86,6 +92,10 @@ public sealed class ClutterKit
 	/// <summary>A picture frame (back to the room or face out), for leaning against a wall: moulding round a canvas.</summary>
 	public static Item Frame(Material wood, Material canvas, float w = 0.6f, float h = 0.8f) => new("frame", (k, xf) =>
 	{
+		// (2026-10-15) modelled in Blender (cl_frame, at 0.5 x 0.65 and scaled); the boxes below are its fallback
+		if (FurnitureKit.Add(k, "cl_frame", xf * new Transform3D(Basis.FromScale(new Vector3(w / 0.5f, h / 0.65f, 1f)), Vector3.Zero),
+			FurnitureKit.Tinted(("wood", wood, k.Color), ("canvas", canvas, k.Color * 0.55f))))
+			return;
 		const float t = 0.03f, f = 0.06f;
 		var b = xf.Basis;
 		Vector3 P(float x, float y) => xf * new Vector3(x, y, 0);
@@ -104,6 +114,10 @@ public sealed class ClutterKit
 	/// <summary>A board or a plank, for leaning.</summary>
 	public static Item Board(Material wood, float len = 1.6f, float w = 0.18f, float t = 0.025f) => new("board", (k, xf) =>
 	{
+		// (2026-10-15) modelled in Blender (cl_board, 1.6 x 0.18 x 0.025 and scaled); the box below is its fallback
+		if (FurnitureKit.Add(k, "cl_board", xf * new Transform3D(Basis.FromScale(new Vector3(w / 0.18f, len / 1.6f, t / 0.025f)), Vector3.Zero),
+			FurnitureKit.Tinted(("wood", wood, k.Color))))
+			return;
 		k.Mat(wood);
 		k.BevelBox(xf * new Vector3(0, len * 0.5f, 0), new Vector3(w, len, t), 0.005f, 1f, xf.Basis);
 	}, new Vector3(w, len, t), false, true, false);
@@ -113,6 +127,9 @@ public sealed class ClutterKit
 	{
 		// (2026-10-15, the props pass: a round handle with a rounded end, set into a stock with a domed top, the bristles
 		// splaying out below it; it was a hexagonal stick on two boxes)
+		// (2026-10-15) modelled in Blender (cl_broom: the tufts, a ferrule); the code below is its fallback
+		if (FurnitureKit.Add(k, "cl_broom", xf, FurnitureKit.Tinted(("wood", wood, k.Color), ("trim", wood, k.Color * 0.45f), ("bristle", bristle, k.Color * 0.8f))))
+			return;
 		k.Mat(wood);
 		TurnedKit.Lathe(k, xf * new Vector3(0, 0.215f, 0), TurnedKit.P(0f, 0f, 0.0145f, 0f, 0.0145f, 1.12f, 0.011f, 1.13f, 0f, 1.135f), 8);
 		k.BevelBox(xf * new Vector3(0, 0.2f, 0), new Vector3(0.28f, 0.045f, 0.06f), 0.016f, 1f, xf.Basis);
@@ -139,6 +156,9 @@ public sealed class ClutterKit
 	{
 		// (2026-10-15, the props pass: a pressed pail, its foot ring, two swaged hoops, a rolled rim and its inside down to
 		// the bottom, the ears and the wire bail lying down; it was a capped ten-sided cone)
+		// (2026-10-15) modelled in Blender (cl_bucket); the code below is its fallback
+		if (FurnitureKit.Add(k, "cl_bucket", xf, FurnitureKit.Tinted(("metal", metal, k.Color), ("trim", metal, k.Color * 0.85f))))
+			return;
 		k.Mat(metal);
 		var keep = k.Color;
 		TurnedKit.Lathe(k, xf, TurnedKit.P(0f, 0.006f, 0.112f, 0.006f, 0.116f, 0f, 0.122f, 0f, 0.121f, 0.012f, 0.124f, 0.012f, 0.128f, 0.07f, 0.131f, 0.074f, 0.132f, 0.08f,
@@ -167,6 +187,10 @@ public sealed class ClutterKit
 	{
 		var keep = k.Color;
 		Color c = tint ?? Colors.White;
+		// (2026-10-15) modelled in Blender (cl_bundle, 0.3 x 0.12 x 0.24 and scaled); the boxes below are its fallback
+		if (FurnitureKit.Add(k, "cl_bundle", xf * new Transform3D(Basis.FromScale(size / new Vector3(0.3f, 0.12f, 0.24f)), Vector3.Zero),
+			FurnitureKit.Tinted(("body", m, c), ("twine", twine, twine == m ? new Color(1f, 0.95f, 0.85f) : Colors.White))))
+			return;
 		k.Mat(m);
 		k.Color = c;
 		k.BevelBox(xf * new Vector3(0, size.Y * 0.5f, 0), size, Mathf.Min(0.01f, size.Y * 0.2f), 1f, xf.Basis);

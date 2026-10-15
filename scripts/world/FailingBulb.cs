@@ -51,12 +51,27 @@ public partial class FailingBulb : Node3D
 			ResourceName = "failing_bulb_glass", AlbedoColor = new Color(0.32f, 0.3f, 0.26f), Roughness = 0.35f, MetallicSpecular = 0.6f,
 			EmissionEnabled = true, Emission = LightColor, EmissionEnergyMultiplier = 0f,
 		};
+		// (2026-10-15) the glass, holder and cage modelled in Blender (tools/Blender/kits.py fb_glass, fb_holder, fb_cage, at a
+		// 0.045 glass and scaled to this one); the glass keeps its own dimming material; the code shapes are the fallback
+		float sc = Radius / 0.045f;
+		var glassMesh = FurnitureKit.Raw("fb_glass");
 		AddChild(new MeshInstance3D
 		{
-			Name = "Glass", Mesh = new SphereMesh { Radius = Radius, Height = Radius * 2.3f, RadialSegments = 10, Rings = 6 },
+			Name = "Glass", Mesh = glassMesh ?? new SphereMesh { Radius = Radius, Height = Radius * 2.3f, RadialSegments = 10, Rings = 6 },
+			Scale = glassMesh != null ? Vector3.One * sc : Vector3.One,
 			MaterialOverride = _glass, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
 		var k = new MeshKit();
+		var wireRoles = new System.Collections.Generic.Dictionary<string, Material>() { ["wire"] = Materials.Wire };
+		bool holder = FurnitureKit.Add(k, "fb_holder", new Transform3D(Basis.FromScale(Vector3.One * sc), Vector3.Zero), wireRoles);
+		bool cage = Kind != Housing.Cage || FurnitureKit.Add(k, "fb_cage", new Transform3D(Basis.FromScale(Vector3.One * sc), Vector3.Zero), wireRoles);
+		if (holder && cage)
+		{
+			k.CommitTo(this, "Holder", false);
+			AddLight();
+			return;
+		}
+		k = new MeshKit();
 		k.Mat(Materials.Wire);
 		k.Color = Colors.White;
 		// the brass-and-bakelite holder above it
@@ -81,6 +96,11 @@ public partial class FailingBulb : Node3D
 			}
 		}
 		k.CommitTo(this, "Holder", false);
+		AddLight();
+	}
+
+	private void AddLight()
+	{
 		_light = new OmniLight3D
 		{
 			Name = "Light", LightColor = LightColor, LightEnergy = 0f, OmniRange = Range, OmniAttenuation = Attenuation, ShadowEnabled = Shadows,

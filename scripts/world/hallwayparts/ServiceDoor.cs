@@ -48,6 +48,26 @@ public static class ServiceDoor
 	/// </summary>
 	public static void Leaf(MeshKit leaf, MeshKit hw, float w, float h, float t, float handleY = 1.0f, int seed = 0)
 	{
+		// (2026-10-15) modelled in Blender (tools/Blender/kits.py: svc_leaf at 1.0 x 2.1 x 0.05 scaled to the leaf, svc_lever
+		// mirrored for the far face, svc_kick, svc_hinge), in the kits' own materials; the boxes below are the fallback
+		if (FurnitureKit.Has("svc_leaf") && FurnitureKit.Has("svc_lever") && FurnitureKit.Has("svc_kick") && FurnitureKit.Has("svc_hinge"))
+		{
+			Material lm = leaf.CurrentMaterial, hm = hw.CurrentMaterial;
+			FurnitureKit.Add(leaf, "svc_leaf", new Transform3D(Basis.FromScale(new Vector3(w, h / 2.1f, t / 0.05f)), Vector3.Zero),
+				FurnitureKit.Tinted(("leaf", lm, Colors.White), ("edge", lm, Colors.White * 0.86f)));
+			leaf.Mat(lm);
+			var roles = FurnitureKit.Tinted(("hw", hm, Colors.White), ("grip", hm, Colors.White * 0.25f));
+			foreach (float s in new[] { -1f, 1f })
+			{
+				FurnitureKit.Add(hw, "svc_kick", new Transform3D(Basis.FromScale(new Vector3((w - 0.1f) / 0.9f, 1f, s)), new Vector3(w * 0.5f, 0.16f, s * (t * 0.5f + 0.003f))), roles);
+				FurnitureKit.Add(hw, "svc_lever", new Transform3D(Basis.FromScale(new Vector3(1f, 1f, s)), new Vector3(w - 0.09f, handleY, s * t * 0.5f)), roles);
+			}
+			foreach (float y in new[] { 0.25f, h * 0.5f + 0.05f, h - 0.25f })
+				FurnitureKit.Add(hw, "svc_hinge", new Transform3D(Basis.Identity, new Vector3(-0.004f, y, 0)), roles);
+			hw.Mat(hm);
+			hw.Color = Colors.White;
+			return;
+		}
 		leaf.Color = Colors.White;
 		// the slab, and its rolled edges a hair proud all round (so its outline catches the light, not a cut box)
 		BuildKit.Box(leaf, new Vector3(w * 0.5f, h * 0.5f, 0), new Vector3(w - 0.03f, h - 0.03f, t));
@@ -87,6 +107,42 @@ public static class ServiceDoor
 		k.Color = Colors.White;
 		float d = z1 - z0 + 2f * proud, zc = (z0 + z1) * 0.5f, inset = 0.006f;
 		float xl = foot.X - w * 0.5f, xr = foot.X + w * 0.5f, yt = foot.Y + h;
+		// (2026-10-15) modelled in Blender (svc_casing: a moulded trim bar, svc_strip: the soffit and the stop, each 1 m up Y
+		// and scaled to its box; across, a bar is turned on its side); the boxes below are the fallback
+		if (FurnitureKit.Has("svc_casing") && FurnitureKit.Has("svc_strip"))
+		{
+			var fm = k.CurrentMaterial;
+			void Bar(string model, Vector3 c, Vector3 size, bool across, float flipX, float flipZ, Color tint, Vector2 refXZ)
+			{
+				var b = across
+					? new Basis(Vector3.Back, Mathf.Pi * 0.5f) * Basis.FromScale(new Vector3(flipX * size.Y / refXZ.X, size.X, flipZ * size.Z / refXZ.Y))
+					: Basis.FromScale(new Vector3(flipX * size.X / refXZ.X, size.Y, flipZ * size.Z / refXZ.Y));
+				FurnitureKit.Add(k, model, new Transform3D(b, c), FurnitureKit.Tinted(("frame", fm, tint)));
+			}
+			var strip = new Vector2(0.02f, 0.016f);
+			var casing = new Vector2(0.055f, 0.014f);
+			Bar("svc_strip", new Vector3(xl + inset * 0.5f + 0.004f, foot.Y + h * 0.5f, zc), new Vector3(inset + 0.008f, h, d), false, 1f, 1f, Colors.White, strip);
+			Bar("svc_strip", new Vector3(xr - inset * 0.5f - 0.004f, foot.Y + h * 0.5f, zc), new Vector3(inset + 0.008f, h, d), false, 1f, 1f, Colors.White, strip);
+			Bar("svc_strip", new Vector3(foot.X, yt - inset * 0.5f - 0.004f, zc), new Vector3(w, inset + 0.008f, d), true, 1f, 1f, Colors.White, strip);
+			foreach (var (zf, out_) in new[] { (z0 - proud * 0.5f, -1f), (z1 + proud * 0.5f, 1f) })
+			{
+				var tc = Colors.White * 0.95f;
+				// (the bead on the outer edge of each: the jambs' away from the opening, the head's along its top)
+				Bar("svc_casing", new Vector3(xl - face * 0.5f + inset, foot.Y + (h + face) * 0.5f, zf), new Vector3(face, h + face, proud), false, 1f, out_, tc, casing);
+				Bar("svc_casing", new Vector3(xr + face * 0.5f - inset, foot.Y + (h + face) * 0.5f, zf), new Vector3(face, h + face, proud), false, -1f, out_, tc, casing);
+				Bar("svc_casing", new Vector3(foot.X, yt + face * 0.5f - inset, zf), new Vector3(w + 2f * face - 2f * inset, face, proud + 0.002f), true, -1f, out_, tc, casing);
+			}
+			if (stopZ is float sz0)
+			{
+				var tc = Colors.White * 0.8f;
+				Bar("svc_strip", new Vector3(xl + 0.018f, foot.Y + h * 0.5f, sz0), new Vector3(0.02f, h, 0.016f), false, 1f, 1f, tc, strip);
+				Bar("svc_strip", new Vector3(xr - 0.018f, foot.Y + h * 0.5f, sz0), new Vector3(0.02f, h, 0.016f), false, 1f, 1f, tc, strip);
+				Bar("svc_strip", new Vector3(foot.X, yt - 0.018f, sz0), new Vector3(w, 0.02f, 0.016f), true, 1f, 1f, tc, strip);
+			}
+			k.Mat(fm);
+			k.Color = Colors.White;
+			return;
+		}
 		// the soffit: the frame's inside through the wall
 		BuildKit.Box(k, new Vector3(xl + inset * 0.5f + 0.004f, foot.Y + h * 0.5f, zc), new Vector3(inset + 0.008f, h, d));
 		BuildKit.Box(k, new Vector3(xr - inset * 0.5f - 0.004f, foot.Y + h * 0.5f, zc), new Vector3(inset + 0.008f, h, d));
