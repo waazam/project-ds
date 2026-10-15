@@ -335,7 +335,7 @@ Offset = 0
 FootprintRadius = 0
 
 [node name="Shed" parent="." instance=ExtResource("15_shed")]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 27, 0, -372)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 27, 0, -372)
 
 [node name="ShedClear" type="Node3D" parent="Shed"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)

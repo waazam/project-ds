@@ -168,6 +168,14 @@ public partial class Playtest
 		Check("empty-handed: the door is boarded shut", _bot.Prompt == "The door is boarded shut.", $"'{_bot.Prompt}'");
 		var hammer = _bot.Pickups(ToolKind.Hammer).FirstOrDefault();
 		Require("the hammer in the shed", hammer != null);
+		// walked in on foot from the yard, not set down beside it (the doorway's sill once stood as a ledge)
+		if (GetTree().CurrentScene.FindChild("Shed", true, false) is Shed shed)
+		{
+			Vector3 inShed = shed.GlobalTransform * new Vector3(0, 0.1f, 0f), yard = shed.GlobalTransform * new Vector3(0, 0, shed.Depth * 0.5f + 3f);
+			await _bot.Teleport(yard, inShed, ct);
+			bool walkedIn = await _bot.WalkTo(inShed, 0.5f, ct, giveUp: 10f);
+			Check("the shed walked into from the yard", walkedIn, $"stopped at {_bot.Player.GlobalPosition}, wanted {inShed}");
+		}
 		await _bot.UseAround(hammer, ct);
 		Check("the hammer picked up", Inv.HasTool(ToolKind.Hammer));
 		await _bot.Teleport(cabin.ApproachPoint, cabin.DoorCenter, ct);

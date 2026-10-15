@@ -12,8 +12,11 @@ namespace ProjectDS.World;
 ///
 /// Local frame: front (the doorway) faces +Z; y = 0 is the plank floor top. At
 /// runtime it grounds itself: floor just above the highest ground under it,
-/// concrete-block piers and skirt boards down to the ground, a block step at the
-/// door if needed. The hammer spot is the child marker "HammerSpot" (shed.tscn,
+/// fieldstone piers and skirt boards down to the ground, a flight of plank steps
+/// from the sill to the ground in front (<see cref="BuildSteps"/>). It stands on a
+/// steep hillside (the ground rises ~0.4 m a metre to the east), so in the Hollow it
+/// faces south, across the slope toward the cabin: facing west, down the slope, the
+/// sill stood 1.05 m over the ground and the ground kept falling. The hammer spot is the child marker "HammerSpot" (shed.tscn,
 /// on the bench top, group "spot_hammer"), also <see cref="BenchSpot"/>.
 /// </summary>
 [Tool]
@@ -69,6 +72,93 @@ public partial class Shed : Node3D
 		return _terrain.HeightAt(w.X, w.Z) - GlobalPosition.Y;
 	}
 
+	private const float StepW = 1.04f, StepRun = 0.27f, MaxRise = 0.2f, StringerH = 0.26f;
+
+	/// <summary>Weathered plank steps from the sill down to the yard: two board stringers (plumb cut at the
+	/// sill, level cut where each meets its own ground, so it works on a cross-slope), cleats, two planks a
+	/// tread, a flat stone under each stringer's foot. However far the floor stands proud, the risers stay
+	/// under <see cref="MaxRise"/>; the collision is one smooth ramp along the nosings, run on past the foot
+	/// and into the ground so there is no lip to climb at either end (the capsule has no step-up).</summary>
+	private void BuildSteps(MeshKit k, List<(Vector3 c, Vector3 s, Basis b)> cols)
+	{
+		float ze = Hd + 0.015f;   // the face of the front skirt, under the sill
+		// how far down: the flight reaches further out on falling ground, so walk the foot out as it grows
+		int n = 1;
+		float drop = -GroundLocal(0, ze + 0.5f * StepRun);
+		for (int it = 0; it < 6; it++)
+		{
+			n = Mathf.Clamp(Mathf.CeilToInt(drop / MaxRise), 1, 14);
+			float d = -GroundLocal(0, ze + (n - 0.5f) * StepRun);
+			if (Mathf.Abs(d - drop) < 0.01f || (it > 0 && d < drop)) break;
+			drop = d;
+		}
+		n = Mathf.Clamp(Mathf.CeilToInt(drop / MaxRise), 1, 14);
+		if (drop < 0.06f) return;   // the sill is at the ground: nothing to climb
+		float rise = drop / n, slope = rise / StepRun;
+		float Nose(float z) => -(z - ze) * slope;   // the line along the nosings
+		var rng = new RandomNumberGenerator { Seed = 4423 };
+		float sw = StepW * 0.5f;
+
+		// stringers, one each side, each cut level where it meets its own ground
+		k.Mat(BuildingTextures.TimberAlongMat);
+		foreach (int s in new[] { -1, 1 })
+		{
+			float x = s * (sw - 0.025f);
+			// its own ground at its foot (on a cross-slope one stringer lands sooner than the other)
+			float g = GroundLocal(x, ze + (n - 0.5f) * StepRun);
+			for (int it = 0; it < 4; it++) g = Mathf.Min(GroundLocal(x, ze - (g + StringerH * 0.5f) / slope), -0.02f);
+			g += 0.02f;   // the foot rests on its stone
+			float zTop = ze - g / slope;                 // where its top edge meets the ground
+			float zBot = ze - (g + StringerH) / slope;   // ... and its bottom edge
+			k.Color = new Color(0.56f, 0.52f, 0.47f) * rng.RandfRange(0.92f, 1.04f);
+			var zy = new List<Vector2> { new(ze, 0f), new(zTop, g) };
+			if (zBot > ze + 0.01f) { zy.Add(new(zBot, g)); zy.Add(new(ze, -StringerH)); }
+			else zy.Add(new(ze, g));
+			k.ExtrudeX(zy, x - 0.025f, x + 0.025f, 1.4f);
+			// a flat stone under its foot
+			k.Mat(ProcTextures.RockTriMat);
+			k.Color = new Color(0.6f, 0.58f, 0.55f);
+			zBot = Mathf.Max(ze, zBot);
+			float zf = (zTop + zBot) * 0.5f;
+			k.Blob(new Vector3(x, GroundLocal(x, zf) - 0.03f, zf), new Vector3(0.13f, 0.07f, Mathf.Max(0.16f, (zTop - zBot) * 0.5f)), 4431 + s, 0.15f, true, 1.5f, 0.35f);
+			k.Mat(BuildingTextures.TimberAlongMat);
+		}
+		// treads: two weathered planks each, resting on cleats nailed inside the stringers
+		float inner = StepW - 0.1f, plankD = (StepRun - 0.012f) * 0.5f;
+		for (int i = 1; i < n; i++)
+		{
+			float top = -i * rise, za = ze + (i - 1) * StepRun;
+			for (int p = 0; p < 2; p++)
+			{
+				float zc = za + 0.004f + plankD * (p + 0.5f) + p * 0.006f;
+				k.Mat(BuildingTextures.PorchDeckMat);
+				k.Color = new Color(0.78f, 0.74f, 0.69f) * rng.RandfRange(0.85f, 1.05f);
+				var tilt = Basis.FromEuler(new Vector3(rng.RandfRange(-0.012f, 0.012f), rng.RandfRange(-0.02f, 0.02f), rng.RandfRange(-0.01f, 0.01f)));
+				BuildKit.Box(k, new Vector3(rng.RandfRange(-0.015f, 0.015f), top - 0.02f - rng.RandfRange(0f, 0.006f), zc), new Vector3(inner + rng.RandfRange(-0.01f, 0.02f), 0.04f, plankD), 1f / 0.15f, BuildKit.Face.None, tilt);
+			}
+			k.Mat(BuildingTextures.TimberAlongMat);
+			k.Color = new Color(0.5f, 0.46f, 0.42f);
+			foreach (int s in new[] { -1, 1 })
+				BuildKit.Box(k, new Vector3(s * (sw - 0.05f - 0.02f), top - 0.065f, za + StepRun * 0.5f), new Vector3(0.04f, 0.05f, StepRun - 0.06f), 1.4f);
+			// nail heads
+			k.Mat(BuildingTextures.IronMat);
+			k.Color = new Color(0.3f, 0.28f, 0.26f);
+			foreach (int s in new[] { -1, 1 })
+				for (int p = 0; p < 2; p++)
+					BuildKit.Box(k, new Vector3(s * (inner * 0.5f - 0.04f), top + 0.001f, za + 0.004f + plankD * (p + 0.5f) + p * 0.006f), new Vector3(0.012f, 0.004f, 0.012f), 3f, BuildKit.Face.NY);
+		}
+		// collision: one ramp along the nosings from the sill, carried on past the foot into the ground
+		float zEnd = ze + n * StepRun + 0.4f;
+		float gEnd = Mathf.Min(GroundLocal(0, zEnd), Mathf.Min(GroundLocal(-sw, zEnd), GroundLocal(sw, zEnd))) - 0.03f;
+		Vector3 from = new(0, 0, Hd), to = new(0, Mathf.Min(gEnd, Nose(zEnd)), zEnd);
+		Vector3 dir = to - from;
+		float len = dir.Length();
+		Vector3 zAxis = dir / len;
+		Vector3 yAxis = zAxis.Cross(Vector3.Right).Normalized();
+		if (yAxis.Y < 0) yAxis = -yAxis;
+		cols.Add(((from + to) * 0.5f - yAxis * 0.1f, new Vector3(StepW, 0.2f, len), new Basis(Vector3.Right, yAxis, zAxis)));
+	}
+
 	public void Build()
 	{
 		var old = GetNodeOrNull("Generated");
@@ -109,18 +199,7 @@ public partial class Shed : Node3D
 		float gMin = Mathf.Min(Mathf.Min(GroundLocal(-hw, -hd), GroundLocal(hw, -hd)), Mathf.Min(GroundLocal(-hw, hd), GroundLocal(hw, hd))) - 0.2f;
 		cols.Add((new Vector3(0, gMin * 0.5f, 0), new Vector3(Width, -gMin, Depth), Basis.Identity));
 
-		// block step at the door when the floor stands proud of the ground
-		float gDoor = GroundLocal(0, hd + 0.35f);
-		if (gDoor < -0.22f)
-		{
-			// (2026-10-14a: was a pale concrete box; now a flat fieldstone set into the ground, as the woods' rocks)
-			k.Mat(ProcTextures.RockTriMat);
-			k.Color = new Color(0.62f, 0.6f, 0.56f);
-			float stepTop = gDoor * 0.5f;
-			float sh = stepTop - gDoor + 0.12f;
-			k.Blob(new Vector3(0.03f, stepTop - sh * 0.5f + 0.01f, hd + 0.32f), new Vector3((DoorW + 0.3f) * 0.5f, sh * 0.5f + 0.02f, 0.27f), 4417, 0.12f, true, 1.5f, 0.35f);
-			cols.Add((new Vector3(0, (stepTop + gDoor - 0.1f) * 0.5f, hd + 0.3f), new Vector3(DoorW + 0.2f, stepTop - gDoor + 0.1f, 0.4f), Basis.Identity));
-		}
+		BuildSteps(k, cols);
 
 		// ---- walls: vertical boards outside, battens over the seams
 		k.Mat(boards);
