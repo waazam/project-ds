@@ -91,6 +91,8 @@ public partial class GroundAudit : Node
 	private PhysicsDirectSpaceState3D _space;
 	private HashSet<string> _shots;
 	private int _scatterPerMesh = 150;
+	/// <summary>In a pass that audits only what's under one node (Act 25's pass: the ending's), that node's path.</summary>
+	private string _onlyUnder;
 
 	public override void _Ready()
 	{
@@ -147,6 +149,7 @@ public partial class GroundAudit : Node
 			await AuditLevel("trailhead", "res://scenes/levels/forest_world.tscn", false);
 			await AuditLevel("hollow", "res://scenes/levels/hollow_world.tscn", false);
 			await AuditLevel("hollow_act6", "res://scenes/levels/hollow_world.tscn", true);
+			await AuditLevel("trailhead_act25", "res://scenes/levels/forest_world.tscn", false, act25: true);
 			WriteReport();
 		}
 		catch (Exception e)
@@ -163,10 +166,14 @@ public partial class GroundAudit : Node
 
 	// ------------------------------------------------------------------ a level
 
-	private async Task AuditLevel(string level, string path, bool act6)
+	private async Task AuditLevel(string level, string path, bool act6, bool act25 = false)
 	{
 		var world = GD.Load<PackedScene>(path).Instantiate<Node3D>();
 		AddChild(world);
+		// (2026-10-14) Act 25's walk home: the trailhead with what the ending puts in it (the snowbank, the old cabin); only
+		// those are audited in this pass
+		if (act25) world.AddChild(new SnowMaze.EndingDirector { Name = "EndingDirector" });
+		_onlyUnder = act25 ? "EndingDirector" : null;
 		// the scatter builds deferred, pickups settle over ~40 physics frames, buildings ground themselves
 		await PhysicsFrames(90);
 		await Frames(5);
@@ -179,6 +186,13 @@ public partial class GroundAudit : Node
 		_space = world.GetWorld3D().DirectSpaceState;
 		var targets = new List<Target>();
 		Collect(level, world, world, targets, act6);
+		if (act25 && world.GetNodeOrNull<Node3D>("EndingDirector/SnowBank") is { } bank)
+		{
+			// a skin of snow lying on the ground has no underside: its "base" is its top, a few cm up, by design. Only its edges
+			// count (they must go into the ground: FLOAT)
+			var t = AddTarget(level, "EndingDirector/SnowBank", "EndingDirector.SnowBank", GroundKind.Terrain, bank, targets, false);
+			if (t != null) t.NoHang = true;
+		}
 		await PhysicsFrames(1);
 		foreach (var t in targets) Measure(t);
 		_all.AddRange(targets);
@@ -211,8 +225,8 @@ public partial class GroundAudit : Node
 	{
 		foreach (var c in n.GetChildren())
 		{
-			if (c is ForestScatter fs) { if (!act6) CollectScatter(level, root, fs, into); continue; }
-			if (IsTarget(c))
+			if (c is ForestScatter fs) { if (!act6 && _onlyUnder == null) CollectScatter(level, root, fs, into); continue; }
+			if (IsTarget(c) && (_onlyUnder == null || PathOf(root, c).StartsWith(_onlyUnder)))
 			{
 				string name = PathOf(root, c);
 				string kind = c is ParkProp pp ? "ParkProp." + pp.Kind : c.GetType().Name;

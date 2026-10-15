@@ -51,6 +51,10 @@ public partial class Cabin : Node3D
 	[Export] public bool AutoGround = true;
 	/// <summary>Ground depth below the floor used in the editor (no terrain there).</summary>
 	[Export] public float EditorGroundDepth = 0.55f;
+	/// <summary>(2026-10-14) Act 25's cabin by the trail home (<see cref="SnowMaze.EndingDirector"/>): the same cabin, long
+	/// left: dark inside, no papers, the door off its top hinge and hanging open into the room. Not the story's cabin: it
+	/// stays out of the "cabin" group.</summary>
+	[Export] public bool Derelict = false;
 
 	public bool DoorBoarded { get; private set; }
 	public bool IsOpen { get; private set; }
@@ -125,7 +129,8 @@ public partial class Cabin : Node3D
 
 	public override void _Ready()
 	{
-		AddToGroup("cabin");
+		if (Derelict) { _lightOn = false; IsOpen = true; }
+		else AddToGroup("cabin");
 		if (!Engine.IsEditorHint())
 		{
 			_terrain = GroundSnap.FindTerrain(this);
@@ -218,9 +223,9 @@ public partial class Cabin : Node3D
 
 		BuildDoor();
 		if (DoorBoarded && !IsOpen) BuildPlanks();
-		if (IsOpen) BuildDebris();
+		if (IsOpen && !Derelict) BuildDebris();
 		RefreshWindowBoards();
-		BuildPapers();
+		if (!Derelict) BuildPapers();
 		if (!Engine.IsEditorHint())
 		{
 			// webs in the top corners and bark, dirt and leaves blown in along the walls' feet (the interiors pass, 2026-10-03)
@@ -1059,6 +1064,20 @@ public partial class Cabin : Node3D
 		k.Color = new Color(0.02f, 0.02f, 0.02f);
 		BuildKit.Box(k, new Vector3(lx, ly - 0.255f, face + 0.0065f), new Vector3(0.008f, 0.025f, 0.001f), 3f);
 		k.CommitTo(_door, "DoorMesh");
+		if (Derelict)
+		{
+			// off its top pintle: swung in, its free edge sagged to the floor, the hinge side lifted a little off the sill
+			const float sag = 3.5f;
+			_door.Rotation = new Vector3(0, Mathf.DegToRad(62f), Mathf.DegToRad(-sag));
+			_door.Position += Vector3.Up * (w * Mathf.Sin(Mathf.DegToRad(sag)) - 0.005f);
+			if (BuildCollision && !Engine.IsEditorHint())
+			{
+				var leaf = new StaticBody3D { Name = "DoorBody", CollisionLayer = 1, CollisionMask = 0 };
+				leaf.SetMeta("surface", "wood");
+				leaf.AddChild(new CollisionShape3D { Position = new Vector3(w * 0.5f, h * 0.5f, 0), Shape = new BoxShape3D { Size = new Vector3(w, h, 0.08f) } });
+				_door.AddChild(leaf);
+			}
+		}
 	}
 
 	// ---- the prints (P5)
