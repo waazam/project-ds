@@ -85,74 +85,96 @@ public static class StationTextures
 
 	// ------------------------------------------------------------------ walls and floors
 
-	/// <summary>Faded sage-and-cream striped wallpaper with a small damask dot between the stripes.</summary>
+	/// <summary>The lobby's paper: a faded sage ground, a fine double pinstripe every 6 cm and a small leaf sprig between,
+	/// all a whisper apart in value (2026-10-14h, the station pass).</summary>
 	// (2026-10-13, the look audit: the lobby's cream paper under its lamp and the lantern read near white, a clean bright
 	// room; aged a step darker and yellower, the texture as it was)
 	// (2026-10-13g, the texture-mood pass: still a clean yellow-cream room under its lamp beside the cabin's worn wood;
 	// the paper is old now: greyer, darker, foxed and yellowed in blotches, and the plaster's
 	// relief and roughness under it, so the lantern finds a surface instead of a print)
-	public static StandardMaterial3D WallpaperMat => Aged(WallpaperFresh, new Color(0.6f, 0.57f, 0.5f));
+	// (2026-10-14h, the station pass: the look survey still read its stripes and diamonds as a flat print a size too big
+	// (a 23 cm motif, stripes a hand wide), and the interiors kit found a loud paper drowns the weathering laid over it.
+	// The pattern is a quarter the size now, real paper's scale, and quiet: the room's stains, damp and dark carry it)
+	public static StandardMaterial3D WallpaperMat => Aged(WallpaperFresh, new Color(0.62f, 0.6f, 0.53f));
 	private static StandardMaterial3D Aged(StandardMaterial3D m, Color c)
 	{
 		m.AlbedoColor = c;
-		if (!m.HasMeta("relief")) { SurfaceKit.Relief(m, "plaster", 0.55f); m.SetMeta("relief", "plaster"); }
+		if (!m.HasMeta("relief")) { SurfaceKit.Relief(m, "plaster", 0.45f); m.SetMeta("relief", "plaster"); m.Uv1Scale = new Vector3(2f, 2f, 1f); }
 		return m;
 	}
-	private static StandardMaterial3D WallpaperFresh => Std("st_wallpaper", Make("st_wallpaper", 64, 64, (x, y) =>
+	/// <summary>A paper pattern 128 px a tile (a tile about 45 cm on the station's walls): <paramref name="ground"/>, a
+	/// fine double stripe in <paramref name="stripe"/> every 16 px, a sprig in <paramref name="sprig"/> between, foxed.</summary>
+	private static Color Paper(int x, int y, Color ground, Color stripe, Color sprig, int seed, float fox)
 	{
-		float n = Fbm(x, y, 64, 4, 3, 11);
-		bool stripe = (x / 8) % 2 == 0;
-		Color c = stripe ? new Color(0.56f, 0.57f, 0.5f) : new Color(0.7f, 0.67f, 0.58f);
-		int dx = x % 16 - 12, dy = y % 16 - 8;
-		if (!stripe && dx * dx + dy * dy < 5) c = new Color(0.5f, 0.44f, 0.37f);
-		c *= 0.88f + 0.2f * n;
-		// foxing: yellow-brown blotches, a few darker specks
-		float fox = Mathf.SmoothStep(0.56f, 0.78f, Fbm(x + 21, y + 5, 64, 3, 3, 14));
-		c = c.Lerp(new Color(0.42f, 0.34f, 0.22f), fox * 0.45f);
-		if (Hash(x, y, 15) > 0.985f) c *= 0.75f;
+		float n = Fbm(x, y, 128, 8, 3, seed);
+		int u = x % 16;
+		Color c = ground;
+		if (u == 0 || u == 3) c = c.Lerp(stripe, 0.8f);
+		else if (u == 1 || u == 2) c = c.Lerp(stripe, 0.25f);
+		// the sprig: a small leaf pair on a stem, every other column, staggered
+		int col = x / 16, sy = (y + (col % 2) * 16) % 32;
+		float sx = x % 16 - 9.5f, ly = sy - 16f;
+		if (Mathf.Abs(sx) < 0.8f && ly > -4f && ly < 4f) c = c.Lerp(sprig, 0.6f);
+		float l1 = (sx + 2.2f) * (sx + 2.2f) / 5f + (ly + 1.5f) * (ly + 1.5f) / 2f, l2 = (sx - 2.2f) * (sx - 2.2f) / 5f + (ly - 1f) * (ly - 1f) / 2f;
+		if (l1 < 1f || l2 < 1f) c = c.Lerp(sprig, 0.7f);
+		c *= 0.92f + 0.14f * n;
+		// foxing: yellow-brown blotches; a few darker specks
+		float f = Mathf.SmoothStep(0.55f, 0.8f, Fbm(x + 21, y + 5, 128, 3, 3, seed + 3));
+		c = c.Lerp(new Color(0.4f, 0.32f, 0.2f), f * fox);
+		if (Hash(x, y, seed + 4) > 0.993f) c *= 0.7f;
 		return c;
-	}), 0.92f, 0.15f);
+	}
+	private static StandardMaterial3D WallpaperFresh => Std("st_wallpaper2", Make("st_wallpaper2", 128, 128, (x, y) =>
+		Paper(x, y, new Color(0.55f, 0.56f, 0.49f), new Color(0.66f, 0.63f, 0.53f), new Color(0.43f, 0.45f, 0.37f), 11, 0.4f)), 0.92f, 0.15f);
 
-	/// <summary>Room 2's paper: deep blood-red stripes, a darker crimson between them, a faint raised
-	/// damask pattern pressed into the dark stripes, and a fine linen weave over all of it.</summary>
-	public static StandardMaterial3D RedWallpaperMat => Std("st_redpaper", Make("st_redpaper", 64, 64, (x, y) =>
+	/// <summary>Room 2's paper: an oxblood regency stripe, a broad band and a narrow one, a dull ochre pin between, faded
+	/// and mottled. (2026-10-14h, the station pass: it was a saturated blood-red at 23 cm a stripe, the loudest colour in
+	/// the game outside the pit; still red, still the red room, but an old dark one at real paper's scale.)</summary>
+	public static StandardMaterial3D RedWallpaperMat => Fine(Std("st_redpaper2", Make("st_redpaper2", 128, 128, (x, y) =>
 	{
-		float n = Fbm(x, y, 64, 8, 2, 111);
-		int col = x % 16;
-		bool wide = col < 10;
-		bool pin = col == 11 || col == 14;
-		Color c = wide ? new Color(0.56f, 0.05f, 0.06f) : new Color(0.36f, 0.02f, 0.03f);
-		if (pin) c = new Color(0.62f, 0.42f, 0.22f) * 0.7f;
-		if (wide)
+		float n = Fbm(x, y, 128, 8, 3, 111);
+		int col = x % 32;
+		Color c = col < 18 ? new Color(0.44f, 0.11f, 0.09f) : new Color(0.32f, 0.08f, 0.07f);
+		if (col == 20 || col == 29) c = new Color(0.38f, 0.27f, 0.16f);
+		if (col < 18)
 		{
-			// a small damask motif, embossed: lighter on its upper edge, darker below
-			float dx = (col - 5f) / 4f, dy = ((y % 16) - 8f) / 6f;
+			// a faint damask in the broad band, a little lighter
+			float dx = (col - 9f) / 6f, dy = ((y % 24) - 12f) / 8f;
 			float r = Mathf.Sqrt(dx * dx + dy * dy);
-			float motif = Mathf.SmoothStep(0.75f, 0.55f, r) * (0.5f + 0.5f * Mathf.Cos(Mathf.Atan2(dy, dx) * 4f));
-			c = c.Lerp(new Color(0.46f, 0.03f, 0.05f), motif * 0.6f);
-			if (motif > 0.3f && (y % 16) < 8) c *= 1.12f;
+			float motif = Mathf.SmoothStep(0.8f, 0.6f, r) * (0.5f + 0.5f * Mathf.Cos(Mathf.Atan2(dy, dx) * 4f));
+			c = c.Lerp(new Color(0.5f, 0.15f, 0.12f), motif * 0.45f);
 		}
-		float weave = ((x + y) % 2 == 0 ? 1.03f : 0.97f);
-		return c * weave * (0.9f + 0.18f * n);
-	}), 0.75f, 0.2f);
+		c *= ((x + y) % 2 == 0 ? 1.02f : 0.98f) * (0.88f + 0.18f * n);
+		// faded in broad patches, browned at the foxing
+		float fade = Fbm(x + 7, y + 31, 128, 2, 3, 112);
+		c = c.Lerp(new Color(0.3f, 0.17f, 0.13f), Mathf.SmoothStep(0.5f, 0.8f, fade) * 0.45f);
+		return c;
+	}), 0.85f, 0.15f), "plaster", 0.4f);
 
-	/// <summary>Heavy crimson velvet: a soft vertical nap, darker in the folds.</summary>
-	public static StandardMaterial3D VelvetMat => Std("st_velvet_drape", Make("st_velvet_drape", 32, 64, (x, y) =>
+	/// <summary>The paper's pattern at a quarter-metre-ish scale (twice the walls' own UV), the plaster's relief under it.</summary>
+	private static StandardMaterial3D Fine(StandardMaterial3D m, string relief, float strength)
+	{
+		if (m.HasMeta("fine")) return m;
+		m.SetMeta("fine", true);
+		SurfaceKit.Relief(m, relief, strength);
+		m.Uv1Scale = new Vector3(2f, 2f, 1f);
+		return m;
+	}
+
+	/// <summary>Heavy velvet gone the colour of old wine: a soft vertical nap, darker in the folds.</summary>
+	public static StandardMaterial3D VelvetMat => Std("st_velvet_drape2", Make("st_velvet_drape2", 32, 64, (x, y) =>
 	{
 		float n = Fbm(x * 2, y * 0.5f, 64, 4, 3, 121);
-		return new Color(0.34f, 0.03f, 0.05f) * (0.8f + 0.35f * n);
+		return new Color(0.21f, 0.055f, 0.055f) * (0.8f + 0.35f * n);
 	}), 0.95f, 0.1f, cullOff: true);
 
 	/// <summary>The same paper gone brown and mottled with damp, a tide line of mould along the bottom.</summary>
-	public static StandardMaterial3D WallpaperStainedMat => Std("st_wallpaper_st", Make("st_wallpaper_st", 64, 64, (x, y) =>
+	public static StandardMaterial3D WallpaperStainedMat => Fine(Std("st_wallpaper_st2", Make("st_wallpaper_st2", 128, 128, (x, y) =>
 	{
-		float n = Fbm(x, y, 64, 4, 4, 12);
-		bool stripe = (x / 8) % 2 == 0;
-		Color c = stripe ? new Color(0.5f, 0.5f, 0.38f) : new Color(0.62f, 0.56f, 0.42f);
-		c *= 0.7f + 0.35f * n;
-		float blot = Mathf.SmoothStep(0.55f, 0.75f, Fbm(x + 13, y + 7, 64, 2, 3, 13));
-		return c.Lerp(new Color(0.24f, 0.2f, 0.12f), blot * 0.7f);
-	}), 0.95f, 0.15f);
+		var c = Paper(x, y, new Color(0.47f, 0.46f, 0.37f), new Color(0.55f, 0.51f, 0.4f), new Color(0.36f, 0.35f, 0.27f), 12, 0.6f);
+		float blot = Mathf.SmoothStep(0.55f, 0.78f, Fbm(x + 13, y + 7, 128, 2, 3, 13));
+		return c.Lerp(new Color(0.24f, 0.2f, 0.13f), blot * 0.55f);
+	}), 0.95f, 0.15f), "plaster", 0.45f);
 
 	/// <summary>Bare, dark, rotting boards (what's under the paper once it peels).</summary>
 	public static StandardMaterial3D RotBoardsMat => Std("st_rotboards", Make("st_rotboards", 32, 64, (x, y) =>
@@ -212,16 +234,20 @@ public static class StationTextures
 		return c * (0.85f + 0.25f * n);
 	}), 0.75f, 0.45f), "rusty_metal_02", 0.5f);
 
-	/// <summary>Raw, wet flesh: dark red marbled with fat and veins.</summary>
-	public static StandardMaterial3D MeatMat => Std("st_meat", Make("st_meat", 64, 64, (x, y) =>
+	/// <summary>Old flesh grown through the walls: a dull, dark liver-brown marbled with yellowed fat and black veins, a
+	/// grey bloom of mould over it. (2026-10-14h, the station pass: it was a glossy, saturated wet red that threw hot
+	/// glints off the lantern; it reads as rot now, matte, the colour of the damp round it.)</summary>
+	public static StandardMaterial3D MeatMat => Std("st_meat2", Make("st_meat2", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 4, 4, 61);
 		float fat = Mathf.SmoothStep(0.62f, 0.72f, Fbm(x + 30, y, 64, 3, 3, 62));
 		float vein = Mathf.SmoothStep(0.96f, 1f, Mathf.Abs(Mathf.Sin(x * 0.2f + n * 10f)));
-		Color c = new Color(0.36f, 0.05f, 0.05f).Lerp(new Color(0.55f, 0.16f, 0.14f), n);
-		c = c.Lerp(new Color(0.72f, 0.58f, 0.45f), fat * 0.6f);
-		return c.Lerp(new Color(0.2f, 0.02f, 0.06f), vein * 0.7f);
-	}), 0.25f, 0.6f);
+		Color c = new Color(0.2f, 0.07f, 0.06f).Lerp(new Color(0.3f, 0.13f, 0.1f), n);
+		c = c.Lerp(new Color(0.42f, 0.36f, 0.24f), fat * 0.5f);
+		c = c.Lerp(new Color(0.07f, 0.03f, 0.03f), vein * 0.7f);
+		float mould = Mathf.SmoothStep(0.58f, 0.78f, Fbm(x + 9, y + 40, 64, 4, 3, 63));
+		return c.Lerp(new Color(0.27f, 0.28f, 0.22f), mould * 0.55f);
+	}), 0.8f, 0.15f);
 
 	// ------------------------------------------------------------------ decals (alpha)
 
@@ -336,7 +362,7 @@ public static class StationTextures
 	/// <summary>Beaded boards under the chair rail: narrow upright planks, darker and waxed.</summary>
 	public static StandardMaterial3D WainscotMat => Projected("st_wainscot", "old_planks", new Color(0.62f, 0.5f, 0.4f), 1.4f, 1f, 0.7f, 0.35f);
 	/// <summary>The doors: panelled, in an old institutional green worn to the wood at the edges (the grain under the paint).</summary>
-	public static StandardMaterial3D DoorPaintMat => Painted("st_doorpaint", "oak", new Color(0.3f, 0.34f, 0.28f), 1.2f, 0.7f, 0.72f);
+	public static StandardMaterial3D DoorPaintMat => Painted("st_doorpaint", "oak", new Color(0.2f, 0.23f, 0.19f), 1.2f, 0.7f, 0.72f);   // (2026-10-14h: a step darker: under the lantern it read near white)
 	/// <summary>The doors' casings and linings: dark stained wood, a shade off the crown mouldings.</summary>
 	public static StandardMaterial3D CasingMat => Projected("st_casing", "darkwood", new Color(0.55f, 0.45f, 0.38f), 2f, 0.8f, 0.6f, 0.4f);
 
@@ -346,4 +372,46 @@ public static class StationTextures
 		{
 			AlbedoColor = c, Roughness = rough, MetallicSpecular = spec, VertexColorUseAsAlbedo = true,
 		}));
+
+	// ------------------------------------------------------------------ the ranger station (2026-10-14h, the station pass)
+
+	/// <summary>Knotty pine boards, varnished and gone amber: the lobby's beadboard wainscot.</summary>
+	public static StandardMaterial3D PineMat => Projected("st_pine", "pine", new Color(0.9f, 0.76f, 0.6f), 1.6f, 0.8f, 0.62f, 0.32f);
+	/// <summary>Pale paper for notices and forms, a step under the lantern's pool (the survey: the notices went near
+	/// white, flat cards that read as screens), with the plaster's mottle for the paper's unevenness.</summary>
+	public static StandardMaterial3D NoticeMat => Painted("st_notice", "linen", new Color(0.5f, 0.47f, 0.39f), 4f, 0.3f, 0.95f);
+	/// <summary>Cast iron, black-brown and dull (the stove, the radiator).</summary>
+	public static StandardMaterial3D CastIronMat => Projected("st_castiron", "ph_rusty_metal_03", new Color(0.3f, 0.27f, 0.25f), 2.5f, 0.9f, 0.7f, 0.35f);
+	/// <summary>Olive-drab painted steel, scuffed (the filing cabinets' kin, the radio's case).</summary>
+	public static StandardMaterial3D DrabSteelMat => Painted("st_drab", "ph_metal_plate_02", new Color(0.26f, 0.28f, 0.22f), 2f, 0.5f, 0.6f);
+
+	/// <summary>The district's map: a survey sheet on yellowed paper, the woods in green tint, the lake in pale blue,
+	/// brown contours, red-dashed trails and a grid, pencil rings round the stations; foxed.</summary>
+	public static StandardMaterial3D MapMat => Std("st_map", Make("st_map", 128, 96, (x, y) =>
+	{
+		float n = Fbm(x, y, 128, 4, 4, 301);
+		Color paper = new Color(0.62f, 0.58f, 0.46f);
+		float wood = Mathf.SmoothStep(0.45f, 0.55f, Fbm(x, y, 128, 3, 3, 302));
+		Color c = paper.Lerp(new Color(0.44f, 0.52f, 0.36f), wood * 0.6f);
+		float lake = Fbm(x * 0.8f + 40, y * 0.8f, 128, 2, 3, 303) - Mathf.Sqrt((x - 70f) * (x - 70f) + (y - 52f) * (y - 52f)) / 120f;
+		if (lake > 0.28f) c = new Color(0.45f, 0.53f, 0.55f);
+		else if (lake > 0.26f) c = new Color(0.25f, 0.3f, 0.35f);
+		// contours: where the height crosses a step
+		float hgt = Fbm(x, y, 128, 2, 4, 304) * 12f;
+		if (lake <= 0.26f && Mathf.Abs(hgt - Mathf.Round(hgt)) < 0.06f) c = c.Lerp(new Color(0.42f, 0.28f, 0.16f), 0.6f);
+		// a trail, red-dashed, wandering across
+		float ty = 30f + 18f * Mathf.Sin(x * 0.05f) + 6f * Mathf.Sin(x * 0.13f + 1f);
+		if (Mathf.Abs(y - ty) < 0.8f && (x / 3) % 2 == 0) c = new Color(0.52f, 0.12f, 0.08f);
+		if (x % 32 == 0 || y % 32 == 0) c = c.Lerp(new Color(0.25f, 0.22f, 0.18f), 0.45f);
+		// a pencil ring or two
+		foreach (var (cx, cy) in new[] { (34f, 22f), (96f, 70f) })
+		{
+			float r = Mathf.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+			if (Mathf.Abs(r - 5f) < 0.6f) c = new Color(0.2f, 0.18f, 0.17f);
+		}
+		if (x < 2 || y < 2 || x > 125 || y > 93) c = paper * 0.85f;
+		float fox = Mathf.SmoothStep(0.55f, 0.8f, Fbm(x + 3, y + 17, 128, 3, 3, 305));
+		c = c.Lerp(new Color(0.42f, 0.33f, 0.2f), fox * 0.5f);
+		return c * (0.9f + 0.15f * n);
+	}), 0.95f, 0.05f);
 }

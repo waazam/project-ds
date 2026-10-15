@@ -145,7 +145,9 @@ public partial class Stairwell : Node3D
 		}
 		_wallMat.SetShaderParameter("macro_vary", 0.5f);
 		// (the clean pour at the top went flat and white with the lantern a foot from it: a step darker, old concrete)
-		_wallMat.SetShaderParameter("tint", new Color(0.74f, 0.73f, 0.71f));
+		// (2026-10-14h, the station pass: still went pale at the top under the lantern, the brightest wall in Act 14; another
+		// step down, a touch warmer, old dirtied concrete)
+		_wallMat.SetShaderParameter("tint", new Color(0.47f, 0.45f, 0.42f));
 
 		BuildTrench(concrete);
 		for (int c = 0; c * ChunkRevs < Revolutions; c++) BuildChunk(c);
@@ -177,7 +179,11 @@ public partial class Stairwell : Node3D
 			BuildKit.Box(k, new Vector3(cx, top - 0.5f, z), new Vector3(W, 1f, TrenchRun), 0.8f);
 		}
 		k.Color = Colors.White;
-		k.Mat(StairwellTextures.BlockMat);
+		// (2026-10-14h, the station pass: the block went flat and bright tan a foot from the lantern; weathered, damp
+		// rising from the shaft, the dark baked into the trench's foot and its far end)
+		k.Tess = 0.6f;
+		k.Mat(RoomSurface.Of(StairwellTextures.BlockMat, RoomSurface.Concrete with { Tide = 0.8f, Streaks = 0.8f }, 181));
+		k.Color = new Color(0.72f, 0.7f, 0.66f);
 		foreach (float x in new[] { x0 - 0.1f, x1 + 0.1f })
 		{
 			var c = new Vector3(x, Y0 * 0.5f, (TrenchZ0 - H) * 0.5f);
@@ -194,11 +200,14 @@ public partial class Stairwell : Node3D
 		}
 		// a painted steel lip round the hole
 		k.Mat(StairwellTextures.SteelMat);
-		k.Color = new Color(0.7f, 0.62f, 0.2f);
+		k.Tess = 0f;
+		k.Color = new Color(0.46f, 0.4f, 0.16f);
 		BuildKit.Box(k, new Vector3(x0 - 0.06f, 0.01f, (TrenchZ0 - H) * 0.5f), new Vector3(0.08f, 0.03f, -H - TrenchZ0 + 0.1f));
 		BuildKit.Box(k, new Vector3(x1 + 0.06f, 0.01f, (TrenchZ0 - H) * 0.5f), new Vector3(0.08f, 0.03f, -H - TrenchZ0 + 0.1f));
 		BuildKit.Box(k, new Vector3(cx, 0.01f, TrenchZ0 - 0.06f), new Vector3(W + 0.2f, 0.03f, 0.08f));
 		// its walls share planes with the shaft's top and Room 3's floor edge: set a hair back (the clip audit)
+		new RoomShade(x0, x1, TrenchZ0, -H, Y0, 0f) { Reach = 0.8f, Foot = 0.35f }
+			.Damp(new Vector3(x0, Y0 + 0.5f, -H), 1.5f, 0.8f).Damp(new Vector3(x1, Y0 + 0.5f, -H), 1.5f, 0.8f).Apply(k);
 		MeshKit.NudgeAll(k.CommitTo(this, "Trench", true), new Vector3(1, 1, 1));
 		// its ramp
 		float len = TrenchSteps * TrenchRun, drop = -Y0;

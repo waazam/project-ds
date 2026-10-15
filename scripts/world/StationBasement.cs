@@ -225,9 +225,12 @@ public partial class StationBasement : Node3D
 		var body = new StaticBody3D { Name = "Stairwell", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "stone");
 		AddChild(body);
-		var k = new MeshKit();
-		k.Mat(StationTextures.BrickMat);
-		k.Color = Colors.White;
+		// (2026-10-14h, the station pass: the brick weathered (it was a clean, bright orange print under the lantern), damp
+		// rising up it from the flooded room, the dark baked into its seams; a step darker)
+		var brick = RoomSurface.Of(StationTextures.BrickMat, RoomSurface.Stone with { Grime = 1.25f, Tide = 0.8f, Streaks = 0.6f, Desaturate = 0.35f }, 171);
+		var k = new MeshKit { Tess = 0.6f };
+		k.Mat(brick);
+		k.Color = new Color(0.62f, 0.58f, 0.55f);
 		const float hw = 0.95f;
 		// the landing just inside the door: solid brick right down, so there's no slit under its lip
 		BuildKit.Box(k, new Vector3(0, Floor * 0.5f, StairTop * 0.5f), new Vector3(hw * 2f, -Floor, -StairTop), 2f);
@@ -237,14 +240,14 @@ public partial class StationBasement : Node3D
 		{
 			float top = -(i + 1) * rise, z0 = StairTop - i * Run, z1 = z0 - Run;
 			float h = top - Floor;
-			k.Color = new Color(0.9f + 0.1f * (i % 2), 1f, 1f);
+			k.Color = new Color(0.58f + 0.06f * (i % 2), 0.58f, 0.55f);
 			BuildKit.Box(k, new Vector3(0, Floor + h * 0.5f, (z0 + z1) * 0.5f), new Vector3(hw * 2f, h, Run), 2f);
 			// a worn stone nosing on each step
 			k.Mat(ProcTextures.ConcreteMat);
 			k.Color = new Color(0.45f, 0.42f, 0.4f);
 			BuildKit.Box(k, new Vector3(0, top + 0.01f, z0 - 0.04f), new Vector3(hw * 2f, 0.03f, 0.09f), 2f);
-			k.Mat(StationTextures.BrickMat);
-			k.Color = Colors.White;
+			k.Mat(brick);
+			k.Color = new Color(0.62f, 0.58f, 0.55f);
 		}
 		// the ramp the body actually walks (it can't climb risers)
 		float len = Steps * Run;
@@ -269,6 +272,10 @@ public partial class StationBasement : Node3D
 			BuildKit.Box(k, new Vector3(0, y + 0.2f, (z0 + z1) * 0.5f), new Vector3(hw * 2f + 0.4f, 0.4f, Mathf.Abs(z1 - z0) + 0.02f), 2f);
 		}
 		k.Color = Colors.White;
+		var shade = new RoomShade(-hw, hw, StairBottom, 0f, Floor, 2.4f) { Dim = 0.7f, Foot = 0.35f };
+		shade.Light(new Vector3(0, 1.4f, -0.4f), 3.2f).Light(new Vector3(0, Floor + 1.2f, StairBottom - 0.5f), 3.4f, 0.8f)
+			.Damp(new Vector3(-hw, Floor + 0.6f, StairBottom + 0.6f), 1.6f, 0.9f).Damp(new Vector3(hw, Floor + 0.6f, StairBottom + 0.6f), 1.6f, 0.9f);
+		shade.Apply(k);
 		k.CommitTo(this, "Stairwell", true);
 
 		_hum = Loop("res://assets/audio/ambient/stairs_hum_loop.wav", new Vector3(0, Floor, StairBottom), "Unnatural", -80f, 6f);
@@ -284,9 +291,11 @@ public partial class StationBasement : Node3D
 		_floorBody = new StaticBody3D { Name = "Floor", CollisionLayer = 1, CollisionMask = 0 };
 		_floorBody.SetMeta("surface", "water");
 		AddChild(_floorBody);
-		var k = new MeshKit();
-		k.Mat(StationTextures.BrickMat);
-		k.Color = new Color(0.8f, 0.78f, 0.76f);
+		// (2026-10-14h, the station pass: weathered, drawn finely for its bake: a flood's tide line round the walls, the
+		// dark in its corners and under the ceiling, the light in two pools under the bulbs)
+		var k = new MeshKit { Tess = 0.6f };
+		k.Mat(RoomSurface.Of(StationTextures.BrickMat, RoomSurface.Stone with { Grime = 1.3f, Tide = 1f, Streaks = 0.7f, Desaturate = 0.35f }, 172));
+		k.Color = new Color(0.6f, 0.56f, 0.53f);
 		float cx = (MinX + MaxX) * 0.5f, cz = (MinZ + StairBottom) * 0.5f, hx = (MaxX - MinX) * 0.5f, hz = (StairBottom - MinZ) * 0.5f;
 		float top = Floor + RoomHeight;
 		// the +Z wall with the stairwell's opening (x in [-0.95, 0.95])
@@ -298,7 +307,7 @@ public partial class StationBasement : Node3D
 		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1331 }, MinX + 0.15f, MaxX - 0.15f, MinZ + 0.15f, StairBottom - 0.15f, Floor, top, 1.0f, 0.95f);
 		DebrisKit.Scatter(this, new RandomNumberGenerator { Seed = 1332 }, MinX + 0.15f, MaxX - 0.15f, MinZ + 0.15f, StairBottom - 0.15f, Floor, new Color(0.34f, 0.2f, 0.15f), 70, 0,
 			new[] { (new Vector3(0, Floor, StairBottom), 1.3f) });
-		k.Mat(ProcTextures.ConcreteMat);
+		k.Mat(RoomSurface.Of(ProcTextures.ConcreteMat, RoomSurface.Concrete with { FloorDirt = 0.8f, CeilingStains = 0.8f }, 173));
 		k.Color = new Color(0.3f, 0.3f, 0.28f);
 		BuildKit.Box(k, new Vector3(cx, Floor - 0.05f, cz), new Vector3(hx * 2f, 0.1f, hz * 2f), 2f);
 		_floorBody.AddChild(new CollisionShape3D { Position = new Vector3(cx, Floor - 0.05f, cz), Shape = new BoxShape3D { Size = new Vector3(hx * 2f, 0.1f, hz * 2f) } });
@@ -310,6 +319,13 @@ public partial class StationBasement : Node3D
 		for (float x = MinX + 1f; x < MaxX; x += 1.6f)
 			BuildKit.Box(k, new Vector3(x, top - 0.1f, cz), new Vector3(0.18f, 0.2f, hz * 2f), 1.2f);
 		k.Color = Colors.White;
+		float iw = 0.15f;
+		var shade = new RoomShade(MinX + iw, MaxX - iw, MinZ + iw, StairBottom - iw, Floor, top) { Dim = 0.62f, Foot = 0.4f };
+		shade.Light(new Vector3(-2.2f, top - 0.6f, -7.4f), 4f).Light(new Vector3(1.4f, top - 0.6f, -10.6f), 4f)
+			.Damp(new Vector3(MinX + iw, Floor + 0.5f, cz), 2.5f, 0.9f).Damp(new Vector3(MaxX - iw, Floor + 0.5f, cz - 1.5f), 2.5f, 0.9f)
+			.Damp(new Vector3(-0.5f, Floor + 0.5f, MinZ + iw), 2.2f, 0.9f).Damp(new Vector3(MinX + iw, top - 0.3f, cz + 1f), 1.4f, 0.8f)
+			.Path(new Vector3(0, Floor, StairBottom), new Vector3(Drain.X, Floor, Drain.Y), 1.0f, 0.6f);
+		shade.Apply(k);
 		k.CommitTo(this, "Room", true);
 		var pipes = new MeshKit();
 		StationProps.Pipe(pipes, new Vector3(MinX + 0.3f, top - 0.35f, MinZ + 0.3f), new Vector3(MaxX - 0.3f, top - 0.35f, MinZ + 0.3f), 0.1f);

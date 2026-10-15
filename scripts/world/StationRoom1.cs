@@ -82,13 +82,15 @@ public partial class StationRoom1 : Node3D
 	{
 		using var __timer = Systems.BuildTimer.Time("StationRoom1");
 		var s = StoryManager.Instance;
-		var k = new MeshKit();
-		var floorK = new MeshKit();
-		var ceilK = new MeshKit();
+		// (2026-10-14h, the station pass, with the interiors kit: drawn finely for the bake; the paper, boards and plaster
+		// weathered; the room's dark in its corners and seams, its light a pool under one bare bulb)
+		var k = new MeshKit { Tess = 0.6f };
+		var floorK = new MeshKit { Tess = 0.6f };
+		var ceilK = new MeshKit { Tess = 0.6f };
 		var body = new StaticBody3D { Name = "Walls", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");
 		AddChild(body);
-		k.Mat(StationTextures.WallpaperStainedMat);
+		k.Mat(RoomSurface.Of(StationTextures.WallpaperStainedMat, RoomSurface.Paper with { Streaks = 0.8f, Tide = 0.75f, Grime = 1.2f }, 141));
 		k.Color = new Color(0.85f, 0.8f, 0.75f);
 		// the wall shared with the lobby: a thin skin just inside the lobby's own wall (never in the same
 		// plane, or the two wallpapers fight), no collision of its own (the lobby's wall has it)
@@ -97,13 +99,43 @@ public partial class StationRoom1 : Node3D
 		StationKit.WallAlongX(k, body, -Half, -Half, Half, Height, 0, null, trimSide: 1);
 		StationKit.WallAlongZ(k, body, Half, -Half, Half, Height, 0, null, trimSide: -1);
 		// (2026-10-14b: the lobby's plank floor and plaster ceiling, darker in here; they were the walls' own boards)
-		floorK.Mat(StationTextures.PlankFloorMat);
+		floorK.Mat(RoomSurface.Of(StationTextures.PlankFloorMat, RoomSurface.Wood with { FloorDirt = 0.65f }, 142));
 		floorK.Color = new Color(0.7f, 0.66f, 0.62f);
-		ceilK.Mat(StationTextures.CeilingMat);
+		ceilK.Mat(RoomSurface.Of(StationTextures.CeilingMat, RoomSurface.Plaster with { CeilingStains = 0.9f }, 143));
 		ceilK.Color = new Color(0.6f, 0.58f, 0.55f);
 		StationKit.FloorAndCeiling(floorK, ceilK, body, Half, Half, Height, 0);
 		k.Color = Colors.White;
+		// the room's inside: the skin on the lobby's wall at -Half + 0.095, the others' faces 7 cm in from ±Half
+		float ix0 = -Half + 0.095f, ix1 = Half - 0.07f, iz = Half - 0.07f;
+		var lampAt = new Vector3(0.2f, Height - 0.55f, -0.1f);
+		var shade = new RoomShade(ix0, ix1, -iz, iz, 0f, Height) { Dim = 0.6f, Reach = 1.3f };
+		shade.Light(lampAt, 3.6f).Path(new Vector3(ix0, 0, 0), new Vector3(0.3f, 0, 0.2f), 0.9f, 0.6f)
+			.Damp(new Vector3(ix1, Height, iz), 1.6f, 0.7f).Damp(new Vector3(ix0, 0.4f, -iz), 1.2f, 0.6f)
+			.Soot(lampAt, 0.5f, 0.35f);
+		// a few things left in the corners, clear of the box, the three pools and the door's swing
+		var small = new MeshKit();
+		var clutterMat = StationTextures.Flat("st_card", new Color(0.4f, 0.32f, 0.22f), 0.95f, 0.05f);
+		var clutter = new ClutterKit(new Aabb(new Vector3(ix0, 0, -iz), new Vector3(ix1 - ix0, Height, iz * 2f)), 1314, shade, body);
+		clutter.Keep(new Vector3(0.3f, 0, 0.2f), 0.9f).Keep(new Vector3(ix0 + 1.1f, 0, 0), 1.25f).Keep(new Vector3(ix0 + 0.6f, 0, -1.3f), 0.6f);
+		foreach (var (foot, n) in Walls) clutter.Keep(new Aabb(foot + n * 0.75f - new Vector3(Mathf.Abs(n.Z) * 2f + 0.75f * Mathf.Abs(n.X), 0, Mathf.Abs(n.X) * 2f + 0.75f * Mathf.Abs(n.Z)), new Vector3(Mathf.Abs(n.Z) * 4f + 1.5f * Mathf.Abs(n.X), 2.5f, Mathf.Abs(n.X) * 4f + 1.5f * Mathf.Abs(n.Z))));
+		var roles = StationParts.LobbyDecor.Roles;
+		var crate = ClutterKit.Model("crate", roles, canStackOn: true);
+		var chair = ClutterKit.Model("dining_chair", roles);
+		var carton = ClutterKit.Carton(clutterMat, new Vector3(0.42f, 0.3f, 0.32f));
+		var files = ClutterKit.Bundle(clutterMat, clutterMat, new Vector3(0.3f, 0.12f, 0.24f), new Color(0.62f, 0.58f, 0.48f));
+		if (crate != null) { var c1 = clutter.InCorner(k, crate); if (c1 != null) clutter.On(small, c1, carton); }
+		var c2 = clutter.InCorner(small, carton);
+		if (c2 != null) clutter.On(small, c2, files);
+		clutter.InCorner(small, ClutterKit.Bucket(StationTextures.CastIronMat));
+		if (chair != null) clutter.Topple(k, chair);
+		clutter.Lean(small, ClutterKit.Frame(StationTextures.CasingMat, clutterMat, 0.5f, 0.62f));
+		GD.Print($"[station] Room 1: {clutter.All.Count} pieces of clutter");
+		shade.Apply(k);
+		shade.Apply(floorK);
+		shade.Apply(ceilK);
+		shade.Apply(small);
 		k.CommitTo(this, "Walls");
+		small.CommitTo(this, "Clutter", false);
 		// webs up in its corners (the interiors pass, 2026-10-03)
 		WebKit.DressRoom(this, new RandomNumberGenerator { Seed = 1311 }, -Half + 0.1f, Half - 0.07f, -Half + 0.07f, Half - 0.07f, 0f, Height, 0.9f, 0.75f);
 		DebrisKit.Scatter(this, new RandomNumberGenerator { Seed = 1312 }, -Half + 0.1f, Half - 0.07f, -Half + 0.07f, Half - 0.07f, 0f, new Color(0.62f, 0.58f, 0.5f), 50, 3,
@@ -112,10 +144,32 @@ public partial class StationRoom1 : Node3D
 		floorK.CommitTo(this, "Floor");
 		ceilK.Color = Colors.White;
 		ceilK.CommitTo(this, "Ceiling", false);
+		// one bare bulb on a flex (the room had a light and no lamp), a dull warm pool under it; its walls fall off into
+		// the dark, the writing's top lines only just reached
+		var flex = new MeshKit();
+		flex.Mat(StationTextures.Flat("st_flex", new Color(0.05f, 0.05f, 0.05f)));
+		flex.Color = Colors.White;
+		flex.Cylinder(new Vector3(lampAt.X, Height, lampAt.Z), lampAt + Vector3.Up * 0.06f, 0.006f, 0.006f, 4, false);
+		flex.Cylinder(lampAt + Vector3.Up * 0.07f, lampAt + Vector3.Up * 0.02f, 0.02f, 0.022f, 8, true);
+		flex.CommitTo(this, "Flex", false);
+		AddChild(new MeshInstance3D
+		{
+			Name = "Bulb", Mesh = new SphereMesh { Radius = 0.035f, Height = 0.09f }, Position = lampAt - Vector3.Up * 0.02f,
+			MaterialOverride = StationTextures.Glow("st_bulb_r1", new Color(1f, 0.72f, 0.5f), 1.3f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		});
 		AddChild(new OmniLight3D
 		{
-			Name = "RoomLamp", LightColor = new Color(0.9f, 0.62f, 0.5f), LightEnergy = 1.3f,
-			OmniRange = 7f, OmniAttenuation = 1.2f, Position = new Vector3(0, Height - 0.3f, 0),
+			Name = "RoomLamp", LightColor = new Color(1f, 0.66f, 0.48f), LightEnergy = 1.25f,
+			OmniRange = 6f, OmniAttenuation = 1.45f, Position = lampAt - Vector3.Up * 0.1f,
+		});
+		// stains, cracks and scuffs by rule; not over the writing
+		DecalDresser.Room(this, new DecalDresser.RoomSpec
+		{
+			Box = new Aabb(new Vector3(ix0, 0, -iz), new Vector3(ix1 - ix0, Height, iz * 2f)), Seed = 141, Painted = true, Amount = 0.9f,
+			Doors = { (new Vector3(ix0, 0, 0), Vector3.Right, 2.2f, 2.2f) },
+			SkipWalls = { Vector3.Forward, Vector3.Left, Vector3.Back },
+			Flames = { lampAt },
+			Keep = { (new Vector3(0, 0, 0), 2.6f) },
 		});
 
 		// the writing (the owner: scrawled over the whole wall): three huge, hurried lines to a wall, each a
