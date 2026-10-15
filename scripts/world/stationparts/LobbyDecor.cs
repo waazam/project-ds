@@ -525,15 +525,17 @@ public partial class LobbyDecor : Node3D
 		// ---- the filing cabinets in the corner by the way in: shut, then rifled (a drawer out, the files on the floor)
 		var cabKept = Group("Cabinets", 0, 1);
 		var cabRifled = Group("CabinetsRifled", 2, 4);
-		var c0 = new Vector3(-4.6f, 0, -IZ + 0.37f);
-		var c1 = new Vector3(-4.06f, 0, -IZ + 0.36f);
+		// (2026-10-15, the scan: 0.54 m apart and turned toward each other, their front corners all but touched; a hand's
+		// width apart now, both a touch the same way)
+		var c0 = new Vector3(-4.62f, 0, -IZ + 0.37f);
+		var c1 = new Vector3(-4.04f, 0, -IZ + 0.36f);
 		var kk = new MeshKit();
-		World.FurnitureKit.Add(kk, "filing_cabinet", c0, Mathf.Pi + 0.03f, roles);
-		World.FurnitureKit.Add(kk, "filing_cabinet", c1, Mathf.Pi - 0.04f, roles);
+		World.FurnitureKit.Add(kk, "filing_cabinet", c0, Mathf.Pi + 0.025f, roles);
+		World.FurnitureKit.Add(kk, "filing_cabinet", c1, Mathf.Pi + 0.04f, roles);
 		kk.CommitTo(cabKept, "Cabinets", true);
 		var kr = new MeshKit();
-		World.FurnitureKit.Add(kr, "filing_cabinet", c0, Mathf.Pi + 0.03f, roles);
-		World.FurnitureKit.Add(kr, "filing_cabinet_open", c1, Mathf.Pi - 0.04f, roles);
+		World.FurnitureKit.Add(kr, "filing_cabinet", c0, Mathf.Pi + 0.025f, roles);
+		World.FurnitureKit.Add(kr, "filing_cabinet_open", c1, Mathf.Pi + 0.04f, roles);
 		World.FurnitureKit.Add(kr, "papers", c1 + new Vector3(0.25f, 0.003f, 0.75f), 0.9f, roles);
 		World.FurnitureKit.Add(kr, "papers", c1 + new Vector3(-0.3f, 0.003f, 0.95f), 2.3f, roles);
 		kr.CommitTo(cabRifled, "Cabinets", true);
@@ -752,7 +754,8 @@ public partial class LobbyDecor : Node3D
 			for (float t = 0.1f; t < len - 0.3f; t += 1.25f)
 			{
 				float w = Mathf.Min(1.2f, len - t - 0.1f);
-				Vector3 c = a + dir * (t + w * 0.5f) + n * 0.1f;
+				// (its back 3 mm off the wall's face at 0.07, not a centimetre and more of air behind it: the scan, 2026-10-15)
+				Vector3 c = a + dir * (t + w * 0.5f) + n * 0.093f;
 				float h = rng.RandfRange(1.6f, 2.9f);
 				Vector3 size = new(Mathf.Abs(dir.X) * w + Mathf.Abs(n.X) * 0.04f, h, Mathf.Abs(dir.Z) * w + Mathf.Abs(n.Z) * 0.04f);
 				BuildKit.Box(k, c + Vector3.Up * h * 0.5f, size, 1.2f, BuildKit.Face.None, new Basis(n, rng.RandfRange(-0.03f, 0.03f)));

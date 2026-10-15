@@ -61,12 +61,14 @@ public partial class StationRoom3 : Node3D
 		over.Color = Colors.White;
 		void Slab(Vector3 c, Vector3 s, bool collide = true, MeshKit into = null)
 		{
-			BuildKit.Box(into ?? k, c, s, into == under ? 1.6f : into == over ? 0.8f : 0.5f);
+			// (the walls' plate at 0.25: its texture is a 4 m tile of eight plates now, 2026-10-15)
+			BuildKit.Box(into ?? k, c, s, into == under ? 1.6f : into == over ? 0.8f : 0.25f);
 			if (collide) body.AddChild(new CollisionShape3D { Position = c, Shape = new BoxShape3D { Size = s } });
 		}
 		// the corridor
-		Slab(new Vector3(-1.3f, 1.3f, CorridorEnd * 0.5f), new Vector3(0.2f, 2.6f, CorridorEnd));
-		Slab(new Vector3(1.3f, 1.3f, CorridorEnd * 0.5f), new Vector3(0.2f, 2.6f, CorridorEnd));
+		// (their tops 2 cm up into the corridor's ceiling slab, not in the plane of its underside: the clip audit, 2026-10-15)
+		Slab(new Vector3(-1.3f, 1.31f, CorridorEnd * 0.5f), new Vector3(0.2f, 2.62f, CorridorEnd));
+		Slab(new Vector3(1.3f, 1.31f, CorridorEnd * 0.5f), new Vector3(0.2f, 2.62f, CorridorEnd));
 		Slab(new Vector3(0, 2.7f, CorridorEnd * 0.5f), new Vector3(2.8f, 0.2f, CorridorEnd), false, over);
 		Slab(new Vector3(0, -0.05f, CorridorEnd * 0.5f), new Vector3(2.8f, 0.1f, CorridorEnd), true, under);
 		// the hall
@@ -335,6 +337,20 @@ public partial class StationRoom3 : Node3D
 	private void HangPortraits(RandomNumberGenerator rng)
 	{
 		int n = 0;
+		// (2026-10-15, the scan: a wall of clones. Its own dice for what's new, so the hanging itself stays as it was: more of
+		// them askew; here and there one gone, its nail and its paler ghost left on the plate; a few hanging empty, the
+		// canvas cut out; and a few come down, leaning at the wall's foot or face down on the floor)
+		var vr = new RandomNumberGenerator { Seed = 1317 };
+		var nails = new MeshKit();
+		nails.Mat(StairwellTextures.RailMat);
+		nails.Color = Colors.White;
+		var ghostMat = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(0.42f, 0.4f, 0.34f, 0.22f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			AlbedoTexture = LakeParts.LakeFx.SoftDot(), Roughness = 1f,
+		};
+		var fallen = new List<(Vector3 at, float yaw, float w, float h)>();
+		int gone = 0;
 		void Wall(float x, float z0, float z1, float yaw)
 		{
 			float z = z0;
@@ -348,34 +364,87 @@ public partial class StationRoom3 : Node3D
 				for (int i = 0; i < stack && y + h < HallHeight - 1.6f; i++)
 				{
 					float ww = i == 0 ? w : w * rng.RandfRange(0.7f, 1.05f), hh = ww * rng.RandfRange(1.15f, 1.4f);
-					var p = new Node3D { Name = $"Portrait{n}", Position = new Vector3(x, y + hh * 0.5f, z + w * 0.5f) };
-					AddChild(p);
-					p.Rotation = new Vector3(0, yaw, rng.Randf() < 0.2f ? rng.RandfRange(-0.08f, 0.08f) : 0f);
-					PortraitKit.Build(p, n, ww, hh);
-					n++;
+					float tilt = rng.Randf() < 0.2f ? rng.RandfRange(-0.08f, 0.08f) : 0f;
+					var at = new Vector3(x, y + hh * 0.5f, z + w * 0.5f);
+					float fate = vr.Randf();
+					if (tilt == 0f && vr.Randf() < 0.3f) tilt = vr.RandfRange(-0.05f, 0.05f);
+					if (fate < 0.06f || (fate < 0.2f && i == 0))
+					{
+						// gone: its nail, and a paler patch where it kept the soot off. The low ones are on the floor below.
+						Vector3 outN = new Vector3(Mathf.Sin(yaw), 0, Mathf.Cos(yaw)), into = -outN;   // (out of the wall, into it)
+						Vector3 nail = at + Vector3.Up * (hh * 0.5f + 0.06f);
+						nails.Cylinder(nail + into * 0.03f, nail + outN * 0.03f, 0.004f, 0.004f, 5, false);
+						nails.Cylinder(nail + outN * 0.026f, nail + outN * 0.03f, 0.009f, 0.009f, 6, true);
+						var ghost = new MeshInstance3D
+						{
+							Name = "PortraitGhost", Mesh = new QuadMesh { Size = new Vector2(ww * 1.25f, hh * 1.25f) },
+							MaterialOverride = ghostMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+						};
+						AddChild(ghost);
+						ghost.Position = at + into * 0.012f;   // (on the plate: the frames hang 15 mm off it)
+						ghost.Rotation = new Vector3(0, yaw, 0);
+						gone++;
+						if (fate >= 0.06f) fallen.Add((at, yaw, ww, hh));
+					}
+					else
+					{
+						var p = new Node3D { Name = $"Portrait{n}", Position = at };
+						AddChild(p);
+						p.Rotation = new Vector3(0, yaw, tilt);
+						PortraitKit.Build(p, n, ww, hh, empty: fate > 0.94f);
+						n++;
+					}
 					y += hh + rng.RandfRange(0.35f, 0.6f);
 				}
 				z += w + rng.RandfRange(0.35f, 0.7f);
 			}
 		}
 		// canvas faces +Z in its own space: turn it to face into the room from each wall
-		Wall(-HallHalf + 0.2f, CorridorEnd + 0.6f, HallEnd - 0.4f, Mathf.Pi * 0.5f);
-		Wall(HallHalf - 0.2f, CorridorEnd + 0.6f, HallEnd - 0.4f, -Mathf.Pi * 0.5f);
+		// (their backs 15 mm off the plate, at 0.15 from the wall's middle; they hung 5 cm out in the air, 2026-10-15)
+		Wall(-HallHalf + 0.165f, CorridorEnd + 0.6f, HallEnd - 0.4f, Mathf.Pi * 0.5f);
+		Wall(HallHalf - 0.165f, CorridorEnd + 0.6f, HallEnd - 0.4f, -Mathf.Pi * 0.5f);
 		// the back wall, either side of where the hole leads
 		for (int i = 0; i < 4; i++)
 		{
 			float x = -4.2f + i * 1.1f, w = rng.RandfRange(0.5f, 0.8f), h = w * 1.3f;
 			if (x > -1.2f) x += 3.4f;
-			var p = new Node3D { Name = $"Portrait{n}", Position = new Vector3(x, rng.RandfRange(2.2f, 3.4f), HallEnd - 0.2f) };
+			var p = new Node3D { Name = $"Portrait{n}", Position = new Vector3(x, rng.RandfRange(2.2f, 3.4f), HallEnd - 0.165f) };
 			AddChild(p);
-			p.Rotation = new Vector3(0, Mathf.Pi, 0);
+			p.Rotation = new Vector3(0, Mathf.Pi, vr.Randf() < 0.5f ? vr.RandfRange(-0.06f, 0.06f) : 0f);
 			PortraitKit.Build(p, n, w, h);
 			n++;
 		}
 		// a big one over the corridor door, looking down the hall at the hole
-		var big = new Node3D { Name = "PortraitBig", Position = new Vector3(0, 4.6f, CorridorEnd + 0.2f) };
+		var big = new Node3D { Name = "PortraitBig", Position = new Vector3(0, 4.6f, CorridorEnd + 0.165f) };
 		AddChild(big);
 		PortraitKit.Build(big, 99, 1.4f, 1.8f);
+		// the ones come down: on the floor under where they hung, leaning back on the wall's foot (over its kick plate), or
+		// one face down where it fell; past the trench's ends and clear of the way down the middle
+		int f = 0;
+		foreach (var (at, yaw, w, h) in fallen)
+		{
+			if (f >= 4) break;
+			Vector3 outN = new Vector3(Mathf.Sin(yaw), 0, Mathf.Cos(yaw));
+			var p = new Node3D { Name = $"FallenPortrait{f}" };
+			AddChild(p);
+			float rim = PortraitKit.Rim(200 + f, w, h);
+			if (f == 1)
+			{
+				// face down, a little skewed, just out from the wall
+				p.Position = new Vector3(at.X, PortraitKit.Depth(200 + f) + 0.003f, at.Z) + outN * (h * 0.5f + rim + 0.25f);   // (its back up, its moulding on the floor)
+				p.Basis = new Basis(Vector3.Up, yaw + vr.RandfRange(-0.4f, 0.4f)) * new Basis(Vector3.Right, Mathf.Pi * 0.5f) * new Basis(Vector3.Back, Mathf.Pi * 0.5f);
+			}
+			else
+			{
+				float a = vr.RandfRange(0.16f, 0.3f), ht = h * 0.5f + rim;
+				p.Position = new Vector3(at.X, ht * Mathf.Cos(a) + 0.01f, at.Z) + outN * (ht * Mathf.Sin(a) + 0.03f);
+				p.Basis = new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, -a) * new Basis(Vector3.Back, vr.RandfRange(-0.04f, 0.04f));
+			}
+			PortraitKit.Build(p, 200 + f, w, h, backed: true);
+			f++;
+		}
+		nails.CommitTo(this, "Nails", false);
+		GD.Print($"[station] Room 3: {n} portraits hung, {gone} gone from their nails, {f} of them on the floor");
 		Portraits = n + 1;
 	}
 

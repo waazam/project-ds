@@ -260,7 +260,8 @@ public partial class Footbridge : Node3D
 				body.AddChild(new CollisionShape3D { Position = lp, Shape = new SphereShape3D { Radius = Mathf.Min(r, r * squash) * 0.95f } });
 		}
 		// settled toward the low side of its footprint, so a rock on the bank slope does not overhang it
-		Vector3 OnGround(Vector3 w, float r, float squash, float sink) { w.Y = Mathf.Lerp(_terrain.HeightAt(w.X, w.Z), LowestUnder(w, r), 0.6f) - r * squash * sink; return w; }
+		// (2026-10-15, the ground audit: at 60 % of the way down to it one hung 22 cm over the low side; down to it now)
+		Vector3 OnGround(Vector3 w, float r, float squash, float sink) { w.Y = Mathf.Lerp(_terrain.HeightAt(w.X, w.Z), LowestUnder(w, r), 0.9f) - r * squash * sink; return w; }
 		Vector3 W(float x, float z) => GlobalTransform * new Vector3(x, 0, z);
 		// lowest ground under a rock of radius r (out to 90 %: the jittered flanks may overhang)
 		float LowestUnder(Vector3 w, float r)

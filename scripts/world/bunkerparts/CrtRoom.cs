@@ -313,6 +313,7 @@ public partial class CrtRoom : Node3D
 	private void BuildShelving()
 	{
 		var rng = new RandomNumberGenerator { Seed = 9101 };
+		var stateRng = new RandomNumberGenerator { Seed = 9107 };
 		var frame = new MeshKit();
 		var bodies = new MeshKit();
 		var screens = new MeshKit();
@@ -417,7 +418,11 @@ public partial class CrtRoom : Node3D
 		{
 			// the seed, and the camera it shows (one of the atlas's nine)
 			int cams = BunkerTextures.SurvGrid * BunkerTextures.SurvGrid;
-			var tint = new Color(rng.Randf(), (rng.RandiRange(0, cams - 1) + 0.5f) / cams, 0f, 1f);
+			// and its own state (the shader's COLOR.b; 2026-10-15, the scan: every set alike and bright): most working, some weak
+			// and dim, some dead, a few with the glass cracked. Its own dice, so the sets stand where they did.
+			float st = stateRng.Randf();
+			float state = st < 0.62f ? 0f : st < 0.78f ? stateRng.RandfRange(0.2f, 0.45f) : st < 0.92f ? 0.6f : 0.95f;
+			var tint = new Color(rng.Randf(), (rng.RandiRange(0, cams - 1) + 0.5f) / cams, state, 1f);
 			BunkerKit.Crt(bodies, screens, xf, spec, tint);
 			screenCount++;
 			ScreenArea += spec.W * spec.H;
