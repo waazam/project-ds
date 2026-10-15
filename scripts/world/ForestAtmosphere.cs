@@ -175,11 +175,13 @@ public partial class ForestAtmosphere : Node
 	[Export] public Color LodgeColdFogColor = new(0.12f, 0.14f, 0.18f);
 	[Export] public float LodgeColdFogDensity = 0.011f;
 	[Export] public Color LodgeColdAmbientColor = new(0.55f, 0.62f, 0.76f);
-	[Export] public float LodgeColdAmbient = 0.36f;
+	[Export] public float LodgeColdAmbient = 0.2f;   // (0.36 until the interior pass)
 	[Export] public Color LodgeFogColor = new(0.1f, 0.08f, 0.065f);
-	[Export] public float LodgeFogDensity = 0.004f;
+	[Export] public float LodgeFogDensity = 0.012f;   // (0.004 until the interior pass: a breath of haze, so the great hall's far end recedes)
 	[Export] public Color LodgeAmbientColor = new(0.78f, 0.68f, 0.56f);
-	[Export] public float LodgeAmbient = 0.42f;
+	// (2026-10-14, the interior pass: 0.42 was a daylight fill everywhere at dusk in a blizzard; nothing fell into shadow. The
+	// lamps and the fire light the rooms now, and the lantern its pool)
+	[Export] public float LodgeAmbient = 0.15f;
 	// (2026-09-30, the owner: dark, the lantern needed, seen only so far round it; and past that not black but a
 	// whitish haze. Before first light: little ambient, the sun a faint glow, and a pale depth fog that lets the near
 	// dark alone and closes in white-grey at forty-odd metres, the trees going into it as silhouettes; held a step
@@ -680,14 +682,33 @@ public partial class ForestAtmosphere : Node
 	public float Enclosed { get; private set; }
 	/// <summary>Off: the outdoor fog follows you in, as before (A/B comparisons).</summary>
 	[Export] public bool EnclosedClearsFog = true;
-	/// <summary>Of the outdoor fog, how much is left inside: the haze across a small room, a breath of it at most.</summary>
-	[Export] public float EnclosedFogKeep = 0.2f;
-	/// <summary>Indoors, where the depth fog (Act 1's, the winter woods') begins: past the walls of any room.</summary>
-	[Export] public float EnclosedFogBegin = 16f;
-	/// <summary>Indoors, how much of the outdoor ambient is kept (the interiors read flat and over-lit in full daylight ambient).</summary>
-	[Export] public float EnclosedAmbientScale = 0.55f;
-	/// <summary>Volumetric fog indoors: just enough for a lamp's halo and a window's shaft, never a haze across the room.</summary>
-	[Export] public float VolumetricEnclosed = 0.0035f;
+	// (2026-10-14, the interior pass, after the survey: with the fog stripped out the far wall was as crisp and bright as the
+	// near one, and a room had no depth at all. The church and the round room, which kept their own haze, looked best. Now
+	// a room keeps a thin, dark haze of its own (dust in still air, not the woods' grey fog), so each step away is a step
+	// darker, and enough volumetric dust that a lamp has a halo and a window a faint shaft. Never milky.)
+	/// <summary>Indoors, the haze's density (exponential: about 9 % across a 10 m room, 40 % down a 60 m nave).</summary>
+	[Export] public float EnclosedFogDensity = 0.009f;
+	/// <summary>Indoors, the haze's colour: dust in the dark, a step above black; how far the outdoor fog's hue goes toward it.</summary>
+	[Export] public Color EnclosedFogColor = new(0.04f, 0.04f, 0.045f);
+	[Export] public float EnclosedFogTint = 0.6f;
+	/// <summary>Indoors, where the depth fog (Act 1's, the winter woods') begins: a few metres in (was 16 m: past the walls).</summary>
+	[Export] public float EnclosedFogBegin = 5f;
+	/// <summary>Indoors, how much of the outdoor ambient is kept (the interiors read flat and over-lit in full daylight ambient).
+	/// (0.55 until the interior pass: rooms are lit by their own lamps and the lantern's pool, with dark corners.)</summary>
+	[Export] public float EnclosedAmbientScale = 0.38f;
+	/// <summary>Volumetric fog indoors: dust in the air, a halo round a lamp, a faint shaft from a window (the church keeps
+	/// 0.014). (0.0035 until the interior pass.)</summary>
+	[Export] public float VolumetricEnclosed = 0.011f;
+	/// <summary>Indoors: the contact shadows darken direct light too (corners, skirtings, furniture feet under the lantern;
+	/// the woods' 0.15 hardly showed under it), a little stronger; and less screen-space bounce, so the lantern's pool doesn't
+	/// spread up every wall.</summary>
+	[Export] public float IndoorSsaoLightAffect = 0.5f, IndoorSsaoIntensity = 2.8f, IndoorSsilIntensity = 0.45f;
+	private const float SsaoLightAffectOut = 0.15f, SsaoIntensityOut = 2.2f, SsilIntensityOut = 0.9f;
+	private float _ssaoApplied = -1f;
+
+	/// <summary>0..1 how far the eye is indoors, in any of its kinds: a room or a tunnel (<see cref="Enclosed"/>), the church
+	/// (<see cref="Interior"/>), the lodge, underground. The lantern draws in to a pool by it, and the finish grades by it.</summary>
+	public float Indoors => Mathf.Clamp(Mathf.Max(Mathf.Max(Enclosed, Interior), Mathf.Max(Lodge, Underground)), 0f, 1f);
 
 	private void UpdateEnclosed()
 	{
@@ -701,6 +722,15 @@ public partial class ForestAtmosphere : Node
 	private void ApplyLayers()
 	{
 		UpdateEnclosed();
+		// indoors: contact shadows on the direct light too, less bounce (in steps: exactly the woods' values outdoors)
+		float io = Mathf.Snapped(Indoors, 0.02f);
+		if (!Mathf.IsEqualApprox(io, _ssaoApplied))
+		{
+			_ssaoApplied = io;
+			_env.SsaoLightAffect = Mathf.Lerp(SsaoLightAffectOut, IndoorSsaoLightAffect, io);
+			_env.SsaoIntensity = Mathf.Lerp(SsaoIntensityOut, IndoorSsaoIntensity, io);
+			_env.SsilIntensity = Mathf.Lerp(SsilIntensityOut, IndoorSsilIntensity, io);
+		}
 		float storm = Mathf.Clamp(Storm, 0f, 1f);
 		float flash = Mathf.Max(0f, Flash);
 
@@ -777,7 +807,10 @@ public partial class ForestAtmosphere : Node
 		// indoors (a room, a hall, a tunnel above ground): the woods' fog stays outside
 		float encl = Enclosed * (1f - under);
 		// (the church's own near-black haze is its darkness, not a fog: kept)
-		density *= Mathf.Lerp(1f, EnclosedFogKeep, encl * (1f - inside));
+		// (2026-10-14: a thin dark haze of the room's own instead, not none; the lodge has its own)
+		float roomHaze = encl * (1f - inside) * (1f - lodge);
+		density = Mathf.Lerp(density, EnclosedFogDensity, roomHaze);
+		fog = fog.Lerp(EnclosedFogColor, EnclosedFogTint * roomHaze);
 		// ...and so does most of the sky's light: a room is lit by its lamps, its windows and the lantern, not by an even
 		// daylight from nowhere (the church and the lodge keep their own tuned ambient)
 		ambient *= Mathf.Lerp(1f, EnclosedAmbientScale, encl * (1f - inside) * (1f - lodge));

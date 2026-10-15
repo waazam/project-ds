@@ -329,7 +329,7 @@ A puzzle stretch through a station that starts kept and tidy and is left more wr
   - a chair falling down the well that never lands;
   - a figure at the rail below, gone when they get there;
   - a long silence near the bottom.
-- **The flame dies.** A quarter of the way down, the lantern's flame gutters out and won't take again ("The flame won't take. B: the blacklight still works."). From here to the top of the round room the blacklight is the only light.
+- **The flame dies.** A quarter of the way down, the lantern's flame gutters out and won't take again ("The flame won't take. The wick only smoulders. B: the blacklight still works."). From here to the top of the round room the wick only smoulders: a weak, guttering red ember-glow a few steps round them, and the blacklight is the only real light, switched to with B for what is written in its ink (a hint comes once in each place when they stand by such writing with only the ember showing). (2026-10-14, the interior pass, with Dan's go-ahead "do what you think best": the lantern no longer switches itself to the blacklight here.)
 
 **The crawler.** A turn after the flame dies, a pale, starved thing on all fours lets itself down onto the stairs above them.
 - It hangs back, surges closer and falls back again, never far behind however fast they go. If they stop, it comes on. Running is the way to keep ahead of it.

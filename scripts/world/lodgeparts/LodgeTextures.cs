@@ -516,7 +516,9 @@ public static class LodgeTextures
 	/// <summary>Daylight through a window's snow-dusted glass (inside faces): pale and grey-blue, dimmed by the storm.</summary>
 	public static StandardMaterial3D DayGlass => _day ??= new StandardMaterial3D
 	{
-		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.36f, 0.39f, 0.45f), EmissionEnabled = true, Emission = new Color(0.62f, 0.7f, 0.82f), EmissionEnergyMultiplier = 0.13f, Roughness = 0.1f,   // (2026-10-14d: a storm's grey light, not a white sheet in the wall)
+		// (2026-10-14, the interior pass: darker glass, grimed (it caught the lantern as a white sheet); its glow is set by the
+		// storm, SkiLodge.Act23)
+		ResourceName = "lodge_dayglass", AlbedoColor = new Color(0.2f, 0.22f, 0.26f), EmissionEnabled = true, Emission = new Color(0.46f, 0.52f, 0.62f), EmissionEnergyMultiplier = 0.13f, Roughness = 0.45f,   // (2026-10-14d: a storm's grey light, not a white sheet in the wall)
 		AlbedoTexture = PaneTex, EmissionTexture = PaneTex, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	};
 	/// <summary>A pane seen from inside: clear (top half) or with the snow drifted up it (bottom half).</summary>
@@ -527,13 +529,13 @@ public static class LodgeTextures
 	public static StandardMaterial3D SnowBlueGlass => _blue ??= new StandardMaterial3D
 	{
 		ResourceName = "lodge_blueglass", AlbedoTexture = WinterWoods.SnowStd("x", 1f, 1f).AlbedoTexture, AlbedoColor = new Color(0.45f, 0.58f, 0.8f),
-		EmissionEnabled = true, Emission = new Color(0.3f, 0.45f, 0.75f), EmissionEnergyMultiplier = 0.8f, Roughness = 0.4f,
+		EmissionEnabled = true, Emission = new Color(0.3f, 0.42f, 0.66f), EmissionEnergyMultiplier = 0.28f, Roughness = 0.5f,   // (0.8 until the interior pass: a lit blue screen)
 	};
 
 	/// <summary>Room 203's window: frosted over, ice feathering across it.</summary>
 	public static StandardMaterial3D IceGlass => _ice ??= new StandardMaterial3D
 	{
 		ResourceName = "lodge_iceglass", AlbedoTexture = WinterWoods.SnowStd("y", 1f, 1f).AlbedoTexture, AlbedoColor = new Color(0.7f, 0.78f, 0.86f),
-		EmissionEnabled = true, Emission = new Color(0.5f, 0.57f, 0.66f), EmissionEnergyMultiplier = 0.42f, Roughness = 0.2f,
+		EmissionEnabled = true, Emission = new Color(0.5f, 0.57f, 0.66f), EmissionEnergyMultiplier = 0.2f, Roughness = 0.4f,   // (0.42 until the interior pass)
 	};
 }

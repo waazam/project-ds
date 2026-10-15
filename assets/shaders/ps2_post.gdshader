@@ -43,6 +43,9 @@ uniform float clarity = 0.55;
 /// The red that matters (blood, the beasts' eyes, the lodge's carpet, a warning sign): kept at its colour and a little
 /// richer while everything else is pulled back toward grey.
 uniform float key_red = 0.6;
+/// Indoors (AreaGrade, 2026-10-14): above 1 the mid-values sink a little while black and white stay put, so a room's walls
+/// sit darker round the lantern's pool. 1 = none (the woods).
+uniform float mid_gamma = 1.0;
 
 const float BAYER[16] = float[16](
 	0.0, 8.0, 2.0, 10.0,
@@ -92,7 +95,8 @@ void fragment() {
 	c = mix(vec3(luma), c, mix(saturation, max(saturation, 1.08), redness * key_red));
 	c = (c - 0.5) * contrast + 0.5;
 	c *= mix(shadow_tone, highlight_tone, smoothstep(0.1, 0.7, luma));
-	c = max(c, vec3(0.0)) + shadow_tint * (1.0 - luma);
+	c = pow(max(c, vec3(0.0)), vec3(mid_gamma));
+	c = c + shadow_tint * (1.0 - luma);
 	// the CRT's heavier grade: a touch darker in the mids, a little more contrast, a little less colour
 	if (crt > 0.5) {
 		c = pow(max(c, vec3(0.0)), vec3(1.0 / 0.96));

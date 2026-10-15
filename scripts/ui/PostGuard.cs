@@ -24,7 +24,9 @@ public partial class PostGuard : Node
 	{
 		// each place's own colour (eased; cutscenes included)
 		if (StoryManager.Instance is { } story && StoryBeat.PostMaterial(this) is { } graded)
-			AreaGrade.Apply(graded, story.Current, (float)delta);
+			AreaGrade.Apply(graded, story.Current, (float)delta,
+				// indoors (the snow maze's trenches and the ice under them are Act 24's own look: not graded as a room)
+				Player.Lantern.Snuffed ? 0f : StoryBeat.Atmosphere(this)?.Indoors ?? 0f);
 		// not during a cutscene, or while the player is held (a wake-up's eyelids are this vignette)
 		if (Cutscene.ActiveCount > 0 || StoryBeat.Player(this) is not { } player || !player.PlayerInput.Enabled) return;
 		var post = StoryBeat.PostMaterial(this);

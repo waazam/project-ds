@@ -1110,12 +1110,15 @@ public partial class SkiLodge
 		// the daylight through the dining hall's windows goes as the storm comes up (and with the freeze)
 		_diningShafts?.SetShaderParameter("strength", DiningShaftStrength * (1f - Storm) * (Frozen ? 0f : 1f));
 		var day = LodgeTextures.DayGlass;
+		// (2026-10-14, the interior pass: it's dusk out there under a snow sky (Act 22): the panes were white sheets in the wall
+		// and the daylight a flat fill of every room. Now dim, cold blue-grey glass, a step above the wall at most, and only a
+		// little cold light falling in under it; the lamps and the fire light the rooms)
 		if (!Frozen)
 		{
-			day.EmissionEnergyMultiplier = Mathf.Lerp(0.9f, 0.28f, Storm);
-			day.Emission = new Color(0.62f, 0.68f, 0.76f).Lerp(new Color(0.34f, 0.38f, 0.45f), Storm);
+			day.EmissionEnergyMultiplier = Mathf.Lerp(0.2f, 0.08f, Storm);
+			day.Emission = new Color(0.46f, 0.52f, 0.62f).Lerp(new Color(0.3f, 0.34f, 0.42f), Storm);
 		}
-		foreach (var dl in _dayLights) dl.LightEnergy = (float)dl.GetMeta("base", 0.9f) * Mathf.Lerp(1f, 0.28f, Storm);
+		foreach (var dl in _dayLights) dl.LightEnergy = (float)dl.GetMeta("base", 0.9f) * Mathf.Lerp(0.32f, 0.12f, Storm);
 		if (_stormWind != null)
 		{
 			float want = inside && !InMaze ? Mathf.Lerp(-40f, Frozen ? -4f : -9f, Storm) : InMaze ? -30f : -60f;

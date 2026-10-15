@@ -44,6 +44,15 @@ public partial class HeldLantern : HeldItem
 		ResourceName = "held_lantern_glass", AlbedoColor = new Color(1f, 0.72f, 0.4f, 0.4f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 		EmissionEnabled = true, Emission = new Color(1f, 0.52f, 0.2f), EmissionEnergyMultiplier = 0.9f, Roughness = 0.15f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
 	};
+	/// <summary>The wick smouldering (the flame dead, Acts 14-20): a dark coal glowing red, not a flame.</summary>
+	private static StandardMaterial3D _ember;
+	private static StandardMaterial3D EmberMat => _ember ??= new StandardMaterial3D
+	{
+		ResourceName = "held_lantern_ember", AlbedoColor = new Color(0.35f, 0.06f, 0.02f), EmissionEnabled = true, Emission = new Color(1f, 0.26f, 0.05f),
+		EmissionEnergyMultiplier = 1f, Roughness = 1f,
+	};
+	private (MeshInstance3D mi, int surface) _flameSlot;
+	private bool _emberShown;
 	private Node3D _swing, _model;
 	private MeshInstance3D _glass;
 	private StandardMaterial3D _uvGlass;
@@ -78,7 +87,10 @@ public partial class HeldLantern : HeldItem
 				// its globe: warm amber glass, glowing with the flame inside (the lamp glass's own white, lit from right
 				// against it, blew out)
 				for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+				{
 					if (mi.Mesh.SurfaceGetMaterial(i) == ItemTextures.LampGlassMat) mi.SetSurfaceOverrideMaterial(i, AmberGlass);
+					else if (mi.Mesh.SurfaceGetMaterial(i) == ItemTextures.FlameMat) { _flameSlot = (mi, i); }
+				}
 			}
 		// the blacklight's glow in the glass: a violet bulb where the flame is
 		_uvGlass = new StandardMaterial3D { AlbedoColor = new Color(0.4f, 0.15f, 1f), EmissionEnabled = true, Emission = new Color(0.45f, 0.18f, 1f), EmissionEnergyMultiplier = 2.2f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
@@ -188,6 +200,21 @@ public partial class HeldLantern : HeldItem
 		AmberGlass.EmissionEnergyMultiplier = _lantern.Blacklight ? 0.9f : 1.2f;
 		_fill.LightEnergy = _lantern.Blacklight ? 1.1f : 1.3f;
 		_fill.LightColor = _lantern.Blacklight ? new Color(0.5f, 0.3f, 1f) : new Color(1f, 0.66f, 0.36f);
+		if (_lantern.Ember)
+		{
+			// (2026-10-14) the flame dead: only the wick's ember, a dull red glow low in the glass, guttering with it
+			AmberGlass.Emission = new Color(1f, 0.3f, 0.08f);
+			AmberGlass.EmissionEnergyMultiplier = 0.18f * _lantern.EmberLevel;
+			_fill.LightEnergy = 0.25f * _lantern.EmberLevel;
+			_fill.LightColor = new Color(1f, 0.42f, 0.18f);
+			EmberMat.EmissionEnergyMultiplier = 0.25f + 0.6f * _lantern.EmberLevel;
+		}
+		// the flame in the glass: a low red coal on the wick while it only smoulders
+		if (_flameSlot.mi != null && IsInstanceValid(_flameSlot.mi) && _lantern.Ember != _emberShown)
+		{
+			_emberShown = _lantern.Ember;
+			_flameSlot.mi.SetSurfaceOverrideMaterial(_flameSlot.surface, _emberShown ? EmberMat : null);
+		}
 		_lantern.HeldFlameAt = Raise > 0.05f ? FlameWorld : null;
 	}
 
