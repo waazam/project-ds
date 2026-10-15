@@ -115,7 +115,7 @@ public static class HeldModels
 		// the camera by its right end, the lens away, the thumb up its back
 		[ToolKind.Camera] = new(HandPose.Camera, new(-0.06f, 0.015f, 0f), new(new(0.2f, -0.22f, -0.42f), 6f, -10f, 4f)),
 		// the cap carried on the open hand under its plinth (its base 12.6 cm under the neck), the ball up
-		[ToolKind.NewelPost] = new(HandPose.Cradle, new(-0.05f, 0.132f, 0.02f), new(new(0.24f, -0.24f, -0.5f), 0f, 10f, 0f)),
+		[ToolKind.NewelPost] = new(HandPose.Cradle, new(-0.05f, 0.09f, 0.02f), new(new(0.24f, -0.24f, -0.5f), 0f, 10f, 0f)),
 	};
 
 	/// <summary>The things with a grip in the table.</summary>
