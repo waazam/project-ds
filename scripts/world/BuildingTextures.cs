@@ -370,13 +370,15 @@ public static class BuildingTextures
 		footHeight: 1.4f, woodTint: new Color(0.52f, 0.48f, 0.43f), grime: 0.6f, across: 0.12f) ?? (Material)PropTextures.WetPostMat;
 
 	/// <summary>(2026-10-14a) The park's signs (the trailhead sign, the fork's posts): park brown enamel over boards,
-	/// worn at the edges of the flakes, in place of the 64 px painted texture whose flakes were blocky pixels up close.</summary>
-	public static Material SignBrownMat => PaintedBoards("b_sign_brown", new Color(0.27f, 0.19f, 0.13f), 0.95f, 0.14f, vertical: false, scale: 0.8f, footY: -9f,
-		footHeight: 0.1f, grime: 0.25f, across: 0.12f) ?? (Material)PropTextures.PaintedPlankMat;
-	public static Material SignPostBrownMat => PaintedBoards("b_signpost_brown", new Color(0.27f, 0.19f, 0.13f), 0.95f, 0.2f, vertical: true, scale: 0.8f, footY: -0.4f,
-		footHeight: 0.7f, grime: 0.5f, across: 0.12f) ?? (Material)PropTextures.PaintedPostMat;
-	public static Material SignGreenMat => PaintedBoards("b_sign_green", new Color(0.08f, 0.2f, 0.14f), 0.97f, 0.1f, vertical: false, scale: 0.8f, footY: -9f,
-		footHeight: 0.1f, grime: 0.2f, across: 0.12f) ?? (Material)PropTextures.PaintedGreenMat;
+	/// worn at the edges of the flakes, in place of the 64 px painted texture whose flakes were blocky pixels up close.
+	/// (2026-10-14, the forest pass: still too fresh; more of the coat gone, more grime, the posts black with wet at the foot.
+	/// SignKit.Weather lays the moss and the streaks over the faces.)</summary>
+	public static Material SignBrownMat => PaintedBoards("b_sign_brown", new Color(0.25f, 0.18f, 0.125f), 0.92f, 0.3f, vertical: false, scale: 0.8f, footY: -9f,
+		footHeight: 0.1f, grime: 0.6f, across: 0.12f) ?? (Material)PropTextures.PaintedPlankMat;
+	public static Material SignPostBrownMat => PaintedBoards("b_signpost_brown", new Color(0.25f, 0.18f, 0.125f), 0.9f, 0.38f, vertical: true, scale: 0.8f, footY: -0.4f,
+		footHeight: 0.9f, grime: 0.75f, across: 0.12f) ?? (Material)PropTextures.PaintedPostMat;
+	public static Material SignGreenMat => PaintedBoards("b_sign_green", new Color(0.08f, 0.17f, 0.12f), 0.94f, 0.24f, vertical: false, scale: 0.8f, footY: -9f,
+		footHeight: 0.1f, grime: 0.5f, across: 0.12f) ?? (Material)PropTextures.PaintedGreenMat;
 
 	/// <summary>(2026-10-14a) The bark scan (bark_*) on a mesh's own UVs (the camp's stump, the woodpile's logs): the
 	/// procedural bark they had was a flat dark smear under the lantern.</summary>

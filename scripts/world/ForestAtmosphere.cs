@@ -75,8 +75,8 @@ public partial class ForestAtmosphere : Node
 	[Export] public float OpenAmbientScale = 2.1f;
 	/// <summary>Ambient light colour when fully open (warmer than the scene's grey-blue).</summary>
 	[Export] public Color OpenAmbientColor = new(0.55f, 0.53f, 0.5f);
-	/// <summary>Extra sky (background) energy when fully open.</summary>
-	[Export] public float OpenSkyBoost = 0.12f;
+	/// <summary>Extra sky (background) energy when fully open (negative: less).</summary>
+	[Export] public float OpenSkyBoost = -0.3f;   // (2026-10-14: was 0.12; the sky gaps between the trunks blew out to white)
 	/// <summary>Warm the ambient light and the sky with the grade (off reproduces the old, subtler grade for comparisons).</summary>
 	[Export] public bool OpenWarmAmbientAndSky = true;
 	/// <summary>The sun stands this much higher when fully open, so its light reaches the ground between the trees.</summary>
@@ -249,16 +249,19 @@ public partial class ForestAtmosphere : Node
 	private static readonly (string name, Vector3 open)[] OpenSky =
 	{
 		// Toned down a step (2026-09-22): the sky was a bright cut-out behind the dark trees.
-		("zenith_color", new Vector3(0.33f, 0.45f, 0.64f)),
-		("horizon_color", new Vector3(0.62f, 0.64f, 0.63f)),
-		("glow_color", new Vector3(0.92f, 0.76f, 0.52f)),
-		("cloud_dark", new Vector3(0.5f, 0.5f, 0.54f)),
-		("cloud_light", new Vector3(0.84f, 0.8f, 0.74f)),
-		("ridge_far", new Vector3(0.52f, 0.56f, 0.62f)),
-		("ridge_mid", new Vector3(0.42f, 0.46f, 0.51f)),
-		("ridge_near", new Vector3(0.32f, 0.36f, 0.39f)),
-		("haze_color", new Vector3(0.68f, 0.65f, 0.58f)),
-		("below_color", new Vector3(0.58f, 0.55f, 0.48f)),
+		// (2026-10-14, the forest pass: and another: between the trunks at the trailhead it still blew out to white; a
+		// hazier, greyer afternoon, every part a good third down: through the post's halation anything over about half
+		// bright bloomed to white)
+		("zenith_color", new Vector3(0.22f, 0.28f, 0.37f)),
+		("horizon_color", new Vector3(0.34f, 0.35f, 0.36f)),
+		("glow_color", new Vector3(0.48f, 0.41f, 0.32f)),
+		("cloud_dark", new Vector3(0.28f, 0.29f, 0.31f)),
+		("cloud_light", new Vector3(0.42f, 0.41f, 0.39f)),
+		("ridge_far", new Vector3(0.34f, 0.36f, 0.4f)),
+		("ridge_mid", new Vector3(0.28f, 0.3f, 0.34f)),
+		("ridge_near", new Vector3(0.22f, 0.24f, 0.26f)),
+		("haze_color", new Vector3(0.4f, 0.39f, 0.36f)),
+		("below_color", new Vector3(0.36f, 0.35f, 0.31f)),
 	};
 	private float _skyGlowBase = 0.55f, _skyCloudBase = 0.55f;
 	private float _skyWinterApplied = -1f;

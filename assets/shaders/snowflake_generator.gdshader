@@ -24,6 +24,12 @@ uniform float blur = 0.0;
 uniform float strength = 1.0;
 /// A soft round clump instead (the wet flakes, the specks): 0 off, 1 on.
 uniform float round_clump = 0.0;
+/// (2026-10-14, the forest pass: the six-armed crystals read as clip-art stars in the air) A falling flake as the eye
+/// sees one: a small, soft aggregate, crystals tangled into a lumpy roundish clot with a feathered edge and a denser
+/// heart. 0 off, 1 on (the crystal above is not drawn).
+uniform float aggregate = 0.0;
+/// A defocused flake near the lens: a plain soft disc, no ring (a bokeh's bright rim reads as a lens effect).
+uniform float soft_disc = 0.0;
 
 float hash(float n) { return fract(sin(n * 127.1 + seed * 311.7) * 43758.5453); }
 
@@ -136,6 +142,35 @@ void fragment() {
 		float lump = 0.95 + 0.05 * sin(ang * 3.0 + hash(7.0) * 6.0) + 0.03 * sin(ang * 5.0 + hash(8.0) * 6.0);
 		alpha = 1.0 - smoothstep(0.15, 0.62 + blur * 0.3, r / lump);
 		alpha = pow(alpha, 1.2);
+	}
+	if (aggregate > 0.5) {
+		// a few lobes round a heart, each a soft blob; the union's edge broken up finely (the tangled crystals' feathers)
+		float a2 = 0.0;
+		int lobes = 4 + int(hash(30.0) * 4.0);
+		for (int i = 0; i < 8; i++) {
+			if (i >= lobes) break;
+			float an = hash(31.0 + float(i)) * 6.2831853;
+			float rr = i == 0 ? 0.0 : mix(0.1, 0.3, hash(41.0 + float(i)));
+			vec2 c = vec2(cos(an), sin(an)) * rr;
+			float rad = mix(0.22, 0.36, hash(51.0 + float(i))) * (i == 0 ? 1.3 : 1.0);
+			float dd = length(q - c) / rad;
+			a2 += exp(-dd * dd * 2.2) * mix(0.75, 1.0, hash(56.0 + float(i)));
+		}
+		// (summed, a metaball: one soft clot, no circle's edge showing inside it)
+		a2 = smoothstep(0.25 - blur * 0.15, 1.1 + blur * 0.4, a2);
+		// a ragged, feathered rim (fine lumps, not spokes)
+		vec2 g = q * 9.0 + hash(61.0) * 17.0;
+		float lumps = sin(g.x) * sin(g.y * 1.3 + 1.7) * 0.5 + sin(g.x * 2.1 + g.y * 1.7) * sin(g.y * 2.3 - g.x * 0.7) * 0.5;
+		a2 *= 1.0 + 0.35 * lumps * smoothstep(0.15, 0.5, r);
+		// the heart a little denser than the fringe
+		a2 *= mix(0.8, 1.0, 1.0 - smoothstep(0.0, 0.45, r));
+		alpha = clamp(a2, 0.0, 1.0) * (1.0 - smoothstep(0.85, 0.98, r));
+	}
+	if (soft_disc > 0.5) {
+		// gaussian-ish, faintly uneven: never a hard rim
+		float lump = 1.0 + 0.06 * sin(ang * 3.0 + hash(71.0) * 6.0);
+		float x = r * lump / 0.7;
+		alpha = exp(-x * x * 3.2) * (1.0 - smoothstep(0.8, 0.98, r));
 	}
 	COLOR = vec4(1.0, 1.0, 1.0, clamp(alpha * strength, 0.0, 1.0));
 }

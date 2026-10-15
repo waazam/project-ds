@@ -57,6 +57,8 @@ public partial class Weather : Node3D
 	[ExportGroup("Snow")]
 	[Export] public int NearFlakes = 1400;
 	[Export] public int MidFlakes = 42000;
+	/// <summary>The few big out-of-focus flakes right at the eye.</summary>
+	[Export] public int LensFlakes = 90;
 	[Export] public int RainDrops = 2600;
 
 	/// <summary>0..1: how heavily it's snowing (eased toward <see cref="SetSnow"/>'s target).</summary>
@@ -71,8 +73,8 @@ public partial class Weather : Node3D
 	private float _snowTarget, _snowRate = 0.2f, _blizTarget, _blizRate = 0.1f;
 	private Vector3 _windNow;
 	private double _t;
-	private GpuParticles3D _near, _mid, _rain;
-	private ShaderMaterial _nearPm, _midPm, _rainPm, _nearDraw, _midDraw, _rainDraw;
+	private GpuParticles3D _near, _mid, _rain, _lens;
+	private ShaderMaterial _nearPm, _midPm, _rainPm, _nearDraw, _midDraw, _rainDraw, _lensPm, _lensDraw;
 	private MeshInstance3D[] _curtains;
 	private ShaderMaterial[] _curtainMats;
 	private GpuParticlesCollisionHeightField3D _shelter;
@@ -196,8 +198,9 @@ public partial class Weather : Node3D
 	{
 		if (_near != null) return;
 		_near = Layer("SnowNear", NearFlakes, new Vector3(4.5f, 3.5f, 4.5f), out _nearPm, out _nearDraw);
-		// the crystals (0-7) and the wet clumps (12-13): big, tumbling
-		_nearPm.SetShaderParameter("size_range", new Vector2(0.025f, 0.05f));
+		// the soft clots (0-7): tumbling. (2026-10-14, the forest pass: they were 2.5-5 cm six-armed crystals, which a metre
+		// off read as clip-art stars; now mostly small, a few bigger, all soft)
+		_nearPm.SetShaderParameter("size_range", new Vector2(0.012f, 0.036f));
 		_nearPm.SetShaderParameter("frames", new Vector2(0f, 8f));
 		_nearPm.SetShaderParameter("fall", new Vector2(0.6f, 1.1f));
 		_nearPm.SetShaderParameter("flutter", 0.35f);
@@ -207,7 +210,8 @@ public partial class Weather : Node3D
 		_nearDraw.SetShaderParameter("opacity", 0.95f);
 		_mid = Layer("SnowMid", MidFlakes, new Vector3(15f, 8f, 15f), out _midPm, out _midDraw);
 		// the defocused crystals, the clumps and the specks (8-15): smaller, many
-		_midPm.SetShaderParameter("size_range", new Vector2(0.055f, 0.11f));
+		// (2026-10-14: the soft discs, the clumps and the specks, a little smaller)
+		_midPm.SetShaderParameter("size_range", new Vector2(0.045f, 0.09f));
 		_midPm.SetShaderParameter("frames", new Vector2(8f, 8f));
 		_midPm.SetShaderParameter("fall", new Vector2(0.8f, 1.4f));
 		_midPm.SetShaderParameter("flutter", 0.22f);
@@ -217,6 +221,17 @@ public partial class Weather : Node3D
 		// (a little light of their own: at dusk there is little else to show them by, and the snow must read)
 		_midDraw.SetShaderParameter("glow", 0.16f);
 		_midDraw.SetShaderParameter("edge_band", 0.35f);
+		// the lens: a few big flakes right by the eye, out of focus, faint (2026-10-14: they give the air its depth)
+		_lens = Layer("SnowLens", LensFlakes, new Vector3(1.6f, 1.2f, 1.6f), out _lensPm, out _lensDraw);
+		_lensPm.SetShaderParameter("size_range", new Vector2(0.03f, 0.065f));
+		_lensPm.SetShaderParameter("frames", new Vector2(8f, 4f));
+		_lensPm.SetShaderParameter("fall", new Vector2(0.5f, 0.9f));
+		_lensPm.SetShaderParameter("flutter", 0.3f);
+		_lensPm.SetShaderParameter("spin", 0.4f);
+		_lensDraw.SetShaderParameter("near_fade", 0.14f);
+		_lensDraw.SetShaderParameter("opacity", 0.32f);
+		_lensDraw.SetShaderParameter("glow", 0.08f);
+		_lensDraw.SetShaderParameter("edge_band", 0.4f);
 		// the far curtain: two rings
 		_curtains = new MeshInstance3D[2];
 		_curtainMats = new ShaderMaterial[2];
@@ -317,19 +332,25 @@ public partial class Weather : Node3D
 		if (_near != null)
 		{
 			bool on = Snow > 0.001f;
-			Show(_near, on); Show(_mid, on);
+			Show(_near, on); Show(_mid, on); Show(_lens, on);
 			foreach (var c in _curtains) c.Visible = on && _outdoors > 0.01f;
 			if (on)
 			{
 				float b = Blizzard;
 				Place(_near, _nearPm, cp);
 				Place(_mid, _midPm, cp);
+				Place(_lens, _lensPm, cp);
 				_nearPm.SetShaderParameter("density", Mathf.Clamp(Snow * 0.9f + b * 0.3f, 0f, 1f));
 				_midPm.SetShaderParameter("density", Mathf.Clamp(0.15f + Snow * 0.65f + b * 0.4f, 0f, 1f) * Mathf.Min(1f, Snow * 4f));
+				// (the lens flakes: a handful in light snow, thick in the gale, driven past the eye)
+				_lensPm.SetShaderParameter("density", Mathf.Clamp(0.25f + Snow * 0.35f + b * 0.6f, 0f, 1f) * Mathf.Min(1f, Snow * 3f));
 				// in the gale the flakes streak a little (never long: nothing whips across the eye)
-				_nearDraw.SetShaderParameter("stretch", 0.035f * b);
-				_midDraw.SetShaderParameter("stretch", 0.02f * b);
-				_nearPm.SetShaderParameter("flutter", Mathf.Lerp(0.35f, 0.6f, b));
+				_nearDraw.SetShaderParameter("stretch", 0.03f * b);
+				_midDraw.SetShaderParameter("stretch", 0.016f * b);
+				_lensDraw.SetShaderParameter("stretch", 0.025f * b);
+				_lensDraw.SetShaderParameter("opacity", Mathf.Lerp(0.42f, 0.3f, b));
+				_nearPm.SetShaderParameter("flutter", Mathf.Lerp(0.35f, 0.7f, b));
+				_lensPm.SetShaderParameter("flutter", Mathf.Lerp(0.3f, 0.9f, b));
 				for (int i = 0; i < _curtains.Length; i++)
 				{
 					_curtains[i].GlobalPosition = new Vector3(cp.X, cp.Y, cp.Z);
@@ -345,7 +366,7 @@ public partial class Weather : Node3D
 		{
 			Color haze = env.FogEnabled ? env.FogLightColor : env.AmbientLightColor * env.AmbientLightEnergy;
 			_hazeTint = _hazeTint.Lerp(haze, 1f - Mathf.Exp(-2f * dt));
-			foreach (var m in new[] { _nearDraw, _midDraw }) { m.SetShaderParameter("glow_tint", _hazeTint); m.SetShaderParameter("haze_lift", 1.25f); }
+			foreach (var m in new[] { _nearDraw, _midDraw, _lensDraw }) { m.SetShaderParameter("glow_tint", _hazeTint); m.SetShaderParameter("haze_lift", 1.25f); }
 			foreach (var m in _curtainMats) { m.SetShaderParameter("glow_tint", _hazeTint); m.SetShaderParameter("haze_lift", 1.15f); }
 		}
 		// the rain

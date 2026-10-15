@@ -103,6 +103,15 @@ public partial class SignPost : Node3D
 			_k.Mat(BuildingTextures.SignBrownMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, dir);
 			Col(c, new Vector3(len, h, t + 0.02f));
+			// (2026-10-14) the weather on its face (over the square part: the film can't follow the point), and a split
+			// running in from its square end on some
+			{
+				float tip = dir == 0 ? 0f : Mathf.Min(h * 0.55f, len * 0.3f);
+				var faceC = c + b * new Vector3(0, 0, t * 0.5f);
+				SignKit.Weather(_k, faceC + b * new Vector3(-dir * tip * 0.5f, 0, 0), b, len - tip - 0.01f, h - 0.01f, Seed * 31 + i);
+				if (Rand(i + 40, 0f, 1f) > 0.35f)
+					SignKit.Split(_k, faceC, b, len * Rand(i + 41, 0.25f, 0.55f), Rand(i + 42, -h * 0.3f, h * 0.3f), dir == 0 ? -len * 0.5f : -dir * len * 0.5f, dir == 0 ? 1 : dir);
+			}
 			// bolt heads on the post
 			_k.Color = new Color(0.25f, 0.24f, 0.22f);
 			_k.Mat(ProcTextures.MetalMat).Box(c + b * new Vector3(-x, 0, t * 0.5f + 0.005f), new Vector3(0.025f, 0.025f, 0.012f));
@@ -149,6 +158,7 @@ public partial class SignPost : Node3D
 			_k.Mat(BuildingTextures.SignBrownMat);
 			SignKit.ArrowBoard(_k, c, b, len, h, t, 0);
 			Col(c, new Vector3(len, h, t + 0.02f));
+			SignKit.Weather(_k, c + b * new Vector3(0, 0, t * 0.5f), b, len - 0.01f, h - 0.01f, Seed * 37 + i);   // (2026-10-14)
 			// the long crack down one board
 			_k.Color = new Color(0.02f, 0.02f, 0.02f);
 			_k.Mat(ProcTextures.Flat("sign_crack", new Color(0.03f, 0.025f, 0.02f)))

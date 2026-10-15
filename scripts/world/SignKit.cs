@@ -12,8 +12,57 @@ public static class SignKit
 {
 	/// <summary>Pale "fresh wood" colour of routed letters.</summary>
 	public static readonly Color Carve = new(0.66f, 0.61f, 0.50f);
-	/// <summary>The white the park's painted signs fill their routed letters with (2026-10-03).</summary>
-	public static readonly Color Paint = new(0.8f, 0.79f, 0.74f);
+	/// <summary>The white the park's painted signs fill their routed letters with (2026-10-03); faded to a dirty cream by
+	/// years out (2026-10-14: it was crisp shop white).</summary>
+	public static readonly Color Paint = new(0.6f, 0.58f, 0.5f);
+
+	private static ShaderMaterial _weatherMat;
+	/// <summary>The weather film (sign_weather.gdshader) over a sign's faces: grime, rain streaks, moss, lichen.</summary>
+	public static ShaderMaterial WeatherMat
+	{
+		get
+		{
+			if (_weatherMat != null) return _weatherMat;
+			_weatherMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/sign_weather.gdshader"), ResourceName = "sign_weather" };
+			_weatherMat.SetShaderParameter("noise_tex", new NoiseTexture2D
+			{
+				Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true,
+				Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.02f, FractalOctaves = 4, Seed = 3131 },
+			});
+			return _weatherMat;
+		}
+	}
+
+	/// <summary>
+	/// (2026-10-14, the forest pass: the signs were crisp and clean) Years of weather over a board's face: a film a hair
+	/// in front of it (and of its routed letters), <paramref name="w"/> x <paramref name="h"/> centred on <paramref name="c"/>,
+	/// facing b.Z; seeded so no two boards weather alike. Grime blotches, rain run from the top, moss along the foot.
+	/// </summary>
+	public static void Weather(MeshKit k, Vector3 c, Basis b, float w, float h, int seed, float lift = 0.0045f)
+	{
+		var keep = k.Color;
+		uint s = (uint)(seed * 2654435761u);
+		k.Color = new Color((s & 0xFF) / 255f, ((s >> 8) & 0xFF) / 255f, 0f, 1f);
+		k.Mat(WeatherMat);
+		Vector3 fz = b.Z.Normalized();
+		Vector3 P(float x, float y) => c + b * new Vector3(x, y, 0) + fz * lift;
+		float hw = w * 0.5f, hh = h * 0.5f;
+		k.Quad(P(-hw, -hh), P(hw, -hh), P(hw, hh), P(-hw, hh), fz, new Vector2(0, 0), new Vector2(w, 0), new Vector2(w, h), new Vector2(0, h));
+		k.Color = keep;
+	}
+
+	/// <summary>A split along a board's grain: a dark crack, a little open, running in from one end.</summary>
+	public static void Split(MeshKit k, Vector3 c, Basis b, float len, float y, float fromX, int dir)
+	{
+		var keep = k.Color;
+		k.Color = new Color(0.02f, 0.02f, 0.02f);
+		k.Mat(ProcTextures.Flat("sign_crack", new Color(0.03f, 0.025f, 0.02f)));
+		Vector3 fz = b.Z.Normalized();
+		// two short thin boxes, the crack tapering as it goes in
+		k.Box(c + b * new Vector3(fromX + dir * len * 0.25f, y, 0) + fz * 0.001f, new Vector3(len * 0.5f, 0.007f, 0.002f), 1f, b);
+		k.Box(c + b * new Vector3(fromX + dir * len * 0.7f, y + 0.002f, 0) + fz * 0.001f, new Vector3(len * 0.42f, 0.004f, 0.002f), 1f, b);
+		k.Color = keep;
+	}
 	/// <summary>Colour of the groove shadow drawn just under the letters.</summary>
 	public static readonly Color CarveShadow = new(0.05f, 0.04f, 0.03f);
 

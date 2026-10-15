@@ -92,6 +92,82 @@ public partial class RainVfx : Node3D
 			Visible = false,
 		};
 		AddChild(_bolt);
+		BuildHorizon();
+	}
+
+	// ------------------------------------------------------------------ (2026-10-14) the storm's far light
+
+	/// <summary>Where the storm's far light lies (world xz, from the eye): down the trail, ahead.</summary>
+	[Export] public Vector2 HorizonToward = new(0.25f, -1f);
+	private MeshInstance3D _horizon;
+	private ShaderMaterial _horizonMat;
+	private float _farT = 4f, _farClock = -1f, _farStrength, _horizonShown;
+	private readonly List<(float t, float e)> _farPulse = new();
+
+	/// <summary>The forest pass (the owner's survey: the storm frames were all but black): a dim cold light low over the
+	/// woods one way, the cloud thinner there, and now and then far lightning flaring in it (storm_horizon.gdshader), on
+	/// a ring inside the fog's reach so the near trunks stand black against it.</summary>
+	private void BuildHorizon()
+	{
+		_horizonMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/storm_horizon.gdshader") };
+		_horizonMat.SetShaderParameter("noise_tex", new NoiseTexture2D
+		{
+			Width = 256, Height = 256, Seamless = true, GenerateMipmaps = true,
+			Noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, Frequency = 0.02f, FractalOctaves = 4, Seed = 3303 },
+		});
+		_horizonMat.SetShaderParameter("toward", HorizonToward);
+		_horizon = new MeshInstance3D
+		{
+			Name = "StormHorizon",
+			Mesh = new CylinderMesh { TopRadius = 66f, BottomRadius = 66f, Height = 70f, RadialSegments = 48, Rings = 4, CapTop = false, CapBottom = false },
+			MaterialOverride = _horizonMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false,
+			ExtraCullMargin = 80f, Layers = Weather.CurtainLayer,   // (the weather's own layer: the snow's roof collider never sees it)
+		};
+		AddChild(_horizon);
+	}
+
+	private void UpdateHorizon(Vector3 cp, bool sheltered, float flash, float dt)
+	{
+		if (_horizon == null) return;
+		bool inside = _atmo != null && (_atmo.Interior > 0.3f || _atmo.Underground > 0.3f || _atmo.Enclosed > 0.5f);
+		float want = sheltered || inside ? 0f : Mathf.Clamp(_intensity * 1.4f, 0f, 1f);
+		_horizonShown = Mathf.MoveToward(_horizonShown, want, dt * 0.5f);
+		_horizon.Visible = _horizonShown > 0.005f;
+		if (!_horizon.Visible) return;
+		_horizon.GlobalPosition = cp + Vector3.Up * 22f;   // (the band's middle well above the eye: the ring reaches from under the horizon to ~40 degrees)
+		// far lightning now and then: a flare in the cloud, no light on the scene, no thunder (the near strikes are Flash's)
+		_farT -= dt;
+		if (_farT <= 0f && _farClock < 0f)
+		{
+			_farT = _rng.RandfRange(6f, 16f);
+			bool gentle = Settings != null && Settings.ReduceFlashing;
+			_farStrength = _rng.RandfRange(0.5f, 1f) * (gentle ? 0.35f : 1f);
+			_farPulse.Clear();
+			if (gentle) { _farPulse.Add((0f, 0f)); _farPulse.Add((0.5f, 1f)); _farPulse.Add((1.6f, 0f)); }
+			else
+			{
+				_farPulse.Add((0f, 0f)); _farPulse.Add((0.06f, 0.6f)); _farPulse.Add((0.14f, 0.15f)); _farPulse.Add((0.22f, 1f));
+				if (_rng.Randf() < 0.5f) { _farPulse.Add((0.3f, 0.3f)); _farPulse.Add((0.38f, 0.7f)); }
+				_farPulse.Add((0.9f, 0f));
+			}
+			_farClock = 0f;
+		}
+		float far = 0f;
+		if (_farClock >= 0f)
+		{
+			_farClock += dt;
+			far = -1f;
+			for (int i = 1; i < _farPulse.Count; i++)
+				if (_farClock <= _farPulse[i].t)
+				{
+					var (t0, e0) = _farPulse[i - 1]; var (t1, e1) = _farPulse[i];
+					far = Mathf.Lerp(e0, e1, (_farClock - t0) / Mathf.Max(0.0001f, t1 - t0)) * _farStrength;
+					break;
+				}
+			if (far < 0f) { far = 0f; _farClock = -1f; }
+		}
+		_horizonMat.SetShaderParameter("strength", _horizonShown);
+		_horizonMat.SetShaderParameter("flicker", far + flash * 0.6f);
 	}
 
 	/// <summary>Vertical streak, soft at both ends.</summary>
@@ -293,6 +369,8 @@ public partial class RainVfx : Node3D
 			if (e < 0f) { _pulseClock = -1f; _bolt.Visible = false; _bolt.LightEnergy = 0f; }
 			else { flash = e * _pulseStrength; _bolt.LightEnergy = flash * LightningEnergy; }
 		}
+
+		UpdateHorizon(cp, sheltered, flash, dt);
 
 		if (_atmo != null)
 		{

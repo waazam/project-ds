@@ -59,6 +59,7 @@ public partial class WinterWoods
 		var lodge = SkiLodge.OriginLocal;
 		// walk the road, and scatter across it on a jittered grid (each grid cell visited once: keyed)
 		var seen = new HashSet<Vector2I>();
+		var mounds = new Dictionary<Vector2I, List<Transform3D>>();
 		for (int i = 0; i < Points; i += 4)
 		{
 			var c0 = RoadPoint(i);
@@ -91,6 +92,17 @@ public partial class WinterWoods
 					ch.trees[kind].Add((new Transform3D(basis, at), ice));
 					if (d < 80f) ch.trunks.Add(at);
 					TreeSpots.Add((p, kinds[kind].h * sc, kinds[kind].fir));
+					// (2026-10-14) the snow drifted up against the trunk, heaped on its lee side (not under a fir's skirts: it's
+					// sheltered there, a well)
+					if (d < 70f && !kinds[kind].fir)
+					{
+						var lee = new Vector3(0.9f, 0f, 0.42f).Normalized();
+						float ms = sc * rng.RandfRange(0.8f, 1.25f);
+						var mb = new Basis(Vector3.Up, Mathf.Atan2(lee.X, lee.Z) + rng.RandfRange(-0.3f, 0.3f)).Scaled(new Vector3(ms * 0.95f, ms * rng.RandfRange(0.7f, 1f), ms * 1.5f));
+						var key2 = new Vector2I(Mathf.FloorToInt(p.X / TreeChunk), Mathf.FloorToInt(p.Y / TreeChunk));
+						if (!mounds.TryGetValue(key2, out var ml)) mounds[key2] = ml = new List<Transform3D>();
+						ml.Add(new Transform3D(mb, at + lee * 0.3f * ms + Vector3.Down * 0.02f));
+					}
 					if (ice > 0.5f && kinds[kind].fir)
 					{
 						// icicles under the tiers' edges
@@ -112,6 +124,12 @@ public partial class WinterWoods
 		{
 			var holder = new Node3D { Name = $"Trees_{key.X}_{key.Y}" };
 			AddChild(holder);
+			if (mounds.TryGetValue(key, out var ml) && ml.Count > 0)
+			{
+				var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = TrunkDriftMesh(_groundMat), InstanceCount = ml.Count };
+				for (int j = 0; j < ml.Count; j++) mm.SetInstanceTransform(j, ml[j]);
+				holder.AddChild(new MultiMeshInstance3D { Name = "TrunkDrifts", Multimesh = mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, VisibilityRangeEnd = 70f, VisibilityRangeEndMargin = 8f });
+			}
 			for (int k = 0; k < kinds.Count; k++)
 			{
 				if (kinds[k].bare) { AddTrees(holder, kinds[k].mesh, c.trees[k], $"K{k}", null); continue; }
@@ -135,6 +153,19 @@ public partial class WinterWoods
 				holder.AddChild(body);
 			}
 		}
+	}
+
+	private static Mesh _trunkDrift;
+	/// <summary>(2026-10-14) A low drift heaped round a trunk's foot, drawn in the ground's own snow (vertex colour: open,
+	/// unfrozen snow), most of it under the ground so only a soft swell shows.</summary>
+	private static Mesh TrunkDriftMesh(Material ground)
+	{
+		if (_trunkDrift != null) return _trunkDrift;
+		var k = new MeshKit();
+		k.Mat(ground);
+		k.Color = new Color(0f, 0f, 0f, 0f);
+		k.Blob(new Vector3(0f, -0.2f, 0f), new Vector3(0.8f, 0.46f, 0.8f), 9071, 0.12f, false, 1f, 0f, 2);
+		return _trunkDrift = k.Commit();
 	}
 
 	private static CylinderShape3D _trunk;
