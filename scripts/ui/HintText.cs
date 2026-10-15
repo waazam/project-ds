@@ -62,9 +62,14 @@ public static class HintStyle
 
 	/// <summary>Where a low block <paramref name="height"/> tall starts: in the middle of the bottom cinema bar when it fits there
 	/// (black under it: the best contrast there is, and nothing of the view covered), else just above the bottom edge.</summary>
+	/// <summary>The camera's viewfinder is up: its readout fills the bottom bar (2026-10-15, the playtest: the camera's how-to
+	/// lay across "1/60 ISO 800"), so the low lines go to the top bar instead.</summary>
+	public static bool ViewfinderUp;
+
 	public static float LowBandTop(Vector2 screen, float height, bool overlay = false)
 	{
 		float bar = CinemaFrame.Bar;
+		if (ViewfinderUp) return Mathf.Round(bar >= height + 3f ? bar * 0.5f - height * 0.5f : bar + 8f);
 		if (!overlay && !float.IsNaN(OverlayTop)) return Mathf.Round(Mathf.Min(OverlayTop - 3f - height, screen.Y - bar - 8f - height));
 		if (bar >= height + 3f) return Mathf.Round(screen.Y - bar * 0.5f - height * 0.5f);
 		return Mathf.Round(screen.Y - bar - 8f - height);

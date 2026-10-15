@@ -11,7 +11,9 @@ namespace ProjectDS.UI;
 /// </summary>
 public partial class CameraViewfinder : CanvasLayer
 {
-	public float Raise { get; set; }          // 0 = lowered, 1 = fully raised (eased by CameraTool)
+	/// <summary>0 = lowered, 1 = fully raised (eased by CameraTool). Raised, the low hint lines move up out of its readout.</summary>
+	public float Raise { get => _raise; set { _raise = value; HintStyle.ViewfinderUp = value > 0.5f; } }
+	private float _raise;
 	public bool FocusLocked { get; set; }
 	/// <summary>The autofocus's pull (0..1): a bar beside the focus square fills as it comes in.</summary>
 	public float FocusLevel { get; set; }
@@ -39,7 +41,7 @@ public partial class CameraViewfinder : CanvasLayer
 	/// <summary>The viewfinder in play, if any (the letterbox bars step aside while it is raised).</summary>
 	public static CameraViewfinder Current { get; private set; }
 
-	public override void _ExitTree() { if (Current == this) Current = null; }
+	public override void _ExitTree() { if (Current == this) Current = null; HintStyle.ViewfinderUp = false; }
 
 	public override void _Ready()
 	{

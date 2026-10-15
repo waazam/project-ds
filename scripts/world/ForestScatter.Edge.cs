@@ -8,7 +8,7 @@ public partial class ForestScatter
 	/// "all end of world parts of the map should not be accessible because the trees will always get too thick and the
 	/// bushes and forest too thick to reach the end of the map ... except for our trailhead road bend"). A band inside
 	/// <see cref="ForestTerrain.PlayRect"/>'s edge, its inner side wandering (never a straight line of trees): young firs,
-	/// snags, saplings crowded together, vine mounds, deadfall, palmetto and fern between, every woody thing solid, denser
+	/// snags, saplings crowded together, vine mounds, deadfall, fern and grass between, every woody thing solid, denser
 	/// the nearer the edge. The terrain's walls stand inside it (<see cref="ForestTerrain.EdgeWallInset"/>). The road is
 	/// left open: it goes on, and a wall across it (the same walls) stops the player before its bend.</summary>
 	[Export] public bool EdgeThicket = false;
@@ -97,9 +97,10 @@ public partial class ForestScatter
 				}
 				else
 				{
-					// palmetto and fern between: no stopping, just no seeing through
+					// fern and tall grass between: no stopping, just no seeing through (2026-10-15, the playtest: fan palms read
+					// wrong in a fir forest; ferns and grass instead)
 					float s = rng.RandfRange(0.9f, 1.4f);
-					Add(kind < 0.94f ? (rng.Randf() < 0.5f ? "palmetto_a" : "palmetto_b") : "fern", FoliageChunk, pos,
+					Add(rng.Randf() < 0.75f ? "fern" : "grass", FoliageChunk, pos,
 						Basis.FromEuler(new Vector3(0, yaw, 0)).Scaled(Vector3.One * s), Colors.White * rng.RandfRange(0.85f, 1.05f));
 				}
 				EdgeCount++;

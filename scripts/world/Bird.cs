@@ -424,17 +424,42 @@ public partial class Bird : Node3D
 			var b = a + new Vector3(_rng.RandfRange(-0.25f, 0.25f), _rng.RandfRange(0.1f, 0.3f), _rng.RandfRange(-0.25f, 0.25f));
 			k.Cylinder(a, b, 0.012f, 0.004f, 4, true, 3f);
 		}
-		// a light crown, well above the bird: it never hides it
-		k.Mat(ProcTextures.LeafMat);
-		for (int i = 0; i < 4; i++)
+		// a light crown, well above the bird (it never hides it): (2026-10-15, the playtest: its crown was four solid
+		// leaf-textured balls, a camouflage blob against the sky) now twigs up off the top with loose clusters of single
+		// leaves at their ends, the way the woods' saplings grow theirs, sky between them
+		var tips = new System.Collections.Generic.List<(Vector3 at, Vector3 dir)>();
+		for (int b = 0; b < 6; b++)
 		{
-			var c = top + new Vector3(_rng.RandfRange(-0.45f, 0.45f), _rng.RandfRange(-0.3f, 0.15f), _rng.RandfRange(-0.45f, 0.45f));
-			k.Color = new Color(0.55f, 0.66f, 0.42f) * _rng.RandfRange(0.85f, 1.1f);
-			k.Blob(c, new Vector3(0.55f, 0.42f, 0.5f) * _rng.RandfRange(0.8f, 1.15f), Seed() + 20 + i, 0.25f, true, 1.5f);
+			float a = _rng.RandfRange(0, Mathf.Tau);
+			var from = Along(_rng.RandfRange(0.72f, 0.98f));
+			var dir = new Vector3(Mathf.Cos(a), _rng.RandfRange(0.35f, 0.9f), Mathf.Sin(a)).Normalized();
+			var to = from + dir * _rng.RandfRange(0.4f, 0.8f);
+			k.Mat(ProcTextures.BarkMat);
+			k.Color = new Color(0.55f, 0.52f, 0.47f);
+			k.Cylinder(from, to, 0.014f, 0.004f, 4, true, 3f);
+			tips.Add((from.Lerp(to, 0.6f), dir));
+			tips.Add((to, dir));
 		}
-		// a few leaves on the limb's end
-		k.Color = new Color(0.5f, 0.62f, 0.38f);
-		k.Blob(tip + new Vector3(0.05f * side, 0.06f, 0), new Vector3(0.16f, 0.1f, 0.14f), Seed() + 31, 0.3f, true, 1.5f);
+		tips.Add((top, Vector3.Up));
+		tips.Add((tip, new Vector3(side, 0.3f, 0).Normalized()));   // a few on the limb's end
+		k.Mat(BunkerParts.BunkerTextures.IvyMat);
+		foreach (var (at, dir) in tips)
+			for (int i = 0; i < 8; i++)
+			{
+				var lp = at + new Vector3(_rng.RandfRange(-0.25f, 0.25f), _rng.RandfRange(-0.15f, 0.2f), _rng.RandfRange(-0.25f, 0.25f));
+				var nrm = (Vector3.Up * 0.6f + new Vector3(_rng.RandfRange(-1f, 1f), _rng.RandfRange(-0.2f, 0.6f), _rng.RandfRange(-1f, 1f))).Normalized();
+				var t = (dir + new Vector3(_rng.RandfRange(-0.6f, 0.6f), -0.4f, _rng.RandfRange(-0.6f, 0.6f))).Normalized();
+				t = (t - nrm * t.Dot(nrm)).Normalized();
+				if (!t.IsFinite() || t.LengthSquared() < 0.5f) continue;
+				var sd = nrm.Cross(t).Normalized();
+				float sz = _rng.RandfRange(0.09f, 0.15f), hs = sz * 0.5f;
+				float l = _rng.RandfRange(0.85f, 1.15f), yel = _rng.Randf() < 0.25f ? _rng.RandfRange(0.4f, 0.9f) : 0f;
+				k.Color = new Color(l, l, l * 0.9f).Lerp(new Color(l * 2.2f, l * 1.6f, l * 0.4f), yel);
+				int cell = _rng.Randf() < 0.6f ? 3 : _rng.Randf() < 0.5f ? 1 : 0;
+				float u0 = (cell % 2) * 0.5f, v0 = (cell / 2) * 0.5f;
+				k.Quad(lp - sd * hs, lp + sd * hs, lp + t * sz + sd * hs, lp + t * sz - sd * hs, nrm,
+					new Vector2(u0, v0 + 0.5f), new Vector2(u0 + 0.5f, v0 + 0.5f), new Vector2(u0 + 0.5f, v0), new Vector2(u0, v0));
+			}
 		k.CommitTo(perch, "PerchMesh");
 		var mid = foot.Lerp(top, 0.5f);
 		Solid(perch, new CylinderShape3D { Radius = 0.13f, Height = top.Y - foot.Y }, mid);

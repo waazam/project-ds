@@ -90,7 +90,7 @@ public partial class CameraTool : Node
 			c.A = Mathf.MoveToward(c.A, 0f, (float)delta * 3.5f);
 			_flash.Color = c;
 		}
-		if (_pendingShot) { _pendingShot = false; _viewfinder.HideMarks = false; Shoot(); ShowOverlays(); }
+		if (_pendingShot) { _pendingShot = false; GrabThenShoot(); _viewfinder.HideMarks = false; ShowOverlays(); }
 		var input = _player.PlayerInput;
 		// (2026-10-13j) only with the camera in the right hand (and up there): otherwise right mouse gathers the lantern's beam
 		bool raising = _inv.HasCamera && PlayerHands.CameraReady(_player) && input.Enabled && input.Focus;
@@ -109,7 +109,7 @@ public partial class CameraTool : Node
 		_viewfinder.Zoom = Zoom;
 		_viewfinder.FocusLevel = _focus;
 		if (_raise > 0.01f) _viewfinder.FocusLocked = _focusOn != null && _focus > 0.85f;
-		if (IsRaised && input.PhotoPressed && _framesLeft > 0 && !_pendingShot)
+		if (IsRaised && input.PhotoPressed && _framesLeft > 0 && !_pendingShot && !_grabbing)
 		{
 			// The readback in Shoot returns the last rendered frame: draw one without the marks first.
 			_pendingShot = true;
@@ -280,7 +280,50 @@ public partial class CameraTool : Node
 		return best;
 	}
 
-	private void Shoot()
+	private bool _grabbing;
+
+	/// <summary>The frame just drawn (the marks and the words hidden), read back without stalling: (2026-10-15, the playtest:
+	/// GetImage() on the whole 2560x1440 frame held the game ~100 ms at every shutter) the GPU copies it out in the
+	/// background and the shot is taken a frame or two later, when it lands. Without a RenderingDevice (or a format we
+	/// can't read) it falls back to the old blocking read.</summary>
+	private void GrabThenShoot()
+	{
+		var tex = GetViewport()?.GetTexture();
+		var rd = RenderingServer.GetRenderingDevice();
+		if (tex != null && rd != null)
+		{
+			var rdTex = RenderingServer.TextureGetRdTexture(tex.GetRid());
+			if (rdTex.IsValid)
+			{
+				var fmt = rd.TextureGetFormat(rdTex);
+				Image.Format? imgFmt = fmt.Format switch
+				{
+					RenderingDevice.DataFormat.R8G8B8A8Unorm or RenderingDevice.DataFormat.R8G8B8A8Srgb => Image.Format.Rgba8,
+					RenderingDevice.DataFormat.R16G16B16A16Sfloat => Image.Format.Rgbah,
+					RenderingDevice.DataFormat.R32G32B32A32Sfloat => Image.Format.Rgbaf,
+					_ => null,
+				};
+				if (imgFmt is { } f)
+				{
+					int w = (int)fmt.Width, h = (int)fmt.Height;
+					_grabbing = true;
+					rd.TextureGetDataAsync(rdTex, 0, Callable.From((byte[] data) =>
+					{
+						_grabbing = false;
+						if (!IsInstanceValid(this) || !IsInsideTree()) return;
+						Image img = null;
+						try { img = Image.CreateFromData(w, h, false, f, data); if (f != Image.Format.Rgba8) img.Convert(Image.Format.Rgba8); }
+						catch (System.Exception e) { GD.PushWarning($"[camera] frame readback: {e.Message}"); }
+						Shoot(img);
+					}));
+					return;
+				}
+			}
+		}
+		Shoot(GetViewport()?.GetTexture()?.GetImage());
+	}
+
+	private void Shoot(Image full)
 	{
 		var cam = _player.CameraRig?.Camera;
 		if (cam == null) return;
@@ -288,7 +331,7 @@ public partial class CameraTool : Node
 		var other = best == null ? FindOtherSubject() : null;
 		_framesLeft--;
 
-		var frame = GrabFrame();
+		var frame = GrabFrame(full);
 		var score = default(PhotoLog.Score);
 		if (best != null) score = Judge(cam, best.GlobalPosition, PhotoCatalog.Get("bird_" + ColourName(best.Color))?.Radius ?? 0.15f, frame);
 		else if (other != null) score = Judge(cam, other.Centre, other.SubjectRadius, frame);
@@ -352,9 +395,9 @@ public partial class CameraTool : Node
 	};
 
 	/// <summary>The last rendered frame, cropped to the viewfinder's 3:2 frame and downsampled to the print size.</summary>
-	private Image GrabFrame()
+	private Image GrabFrame(Image img)
 	{
-		var img = GetViewport()?.GetTexture()?.GetImage();
+		// (the frame comes from GrabThenShoot)
 		if (img == null) return null;
 		var frame = _viewfinder.FrameRect;
 		// the frame is in the game's 640x360 layout; with the CRT filter the rendered frame is the window's size
