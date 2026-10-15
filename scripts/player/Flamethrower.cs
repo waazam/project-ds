@@ -91,8 +91,13 @@ public partial class Flamethrower : Node3D
 			// (the grips raked back a little, as the pistol grips are)
 			hand.RotationDegrees = side == HandSide.Right ? WandGripTurn : WandGripTurnLeft;
 			_wand.AddChild(hand);
+			// (2026-10-15) on the held layer, out of the lantern's own light: hung at the belt, an inch under the front hand, it
+			// blew the glove and the sleeve out to white (the charcoal glove read silver); lit instead by the fill below, the
+			// pilot, the sun and the sky, as every held thing is
+			HeldItem.SetLayer(hand);
 			_hands.Add(hand);
 		}
+		_wand.AddChild(new OmniLight3D { Name = "HandLight", LightColor = new Color(1f, 0.66f, 0.38f), LightEnergy = 0.6f, OmniRange = 0.9f, OmniAttenuation = 1.4f, ShadowEnabled = false, LightCullMask = HeldItem.HeldLayer, LightSpecular = 0.3f, Position = new Vector3(-0.05f, -0.16f, -0.12f) });
 		// (the wand's model runs along -Z, its nozzle's mouth 0.82 m out)
 		_nozzle = new Node3D { Name = "Nozzle", Position = new Vector3(0f, 0.035f, -0.86f) };
 		_wand.AddChild(_nozzle);

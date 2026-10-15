@@ -3,17 +3,21 @@
 // (2026-10-14g, the owner: "the player's arms need more texture, and the hands too") Each cloth's detail is sized to
 // read at the game's 640x360 (a pixel there is about a millimetre at arm's length): stitches, seams, scratches, creases
 // and dirt a few pixels across, never a fine pattern that would only shimmer.
-// - kind 0, the work glove's leather: its own baked colour map (an oiled dark brown: rubbed paler and warmer over the
-//   knuckles and fingertips, grime in the palm, the fingertips and the creases, scuffs, scratches, the seams' pale
-//   thread) and baked normal map (the folds bunched in the bends, the creases over the knuckles, the stitched seams);
+// - kind 0, the work glove's leather: its own baked colour map ((2026-10-15) a charcoal-black winter work glove: rubbed
+//   to a worn grey over the knuckles and fingertips, a blacker synthetic grip palm, grime in the palm, the fingertips and
+//   the creases, scuffs, scratches, the seams' grey thread) and baked normal map (the folds bunched in the bends, the creases over the knuckles, the stitched seams);
 //   over them the leather's pebbled grain at two sizes, the dirt held in its hollows. The vertices carry the baked
 //   occlusion (r), how worn it is (g) and the palm (b): the worn places polished, a slight sheen the lantern catches.
-// - kind 1, the jacket's knitted storm cuff: wool ribs running along the arm (its UVs run round it), its stitches,
+//   (2026-10-15) A black glove would vanish into the dark: the leather over the back keeps a low sheen and a rim, so its
+//   silhouette and fingers stay drawn under the lantern; the palm's grip panel is matte, finer grained.
+// - kind 1 (until 2026-10-15; the models no longer have it: the sleeve's hem now comes down over the glove), the jacket's
+//   knitted storm cuff: wool ribs running along the arm (its UVs run round it), its stitches,
 //   darker down in the ribs, a little fuzz.
 // - kind 2, the jacket's cotton duck sleeve (its UVs: u round the arm, v metres up it from the hem): the weave, slubbed
 //   threads, two felled seams (a raised welt, two rows of pale stitches) up the sleeve, the hem's double row of
 //   stitching, its edge frayed pale and grimy, fine creases bunched above the cuff and at the elbow, dirt rubbed into
-//   the weave. Its colour (sun-faded on top, darker underneath, mud, a grease mark) is the model's.
+//   the weave. Its colour (sun-faded on top, darker underneath, mud, a grease mark; 2026-10-15 a very dark olive-brown)
+//   is the model's.
 // Every normal is in the mesh's own tangent frame (the models carry their tangents), so either hand works.
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
@@ -31,12 +35,17 @@ uniform sampler2D grain : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform float grain_scale = 24.0;
 uniform float grain_strength = 0.22;
 uniform vec3 tint : source_color = vec3(1.0);
-uniform float roughness = 0.8;
+uniform float roughness = 0.74;
 /// The worn, polished places (the knuckles, the fingertips): a slight sheen
-uniform float worn_roughness = 0.46;
-uniform float specular = 0.22;
-uniform float worn_specular = 0.42;
-uniform float rim = 0.06;
+uniform float worn_roughness = 0.5;
+uniform float specular = 0.24;
+uniform float worn_specular = 0.36;
+/// (2026-10-15) the black glove's rim: its edges and fingers lit against the dark (more, and with more sheen, and a
+/// strong light close by, the flamethrower's pilot, washed the black out silver)
+uniform float rim = 0.2;
+/// The palm's synthetic grip panel: matte, finer grained
+uniform float palm_roughness = 0.86;
+uniform float palm_specular = 0.18;
 /// The knit's ribs round the cuff and its stitches along it
 uniform float ribs = 44.0;
 uniform float stitches = 22.0;
@@ -45,7 +54,7 @@ uniform float girth = 0.215;
 uniform float seam_a = 0.36;
 uniform float seam_b = 0.86;
 uniform vec3 sleeve_warmth = vec3(1.1, 1.02, 0.72);
-uniform vec3 leather_warmth = vec3(1.08, 0.98, 0.84);
+uniform vec3 leather_warmth = vec3(1.07, 1.0, 0.9);   // (2026-10-15: just enough that the black reads charcoal, not navy, under the cool rim)
 
 float hash1(float x) { return fract(sin(x * 127.1) * 43758.5453); }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -80,17 +89,19 @@ void fragment() {
 	if (kind == 0) {
 		float ao = COLOR.r;
 		float wear = COLOR.g;
+		float palm = COLOR.b;
 		c = has_albedo ? texture(baked_albedo, UV).rgb : COLOR.rgb;
 		c *= 0.4 + 0.6 * ao;
 		if (has_baked) n = (texture(baked_normal, UV).xy * 2.0 - 1.0) * baked_strength;
-		vec2 g = texture(grain, UV * grain_scale).xy * 2.0 - 1.0;
+		// (the palm's grip panel: a finer, flatter grain)
+		vec2 g = texture(grain, UV * grain_scale * (1.0 + 0.8 * palm)).xy * 2.0 - 1.0;
 		vec2 g2 = texture(grain, UV * grain_scale * 2.63 + vec2(0.37, 0.71)).xy * 2.0 - 1.0;
 		// (the worn places smoothed: less grain where it's polished)
 		n += (g + g2 * 0.55) * grain_strength * (1.0 - 0.45 * wear);
 		// (the grain's hollows hold the dirt)
 		c *= 1.0 - 0.28 * clamp(length(g) - 0.2, 0.0, 1.0);
-		rough = mix(roughness, worn_roughness, wear);
-		spec = mix(specular, worn_specular, wear);
+		rough = mix(mix(roughness, worn_roughness, wear), palm_roughness, palm * 0.8);
+		spec = mix(mix(specular, worn_specular, wear), palm_specular, palm * 0.8);
 	} else if (kind == 1) {
 		c = COLOR.rgb;
 		float u = UV.x * ribs;
@@ -131,7 +142,7 @@ void fragment() {
 		float above = smoothstep(-0.001, 0.002, v);
 		n.x += (dh + dh2) * 0.35 * above;
 		c *= 1.0 + (h + h2) * 0.12 * above;            // the welts' crests rubbed paler
-		vec3 thread = vec3(0.15, 0.13, 0.085);
+		vec3 thread = vec3(0.075, 0.068, 0.046);   // (2026-10-15: a shade darker, with the cloth)
 		c = mix(c, thread, clamp(th + th2, 0.0, 1.0) * 0.35 * above);
 		// the hem: two rows of stitching round it, and its edge frayed: pale broken threads, grime
 		float hr = exp(-pow((v - 0.0075) / 0.0005, 2.0)) + exp(-pow((v - 0.0135) / 0.0005, 2.0));
@@ -142,11 +153,12 @@ void fragment() {
 		float fray = (1.0 - smoothstep(0.0, 0.002 + strand, v)) * step(0.45, hash1(ex + 17.0));
 		float edge = 1.0 - smoothstep(-0.0015, 0.0045, v);
 		c = mix(c, c * 0.55 + vec3(0.012, 0.01, 0.006), edge * 0.6);      // grime at the edge
-		c = mix(c, vec3(0.2, 0.18, 0.12), fray * 0.75);                   // the frayed threads, pale
+		c = mix(c, vec3(0.095, 0.087, 0.058), fray * 0.75);               // the frayed threads, pale
 		n.y += fray * 0.4 * sign(hash1(ex + 3.0) - 0.5);
 		// creases: bunched above the cuff (the first ten centimetres) and at the elbow; fine dark lines that wander
 		float bunch = exp(-max(v - 0.01, 0.0) / 0.045) * smoothstep(0.0, 0.008, v);
-		float elbow = smoothstep(0.17, 0.2, v) * (1.0 - smoothstep(0.25, 0.27, v));
+		// (2026-10-15: the hem 5.4 cm nearer the hand, so the elbow as much further up the sleeve)
+		float elbow = smoothstep(0.224, 0.254, v) * (1.0 - smoothstep(0.304, 0.324, v));
 		float wob = vnoise(vec2(x * 60.0, v * 25.0));
 		float cr = sin(v / 0.0085 * 6.2831853 + wob * 7.0 + sin(x / girth * 6.2831853 * 2.0) * 1.8);
 		float crease = smoothstep(0.55, 0.95, cr) * (bunch + elbow) * smoothstep(0.2, 0.6, wob + 0.25);
@@ -167,6 +179,6 @@ void fragment() {
 	ROUGHNESS = rough;
 	// (the cloths dull: a sheen on the canvas washed the sleeve out pale in the sun)
 	SPECULAR = spec;
-	RIM = kind == 0 ? rim : 0.03;
+	RIM = kind == 0 ? rim * (1.0 - 0.5 * COLOR.b) : 0.03;
 	RIM_TINT = 0.6;
 }
