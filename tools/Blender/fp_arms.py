@@ -21,9 +21,8 @@ twenty-vertex sections, four eight-sided fingers grown out of its end with their
 heel, a fleshy ball of the thumb), posed joint by joint along the solved grip, and smoothed by subdivision, so the
 whole hand is one continuous, smooth skin with real knuckles, finger pads and creases. The glove's folds, seams and
 wrinkles are carved into a finer subdivision and baked onto the game's (two levels) through clean UVs; the leather's
-grain is the game's shader's. The glove ends in a short gauntlet, all of it inside the jacket's sleeve (2026-10-15: the
-knitted storm cuff that showed between them gone, the sleeve's hem down to the wrist; the glove charcoal-black, the
-sleeve's canvas a very dark olive-brown).
+grain is the game's shader's. The glove ends in a short cuff under the jacket's knitted storm cuff, the sleeve over that.
+(2026-10-15: the glove charcoal-black, the cuff dark charcoal wool, the jacket a worn dark navy canvas.)
 
 Coordinates: the game's camera space (x right, y up, z back toward the eye), converted to Blender's (x, -z, y).
 """
@@ -745,7 +744,7 @@ def carve(ob, hand):
 
 
 # (linear colours; 2026-10-15, the owner: "make the gloves darker grey or black") a winter work glove: charcoal-black
-# leather over the back, rubbed to a worn grey over the knuckles and fingertips, a darker synthetic grip palm, grey thread
+# leather over the back, rubbed to a worn grey over the knuckles and fingertips, a blacker synthetic grip palm, grey thread
 GLOVE = np.array((0.021, 0.020, 0.019))         # (the leather: a dyed charcoal-black)
 GLOVE_RED = np.array((0.026, 0.023, 0.020))     # (here and there a little warmer, where the dye's faded)
 GLOVE_WORN = np.array((0.060, 0.057, 0.052))    # (rubbed grey where it's stretched: the knuckles, the fingertips)
@@ -754,17 +753,18 @@ GLOVE_SCUFF = np.array((0.046, 0.044, 0.041))   # (scuffed: the grain roughed up
 GLOVE_SCRATCH = np.array((0.095, 0.090, 0.082))  # (a scratch through the dye to the grey leather under it)
 GLOVE_PALM = np.array((0.011, 0.011, 0.011))    # (the palm's synthetic grip panel: blacker than the leather)
 THREAD = np.array((0.070, 0.068, 0.064))        # (the grey nylon thread of the seams)
-CUFF = np.array((0.036, 0.032, 0.026))          # (the jacket's knitted storm cuff: a warm charcoal wool)
-CUFF_DIRT = np.array((0.030, 0.025, 0.018))
-# (2026-10-14g, the owner: "in some shots the sleeve reads dark navy-black") the jacket's cotton duck, sun-faded paler on
-# top, darker and dirtier underneath. (2026-10-15, the owner: darker colours) a very dark olive-brown now, the body's
-# jacket's own dark olive (player_body.py) gone a little browner with wear: dark against the woods, but still brown-olive
-# (not black: the charcoal glove has to read against it) under the lantern
-SLEEVE = np.array((0.034, 0.030, 0.016))
-SLEEVE_FADED = np.array((0.050, 0.045, 0.027))
-SLEEVE_UNDER = np.array((0.020, 0.018, 0.010))
-SLEEVE_DIRT = np.array((0.024, 0.020, 0.013))   # (mud, dried and rubbed in)
-SLEEVE_GREASE = np.array((0.016, 0.015, 0.011))
+# (2026-10-15) the knitted storm cuff: a dark charcoal-grey wool, a shade lighter and warmer than the glove so the two
+# read apart, neutral beside the blue
+CUFF = np.array((0.042, 0.040, 0.037))
+CUFF_DIRT = np.array((0.032, 0.030, 0.026))
+# (2026-10-15, the owner: the jacket "DARK BLUE") the jacket's cotton duck: a worn dark navy-indigo work canvas, sun-faded
+# paler and greyer on top, darker underneath, mud and a grease mark; light and blue enough to read as blue (not black)
+# under the lantern and in daylight
+SLEEVE = np.array((0.016, 0.021, 0.040))
+SLEEVE_FADED = np.array((0.027, 0.032, 0.052))
+SLEEVE_UNDER = np.array((0.009, 0.011, 0.022))
+SLEEVE_DIRT = np.array((0.022, 0.021, 0.020))   # (mud, dried and rubbed in)
+SLEEVE_GREASE = np.array((0.010, 0.011, 0.015))
 
 
 def mesh_arrays(me):
@@ -895,7 +895,7 @@ def cloth_colour(ob, hand, kind):
     col = _lerp(col, SLEEVE_FADED, np.clip(top, 0, 1) ** 1.3 * (0.65 + 0.25 * noise3(P, 30.0, 5)))
     col = _lerp(col, SLEEVE_UNDER, np.clip(-top, 0, 1) * 0.7)
     # mud: splashed on, worst near the hem and underneath, rubbed in
-    hem = np.exp(-np.clip(along - HEM_AT, 0, None) / 0.05)
+    hem = np.exp(-np.clip(along - 0.058, 0, None) / 0.05)
     splash = np.clip(noise3(P, 34.0, 15) * 2.0 - 0.55 + 0.5 * hem + 0.35 * np.clip(-top, 0, 1), 0, 1)
     splash *= np.clip(0.4 + noise3(P, 140.0, 16) * 1.2, 0, 1)
     col = _lerp(col, SLEEVE_DIRT, splash * 0.75)
@@ -960,23 +960,35 @@ def ellipse_ring(c, d, up, rx, ry, nr, fn=None):
     return out
 
 
-# (2026-10-15, the owner: "make the player's coat ... cover the sleeve of the glove") The jacket's knitted storm cuff
-# (knit_cuff, v5) is gone: the sleeve's hem comes down to the wrist over the glove's whole gauntlet instead.
-HEM_AT = 0.004   # (how far behind the wrist joint the sleeve's hem lies; v5's was 0.058, its knitted cuff out of it)
+def knit_cuff(hand):
+    """The jacket's knitted storm cuff, snug round the glove's wrist: a rolled edge and a ribbed band back into the
+    sleeve. Its ribs are the shader's (its UVs run round it)."""
+    T, b = hand.toward, hand.b
+    d = -T
+    up = (b - d * b.dot(d)).normalized()
+    c0 = hand.w + T * 0.010 - up * 0.0012
+    nr = 48
+    rings_ = []
+    # (inside the edge, hugging the glove; round the roll; then out along the band)
+    for along, rx, ry in ((0.020, 0.0315, 0.0215), (0.008, 0.0318, 0.0218), (0.0035, 0.0335, 0.0232),
+                          (0.006, 0.0352, 0.0248), (0.016, 0.0358, 0.0254), (0.032, 0.0364, 0.0260),
+                          (0.050, 0.0362, 0.0262), (0.080, 0.0335, 0.0245)):
+        rings_.append(ellipse_ring(c0 + T * along, d, up, rx, ry, nr,
+                                   lambda a: 1.0 + 0.008 * math.sin(a * 3 + 1.0)))
+    ob = loft("Cuff", rings_)
+    return ob
 
 
-def sleeve(hand, length=0.304, seed=7):
-    """The jacket's sleeve over the forearm: loose canvas from the wrist (over the glove's gauntlet) back past the elbow,
-    folds gathered toward its hem; a turned hem."""
+def sleeve(hand, length=0.25, seed=7):
+    """The jacket's sleeve over the forearm: loose waxed canvas from just behind the wrist (the cuff showing out of it)
+    back past the elbow, folds gathered toward its hem; a turned hem."""
     T, b = hand.toward, hand.b
     d = -T
     up = (b - d * b.dot(d)).normalized()
     rng = np.random.default_rng(seed)
     phase = rng.uniform(0, math.tau, 6)
     nr = 56
-    # (2026-10-15, the owner: "so that it covers the sleeve of the glove") the hem down to the wrist, over the glove's
-    # whole gauntlet: no knitted cuff, no wrist, the glove going straight into the sleeve. Its far end stays where it was.
-    c0 = hand.w + T * HEM_AT - up * 0.002
+    c0 = hand.w + T * 0.058 - up * 0.002
     rings_, vs = [], []
     # (the hem's turn-up: inside, round the edge, out; the edge a little ragged, worn through in places)
     rag = rng.uniform(-1, 1, nr)
@@ -1006,7 +1018,7 @@ def sleeve(hand, length=0.304, seed=7):
                 r += amp * part * math.exp(-((along - c_) / 0.0062) ** 2) * min(1.0, along / 0.01)
             # (the elbow's creases, on the inside of the arm: underneath here)
             inside = max(0.0, -math.sin(a - 0.3))
-            for ec in (0.244, 0.262, 0.28, 0.296):   # (2026-10-15: where they were, the hem moved 5.4 cm toward the hand)
+            for ec in (0.19, 0.208, 0.226, 0.244):
                 r += 0.03 * inside * math.exp(-((along - ec - 0.008 * math.sin(a * 2 + phase[4])) / 0.006) ** 2)
             return r
         rings_.append(ellipse_ring(c0 + T * along, d, up, 0.0372 * base, 0.0292 * base, nr, fn))
@@ -1131,6 +1143,7 @@ def export(ob, path):
 def make_hand(pose):
     hand = skeleton(pose)
     low = make_skin(hand, 2, "fp_hand_L_" + pose)
+    cuff = knit_cuff(hand)
     sl = sleeve(hand)
     if LOOK:
         for nm_, c_ in (("palm", (0.35, 0.3, 0.26)), ("finger", (0.3, 0.32, 0.4)), ("thumb", (0.45, 0.25, 0.2))):
@@ -1139,6 +1152,7 @@ def make_hand(pose):
             low.data.materials.append(mm)
         bpy.context.scene.display.shading.color_type = "MATERIAL"
         set_colors(low.data, np.tile(GLOVE_WORN * 3, (len(low.data.vertices), 1)))
+        set_colors(cuff.data, np.tile(CUFF * 4, (len(cuff.data.vertices), 1)))
         set_colors(sl.data, np.tile(SLEEVE * 4, (len(sl.data.vertices), 1)))
         print(f"[fp-arm] {pose}: {tri_count(low)} glove triangles (look only)")
         return low
@@ -1154,10 +1168,10 @@ def make_hand(pose):
     _, wear, palm = glove_colour(low, hand)
     set_colors(low.data, np.stack((ao, wear, palm), 1))
     # the cuff and the sleeve: their own cloths, coloured in their vertices (the weave, seams and stitching the shader's)
-    for ob_, kind, mname, rough in ((sl, 2, "fp_sleeve", 0.9),):
+    for ob_, kind, mname, rough in ((cuff, 1, "fp_cuff", 0.95), (sl, 2, "fp_sleeve", 0.9)):
         set_colors(ob_.data, cloth_colour(ob_, hand, kind))
         ob_.data.materials.append(flat_material(mname, rough))
-    select_only(sl, low)
+    select_only(cuff, sl, low)
     bpy.ops.object.join()
     me = low.data
     for a_ in [a for a in me.attributes if not a.name.startswith(".") and a.name not in ("position", "sharp_face", "material_index", "Col", "UVMap")]:

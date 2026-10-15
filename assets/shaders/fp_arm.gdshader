@@ -10,14 +10,13 @@
 //   occlusion (r), how worn it is (g) and the palm (b): the worn places polished, a slight sheen the lantern catches.
 //   (2026-10-15) A black glove would vanish into the dark: the leather over the back keeps a low sheen and a rim, so its
 //   silhouette and fingers stay drawn under the lantern; the palm's grip panel is matte, finer grained.
-// - kind 1 (until 2026-10-15; the models no longer have it: the sleeve's hem now comes down over the glove), the jacket's
-//   knitted storm cuff: wool ribs running along the arm (its UVs run round it), its stitches,
+// - kind 1, the jacket's knitted storm cuff (2026-10-15: a dark charcoal wool): wool ribs running along the arm (its UVs run round it), its stitches,
 //   darker down in the ribs, a little fuzz.
 // - kind 2, the jacket's cotton duck sleeve (its UVs: u round the arm, v metres up it from the hem): the weave, slubbed
 //   threads, two felled seams (a raised welt, two rows of pale stitches) up the sleeve, the hem's double row of
 //   stitching, its edge frayed pale and grimy, fine creases bunched above the cuff and at the elbow, dirt rubbed into
-//   the weave. Its colour (sun-faded on top, darker underneath, mud, a grease mark; 2026-10-15 a very dark olive-brown)
-//   is the model's.
+//   the weave. Its colour (sun-faded on top, darker underneath, mud, a grease mark; 2026-10-15 a worn dark navy) is the
+//   model's.
 // Every normal is in the mesh's own tangent frame (the models carry their tangents), so either hand works.
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
@@ -53,8 +52,19 @@ uniform float stitches = 22.0;
 uniform float girth = 0.215;
 uniform float seam_a = 0.36;
 uniform float seam_b = 0.86;
-uniform vec3 sleeve_warmth = vec3(1.1, 1.02, 0.72);
-uniform vec3 leather_warmth = vec3(1.07, 1.0, 0.9);   // (2026-10-15: just enough that the black reads charcoal, not navy, under the cool rim)
+/// The sleeve's and the leather's colour over the model's. (2026-10-15: neutral now: v5's warm bias, there to keep the
+/// olive canvas olive, turned the navy one grey)
+uniform vec3 sleeve_warmth = vec3(1.0, 1.0, 1.0);
+uniform vec3 leather_warmth = vec3(0.9, 0.9, 0.9);
+/// (2026-10-15) How much of the colour is taken out of the light falling on each cloth (light()): a black glove under the
+/// lantern's orange fill read tan-brown, under the cool rim grey; with most of the light's colour taken out it reads
+/// charcoal under both. The navy sleeve and the cuff likewise (the orange fill turned the blue to a muddy grey).
+uniform float glove_neutral = 0.75;
+uniform float sleeve_neutral = 0.6;
+
+varying float v_f0;
+varying float v_rim;
+varying float v_neutral;
 
 float hash1(float x) { return fract(sin(x * 127.1) * 43758.5453); }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -157,8 +167,7 @@ void fragment() {
 		n.y += fray * 0.4 * sign(hash1(ex + 3.0) - 0.5);
 		// creases: bunched above the cuff (the first ten centimetres) and at the elbow; fine dark lines that wander
 		float bunch = exp(-max(v - 0.01, 0.0) / 0.045) * smoothstep(0.0, 0.008, v);
-		// (2026-10-15: the hem 5.4 cm nearer the hand, so the elbow as much further up the sleeve)
-		float elbow = smoothstep(0.224, 0.254, v) * (1.0 - smoothstep(0.304, 0.324, v));
+		float elbow = smoothstep(0.17, 0.2, v) * (1.0 - smoothstep(0.25, 0.27, v));
 		float wob = vnoise(vec2(x * 60.0, v * 25.0));
 		float cr = sin(v / 0.0085 * 6.2831853 + wob * 7.0 + sin(x / girth * 6.2831853 * 2.0) * 1.8);
 		float crease = smoothstep(0.55, 0.95, cr) * (bunch + elbow) * smoothstep(0.2, 0.6, wob + 0.25);
@@ -178,7 +187,33 @@ void fragment() {
 	NORMAL_MAP = vec3(clamp(n, vec2(-1.0), vec2(1.0)) * 0.5 + 0.5, 1.0);
 	ROUGHNESS = rough;
 	// (the cloths dull: a sheen on the canvas washed the sleeve out pale in the sun)
-	SPECULAR = spec;
-	RIM = kind == 0 ? rim * (1.0 - 0.5 * COLOR.b) : 0.03;
-	RIM_TINT = 0.6;
+	v_f0 = 0.16 * spec * spec;
+	v_rim = kind == 0 ? rim * (1.0 - 0.5 * COLOR.b) : 0.03;
+	v_neutral = kind == 0 ? glove_neutral : sleeve_neutral;
+}
+
+// (2026-10-15) The engine's own lighting (Lambert diffuse, GGX specular, its rim), but with part of each light's colour
+// taken out first (v_neutral): so the black glove stays charcoal under the lantern's orange and the cool rim alike.
+void light() {
+	vec3 lc = LIGHT_COLOR * ATTENUATION;
+	float luma = dot(lc, vec3(0.2126, 0.7152, 0.0722));
+	// (a strong light close by keeps its colour: the lantern an inch under the hand, taken grey, clipped to a cream-white)
+	lc = mix(lc, vec3(luma), v_neutral * (1.0 - smoothstep(8.0, 24.0, luma)));
+	float ndl = max(dot(NORMAL, LIGHT), 0.0);
+	float ndv = max(dot(NORMAL, VIEW), 1e-4);
+	DIFFUSE_LIGHT += lc * ndl / PI;
+	// the rim: grazing light round the silhouette, a little of the albedo's colour in it
+	float rimv = pow(max(1e-4, 1.0 - ndv), max(0.0, (1.0 - ROUGHNESS) * 16.0));
+	DIFFUSE_LIGHT += rimv * v_rim * mix(vec3(1.0), ALBEDO, 0.6) * lc / PI;
+	// GGX
+	vec3 H = normalize(LIGHT + VIEW);
+	float ndh = max(dot(NORMAL, H), 0.0);
+	float ldh = max(dot(LIGHT, H), 0.0);
+	float a = max(ROUGHNESS * ROUGHNESS, 0.002);
+	float a2 = a * a;
+	float dd = ndh * ndh * (a2 - 1.0) + 1.0;
+	float D = a2 / (PI * dd * dd);
+	float G = 0.5 / (ndl * (ndv * (1.0 - a) + a) + ndv * (ndl * (1.0 - a) + a) + 1e-5);
+	float F = v_f0 + (1.0 - v_f0) * pow(1.0 - ldh, 5.0);
+	SPECULAR_LIGHT += lc * ndl * D * G * F * SPECULAR_AMOUNT;
 }
