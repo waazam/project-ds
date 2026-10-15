@@ -41,7 +41,7 @@ public partial class Squirrel : Node3D
 		_home = GlobalPosition;
 		TopLevel = true;
 		GlobalPosition = Ground(_home);
-		BuildModel();
+		if (!TryLoadRig()) BuildModel();   // (the Blender model; the code-built squirrel only if it's missing)
 		_timer = _rng.RandfRange(0.5f, 3f);
 		if (Systems.StoryManager.Instance is { } story && story.Current >= Systems.Checkpoint.Act2StairsClimbed) { Visible = false; SetProcess(false); }
 	}
@@ -101,6 +101,7 @@ public partial class Squirrel : Node3D
 				}
 				break;
 		}
+		if (_rigged) RigAdvance(dt);
 	}
 
 	private void Next()
@@ -153,6 +154,15 @@ public partial class Squirrel : Node3D
 		GlobalPosition = p;
 		float yaw = Yaw(to);
 		Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, yaw, 1f - Mathf.Exp(-18f * dt)), 0);
+		if (_rigged)
+		{
+			// the clips: hop for a dash, run when it's fleeing; played at the pace it goes
+			_model.Position = Vector3.Zero;
+			_model.Basis = Basis.Identity.Scaled(Vector3.One * ModelScale);
+			bool fast = _fleeing || _speed > 4f;
+			Clip(fast ? "run" : "hop", 0.12f, _speed / (fast ? 5.2f : 3.0f));
+			return;
+		}
 		float gait = _phase * _speed * 2.6f;
 		float hop = Mathf.Max(0f, Mathf.Sin(gait)) * 0.06f * ModelScale;
 		_model.Position = new Vector3(0, hop, 0);
@@ -178,6 +188,12 @@ public partial class Squirrel : Node3D
 		// belly to the bark either way: head up climbing, turned end over end (about the trunk's normal) head down
 		var climb = new Basis(Vector3.Right, Mathf.Pi * 0.5f);
 		_model.Basis = (up ? climb : new Basis(Vector3.Back, Mathf.Pi) * climb).Scaled(Vector3.One * ModelScale);
+		if (_rigged)
+		{
+			// scurrying up (or down), still while it clings
+			Clip("climb", 0.15f, _mode == Mode.Cling ? 0f : (up ? 1.6f : 1.0f));
+			return;
+		}
 		float scurry = up ? Mathf.Sin(_phase * 18f) * 0.08f : 0f;
 		_body.Rotation = new Vector3(scurry, 0, 0);
 		_head.Rotation = new Vector3(up ? 0f : -0.3f + 0.2f * Mathf.Sin(_phase * 2.3f), up ? 0f : 0.5f * Mathf.Sin(_phase * 0.9f), 0);
@@ -194,6 +210,13 @@ public partial class Squirrel : Node3D
 	{
 		SetProcess(false);
 		_phase = phase;
+		if (_rigged)
+		{
+			string clip = which switch { 0 => "forage", 1 => "sit_up", 2 => "hop", _ => "climb" };
+			Clip(clip, 0f);
+			_anim.Seek(phase % (float)_anim.GetAnimation(clip).Length, true);
+			return;
+		}
 		switch (which)
 		{
 			case 0: Pose(0f, -0.25f, 0f); break;
@@ -216,6 +239,13 @@ public partial class Squirrel : Node3D
 
 	private void Pose(float bodyPitch, float headPitch, float sitUp)
 	{
+		if (_rigged)
+		{
+			_model.Position = Vector3.Zero;
+			_model.Basis = Basis.Identity.Scaled(Vector3.One * ModelScale);
+			Clip(sitUp > 0.5f ? "sit_up" : "forage", 0.3f);
+			return;
+		}
 		// sitting up: reared back on the haunches (the rump kept out of the ground)
 		_model.Position = new Vector3(0, 0.05f * sitUp * ModelScale, 0);
 		_model.Rotation = new Vector3(0.9f * sitUp, 0, 0);

@@ -71,7 +71,7 @@ public partial class Deer : Node3D
 	public override void _Ready()
 	{
 		_rng.Seed = (ulong)(Seed * 7919 + 3);
-		BuildModel();
+		if (!TryLoadRig()) BuildModel();   // (the Blender model; the code-built doe only if it's missing)
 		AddChild(new PhotoSubject
 		{
 			Name = "PhotoSubject",
@@ -138,6 +138,7 @@ public partial class Deer : Node3D
 			case State.Alert: Alert(dt); break;
 			case State.Fleeing: Flee(dt); break;
 		}
+		if (_rigged) { RigProcess(dt); return; }
 		Ears(dt);
 		_neck.Rotation = new Vector3(_neckPitch, _neckYaw, 0);
 		// breathing: the barrel swells a little (quicker once it's frightened)
@@ -164,6 +165,7 @@ public partial class Deer : Node3D
 		_neckPitch = Mathf.Lerp(_neckPitch, target, 1f - Mathf.Exp(-dt * 2.2f));
 		_neckYaw = Mathf.Lerp(_neckYaw, _neckYawTarget, 1f - Mathf.Exp(-dt * 1.5f));
 		if (!_headDown && _rng.Randf() < dt * 0.6f) _neckYawTarget = _rng.RandfRange(-0.5f, 0.5f);
+		if (_rigged) return;   // (the model's clips do the rest: Deer.Rig.cs)
 		_tailTimer -= dt;
 		if (_tailTimer <= 0f) { _tailFlick = 0.35f; _tailTimer = _rng.RandfRange(3f, 8f); }
 		_tailFlick = Mathf.Max(0f, _tailFlick - dt);
@@ -197,10 +199,10 @@ public partial class Deer : Node3D
 			look = Mathf.Clamp(Mathf.Atan2(-to.X, -to.Z), -0.9f, 0.9f);
 		}
 		_neckYaw = Mathf.Lerp(_neckYaw, look, 1f - Mathf.Exp(-dt * 10f));
-		_tail.Rotation = new Vector3(-1.2f, 0, 0);
 		// frozen, every leg planted (a step in progress set down)
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 4 && !_rigged; i++)
 		{
+			if (i == 0) _tail.Rotation = new Vector3(-1.2f, 0, 0);
 			_legs[i].Rotation = _legs[i].Rotation.Lerp(Vector3.Zero, 1f - Mathf.Exp(-dt * 14f));
 			if (_legs[i].GetNodeOrNull<Node3D>("Lower") is { } lower) lower.Rotation = lower.Rotation.Lerp(Vector3.Zero, 1f - Mathf.Exp(-dt * 14f));
 		}
@@ -232,6 +234,10 @@ public partial class Deer : Node3D
 		_model.Rotation = Vector3.Zero;
 		// legs: fore pair reach forward while the hind pair push back, then swap
 		float s = Mathf.Sin(phase * Mathf.Tau);
+		_neckPitch = Mathf.Lerp(_neckPitch, -0.15f + 0.15f * s, 1f - Mathf.Exp(-dt * 8f));
+		_neckYaw = Mathf.Lerp(_neckYaw, 0f, 1f - Mathf.Exp(-dt * 6f));
+		if (_stateTime >= FleeSeconds && (_stateTime > 6f || !InView())) { Vanish(); return; }
+		if (_rigged) return;   // (the bound clip: Deer.Rig.cs)
 		for (int i = 0; i < 4; i++)
 		{
 			bool fore = i < 2;
@@ -244,11 +250,7 @@ public partial class Deer : Node3D
 		}
 		// (2026-10-15) the back flexes with the bound: gathered over the legs as they come under, stretched as they reach
 		_body.Rotation = new Vector3(0.06f * s, 0, 0);
-		_neckPitch = Mathf.Lerp(_neckPitch, -0.15f + 0.15f * s, 1f - Mathf.Exp(-dt * 8f));
-		_neckYaw = Mathf.Lerp(_neckYaw, 0f, 1f - Mathf.Exp(-dt * 6f));
 		_tail.Rotation = new Vector3(-1.2f + 0.15f * s, 0, 0);
-		if (_stateTime < FleeSeconds) return;
-		if (_stateTime > 6f || !InView()) Vanish();
 	}
 
 	/// <summary>Whether the player's camera could still see it (in front, near enough, not behind a trunk).</summary>
