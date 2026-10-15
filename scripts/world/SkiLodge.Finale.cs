@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Godot;
@@ -463,10 +464,39 @@ public partial class SkiLodge
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Color = Colors.White;
 		var rng = new RandomNumberGenerator { Seed = 2399 };
+		// (2026-10-15, the scan pass: all sixteen lay flat at one height, through each other, their tops fighting. Now each
+		// comes down on what's already there: an end on the floor and an end up on a board under it, tipped to fit and
+		// rolled a little)
+		const float bt = 0.045f;
+		var down = new List<(Vector2 c, Vector2 along, float len, float w, float top)>();
+		float Under(Vector2 q)
+		{
+			float h = FloorY;
+			foreach (var b in down)
+			{
+				var d = q - b.c;
+				if (Mathf.Abs(d.Dot(b.along)) < b.len * 0.5f && Mathf.Abs(d.Dot(new Vector2(-b.along.Y, b.along.X))) < b.w * 0.5f + 0.02f) h = Mathf.Max(h, b.top);
+			}
+			return h;
+		}
 		for (int i = 0; i < 16; i++)
 		{
-			var p = new Vector3(rng.RandfRange(-2.4f, 2.4f), FloorY + 0.03f, HexIn + rng.RandfRange(-2.5f, 4f));
-			k.Box(p, new Vector3(rng.RandfRange(0.08f, 0.2f), 0.05f, rng.RandfRange(0.4f, 1.3f)), 1f, new Basis(Vector3.Up, rng.RandfRange(0f, Mathf.Pi)));
+			var c = new Vector2(rng.RandfRange(-2.4f, 2.4f), HexIn + rng.RandfRange(-2.5f, 4f));
+			float w = rng.RandfRange(0.08f, 0.2f), len = rng.RandfRange(0.4f, 1.3f), yaw = rng.RandfRange(0f, Mathf.Pi);
+			var along = new Vector2(Mathf.Sin(yaw), Mathf.Cos(yaw));
+			// what each end rests on (the highest thing under either half)
+			float hA = FloorY, hB = FloorY;
+			for (int sI = 0; sI < 5; sI++)
+			{
+				float u = (sI / 4f - 0.5f) * len * 0.9f;
+				float h = Under(c + along * u);
+				if (u < 0f) hA = Mathf.Max(hA, h); else hB = Mathf.Max(hB, h);
+			}
+			float pitch = Mathf.Atan2(hB - hA, len * 0.8f), roll = (hA > FloorY || hB > FloorY) ? rng.RandfRange(-0.12f, 0.12f) : 0f;
+			var basis = new Basis(Vector3.Up, yaw) * new Basis(Vector3.Right, -pitch) * new Basis(Vector3.Back, roll);
+			var p = new Vector3(c.X, (hA + hB) * 0.5f + bt * 0.5f + Mathf.Abs(roll) * w * 0.5f + 0.002f, c.Y);
+			k.Box(p, new Vector3(w, bt, len), 1f, basis);
+			down.Add((c, along, len, w, Mathf.Max(hA, hB) + bt + 0.003f));
 		}
 		// splintered stumps of the torn-off leaf still on its hinges
 		for (int j = 0; j < 4; j++)

@@ -154,14 +154,19 @@ public partial class SkiLodge
 		var k = new MeshKit();
 		// the woods' own snow (Poly Haven's, world-mapped), not the roofs' glazed look: packed hard into the
 		// doorway to the lintel, heaped outside, and a soft fan of it spilled in over the sill with loose clumps
-		k.Mat(SnowMaze.SnowMazeLook.PackedSnowIndoor());   // (2026-10-14d: packed, grey-blue and gouged; the soft snow glared white under the mudroom bulb)
+		k.Mat(BackDoorSnow);   // (2026-10-14d: packed, grey-blue and gouged; the soft snow glared white under the mudroom bulb)
 		k.Color = Colors.White;
-		k.Blob(new Vector3(0, 0, -1.3f), new Vector3(2.1f, 2.7f, 1.7f), 2301, 0.18f, true, 1f);
-		k.Blob(new Vector3(0.05f, 0, -0.4f), new Vector3(0.78f, 2.35f, 0.62f), 2302, 0.12f, true, 1f);   // the doorway, packed full
-		k.Blob(new Vector3(-0.05f, 0, 0.45f), new Vector3(1.05f, 0.62f, 0.85f), 2303, 0.2f, true, 1f);   // spilled in over the sill
-		k.Blob(new Vector3(0.25f, 0, 1.15f), new Vector3(0.7f, 0.16f, 0.55f), 2304, 0.3f, true, 1f);     // the fan's thin edge
+		// (2026-10-15, the scan pass: it read as a grey faceted boulder. Rounded now (smooth, finer), its packed snow paler
+		// and its gouges smaller and softer, and a rim of loose powder where the fan thins out)
+		k.Blob(new Vector3(0, 0, -1.3f), new Vector3(2.1f, 2.7f, 1.7f), 2301, 0.12f, false, 1f, 0f, 2);
+		k.Blob(new Vector3(0.05f, 0, -0.4f), new Vector3(0.78f, 2.35f, 0.62f), 2302, 0.08f, false, 1f, 0f, 2);   // the doorway, packed full
+		k.Blob(new Vector3(-0.05f, 0, 0.45f), new Vector3(1.05f, 0.62f, 0.85f), 2303, 0.14f, false, 1f, 0f, 2);   // spilled in over the sill
+		k.Blob(new Vector3(0.25f, 0, 1.15f), new Vector3(0.7f, 0.16f, 0.55f), 2304, 0.2f, false, 1f);     // the fan's thin edge
 		k.Blob(new Vector3(-0.75f, 0, 0.95f), new Vector3(0.16f, 0.12f, 0.14f), 2305, 0.3f, true, 1f);   // clumps thrown in
 		k.Blob(new Vector3(0.7f, 0, 1.4f), new Vector3(0.12f, 0.09f, 0.1f), 2306, 0.3f, true, 1f);
+		k.Mat(WinterWoods.SoftSnow);
+		k.Blob(new Vector3(-0.35f, 0, 1.25f), new Vector3(0.75f, 0.05f, 0.5f), 2307, 0.25f, false, 1f);   // loose powder at the fan's edge
+		k.Blob(new Vector3(0.55f, 0, 0.95f), new Vector3(0.5f, 0.04f, 0.45f), 2308, 0.25f, false, 1f);
 		k.CommitTo(SnowPile, "Mesh", false);
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "snow");
@@ -172,6 +177,25 @@ public partial class SkiLodge
 		if (!snowed) foreach (var c in body.GetChildren()) if (c is CollisionShape3D cs) cs.Disabled = true;
 		SnowPile.Scale = snowed ? Vector3.One : new Vector3(1f, 0.01f, 1f);
 	}
+
+	/// <summary>(2026-10-15, the scan pass) The back door's drift: the snow maze's packed indoor snow, paler, its gouges a
+	/// half the size and shallower, its relief softer (it read as a grey boulder under the bulb).</summary>
+	private static ShaderMaterial BackDoorSnow
+	{
+		get
+		{
+			if (_backDoorSnow != null) return _backDoorSnow;
+			_backDoorSnow = (ShaderMaterial)SnowMaze.SnowMazeLook.PackedSnowIndoor().Duplicate();
+			_backDoorSnow.ResourceName = "packed_snow_backdoor";
+			_backDoorSnow.SetShaderParameter("crest_color", new Color(0.64f, 0.66f, 0.7f));
+			_backDoorSnow.SetShaderParameter("hollow_color", new Color(0.4f, 0.44f, 0.5f));
+			_backDoorSnow.SetShaderParameter("scallop_scale", 0.65f);
+			_backDoorSnow.SetShaderParameter("scallop_depth", 0.4f);
+			_backDoorSnow.SetShaderParameter("normal_strength", 0.45f);
+			return _backDoorSnow;
+		}
+	}
+	private static ShaderMaterial _backDoorSnow;
 
 	/// <summary>In through the back door: they turn at a rumble overhead, and the roof's snow comes down and buries
 	/// the doorway behind them, a spray of it blowing in. Snowed in.</summary>

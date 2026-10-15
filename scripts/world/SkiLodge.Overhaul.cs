@@ -479,7 +479,8 @@ public partial class SkiLodge
 					case 2: SkisSideBySide(k); break;
 					default: Poles(k); break;
 				}
-				k.CommitTo(node, "Gear", true);
+				// (2026-10-15, the scan pass: solid; the clip audit walked through them) a box round it, off the wall
+				MeshKit.Solidify(k.CommitTo(node, "Gear", true), Vector3.One * 0.95f);
 				_hung.Add((spot.at, spot.n, size.X));
 				WallGear++;
 				kind++;
@@ -517,7 +518,7 @@ public partial class SkiLodge
 		Ski(k, Basis.Identity, new Vector3(-0.07f, 0, 0), 1.8f, _skiWood);
 		Ski(k, Basis.Identity, new Vector3(0.07f, 0, 0), 1.8f, _skiWood);
 		k.Mat(_strap);
-		k.Box(new Vector3(0, 0.55f, 0.04f), new Vector3(0.26f, 0.05f, 0.03f), 1f);   // the strap round them both
+		k.Box(new Vector3(0, 0.55f, 0.025f), new Vector3(0.26f, 0.05f, 0.03f), 1f);   // the strap round them both (2026-10-15: on the skis' faces; it stood 15 mm off them)
 	}
 
 	private static void Poles(MeshKit k)
@@ -618,9 +619,13 @@ public partial class SkiLodge
 		{
 			float y = 0.075f + s * 0.45f;
 			// books along it (the rows modelled; a gap, a stack lying flat, a few leaning)
+			// (2026-10-15, the scan pass: the rows were turned a quarter, running back into the wall 0.46 m from near the
+			// shelf's front: through a partition, their ends stood out of the corridor's wall. Along the shelf now, from its
+			// left end and from just right of the middle, their backs at the shelf's back (a row runs from its origin
+			// along +X, 0.23 deep, its pages toward +Z: turned about, they run leftward with their spines out)
 			var row = _orng.Randf() < 0.5f ? "books_row_a" : "books_row_b";
-			if (!FurnitureKit.Add(k, row, P(-0.3f, y, -0.02f), yaw + Mathf.Pi * 0.5f, roles)) BookBlocks(k, P(-0.3f, y, 0), b);
-			if (_orng.Randf() < 0.6f) FurnitureKit.Add(k, row == "books_row_a" ? "books_row_b" : "books_row_a", P(0.3f, y, -0.02f), yaw + Mathf.Pi * 0.5f, roles);
+			if (!FurnitureKit.Add(k, row, P(-0.14f, y, -0.04f), yaw + Mathf.Pi, roles)) BookBlocks(k, P(-0.3f, y, 0), b);
+			if (_orng.Randf() < 0.6f) FurnitureKit.Add(k, row == "books_row_a" ? "books_row_b" : "books_row_a", P(0.54f, y, -0.04f), yaw + Mathf.Pi, roles);
 			else FurnitureKit.Add(k, "books_stack", P(0.35f, y, 0), yaw + 0.3f, roles);
 		}
 	}
@@ -762,8 +767,16 @@ public partial class SkiLodge
 		foreach (var (x, z) in new[] { (WingX0 + 2.2f, WingHalfZ - 2f), (WingX0 + 2.2f, -WingHalfZ + 2f), (DiningX1 - 2f, WingHalfZ - 2f), (DiningX1 - 2f, -WingHalfZ + 2f) })
 		{
 			FurnitureKit.Add(k, "xmas_tree", new Vector3(x, FloorY, z), _orng.RandfRange(0, Mathf.Tau), roles, Vector3.One * 0.85f);
+			// (2026-10-15, the scan pass: four heaps anywhere in a 2 m square, into each other and the trunk. Round the tree
+			// now, under its lowest boughs, each a quarter turn or so from the last; the same draws taken from _orng, so
+			// what's dressed after this is where it was)
+			float pa = (x + z) * 1.7f;
 			for (int i = 0; i < 4; i++)
-				FurnitureKit.Add(k, i % 2 == 0 ? "presents_a" : "presents_b", new Vector3(x + _orng.RandfRange(-1f, 1f), FloorY, z + _orng.RandfRange(-1f, 1f)), _orng.RandfRange(0, Mathf.Tau), roles);
+			{
+				float r = 0.78f + 0.22f * _orng.Randf();
+				pa += 1.25f + 0.35f * _orng.Randf();
+				FurnitureKit.Add(k, i % 2 == 0 ? "presents_a" : "presents_b", new Vector3(x + Mathf.Cos(pa) * r, FloorY + i * 0.002f, z + Mathf.Sin(pa) * r), _orng.RandfRange(0, Mathf.Tau), roles);
+			}
 			LodgeKit.Solid(_inBody, new Vector3(x, FloorY + 1.2f, z), new Vector3(1.6f, 2.4f, 1.6f));
 		}
 		// wreaths down both walls, between the windows (found by rays), garlands swagged from one to the next
@@ -815,10 +828,36 @@ public partial class SkiLodge
 			}
 		}
 		// tinsel and baubles dropped about the floor, a few party hats
+		// (2026-10-15, the scan pass: they fell anywhere, under the sheeted tables and in the chairs' legs, and lay level
+		// with each other on the floor (the clip audit's coplanar pieces). Now only on open floor: clear of the tables and
+		// their chairs, the corner trees, the chairs gathered at the end wall; no two within 1.4 m; each a hair over the last)
+		var placedXmas = new List<Vector3>();
+		var frng = new RandomNumberGenerator { Seed = 8180 };
+		bool Clear(Vector3 p)
+		{
+			for (int t = 0; t < 6; t++)
+			{
+				var c = TableCentre(t);
+				if (Mathf.Abs(p.X - c.X) < TableLen * 0.5f + 0.5f && Mathf.Abs(p.Z - c.Z) < TableW * 0.5f + 1.25f) return false;
+			}
+			foreach (var (x, z) in new[] { (WingX0 + 2.2f, WingHalfZ - 2f), (WingX0 + 2.2f, -WingHalfZ + 2f), (DiningX1 - 2f, WingHalfZ - 2f), (DiningX1 - 2f, -WingHalfZ + 2f) })
+				if (new Vector2(p.X - x, p.Z - z).Length() < 1.6f) return false;
+			if (p.X > 13.6f && p.X < 16.2f && p.Z < -InnerZ + 1.8f) return false;   // (the chairs by the end wall: DiningChairs)
+			if (p.X > DiningX1 - 3.2f && Mathf.Abs(p.Z - 2.1f) < 1.7f) return false;   // (the snow in at the open window)
+			foreach (var q in placedXmas) if (q.DistanceTo(p) < 1.4f) return false;
+			return true;
+		}
 		for (int i = 0; i < 12; i++)
 		{
-			var p = new Vector3(_orng.RandfRange(WingX0 + 2f, DiningX1 - 2f), FloorY, _orng.RandfRange(-WingHalfZ + 1f, WingHalfZ - 1f));
-			FurnitureKit.Add(k, i % 3 == 0 ? "tinsel_floor" : i % 3 == 1 ? "bauble_floor" : "party_hat", p, _orng.RandfRange(0, Mathf.Tau), roles);
+			_orng.Randf(); _orng.Randf(); _orng.Randf();   // (the draws they took)
+			for (int tries = 0; tries < 40; tries++)
+			{
+				var p = new Vector3(frng.RandfRange(WingX0 + 2f, DiningX1 - 2f), FloorY + placedXmas.Count * 0.002f, frng.RandfRange(-InnerZ + 0.5f, InnerZ - 0.5f));
+				if (!Clear(p)) continue;
+				placedXmas.Add(p);
+				FurnitureKit.Add(k, i % 3 == 0 ? "tinsel_floor" : i % 3 == 1 ? "bauble_floor" : "party_hat", p, frng.RandfRange(0, Mathf.Tau), roles);
+				break;
+			}
 		}
 		k.CommitTo(this, "DiningChristmas", true);
 	}

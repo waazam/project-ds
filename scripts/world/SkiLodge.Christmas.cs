@@ -185,8 +185,11 @@ public partial class SkiLodge
 			if (i == 3)
 			{
 				// knocked over backward, lying on its back
-				var fallen = new Basis(Vector3.Up, a) * new Basis(Vector3.Right, -Mathf.Pi * 0.5f);
-				FurnitureKit.Add(k, "dining_chair", new Transform3D(fallen, rt + d * 1.45f + Vector3.Up * 0.42f), Woodwork);
+				// (2026-10-15, the scan pass: it was turned the other way, onto its front, and hung 17 cm over the floor on
+				// nothing. On its back now: the back and the back legs' feet on the floor (the model's back is 0.31 behind its
+				// middle), the seat's front and the front legs up; its feet toward the table)
+				var fallen = new Basis(Vector3.Up, a) * new Basis(Vector3.Right, Mathf.Pi * 0.5f);
+				FurnitureKit.Add(k, "dining_chair", new Transform3D(fallen, rt + d * 1.2f + Vector3.Up * 0.31f), Woodwork);
 			}
 			else FurnitureKit.Add(k, "dining_chair", rt + d * (1.05f + i * 0.12f), a + (i == 1 ? 0.4f : 0f), Woodwork);
 		}
