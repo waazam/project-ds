@@ -73,6 +73,12 @@ name, flag and mesh, so its prompt and outline work as before.
 - **Room 203's window icicles** hang in clumps and gaps, not a comb every 13 cm.
 - **The hung skis, snowshoes and poles** on the lodge's walls have colliders (the clip audit walked through them). The
   side-by-side pair's strap sits on the skis; it stood 15 mm off them.
+- **The porch piers** (`BuildPorch`), seen close from Act 24's vault: their half-metre cobble tile read as a
+  checkerboard up 4.6 m. Now the stair pier's laid river stone, each pier at its own scale, on a plinth under a timber
+  cap.
+- **The bookshelves** (`SkiLodge.Overhaul.cs`, `Shelf`). The book rows were turned a quarter and ran 0.46 m back into
+  the wall. A shelf in room 203 against the corridor partition pushed them out through the corridor's wall, in a column
+  of red book ends. Now they run along the shelf, spines out, backs at the shelf's back.
 - **Linen** (`LodgeTextures.SheetLinenMat`): the weave was stretched 3.5 : 1. Now the same scale both ways.
 
 ## Not changed

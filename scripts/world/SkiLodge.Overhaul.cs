@@ -619,9 +619,13 @@ public partial class SkiLodge
 		{
 			float y = 0.075f + s * 0.45f;
 			// books along it (the rows modelled; a gap, a stack lying flat, a few leaning)
+			// (2026-10-15, the scan pass: the rows were turned a quarter, running back into the wall 0.46 m from near the
+			// shelf's front: through a partition, their ends stood out of the corridor's wall. Along the shelf now, from its
+			// left end and from just right of the middle, their backs at the shelf's back (a row runs from its origin
+			// along +X, 0.23 deep, its pages toward +Z: turned about, they run leftward with their spines out)
 			var row = _orng.Randf() < 0.5f ? "books_row_a" : "books_row_b";
-			if (!FurnitureKit.Add(k, row, P(-0.3f, y, -0.02f), yaw + Mathf.Pi * 0.5f, roles)) BookBlocks(k, P(-0.3f, y, 0), b);
-			if (_orng.Randf() < 0.6f) FurnitureKit.Add(k, row == "books_row_a" ? "books_row_b" : "books_row_a", P(0.3f, y, -0.02f), yaw + Mathf.Pi * 0.5f, roles);
+			if (!FurnitureKit.Add(k, row, P(-0.14f, y, -0.04f), yaw + Mathf.Pi, roles)) BookBlocks(k, P(-0.3f, y, 0), b);
+			if (_orng.Randf() < 0.6f) FurnitureKit.Add(k, row == "books_row_a" ? "books_row_b" : "books_row_a", P(0.54f, y, -0.04f), yaw + Mathf.Pi, roles);
 			else FurnitureKit.Add(k, "books_stack", P(0.35f, y, 0), yaw + 0.3f, roles);
 		}
 	}
