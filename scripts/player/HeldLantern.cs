@@ -84,7 +84,8 @@ public partial class HeldLantern : HeldItem
 		try { built = ItemMeshes.Build(ToolKind.Lantern, _model); }
 		finally { ItemMeshes.LanternBailRise = 0.1f; ItemMeshes.LanternBailGrip = false; }
 		if (built.Glow != null) { built.Glow.QueueFree(); }   // (the lantern's own light is the real one)
-		foreach (var c in _model.GetChildren())
+		// (the Blender model's meshes sit a level down under its scene root: look through all of them)
+		foreach (var c in _model.FindChildren("*", nameof(MeshInstance3D), true, false))
 			if (c is MeshInstance3D mi && mi.Mesh != null)
 			{
 				_glass ??= mi;
@@ -92,8 +93,9 @@ public partial class HeldLantern : HeldItem
 				// against it, blew out)
 				for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
 				{
-					if (mi.Mesh.SurfaceGetMaterial(i) == ItemTextures.LampGlassMat) mi.SetSurfaceOverrideMaterial(i, AmberGlass);
-					else if (mi.Mesh.SurfaceGetMaterial(i) == ItemTextures.FlameMat) { _flameSlot = (mi, i); }
+					var sm = World.LanternModel.SurfaceMaterial(mi, i);
+					if (sm == ItemTextures.LampGlassMat) mi.SetSurfaceOverrideMaterial(i, AmberGlass);
+					else if (sm == ItemTextures.FlameMat) { _flameSlot = (mi, i); }
 				}
 			}
 		// the blacklight's glow in the glass: a violet bulb where the flame is
@@ -219,7 +221,7 @@ public partial class HeldLantern : HeldItem
 		if (_flameSlot.mi != null && IsInstanceValid(_flameSlot.mi) && _lantern.Ember != _emberShown)
 		{
 			_emberShown = _lantern.Ember;
-			_flameSlot.mi.SetSurfaceOverrideMaterial(_flameSlot.surface, _emberShown ? EmberMat : null);
+			_flameSlot.mi.SetSurfaceOverrideMaterial(_flameSlot.surface, _emberShown ? EmberMat : ItemTextures.FlameMat);   // (the flame back: the game's own, never the model's preview material)
 		}
 		_lantern.HeldFlameAt = Raise > 0.05f ? FlameWorld : null;
 	}

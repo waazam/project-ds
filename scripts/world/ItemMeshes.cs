@@ -689,6 +689,25 @@ public static class ItemMeshes
 
 	private static void Lantern(MeshKit k, Node3D parent, ref Built b)
 	{
+		// (2026-10-15) the Blender model (LanternModel); the code-built one below only if its file is missing
+		if (!LanternModel.Add(parent, LanternBailGrip)) LanternCode(k);
+		b.Glow = new OmniLight3D
+		{
+			Name = "Glow",
+			Position = new Vector3(0, 0.13f, 0),
+			LightColor = new Color(1f, 0.62f, 0.3f),
+			LightEnergy = 0.55f,
+			OmniRange = 1.7f,
+			OmniAttenuation = 1.4f,
+			ShadowEnabled = false,
+		};
+		parent.AddChild(b.Glow);
+		b.PickCenter = new Vector3(0, 0.16f, 0);
+		b.PickRadius = 0.26f;
+	}
+
+	private static void LanternCode(MeshKit k)
+	{
 		// Hurricane lantern: painted font, wire guards, glass globe, vented cap, bail. (2026-10-10c, finer: twice as round,
 		// six guards and their hoops, the burner and its wick knob, the soot clouding the top of the glass)
 		const int sides = 16;
@@ -774,20 +793,6 @@ public static class ItemMeshes
 		k.Mat(ItemTextures.FlameMat);
 		k.Cylinder(new Vector3(0, 0.1f, 0), new Vector3(0, 0.086f, 0), 0.008f, 0f, 5, true);
 		k.Cylinder(new Vector3(0, 0.1f, 0), new Vector3(0, 0.132f, 0), 0.008f, 0f, 5, true);
-
-		b.Glow = new OmniLight3D
-		{
-			Name = "Glow",
-			Position = new Vector3(0, 0.13f, 0),
-			LightColor = new Color(1f, 0.62f, 0.3f),
-			LightEnergy = 0.55f,
-			OmniRange = 1.7f,
-			OmniAttenuation = 1.4f,
-			ShadowEnabled = false,
-		};
-		parent.AddChild(b.Glow);
-		b.PickCenter = new Vector3(0, 0.16f, 0);
-		b.PickRadius = 0.26f;
 	}
 
 	private static void NewelPost(MeshKit k, ref Built b)
