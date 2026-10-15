@@ -13,6 +13,7 @@ than one entry lands the same day) and list it below.
 
 ## Entries (newest first)
 
+- [2026-10-15c — Three quarters and a thumb on the button: the axe and hammer heads turned 32° so bit and face read at three-quarters, the crowbar's hook turned so it reads as a hook, the walkie held by its sides with the thumb on the push-to-talk](2026-10-15c-three-quarters-and-a-thumb-on-the-button.md)
 - [2026-10-15b — Held the way hands hold them: axe, hammer and crowbar with bit, face and hook forward from a fist in the lower right, the knife's guard against the index finger, the walkie held round its case; references in docs/research/first-person-held-items.md](2026-10-15b-held-the-way-hands-hold-them.md)
 - [2026-10-15 — The sleeve, the cuff and the gloves: a worn dark navy sleeve, the grey knit cuff back, charcoal-black gloves on both hands (the arm shader strips most of a light's colour so the lantern no longer turns them tan); the flamethrower's hands lit on the held layer](2026-10-15-the-sleeve-over-the-glove.md)
 - [2026-10-15a — Hints in the inventory's hand: every prompt, hint and in-play thought in the inventory label's Anton with a dark outline and soft backing, keys as key caps (pad buttons once a pad is used), drawn crisp above the PS2 filter; prompts just under the crosshair, hints and thoughts in the bottom bar, stacked so they never overlap; a Hint text size setting](2026-10-15a-hints-in-the-inventorys-hand.md)
