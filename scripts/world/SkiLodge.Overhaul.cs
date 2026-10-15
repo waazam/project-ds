@@ -319,13 +319,10 @@ public partial class SkiLodge
 		if (_orng.Randf() < 0.25f) node.Rotate(n, _orng.RandfRange(-0.04f, 0.04f));
 		bool gilt = art.Kind is "face" or "still" || _orng.Randf() < 0.4f;
 		var k = new MeshKit();
-		k.Mat(gilt ? LodgeTextures.GoldMat : LodgeTextures.DarkWoodMat);
 		k.Color = gilt ? new Color(0.8f, 0.72f, 0.6f) : Colors.White;
-		float fw = Mathf.Clamp(Mathf.Min(w, h) * 0.08f, 0.04f, 0.1f), dpt = 0.05f;
-		k.Box(new Vector3(0, h * 0.5f + fw * 0.5f, 0), new Vector3(w + fw * 2f, fw, dpt), 1f);
-		k.Box(new Vector3(0, -h * 0.5f - fw * 0.5f, 0), new Vector3(w + fw * 2f, fw, dpt), 1f);
-		k.Box(new Vector3(-w * 0.5f - fw * 0.5f, 0, 0), new Vector3(fw, h, dpt), 1f);
-		k.Box(new Vector3(w * 0.5f + fw * 0.5f, 0, 0), new Vector3(fw, h, dpt), 1f);
+		float fw = Mathf.Clamp(Mathf.Min(w, h) * 0.08f, 0.04f, 0.1f);
+		// (2026-10-15, the props pass: a moulding swept round it and mitred, a crest and a cove; it was four flat battens)
+		LodgeProps.PictureFrame(k, w, h, fw, gilt ? LodgeTextures.GoldMat : LodgeTextures.DoorWoodMat);
 		// a thin inner lip, darker
 		k.Color = Colors.White;
 		k.Mat(LodgeTextures.BlackMat);
@@ -494,7 +491,7 @@ public partial class SkiLodge
 	{
 		k.Mat(m);
 		k.Color = Colors.White;
-		k.Box(o + b * new Vector3(0, 0, 0), new Vector3(0.075f, len, 0.02f), 1f, b);
+		k.BevelBox(o + b * new Vector3(0, 0, 0), new Vector3(0.075f, len, 0.02f), 0.006f, 1f, b);   // (2026-10-15: its edges eased)
 		// the tip, bent away from the wall
 		for (int i = 0; i < 4; i++)
 		{
@@ -606,12 +603,16 @@ public partial class SkiLodge
 	{
 		var b = Basis.LookingAt(-n, Vector3.Up);   // its back to the wall (-Z), its face +Z into the room
 		Vector3 P(float x, float y, float z) => floor + b * new Vector3(x, y, z) + n * 0.18f;
-		k.Mat(LodgeTextures.DarkWoodMat);
+		// (2026-10-15, the props pass: the furniture's varnish, the edges eased, a plinth and a cornice; it was six planks)
+		k.Mat(LodgeTextures.DoorWoodMat);
 		k.Color = Colors.White;
 		k.Box(P(0, 0.95f, -0.15f), new Vector3(1.3f, 1.9f, 0.03f), 1f, b);
-		k.Box(P(-0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 1f, b);
-		k.Box(P(0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 1f, b);
-		for (int s = 0; s < 5; s++) k.Box(P(0, 0.06f + s * 0.45f, 0), new Vector3(1.24f, 0.03f, 0.3f), 1f, b);
+		k.BevelBox(P(-0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 0.006f, 1f, b);
+		k.BevelBox(P(0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 0.006f, 1f, b);
+		for (int s = 0; s < 5; s++) k.BevelBox(P(0, 0.06f + s * 0.45f, 0), new Vector3(1.24f, 0.03f, 0.3f), 0.006f, 1f, b);
+		k.BevelBox(P(0, 0.04f, 0.145f), new Vector3(1.24f, 0.08f, 0.02f), 0.005f, 1f, b);   // the plinth's face
+		k.BevelBox(P(0, 1.92f, 0.01f), new Vector3(1.36f, 0.04f, 0.35f), 0.01f, 1f, b);   // the cornice
+		k.BevelBox(P(0, 1.95f, 0.005f), new Vector3(1.32f, 0.025f, 0.33f), 0.008f, 1f, b);
 		float yaw = Mathf.Atan2(n.X, n.Z);
 		for (int s = 0; s < 4; s++)
 		{

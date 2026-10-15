@@ -275,7 +275,10 @@ public static class LodgeKit
 	/// <summary>A lamp: a turned base, a pleated shade that glows. Returns the bulb's position (parent space).</summary>
 	public static Vector3 Lamp(MeshKit k, Vector3 c, float h, Material shade, bool floor = false)
 	{
-		// the modelled lamps (a stepped, turned base, a reeded column, a pleated drum shade), scaled to the height asked
+		// (2026-10-15, the props pass) a table lamp is the lodge's own now: a glazed crock base, a drum shade 0.6 of its
+		// height across (the modelled one's tall pleated shade on a thin column read as a toy at 45-50 cm)
+		if (!floor) return LodgeProps.TableLamp(k, c, h, shade);
+		// the modelled floor lamp (a stepped, turned base, a reeded column, a pleated drum shade), scaled to the height asked
 		float made = floor ? 1.6f : 0.5f;
 		if (FurnitureKit.Add(k, floor ? "lamp_floor" : "lamp_table", c, 0f, new() { ["metal"] = LodgeTextures.BrassMat, ["shade"] = shade }, Vector3.One * (h / made)))
 			return c + Vector3.Up * (h - 0.1f);
@@ -305,8 +308,10 @@ public static class LodgeKit
 				Vector3 dir = new(Mathf.Cos(a), 0, Mathf.Sin(a));
 				Vector3 tip = hub + dir * rr + Vector3.Up * dy;
 				k.Mat(LodgeTextures.IronMat);
-				k.Cylinder(hub + Vector3.Up * dy * 0.5f, hub + dir * rr * 0.5f + Vector3.Down * 0.12f + Vector3.Up * dy, 0.015f, 0.015f, 4, false);
-				k.Cylinder(hub + dir * rr * 0.5f + Vector3.Down * 0.12f + Vector3.Up * dy, tip, 0.015f, 0.015f, 4, false);
+				// (2026-10-15: six-sided arms, a cup under each candle; the arms were square sticks)
+				k.Cylinder(hub + Vector3.Up * dy * 0.5f, hub + dir * rr * 0.5f + Vector3.Down * 0.12f + Vector3.Up * dy, 0.015f, 0.013f, 6, false);
+				k.Cylinder(hub + dir * rr * 0.5f + Vector3.Down * 0.12f + Vector3.Up * dy, tip, 0.013f, 0.012f, 6, false);
+				LodgeProps.Lathe(k, tip + Vector3.Down * 0.02f, new[] { new Vector2(0.012f, 0f), new Vector2(0.04f, 0.018f), new Vector2(0.042f, 0.024f), new Vector2(0.02f, 0.024f) }, 8, hardDeg: 60f);
 				k.Mat(LodgeTextures.LinenMat);
 				k.Cylinder(tip, tip + Vector3.Up * 0.12f, 0.018f, 0.018f, 6, true);
 				k.Mat(bulb);
@@ -319,15 +324,8 @@ public static class LodgeKit
 	/// <summary>A wall sconce facing <paramref name="outward"/>: a brass back plate, an arm, a small shade. Returns the bulb.</summary>
 	public static Vector3 Sconce(MeshKit k, Vector3 at, Vector3 outward, Material shade)
 	{
-		k.Mat(LodgeTextures.BrassMat);
-		k.Color = Colors.White;
-		var b = new Basis(outward.Cross(Vector3.Up).Normalized(), Vector3.Up, outward);
-		k.Box(at + outward * 0.01f, new Vector3(0.08f, 0.16f, 0.02f), 1f, b);
-		k.Cylinder(at + outward * 0.02f, at + outward * 0.14f + Vector3.Up * 0.06f, 0.012f, 0.012f, 5, false);
-		k.Mat(shade);
-		Vector3 s = at + outward * 0.16f + Vector3.Up * 0.12f;
-		k.Cylinder(s + Vector3.Down * 0.07f, s + Vector3.Up * 0.05f, 0.08f, 0.05f, 10, false);
-		return s;
+		// (2026-10-15, the props pass: a round boss, a swan neck, a flared shade; it was a box plate and a straight stick)
+		return LodgeProps.Sconce(k, at, outward, shade);
 	}
 
 	/// <summary>(2026-10-14h) A wagon-wheel chandelier, the mountain bar's own: an old cart wheel hung flat on three chains
