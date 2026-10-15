@@ -593,6 +593,14 @@ public static class ItemMeshes
 	private static void Camera(MeshKit k, ref Built b)
 	{
 		var xf = new Transform3D(new Basis(Vector3.Up, 0.7f), Vector3.Zero);
+		// (2026-10-15) the Blender SLR, the same one that's held (sat on its base plate), and its strap in a loop beside it
+		if (Player.HeldModels.CameraModel(k, xf * new Transform3D(Basis.Identity, new Vector3(0, 0.0355f, 0))))
+		{
+			FurnitureKit.Clean(() => FurnitureKit.Add(k, "camera_strap", xf, Player.HeldModels.CameraRoles));
+			b.PickCenter = xf * new Vector3(0, 0.05f, -0.04f);
+			b.PickRadius = 0.26f;
+			return;
+		}
 		k.Xf = xf;
 		// body: leatherette wrap between chrome plates
 		k.Color = new Color(0.2f, 0.2f, 0.21f);

@@ -450,8 +450,23 @@ public static class HeldModels
 
 	/// <summary>The SLR, built centred (its body's middle at the origin, the lens on -Z), then shifted so its right end
 	/// sits in the fist (<see cref="SpecOf"/>).</summary>
+	/// <summary>The SLR's materials by role (tools/Blender/items.py camera_slr: leatherette, chrome, black, rubber, glass,
+	/// strap), shared by the held camera and the pickup so they're the one camera.</summary>
+	public static Dictionary<string, Material> CameraRoles => _cameraRoles ??= new Dictionary<string, Material>
+	{
+		["leatherette"] = Leatherette, ["chrome"] = Chrome, ["black"] = BlackEnamel, ["rubber"] = Rubber, ["glass"] = LensGlass,
+		["strap"] = ItemTextures.StrapMat,
+	};
+	private static Dictionary<string, Material> _cameraRoles;
+
+	/// <summary>The Blender SLR (2026-10-15, the owner: every model built in Blender), centred as the code one below was:
+	/// its body's middle at the origin, the lens on -Z, the advance lever at +X. False if the model isn't there.</summary>
+	public static bool CameraModel(MeshKit k, Transform3D xf) =>
+		FurnitureKit.Clean(() => { k.Color = Colors.White; return FurnitureKit.Add(k, "camera_slr", xf, CameraRoles); });
+
 	private static void Camera(MeshKit k)
 	{
+		if (CameraModel(k, Transform3D.Identity)) return;
 		const float W = 0.143f, H = 0.062f, D = 0.036f;   // the body below the top plate
 		const float TopH = 0.016f;
 		float bodyTop = H * 0.5f, plateTop = bodyTop + TopH;
