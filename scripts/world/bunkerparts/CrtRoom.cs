@@ -143,7 +143,7 @@ public partial class CrtRoom : Node3D
 	{
 		var k = new MeshKit();
 		float w = CrtRoomHalfWidth, h = CrtRoomHeight;
-		k.Mat(BunkerTextures.RoomWallMat);
+		k.Mat(BunkerTextures.PaintedRoomWallMat);
 		k.Color = Colors.White;
 		k.Box(new Vector3(-w - 0.1f, h * 0.5f, MidZ), new Vector3(0.2f, h, Depth));
 		k.Box(new Vector3(w + 0.1f, h * 0.5f, MidZ), new Vector3(0.2f, h, Depth));
@@ -166,11 +166,7 @@ public partial class CrtRoom : Node3D
 		}
 		k.CommitTo(this, "CrtRoomShell");
 
-		var f = new MeshKit();
-		f.Mat(BunkerTextures.RoomFloorMat);
-		f.Color = Colors.White;
-		f.Box(new Vector3(0, -0.05f, MidZ), new Vector3(w * 2f, 0.1f, Depth));
-		f.CommitTo(this, "CrtRoomFloor");
+		BuildFloor();
 
 		AddBox(new Vector3(-w - 0.1f, h * 0.5f, MidZ), new Vector3(0.2f, h, Depth));
 		AddBox(new Vector3(w + 0.1f, h * 0.5f, MidZ), new Vector3(0.2f, h, Depth));
@@ -196,6 +192,118 @@ public partial class CrtRoom : Node3D
 		for (int i = 0; i < 6; i++)
 			BunkerKit.AddDecal(this, BunkerTextures.Blotch(), new Vector3(rng.RandfRange(-5f, 5f), 0f, rng.RandfRange(CrtRoomBackZ + 1f, CrtRoomFrontZ - 1f)),
 				Vector3.Up, Vector3.Forward, new Vector2(2f, 2f), 0.3f, new Color(1, 1, 1, 0.7f));
+	}
+
+	/// <summary>(2026-10-14h, the bunker pass: the floor was one flat grey plane eighteen metres long) Old linoleum tiles
+	/// on the slab (<see cref="BunkerTextures.LinoFloorMat"/>), drawn as a half-metre grid so the dark can sit in it: at
+	/// the walls' feet and under the shelving, and wet round two floor drains and down the damp left wall. Cast-iron
+	/// grates over the drains, rust round them; tiles come up and lying loose; the ceiling's spalled concrete fallen by
+	/// the right wall; papers blown out of the filing cabinets; a heavy cable run from the fuse box round the room's edge.
+	/// The way from the door to the console and the chair left clear.</summary>
+	private void BuildFloor()
+	{
+		float w = CrtRoomHalfWidth;
+		var drains = new[] { new Vector3(-2.4f, 0f, -97.6f), new Vector3(2.7f, 0f, -103.3f) };
+		const float cell = 0.5f;
+		int nx = Mathf.RoundToInt(w * 2f / cell), nz = Mathf.RoundToInt(Depth / cell);
+		Color FloorCol(float x, float z)
+		{
+			float dWall = Mathf.Min(w - Mathf.Abs(x), Mathf.Min(z - CrtRoomBackZ, CrtRoomFrontZ - z));
+			float occ = 1f - 0.5f * (1f - Mathf.SmoothStep(0f, 1.3f, dWall));
+			// under and in front of the shelving (the back wall's units, the sides' from the second bay back)
+			float shelfBack = z - (CrtRoomBackZ + 0.75f);
+			float shelfSide = z < -93.6f ? w - 0.75f - Mathf.Abs(x) : 9f;
+			float dShelf = Mathf.Min(shelfBack, shelfSide);
+			occ *= 1f - 0.35f * (1f - Mathf.SmoothStep(-0.2f, 0.8f, dShelf));
+			occ *= 0.94f + 0.08f * Mathf.Sin(x * 1.3f + z * 0.7f) * Mathf.Sin(z * 0.31f);
+			float wet = 0f;
+			foreach (var d in drains)
+				wet = Mathf.Max(wet, 0.85f * (1f - Mathf.SmoothStep(0.2f, 1.3f, new Vector2(x - d.X, z - d.Z).Length())));
+			wet = Mathf.Max(wet, 0.6f * (1f - Mathf.SmoothStep(0f, 0.9f, x + w)) * Mathf.Clamp(Mathf.Sin(z * 0.45f) * 1.5f - 0.2f, 0f, 1f));
+			return new Color(occ, occ, occ * 0.98f, 1f - wet);
+		}
+		var floorMesh = BunkerKit.Grid(nx, nz, (i, j) =>
+		{
+			float x = -w + i * cell, z = CrtRoomFrontZ - j * cell;
+			return (new Vector3(x, 0, z), Vector3.Up, FloorCol(x, z));
+		}, BunkerTextures.LinoFloorMat);
+		AddChild(new MeshInstance3D { Name = "CrtRoomFloor", Mesh = floorMesh });
+
+		var rng = new RandomNumberGenerator { Seed = 9103 };
+		var k = new MeshKit();
+		// the drains: a dark sump under a cast-iron grate, a rim, rust bled out round it
+		foreach (var d in drains)
+		{
+			k.Mat(BunkerTextures.VoidMat);
+			k.Color = Colors.White;
+			k.Quad(d + new Vector3(-0.17f, 0.002f, -0.17f), d + new Vector3(0.17f, 0.002f, -0.17f), d + new Vector3(0.17f, 0.002f, 0.17f), d + new Vector3(-0.17f, 0.002f, 0.17f), Vector3.Up);
+			k.Mat(ProcTextures.MetalMat);
+			k.Color = new Color(0.32f, 0.26f, 0.2f);
+			foreach (int s in new[] { -1, 1 })
+			{
+				k.Box(d + new Vector3(s * 0.19f, 0.006f, 0), new Vector3(0.04f, 0.012f, 0.42f));
+				k.Box(d + new Vector3(0, 0.006f, s * 0.19f), new Vector3(0.34f, 0.012f, 0.04f));
+			}
+			for (int b = -3; b <= 3; b++)
+				k.Box(d + new Vector3(b * 0.045f, 0.007f, 0), new Vector3(0.016f, 0.012f, 0.36f));
+			k.Box(d + new Vector3(0, 0.006f, 0), new Vector3(0.36f, 0.01f, 0.018f));
+			BunkerKit.AddDecal(this, BunkerTextures.RustRun(), d + new Vector3(0, 0, 0.05f), Vector3.Up, Vector3.Forward, new Vector2(0.9f, 1.1f), 0.2f, new Color(1, 1, 1, 0.7f));
+		}
+		// loose tiles: come up at a corner, or lying where they were kicked
+		k.Mat(BunkerTextures.PlasticMat);
+		var tilePlaces = new[] { new Vector3(-3.6f, 0, -95.2f), new Vector3(-2.1f, 0, -98.9f), new Vector3(3.3f, 0, -96.4f), new Vector3(2.1f, 0, -102.2f), new Vector3(-4.2f, 0, -101.5f), new Vector3(4.1f, 0, -99.8f), new Vector3(-1.9f, 0, -93.1f) };
+		foreach (var p in tilePlaces)
+		{
+			bool dark = rng.Randf() < 0.5f;
+			k.Color = (dark ? new Color(0.24f, 0.27f, 0.24f) : new Color(0.46f, 0.44f, 0.37f)) * rng.RandfRange(0.7f, 0.95f) * 2.2f;
+			float lift = rng.RandfRange(0.05f, 0.35f);
+			var b = Basis.FromEuler(new Vector3(lift, rng.RandfRange(0f, Mathf.Tau), rng.RandfRange(-0.1f, 0.1f)));
+			k.Box(p + new Vector3(0, 0.004f + Mathf.Sin(lift) * 0.15f, 0), new Vector3(0.3f, 0.005f, 0.3f), 1f, b);
+		}
+		// the ceiling's spalled concrete, fallen by the right wall
+		k.Mat(BunkerTextures.GreyRoomFloorMat);
+		var fall = new Vector3(3.8f, 0, -97.8f);
+		for (int c = 0; c < 14; c++)
+		{
+			float sz = rng.RandfRange(0.03f, c < 3 ? 0.18f : 0.09f);
+			var p = fall + new Vector3(rng.RandfRange(-0.7f, 0.7f), sz * 0.35f, rng.RandfRange(-0.6f, 0.6f));
+			k.Color = new Color(0.9f, 0.9f, 0.88f) * rng.RandfRange(0.75f, 1f);
+			k.Box(p, new Vector3(sz * rng.RandfRange(0.8f, 1.4f), sz * 0.7f, sz * rng.RandfRange(0.8f, 1.3f)), 1f,
+				Basis.FromEuler(new Vector3(rng.RandfRange(-0.4f, 0.4f), rng.RandfRange(0f, 3f), rng.RandfRange(-0.4f, 0.4f))));
+		}
+		DecalDresser.Place(this, "ceiling", new Vector3(fall.X, CrtRoomHeight, fall.Z), Vector3.Down, new Vector2(1.8f, 1.6f), 0.85f, 0.6f, 0.1f);
+		DecalDresser.Place(this, "crack", new Vector3(fall.X + 0.2f, CrtRoomHeight, fall.Z - 0.4f), Vector3.Down, new Vector2(1.2f, 1.2f), 0.9f, 1.9f, 0.1f);
+		// papers blown out of the filing cabinets and trodden
+		k.Mat(Roles["paper"]);
+		for (int i = 0; i < 11; i++)
+		{
+			var p = new Vector3(-w + 0.9f + rng.RandfRange(0f, 2.6f), 0.004f + i * 0.0006f, CrtRoomFrontZ - 1.6f - rng.RandfRange(0f, 3.2f));
+			k.Color = new Color(0.9f, 0.88f, 0.8f) * rng.RandfRange(0.55f, 1f);
+			var b = Basis.FromEuler(new Vector3(rng.RandfRange(-0.04f, 0.04f), rng.RandfRange(0f, Mathf.Tau), 0));
+			k.Box(p, new Vector3(0.21f, 0.002f, 0.297f), 1f, b);
+		}
+		k.CommitTo(this, "FloorDebris", false);
+
+		// the cable run: from the fuse box by the door, down the wall and round the room's right side to the shelving
+		var cab = new MeshKit();
+		cab.Mat(BunkerTextures.RubberMat);
+		cab.Color = Colors.White;
+		float fx = DoorHalfWidth + 0.9f;
+		for (int c = 0; c < 2; c++)
+		{
+			float o = c * 0.05f;
+			var run = new System.Collections.Generic.List<Vector3>
+			{
+				new(fx + o, 1.18f, CrtRoomFrontZ - BulkheadThickness - 0.06f),
+				new(fx + o, 0.03f, CrtRoomFrontZ - BulkheadThickness - 0.08f),
+				new(fx + 0.6f + o, 0.025f, CrtRoomFrontZ - BulkheadThickness - 0.12f - o),
+				new(w - 1.1f - o, 0.025f, CrtRoomFrontZ - 0.55f - o),
+				new(w - 0.95f - o, 0.025f, CrtRoomFrontZ - 3.6f),
+				new(w - 0.85f - o, 0.025f, -96.2f),
+			};
+			BunkerKit.Tube(cab, run, 0.024f - c * 0.006f, 0.024f - c * 0.006f, 5);
+		}
+		cab.CommitTo(this, "FloorCables", false);
 	}
 
 	/// <summary>Steel shelving along the back and side walls, stacked unevenly with CRTs. (The CRT room pass,

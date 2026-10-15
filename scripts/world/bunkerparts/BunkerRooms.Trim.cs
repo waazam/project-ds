@@ -14,7 +14,7 @@ public partial class BunkerRooms
 	{
 		float hw = RoomW * 0.5f;
 		var k = new MeshKit();
-		k.Mat(BunkerTextures.RoomWallMat);
+		k.Mat(BunkerTextures.PaintedRoomWallMat);
 		const float paintTop = 1.15f, frameHalf = 0.63f;
 		// each wall's inner face: a start, its direction along, its inward normal, its length, and its door's centre along it
 		var walls = new (Vector3 a, Vector3 along, Vector3 n, float len, float door)[]

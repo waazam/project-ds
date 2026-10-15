@@ -471,7 +471,7 @@ public partial class BunkerRooms : Node3D
 	{
 		float hw = RoomW * 0.5f, hz = RoomD * 0.5f;
 		var k = new MeshKit();
-		k.Mat(BunkerTextures.RoomWallMat);
+		k.Mat(BunkerTextures.PaintedRoomWallMat);
 		k.Color = Colors.White;
 		// Walls (0.3 thick, faces inward), floor, ceiling with two cast beams. The entry wall (+Z) has
 		// a real doorway in it: the way out, once the door behind you opens.
@@ -489,7 +489,7 @@ public partial class BunkerRooms : Node3D
 			k.Box(new Vector3(0, RoomH - 0.14f, z), new Vector3(RoomW, 0.28f, 0.32f));
 		k.CommitTo(this, "RoomShell");
 		var f = new MeshKit();
-		f.Mat(BunkerTextures.RoomFloorMat);
+		f.Mat(BunkerTextures.GreyRoomFloorMat);
 		f.Color = Colors.White;
 		f.Box(new Vector3(0, -0.05f, -hz), new Vector3(RoomW, 0.1f, RoomD));
 		f.CommitTo(this, "RoomFloor");

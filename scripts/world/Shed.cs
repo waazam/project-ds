@@ -193,30 +193,74 @@ public partial class Shed : Node3D
 			var s = alongZ ? new Vector3(0.03f, -0.1f - g, Depth) : new Vector3(Width, -0.1f - g, 0.03f);
 			BuildKit.Box(k, c, s, 1.1f, BuildKit.Face.NY | BuildKit.Face.PY);
 		}
-		k.Mat(BuildingTextures.CabinFloorMat);
-		k.Color = new Color(0.8f, 0.76f, 0.72f);
-		BuildKit.Box(k, new Vector3(0, -0.05f, 0), new Vector3(Width, 0.1f, Depth), 1f / 0.6f, BuildKit.Face.NY);
+		// (2026-10-14h, the Hollow's interiors pass) the floor's top is the room's lining: drawn fine and baked
+		var lk = new MeshKit { Tess = 0.5f };
+		var small = new MeshKit();
+		lk.Mat(HollowLook.ShedFloor);
+		lk.Color = new Color(0.9f, 0.88f, 0.85f);
+		lk.Quad(new Vector3(-hw, 0, hd), new Vector3(hw, 0, hd), new Vector3(hw, 0, -hd), new Vector3(-hw, 0, -hd), Vector3.Up,
+			new Vector2(-hd, -hw) / 0.6f, new Vector2(-hd, hw) / 0.6f, new Vector2(hd, hw) / 0.6f, new Vector2(hd, -hw) / 0.6f);
+		k.Mat(HollowLook.ShedFloor);
+		k.Color = new Color(0.7f, 0.66f, 0.62f);
+		BuildKit.Box(k, new Vector3(0, -0.05f, 0), new Vector3(Width, 0.1f, Depth), 1f / 0.6f, BuildKit.Face.NY | BuildKit.Face.PY);
 		float gMin = Mathf.Min(Mathf.Min(GroundLocal(-hw, -hd), GroundLocal(hw, -hd)), Mathf.Min(GroundLocal(-hw, hd), GroundLocal(hw, hd))) - 0.2f;
 		cols.Add((new Vector3(0, gMin * 0.5f, 0), new Vector3(Width, -gMin, Depth), Basis.Identity));
 
 		BuildSteps(k, cols);
 
-		// ---- walls: vertical boards outside, battens over the seams
+		// ---- walls: vertical boards, barn red long gone outside; inside bare rough-sawn boards that were never painted
+		// (the outside faces, the edges, in the shell; the inside faces in the lining)
+		float dw = DoorW * 0.5f;
+		float sideW = hw - dw;
+		var inside = HollowLook.ShedInside;
 		k.Mat(boards);
 		k.Color = new Color(0.9f, 0.86f, 0.82f);
-		float dw = DoorW * 0.5f;
-		// back and sides (sides follow the roof slope with a trapezoid)
-		BuildKit.Box(k, new Vector3(0, BackH * 0.5f - 0.05f, -hd), new Vector3(Width, BackH + 0.1f, WallT), 1.1f);
+		// back
+		BuildKit.Box(k, new Vector3(0, BackH * 0.5f - 0.05f, -hd), new Vector3(Width, BackH + 0.1f, WallT), 1.1f, BuildKit.Face.PZ);
+		lk.Mat(inside);
+		lk.Color = Colors.White;
+		{
+			float zi = -hd + WallT * 0.5f;
+			lk.Quad(new Vector3(-hw, -0.1f, zi), new Vector3(hw, -0.1f, zi), new Vector3(hw, BackH, zi), new Vector3(-hw, BackH, zi), Vector3.Back,
+				new Vector2(-hw, 0.1f) * 1.1f, new Vector2(hw, 0.1f) * 1.1f, new Vector2(hw, -BackH) * 1.1f, new Vector2(-hw, -BackH) * 1.1f);
+		}
+		// the sides follow the roof's slope: a trapezoid each, its outer face, its top edge, and its inner face
 		foreach (int s in new[] { -1, 1 })
 		{
-			var zy = new List<Vector2> { new(-hd, -0.1f), new(hd, -0.1f), new(hd, WallHeight), new(-hd, BackH) };
-			k.ExtrudeX(zy, s * hw - WallT * 0.5f, s * hw + WallT * 0.5f, 1.1f);
+			float xo = s * (hw + WallT * 0.5f), xi = s * (hw - WallT * 0.5f);
+			Vector3 A(float x) => new(x, -0.1f, -hd);
+			Vector3 B(float x) => new(x, -0.1f, hd);
+			Vector3 C(float x) => new(x, WallHeight, hd);
+			Vector3 D(float x) => new(x, BackH, -hd);
+			Vector2 U(Vector3 p) => new Vector2(p.Z, -p.Y) * 1.1f;
+			k.Mat(boards);
+			k.Tri(A(xo), B(xo), C(xo), new Vector3(s, 0, 0), U(A(xo)), U(B(xo)), U(C(xo)));
+			k.Tri(A(xo), C(xo), D(xo), new Vector3(s, 0, 0), U(A(xo)), U(C(xo)), U(D(xo)));
+			Vector3 tn = new Vector3(0, Depth, -(WallHeight - BackH)).Normalized();
+			k.Quad(D(xi), D(xo), C(xo), C(xi), tn);
+			lk.Mat(inside);
+			// (the inner face as a strip and a wedge, so the bake has rows to sit on)
+			Vector3 E = new(xi, BackH, hd);
+			lk.Quad(A(xi), B(xi), E, D(xi), new Vector3(-s, 0, 0), U(A(xi)), U(B(xi)), U(E), U(D(xi)));
+			lk.Tri(D(xi), E, C(xi), new Vector3(-s, 0, 0), U(D(xi)), U(E), U(C(xi)));
 		}
 		// front: either side of the doorway and the header
-		float sideW = hw - dw;
+		k.Mat(boards);
 		foreach (int s in new[] { -1, 1 })
-			BuildKit.Box(k, new Vector3(s * (dw + sideW * 0.5f), WallHeight * 0.5f - 0.05f, hd), new Vector3(sideW, WallHeight + 0.1f, WallT), 1.1f);
-		BuildKit.Box(k, new Vector3(0, (DoorH + WallHeight) * 0.5f, hd), new Vector3(DoorW, WallHeight - DoorH, WallT), 1.1f);
+			BuildKit.Box(k, new Vector3(s * (dw + sideW * 0.5f), WallHeight * 0.5f - 0.05f, hd), new Vector3(sideW, WallHeight + 0.1f, WallT), 1.1f, BuildKit.Face.NZ);
+		BuildKit.Box(k, new Vector3(0, (DoorH + WallHeight) * 0.5f, hd), new Vector3(DoorW, WallHeight - DoorH, WallT), 1.1f, BuildKit.Face.NZ);
+		lk.Mat(inside);
+		{
+			float zi = hd - WallT * 0.5f;
+			foreach (int s in new[] { -1, 1 })
+			{
+				float x0 = s * dw, x1 = s * hw;
+				lk.Quad(new Vector3(x1, -0.1f, zi), new Vector3(x0, -0.1f, zi), new Vector3(x0, WallHeight, zi), new Vector3(x1, WallHeight, zi), Vector3.Forward,
+					new Vector2(x1, 0.1f) * 1.1f, new Vector2(x0, 0.1f) * 1.1f, new Vector2(x0, -WallHeight) * 1.1f, new Vector2(x1, -WallHeight) * 1.1f);
+			}
+			lk.Quad(new Vector3(dw, DoorH, zi), new Vector3(-dw, DoorH, zi), new Vector3(-dw, WallHeight, zi), new Vector3(dw, WallHeight, zi), Vector3.Forward,
+				new Vector2(dw, -DoorH) * 1.1f, new Vector2(-dw, -DoorH) * 1.1f, new Vector2(-dw, -WallHeight) * 1.1f, new Vector2(dw, -WallHeight) * 1.1f);
+		}
 		// battens
 		k.Mat(frame);
 		k.Color = new Color(0.5f, 0.46f, 0.42f);
@@ -244,20 +288,20 @@ public partial class Shed : Node3D
 			BuildKit.Box(k, new Vector3(s * (dw + 0.05f), DoorH * 0.5f, hd + 0.035f), new Vector3(0.1f, DoorH, 0.035f), 1.4f);
 		BuildKit.Box(k, new Vector3(0, DoorH + 0.05f, hd + 0.035f), new Vector3(DoorW + 0.2f, 0.1f, 0.035f), 1.4f);
 
-		// frame inside: studs, plates, the door header
+		// frame inside: studs, plates, the door header (eased edges: the lantern catches a line down each)
 		k.Color = new Color(0.66f, 0.6f, 0.52f);
+		k.Bevel = 0.012f; k.BevelAxis = 1;
 		for (float x = -hw + 0.6f; x < hw - 0.2f; x += 0.6f)
 			BuildKit.Box(k, new Vector3(x, BackH * 0.5f, -hd + WallT * 0.5f + 0.045f), new Vector3(0.05f, BackH, 0.09f), 1.4f, BuildKit.Face.NY);
 		for (float z = -hd + 0.6f; z < hd - 0.2f; z += 0.6f)
 			foreach (int s in new[] { -1, 1 })
 				BuildKit.Box(k, new Vector3(s * (hw - WallT * 0.5f - 0.045f), WallTopAt(z) * 0.5f, z), new Vector3(0.09f, WallTopAt(z), 0.05f), 1.4f, BuildKit.Face.NY);
+		foreach (int s in new[] { -1, 1 })
+			BuildKit.Box(k, new Vector3(s * (dw + 0.025f), DoorH * 0.5f, hd - WallT * 0.5f - 0.045f), new Vector3(0.05f, DoorH, 0.09f), 1.4f, BuildKit.Face.NY);
+		k.Bevel = 0f; k.BevelAxis = -1;
 		BuildKit.Box(k, new Vector3(0, BackH - 0.05f, -hd + WallT * 0.5f + 0.045f), new Vector3(Width - 0.1f, 0.09f, 0.09f), 1.4f);
 		foreach (int s in new[] { -1, 1 })
-		{
-			BuildKit.Box(k, new Vector3(s * (dw + 0.025f), DoorH * 0.5f, hd - WallT * 0.5f - 0.045f), new Vector3(0.05f, DoorH, 0.09f), 1.4f, BuildKit.Face.NY);
-			// top plates along the sloped side walls
 			k.Beam(new Vector3(s * (hw - 0.07f), BackH - 0.05f, -hd), new Vector3(s * (hw - 0.07f), WallHeight - 0.05f, hd), 0.09f, 0.09f, 1.4f);
-		}
 		BuildKit.Box(k, new Vector3(0, DoorH + 0.05f, hd - WallT * 0.5f - 0.045f), new Vector3(DoorW + 0.1f, 0.1f, 0.09f), 1.4f);
 
 		// ---- lean-to roof, falling to the back, with rafters under it
@@ -272,9 +316,24 @@ public partial class Shed : Node3D
 		k.Color = new Color(0.85f, 0.85f, 0.83f);
 		k.Quad(new Vector3(-xr, rb.Y, rb.Z) + lift, new Vector3(xr, rb.Y, rb.Z) + lift, new Vector3(xr, rf.Y, rf.Z) + lift, new Vector3(-xr, rf.Y, rf.Z) + lift, n,
 			new Vector2(-xr, slopeLen) * 0.9f, new Vector2(xr, slopeLen) * 0.9f, new Vector2(xr * 0.9f, 0), new Vector2(-xr * 0.9f, 0));
-		k.Mat(BuildingTextures.GableBoardsMat);
-		k.Color = new Color(0.55f, 0.5f, 0.45f);
-		k.Quad(new Vector3(-xr, rb.Y, rb.Z), new Vector3(xr, rb.Y, rb.Z), new Vector3(xr, rf.Y, rf.Z), new Vector3(-xr, rf.Y, rf.Z), -n);
+		// its boards from below: over the room in the lining (dark, baked), the overhangs outside in the shell
+		{
+			Vector3 R(float x, float z) => new(x, Mathf.Lerp(rb.Y, rf.Y, (z - rb.Z) / (rf.Z - rb.Z)), z);
+			void Under(MeshKit kk, float x0, float x1, float z0, float z1)
+			{
+				if (x1 - x0 < 0.005f || z1 - z0 < 0.005f) return;
+				kk.Quad(R(x0, z0), R(x1, z0), R(x1, z1), R(x0, z1), -n, new Vector2(x0, z0), new Vector2(x1, z0), new Vector2(x1, z1), new Vector2(x0, z1));
+			}
+			lk.Mat(HollowLook.ShedCeiling);
+			lk.Color = new Color(0.6f, 0.58f, 0.56f);
+			Under(lk, -hw, hw, -hd, hd);
+			k.Mat(HollowLook.ShedCeiling);
+			k.Color = new Color(0.7f, 0.68f, 0.65f);
+			Under(k, -xr, -hw, rb.Z, rf.Z);
+			Under(k, hw, xr, rb.Z, rf.Z);
+			Under(k, -hw, hw, rb.Z, -hd);
+			Under(k, -hw, hw, hd, rf.Z);
+		}
 		k.Mat(BuildingTextures.TimberAlongMat);
 		k.Color = new Color(0.6f, 0.55f, 0.48f);
 		// fascia all round
@@ -282,6 +341,7 @@ public partial class Shed : Node3D
 		BuildKit.Box(k, new Vector3(0, rb.Y + 0.02f, rb.Z - 0.02f), new Vector3(xr * 2f + 0.04f, 0.16f, 0.035f), 1.4f);
 		foreach (int s in new[] { -1, 1 })
 			k.Beam(new Vector3(s * (xr + 0.02f), rb.Y + 0.03f, rb.Z), new Vector3(s * (xr + 0.02f), rf.Y + 0.03f, rf.Z), 0.035f, 0.16f, 1.4f, n);
+		k.Color = new Color(0.3f, 0.28f, 0.26f);   // (the rafters dark: under the roof, out of the lantern's reach)
 		for (float x = -hw + 0.3f; x < hw; x += 0.6f)
 			k.Beam(new Vector3(x, rb.Y - 0.05f, rb.Z + 0.05f), new Vector3(x, rf.Y - 0.05f, rf.Z - 0.05f), 0.05f, 0.1f, 1.4f, n);
 
@@ -302,102 +362,118 @@ public partial class Shed : Node3D
 		BuildKit.Box(k, new Vector3(-dw - 0.17f, 0.99f, hd + 0.07f), new Vector3(0.05f, 0.06f, 0.025f), 3f);
 		cols.Add((hinge + doorBasis * new Vector3(-DoorW * 0.5f, DoorH * 0.5f, 0.02f), new Vector3(DoorW, DoorH, 0.06f), doorBasis));
 
-		// ---- workbench along the back wall
-		var wood = BuildingTextures.PorchDeckMat;
+		// ---- workbench along the back wall: a thick top black with oil, a shelf under it, square legs, an apron
 		float bz = -hd + 0.34f, bw = Width - 0.3f;
-		k.Mat(wood);
-		k.Color = new Color(0.85f, 0.8f, 0.72f);
-		BuildKit.Box(k, new Vector3(0, BenchTop - 0.03f, bz), new Vector3(bw, 0.06f, 0.56f), 1f / 0.15f);
-		BuildKit.Box(k, new Vector3(0, 0.25f, bz + 0.02f), new Vector3(bw - 0.1f, 0.03f, 0.46f), 1f / 0.15f);
+		k.Mat(HollowLook.BenchTop);
+		k.Color = new Color(0.95f, 0.92f, 0.9f);
+		k.BevelBox(new Vector3(0, BenchTop - 0.03f, bz), new Vector3(bw, 0.06f, 0.56f), 0.01f, 1f / 0.15f);
+		k.BevelBox(new Vector3(0, 0.25f, bz + 0.02f), new Vector3(bw - 0.1f, 0.03f, 0.46f), 0.006f, 1f / 0.15f);
 		k.Mat(frame);
 		k.Color = new Color(0.62f, 0.56f, 0.48f);
 		foreach (float x in new[] { -bw * 0.5f + 0.06f, bw * 0.5f - 0.06f })
 			foreach (float z in new[] { bz - 0.22f, bz + 0.22f })
-				BuildKit.Box(k, new Vector3(x, (BenchTop - 0.06f) * 0.5f, z), new Vector3(0.07f, BenchTop - 0.06f, 0.07f), 1.4f, BuildKit.Face.NY);
-		BuildKit.Box(k, new Vector3(0, BenchTop - 0.1f, bz + 0.27f), new Vector3(bw, 0.1f, 0.03f), 1.4f);
+				k.ChamferBox(new Vector3(x, (BenchTop - 0.06f) * 0.5f, z), new Vector3(0.07f, BenchTop - 0.06f, 0.07f), 0.008f, 1.4f, null, 1, false, true);
+		k.ChamferBox(new Vector3(0, BenchTop - 0.1f, bz + 0.27f), new Vector3(bw, 0.1f, 0.03f), 0.006f, 1.4f, null, 0);
 		cols.Add((new Vector3(0, BenchTop * 0.5f, bz), new Vector3(bw, BenchTop, 0.56f), Basis.Identity));
-		// vise on the right end
-		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.3f, 0.32f, 0.3f);
+		// the vise on the right end: an old machinist's, its green paint chipped: the base, the body, the sliding jaw,
+		// the screw, the tommy bar through its end
+		var vise = BuildingTextures.Plain("h_vise", new Color(0.2f, 0.25f, 0.21f), 0.55f);
 		float vx = bw * 0.5f - 0.2f;
-		BuildKit.Box(k, new Vector3(vx, BenchTop + 0.07f, bz + 0.22f), new Vector3(0.16f, 0.14f, 0.12f), 3f, BuildKit.Face.NY);
-		BuildKit.Box(k, new Vector3(vx, BenchTop + 0.08f, bz + 0.33f), new Vector3(0.16f, 0.12f, 0.04f), 3f);
-		k.Cylinder(new Vector3(vx - 0.1f, BenchTop + 0.06f, bz + 0.37f), new Vector3(vx + 0.1f, BenchTop + 0.06f, bz + 0.37f), 0.01f, 0.01f, 4, false);
-		// a tin of nails, a coffee can, a rag on the bench (left side; the hammer spot is middle-right)
-		k.Mat(BuildingTextures.Plain("s_tin", new Color(0.42f, 0.38f, 0.32f), 0.5f));
+		k.Mat(vise);
 		k.Color = Colors.White;
-		k.Cylinder(new Vector3(-0.55f, BenchTop, bz - 0.1f), new Vector3(-0.55f, BenchTop + 0.14f, bz - 0.1f), 0.06f, 0.06f, 7, true);
-		k.Mat(BuildingTextures.Plain("s_can", new Color(0.28f, 0.3f, 0.34f), 0.5f));
-		k.Cylinder(new Vector3(-0.38f, BenchTop, bz + 0.05f), new Vector3(-0.38f, BenchTop + 0.1f, bz + 0.05f), 0.045f, 0.045f, 7, true);
-		k.Mat(BuildingTextures.Plain("s_rag", new Color(0.45f, 0.4f, 0.32f)));
-		BuildKit.Box(k, new Vector3(-0.2f, BenchTop + 0.01f, bz + 0.12f), new Vector3(0.22f, 0.02f, 0.16f), 1f, BuildKit.Face.NY, new Basis(Vector3.Up, 0.4f));
-
-		// ---- pegboard of hanging tools above the bench
-		k.Mat(BuildingTextures.Plain("s_pegboard", new Color(0.34f, 0.27f, 0.2f), 0.9f));
-		k.Color = new Color(0.5f, 0.44f, 0.38f);
-		BuildKit.Box(k, new Vector3(0, 1.35f, -hd + WallT * 0.5f + 0.1f), new Vector3(1.4f, 0.6f, 0.015f), 1.5f);
-		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.36f, 0.35f, 0.33f);
-		float pz = -hd + WallT * 0.5f + 0.12f;
-		// saw blade, wrench, pliers, a coil of rope
-		BuildKit.Box(k, new Vector3(-0.35f, 1.35f, pz), new Vector3(0.42f, 0.13f, 0.005f), 3f, BuildKit.Face.None, new Basis(Vector3.Back, 0.12f));
-		BuildKit.Box(k, new Vector3(0.05f, 1.37f, pz), new Vector3(0.025f, 0.24f, 0.01f), 3f);
-		BuildKit.Box(k, new Vector3(0.2f, 1.36f, pz), new Vector3(0.025f, 0.2f, 0.01f), 3f, BuildKit.Face.None, new Basis(Vector3.Back, 0.25f));
-		k.Mat(frame);
-		k.Color = new Color(0.55f, 0.35f, 0.2f);
-		BuildKit.Box(k, new Vector3(-0.6f, 1.33f, pz + 0.005f), new Vector3(0.12f, 0.06f, 0.03f), 3f);
-		k.Mat(BuildingTextures.Plain("s_rope", new Color(0.5f, 0.44f, 0.3f)));
+		k.BevelBox(new Vector3(vx, BenchTop + 0.025f, bz + 0.16f), new Vector3(0.14f, 0.05f, 0.2f), 0.008f, 3f);
+		k.BevelBox(new Vector3(vx, BenchTop + 0.1f, bz + 0.2f), new Vector3(0.12f, 0.1f, 0.12f), 0.01f, 3f);
+		k.BevelBox(new Vector3(vx, BenchTop + 0.1f, bz + 0.31f), new Vector3(0.13f, 0.11f, 0.05f), 0.01f, 3f);
+		k.Mat(HollowLook.ToolSteel);
 		k.Color = Colors.White;
-		// (2026-10-14a: was a solid eight-sided disc) a coil of rope: three loops of a round strand hung on a peg
-		for (int loop = 0; loop < 3; loop++)
+		foreach (float jz in new[] { bz + 0.265f, bz + 0.285f })
+			BuildKit.Box(k, new Vector3(vx, BenchTop + 0.14f, jz), new Vector3(0.13f, 0.03f, 0.008f), 3f);
+		k.Cylinder(new Vector3(vx, BenchTop + 0.08f, bz + 0.33f), new Vector3(vx, BenchTop + 0.08f, bz + 0.39f), 0.014f, 0.014f, 8, false);
+		k.Cylinder(new Vector3(vx, BenchTop + 0.08f, bz + 0.39f), new Vector3(vx, BenchTop + 0.08f, bz + 0.41f), 0.024f, 0.024f, 8, true);
+		k.Cylinder(new Vector3(vx - 0.11f, BenchTop + 0.08f, bz + 0.4f), new Vector3(vx + 0.11f, BenchTop + 0.08f, bz + 0.4f), 0.006f, 0.006f, 6, false);
+		foreach (int s in new[] { -1, 1 }) k.Cylinder(new Vector3(vx + s * 0.11f, BenchTop + 0.08f, bz + 0.4f), new Vector3(vx + s * 0.125f, BenchTop + 0.08f, bz + 0.4f), 0.012f, 0.012f, 6, true);
+		// a tin of nails (some spilled), a coffee can, a rag on the bench (left side; the hammer spot is middle-right)
+		small.Mat(BuildingTextures.Plain("s_tin", new Color(0.42f, 0.38f, 0.32f), 0.5f));
+		small.Color = Colors.White;
+		small.Cylinder(new Vector3(-0.55f, BenchTop, bz - 0.1f), new Vector3(-0.55f, BenchTop + 0.14f, bz - 0.1f), 0.06f, 0.06f, 10, true);
+		small.Mat(BuildingTextures.Plain("s_can", new Color(0.28f, 0.3f, 0.34f), 0.5f));
+		small.Cylinder(new Vector3(-0.38f, BenchTop, bz + 0.05f), new Vector3(-0.38f, BenchTop + 0.1f, bz + 0.05f), 0.045f, 0.045f, 10, true);
+		small.Mat(HollowLook.ToolSteel);
+		for (int i = 0; i < 6; i++)
 		{
-			float r = 0.12f - loop * 0.008f, lz = pz + 0.015f + loop * 0.02f, sag = 0.01f * loop;
-			Vector3 Rp(int i) { float a = i * Mathf.Tau / 14f; return new Vector3(0.48f + Mathf.Cos(a) * r, 1.34f - sag + Mathf.Sin(a) * r * 1.08f, lz); }
-			for (int i = 0; i < 14; i++) k.Cylinder(Rp(i), Rp(i + 1), 0.016f, 0.016f, 6, false);
+			var na = new Vector3(-0.47f + rng.RandfRange(-0.05f, 0.05f), BenchTop + 0.004f, bz + rng.RandfRange(-0.05f, 0.08f));
+			float ang = rng.RandfRange(0f, Mathf.Tau);
+			small.Cylinder(na, na + new Vector3(Mathf.Cos(ang), 0, Mathf.Sin(ang)) * 0.06f, 0.003f, 0.003f, 4, false);
 		}
-		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.3f, 0.28f, 0.26f);
-		k.Cylinder(new Vector3(0.48f, 1.46f, pz - 0.01f), new Vector3(0.48f, 1.46f, pz + 0.08f), 0.008f, 0.008f, 6, true);
+		small.Mat(BuildingTextures.Plain("s_rag", new Color(0.45f, 0.4f, 0.32f)));
+		small.Blob(new Vector3(-0.2f, BenchTop + 0.015f, bz + 0.12f), new Vector3(0.12f, 0.02f, 0.09f), 4471, 0.35f, true, 1f);
 
-		// ---- shelf on the left wall with jars and tins; long tools leaning in the front-right corner
-		k.Mat(wood);
-		k.Color = new Color(0.8f, 0.75f, 0.68f);
+		// ---- the pegboard over the bench: brown hardboard with its holes, on two furring strips, and the tools that
+		// hang on it, modelled (Shed.Tools.cs)
+		float pz = -hd + WallT * 0.5f + 0.1f;
+		k.Mat(frame);
+		k.Color = new Color(0.5f, 0.46f, 0.42f);
+		foreach (float fx in new[] { -0.62f, 0.62f })
+			BuildKit.Box(k, new Vector3(fx, 1.35f, pz - 0.05f), new Vector3(0.05f, 0.6f, 0.09f), 1.4f);
+		k.Mat(HollowLook.Pegboard);
+		k.Color = Colors.White;
+		BuildKit.Box(k, new Vector3(0, 1.35f, pz), new Vector3(1.4f, 0.6f, 0.008f), 2.5f);
+		Tools(small, pz + 0.004f);
+
+		// ---- the shelf on the left wall with jars and tins, on braced brackets; long tools in the front-right corner
 		float sx = -hw + WallT * 0.5f + 0.17f;
+		k.Mat(HollowLook.ShelfWood);
+		k.Color = new Color(0.9f, 0.88f, 0.85f);
 		foreach (float y in new[] { 1.2f, 1.62f })
-			BuildKit.Box(k, new Vector3(sx, y, 0.1f), new Vector3(0.26f, 0.03f, 1.1f), 1f / 0.15f);
+		{
+			k.BevelBox(new Vector3(sx, y, 0.1f), new Vector3(0.26f, 0.03f, 1.1f), 0.006f, 1.4f);
+			foreach (float z in new[] { -0.36f, 0.56f })
+				k.Beam(new Vector3(-hw + WallT * 0.5f + 0.01f, y - 0.2f, z), new Vector3(sx + 0.08f, y - 0.02f, z), 0.03f, 0.028f, 1.4f, Vector3.Forward);
+		}
+		var jroles = new Dictionary<string, Material>
+		{
+			["glass"] = BuildingTextures.Plain("b_jar", new Color(0.32f, 0.36f, 0.3f), 0.3f), ["metal"] = BuildingTextures.Plain("s_tin2", new Color(0.44f, 0.38f, 0.28f), 0.45f),
+			["label"] = BuildingTextures.Plain("b_label", new Color(0.55f, 0.5f, 0.4f)), ["paper"] = BuildingTextures.Plain("b_label", new Color(0.55f, 0.5f, 0.4f)),
+			["*"] = BuildingTextures.Plain("s_tin2", new Color(0.44f, 0.38f, 0.28f), 0.45f),
+		};
 		for (int i = 0; i < 5; i++)
 		{
-			k.Mat(BuildingTextures.Plain(i % 2 == 0 ? "s_jar" : "s_tin2", i % 2 == 0 ? new Color(0.3f, 0.34f, 0.28f) : new Color(0.44f, 0.38f, 0.28f), 0.45f));
-			k.Color = Colors.White;
 			float z = -0.35f + i * 0.2f + rng.RandfRange(-0.03f, 0.03f);
 			float y = i < 3 ? 1.215f : 1.635f;
-			k.Cylinder(new Vector3(sx, y, z), new Vector3(sx, y + rng.RandfRange(0.1f, 0.18f), z), 0.05f, 0.05f, 6, true);
+			if (FurnitureKit.Add(small, i % 2 == 0 ? "jar" : "tin", new Vector3(sx, y, z), i * 1.7f, jroles)) continue;
+			small.Mat(BuildingTextures.Plain(i % 2 == 0 ? "s_jar" : "s_tin2", i % 2 == 0 ? new Color(0.3f, 0.34f, 0.28f) : new Color(0.44f, 0.38f, 0.28f), 0.45f));
+			small.Color = Colors.White;
+			small.Cylinder(new Vector3(sx, y, z), new Vector3(sx, y + rng.RandfRange(0.1f, 0.18f), z), 0.05f, 0.05f, 10, true);
 		}
-		// shovel and rake leaning in the corner
-		k.Mat(frame);
-		k.Color = new Color(0.6f, 0.5f, 0.38f);
-		Vector3 c0 = new(hw - 0.2f, 0.02f, hd - 0.3f);
-		k.Beam(c0, c0 + new Vector3(-0.28f, 1.25f, -0.12f), 0.035f, 0.035f, 2f);
-		k.Beam(c0 + new Vector3(-0.1f, 0, -0.18f), c0 + new Vector3(-0.35f, 1.4f, -0.3f), 0.03f, 0.03f, 2f);
-		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.3f, 0.3f, 0.29f);
-		BuildKit.Box(k, c0 + new Vector3(0.02f, 0.14f, 0.01f), new Vector3(0.22f, 0.28f, 0.02f), 2f, BuildKit.Face.None, Basis.FromEuler(new Vector3(0.1f, 0.4f, 0.2f)));
-		BuildKit.Box(k, c0 + new Vector3(-0.35f, 1.42f, -0.3f), new Vector3(0.36f, 0.03f, 0.06f), 2f, BuildKit.Face.None, new Basis(Vector3.Up, 0.5f));
+		LongTools(k, new Vector3(hw - 0.2f, 0.02f, hd - 0.3f));
 
-		// ---- floor clutter: a red gas can, a sack, a bucket
-		k.Mat(BuildingTextures.Plain("s_gascan", new Color(0.42f, 0.08f, 0.06f), 0.6f));
-		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(-hw + 0.35f, 0.17f, hd - 0.45f), new Vector3(0.2f, 0.34f, 0.3f), 2f, BuildKit.Face.NY, new Basis(Vector3.Up, 0.3f));
+		// ---- floor clutter: a red gas can, a feed sack, a galvanised bucket
+		GasCan(k, new Vector3(-hw + 0.35f, 0f, hd - 0.45f), 0.3f);
 		k.Mat(BuildingTextures.CanvasMat);
 		k.Color = new Color(0.8f, 0.72f, 0.55f);
-		k.Blob(new Vector3(-hw + 0.4f, 0.2f, -0.35f), new Vector3(0.22f, 0.2f, 0.18f), 91, 0.2f, true, 2f);
-		k.Mat(BuildingTextures.IronMat);
-		k.Color = new Color(0.4f, 0.4f, 0.4f);
-		k.Cylinder(new Vector3(0.55f, 0.0f, bz + 0.05f), new Vector3(0.55f, 0.24f, bz + 0.05f), 0.11f, 0.14f, 8, false);
+		k.Blob(new Vector3(-hw + 0.4f, 0.2f, -0.35f), new Vector3(0.22f, 0.2f, 0.18f), 91, 0.2f, true, 2f, 0.35f);
+		ClutterKit.Bucket(HollowLook.ToolSteel).Build(small, new Transform3D(new Basis(Vector3.Up, 0.7f), new Vector3(0.55f, 0f, bz + 0.05f)));
 		cols.Add((new Vector3(-hw + 0.35f, 0.2f, 0), new Vector3(0.4f, 0.4f, 1.1f), Basis.Identity));
+
+		// ---- the bake: the shed's dark corners, under the bench and the shelf, the roof black, the floor worn from the
+		// door to the bench (the shell's outside surfaces left out)
+		var shade = new RoomShade(-hw + WallT * 0.5f, hw - WallT * 0.5f, -hd + WallT * 0.5f, hd - WallT * 0.5f, 0f, WallHeight) { Dim = 0.75f, Ceiling = 0.55f, Reach = 0.7f, Seam = 0.5f };
+		shade.Plane(new Vector3(0, rb.Y, rb.Z), -n);
+		shade.Under(new Vector3(0, 0, bz), new Vector3(bw, BenchTop, 0.56f), 0.5f, 0.45f)
+			.Under(new Aabb(new Vector3(sx - 0.13f, 1.0f, -0.45f), new Vector3(0.26f, 0.7f, 1.1f)), 0.35f, 0.3f)
+			.Under(new Aabb(new Vector3(-0.7f, 1.05f, pz - 0.05f), new Vector3(1.4f, 0.6f, 0.06f)), 0.3f, 0.25f)
+			.Under(new Vector3(-hw + 0.4f, 0, -0.35f), new Vector3(0.45f, 0.4f, 0.4f), 0.4f, 0.35f)
+			.Light(new Vector3(0, 1.2f, hd), 1.8f, 0.8f)
+			.Path(new Vector3(0, 0, hd), new Vector3(0.1f, 0, bz + 0.4f), 0.6f, 0.7f);
+		var outside = new HashSet<Material> { boards, BuildingTextures.ShingleMat, BuildingTextures.StoneMat, BuildingTextures.GableBoardsMat, BuildingTextures.TimberAlongMat, BuildingTextures.PorchDeckMat, BuildingTextures.ShedDoorMat, ProcTextures.RockTriMat };
+		shade.Apply(lk);
+		shade.Apply(k, m => !outside.Contains(m));
+		shade.Apply(small);
 
 		k.Color = Colors.White;
 		k.CommitTo(gen, "ShedMesh");
+		lk.CommitTo(gen, "ShedLining", false);
+		small.CommitTo(gen, "ShedSmall", false);
 
 		// dim bulb-less interior: the shed is lit only from outside (and the lantern)
 
