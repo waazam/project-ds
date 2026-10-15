@@ -309,8 +309,10 @@ public partial class RoundRoom
 				Vector3 p = c + new Vector3(Mathf.Sin(ang), 0, Mathf.Cos(ang)) * d;
 				float h = i == 0 ? rng.RandfRange(0.26f, 0.36f) : rng.RandfRange(0.07f, 0.24f), r = rng.RandfRange(0.03f, 0.05f);
 				wax.Color = Colors.White * rng.RandfRange(0.82f, 1f);
-				wax.Cylinder(p, p + Vector3.Up * h, r * 1.1f, r, 9, true);
-				wax.Blob(p + Vector3.Up * h, new Vector3(r * 0.95f, 0.012f, r * 0.95f), q * 13 + i, 0.3f);
+				// (2026-10-15: turned, its foot spread into the pool, its top burnt down into a cup with a ragged rim; it
+				// was a capped cylinder with a lump on it)
+				TurnedKit.Lathe(wax, p, TurnedKit.P(0f, 0f, r * 1.35f, 0f, r * 1.15f, 0.012f, r * 1.06f, 0.03f, r, h - 0.01f, r * 1.03f, h + 0.004f, r * 0.82f, h + 0.006f,
+					r * 0.5f, h - 0.008f, 0f, h - 0.01f), 9, 40f, 1f, 1f, q * 1.3f + i);
 				wax.Blob(p + Vector3.Up * (h * 0.6f) + new Vector3(r, 0, 0), new Vector3(0.012f, h * 0.35f, 0.012f), q * 17 + i, 0.2f);   // a drip down its side
 				tops.Add(p + Vector3.Up * (h + 0.035f));
 				topSum += h;

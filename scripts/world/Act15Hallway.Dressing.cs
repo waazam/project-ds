@@ -6,16 +6,17 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// (2026-10-14h, the old-and-abandoned pass; Dan: "old and abandoned ... not sci-fi") Act 15's hall dressed as an old
-/// hospital corridor gone to ruin, decades shut: the walls' two-tone paint on block (<c>hospital_wall.gdshader</c>), a
-/// bump rail down both sides on its brackets (a length missing here, one hanging off), a perished rubber base, ward
-/// doors with wired-glass panels and their number plates, fire cabinets with their glass gone and their extinguishers
+/// institutional service corridor gone to ruin, decades shut (2026-10-15, Dan: not a hospital, nor any particular kind
+/// of building: its signs and door plates are a service corridor's): the walls' two-tone paint on block
+/// (<c>corridor_wall.gdshader</c>), a bump rail down both sides on its brackets (a length missing here, one hanging off), a perished rubber base, steel
+/// service doors with wired-glass panels and their number plates, fire cabinets with their glass gone and their extinguishers
 /// missing, enamel signs, paper trodden into the floor, vinyl tiles lifted, and stains, peel and scuffs by rule.
 /// <para>None of it is in anyone's way (no collision: the hall is a body's width), and none of it touches the hall's own
 /// dice: everything here is drawn from its own (red light, green light's timings come from the hall's; see Build).</para>
 /// </summary>
 public partial class Act15Hallway
 {
-	/// <summary>The ward doors: the side (-1 left, +1 right), where along the hall, the wall's half-width there.</summary>
+	/// <summary>The service doors: the side (-1 left, +1 right), where along the hall, the wall's half-width there.</summary>
 	private readonly List<(float s, float z, float halfW)> _doors = new();
 
 	private static Shader _wallShader;
@@ -23,8 +24,8 @@ public partial class Act15Hallway
 	/// <summary>The hall's walls (old painted block, two tones at a dado line), for a floor at world y <paramref name="floorY"/>.</summary>
 	private static ShaderMaterial HallWallMat(float floorY)
 	{
-		_wallShader ??= GD.Load<Shader>("res://assets/shaders/hospital_wall.gdshader");
-		var m = new ShaderMaterial { Shader = _wallShader, ResourceName = "hw_hospital_wall" };
+		_wallShader ??= GD.Load<Shader>("res://assets/shaders/corridor_wall.gdshader");
+		var m = new ShaderMaterial { Shader = _wallShader, ResourceName = "hw_corridor_wall" };
 		m.SetShaderParameter("block_tex", SurfaceSets.Tex("ph_concrete_wall_004"));
 		m.SetShaderParameter("block_nor", SurfaceSets.Tex("ph_concrete_wall_004", "normal"));
 		m.SetShaderParameter("bare_tex", SurfaceSets.Tex("ph_concrete_wall_006"));
@@ -44,17 +45,17 @@ public partial class Act15Hallway
 			if (Mathf.Abs(z - ShadowZ) > 7f && rng.Randf() < 0.24f)
 				_doors.Add((rng.Randf() < 0.5f ? -1f : 1f, z, W2 * 0.5f));
 
-		var leaf = new MeshKit(); leaf.Mat(HospitalTextures.DoorMat);
-		var hw = new MeshKit(); hw.Mat(HospitalTextures.PlateMat);
+		var leaf = new MeshKit(); leaf.Mat(CorridorTextures.DoorMat);
+		var hw = new MeshKit(); hw.Mat(CorridorTextures.PlateMat);
 		var frame = new MeshKit(); frame.Mat(ServiceDoor.FrameMat);
-		var glass = new MeshKit(); glass.Mat(HospitalTextures.GlassMat);
-		var signs = new MeshKit(); signs.Mat(HospitalTextures.EnamelMat);
-		var backs = new MeshKit(); backs.Mat(HospitalTextures.SignBackMat);
-		var red = new MeshKit(); red.Mat(HospitalTextures.RedMat);
-		var rail = new MeshKit(); rail.Mat(HospitalTextures.RailMat);
-		var cove = new MeshKit(); cove.Mat(HospitalTextures.CoveMat);
-		var floorBits = new MeshKit(); floorBits.Mat(HospitalTextures.PaperMat);
-		var tiles = new MeshKit(); tiles.Mat(HospitalTextures.CoveMat);
+		var glass = new MeshKit(); glass.Mat(CorridorTextures.GlassMat);
+		var signs = new MeshKit(); signs.Mat(CorridorTextures.EnamelMat);
+		var backs = new MeshKit(); backs.Mat(CorridorTextures.SignBackMat);
+		var red = new MeshKit(); red.Mat(CorridorTextures.RedMat);
+		var rail = new MeshKit(); rail.Mat(CorridorTextures.RailMat);
+		var cove = new MeshKit(); cove.Mat(CorridorTextures.CoveMat);
+		var floorBits = new MeshKit(); floorBits.Mat(CorridorTextures.PaperMat);
+		var tiles = new MeshKit(); tiles.Mat(CorridorTextures.CoveMat);
 		foreach (var k in new[] { leaf, hw, frame, glass, signs, backs, red, rail, cove, floorBits, tiles }) k.Color = Colors.White;
 		var labels = new Node3D { Name = "Signs" };
 		AddChild(labels);
@@ -104,7 +105,7 @@ public partial class Act15Hallway
 			BuildKit.Box(frame, new Vector3(fx, h + 0.035f, zc), new Vector3(0.05f, 0.07f, w + 0.13f));
 			// its number on a plate over it
 			BuildKit.Box(hw, new Vector3(s * (hwid - 0.006f), h + 0.22f, zc), new Vector3(0.012f, 0.09f, 0.22f));
-			Text($"C-{room}", new Vector3(s * (hwid - 0.0135f), h + 0.22f, zc), n, 0.0016f, new Color(0.1f, 0.09f, 0.07f));
+			Text($"S{room - 100:00}", new Vector3(s * (hwid - 0.0135f), h + 0.22f, zc), n, 0.0016f, new Color(0.1f, 0.09f, 0.07f));
 			room += rng.RandiRange(1, 3);
 			cuts.Add((s, zc - w * 0.5f - 0.1f, zc + w * 0.5f + 0.1f));
 		}
@@ -128,7 +129,7 @@ public partial class Act15Hallway
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 		};
 		var cg = new MeshKit(); cg.Mat(cabGlass); cg.Color = Colors.White;
-		var dark = new MeshKit(); dark.Mat(HospitalTextures.SignBackMat); dark.Color = Colors.White * 0.4f;
+		var dark = new MeshKit(); dark.Mat(CorridorTextures.SignBackMat); dark.Color = Colors.White * 0.4f;
 		foreach (var (s, zc, hwid) in cabinets)
 		{
 			const float cw = 0.34f, ch = 0.68f, cd = 0.13f, cy = 1.2f;
@@ -146,9 +147,12 @@ public partial class Act15Hallway
 				// an extinguisher still in it, its hose hung round
 				Vector3 foot = new(wx - s * 0.07f, cy - ch * 0.5f + 0.03f, zc);
 				red.Color = Colors.White * rng.RandfRange(0.6f, 0.9f);
-				red.Cylinder(foot, foot + Vector3.Up * 0.42f, 0.07f, 0.07f, 12, true);
-				red.Cylinder(foot + Vector3.Up * 0.42f, foot + Vector3.Up * 0.48f, 0.07f, 0.03f, 10, true);
-				dark.Cylinder(foot + Vector3.Up * 0.47f, foot + new Vector3(0, 0.3f, 0.09f), 0.012f, 0.012f, 5, false);
+				// (2026-10-15, the props pass: a turned cylinder with a domed shoulder, a valve head and handle, its hose
+				// looped down and back; it was a can and a cone)
+				TurnedKit.Lathe(red, foot, TurnedKit.P(0f, 0f, 0.062f, 0f, 0.067f, 0.012f, 0.068f, 0.39f, 0.062f, 0.43f, 0.045f, 0.455f, 0.022f, 0.47f, 0f, 0.47f), 12);
+				TurnedKit.Lathe(dark, foot + Vector3.Up * 0.465f, TurnedKit.P(0f, 0f, 0.016f, 0f, 0.016f, 0.03f, 0.012f, 0.045f, 0f, 0.045f), 8);
+				dark.Beam(foot + new Vector3(0, 0.505f, 0), foot + new Vector3(-s * 0.06f, 0.53f, 0), 0.02f, 0.008f);
+				TurnedKit.Rod(dark, new[] { foot + new Vector3(0, 0.48f, 0.015f), foot + new Vector3(0, 0.46f, 0.08f), foot + new Vector3(0, 0.3f, 0.09f), foot + new Vector3(0, 0.18f, 0.075f), foot + new Vector3(0, 0.16f, 0.06f) }, 0.009f, 5, true);
 			}
 			if (rng.Randf() < 0.35f)
 			{
@@ -226,8 +230,8 @@ public partial class Act15Hallway
 		// ---- the signs: enamel, some out from the wall to be read down the hall
 		(string text, float z)[] hung =
 		{
-			("WARD C", 30f), ("NO SMOKING", 62f), ("RADIOLOGY  >", 96f), ("QUIET PLEASE", 178f), ("< WARD D", 214f), ("ISOLATION", 262f),
-			("STAFF ONLY", 305f), ("PATHOLOGY  >", 350f), ("NO ADMITTANCE", 402f), ("WARD E", 446f),
+			("NO ENTRY", 30f), ("NO SMOKING", 62f), ("BOILER ROOM  >", 96f), ("KEEP CLEAR", 178f), ("< FIRE EXIT", 214f), ("ELECTRICAL", 262f),
+			("STAFF ONLY", 305f), ("STORES  >", 350f), ("NO ADMITTANCE", 402f), ("SERVICE C", 446f),
 		};
 		foreach (var (text, z0) in hung)
 		{
@@ -303,10 +307,10 @@ public partial class Act15Hallway
 			}
 		}
 
-		leaf.CommitTo(this, "WardDoors", true);
-		hw.CommitTo(this, "WardDoorHardware", false);
-		frame.CommitTo(this, "WardDoorFrames", false);
-		glass.CommitTo(this, "WardDoorGlass", false);
+		leaf.CommitTo(this, "ServiceDoors", true);
+		hw.CommitTo(this, "ServiceDoorHardware", false);
+		frame.CommitTo(this, "ServiceDoorFrames", false);
+		glass.CommitTo(this, "ServiceDoorGlass", false);
 		signs.CommitTo(this, "SignPlates", false);
 		backs.CommitTo(this, "SignBrackets", false);
 		red.CommitTo(this, "FireCabinets", false);

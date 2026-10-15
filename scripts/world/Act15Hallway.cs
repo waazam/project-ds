@@ -123,12 +123,12 @@ public partial class Act15Hallway : Node3D
 		body.SetMeta("surface", "stone");
 		AddChild(body);
 		var wall = new MeshKit();
-		// (2026-10-14h, the old-and-abandoned pass: an old hospital corridor's painted block, two-tone at a dado line,
+		// (2026-10-14h, the old-and-abandoned pass: an old service corridor's painted block, two-tone at a dado line,
 		// chipped, scuffed, water-stained; it was smooth concrete, and its second set smeared along the tall walls in lines)
 		wall.Mat(HallWallMat(GlobalPosition.Y));
 		var dark = new MeshKit();
 		// (the floor: old vinyl tile, weathered by the kit; it was the stairwell's grimy concrete)
-		dark.Mat(RoomSurface.Of(HospitalTextures.FloorMat, RoomSurface.Concrete with { Streaks = 0f, Tide = 0f, FloorDirt = 0.8f, Wear = 0.7f }, 15));
+		dark.Mat(RoomSurface.Of(CorridorTextures.FloorMat, RoomSurface.Concrete with { Streaks = 0f, Tide = 0f, FloorDirt = 0.8f, Wear = 0.7f }, 15));
 		_doors.Clear();
 		void Box(MeshKit k, Vector3 c, Vector3 s, Basis? rot = null, bool collide = true, float tint = 1f)
 		{
@@ -155,7 +155,7 @@ public partial class Act15Hallway : Node3D
 			foreach (float s in new[] { -1f, 1f })
 				Box(wall, new Vector3(s * (W1 * 0.5f - 0.05f), y, Part1 * 0.5f), new Vector3(0.1f, 0.12f, Part1), null, false, 0.7f);
 		// doors in the walls that go nowhere
-		// (2026-10-14h: old ward doors, shut, a wired-glass panel in each, dark behind; they were black openings. The two
+		// (2026-10-14h: old steel service doors, shut, a wired-glass panel in each, dark behind; they were black openings. The two
 		// draws a door takes from the hall's dice are as they were, in the same order: red light, green light comes after)
 		for (float z = 23f; z < Part1 - 10f; z += _rng.RandfRange(28f, 46f))
 		{
@@ -237,7 +237,7 @@ public partial class Act15Hallway : Node3D
 	}
 
 	/// <summary>The strip lights in the floor, down both sides, three thin bars to a segment.
-	/// (2026-10-14h, the old-and-abandoned pass; Dan: keep them, but an old haunted hospital's) Each segment its own:
+	/// (2026-10-14h, the old-and-abandoned pass; Dan: keep them, but an old abandoned service corridor's) Each segment its own:
 	/// its diffuser yellowed, grime lying over it, some dimmer than the next, a run of them here and there burnt out,
 	/// a few sagging and buzzing on their own time, a lens cracked and lying askew. Their colour and level are still
 	/// the hall's, red light, green light's (<see cref="SyncStrips"/>): the dirt is drawn over the signal, never instead of it.</summary>
@@ -255,10 +255,10 @@ public partial class Act15Hallway : Node3D
 		s2.Mat(_strip2);
 		// (2026-10-14c) each segment's bars sit in a low steel channel let into the floor, scuffed at its ends
 		var housing = new MeshKit();
-		housing.Mat(HospitalTextures.ChannelMat);
+		housing.Mat(CorridorTextures.ChannelMat);
 		housing.Color = Colors.White;
 		var shards = new MeshKit();
-		shards.Mat(HospitalTextures.ShardMat);
+		shards.Mat(CorridorTextures.ShardMat);
 		shards.Color = Colors.White;
 		// (their wear: their own dice, not the hall's)
 		var wr = new RandomNumberGenerator { Seed = 151514 };
@@ -384,7 +384,7 @@ public partial class Act15Hallway : Node3D
 	private void BuildLights()
 	{
 		var bracket = new MeshKit();
-		bracket.Mat(HospitalTextures.ChannelMat);
+		bracket.Mat(CorridorTextures.ChannelMat);
 		bracket.Color = Colors.White * 0.8f;
 		FailingBulb.Mode[] modes = { FailingBulb.Mode.Steady, FailingBulb.Mode.Flicker, FailingBulb.Mode.Dead, FailingBulb.Mode.Steady, FailingBulb.Mode.Buzz, FailingBulb.Mode.Dead, FailingBulb.Mode.Steady };
 		int bi = 0;
@@ -426,7 +426,7 @@ public partial class Act15Hallway : Node3D
 		k.Mat(cable); k.Color = Colors.White;
 		var sk = new MeshKit();
 		// (2026-10-14h: old enamel shades, chipped to rust; they were a clean dark metal)
-		sk.Mat(HospitalTextures.LampShadeMat); sk.Color = Colors.White;
+		sk.Mat(CorridorTextures.LampShadeMat); sk.Color = Colors.White;
 		lk.Mat(_lampMat); lk.Color = Colors.White;
 		for (float z = Part1 + Taper + 5f; z < End - 3f; z += 10f)
 		{

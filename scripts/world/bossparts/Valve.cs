@@ -33,7 +33,12 @@ public partial class Valve : Node3D
 		k.Cylinder(new Vector3(0, -1.25f, 0), new Vector3(0, 0.5f, 0), 0.12f, 0.12f, 10, true);
 		k.Cylinder(new Vector3(0, -0.25f, 0), new Vector3(0, -0.2f, 0), 0.2f, 0.2f, 12, true);    // flange
 		k.Cylinder(new Vector3(0, 0.2f, 0), new Vector3(0, 0.25f, 0), 0.2f, 0.2f, 12, true);      // flange
-		k.Blob(new Vector3(0, 0, -0.05f), new Vector3(0.24f, 0.22f, 0.26f), Number + 3, 0.04f, false);
+		// (2026-10-15, the props pass: a cast globe body between the flanges, a bonnet out toward the wheel with a
+		// hexagonal packing nut; it was a lumpy ball)
+		TurnedKit.Lathe(k, Vector3.Zero, TurnedKit.P(0.125f, -0.2f, 0.17f, -0.16f, 0.21f, -0.08f, 0.225f, 0f, 0.21f, 0.08f, 0.17f, 0.16f, 0.125f, 0.2f), 14, 40f);
+		var bonnet = new Transform3D(new Basis(Vector3.Right, -Mathf.Pi * 0.5f), new Vector3(0, 0, -0.17f));
+		TurnedKit.Lathe(k, bonnet, TurnedKit.P(0.13f, 0f, 0.13f, 0.03f, 0.1f, 0.04f, 0.075f, 0.1f, 0.08f, 0.11f, 0.08f, 0.14f, 0.05f, 0.15f, 0.05f, 0.19f, 0.035f, 0.2f, 0f, 0.2f), 10, 40f);
+		TurnedKit.Lathe(k, bonnet * new Transform3D(Basis.Identity, new Vector3(0, 0.15f, 0)), TurnedKit.P(0f, 0f, 0.06f, 0f, 0.06f, 0.035f, 0f, 0.035f), 6, 40f);
 		for (int b = 0; b < 6; b++)
 		{
 			float a = b / 6f * Mathf.Tau;

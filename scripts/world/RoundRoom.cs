@@ -287,9 +287,14 @@ public partial class RoundRoom : Node3D
 				Vector3 d = new(Mathf.Sin(a), 0, Mathf.Cos(a));
 				Vector3 at = d * (Radius - 0.25f) + Vector3.Up * y;
 				k.Color = new Color(0.7f, 0.55f, 0.32f);
-				k.Beam(d * (Radius - 0.02f) + Vector3.Up * (y - 0.15f), at, 0.04f, 0.04f);
-				k.Cylinder(at, at + Vector3.Up * 0.04f, 0.09f, 0.08f, 10, true);
-				wax.Cylinder(at + Vector3.Up * 0.04f, at + Vector3.Up * 0.22f, 0.025f, 0.025f, 8, true);
+				// (2026-10-15, the props pass: a round wall plate, the arm a curve rising out from it to a turned cup and
+				// drip pan, the candle burnt into a hollow at its top; it was a square bar into a disc, a plain stick)
+				Vector3 wall = d * (Radius - 0.02f) + Vector3.Up * (y - 0.15f);
+				var plate = new Transform3D(Basis.LookingAt(d, Vector3.Up) * new Basis(Vector3.Right, Mathf.Pi * 0.5f), wall + d * 0.012f);
+				TurnedKit.Lathe(k, plate, TurnedKit.P(0f, 0f, 0.055f, 0f, 0.055f, 0.008f, 0.04f, 0.016f, 0.02f, 0.022f, 0f, 0.024f), 10, 38f, 0.75f, 1f);
+				TurnedKit.Rod(k, TurnedKit.Curve(wall, wall - d * 0.16f + Vector3.Down * 0.02f, at + Vector3.Down * 0.03f, 8), 0.011f, 6, true);
+				TurnedKit.Lathe(k, at + Vector3.Down * 0.035f, TurnedKit.P(0f, 0f, 0.014f, 0f, 0.022f, 0.03f, 0.07f, 0.055f, 0.085f, 0.07f, 0.08f, 0.075f, 0.06f, 0.07f, 0.03f, 0.07f, 0.03f, 0.075f, 0f, 0.075f), 12);
+				TurnedKit.Lathe(wax, at + Vector3.Up * 0.04f, TurnedKit.P(0f, 0f, 0.026f, 0f, 0.025f, 0.172f, 0.021f, 0.18f, 0.01f, 0.176f, 0f, 0.177f), 8, 40f);
 				// (unlit until the power comes back: then they light themselves)
 				var flame = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.018f, Height = 0.05f, RadialSegments = 6, Rings = 3 }, Position = at + Vector3.Up * 0.25f, MaterialOverride = flameMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
 				AddChild(flame);

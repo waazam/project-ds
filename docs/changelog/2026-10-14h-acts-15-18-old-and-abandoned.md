@@ -1,4 +1,4 @@
-# 2026-10-14h — Acts 15-18 old and abandoned: the hall an old hospital corridor, the sewer's lamps brown out, the pit lit by work lamps
+# 2026-10-14h — Acts 15-18 old and abandoned: the hall an old service corridor, the sewer's lamps brown out, the pit lit by work lamps
 
 Dan wants the later rooms to read as a decades-old, neglected real 20th-century building: not ancient ruins, and not
 sci-fi, alien or a nightclub. The look survey's "Futuristic elements" table (`test-output/survey/SURVEY.md`) listed
@@ -8,7 +8,7 @@ teal laser and red emergency light. This pass replaces them in Acts 15-18. It us
 
 ## Red light, green light is unchanged
 - `Act15Hallway.Rlgl.cs` and `Act15Hallway.Variants.cs` are byte for byte as they were.
-- The hall's dice (`_rng`) take the same draws in the same order. The ward doors replaced the black doorways, but each
+- The hall's dice (`_rng`) take the same draws in the same order. The service doors replaced the black doorways, but each
   door still takes its two draws (`RandfRange(28, 46)`, then `Randf()` for the side). The closet's dummy shelf draws stay.
   Everything new uses its own `RandomNumberGenerator`.
 - The build now prints the dice's state once it is done (`[rlgl] hall dice after build: state ...`). The state is
@@ -19,7 +19,7 @@ teal laser and red emergency light. This pass replaces them in Acts 15-18. It us
   (0.3, 1, 0.42 → 0.4, 0.95, 0.42). Red is (1, 0.1, 0.05). They mean the same thing at the same moments.
 
 ## Act 15: the hall
-- **Walls** (`assets/shaders/hospital_wall.gdshader`): painted concrete block (the `concrete_wall_004` scan, 21 cm
+- **Walls** (`assets/shaders/corridor_wall.gdshader`): painted concrete block (the `concrete_wall_004` scan, 21 cm
   courses) in two tones split at a dado line, with a dark line between them: an institutional green-grey below and an old
   cream above.
   - The paint is chipped back to grey block and primer, more of it low down and at rail height.
@@ -29,17 +29,17 @@ teal laser and red emergency light. This pass replaces them in Acts 15-18. It us
   - Above the 3.2 m ledge the paint gives way to grimy bare concrete.
   - The shader is projected flat on each wall's own plane. This fixes the long diagonal streaks on the 22-34 m walls:
     the old `concrete_varied` shader's second set was swizzled end-on onto them.
-- **Floor**: old vinyl composition tile, 30 cm, off-white and grey-green in a broken checker (`HospitalTextures.VinylTile`),
+- **Floor**: old vinyl composition tile, 30 cm, off-white and grey-green in a broken checker (`CorridorTextures.VinylTile`),
   weathered by `RoomSurface`. A few patches have lifted to the black adhesive, and paper is trodden into the floor along
   the walls.
 - **Dressing** (`Act15Hallway.Dressing.cs`, none of it with collision):
   - A hardwood bump rail on brackets down both sides, bay by bay between the pilasters. About one length in 14 is gone
     (its brackets left), and some hang off one end.
   - A perished rubber base along the foot of the walls.
-  - Ward doors with wired-glass vision panels and C-1xx number plates. These are part 1's old "doorways that go nowhere"
+  - Steel service doors with wired-glass vision panels and S-numbered plates. These are part 1's old "doorways that go nowhere"
     plus about one bay in four in part 2.
   - Red fire cabinets: glass gone or cracked, some extinguishers missing, the glass on the floor.
-  - Enamel signs, some on flag brackets so they read down the hall: WARD C, RADIOLOGY, ISOLATION, PATHOLOGY, NO
+  - Enamel signs, some on flag brackets so they read down the hall: NO ENTRY, BOILER ROOM, KEEP CLEAR, FIRE EXIT, NO
     ADMITTANCE and so on.
   - Tide, scuff, mould, peel, crack and streak decals by rule along both walls, with a floor stain now and then.
 - **The floor strips are kept** (`assets/shaders/old_strip_light.gdshader`). Each segment has its own brightness and a

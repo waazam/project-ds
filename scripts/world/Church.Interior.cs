@@ -263,9 +263,20 @@ public partial class Church
 			l.Beam(new Vector3(Mathf.Cos(a0) * 0.08f, 0.38f, Mathf.Sin(a0) * 0.08f * 0.3f), new Vector3(Mathf.Cos(a1) * 0.08f, 0.38f, Mathf.Sin(a1) * 0.08f * 0.3f), 0.015f, 0.015f);
 		}
 		// the chain down the side to a staple in the stone, and the padlock
-		for (int i = 0; i < 6; i++) l.Box(new Vector3(0.12f + i * 0.1f, 0.3f - i * 0.07f, 0), new Vector3(0.06f, 0.02f, 0.04f));
-		l.Box(new Vector3(0.74f, -0.14f, 0), new Vector3(0.1f, 0.12f, 0.05f));
-		l.Cylinder(new Vector3(0.74f, -0.06f, -0.03f), new Vector3(0.74f, -0.06f, 0.03f), 0.035f, 0.035f, 8, false);
+		// (2026-10-15: round links, each turned across the last, and a padlock with a rounded body and a shackle; they
+		// were six flat bars and a box)
+		Vector3 dir = new Vector3(0.1f, -0.07f, 0).Normalized();
+		for (int i = 0; i < 7; i++)
+		{
+			Vector3 c = new Vector3(0.12f, 0.3f, 0) + dir * (i * 0.105f);
+			var ax = i % 2 == 0 ? Vector3.Back : dir.Cross(Vector3.Back).Normalized();
+			var b = new Basis(ax.Cross(dir).Normalized(), dir, ax);
+			l.Xf = new Transform3D(b * Basis.FromScale(new Vector3(1f, 1.5f, 1f)), c);
+			ItemMeshes.Torus(l, Vector3.Zero, Vector3.Back, 0.03f, 0.008f, 10, 4);
+			l.Xf = Transform3D.Identity;
+		}
+		l.BevelBox(new Vector3(0.74f, -0.15f, 0), new Vector3(0.1f, 0.11f, 0.045f), 0.012f);
+		ItemMeshes.Torus(l, new Vector3(0.74f, -0.085f, 0), Vector3.Back, 0.032f, 0.008f, 10, 4);
 		l.CommitTo(_fontLid, "Lid", true);
 		_fontUse = new PickupInteractable
 		{
@@ -290,22 +301,26 @@ public partial class Church
 			k.Mat(brass);
 			k.Color = new Color(0.8f, 0.62f, 0.34f);
 			// three clawed feet, a stem with knops, a wide drip pan, a pricket
+			// (2026-10-15, the props pass: three legs curving down from the boss to paw feet, a turned stem with its knops
+			// and collars, a dished drip pan, the candle burnt down a little, wax run over its side; the legs were square bars
+			// and lumps, the stem plain tubes and discs)
 			for (int f = 0; f < 3; f++)
 			{
 				float a = Mathf.Tau * f / 3f;
 				Vector3 d = new(Mathf.Cos(a), 0, Mathf.Sin(a));
-				k.Beam(at + Vector3.Up * 0.25f, at + d * 0.34f + Vector3.Up * 0.02f, 0.06f, 0.05f);
-				k.Blob(at + d * 0.36f + Vector3.Up * 0.04f, new Vector3(0.05f, 0.04f, 0.05f), i * 3 + f, 0.1f);
+				TurnedKit.Rod(k, TurnedKit.Curve(at + Vector3.Up * 0.26f + d * 0.05f, at + d * 0.3f + Vector3.Up * 0.24f, at + d * 0.35f + Vector3.Up * 0.05f, 8), 0.024f, 7, true);
+				TurnedKit.Lathe(k, at + d * 0.36f, TurnedKit.P(0f, 0f, 0.04f, 0f, 0.046f, 0.02f, 0.036f, 0.045f, 0.022f, 0.06f, 0f, 0.062f), 8, 50f, 1.15f, 1f, -a);
 			}
-			k.Cylinder(at + Vector3.Up * 0.2f, at + Vector3.Up * 0.34f, 0.1f, 0.05f, 10, true);
-			k.Cylinder(at + Vector3.Up * 0.34f, at + Vector3.Up * 1.62f, 0.032f, 0.026f, 10, false);
-			foreach (float y in new[] { 0.62f, 1.05f, 1.42f }) k.Cylinder(at + Vector3.Up * (y - 0.05f), at + Vector3.Up * (y + 0.05f), 0.06f, 0.06f, 10, true);
-			k.Cylinder(at + Vector3.Up * 1.62f, at + Vector3.Up * 1.68f, 0.03f, 0.16f, 12, true);
-			k.Cylinder(at + Vector3.Up * 1.68f, at + Vector3.Up * 1.72f, 0.17f, 0.17f, 12, true);
+			var stem = new List<Vector2>(TurnedKit.P(0f, 0.2f, 0.1f, 0.2f, 0.11f, 0.23f, 0.09f, 0.28f, 0.05f, 0.32f, 0.034f, 0.36f));
+			foreach (float y in new[] { 0.62f, 1.05f, 1.42f })
+				stem.AddRange(TurnedKit.P(0.03f, y - 0.07f, 0.042f, y - 0.05f, 0.064f, y - 0.02f, 0.066f, y, 0.064f, y + 0.02f, 0.042f, y + 0.05f, 0.03f, y + 0.07f));
+			stem.AddRange(TurnedKit.P(0.026f, 1.58f, 0.04f, 1.61f, 0.045f, 1.64f, 0.16f, 1.68f, 0.175f, 1.7f, 0.17f, 1.725f, 0.14f, 1.715f, 0.07f, 1.712f, 0f, 1.715f));
+			TurnedKit.Lathe(k, at, stem, 12, 40f);
 			k.Mat(wax);
 			k.Color = Colors.White;
-			k.Cylinder(at + Vector3.Up * 1.72f, at + Vector3.Up * 2.1f, 0.065f, 0.062f, 12, true);
+			TurnedKit.Lathe(k, at + Vector3.Up * 1.712f, TurnedKit.P(0f, 0f, 0.07f, 0f, 0.068f, 0.012f, 0.065f, 0.03f, 0.063f, 0.38f, 0.054f, 0.388f, 0.03f, 0.382f, 0f, 0.384f), 12, 40f);
 			k.Blob(at + Vector3.Up * 1.73f + new Vector3(0.06f, 0, 0.02f), new Vector3(0.03f, 0.02f, 0.03f), i, 0.2f);   // a run of wax
+			TurnedKit.Rod(k, new[] { at + new Vector3(0.05f, 2.09f, 0.035f), at + new Vector3(0.058f, 1.98f, 0.04f), at + new Vector3(0.06f, 1.85f, 0.042f) }, 0.007f, 4, true);
 			k.CommitTo(this, $"Candle{i + 1}", true);
 			_stone.AddChild(new CollisionShape3D { Position = at + Vector3.Up * 1f, Shape = new CylinderShape3D { Radius = 0.3f, Height = 2f } });
 			// the flame (unlit until the lighter touches it)

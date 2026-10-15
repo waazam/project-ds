@@ -5,11 +5,11 @@ using Godot;
 namespace ProjectDS.World.HallwayParts;
 
 /// <summary>
-/// (2026-10-14h, the old-and-abandoned pass) Act 15's hall as an old hospital corridor: its materials. The walls are
-/// <c>hospital_wall.gdshader</c> (two-tone paint on block, chipped, stained); here are the floor's vinyl tile, the doors'
+/// (2026-10-14h, the old-and-abandoned pass) Act 15's hall as an old institutional service corridor: its materials. The walls are
+/// <c>corridor_wall.gdshader</c> (two-tone paint on block, chipped, stained); here are the floor's vinyl tile, the doors'
 /// wired glass, the rail, the extinguisher cabinets' red, the signs' enamel, and the floor strips' housings.
 /// </summary>
-public static class HospitalTextures
+public static class CorridorTextures
 {
 	private static readonly Dictionary<string, Texture2D> _tex = new();
 
@@ -17,7 +17,7 @@ public static class HospitalTextures
 	{
 		if (_tex.TryGetValue(key, out var t)) return t;
 		var tg = Systems.TexGen.Start();
-		Image img = Systems.TexCache.Load("Hospital_" + key);
+		Image img = Systems.TexCache.Load("Corridor_" + key);
 		if (img == null)
 		{
 			img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
@@ -25,7 +25,7 @@ public static class HospitalTextures
 				for (int x = 0; x < w; x++)
 					img.SetPixel(x, y, f(x, y));
 			img.GenerateMipmaps();
-			Systems.TexCache.Save("Hospital_" + key, img);
+			Systems.TexCache.Save("Corridor_" + key, img);
 		}
 		t = ImageTexture.CreateFromImage(img);
 		Systems.TexGen.Stop(tg);
@@ -125,10 +125,10 @@ public static class HospitalTextures
 		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	};
 
-	/// <summary>The ward doors: old institutional paint over steel, its rust coming through.</summary>
+	/// <summary>The service doors: old institutional paint over steel, its rust coming through.</summary>
 	public static StandardMaterial3D DoorMat => _door ??= SurfaceSets.Scan(new StandardMaterial3D
 	{
-		ResourceName = "hw_ward_door", Roughness = 0.8f, MetallicSpecular = 0.35f, VertexColorUseAsAlbedo = true,
+		ResourceName = "hw_service_door", Roughness = 0.8f, MetallicSpecular = 0.35f, VertexColorUseAsAlbedo = true,
 		Uv1Triplanar = true, Uv1WorldTriplanar = false, Uv1TriplanarSharpness = 8f, Uv1Scale = Vector3.One * 1.3f,
 	}, "rusty_metal_02", 1f, 0.8f, new Color(0.46f, 0.5f, 0.44f));
 
