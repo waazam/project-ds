@@ -174,8 +174,20 @@ public partial class Stairwell
 		}
 		junk.CommitTo(this, "Wreckage", true);
 
-		// a little light: a cold glow far down the passage, as if something is lit round the corner
-		AddChild(new OmniLight3D { Name = "FarGlow", Position = new Vector3(0, y + 1.8f, half + 7.5f), LightColor = new Color(0.4f, 0.9f, 0.5f), LightEnergy = 0.7f, OmniRange = 7f, ShadowEnabled = false });
+		// a little light far down the passage, as if something is lit round the corner
+		// (2026-10-14h, the old-and-abandoned pass: one old caged bulb on the passage's ceiling, warm and failing, dropping
+		// out now and then; it was a green glow from nowhere, the doorway lit like a sign)
+		var hanger = new MeshKit();
+		hanger.Mat(FailingBulb.Materials.Wire);
+		hanger.Color = Colors.White;
+		hanger.Cylinder(new Vector3(0, y + 2.4f, half + 7.2f), new Vector3(0, y + 2.18f, half + 7.2f), 0.008f, 0.008f, 4, false);
+		hanger.Cylinder(new Vector3(0, y + 2.4f, half + 7.2f), new Vector3(0, y + 2.39f, half + 7.2f), 0.05f, 0.05f, 8, true);
+		hanger.CommitTo(this, "FarGlowHanger", false);
+		AddChild(new FailingBulb
+		{
+			Name = "FarGlow", Position = new Vector3(0, y + 2.08f, half + 7.2f), State = FailingBulb.Mode.Flicker, Seed = 1414,
+			LightColor = new Color(1f, 0.68f, 0.38f), Energy = 0.75f, Range = 7f, Attenuation = 1.1f, ActiveRange = 45f,
+		});
 		AddChild(new OmniLight3D { Name = "ChamberDim", Position = new Vector3(0, y + 5f, 0), LightColor = new Color(0.45f, 0.5f, 0.6f), LightEnergy = 0.25f, OmniRange = 9f, ShadowEnabled = false });
 	}
 

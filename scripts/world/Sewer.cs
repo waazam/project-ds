@@ -524,20 +524,74 @@ public partial class Sewer : Node3D
 		// five down the pipe now, brighter and further-reaching (were two, 0.6 at 7 m)
 		foreach (float z in new[] { 10f, 28f, 46f, 64f, 84f })
 			AddLamp(new Vector3(0, PipeCy + 1.3f, z), 1.6f, 13f);
+		_lampArms.CommitTo(this, "LampArms", false);
 		AddChild(new OmniLight3D { Name = "FarPipeGlow", Position = new Vector3(0, 3.2f, RoomZ1 - 1f), LightColor = new Color(1f, 0.95f, 0.85f), LightEnergy = 0.8f, OmniRange = 5f, ShadowEnabled = false });
+		BuildGrate();
 	}
+
+	/// <summary>(2026-10-14h) The old lamps: caged bulbs on brackets (on the walls) or on a stalk (from the pipe's crown).
+	/// One in the pipe flickers; they all brown out, and some die, at the second no (<c>Sewer.Hole.cs</c>).</summary>
+	private readonly List<FailingBulb> _bulbs = new();
+	private readonly MeshKit _lampArms = new MeshKit().Mat(FailingBulb.Materials.Wire);
 
 	private void AddLamp(Vector3 at, float energy, float range)
 	{
-		var l = new OmniLight3D { Position = at, LightColor = new Color(1f, 0.62f, 0.3f), LightEnergy = energy, OmniRange = range, OmniAttenuation = 1.2f, ShadowEnabled = false };
-		AddChild(l);
-		_lamps.Add(l);
+		int i = _bulbs.Count;
+		var b = new FailingBulb
+		{
+			Name = $"Lamp{i}", Position = at, Seed = 1700 + i, LightColor = new Color(1f, 0.62f, 0.3f), Energy = energy, Range = range, Attenuation = 1.2f,
+			Radius = 0.065f, ActiveRange = 90f, State = i == 9 ? FailingBulb.Mode.Flicker : FailingBulb.Mode.Steady,
+		};
+		AddChild(b);
+		_bulbs.Add(b);
+		// its fitting: back to the wall it's by, or up to the pipe's crown
+		_lampArms.Color = Colors.White;
+		Vector3 wall = Mathf.Abs(at.X) > RoomX - 1f ? new Vector3(Mathf.Sign(at.X) * RoomX, at.Y, at.Z)
+			: at.Z < RoomZ0 + 1f && at.Z > RoomZ0 - 0.5f ? new Vector3(at.X, at.Y, RoomZ0) : at.Z > RoomZ1 - 1f ? new Vector3(at.X, at.Y, RoomZ1)
+			: new Vector3(at.X, PipeCy + PipeR, at.Z);
+		Vector3 top = at + Vector3.Up * 0.16f;
+		if (wall.Y > at.Y + 0.1f) _lampArms.Cylinder(top, wall, 0.012f, 0.012f, 5, false);
+		else { _lampArms.Cylinder(top, wall + Vector3.Up * 0.16f, 0.014f, 0.014f, 5, false); BuildKit.Box(_lampArms, wall + Vector3.Up * 0.16f, new Vector3(0.12f, 0.16f, 0.12f)); }
+	}
+
+	/// <summary>(2026-10-14h) The far side of the cistern, high in a vault: a street grate, and a little grey light through
+	/// it, a faint grey pool on the water far off. A shape in the black, not a light to see by.</summary>
+	private void BuildGrate()
+	{
+		Vector3 c = new(11f, Spring + 5.5f - 0.12f, RoomZ1 - 10f);
+		var g = new MeshKit();
+		g.Mat(SewerTextures.PipeMat);
+		g.Color = Colors.White * 0.5f;
+		const float half = 0.55f;
+		foreach (float s in new[] { -1f, 1f })
+		{
+			BuildKit.Box(g, c + new Vector3(s * half, -0.03f, 0), new Vector3(0.08f, 0.12f, half * 2f + 0.08f));
+			BuildKit.Box(g, c + new Vector3(0, -0.03f, s * half), new Vector3(half * 2f, 0.12f, 0.08f));
+		}
+		for (int i = -3; i <= 3; i++)
+			BuildKit.Box(g, c + new Vector3(i * 0.15f, -0.03f, 0), new Vector3(0.035f, 0.1f, half * 2f));
+		g.CommitTo(this, "Grate", true);
+		// what's beyond it: the night, a dirty grey, barely
 		AddChild(new MeshInstance3D
 		{
-			Mesh = new SphereMesh { Radius = 0.07f, Height = 0.14f }, Position = at,
-			MaterialOverride = StationParts.StationTextures.Glow("sw_sodium", new Color(1f, 0.62f, 0.3f), 2f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			Name = "GrateSky", Mesh = new PlaneMesh { Size = new Vector2(half * 2f, half * 2f) }, Position = c + Vector3.Up * 0.06f, Rotation = new Vector3(Mathf.Pi, 0, 0),
+			MaterialOverride = new StandardMaterial3D
+			{
+				ResourceName = "sewer_grate_sky", AlbedoColor = new Color(0.05f, 0.055f, 0.06f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+				EmissionEnabled = true, Emission = new Color(0.4f, 0.44f, 0.5f), EmissionEnergyMultiplier = 2.5f,
+			},
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
+		_grateLight = new SpotLight3D
+		{
+			Name = "GrateLight", Position = c + Vector3.Up * 0.04f, Rotation = new Vector3(-Mathf.Pi * 0.5f, 0, 0.08f),
+			LightColor = new Color(0.58f, 0.64f, 0.74f), LightEnergy = 14f, SpotRange = 24f, SpotAngle = 14f, SpotAttenuation = 0.45f,
+			ShadowEnabled = false, LightVolumetricFogEnergy = 0.5f,
+		};
+		AddChild(_grateLight);
 	}
+
+	private SpotLight3D _grateLight;
 
 	// ------------------------------------------------------------------ per frame
 
@@ -612,6 +666,7 @@ public partial class Sewer : Node3D
 			else if (_drip.VolumeDb <= -79f && _drip.Playing) _drip.Stop();
 		}
 		ProcessWhispers(player, dt);
+		ProcessBrownOut(dt);
 	}
 
 	/// <summary>How much the water slows the player (a fraction of their speed).</summary>

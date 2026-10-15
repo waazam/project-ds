@@ -73,8 +73,11 @@ public partial class Act15Hallway : Node3D
 	private Interactable _doorUse;
 	private AudioStreamPlayer _hum;
 	private readonly RandomNumberGenerator _rng = new();
-	private static readonly Color Green = new(0.3f, 1f, 0.42f), Red = new(1f, 0.07f, 0.04f);
-	private static readonly Color FogGreen = new(0.01f, 0.035f, 0.016f), FogRed = new(0.045f, 0.004f, 0.004f);
+	// (2026-10-14h, the old-and-abandoned pass: the same green and red, meaning the same thing at the same moments, a step
+	// less neon: an old lamp's green, not a laser's; and the air a dirty dim haze with only a breath of green in it, the
+	// red still swinging it dark red)
+	private static readonly Color Green = new(0.4f, 0.95f, 0.42f), Red = new(1f, 0.1f, 0.05f);
+	private static readonly Color FogGreen = new(0.017f, 0.024f, 0.016f), FogRed = new(0.045f, 0.006f, 0.004f);
 
 	public override void _Ready() => Callable.From(Build).CallDeferred();
 
@@ -120,13 +123,13 @@ public partial class Act15Hallway : Node3D
 		body.SetMeta("surface", "stone");
 		AddChild(body);
 		var wall = new MeshKit();
-		// (the walls in concrete that doesn't repeat down its kilometre: two baked sets blended, pours of different tones,
-		// water down from the top, grime at the foot; 2026-10-09)
-		wall.Mat(SurfaceSets.VariedConcrete("hw_wall", 0.3f, GlobalPosition.Y + H1, GlobalPosition.Y, null, 0.8f, 20f));
+		// (2026-10-14h, the old-and-abandoned pass: an old hospital corridor's painted block, two-tone at a dado line,
+		// chipped, scuffed, water-stained; it was smooth concrete, and its second set smeared along the tall walls in lines)
+		wall.Mat(HallWallMat(GlobalPosition.Y));
 		var dark = new MeshKit();
-		dark.Mat(SurfaceSets.Apply(Concrete("hw_floor", StairwellTextures.GrimeConcrete, 0.4f), "concrete_b", 0.8f));
-		var black = new MeshKit();
-		black.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.01f, 0.01f, 0.01f), Roughness = 1f });
+		// (the floor: old vinyl tile, weathered by the kit; it was the stairwell's grimy concrete)
+		dark.Mat(RoomSurface.Of(HospitalTextures.FloorMat, RoomSurface.Concrete with { Streaks = 0f, Tide = 0f, FloorDirt = 0.8f, Wear = 0.7f }, 15));
+		_doors.Clear();
 		void Box(MeshKit k, Vector3 c, Vector3 s, Basis? rot = null, bool collide = true, float tint = 1f)
 		{
 			k.Color = Colors.White * tint;
@@ -151,16 +154,14 @@ public partial class Act15Hallway : Node3D
 		foreach (float y in new[] { 3.2f, 9.5f, 16f })
 			foreach (float s in new[] { -1f, 1f })
 				Box(wall, new Vector3(s * (W1 * 0.5f - 0.05f), y, Part1 * 0.5f), new Vector3(0.1f, 0.12f, Part1), null, false, 0.7f);
-		// dark doorways in the walls that go nowhere
+		// doors in the walls that go nowhere
+		// (2026-10-14h: old ward doors, shut, a wired-glass panel in each, dark behind; they were black openings. The two
+		// draws a door takes from the hall's dice are as they were, in the same order: red light, green light comes after)
 		for (float z = 23f; z < Part1 - 10f; z += _rng.RandfRange(28f, 46f))
 		{
 			float s = _rng.Randf() < 0.5f ? -1f : 1f;
-			Box(black, new Vector3(s * (W1 * 0.5f - 0.005f), 1.2f, z), new Vector3(0.02f, 2.3f, 1.0f), null, false);
-			Box(wall, new Vector3(s * (W1 * 0.5f - 0.06f), 2.4f, z), new Vector3(0.14f, 0.12f, 1.25f), null, false, 0.8f);
-			// (2026-10-14c) a reveal round it, the black set back in the wall's thickness: it was a black card on the face
-			foreach (float e in new[] { -1f, 1f })
-				Box(wall, new Vector3(s * (W1 * 0.5f - 0.035f), 1.17f, z + e * 0.535f), new Vector3(0.07f, 2.34f, 0.07f), null, false, 0.72f);
-			Box(wall, new Vector3(s * (W1 * 0.5f - 0.03f), 0.015f, z), new Vector3(0.06f, 0.03f, 1.0f), null, false, 0.6f);
+			// (between two pilasters: they're every 6 m from 3 m)
+			_doors.Add((s, Mathf.Round(z / 6f) * 6f, W1 * 0.5f));
 		}
 
 		// the taper: the walls lean apart and the ceiling climbs
@@ -200,10 +201,10 @@ public partial class Act15Hallway : Node3D
 		Box(wall, new Vector3(0, (H2 + 2.15f) * 0.5f, End + 0.1f), new Vector3(DoorWidth, H2 - 2.15f, 0.2f), null, true, 0.8f);
 		wall.CommitTo(this, "Walls", true);
 		dark.CommitTo(this, "Floor", true);
-		black.CommitTo(this, "Doorways", false);
 
 		BuildStrips();
 		BuildLights();
+		BuildDressing(body);
 		BuildCloset(body);
 
 		_shadow = new ShadowMan { Name = "ShadowMan" };
@@ -230,52 +231,124 @@ public partial class Act15Hallway : Node3D
 		// a kilometre of corridor: a tunnel, every sound running away down it and coming back
 		AudioDirector.Zone(this, new Vector3(0, H2 * 0.5f, End * 0.5f), new Vector3(W2 + 0.4f, H2, End + 2f), AudioDirector.Space.Tunnel, "HallwayVerb");
 		GD.Print($"[story] Act 15: the hallway - {End:0} m to the closet door, the shadow man at {ShadowZ:0} m");
+		// (2026-10-14h) the hall's dice once it's built: red light, green light's timings all come after this, so a dressing
+		// pass that leaves this number alone has left the game alone
+		GD.Print($"[rlgl] hall dice after build: state {_rng.State}");
 	}
 
-	/// <summary>The strip lights in the floor, down both sides, three thin bars to a segment.</summary>
+	/// <summary>The strip lights in the floor, down both sides, three thin bars to a segment.
+	/// (2026-10-14h, the old-and-abandoned pass; Dan: keep them, but an old haunted hospital's) Each segment its own:
+	/// its diffuser yellowed, grime lying over it, some dimmer than the next, a run of them here and there burnt out,
+	/// a few sagging and buzzing on their own time, a lens cracked and lying askew. Their colour and level are still
+	/// the hall's, red light, green light's (<see cref="SyncStrips"/>): the dirt is drawn over the signal, never instead of it.</summary>
 	private void BuildStrips()
 	{
-		var s1 = new MeshKit();
-		s1.Mat(Glow(new Color(0.25f, 0.8f, 0.35f), 1.1f));
-		var s2 = new MeshKit();
+		// (what red light, green light writes its colour and level to: kept as they were, read each frame by SyncStrips)
 		_stripMat2 = Glow(Green, 1.3f);
-		s2.Mat(_stripMat2);
-		s1.Color = s2.Color = Colors.White;
-		// (2026-10-14c) each segment's bars sit in a low steel channel let into the floor, scuffed at its ends: they lay on
-		// the bare concrete like glowing sticks
+		_centreMat = Glow(Green, 1.2f);
+		_strip1 = StripMat("hw_strips1", new Color(0.38f, 0.82f, 0.4f), 1.7f);
+		_strip2 = StripMat("hw_strips2", Green, 2.1f);
+		_stripC = StripMat("hw_strips_centre", Green, 1.9f);
+		var s1 = new MeshKit();
+		s1.Mat(_strip1);
+		var s2 = new MeshKit();
+		s2.Mat(_strip2);
+		// (2026-10-14c) each segment's bars sit in a low steel channel let into the floor, scuffed at its ends
 		var housing = new MeshKit();
-		housing.Mat(new StandardMaterial3D { ResourceName = "hw_strip_channel", AlbedoColor = new Color(0.07f, 0.07f, 0.065f), Metallic = 0.6f, Roughness = 0.55f, VertexColorUseAsAlbedo = true });
+		housing.Mat(HospitalTextures.ChannelMat);
 		housing.Color = Colors.White;
-		void Strip(MeshKit k, float x, float z)
+		var shards = new MeshKit();
+		shards.Mat(HospitalTextures.ShardMat);
+		shards.Color = Colors.White;
+		// (their wear: their own dice, not the hall's)
+		var wr = new RandomNumberGenerator { Seed = 151514 };
+		var deadRun = new Dictionary<float, int>();
+		Color Wear(float side, bool dying = false)
 		{
+			// a run of them burnt out together now and then; otherwise each its own brightness
+			deadRun.TryGetValue(side, out int run);
+			if (run == 0 && wr.Randf() < 0.025f) run = wr.RandiRange(2, 6);
+			float bright = wr.RandfRange(0.45f, 1f);
+			float fail = 0f;
+			if (run > 0) { run--; bright = wr.RandfRange(0.0f, 0.05f); }
+			else if (dying) bright = wr.RandfRange(0.03f, 0.08f);
+			else if (wr.Randf() < 0.05f) { bright = wr.RandfRange(0.01f, 0.06f); }
+			else if (wr.Randf() < 0.06f) fail = wr.RandfRange(0.05f, 1f);
+			deadRun[side] = run;
+			return new Color(bright, fail, wr.RandfRange(0.25f, 1f), 1f);
+		}
+		void Strip(MeshKit k, float x, float z, Color wear)
+		{
+			k.Color = wear;
 			for (int b = -1; b <= 1; b++)
 				BuildKit.Box(k, new Vector3(x + b * 0.06f, 0.006f, z), new Vector3(0.03f, 0.012f, 0.75f));
+			housing.Color = Colors.White * wr.RandfRange(0.7f, 1.1f);
 			BuildKit.Box(housing, new Vector3(x, 0.005f, z), new Vector3(0.21f, 0.01f, 0.82f), 1f, BuildKit.Face.NY);
+			// a cracked lens: a piece of it lying askew over the bars, dimming them under it
+			if (wr.Randf() < 0.07f)
+			{
+				float len = wr.RandfRange(0.12f, 0.4f), dz = wr.RandfRange(-0.3f, 0.3f);
+				var rot = new Basis(Vector3.Up, wr.RandfRange(-0.5f, 0.5f)) * new Basis(Vector3.Forward, wr.RandfRange(-0.12f, 0.12f));
+				shards.Color = Colors.White * wr.RandfRange(0.6f, 1f);
+				BuildKit.Box(shards, new Vector3(x + wr.RandfRange(-0.03f, 0.03f), 0.016f, z + dz), new Vector3(0.17f, 0.004f, len), 1f, BuildKit.Face.NY, rot);
+			}
 		}
 		for (float z = 1f; z < Part1 + Taper; z += 1f)
 		{
 			float w = z < Part1 ? W1 : Mathf.Lerp(W1, W2, (z - Part1) / Taper);
-			foreach (float s in new[] { -1f, 1f }) Strip(s1, s * (w * 0.5f - 0.22f), z);
+			foreach (float s in new[] { -1f, 1f }) Strip(s1, s * (w * 0.5f - 0.22f), z, Wear(s));
 		}
 		for (float z = Part1 + Taper; z < End - 0.5f; z += 1f)
-			foreach (float s in new[] { -1f, 1f }) Strip(s2, s * (W2 * 0.5f - 0.5f), z);
+			foreach (float s in new[] { -1f, 1f }) Strip(s2, s * (W2 * 0.5f - 0.5f), z, Wear(s + 10f));
 		s1.CommitTo(this, "Strips1", false);
 		s2.CommitTo(this, "Strips2", false);
 		// (the owner) a row down the middle too, going bad: the whole row dips now and then, and here and there a
-		// segment has all but died
+		// segment has all but died (which ones: the same dice as before)
 		var c1 = new MeshKit();
-		_centreMat = Glow(Green, 1.2f);
-		c1.Mat(_centreMat);
-		c1.Color = Colors.White;
-		var c2 = new MeshKit();
-		c2.Mat(Glow(new Color(0.1f, 0.32f, 0.14f), 0.22f));
-		c2.Color = Colors.White;
+		c1.Mat(_stripC);
 		var rng = new RandomNumberGenerator { Seed = 1515 };
 		for (float z = 1.5f; z < End - 0.5f; z += 1f)
-			Strip(rng.Randf() < 0.09f ? c2 : c1, 0f, z);
+			Strip(c1, 0f, z, Wear(0f, rng.Randf() < 0.09f));
 		c1.CommitTo(this, "StripsCentre", false);
-		c2.CommitTo(this, "StripsCentreDead", false);
 		housing.CommitTo(this, "StripChannels", false);
+		shards.CommitTo(this, "StripShards", false);
+		SyncStrips();
+		// (and again just before every frame is drawn, after everything has run: a change of light shows on the frame it happens)
+		RenderingServer.FramePreDraw += SyncStrips;
+	}
+
+	private ShaderMaterial _strip1, _strip2, _stripC;
+
+	public override void _ExitTree()
+	{
+		if (_strip2 != null) RenderingServer.FramePreDraw -= SyncStrips;
+	}
+	private static Shader _stripShader;
+
+	private static ShaderMaterial StripMat(string name, Color c, float energy)
+	{
+		_stripShader ??= GD.Load<Shader>("res://assets/shaders/old_strip_light.gdshader");
+		var m = new ShaderMaterial { Shader = _stripShader, ResourceName = name };
+		m.SetShaderParameter("signal_color", c);
+		m.SetShaderParameter("level", 1f);
+		m.SetShaderParameter("energy", energy);
+		m.SetShaderParameter("noise_tex", RoomSurface.Noise);
+		return m;
+	}
+
+	/// <summary>The strips' signal, from what red light, green light last set (<c>SetLights</c>) and the centre row's dips.</summary>
+	private void SyncStrips()
+	{
+		if (_strip2 == null) return;
+		float flick = (GameSettings.Instance?.ReduceFlashing ?? false) ? 0f : 1f;
+		_strip2.SetShaderParameter("signal_color", _stripMat2.Emission);
+		_strip2.SetShaderParameter("level", _stripMat2.EmissionEnergyMultiplier / 1.3f);
+		_strip2.SetShaderParameter("flicker_ok", flick);
+		// (the centre row from the phase's own colour and level and its dip: the same as its carrier gets, a frame sooner)
+		_stripC.SetShaderParameter("signal_color", _centreColor);
+		_stripC.SetShaderParameter("level", Mathf.Max(0.15f, _centreLevel) * _centreDip);
+		_stripC.SetShaderParameter("flicker_ok", flick);
+		_strip1.SetShaderParameter("flicker_ok", flick);
 	}
 
 	/// <summary>The centre row's failing: every few seconds a soft dip (down to a third and back over a quarter of a
@@ -301,36 +374,69 @@ public partial class Act15Hallway : Node3D
 		_centreMat.AlbedoColor = _centreColor * level * Mathf.Lerp(0.55f, 1f, _centreDip);
 		_centreMat.Emission = _centreColor;
 		_centreMat.EmissionEnergyMultiplier = 1.2f * level * _centreDip;
+		SyncStrips();
 	}
 
-	/// <summary>Part 1: a few weak green lights high up, and a stronger glow where the hall opens out
-	/// (the green seen from far off). Part 2: dome lamps hanging on long cables out of the dark.</summary>
+	/// <summary>Part 1: a few weak lights on the walls, and a stronger glow where the hall opens out (the green seen
+	/// from far off). Part 2: dome lamps hanging on long cables out of the dark.
+	/// (2026-10-14h) Part 1's were green omnis floating in the air; now old caged bulbs on brackets, warm, going bad:
+	/// one steady, one flickering, one buzzing, some dead.</summary>
 	private void BuildLights()
 	{
-		for (float z = 20f; z < Part1; z += 30f)
-			AddChild(new OmniLight3D
+		var bracket = new MeshKit();
+		bracket.Mat(HospitalTextures.ChannelMat);
+		bracket.Color = Colors.White * 0.8f;
+		FailingBulb.Mode[] modes = { FailingBulb.Mode.Steady, FailingBulb.Mode.Flicker, FailingBulb.Mode.Dead, FailingBulb.Mode.Steady, FailingBulb.Mode.Buzz, FailingBulb.Mode.Dead, FailingBulb.Mode.Steady };
+		int bi = 0;
+		for (float z = 12f; z < Part1 - 4f; z += 18f, bi++)
+		{
+			float s = bi % 2 == 0 ? -1f : 1f, wx = s * W1 * 0.5f;
+			// between two pilasters, under the first ledge
+			float zc = Mathf.Round(z / 6f) * 6f;
+			Vector3 at = new(wx - s * 0.2f, 2.78f, zc);
+			bracket.Cylinder(new Vector3(wx, 2.95f, zc), at + Vector3.Up * 0.13f, 0.012f, 0.012f, 5, false);
+			BuildKit.Box(bracket, new Vector3(wx - s * 0.008f, 2.95f, zc), new Vector3(0.016f, 0.12f, 0.1f));
+			var b = new FailingBulb
 			{
-				Position = new Vector3(0, 4f, z), LightColor = new Color(0.35f, 0.9f, 0.45f), LightEnergy = 0.35f, OmniRange = 9f,
-				OmniAttenuation = 1.4f, ShadowEnabled = false, DistanceFadeEnabled = true, DistanceFadeBegin = 60f, DistanceFadeLength = 20f,
+				Name = $"WallBulb{bi}", Seed = 1500 + bi, State = modes[bi % modes.Length], LightColor = new Color(1f, 0.74f, 0.46f),
+				Energy = 0.5f, Range = 8f, Attenuation = 1.2f, ActiveRange = 50f, Position = at,
+			};
+			AddChild(b);
+		}
+		// one more on the wall just past where he first stands: the wall behind him lit, so he is a dark shape against it
+		{
+			float wx = -W2 * 0.5f, zc = ShadowZ + 3.2f;
+			Vector3 at = new(wx + 0.2f, 2.9f, zc);
+			bracket.Cylinder(new Vector3(wx, 3.07f, zc), at + Vector3.Up * 0.13f, 0.012f, 0.012f, 5, false);
+			BuildKit.Box(bracket, new Vector3(wx + 0.008f, 3.07f, zc), new Vector3(0.016f, 0.12f, 0.1f));
+			AddChild(new FailingBulb
+			{
+				Name = "WallBulbShadow", Seed = 1599, State = FailingBulb.Mode.Steady, LightColor = new Color(1f, 0.74f, 0.46f),
+				Energy = 0.7f, Range = 7f, Attenuation = 1.1f, ActiveRange = 50f, Position = at,
 			});
+		}
+		bracket.CommitTo(this, "WallBulbBrackets", false);
 		foreach (float z in new[] { Part1 + 4f, Part1 + 16f, Part1 + 28f })
-			AddChild(new OmniLight3D { Position = new Vector3(0, 6f, z), LightColor = Green, LightEnergy = 2.2f, OmniRange = 22f, ShadowEnabled = false });
+			AddChild(new OmniLight3D { Position = new Vector3(0, 6f, z), LightColor = new Color(0.45f, 0.85f, 0.48f), LightEnergy = 2.0f, OmniRange = 22f, ShadowEnabled = false });
 
 		_lampMat = Glow(Green, 3f);
 		var cable = new StandardMaterial3D { AlbedoColor = new Color(0.02f, 0.02f, 0.02f), Roughness = 0.6f };
-		var shade = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.14f, 0.12f), Metallic = 0.6f, Roughness = 0.45f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
 		var k = new MeshKit();
 		var lk = new MeshKit();
 		k.Mat(cable); k.Color = Colors.White;
 		var sk = new MeshKit();
-		sk.Mat(shade); sk.Color = Colors.White;
+		// (2026-10-14h: old enamel shades, chipped to rust; they were a clean dark metal)
+		sk.Mat(HospitalTextures.LampShadeMat); sk.Color = Colors.White;
 		lk.Mat(_lampMat); lk.Color = Colors.White;
 		for (float z = Part1 + Taper + 5f; z < End - 3f; z += 10f)
 		{
 			float y = 5.2f + 0.6f * Mathf.Sin(z * 0.37f);
 			Vector3 at = new(0, y, z);
 			k.Cylinder(at, new Vector3(0, H2, z), 0.012f, 0.012f, 4, false);
+			sk.Color = Colors.White * (0.75f + 0.25f * Mathf.Abs(Mathf.Sin(z * 1.7f)));
 			sk.Cylinder(at + Vector3.Down * 0.02f, at + Vector3.Down * 0.32f, 0.08f, 0.42f, 12, false);
+			// the shade's rolled rim
+			sk.Cylinder(at + Vector3.Down * 0.31f, at + Vector3.Down * 0.34f, 0.43f, 0.43f, 12, false);
 			lk.Cylinder(at + Vector3.Down * 0.2f, at + Vector3.Down * 0.3f, 0.09f, 0.09f, 8, true);
 			var light = new OmniLight3D
 			{
@@ -352,12 +458,15 @@ public partial class Act15Hallway : Node3D
 		float z0 = End + 0.2f, z1 = End + 0.2f + ClosetDepth, h = 2.6f;
 		// (2026-10-14c: painted block walls, a worn concrete floor and a rubber base where they meet; the walls, floor and
 		// ceiling were all one pale board-marked concrete, its pits blown up to the size of coins)
+		// (2026-10-14h: weathered and baked by the interiors kit, drawn finely enough for the bake to show)
 		var k = new MeshKit();
-		k.Mat(ClosetWallMat);
+		k.Mat(RoomSurface.Of(ClosetWallMat, RoomSurface.Concrete with { Streaks = 0.6f, StreakLen = 1.2f }, 16));
 		k.Color = Colors.White;
 		var fk = new MeshKit();
-		fk.Mat(ClosetFloorMat);
+		fk.Mat(RoomSurface.Of(ClosetFloorMat, RoomSurface.Concrete with { FloorDirt = 0.8f }, 16));
 		fk.Color = Colors.White;
+		k.Tess = fk.Tess = 0.3f;
+		var closetShade = ClosetShade(z0, z1, h);
 		void Slab(MeshKit kit, Vector3 c, Vector3 s, float tint = 1f)
 		{
 			kit.Color = Colors.White * tint;
@@ -369,6 +478,9 @@ public partial class Act15Hallway : Node3D
 		Slab(k, new Vector3(0, h * 0.5f, z1 + 0.1f), new Vector3(ClosetHalf * 2f + 0.4f, h, 0.2f), 0.97f);
 		Slab(k, new Vector3(0, h + 0.1f, (z0 + z1) * 0.5f), new Vector3(ClosetHalf * 2f + 0.4f, 0.2f, ClosetDepth), 0.6f);
 		Slab(fk, new Vector3(0, -0.1f, (z0 + z1) * 0.5f), new Vector3(ClosetHalf * 2f + 0.4f, 0.2f, ClosetDepth + 0.2f));
+		k.Tess = fk.Tess = 0f;
+		closetShade.Apply(k);
+		closetShade.Apply(fk);
 		k.CommitTo(this, "Closet", true);
 		fk.CommitTo(this, "ClosetFloor", true);
 		// the black rubber base round the foot of the walls (not across the doorway)
@@ -385,12 +497,15 @@ public partial class Act15Hallway : Node3D
 		cove.CommitTo(this, "ClosetBase", false);
 		// the door's wall from inside: the same painted block (it was the hall's raw concrete), round the frame
 		var face = new MeshKit();
-		face.Mat(ClosetWallMat);
+		face.Mat(RoomSurface.Of(ClosetWallMat, RoomSurface.Concrete with { Streaks = 0.6f, StreakLen = 1.2f }, 16));
 		face.Color = Colors.White * 0.97f;
+		face.Tess = 0.3f;
 		float side = ClosetHalf - DoorWidth * 0.5f;
 		foreach (float s in new[] { -1f, 1f })
 			BuildKit.Box(face, new Vector3(s * (DoorWidth * 0.5f + side * 0.5f), h * 0.5f, z0 + 0.0035f), new Vector3(side, h, 0.005f));
 		BuildKit.Box(face, new Vector3(0, (h + 2.15f) * 0.5f, z0 + 0.0035f), new Vector3(DoorWidth, h - 2.15f, 0.005f));
+		face.Tess = 0f;
+		closetShade.Apply(face);
 		face.CommitTo(this, "ClosetDoorWall", true);
 		// shelves down both sides and the back, crowded with bottles, tins and rags
 		var sk = new MeshKit();
@@ -497,5 +612,6 @@ public partial class Act15Hallway : Node3D
 		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(ClosetHalf * 2f - 0.2f, 2f, ClosetDepth - 1.1f) },
 			new Vector3(0, 1f, z1 - (ClosetDepth - 1.1f) * 0.5f - 0.05f), OnInCloset, "ClosetInside");
 		BuildClosetAct16();
+		DecorateCloset(z0, z1, h);
 	}
 }

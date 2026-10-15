@@ -13,8 +13,9 @@ namespace ProjectDS.World;
 /// Saying no changes the room:
 /// <list type="bullet">
 /// <item>the first no: "come and see", whispered from one pipe mouth, then another, then another, round the room;</item>
-/// <item>the second: the light turns to a hazy teal that makes the room hard to see across, and the
-/// whispers multiply and don't stop;</item>
+/// <item>the second: the lamps brown out, dim and orange and stuttering, and die one by one; a brown murk comes up that
+/// makes the room hard to see across, and the whispers multiply and don't stop (2026-10-14h: it was a hazy teal; the
+/// property and the tests still call it <see cref="Teal"/>);</item>
 /// <item>after that, each no only brings them closer.</item>
 /// </list>
 /// </summary>
@@ -27,7 +28,7 @@ public partial class Sewer
 	public int Whispers { get; private set; }
 	public Interactable HoleUse => _holeUse;
 
-	private static readonly Color TealFog = new(0.05f, 0.2f, 0.19f);
+	private static readonly Color TealFog = new(0.075f, 0.05f, 0.028f);   // (the brown murk of the brown-out)
 	private static readonly string[] Takes = { "distant", "light", "medium", "loud" };
 	private Interactable _holeUse;
 	private bool _teal;
@@ -81,12 +82,50 @@ public partial class Sewer
 		else if (Noes == 2)
 		{
 			_teal = true;
-			foreach (var l in _lamps) { l.LightColor = new Color(0.35f, 0.9f, 0.85f); l.LightEnergy *= 0.6f; }
-			_holeLight.LightColor = new Color(0.45f, 0.95f, 0.9f);
-			_holeLight.LightEnergy = 2.5f;
+			_brownT = 0f;
+			_holeBase = _holeLight.LightEnergy;
 			_whisperT = 1.5f;
 		}
 		else _whisperT = 0.3f;
+	}
+
+	private float _brownT = -1f, _holeBase;
+	private float[] _deathAt, _vaultBase;
+	private readonly RandomNumberGenerator _brownRng = new() { Seed = 1771 };
+
+	/// <summary>(2026-10-14h) The second no's brown-out: every lamp sags to a dim, stuttering orange over a couple of
+	/// seconds and keeps sagging and swelling on its own time; nearly half of them, one by one over half a minute,
+	/// gutter and die. The light on the hole browns and dims with them (it stays on: the hole must still be found).</summary>
+	private void ProcessBrownOut(float dt)
+	{
+		if (_brownT < 0f) return;
+		_brownT += dt;
+		if (_deathAt == null)
+		{
+			_deathAt = new float[_bulbs.Count];
+			for (int i = 0; i < _deathAt.Length; i++) _deathAt[i] = _brownRng.Randf() < 0.45f ? _brownRng.RandfRange(2.5f, 32f) : -1f;
+			_vaultBase = new float[_lamps.Count];
+			for (int i = 0; i < _lamps.Count; i++) _vaultBase[i] = _lamps[i].LightEnergy;
+		}
+		float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, _brownT / 2.5f));
+		var sodium = new Color(1f, 0.62f, 0.3f);
+		var brown = new Color(1f, 0.4f, 0.13f);
+		for (int i = 0; i < _bulbs.Count; i++)
+		{
+			var b = _bulbs[i];
+			b.LightColor = sodium.Lerp(brown, u);
+			float sag = 0.32f + 0.14f * Mathf.Sin(_brownT * (0.7f + 0.13f * i) + i * 1.7f);
+			b.Level = Mathf.Lerp(1f, sag, u);
+			float d = _deathAt[i];
+			if (d >= 0f && _brownT > d) b.State = _brownT < d + 1.4f ? FailingBulb.Mode.Flicker : FailingBulb.Mode.Dead;
+		}
+		for (int i = 0; i < _lamps.Count; i++)
+		{
+			_lamps[i].LightColor = new Color(0.75f, 0.6f, 0.45f).Lerp(brown * 0.8f, u);
+			_lamps[i].LightEnergy = _vaultBase[i] * Mathf.Lerp(1f, 0.3f, u);
+		}
+		_holeLight.LightColor = new Color(0.85f, 0.88f, 0.92f).Lerp(new Color(0.8f, 0.56f, 0.34f), u);
+		_holeLight.LightEnergy = Mathf.Lerp(_holeBase, _holeBase * 0.62f, u);
 	}
 
 	/// <summary>The first no: one voice, going round the pipe mouths.</summary>

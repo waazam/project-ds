@@ -395,21 +395,33 @@ public partial class BossRoom : Node3D
 		for (int i = 0; i < kits.Length; i++) kits[i].CommitTo(this, $"Pipes{i}", true);
 		bracket.CommitTo(this, "Brackets", false);
 		cable.CommitTo(this, "Cables", false);
-		// red caged emergency lamps on the walls, dim
+		// caged work lamps on the walls, dim, old: one dead, one guttering, one buzzing
+		// (2026-10-14h, the old-and-abandoned pass: amber incandescents in wire cages on their arms; they were red
+		// emergency lamps, and with the red off the blood the whole pit read as a nightclub)
+		var arms = new MeshKit();
+		arms.Mat(BossTextures.Painted(new Color(0.2f, 0.19f, 0.17f), 0.6f, 0.4f));
+		arms.Color = Colors.White;
+		FailingBulb.Mode[] modes = { FailingBulb.Mode.Steady, FailingBulb.Mode.Dead, FailingBulb.Mode.Steady, FailingBulb.Mode.Flicker, FailingBulb.Mode.Steady, FailingBulb.Mode.Buzz, FailingBulb.Mode.Steady, FailingBulb.Mode.Steady };
+		int lamp = 0;
 		for (int w = 0; w < 4; w++)
 		{
 			var (o, along, inw) = Wall(w);
 			foreach (float s in new[] { -8f, 8f })
 			{
 				Vector3 at = o + along * s + inw * 1.1f + Vector3.Up * 2.4f;
-				AddChild(new OmniLight3D { Position = at + inw * 0.3f, LightColor = new Color(1f, 0.2f, 0.12f), LightEnergy = 0.45f, OmniRange = 6f, ShadowEnabled = false });
-				AddChild(new MeshInstance3D
+				// its arm back to the pipe rack, and a conduit up out of sight
+				arms.Cylinder(at + Vector3.Up * 0.14f, at + Vector3.Up * 0.14f - inw * 0.5f, 0.016f, 0.016f, 5, false);
+				arms.Cylinder(at + Vector3.Up * 0.14f - inw * 0.5f, at + Vector3.Up * 2.6f - inw * 0.5f, 0.012f, 0.012f, 4, false);
+				AddChild(new FailingBulb
 				{
-					Mesh = new SphereMesh { Radius = 0.06f, Height = 0.12f }, Position = at,
-					MaterialOverride = StationParts.StationTextures.Glow("bt_redlamp", new Color(1f, 0.2f, 0.12f), 2f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+					Name = $"WorkLamp{lamp}", Position = at, Seed = 1800 + lamp, State = modes[lamp % modes.Length], LightColor = new Color(1f, 0.62f, 0.3f),
+					Energy = 0.65f, Range = 7f, Attenuation = 1.1f, Radius = 0.055f, ActiveRange = 70f,
 				});
+				lamp++;
 			}
 		}
+		arms.CommitTo(this, "WorkLampArms", false);
+		BuildPipeWear();
 	}
 
 	/// <summary>A run of pipe along a wall from s0 to s1, flanged every few metres, bracketed back to the wall.</summary>
@@ -417,6 +429,7 @@ public partial class BossRoom : Node3D
 	{
 		Vector3 a = centre + along * s0, b = centre + along * s1;
 		k.Cylinder(a, b, r, r, r > 0.15f ? 14 : 10, true);
+		_runs.Add((centre, along, s0, s1, r, k.CurrentMaterial, inward, layer));
 		for (float s = s0 + 1.5f; s < s1 - 0.5f; s += _rng.RandfRange(3f, 5f))
 		{
 			Vector3 p = centre + along * s;
@@ -501,60 +514,130 @@ public partial class BossRoom : Node3D
 		foreach (float x in new[] { -Half + 2.5f, Half - 2.5f })
 			Truss(t, new Vector3(x, Ceil - 2.3f, -Half + 0.5f), new Vector3(x, Ceil - 2.3f, Half - 0.5f));
 		t.CommitTo(this, "Trusses", true);
-		// stage lamps pointing down into the pit, dim and cold
+		// lamps pointing down into the pit, dim
+		// (2026-10-14h, the old-and-abandoned pass: old industrial reflector lamps, warm incandescent, two of them dead;
+		// they were cold white stage lights)
 		var lamp = new MeshKit();
-		lamp.Mat(BossTextures.Painted(new Color(0.07f, 0.07f, 0.08f), 0.5f, 0.5f));
+		lamp.Mat(BossTextures.Painted(new Color(0.24f, 0.25f, 0.2f), 0.5f, 0.5f));
 		lamp.Color = Colors.White;
+		int si = 0;
 		foreach (float z in new[] { -10f, 10f })
 			foreach (float x in new[] { -9f, -3f, 3f, 9f })
 			{
 				Vector3 at = new(x, Ceil - 2.1f, z);
+				bool dead = si == 2 || si == 7;
+				si++;
 				lamp.Cylinder(at, at + Vector3.Down * 0.35f, 0.14f, 0.18f, 10, true);
-				var l = new SpotLight3D
+				lamp.Cylinder(at + Vector3.Down * 0.3f, at + Vector3.Down * 0.36f, 0.2f, 0.2f, 10, false);   // the reflector's rim
+				if (!dead)
 				{
-					Position = at + Vector3.Down * 0.4f, Rotation = new Vector3(-Mathf.Pi * 0.5f + (z > 0 ? -0.2f : 0.2f), 0, 0),
-					LightColor = new Color(0.8f, 0.85f, 0.9f), LightEnergy = 3f, SpotRange = 70f, SpotAngle = 14f, SpotAttenuation = 0.6f, ShadowEnabled = false,
-				};
-				AddChild(l);
+					var l = new SpotLight3D
+					{
+						Position = at + Vector3.Down * 0.4f, Rotation = new Vector3(-Mathf.Pi * 0.5f + (z > 0 ? -0.2f : 0.2f), 0, 0),
+						LightColor = new Color(1f, 0.74f, 0.45f), LightEnergy = 2.6f, SpotRange = 70f, SpotAngle = 14f, SpotAttenuation = 0.6f, ShadowEnabled = false,
+					};
+					AddChild(l);
+				}
 				AddChild(new MeshInstance3D
 				{
 					Mesh = new SphereMesh { Radius = 0.13f, Height = 0.06f }, Position = at + Vector3.Down * 0.36f,
-					MaterialOverride = StationParts.StationTextures.Glow("bt_stage", new Color(0.9f, 0.93f, 1f), 3f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+					MaterialOverride = dead ? BossTextures.Painted(new Color(0.18f, 0.17f, 0.15f), 0.3f, 0.2f) : StationParts.StationTextures.Glow("bt_stage_warm", new Color(1f, 0.78f, 0.5f), 2.2f),
+					CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 				});
 			}
 		lamp.CommitTo(this, "StageLamps", false);
+		// a bare bulb in a cage, on a long flex off the truss, swinging over the catwalk
+		var swing = new SwingingLamp { Name = "SwingingLamp", Position = new Vector3(-(Half + CatIn) * 0.5f, Ceil - 1.6f, 0f), Length = 9.5f };
+		AddChild(swing);
 		// dim fill so the size of the place reads
 		foreach (var at in new[] { new Vector3(0, 6f, 0), new Vector3(-12f, 4f, -12f), new Vector3(12f, 4f, 12f) })
 		{
-			var l = new OmniLight3D { Position = at, LightColor = new Color(0.55f, 0.6f, 0.65f), LightEnergy = 0.5f, OmniRange = 30f, OmniAttenuation = 0.8f, ShadowEnabled = false };
+			var l = new OmniLight3D { Position = at, LightColor = new Color(0.62f, 0.55f, 0.47f), LightEnergy = 0.5f, OmniRange = 30f, OmniAttenuation = 0.8f, ShadowEnabled = false };
 			AddChild(l);
 			_stage.Add(l);
 		}
-		// the four teal spotlights, one on each side, each across the room from the valves it picks out
+		// the four searchlights, one on each side, each across the room from the valves it picks out
+		// (2026-10-14h, the old-and-abandoned pass: old carbon-arc searchlights, a drum with a ribbed back, a yoke and a
+		// big lens, throwing a hard warm beam through the dust, swinging round onto the valve and dust sifting down in
+		// it where it lands; it was a teal laser. Still the one telegraph: the one bright beam in the room, on one valve)
 		var beamShader = GD.Load<Shader>("res://assets/shaders/light_beam.gdshader");
+		var drum = BossTextures.Painted(new Color(0.26f, 0.27f, 0.22f), 0.5f, 0.5f);
 		for (int w = 0; w < 4; w++)
 		{
 			var (o, along, inw) = Wall(w);
 			Vector3 at = o + inw * 2.6f + Vector3.Up * (Ceil - 3f);
 			var housing = new MeshKit();
-			housing.Mat(BossTextures.Painted(new Color(0.07f, 0.07f, 0.08f), 0.5f, 0.5f));
+			housing.Mat(drum);
 			housing.Color = Colors.White;
 			housing.Cylinder(at + inw * 0.2f, at - inw * 0.3f, 0.32f, 0.26f, 14, true);
+			// the front ring and the ribs round the back, the yoke and its post up to the truss
+			housing.Cylinder(at + inw * 0.18f, at + inw * 0.26f, 0.36f, 0.36f, 14, false);
+			for (float r = -0.25f; r < 0.1f; r += 0.09f) housing.Cylinder(at + inw * r, at + inw * (r + 0.025f), 0.3f, 0.3f, 14, false);
+			Vector3 side = along * 0.4f;
+			housing.Cylinder(at + side, at - side, 0.03f, 0.03f, 6, true);
+			housing.Cylinder(at + side, at + side + Vector3.Up * 0.45f, 0.025f, 0.025f, 5, false);
+			housing.Cylinder(at - side, at - side + Vector3.Up * 0.45f, 0.025f, 0.025f, 5, false);
+			housing.Cylinder(at + side + Vector3.Up * 0.45f, at - side + Vector3.Up * 0.45f, 0.025f, 0.025f, 5, false);
+			housing.Cylinder(at + Vector3.Up * 0.45f, at + Vector3.Up * 1.4f, 0.05f, 0.05f, 6, false);
 			housing.CommitTo(this, $"Fixture{w}", false);
+			// the lens: dark glass until it strikes up
+			var lens = new StandardMaterial3D
+			{
+				ResourceName = "pit_searchlight_lens", AlbedoColor = new Color(0.2f, 0.19f, 0.16f), Roughness = 0.15f, MetallicSpecular = 0.8f,
+				EmissionEnabled = true, Emission = new Color(1f, 0.82f, 0.56f), EmissionEnergyMultiplier = 0f,
+			};
+			var lk = new MeshKit();
+			lk.Mat(lens);
+			lk.Color = Colors.White;
+			lk.Cylinder(at + inw * 0.205f, at + inw * 0.215f, 0.3f, 0.3f, 14, true);
+			lk.CommitTo(this, $"Lens{w}", false);
 			var light = new SpotLight3D
 			{
-				Name = $"Teal{w}", Position = at + inw * 0.35f, LightColor = new Color(0.3f, 1f, 0.88f), LightEnergy = 0f,
+				Name = $"Searchlight{w}", Position = at + inw * 0.35f, LightColor = new Color(1f, 0.84f, 0.6f), LightEnergy = 0f,
 				SpotRange = 55f, SpotAngle = 5.5f, SpotAngleAttenuation = 0.4f, SpotAttenuation = 0.2f, ShadowEnabled = true,
 			};
 			AddChild(light);
 			var mat = new ShaderMaterial { Shader = beamShader };
 			mat.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
 			mat.SetShaderParameter("strength", 0f);
+			mat.SetShaderParameter("beam_color", new Color(1f, 0.8f, 0.52f));
 			var beam = new MeshInstance3D { Name = $"Beam{w}", Mesh = new CylinderMesh { TopRadius = 0.28f, BottomRadius = 1f, Height = 1f, RadialSegments = 18, CapTop = false, CapBottom = false }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
 			AddChild(beam);
+			// dust sifting down through the beam where it lands
+			var dust = new GpuParticles3D
+			{
+				Name = $"BeamDust{w}", Amount = 40, Lifetime = 4.0, Emitting = false, LocalCoords = false,
+				VisibilityAabb = new Aabb(new Vector3(-2, -3, -2), new Vector3(4, 6, 4)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+				ProcessMaterial = new ParticleProcessMaterial
+				{
+					EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.45f, 0.9f, 0.45f),
+					Direction = Vector3.Down, Spread = 25f, InitialVelocityMin = 0.03f, InitialVelocityMax = 0.12f, Gravity = new Vector3(0, -0.06f, 0),
+					ScaleMin = 0.5f, ScaleMax = 1.2f, DampingMin = 0.2f, DampingMax = 0.5f,
+					ColorRamp = new GradientTexture1D { Gradient = new Gradient { Colors = new[] { new Color(1, 1, 1, 0f), new Color(1, 1, 1, 0.55f), new Color(1, 1, 1, 0f) }, Offsets = new[] { 0f, 0.3f, 1f } } },
+				},
+				DrawPass1 = new QuadMesh
+				{
+					Size = Vector2.One * 0.025f,
+					Material = new StandardMaterial3D
+					{
+						AlbedoTexture = LakeParts.LakeFx.SoftDot(), AlbedoColor = new Color(0.85f, 0.78f, 0.62f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+						BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, VertexColorUseAsAlbedo = true,
+					},
+				},
+			};
+			AddChild(dust);
 			_fixtures.Add((light, beam, mat));
+			_lenses.Add(lens);
+			_dust.Add(dust);
+			_aimDir.Add((-inw + Vector3.Down * 0.6f).Normalized());
+			_aimTo.Add(Vector3.Zero);
+			_aimFrom.Add(_aimDir[w]);
 		}
 	}
+
+	private readonly List<StandardMaterial3D> _lenses = new();
+	private readonly List<GpuParticles3D> _dust = new();
+	private readonly List<Vector3> _aimDir = new(), _aimFrom = new(), _aimTo = new();
 
 	private static void Truss(MeshKit k, Vector3 a, Vector3 b)
 	{
@@ -572,14 +655,22 @@ public partial class BossRoom : Node3D
 		}
 	}
 
-	/// <summary>Points fixture w's light and beam at a world point.</summary>
+	/// <summary>Points fixture w's light and beam at a world point.
+	/// (2026-10-14h) A new target: the light swings round onto it from where it last pointed as it strikes up (the same
+	/// moment, the same target, as before), the lens glowing with it, the dust sifting down where it lands.</summary>
 	private void Aim(int w, Vector3 targetLocal, float strength)
 	{
 		var (light, beam, mat) = _fixtures[w];
 		Vector3 from = light.Position;
-		Vector3 d = targetLocal - from;
-		float len = d.Length();
-		light.LookAt(ToGlobal(targetLocal), Vector3.Up);
+		if (!_aimTo[w].IsEqualApprox(targetLocal)) { _aimFrom[w] = _aimDir[w]; _aimTo[w] = targetLocal; }
+		Vector3 want = (targetLocal - from).Normalized();
+		float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(strength * 1.15f, 0f, 1f));
+		Vector3 dir = _aimFrom[w].Slerp(want, u).Normalized();
+		if (strength >= 0.999f || u >= 0.999f) { dir = want; _aimFrom[w] = want; }   // (there: fading out, it stays put)
+		_aimDir[w] = dir;
+		float len = (targetLocal - from).Length();
+		Vector3 d = dir * len;
+		light.LookAt(ToGlobal(from + d), Vector3.Up);
 		light.LightEnergy = 14f * strength;
 		// the beam: a cone from the lamp (its top) to a metre or so wide at the valve
 		Vector3 y = -d / len;   // the cylinder's top (+Y) at the lamp
@@ -590,6 +681,10 @@ public partial class BossRoom : Node3D
 		beam.Basis = new Basis(x * 1f, y * len, z * 1f);
 		beam.Position = from + d * 0.5f;
 		mat.SetShaderParameter("strength", 0.33f * strength);
+		_lenses[w].EmissionEnergyMultiplier = 3.5f * strength;
+		var dust = _dust[w];
+		dust.Position = targetLocal + Vector3.Up * 0.8f;
+		dust.Emitting = strength > 0.5f;
 	}
 
 	// ------------------------------------------------------------------ the blood
@@ -607,10 +702,11 @@ public partial class BossRoom : Node3D
 			Position = new Vector3(0, BloodY, 0), MaterialOverride = _bloodMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		};
 		AddChild(_blood);
-		// a dull red glow off the blood's surface, lighting the limbs from below (it goes down with the blood)
+		// a dull glow off the blood's surface, lighting the limbs from below (it goes down with the blood)
+		// (2026-10-14h: the lamps' warm light thrown back up off it, dark and brown-red; it was a saturated emergency red)
 		foreach (var at in new[] { new Vector3(-9f, 0, -9f), new Vector3(9f, 0, -9f), new Vector3(9f, 0, 9f), new Vector3(-9f, 0, 9f), new Vector3(0, 0, 0) })
 		{
-			var l = new OmniLight3D { Position = at + Vector3.Up * (BloodY + 1.5f), LightColor = new Color(0.9f, 0.18f, 0.12f), LightEnergy = 1.3f, OmniRange = 22f, OmniAttenuation = 0.9f, ShadowEnabled = false };
+			var l = new OmniLight3D { Position = at + Vector3.Up * (BloodY + 1.5f), LightColor = new Color(0.6f, 0.3f, 0.2f), LightEnergy = 1.05f, OmniRange = 22f, OmniAttenuation = 0.9f, ShadowEnabled = false };
 			AddChild(l);
 			_bloodGlow.Add(l);
 		}

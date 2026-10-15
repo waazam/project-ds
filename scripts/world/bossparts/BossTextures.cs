@@ -127,11 +127,68 @@ public static class BossTextures
 		AlbedoColor = new Color(0.62f, 0.6f, 0.56f), Roughness = 0.5f, Metallic = 0.75f, MetallicSpecular = 0.6f, TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	});
 
-	public static StandardMaterial3D Painted(Color c, float rough = 0.5f, float metal = 0.3f) => Std($"bt_paint{c.ToHtml()}", () => new StandardMaterial3D
+	public static StandardMaterial3D Painted(Color c, float rough = 0.5f, float metal = 0.3f) => Std($"bt_paint{c.ToHtml()}", () => SurfaceSets.Relief(new StandardMaterial3D
 	{
 		// (2026-10-13g: no fresh gloss down here; every painted pipe is dulled with grime)
-		AlbedoColor = c, Roughness = Mathf.Max(rough, 0.68f), Metallic = metal * 0.75f, MetallicSpecular = 0.45f,
-	});
+		// (2026-10-14h, the old-and-abandoned pass: and old: the paint chipped and flaking back to rust, rust bled down
+		// from every chip and seam, scale in the low places; it was a clean flat colour, so the pipes read as new tubes)
+		AlbedoTexture = RustyPaint(c), AlbedoColor = Colors.White, Roughness = Mathf.Max(rough, 0.72f), Metallic = metal * 0.6f, MetallicSpecular = 0.4f,
+		Uv1Triplanar = true, Uv1WorldTriplanar = true, Uv1Scale = Vector3.One * 0.75f, Uv1TriplanarSharpness = 4f,
+		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps, VertexColorUseAsAlbedo = true,
+	}, "ph_rusty_metal_02", 0.55f));
+
+	/// <summary>Old paint in colour <paramref name="c"/> on steel: chipped in flakes to rust, rust run down from the
+	/// chips (the texture's v is down the world's y on a pipe's side), scale and grime in blotches. 128 px, 1.3 m a repeat.</summary>
+	public static Texture2D RustyPaint(Color c)
+	{
+		var f = RustField;
+		return Make($"bt_rustpaint{c.ToHtml(false)}", 128, 128, (x, y) =>
+		{
+			int i = y * 128 + x;
+			float n = f.n[i], fine = f.fine[i], chip = f.chip[i], run = f.run[i];
+			var rust = new Color(0.32f, 0.17f, 0.08f).Lerp(new Color(0.48f, 0.27f, 0.12f), f.tone[i]);
+			// the paint: its own colour, faded and dirtied in broad blotches
+			var paint = c * (0.78f + 0.3f * n);
+			paint = paint.Lerp(new Color(0.3f, 0.27f, 0.22f), 0.18f + 0.25f * Mathf.SmoothStep(0.55f, 0.8f, n));
+			var col = paint.Lerp(rust * 1.15f, run * 0.55f);
+			if (chip > 0.61f) col = rust * (0.8f + 0.4f * fine);
+			else if (chip > 0.585f) col *= 0.7f;   // the flaking edge
+			return new Color(col.R, col.G, col.B);
+		});
+	}
+
+	private static (float[] n, float[] fine, float[] chip, float[] tone, float[] run) _rustField;
+
+	/// <summary>The chips, the blotches and the rust runs, the same under every colour (drawn once).</summary>
+	private static (float[] n, float[] fine, float[] chip, float[] tone, float[] run) RustField
+	{
+		get
+		{
+			if (_rustField.n != null) return _rustField;
+			const int S = 128;
+			var n = new float[S * S]; var fine = new float[S * S]; var chip = new float[S * S]; var tone = new float[S * S]; var run = new float[S * S];
+			for (int y = 0; y < S; y++)
+				for (int x = 0; x < S; x++)
+				{
+					int i = y * S + x;
+					n[i] = Fbm(x, y, S, 4, 4, 431);
+					fine[i] = Fbm(x, y, S, 16, 2, 432);
+					chip[i] = Fbm(x, y, S, 6, 3, 433) * 0.7f + fine[i] * 0.3f;
+					tone[i] = Fbm(x, y, S, 8, 3, 434);
+				}
+			// rust bleeding down from above: a run under every chip, longer here and there
+			for (int y = 0; y < S; y++)
+				for (int x = 0; x < S; x++)
+				{
+					float r = 0f;
+					if (Hash(x / 2, 0, 435) > 0.35f)
+						for (int k = 1; k < 26; k++)
+							if (chip[((y - k + S) % S) * S + x] > 0.6f) { r = 1f - k / 26f; break; }
+					run[y * S + x] = r;
+				}
+			return _rustField = (n, fine, chip, tone, run);
+		}
+	}
 
 	/// <summary>A pressure gauge's face: white, black ticks round three quarters of it, a red arc near
 	/// the top of the scale.</summary>
