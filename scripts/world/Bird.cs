@@ -77,7 +77,7 @@ public partial class Bird : Node3D
 		}
 		_model = new Node3D { Name = "Model", Scale = Vector3.One * ModelScale };
 		AddChild(_model);
-		Build();
+		if (!LoadModel()) Build();
 		_headTimer = _rng.RandfRange(0.2f, 1f);
 		_bodyTimer = _rng.RandfRange(1f, 4f);
 	}
@@ -139,6 +139,136 @@ public partial class Bird : Node3D
 			Tail = new Color(0.03f, 0.03f, 0.035f), Mask = new Color(0.02f, 0.02f, 0.02f), Beak = new Color(0.09f, 0.08f, 0.08f), Legs = new Color(0.08f, 0.08f, 0.08f),
 		},
 	};
+
+	// ───────────────────────────── the model ─────────────────────────────
+
+	/// <summary>(2026-10-15, the owner: "from now on everything should be made in blender") The songbird modelled, baked
+	/// and rigged in Blender (tools/Blender/birds.py → assets/models/bird/bird.glb): one skinned body on a skeleton (body,
+	/// neck, head, tail, the folded wings, the spread wings, the legs), the red feathers baked in, the other colours'
+	/// albedo beside it, the eyes their own surface (the omen's glow). Its clips: idle, look, peck, hop, takeoff, flap,
+	/// glide, lunge (the lunge plays at the omen's rush; the rest it does by hand here, as it always did: quick head
+	/// turns, pecks, the bounding flight's beats and shut wings).</summary>
+	private const string ModelPath = "res://assets/models/bird/bird.glb";
+	/// <summary>For the before/after preview: false builds the old code-made bird.</summary>
+	public static bool UseModel = true;
+	/// <summary>For the preview: the wings opened at an angle (radians above level), or shut.</summary>
+	public void PreviewWings(bool open, float up) => SetWings(open, up);
+	private Skeleton3D _skel;
+	private AnimationPlayer _anim;
+	private int _bBody = -1, _bNeck = -1, _bHead = -1, _bTail = -1, _bWingL = -1, _bWingR = -1, _bFoldL = -1, _bFoldR = -1;
+	private float _tailFlick;
+	private bool _wingsOpen = true;
+
+	private bool LoadModel()
+	{
+		if (!UseModel || !ResourceLoader.Exists(ModelPath)) return false;
+		var scene = GD.Load<PackedScene>(ModelPath);
+		if (scene?.Instantiate() is not Node3D inst) return false;
+		inst.Name = "Bird";
+		_model.AddChild(inst);
+		_skel = FindOf<Skeleton3D>(inst);
+		_anim = FindOf<AnimationPlayer>(inst);
+		var mesh = FindOf<MeshInstance3D>(inst);
+		if (_skel == null || mesh == null) { inst.QueueFree(); _skel = null; _anim = null; return false; }
+		_bBody = _skel.FindBone("body"); _bNeck = _skel.FindBone("neck"); _bHead = _skel.FindBone("head"); _bTail = _skel.FindBone("tail");
+		_bWingL = _skel.FindBone("wing_L"); _bWingR = _skel.FindBone("wing_R");
+		_bFoldL = _skel.FindBone("wingfold_L"); _bFoldR = _skel.FindBone("wingfold_R");
+		// its colour: the red is baked into the model; the others' albedo beside it
+		if (Color != BirdColor.Red && mesh.Mesh != null && mesh.Mesh.GetSurfaceCount() > 0
+			&& mesh.Mesh.SurfaceGetMaterial(0) is StandardMaterial3D fm)
+		{
+			string tex = $"res://assets/models/bird/bird_albedo_{(Color == BirdColor.Blue ? "blue" : Color == BirdColor.Purple ? "purple" : "black")}.png";
+			if (ResourceLoader.Exists(tex))
+			{
+				var m = (StandardMaterial3D)fm.Duplicate();
+				m.AlbedoTexture = GD.Load<Texture2D>(tex);
+				mesh.SetSurfaceOverrideMaterial(0, m);
+			}
+		}
+		// the omen's eyes: a glowing red
+		if (IsOmen && mesh.Mesh != null && mesh.Mesh.GetSurfaceCount() > 1)
+			mesh.SetSurfaceOverrideMaterial(1, new StandardMaterial3D
+			{
+				AlbedoColor = new Color(0.6f, 0.02f, 0.02f), EmissionEnabled = true, Emission = new Color(1f, 0.08f, 0.04f),
+				EmissionEnergyMultiplier = 3.5f, Roughness = 0.1f,
+			});
+		mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+		TriangleCount = 0;
+		if (mesh.Mesh is ArrayMesh am)
+			for (int i = 0; i < am.GetSurfaceCount(); i++) TriangleCount += (am.SurfaceGetArrayIndexLen(i) > 0 ? am.SurfaceGetArrayIndexLen(i) : am.SurfaceGetArrayLen(i)) / 3;
+		if (_anim != null)
+		{
+			_anim.Stop();
+			_anim.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Idle;
+		}
+		SetWings(false, 0f);
+		return true;
+	}
+
+	private static T FindOf<T>(Node n) where T : Node
+	{
+		if (n is T t) return t;
+		foreach (var c in n.GetChildren())
+			if (FindOf<T>(c) is { } f) return f;
+		return null;
+	}
+
+	/// <summary>A bone turned by <paramref name="angle"/> about a model-space axis, from its rest (the axis carried into its
+	/// parent's frame).</summary>
+	private void PoseTurn(int bone, int parent, Vector3 modelAxis, float angle, Quaternion? extra = null)
+	{
+		if (_skel == null || bone < 0) return;
+		var rest = _skel.GetBoneRest(bone).Basis.GetRotationQuaternion();
+		var pBasis = parent >= 0 ? _skel.GetBoneGlobalRest(parent).Basis.Orthonormalized() : Basis.Identity;
+		var axis = (pBasis.Inverse() * modelAxis).Normalized();
+		var q = new Quaternion(axis, angle);
+		if (extra is { } e) q = q * e;
+		_skel.SetBonePoseRotation(bone, q * rest);
+	}
+
+	/// <summary>The head turned (yaw about up) and tipped (a peck: positive is down), whichever model it has.</summary>
+	private void SetHead(float yaw, float tilt)
+	{
+		if (_skel != null && _bHead >= 0)
+		{
+			var pBasis = _bNeck >= 0 ? _skel.GetBoneGlobalRest(_bNeck).Basis.Orthonormalized() : Basis.Identity;
+			var right = (pBasis.Inverse() * Vector3.Right).Normalized();
+			PoseTurn(_bHead, _bNeck, Vector3.Up, yaw, new Quaternion(right, tilt));
+			return;
+		}
+		if (_head != null) _head.Rotation = new Vector3(tilt, yaw, 0);
+	}
+
+	/// <summary>Wings: open and beating (<paramref name="up"/> radians above level), or shut along the body.</summary>
+	private void SetWings(bool open, float up)
+	{
+		if (_skel != null)
+		{
+			if (_anim != null && _anim.IsPlaying()) return;   // (the lunge has them)
+			if (open != _wingsOpen)
+			{
+				_wingsOpen = open;
+				var tiny = Vector3.One * 0.001f;
+				foreach (int b in new[] { _bWingL, _bWingR }) if (b >= 0) _skel.SetBonePoseScale(b, open ? Vector3.One : tiny);
+				foreach (int b in new[] { _bFoldL, _bFoldR }) if (b >= 0) _skel.SetBonePoseScale(b, open ? tiny : Vector3.One);
+			}
+			if (open)
+			{
+				var fwd = new Vector3(0, 0, 1);
+				PoseTurn(_bWingL, _bBody, fwd, up);
+				PoseTurn(_bWingR, _bBody, fwd, -up);
+			}
+			return;
+		}
+		if (_folded == null) return;
+		_folded.Visible = !open;
+		_wingL.Visible = _wingR.Visible = open;
+		if (open)
+		{
+			_wingL.Rotation = new Vector3(0, 0, up);
+			_wingR.Rotation = new Vector3(0, 0, -up);
+		}
+	}
 
 	// ───────────────────────────── build ─────────────────────────────
 
@@ -510,7 +640,14 @@ public partial class Bird : Node3D
 		_headYaw = Mathf.Lerp(_headYaw, _headYawTarget, kHead);
 		_headTilt = Mathf.Lerp(_headTilt, _headTiltTarget, kHead);
 		_bodyYaw = Mathf.Lerp(_bodyYaw, _bodyYawTarget, kBody);
-		_head.Rotation = new Vector3(_headTilt, _headYaw, 0);
+		SetHead(_headYaw, _headTilt);
+		// (the modelled bird) its tail flicks now and then as it looks about
+		if (_skel != null && _bTail >= 0)
+		{
+			_tailFlick = Mathf.MoveToward(_tailFlick, 0f, dt * 4f);
+			if (_rng.Randf() < dt * 0.5f) _tailFlick = 1f;
+			PoseTurn(_bTail, _bBody, new Vector3(1, 0, 0), 0.25f * Mathf.Sin(_tailFlick * Mathf.Pi));
+		}
 
 		float y = 0f;
 		if (_hop >= 0f)
@@ -574,6 +711,8 @@ public partial class Bird : Node3D
 			Vector3 face = player.GlobalPosition + Vector3.Up * 1.6f;
 			Vector3 dir = (face - GlobalPosition).Normalized();
 			Vector3 through = ToLocal(face + dir * 1.5f);   // fly past the player, not just up to them
+			// (the modelled bird) wings flung open, head thrust out, at the face
+			if (_anim != null && _anim.HasAnimation("lunge")) _anim.Play("lunge", -1, 2.4f);
 			tween.TweenProperty(model, "position", through, 0.2f)
 				.SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.In);
 		}
@@ -622,9 +761,8 @@ public partial class Bird : Node3D
 		_burst = 0.9f;   // (the first burst long: it has to get up)
 		_model.TopLevel = true;   // (it keeps where it is, and leaves its perch)
 		_model.GlobalPosition = from;
-		_head.Rotation = Vector3.Zero;
-		_folded.Visible = false;
-		_wingL.Visible = _wingR.Visible = true;
+		SetHead(0f, 0f);
+		SetWings(true, 0.6f);
 		string fl = $"res://assets/audio/sfx/wing_flutter_0{_rng.RandiRange(1, 3)}.wav";
 		if (ResourceLoader.Exists(fl))
 		{
@@ -661,15 +799,8 @@ public partial class Bird : Node3D
 		var basis = Basis.LookingAt(-fwd, Vector3.Up).Scaled(Vector3.One * ModelScale);
 		_model.GlobalTransform = new Transform3D(basis, pos);
 		// the wings: beating fast (faster getting up), or shut tight along the body
-		_folded.Visible = _gliding;
-		_wingL.Visible = _wingR.Visible = !_gliding;
-		if (!_gliding)
-		{
-			_flapPhase += dt * Mathf.Tau * (_flyT < 1f ? 17f : 13f);
-			float up = 0.25f + 0.95f * Mathf.Sin(_flapPhase);   // (up past level, and down below it)
-			_wingL.Rotation = new Vector3(0, 0, up);
-			_wingR.Rotation = new Vector3(0, 0, -up);
-		}
+		if (!_gliding) _flapPhase += dt * Mathf.Tau * (_flyT < 1f ? 17f : 13f);
+		SetWings(!_gliding, 0.25f + 0.95f * Mathf.Sin(_flapPhase));   // (up past level, and down below it)
 		// gone: only far off and out of sight behind something (or out of view, or lost in the fog, or long since away)
 		_checkT -= dt;
 		if (_checkT > 0f) return;

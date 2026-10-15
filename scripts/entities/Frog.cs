@@ -37,7 +37,7 @@ public partial class Frog : Node3D
 			// side-on to the bank (so it shows in profile from the bank and the bridge), a little nose-up
 			Rotation = new Vector3(-0.12f, Mathf.Pi * 0.5f + _rng.RandfRange(-0.4f, 0.4f), 0) };
 		AddChild(_frog);
-		BuildFrog();
+		if (!LoadModel()) BuildFrog();
 		AddChild(new PhotoSubject
 		{
 			Name = "PhotoSubject",
@@ -106,6 +106,42 @@ public partial class Frog : Node3D
 		top = 0.085f;
 	}
 
+	/// <summary>(2026-10-15, the owner: "from now on everything should be made in blender") The frog modelled, baked and
+	/// rigged in Blender (tools/Blender/birds.py → assets/models/frog/frog.glb): one wet skin over the folded hind legs and the
+	/// turned-in front ones, gold eyes with their dark bar, its throat sac on its own bone. Its clips: idle (breathing),
+	/// throat, hop; the idle loops, the throat's pulses come by hand below (in runs, then still), as they always did.</summary>
+	private const string ModelPath = "res://assets/models/frog/frog.glb";
+	/// <summary>For the before/after preview: false builds the old code-made frog.</summary>
+	public static bool UseModel = true;
+	private Skeleton3D _skel;
+	private int _bThroat = -1;
+
+	private bool LoadModel()
+	{
+		if (!UseModel || !ResourceLoader.Exists(ModelPath)) return false;
+		if (GD.Load<PackedScene>(ModelPath)?.Instantiate() is not Node3D inst) return false;
+		inst.Name = "FrogModel";
+		_frog.AddChild(inst);
+		_skel = FindOf<Skeleton3D>(inst);
+		if (_skel == null) { inst.QueueFree(); return false; }
+		_bThroat = _skel.FindBone("throat");
+		if (FindOf<AnimationPlayer>(inst) is { } anim && anim.HasAnimation("idle"))
+		{
+			anim.GetAnimation("idle").LoopMode = Animation.LoopModeEnum.Linear;
+			anim.Play("idle");
+			anim.Seek(_rng.RandfRange(0f, 1.5f), true);
+		}
+		return true;
+	}
+
+	private static T FindOf<T>(Node n) where T : Node
+	{
+		if (n is T t) return t;
+		foreach (var c in n.GetChildren())
+			if (FindOf<T>(c) is { } f) return f;
+		return null;
+	}
+
 	private static Color C(float r, float g, float b) => new Color(r, g, b).SrgbToLinear();
 
 	private void BuildFrog()
@@ -158,7 +194,9 @@ public partial class Frog : Node3D
 			else { _pulseOn = 1f; _pulseTimer = _rng.RandfRange(1.5f, 3f); }
 		}
 		float swell = _pulseOn > 0f ? Mathf.Max(0f, Mathf.Sin(_t * Mathf.Tau * 2.6f)) : 0f;
-		_throat.Scale = new Vector3(1f + 0.25f * swell, 1f + 0.9f * swell, 1f + 0.5f * swell);
+		var sc = new Vector3(1f + 0.25f * swell, 1f + 0.9f * swell, 1f + 0.5f * swell);
+		if (_skel != null && _bThroat >= 0) _skel.SetBonePoseScale(_bThroat, Vector3.One * (1f + 0.45f * swell));   // (the sac swells round)
+		else if (_throat != null) _throat.Scale = sc;
 		// now and then it shifts round a little on the rock
 		_shiftTimer -= dt;
 		if (_shiftTimer <= 0f)
