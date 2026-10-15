@@ -123,6 +123,14 @@ public partial class LookShots : Node
 		foreach (var (lpos, lyaw, pitch) in _poses)
 		{
 			var pos = rel * lpos;
+			// a y of 9999 or more: dropped onto whatever is under that x, z (a long road, its heights unknown)
+			if (lpos.Y >= 9999f)
+			{
+				await ToSignal(tree, SceneTree.SignalName.PhysicsFrame);
+				var hit = p.GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(
+					new Vector3(pos.X, 3000f, pos.Z), new Vector3(pos.X, -3000f, pos.Z), 1));
+				pos.Y = hit.Count > 0 ? ((Vector3)hit["position"]).Y + 0.3f : 0f;
+			}
 			float yaw = lyaw + Mathf.RadToDeg(relYaw);
 			_pin = null;
 			p.Teleport(pos, Mathf.DegToRad(yaw));
