@@ -185,6 +185,20 @@ public static class LodgeProps
 		if (bottom) Cap(k, rings[0], Vector3.Down);
 	}
 
+	// ---------------------------------------------------------------- the Blender models
+
+	/// <summary>(2026-10-15, the Blender pass) The pieces here are modelled in Blender (tools/Blender/lodge_props.py, to
+	/// assets/models/furniture/lp_*.glb), each in the frame its builder draws in, so it goes in with the transform the
+	/// builder pushed; its roles take the room's materials. The code under each stays as the fallback for a missing model.</summary>
+	public static bool Model(MeshKit k, string model, Transform3D xf, params (string role, Material m)[] roles)
+	{
+		var d = new Dictionary<string, Material>();
+		foreach (var (r, m) in roles) if (m != null) d[r] = m;
+		return FurnitureKit.Add(k, model, xf, d);
+	}
+
+	private static bool Near(float a, float b) => Mathf.IsEqualApprox(a, b, 0.002f);
+
 	private static Transform3D Push(MeshKit k, Transform3D xf)
 	{
 		var was = k.Xf;
@@ -209,6 +223,11 @@ public static class LodgeProps
 		var col = k.Color;
 		k.Color = Colors.White;
 		float f = h / 0.62f;   // (drawn at 62 cm)
+		if (Model(k, "lp_table_lamp", new Transform3D(Basis.FromScale(Vector3.One * f), c), ("brass", LodgeTextures.BrassMat), ("crock", body ?? CrockMat), ("shade", shade), ("bulb", shade)))
+		{
+			k.Color = col;
+			return c + Vector3.Up * (0.45f * f);
+		}
 		Vector2 P(float r, float y) => new(r * f, y * f);
 		// the base: a foot ring, the jar's belly, its shoulder, the neck
 		k.Mat(LodgeTextures.BrassMat);
@@ -240,6 +259,11 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Model(k, "lp_bankers_lamp", new Transform3D(new Basis(Vector3.Up, yaw), c), ("brass", LodgeTextures.BrassMat), ("glass", glass), ("opal", OpalMat)))
+		{
+			k.Color = col;
+			return c + new Basis(Vector3.Up, yaw) * new Vector3(0, 0.3f, 0f);
+		}
 		var was = Push(k, new Transform3D(new Basis(Vector3.Up, yaw), c));
 		// the base: an oval of stepped brass, 26 x 16 cm
 		k.Mat(LodgeTextures.BrassMat);
@@ -316,8 +340,13 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Model(k, "lp_ceiling_dome", new Transform3D(Basis.Identity, ceiling), ("brass", LodgeTextures.BrassMat), ("glass", glass)))
+		{
+			k.Color = col;
+			return;
+		}
 		k.Mat(LodgeTextures.BrassMat);
-		Lathe(k, ceiling, new[] { new Vector2(0.16f, -0.004f), new Vector2(0.185f, -0.012f), new Vector2(0.186f, -0.03f), new Vector2(0.172f, -0.036f) }, 18, flip: true, hardDeg: 40f);
+		Lathe(k, ceiling,new[] { new Vector2(0.16f, -0.004f), new Vector2(0.185f, -0.012f), new Vector2(0.186f, -0.03f), new Vector2(0.172f, -0.036f) }, 18, flip: true, hardDeg: 40f);
 		k.Mat(glass);
 		Lathe(k, ceiling, new[] { new Vector2(0.17f, -0.034f), new Vector2(0.168f, -0.06f), new Vector2(0.15f, -0.1f), new Vector2(0.11f, -0.13f), new Vector2(0.05f, -0.148f), new Vector2(0.0f, -0.152f) }, 18, flip: true);
 		k.Mat(LodgeTextures.BrassMat);
@@ -334,6 +363,11 @@ public static class LodgeProps
 		k.Color = Colors.White;
 		var o = outward.Normalized();
 		var side = Vector3.Up.Cross(o).Normalized();   // (right-handed: a mirrored frame turns every face inside out)
+		if (Model(k, "lp_sconce", new Transform3D(new Basis(side, Vector3.Up, o), at), ("wood", LodgeTextures.DoorWoodMat), ("brass", LodgeTextures.BrassMat), ("shade", shade), ("bulb", shade)))
+		{
+			k.Color = col;
+			return at + o * 0.16f + Vector3.Up * 0.12f;
+		}
 		var was = Push(k, new Transform3D(new Basis(side, Vector3.Up, o), at));
 		// the back plate: a turned wooden pattress, an oval with its edge rounded (brass, square on to the eye, it mirrored
 		// the dark and read as a ring), a brass boss where the arm leaves it
@@ -375,6 +409,7 @@ public static class LodgeProps
 	/// edge, a crest, a cove down to a lip at the canvas.</summary>
 	public static void PictureFrame(MeshKit k, float w, float h, float fw, Material m)
 	{
+		if (FrameModel(k, w, h, fw, m)) return;
 		k.Mat(m);
 		Vector3[] R(float grow, float z)
 		{
@@ -392,6 +427,38 @@ public static class LodgeProps
 		}, true, 40f);
 	}
 
+	private static readonly Dictionary<Material, Mesh> _frames = new();
+
+	/// <summary>The frame modelled round a unit canvas at a 0.1 moulding, stretched to this one nine-slice fashion: what's
+	/// inside the canvas's edge with the canvas, what's outside it with the moulding (each side keeps its profile).</summary>
+	private static bool FrameModel(MeshKit k, float w, float h, float fw, Material m)
+	{
+		if (!_frames.TryGetValue(m, out var unit))
+			_frames[m] = unit = FurnitureKit.Mesh("lp_picture_frame", new() { ["wood"] = m, ["black"] = LodgeTextures.BlackMat });
+		if (unit == null) return false;
+		float kf = fw / 0.1f;
+		float Warp(float x, float size) => Mathf.Abs(x) <= 0.5f ? x * size : Mathf.Sign(x) * (size * 0.5f + (Mathf.Abs(x) - 0.5f) * kf);
+		var warped = new ArrayMesh();
+		for (int s = 0; s < unit.GetSurfaceCount(); s++)
+		{
+			var arr = unit.SurfaceGetArrays(s);
+			var v = (Vector3[])arr[(int)Mesh.ArrayType.Vertex];
+			var n = arr[(int)Mesh.ArrayType.Normal].VariantType == Variant.Type.Nil ? null : (Vector3[])arr[(int)Mesh.ArrayType.Normal];
+			for (int i = 0; i < v.Length; i++)
+			{
+				float sx = Mathf.Abs(v[i].X) <= 0.5f ? w : kf, sy = Mathf.Abs(v[i].Y) <= 0.5f ? h : kf;
+				if (n != null) n[i] = new Vector3(n[i].X / sx, n[i].Y / sy, n[i].Z).Normalized();
+				v[i] = new Vector3(Warp(v[i].X, w), Warp(v[i].Y, h), v[i].Z);
+			}
+			arr[(int)Mesh.ArrayType.Vertex] = v;
+			if (n != null) arr[(int)Mesh.ArrayType.Normal] = n;
+			warped.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arr);
+			warped.SurfaceSetMaterial(s, unit.SurfaceGetMaterial(s));
+		}
+		k.AddMesh(warped, Transform3D.Identity);
+		return true;
+	}
+
 	/// <summary>A split log laid along <paramref name="along"/> (a mantel shelf): its split face flat on top at
 	/// <paramref name="top"/>, the round of the log under it, <paramref name="len"/> long, d deep, h from top to belly;
 	/// its ends sawn. <paramref name="room"/> points out of its front.</summary>
@@ -399,6 +466,10 @@ public static class LodgeProps
 	{
 		var up = Vector3.Up;
 		room = (room - along * room.Dot(along)).Normalized();
+		var ax = along.Normalized();
+		if (ax.Cross(up).Dot(room) < 0f) ax = -ax;   // (a right-handed frame: the log's the same either way along)
+		if (Model(k, "lp_split_log", new Transform3D(new Basis(ax * (len / 3.8f), up * (h / 0.24f), room * (d / 0.36f)), top), ("log", k.CurrentMaterial), ("cut", k.CurrentMaterial)))
+			return;
 		Vector3[] Ring(float x)
 		{
 			var pts = new List<Vector3>();
@@ -430,6 +501,11 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Model(k, "lp_fire_tools", new Transform3D(new Basis(Vector3.Up, yaw), at), ("iron", LodgeTextures.IronMat), ("black", LodgeTextures.BlackMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		var was = Push(k, new Transform3D(new Basis(Vector3.Up, yaw), at));
 		k.Mat(LodgeTextures.IronMat);
 		Lathe(k, Vector3.Zero, new[] { new Vector2(0.11f, 0f), new Vector2(0.115f, 0.01f), new Vector2(0.09f, 0.025f), new Vector2(0.03f, 0.04f), new Vector2(0.012f, 0.05f), new Vector2(0.01f, 0.06f) }, 12, capBottom: true);
@@ -469,6 +545,11 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Model(k, "lp_table_candle", new Transform3D(Basis.Identity, c), ("glow", glow), ("black", LodgeTextures.BlackMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		k.Mat(glow);
 		Lathe(k, c, new[] { new Vector2(0.026f, 0f), new Vector2(0.04f, 0.018f), new Vector2(0.048f, 0.045f), new Vector2(0.046f, 0.07f), new Vector2(0.036f, 0.092f), new Vector2(0.03f, 0.1f), new Vector2(0.026f, 0.096f) }, 12, capBottom: true);
 		k.Mat(LodgeTextures.BlackMat);
@@ -482,9 +563,13 @@ public static class LodgeProps
 	/// field on a deep one, a turned brass knob (two on a wide one), centred at <paramref name="c"/>, its face toward +Z.</summary>
 	public static void DrawerFront(MeshKit k, Vector3 c, float w, float h, Material wood)
 	{
-		k.Mat(wood);
-		k.BevelBox(c, new Vector3(w, h, 0.022f), 0.006f);
-		if (h > 0.13f) k.BevelBox(c + new Vector3(0, 0, 0.011f), new Vector3(w - 0.07f, h - 0.06f, 0.008f), 0.006f);
+		bool field = h > 0.13f;
+		if (!Model(k, field ? "lp_drawer_front_field" : "lp_drawer_front", new Transform3D(Basis.FromScale(new Vector3(w / 0.5f, h / (field ? 0.25f : 0.1f), 1f)), c), ("wood", wood)))
+		{
+			k.Mat(wood);
+			k.BevelBox(c, new Vector3(w, h, 0.022f), 0.006f);
+			if (field) k.BevelBox(c + new Vector3(0, 0, 0.011f), new Vector3(w - 0.07f, h - 0.06f, 0.008f), 0.006f);
+		}
 		k.Mat(LodgeTextures.BrassMat);
 		float zf = c.Z + (h > 0.13f ? 0.019f : 0.011f);
 		foreach (float x in w > 0.6f ? new[] { -w * 0.28f, w * 0.28f } : new[] { 0f })
@@ -495,6 +580,7 @@ public static class LodgeProps
 	public static void Knob(MeshKit k, Vector3 at, Vector3 n)
 	{
 		var b = Basis.LookingAt(-n, Mathf.Abs(n.Y) > 0.9f ? Vector3.Forward : Vector3.Up) * new Basis(Vector3.Right, Mathf.Pi * 0.5f);   // (local +Y along n)
+		if (Model(k, "lp_knob", new Transform3D(b, at), ("brass", LodgeTextures.BrassMat))) return;
 		var was = Push(k, new Transform3D(b, at));
 		Lathe(k, Vector3.Zero, new[] { new Vector2(0.011f, 0f), new Vector2(0.006f, 0.006f), new Vector2(0.005f, 0.014f), new Vector2(0.014f, 0.02f), new Vector2(0.015f, 0.026f), new Vector2(0.01f, 0.032f), new Vector2(0f, 0.034f) }, 8, hardDeg: 60f);
 		k.Xf = was;
@@ -511,6 +597,11 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (CaseModel(w, h, d) is { } cm && Model(k, cm, xf, ("wood", wood), ("top", top ?? wood), ("brass", LodgeTextures.BrassMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		var was = Push(k, xf);
 		float t = openW > 0f ? Mathf.Clamp((w - openW - 0.01f) * 0.5f, 0.018f, 0.06f) : 0.022f;
 		float yTop = h - topThick;
@@ -581,6 +672,19 @@ public static class LodgeProps
 		k.Color = col;
 	}
 
+	/// <summary>The lodge's case pieces as modelled (each the one call that builds it: the back bar's cupboards, the
+	/// pantry's, a nightstand, a vanity, room 204's dresser), by their sizes; null for any other.</summary>
+	private static string CaseModel(float w, float h, float d)
+	{
+		bool Is(float a, float b, float c) => Near(w, a) && Near(h, b) && Near(d, c);
+		if (Is(5.0f, 1.0f, 0.6f)) return "lp_case_backbar";
+		if (Is(0.93f, 0.94f, 0.6f)) return "lp_case_cabinet";
+		if (Is(0.5f, 0.6f, 0.48f)) return "lp_case_nightstand";
+		if (Is(0.9f, 0.9f, 0.56f)) return "lp_case_vanity";
+		if (Is(1.2f, 1.1f, 0.5f)) return "lp_case_dresser";
+		return null;
+	}
+
 	/// <summary>A wardrobe's or a closet's case (its door is its own: <see cref="CabinetDoor"/>): at <paramref name="xf"/>
 	/// (its front toward local +Z, as SkiLodge's MakeCabinet has it), the sides and the top and the back, a base rail under
 	/// the door, a moulded cornice over it, a rail inside and the dark of it.</summary>
@@ -588,6 +692,14 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		string cm = !rail || !Near(size.Z, 0.6f) ? null
+			: Near(size.X, 1.1f) && Near(size.Y, 2.1f) ? "lp_cabinet_case_110"
+			: Near(size.X, 1.2f) && Near(size.Y, 2.3f) ? "lp_cabinet_case_120" : null;
+		if (cm != null && Model(k, cm, xf, ("wood", wood), ("back", wood), ("brass", LodgeTextures.BrassMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		var was = Push(k, xf);
 		float w = size.X, h = size.Y, d = size.Z, t = 0.024f;
 		k.Mat(wood);
@@ -625,6 +737,14 @@ public static class LodgeProps
 		var col = k.Color;
 		k.Color = Colors.White;
 		float h = y1 - y0, st = 0.085f, rl = 0.1f;
+		string dm = !Near(y0, 0.1f) || !Near(knob.Y, 1.1f) || !Near(knob.Z, 0.025f) || !Near(knob.X, w - 0.08f) ? null
+			: Near(w, 1.1f) && Near(y1, 2.1f - 0.008f) ? "lp_cabinet_door_110"
+			: Near(w, 1.2f) && Near(y1, 2.3f - 0.008f) ? "lp_cabinet_door_120" : null;
+		if (dm != null && Model(k, dm, Transform3D.Identity, ("wood", wood), ("brass", LodgeTextures.BrassMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		k.Mat(wood);
 		k.BevelBox(new Vector3(w * 0.5f, (y0 + y1) * 0.5f, 0.0125f), new Vector3(w - 0.004f, h, 0.025f), 0.006f);
 		// the frame stands proud of the two panels' fields: rails and stiles as a raised lip, the fields raised again
@@ -649,6 +769,12 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Near(w, 1.2f) && Near(d, 0.64f) && Near(h, 0.765f) && Near(dw, 0.9f) && Near(dy0, 0.58f) && Near(dy1, 0.7f) && Near(inset, 0.031f)
+			&& Model(k, "lp_writing_desk", xf, ("wood", wood)))
+		{
+			k.Color = col;
+			return;
+		}
 		var was = Push(k, xf);
 		k.Mat(wood);
 		RoundSlab(k, new Vector3(0, h, 0), w * 0.5f, d * 0.5f, 0.032f, 0.02f, 0.012f, 2);
@@ -684,6 +810,11 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Near(hx, 0.9f) && Near(hz, 0.4f) && Near(h, 0.56f) && Model(k, "lp_tub", xf, ("porcelain", porcelain), ("brass", LodgeTextures.BrassMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		var was = Push(k, xf);
 		k.Mat(porcelain);
 		var rings = new List<Vector3[]>
@@ -724,6 +855,12 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Near(w, 0.94f) && Near(d, 0.6f) && Near(h, 0.9f) && Near(bx, 0f) && Near(bz, -0.04f)
+			&& Model(k, "lp_basin_top", xf, ("top", top), ("bowl", bowl), ("brass", LodgeTextures.BrassMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		var was = Push(k, xf);
 		k.Mat(top);
 		const int seg = 4, n = 20;
@@ -767,6 +904,11 @@ public static class LodgeProps
 	{
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Model(k, "lp_lavatory", xf, ("porcelain", porcelain), ("seat", seat), ("brass", LodgeTextures.BrassMat)))
+		{
+			k.Color = col;
+			return;
+		}
 		var was = Push(k, xf);
 		k.Mat(porcelain);
 		var bowl = new List<Vector3[]>();

@@ -296,9 +296,23 @@ public static class LodgeKit
 	public static List<Vector3> Chandelier(MeshKit k, Vector3 hang, float chain, float r, int arms, Material bulb)
 	{
 		var bulbs = new List<Vector3>();
-		k.Mat(LodgeTextures.IronMat);
 		k.Color = Colors.White;
 		Vector3 hub = hang + Vector3.Down * chain;
+		// (2026-10-15, the Blender pass) the hall's and the rooms' chandeliers modelled (a chain of links, turned hub and
+		// cups, arms swept down and up); the bulbs where they were
+		string model = Mathf.IsEqualApprox(chain, 8.2f, 0.01f) && Mathf.IsEqualApprox(r, 2.8f, 0.01f) && arms == 14 ? "lp_chandelier_hall"
+			: Mathf.IsEqualApprox(chain, 1.6f, 0.01f) && Mathf.IsEqualApprox(r, 1.2f, 0.01f) && arms == 8 ? "lp_chandelier_room" : null;
+		if (model != null && LodgeProps.Model(k, model, new Transform3D(Basis.Identity, hang), ("iron", LodgeTextures.IronMat), ("linen", LodgeTextures.LinenMat), ("bulb", bulb)))
+		{
+			foreach (var (ring, rr, dy) in new[] { (0, r, 0f), (1, r * 0.6f, 0.35f) })
+				for (int i = 0; i < arms; i++)
+				{
+					float a = Mathf.Tau * (i + ring * 0.5f) / arms;
+					bulbs.Add(hub + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * rr + Vector3.Up * (dy + 0.16f));
+				}
+			return bulbs;
+		}
+		k.Mat(LodgeTextures.IronMat);
 		k.Cylinder(hang, hub, 0.02f, 0.02f, 5, false);
 		k.Cylinder(hub + Vector3.Up * 0.15f, hub + Vector3.Down * 0.25f, 0.07f, 0.04f, 8, true);
 		foreach (var (ring, rr, dy) in new[] { (0, r, 0f), (1, r * 0.6f, 0.35f) })
@@ -337,6 +351,17 @@ public static class LodgeKit
 		Vector3 hub = ceiling + Vector3.Down * drop;
 		var col = k.Color;
 		k.Color = Colors.White;
+		if (Mathf.IsEqualApprox(drop, 1.25f, 0.01f) && Mathf.IsEqualApprox(r, 0.62f, 0.01f) && sockets == 8
+			&& LodgeProps.Model(k, "lp_wagon_wheel", new Transform3D(Basis.Identity, ceiling), ("darkwood", LodgeTextures.DarkWoodMat), ("iron", LodgeTextures.IronMat), ("glow", glow)))
+		{
+			for (int i = 0; i < sockets; i++)
+			{
+				float a = Mathf.Tau * (i + 0.5f) / sockets;
+				at.Add(hub + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r + Vector3.Up * (0.045f + 0.09f));
+			}
+			k.Color = col;
+			return at;
+		}
 		k.Mat(LodgeTextures.DarkWoodMat);
 		k.Cylinder(hub + Vector3.Down * 0.1f, hub + Vector3.Up * 0.1f, 0.09f, 0.09f, 10, true);
 		const int spokes = 12, segs = 24;
@@ -387,6 +412,12 @@ public static class LodgeKit
 		var col = k.Color;
 		k.Color = Colors.White;
 		Vector3 top = ceiling + Vector3.Down * (drop - 0.2f), rim = ceiling + Vector3.Down * drop;
+		if (Mathf.IsEqualApprox(drop, 1.75f, 0.01f)
+			&& LodgeProps.Model(k, "lp_pendant", new Transform3D(Basis.Identity, ceiling), ("black", LodgeTextures.BlackMat), ("shade", shade), ("glow", glow)))
+		{
+			k.Color = col;
+			return rim + Vector3.Up * 0.08f;
+		}
 		k.Mat(LodgeTextures.BlackMat);
 		k.Cylinder(ceiling, top, 0.006f, 0.006f, 4, false);
 		k.Cylinder(ceiling + Vector3.Down * 0.03f, ceiling + Vector3.Down * 0.003f, 0.05f, 0.06f, 8, true);

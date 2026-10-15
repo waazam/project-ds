@@ -173,7 +173,13 @@ public partial class SkiLodge
 				for (int s = 1; s <= 5; s++)
 				{
 					Vector3 p = Curve(s / 5f);
-					wire.Cylinder(prev, p, 0.005f, 0.005f, 4, false);
+					// (2026-10-15, the Blender pass: the wire a twisted pair modelled a metre long, stretched along each run; the
+					// bulbs an old C9's socket and glass; the code's cylinders and blobs their fallback)
+					var run = p - prev;
+					var rx = run.Normalized();
+					var ry = (Vector3.Up - rx * rx.Dot(Vector3.Up)).Normalized();
+					if (!Put(wire, "lp_wire", new Transform3D(new Basis(run, ry, rx.Cross(ry)), (prev + p) * 0.5f), ("wire", _wireMat)))
+						wire.Cylinder(prev, p, 0.005f, 0.005f, 4, false);
 					prev = p;
 				}
 				for (int s = 0; s < 3; s++)
@@ -182,8 +188,11 @@ public partial class SkiLodge
 					int ci = (n + s + st) % colours.Length;
 					bool isDead = rng.Randf() < 0.06f;
 					var kit = isDead ? dead : bulbs[ci];
-					kit.Cylinder(p + Vector3.Down * 0.005f, p + Vector3.Down * 0.024f, 0.009f, 0.009f, 6, false);   // the socket's cap (open: its flat ends lay in one plane with others')
-					kit.Blob(p + Vector3.Down * 0.044f, new Vector3(0.014f, 0.025f, 0.014f), n + s, 0f, false, 1f);
+					if (!Put(kit, "lp_xmas_bulb", new Transform3D(new Basis(Vector3.Up, (n + s) * 1.3f), p), ("socket", _wireMat), ("bulb", kit.CurrentMaterial)))
+					{
+						kit.Cylinder(p + Vector3.Down * 0.005f, p + Vector3.Down * 0.024f, 0.009f, 0.009f, 6, false);   // the socket's cap (open: its flat ends lay in one plane with others')
+						kit.Blob(p + Vector3.Down * 0.044f, new Vector3(0.014f, 0.025f, 0.014f), n + s, 0f, false, 1f);
+					}
 					if (!isDead) halos[ci].Add(new Transform3D(Basis.FromScale(Vector3.One * rng.RandfRange(0.85f, 1.15f)), p + Vector3.Down * 0.044f));
 					CrawlBulbs++;
 				}

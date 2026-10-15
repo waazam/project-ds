@@ -408,9 +408,16 @@ public partial class SkiLodge
 	/// <paramref name="rz"/>, turned <paramref name="yaw"/>.</summary>
 	private void Rug(MeshKit k, Vector3 c, float rx, float rz, float yaw, int palette)
 	{
-		k.Mat(RugMaterial(palette));
 		k.Color = Colors.White;
 		var b = new Basis(Vector3.Up, yaw);
+		// (2026-10-15, the Blender pass) a braided oval modelled at unit radius (its rings of braid, its edge rolled), its UVs
+		// the disc's; the flat disc below is the fallback
+		if (LodgeProps.Model(k, "lp_rug_oval", new Transform3D(b * Basis.FromScale(new Vector3(rx, 1f, rz)), c + Vector3.Down * 0.007f), ("rug", RugMaterial(palette))))
+		{
+			RugsLaid++;
+			return;
+		}
+		k.Mat(RugMaterial(palette));
 		const int n = 40;
 		for (int i = 0; i < n; i++)
 		{
@@ -472,13 +479,17 @@ public partial class SkiLodge
 				node.Position = spot.at + spot.n * 0.07f;
 				node.Basis = Basis.LookingAt(-spot.n, Vector3.Up);
 				var k = new MeshKit();
-				switch (what)
-				{
-					case 0: CrossedSkis(k); break;
-					case 1: Snowshoes(k); break;
-					case 2: SkisSideBySide(k); break;
-					default: Poles(k); break;
-				}
+				// (2026-10-15, the Blender pass: each hang modelled, tools/Blender/lodge_props.py; the code below is the fallback)
+				string model = what switch { 0 => "lp_skis_crossed", 1 => "lp_snowshoes", 2 => "lp_skis_pair", _ => "lp_poles" };
+				if (!LodgeProps.Model(k, model, Transform3D.Identity, ("ski", what == 2 ? _skiWood : _skiRed), ("wood", _skiWood), ("brass", LodgeTextures.BrassMat),
+					("strap", _strap), ("frame", _shoeFrame), ("lace", _shoeLace)))
+					switch (what)
+					{
+						case 0: CrossedSkis(k); break;
+						case 1: Snowshoes(k); break;
+						case 2: SkisSideBySide(k); break;
+						default: Poles(k); break;
+					}
 				// (2026-10-15, the scan pass: solid; the clip audit walked through them) a box round it, off the wall
 				MeshKit.Solidify(k.CommitTo(node, "Gear", true), Vector3.One * 0.95f);
 				_hung.Add((spot.at, spot.n, size.X));
@@ -604,16 +615,20 @@ public partial class SkiLodge
 	{
 		var b = Basis.LookingAt(-n, Vector3.Up);   // its back to the wall (-Z), its face +Z into the room
 		Vector3 P(float x, float y, float z) => floor + b * new Vector3(x, y, z) + n * 0.18f;
-		// (2026-10-15, the props pass: the furniture's varnish, the edges eased, a plinth and a cornice; it was six planks)
-		k.Mat(LodgeTextures.DoorWoodMat);
+		// (2026-10-15, the props pass: the furniture's varnish, the edges eased, a plinth and a cornice; it was six planks.
+		// The Blender pass: modelled, lp_bookshelf, with the code as its fallback)
 		k.Color = Colors.White;
-		k.Box(P(0, 0.95f, -0.15f), new Vector3(1.3f, 1.9f, 0.03f), 1f, b);
-		k.BevelBox(P(-0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 0.006f, 1f, b);
-		k.BevelBox(P(0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 0.006f, 1f, b);
-		for (int s = 0; s < 5; s++) k.BevelBox(P(0, 0.06f + s * 0.45f, 0), new Vector3(1.24f, 0.03f, 0.3f), 0.006f, 1f, b);
-		k.BevelBox(P(0, 0.04f, 0.145f), new Vector3(1.24f, 0.08f, 0.02f), 0.005f, 1f, b);   // the plinth's face
-		k.BevelBox(P(0, 1.92f, 0.01f), new Vector3(1.36f, 0.04f, 0.35f), 0.01f, 1f, b);   // the cornice
-		k.BevelBox(P(0, 1.95f, 0.005f), new Vector3(1.32f, 0.025f, 0.33f), 0.008f, 1f, b);
+		if (!LodgeProps.Model(k, "lp_bookshelf", new Transform3D(b, floor), ("wood", LodgeTextures.DoorWoodMat)))
+		{
+			k.Mat(LodgeTextures.DoorWoodMat);
+			k.Box(P(0, 0.95f, -0.15f), new Vector3(1.3f, 1.9f, 0.03f), 1f, b);
+			k.BevelBox(P(-0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 0.006f, 1f, b);
+			k.BevelBox(P(0.635f, 0.95f, 0), new Vector3(0.03f, 1.9f, 0.32f), 0.006f, 1f, b);
+			for (int s = 0; s < 5; s++) k.BevelBox(P(0, 0.06f + s * 0.45f, 0), new Vector3(1.24f, 0.03f, 0.3f), 0.006f, 1f, b);
+			k.BevelBox(P(0, 0.04f, 0.145f), new Vector3(1.24f, 0.08f, 0.02f), 0.005f, 1f, b);   // the plinth's face
+			k.BevelBox(P(0, 1.92f, 0.01f), new Vector3(1.36f, 0.04f, 0.35f), 0.01f, 1f, b);   // the cornice
+			k.BevelBox(P(0, 1.95f, 0.005f), new Vector3(1.32f, 0.025f, 0.33f), 0.008f, 1f, b);
+		}
 		float yaw = Mathf.Atan2(n.X, n.Z);
 		for (int s = 0; s < 4; s++)
 		{

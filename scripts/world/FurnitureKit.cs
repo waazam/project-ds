@@ -91,6 +91,9 @@ public static class FurnitureKit
 	private static Material Dressed(Material room, string model, Texture2D cavity)
 	{
 		if (cavity == null || room is not StandardMaterial3D sm) return room;
+		// (2026-10-15, the lodge's lights modelled) a glow keeps its own material, uncopied: a room's switch turns it by
+		// reference (LightSwitch.WireGlow), and a lit shade wants no creases darkened in it
+		if (sm.EmissionEnabled) return room;
 		string key = Dusty ? model : model + "#clean";
 		if (_mats.TryGetValue((room, key), out var m)) return m;
 		// dusty: one shader that is the dressed material and its dust together (furniture_dusty.gdshader); it had been

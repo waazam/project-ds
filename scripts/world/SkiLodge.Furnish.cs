@@ -307,8 +307,10 @@ public partial class SkiLodge
 	private static void FrontDesk(MeshKit k, Vector3 d0)
 	{
 		const float L = 3.2f, D = 0.6f, top = 1.13f;
-		k.Mat(LodgeTextures.DoorWoodMat);
 		k.Color = Colors.White;
+		// (2026-10-15, the Blender pass: tools/Blender/lodge_props.py; this code is its fallback)
+		if (LodgeProps.Model(k, "lp_front_desk", new Transform3D(Basis.Identity, d0 with { Y = 0f }), ("wood", LodgeTextures.DoorWoodMat), ("brass", LodgeTextures.BrassMat))) return;
+		k.Mat(LodgeTextures.DoorWoodMat);
 		k.BevelBox(d0 + new Vector3(0, 0.06f, 0.015f), new Vector3(L - 0.04f, 0.12f, D - 0.03f), 0.01f);                  // the plinth
 		k.Box(d0 + new Vector3(0, 0.6f, 0.01f), new Vector3(L - 0.06f, 0.96f, D - 0.04f), 1f);                             // the body
 		int panels = 6;
@@ -378,29 +380,32 @@ public partial class SkiLodge
 		float cx = BarCounterX, z0 = 1.6f, z1 = 6.6f;
 		// the counter: dark wood, its front in raised panels between pilasters (2026-10-14h, the kit pass: the front was a
 		// panel lit from within, and with the strip lights over it the bar read as an office), a brass foot rail, a worn
-		// bar top with a rounded nosing
-		k.Mat(LodgeTextures.DarkWoodMat);
-		k.Box(new Vector3(cx - 0.35f, 0.55f, (z0 + z1) * 0.5f), new Vector3(0.7f, 1.1f, z1 - z0), 1f);
-		k.Mat(LodgeTextures.DoorWoodMat);
-		int panels = 5;
-		float pw = (z1 - z0) / panels;
-		var faceB = new Basis(Vector3.Forward, Vector3.Up, Vector3.Right);   // (a panel's face toward +X, the customers)
-		for (int i = 0; i < panels; i++)
+		// bar top with a rounded nosing (2026-10-15: modelled in Blender, lp_bar_counter; this is its fallback)
+		if (!LodgeProps.Model(k, "lp_bar_counter", new Transform3D(Basis.Identity, new Vector3(cx, 0f, (z0 + z1) * 0.5f)), ("darkwood", LodgeTextures.DarkWoodMat), ("wood", LodgeTextures.DoorWoodMat), ("brass", LodgeTextures.BrassMat)))
 		{
-			float pz = z0 + pw * (i + 0.5f);
-			k.BevelBox(new Vector3(cx + 0.004f, 0.6f, pz), new Vector3(pw - 0.22f, 0.62f, 0.02f), 0.008f, 1f, faceB);       // the panel (its faces short of the blacklight ink on the front, 2.5 cm out)
-			k.BevelBox(new Vector3(cx + 0.009f, 0.6f, pz), new Vector3(pw - 0.36f, 0.48f, 0.02f), 0.008f, 1f, faceB);   // its raised field
+			k.Mat(LodgeTextures.DarkWoodMat);
+			k.Box(new Vector3(cx - 0.35f, 0.55f, (z0 + z1) * 0.5f), new Vector3(0.7f, 1.1f, z1 - z0), 1f);
+			k.Mat(LodgeTextures.DoorWoodMat);
+			int panels = 5;
+			float pw = (z1 - z0) / panels;
+			var faceB = new Basis(Vector3.Forward, Vector3.Up, Vector3.Right);   // (a panel's face toward +X, the customers)
+			for (int i = 0; i < panels; i++)
+			{
+				float pz = z0 + pw * (i + 0.5f);
+				k.BevelBox(new Vector3(cx + 0.004f, 0.6f, pz), new Vector3(pw - 0.22f, 0.62f, 0.02f), 0.008f, 1f, faceB);       // the panel (its faces short of the blacklight ink on the front, 2.5 cm out)
+				k.BevelBox(new Vector3(cx + 0.009f, 0.6f, pz), new Vector3(pw - 0.36f, 0.48f, 0.02f), 0.008f, 1f, faceB);   // its raised field
+			}
+			for (int i = 0; i <= panels; i++)
+				k.ChamferBox(new Vector3(cx + 0.03f, 0.55f, z0 + pw * i), new Vector3(0.06f, 1.02f, 0.09f), 0.012f);   // the pilasters
+			k.BevelBox(new Vector3(cx + 0.02f, 0.06f, (z0 + z1) * 0.5f), new Vector3(0.06f, 0.12f, z1 - z0), 0.01f);    // the kick
+			k.Mat(LodgeTextures.BrassMat);
+			k.Cylinder(new Vector3(cx + 0.22f, 0.16f, z0 + 0.05f), new Vector3(cx + 0.22f, 0.16f, z1 - 0.05f), 0.025f, 0.025f, 8, true);   // the foot rail
+			foreach (float z in new[] { z0 + 0.3f, (z0 + z1) * 0.5f, z1 - 0.3f })
+				k.Cylinder(new Vector3(cx + 0.05f, 0.16f, z), new Vector3(cx + 0.22f, 0.16f, z), 0.012f, 0.012f, 5, false);
+			k.Mat(LodgeTextures.DoorWoodMat);
+			k.BevelBox(new Vector3(cx - 0.3f, 1.13f, (z0 + z1) * 0.5f), new Vector3(0.92f, 0.05f, z1 - z0 + 0.12f), 0.02f);
+			k.Cylinder(new Vector3(cx + 0.16f, 1.12f, z0 - 0.06f), new Vector3(cx + 0.16f, 1.12f, z1 + 0.06f), 0.035f, 0.035f, 8, true);   // the nosing, rounded
 		}
-		for (int i = 0; i <= panels; i++)
-			k.ChamferBox(new Vector3(cx + 0.03f, 0.55f, z0 + pw * i), new Vector3(0.06f, 1.02f, 0.09f), 0.012f);   // the pilasters
-		k.BevelBox(new Vector3(cx + 0.02f, 0.06f, (z0 + z1) * 0.5f), new Vector3(0.06f, 0.12f, z1 - z0), 0.01f);    // the kick
-		k.Mat(LodgeTextures.BrassMat);
-		k.Cylinder(new Vector3(cx + 0.22f, 0.16f, z0 + 0.05f), new Vector3(cx + 0.22f, 0.16f, z1 - 0.05f), 0.025f, 0.025f, 8, true);   // the foot rail
-		foreach (float z in new[] { z0 + 0.3f, (z0 + z1) * 0.5f, z1 - 0.3f })
-			k.Cylinder(new Vector3(cx + 0.05f, 0.16f, z), new Vector3(cx + 0.22f, 0.16f, z), 0.012f, 0.012f, 5, false);
-		k.Mat(LodgeTextures.DoorWoodMat);
-		k.BevelBox(new Vector3(cx - 0.3f, 1.13f, (z0 + z1) * 0.5f), new Vector3(0.92f, 0.05f, z1 - z0 + 0.12f), 0.02f);
-		k.Cylinder(new Vector3(cx + 0.16f, 1.12f, z0 - 0.06f), new Vector3(cx + 0.16f, 1.12f, z1 + 0.06f), 0.035f, 0.035f, 8, true);   // the nosing, rounded
 		LodgeKit.Solid(_inBody, new Vector3(cx - 0.35f, 0.58f, (z0 + z1) * 0.5f), new Vector3(0.75f, 1.16f, z1 - z0));
 		// under the lip, on the customers' side, where a card could be taped: a dark recess
 		BarCardSpot = new Node3D { Name = "BarCardSpot", Position = new Vector3(cx + 0.13f, 1.08f, 3.9f) };
@@ -430,17 +435,22 @@ public partial class SkiLodge
 		// the back bar on the west wall: shelves of bottles in front of a mirror, a gilt frame
 		// (2026-10-15, the props pass) the mirror in a gilt frame, a moulded cornice over it; the base a run of panelled
 		// cupboards under a bar top; the shelves on brackets, each with a lip (they were a box and three planks)
-		k.Mat(LodgeTextures.MirrorMat);
-		k.Box(new Vector3(BarX0 + 0.1f, 2.0f, (z0 + z1) * 0.5f), new Vector3(0.02f, 1.6f, z1 - z0), 1f);
-		k.Mat(LodgeTextures.GoldMat);
-		k.BevelBox(new Vector3(BarX0 + 0.12f, 2.82f, (z0 + z1) * 0.5f), new Vector3(0.05f, 0.06f, z1 - z0 + 0.16f), 0.012f);
-		k.BevelBox(new Vector3(BarX0 + 0.135f, 2.87f, (z0 + z1) * 0.5f), new Vector3(0.08f, 0.05f, z1 - z0 + 0.24f), 0.015f);
-		foreach (float fz in new[] { z0 - 0.04f, z1 + 0.04f })
-			k.BevelBox(new Vector3(BarX0 + 0.12f, 2.0f, fz), new Vector3(0.05f, 1.66f, 0.08f), 0.012f);
+		// (2026-10-15: modelled in Blender, lp_back_bar and lp_case_backbar; the code is their fallback)
+		bool backModel = LodgeProps.Model(k, "lp_back_bar", new Transform3D(Basis.Identity, new Vector3(BarX0, 0f, (z0 + z1) * 0.5f)), ("mirror", LodgeTextures.MirrorMat), ("gold", LodgeTextures.GoldMat), ("wood", LodgeTextures.DoorWoodMat));
+		if (!backModel)
+		{
+			k.Mat(LodgeTextures.MirrorMat);
+			k.Box(new Vector3(BarX0 + 0.1f, 2.0f, (z0 + z1) * 0.5f), new Vector3(0.02f, 1.6f, z1 - z0), 1f);
+			k.Mat(LodgeTextures.GoldMat);
+			k.BevelBox(new Vector3(BarX0 + 0.12f, 2.82f, (z0 + z1) * 0.5f), new Vector3(0.05f, 0.06f, z1 - z0 + 0.16f), 0.012f);
+			k.BevelBox(new Vector3(BarX0 + 0.135f, 2.87f, (z0 + z1) * 0.5f), new Vector3(0.08f, 0.05f, z1 - z0 + 0.24f), 0.015f);
+			foreach (float fz in new[] { z0 - 0.04f, z1 + 0.04f })
+				k.BevelBox(new Vector3(BarX0 + 0.12f, 2.0f, fz), new Vector3(0.05f, 1.66f, 0.08f), 0.012f);
+		}
 		var backBar = new Transform3D(new Basis(Vector3.Up, -Mathf.Pi * 0.5f), new Vector3(BarX0 + 0.35f, FloorY, (z0 + z1) * 0.5f));
 		LodgeProps.Carcass(k, backBar, z1 - z0, 1.0f, 0.6f, LodgeTextures.DoorWoodMat, System.Array.Empty<(float, float)>(), legH: 0.1f, legs: false, topThick: 0.04f, bays: 8);
 		k.Mat(LodgeTextures.DoorWoodMat);
-		foreach (float y in new[] { 1.45f, 1.95f, 2.45f })
+		foreach (float y in backModel ? System.Array.Empty<float>() : new[] { 1.45f, 1.95f, 2.45f })
 		{
 			k.BevelBox(new Vector3(BarX0 + 0.25f, y, (z0 + z1) * 0.5f), new Vector3(0.3f, 0.035f, z1 - z0), 0.008f);
 			k.BevelBox(new Vector3(BarX0 + 0.395f, y + 0.02f, (z0 + z1) * 0.5f), new Vector3(0.012f, 0.03f, z1 - z0), 0.004f);   // the lip
@@ -1058,6 +1068,9 @@ public partial class SkiLodge
 	/// middle of the seat to the rim and on down to the hem, folded as it falls.</summary>
 	private static void ChairDustSheet(MeshKit k, Transform3D xf, int seed)
 	{
+		// (2026-10-15, the Blender pass) three sheets settled over the chair's model by a cloth simulation; the code's sheet
+		// below is the fallback
+		if (LodgeProps.Model(k, "lp_dust_sheet_" + (char)('a' + seed % 3), xf, ("linen", LodgeTextures.ChairSheetMat))) return;
 		var rng = new RandomNumberGenerator { Seed = (ulong)seed };
 		const int na = 40, nIn = 6, nOut = 7;
 		// (the model: the seat's top 0.495 from the front to z 0.15, the back z 0.2 to 0.31 and 0.98 high, 0.46 wide)

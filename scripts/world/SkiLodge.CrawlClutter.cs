@@ -180,14 +180,31 @@ public partial class SkiLodge
 		};
 	}
 
+	/// <summary>(2026-10-15, the Blender pass) A piece modelled in Blender (tools/Blender/lodge_props.py) into one of these
+	/// kits, its roles in the kits' own materials; the kit's material back as it was after (each kit draws in its own).
+	/// False if the model isn't there (the code builds it).</summary>
+	private static bool Put(MeshKit k, string model, Transform3D xf, params (string role, Material m)[] roles)
+	{
+		var was = k.CurrentMaterial;
+		bool ok = LodgeParts.LodgeProps.Model(k, model, xf, roles);
+		if (was != null) k.Mat(was);
+		return ok;
+	}
+
 	/// <summary>A balled-up sheet: a lumpy, creased little ball, resting on the floor.</summary>
 	private static void Crumple(MeshKit k, Vector3 at, float r, RandomNumberGenerator rng)
-		=> k.Blob(at + Vector3.Up * r * 0.75f, new Vector3(r, r * 0.8f, r * 1.05f), rng.RandiRange(1, 99999), 0.38f, false, 1f, 0f, 1);
+	{
+		int seed = rng.RandiRange(1, 99999);
+		var b = new Basis(Vector3.Up, seed * 0.37f) * Basis.FromScale(Vector3.One * r);
+		if (Put(k, "lp_paper_ball", new Transform3D(b, at), ("paper", k.CurrentMaterial))) return;
+		k.Blob(at + Vector3.Up * r * 0.75f, new Vector3(r, r * 0.8f, r * 1.05f), seed, 0.38f, false, 1f, 0f, 1);
+	}
 
 	/// <summary>A loose sheet lying on the floor, a little curled and creased (a grid of 4 x 4, lifted here and there).</summary>
 	private static void Sheet(MeshKit k, Vector3 at, Vector2 size, float yaw, RandomNumberGenerator rng, float lift = 0.015f)
 	{
 		var rot = new Basis(Vector3.Up, yaw);
+		if (Put(k, "lp_paper_sheet", new Transform3D(rot * Basis.FromScale(new Vector3(size.X, lift / 0.03f, size.Y)), at), ("paper", k.CurrentMaterial))) return;
 		const int n = 4;
 		var p = new Vector3[n + 1, n + 1];
 		for (int i = 0; i <= n; i++)
@@ -207,6 +224,7 @@ public partial class SkiLodge
 	private static void Bow(MeshKit k, Vector3 at, float s, float yaw, RandomNumberGenerator rng)
 	{
 		var rot = new Basis(Vector3.Up, yaw);
+		if (Put(k, "lp_bow", new Transform3D(rot * Basis.FromScale(Vector3.One * s * 1.3f), at), ("ribbon", k.CurrentMaterial))) return;
 		var x = rot * Vector3.Right;
 		foreach (float side in new[] { -1f, 1f })
 		{
@@ -221,6 +239,7 @@ public partial class SkiLodge
 	private static void Gift(MeshKit wrap, MeshKit ribbon, Vector3 at, float s, float yaw)
 	{
 		var rot = new Basis(Vector3.Up, yaw);
+		if (Put(wrap, "lp_gift", new Transform3D(rot * Basis.FromScale(Vector3.One * s), at), ("wrap", wrap.CurrentMaterial), ("ribbon", ribbon.CurrentMaterial))) return;
 		var size = new Vector3(s, s * 0.7f, s * 0.85f);
 		var c = at + Vector3.Up * size.Y * 0.5f;
 		wrap.Box(c, size, 1f, rot);
@@ -234,6 +253,9 @@ public partial class SkiLodge
 	private static void Tinsel(MeshKit k, Vector3 at, Vector3 dir, float len, RandomNumberGenerator rng, float down = float.NaN)
 	{
 		var side = dir.Cross(Vector3.Up).Normalized();
+		// (on the floor: the modelled run, 1 m along its x; spilling down a box's side, the code's)
+		var dn = (dir with { Y = 0f }).Normalized();
+		if (float.IsNaN(down) && Put(k, "lp_tinsel", new Transform3D(new Basis(dn * len, Vector3.Up, dn.Cross(Vector3.Up)), at), ("tinsel", k.CurrentMaterial))) return;
 		var prev = at;
 		for (int i = 1; i <= 8; i++)
 		{
@@ -254,6 +276,11 @@ public partial class SkiLodge
 	/// <summary>A wreath: a ring of fir clumps, a few berries in it, a red bow at its foot; flat to <paramref name="normal"/>.</summary>
 	private static void Wreath(MeshKit fir, MeshKit berry, MeshKit ribbon, Vector3 at, Vector3 normal, float r, RandomNumberGenerator rng)
 	{
+		// (the model: flat to its +Z, its bow at its foot, -Y; that turned as near upright as the wreath lies)
+		var wy = Vector3.Up - normal * normal.Dot(Vector3.Up);
+		wy = wy.LengthSquared() > 1e-4f ? wy.Normalized() : Vector3.Forward;
+		if (Put(fir, "lp_wreath_small", new Transform3D(new Basis(wy.Cross(normal), wy, normal) * Basis.FromScale(Vector3.One * r), at),
+			("fir", fir.CurrentMaterial), ("berry", berry.CurrentMaterial), ("ribbon", ribbon.CurrentMaterial))) return;
 		var u = normal.Cross(Mathf.Abs(normal.Y) < 0.9f ? Vector3.Up : Vector3.Right).Normalized();
 		var v = normal.Cross(u).Normalized();
 		for (int i = 0; i < 22; i++)
@@ -273,6 +300,12 @@ public partial class SkiLodge
 	/// <summary>A strand of holly stapled up at both ends, sagging between: leaf clumps, red berries every few.</summary>
 	private static void Holly(MeshKit leaf, MeshKit berry, Vector3 a, Vector3 b, float sag, Vector3 outward, RandomNumberGenerator rng)
 	{
+		// (the model: 1 m along its x, sagging 0.16, its leaves out toward +Z; x run from b to a so the frame's right-handed)
+		var hx = a - b;
+		var oz = (outward - hx.Normalized() * outward.Dot(hx.Normalized())).Normalized();
+		if (hx.Normalized().Cross(Vector3.Up).Dot(oz) < 0f) hx = -hx;
+		if (Put(leaf, "lp_holly", new Transform3D(new Basis(hx, Vector3.Up * (sag / 0.16f), oz), (a + b) * 0.5f), ("holly", leaf.CurrentMaterial), ("berry", berry.CurrentMaterial)))
+			return;
 		const int n = 14;
 		for (int i = 0; i <= n; i++)
 		{
