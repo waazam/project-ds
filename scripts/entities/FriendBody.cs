@@ -112,6 +112,8 @@ public partial class FriendBody : Node3D
 	});
 
 	private static StandardMaterial3D GauzeMat => ItemTextures.Std("fr_gauze", Gauze(), 0.9f, 0.2f);
+	/// <summary>The Blender models' materials only this file knows (ItemModels paints the rest).</summary>
+	private static Material Paint(string name) => name == "gauze" ? GauzeMat : null;
 	/// <summary>Old, dried blood: near black-brown, a faint sheen, never bright red.</summary>
 	private static StandardMaterial3D StainMat => (StandardMaterial3D)ItemTextures.Cached("fr_stain", () => new StandardMaterial3D
 	{
@@ -151,6 +153,11 @@ public partial class FriendBody : Node3D
 		var floor = k.CommitTo(this, "LeftBehind", false);
 		floor.SetMeta("friend_generated", true);
 		TriangleCount += ItemMeshes.CountTriangles(floor.Mesh);
+		if (ItemModels.Add(this, "friend", "FriendFloorBandage", Transform3D.Identity, "FloorBandage", Paint, false) is { } fb)
+		{
+			fb.SetMeta("friend_generated", true);
+			TriangleCount += ItemModels.Triangles(fb);
+		}
 
 		if (BuildCollision && !Engine.IsEditorHint())
 		{
@@ -195,7 +202,8 @@ public partial class FriendBody : Node3D
 		Stain(k, new Vector3(0.34f, 0.004f, 1.45f), 0.03f, 1f, 7103);
 		Stain(k, new Vector3(0.28f, 0.004f, 1.8f), 0.025f, 1f, 7104);
 		Stain(k, new Vector3(0.36f, 0.004f, 2.2f), 0.02f, 1f, 7105);
-		// a loose strip of bandage on the floor beside the chair, dark at one end
+		// a loose strip of bandage on the floor beside the chair, dark at one end (Blender's when it's there: BuildFloorBandage)
+		if (ItemModels.Get("friend", "FriendFloorBandage") != null) return;
 		k.Mat(GauzeMat);
 		k.Color = S(0.66f, 0.63f, 0.57f);
 		ItemMeshes.Ribbon(k, new[]
@@ -213,6 +221,23 @@ public partial class FriendBody : Node3D
 	{
 		var old = chair.GetNodeOrNull("Generated");
 		if (old != null) { chair.RemoveChild(old); old.QueueFree(); }
+		// (2026-10-15, the owner: every model made in Blender) the chair is Blender's (tools/Blender/items_small.py); the dried
+		// smears stay here, laid over it. The code after this is the fallback.
+		var mgen = new Node3D { Name = "Generated" };
+		chair.AddChild(mgen);
+		var model = ItemModels.Add(mgen, "friend", "FriendChair", Transform3D.Identity, "ChairMesh", Paint);
+		if (model != null)
+		{
+			var sk = new MeshKit();
+			sk.Mat(StainMat);
+			sk.Color = Colors.White;
+			Stain(sk, new Vector3(0.1f, 0.45f + 0.0015f, 0.12f), 0.06f, 1.4f, 7111, 0.2f);
+			sk.Box(new Vector3(0.185f, 0.29f, 0.2f), new Vector3(0.012f, 0.14f, 0.006f), 1f, new Basis(Vector3.Forward, -0.05f));
+			sk.CommitTo(mgen, "Stains", false);
+			return ItemModels.Triangles(model);
+		}
+		chair.RemoveChild(mgen);
+		mgen.QueueFree();
 		var k = new MeshKit();
 		k.Mat(ProcTextures.WoodMat);
 		k.Color = new Color(0.4f, 0.31f, 0.22f);
@@ -271,6 +296,26 @@ public partial class FriendBody : Node3D
 	{
 		var old = table.GetNodeOrNull("Generated");
 		if (old != null) { table.RemoveChild(old); old.QueueFree(); }
+		// (2026-10-15) the table and the bandage on it are Blender's; the stains stay here. The code after this is the fallback.
+		var mgen = new Node3D { Name = "Generated" };
+		table.AddChild(mgen);
+		var model = ItemModels.Add(mgen, "friend", "FriendTable", Transform3D.Identity, "TableMesh", Paint);
+		if (model != null)
+		{
+			int tris = ItemModels.Triangles(model);
+			tris += ItemModels.Triangles(ItemModels.Add(mgen, "friend", "FriendBandage", Transform3D.Identity, "Bandage", Paint, false));
+			var sk = new MeshKit();
+			sk.Mat(StainMat);
+			sk.Color = Colors.White;
+			float sy = TableTop + 0.0015f;
+			Stain(sk, new Vector3(0.265f, sy, 0.02f), 0.09f, 1.25f, 4417);
+			Stain(sk, new Vector3(0.2f, sy, -0.2f), 0.045f, 1.3f, 4418, 0.5f);
+			sk.Box(new Vector3(0.23f, TableTop - 0.05f, -0.352f), new Vector3(0.05f, 0.09f, 0.004f), 1f);
+			sk.CommitTo(mgen, "Stains", false);
+			return tris;
+		}
+		table.RemoveChild(mgen);
+		mgen.QueueFree();
 		var k = new MeshKit();
 		k.Mat(ProcTextures.WoodMat);
 		k.Color = new Color(0.5f, 0.39f, 0.27f);

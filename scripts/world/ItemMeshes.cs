@@ -208,6 +208,7 @@ public static class ItemMeshes
 	{
 		var k = new MeshKit();
 		var b = new Built { PickCenter = new Vector3(0, 0.08f, 0), PickRadius = 0.3f };
+		if (FromBlender(kind, parent, ref b)) return b;
 		switch (kind)
 		{
 			case ToolKind.Axe: Axe(k, ref b); break;
@@ -236,9 +237,41 @@ public static class ItemMeshes
 		return b;
 	}
 
+	/// <summary>(2026-10-15, the owner: every model made in Blender) The small pickups and key items from
+	/// assets/models/items/small_items.glb (tools/Blender/items_small.py), each placed with the old code's own transform and
+	/// pick sphere. False when the item isn't modelled there (or the file is missing): the code below builds it.</summary>
+	private static bool FromBlender(ToolKind kind, Node3D parent, ref Built b)
+	{
+		(string node, Transform3D xf, Vector3 pick, float radius) = kind switch
+		{
+			ToolKind.Key => ("Key", new Transform3D(new Basis(Vector3.Up, 0.5f), new Vector3(0.01f, 0.083f, 0)), new Vector3(0, 0.1f, 0), 0.3f),
+			ToolKind.Bookmark => ("Bookmark", new Transform3D(new Basis(Vector3.Up, 0.5f), new Vector3(0, 0.002f, 0)), new Vector3(0, 0.02f, 0), 0.18f),
+			ToolKind.Keycard201 => ("Keycard201", new Transform3D(new Basis(Vector3.Up, 0.3f), new Vector3(0, 0.002f, 0)), new Vector3(0, 0.01f, 0), 0.1f),
+			ToolKind.Keycard202 => ("Keycard202", new Transform3D(new Basis(Vector3.Up, 0.3f), new Vector3(0, 0.002f, 0)), new Vector3(0, 0.01f, 0), 0.1f),
+			ToolKind.Keycard203 => ("Keycard203", new Transform3D(new Basis(Vector3.Up, 0.3f), new Vector3(0, 0.002f, 0)), new Vector3(0, 0.01f, 0), 0.1f),
+			ToolKind.PantryKey => ("PantryKey", new Transform3D(new Basis(Vector3.Up, -0.5f), new Vector3(0, 0.006f, 0)), new Vector3(0, 0.02f, 0), 0.12f),
+			ToolKind.DiningKey => ("DiningKey", new Transform3D(new Basis(Vector3.Up, 0.8f), new Vector3(0, 0.008f, 0)), new Vector3(0, 0.02f, -0.03f), 0.14f),
+			ToolKind.FontKey => ("FontKey", new Transform3D(new Basis(Vector3.Up, 0.4f), new Vector3(0, 0.012f, 0)), new Vector3(0, 0.02f, 0), 0.16f),
+			ToolKind.Chalice => ("Chalice", Transform3D.Identity, new Vector3(0, 0.1f, 0), 0.16f),
+			ToolKind.Compass => ("Compass", new Transform3D(new Basis(Vector3.Up, -0.5f).Scaled(Vector3.One * 0.6f), Vector3.Zero), new Vector3(0, 0.035f, -0.01f), 0.22f),
+			_ => (null, Transform3D.Identity, Vector3.Zero, 0f),
+		};
+		if (node == null) return false;
+		var mi = ItemModels.Add(parent, "small_items", node, xf);
+		if (mi == null) return false;
+		b.PickCenter = pick;
+		b.PickRadius = radius;
+		b.Triangles = ItemModels.Triangles(mi);
+		return true;
+	}
+
 	/// <summary>Scenery the item rests on, which stays when the item is taken. Returns false if the item has none.</summary>
 	public static bool BuildRest(ToolKind kind, Node3D parent, int seed = 0)
 	{
+		// (2026-10-15: modelled in Blender, the old code below the fallback)
+		string rest = kind switch { ToolKind.Axe => "ChoppingStump", ToolKind.Key => "FlatStone", _ => null };
+		if (rest != null && ItemModels.Add(parent, "small_items", rest, new Transform3D(new Basis(Vector3.Up, seed * 0.7f), Vector3.Zero), "RestMesh") != null)
+			return true;
 		var k = new MeshKit();
 		switch (kind)
 		{

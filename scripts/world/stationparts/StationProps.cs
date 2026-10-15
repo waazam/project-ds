@@ -114,10 +114,11 @@ public static class StationProps
 		root.AddChild(ball);
 		LakeCreature.BuildEye(ball);
 		// a milky film over it: dead. Clear of the iris and pupil (which stand to 1.07 of the radius): at 1.03 they poked
-		// through its facets and read as something clipping through the eye.
+		// through its facets and read as something clipping through the eye. (2026-10-15: its sphere and the torn stump are
+		// Blender's, tools/Blender/items_small.py; the primitive and MeshKit below are the fallback.)
 		ball.AddChild(new MeshInstance3D
 		{
-			Mesh = new SphereMesh { Radius = 1.12f, Height = 2.24f, RadialSegments = 16, Rings = 10 },
+			Mesh = ItemModels.Get("station_items", "DeadEyeFilm") ?? new SphereMesh { Radius = 1.12f, Height = 2.24f, RadialSegments = 16, Rings = 10 },
 			MaterialOverride = new StandardMaterial3D
 			{
 				AlbedoColor = new Color(0.8f, 0.8f, 0.72f, 0.28f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
@@ -126,6 +127,10 @@ public static class StationProps
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
 		});
 		if (!stump) return root;       // set in the iron door: the stump would come out through the back of it
+		// (modelled for a 0.13 m ball, scaled to this one's)
+		if (ItemModels.Add(root, "station_items", "DeadEyeStump", new Transform3D(Basis.Identity.Scaled(Vector3.One * (r / 0.13f)), Vector3.Zero), "LidAndStump",
+			n => n == "meat" ? StationTextures.MeatMat : null) != null)
+			return root;
 		var k = new MeshKit();
 		// (it had a droopy upper lid: a sheet of skin whose drooping front edge cut through the eyeball and read as a
 		// dark band across it (the owner: the eye should never be obscured). The wet rim round it stays: BuildEye's.)
@@ -144,6 +149,14 @@ public static class StationProps
 	{
 		var root = new Node3D { Name = "PaleHand" };
 		parent.AddChild(root);
+		// (2026-10-15: Blender's, tools/Blender/items_small.py; the code below is the fallback)
+		if (ItemModels.Add(root, "station_items", "PaleHand", Transform3D.Identity, "Hand", n => n switch
+			{
+				"skin_pale" => StationTextures.Flat("st_skin_pale", new Color(0.78f, 0.74f, 0.68f), 0.5f, 0.35f),
+				"skin_cut" => StationTextures.Flat("st_skin_cut", new Color(0.45f, 0.08f, 0.07f), 0.3f, 0.5f),
+				_ => null,
+			}) != null)
+			return root;
 		var k = new MeshKit();
 		k.Mat(StationTextures.Flat("st_skin_pale", new Color(0.78f, 0.74f, 0.68f), 0.5f, 0.35f));
 		k.Color = Colors.White;
@@ -169,6 +182,14 @@ public static class StationProps
 	{
 		var root = new Node3D { Name = "StairTread" };
 		parent.AddChild(root);
+		// (2026-10-15: Blender's, tools/Blender/items_small.py; the code below is the fallback)
+		if (ItemModels.Add(root, "station_items", "StairTread", Transform3D.Identity, "Tread", n => n switch
+			{
+				"deck" => PropTextures.DeckMat,
+				"carve" => StationTextures.Flat("st_carve", new Color(0.18f, 0.15f, 0.12f), 0.9f, 0.1f),
+				_ => null,
+			}) != null)
+			return root;
 		var k = new MeshKit();
 		k.Mat(PropTextures.DeckMat);
 		k.Color = new Color(0.55f, 0.52f, 0.48f);
