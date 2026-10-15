@@ -59,6 +59,7 @@ public partial class WalkiePickup : Area3D
 		};
 		_use.Interacted += OnInteract;
 		AddChild(_use);
+		ItemOutline.Attach(_item, _item, () => !_taken);   // the pickups' thin white line (2026-10-14)
 
 		AddToGroup("walkie_marker");   // the compass finds it after the screens
 		string path = "res://assets/audio/ambient/radio_static_loop.wav";

@@ -26,6 +26,9 @@ public partial class Curio : Interactable
 	public static Curio Add(Node3D parent, Vector3 local, string prompt, Kind kind, params string[] lines)
 	{
 		var c = new Curio { Name = "Curio_" + prompt.Replace(' ', '_'), Prompt = prompt, _kind = kind, _lines = lines, PickRadius = 0.16f, MaxDistance = 2.2f, Position = local };
+		// no white outline (2026-10-14): a curio is drawn into its room's one mesh, and the nearest mesh of its own was
+		// something else (the books on the mantel outlined the ski poles beside them)
+		c.Outline = false;
 		parent.AddChild(c);
 		return c;
 	}

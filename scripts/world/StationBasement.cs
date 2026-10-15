@@ -711,8 +711,9 @@ public partial class StationBasement : Node3D
 			tw.TweenProperty(mi, "rotation", new Vector3(rng.RandfRange(-6f, 6f), rng.RandfRange(-6f, 6f), rng.RandfRange(-6f, 6f)), 0.7f);
 		}
 		// the key, clear of the wreck, out on the floor toward the room
-		Vector3 keyAt = at + new Vector3(1.3f, 0.02f, 1.2f);
-		var key = new Pickup { Name = "ClockKey", Kind = ToolKind.Key, TakenId = "station_key", UseSpot = false, SnapToSurface = false, Position = live ? at + new Vector3(0, 1.85f, 0.3f) : keyAt, TakenLine = "Still wet. Warm." };
+		// (on the floor itself: it lay 10 cm over it once the flat stone that came with every key was gone; the pickup audit)
+		Vector3 keyAt = at + new Vector3(1.3f, -0.072f, 1.2f);
+		var key = new Pickup { Name = "ClockKey", Kind = ToolKind.Key, TakenId = "station_key", UseSpot = false, SnapToSurface = false, WithRest = false, Position = live ? at + new Vector3(0, 1.85f, 0.3f) : keyAt, TakenLine = "Still wet. Warm." };
 		AddChild(key);
 		if (live)
 		{

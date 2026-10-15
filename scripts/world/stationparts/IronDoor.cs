@@ -98,6 +98,7 @@ public partial class IronDoor : Node3D
 		{
 			Name = "Use", Prompt = "Three hollows in the iron", PickRadius = 0.7f, MaxDistance = 2.8f, Position = new Vector3(0, 1.35f, -0.1f),
 			PromptFor = PromptFor, Enabled = false,
+			Outline = true,   // (the white outline: a door, but the three hollows are the puzzle, not the way through)
 		};
 		_doorUse.Interacted += OnDoorUsed;
 		_leaf.AddChild(_doorUse);
@@ -234,7 +235,7 @@ public partial class IronDoor : Node3D
 
 		_webUse = new PickupInteractable
 		{
-			Name = "WebUse", Prompt = "Thick with web", PickRadius = 0.9f, MaxDistance = 3.2f, Position = new Vector3(0, 1.3f, -0.3f),
+			Name = "WebUse", Prompt = "Thick with web", PickRadius = 0.9f, MaxDistance = 3.2f, Position = new Vector3(0, 1.3f, -0.3f), Outline = true,   // (the web is the thing, not the door)
 			PromptFor = p => p?.Inventory is { } inv && inv.HasTool(ToolKind.Lighter) ? "Burn the web" : "Thick with web. It won't tear.",
 		};
 		_webUse.Interacted += OnWebUsed;

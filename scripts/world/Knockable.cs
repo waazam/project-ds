@@ -65,6 +65,7 @@ public partial class Knockable : RigidBody3D
 			_take = new Interactable { Name = "Take", Prompt = TakePrompt, PickRadius = 0.3f, MaxDistance = 2.2f, Position = Vector3.Up * Size.Y * 0.5f };
 			_take.Interacted += Take;
 			AddChild(_take);
+			ItemOutline.Attach(this, this);   // the pickups' thin white line (2026-10-14)
 		}
 		_landed = !Thrown;
 	}

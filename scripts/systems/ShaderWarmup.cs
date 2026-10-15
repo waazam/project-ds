@@ -65,6 +65,14 @@ public partial class ShaderWarmup : Node
 		var seen = new HashSet<(ulong, ulong)>();
 		int n = 0;
 		Walk(root, _held, seen, ref n, false);
+		// the pickups' white outline on the items' own vertex layout (MeshKit's), for one revealed later in the level
+		var kit = new World.MeshKit();
+		kit.Mat(new StandardMaterial3D());
+		kit.Box(Vector3.Zero, Vector3.One * 0.1f);
+		var outlined = new MeshInstance3D { Name = "OutlineWarm", Mesh = kit.Commit() };
+		outlined.SetMeta(World.ItemOutline.Meta, true);
+		outlined.MaterialOverlay = World.ItemOutline.WarmOverlay(outlined);
+		Place(_held, outlined, ref n);
 		// the skinned ones drawn as themselves (their skinning set up too), each for those few frames
 		var placed = new List<IWarmUp>();
 		foreach (var w in tree.GetNodesInGroup("warm_up_self"))
@@ -107,9 +115,18 @@ public partial class ShaderWarmup : Node
 					if (seen.Add(key)) fresh = true;
 				}
 				if (mi.MaterialOverlay != null && seen.Add((mi.MaterialOverlay.GetRid().Id, 1))) fresh = true;
+				// a pickup's white outline (World.ItemOutline): its overlay is on only near it, so it's drawn here with the
+				// outline's shared pair, once for each vertex layout an item has
+				var overlay = mi.MaterialOverlay;
+				if (overlay == null && World.ItemOutline.WarmOverlay(mi) is { } outline)
+				{
+					overlay = outline;
+					for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
+						if (seen.Add((outline.GetRid().Id, 3ul << 58 ^ (ulong)(mi.Mesh is ArrayMesh om ? (long)om.SurfaceGetFormat(s) : 0)))) fresh = true;
+				}
 				if (fresh)
 				{
-					var copy = new MeshInstance3D { Mesh = mi.Mesh, MaterialOverride = mi.MaterialOverride, MaterialOverlay = mi.MaterialOverlay, CastShadow = mi.CastShadow };
+					var copy = new MeshInstance3D { Mesh = mi.Mesh, MaterialOverride = mi.MaterialOverride, MaterialOverlay = overlay, CastShadow = mi.CastShadow };
 					// (each surface's own override too: without it the copy drew the mesh's imported materials, and the
 					// ones the thing is really drawn with, a creature's skin set on its model, were never warmed)
 					for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)

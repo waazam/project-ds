@@ -43,6 +43,9 @@ public partial class Searchable : Node3D
 		{
 			Name = "Use", PickRadius = PickRadius, MaxDistance = 2.2f, Position = Grip,
 			PromptFor = _ => IsOpen ? "" : $"Search the {What}", CanUse = _ => !IsOpen,
+			// the white outline (2026-10-14): a drawer or a cupboard is part of the furniture, outlined only while
+			// something's in it (a wardrobe's doors too, then: it's the find that's outlined for, not the door)
+			Outline = true, OutlineWhen = () => HasSomething && !IsOpen, HighlightRoot = new NodePath("../Part"),
 		};
 		Use.Interacted += p => Open(p);
 		AddChild(Use);

@@ -80,7 +80,7 @@ public partial class SkiLodge
 		ck.CommitTo(FrontChain, "Chain", false);
 		FrontInsideUse = new PickupInteractable
 		{
-			Name = "FrontInsideUse", PickRadius = 1.2f, MaxDistance = 2.8f, Position = dc + new Vector3(0, 0, -0.3f),
+			Name = "FrontInsideUse", PickRadius = 1.2f, MaxDistance = 2.8f, Position = dc + new Vector3(0, 0, -0.3f), Outline = false,   // (a door: no white outline)
 			PromptFor = _ => FrontBroken ? "" : Frozen ? "Push the door open" : "Requires Master Key.",
 			CanUse = _ => !FrontBroken && !_finaleRunning,
 		};
