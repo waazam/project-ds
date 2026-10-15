@@ -10,9 +10,11 @@ namespace ProjectDS.World;
 /// metres upstream of the trail crossing, and builds, all in code:
 /// - a rock ledge across the channel (the water slides over its flat top) with a wet rock
 ///   face under it and stacked boulders framing it on both banks (solid);
-/// - a pale water curtain from the lip to the pool: a curved strip with a scrolling streak
-///   texture, fading at its edges;
-/// - foam on the water below, drifting downstream, and a thin mist;
+/// - the water from the lip to the pool (the gushy-water pass, 2026-10-15: <see cref="FlowFx"/>'s pour): dark glassy
+///   water over the ledge, then a curtain combed into ropes, whitening as it falls, surging, its sides ragged, with
+///   three strands of it standing out over the curtain;
+/// - where it lands: a churning boil of white water, spray thrown up off it, a thin mist (the flat foam patch
+///   that drifted below it is gone: the creek's own foam streaks carry the white water on down);
 /// - a quiet looping water sound on the Water bus (the creek's own loop, pitched down: the
 ///   stream audio already along the creek carries most of it);
 /// - clear zones along the creek down to the bridge so the fall can be seen from the deck.
@@ -175,9 +177,13 @@ public partial class Waterfall : Node3D
 		k.CommitTo(this, "RockMesh");
 
 		BuildWater(sLip, sTop, sCurt, lipY, curtBottom);
-		BuildFoam(sCurt);
+
 		Flat(sCurt, out Vector2 flow);
 		BuildMist(P(sCurt, 0, curtBottom + 0.15f), flow);
+		// (the gushy-water pass) where it lands: a boil of white water, and spray thrown up off it
+		// (over the creek's own surface and its waves: it writes depth, and would hide a churn sat on it)
+		FlowFx.Churn(this, P(sCurt + 0.25f, 0, Level(sCurt + 0.25f) + 0.1f), 1.35f, FlowFx.Liquid.Creek, 1f, "FootChurn");
+		FlowFx.Spray(this, P(sCurt, 0, curtBottom + 0.05f), FlowFx.Liquid.Creek, CurtainWidth * 0.9f, 56, 2.4f, "FootSpray");
 		BuildSound(P(sCurt, 0, curtBottom + 0.5f));
 		BuildClearZones(sLip, sPool, sCross);
 
@@ -198,39 +204,6 @@ public partial class Waterfall : Node3D
 
 	// ------------------------------------------------------------------ water
 
-	private const string WaterShader = @"
-shader_type spatial;
-render_mode blend_mix, cull_disabled, depth_draw_never, diffuse_lambert, specular_schlick_ggx;
-uniform sampler2D streaks : source_color, filter_linear_mipmap, repeat_enable;
-uniform vec4 tint : source_color = vec4(0.8, 0.86, 0.88, 1.0);
-uniform float speed = 1.5;
-uniform vec2 scale = vec2(1.0, 0.5);
-uniform float opacity = 0.85;
-uniform float glow = 0.12;
-void fragment() {
-	vec2 uv = UV * scale;
-	vec4 a = texture(streaks, uv + vec2(0.0, -TIME * speed));
-	vec4 b = texture(streaks, uv * vec2(1.6, 0.7) + vec2(0.37, -TIME * speed * 0.63));
-	float edge = smoothstep(0.0, 0.18, UV.x) * smoothstep(1.0, 0.82, UV.x);
-	float al = max(a.a, b.a * 0.85);
-	ALBEDO = tint.rgb * (0.78 + 0.3 * a.r) * COLOR.rgb;
-	EMISSION = tint.rgb * glow * al;
-	ROUGHNESS = 0.25;
-	SPECULAR = 0.55;
-	ALPHA = clamp(al * opacity * edge * COLOR.a, 0.0, 1.0);
-}";
-
-	private static ShaderMaterial WaterMat(Texture2D tex, float speed, Vector2 scale, float opacity, float glow)
-	{
-		var m = new ShaderMaterial { Shader = new Shader { Code = WaterShader } };
-		m.SetShaderParameter("streaks", tex);
-		m.SetShaderParameter("speed", speed);
-		m.SetShaderParameter("scale", scale);
-		m.SetShaderParameter("opacity", opacity);
-		m.SetShaderParameter("glow", glow);
-		return m;
-	}
-
 	/// <summary>The lip (flat water over the ledge) and the curtain (the drop), one strip, UV.x across, UV.y along the flow.</summary>
 	private void BuildWater(float sLip, float sTop, float sCurt, float lipY, float bottomY)
 	{
@@ -248,10 +221,16 @@ void fragment() {
 			float s = Mathf.Lerp(sTop, sCurt, Mathf.Sqrt(v) * 0.85f + v * 0.15f);   // shoots out, then falls near-vertical
 			path.Add(P(s, 0, Mathf.Lerp(lipY + 0.015f, bottomY, v * v * 0.6f + v * 0.4f)));
 		}
-		var mat = WaterMat(PropTextures.FallStreaks(), 1.4f, new Vector2(1.0f, 0.55f), 0.9f, 0.14f);
+		// (the gushy-water pass, 2026-10-15: was a flat strip with a scrolling streak texture) the pour shader: dark glassy
+		// water over the lip, then ropes of it, whitening as they fall, surging and breaking up at the sides
+		float lipLen = 0f;
+		for (int i = 0; i < lipSteps; i++) lipLen += path[i].DistanceTo(path[i + 1]);
+		var mat = FlowFx.PourMat(FlowFx.Liquid.Creek, speed: 2.6f, strands: 7f, wobble: 0.11f, aerateLen: 2.0f);
+		mat.SetShaderParameter("aerate_start", lipLen - 0.2f);
+		mat.SetShaderParameter("rope", 1.5f);
 		var k = new MeshKit();
 		k.Mat(mat);
-		const int across = 6;
+		const int across = 8;
 		float vAcc = 0f;
 		for (int i = 0; i < path.Count - 1; i++)
 		{
@@ -268,9 +247,9 @@ void fragment() {
 				float u0 = j / (float)across, u1 = (j + 1) / (float)across;
 				Vector3 p00 = a + n0 * (u0 - 0.5f) * w0, p10 = a + n0 * (u1 - 0.5f) * w0;
 				Vector3 p01 = b + n1 * (u0 - 0.5f) * w1, p11 = b + n1 * (u1 - 0.5f) * w1;
-				// the lip water is clear and dark, the falling water white; fade in at the lip's start and out at the foot
-				float c0 = falling ? 1f : 0.55f, c1 = i + 1 >= lipSteps ? 1f : 0.55f;
-				float a0 = i == 0 ? 0f : (falling && i + 1 == path.Count - 1 ? 0.9f : 1f), a1 = i + 1 == path.Count - 1 ? 0.35f : 1f;
+				// (the gushy-water pass: the colour is one per triangle, so the old fade in at the lip and out at the foot cut a
+				// sawtooth across the strip; the pour shader keeps the lip dark and rags the foot itself, and the churn hides it)
+				const float c0 = 1f, c1 = 1f, a0 = 1f, a1 = 1f;
 				var nrm = (p10 - p00).Cross(p01 - p00).Normalized();
 				k.Color = new Color(c0, c0, c0, a0);
 				k.Tri(p00, p10, p11, nrm, new Vector2(u0, vAcc), new Vector2(u1, vAcc), new Vector2(u1, vAcc + seg));
@@ -281,34 +260,25 @@ void fragment() {
 		}
 		var mi = new MeshInstance3D { Name = "Water", Mesh = k.Commit(), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
 		AddChild(mi);
+		// ropes over the curtain: thick strands standing out of it, two at its ragged sides, so it's never a flat sheet
+		var fall = path.GetRange(lipSteps, path.Count - lipSteps);
+		var rope = FlowFx.PourMat(FlowFx.Liquid.Creek, speed: 2.9f, strands: 3f, tube: true, wobble: 0.05f, aerateLen: 1.0f);
+		float[] lats = { -0.47f, 0.12f, 0.49f };
+		for (int r = 0; r < lats.Length; r++)
+		{
+			var pts = new List<Vector3>();
+			for (int i = 1; i < fall.Count; i++)
+			{
+				float v = i / (float)(fall.Count - 1);
+				float s = Mathf.Lerp(sTop - 0.1f, sCurt, v);
+				pts.Add(fall[i] + Right(s) * lats[r] * CurtainWidth * (1f + 0.2f * v) + Dir3(s) * (0.03f + 0.04f * v));
+			}
+			float r0 = Mathf.Abs(lats[r]) > 0.4f ? 0.05f : 0.07f;
+			FlowFx.Tube(this, pts, r0, r0 * 1.7f, rope, $"Rope{r}", 7);
+		}
 	}
 
 	private Vector3 Right(float s) { Flat(s, out Vector2 d); return new Vector3(-d.Y, 0, d.X); }
-
-	/// <summary>Foam on the water below the fall: a patch that follows the stream's surface, thick at the foot, thinning downstream.</summary>
-	private void BuildFoam(float sCurt)
-	{
-		var mat = WaterMat(PropTextures.Foam(), -0.25f, new Vector2(1f, 1f), 0.95f, 0.1f);
-		var k = new MeshKit();
-		k.Mat(mat);
-		const int along = 8, across = 6;
-		float len = 3.2f, half = 1.4f;
-		for (int i = 0; i < along; i++)
-			for (int j = 0; j < across; j++)
-			{
-				float s0 = sCurt - 0.15f + len * i / along, s1 = sCurt - 0.15f + len * (i + 1) / along;
-				float l0 = -half + 2f * half * j / across, l1 = -half + 2f * half * (j + 1) / across;
-				Vector3 V(float s, float l) => P(s, l, Level(s) + 0.025f);
-				float A(float s, float l) => Mathf.Clamp(1f - (s - sCurt) / len, 0f, 1f) * Mathf.Clamp(1f - Mathf.Abs(l) / half, 0f, 1f) * 1.6f;
-				Vector3 a = V(s0, l0), b = V(s0, l1), c = V(s1, l1), d = V(s1, l0);
-				Vector2 U(float s, float l) => new(l * 0.7f, (s - sCurt) * 0.7f);
-				k.Color = new Color(1, 1, 1, Mathf.Min(1f, A(s0, l0)));
-				k.Tri(a, b, c, Vector3.Up, U(s0, l0), U(s0, l1), U(s1, l1));
-				k.Color = new Color(1, 1, 1, Mathf.Min(1f, A(s1, l0)));
-				k.Tri(a, c, d, Vector3.Up, U(s0, l0), U(s1, l1), U(s1, l0));
-			}
-		AddChild(new MeshInstance3D { Name = "Foam", Mesh = k.Commit(), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-	}
 
 	/// <summary>A thin, slow mist off the foot of the fall.</summary>
 	private void BuildMist(Vector3 at, Vector2 flow)
@@ -335,7 +305,7 @@ void fragment() {
 		draw.Material = new StandardMaterial3D
 		{
 			AlbedoTexture = PropTextures.Puff(),
-			AlbedoColor = new Color(0.92f, 0.94f, 0.95f, 0.16f),
+			AlbedoColor = new Color(0.92f, 0.94f, 0.95f, 0.08f),   // (fainter: unshaded, at night the puffs glowed as balls)
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,

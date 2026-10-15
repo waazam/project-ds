@@ -99,13 +99,19 @@ public partial class EndingDirector : Node3D
 		get
 		{
 			if (_edgeSnow != null) return _edgeSnow;
-			_edgeSnow = (Material)WinterWoods.SoftSnow.Duplicate();
+			// (2026-10-15, the scan: the bank read as a smooth clay blob under the lantern) The maze's packed snow, the same
+			// snow they came up through: its crust pitted and scalloped, greyer and shallower out here where it's thawing,
+			// grit in it, a dull glaze in streaks. (It was the fresh snow, greyed: smooth and even all over.)
+			_edgeSnow = (Material)SnowMazeLook.PackedSnow().Duplicate();
 			_edgeSnow.ResourceName = "end_old_snow";
 			if (_edgeSnow is ShaderMaterial sm)
 			{
-				sm.SetShaderParameter("top_color", new Color(0.53f, 0.54f, 0.56f));
-				sm.SetShaderParameter("side_color", new Color(0.38f, 0.4f, 0.45f));
-				sm.SetShaderParameter("glisten", 0.25f);
+				sm.SetShaderParameter("crest_color", new Color(0.6f, 0.61f, 0.63f));
+				sm.SetShaderParameter("hollow_color", new Color(0.4f, 0.43f, 0.5f));
+				sm.SetShaderParameter("grit_color", new Color(0.46f, 0.42f, 0.36f));
+				sm.SetShaderParameter("scallop_scale", 0.55f);
+				sm.SetShaderParameter("scallop_depth", 0.45f);
+				sm.SetShaderParameter("glisten", 0.15f);
 			}
 			return _edgeSnow;
 		}
@@ -197,13 +203,25 @@ public partial class EndingDirector : Node3D
 	/// <summary>The face's lean: sheer low down, rounding over at the top.</summary>
 	private static float Lean(float s, float v) => Mathf.Pow(s, Mathf.Lerp(2.4f, 0.85f, Mathf.SmoothStep(1.8f, 6f, Mathf.Abs(v))));
 	/// <summary>Lumps and hollows over the snow (none round the mouth, so the tunnel meets the face exactly).</summary>
-	private float Relief(float u, float v) => 0.08f * _apronNoise.GetNoise2D(u * 2.2f + 50f, v * 2.2f) * (1f - AtMouth(v));
+	/// <summary>(2026-10-15, the scan: the mound round the hole read as smooth clay) Lumps and hollows, a finer crust broken over
+	/// them, and the wind's layers in the face (ledges a hand apart); kept off only the hole's own edge
+	/// (<paramref name="mask"/>, 0 there), not the whole width of the bank round it.</summary>
+	private float Relief(float u, float v, float mask = 1f, float y = 0f) =>
+		(0.1f * _apronNoise.GetNoise2D(u * 2.2f + 50f, v * 2.2f) + 0.035f * _apronNoise.GetNoise2D(u * 6.5f - 20f, v * 6.5f + y * 3f)
+		 + 0.03f * Mathf.Sin(y * 9f + 2.4f * _bankNoise.GetNoise2D(v * 3f, 11f)) * (0.5f + 0.5f * _apronNoise.GetNoise2D(v * 1.4f, y * 0.7f + 9f))) * mask;
+	/// <summary>How far from the hole's edge (0 on it, 1 a hand or two out): the face's relief fades in from it, so the bore
+	/// still meets the face exactly.</summary>
+	private float MouthMask(float v, float y)
+	{
+		float ev = v / MouthW, ey = (y - _mouthGround - MouthY) / MouthH;
+		return Mathf.SmoothStep(1.12f, 1.55f, Mathf.Sqrt(ev * ev + ey * ey));
+	}
 	/// <summary>The face at (v, s): s = 0 its foot (in the ground), 1 its top edge.</summary>
 	private Vector3 FacePoint(float v, float s)
 	{
 		float u = FaceU(v) + FaceRun(v) * Lean(s, v);
 		float y = GroundAt(u, v) - BankSink + (Crest(v) + BankSink) * s;
-		return At(u + Relief(u, v + y) * Mathf.SmoothStep(0f, 0.15f, s) * (1f - Mathf.SmoothStep(0.8f, 1f, s)), v, y);   // (none at the top edge, shared with the top)
+		return At(u + Relief(u, v + y, MouthMask(v, y), y) * Mathf.SmoothStep(0f, 0.15f, s) * (1f - Mathf.SmoothStep(0.8f, 1f, s)), v, y);   // (none at the top edge, shared with the top)
 	}
 	/// <summary>The face's surface u at (v, world y) (for the tunnel and the lip to meet it).</summary>
 	private float FaceSurfaceU(float v, float y)
@@ -265,27 +283,70 @@ public partial class EndingDirector : Node3D
 		BuildTunnel();
 		BuildMouthRim();
 
-		// the snow on the ground, thinning and breaking up into patches as it goes (2026-10-14d: laid on the ground as decals,
-		// soft-edged and following every bump of it)
+		// the snow on the ground, thinning and breaking up into patches as it goes
+		BuildSnowPatches(at);
+	}
+
+	/// <summary>(2026-10-15, the scan: the patches were decals 1.6 m deep that painted every fern, bush and log inside them flat
+	/// white, the car and the player's own legs too) Now each patch is a thin sheet of old snow laid on the ground itself
+	/// (every vertex at the terrain's height, a hand's thickness heaped toward its middle), its ragged edge and the holes melted
+	/// through it cut out by its alpha: the ferns and the logs come up through the snow instead of being painted over.</summary>
+	private void BuildSnowPatches(Vector3 at)
+	{
+		var mat = new StandardMaterial3D
+		{
+			ResourceName = "end_snow_patch", AlbedoTexture = PatchAlbedo(), AlbedoColor = new Color(0.6f, 0.62f, 0.66f),
+			VertexColorUseAsAlbedo = true, NormalEnabled = true, NormalTexture = PatchNormal(), NormalScale = 0.8f,
+			Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 0.42f,
+			Roughness = 0.88f, MetallicSpecular = 0.3f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+		};
+		var k = new MeshKit();
+		k.Mat(mat);
 		var rng = new RandomNumberGenerator { Seed = 2504 };
+		float H(float x, float z) => _terrain?.HeightAt(x, z) ?? at.Y;
 		for (int i = 0; i < 46; i++)
 		{
 			float r = Mathf.Pow(rng.Randf(), 0.8f) * 18f;
 			float a = rng.Randf() * Mathf.Tau;
 			var p = at + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r;
-			if (_terrain != null) p.Y = _terrain.HeightAt(p.X, p.Z);
 			float s = Mathf.Lerp(2.2f, 0.5f, r / 18f) * rng.RandfRange(0.6f, 1.2f);
 			float sz = s * rng.RandfRange(0.6f, 1f);
-			var d = new Decal
+			float yaw = rng.Randf() * Mathf.Tau;
+			var ax = new Vector3(Mathf.Cos(yaw), 0, -Mathf.Sin(yaw)) * s * 2.6f;
+			var az = new Vector3(Mathf.Sin(yaw), 0, Mathf.Cos(yaw)) * sz * 2.6f;
+			float shade = Mathf.Lerp(1f, 0.86f, r / 18f) * rng.RandfRange(0.94f, 1.04f);
+			k.Color = new Color(shade, shade, shade * 1.01f);
+			float thick = Mathf.Lerp(0.07f, 0.03f, r / 18f);
+			int n = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(s, sz) * 2.6f / 0.3f), 6, 22);
+			var pts = new Vector3[n + 1, n + 1];
+			var nrm = new Vector3[n + 1, n + 1];
+			for (int ix = 0; ix <= n; ix++)
+				for (int iz = 0; iz <= n; iz++)
+				{
+					float u = ix / (float)n - 0.5f, v = iz / (float)n - 0.5f;
+					var q = p + ax * u + az * v;
+					float bump = Mathf.Max(0f, 1f - 4f * (u * u + v * v));
+					pts[ix, iz] = q with { Y = H(q.X, q.Z) + 0.025f + thick * bump * bump };
+					nrm[ix, iz] = _terrain?.NormalAt(q.X, q.Z) ?? Vector3.Up;
+				}
+			Vector2 U(int x, int z) => new(x / (float)n, z / (float)n);
+			// (not in under the bank: one lay on the tunnel's floor, in through the hole)
+			bool Under(Vector3 q)
 			{
-				Name = $"SnowPatch{i}", TextureAlbedo = PatchAlbedo(), TextureNormal = PatchNormal(), Size = new Vector3(s * 2.6f, 1.6f, sz * 2.6f),
-				Modulate = new Color(0.66f, 0.68f, 0.72f, Mathf.Lerp(1f, 0.75f, r / 18f)), AlbedoMix = 1f, UpperFade = 0.3f, LowerFade = 0.3f, NormalFade = 0.1f,
-				CullMask = 1, DistanceFadeEnabled = true, DistanceFadeBegin = 45f, DistanceFadeLength = 10f,
-			};
-			AddChild(d);
-			d.GlobalPosition = p;
-			d.GlobalBasis = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau);
+				float bu = (q - _bankO).Dot(_bankU), bv = (q - _bankO).Dot(_bankV);
+				return Mathf.Abs(bv) < 11f && bu > FaceU(bv) - 0.4f && bu < 14.5f;
+			}
+			for (int ix = 0; ix < n; ix++)
+				for (int iz = 0; iz < n; iz++)
+				{
+					if (Under(pts[ix, iz]) || Under(pts[ix + 1, iz + 1])) continue;
+					k.Tri(pts[ix, iz], pts[ix, iz + 1], pts[ix + 1, iz + 1], nrm[ix, iz], nrm[ix, iz + 1], nrm[ix + 1, iz + 1], U(ix, iz), U(ix, iz + 1), U(ix + 1, iz + 1));
+					k.Tri(pts[ix, iz], pts[ix + 1, iz + 1], pts[ix + 1, iz], nrm[ix, iz], nrm[ix + 1, iz + 1], nrm[ix + 1, iz], U(ix, iz), U(ix + 1, iz + 1), U(ix + 1, iz));
+				}
 		}
+		var mi = k.CommitTo(this, "SnowPatches", false);
+		mi.VisibilityRangeEnd = 55f;
+		mi.VisibilityRangeEndMargin = 8f;
 	}
 
 	/// <summary>One sheet of the bank: a grid of points (rows by columns) with smooth normals, those facing the wrong way
@@ -444,25 +505,76 @@ public partial class EndingDirector : Node3D
 		k.Color = Colors.White;
 		var rng = new RandomNumberGenerator { Seed = 2511 };
 		var frame = new Basis(_bankV, Vector3.Up, _bankU);
-		const int count = 9;
-		for (int i = 0; i < count; i++)
+		// (2026-10-15, the scan: nine lumps of one shape evenly round the arch read as the petals of a flower) The crust
+		// broken where it was dug through: a few slabs of it still in place over the hole, of all sizes and none alike, at
+		// uneven gaps along the arch (long bare stretches where it fell away), cocked at their own angles, some sagging
+		// out over the edge, their faces broken flat; the rest of it down at the foot and just inside, in pieces.
+		// the cut's own edge: a rounded, uneven roll of crust all the way round it (the face's grid stepped along the hole's
+		// edge in a saw-tooth that showed against the dark once the old lumps were gone)
 		{
-			float th = Mathf.Lerp(0.35f, Mathf.Pi - 0.35f, (i + rng.RandfRange(-0.3f, 0.3f)) / (count - 1f));
-			float v = Mathf.Cos(th) * (MouthW + 0.06f);
-			float y = _mouthGround + MouthY + Mathf.Sin(th) * (MouthH + 0.04f);
-			float top = Mathf.Sin(th), size = rng.RandfRange(0.5f, 1.2f);
-			var r = new Vector3(0.18f + 0.12f * top, 0.09f + 0.05f * top, 0.2f) * size;
-			var at = At(FaceSurfaceU(v, y) - 0.03f, v, y + r.Y * 0.4f);
-			var keep = k.Xf;
-			k.Xf = new Transform3D(frame.Rotated(_bankU, -th + Mathf.Pi * 0.5f), at);
-			k.Blob(Vector3.Zero, r, 2520 + i, 0.14f, false, 1f, 0f, 2);
-			k.Xf = keep;
+			const int segs = 56;
+			var lipNoise = new FastNoiseLite { Frequency = 0.9f, Seed = 2512 };
+			Vector3? prev = null; float prevR = 0f;
+			for (int i = 0; i <= segs; i++)
+			{
+				float th = Mathf.Tau * i / segs;
+				float lr = 0.07f + 0.035f * lipNoise.GetNoise1D(i * 1.7f);
+				float v = Mathf.Cos(th) * (MouthW + 0.04f), y = _mouthGround + MouthY + Mathf.Sin(th) * (MouthH + 0.04f);
+				Vector3? p = y < GroundAt(FaceSurfaceU(v, y), v) - 0.05f ? null : At(FaceSurfaceU(v, y) - lr * 0.35f, v, y);
+				if (p is { } a && prev is { } b) k.Cylinder(b, a, prevR, lr, 6, false, 1f);
+				prev = p; prevR = lr;
+			}
 		}
-		for (int i = 0; i < 5; i++)
+		var arcs = new System.Collections.Generic.List<float>();
+		for (float th = 0.3f + rng.RandfRange(0f, 0.25f); th < Mathf.Pi - 0.3f; th += rng.RandfRange(0.28f, 0.75f))
+			if (rng.Randf() < 0.72f) arcs.Add(th);
+		int slab = 0;
+		foreach (float th0 in arcs)
 		{
-			float v = rng.RandfRange(-1.4f, 1.4f) * (i % 2 == 0 ? 1f : 0.6f), u = FaceU(v) - rng.RandfRange(0.3f, 1.3f);
-			var at = At(u, v, GroundAt(u, v) + 0.01f);
-			k.Blob(at, new Vector3(rng.RandfRange(0.12f, 0.24f), rng.RandfRange(0.07f, 0.12f), rng.RandfRange(0.12f, 0.22f)), 2540 + i, 0.18f, false, 1f, 0f, 2);
+			float th = th0 + rng.RandfRange(-0.06f, 0.06f);
+			float v = Mathf.Cos(th) * (MouthW + 0.05f);
+			float y = _mouthGround + MouthY + Mathf.Sin(th) * (MouthH + 0.03f);
+			float top = Mathf.Sin(th), size = Mathf.Pow(rng.Randf(), 1.4f) * 1.2f + 0.5f;
+			// a plate of the crust in the face's own plane (along the arch, out from it, and its thickness standing proud of
+			// the face), its inner edge overhanging the hole a little; long and thin or short and thick, never the same twice
+			var r = new Vector3(rng.RandfRange(0.13f, 0.3f) * (0.7f + 0.4f * top), rng.RandfRange(0.07f, 0.17f), rng.RandfRange(0.035f, 0.075f)) * size;
+			var radial = new Vector3(0f, 0f, 0f) + _bankV * (Mathf.Cos(th) / MouthW) + Vector3.Up * (Mathf.Sin(th) / MouthH);
+			radial = radial.Normalized();
+			float rv = v + radial.Dot(_bankV) * r.Y * 0.35f, ry = y + radial.Y * r.Y * 0.35f;
+			var at = At(FaceSurfaceU(rv, ry) - r.Z * rng.RandfRange(0.15f, 0.55f), rv, ry);
+			var b = frame.Rotated(_bankU, -th + Mathf.Pi * 0.5f + rng.RandfRange(-0.3f, 0.3f));
+			b = b.Rotated(b.X.Normalized(), -rng.RandfRange(0f, 0.35f)).Rotated(Vector3.Up, rng.RandfRange(-0.2f, 0.2f));   // (its free edge sagging out, twisted)
+			var keep = k.Xf;
+			k.Xf = new Transform3D(b, at);
+			k.Blob(Vector3.Zero, r, 2520 + slab * 7, rng.RandfRange(0.22f, 0.36f), true, 1f, 0.2f, 1);
+			k.Xf = keep;
+			slab++;
+		}
+		// what fell: at the foot of the face, strewn out onto the apron, and a few just inside the mouth on its floor
+		for (int i = 0; i < 11; i++)
+		{
+			bool inside = i < 3;
+			float v, u, y;
+			if (inside)
+			{
+				v = rng.RandfRange(-0.45f, 0.45f);
+				float d = rng.RandfRange(0.15f, 0.9f);
+				u = FaceSurfaceU(v, _mouthGround) + d;
+				y = _mouthGround + MouthY - (MouthH + 0.07f) * Mathf.Sqrt(Mathf.Max(0f, 1f - Mathf.Pow(v / (MouthW + 0.07f), 2f))) - d * 0.12f;
+			}
+			else
+			{
+				v = rng.RandfRange(-1.7f, 1.7f);
+				u = FaceU(v) - Mathf.Pow(rng.Randf(), 1.5f) * 1.8f - 0.15f;
+				y = GroundAt(u, v) - BankSink + Apron(u, v);
+			}
+			float sz = Mathf.Pow(rng.Randf(), 2f) * 0.2f + 0.05f;
+			var rr = new Vector3(sz * rng.RandfRange(0.8f, 1.6f), sz * rng.RandfRange(0.35f, 0.7f), sz * rng.RandfRange(0.7f, 1.4f));
+			var keep = k.Xf;
+			var bb = new Basis(Vector3.Up, rng.Randf() * Mathf.Tau).Rotated(_bankV, rng.RandfRange(-0.5f, 0.5f));
+			k.Xf = new Transform3D(bb, At(u, v, y + rr.Y * 0.35f));
+			k.Blob(Vector3.Zero, rr, 2540 + i * 5, rng.RandfRange(0.2f, 0.35f), true, 1f, 0.3f, 1);
+			k.Xf = keep;
 		}
 		k.CommitTo(this, "MouthRim", true);
 	}
@@ -666,16 +778,8 @@ public partial class EndingDirector : Node3D
 		_stairs.GlobalBasis = Basis.LookingAt(-face.Normalized(), Vector3.Up);
 		await StoryBeat.PanTowards(this, player, CarAt + Vector3.Up * 2f, 1.5f, ct, pitch: true);
 		await Cutscene.Wait(this, 1.5, ct);
-		// the blood: down from the top step, a step at a time, to the bottom
-		var blood = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.02f, 0.02f), Roughness = 0.1f, MetallicSpecular = 0.8f };
-		for (int i = 11; i >= 0; i--)
-		{
-			var step = new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.7f, 0.01f, 0.32f) }, MaterialOverride = blood, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-			_stairs.AddChild(step);
-			step.Position = new Vector3(0, 0.2f + i * 0.2f, -0.3f - i * 0.3f);
-			AudioDirector.OneShot(this, "haunt_drip", 3, step.GlobalPosition, -10f, "Events", 2f, 0.1f);
-			await Cutscene.Wait(this, 0.45, ct);
-		}
+		// the blood: down from the top step, a step at a time, to the bottom (EndingDirector.Blood.cs)
+		await BleedStairs(ct);
 		await Cutscene.Wait(this, 1.0, ct);
 		// up them: slowly at first, faster and faster
 		var top = _stairs.GlobalPosition + _stairs.GlobalBasis * new Vector3(0, 2.6f, -3.6f);

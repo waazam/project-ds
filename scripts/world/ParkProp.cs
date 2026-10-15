@@ -69,11 +69,7 @@ public partial class ParkProp : Node3D
 			case PropKind.Car: Car(); break;
 			case PropKind.CameraItem: CameraItem(); break;
 		}
-		if (!_k.IsEmpty)
-		{
-			var mi = _k.CommitTo(_gen, "Mesh");
-			if (Kind == PropKind.Car && !Engine.IsEditorHint()) GD.Print($"[car] {ItemMeshes.CountTriangles(mi.Mesh)} triangles");
-		}
+		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");
 		if (ClearRadius > 0f && !Engine.IsEditorHint())
 			_gen.AddChild(new ClearZone { Name = "ClearZone", Radius = ClearRadius, ClearFoliage = ClearFoliage });
 	}
@@ -892,19 +888,6 @@ public partial class ParkProp : Node3D
 		// a stub of pencil on a string
 		_k.Mat(Tint("pencil", new Color(0.55f, 0.45f, 0.15f)));
 		_k.Cylinder(c + tilt * new Vector3(0.12f, -bh * 0.5f + 0.04f, 0.09f), c + tilt * new Vector3(0.02f, -bh * 0.5f + 0.04f, 0.12f), 0.005f, 0.005f, 5, true);
-	}
-
-	private static readonly Dictionary<string, StandardMaterial3D> _carMats = new();
-	private static StandardMaterial3D CarMat(string key, Color c, float rough, float spec, bool vertexColor = true)
-	{
-		if (_carMats.TryGetValue(key, out var m)) return m;
-		m = new StandardMaterial3D
-		{
-			AlbedoColor = c, Roughness = rough, MetallicSpecular = spec, VertexColorUseAsAlbedo = vertexColor,
-			AlbedoTexture = PropTextures.Fur(), TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
-		};
-		_carMats[key] = m;
-		return m;
 	}
 
 	/// <summary>The film camera on its own (the Act 1 camera, as ItemMeshes builds it), for the one lying in the car.</summary>

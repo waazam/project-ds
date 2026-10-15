@@ -11,14 +11,15 @@ namespace ProjectDS.World;
 /// <summary>
 /// The look audit's camera (dev only). Run as the main scene with the test save slots:
 /// `godot --path . res://scenes/levels/look_shots.tscn -- --autotest --look-act=N [--look-out=dir] [--look-wait=8]
-///  [--look-pos="x,y,z,yawDeg,pitchDeg;..."] [--look-turns=4]`.
+///  [--look-pos="x,y,z,yawDeg,pitchDeg;..."] [--look-turns=4] [--look-nohud]`.
 /// Writes act N's save (the story test's own state for that act), Continues into it (Act 1: a new game),
 /// keeps the story test out of it, waits, then photographs the view: from the spawn at --look-turns headings,
 /// then from each --look-pos. Shots go to test-output/look/&lt;dir&gt;/. Quits when done.
 /// </summary>
 public partial class LookShots : Node
 {
-	private int _act = 1, _turns = 4;
+	private int _act = 1, _turns = 4, _seq;
+	private string _fx = "";
 	private float _wait = 8f;
 	private string _out = "res://test-output/look";
 	private readonly List<(Vector3 p, float yaw, float pitch)> _poses = new();
@@ -34,6 +35,8 @@ public partial class LookShots : Node
 			else if (a.StartsWith("--look-out=")) dir = V("--look-out=");
 			else if (a.StartsWith("--look-wait=")) _wait = float.Parse(V("--look-wait="), CultureInfo.InvariantCulture);
 			else if (a.StartsWith("--look-turns=")) _turns = int.Parse(V("--look-turns="));
+			else if (a.StartsWith("--look-seq=")) _seq = int.Parse(V("--look-seq="));
+			else if (a.StartsWith("--look-fx=")) _fx = V("--look-fx=");
 			else if (a.StartsWith("--look-pos="))
 				foreach (var pose in V("--look-pos=").Split(';', StringSplitOptions.RemoveEmptyEntries))
 				{
@@ -95,6 +98,8 @@ public partial class LookShots : Node
 		if (p == null) { GD.PrintErr("[look] no player"); tree.Quit(2); return; }
 		p.PlayerInput.Scripted = true;
 		await Wait(_wait);
+		// --look-fx=name: a water or blood effect an event makes, put on for the shots (FlowPreview)
+		if (_fx != "") await FlowPreview.Apply(this, _fx);
 		var start = p.GlobalPosition;
 		float yaw0 = p.CameraRig.Yaw;
 		GD.Print($"[look] act {_act} at {start} yaw {Mathf.RadToDeg(yaw0):0}");
@@ -137,6 +142,12 @@ public partial class LookShots : Node
 			p.CameraRig.SetPitch(Mathf.DegToRad(pitch));
 			await Hold(p, Mathf.DegToRad(yaw), Mathf.DegToRad(pitch), 2.5f);
 			Save($"{shot++:00}_pos_{pos.X:0}_{pos.Z:0}_{yaw:0}");
+			// --look-seq=N: N more frames of the same view, 0.12 s apart (motion: the water's flow)
+			for (int f = 1; f <= _seq; f++)
+			{
+				await Hold(p, Mathf.DegToRad(yaw), Mathf.DegToRad(pitch), 0.12f);
+				Save($"{shot - 1:00}_seq{f}");
+			}
 			if (_perf > 0f)
 			{
 				await Perf(p, yaw, pitch, "with");
@@ -189,6 +200,7 @@ public partial class LookShots : Node
 			}
 		}
 		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-pickups") >= 0) await ShootPickups(p, start);
+		if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-endings") >= 0) await ShootEndings(p, shot);
 		GD.Print("[look] done");
 		tree.Quit(0);
 	}
@@ -424,7 +436,53 @@ public partial class LookShots : Node
 			else if (t > 0.8 && p.IsOnFloor()) _pin = p.GlobalPosition;
 			p.CameraRig.SnapBehind(yaw);
 			p.CameraRig.SetPitch(pitch);
+			if (_noHud) HideHud();
 		}
+	}
+
+	/// <summary>--look-endings (Act 1's level, at the car): the car as the endings show it, posed as EndingDirector poses it.
+	/// The fifth: the eye at the driver's seat (EyeHeight 1.0), looking out of the windscreen. The third: the car's meshes
+	/// squashed about its origin and the wendigo stood on it, seen from the lot.</summary>
+	private async System.Threading.Tasks.Task ShootEndings(PlayerController p, int shot)
+	{
+		if (GetTree().Root.FindChild("Car", true, false) is not ParkProp car) { GD.PrintErr("[look] no car"); return; }
+		var fwd = -car.GlobalBasis.Z;
+		float yaw = Mathf.Atan2(-fwd.X, -fwd.Z);
+		float eye = p.CameraRig.EyeHeight;
+		var seat = car.GlobalPosition + car.GlobalBasis * new Vector3(-0.38f, 1.15f, 0.25f);
+		p.CameraRig.EyeHeight = 1.0f;
+		_pin = seat + Vector3.Down * 1.0f;
+		p.GlobalPosition = _pin.Value;
+		await Hold(p, yaw, -0.05f, 2.0f);
+		Save($"{shot++:00}_ending5_seat");
+		await Hold(p, yaw + 0.6f, -0.1f, 1.0f);
+		Save($"{shot++:00}_ending5_seat_left");
+		p.CameraRig.EyeHeight = eye;
+		var squash = new Transform3D(Basis.FromScale(new Vector3(1.05f, 0.55f, 1f)), Vector3.Zero);
+		var carXf = car.GlobalTransform;
+		foreach (var g in car.FindChildren("*", "GeometryInstance3D", true, false))
+			if (g is GeometryInstance3D gi && gi.GetParent() is not GeometryInstance3D && g is not Decal)
+				gi.GlobalTransform = carXf * (squash * (carXf.AffineInverse() * gi.GlobalTransform));
+		var view = car.GlobalTransform * new Vector3(-5f, 0f, -5.5f);
+		var w = new Entities.Wendigo { Name = "LookWendigo" };
+		car.GetParent().AddChild(w);
+		w.StandAt(car.GlobalPosition + Vector3.Up * 0.9f, view);
+		_pin = null;
+		var d = car.GlobalPosition - view;
+		p.Teleport(view + Vector3.Up * 0.3f, Mathf.Atan2(-d.X, -d.Z));
+		await Hold(p, Mathf.Atan2(-d.X, -d.Z), Mathf.DegToRad(4f), 3.0f);
+		Save($"{shot++:00}_ending3_crushed");
+	}
+
+	/// <summary>--look-nohud: the hands and what they hold, the chapter card, the subtitles and the item HUD hidden (a
+	/// clean look at the set, a prop's before and after).</summary>
+	private readonly bool _noHud = Array.IndexOf(OS.GetCmdlineUserArgs(), "--look-nohud") >= 0;
+	private void HideHud()
+	{
+		if (GetViewport().GetCamera3D() is { } cam) cam.CullMask &= ~HeldItem.HeldLayer;
+		foreach (var n in GetTree().Root.FindChildren("*", "", true, false))
+			if (n is FirstPersonHand or HeldItem) ((Node3D)n).Visible = false;
+			else if (n is UI.ChapterCard or UI.Subtitle or UI.EquippedItemHud) ((CanvasLayer)n).Visible = false;
 	}
 
 	private async System.Threading.Tasks.Task Wait(float s)
