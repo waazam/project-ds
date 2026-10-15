@@ -27,6 +27,9 @@ public static class DetailKit
 
 	public static Texture2D Albedo(Kind k) => Get(k).albedo;
 	public static Texture2D Normal(Kind k) => Get(k).normal;
+	/// <summary>(2026-10-15) The grain alone, without the game's grime baked over it: for <see cref="RoomSurface"/>, which
+	/// draws its own grime across the room (the baked stains tiled with the grain, the same marks at every repeat).</summary>
+	public static Texture2D Grain(Kind k) => GD.Load<Texture2D>($"res://assets/textures/detail/{k.ToString().ToLowerInvariant()}_albedo.png");
 
 	private static (Texture2D albedo, Texture2D normal) Get(Kind k)
 	{
@@ -109,14 +112,20 @@ public static class DetailKit
 		(new[] { "wood", "plank", "board", "deck", "timber", "oak", "pine", "table", "chair", "desk", "shelf", "shelves", "cabinet", "door", "crate", "box", "pew", "bench", "beam", "post", "frame", "ladder", "stair", "drawer", "bed", "wardrobe", "barrel", "cabin", "fence", "sign" }, Kind.Wood),
 	};
 
-	/// <summary>A surface's kind from a texture key or a node name (null if nothing matches).</summary>
+	/// <summary>A surface's kind from a texture key or a node name (null if nothing matches). (2026-10-15) A short word
+	/// (four letters or fewer) only counts where a word of the name starts (after a non-letter, at a capital, or at the
+	/// start): "trail" isn't "rail", "painting" isn't "tin", "Notice_" isn't "ice_".</summary>
 	public static Kind? Classify(string name)
 	{
 		if (string.IsNullOrEmpty(name)) return null;
 		string n = name.ToLowerInvariant();
 		foreach (var (words, kind) in Words)
 			foreach (var w in words)
-				if (n.Contains(w)) return kind;
+				for (int at = n.IndexOf(w, System.StringComparison.Ordinal); at >= 0; at = n.IndexOf(w, at + 1, System.StringComparison.Ordinal))
+				{
+					if (w.TrimEnd('_').Length > 4 || at == 0 || !char.IsLetter(name[at - 1]) || (char.IsUpper(name[at]) && !char.IsUpper(name[at - 1])))
+						return kind;
+				}
 		return null;
 	}
 }

@@ -103,6 +103,10 @@ public partial class ForestScatter : Node3D
 		_meshes["boulder_b"] = BoulderMesh(22);
 		_meshes["log"] = LogMesh();
 		_meshes["branch"] = BranchMesh();
+		// (2026-10-15, the repetition pass) a second of each: one stump, one log and one branch were every one of them
+		_meshes["stump_b"] = StumpBrokenMesh();
+		_meshes["log_b"] = LogBrokenMesh();
+		_meshes["branch_b"] = BranchForkMesh();
 		_meshes["fern"] = FernMesh();
 		_meshes["grass"] = GrassMesh();
 		_meshes["litter"] = LitterMesh();
@@ -116,6 +120,7 @@ public partial class ForestScatter : Node3D
 		_meshes["sapling_c"] = SaplingMesh(3, 4.2f);
 		_meshes["vinemound_a"] = VineMoundMesh(1, new Vector3(1.6f, 1.5f, 1.4f));
 		_meshes["vinemound_b"] = VineMoundMesh(2, new Vector3(2.2f, 2.1f, 1.8f));
+		_meshes["vinemound_c"] = VineMoundMesh(3, new Vector3(2.6f, 1.3f, 1.7f));   // (2026-10-15) a long low one
 		_meshes["palmetto_a"] = PalmettoMesh(1);
 		_meshes["palmetto_b"] = PalmettoMesh(2);
 		_meshes["boardpile"] = BoardPileMesh(1);
@@ -214,17 +219,28 @@ public partial class ForestScatter : Node3D
 			float rot = rng.RandfRange(0, Mathf.Tau);
 			float ao = Mathf.Lerp(0.55f, 1f, f);                  // lower tiers sit in shade
 			Vector3 c = Axis(y);
-			// dense dark core: a low cone skirt so the tier reads as a solid mass, not loose fronds
+			// dense dark core: a cone skirt so the tier reads as a solid mass, not loose fronds
+			// (2026-10-15, the scan: "the lowest fir branches read as flat slabs", the floating slab at the lake: seen from
+			// under or beside, a wide shallow cone is a dark disc hung on the trunk.) Low tiers (within reach of the eye:
+			// under 3.4 m) have none, their boughs alone; higher ones a narrower, steeper skirt with a ragged rim and a gap
+			// or two, so it reads as needles massed round the trunk, not a plate. (No draws on rng: the tree's shape holds.)
+			if (y > 3.4f)
 			{
-				float cr = R * 0.55f, drop = cr * Mathf.Tan(droop * 0.7f);
-				int cs = 7;
+				float cr = R * 0.42f, drop = cr * Mathf.Max(Mathf.Tan(droop * 0.7f), 0.8f);
+				const int cs = 9;
 				k.Color = new Color(ao * 0.8f, ao * 0.8f, ao * 0.8f);
-				Vector3 apex = c + Vector3.Up * 0.35f;
+				Vector3 apex = c + Vector3.Up * 0.3f;
+				float H(int s, float salt) => Mathf.Abs(Mathf.Sin((t * 12.9898f + s * 78.233f + salt) * 43.758f) * 137.5f) % 1f;
+				var rim = new Vector3[cs];
 				for (int s = 0; s < cs; s++)
 				{
-					float a0 = rot + Mathf.Tau * s / cs, a1 = rot + Mathf.Tau * (s + 1) / cs;
-					Vector3 p0 = c + new Vector3(Mathf.Cos(a0) * cr, -drop, Mathf.Sin(a0) * cr);
-					Vector3 p1 = c + new Vector3(Mathf.Cos(a1) * cr, -drop, Mathf.Sin(a1) * cr);
+					float a0 = rot + Mathf.Tau * s / cs, rr = cr * (0.68f + 0.32f * H(s, y));
+					rim[s] = c + new Vector3(Mathf.Cos(a0) * rr, -drop * (0.75f + 0.4f * H(s, 3.1f + y)), Mathf.Sin(a0) * rr);
+				}
+				for (int s = 0; s < cs; s++)
+				{
+					if (H(s, 7.7f + y) < 0.18f) continue;   // a gap
+					Vector3 p0 = rim[s], p1 = rim[(s + 1) % cs];
 					Vector3 nn = (p0 + p1 - 2f * c).Normalized() + Vector3.Up;
 					k.Tri(apex, p0, p1, nn.Normalized(), new Vector2(0.5f, 0.99f), new Vector2(0.1f, 0.93f), new Vector2(0.9f, 0.93f));
 				}
@@ -379,15 +395,19 @@ public partial class ForestScatter : Node3D
 		}
 		k.Cylinder(top, top + new Vector3(0, 1.6f, 0), 0.13f, 0.05f, 5, false);
 		k.Mat(ProcTextures.TreeLeafMat);
-		int blobs = 5;
+		// (2026-10-15, the scan: the "floating slab" by the lake was this crown: five broad, flattened blobs fused into one
+		// dark cap on a pole, seen through the fog.) Now clumps, smaller and taller than wide, at the ends of the limbs and
+		// stacked up the leader at uneven heights, with sky between them, so it reads as a broadleaf's crown, not a disc.
+		int blobs = 9;
 		for (int i = 0; i < blobs; i++)
 		{
-			float a = Mathf.Tau * i / blobs + rng.RandfRange(-0.3f, 0.3f);
-			float d = i == 0 ? 0 : rng.RandfRange(1.0f, 1.7f);
-			Vector3 c = top + new Vector3(Mathf.Cos(a) * d, (i == 0 ? 1.9f : rng.RandfRange(0.4f, 1.6f)), Mathf.Sin(a) * d);
-			float s = rng.RandfRange(0.75f, 1.0f);
+			float a = Mathf.Tau * i / blobs * 2.3f + rng.RandfRange(-0.4f, 0.4f);
+			float d = i < 2 ? rng.RandfRange(0f, 0.4f) : rng.RandfRange(0.8f, 1.9f);
+			Vector3 c = top + new Vector3(Mathf.Cos(a) * d, i < 2 ? 1.2f + i * 1.3f : rng.RandfRange(-0.2f, 2.4f), Mathf.Sin(a) * d);
+			float s = rng.RandfRange(0.7f, 1.0f);
 			k.Color = new Color(s, s, s * 0.95f);
-			k.Blob(c, new Vector3(1.7f, 1.3f, 1.7f) * rng.RandfRange(0.8f, 1.15f), seed * 13 + i, 0.3f, false, 0.6f, 0.6f);
+			float r = rng.RandfRange(0.7f, 1.15f);
+			k.Blob(c, new Vector3(r, r * rng.RandfRange(0.9f, 1.25f), r * rng.RandfRange(0.8f, 1.1f)), seed * 13 + i, 0.34f, false, 0.6f, 0.6f);
 		}
 		return k.Commit();
 	}
@@ -436,6 +456,73 @@ public partial class ForestScatter : Node3D
 		k.Color = new Color(0.7f, 0.66f, 0.6f);
 		k.Mat(ProcTextures.EndGrainMat).Cylinder(new Vector3(0, 0.44f, 0), new Vector3(0, 0.45f, 0), 0.28f, 0.28f, 7, true, 1.7f);
 		return k.Commit();
+	}
+
+	/// <summary>(2026-10-15) A stump snapped off rather than sawn: taller, leaning a touch, its top a few splintered teeth
+	/// round a ragged end.</summary>
+	internal static Mesh StumpBrokenMesh()
+	{
+		var k = new MeshKit();
+		var top = new Vector3(0.04f, 0.66f, 0.02f);
+		k.Color = new Color(0.72f, 0.7f, 0.66f);
+		k.Mat(ProcTextures.BarkMat).Cylinder(new Vector3(0, -0.3f, 0), top, 0.37f, 0.27f, 8, false, 1f);
+		k.Color = new Color(0.62f, 0.56f, 0.48f);
+		k.Mat(ProcTextures.EndGrainMat).Cylinder(top - new Vector3(0, 0.02f, 0), top + new Vector3(0, 0.005f, 0), 0.268f, 0.25f, 8, true, 1.7f);
+		// the splinters: tapering teeth standing up off the rim, the tallest on one side (where it tore)
+		k.Mat(ProcTextures.BarkMat);
+		k.Color = new Color(0.6f, 0.55f, 0.48f);
+		float[] ang = { 0.3f, 1.4f, 2.2f, 3.9f, 5.1f };
+		float[] len = { 0.38f, 0.22f, 0.3f, 0.12f, 0.17f };
+		for (int i = 0; i < ang.Length; i++)
+		{
+			var d = new Vector3(Mathf.Cos(ang[i]), 0, Mathf.Sin(ang[i]));
+			Vector3 b = top + d * 0.19f;
+			k.Cylinder(b, b + Vector3.Up * len[i] + d * 0.03f, 0.075f, 0.008f, 4, false, 2f);
+		}
+		return k.Commit();
+	}
+
+	/// <summary>(2026-10-15) A log as long as <see cref="LogMesh"/> (the same collider fits it), its far end broken off in
+	/// splinters rather than sawn, two snags of branch along it, a different taper.</summary>
+	internal static Mesh LogBrokenMesh()
+	{
+		var k = new MeshKit();
+		k.Color = new Color(0.58f, 0.55f, 0.5f);
+		k.Mat(ProcTextures.BarkMat).Cylinder(new Vector3(-2.6f, 0, 0.05f), new Vector3(2.45f, 0.02f, -0.08f), 0.25f, 0.22f, 7, false, 1f);
+		k.Mat(ProcTextures.EndGrainMat).Cylinder(new Vector3(-2.62f, 0, 0.05f), new Vector3(-2.6f, 0, 0.05f), 0.245f, 0.245f, 7, true, 1.8f);
+		k.Mat(ProcTextures.BarkMat);
+		k.Color = new Color(0.55f, 0.5f, 0.44f);
+		foreach (var (a, l) in new[] { (0.4f, 0.35f), (1.5f, 0.22f), (2.6f, 0.3f), (4.1f, 0.18f), (5.3f, 0.26f) })
+		{
+			var d = new Vector3(0, Mathf.Sin(a), Mathf.Cos(a)) * 0.15f;
+			Vector3 b = new Vector3(2.4f, 0.02f, -0.08f) + d;
+			k.Cylinder(b, b + new Vector3(l, d.Y * 0.4f, d.Z * 0.4f), 0.06f, 0.008f, 4, false, 2f);
+		}
+		k.Cylinder(new Vector3(-0.9f, 0.12f, 0.1f), new Vector3(-1.1f, 0.5f, 0.45f), 0.05f, 0.015f, 4, false);
+		k.Cylinder(new Vector3(1.2f, 0.15f, -0.12f), new Vector3(1.45f, 0.3f, -0.55f), 0.04f, 0.012f, 4, false);
+		return k.Commit();
+	}
+
+	/// <summary>(2026-10-15) A forked branch: two limbs off one butt, twigs off them.</summary>
+	internal static Mesh BranchForkMesh()
+	{
+		var k = new MeshKit();
+		k.Color = new Color(0.5f, 0.47f, 0.43f);
+		k.Mat(ProcTextures.BarkMat);
+		k.Cylinder(new Vector3(-0.8f, 0.04f, 0.05f), new Vector3(0.05f, 0.045f, 0f), 0.05f, 0.035f, 4, false, 2f);
+		k.Cylinder(new Vector3(0.05f, 0.045f, 0f), new Vector3(0.85f, 0.035f, 0.32f), 0.035f, 0.012f, 4, false, 2f);
+		k.Cylinder(new Vector3(0.05f, 0.045f, 0f), new Vector3(0.75f, 0.03f, -0.36f), 0.03f, 0.01f, 4, false, 2f);
+		k.Cylinder(new Vector3(0.45f, 0.04f, 0.16f), new Vector3(0.6f, 0.06f, 0.5f), 0.015f, 0.006f, 4, false, 2f);
+		k.Cylinder(new Vector3(-0.35f, 0.045f, 0.03f), new Vector3(-0.5f, 0.05f, -0.25f), 0.018f, 0.007f, 4, false, 2f);
+		return k.Commit();
+	}
+
+	/// <summary>A number in [0, 1) from a position (the scatter's variety that mustn't draw on its own stream: the trees
+	/// and everything after them would move).</summary>
+	private static float Hash01(Vector3 p, float salt)
+	{
+		float h = Mathf.Sin(p.X * 12.9898f + p.Z * 78.233f + salt * 37.719f) * 43758.5453f;
+		return h - Mathf.Floor(h);
 	}
 
 	internal static Mesh RockMesh(int seed)
@@ -728,8 +815,10 @@ public partial class ForestScatter : Node3D
 					if (sdT > 2.2f && sdS > 3f && _terrain.RouteDistance(sp.X, sp.Z) > 2f && _terrain.SampleBranch(sp.X, sp.Z, out float sbh) > sbh + 1.2f)
 					{
 						sp.Y = _terrain.HeightAt(sp.X, sp.Z);
-						Add("stump", TreeChunk, sp, Basis.FromEuler(new Vector3(0, _rng.RandfRange(0, 6.28f), 0)), Colors.White);
-						AddCollider(sp, Cylinder(0.32f, 1f), new Transform3D(Basis.Identity, sp));
+						// (2026-10-15) two kinds, each its own size and shade (a hash of the spot: the stream stays as it was)
+						float ss = 0.8f + 0.4f * Hash01(sp, 2f), st = 0.86f + 0.22f * Hash01(sp, 3f);
+						Add(Hash01(sp, 1f) < 0.45f ? "stump_b" : "stump", TreeChunk, sp, Basis.FromEuler(new Vector3(0, _rng.RandfRange(0, 6.28f), 0)).Scaled(Vector3.One * ss), new Color(st, st * 0.97f, st * 0.93f));
+						AddCollider(sp, Cylinder(0.32f * ss, 1f), new Transform3D(Basis.Identity, sp));
 					}
 				}
 			}
@@ -789,9 +878,11 @@ public partial class ForestScatter : Node3D
 						float hc = _terrain.HeightAt(cx, cz);
 						across = Mathf.Max(across, (hc - Mathf.Min(_terrain.HeightAt(cx + yb.Z.X * 0.35f * s, cz + yb.Z.Z * 0.35f * s), _terrain.HeightAt(cx - yb.Z.X * 0.35f * s, cz - yb.Z.Z * 0.35f * s))) / (0.35f * s));
 					}
-					float bed = Mathf.Clamp(0.165f * across - 0.07f, 0f, 0.2f) * s;
+					// (2026-10-15: deeper on crests, where the ground audit still found three logs hanging)
+					float bed = Mathf.Clamp(0.2f * across - 0.05f, 0f, 0.28f) * s;
 					var pos = new Vector3(px, (hA + hB) * 0.5f + dip + 0.12f * s - bed, pz);
-					Add("log", TreeChunk, pos, basis.Scaled(Vector3.One * s), Colors.White);
+					float lt = 0.88f + 0.22f * Hash01(pos, 5f);
+					Add(Hash01(pos, 4f) < 0.45f ? "log_b" : "log", TreeChunk, pos, basis.Scaled(Vector3.One * s), new Color(lt, lt * 0.98f, lt * 0.94f));
 					AddCollider(pos, BoxShape(new Vector3(2.5f * s, 0.22f * s, 0.22f * s)), new Transform3D(basis, pos));
 				}
 				else
@@ -805,7 +896,9 @@ public partial class ForestScatter : Node3D
 					float hL = _terrain.HeightAt(px + yb.Z.X * 0.5f, pz + yb.Z.Z * 0.5f), hR = _terrain.HeightAt(px - yb.Z.X * 0.5f, pz - yb.Z.Z * 0.5f);
 					float h = Mathf.Min(_terrain.HeightAt(px, pz), (hA + hB) * 0.5f);
 					var basis = LieAlong(yb.X * (2f * half) + Vector3.Up * (hA - hB), yb.Z + Vector3.Up * (hL - hR));
-					Add("branch", TreeChunk, new Vector3(px, h - 0.01f, pz), basis.Scaled(Vector3.One * s), Colors.White);
+					var bp = new Vector3(px, h - 0.01f, pz);
+					float bt = 0.85f + 0.25f * Hash01(bp, 7f);
+					Add(Hash01(bp, 6f) < 0.5f ? "branch_b" : "branch", TreeChunk, bp, basis.Scaled(Vector3.One * s), new Color(bt, bt * 0.97f, bt * 0.92f));
 				}
 			}
 	}
@@ -966,7 +1059,7 @@ public partial class ForestScatter : Node3D
 		foreach (var (meshKey, byChunk) in inst)
 		{
 			bool foliage = meshKey is "fern" or "grass" or "litter" || meshKey.StartsWith("palmetto");
-			bool small = foliage || meshKey is "branch" or "stump";
+			bool small = foliage || meshKey.StartsWith("branch") || meshKey.StartsWith("stump");
 			bool under = meshKey.StartsWith("sapling") || meshKey.StartsWith("vinemound");
 			float chunk = foliage ? FoliageChunk : TreeChunk;
 			foreach (var (key, list) in byChunk)

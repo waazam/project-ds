@@ -194,6 +194,9 @@ public static class FurnitureKit
 			if (room == null) Unmapped(model, role);
 			if (room != null) mi.SetSurfaceOverrideMaterial(s, Dressed(room, model, cavity));
 		}
+		// (2026-10-15) furniture: the room's stains stop at it (they pooled over its top and ran down its front); DetailSweep
+		// puts it on DecalDresser.NoDecalLayer as it enters the tree (unless it's on a layer of its own: the held item's)
+		mi.SetMeta("furniture", true);
 		parent.AddChild(mi);
 		return mi;
 	}

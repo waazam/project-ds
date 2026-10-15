@@ -75,7 +75,9 @@ public static class RoomSurface
 		m.SetShaderParameter("specular", sm.MetallicSpecular);
 		bool detail = sm.DetailEnabled && sm.DetailAlbedo != null && sm.DetailUVLayer == BaseMaterial3D.DetailUV.UV1;
 		m.SetShaderParameter("use_detail", detail);
-		if (detail) m.SetShaderParameter("detail_tex", sm.DetailAlbedo);
+		// (the grain alone: the shader draws the grime itself, across the room, where the grain's baked grime tiled with it)
+		if (detail) m.SetShaderParameter("detail_tex", sm.HasMeta("detail_kind") && (int)sm.GetMeta("detail_kind") is int dk && dk >= 0
+			&& sm.DetailAlbedo == DetailKit.Albedo((DetailKit.Kind)dk) ? DetailKit.Grain((DetailKit.Kind)dk) ?? sm.DetailAlbedo : sm.DetailAlbedo);
 		Set(m, w);
 		m.SetShaderParameter("seed", (float)seed);
 		m.SetMeta("detail_kind", -1);

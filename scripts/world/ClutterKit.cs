@@ -34,6 +34,10 @@ public sealed class ClutterKit
 	public StaticBody3D Body;
 	/// <summary>The yaw jitter's range, degrees (2-8: lived in, not tidy).</summary>
 	public float JitterMin = 2f, JitterMax = 8f;
+	/// <summary>(2026-10-15) How far the skirting (or a wall's foot) stands proud: pieces against the walls clear it.</summary>
+	public float Skirting = 0.022f;
+	/// <summary>(2026-10-15) Every placed piece's box (for a room's <see cref="DecalDresser.RoomSpec.Furniture"/>).</summary>
+	public IEnumerable<Aabb> Boxes { get { foreach (var p in All) yield return p.Box; } }
 	private readonly List<Aabb> _taken = new();
 	public readonly List<Placed> All = new();
 
@@ -57,7 +61,11 @@ public sealed class ClutterKit
 	{
 		if (FurnitureKit.Bounds(model) is not { } b) return null;
 		Vector3 sz = b.Size * scale;
-		return new Item(model, (k, xf) => FurnitureKit.Add(k, model, xf * new Transform3D(Basis.FromScale(Vector3.One * scale), Vector3.Zero), roles), sz, canStackOn, false, solid);
+		// (2026-10-15) the model's bounds needn't be centred on its origin (a chair's back, a cabinet's plinth): set it so its
+		// box's foot-middle is the piece's origin, or it fits the room by one box and stands in another (into the wall, its
+		// collider off to one side)
+		var shift = new Vector3(-(b.Position.X + b.Size.X * 0.5f), -b.Position.Y, -(b.Position.Z + b.Size.Z * 0.5f)) * scale;
+		return new Item(model, (k, xf) => FurnitureKit.Add(k, model, xf * new Transform3D(Basis.FromScale(Vector3.One * scale), shift), roles), sz, canStackOn, false, solid);
 	}
 
 	/// <summary>A carton or a wooden box, its lid's seam and its edges eased.</summary>
@@ -228,8 +236,12 @@ public sealed class ClutterKit
 			var (n, a, b) = walls[wall >= 0 ? wall : Rng.RandiRange(0, 3)];
 			float len = a.DistanceTo(b), half = it.Size.X * 0.5f + 0.05f;
 			if (len < half * 2f) continue;
-			Vector3 p = a.Lerp(b, Rng.RandfRange(half / len, 1f - half / len)) + n * (it.Size.Z * 0.5f + Rng.RandfRange(0.01f, 0.05f));
-			var xf = new Transform3D(new Basis(Vector3.Up, YawFacing(n) + Jitter()), p);
+			float t0 = Rng.RandfRange(half / len, 1f - half / len), gap = Rng.RandfRange(0.01f, 0.05f), jit = Jitter();
+			// (2026-10-15) turned a few degrees, its back corner swings toward the wall by sin(turn) of its half-width: clear
+			// that, the skirting (up to 22 mm) and a finger's breadth more (the corners were up to 2 cm into the walls)
+			float back = it.Size.Z * 0.5f * Mathf.Cos(jit) + it.Size.X * 0.5f * Mathf.Abs(Mathf.Sin(jit)) + Skirting + gap;
+			Vector3 p = a.Lerp(b, t0) + n * back;
+			var xf = new Transform3D(new Basis(Vector3.Up, YawFacing(n) + jit), p);
 			if (Fits(Footprint(xf, it.Size))) return Put(k, it, xf);
 		}
 		return null;
@@ -249,9 +261,13 @@ public sealed class ClutterKit
 			// facing out along one wall or the other
 			bool alongX = Rng.Randf() < 0.5f;
 			Vector3 face = alongX ? new Vector3(0, 0, sz) : new Vector3(sx, 0, 0);
-			float yaw = YawFacing(face) + Jitter();
+			float jit = Jitter();
+			float yaw = YawFacing(face) + jit;
 			float ex = alongX ? it.Size.X : it.Size.Z, ez = alongX ? it.Size.Z : it.Size.X;
-			Vector3 p = at + new Vector3(sx * (ex * 0.5f + Rng.RandfRange(0.02f, 0.06f)), 0, sz * (ez * 0.5f + Rng.RandfRange(0.02f, 0.06f)));
+			// (2026-10-15) the turned box's half-extents on the room's axes, so neither back corner goes into a wall
+			float cj = Mathf.Cos(jit), sj = Mathf.Abs(Mathf.Sin(jit));
+			float hx = ex * 0.5f * cj + ez * 0.5f * sj, hz = ez * 0.5f * cj + ex * 0.5f * sj;
+			Vector3 p = at + new Vector3(sx * (hx + Skirting + Rng.RandfRange(0.02f, 0.06f)), 0, sz * (hz + Skirting + Rng.RandfRange(0.02f, 0.06f)));
 			var xf = new Transform3D(new Basis(Vector3.Up, yaw), p);
 			if (Fits(Footprint(xf, it.Size))) return Put(k, it, xf);
 		}

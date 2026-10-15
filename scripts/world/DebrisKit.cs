@@ -60,11 +60,47 @@ public static class DebrisKit
 					Basis.FromEuler(new Vector3(rng.RandfRange(-0.3f, 0.3f), rng.RandfRange(0f, Mathf.Tau), rng.RandfRange(-0.3f, 0.3f))));
 			}
 		}
+		// (2026-10-15) the scraps keep out from under what stands in the room (they sat inside bed and table legs): the
+		// room's standing colliders, as built so far under parent; each scrap its own size and shape (one mesh, 14 times)
+		var standing = Standing(parent, y);
 		for (int i = 0; i < papers; i++)
 		{
 			var p = new Vector3(rng.RandfRange(x0 + 0.3f, x1 - 0.3f), y + 0.002f, rng.RandfRange(z0 + 0.3f, z1 - 0.3f));
-			if (Clear(p)) FurnitureKit.Add(k, "papers", p, rng.RandfRange(0f, Mathf.Tau), PaperRoles);
+			float yaw = rng.RandfRange(0f, Mathf.Tau);
+			var scale = new Vector3(rng.RandfRange(0.7f, 1.25f), 1f, rng.RandfRange(0.7f, 1.25f));
+			bool under = false;
+			foreach (var b in standing) if (b.Grow(0.25f).HasPoint(p with { Y = b.GetCenter().Y })) { under = true; break; }
+			if (Clear(p) && !under) FurnitureKit.Add(k, "papers", p, yaw, PaperRoles, scale);
 		}
 		k.CommitTo(parent, "Debris", false);
+	}
+
+	/// <summary>The boxes (in <paramref name="parent"/>'s space) of the colliders under it that stand on the floor at
+	/// <paramref name="y"/>: furniture, not the room (a box under 3.5 m across, from the floor up).</summary>
+	private static List<Aabb> Standing(Node3D parent, float y)
+	{
+		var list = new List<Aabb>();
+		foreach (var n in parent.FindChildren("*", "CollisionShape3D", true, false))
+		{
+			var cs = (CollisionShape3D)n;
+			if (cs.Shape == null || cs.Disabled) continue;
+			// its transform relative to parent (it may not be in the tree yet)
+			var xf = Transform3D.Identity;
+			Node a = cs;
+			while (a != null && a != parent) { if (a is Node3D a3) xf = a3.Transform * xf; a = a.GetParent(); }
+			if (a != parent) continue;
+			Aabb local = cs.Shape switch
+			{
+				BoxShape3D bs => new Aabb(-bs.Size * 0.5f, bs.Size),
+				CylinderShape3D cy => new Aabb(new Vector3(-cy.Radius, -cy.Height * 0.5f, -cy.Radius), new Vector3(cy.Radius * 2f, cy.Height, cy.Radius * 2f)),
+				CapsuleShape3D cp => new Aabb(new Vector3(-cp.Radius, -cp.Height * 0.5f, -cp.Radius), new Vector3(cp.Radius * 2f, cp.Height, cp.Radius * 2f)),
+				_ => new Aabb(),
+			};
+			if (local.Size == Vector3.Zero) continue;
+			var box = xf * local;
+			if (box.Size.X > 3.5f || box.Size.Z > 3.5f || box.Position.Y > y + 0.6f || box.End.Y < y + 0.15f) continue;
+			list.Add(box);
+		}
+		return list;
 	}
 }
