@@ -244,8 +244,15 @@ public partial class Library : Node3D
 		var brass = new MeshKit();
 		brass.Mat(ItemTextures.BrassMat);
 		brass.Color = new Color(0.85f, 0.7f, 0.42f);
-		foreach (float dz in new[] { -0.8f, 0.8f }) brass.Cylinder(new Vector3(x - 0.35f, 1.46f, z + dz), new Vector3(x - 0.35f, 1.68f, z + dz), 0.035f, 0.02f, 8, true);
+		// (2026-10-15: turned candlesticks with their candles, burnt down, out on the shelf in front of the chimney breast;
+		// they were plain brass cones standing inside the breast, hidden)
+		var candles = new MeshKit();
+		candles.Mat(WaxMaterial.Make(new Color(0.9f, 0.86f, 0.74f), 0.55f, "lib_candle_wax"));
+		candles.Color = Colors.White;
+		int ci = 0;
+		foreach (float dz in new[] { -0.8f, 0.8f }) LampKit.Candlestick(brass, candles, new Vector3(x - 0.6f, 1.46f, z + dz), 0.22f, ci++ == 0 ? 0.13f : 0.09f, ci);
 		brass.CommitTo(this, "Candlesticks", false);
+		candles.CommitTo(this, "MantelCandles", false);
 	}
 
 	/// <summary>(2026-10-14c) A leather club chair at <paramref name="at"/> (its feet), facing +Z times <paramref name="dir"/>:
@@ -299,9 +306,9 @@ public partial class Library : Node3D
 		var k = new MeshKit();
 		k.Mat(_wood);
 		// the reading table in the middle, a green banker's lamp on it
-		Slab(k, new Vector3(0, 0.74f, 8.2f), new Vector3(1.6f, 0.06f, 0.9f));
-		foreach (var (dx, dz) in new[] { (-0.72f, -0.38f), (0.72f, -0.38f), (-0.72f, 0.38f), (0.72f, 0.38f) })
-			Slab(k, new Vector3(dx, 0.36f, 8.2f + dz), new Vector3(0.07f, 0.72f, 0.07f), false);
+		// (2026-10-15, the props pass: a moulded top over an apron on four turned legs; it was a slab on four square posts)
+		ReadingTable(k, new Vector3(0, 0, 8.2f), new Vector3(1.6f, 0.77f, 0.9f), 0.07f);
+		_body.AddChild(new CollisionShape3D { Position = new Vector3(0, 0.74f, 8.2f), Shape = new BoxShape3D { Size = new Vector3(1.6f, 0.06f, 0.9f) } });
 		_body.AddChild(new CollisionShape3D { Position = new Vector3(0, 0.4f, 8.2f), Shape = new BoxShape3D { Size = new Vector3(1.6f, 0.8f, 0.9f) } });
 		// two armchairs by the fire
 		var chair = new MeshKit();
@@ -317,15 +324,39 @@ public partial class Library : Node3D
 		}
 		chair.CommitTo(this, "Armchairs", true);
 		// a globe, a grandfather clock, a rolling ladder, a floor lamp by the door
-		var brass = new MeshKit();
-		brass.Mat(ItemTextures.BrassMat);
-		brass.Color = new Color(0.8f, 0.62f, 0.34f);
-		brass.Cylinder(new Vector3(-2.8f, 0, 10.8f), new Vector3(-2.8f, 0.9f, 10.8f), 0.03f, 0.03f, 8, true);
-		brass.CommitTo(this, "GlobeStand", false);
-		// (2026-10-14c: an old varnished globe, the brass meridian round it and a foot under its stand; it was a plain glossy ball on a rod)
-		AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.3f, Height = 0.6f, RadialSegments = 32, Rings = 16 }, Position = new Vector3(-2.8f, 1.15f, 10.8f), Rotation = new Vector3(0, 0, 0.41f), MaterialOverride = new StandardMaterial3D { AlbedoTexture = ProcTextures.Grime(), AlbedoColor = new Color(0.5f, 0.42f, 0.27f), Roughness = 0.62f, MetallicSpecular = 0.4f, Uv1Scale = new Vector3(3f, 2f, 1f) } });
-		AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.31f, OuterRadius = 0.335f, Rings = 32, RingSegments = 6 }, Position = new Vector3(-2.8f, 1.15f, 10.8f), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0.41f), MaterialOverride = ItemTextures.BrassMat });
-		AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.12f, BottomRadius = 0.17f, Height = 0.05f, RadialSegments = 20 }, Position = new Vector3(-2.8f, 0.025f, 10.8f), MaterialOverride = ItemTextures.BrassMat });
+		// (2026-10-15, the props pass: a floor globe's stand, a turned column on three splayed legs, a wooden horizon ring
+		// on a cradle, the brass meridian through it, the globe's middle at 0.9 m; it was a 60 cm ball on a 1.2 m brass rod,
+		// a lollipop, its top at 1.45 m)
+		Vector3 g = new(-2.8f, 0, 10.8f);
+		const float gr = 0.27f, gy = 0.9f;
+		var stand = new MeshKit();
+		stand.Mat(_wood);
+		stand.Color = Colors.White * 0.85f;
+		TurnedKit.Lathe(stand, g, TurnedKit.P(0f, 0.2f, 0.035f, 0.2f, 0.05f, 0.24f, 0.045f, 0.28f, 0.03f, 0.3f, 0.026f, 0.4f, 0.04f, 0.47f, 0.036f, 0.52f,
+			0.022f, 0.56f, 0.024f, 0.6f, 0.04f, 0.61f, 0f, 0.62f), 10, 50f);
+		for (int i = 0; i < 3; i++)
+		{
+			float a = Mathf.Tau * i / 3f + 0.4f;
+			Vector3 d = new(Mathf.Cos(a), 0, Mathf.Sin(a));
+			TurnedKit.Rod(stand, TurnedKit.Curve(g + Vector3.Up * 0.26f + d * 0.03f, g + Vector3.Up * 0.12f + d * 0.2f, g + d * 0.34f + Vector3.Up * 0.02f, 7), 0.02f, 6, true);
+			TurnedKit.Lathe(stand, g + d * 0.34f, TurnedKit.P(0f, 0f, 0.028f, 0f, 0.03f, 0.015f, 0.02f, 0.035f, 0f, 0.036f), 8);
+		}
+		// the cradle: two arms up from the column's top to the horizon ring
+		foreach (float s in new[] { -1f, 1f })
+			TurnedKit.Rod(stand, TurnedKit.Curve(g + Vector3.Up * 0.6f, g + new Vector3(s * 0.22f, 0.62f, 0), g + new Vector3(s * (gr + 0.04f), gy - 0.01f, 0), 8), 0.014f, 6, true);
+		stand.Color = Colors.White;
+		ItemMeshes.Torus(stand, g + Vector3.Up * gy, Vector3.Up, gr + 0.045f, 0.018f, 28, 4);
+		stand.CommitTo(this, "GlobeStand", true);
+		_body.AddChild(new CollisionShape3D { Position = g + Vector3.Up * 0.6f, Shape = new CylinderShape3D { Radius = 0.3f, Height = 1.2f } });
+		AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = gr, Height = gr * 2f, RadialSegments = 24, Rings = 12 }, Position = g + Vector3.Up * gy, Rotation = new Vector3(0, 0, 0.41f), MaterialOverride = new StandardMaterial3D { AlbedoTexture = ProcTextures.Grime(), AlbedoColor = new Color(0.5f, 0.42f, 0.27f), Roughness = 0.62f, MetallicSpecular = 0.4f, Uv1Scale = new Vector3(3f, 2f, 1f) } });
+		// the brass meridian, tipped with the axis, and the axis's pins
+		var mer = new MeshKit();
+		mer.Mat(ItemTextures.BrassMat);
+		mer.Color = new Color(0.8f, 0.62f, 0.34f);
+		var tilt = new Basis(Vector3.Back, 0.41f);
+		ItemMeshes.Torus(mer, g + Vector3.Up * gy, tilt * Vector3.Back, gr + 0.02f, 0.008f, 28, 4);
+		foreach (float s in new[] { -1f, 1f }) mer.Cylinder(g + Vector3.Up * gy + tilt * Vector3.Up * s * (gr - 0.01f), g + Vector3.Up * gy + tilt * Vector3.Up * s * (gr + 0.05f), 0.006f, 0.006f, 6, true);
+		mer.CommitTo(this, "GlobeMeridian", false);
 		// the grandfather clock (2026-10-14c: a plinth, a narrower trunk with its pendulum door, a hood with a moulded
 		// crown, its old ivory dial in a brass bezel with its hands; it was one box with a white disc on it)
 		float cz2 = Depth - 0.75f;
@@ -372,70 +403,55 @@ public partial class Library : Node3D
 		Lamp(new Vector3(HalfW - 0.5f, 2.6f, 10.5f), new Color(0.9f, 0.7f, 0.4f), 0.7f, LampKind.Sconce, 0f, Vector3.Right);
 	}
 
+	/// <summary>(2026-10-15) A library table standing at <paramref name="foot"/>: <paramref name="size"/> its top's width,
+	/// height (to the top surface) and depth; a top with a moulded edge, an apron set in under it, four turned legs
+	/// <paramref name="leg"/> square at their tops.</summary>
+	private static void ReadingTable(MeshKit k, Vector3 foot, Vector3 size, float leg)
+	{
+		float topT = Mathf.Clamp(size.Y * 0.055f, 0.03f, 0.045f);
+		float yTop = size.Y - topT * 0.5f;
+		k.Color = Colors.White * 0.95f;
+		k.BevelBox(foot + Vector3.Up * yTop, new Vector3(size.X, topT, size.Z), topT * 0.3f);
+		// the moulding under the top's edge: a step in
+		k.Color = Colors.White * 0.82f;
+		k.BevelBox(foot + Vector3.Up * (size.Y - topT - 0.009f), new Vector3(size.X - 0.03f, 0.018f, size.Z - 0.03f), 0.006f);
+		// the apron
+		float inset = 0.05f + leg * 0.5f, ah = 0.1f, ay = size.Y - topT - 0.018f - ah * 0.5f;
+		k.Color = Colors.White * 0.88f;
+		foreach (float s in new[] { -1f, 1f })
+		{
+			k.BevelBox(foot + new Vector3(0, ay, s * (size.Z * 0.5f - inset)), new Vector3(size.X - inset * 2f, ah, 0.022f), 0.005f);
+			k.BevelBox(foot + new Vector3(s * (size.X * 0.5f - inset), ay, 0), new Vector3(0.022f, ah, size.Z - inset * 2f), 0.005f);
+		}
+		k.Color = Colors.White * 0.9f;
+		float legH = size.Y - topT - 0.018f;
+		foreach (float sx in new[] { -1f, 1f })
+			foreach (float sz in new[] { -1f, 1f })
+				TurnedKit.Leg(k, foot + new Vector3(sx * (size.X * 0.5f - inset), 0, sz * (size.Z * 0.5f - inset)), legH, leg, ah + 0.02f);
+		k.Color = Colors.White;
+	}
+
 	private enum LampKind { Desk, Floor, Sconce }
 
-	/// <summary>A lamp with its body: <paramref name="at"/> is the shade's centre. A desk lamp stands on a
-	/// brass base on the surface at <paramref name="baseY"/>; a floor lamp on a weighted foot on the floor;
-	/// a sconce hangs off a brass arm and plate on the wall it points away from (<paramref name="wall"/>).</summary>
+	/// <summary>A lamp with its body (<see cref="LampKit"/>, 2026-10-15: they were primitive cylinders and a squashed green
+	/// barrel): <paramref name="at"/> is the shade's centre. The banker's lamp stands on the desk at
+	/// <paramref name="baseY"/>, its shade's middle 0.3 m over it (it was 0.33 m and 32 cm long: now 27 cm, real
+	/// measure); a standard lamp on the floor; a sconce off the wall it points away from (<paramref name="wall"/>).</summary>
 	private void Lamp(Vector3 at, Color shade, float energy, LampKind kind, float baseY, Vector3? wall = null)
 	{
-		var brass = new MeshKit();
-		brass.Mat(ItemTextures.BrassMat);
-		brass.Color = new Color(0.78f, 0.6f, 0.34f);
-		var dark = new MeshKit();
-		dark.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.09f, 0.07f), Roughness = 0.5f, MetallicSpecular = 0.5f });
-		dark.Color = Colors.White;
-		float shadeH = 0.14f, shadeR = 0.16f;
 		switch (kind)
 		{
 			case LampKind.Desk:
-			{
-				Vector3 b = new(at.X, baseY, at.Z);
-				brass.Cylinder(b, b + Vector3.Up * 0.025f, 0.11f, 0.1f, 16, true);                  // the base
-				brass.Cylinder(b + Vector3.Up * 0.025f, b + Vector3.Up * 0.05f, 0.07f, 0.04f, 12, true);
-				brass.Cylinder(b + Vector3.Up * 0.05f, at + Vector3.Down * 0.05f, 0.012f, 0.012f, 8, false);   // the stem
-				brass.Cylinder(at + Vector3.Down * 0.07f, at + Vector3.Down * 0.02f, 0.02f, 0.02f, 8, true);   // the collar
-				// the pull chain
-				brass.Cylinder(at + new Vector3(0.05f, -0.05f, 0), at + new Vector3(0.05f, -0.2f, 0), 0.003f, 0.003f, 4, false);
-				brass.Cylinder(at + new Vector3(0.05f, -0.21f, 0), at + new Vector3(0.05f, -0.23f, 0), 0.008f, 0.004f, 6, true);
-				// the banker's shade: a long half-round of green glass, lying across the stem
-				shadeH = 0.08f; shadeR = 0.13f;
+				// a pool on the desk under the shade, a little spill (it was a 7 m omni at the shade)
+				LampKit.Banker(this, new Transform3D(Basis.Identity, new Vector3(at.X, baseY, at.Z)), energy * 1.9f);
 				break;
-			}
 			case LampKind.Floor:
-			{
-				Vector3 b = new(at.X, 0f, at.Z);
-				dark.Cylinder(b, b + Vector3.Up * 0.04f, 0.2f, 0.18f, 18, true);                       // a weighted foot
-				brass.Cylinder(b + Vector3.Up * 0.04f, b + Vector3.Up * 0.1f, 0.06f, 0.025f, 12, true);
-				brass.Cylinder(b + Vector3.Up * 0.1f, at + Vector3.Down * 0.05f, 0.017f, 0.014f, 8, false);   // the pole
-				foreach (float f in new[] { 0.35f, 0.7f }) brass.Cylinder(b + Vector3.Up * (at.Y * f), b + Vector3.Up * (at.Y * f + 0.03f), 0.025f, 0.025f, 8, true);   // turned rings
-				brass.Cylinder(at + Vector3.Down * 0.07f, at, 0.025f, 0.02f, 8, true);
-				shadeH = 0.28f; shadeR = 0.22f;
+				LampKit.Floor(this, new Transform3D(Basis.Identity, new Vector3(at.X, 0f, at.Z)), shade, energy, at.Y + 0.1f);
 				break;
-			}
 			default:
-			{
-				Vector3 n = (wall ?? Vector3.Left).Normalized();   // toward the wall behind it
-				Vector3 plate = at + n * 0.5f;
-				brass.Cylinder(plate - n * 0.02f, plate, 0.06f, 0.06f, 12, true);                       // the wall plate
-				Vector3 elbow = plate - n * 0.25f + Vector3.Down * 0.12f;
-				brass.Cylinder(plate - n * 0.02f, elbow, 0.012f, 0.012f, 8, false);                   // the arm, out and down
-				brass.Cylinder(elbow, at + Vector3.Down * 0.08f, 0.012f, 0.012f, 8, false);           // and up to the cup
-				brass.Cylinder(at + Vector3.Down * 0.1f, at + Vector3.Down * 0.06f, 0.045f, 0.03f, 10, true);
-				shadeH = 0.16f; shadeR = 0.12f;
+				LampKit.Sconce(this, at, wall ?? Vector3.Left, shade, energy, 0.5f);
 				break;
-			}
 		}
-		brass.CommitTo(this, "LampBody", true);
-		if (!dark.IsEmpty) dark.CommitTo(this, "LampFoot", true);
-		var shadeMat = new StandardMaterial3D { AlbedoColor = shade, Roughness = 0.4f, EmissionEnabled = true, Emission = shade, EmissionEnergyMultiplier = 0.45f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
-		if (kind == LampKind.Desk)
-			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = shadeR, BottomRadius = shadeR, Height = 0.32f, RadialSegments = 16 }, Position = at + Vector3.Up * 0.02f, Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), Scale = new Vector3(1f, 1f, 0.55f), MaterialOverride = shadeMat });
-		else
-			AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = shadeR * 0.6f, BottomRadius = shadeR, Height = shadeH, RadialSegments = 16 }, Position = at + Vector3.Up * (shadeH * 0.5f - 0.06f), MaterialOverride = shadeMat });
-		// the bulb, glowing warm under the shade
-		AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.03f, Height = 0.06f }, Position = at + Vector3.Down * 0.02f, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.9f, 0.7f), EmissionEnabled = true, Emission = new Color(1f, 0.82f, 0.55f), EmissionEnergyMultiplier = 3f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded }, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-		AddChild(new OmniLight3D { Position = at + Vector3.Down * 0.12f, LightColor = new Color(1f, 0.82f, 0.6f), LightEnergy = energy, OmniRange = 7f, OmniAttenuation = 1.1f, ShadowEnabled = kind == LampKind.Desk });
 	}
 
 	/// <summary>The side table by the west shelves: the puzzle box and its pieces on it, a sheet over everything.</summary>
@@ -443,9 +459,7 @@ public partial class Library : Node3D
 	{
 		var k = new MeshKit();
 		k.Mat(_wood);
-		Slab(k, TableAt + new Vector3(0, 0.7f, 0), new Vector3(0.6f, 0.04f, 1.25f), false);
-		foreach (var (dx, dz) in new[] { (-0.25f, -0.55f), (0.25f, -0.55f), (-0.25f, 0.55f), (0.25f, 0.55f) })
-			Slab(k, TableAt + new Vector3(dx, 0.35f, dz), new Vector3(0.05f, 0.7f, 0.05f), false);
+		ReadingTable(k, TableAt, new Vector3(0.6f, 0.72f, 1.25f), 0.05f);   // (2026-10-15: turned legs, an apron; it was a slab on posts)
 		k.CommitTo(this, "SideTable", true);
 		_body.AddChild(new CollisionShape3D { Position = TableAt + new Vector3(0, 0.37f, 0), Shape = new BoxShape3D { Size = new Vector3(0.6f, 0.74f, 1.25f) } });
 		// the puzzle, turned so its loose pieces lie along the table and its near side faces the room

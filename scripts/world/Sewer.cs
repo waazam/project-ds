@@ -454,7 +454,7 @@ public partial class Sewer : Node3D
 			{
 				0 => new BoxMesh { Size = new Vector3(_rng.RandfRange(0.4f, 1.1f), 0.04f, _rng.RandfRange(0.08f, 0.16f)) },
 				1 => new SphereMesh { Radius = 0.15f, Height = 0.16f },
-				_ => new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.04f, Height = 0.22f },
+				_ => FloatBottle,
 			};
 			if (kind == 2) mi.Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0);
 			n.AddChild(mi);
@@ -490,12 +490,30 @@ public partial class Sewer : Node3D
 			for (int i = 0; i < 5; i++)
 			{
 				Vector3 p = c + new Vector3(_rng.RandfRange(-1.2f, 1.2f), 0.2f, _rng.RandfRange(-1.2f, 1.2f));
-				bags.Cylinder(p + Vector3.Down * 0.2f, p + Vector3.Up * 0.25f, 0.3f, 0.12f, 8, true);
+				// (2026-10-15: a sack slumped on the heap, lumpy, its neck tied off; it was an eight-sided cone)
+				bags.Blob(p + Vector3.Up * 0.02f, new Vector3(0.3f, 0.22f, 0.26f), (int)(c.X * 31f + c.Z * 7f) + i, 0.16f, false);
+				TurnedKit.Lathe(bags, p + new Vector3(0.04f, 0.2f, 0.02f), TurnedKit.P(0f, 0f, 0.06f, 0f, 0.025f, 0.05f, 0.02f, 0.08f, 0.045f, 0.12f, 0f, 0.13f), 6, 50f);
 			}
 			_stone.AddChild(new CollisionShape3D { Position = c + Vector3.Up * 0.3f, Shape = new CylinderShape3D { Radius = 1.4f, Height = 0.6f } });
 		}
 		heap.CommitTo(this, "Heaps", true);
 		bags.CommitTo(this, "Bags", true);
+	}
+
+	private static Mesh _floatBottle;
+	/// <summary>(2026-10-15, the props pass) A floating bottle: a turned body, shoulder, neck and lip (lying on its side in
+	/// the water); it was a plain tapered cylinder. Its material is the floater's override.</summary>
+	private static Mesh FloatBottle
+	{
+		get
+		{
+			if (_floatBottle != null) return _floatBottle;
+			var k = new MeshKit();
+			k.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.62f, 0.6f, 0.55f), Roughness = 0.6f });
+			TurnedKit.Lathe(k, Vector3.Down * 0.11f, TurnedKit.P(0f, 0f, 0.034f, 0f, 0.037f, 0.008f, 0.037f, 0.13f, 0.03f, 0.16f, 0.014f, 0.18f, 0.012f, 0.21f,
+				0.015f, 0.214f, 0.014f, 0.22f, 0f, 0.22f), 10);
+			return _floatBottle = k.Commit();
+		}
 	}
 
 	private void BuildLights()

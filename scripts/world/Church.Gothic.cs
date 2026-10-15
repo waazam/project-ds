@@ -45,10 +45,13 @@ public partial class Church
 	private static StandardMaterial3D _wax;
 	private static StandardMaterial3D Wax => _wax ??= WaxMaterial.Make(new Color(0.88f, 0.84f, 0.74f), 0.6f, "church_wax");
 
-	/// <summary>A candle standing at <paramref name="at"/> (its foot), lit.</summary>
+	/// <summary>A candle standing at <paramref name="at"/> (its foot), lit.
+	/// (2026-10-15, the props pass: turned, 8 sides, its top burnt down into a hollow round the wick and a lip of wax
+	/// run over at its foot; it was a six-sided stick with a flat top)</summary>
 	private void Candle(MeshKit wax, Vector3 at, float h, float r)
 	{
-		wax.Cylinder(at, at + Vector3.Up * h, r, r * 0.95f, 6, true);
+		TurnedKit.Lathe(wax, at, TurnedKit.P(0f, 0f, r * 1.12f, 0f, r * 1.08f, Mathf.Min(0.012f, h * 0.15f), r, Mathf.Min(0.02f, h * 0.25f), r * 0.96f, h - 0.006f,
+			r * 0.84f, h, r * 0.45f, h - 0.005f, 0f, h - 0.004f), 8, 40f);
 		_flames.Add(new Transform3D(Basis.Identity, at + Vector3.Up * (h + 0.025f)));
 	}
 
@@ -79,9 +82,15 @@ public partial class Church
 	/// always be found in the dark.</summary>
 	private void DoorSconce(MeshKit iron, MeshKit wax, Vector3 at, Vector3 outOfWall)
 	{
-		iron.Beam(at - outOfWall * 0.02f, at + outOfWall * 0.22f, 0.04f, 0.04f);
-		iron.Cylinder(at + outOfWall * 0.22f + Vector3.Down * 0.02f, at + outOfWall * 0.22f + Vector3.Up * 0.02f, 0.07f, 0.07f, 8, true);
-		Candle(wax, at + outOfWall * 0.22f + Vector3.Up * 0.02f, 0.18f, 0.03f);
+		// (2026-10-15: a wrought bracket, a wall plate, an arm curling up under a drip pan with a pricket; it was a bar
+		// and a disc)
+		Vector3 cup = at + outOfWall * 0.22f;
+		var plate = new Transform3D(Basis.LookingAt(-outOfWall, Vector3.Up) * new Basis(Vector3.Right, Mathf.Pi * 0.5f), at - outOfWall * 0.02f + Vector3.Down * 0.08f);
+		TurnedKit.Lathe(iron, plate, TurnedKit.P(0f, 0f, 0.05f, 0f, 0.05f, 0.012f, 0.03f, 0.022f, 0f, 0.024f), 8, 38f, 0.7f, 1f);
+		TurnedKit.Rod(iron, TurnedKit.Curve(at - outOfWall * 0.01f + Vector3.Down * 0.08f, at + outOfWall * 0.2f + Vector3.Down * 0.14f, cup + Vector3.Down * 0.05f, 8), 0.012f, 6, true);
+		TurnedKit.Rod(iron, TurnedKit.Curve(at + outOfWall * 0.02f + Vector3.Down * 0.08f, at + outOfWall * 0.08f + Vector3.Up * 0.02f, cup + Vector3.Down * 0.035f - outOfWall * 0.04f, 6), 0.008f, 5, true);
+		TurnedKit.Lathe(iron, cup + Vector3.Down * 0.055f, TurnedKit.P(0f, 0f, 0.012f, 0f, 0.016f, 0.03f, 0.06f, 0.05f, 0.07f, 0.065f, 0.064f, 0.07f, 0.05f, 0.062f, 0.012f, 0.062f, 0f, 0.064f), 10);
+		Candle(wax, cup + Vector3.Up * 0.01f, 0.18f, 0.03f);
 		Warm(at + outOfWall * 0.5f + Vector3.Up * 0.3f, 0.75f, 7f);
 	}
 
@@ -170,19 +179,24 @@ public partial class Church
 		wax.Mat(Wax);
 		Vector3 cc = at + Vector3.Up * 5.2f;
 		crown.Cylinder(cc + Vector3.Up * 1.2f, new Vector3(cc.X, NaveVaultY(0) - 0.4f, cc.Z), 0.03f, 0.03f, 4, false);
+		// (2026-10-15: round iron hoops, a band of uprights between them, a cup under every candle; the hoops were
+		// rings of square bars)
 		foreach (var (rr, yy) in new[] { (1.7f, 0f), (1.7f, 0.35f) })
-			for (int i = 0; i < 24; i++)
-			{
-				float a0 = Mathf.Tau * i / 24f, a1 = Mathf.Tau * (i + 1) / 24f;
-				crown.Beam(cc + new Vector3(Mathf.Cos(a0) * rr, yy, Mathf.Sin(a0) * rr), cc + new Vector3(Mathf.Cos(a1) * rr, yy, Mathf.Sin(a1) * rr), 0.06f, 0.06f);
-			}
+			ItemMeshes.Torus(crown, cc + Vector3.Up * yy, Vector3.Up, rr, 0.03f, 36, 5);
+		for (int i = 0; i < 24; i++)
+		{
+			float a = Mathf.Tau * (i + 0.5f) / 24f;
+			Vector3 d = new(Mathf.Cos(a) * 1.7f, 0, Mathf.Sin(a) * 1.7f);
+			crown.Cylinder(cc + d, cc + d + Vector3.Up * 0.35f, 0.012f, 0.012f, 4, false);
+		}
+		crown.Cylinder(cc + Vector3.Up * 1.12f, cc + Vector3.Up * 1.28f, 0.07f, 0.05f, 8, true);   // the boss the chains meet at
 		for (int i = 0; i < 12; i++)
 		{
 			float a = Mathf.Tau * i / 12f;
 			Vector3 p = cc + new Vector3(Mathf.Cos(a) * 1.7f, 0.35f, Mathf.Sin(a) * 1.7f);
-			crown.Beam(p, cc + Vector3.Up * 1.2f, 0.025f, 0.025f);
-			crown.Cylinder(p, p + Vector3.Up * 0.04f, 0.06f, 0.06f, 6, true);
-			Candle(wax, p + Vector3.Up * 0.04f, 0.2f, 0.035f);
+			crown.Cylinder(p, cc + Vector3.Up * 1.2f, 0.012f, 0.012f, 4, false);
+			TurnedKit.Lathe(crown, p, TurnedKit.P(0f, 0f, 0.025f, 0f, 0.03f, 0.012f, 0.06f, 0.025f, 0.065f, 0.04f, 0.055f, 0.042f, 0.035f, 0.035f, 0f, 0.036f), 8);
+			Candle(wax, p + Vector3.Up * 0.036f, 0.2f, 0.035f);
 		}
 		crown.CommitTo(this, "Crown", false);
 		wax.CommitTo(this, "CrownCandles", false);
@@ -210,9 +224,22 @@ public partial class Church
 			BuildKit.Box(k, at + new Vector3(0, 1.21f, 0.2f), new Vector3(2.2f, 0.02f, 1f), 1f);
 			BuildKit.Box(k, at + new Vector3(0, 1.0f, -0.27f), new Vector3(2.2f, 0.42f, 0.02f), 1f);
 			k.Mat(ChurchTextures.IronMat);
-			k.Box(at + new Vector3(0, 1.8f, 0.5f), new Vector3(0.05f, 1.1f, 0.05f));
-			k.Box(at + new Vector3(0, 2.05f, 0.5f), new Vector3(0.5f, 0.05f, 0.05f));
-			foreach (float x in new[] { -0.8f, 0.8f }) Candle(wax, at + new Vector3(x, 1.22f, 0.35f), 0.3f, 0.04f);
+			// the cross (2026-10-15: its arms ending in flared terminals, its foot in a stepped base; it was two square bars)
+			k.ChamferBox(at + new Vector3(0, 1.8f, 0.5f), new Vector3(0.05f, 1.1f, 0.05f), 0.01f);
+			k.ChamferBox(at + new Vector3(0, 2.05f, 0.5f), new Vector3(0.5f, 0.05f, 0.05f), 0.01f, 1f, null, 0);
+			foreach (var (c, sz) in new[] { (new Vector3(-0.25f, 2.05f, 0.5f), new Vector3(0.03f, 0.09f, 0.08f)), (new Vector3(0.25f, 2.05f, 0.5f), new Vector3(0.03f, 0.09f, 0.08f)), (new Vector3(0, 2.35f, 0.5f), new Vector3(0.09f, 0.03f, 0.08f)) })
+				k.BevelBox(at + c, sz, 0.008f);
+			k.BevelBox(at + new Vector3(0, 1.27f, 0.5f), new Vector3(0.16f, 0.06f, 0.12f), 0.012f);
+			// and its two candles in tall iron candlesticks (they stood on the cloth with nothing under them)
+			var sticks = new MeshKit();
+			sticks.Mat(ChurchTextures.IronMat);
+			sticks.Color = Colors.White;
+			foreach (float x in new[] { -0.8f, 0.8f })
+			{
+				LampKit.Candlestick(sticks, null, at + new Vector3(x, 1.22f, 0.35f), 0.34f);
+				Candle(wax, at + new Vector3(x, 1.22f + 0.34f - 0.012f, 0.35f), 0.3f, 0.021f);
+			}
+			sticks.CommitTo(this, s < 0 ? "TransAltarSticksL" : "TransAltarSticksR", true);
 			Warm(at + new Vector3(0, 1.9f, -0.4f), 1.2f, 8f);
 		}
 		k.CommitTo(this, "TransAltars", true);

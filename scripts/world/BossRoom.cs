@@ -340,9 +340,23 @@ public partial class BossRoom : Node3D
 							Vector3 top = o + along * s + inw * (lay.depth + r + r * 2.2f) + Vector3.Up * yc;
 							Vector3 bot = top;
 							bot.Y = o.Y + y2;
-							kits[m].Cylinder(top, bot, r * 0.8f, r * 0.8f, 12, false);
-							Elbow(kits[m], top, r * 0.8f);
-							Elbow(kits[m], bot, r * 0.8f);
+							// (2026-10-15, the props pass: a stub out of the run, a swept bend down or up into the riser, a
+							// flange at the joint; the riser had stood off the run on its own with a ball at each end)
+							float rr = r * 0.8f, R = rr * 1.6f;
+							Vector3 vu = Vector3.Up * Mathf.Sign(bot.Y - top.Y);
+							Vector3 c = top - inw * R + vu * R;
+							var arc = new List<Vector3>();
+							for (int q = 0; q <= 6; q++)
+							{
+								float th = Mathf.Pi * 0.5f * q / 6f;
+								arc.Add(c - vu * R * Mathf.Cos(th) + inw * R * Mathf.Sin(th));
+							}
+							Vector3 stub = top - inw * (r * 2.2f);
+							kits[m].Cylinder(stub, arc[0], rr, rr, 12, false);
+							kits[m].Cylinder(arc[0] - inw * 0.03f, arc[0] + inw * 0.03f, rr * 1.25f, rr * 1.25f, 12, true);
+							TurnedKit.Rod(kits[m], arc, rr, 12, false);
+							kits[m].Cylinder(arc[6], bot, rr, rr, 12, false);
+							Elbow(kits[m], bot, rr);
 						}
 					}
 					y += r * 2f + _rng.RandfRange(lay.gapMin, lay.gapMax);

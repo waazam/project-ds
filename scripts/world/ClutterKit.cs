@@ -103,22 +103,54 @@ public sealed class ClutterKit
 	/// <summary>A broom, for leaning: a pole and a bristled head.</summary>
 	public static Item Broom(Material wood, Material bristle) => new("broom", (k, xf) =>
 	{
+		// (2026-10-15, the props pass: a round handle with a rounded end, set into a stock with a domed top, the bristles
+		// splaying out below it; it was a hexagonal stick on two boxes)
 		k.Mat(wood);
-		k.Cylinder(xf * new Vector3(0, 0.2f, 0), xf * new Vector3(0, 1.35f, 0), 0.014f, 0.014f, 6, true);
-		k.BevelBox(xf * new Vector3(0, 0.2f, 0), new Vector3(0.28f, 0.05f, 0.06f), 0.01f, 1f, xf.Basis);
+		TurnedKit.Lathe(k, xf * new Vector3(0, 0.215f, 0), TurnedKit.P(0f, 0f, 0.0145f, 0f, 0.0145f, 1.12f, 0.011f, 1.13f, 0f, 1.135f), 8);
+		k.BevelBox(xf * new Vector3(0, 0.2f, 0), new Vector3(0.28f, 0.045f, 0.06f), 0.016f, 1f, xf.Basis);
 		k.Mat(bristle);
 		var keep = k.Color;
 		k.Color = keep * 0.8f;
-		k.Box(xf * new Vector3(0, 0.09f, 0), new Vector3(0.26f, 0.13f, 0.05f), 1f, xf.Basis);
+		// the bristles: a block flaring from the stock's width to a little wider at the floor, ragged at the tips
+		var b = xf.Basis;
+		Vector3 P(float x, float y, float z) => xf * new Vector3(x, y, z);
+		var top = new[] { P(-0.125f, 0.178f, -0.022f), P(0.125f, 0.178f, -0.022f), P(0.125f, 0.178f, 0.022f), P(-0.125f, 0.178f, 0.022f) };
+		var bot = new[] { P(-0.138f, 0.0f, -0.03f), P(0.138f, 0.0f, -0.03f), P(0.138f, 0.0f, 0.03f), P(-0.138f, 0.0f, 0.03f) };
+		for (int i = 0; i < 4; i++)
+		{
+			int j = (i + 1) % 4;
+			Vector3 n = ((top[i] + top[j] + bot[i] + bot[j]) * 0.25f - xf * new Vector3(0, 0.09f, 0)).Normalized();
+			k.Quad(bot[i], bot[j], top[j], top[i], n);
+		}
+		k.Quad(bot[0], bot[1], bot[2], bot[3], -b.Y.Normalized());
 		k.Color = keep;
 	}, new Vector3(0.28f, 1.35f, 0.06f), false, true, false);
 
 	/// <summary>A tin bucket (a pail), its handle down.</summary>
 	public static Item Bucket(Material metal) => new("bucket", (k, xf) =>
 	{
+		// (2026-10-15, the props pass: a pressed pail, its foot ring, two swaged hoops, a rolled rim and its inside down to
+		// the bottom, the ears and the wire bail lying down; it was a capped ten-sided cone)
 		k.Mat(metal);
-		k.Cylinder(xf * new Vector3(0, 0f, 0), xf * new Vector3(0, 0.28f, 0), 0.12f, 0.15f, 10, true);
-		k.Cylinder(xf * new Vector3(0, 0.27f, 0), xf * new Vector3(0, 0.29f, 0), 0.158f, 0.158f, 10, false);
+		var keep = k.Color;
+		TurnedKit.Lathe(k, xf, TurnedKit.P(0f, 0.006f, 0.112f, 0.006f, 0.116f, 0f, 0.122f, 0f, 0.121f, 0.012f, 0.124f, 0.012f, 0.128f, 0.07f, 0.131f, 0.074f, 0.132f, 0.08f,
+			0.14f, 0.2f, 0.143f, 0.204f, 0.144f, 0.21f, 0.15f, 0.272f, 0.158f, 0.276f, 0.16f, 0.284f, 0.155f, 0.29f, 0.147f, 0.284f,
+			0.143f, 0.27f, 0.118f, 0.025f, 0f, 0.025f), 14, 40f);
+		k.Color = keep * 0.85f;
+		foreach (float s in new[] { -1f, 1f })
+		{
+			var ear = xf * new Transform3D(new Basis(Vector3.Back, s * Mathf.Pi * 0.5f), new Vector3(s * 0.149f, 0.245f, 0));
+			TurnedKit.Lathe(k, ear, TurnedKit.P(0f, 0f, 0.016f, 0f, 0.013f, 0.008f, 0f, 0.009f), 8);
+		}
+		// the bail, dropped down against the side
+		var bail = new List<Vector3>();
+		for (int i = 0; i <= 10; i++)
+		{
+			float a = Mathf.Pi * i / 10f;
+			bail.Add(xf * new Vector3(-Mathf.Cos(a) * 0.158f, 0.245f - Mathf.Sin(a) * 0.04f, -Mathf.Sin(a) * 0.162f));
+		}
+		TurnedKit.Rod(k, bail, 0.0035f, 4, false);
+		k.Color = keep;
 	}, new Vector3(0.3f, 0.29f, 0.3f), false, false, true);
 
 	/// <summary>A tied bundle (papers, hymnals, cloth): a soft slab with string round it, <paramref name="tint"/> its

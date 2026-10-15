@@ -146,11 +146,15 @@ public partial class Church
 		foreach (var (x, z) in new[] { (-6f, 54f), (-6f, 62f), (6f, 54f), (6f, 62f) })
 		{
 			k.Mat(stone);
-			BuildKit.Box(k, new Vector3(x, y0 + 0.45f, z), new Vector3(1.1f, 0.9f, 2.3f), 1f, BuildKit.Face.NY);
-			BuildKit.Box(k, new Vector3(x, y0 + 0.97f, z), new Vector3(1.25f, 0.14f, 2.45f), 1f);
+			// (2026-10-15, the props pass: a plinth under the chest, its edges worn round, the lid's edge chamfered and a
+			// raised slab on it for the cross; they were two sharp boxes)
+			k.BevelBox(new Vector3(x, y0 + 0.07f, z), new Vector3(1.22f, 0.14f, 2.42f), 0.025f);
+			k.BevelBox(new Vector3(x, y0 + 0.52f, z), new Vector3(1.1f, 0.78f, 2.3f), 0.03f);
+			k.BevelBox(new Vector3(x, y0 + 0.97f, z), new Vector3(1.25f, 0.14f, 2.45f), 0.045f);
+			k.BevelBox(new Vector3(x, y0 + 1.04f + 0.0f, z), new Vector3(0.95f, 0.03f, 2.1f), 0.012f);
 			k.Mat(ChurchTextures.IronMat);
-			BuildKit.Box(k, new Vector3(x, y0 + 1.045f, z), new Vector3(0.1f, 0.01f, 1.4f), 1f);
-			BuildKit.Box(k, new Vector3(x, y0 + 1.045f, z - 0.25f), new Vector3(0.7f, 0.01f, 0.1f), 1f);
+			BuildKit.Box(k, new Vector3(x, y0 + 1.06f, z), new Vector3(0.1f, 0.01f, 1.4f), 1f);
+			BuildKit.Box(k, new Vector3(x, y0 + 1.06f, z - 0.25f), new Vector3(0.7f, 0.01f, 0.1f), 1f);
 			Collide(_stone, new Vector3(x, y0 + 0.52f, z), new Vector3(1.25f, 1.04f, 2.45f));
 		}
 		// ---- the far end: an altar draped in red, a small organ, a hooded figure
@@ -172,7 +176,11 @@ public partial class Church
 		for (int i = 0; i < 11; i++)
 		{
 			float x = ox - 1.05f + i * 0.21f, ht = 0.9f + 0.9f * (1f - Mathf.Abs(i - 5) / 5f);
-			k.Cylinder(new Vector3(x, y0 + 2.3f, oz + 0.1f), new Vector3(x, y0 + 2.3f + ht, oz + 0.1f), 0.07f, 0.07f, 8, true);
+			// (2026-10-15: each pipe on its conical foot, its mouth a step in under the body; they were plain tubes)
+			TurnedKit.Lathe(k, new Vector3(x, y0 + 2.3f, oz + 0.1f), TurnedKit.P(0f, 0f, 0.018f, 0f, 0.062f, 0.2f, 0.07f, 0.21f, 0.07f, ht, 0.062f, ht + 0.004f, 0.056f, ht - 0.03f, 0f, ht - 0.03f), 10, 40f);
+			k.Color = Colors.White * 0.35f;
+			k.Box(new Vector3(x, y0 + 2.3f + 0.27f, oz + 0.1f - 0.066f), new Vector3(0.05f, 0.05f, 0.012f));
+			k.Color = Colors.White;
 		}
 		Collide(_wood, new Vector3(ox, y0 + 1.2f, oz), new Vector3(2.4f, 2.4f, 1f));
 		// the hooded figure, stone, head bowed, looking at its hands
