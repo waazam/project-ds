@@ -23,6 +23,8 @@ public class MeshKit
 		public readonly List<float> T = new();
 		/// <summary>The second UV set (a modelled piece's baked maps), likewise only for <see cref="AddMesh"/>'s geometry.</summary>
 		public readonly List<Vector2> UV2 = new();
+		/// <summary>Its second UVs were written by a <see cref="Shade"/> (not a modelled piece's own).</summary>
+		public bool Shaded;
 	}
 
 	private readonly Dictionary<Material, Surf> _surfs = new();
@@ -51,6 +53,8 @@ public class MeshKit
 
 	private int Vert(Vector3 p, Vector3 n, Vector2 uv)
 	{
+		// (a surface already given second UVs by a Shade keeps them whole: what's added after gets none)
+		if (_cur.UV2.Count > 0 && _cur.UV2.Count == _cur.V.Count && _cur.T.Count == 0) _cur.UV2.Add(Vector2.Zero);
 		_cur.V.Add(Xf * p);
 		_cur.N.Add((Xf.Basis * n).Normalized());
 		_cur.UV.Add(uv);
@@ -85,9 +89,54 @@ public class MeshKit
 	public void Tri(Vector3 a, Vector3 b, Vector3 c, Vector3 n, Vector2 ua, Vector2 ub, Vector2 uc)
 		=> Tri(a, b, c, n, n, n, ua, ub, uc);
 
+	/// <summary>(2026-10-14g, the interiors kit) When above zero, every <see cref="Quad"/> (and so every box face,
+	/// <see cref="BuildKit.Box"/>, a church wall's strips) longer than this many metres along a side is drawn as a grid of
+	/// smaller quads, with an extra row 0.15 m in from each long edge: so a colour baked into the vertices
+	/// (<see cref="RoomShade"/>: the dark at a wall's foot, in its corners, under its ceiling) has vertices to sit on. The
+	/// PS2 lit its rooms per vertex the same way. 0.6 suits a room's walls, floor and ceiling; set it back to 0 for the
+	/// small things after them.</summary>
+	public float Tess;
+
+	/// <summary>Where to cut a side <paramref name="len"/> long (fractions 0..1, ends included) for <see cref="Tess"/>.</summary>
+	private static List<float> Cuts(float len, float tess)
+	{
+		var f = new List<float> { 0f, 1f };
+		if (tess <= 0f || len <= tess) return f;
+		int n = Mathf.CeilToInt(len / tess);
+		for (int i = 1; i < n; i++) f.Add(i / (float)n);
+		// a row close to each end, so a seam's dark falls off over 15 cm instead of a whole cell
+		if (len > 0.8f)
+			foreach (float e in new[] { 0.15f / len, 1f - 0.15f / len })
+			{
+				bool near = false;
+				foreach (float x in f) if (Mathf.Abs(x - e) * len < 0.08f) { near = true; break; }
+				if (!near) f.Add(e);
+			}
+		f.Sort();
+		return f;
+	}
+
 	/// <summary>Quad a-b-c-d (in order around the edge) facing n.</summary>
 	public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 n, Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud)
 	{
+		if (Tess > 0f)
+		{
+			var cu = Cuts(Mathf.Max(a.DistanceTo(b), d.DistanceTo(c)), Tess);
+			var cv = Cuts(Mathf.Max(a.DistanceTo(d), b.DistanceTo(c)), Tess);
+			if (cu.Count > 2 || cv.Count > 2)
+			{
+				Vector3 P(float s, float t) => (a.Lerp(b, s)).Lerp(d.Lerp(c, s), t);
+				Vector2 U(float s, float t) => (ua.Lerp(ub, s)).Lerp(ud.Lerp(uc, s), t);
+				for (int j = 0; j < cv.Count - 1; j++)
+					for (int i = 0; i < cu.Count - 1; i++)
+					{
+						float s0 = cu[i], s1 = cu[i + 1], t0 = cv[j], t1 = cv[j + 1];
+						Tri(P(s0, t0), P(s1, t0), P(s1, t1), n, U(s0, t0), U(s1, t0), U(s1, t1));
+						Tri(P(s0, t0), P(s1, t1), P(s0, t1), n, U(s0, t0), U(s1, t1), U(s0, t1));
+					}
+				return;
+			}
+		}
 		Tri(a, b, c, n, ua, ub, uc);
 		Tri(a, c, d, n, ua, uc, ud);
 	}
@@ -180,6 +229,92 @@ public class MeshKit
 					Tri(c + b * p0, c + b * p1, c + b * p2, (b * n).Normalized(), Uv(p0, n), Uv(p1, n), Uv(p2, n));
 				}
 	}
+
+	/// <summary>(2026-10-14g) When above zero, <see cref="BuildKit.Box"/> eases its edges by this much (2-4 cm reads at
+	/// PS2 resolution: the lantern catches a line of light along the edge instead of a knife cut). Which edges:
+	/// <see cref="BevelAxis"/>.</summary>
+	public float Bevel;
+	/// <summary>Which of <see cref="BuildKit.Box"/>'s edges <see cref="Bevel"/> eases: -1 all twelve (a prop, a table
+	/// top); 0, 1 or 2 only the four running along local X, Y or Z (1: a wall's or a post's upright corners, leaving
+	/// the joints with the floor and the ceiling tight).</summary>
+	public int BevelAxis = -1;
+
+	/// <summary>(2026-10-14g) A box whose four edges along local <paramref name="axis"/> (0 X, 1 Y, 2 Z) are chamfered by
+	/// <paramref name="bevel"/>, the other eight left square: a wall slab's or a jamb's outside corners, a post. Its two
+	/// end caps only if asked (a wall standing on a floor needs no bottom). Sides go through <see cref="Quad"/>, so
+	/// <see cref="Tess"/> subdivides them. UVs world-scaled per face like <see cref="BevelBox"/>.</summary>
+	public void ChamferBox(Vector3 c, Vector3 s, float bevel, float uvScale = 1f, Basis? rot = null, int axis = 1, bool capLow = true, bool capHigh = true)
+	{
+		Basis b = rot ?? Basis.Identity;
+		// a local frame with the chamfered edges running along 'a'
+		Vector3 ea = axis == 0 ? Vector3.Right : axis == 1 ? Vector3.Up : Vector3.Back;
+		Vector3 eu = axis == 0 ? Vector3.Back : axis == 1 ? Vector3.Right : Vector3.Up;
+		Vector3 ev = ea.Cross(eu);
+		float ha = s.Dot(ea) * 0.5f, hu = Mathf.Abs(s.Dot(eu)) * 0.5f, hv = Mathf.Abs(s.Dot(ev)) * 0.5f;
+		ha = Mathf.Abs(ha);
+		float e = Mathf.Min(bevel, Mathf.Min(hu, hv) * 0.9f);
+		var ring = e <= 0.0005f
+			? new[] { new Vector2(hu, hv), new Vector2(hu, -hv), new Vector2(-hu, -hv), new Vector2(-hu, hv) }
+			: new[] { new Vector2(hu - e, hv), new Vector2(hu, hv - e), new Vector2(hu, -hv + e), new Vector2(hu - e, -hv), new Vector2(-hu + e, -hv), new Vector2(-hu, -hv + e), new Vector2(-hu, hv - e), new Vector2(-hu + e, hv) };
+		Vector3 L(Vector2 q, float h) => eu * q.X + ev * q.Y + ea * h;
+		Vector2 Uv(Vector3 p, Vector3 n)
+		{
+			Vector3 an = n.Abs();
+			Vector2 q = an.X >= an.Y && an.X >= an.Z ? new Vector2(p.Z, -p.Y) : an.Y >= an.Z ? new Vector2(p.X, p.Z) : new Vector2(p.X, -p.Y);
+			return q * uvScale;
+		}
+		Vector3 W(Vector3 p) => c + b * p;
+		for (int i = 0; i < ring.Length; i++)
+		{
+			Vector2 q0 = ring[i], q1 = ring[(i + 1) % ring.Length];
+			Vector2 en = new Vector2(q1.Y - q0.Y, -(q1.X - q0.X)).Normalized();
+			if (en.Dot((q0 + q1) * 0.5f) < 0) en = -en;
+			Vector3 n = (eu * en.X + ev * en.Y).Normalized();
+			Vector3 p0 = L(q0, -ha), p1 = L(q1, -ha), p2 = L(q1, ha), p3 = L(q0, ha);
+			Quad(W(p0), W(p1), W(p2), W(p3), (b * n).Normalized(), Uv(p0, n), Uv(p1, n), Uv(p2, n), Uv(p3, n));
+		}
+		foreach (var (h, cap) in new[] { (-ha, capLow), (ha, capHigh) })
+		{
+			if (!cap) continue;
+			Vector3 n = ea * Mathf.Sign(h);
+			Vector3 m = L(Vector2.Zero, h);
+			for (int i = 0; i < ring.Length; i++)
+			{
+				Vector3 p0 = L(ring[i], h), p1 = L(ring[(i + 1) % ring.Length], h);
+				Tri(W(m), W(p0), W(p1), (b * n).Normalized(), Uv(m, n), Uv(p0, n), Uv(p1, n));
+			}
+		}
+	}
+
+	/// <summary>(2026-10-14g) Visits every vertex drawn so far (in the kit's space, after <see cref="Xf"/>) of the surfaces
+	/// <paramref name="which"/> accepts (all if null), to rewrite its colour and its second UV: how <see cref="RoomShade"/>
+	/// bakes a room's dark into its walls. Surfaces taken from a modelled mesh (<see cref="AddMesh"/>: their second UV is
+	/// their baked cavity map) are left alone.</summary>
+	public delegate void VertexShader(Vector3 p, Vector3 n, ref Color c, ref Vector2 uv2);
+
+	public void Shade(VertexShader fn, System.Func<Material, bool> which = null)
+	{
+		foreach (var m in _order)
+		{
+			if (which != null && !which(m)) continue;
+			var s = _surfs[m];
+			if (s.T.Count > 0 || (s.UV2.Count > 0 && !s.Shaded)) continue;
+			// (glass and other see-through surfaces keep their alpha)
+			if (which == null && m is BaseMaterial3D bm && bm.Transparency != BaseMaterial3D.TransparencyEnum.Disabled) continue;
+			if (!s.Shaded) { s.UV2.Clear(); for (int i = 0; i < s.V.Count; i++) s.UV2.Add(Vector2.Zero); s.Shaded = true; }
+			for (int i = 0; i < s.V.Count; i++)
+			{
+				Color c = s.C[i];
+				Vector2 uv2 = s.UV2[i];
+				fn(s.V[i], s.N[i], ref c, ref uv2);
+				s.C[i] = c;
+				s.UV2[i] = uv2;
+			}
+		}
+	}
+
+	/// <summary>Every material drawn with so far (to pick which a <see cref="Shade"/> or a weathering swap applies to).</summary>
+	public IReadOnlyList<Material> Materials => _order;
 
 	/// <summary>Box spanning between two points (a beam), with the given cross-section (width along 'side', height along the rest).</summary>
 	public void Beam(Vector3 from, Vector3 to, float width, float height, float uvScale = 1f, Vector3? upHint = null)

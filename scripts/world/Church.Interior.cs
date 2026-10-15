@@ -488,53 +488,12 @@ public partial class Church
 
 	private void BuildVestry()
 	{
-		var k = new MeshKit();
-		var ash = ChurchTextures.AshlarMat;
-		float x0 = VestryX0, x1 = VestryX1, z0 = VestryZ0, z1 = VestryZ1, h = VestryH;
-		// its floor of oak boards, and a plain coffered ceiling
-		k.Mat(ChurchTextures.OakMat);
-		k.Color = Colors.White * 0.9f;
-		k.Quad(new Vector3(x1, 0, z0), new Vector3(x0, 0, z0), new Vector3(x0, 0, z1), new Vector3(x1, 0, z1), Vector3.Up, new Vector2(x1, z0), new Vector2(x0, z0), new Vector2(x0, z1), new Vector2(x1, z1));
-		Collide(_wood, new Vector3((x0 + x1) * 0.5f, -0.3f, (z0 + z1) * 0.5f), new Vector3(x0 - x1, 0.6f, z1 - z0));
-		k.Quad(new Vector3(x0, h, z0), new Vector3(x1, h, z0), new Vector3(x1, h, z1), new Vector3(x0, h, z1), Vector3.Down, new Vector2(x0, z0), new Vector2(x1, z0), new Vector2(x1, z1), new Vector2(x0, z1));
-		for (float x = x1 + 1f; x < x0; x += 1.6f) BuildKit.Box(k, new Vector3(x, h - 0.12f, (z0 + z1) * 0.5f), new Vector3(0.2f, 0.24f, z1 - z0), 1f);
-		// its walls: the far wall with a window of clear glass (the snow outside), the two ends
-		Wall(k, ash, new Vector3(x1, 0, 0), Vector3.Back, Vector3.Right, 0.9f, z0, z1, 0f, _ => h,
-			new List<Hole> { Hole.Lancet((z0 + z1) * 0.5f - 0.9f, (z0 + z1) * 0.5f + 0.9f, 1.3f, 3.4f, ChurchTextures.QuarryMat, 0.8f) });
-		Wall(k, ash, new Vector3(0, 0, z0), Vector3.Left, Vector3.Back, 0.9f, -x0, -x1 + 0.9f, 0f, _ => h, null);
-		Wall(k, ash, new Vector3(0, 0, z1), Vector3.Left, Vector3.Forward, 0.9f, -x0, -x1 + 0.9f, 0f, _ => h, null);
-		Collide(_stone, new Vector3(x1 - 0.45f, h * 0.5f, (z0 + z1) * 0.5f), new Vector3(0.9f, h, z1 - z0 + 1.8f));
-		Collide(_stone, new Vector3((x0 + x1) * 0.5f, h * 0.5f, z0 - 0.45f), new Vector3(x0 - x1, h, 0.9f));
-		Collide(_stone, new Vector3((x0 + x1) * 0.5f, h * 0.5f, z1 + 0.45f), new Vector3(x0 - x1, h, 0.9f));
-		// the wardrobe for the vestments, a long table, a hook board
-		k.Mat(ChurchTextures.OakMat);
-		k.Color = Colors.White;
-		BuildKit.Box(k, new Vector3(x1 + 3.5f, 1.3f, z1 - 0.4f), new Vector3(2.4f, 2.6f, 0.7f), 1f, BuildKit.Face.NY);
-		Collide(_wood, new Vector3(x1 + 3.5f, 1.3f, z1 - 0.4f), new Vector3(2.4f, 2.6f, 0.7f));
-		BuildKit.Box(k, new Vector3(x1 + 1.3f, 0.78f, (z0 + z1) * 0.5f), new Vector3(0.9f, 0.06f, 3.2f), 1f);
-		foreach (float dz in new[] { -1.4f, 1.4f }) foreach (float dx in new[] { -0.35f, 0.35f })
-				BuildKit.Box(k, new Vector3(x1 + 1.3f + dx, 0.38f, (z0 + z1) * 0.5f + dz), new Vector3(0.07f, 0.76f, 0.07f), 1f);
-		Collide(_wood, new Vector3(x1 + 1.3f, 0.4f, (z0 + z1) * 0.5f), new Vector3(0.9f, 0.8f, 3.2f));
-		BuildKit.Box(k, new Vector3(x1 + 5.2f, 1.6f, z0 + 0.06f), new Vector3(1.6f, 0.3f, 0.06f), 1f);
-		k.Mat(ChurchTextures.IronMat);
-		for (int i = 0; i < 4; i++) k.Cylinder(new Vector3(x1 + 4.6f + i * 0.4f, 1.62f, z0 + 0.09f), new Vector3(x1 + 4.6f + i * 0.4f, 1.6f, z0 + 0.2f), 0.012f, 0.012f, 5, false);
-		// on the long table: the registers stacked, an open hymnal's loose pages, a row of service books; a crate of
-		// candles under the window (the fidelity pass's clutter)
-		var vroles = new System.Collections.Generic.Dictionary<string, Material>
-		{
-			["wood"] = ChurchTextures.OakMat, ["leather"] = new StandardMaterial3D { ResourceName = "ch_binding", AlbedoColor = new Color(0.16f, 0.06f, 0.05f), Roughness = 0.7f },
-			["paper"] = new StandardMaterial3D { ResourceName = "ch_pages", AlbedoColor = new Color(0.6f, 0.56f, 0.45f), Roughness = 0.95f },
-			["metal"] = ChurchTextures.GoldMat, ["iron"] = ChurchTextures.IronMat,
-		};
-		float tz = (z0 + z1) * 0.5f;
-		FurnitureKit.Add(k, "books_stack", new Vector3(x1 + 1.3f, 0.81f, tz - 1.1f), 0.3f, vroles);
-		FurnitureKit.Add(k, "papers", new Vector3(x1 + 1.25f, 0.81f, tz + 0.4f), 1.2f, vroles);
-		FurnitureKit.Add(k, "books_row_a", new Vector3(x1 + 1.42f, 0.81f, tz + 1.5f), Mathf.Pi * 0.5f, vroles);
-		FurnitureKit.Add(k, "crate", new Vector3(x1 + 0.42f, 0f, z1 - 0.75f), 0.05f, vroles);
-		k.CommitTo(this, "Vestry", true);
+		// the room itself (its shell, joinery, furniture, the bake, the clutter, the decals): Church.Vestry.cs
+		BuildVestryRoom();
+		float x1 = VestryX1, z0 = VestryZ0, z1 = VestryZ1;
 		// a white alb hanging on a peg, a candle burning low on the table
 		var alb = new MeshKit();
-		alb.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.86f, 0.84f, 0.8f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled });
+		alb.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.58f, 0.53f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled });
 		alb.Cylinder(new Vector3(x1 + 6.6f, 0.4f, z0 + 0.35f), new Vector3(x1 + 6.6f, 1.9f, z0 + 0.35f), 0.38f, 0.14f, 10, false);
 		alb.CommitTo(this, "Alb", true);
 		// the key to the font, on the hook board
