@@ -97,6 +97,7 @@ public partial class UiPreviewDriver : Node
 			GetTree().Quit(0);
 			return;
 		}
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--hints") >= 0) { await HintShots(player, inv); return; }
 		inv.TryPickup(ToolKind.Compass);
 		inv.TryPickup(ToolKind.Lantern);
 		await Seconds(1.0);
@@ -182,6 +183,146 @@ public partial class UiPreviewDriver : Node
 
 		GD.Print($"[ui-preview] done, {_fails} failure(s)");
 		GetTree().Quit(_fails == 0 ? 0 : 1);
+	}
+
+	/// <summary>`-- --hints [--hints-tag=before]` (2026-10-15): every kind of hint at 1920x1080 and 2560x1440, in the day and in
+	/// the dark, the window's real frame (2D at the window's resolution with the CRT filter on). Shots go to
+	/// test-output/hints/&lt;tag&gt;/.</summary>
+	private async Task HintShots(PlayerController player, PlayerInventory inv)
+	{
+		string tag = "now";
+		foreach (var a in OS.GetCmdlineUserArgs()) if (a.StartsWith("--hints-tag=")) tag = a["--hints-tag=".Length..];
+		string dir = ProjectSettings.GlobalizePath($"res://test-output/hints/{tag}");
+		DirAccess.MakeDirRecursiveAbsolute(dir);
+		inv.TryPickup(ToolKind.Compass);
+		inv.TryPickup(ToolKind.Camera);
+		inv.TryPickup(ToolKind.Lantern);
+		await Seconds(1.0);
+		var cam = player.CameraRig.Camera;
+		var prop = new Node3D { Name = "PreviewCrate" };
+		GetTree().CurrentScene.AddChild(prop);
+		prop.GlobalPosition = cam.GlobalPosition - cam.GlobalBasis.Z * 1.9f + Vector3.Down * 0.45f;
+		prop.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.45f, 0.32f, 0.32f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.24f, 0.16f) } } });
+		var it = new Interactable { Prompt = "Take the lantern", PickRadius = 0.6f, PickOffset = new Vector3(0, 0.35f, 0) };
+		prop.AddChild(it);
+		var fader = GetTree().CurrentScene.FindChild("ScreenFader", true, false) as ScreenFader;
+		if (ChoicePrompt.Instance == null) GetTree().CurrentScene.AddChild(new ChoicePrompt());
+		var win = GetWindow();
+		var suns = GetTree().Root.FindChildren("*", "DirectionalLight3D", true, false);
+		var env = GetViewport().World3D?.Environment;
+		Node atmo = null;
+		foreach (var n in GetTree().Root.FindChildren("*", "", true, false)) if (n.GetType().Name == "ForestAtmosphere") { atmo = n; break; }
+		float envExp = env?.TonemapExposure ?? 1f;
+		foreach (var res in new[] { new Vector2I(1920, 1080), new Vector2I(2560, 1440) })
+		{
+			win.Mode = Window.ModeEnum.Windowed;
+			win.Size = res;
+			await Frames(20);
+			foreach (bool dark in new[] { false, true })
+			{
+				// the dark: the atmosphere held still, the sun out and the exposure right down (the lantern still lights the hand)
+				if (atmo != null) atmo.ProcessMode = dark ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
+				foreach (var n in suns) if (n is DirectionalLight3D d) d.Visible = !dark;
+				if (env != null) env.TonemapExposure = dark ? envExp * 0.15f : envExp;
+				await Frames(3);
+				string k = $"{res.Y}p_{(dark ? "dark" : "light")}";
+				async Task Snap(string name)
+				{
+					var img = GetViewport().GetTexture().GetImage();
+					img.SavePng($"{dir}/{k}_{name}.png");
+					GD.Print($"[ui-preview] hint shot {k}_{name} ({img.GetWidth()}x{img.GetHeight()})");
+					await Frames(1);
+				}
+				async Task Clear() { prop.Visible = false; await Seconds(1.6); }
+				// 1. the interaction prompt, short
+				prop.Visible = true; it.Prompt = "Take the lantern"; it.HoldSeconds = 0f;
+				await Seconds(0.9);
+				await Snap("1_prompt");
+				// 2. a hold prompt
+				it.Prompt = "Throw the switch"; it.HoldSeconds = 3f;
+				await Seconds(0.5);
+				await Snap("2_prompt_hold");
+				// 3. a long examine line
+				it.Prompt = "An empty niche, the shape of a chalice worked in gold at its back."; it.HoldSeconds = 0f;
+				await Seconds(0.5);
+				await Snap("3_examine");
+				// 4. a context hint with its key, and a prompt at once (the overlap case)
+				it.Prompt = "Read the note";
+				_ = Subtitle.Instance?.Show($"Something's there the ember won't show.   {KeyHint.Blacklight}: the blacklight.", 0.2f, 2.2f, 0.2f);
+				await Seconds(0.8);
+				await Snap("4_hint_and_prompt");
+				await Seconds(2.0);
+				// 5. the lantern's how-to (many keys), a thought caption and a prompt: the worst stack
+				_ = Subtitle.Instance?.Show("F: lantern on and off.   B: its blacklight.   Right mouse: gather its beam.   Wheel: the camera.", 0.2f, 2.4f, 0.2f);
+				_ = fader?.ShowCaption("", "Pitch black in here. There was a switch by the door.", 0.2f, 2.4f, 0.2f);
+				await Seconds(0.8);
+				await Snap("5_howto_thought_prompt");
+				await Seconds(2.2);
+				// 6. a thought alone and a long context hint alone (nothing focused)
+				await Clear();
+				_ = fader?.ShowCaption("", "Not yet. Something is still calling, back across the creek.", 0.2f, 2.2f, 0.2f);
+				await Seconds(0.8);
+				await Snap("6_thought");
+				await Seconds(2.0);
+				_ = Subtitle.Instance?.Show($"The flame won't take. The wick only smoulders.   {KeyHint.Blacklight}: the blacklight still works.", 0.2f, 2.2f, 0.2f);
+				await Seconds(0.8);
+				await Snap("7_hint_long");
+				await Seconds(2.0);
+				// 8. a spoken line (dialogue keeps its own look) under a thought
+				_ = Subtitle.Instance?.Show("\"...are you still out there? Say something.\"", 0.2f, 2.2f, 0.2f);
+				_ = fader?.ShowCaption("", "Snowed in.", 0.2f, 2.2f, 0.2f);
+				await Seconds(0.8);
+				await Snap("8_dialogue_thought");
+				await Seconds(2.0);
+				// 9. the choice prompt's control hint
+				if (ChoicePrompt.Instance != null)
+				{
+					// (with a hint and a thought up too: playtest 14 caught the hint under the choice's controls)
+					_ = Subtitle.Instance?.Show($"Something's there the ember won't show.   {KeyHint.Blacklight}: the blacklight.", 0.2f, 2.2f, 0.2f);
+					_ = fader?.ShowCaption("", "How far down does this go?", 0.2f, 2.2f, 0.2f);
+					var ask = ChoicePrompt.Instance.Ask(player, "Jump across?", "Jump down?");
+					await Seconds(0.8);
+					await Snap("9_choice");
+					ChoicePrompt.Instance.TestChoose(-1);
+					await ask;
+					await Seconds(0.4);
+				}
+			}
+		}
+		foreach (var n in suns) if (n is DirectionalLight3D d) d.Visible = true;
+		if (atmo != null) atmo.ProcessMode = ProcessModeEnum.Inherit;
+		if (env != null) env.TonemapExposure = envExp;
+		// a pad in use: its buttons named, at 1080p in the day; then the large hint size
+		win.Size = new Vector2I(1920, 1080);
+		await Frames(20);
+		async Task Shot2(string name)
+		{
+			var img = GetViewport().GetTexture().GetImage();
+			img.SavePng($"{dir}/1080p_{name}.png");
+			GD.Print($"[ui-preview] hint shot 1080p_{name}");
+			await Frames(1);
+		}
+		foreach (var (pad, size, name) in new[] { (true, 1, "pad"), (false, 2, "large"), (false, 0, "small") })
+		{
+			HintStyle.UsingPad = pad;
+			int keepSize = GameSettings.Instance.HintSize;
+			GameSettings.Instance.HintSize = size;   // (not saved: the field alone)
+			prop.Visible = true; it.Prompt = "Take the lantern"; it.HoldSeconds = 0f;
+			_ = Subtitle.Instance?.Show(KeyHint.ForDevice("F: lantern on and off.   B: its blacklight.   Right mouse: gather its beam.   Wheel: the camera."), 0.2f, 2.2f, 0.2f);
+			await Seconds(0.9);
+			await Shot2($"{name}_1_howto_prompt");
+			await Seconds(2.0);
+			it.Prompt = "Throw the switch"; it.HoldSeconds = 3f;
+			_ = Subtitle.Instance?.Show($"Something's there the ember won't show.   {KeyHint.Blacklight}: the blacklight.", 0.2f, 2.2f, 0.2f);
+			_ = fader?.ShowCaption("", "Pitch black in here. There was a switch by the door.", 0.2f, 2.2f, 0.2f);
+			await Seconds(0.9);
+			await Shot2($"{name}_2_hold_hint_thought");
+			await Seconds(2.0);
+			GameSettings.Instance.HintSize = keepSize;
+		}
+		HintStyle.UsingPad = false;
+		GD.Print($"[ui-preview] hint shots done -> {dir}");
+		GetTree().Quit(0);
 	}
 
 	private static Button FindButton(Node root, string text)

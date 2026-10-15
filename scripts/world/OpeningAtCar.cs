@@ -118,5 +118,5 @@ public partial class OpeningAtCar : Node3D
 
 	/// <summary>The how-to line, after control is back (so it never holds the player up).</summary>
 	public Task ShowHowTo(CancellationToken ct) =>
-		string.IsNullOrEmpty(HowToLine) || Subtitle.Instance == null ? Task.CompletedTask : Subtitle.Instance.Show(HowToLine, 1.0f, 5.5f, 1.4f, ct);
+		string.IsNullOrEmpty(HowToLine) || Subtitle.Instance == null ? Task.CompletedTask : Subtitle.Instance.Show(KeyHint.ForDevice(HowToLine), 1.0f, 5.5f, 1.4f, ct);
 }

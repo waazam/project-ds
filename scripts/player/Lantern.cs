@@ -400,7 +400,7 @@ public partial class Lantern : Node3D
 		else if (!_hinted && _inv.HasLantern)
 		{
 			_hinted = true;
-			if (!string.IsNullOrEmpty(HowToLine) && UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show(HowToLine.Replace("F:", UI.KeyHint.Lantern + ":").Replace("B:", UI.KeyHint.Blacklight + ":"), 1.0f, 5.5f, 1.4f);   // (the keys as bound)
+			if (!string.IsNullOrEmpty(HowToLine) && UI.Subtitle.Instance != null) _ = UI.Subtitle.Instance.Show(UI.KeyHint.ForDevice(HowToLine), 1.0f, 5.5f, 1.4f);   // (the keys as bound, or the pad's)
 		}
 
 		// (2026-10-12) the flame dead (Acts 14-20): it used to go to its blacklight by itself here. (2026-10-14, the interior

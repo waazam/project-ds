@@ -20,6 +20,13 @@ namespace ProjectDS.UI;
 /// call: an older call that is superseded returns quietly and never fades the
 /// newer text out from under it. Every wait honours its CancellationToken (a
 /// cancelled caption is taken down at once).
+///
+/// (2026-10-15) A caption with no title said in play (the screen not black: a
+/// thought, "Pitch black in here. There was a switch by the door.") is a hint, in
+/// the hints' look (<see cref="HintText"/>), low: in the bottom cinema bar, or just
+/// over a hint or a spoken line showing there, never across the middle of the view
+/// or over the prompt. Title cards, the black-screen narration, the death lines and
+/// the credits keep the caption look in the middle.
 /// </summary>
 public partial class ScreenFader : CanvasLayer
 {
@@ -27,13 +34,16 @@ public partial class ScreenFader : CanvasLayer
 	private Label _title;
 	private Label _subtitle;
 	private Label _echo;
+	private HintText _thought;
+	private CanvasItem[] _cardItems, _thoughtItems;
+	private float _thoughtTop = float.NaN;
 	private readonly Slot _main = new();
 	private readonly Slot _echoSlot = new();
 	private Tween _fadeTween;
 
 	private sealed class Slot
 	{
-		public Label[] Labels;
+		public CanvasItem[] Labels;
 		public int Gen;
 		public Tween Tween;
 	}
@@ -53,8 +63,39 @@ public partial class ScreenFader : CanvasLayer
 		_echo = MakeLabel(UiKit.CaptionLabel, UiKit.CaptionSize, VerticalAlignment.Top);
 		_echo.OffsetLeft = -230; _echo.OffsetRight = 230; _echo.OffsetTop = 6 + 18; _echo.OffsetBottom = 6 + 18 + 2 * 16;
 		_echo.SelfModulate = new Color(1, 1, 1, 0.8f);
-		_main.Labels = new[] { _title, _subtitle };
-		_echoSlot.Labels = new[] { _echo };
+		_thought = new HintText { Modulate = new Color(1, 1, 1, 0) };
+		AddChild(_thought);
+		_cardItems = new CanvasItem[] { _title, _subtitle };
+		_thoughtItems = new CanvasItem[] { _thought };
+		_main.Labels = _cardItems;
+		_echoSlot.Labels = new CanvasItem[] { _echo };
+	}
+
+	public override void _ExitTree() => HintStyle.ThoughtTop = float.NaN;
+
+	/// <summary>The thought: low, in the bar, or stepped up over the line in the subtitle band.</summary>
+	public override void _Process(double delta)
+	{
+		if (_thought == null) return;
+		bool up = _thought.Modulate.A > 0.01f;
+		if (!up) { _thoughtTop = float.NaN; HintStyle.ThoughtTop = float.NaN; return; }
+		var screen = GetViewport().GetVisibleRect().Size;
+		_thought.MaxWidth = HintStyle.LowMaxWidth(screen);
+		float h = _thought.BlockSize.Y;
+		float under = HintStyle.SubtitleTop;
+		float top = float.IsNaN(under) ? HintStyle.LowBandTop(screen, h) : Mathf.Min(HintStyle.LowBandTop(screen, h), under - 3f - h);
+		_thoughtTop = float.IsNaN(_thoughtTop) ? top : Mathf.MoveToward(_thoughtTop, top, (float)delta * 360f);
+		_thought.Position = new Vector2(Mathf.Round(screen.X * 0.5f), Mathf.Round(_thoughtTop));
+		HintStyle.ThoughtTop = _thoughtTop;
+	}
+
+	/// <summary>A caption with no title, said while the world shows: a thought, in the hints' look.</summary>
+	private bool IsThought(string title) => string.IsNullOrEmpty(title) && _black.Color.A < 0.5f && !(Systems.GameSettings.Instance?.Trailer ?? false);
+
+	private static void SetText(CanvasItem c, string text)
+	{
+		if (c is Label l) l.Text = text;
+		else if (c is HintText h) h.SetText(text);
 	}
 
 	private Label MakeLabel(string variation, int size, VerticalAlignment valign)
@@ -79,7 +120,9 @@ public partial class ScreenFader : CanvasLayer
 	public bool IsBlack => _black.Color.A > 0.99f;
 
 	/// <summary>For tests: alpha of the caption line / the echo line.</summary>
-	public float CaptionAlpha => _subtitle.Modulate.A;
+	public float CaptionAlpha => Mathf.Max(_subtitle.Modulate.A, _thought?.Modulate.A ?? 0f);
+	/// <summary>For tests and the preview: whether the caption showing is a thought in the hints' look.</summary>
+	public bool CaptionIsThought => _main.Labels == _thoughtItems;
 	public float EchoAlpha => _echo.Modulate.A;
 
 	public void SetBlack(bool black) => _black.Color = new Color(0, 0, 0, black ? 1 : 0);
@@ -104,7 +147,18 @@ public partial class ScreenFader : CanvasLayer
 
 	/// <summary>A title card or narration caption on the main band. hold &lt; 0 = stay up.</summary>
 	public Task ShowCaption(string title, string subtitle, float fadeIn, float hold, float fadeOut, CancellationToken ct = default)
-		=> Play(_main, new[] { title, subtitle }, fadeIn, hold, fadeOut, ct);
+	{
+		var items = IsThought(title) ? _thoughtItems : _cardItems;
+		if (items != _main.Labels && !ct.IsCancellationRequested)
+		{
+			// the other look was up: it goes quickly rather than sit under the new caption
+			var fade = CreateTween().SetParallel();
+			foreach (var c in _main.Labels) fade.TweenProperty(c, "modulate:a", 0f, 0.2f);
+			_main.Tween?.Kill();
+			_main.Labels = items;
+		}
+		return Play(_main, items == _thoughtItems ? new[] { subtitle } : new[] { title, subtitle }, fadeIn, hold, fadeOut, ct);
+	}
 
 	/// <summary>A second line under the caption (an overlapping echo of a voice), independent of the main band.</summary>
 	public Task ShowEcho(string text, float fadeIn, float hold, float fadeOut, CancellationToken ct = default)
@@ -115,7 +169,7 @@ public partial class ScreenFader : CanvasLayer
 		if (ct.IsCancellationRequested) return;
 		int gen = ++slot.Gen;
 		slot.Tween?.Kill();
-		for (int i = 0; i < slot.Labels.Length; i++) slot.Labels[i].Text = texts[i];
+		for (int i = 0; i < slot.Labels.Length; i++) SetText(slot.Labels[i], texts[i]);
 
 		var tween = slot.Tween = CreateTween().SetParallel();
 		tween.TweenProperty(slot.Labels[0], "modulate:a", 1f, fadeIn);
