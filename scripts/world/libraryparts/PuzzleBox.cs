@@ -61,7 +61,8 @@ public partial class PuzzleBox : Node3D
 			AddChild(p.Node);
 			for (int c = 0; c < p.Shape.Length; c++)
 			{
-				var cube = new MeshInstance3D { Mesh = new BoxMesh { Size = Vector3.One * (Cell - 0.003f) }, MaterialOverride = Mat((i + c) % 2 == 0) };
+				// (2026-10-15) the bevelled cell modelled in Blender (tools/Blender/interactive.py), a plain box if it's missing
+				var cube = new MeshInstance3D { Mesh = KitModels.Raw("puzzle_cell") ?? new BoxMesh { Size = Vector3.One * (Cell - 0.003f) }, MaterialOverride = Mat((i + c) % 2 == 0) };
 				p.Node.AddChild(cube);
 				p.Cubes.Add(cube);
 				// the held piece's shadow: projected straight down onto whatever is under it (the table, the box's
@@ -317,22 +318,25 @@ public partial class PuzzleBox : Node3D
 	private void BuildBox()
 	{
 		float inner = N * Cell, outer = inner + 2f * Wall;
-		var parts = new List<(Vector3 c, Vector3 s, bool dark)>
+		// (2026-10-15) each board modelled in Blender (tools/Blender/interactive.py: bevelled, the bamboo over each face whole),
+		// a plain box where one is missing
+		var parts = new List<(Vector3 c, Vector3 s, bool dark, string model)>
 		{
-			(new Vector3(0, Floor * 0.5f, 0), new Vector3(outer, Floor, outer), true),
-			(new Vector3(0, Depth * 0.5f, -(inner + Wall) * 0.5f), new Vector3(outer, Depth, Wall), false),
-			(new Vector3(0, Depth * 0.5f, (inner + Wall) * 0.5f), new Vector3(outer, Depth, Wall), false),
-			(new Vector3(-(inner + Wall) * 0.5f, Depth * 0.5f, 0), new Vector3(Wall, Depth, inner), true),
-			(new Vector3((inner + Wall) * 0.5f, Depth * 0.5f, 0), new Vector3(Wall, Depth, inner), true),
+			(new Vector3(0, Floor * 0.5f, 0), new Vector3(outer, Floor, outer), true, "puzzle_floor"),
+			(new Vector3(0, Depth * 0.5f, -(inner + Wall) * 0.5f), new Vector3(outer, Depth, Wall), false, "puzzle_wall_x"),
+			(new Vector3(0, Depth * 0.5f, (inner + Wall) * 0.5f), new Vector3(outer, Depth, Wall), false, "puzzle_wall_x"),
+			(new Vector3(-(inner + Wall) * 0.5f, Depth * 0.5f, 0), new Vector3(Wall, Depth, inner), true, "puzzle_wall_z"),
+			(new Vector3((inner + Wall) * 0.5f, Depth * 0.5f, 0), new Vector3(Wall, Depth, inner), true, "puzzle_wall_z"),
 		};
-		foreach (var (c, s, dark) in parts)
-			AddChild(new MeshInstance3D { Name = "Box", Mesh = new BoxMesh { Size = s }, Position = c, MaterialOverride = Mat(dark) });
+		foreach (var (c, s, dark, model) in parts)
+			AddChild(new MeshInstance3D { Name = "Box", Mesh = KitModels.Raw(model) ?? new BoxMesh { Size = s }, Position = c, MaterialOverride = Mat(dark) });
 		// inlaid strips on the rim, like the reference's checkered bamboo
+		var inlay = KitModels.Raw("puzzle_inlay") ?? new BoxMesh { Size = new Vector3(outer / 4f - 0.002f, 0.004f, Wall - 0.004f) };
 		for (int i = 0; i < 4; i++)
 		{
 			float x = -outer * 0.5f + (i + 0.5f) * outer / 4f;
-			AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(outer / 4f - 0.002f, 0.004f, Wall - 0.004f) }, Position = new Vector3(x, Depth + 0.002f, -(inner + Wall) * 0.5f), MaterialOverride = Mat(i % 2 == 0) });
-			AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(outer / 4f - 0.002f, 0.004f, Wall - 0.004f) }, Position = new Vector3(x, Depth + 0.002f, (inner + Wall) * 0.5f), MaterialOverride = Mat(i % 2 == 1) });
+			AddChild(new MeshInstance3D { Mesh = inlay, Position = new Vector3(x, Depth + 0.002f, -(inner + Wall) * 0.5f), MaterialOverride = Mat(i % 2 == 0) });
+			AddChild(new MeshInstance3D { Mesh = inlay, Position = new Vector3(x, Depth + 0.002f, (inner + Wall) * 0.5f), MaterialOverride = Mat(i % 2 == 1) });
 		}
 	}
 }

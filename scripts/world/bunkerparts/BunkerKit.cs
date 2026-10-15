@@ -99,6 +99,15 @@ public static class BunkerKit
 	/// </summary>
 	public static void CagedLamp(MeshKit metal, Transform3D xf)
 	{
+		// (2026-10-15) modelled in Blender (tools/Blender/interactive.py: caged_lamp, its shades in the model), in the caller's
+		// metal; the code below is its stand-in if missing
+		var cur = metal.CurrentMaterial;
+		if (cur != null && KitModels.Add(metal, "caged_lamp", xf, KitModels.R("metal", cur), KitModels.R("enamel", cur), KitModels.R("wire", cur)))
+		{
+			metal.Mat(cur);
+			metal.Color = new Color(0.3f, 0.3f, 0.28f);
+			return;
+		}
 		var old = metal.Xf;
 		metal.Xf = old * xf;
 		// (2026-10-15, the props' proportions pass) a round canopy (it was a 20 cm square plate), the conduit, the cast
@@ -137,6 +146,13 @@ public static class BunkerKit
 	/// <summary>The glowing bulb of a caged lamp, with its own material (so it can flicker alone).</summary>
 	public static MeshInstance3D LampGlass(Node3D parent, Transform3D xf, StandardMaterial3D mat, string name = "Glass")
 	{
+		// (2026-10-15) the bulb modelled in Blender (lamp_bulb), its own material set over it whole (it flickers alone)
+		if (KitModels.Raw("lamp_bulb") is { } bulb)
+		{
+			var g = new MeshInstance3D { Name = name, Mesh = bulb, MaterialOverride = mat, Transform = xf, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+			parent.AddChild(g);
+			return g;
+		}
 		var k = new MeshKit();
 		k.Mat(mat);
 		// (2026-10-15: a pear-shaped work-light bulb in the dish, 10 cm across, not a 14 cm drum and a blob)
@@ -192,9 +208,23 @@ public static class BunkerKit
 	/// </summary>
 	public static Vector3 Crt(MeshKit body, MeshKit screen, Transform3D xf, CrtSpec s, Color screenColor)
 	{
+		float fz = s.D * 0.5f;
+		float sw, sh; Vector2 sc;
+		if (s.KnobsRight) { sw = s.W * 0.7f; sh = s.H * 0.74f; sc = new Vector2(-s.W * 0.11f, s.H * 0.53f); }
+		else { sw = s.W * 0.8f; sh = s.H * 0.66f; sc = new Vector2(0, s.H * 0.58f); }
+		var tube = new Transform3D(Basis.Identity, new Vector3(sc.X, sc.Y, fz + 0.002f));
+		// (2026-10-15) the cabinet modelled in Blender (tools/Blender/interactive.py: crt_tv, crt_mon, at 0.58 x 0.5 x 0.52,
+		// scaled to the set); the code below is its stand-in if missing. The tube is still drawn here, into the screen kit.
+		if (KitModels.Add(body, s.KnobsRight ? "crt_tv" : "crt_mon", xf * new Transform3D(Basis.FromScale(new Vector3(s.W / 0.58f, s.H / 0.5f, s.D / 0.52f)), Vector3.Zero),
+			KitModels.R("plastic", BunkerTextures.PlasticMat, s.Body), KitModels.R("black", BunkerTextures.PlasticMat, new Color(0.09f, 0.09f, 0.09f)),
+			KitModels.R("rubber", BunkerTextures.RubberMat)))
+		{
+			body.Color = Colors.White;
+			BulgeScreen(screen, xf * tube, sw, sh, 0.022f, screenColor);
+			return xf * tube.Origin;
+		}
 		var old = body.Xf;
 		body.Xf = old * xf;
-		float fz = s.D * 0.5f;
 		body.Mat(BunkerTextures.PlasticMat);
 		body.Color = s.Body;
 		// Bezel slab and the tapered tube housing behind it.
@@ -203,9 +233,6 @@ public static class BunkerKit
 		Frustum(body, new Vector3(0, s.H * 0.5f, fz - 0.08f), new Vector2(s.W * 0.95f, s.H * 0.93f),
 			new Vector3(0, s.H * 0.42f, -fz), new Vector2(s.W * 0.52f, s.H * 0.55f));
 		// Tube aperture and its raised lip.
-		float sw, sh; Vector2 sc;
-		if (s.KnobsRight) { sw = s.W * 0.7f; sh = s.H * 0.74f; sc = new Vector2(-s.W * 0.11f, s.H * 0.53f); }
-		else { sw = s.W * 0.8f; sh = s.H * 0.66f; sc = new Vector2(0, s.H * 0.58f); }
 		float lip = 0.022f, lz = fz + 0.008f;
 		body.Color = s.Body * 0.8f;
 		body.Box(new Vector3(sc.X, sc.Y + sh * 0.5f + lip * 0.5f, lz), new Vector3(sw + lip * 2f, lip, 0.02f));
@@ -241,7 +268,6 @@ public static class BunkerKit
 		body.Xf = old;
 		body.Color = Colors.White;
 
-		var tube = new Transform3D(Basis.Identity, new Vector3(sc.X, sc.Y, fz + 0.002f));
 		BulgeScreen(screen, xf * tube, sw, sh, 0.022f, screenColor);
 		return xf * tube.Origin;
 	}

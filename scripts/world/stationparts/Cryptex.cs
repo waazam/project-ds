@@ -54,23 +54,33 @@ public partial class Cryptex : Node3D
 		k.Mat(bronze);
 		k.Color = Colors.White;
 		float half = Rings * 0.5f * (RingW + Gap);
-		k.Cylinder(new Vector3(-half - 0.01f, 0, 0), new Vector3(half + 0.01f, 0, 0), RingR * 0.8f, RingR * 0.8f, 16, true);
+		// (2026-10-15) modelled in Blender (tools/Blender/interactive.py: the core with its reading guides, each ring, each cap);
+		// the code is the stand-in if a model is missing
+		bool core = KitModels.Add(k, "cryptex_core", Transform3D.Identity, KitModels.R("bronze", bronze), KitModels.R("brass", brass));
+		if (!core)
+			k.Cylinder(new Vector3(-half - 0.01f, 0, 0), new Vector3(half + 0.01f, 0, 0), RingR * 0.8f, RingR * 0.8f, 16, true);
 		k.CommitTo(this, "Core", true);
 		_capR = BuildCap(bronze, brass, 1, half);
 		BuildCap(bronze, brass, -1, half);
 		// the reading guides: two thin raised bars along the top
+		if (!core)
+		{
 		var g = new MeshKit();
 		g.Mat(brass);
 		g.Color = new Color(0.9f, 0.75f, 0.45f);
 		foreach (int s in new[] { -1, 1 })
 			g.Box(new Vector3(0, RingR + 0.004f, s * 0.018f), new Vector3(half * 2f + 0.03f, 0.004f, 0.004f), 4f);
 		g.CommitTo(this, "Guides", false);
+		}
 
 		for (int i = 0; i < Rings; i++)
 		{
 			var ring = new Node3D { Name = $"Ring{i}", Position = new Vector3(RingX(i), 0, 0) };
 			AddChild(ring);
 			_rings[i] = ring;
+			var ringTint = new Color(0.75f + 0.05f * (i % 2), 0.62f, 0.4f);
+			if (KitModels.Place(ring, "cryptex_ring", Transform3D.Identity, "Ring", true, KitModels.R("brass", brass, ringTint), KitModels.R("lip", brass, new Color(0.75f, 0.75f, 0.75f))) == null)
+			{
 			var rk = new MeshKit();
 			rk.Mat(brass);
 			rk.Color = new Color(0.75f + 0.05f * (i % 2), 0.62f, 0.4f);
@@ -80,6 +90,7 @@ public partial class Cryptex : Node3D
 			foreach (int s in new[] { -1, 1 })
 				rk.Cylinder(new Vector3(s * RingW * 0.5f - s * 0.003f, 0, 0), new Vector3(s * RingW * 0.5f, 0, 0), RingR + 0.003f, RingR + 0.003f, 26, true);
 			rk.CommitTo(ring, "Ring", true);
+			}
 			// the alphabet round it, each letter facing out
 			for (int L = 0; L < 26; L++)
 			{
@@ -119,6 +130,8 @@ public partial class Cryptex : Node3D
 	{
 		var cap = new Node3D { Name = side > 0 ? "CapRight" : "CapLeft", Position = new Vector3(side * (half + 0.035f), 0, 0) };
 		AddChild(cap);
+		if (KitModels.Place(cap, side > 0 ? "cryptex_cap_r" : "cryptex_cap_l", Transform3D.Identity, "Cap", true, KitModels.R("bronze", bronze), KitModels.R("brass", brass)) != null)
+			return cap;
 		var k = new MeshKit();
 		k.Mat(bronze);
 		k.Color = Colors.White;

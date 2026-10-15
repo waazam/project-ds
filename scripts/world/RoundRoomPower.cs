@@ -104,6 +104,11 @@ public partial class RoundRoom
 		var copper = new StandardMaterial3D { AlbedoColor = new Color(0.72f, 0.42f, 0.25f), Metallic = 0.8f, Roughness = 0.35f };
 		var steel = StairwellTextures.SteelMat;
 		var red = new StandardMaterial3D { AlbedoColor = new Color(0.78f, 0.06f, 0.05f), Roughness = 0.35f, MetallicSpecular = 0.7f };
+		// (2026-10-15) the plate with its jaws and hinges, and the lever, modelled in Blender (tools/Blender/interactive.py:
+		// knife_base, knife_lever, its origin on the hinge); the boxes below are their stand-ins if missing
+		if (KitModels.Place(root, "knife_base", Transform3D.Identity, "Base", true, KitModels.R("bakelite", bakelite), KitModels.R("steel", steel),
+			KitModels.R("copper", copper), KitModels.R("black", black)) == null)
+		{
 		Box(root, "Plate", new Vector3(0, 0, 0.02f), new Vector3(0.34f, 0.56f, 0.04f), bakelite);
 		foreach (var (x, y) in new[] { (-0.14f, 0.25f), (0.14f, 0.25f), (-0.14f, -0.25f), (0.14f, -0.25f) })
 			root.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.012f, BottomRadius = 0.012f, Height = 0.012f, RadialSegments = 8 }, Position = new Vector3(x, y, 0.044f), Rotation = new Vector3(Mathf.Pi * 0.5f, 0, 0), MaterialOverride = steel });
@@ -116,18 +121,23 @@ public partial class RoundRoom
 				Box(root, "JawFoot", new Vector3(x, y, 0.045f), new Vector3(0.04f, 0.08f, 0.012f), black);
 			}
 		foreach (float x in new[] { -0.1f, 0.1f }) Box(root, "Hinge", new Vector3(x, 0, 0.065f), new Vector3(0.04f, 0.06f, 0.05f), black);
+		}
 		// the warning stickers: a yellow triangle with a black bolt, above and below the hinge
 		foreach (float y in new[] { 0.105f, -0.105f }) root.AddChild(Warning(new Vector3(0, y, 0.041f), 0.085f));
 		// the lever: two black arms, a crossbar with the danger sign, the red grip
 		var pivot = new Node3D { Name = "Pivot", Position = new Vector3(0, 0, 0.075f), Rotation = new Vector3(LeverAngle(sw.Pos), 0, 0) };
 		root.AddChild(pivot);
 		sw.Pivot = pivot;
+		bool lever = KitModels.Place(pivot, "knife_lever", Transform3D.Identity, "Lever", true, KitModels.R("black", black), KitModels.R("copper", copper), KitModels.R("red", red)) != null;
+		if (!lever)
+		{
 		foreach (float x in new[] { -0.1f, 0.1f })
 		{
 			Box(pivot, "Arm", new Vector3(x, 0, 0.19f), new Vector3(0.022f, 0.032f, 0.38f), black);
 			Box(pivot, "Blade", new Vector3(x, 0, 0.01f), new Vector3(0.006f, 0.05f, 0.07f), copper);
 		}
 		Box(pivot, "Crossbar", new Vector3(0, 0, 0.2f), new Vector3(0.25f, 0.018f, 0.075f), black);
+		}
 		foreach (float side in new[] { 1f, -1f })
 		{
 			// the sign on both faces of the crossbar (it faces you with the lever up or down)
@@ -139,9 +149,12 @@ public partial class RoundRoom
 			face.AddChild(new Label3D { Text = "DANGER", FontSize = 20, PixelSize = 0.0008f, Modulate = Colors.White, OutlineSize = 0, Shaded = true, Position = new Vector3(0, 0.014f, 0.0015f) });
 			face.AddChild(new Label3D { Text = "HIGH\nVOLTAGE", FontSize = 18, PixelSize = 0.0008f, LineSpacing = -4f, Modulate = Colors.Black, OutlineSize = 0, Shaded = true, Position = new Vector3(0, -0.009f, 0.0015f) });
 		}
+		if (!lever)
+		{
 		pivot.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.022f, BottomRadius = 0.022f, Height = 0.2f, RadialSegments = 12 }, Position = new Vector3(0, 0, 0.37f), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = red });
 		foreach (float x in new[] { -0.115f, 0.115f })
 			pivot.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.03f, Height = 0.035f, RadialSegments = 12 }, Position = new Vector3(x, 0, 0.37f), Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f), MaterialOverride = black });
+		}
 		sw.Use = new PickupInteractable
 		{
 			Name = "Use", PickRadius = 0.2f, MaxDistance = 2.6f, Position = new Vector3(0, 0, 0.3f),
@@ -203,20 +216,20 @@ public partial class RoundRoom
 			Vector3 up = (xf * new Vector3(0.12f, 0f, 0.02f)) with { Y = ringY - 0.12f };
 			Vector3 dIn = (-(up with { Y = 0 })).Normalized();
 			Vector3 joint = up + Vector3.Up * 0.12f + dIn * 0.17f;
-			k.Cylinder(foot, up, 0.014f, 0.014f, 6, false);
-			k.Cylinder(up, joint, 0.014f, 0.014f, 6, false);
-			k.Cylinder(joint + Vector3.Down * 0.04f, joint + Vector3.Up * 0.04f, 0.035f, 0.035f, 8, true);   // the junction box
+			k.Cylinder(foot, up, 0.014f, 0.014f, 12, false);
+			k.Cylinder(up, joint, 0.014f, 0.014f, 12, false);
+			k.Cylinder(joint + Vector3.Down * 0.04f, joint + Vector3.Up * 0.04f, 0.035f, 0.035f, 16, true);   // the junction box
 		}
 		const int n = 64;
 		for (int i = 0; i < n; i++)
 		{
 			float a0 = Mathf.Tau * i / n, a1 = Mathf.Tau * (i + 1) / n;
-			k.Cylinder(new Vector3(Mathf.Sin(a0) * ringR, ringY, Mathf.Cos(a0) * ringR), new Vector3(Mathf.Sin(a1) * ringR, ringY, Mathf.Cos(a1) * ringR), 0.014f, 0.014f, 6, false);
+			k.Cylinder(new Vector3(Mathf.Sin(a0) * ringR, ringY, Mathf.Cos(a0) * ringR), new Vector3(Mathf.Sin(a1) * ringR, ringY, Mathf.Cos(a1) * ringR), 0.014f, 0.014f, 12, false);
 			if (i % 4 == 0)
 			{
 				// a standoff bracket back to the wall
 				Vector3 d = new(Mathf.Sin(a0), 0, Mathf.Cos(a0));
-				k.Cylinder(d * ringR + Vector3.Up * ringY, d * (Radius - 0.01f) + Vector3.Up * ringY, 0.008f, 0.008f, 4, false);
+				k.Cylinder(d * ringR + Vector3.Up * ringY, d * (Radius - 0.01f) + Vector3.Up * ringY, 0.008f, 0.008f, 8, false);
 			}
 		}
 		// the bulbs: a drop, a socket, a bare bulb in a wire cage
@@ -226,6 +239,11 @@ public partial class RoundRoom
 			float a = Mathf.Tau * i / 8f + 0.18f;
 			Vector3 d = new(Mathf.Sin(a), 0, Mathf.Cos(a));
 			Vector3 top = d * ringR + Vector3.Up * ringY, bulb = top + Vector3.Down * 0.36f;
+			// (2026-10-15) the drop, socket and cage modelled in Blender (tools/Blender/interactive.py: caged_bulb, round_bulb);
+			// the code is their stand-in if missing
+			bool modelled = KitModels.Add(k, "caged_bulb", new Transform3D(new Basis(Vector3.Up, a), top), KitModels.R("steel", StairwellTextures.SteelMat, new Color(0.42f, 0.42f, 0.4f)));
+			if (!modelled)
+			{
 			k.Cylinder(top, top + Vector3.Down * 0.2f, 0.01f, 0.01f, 6, false);
 			k.Cylinder(top + Vector3.Down * 0.2f, top + Vector3.Down * 0.29f, 0.03f, 0.026f, 10, true);
 			// the cage: four wires round the bulb, a hoop at its waist
@@ -241,7 +259,8 @@ public partial class RoundRoom
 				float b0 = Mathf.Tau * w / 8f, b1 = Mathf.Tau * (w + 1) / 8f;
 				k.Beam(bulb + new Vector3(Mathf.Sin(b0), 0, Mathf.Cos(b0)) * 0.07f, bulb + new Vector3(Mathf.Sin(b1), 0, Mathf.Cos(b1)) * 0.07f, 0.005f, 0.005f);
 			}
-			var glass = new MeshInstance3D { Name = $"Bulb{i}", Mesh = new SphereMesh { Radius = 0.045f, Height = 0.11f, RadialSegments = 10, Rings = 6 }, Position = bulb + Vector3.Up * 0.01f, MaterialOverride = glassMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+			}
+			var glass = new MeshInstance3D { Name = $"Bulb{i}", Mesh = (modelled ? KitModels.Raw("round_bulb") : null) ?? new SphereMesh { Radius = 0.045f, Height = 0.11f, RadialSegments = 10, Rings = 6 }, Position = bulb + Vector3.Up * 0.01f, MaterialOverride = glassMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
 			AddChild(glass);
 			var light = new OmniLight3D { Name = $"BulbLight{i}", Position = bulb - d * 0.05f, LightColor = BulbColour, LightEnergy = 1.35f, OmniRange = 9f, OmniAttenuation = 1.2f, ShadowEnabled = false };
 			AddChild(light);

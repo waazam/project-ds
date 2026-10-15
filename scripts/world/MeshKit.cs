@@ -676,17 +676,23 @@ public class MeshKit
 	/// <summary>Adds a modelled mesh (assets/models: Blender's), transformed by <paramref name="xf"/> (then <see cref="Xf"/>),
 	/// each of its surfaces into its own material's surface here, normals and tangents kept (so its baked normal maps
 	/// hold), its vertex colour white. The kit's furniture stays one mesh per material, however many pieces.</summary>
-	public void AddMesh(Mesh mesh, Transform3D xf, Dictionary<Material, Material> materials = null)
+	/// <param name="tints">(2026-10-15, the interactive props in Blender) per source material: its vertex colour is then the model's own
+	/// "Col" shade (a bezel's darker lip) times this tint (a CRT's body colour), for the game's vertex-coloured materials.</param>
+	public void AddMesh(Mesh mesh, Transform3D xf, Dictionary<Material, Material> materials = null, Dictionary<Material, Color> tints = null)
 	{
 		if (mesh == null) return;
 		var full = Xf * xf;
 		var nb = full.Basis.Inverse().Transposed();
+		bool mirrored = full.Basis.Determinant() < 0f;
 		for (int si = 0; si < mesh.GetSurfaceCount(); si++)
 		{
 			var arr = mesh.SurfaceGetArrays(si);
 			var mat = mesh.SurfaceGetMaterial(si);
+			Color? tint = null;
+			if (tints != null && mat != null && tints.TryGetValue(mat, out var tc)) tint = tc;
 			if (materials != null && mat != null && materials.TryGetValue(mat, out var swap)) mat = swap;
 			if (mat == null) continue;
+			var col = tint != null && arr[(int)Mesh.ArrayType.Color].VariantType != Variant.Type.Nil ? (Color[])arr[(int)Mesh.ArrayType.Color] : null;
 			Mat(mat);
 			var v = (Vector3[])arr[(int)Mesh.ArrayType.Vertex];
 			var n = arr[(int)Mesh.ArrayType.Normal].VariantType == Variant.Type.Nil ? null : (Vector3[])arr[(int)Mesh.ArrayType.Normal];
@@ -700,7 +706,7 @@ public class MeshKit
 				_cur.V.Add(full * v[i]);
 				_cur.N.Add(n != null ? (nb * n[i]).Normalized() : Vector3.Up);
 				_cur.UV.Add(uv != null ? uv[i] : Vector2.Zero);
-				_cur.C.Add(Colors.White);
+				_cur.C.Add(tint is { } tt ? (col != null ? col[i] * tt : tt) : Colors.White);
 				if (uv2 != null) _cur.UV2.Add(uv2[i]);
 				if (t != null)
 				{
@@ -708,8 +714,14 @@ public class MeshKit
 					_cur.T.Add(tv.X); _cur.T.Add(tv.Y); _cur.T.Add(tv.Z); _cur.T.Add(t[i * 4 + 3] * (full.Basis.Determinant() < 0 ? -1f : 1f));
 				}
 			}
-			if (idx != null) foreach (int i in idx) _cur.I.Add(b + i);
-			else for (int i = 0; i < v.Length; i++) _cur.I.Add(b + i);
+			int count = idx?.Length ?? v.Length;
+			for (int i = 0; i + 2 < count; i += 3)
+			{
+				// (a mirrored placement turns the triangles' winding inside out: put it back)
+				int i0 = idx != null ? idx[i] : i, i1 = idx != null ? idx[i + 1] : i + 1, i2 = idx != null ? idx[i + 2] : i + 2;
+				if (mirrored) (i1, i2) = (i2, i1);
+				_cur.I.Add(b + i0); _cur.I.Add(b + i1); _cur.I.Add(b + i2);
+			}
 		}
 	}
 

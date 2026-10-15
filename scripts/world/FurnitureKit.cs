@@ -146,6 +146,10 @@ public static class FurnitureKit
 	/// <summary>Whether a piece exists (built and imported).</summary>
 	public static bool Has(string model) => Load(model).mesh != null;
 
+	/// <summary>(2026-10-15) A piece's mesh as imported, or null: for a caller that sets its own material over the whole
+	/// of it (the puzzle box's dissolving bamboo).</summary>
+	public static Mesh Raw(string model) => Load(model).mesh;
+
 	/// <summary>(2026-10-14g) A piece's bounds as it stands (its origin on the floor), or null if it isn't there: what
 	/// <see cref="ClutterKit"/> fits it into the room by.</summary>
 	public static Aabb? Bounds(string model) => Load(model).mesh is { } m ? m.GetAabb() : null;
@@ -199,6 +203,29 @@ public static class FurnitureKit
 		mi.SetMeta("furniture", true);
 		parent.AddChild(mi);
 		return mi;
+	}
+
+	/// <summary>(2026-10-15, the interactive props in Blender) As <see cref="Add(MeshKit, string, Transform3D, Dictionary{string, Material})"/>,
+	/// each role with a vertex tint too (times the model's own "Col" shade), for the game's vertex-coloured materials.</summary>
+	public static bool Add(MeshKit k, string model, Transform3D xf, Dictionary<string, (Material mat, Color tint)> roles)
+	{
+		var (mesh, cavity) = Load(model);
+		if (mesh == null) return false;
+		var map = new Dictionary<Material, Material>();
+		var tints = new Dictionary<Material, Color>();
+		for (int s = 0; s < mesh.GetSurfaceCount(); s++)
+		{
+			var src = mesh.SurfaceGetMaterial(s);
+			if (src == null) continue;
+			string role = src.ResourceName ?? "";
+			int dot = role.IndexOf('.');
+			if (dot > 0) role = role[..dot];
+			if (!roles.TryGetValue(role, out var r) && !roles.TryGetValue("*", out r)) { Unmapped(model, role); continue; }
+			map[src] = Dressed(r.mat, model, cavity);
+			tints[src] = r.tint;
+		}
+		k.AddMesh(mesh, xf, map, tints);
+		return true;
 	}
 
 	/// <summary>As <see cref="Add(MeshKit, string, Vector3, float, Dictionary{string, Material}, Vector3?)"/>, with any

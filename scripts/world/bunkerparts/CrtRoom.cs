@@ -333,6 +333,23 @@ public partial class CrtRoom : Node3D
 			// (2026-10-15, the props' proportions pass) slotted angle-iron uprights (an L of 4 cm flanges, 3 mm steel; they
 			// were 4 cm square bars), on foot plates; the shelves pressed steel with their edges turned down (a 3 cm slab
 			// before), a brace across each end
+			// (2026-10-15) the upright and the shelf modelled in Blender (tools/Blender/interactive.py: shelf_post, its corner on
+			// its origin, mirrored to each corner; shelf_tray, 1 m wide, stretched to the unit); the boxes are their stand-ins
+			if (KitModels.Has("shelf_post") && KitModels.Has("shelf_tray"))
+			{
+				var paint = KitModels.R("paint", BunkerTextures.PaintedMetalMat, frame.Color);
+				foreach (int ix in new[] { -1, 1 })
+					foreach (int iz in new[] { -1, 1 })
+					{
+						float sx = ix * (uw * 0.5f - 0.02f), sz = iz * (ud * 0.5f - 0.02f);
+						KitModels.Add(frame, "shelf_post", new Transform3D(Basis.FromScale(new Vector3(-ix, 1, -iz)), new Vector3(sx + ix * 0.02f, 0, sz + iz * 0.02f)), paint);
+					}
+				foreach (float y in shelves)
+					KitModels.Add(frame, "shelf_tray", new Transform3D(Basis.FromScale(new Vector3(uw, 1, 1)), new Vector3(0, y + 0.015f, 0)), paint);
+				frame.Mat(BunkerTextures.PaintedMetalMat);
+			}
+			else
+			{
 			foreach (int ix in new[] { -1, 1 })
 				foreach (int iz in new[] { -1, 1 })
 				{
@@ -348,6 +365,7 @@ public partial class CrtRoom : Node3D
 					frame.Box(new Vector3(0, y - 0.004f, iz * (ud * 0.5f - 0.003f)), new Vector3(uw - 0.006f, 0.034f, 0.0025f));
 				foreach (int ix in new[] { -1, 1 })
 					frame.Box(new Vector3(ix * (uw * 0.5f - 0.003f), y - 0.004f, 0), new Vector3(0.0025f, 0.034f, ud - 0.006f));
+			}
 			}
 			foreach (int ix in new[] { -1, 1 })
 			{
@@ -448,6 +466,18 @@ public partial class CrtRoom : Node3D
 		GD.Print($"[bunker] CRT room: {screenCount} screens, {ScreenArea:0.0} m² of sets");
 	}
 
+	/// <summary>The keyboard's stand-in (a sloped case, its keys in rows), if its model is missing.</summary>
+	private static void Keyboard(MeshKit k, Basis kb, Vector3 kc)
+	{
+		k.Mat(BunkerTextures.PlasticMat);
+		k.Color = new Color(0.55f, 0.52f, 0.45f);
+		k.BevelBox(kc + kb * new Vector3(0, 0.014f, 0), new Vector3(0.46f, 0.028f, 0.17f), 0.008f, 1f, kb);
+		k.Color = new Color(0.4f, 0.38f, 0.33f);
+		for (int r = 0; r < 4; r++)
+			k.BevelBox(kc + kb * new Vector3(-0.02f, 0.031f + r * 0.0025f, 0.045f - r * 0.032f), new Vector3(0.38f, 0.008f, 0.024f), 0.003f, 1f, kb);
+		k.BevelBox(kc + kb * new Vector3(0.19f, 0.031f, 0.0f), new Vector3(0.06f, 0.008f, 0.11f), 0.003f, 1f, kb);
+	}
+
 	private void BuildConsoleAndTarget()
 	{
 		var k = new MeshKit();
@@ -457,6 +487,19 @@ public partial class CrtRoom : Node3D
 		// (2026-10-15, the props' proportions pass) a steel tanker desk, not five slabs: a top with its edge rolled under
 		// and a black linoleum inset, slab ends on a recessed plinth, a modesty panel, a drawer pedestal with three drawers
 		// and their pulls; its top where it was
+		// (2026-10-15) the desk and the keyboard modelled in Blender (tools/Blender/interactive.py: console_desk, keyboard);
+		// the code is their stand-in if missing
+		var inset = new StandardMaterial3D { ResourceName = "bk_deskinset", AlbedoColor = new Color(0.07f, 0.075f, 0.07f), Roughness = 0.6f, VertexColorUseAsAlbedo = true };
+		var kb = Basis.FromEuler(new Vector3(0, 0.08f, 0));
+		var kc = new Vector3(-0.05f, ConsoleTop, ConsoleZ + 0.28f);
+		if (KitModels.Add(k, "console_desk", new Transform3D(Basis.Identity, new Vector3(0, 0, ConsoleZ)), KitModels.R("paint", BunkerTextures.PaintedMetalMat),
+			KitModels.R("steel", ProcTextures.MetalMat), KitModels.R("inset", inset)))
+		{
+			if (!KitModels.Add(k, "keyboard", new Transform3D(kb, kc), KitModels.R("plastic", BunkerTextures.PlasticMat), KitModels.R("keys", BunkerTextures.PlasticMat)))
+				Keyboard(k, kb, kc);
+		}
+		else
+		{
 		k.BevelBox(new Vector3(0, ConsoleTop - 0.0175f, ConsoleZ), new Vector3(1.6f, 0.035f, 0.8f), 0.012f);
 		foreach (float x in new[] { -0.765f, 0.765f })
 		{
@@ -478,19 +521,13 @@ public partial class CrtRoom : Node3D
 			k.Mat(BunkerTextures.PaintedMetalMat);
 			k.Color = new Color(0.68f, 0.71f, 0.69f);
 		}
-		k.Mat(new StandardMaterial3D { ResourceName = "bk_deskinset", AlbedoColor = new Color(0.07f, 0.075f, 0.07f), Roughness = 0.6f, VertexColorUseAsAlbedo = true });
+		k.Mat(inset);
 		k.Color = Colors.White;
 		k.Box(new Vector3(0, ConsoleTop + 0.0004f, ConsoleZ), new Vector3(1.5f, 0.001f, 0.7f));
 		// Keyboard (a sloped case, its keys in rows) and a mug.
+		Keyboard(k, kb, kc);
+		}
 		k.Mat(BunkerTextures.PlasticMat);
-		k.Color = new Color(0.55f, 0.52f, 0.45f);
-		var kb = Basis.FromEuler(new Vector3(0, 0.08f, 0));
-		var kc = new Vector3(-0.05f, ConsoleTop, ConsoleZ + 0.28f);
-		k.BevelBox(kc + kb * new Vector3(0, 0.014f, 0), new Vector3(0.46f, 0.028f, 0.17f), 0.008f, 1f, kb);
-		k.Color = new Color(0.4f, 0.38f, 0.33f);
-		for (int r = 0; r < 4; r++)
-			k.BevelBox(kc + kb * new Vector3(-0.02f, 0.031f + r * 0.0025f, 0.045f - r * 0.032f), new Vector3(0.38f, 0.008f, 0.024f), 0.003f, 1f, kb);
-		k.BevelBox(kc + kb * new Vector3(0.19f, 0.031f, 0.0f), new Vector3(0.06f, 0.008f, 0.11f), 0.003f, 1f, kb);
 		k.Color = new Color(0.25f, 0.3f, 0.35f);
 		if (!FurnitureKit.Add(k, "mug", new Vector3(0.55f, ConsoleTop, ConsoleZ + 0.2f), 2.6f, Roles))
 			k.Cylinder(new Vector3(0.55f, ConsoleTop, ConsoleZ + 0.2f), new Vector3(0.55f, ConsoleTop + 0.1f, ConsoleZ + 0.2f), 0.04f, 0.04f, 8);

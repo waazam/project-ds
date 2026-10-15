@@ -550,6 +550,18 @@ public partial class BunkerKeypad : Interactable
 		// the cast back box, its rain hood and the four masonry bolts through its flanges
 		var k = new MeshKit();
 		k.Mat(Steel);
+		// (2026-10-15) the box, conduit, faceplate and bezels, the hood, each key's cap and seat modelled in Blender
+		// (tools/Blender/interactive.py: keypad_*, each key's origin on its centre); the code below is their stand-in if missing.
+		// (the stand-in's dice still thrown, so each key wears and inks as it did)
+		bool modelled = KitModels.Has("keypad_body") && KitModels.Has("keypad_hood");
+		if (modelled)
+		{
+			KitModels.Add(k, "keypad_body", Transform3D.Identity, KitModels.R("steel", Steel), KitModels.R("black", Steel, new Color(0.1f, 0.1f, 0.1f)));
+			KitModels.Place(this, "keypad_hood", Transform3D.Identity, "KP_Hood", false, KitModels.R("steel", Steel));
+			for (int n = 0; n < 12; n++) rng.Randf();
+		}
+		else
+		{
 		Color cast = new(0.34f, 0.36f, 0.33f);
 		k.Color = cast;
 		k.Box(new Vector3(0, 0, BoxD * 0.5f), new Vector3(BoxW, BoxH, BoxD));
@@ -620,6 +632,7 @@ public partial class BunkerKeypad : Interactable
 			Vector3 p = LampPos(i);
 			k.Cylinder(p, p + Vector3.Back * 0.0018f, 0.0045f, 0.0045f, 10);
 		}
+		}
 		k.CommitTo(this, "KP_Body");
 
 		// the readout's dark red glass, and every segment's ghost behind it
@@ -658,6 +671,16 @@ public partial class BunkerKeypad : Interactable
 			var key = new Node3D { Name = $"KP_Key{i}", Position = KeyCentre(i) };
 			AddChild(key);
 			_keys[i] = key;
+			if (KitModels.Has("keypad_key") && KitModels.Has("keypad_seat"))
+			{
+				KitModels.Place(key, "keypad_seat", Transform3D.Identity, "Seat", false, KitModels.R("rubber", Rubber, new Color(0.07f, 0.07f, 0.07f)));
+				float w = rng.RandfRange(0.15f, 0.55f) + (i / Cols) * 0.06f;
+				var capTint = Grime(new Color(0.7f, 0.7f, 0.68f), w);
+				Grime(new Color(0.78f, 0.78f, 0.75f), w * 0.6f);
+				_keyMesh[i] = KitModels.Place(key, "keypad_key", Transform3D.Identity, "Cap", true, KitModels.R("key", KeyMat, capTint));
+			}
+			else
+			{
 			var seat = new MeshKit();
 			seat.Mat(Rubber);
 			seat.Color = new Color(0.07f, 0.07f, 0.07f);
@@ -671,6 +694,7 @@ public partial class BunkerKeypad : Interactable
 			cap.Color = Grime(new Color(0.78f, 0.78f, 0.75f), wear * 0.6f);   // the face, rubbed a little brighter by thumbs
 			cap.Box(new Vector3(0, 0, KeyH * 0.5f - 0.0004f), new Vector3(KeySize - 0.0024f, KeySize - 0.0024f, 0.0008f));
 			_keyMesh[i] = cap.CommitTo(key, "Cap", true);
+			}
 			string text = Keys[i];
 			float ink = rng.RandfRange(0.72f, 0.95f);
 			key.AddChild(Engrave("Numeral", text, new Vector3(0, i >= Clear && i != 10 ? 0.0025f : 0f, KeyH * 0.5f + 0.0003f), text == "*" ? 110 : 64, 0.00023f, ink));

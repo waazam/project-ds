@@ -29,6 +29,9 @@ public partial class Valve : Node3D
 		var k = new MeshKit();
 		k.Mat(steel);
 		k.Color = Colors.White;
+		// (2026-10-15) modelled in Blender (tools/Blender/interactive.py); the code below is its stand-in if the model is missing
+		if (!KitModels.Add(k, "valve_body", Transform3D.Identity, KitModels.R("steel", steel)))
+		{
 		// the riser from the manifold below, the valve body, and the stem out to the wheel
 		k.Cylinder(new Vector3(0, -1.25f, 0), new Vector3(0, 0.5f, 0), 0.12f, 0.12f, 10, true);
 		k.Cylinder(new Vector3(0, -0.25f, 0), new Vector3(0, -0.2f, 0), 0.2f, 0.2f, 12, true);    // flange
@@ -46,6 +49,7 @@ public partial class Valve : Node3D
 				k.Cylinder(new Vector3(Mathf.Cos(a) * 0.17f, y - 0.03f, Mathf.Sin(a) * 0.17f), new Vector3(Mathf.Cos(a) * 0.17f, y + 0.03f, Mathf.Sin(a) * 0.17f), 0.02f, 0.02f, 6, true);
 		}
 		k.Cylinder(new Vector3(0, 0, -0.2f), new Vector3(0, 0, -0.44f), 0.035f, 0.035f, 8, true);  // stem
+		}
 		k.CommitTo(this, "Body", true);
 
 		// the handwheel: rim, five spokes, a hub with a red cap
@@ -53,6 +57,9 @@ public partial class Valve : Node3D
 		AddChild(_wheel);
 		var yellow = BossTextures.Painted(new Color(0.85f, 0.68f, 0.08f), 0.4f, 0.2f);
 		const float R = 0.36f, tube = 0.034f;
+		var capRed = BossTextures.Painted(new Color(0.6f, 0.06f, 0.05f), 0.3f, 0.1f);
+		if (KitModels.Place(_wheel, "valve_wheel", Transform3D.Identity, "WheelMesh", true, KitModels.R("yellow", yellow), KitModels.R("red", capRed)) == null)
+		{
 		// the rim: a true torus, smooth all the way round (it lies in XZ; turn it to face the catwalk)
 		_wheel.AddChild(new MeshInstance3D
 		{
@@ -79,15 +86,20 @@ public partial class Valve : Node3D
 		_wheel.AddChild(new MeshInstance3D
 		{
 			Name = "Cap", Mesh = new CylinderMesh { TopRadius = 0.036f, BottomRadius = 0.046f, Height = 0.04f, RadialSegments = 32 },
-			MaterialOverride = BossTextures.Painted(new Color(0.6f, 0.06f, 0.05f), 0.3f, 0.1f), Position = new Vector3(0, 0, -0.07f), Rotation = new Vector3(-Mathf.Pi * 0.5f, 0, 0),
+			MaterialOverride = capRed, Position = new Vector3(0, 0, -0.07f), Rotation = new Vector3(-Mathf.Pi * 0.5f, 0, 0),
 		});
+		}
 
 		// the gauge above
 		var g = new MeshKit();
-		g.Mat(BossTextures.Painted(new Color(0.6f, 0.5f, 0.25f), 0.35f, 0.7f));
+		var gaugeMat = BossTextures.Painted(new Color(0.6f, 0.5f, 0.25f), 0.35f, 0.7f);
+		g.Mat(gaugeMat);
 		g.Color = Colors.White;
-		g.Cylinder(new Vector3(0, 0.5f, 0), new Vector3(0, 0.62f, 0), 0.02f, 0.02f, 6, true);
-		g.Cylinder(new Vector3(0, 0.78f, 0.02f), new Vector3(0, 0.78f, -0.05f), 0.13f, 0.13f, 16, true);
+		if (!KitModels.Add(g, "valve_gauge", Transform3D.Identity, KitModels.R("brass", gaugeMat)))
+		{
+			g.Cylinder(new Vector3(0, 0.5f, 0), new Vector3(0, 0.62f, 0), 0.02f, 0.02f, 6, true);
+			g.Cylinder(new Vector3(0, 0.78f, 0.02f), new Vector3(0, 0.78f, -0.05f), 0.13f, 0.13f, 16, true);
+		}
 		g.CommitTo(this, "Gauge", false);
 		AddChild(new MeshInstance3D
 		{
