@@ -213,6 +213,7 @@ public partial class GameSettings : Node
 		if (ContinueTest || PlaytestRun) AutoTest = true;   // same test save slots and defaults
 		RegisterInputActions();
 		FrameRecorder.StartIfAsked(GetTree());
+		if (args.Contains("--soundhud")) CallDeferred(Node.MethodName.AddChild, new UI.SoundHud());   // dev: sounds on screen as they play
 		Load();
 		if (args.Contains("--third-person")) Camera = CameraMode.ThirdPerson;
 		ApplyMasterVolume();
