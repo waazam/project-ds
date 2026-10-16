@@ -172,7 +172,7 @@ public partial class LakeCrossingEvent : Node3D
 	private MeshInstance3D _line;
 	private ShaderMaterial _red;
 	private RowingPrompt _prompt;
-	private AudioStreamPlayer3D _lap, _rough;
+	private AudioStreamPlayer3D _lap, _rough, _glide;
 	private AudioStreamPlayer _heart;
 	private bool _running, _arrived;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 1212 };
@@ -230,8 +230,8 @@ public partial class LakeCrossingEvent : Node3D
 			// of its sounds were made and read off the disk on the spot) the spray built and the strike's and the near miss's
 			// sounds read in the load's black, held for the crossing; nothing about when or how they play changes
 			LakeParts.LakeFx.Warm();
-			foreach (var name in new[] { "breach_erupt", "creature_foghorn", "limb_rise", "boat_creak", "underwater_thoom" })
-				for (int take = 1; take <= 3; take++)
+			foreach (var (name, takes) in new[] { ("breach_surge", 6), ("creature_foghorn", 2), ("limb_rise_water", 8), ("hull_creak", 10), ("deep_thoom", 6), ("limb_sink", 6) })
+				for (int take = 1; take <= takes; take++)
 				{
 					string path = $"res://assets/audio/sfx/{name}_{take:00}.wav";
 					if (ResourceLoader.Exists(path)) _heldSounds.Add(GD.Load<AudioStream>(path));
@@ -305,6 +305,8 @@ public partial class LakeCrossingEvent : Node3D
 	{
 		_lap = Loop3D("res://assets/audio/ambient/hull_lap_loop.wav", "Water", -8f, 3f);
 		_rough = Loop3D("res://assets/audio/ambient/lake_rough_loop.wav", "Weather", -80f, 10f);
+		// the water chuckling along the planks while she makes way (raised with her speed)
+		_glide = Loop3D("res://assets/audio/ambient/hull_glide_loop.wav", "Water", -80f, 3f);
 		const string heart = "res://assets/audio/ambient/heartbeat_loop.wav";
 		if (ResourceLoader.Exists(heart))
 		{
@@ -435,6 +437,12 @@ public partial class LakeCrossingEvent : Node3D
 		DriveFog(dt);
 		// the rough water's roar follows the chop
 		if (_rough != null) _rough.VolumeDb = Mathf.Lerp(-40f, -4f, Mathf.Clamp(_lake.Waves.Intensity, 0f, 1f));
+		// the hull's chuckle follows her way through the water (silent at rest)
+		if (_glide != null)
+		{
+			float way = Mathf.Clamp(Mathf.Abs(_v) / MaxSpeed, 0f, 1f);
+			_glide.VolumeDb = way < 0.05f ? -80f : Mathf.Lerp(-30f, -9f, Mathf.Sqrt(way));
+		}
 	}
 
 	// ------------------------------------------------------------------ boarding -> crossing -> landing
@@ -536,7 +544,7 @@ public partial class LakeCrossingEvent : Node3D
 			_rollVel = -0.55f;
 			player.Footsteps?.StepNow("wood", 2f);
 			Sfx("boat_board", 1, _boat.GlobalPosition, "Player", -2f);
-			Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -6f);
+			Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", -6f);
 
 			// sit: the eye drops to a seated height while the view comes round to the bow
 			var sit = player.CreateTween();
@@ -551,9 +559,11 @@ public partial class LakeCrossingEvent : Node3D
 			if (_line != null && GodotObject.IsInstanceValid(_line)) _line.QueueFree();
 			await Cutscene.Wait(this, 0.35, ct);
 			_boat.Stow(false);
-			Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(-1)), "Player", -8f);
+			Sfx("row_lock_knock", 8, _boat.ToGlobal(Rowboat.OarlockLocal(-1)), "Player", -9f, 2f);
+			Sfx("row_lock_creak", 8, _boat.ToGlobal(Rowboat.OarlockLocal(-1)), "Player", -8f);
 			await Cutscene.Wait(this, 0.25, ct);
-			Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(1)), "Player", -8f);
+			Sfx("row_lock_knock", 8, _boat.ToGlobal(Rowboat.OarlockLocal(1)), "Player", -9f, 2f);
+			Sfx("row_lock_creak", 8, _boat.ToGlobal(Rowboat.OarlockLocal(1)), "Player", -8f);
 			_rollVel = 0.4f;
 			_yawVel = 0.15f;
 			// drift out along the push-off leg on the shove alone
@@ -810,7 +820,7 @@ public partial class LakeCrossingEvent : Node3D
 				_lake.Hush();
 				PrepareBreach();
 				ForestAmbienceManager.Instance?.RequestSilence(this, 0.62f, 5);
-				Sfx("underwater_thoom", 1, _boat.GlobalPosition + Vector3.Down * 6f, "Unnatural", -6f, 20f);
+				Sfx("deep_thoom", 6, _boat.GlobalPosition + Vector3.Down * 6f, "Unnatural", -6f, 20f);
 				RingsAround(3, 5f, 9f);
 			}
 			// ...a vast shape slides under the boat...
@@ -818,7 +828,7 @@ public partial class LakeCrossingEvent : Node3D
 			// ...and something big moves under the boat
 			if (Passed("stir", b - 4f / _total))
 			{
-				Sfx("underwater_thoom", 1, _boat.GlobalPosition + Vector3.Down * 4f, "Unnatural", -1f, 20f);
+				Sfx("deep_thoom", 6, _boat.GlobalPosition + Vector3.Down * 4f, "Unnatural", -1f, 20f);
 				_pitchVel += 0.25f;
 				_dipVel -= 0.35f;
 				RingsAround(5, 3f, 7f);
@@ -851,11 +861,12 @@ public partial class LakeCrossingEvent : Node3D
 	{
 		Bumps++;
 		_ = ShadowPass(ct, 3.2f, 0.6f);
-		Sfx("underwater_thoom", 1, _boat.GlobalPosition + Vector3.Down * 5f, "Unnatural", -8f, 20f);
+		Sfx("deep_thoom", 6, _boat.GlobalPosition + Vector3.Down * 5f, "Unnatural", -8f, 20f);
 		_ = Later(1.4f, () =>
 		{
-			Sfx("wood_bump", 3, _boat.ToGlobal(new Vector3(0.2f, -0.2f, 0.4f)), "Player", -2f, 4f);
-			Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -6f);
+			Sfx("hull_bump", 6, _boat.ToGlobal(new Vector3(0.2f, -0.2f, 0.4f)), "Player", -2f, 4f);
+			Sfx("bilge_slosh", 8, _boat.GlobalPosition, "Player", -10f, 3f);
+			Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", -6f);
 			_pitchVel -= 0.22f;
 			_rollVel += 0.3f;
 			_dipVel += 0.25f;
@@ -869,11 +880,11 @@ public partial class LakeCrossingEvent : Node3D
 	private void Knock()
 	{
 		Bumps++;
-		Sfx("wall_knock", 3, _boat.ToGlobal(new Vector3(0, -0.2f, -0.6f)), "Unnatural", -5f, 4f);
+		Sfx("hull_knock_below", 8, _boat.ToGlobal(new Vector3(0, -0.2f, -0.6f)), "Unnatural", -5f, 4f);
 		_pitchVel -= 0.08f;
 		_ = Later(0.75f, () =>
 		{
-			Sfx("wall_knock", 3, _boat.ToGlobal(new Vector3(0, -0.2f, 0.8f)), "Unnatural", -3f, 4f);
+			Sfx("hull_knock_below", 8, _boat.ToGlobal(new Vector3(0, -0.2f, 0.8f)), "Unnatural", -3f, 4f);
 			_pitchVel += 0.1f;
 			RingsAround(3, 2f, 4f);
 		});
@@ -890,8 +901,16 @@ public partial class LakeCrossingEvent : Node3D
 		var c = Creature();
 		c.Surface(at, _boat.GlobalPosition, _rng.RandfRange(6f, 8f), stare);
 		LastScare = at;
-		Sfx("limb_rise", 3, at, "Unnatural", -3f, 10f, 120f);
-		_ = Later(0.5f, () => Sfx("squelch_open", 2, at + Vector3.Up * 5f, "Unnatural", -6f, 10f, 90f));
+		Sfx("limb_rise_water", 8, at, "Unnatural", -3f, 10f, 120f);
+		_ = Later(0.5f, () => Sfx("creature_eye_open", 8, at + Vector3.Up * 5f, "Unnatural", -6f, 10f, 90f));
+		// while it stares, water still running off it drips back into the lake; then it slides under (rise 1.4 s, then the stare)
+		int drips = _rng.RandiRange(2, 4);
+		for (int i = 0; i < drips; i++)
+		{
+			Vector3 d = at + new Vector3(_rng.RandfRange(-0.6f, 0.6f), 0, _rng.RandfRange(-0.6f, 0.6f));
+			_ = Later(1.5f + _rng.RandfRange(0f, Mathf.Max(0.3f, stare - 0.2f)), () => Sfx("limb_drip_water", 8, d, "Unnatural", -8f, 5f, 60f));
+		}
+		_ = Later(1.4f + stare, () => Sfx("limb_sink", 6, at, "Unnatural", -4f, 10f, 110f));
 	}
 
 	/// <summary>The creature the lone limbs belong to: the breach's own once it's up, else one of their own.</summary>
@@ -927,8 +946,8 @@ public partial class LakeCrossingEvent : Node3D
 		Vector3 targetW = _lake.ToGlobal(new Vector3(target.X, 0f, target.Y)) with { Y = water };
 		Creature().Surface(rootW, targetW, length, -1f, hold);
 		LastScare = rootW;
-		Sfx("breach_erupt", 1, rootW, "Unnatural", -4f, 12f, 120f);
-		Sfx("limb_rise", 3, rootW, "Unnatural", 0f, 10f, 100f);
+		Sfx("breach_surge", 6, rootW, "Unnatural", -4f, 12f, 120f);
+		Sfx("limb_rise_water", 8, rootW, "Unnatural", 0f, 10f, 100f);
 		_shake = Mathf.Max(_shake, 0.25f);
 		_rollVel += -side * 0.15f;
 		// the way out: the prompt lights the steer key away from it
@@ -994,19 +1013,23 @@ public partial class LakeCrossingEvent : Node3D
 		LakeFx.Splash(Cutscene.SceneRoot(this), w, rough ? 0.7f : 0.45f, rough ? 12 : 7);
 		LakeFx.Ripple(Cutscene.SceneRoot(this), w, 1.3f, 1.4f, 0.35f);
 		float dur = _strokeDur[side < 0 ? 0 : 1];
-		Sfx("oar_catch", 4, w, "Player", (rough ? -7f : -11f) - (_pair ? 2.5f : 0f), 4f);
-		var pull = Sfx("oar_pull", 4, w, "Player", (rough ? -6f : -10f) - (_pair ? 2.5f : 0f), 4f);
+		Sfx("row_catch", 10, w, "Player", (rough ? -7f : -11f) - (_pair ? 2.5f : 0f), 4f);
+		var pull = Sfx("row_pull", 10, w, "Player", (rough ? -6f : -10f) - (_pair ? 2.5f : 0f), 4f);
 		// (2026-10-13, the "bouncy" sweep: up to 1.35 a hurried stroke's water went a fifth up, a chipmunk splash; the
 		// stroke's speed shows in it, but only a little)
 		if (pull != null) pull.PitchScale = Mathf.Clamp(0.62f / Mathf.Max(0.25f, dur), 0.93f, 1.1f) * _rng.RandfRange(0.97f, 1.03f);
-		// the oar turning in its lock as it loads (often, not always)
-		if (_rng.Randf() < 0.35f) Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(side)), "Player", -17f);
+		// the loom knocking home in its lock as the oar loads, and turning in it (often, not always)
+		Vector3 lockAt = _boat.ToGlobal(Rowboat.OarlockLocal(side));
+		if (_rng.Randf() < 0.6f) Sfx("row_lock_knock", 8, lockAt, "Player", (rough ? -14f : -17f) - (_pair ? 2f : 0f), 2f);
+		if (_rng.Randf() < 0.35f) Sfx("row_lock_creak", 8, lockAt, "Player", -17f);
 	}
 
 	private void OnBladeOut(int side, Vector3 at)
 	{
 		Vector3 w = at with { Y = _lake.WaterHeightAt(at, out _) };
-		Sfx("oar_release", 4, w, "Player", (InCurrent ? -9f : -13f) - (_pair ? 2.5f : 0f), 4f);
+		Sfx("row_release", 10, w, "Player", (InCurrent ? -9f : -13f) - (_pair ? 2.5f : 0f), 4f);
+		// the oar swinging back seats in its lock now and then
+		if (_rng.Randf() < 0.3f) Sfx("row_lock_knock", 8, _boat.ToGlobal(Rowboat.OarlockLocal(side)), "Player", -20f, 2f);
 		LakeFx.Ripple(Cutscene.SceneRoot(this), w, 0.7f, 1.0f, 0.25f);
 	}
 
@@ -1041,8 +1064,8 @@ public partial class LakeCrossingEvent : Node3D
 		_shake = Mathf.Max(_shake, 0.06f);
 		Vector3 bow = _boat.ToGlobal(new Vector3(0, 0.3f, -Rowboat.HalfLength));
 		LakeFx.Splash(Cutscene.SceneRoot(this), bow, 1.4f, 20, (_boat.GlobalBasis.Z * 1.2f));
-		Sfx("wave_slap", 4, bow, "Weather", -2f, 6f);
-		if (_rng.Randf() < 0.5f) Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -6f);
+		Sfx("bow_slap", 8, bow, "Weather", -2f, 6f);
+		if (_rng.Randf() < 0.5f) Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", -6f);
 	}
 
 	// ------------------------------------------------------------------ the hunt, and being taken
@@ -1105,8 +1128,8 @@ public partial class LakeCrossingEvent : Node3D
 			_surgeLeft = SurgeSeconds;
 			_surgeAt = clock + SurgeSeconds + _rng.RandfRange(SurgeEvery.X, SurgeEvery.Y);
 			Vector3 at = RailWorld(_hunt, _huntLat) with { Y = _lake.GlobalPosition.Y };
-			Sfx("underwater_thoom", 1, at + Vector3.Down * 3f, "Unnatural", -2f, 16f);
-			Sfx("limb_rise", 3, at, "Unnatural", -2f, 10f, 90f);
+			Sfx("deep_thoom", 6, at + Vector3.Down * 3f, "Unnatural", -2f, 16f);
+			Sfx("limb_rise_water", 8, at, "Unnatural", -2f, 10f, 90f);
 			LakeFx.Splash(Cutscene.SceneRoot(this), at + Vector3.Up * 0.3f, 1.6f, 24);
 			if (Surges == 1) _ = StoryBeat.Caption(this, "It's coming. Row hard.", 0.2f, 1.6f, 0.8f);
 		}
@@ -1123,7 +1146,7 @@ public partial class LakeCrossingEvent : Node3D
 		// fair warning before the take: inside the warning gap long enough, and only then
 		if (gap < WarnGap)
 		{
-			if (!_warning) { _warning = true; Warnings++; Sfx("wall_knock", 3, _boat.ToGlobal(new Vector3(0, -0.1f, Rowboat.HalfLength * 0.8f)), "Unnatural", 0f, 4f); _knockTimer = 0.6; }
+			if (!_warning) { _warning = true; Warnings++; Sfx("hull_knock_below", 8, _boat.ToGlobal(new Vector3(0, -0.1f, Rowboat.HalfLength * 0.8f)), "Unnatural", 0f, 4f); _knockTimer = 0.6; }
 			_warnT += dt;
 		}
 		else { _warning = false; _warnT = Mathf.Max(0f, _warnT - dt * 2f); }
@@ -1136,7 +1159,7 @@ public partial class LakeCrossingEvent : Node3D
 		if (near > 0.6f && _knockTimer <= 0)
 		{
 			_knockTimer = _rng.RandfRange(1.0f, 2.0f);
-			Sfx("wall_knock", 3, _boat.ToGlobal(new Vector3(0, -0.1f, Rowboat.HalfLength * 0.8f)), "Unnatural", -4f, 4f);
+			Sfx("hull_knock_below", 8, _boat.ToGlobal(new Vector3(0, -0.1f, Rowboat.HalfLength * 0.8f)), "Unnatural", -4f, 4f);
 			_pitchVel -= 0.1f;
 		}
 		_prompt.Danger = Mathf.Max(Mathf.Clamp((WarnGap + 4f - gap) / 4f, 0f, 1f), surging || FinalDash ? 0.55f : 0f);
@@ -1204,7 +1227,7 @@ public partial class LakeCrossingEvent : Node3D
 		_surgeLeft = 0;
 		_warning = false; _warnT = 0f;
 		Vector3 at = RailWorld(_hunt, _huntLat) with { Y = _lake.GlobalPosition.Y };
-		Sfx("underwater_thoom", 1, at + Vector3.Down * 3f, "Unnatural", 0f, 16f);
+		Sfx("deep_thoom", 6, at + Vector3.Down * 3f, "Unnatural", 0f, 16f);
 		GD.Print($"[lake] the near miss: it comes for the stern from {_nearMissFrom:0.0} m back");
 	}
 
@@ -1227,10 +1250,11 @@ public partial class LakeCrossingEvent : Node3D
 		{
 			// up, right behind them
 			_nearMissUp = true;
-			Sfx("breach_erupt", 1, stern, "Unnatural", 0f, 12f, 120f);
+			Sfx("breach_surge", 6, stern, "Unnatural", 0f, 12f, 120f);
 			PlayFoghorn(stern + Vector3.Down * 1f, -1f);   // its own voice, the foghorn, right behind them
-			Sfx("limb_rise", 3, stern, "Unnatural", 0f, 10f, 90f);
-			Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -1f);
+			Sfx("limb_rise_water", 8, stern, "Unnatural", 0f, 10f, 90f);
+			Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", -1f);
+			Sfx("bilge_slosh", 8, _boat.GlobalPosition, "Player", -6f, 3f);
 			LakeFx.Column(Cutscene.SceneRoot(this), stern, 3.5f);
 			LakeFx.Splash(Cutscene.SceneRoot(this), stern + Vector3.Up * 0.4f, 2.2f, 40, _boat.GlobalBasis.Z * -1.5f);
 			for (int i = 0; i < 3; i++) LakeFx.Ripple(Cutscene.SceneRoot(this), stern, 3f + i * 1.6f, 2.4f + i * 0.4f, 0.45f);
@@ -1245,7 +1269,8 @@ public partial class LakeCrossingEvent : Node3D
 		{
 			// and back under
 			_nearMissDown = true;
-			Sfx("underwater_thoom", 1, stern + Vector3.Down * 3f, "Unnatural", -3f, 16f);
+			Sfx("limb_sink", 6, stern, "Unnatural", -2f, 10f, 100f);
+			Sfx("deep_thoom", 6, stern + Vector3.Down * 3f, "Unnatural", -6f, 16f);
 			LakeFx.Splash(Cutscene.SceneRoot(this), stern + Vector3.Up * 0.2f, 1.2f, 16);
 			RingsAround(3, 2f, 5f);
 		}
@@ -1275,14 +1300,15 @@ public partial class LakeCrossingEvent : Node3D
 		Vector3 behind = _boat.ToGlobal(new Vector3(0, 0, Rowboat.HalfLength + 2.2f));
 		LastCreature?.SetHunter(behind with { Y = _lake.GlobalPosition.Y }, _boat.GlobalPosition, 1f);
 		LastCreature?.HunterStrike();
-		Sfx("breach_erupt", 1, behind, "Unnatural", -2f, 12f, 120f);
+		Sfx("breach_surge", 6, behind, "Unnatural", -2f, 12f, 120f);
 		LakeFx.Column(Cutscene.SceneRoot(this), behind with { Y = _lake.GlobalPosition.Y }, 6f);
 		_shake = 0.6f;
 		if (_heart != null) _heart.VolumeDb = 0f;
 		if (_huntRumble != null) _huntRumble.VolumeDb = 3f;
 		await LookAt(player, () => behind + Vector3.Up * 4f, 1.1f, 3f, ct);
-		Sfx("tentacle_slam", 2, _boat.GlobalPosition, "Unnatural", 2f, 10f);
-		Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", 0f);
+		// it comes down on the boat itself
+		Sfx("hull_hit", 6, _boat.GlobalPosition, "Unnatural", 2f, 10f);
+		Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", 0f);
 		// over she goes
 		double t = 0;
 		while (t < 0.9)
@@ -1297,7 +1323,7 @@ public partial class LakeCrossingEvent : Node3D
 		rig.RollSwim = 0f;
 		Vector3 from = player.GlobalPosition;
 		Vector3 to = from + Vector3.Down * 3.4f + _boat.GlobalBasis.Z * 2.5f;
-		Sfx("underwater_thoom", 1, from + Vector3.Down * 4f, "Unnatural", 0f, 10f);
+		Sfx("deep_thoom", 6, from + Vector3.Down * 4f, "Unnatural", 0f, 10f);
 		t = 0;
 		const double sink = 3.2;
 		while (t < sink)
@@ -1318,7 +1344,8 @@ public partial class LakeCrossingEvent : Node3D
 		eye.GlobalPosition = eyeAt;
 		LakeCreature.BuildEye(eye);
 		eye.Scale = Vector3.One * 1.4f;
-		Sfx("squelch_open", 2, eyeAt, "Unnatural", 0f, 6f);
+		Sfx("creature_eye_open", 8, eyeAt, "Unnatural", 0f, 6f);
+		Sfx("creature_wet_moan", 6, eyeAt + Vector3.Down * 2f, "Unnatural", -4f, 8f);
 		t = 0;
 		while (t < 2.6)
 		{
@@ -1397,16 +1424,17 @@ public partial class LakeCrossingEvent : Node3D
 			creature.Breach(centerW, _boat.GlobalPosition, BreachHoldSeconds);
 			creature.Slammed += OnSlam;
 			LastCreature = creature;
-			Sfx("breach_erupt", 1, centerW, "Unnatural", 4f, 18f, 160f);
+			Sfx("breach_surge", 6, centerW, "Unnatural", 4f, 18f, 160f);
 			PlayFoghorn(centerW + Vector3.Down * 2f, 3f);
-			Sfx("tentacle_slam", 2, centerW, "Unnatural", 0f, 14f, 140f);
+			Sfx("limb_slam_water", 8, centerW, "Unnatural", 0f, 14f, 140f);
 			ForestAmbienceManager.Instance?.Startle(1f, 3f);
 			LakeFx.Column(Cutscene.SceneRoot(this), centerW, 7f);
 			LakeFx.Splash(Cutscene.SceneRoot(this), centerW + Vector3.Up * 0.5f, 3f, 60);
 			Vector3 bow = _boat.ToGlobal(new Vector3(0, 0.3f, -Rowboat.HalfLength));
 			LakeFx.Splash(Cutscene.SceneRoot(this), bow, 1.8f, 30, _boat.GlobalBasis.Z * 1.6f);
-			Sfx("wave_slap", 4, bow, "Weather", 2f, 6f);
-			Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", 0f);
+			Sfx("bow_slap", 8, bow, "Weather", 2f, 6f);
+			Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", 0f);
+			Sfx("bilge_slosh", 8, _boat.GlobalPosition, "Player", -4f, 3f);
 			_lake.Waves.RingAt = centerL;
 			float shadow0 = _lake.Waves.Shadow;
 			_ = RampWaves((ref LakeShape.Waves w, float u) => w.Shadow = Mathf.Lerp(shadow0, 0f, u), 0.7f, ct);
@@ -1427,26 +1455,29 @@ public partial class LakeCrossingEvent : Node3D
 			await coast;
 
 			// 5. surrounded: the others come up all round, two right beside the boat
-			Sfx("breach_erupt", 1, _boat.GlobalPosition + _boat.GlobalBasis.X * 5f, "Unnatural", -4f, 12f, 120f);
+			Sfx("breach_surge", 6, _boat.GlobalPosition + _boat.GlobalBasis.X * 5f, "Unnatural", -4f, 12f, 120f);
 			await LookAt(player, () => _boat.GlobalPosition + _boat.GlobalBasis.X * 5f + Vector3.Up * 3.5f, 0.8f, 3.4f, ct);
 			await LookAt(player, () => _boat.GlobalPosition - _boat.GlobalBasis.X * 5f + Vector3.Up * 3.5f, 0.75f, 3.4f, ct);
 
 			// 6. every eye opens at once, and turns to them; then they all blink, together
 			creature.OpenEyes();
-			Sfx("squelch_open", 2, centerW + Vector3.Up * 4f, "Unnatural", -1f, 12f);
-			Sfx("squelch_open", 2, _boat.GlobalPosition + _boat.GlobalBasis.X * 4f + Vector3.Up * 3f, "Unnatural", -4f, 8f);
-			Sfx("squelch_open", 2, _boat.GlobalPosition - _boat.GlobalBasis.X * 4f + Vector3.Up * 3f, "Unnatural", -4f, 8f);
+			Sfx("creature_eye_open", 8, centerW + Vector3.Up * 4f, "Unnatural", -1f, 12f);
+			Sfx("creature_eye_open", 8, _boat.GlobalPosition + _boat.GlobalBasis.X * 4f + Vector3.Up * 3f, "Unnatural", -4f, 8f);
+			Sfx("creature_eye_open", 8, _boat.GlobalPosition - _boat.GlobalBasis.X * 4f + Vector3.Up * 3f, "Unnatural", -4f, 8f);
 			Sfx("whisper_voice", 3, centerW + Vector3.Up * 6f, "Unnatural", -4f, 10f);
 			await LookAt(player, () => creature.ColossusTop() ?? centerW + Vector3.Up * 8f, 1.1f, 3f, ct);
 			creature.Blink();
-			Sfx("squelch_close", 2, centerW + Vector3.Up * 5f, "Unnatural", -3f, 12f);
+			Sfx("creature_eye_blink", 6, centerW + Vector3.Up * 5f, "Unnatural", -3f, 12f);
 			await Cutscene.Wait(this, 0.5, ct);
 
 			// 7. the nearest one bends over the boat and looks down into it
 			if (creature.Loom(_boat.GlobalPosition))
 			{
 				if (_heart != null) _heart.VolumeDb = -3f;
-				Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -4f);
+				Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", -4f);
+				// its flesh right over them: suckers letting go as it bends, and a deep wet groan from somewhere in it
+				Sfx("sucker_pops", 8, _boat.GlobalPosition + Vector3.Up * 4f, "Unnatural", -6f, 5f);
+				_ = Later(0.9f, () => Sfx("creature_wet_moan", 6, _boat.GlobalPosition + Vector3.Up * 5f, "Unnatural", -8f, 8f));
 				_ = DripOnBoat(2.6f, ct);
 				await LookAt(player, () => creature.LoomBend() ?? _boat.GlobalPosition + Vector3.Up * 5f, 1.1f, 2.6f, ct);
 				await LookAt(player, () => creature.LoomTip() ?? _boat.GlobalPosition + Vector3.Up * 4f, 1.1f, 3f, ct);
@@ -1569,7 +1600,8 @@ public partial class LakeCrossingEvent : Node3D
 			t += 0.22;
 			Vector3 p = _boat.ToGlobal(new Vector3(_rng.RandfRange(-1f, 1f), 0.35f, _rng.RandfRange(-1.4f, 1.2f)));
 			LakeFx.Splash(Cutscene.SceneRoot(this), p, 0.22f, 4);
-			if (_rng.Randf() < 0.4f) Sfx("oar_release", 4, p, "Player", -18f, 3f);
+			// mostly on the boards, now and then over the side into the lake
+			if (_rng.Randf() < 0.7f) Sfx(_rng.Randf() < 0.75f ? "limb_drip_wood" : "limb_drip_water", 8, p, "Water", -14f, 3f);
 		}
 	}
 
@@ -1643,9 +1675,10 @@ public partial class LakeCrossingEvent : Node3D
 		_dipVel -= 0.4f;
 		_yawVel += side * 0.2f;
 		_shake = 0.6f;
-		Sfx("tentacle_slam", 2, at, "Unnatural", 3f, 16f, 140f);
+		Sfx("limb_slam_water", 8, at, "Unnatural", 3f, 16f, 140f);
 		LakeFx.Splash(Cutscene.SceneRoot(this), _boat.GlobalPosition + Vector3.Up * 0.6f - away.Normalized() * 0.8f, 2f, 30, away.Normalized() * 0.6f);
-		Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -2f);
+		Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", -2f);
+		Sfx("bilge_slosh", 8, _boat.GlobalPosition, "Player", -6f, 3f);
 	}
 
 	/// <summary>A limb's strike (<see cref="Strike"/>) comes down. On the boat (the hull and a little
@@ -1660,7 +1693,7 @@ public partial class LakeCrossingEvent : Node3D
 		Vector3 away = _boat.GlobalPosition - at; away.Y = 0;
 		away = away.LengthSquared() > 0.01f ? away.Normalized() : _boat.GlobalBasis.X;
 		float side = _boat.GlobalBasis.X.Dot(away);
-		Sfx("tentacle_slam", 2, at, "Unnatural", 4f, 16f, 140f);
+		Sfx("limb_slam_water", 8, at, "Unnatural", 4f, 16f, 140f);
 		GD.Print($"[lake] strike came down {miss:0.0} m off the hull");
 		if (miss < 0.8f)
 		{
@@ -1674,8 +1707,8 @@ public partial class LakeCrossingEvent : Node3D
 			_latVel += side * 1.5f;
 			_shake = 0.9f;
 			LakeFx.Splash(Cutscene.SceneRoot(this), _boat.GlobalPosition + Vector3.Up * 0.8f, 2.6f, 40, away * 0.8f + Vector3.Up * 0.4f);
-			Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", 0f);
-			Sfx("wood_bump", 3, _boat.GlobalPosition, "Player", 2f, 4f);
+			Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", 0f);
+			Sfx("hull_hit", 6, _boat.GlobalPosition, "Player", 2f, 4f);
 			return;
 		}
 		float k = 1f - Mathf.Clamp((miss - 0.8f) / 5f, 0f, 1f);
@@ -1685,7 +1718,8 @@ public partial class LakeCrossingEvent : Node3D
 		_latVel += side * 0.8f * k;
 		_shake = Mathf.Max(_shake, 0.25f + 0.4f * k);
 		if (k > 0.2f) LakeFx.Splash(Cutscene.SceneRoot(this), _boat.GlobalPosition + Vector3.Up * 0.6f - away * 0.8f, 1.2f + 1.2f * k, 26, away * 0.6f);
-		Sfx("boat_creak", 3, _boat.GlobalPosition, "Player", -6f + 4f * k);
+		Sfx("hull_creak", 10, _boat.GlobalPosition, "Player", -6f + 4f * k);
+		if (k > 0.3f) Sfx("bilge_slosh", 8, _boat.GlobalPosition, "Player", -12f + 6f * k, 3f);
 	}
 
 	private void PlayFoghorn(Vector3 at, float db = 4f)
@@ -1732,7 +1766,8 @@ public partial class LakeCrossingEvent : Node3D
 			await Cutscene.Wait(this, 0.6, ct);
 
 			_boat.Stow(true);
-			Sfx("oarlock_creak", 3, _boat.ToGlobal(Rowboat.OarlockLocal(1)), "Player", -8f);
+			Sfx("row_lock_creak", 8, _boat.ToGlobal(Rowboat.OarlockLocal(1)), "Player", -8f);
+			Sfx("row_lock_knock", 8, _boat.ToGlobal(Rowboat.OarlockLocal(-1)), "Player", -10f, 2f);
 			await Cutscene.Wait(this, 0.5, ct);
 
 			// stand
@@ -1797,17 +1832,18 @@ public partial class LakeCrossingEvent : Node3D
 			Stream = GD.Load<AudioStream>(path), Bus = bus, VolumeDb = db,
 			UnitSize = unit, MaxDistance = maxDistance, PitchScale = _rng.RandfRange(0.94f, 1.05f),
 		};
-		// the oars: at most six of their sounds at once (the oldest is cut), however hard the rowing
-		if (name.StartsWith("oar_"))
+		// the oars: at most eight of their sounds at once (the oldest is cut), however hard the rowing
+		if (name.StartsWith("row_"))
 		{
 			_oarVoices.RemoveAll(v => !IsInstanceValid(v));
-			while (_oarVoices.Count >= 6) { var old = _oarVoices[0]; _oarVoices.RemoveAt(0); if (IsInstanceValid(old)) old.QueueFree(); }
+			while (_oarVoices.Count >= 8) { var old = _oarVoices[0]; _oarVoices.RemoveAt(0); if (IsInstanceValid(old)) old.QueueFree(); }
 			_oarVoices.Add(voice);
 		}
 		Cutscene.SceneRoot(this).AddChild(voice);
 		voice.GlobalPosition = at;
 		voice.Finished += voice.QueueFree;
 		voice.Play();
+		SoundCaption.Heard(this, name, at);
 		return voice;
 	}
 
@@ -1832,6 +1868,7 @@ public partial class LakeCrossingEvent : Node3D
 			RestoreFog();
 			_heart?.Stop();
 			if (_rough != null) _rough.Stop();
+			_glide?.Stop();
 			var station = StationInterior.Instance;
 			// (a new game left the station unbuilt at load: built now, in this black, with its shaders warmed)
 			if (station is { Built: false })

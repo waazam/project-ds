@@ -51,7 +51,7 @@ public partial class Lake : Node3D
 	public ref LakeShape.Waves Waves => ref _waves;
 	private LakeShape.Waves _waves;
 
-	private OneShotEmitter _birds, _loons;
+	private OneShotEmitter _birds, _loons, _reeds, _plops;
 	private Node3D _player;
 
 	public override void _Ready()
@@ -134,7 +134,12 @@ public partial class Lake : Node3D
 		Vector3 d = _player.GlobalPosition - GlobalPosition;
 		bool here = !_hushed && Mathf.Abs(d.X) < 200f && Mathf.Abs(d.Z) < 200f;
 		var mode = here ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
-		if (_birds.ProcessMode != mode) { _birds.ProcessMode = mode; _loons.ProcessMode = mode; }
+		if (_birds.ProcessMode != mode) { _birds.ProcessMode = mode; _loons.ProcessMode = mode; _plops.ProcessMode = mode; }
+		// the reeds grow along the margins: heard near the shore, not out in the middle of the lake
+		Vector3 l = ToLocal(_player.GlobalPosition);
+		float ex = l.X / LakeShape.SemiX, ez = (l.Z - LakeShape.CenterZ) / LakeShape.SemiZ;
+		var reedMode = here && ex * ex + ez * ez > 0.6f ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+		if (_reeds.ProcessMode != reedMode) _reeds.ProcessMode = reedMode;
 	}
 
 	private bool _hushed;
@@ -199,7 +204,9 @@ public partial class Lake : Node3D
 
 	private void BuildSound()
 	{
-		const string path = "res://assets/audio/ambient/lake_loop.wav";
+		// (2026-10-15) the lake's own water, all events and no hiss: little waves on the beach stones, laps along the shore,
+		// the odd plop far out (was lake_loop, a low noise bed with a lap now and then)
+		const string path = "res://assets/audio/ambient/lake_shore_loop.wav";
 		if (ResourceLoader.Exists(path))
 		{
 			var player = new AudioStreamPlayer3D
@@ -225,8 +232,25 @@ public partial class Lake : Node3D
 			IntervalSeconds = new Vector2(13f, 26f), DistanceRange = new Vector2(55f, 95f), HeightRange = new Vector2(0f, 1.5f),
 			VolumeDb = -5f, UnitSize = 34f, Voices = 2, PitchRange = new Vector2(0.97f, 1.03f),
 		};
+		// the reeds along the margins stirring in a breath of air, near; and something rising or dropping far out on the water
+		_reeds = new OneShotEmitter
+		{
+			Name = "Reeds", SamplePattern = "res://assets/audio/sfx/reed_rustle_{0:00}.wav", SampleCount = 8,
+			Bus = "Wind", LifeCategory = OneShotEmitter.Life.Wind,
+			IntervalSeconds = new Vector2(4f, 11f), DistanceRange = new Vector2(7f, 22f), HeightRange = new Vector2(0f, 1.2f),
+			VolumeDb = -14f, UnitSize = 6f, Voices = 2,
+		};
+		_plops = new OneShotEmitter
+		{
+			Name = "FarWater", SamplePattern = "res://assets/audio/sfx/lake_far_plop_{0:00}.wav", SampleCount = 8,
+			Bus = "Water", LifeCategory = OneShotEmitter.Life.Distant,
+			IntervalSeconds = new Vector2(9f, 22f), DistanceRange = new Vector2(30f, 80f), HeightRange = new Vector2(0f, 0.3f),
+			VolumeDb = -10f, UnitSize = 20f, Voices = 2, PitchRange = new Vector2(0.9f, 1.08f),
+		};
 		AddChild(_birds);
 		AddChild(_loons);
-		_birds.ProcessMode = _loons.ProcessMode = ProcessModeEnum.Disabled;
+		AddChild(_reeds);
+		AddChild(_plops);
+		_birds.ProcessMode = _loons.ProcessMode = _reeds.ProcessMode = _plops.ProcessMode = ProcessModeEnum.Disabled;
 	}
 }

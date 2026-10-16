@@ -112,7 +112,7 @@ public partial class BossRoom
 		{
 			// the blood below; something moves in it; a limb comes up out of it and down on the catwalk, not far off
 			await Look(player, ToGlobal(new Vector3(0, BloodY, 0)), 1.6f, ct);
-			Sfx("creature_giant_bellow", 1, ToGlobal(new Vector3(0, BloodY, 0)), 6f, 30f);
+			Sfx("boss_bellow", 4, ToGlobal(new Vector3(0, BloodY, 0)), 6f, 30f);
 			await Cutscene.Wait(this, 1.2, ct);
 			Vector3 demo = ToGlobal(RingLocal(RingOf(LandingLocal) + 9f));
 			await Look(player, demo + Vector3.Up * 4f, 1.0f, ct);
@@ -122,7 +122,7 @@ public partial class BossRoom
 		}
 		else
 		{
-			Sfx("creature_giant_bellow", 1, ToGlobal(new Vector3(0, BloodY, 0)), 2f, 30f);
+			Sfx("boss_bellow", 4, ToGlobal(new Vector3(0, BloodY, 0)), 2f, 30f);
 			await Cutscene.Wait(this, 0.8, ct);
 		}
 		LightNext();
@@ -211,7 +211,20 @@ public partial class BossRoom
 			FightSeconds += dt;
 			Turning(player, dt);
 			ScheduleSlams(player, dt);
+			Gurgles(dt);
 		}
+	}
+
+	private float _gurgleT = 3f;
+
+	/// <summary>The blood never quite still while it lives: a big slow gurgle somewhere on the surface every few seconds.</summary>
+	private void Gurgles(float dt)
+	{
+		_gurgleT -= dt;
+		if (_gurgleT > 0f) return;
+		_gurgleT = _rng.RandfRange(4f, 9f);
+		float a = _rng.RandfRange(0f, Mathf.Tau), r = _rng.RandfRange(2f, Half - 3f);
+		Sfx("boss_gurgle", 8, ToGlobal(new Vector3(Mathf.Cos(a) * r, BloodY, Mathf.Sin(a) * r)), -4f, 8f);
 	}
 
 	public bool Inside(Vector3 world)
@@ -272,8 +285,8 @@ public partial class BossRoom
 		// it hurts: the blood drops, it thrashes and screams, and it rots a little more
 		Beast.Rot = ValvesTurned / (float)ValvesToTurn;
 		Beast.Convulse(1.4f);
-		string[] cries = { "creature_roar_near", "creature_screech", "creature_giant_moan" };
-		Sfx(cries[ValvesTurned % cries.Length], 1, ToGlobal(new Vector3(0, BloodY + 4f, 0)), 6f, 30f);
+		// its own cry (2026-10-15: was the forest creature's roar, a screech and the giant's moan, in turn)
+		Sfx("boss_cry", 6, ToGlobal(new Vector3(0, BloodY + 4f, 0)), 6f, 30f);
 		GD.Print($"[story] Act 18: valve {v.Number} turned ({ValvesTurned} of {ValvesToTurn}) - it rots ({Beast.Rot:0.00})");
 		float from = BloodY, to = Mathf.Lerp(BloodStart, PitFloor, ValvesTurned / (float)ValvesToTurn);
 		_ = Cutscene.Run(this, ct => Drain(from, to, ValvesTurned >= ValvesToTurn ? 5f : 3.5f, ct));
@@ -283,7 +296,7 @@ public partial class BossRoom
 
 	private async Task Drain(float from, float to, float seconds, CancellationToken ct)
 	{
-		Sfx("blood_drain", 1, ToGlobal(new Vector3(0, from, 0)), 4f, 30f);
+		Sfx("boss_drain", 4, ToGlobal(new Vector3(0, from, 0)), 4f, 30f);
 		double t = 0;
 		while (t < seconds)
 		{
@@ -427,7 +440,7 @@ public partial class BossRoom
 		marker.SetMeta("total", seconds);
 		marker.SetMeta("radius", r);
 		_telegraphs.Add((t, marker, seconds + Leviathan.StrikeSeconds));
-		Sfx("limb_rise", 3, world + Vector3.Down * 2f, -2f, 10f);
+		Sfx("boss_limb_rise", 6, world + Vector3.Down * 2f, -2f, 10f);
 	}
 
 	private void UpdateTelegraphs(float dt)
@@ -448,7 +461,7 @@ public partial class BossRoom
 	private void OnImpact(Vector3 at, Leviathan.Tentacle t)
 	{
 		if (!t.Second) Slams++;
-		Sfx("catwalk_slam", 3, at, 6f, 10f);
+		Sfx("boss_slam", 8, at, 6f, 10f);
 		Splash(at);
 		Damage(at);
 		var player = StoryBeat.Player(this);
@@ -554,7 +567,7 @@ public partial class BossRoom
 		}
 		await Look(player, Beast.GlobalPosition + Vector3.Up * 10f, 2.0f, ct);
 		await Cutscene.Wait(this, 2.2, ct);   // the last of the blood going (2026-10-15: was 3.2)
-		Sfx("creature_giant_rattle_loop", 1, Beast.GlobalPosition + Vector3.Up * 10f, 2f, 30f);
+		Sfx("boss_death_rattle", 2, Beast.GlobalPosition + Vector3.Up * 10f, 2f, 30f);
 		// the eyes, one after another: slow at first, each pop on its own, then faster and faster until they go in a
 		// rush (the owner, 2026-10-03: "they should start off popping slow then progressively get faster"); the gap
 		// shrinks geometrically from most of a second to a few hundredths, and past a frame's worth several go at once
@@ -570,14 +583,13 @@ public partial class BossRoom
 				Beast.Burst(eyes[i]);
 				// every pop heard while they're slow; fewer as they rush, or it's a single smear of noise
 				if (gap > 0.25f || i % (gap > 0.08f ? 2 : 4) == 0)
-					Sfx(i % 2 == 0 ? "squelch_open" : "squelch_close", 2, eyes[i].GlobalPosition, gap > 0.25f ? 4f : 2f, 12f);
+					Sfx("eye_burst", 12, eyes[i].GlobalPosition, gap > 0.25f ? 4f : 2f, 12f);
 			}
 			await Cutscene.Wait(this, Mathf.Max(gap, 0.016f), ct);
 		}
 		await Cutscene.Wait(this, 0.4, ct);
 		// it shrieks, and dies
-		Sfx("creature_screech", 1, Beast.GlobalPosition + Vector3.Up * 10f, 8f, 40f);
-		Sfx("creature_giant_bellow", 1, Beast.GlobalPosition + Vector3.Up * 10f, 6f, 40f);
+		Sfx("boss_death", 2, Beast.GlobalPosition + Vector3.Up * 10f, 8f, 40f);
 		Beast.Die();
 		await Cutscene.Wait(this, 5.0, ct);
 		// quiet; and across the pit the door opens, light coming out of it
@@ -612,9 +624,15 @@ public partial class BossRoom
 
 	private void Sfx(string name, int variants, Vector3 at, float db, float unit = 5f) => SfxPlayer(name, variants, at, db, unit);
 
+	private readonly System.Collections.Generic.Dictionary<string, int> _lastTake = new();
+
 	private AudioStreamPlayer3D SfxPlayer(string name, int variants, Vector3 at, float db, float unit)
 	{
-		string path = $"res://assets/audio/sfx/{name}_{_rng.RandiRange(1, variants):00}.wav";
+		// never the same take twice running (the owner's rule: no repetitive sounds)
+		int n = Mathf.Max(1, variants), take = _rng.RandiRange(1, n);
+		if (n > 1 && _lastTake.TryGetValue(name, out int last) && take == last) take = take % n + 1;
+		_lastTake[name] = take;
+		string path = $"res://assets/audio/sfx/{name}_{take:00}.wav";
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/sfx/{name}.wav";
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/ambient/{name}.wav";
 		if (!ResourceLoader.Exists(path)) return null;
@@ -623,6 +641,7 @@ public partial class BossRoom
 		s.GlobalPosition = at;
 		s.Finished += s.QueueFree;
 		s.Play();
+		ProjectDS.UI.SoundCaption.Heard(this, name, at);
 		return s;
 	}
 }

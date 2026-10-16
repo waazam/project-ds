@@ -179,8 +179,35 @@ jobs.Add(("underwater_thoom_01", sfx, false, Lo, (r, sr) => Lake.UnderwaterThoom
 jobs.Add(("breach_erupt_01", sfx, false, Lo, (r, sr) => Lake.BreachErupt(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"tentacle_slam_{i:00}", sfx, false, Lo, (r, sr) => Lake.TentacleSlam(r, sr)));
 for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"loon_{k:00}", sfx, false, Hi, (r, sr) => Lake.Loon(r, sr, k))); }
-jobs.Add(("hull_lap_loop", ambient, true, Lo, (r, sr) => Lake.HullLap(r, sr, 24)));
+jobs.Add(("hull_lap_loop", ambient, true, Lo, (r, sr) => Rowing.HullLap(r, sr, 24)));
 jobs.Add(("lake_rough_loop", ambient, true, Lo, (r, sr) => Lake.RoughWater(r, sr, 30)));
+// Act 12 rebuilt from how rowing, lake water and a creature that size really sound (2026-10-15; Rowing, LakeNight, Kraken)
+for (int i = 1; i <= 10; i++) jobs.Add(($"row_catch_{i:00}", sfx, false, Lo, (r, sr) => Rowing.Catch(r, sr)));
+for (int i = 1; i <= 10; i++) jobs.Add(($"row_pull_{i:00}", sfx, false, Lo, (r, sr) => Rowing.Pull(r, sr)));
+for (int i = 1; i <= 10; i++) jobs.Add(($"row_release_{i:00}", sfx, false, Hi, (r, sr) => Rowing.Release(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"row_lock_knock_{i:00}", sfx, false, Hi, (r, sr) => Rowing.LockKnock(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"row_lock_creak_{i:00}", sfx, false, Lo, (r, sr) => Rowing.LockCreak(r, sr)));
+for (int i = 1; i <= 10; i++) jobs.Add(($"hull_creak_{i:00}", sfx, false, Lo, (r, sr) => Rowing.HullCreak(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"hull_knock_below_{i:00}", sfx, false, Lo, (r, sr) => Rowing.KnockBelow(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"hull_bump_{i:00}", sfx, false, Lo, (r, sr) => Rowing.HullBump(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"hull_hit_{i:00}", sfx, false, Lo, (r, sr) => Rowing.HullHit(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"bilge_slosh_{i:00}", sfx, false, Lo, (r, sr) => Rowing.BilgeSlosh(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"bow_slap_{i:00}", sfx, false, Lo, (r, sr) => Rowing.BowSlap(r, sr)));
+jobs.Add(("hull_glide_loop", ambient, true, Lo, (r, sr) => Rowing.Glide(r, sr, 21.6)));
+jobs.Add(("lake_shore_loop", ambient, true, Lo, (r, sr) => LakeNight.Shore(r, sr, 32)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"lake_far_plop_{i:00}", sfx, false, Lo, (r, sr) => LakeNight.FarPlop(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"reed_rustle_{i:00}", sfx, false, Hi, (r, sr) => LakeNight.Reeds(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"deep_thoom_{i:00}", sfx, false, Lo, (r, sr) => Kraken.DeepThoom(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"limb_rise_water_{i:00}", sfx, false, Lo, (r, sr) => Kraken.LimbRise(r, sr, 0)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"limb_sink_{i:00}", sfx, false, Lo, (r, sr) => Kraken.LimbSink(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"limb_slam_water_{i:00}", sfx, false, Lo, (r, sr) => Kraken.SlamWater(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"breach_surge_{i:00}", sfx, false, Lo, (r, sr) => Kraken.BreachSurge(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"creature_eye_open_{i:00}", sfx, false, Lo, (r, sr) => Kraken.EyeOpen(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"creature_eye_blink_{i:00}", sfx, false, Lo, (r, sr) => Kraken.EyeBlink(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"sucker_pops_{i:00}", sfx, false, Lo, (r, sr) => Kraken.SuckerPops(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"limb_drip_water_{i:00}", sfx, false, Hi, (r, sr) => Kraken.DripWater(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"limb_drip_wood_{i:00}", sfx, false, Hi, (r, sr) => Kraken.DripWood(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"creature_wet_moan_{i:00}", sfx, false, Lo, (r, sr) => Kraken.WetMoan(r, sr)));
 // Act 13: the forester station.
 jobs.Add(("bulb_buzz_loop", sfx, true, Lo, (r, sr) => Station.BulbBuzz(r, sr, 20)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"bulb_sputter_{i:00}", sfx, false, Lo, (r, sr) => Station.BulbSputter(r, sr)));
@@ -199,6 +226,11 @@ jobs.Add(("web_burn_01", sfx, false, Lo, (r, sr) => Station.WebBurn(r, sr)));
 for (int i = 1; i <= 4; i++) jobs.Add(($"wade_{i:00}", sfx, false, Lo, (r, sr) => Station.Wade(r, sr)));
 jobs.Add(("door_creak_01", sfx, false, Lo, (r, sr) => Station.SmallCreak(r, sr)));
 jobs.Add(("industrial_drone_loop", ambient, true, Lo, (r, sr) => Station.IndustrialDrone(r, sr, 30)));
+// the lake thing's limb at room 2's window (2026-10-15)
+for (int i = 1; i <= 6; i++) jobs.Add(($"window_press_{i:00}", sfx, false, Hi, (r, sr) => Kraken.WindowPress(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"window_crack_{i:00}", sfx, false, Hi, (r, sr) => Kraken.WindowCrack(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"window_burst_{i:00}", sfx, false, Hi, (r, sr) => Kraken.WindowBurst(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"tentacle_drag_{i:00}", sfx, false, Lo, (r, sr) => Kraken.TentacleDrag(r, sr)));
 // Act 14: the stairwell
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_metal_{i:00}", sfx, false, Lo, (r, sr) => Stairwell.StepMetal(r, sr)));
 jobs.Add(("stairwell_drone_loop", ambient, true, Lo, (r, sr) => Stairwell.ShaftDrone(r, sr, 36)));
@@ -226,6 +258,16 @@ jobs.Add(("blood_drain_01", sfx, false, Lo, (r, sr) => Boss.BloodDrain(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"catwalk_slam_{i:00}", sfx, false, Lo, (r, sr) => Boss.CatwalkSlam(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"limb_rise_{i:00}", sfx, false, Lo, (r, sr) => Boss.LimbRise(r, sr)));
 jobs.Add(("boss_loop", ambient, true, Lo, (r, sr) => Boss.PitAir(r, sr, 33)));
+// its own voice and wet noises (2026-10-15, Octopus): no more borrowed giant, walkie squelch or generic roars
+for (int i = 1; i <= 4; i++) jobs.Add(($"boss_bellow_{i:00}", sfx, false, Lo, (r, sr) => Octopus.Bellow(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"boss_cry_{i:00}", sfx, false, Lo, (r, sr) => Octopus.Cry(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"boss_death_rattle_{i:00}", sfx, false, Lo, (r, sr) => Octopus.DeathRattle(r, sr)));
+for (int i = 1; i <= 2; i++) jobs.Add(($"boss_death_{i:00}", sfx, false, Lo, (r, sr) => Octopus.Death(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"boss_slam_{i:00}", sfx, false, Lo, (r, sr) => Octopus.Slam(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"boss_gurgle_{i:00}", sfx, false, Lo, (r, sr) => Octopus.Gurgle(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"boss_drain_{i:00}", sfx, false, Lo, (r, sr) => Octopus.Drain(r, sr)));
+for (int i = 1; i <= 12; i++) jobs.Add(($"eye_burst_{i:00}", sfx, false, Lo, (r, sr) => Octopus.EyeBurst(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"boss_limb_rise_{i:00}", sfx, false, Lo, (r, sr) => Octopus.LimbRise(r, sr)));
 // Acts 19-20: the library and the round room
 for (int i = 1; i <= 3; i++) jobs.Add(($"wood_take_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.WoodTake(r, sr)));
 for (int i = 1; i <= 3; i++) jobs.Add(($"wood_place_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.WoodPlace(r, sr)));

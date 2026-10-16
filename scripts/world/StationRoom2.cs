@@ -469,8 +469,9 @@ public partial class StationRoom2 : Node3D
 		var press = _tentacle.CreateTween();
 		press.TweenProperty(_tentacle, "Reach", 0.34f, 0.3f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
 		await Cutscene.Wait(this, 0.28, ct);
-		PlaySfx("tentacle_slam", 1, win, -4f);
-		PlaySfx("glass_crack", 1, win, 0f);
+		// (2026-10-15: its own sounds, not the lake's water slam and the generic glass) flesh on the pane, the crack running
+		PlaySfx("window_press", 6, win, -2f);
+		PlaySfx("window_crack", 6, win, 0f);
 		// it draws back while the player turns to it
 		var back = _tentacle.CreateTween();
 		back.TweenProperty(_tentacle, "Reach", 0.18f, 0.9f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
@@ -482,8 +483,8 @@ public partial class StationRoom2 : Node3D
 		strike.TweenProperty(_tentacle, "Writhe", 1f, 0.3f);
 		await Cutscene.Wait(this, 0.06, ct);
 		WindowBroken = true;
-		PlaySfx("glass_shatter", 1, win, 4f);
-		PlaySfx("tentacle_slam", 2, win, 2f);
+		PlaySfx("window_burst", 6, win, 4f);
+		PlaySfx("sucker_pops", 8, win, -2f);
 		_windowPane.Visible = false;
 		_shards.Visible = true;
 		foreach (var n in _shards.GetChildren())
@@ -519,7 +520,7 @@ public partial class StationRoom2 : Node3D
 		// it thrashes a moment in the pouring water, then drags itself back out through the window
 		var retract = _tentacle.CreateTween();
 		retract.TweenInterval(0.35f);
-		retract.TweenCallback(Callable.From(() => PlaySfx("squelch_close", 2, win, 2f)));
+		retract.TweenCallback(Callable.From(() => PlaySfx("tentacle_drag", 6, win, 2f)));
 		retract.TweenProperty(_tentacle, "Reach", 0f, 0.85f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
 		retract.Parallel().TweenProperty(_tentacle, "Writhe", 0.5f, 0.85f);
 		retract.TweenCallback(Callable.From(() => _tentacle.Visible = false));
@@ -785,9 +786,15 @@ public partial class StationRoom2 : Node3D
 		}
 	}
 
+	private readonly System.Collections.Generic.Dictionary<string, int> _lastTake = new();
+
 	private void PlaySfx(string name, int variants, Vector3 at, float db)
 	{
-		string path = $"res://assets/audio/sfx/{name}_{_rng.RandiRange(1, variants):00}.wav";
+		// never the same take twice running (the owner's rule: no repetitive sounds)
+		int n = Mathf.Max(1, variants), take = _rng.RandiRange(1, n);
+		if (n > 1 && _lastTake.TryGetValue(name, out int last) && take == last) take = take % n + 1;
+		_lastTake[name] = take;
+		string path = $"res://assets/audio/sfx/{name}_{take:00}.wav";
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/sfx/{name}.wav";
 		if (!ResourceLoader.Exists(path)) return;
 		var s = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(path), Bus = "Events", VolumeDb = db, UnitSize = 3f, MaxDistance = 25f, PitchScale = _rng.RandfRange(0.95f, 1.05f) };
@@ -795,6 +802,7 @@ public partial class StationRoom2 : Node3D
 		s.GlobalPosition = at;
 		s.Finished += s.QueueFree;
 		s.Play();
+		ProjectDS.UI.SoundCaption.Heard(this, name, at);
 	}
 
 	private AudioStreamPlayer3D Loop(string path, Vector3 at, float db)

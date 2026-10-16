@@ -123,6 +123,41 @@ public static class Verify
 		_ when name.StartsWith("stalker_step") => (0.08, 0.45),
 		_ when name.StartsWith("drawer_slide") => (0.25, 0.9),
 		_ when name.StartsWith("loon") => (2.0, 6.0),
+		// 2026-10-15: the lake, the window and the pit rebuilt (Rowing, LakeNight, Kraken, Octopus)
+		_ when name.StartsWith("row_catch") => (0.25, 0.9),
+		_ when name.StartsWith("row_pull") => (0.5, 1.25),
+		_ when name.StartsWith("row_release") => (0.5, 1.6),
+		_ when name.StartsWith("row_lock_") => (0.08, 0.75),
+		_ when name.StartsWith("hull_creak") => (0.4, 1.6),
+		_ when name.StartsWith("hull_knock_below") => (0.2, 1.0),
+		_ when name.StartsWith("hull_bump") => (0.8, 2.0),
+		_ when name.StartsWith("hull_hit") => (1.0, 2.6),
+		_ when name.StartsWith("bilge_slosh") => (0.4, 1.35),
+		_ when name.StartsWith("bow_slap") => (0.6, 1.6),
+		_ when name.StartsWith("lake_far_plop") => (0.8, 3.2),
+		_ when name.StartsWith("reed_rustle") => (0.7, 2.5),
+		_ when name.StartsWith("deep_thoom") => (1.5, 3.6),
+		_ when name.StartsWith("limb_rise_water") || name.StartsWith("boss_limb_rise") => (1.8, 4.0),
+		_ when name.StartsWith("limb_sink") => (1.0, 2.8),
+		_ when name.StartsWith("limb_slam_water") => (1.8, 3.4),
+		_ when name.StartsWith("breach_surge") => (3.0, 5.0),
+		_ when name.StartsWith("creature_eye_open") => (0.3, 1.1),
+		_ when name.StartsWith("creature_eye_blink") => (0.12, 0.9),
+		_ when name.StartsWith("sucker_pops") => (0.3, 1.5),
+		_ when name.StartsWith("limb_drip") => (0.04, 0.7),
+		_ when name.StartsWith("creature_wet_moan") => (2.0, 5.0),
+		_ when name.StartsWith("window_press") => (0.4, 1.4),
+		_ when name.StartsWith("window_crack") => (0.4, 2.2),
+		_ when name.StartsWith("window_burst") => (1.4, 3.4),
+		_ when name.StartsWith("tentacle_drag") => (0.9, 2.4),
+		_ when name.StartsWith("boss_bellow") => (2.8, 6.4),
+		_ when name.StartsWith("boss_cry") => (1.6, 4.6),
+		_ when name.StartsWith("boss_death_rattle") => (3.5, 7.2),
+		_ when name.StartsWith("boss_death") => (6.0, 11.0),
+		_ when name.StartsWith("boss_slam") => (1.5, 4.0),
+		_ when name.StartsWith("boss_gurgle") => (0.8, 3.4),
+		_ when name.StartsWith("boss_drain") => (4.0, 7.4),
+		_ when name.StartsWith("eye_burst") => (0.25, 1.4),
 		_ => (0, 1e9),
 	};
 
@@ -148,6 +183,17 @@ public static class Verify
 		if (name.StartsWith("door_frame_thud") && b[0] + b[1] < 0.7) yield return "door thud not low";
 		if (name.StartsWith("stalker_step_stone") && b[3] + b[4] < 0.03) yield return "no nail clicks";
 		if (name.StartsWith("boat_creak") && (b[1] < 0.5 || centroid > 900)) yield return "hull creak not low/woody";
+		// the rebuilt lake (2026-10-15): the oars' water must not be a low thump (the old complaint), the hull's sounds
+		// must stay woody and low, the thing below felt more than heard, the drips and the reeds bright
+		if (name.StartsWith("row_catch") && b[0] > 0.45) yield return "catch is a low thump";
+		if (name.StartsWith("row_release") && b[2] + b[3] + b[4] < 0.25) yield return "release not bright/wet";
+		if (name.StartsWith("hull_creak") && (b[1] < 0.5 || centroid > 900)) yield return "hull creak not low/woody";
+		if (name.StartsWith("hull_knock_below") && b[0] + b[1] < 0.85) yield return "knock below not low/muffled";
+		if (name.StartsWith("deep_thoom") && b[0] + b[1] < 0.9) yield return "thoom not low";
+		if (name.StartsWith("limb_drip") && b[2] + b[3] + b[4] < 0.3) yield return "drip not bright";
+		if (name.StartsWith("reed_rustle") && b[2] + b[3] + b[4] < 0.6) yield return "reeds not dry/bright";
+		if (name.StartsWith("window_crack") && b[3] + b[4] < 0.3) yield return "crack not glassy";
+		if ((name.StartsWith("boss_bellow") || name.StartsWith("boss_death_rattle")) && b[0] + b[1] < 0.8) yield return "bellow not deep";
 	}
 
 	/// <summary>Files that get the extra taste measurements (the reworked sounds and the new ones).</summary>

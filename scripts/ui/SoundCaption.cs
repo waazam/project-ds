@@ -24,6 +24,13 @@ public partial class SoundCaption : CanvasLayer
 		["giant_step"] = "something huge walking", ["tree_fall_impact"] = "a tree falls", ["stair_groan"] = "the stairs groan", ["catwalk_slam"] = "a crashing blow",
 		["shadow_breath"] = "breathing", ["crawler_step"] = "something on the stairs", ["dust_trickle"] = "dust falling", ["flame_ignite"] = "fire catches",
 		["bottle_clink"] = "glass clinking", ["can_clatter"] = "a tin clatters", ["wood_bump"] = "something rolling",
+		// the lake, the window and the pit (2026-10-15)
+		["hull_knock_below"] = "knocking under the boat", ["hull_bump"] = "something lifts the boat", ["hull_hit"] = "the boat is struck",
+		["deep_thoom"] = "something huge moves below", ["breach_surge"] = "something huge breaks the surface", ["limb_slam_water"] = "a crashing blow on the water",
+		["limb_rise_water"] = "water pouring off something rising", ["creature_wet_moan"] = "a deep, wet groan", ["creature_eye_open"] = "a wet, peeling sound",
+		["window_press"] = "something against the glass", ["window_crack"] = "glass cracking", ["window_burst"] = "the window bursts",
+		["tentacle_drag"] = "something wet dragging", ["boss_bellow"] = "a bellow from the blood", ["boss_cry"] = "it screams",
+		["boss_slam"] = "a crashing blow", ["boss_death"] = "it shrieks, and dies", ["boss_death_rattle"] = "a wet, failing rattle", ["boss_gurgle"] = "the blood gurgles", ["eye_burst"] = "an eye bursts",
 	};
 
 	private Label _label;
