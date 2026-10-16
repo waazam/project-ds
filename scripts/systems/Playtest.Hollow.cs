@@ -451,6 +451,9 @@ public partial class Playtest
 		Check("the key opens it, saved", bunker.IsOpen && Story.HasFlag(StoryManager.Flag.BunkerUnlocked) && Story.HasFlag(StoryManager.Flag.KeyAssembled));
 		await _bot.WaitUntil(() => !HeldUse.Busy && !Input.Modal, 4, ct);
 		Check("control comes back", !HeldUse.Busy && !Input.Modal);
+		// (2026-10-16, STORY.md Rev 5) the approach as at the stairs: the woods hushed, the hum up, the third chapter's title
+		Check("at the door: the woods hushed, the hum risen, ROOT OF THE PROBLEM", bunker.HushActive && bunker.HumDb > bunker.HumEdgeDb && ChapterCard.Shown.Contains(3),
+			$"hush {bunker.HushActive}, hum {bunker.HumDb:0} dB, shown [{string.Join(",", ChapterCard.Shown)}]");
 		await _bot.WalkTo(bunker.EntryPointWorld, 0.3f, ct, () => Story.Current >= Checkpoint.Act8BunkerEntered);
 		await _bot.WaitUntil(() => Story.Current >= Checkpoint.Act8BunkerEntered, 10, ct);
 		Check("checkpoint 7 entering the bunker", Story.Current == Checkpoint.Act8BunkerEntered);
@@ -458,6 +461,7 @@ public partial class Playtest
 		Require("the interior", bi != null);
 		await _bot.WaitUntil(() => Player.GlobalPosition.DistanceTo(bi.GlobalPosition) < 500f && Input.Enabled, 10, ct);
 		Check("carried into the interior: indoors", ForestAmbienceManager.Instance?.IsIndoor ?? false);
+		Check("just inside: R.H.'s empty boots", bi.Hallway?.RhBoots != null);
 		// Act 8: the hallway, run (time-compressed)
 		using (Fast(2)) await _bot.WalkTo(bi.VineDoorApproachWorld + new Vector3(0, 0, -4f), 0.6f, ct, giveUp: 20f, run: true);
 		Check("down the hallway the lights go red", bi.RedTriggered);
@@ -470,6 +474,8 @@ public partial class Playtest
 		await _bot.Seconds(1.2, ct);
 		Check("it swings shut behind them, locked", bi.VineDoor is { ShutBehind: true } && bi.Flow is { VineDoorUnlocked: false });
 		// Act 9: the screens, the walkie
+		Check("a row of sets replays his path; one shows the lot the day he came", bi.Crt is { PathScreens: >= 3, ArrivalSet: not null },
+			$"{bi.Crt?.PathScreens} path sets, arrival {bi.Crt?.ArrivalSet != null}");
 		await _bot.WalkTo(bi.CrtTargetApproachWorld, 1.0f, ct);
 		await _bot.Aim(bi.CrtSwitchWorld, ct);
 		await _bot.Press(ct);
@@ -563,6 +569,8 @@ public partial class Playtest
 			Check("the giant rises and reaches: checkpoint 9", Story.Current == Checkpoint.Act11GiantEncounter && act11.EndingStarted && act11.Grabbed, $"{Story.Current}, started {act11.EndingStarted}, grabbed {act11.Grabbed}");
 			Check("they looked up into its eyes, trembling", act11.LookedUp && act11.Trembled, $"looked up {act11.LookedUp}, trembled {act11.Trembled}, passed out {act11.PassedOut}");
 			Check("the view never flipped through it", !act11.ViewFlipped);
+			Check("lifted over the treetops and thrown", act11.Thrown && act11.LiftHeight > 15f && act11.ThrowDistance > 100f,
+				$"thrown {act11.Thrown}, lifted {act11.LiftHeight:0} m, carried {act11.ThrowDistance:0} m");
 			await _bot.WaitUntil(() => Input.Enabled, 20, ct);
 		}
 		var lake = GetTree().GetFirstNodeInGroup("lake_marker") as Lake;
@@ -658,6 +666,12 @@ public partial class Playtest
 		if (Phase == 0) Check("checkpoint 9: on the shore by the dock", Player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 4f && Story.Current == Checkpoint.Act11GiantEncounter, $"{Player.GlobalPosition.DistanceTo(lake.WakeSpotWorld):0.0} m");
 		else Check("drowned: back on the shore at checkpoint 9, the death counted", Player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 4f && Story.Current == Checkpoint.Act11GiantEncounter && PlayerDeath.Deaths >= 1 && Story.TotalDeaths >= 1,
 			$"deaths {PlayerDeath.Deaths}, saved {Story.TotalDeaths}");
+		Check("the crater and the furrow behind where he woke", lake.Crater != null && lake.Furrow != null);
+		if (Phase == 0)
+		{
+			await _bot.WaitUntil(() => Story.HasFlag(Lake.RowboatLineFlag), 6, ct);
+			Check("at the dock: \"Dad's rowboat?\"", Story.HasFlag(Lake.RowboatLineFlag));
+		}
 		// onto the dock, into the boat
 		Vector3 onDock = lake.ToGlobal(new Vector3(0, ProjectDS.World.LakeParts.LakeShape.DockDeck + 0.05f, ProjectDS.World.LakeParts.LakeShape.DockEndZ + 2.5f));
 		await _bot.Inside(onDock, crossing.BoardPrompt.GlobalPosition, ct);

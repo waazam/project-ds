@@ -23,9 +23,10 @@ namespace ProjectDS.World;
 /// since the cabin goes back on it (E), grinds home in a purple flash, the flight
 /// is whole, and the giant (Act 7's) rises out of the woods beyond the landing,
 /// all wrong and stop-start, the view following its head up; its eyes open red;
-/// then it grabs them in juddering haste and the screen cuts to black
-/// (<see cref="GiantRise"/>, 2026-10-03). Over black, the radio's last "Did you see
-/// them?", and they wake at the lake (Act 12).
+/// then it grabs them in juddering haste (<see cref="GiantRise"/>, 2026-10-03), and (2026-10-16, STORY.md Rev 5) its
+/// hand lifts them high over the treetops and throws them in a long arc down into the woods (<see cref="Throw"/>);
+/// black. Over black, the radio's last "Did you see them?", the fourth chapter's title, and they wake at the lake by
+/// the crater they made (Act 12, <see cref="WakeAtLake"/>).
 ///
 /// Restore: once the radio exchange is done (<see cref="StoryManager.Flag.Act11DialogueDone"/>)
 /// the stairs are tall on load (the one length rule is <see cref="StairsState"/>) and the flight
@@ -693,19 +694,21 @@ public partial class Act11Ending : Node3D
 		try
 		{
 			await GiantRise.Run(this, body, skin, stage, ct);
-			// the grab: cut to black, and the hum cut dead with it
-			if (fader != null) fader.BlackAlpha = 1f;
-			hum?.SetOverrideDb(-80f);
-			PassedOut = true;
 			EndingStarted = true;
+			// (2026-10-16, STORY.md Rev 5) no more cut to black on the grab: its hand closes round them, lifts them over the
+			// treetops and throws them, and the black comes at the end of the fall, the hum cut dead with it
+			await Throw(player, body, fader, hum, ct);
+			PassedOut = true;
 		}
 		finally
 		{
 			if (IsInstanceValid(body)) body.QueueFree();
-			if (IsInstanceValid(rig)) rig.MaxPitchOverride = null;
+			if (IsInstanceValid(rig)) { rig.MaxPitchOverride = null; rig.FovSwim = 0f; }
+			if (_slit != null && IsInstanceValid(_slit)) _slit.QueueFree();
+			_slit = null;
 			postMat?.SetShaderParameter("vignette", baseVignette);
 		}
-		GD.Print("[story] Act 11: grabbed, into black");
+		GD.Print("[story] Act 11: thrown, into black");
 		HumOut = true;
 		await Cutscene.Wait(this, HumOutSeconds * 0.6f, ct);   // silence over black
 		ForestAmbienceManager.Instance?.ReleaseSilence(this);
@@ -716,51 +719,304 @@ public partial class Act11Ending : Node3D
 		var s = StoryManager.Instance;
 		s?.SetFlag(StoryManager.Flag.NewelSeated);
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act11GiantEncounter);
-		await Cutscene.Wait(this, 1.0, ct);
+		// (2026-10-16) the fourth chapter's title over the black (it was on the wake at the lake); the morning comes up as it goes
+		UI.ChapterCard.Show(this, 4, 0.6f, overBlack: true);
+		await Cutscene.Wait(this, GameSettings.Instance.AutoTest ? 1.0 : 6.4, ct);
 		// Act 12 picks up from here: the lake, at sunrise.
 		await WakeAtLake(player, fader, ct);
 	}
 
+	// ================================================================== the throw
+
+	/// <summary>For tests: they were lifted over the treetops and thrown (the arc flown to its end).</summary>
+	public bool Thrown { get; private set; }
+	/// <summary>For tests: how high over the landing the lift took them (m), and how far the throw carried them (m).</summary>
+	public float LiftHeight { get; private set; }
+	public float ThrowDistance { get; private set; }
+
+	[ExportGroup("The throw")]
+	/// <summary>Seconds: the hand closing, the lift over the treetops, the swing back, and the flight.</summary>
+	[Export] public float CloseSeconds = 0.7f;
+	[Export] public float LiftSeconds = 3.2f;
+	[Export] public float WindSeconds = 1.3f;
+	[Export] public float FlightSeconds = 4.6f;
+	/// <summary>How far the throw carries them (m, level), and how high the arc rises over where it starts.</summary>
+	[Export] public float ThrowReach = 170f;
+	[Export] public float ThrowRise = 9f;
+	/// <summary>How far above the woods' floor the fall ends, in among the crowns, when the black comes.</summary>
+	[Export] public float FallEndsAbove = 9f;
+
+	private CanvasLayer _slit;
+	private Control _slitTop, _slitBottom;
 
 	/// <summary>
-	/// Still black from the pass-out: the player is carried (unseen) to the lake's near shore and
-	/// comes to at sunrise, eyes adjusting, head lifting from a down-turned start — the same shape
-	/// as GameFlow's hollow wake-up, just shorter, since this one has no level load to hide behind.
-	/// A rowboat is right there; control comes back once they are looking level.
+	/// STORY.md Rev 5, Act 11, the throw: control taken, the motion smooth throughout (no shake, no flash).
+	/// 1. Its hand closes round them: the view held in the black of its fingers, a slit of fog and treetops.
+	/// 2. It lifts them high over the treetops, the woods falling away below (the hand carries the eye; the view tips down).
+	/// 3. A swing back, the view turning to where it will throw; the fingers open and they fly: a long arc, rising and then
+	///    down, the view along the way they go, faster as they fall, the trees rushing past at the edges as the woods come up.
+	/// 4. Black, the hum cut dead.
+	/// The arc goes the way with the most woods under it (the terrain's own extent), leaning toward the lake.
+	/// </summary>
+	private async Task Throw(PlayerController player, StalkerBody body, ScreenFader fader, StairsHum hum, CancellationToken ct)
+	{
+		var rig = player.CameraRig;
+		bool auto = GameSettings.Instance.AutoTest;
+		float sp = auto ? 0.5f : 1f;
+		const string side = "R";
+		Vector3 Eye() => rig.Camera?.GlobalPosition ?? player.GlobalPosition + Vector3.Up * rig.EyeHeight;
+		Vector3 eye0 = Eye();
+		Vector3 feetToEye = eye0 - player.GlobalPosition;
+		Vector3 shoulder = body.BoneWorld("upper_" + side);
+		Vector3 handOff = body.BoneWorld("hand_" + side) - eye0;
+		Vector3 fingers = (eye0 - shoulder) with { Y = 0f };
+		fingers = fingers.LengthSquared() > 0.01f ? fingers.Normalized() : Vector3.Forward;
+		float reach = body.ArmLength(side);
+		body.Hold = true;
+
+		void PutEye(Vector3 eye) => player.GlobalPosition = eye - feetToEye;
+		void Hand(Vector3 eye)
+		{
+			body.Grab(eye + handOff, (eye - shoulder).Normalized(), side);
+			body.Step();
+		}
+		void Look(Vector3 dir, float yawStep, float pitchStep)
+		{
+			// never steeper than 50 degrees either way (the drive's watch flags past 70)
+			float h = new Vector2(dir.X, dir.Z).Length();
+			float pitch = Mathf.Clamp(Mathf.Atan2(dir.Y, Mathf.Max(h, 0.001f)), Mathf.DegToRad(-50f), Mathf.DegToRad(50f));
+			Vector3 flat = h > 0.001f ? new Vector3(dir.X, 0, dir.Z) / h : -rig.GlobalBasis.Z with { Y = 0 };
+			Vector3 eye = Eye();
+			Vector3 target = eye + flat * 10f + Vector3.Up * Mathf.Tan(pitch) * 10f;
+			DriveView(player, target, yawStep, pitchStep);
+		}
+
+		// ---- 1. the fingers close: the view held in a slit of fog and treetops
+		BuildSlit();
+		var close = CreateTween().SetParallel();
+		close.TweenProperty(_slitTop, "anchor_bottom", 0.41f, CloseSeconds * sp).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		close.TweenProperty(_slitBottom, "anchor_top", 0.6f, CloseSeconds * sp).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		StoryBeat.PlayAt(this, AudioDirector.Take("giant_sinew_creak", 8), "Unnatural", ToLocal(eye0 + handOff), -2f, 6f, 120f, 0.8f);
+
+		// ---- 2. the lift: up and back toward its shoulder, over the treetops
+		Vector3 fromShoulder = (eye0 - shoulder) with { Y = 0f };
+		fromShoulder = fromShoulder.LengthSquared() > 0.01f ? fromShoulder.Normalized() : Vector3.Forward;
+		Vector3 lifted = shoulder + Vector3.Up * reach * 0.8f + fromShoulder * reach * 0.4f;
+		lifted.Y = Mathf.Max(lifted.Y, eye0.Y + 22f);   // high over the treetops, whatever its size
+		Vector3 liftCtrl = eye0.Lerp(lifted, 0.5f) + Vector3.Up * 4f;
+		Vector3 throwDir = ThrowDirection(eye0, fingers);
+		Vector3 view0 = -rig.GlobalBasis.Z;
+		double t = 0;
+		float liftT = LiftSeconds * sp;
+		while (t < liftT)
+		{
+			await Cutscene.Frame(this, ct);
+			t += GetProcessDeltaTime();
+			float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp((float)(t / liftT), 0f, 1f));
+			Vector3 eye = (1 - u) * (1 - u) * eye0 + 2 * (1 - u) * u * liftCtrl + u * u * lifted;
+			PutEye(eye);
+			Hand(eye);
+			// the view tips down over the woods falling away
+			Look(view0 with { Y = 0 } + Vector3.Down * Mathf.Lerp(0.1f, 0.75f, u), 0.012f, 0.01f);
+		}
+		LiftHeight = lifted.Y - eye0.Y;
+
+		// ---- 3. the swing back, the view turning to where it throws
+		Vector3 wound = lifted - throwDir * 3.5f + Vector3.Up * 1.5f;
+		t = 0;
+		float windT = WindSeconds * sp;
+		while (t < windT)
+		{
+			await Cutscene.Frame(this, ct);
+			t += GetProcessDeltaTime();
+			float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp((float)(t / windT), 0f, 1f));
+			Vector3 eye = lifted.Lerp(wound, u);
+			PutEye(eye);
+			Hand(eye);
+			Look(throwDir + Vector3.Down * 0.2f, 0.045f, 0.012f);
+		}
+
+		// ---- the flight: the fingers open, a long arc up and then down into the woods
+		var terrain = GroundSnap.FindTerrain(this);
+		float Ground(Vector3 p) => terrain != null ? terrain.HeightAt(p.X, p.Z) : eye0.Y - 40f;
+		Vector3 start = wound;
+		Vector3 end = start + throwDir * ThrowReach;
+		end.Y = Ground(end) + FallEndsAbove;
+		Vector3 apex = start.Lerp(end, 0.4f) with { Y = start.Y + ThrowRise };
+		// (never through a hill on the way: the arc held over the ground under it)
+		for (int i = 1; i < 10; i++)
+		{
+			float u = i / 10f;
+			Vector3 p = (1 - u) * (1 - u) * start + 2 * (1 - u) * u * apex + u * u * end;
+			float floor = Ground(p) + FallEndsAbove * 0.8f;
+			if (p.Y < floor) { float lift = floor - p.Y; apex.Y += lift * 1.5f; end.Y += lift * 0.6f; }
+		}
+		Vector3 Arc(float u) => (1 - u) * (1 - u) * start + 2 * (1 - u) * u * apex + u * u * end;
+		var open = CreateTween().SetParallel();
+		open.TweenProperty(_slitTop, "anchor_bottom", 0f, 0.5f * sp).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+		open.TweenProperty(_slitBottom, "anchor_top", 1f, 0.5f * sp).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+		StoryBeat.PlayAt(this, AudioDirector.Take("giant_sinew_creak", 8), "Unnatural", ToLocal(start), 2f, 10f, 200f, 0.7f);
+		float flightT = FlightSeconds * sp;
+		bool blacking = false;
+		t = 0;
+		Task fade = Task.CompletedTask;
+		while (t < flightT)
+		{
+			await Cutscene.Frame(this, ct);
+			t += GetProcessDeltaTime();
+			float s = Mathf.Clamp((float)(t / flightT), 0f, 1f);
+			// a throw's arc: quick off the hand, easing over the top, then faster and faster down
+			float u = Mathf.Lerp(s, s * s, 0.45f);
+			Vector3 eye = Arc(u);
+			PutEye(eye);
+			Vector3 vel = Arc(Mathf.Min(1f, u + 0.02f)) - Arc(Mathf.Max(0f, u - 0.02f));
+			Look(vel, 0.03f, 0.016f);
+			// the speed in the view: a little wider as they fall (eased, never a jump)
+			rig.FovSwim = Mathf.Lerp(0f, 12f, Mathf.SmoothStep(0.45f, 1f, s));
+			if (!blacking && s > 0.86f && fader != null)
+			{
+				blacking = true;
+				fade = fader.Fade(1f, flightT * 0.14f, ct);
+			}
+		}
+		await fade;
+		if (fader != null) fader.BlackAlpha = 1f;
+		hum?.SetOverrideDb(-80f);
+		ThrowDistance = new Vector2(end.X - eye0.X, end.Z - eye0.Z).Length();
+		Thrown = true;
+		GD.Print($"[story] Act 11: lifted {LiftHeight:0} m and thrown {ThrowDistance:0} m");
+	}
+
+	/// <summary>Which way the giant throws them: of sixteen ways, the one with the most of the woods' ground under the arc
+	/// (inside the terrain's extent), leaning toward the lake, and never back through the giant itself.</summary>
+	private Vector3 ThrowDirection(Vector3 from, Vector3 towardPlayer)
+	{
+		var terrain = GroundSnap.FindTerrain(this);
+		var lake = GetTree().GetFirstNodeInGroup("lake_marker") as Node3D;
+		Vector3 toLake = lake != null ? (lake.GlobalPosition - from) with { Y = 0 } : Vector3.Zero;
+		if (toLake.LengthSquared() > 1f) toLake = toLake.Normalized();
+		Vector3 best = towardPlayer;
+		float bestScore = float.MinValue;
+		for (int i = 0; i < 16; i++)
+		{
+			float a = Mathf.Tau * i / 16f;
+			var d = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+			float score = 0f;
+			if (terrain != null)
+				for (float r = 20f; r <= ThrowReach + 30f; r += 15f)
+				{
+					Vector3 l = terrain.ToLocal(from + d * r);
+					if (l.X > terrain.MinXZ.X + 10f && l.X < terrain.MaxXZ.X - 10f && l.Z > terrain.MinXZ.Y + 10f && l.Z < terrain.MaxXZ.Y - 10f) score += 1f;
+				}
+			score += 1.5f * d.Dot(toLake);
+			if (d.Dot(-towardPlayer) > 0.5f) score -= 4f;   // (back the way of its body)
+			if (score > bestScore) { bestScore = score; best = d; }
+		}
+		return best;
+	}
+
+	/// <summary>The black of its fingers: two bands closing from the top and the bottom of the picture, their edges soft
+	/// (no hard line), leaving a slit across the middle.</summary>
+	private void BuildSlit()
+	{
+		if (_slit != null && IsInstanceValid(_slit)) _slit.QueueFree();
+		_slit = new CanvasLayer { Name = "GiantHand", Layer = 8 };
+		Cutscene.SceneRoot(this).AddChild(_slit);
+		var dark = new Color(0.012f, 0.009f, 0.008f, 1f);
+		TextureRect Band(bool top)
+		{
+			var g = new Gradient();
+			g.SetColor(0, top ? dark : dark with { A = 0f });
+			g.SetColor(1, top ? dark with { A = 0f } : dark);
+			g.AddPoint(top ? 0.82f : 0.18f, dark);
+			var r = new TextureRect
+			{
+				Texture = new GradientTexture2D { Gradient = g, FillFrom = Vector2.Zero, FillTo = new Vector2(0, 1), Width = 4, Height = 128 },
+				StretchMode = TextureRect.StretchModeEnum.Scale, MouseFilter = Control.MouseFilterEnum.Ignore,
+				AnchorLeft = 0f, AnchorRight = 1f, AnchorTop = top ? 0f : 1f, AnchorBottom = top ? 0f : 1f,
+			};
+			_slit.AddChild(r);
+			return r;
+		}
+		_slitTop = Band(true);
+		_slitBottom = Band(false);
+	}
+
+
+	/// <summary>
+	/// (2026-10-16, STORY.md Rev 5, Act 12: the wake) Still black after the throw: they come to at sunrise on the ground
+	/// at the head of the lake's dock, lying where the long furrow their body dragged ends, looking back up it to the crater
+	/// where they came down (<see cref="Lake.WakeSpotWorld"/>, the crater and furrow from Lake.Wake.cs). They get up, turn
+	/// round, and the dock is there, the mist on the water and the rowboat tied at its end: "Dad's rowboat?". Control comes
+	/// back once they're facing it. All of it smooth (the eye rising, the head turning), no snaps.
 	/// </summary>
 	private async Task WakeAtLake(PlayerController player, ScreenFader fader, CancellationToken ct)
 	{
 		if (GetTree().GetFirstNodeInGroup("lake_marker") is not Lake lake) return;
 		var rig = player.CameraRig;
+		bool auto = GameSettings.Instance.AutoTest;
+		var story = StoryManager.Instance;
+		// the line is said here (the dock's own trigger, for a Continue, stands down)
+		bool sayLine = story?.HasFlag(Lake.RowboatLineFlag) != true;
+		story?.SetFlag(Lake.RowboatLineFlag);
 		if (fader != null) fader.SetBlack(true);
-		player.Teleport(lake.WakeSpotWorld, lake.WakeYaw);
+		// lying at the end of the furrow, facing back up it (away from the dock)
+		float facingFurrow = Mathf.Wrap(lake.WakeYaw + Mathf.Pi, -Mathf.Pi, Mathf.Pi);
+		player.Teleport(lake.WakeSpotWorld, facingFurrow);
 		StoryBeat.SetMood(this, ForestAtmosphere.Mood.Dawn, 4.0f);
-		// Not rig.Pitch: after the giant they were still looking steeply up at it (Teleport only resets
-		// yaw), and waking up should mean a level, ordinary view, not picking that stare back up.
-		const float levelPitch = 0f;
-		float downPitch = Mathf.DegToRad(-45f);
-		rig.SetPitch(downPitch);
-		// (2026-10-15) the station across the water built now, in this black, so its front door opens onto its lobby
-		// (it was built in the black after the door; Lake.FrontDoor.cs)
-		if (StationInterior.Instance is { Built: false } station)
+		float standEye = rig.EyeHeight;
+		const float lyingEye = 0.34f;
+		rig.EyeHeight = lyingEye;
+		rig.SetPitch(Mathf.DegToRad(-5f));
+		try
 		{
-			station.EnsureBuilt();
-			await station.WhenBuilt(ct);
+			// (2026-10-15) the station across the water built now, in this black, so its front door opens onto its lobby
+			// (it was built in the black after the door; Lake.FrontDoor.cs)
+			if (StationInterior.Instance is { Built: false } station)
+			{
+				station.EnsureBuilt();
+				await station.WhenBuilt(ct);
+			}
+			await Cutscene.Wait(this, auto ? 0.4 : 1.2, ct);
+			if (fader != null) await fader.Fade(0f, auto ? 1.5f : 3.4f, ct);
+			// a while on the ground, looking back up the furrow to the crater
+			await Cutscene.Wait(this, auto ? 0.4 : 2.4, ct);
+			// getting up: the eye rises off the ground, the head coming level
+			double up = auto ? 1.0 : 2.6, t = 0;
+			while (t < up)
+			{
+				await Cutscene.Frame(this, ct);
+				t += GetProcessDeltaTime();
+				float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, (float)(t / up)));
+				rig.EyeHeight = Mathf.Lerp(lyingEye, standEye, u);
+				rig.SetPitch(Mathf.Lerp(Mathf.DegToRad(-5f), 0f, u));
+			}
+			rig.EyeHeight = standEye;
+			// turning round: the dock, the mist on the water, the boat
+			double turn = auto ? 1.2 : 2.8;
+			t = 0;
+			float turned = 0f;
+			while (t < turn)
+			{
+				await Cutscene.Frame(this, ct);
+				t += GetProcessDeltaTime();
+				// (each frame only the step along the turn: the view's own easing follows it, never overshoots)
+				float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, (float)(t / turn)));
+				player.PlayerInput.AddCutsceneLook(new Vector2(Mathf.Pi * u - turned, 0f));
+				turned = Mathf.Pi * u;
+			}
 		}
-		await Cutscene.Wait(this, 1.2, ct);
-		if (fader != null) await fader.Fade(0f, 3.2f, ct);
-		const double riseSeconds = 3.0;
-		double t = 0;
-		while (t < riseSeconds)
+		finally
 		{
-			await Cutscene.Frame(this, ct);
-			t += GetProcessDeltaTime();
-			float u = Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, (float)(t / riseSeconds)));
-			rig.SetPitch(Mathf.Lerp(downPitch, levelPitch, u));
+			if (IsInstanceValid(rig)) rig.EyeHeight = standEye;
 		}
-		rig.SetPitch(levelPitch);
-		GD.Print("[story] Act 12: woke at the lake");
-		UI.ChapterCard.Show(this, 4, 1.2f);
+		GD.Print("[story] Act 12: woke at the lake, by the crater; turned round to the dock");
+		if (sayLine)
+			_ = Cutscene.Run(this, async lineCt =>
+			{
+				await Cutscene.Wait(this, 0.5, lineCt);
+				await PlayerVoice.Say(this, "dads_rowboat", 2.2f, lineCt);
+			});
 	}
 
 	/// <summary>Hard ceiling on the driven pitch (degrees): well short of the zenith, where yaw is ill-defined.</summary>
