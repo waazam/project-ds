@@ -11,6 +11,9 @@ namespace ProjectDS.World.BunkerParts;
 /// showing grainy night surveillance of the woods. One marked set on the
 /// console at the back shows the cabin smouldering; "Turn off the screen"
 /// (an <see cref="Interactable"/>) is what the story's CRT sequence hangs on.
+/// (2026-10-16, STORY.md Rev 5) The back wall's middle row, over the console, replays his own path in fixed shots, in
+/// order, ending on the cabin burning (<see cref="BunkerTextures.PathPicture"/>), and a small set stacked on the marked
+/// one shows the trailhead lot on the morning he came (<see cref="BunkerTextures.ArrivalPicture"/>).
 /// Caged pendant lamps and the screens' own glow light the room.
 /// The sequence itself (timing, caption, flag) lives in <see cref="BunkerFlow"/>;
 /// this node only builds the room and switches the tubes.
@@ -30,7 +33,20 @@ public partial class CrtRoom : Node3D
 		"09/20  0310  One came down. Did not answer. Recorded.\n" +
 		"09/21  0314  I am going up to see";
 
-	private ShaderMaterial _normalMat, _targetMat;
+	private ShaderMaterial _normalMat, _targetMat, _pathMat, _arrivalMat;
+	private ShaderMaterial[] AllMats => new[] { _normalMat, _targetMat, _pathMat, _arrivalMat };
+	private int _pathStep;
+	private double _pathClock;
+
+	/// <summary>For tests: the sets replaying his path, the shot they're on (0 .. <see cref="BunkerTextures.PathShots"/>
+	/// - 1, the last the cabin burning), and the set showing the lot on the day he came.</summary>
+	public int PathScreens { get; private set; }
+	public int PathShot => _pathStep;
+	public Node3D ArrivalSet { get; private set; }
+
+	/// <summary>Seconds each shot of his path holds, and the last (the cabin burning) before it starts again.</summary>
+	[Export] public float PathShotSeconds = 3.6f;
+	[Export] public float PathLastSeconds = 9f;
 	private Node3D _target;
 	private Vector3 _targetTubeLocal;
 	private Interactable _switch;
@@ -62,6 +78,12 @@ public partial class CrtRoom : Node3D
 		_normalMat.SetShaderParameter("atlas_grid", (float)BunkerTextures.SurvGrid);
 		_normalMat.SetShaderParameter("tint", new Color(0.72f, 0.78f, 0.74f));
 		_targetMat = BunkerTextures.NewCrtMat(BunkerTextures.CabinPicture(), false, 0.9f, 1f);
+		// (2026-10-16, STORY.md Rev 5) his path, replayed shot by shot on a row of sets, and the lot on the day he came
+		for (int i = BunkerTextures.PathShots - 1; i >= 0; i--) BunkerTextures.PathPicture(i);   // (all painted now, not mid-replay)
+		_pathMat = BunkerTextures.NewCrtMat(BunkerTextures.PathPicture(0), false, 0.95f, 0f);
+		_pathMat.SetShaderParameter("tint", new Color(0.72f, 0.78f, 0.74f));
+		_arrivalMat = BunkerTextures.NewCrtMat(BunkerTextures.ArrivalPicture(), false, 0.95f, 0f);
+		_arrivalMat.SetShaderParameter("tint", new Color(0.8f, 0.8f, 0.78f));
 		_body = new StaticBody3D { Name = "CrtRoomBody", CollisionLayer = 1, CollisionMask = 0 };
 		_body.SetMeta("surface", "stone");
 		AddChild(_body);
@@ -75,12 +97,27 @@ public partial class CrtRoom : Node3D
 
 	// ------------------------------------------------------------------ tube states
 
+	/// <summary>His path, replayed: the row's sets cut from shot to shot in order (his camp, the cabin boarded, the
+	/// footbridge, the clearing) and end on the cabin burning, held, then round again. Until the screens go off.</summary>
+	public override void _Process(double delta)
+	{
+		if (ScreensOff || ShowingStairs || _pathMat == null) return;
+		_pathClock += delta;
+		float hold = _pathStep == BunkerTextures.PathShots - 1 ? PathLastSeconds : PathShotSeconds;
+		if (_pathClock < hold) return;
+		_pathClock = 0;
+		_pathStep = (_pathStep + 1) % BunkerTextures.PathShots;
+		_pathMat.SetShaderParameter("picture", BunkerTextures.PathPicture(_pathStep));
+		// (the burning shot's flames flicker on the tube as the marked set's do, softer)
+		_pathMat.SetShaderParameter("fire", _pathStep == BunkerTextures.PathShots - 1 ? 0.6f : 0f);
+	}
+
 	/// <summary>The story's switch-off: every tube collapses to a line and goes dark.</summary>
 	public void TurnAllOff()
 	{
 		ScreensOff = true;
 		var tw = CreateTween().SetParallel();
-		foreach (var m in new[] { _normalMat, _targetMat })
+		foreach (var m in AllMats)
 			tw.TweenProperty(m, "shader_parameter/power", 0f, 0.35f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
 		foreach (var l in _glow) tw.TweenProperty(l, "light_energy", 0f, 0.35f);
 		tw.TweenProperty(_targetGlow, "light_energy", 0f, 0.35f);
@@ -93,7 +130,7 @@ public partial class CrtRoom : Node3D
 		ScreensOff = false;
 		ShowingStairs = true;
 		var tw = CreateTween().SetParallel();
-		foreach (var m in new[] { _normalMat, _targetMat })
+		foreach (var m in AllMats)
 		{
 			SetStairsPicture(m);
 			m.SetShaderParameter("power", 0f);
@@ -111,7 +148,7 @@ public partial class CrtRoom : Node3D
 	{
 		ScreensOff = false;
 		ShowingStairs = true;
-		foreach (var m in new[] { _normalMat, _targetMat })
+		foreach (var m in AllMats)
 		{
 			SetStairsPicture(m);
 			m.SetShaderParameter("power", 1f);
@@ -324,7 +361,8 @@ public partial class CrtRoom : Node3D
 		float[] shelves = { 0.1f, 0.98f, 1.86f, 2.74f };
 
 		// stackTop: what may go on the top shelf's sets (the back wall's, clear of the beams: the small ones only)
-		void Unit(Transform3D xf, float uw, bool stackTop)
+		// pathRow: this unit's eye-height shelf (the third, over the console's sets) replays his path
+		void Unit(Transform3D xf, float uw, bool stackTop, bool pathRow = false)
 		{
 			frame.Mat(BunkerTextures.PaintedMetalMat);
 			frame.Color = new Color(0.9f, 0.92f, 0.9f) * rng.RandfRange(0.8f, 1f);
@@ -398,7 +436,7 @@ public partial class CrtRoom : Node3D
 					// pushed to the back of the shelf (the big ones stand out over its front edge)
 					var local = new Transform3D(Basis.FromEuler(new Vector3(0, rng.RandfRange(-0.07f, 0.07f), 0)),
 						new Vector3(cx, y, -ud * 0.5f + spec.D * 0.5f + rng.RandfRange(0.02f, 0.06f)));
-					PlaceCrt(xf * local, spec);
+					PlaceCrt(xf * local, spec, pathRow && s == 2);
 					if (top && stackTop && rng.Randf() < 0.55f)
 					{
 						var up = BunkerKit.RandomCrt(rng, 0);
@@ -432,7 +470,7 @@ public partial class CrtRoom : Node3D
 			BunkerKit.Tube(cables, pts, 0.02f, 0.02f, 4);
 		}
 
-		void PlaceCrt(Transform3D xf, BunkerKit.CrtSpec spec)
+		void PlaceCrt(Transform3D xf, BunkerKit.CrtSpec spec, bool path = false)
 		{
 			// the seed, and the camera it shows (one of the atlas's nine)
 			int cams = BunkerTextures.SurvGrid * BunkerTextures.SurvGrid;
@@ -441,7 +479,15 @@ public partial class CrtRoom : Node3D
 			float st = stateRng.Randf();
 			float state = st < 0.62f ? 0f : st < 0.78f ? stateRng.RandfRange(0.2f, 0.45f) : st < 0.92f ? 0.6f : 0.95f;
 			var tint = new Color(rng.Randf(), (rng.RandiRange(0, cams - 1) + 0.5f) / cams, state, 1f);
-			BunkerKit.Crt(bodies, screens, xf, spec, tint);
+			if (path)
+			{
+				// (his path's row: every set working, so the replay reads)
+				screens.Mat(_pathMat);
+				BunkerKit.Crt(bodies, screens, xf, spec, tint with { B = 0f });
+				screens.Mat(_normalMat);
+				PathScreens++;
+			}
+			else BunkerKit.Crt(bodies, screens, xf, spec, tint);
 			screenCount++;
 			ScreenArea += spec.W * spec.H;
 		}
@@ -449,7 +495,7 @@ public partial class CrtRoom : Node3D
 		// The back wall: five units shoulder to shoulder, wall to wall but for the corners.
 		float backZ = CrtRoomBackZ + ud * 0.5f + 0.03f;
 		foreach (float x in new[] { -4.2f, -2.1f, 0f, 2.1f, 4.2f })
-			Unit(new Transform3D(Basis.Identity, new Vector3(x, 0, backZ)), 2.06f, true);
+			Unit(new Transform3D(Basis.Identity, new Vector3(x, 0, backZ)), 2.06f, true, Mathf.Abs(x) < 2.5f);
 		// The sides: one unit filling each bay between the pilasters (every 4 m from the front: the front bay's clutter
 		// by the door stays clear), and a narrow one in the back corner bay.
 		float sideX = CrtRoomHalfWidth - ud * 0.5f - 0.03f;
@@ -553,6 +599,24 @@ public partial class CrtRoom : Node3D
 		screen.CommitTo(_target, "Screen", false);
 		// solid (the big set: the clip audit's walk-through rule); the switch's pick sphere stands proud of its screen
 		AddBox(_target.Position + new Vector3(0, spec.H * 0.5f, 0.02f), new Vector3(spec.W, spec.H, spec.D + 0.04f));   // (over its bulged glass too)
+
+		// (2026-10-16, STORY.md Rev 5: "One screen shows the trailhead lot on the day he arrived ... He was watched from the
+		// start.") A small set stacked on the marked one, turned a little toward the door, showing the lot by day: his car,
+		// the trunk up, him lifting the camera out
+		ArrivalSet = new Node3D
+		{
+			Name = "ArrivalSet", Position = _target.Position + new Vector3(0.08f, spec.H + 0.001f, -0.06f),
+			Rotation = new Vector3(0, 0.12f, 0),
+		};
+		AddChild(ArrivalSet);
+		var aBody = new MeshKit();
+		var aScreen = new MeshKit();
+		aScreen.Mat(_arrivalMat);
+		var aSpec = new BunkerKit.CrtSpec { W = 0.5f, H = 0.43f, D = 0.45f, KnobsRight = false, Body = new Color(0.32f, 0.32f, 0.31f) };
+		BunkerKit.Crt(aBody, aScreen, Transform3D.Identity, aSpec, new Color(0.61f, 0f, 0f, 1f));
+		aBody.CommitTo(ArrivalSet, "Body");
+		aScreen.CommitTo(ArrivalSet, "Screen", false);
+		AddBox(ArrivalSet.Position + new Vector3(0, aSpec.H * 0.5f, 0.02f), new Vector3(aSpec.W, aSpec.H, aSpec.D + 0.04f), ArrivalSet.Basis);
 
 		_switch = new Interactable
 		{

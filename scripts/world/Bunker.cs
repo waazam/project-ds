@@ -16,6 +16,9 @@ namespace ProjectDS.World;
 /// its face: with both halves of R.H.'s key found (<see cref="SurveyLot"/>, <see cref="KeyPieceCache"/>) using it joins
 /// them in the hand and turns the key (<see cref="UseKey"/>); without them it says so. The old keypad
 /// (<see cref="BunkerKeypad"/>) is no longer built.
+/// (2026-10-16, STORY.md Rev 5) The approach is the stairs': near the door the woods go silent and the hum rises
+/// (<see cref="BuildApproachHush"/>), the third chapter's title comes up over the door, and roots and ivy grow through
+/// its frame (Blender's DoorRoots).
 /// Group "bunker_marker" so the compass can find it.
 ///
 /// Restore: in _Ready the door is open (silently, no caption) if the story is at
@@ -134,9 +137,64 @@ public partial class Bunker : Node3D
 				_ = StoryBeat.Caption(this, "Not yet. Something is still calling, back across the creek.", 0.4f, 3.2f, 1f);
 			}
 		}
+		// (2026-10-16, STORY.md Rev 5) the third chapter's title comes up over the vault door on the approach, once (it was
+		// on walking in); not on the way back out after the walkie
+		if (s != null && StoryAllowsOpening && s.Current < Checkpoint.Act10WalkieFound) UI.ChapterCard.Show(this, 3, 0.8f);
 		if (IsOpen || !StoryAllowsOpening) return;
 		SayDialLine();
 		NudgeMissingPieces();
+	}
+
+	// ------------------------------------------------------------------ the approach: the silence and the hum
+
+	/// <summary>(2026-10-16, STORY.md Rev 5: "Near it the ambience cuts to silence and a hum rises, as at the stairs") A
+	/// <see cref="Audio.SilenceZone"/> before the door hushes the woods as the stairs' does, and the stairs' hum
+	/// (<see cref="Audio.StairsHum"/>'s loop and curve) rises with the hush, from <see cref="HumEdgeDb"/> at its edge to
+	/// <see cref="HumCloseDb"/> at the door. Only while the door is the way on: from the fire (or the loop done) until the
+	/// walkie (after it, the thing from the rooms comes out of this door, and a silence here would send it away).</summary>
+	[Export] public float HumEdgeDb = -30f;
+	[Export] public float HumCloseDb = -13f;
+	private Audio.SilenceZone _hush;
+	private Audio.AmbienceLoop _hum;
+	private float _humDb = -80f;
+	private double _hushCheck;
+	private Node3D _listener;
+
+	/// <summary>For tests: the approach's hush is live, and the hum's level now (dB).</summary>
+	public bool HushActive => _hush is { Active: true };
+	public float HumDb => _humDb;
+
+	private static bool HushWanted => StoryManager.Instance is { } s && s.Current < Checkpoint.Act10WalkieFound
+		&& (s.Current >= Checkpoint.Act7CabinBurning || s.HasFlag(StoryManager.Flag.ClearingLoopDone));
+
+	private void BuildApproachHush()
+	{
+		_hush = new Audio.SilenceZone { Name = "ApproachSilence", InnerRadius = 7f, OuterRadius = 34f, Falloff = 1.2f, Position = new Vector3(0, 1f, 4f), Active = HushWanted };
+		_gen.AddChild(_hush);
+		var player = new AudioStreamPlayer { Name = "ApproachHum", Bus = "Unnatural" };
+		_gen.AddChild(player);
+		_hum = new Audio.AmbienceLoop { Name = "Loop", StreamPath = "res://assets/audio/ambient/stairs_hum_loop.wav", BaseVolumeDb = 0f, Gain = 0f };
+		player.AddChild(_hum);
+	}
+
+	public override void _Process(double delta)
+	{
+		if (Engine.IsEditorHint() || _hush == null || !IsInstanceValid(_hush)) return;
+		_hushCheck -= delta;
+		if (_hushCheck <= 0) { _hushCheck = 0.5; _hush.Active = HushWanted; }
+		if (_listener == null || !IsInstanceValid(_listener)) _listener = GetTree().GetFirstNodeInGroup("player") as Node3D;
+		float target = -80f;
+		if (_listener != null && _hush.Active)
+		{
+			float prox = _hush.SilenceAt(_listener.GlobalPosition) / Mathf.Max(_hush.Strength, 0.01f);
+			if (prox > 0.001f) target = Mathf.Lerp(HumEdgeDb, HumCloseDb, prox);
+		}
+		float k = 1f - Mathf.Exp(-(float)delta / 0.6f);
+		_humDb = Mathf.Lerp(_humDb, target, k);
+		if (_hum == null) return;
+		// as the stairs' hum: Gain carries the fade to silence, ExtraDb the level while audible
+		_hum.Gain = Mathf.Clamp(Mathf.DbToLinear(_humDb - HumEdgeDb + 6f), 0f, 1f);
+		_hum.ExtraDb = Mathf.Max(_humDb, HumEdgeDb - 6f);
 	}
 	private ulong _nudgedAt, _piecesNudgedAt;
 
@@ -286,6 +344,13 @@ public partial class Bunker : Node3D
 		}
 		BunkerExterior.BuildConcrete(_gen, _gen, _rampEndTop);
 		BuildStationCardPlate();
+		// (2026-10-16, STORY.md Rev 5) roots and ivy grown through the vault door's frame (Blender's: tools/Blender/rh_trail.py)
+		ItemModels.Add(_gen, "rh_trail", "DoorRoots", Transform3D.Identity, "DoorRoots", n => n switch
+		{
+			"bark" => BunkerTextures.BarkMat,
+			"ivy" => IvyMat,
+			_ => null,
+		});
 		// (2026-10-15) no keypad any more: the door's own keyhole (BuildClosedDoor) takes R.H.'s key
 
 		if (Engine.IsEditorHint()) return;
@@ -352,6 +417,7 @@ public partial class Bunker : Node3D
 
 		// Coming within OpenRadius after the fire opens the door (a trigger, not a per-frame poll).
 		_openTrigger = StoryBeat.MakeTrigger(_gen, new CylinderShape3D { Radius = OpenRadius, Height = 30f }, Vector3.Zero, OnApproach, "OpenTrigger");
+		BuildApproachHush();
 		// A proper doorway trigger: just inside the hatch, so only walking in through the door counts.
 		_entryTrigger = StoryBeat.MakeTrigger(_gen, new BoxShape3D { Size = new Vector3(0.9f, 1.7f, 1.1f) }, new Vector3(0, fy + 0.95f, -1.05f), OnEntered, "EntryTrigger");
 		// (2026-10-15, Dan: doors open onto the next area, never a black room) the vestibule's back opens onto the hall
@@ -369,6 +435,14 @@ public partial class Bunker : Node3D
 
 		_doorNode = BuildClosedDoor();
 	}
+
+	private static StandardMaterial3D _ivy;
+	/// <summary>The ivy's leaves on the door's roots: a dark waxy green, both faces drawn.</summary>
+	private static StandardMaterial3D IvyMat => _ivy ??= new StandardMaterial3D
+	{
+		ResourceName = "bk_door_ivy", AlbedoColor = new Color(0.11f, 0.17f, 0.07f), Roughness = 0.62f,
+		CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+	};
 
 	/// <summary>The steel plate and four bolts the station card sits on (built in the editor too; the card itself is runtime).</summary>
 	private void BuildStationCardPlate()
@@ -439,6 +513,7 @@ public partial class Bunker : Node3D
 		interior.AdmitPlayer(player);
 		story?.ReachCheckpoint(Checkpoint.Act8BunkerEntered, ApproachPointWorld, ApproachYaw);
 		GD.Print("[story] Act 8: into the bunker");
+		// (2026-10-16) the third chapter's title is the approach's now (OnApproach); this only catches a way in that missed it
 		UI.ChapterCard.Show(interior, 3, 2.5f);
 	}
 

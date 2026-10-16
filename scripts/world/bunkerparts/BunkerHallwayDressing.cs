@@ -13,7 +13,7 @@ namespace ProjectDS.World.BunkerParts;
 /// <item>two sealed steel side doors on the right (one chained shut from this side), junction boxes with their
 /// conduit up to the tray, a fire-hose cabinet, a wall telephone with its handset hanging off its cord;</item>
 /// <item>the vault spalled in places, the rebar showing, the chunks that fell still on the floor; drains down the
-/// middle; a crate or two, papers, and a pair of boots standing by the wall, nobody in them.</item>
+/// middle; a crate or two, papers; and just inside, R.H.'s boots by the wall, nobody in them (2026-10-16).</item>
 /// </list>
 /// Everything stands within the walls' last 0.2 m (outside the walking collision) or has its own.
 /// </summary>
@@ -285,11 +285,38 @@ public partial class BunkerHallway
 				body?.AddChild(new CollisionShape3D { Position = c + new Vector3(0, stack ? 0.45f : 0.25f, 0), Shape = new BoxShape3D { Size = new Vector3(0.6f, stack ? 0.9f : 0.5f, 0.6f) } });
 			}
 		}
-		// papers blown along it, and the boots
+		// papers blown along it
 		foreach (var (x, z, yaw) in new[] { (0.6f, -14f, 0.4f), (-0.9f, -43.5f, 2.1f), (1.3f, -74f, -0.8f) })
 			FurnitureKit.Add(steel, "papers", new Vector3(x, 0.002f, z), yaw, Roles);
-		FurnitureKit.Add(steel, "boots", new Vector3(1.78f, 0f, -56.2f), -1.75f, Roles);
+		BuildRhBoots(steel);
 
 		steel.CommitTo(this, "Dressing");
+	}
+
+	/// <summary>Where R.H.'s boots stand (hallway-local): just inside, by the right wall, toes to the door.</summary>
+	public static readonly Vector3 RhBootsLocal = new(1.68f, 0f, -3.4f);
+	/// <summary>For tests: R.H.'s boots stand just inside.</summary>
+	public MeshInstance3D RhBoots { get; private set; }
+
+	/// <summary>(2026-10-16, STORY.md Rev 5, Act 8: "Just inside stands a pair of boots with nobody in them, R.H.'s
+	/// initials inked inside their tops: he took them off here and walked on barefoot") His hiking boots, modelled in Blender
+	/// (tools/Blender/rh_trail.py: RhBoots, the initials inked on the lining at the back of each top), stood just inside by
+	/// the right wall with their toes to the door, so the first look down into them reads R.H. They were a pair of
+	/// anybody's boots at 56 m.</summary>
+	private void BuildRhBoots(MeshKit steel)
+	{
+		var mats = new System.Collections.Generic.Dictionary<string, Material>
+		{
+			["leather"] = new StandardMaterial3D { ResourceName = "rh_leather", AlbedoColor = new Color(0.3f, 0.19f, 0.11f), Roughness = 0.66f },
+			["collar"] = new StandardMaterial3D { ResourceName = "rh_collar", AlbedoColor = new Color(0.2f, 0.12f, 0.07f), Roughness = 0.8f },
+			["lining"] = new StandardMaterial3D { ResourceName = "rh_lining", AlbedoColor = new Color(0.33f, 0.29f, 0.23f), Roughness = 0.95f },
+			["sole"] = BunkerTextures.RubberMat,
+			["lace"] = new StandardMaterial3D { ResourceName = "rh_lace", AlbedoColor = new Color(0.42f, 0.37f, 0.28f), Roughness = 0.95f },
+			["ink"] = new StandardMaterial3D { ResourceName = "rh_ink", AlbedoColor = new Color(0.02f, 0.025f, 0.06f), Roughness = 0.5f },
+		};
+		RhBoots = ItemModels.Add(this, "rh_trail", "RhBoots", new Transform3D(new Basis(Vector3.Up, Mathf.Pi + 0.25f), RhBootsLocal), "RhBoots",
+			n => mats.TryGetValue(n, out var m) ? m : null);
+		if (RhBoots == null)
+			FurnitureKit.Add(steel, "boots", RhBootsLocal, Mathf.Pi, Roles);   // (the model missing: anybody's boots, where his stand)
 	}
 }

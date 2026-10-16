@@ -49,14 +49,17 @@ public partial class ChapterCard : CanvasLayer
 
 	/// <summary>Chapter <paramref name="n"/>'s card, once in the playthrough, <paramref name="delay"/> seconds from now
 	/// (and only once the screen is clear of black).</summary>
-	public static void Show(Node from, int n, float delay = 1.5f)
+	public static void Show(Node from, int n, float delay = 1.5f, bool overBlack = false)
 	{
 		var s = StoryManager.Instance;
 		if (from == null || !from.IsInsideTree() || n < 1 || n >= Titles.Length) return;
 		if (s != null && s.HasFlag(Flag(n))) return;
 		s?.SetFlag(Flag(n));
-		Spawn(from, n, delay);
+		// (2026-10-16, STORY.md Rev 5: Dawn is Breaking comes up over the black after the throw) overBlack: it doesn't wait
+		// for the picture
+		Spawn(from, n, delay)._overBlack = overBlack;
 	}
+	private bool _overBlack;
 
 	/// <summary>The game's name (the trailer's title), once in the playthrough: at the foot of the first stairs, in the dead
 	/// silence there, the player held looking up the flight (2026-10-15, the owner: "when you get to the stairs it shows the
@@ -145,7 +148,7 @@ public partial class ChapterCard : CanvasLayer
 			_wait -= (float)delta;
 			// (wait for the picture: not while the screen is black, nor while paused)
 			var fader = StoryBeat.Fader(this);
-			if (_wait > 0 || GetTree().Paused || (fader != null && fader.BlackAlpha > 0.35f)) return;
+			if (_wait > 0 || GetTree().Paused || (!_overBlack && fader != null && fader.BlackAlpha > 0.35f)) return;
 			_t = 0;
 			Shown.Add(_n);
 			GD.Print(_n == 0 ? "[story] title: DEAD SILENT" : $"[story] chapter {_n}: {Titles[_n]}");

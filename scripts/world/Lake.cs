@@ -24,7 +24,7 @@ public partial class Lake : Node3D
 {
 	[Export] public int Seed = 1201;
 
-	/// <summary>The near shore's wake-up spot, facing the boat (world). Also the checkpoint-9 respawn
+	/// <summary>The near shore's wake-up spot at the head of the dock, facing the boat (world). Also the checkpoint-9 respawn
 	/// point: registered in group "respawn_Act11GiantEncounter".</summary>
 	public Vector3 WakeSpotWorld { get; private set; }
 	public float WakeYaw { get; private set; }
@@ -61,7 +61,8 @@ public partial class Lake : Node3D
 		AddToGroup("lake_marker");
 		var rng = new RandomNumberGenerator { Seed = (ulong)Seed };
 
-		Vector2 wake = new(-1.3f, 9.2f);
+		// (2026-10-16, STORY.md Rev 5) at the head of the dock, where the furrow ends (Lake.Wake.cs); it was 3 m back up the beach
+		Vector2 wake = WakeSpot;
 		WakeSpotWorld = ToGlobal(new Vector3(wake.X, LakeShape.Ground(wake.X, wake.Y) + 0.05f, wake.Y));
 		Vector2 toBoat = LakeShape.BoatMooring - wake;
 		WakeYaw = Mathf.Atan2(-toBoat.X, -toBoat.Y);
@@ -99,6 +100,8 @@ public partial class Lake : Node3D
 		BuildStationFrontDoor();
 		if (Systems.StoryManager.Instance is { Current: >= Systems.Checkpoint.Act12LakeCrossed }) OpenStationDoor(instant: true);
 		LakeStructures.BuildFences(this);
+		BuildWakeGround();
+		BuildRowboatLine();
 		BuildMist(rng);
 		BuildSound();
 

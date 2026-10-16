@@ -262,6 +262,12 @@ public partial class LakeCrossingEvent : Node3D
 		Vector3 cleat = _lake.ToGlobal(new Vector3(LakeShape.DockHalfWidth - 0.15f, LakeShape.DockDeck + 0.07f, LakeShape.BoatMooring.Y - 1.3f));
 		Vector3 bow = _boat.ToGlobal(new Vector3(0, 0.42f, -Rowboat.HalfLength + 0.1f));
 		_line = LakeStructures.BuildMooringLine(Cutscene.SceneRoot(this), cleat, bow);
+		// (2026-10-16, STORY.md Rev 5: "its rope knotted in a hurry, tight and ugly"; nobody says by whom) the line made fast
+		// round the cleat in too many crossed turns, a loop half pulled through, the tail left hanging over the edge
+		// (Blender's: tools/Blender/rh_trail.py); it goes with the line when it's cast off
+		if (_line != null)
+			ItemModels.Add(_line, "rh_trail", "HurriedKnot", new Transform3D(new Basis(Vector3.Up, _lake.GlobalRotation.Y), cleat + _lake.GlobalBasis.X * 0.04f),
+				"HurriedKnot", n => n == "rope" ? ProcTextures.Flat("lake_rope", new Color(0.5f, 0.44f, 0.33f)) : null);
 
 		_boardPrompt = new Interactable
 		{
