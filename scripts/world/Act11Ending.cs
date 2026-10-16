@@ -230,7 +230,7 @@ public partial class Act11Ending : Node3D
 		await Cutscene.Wait(this, GameSettings.Instance.AutoTest ? 0.5 : 2.0, ct);
 		await RadioLine("\"Did you see them?\"", 0.8f, 3.0f, 0.8f, ct);
 		await Cutscene.Wait(this, 0.7, ct);
-		await PlayerShout("\"Who are you!\"", ct);
+		await PlayerShout("who_are_you", ct);
 		await Cutscene.Wait(this, 1.0, ct);
 
 		_fogLineArmed = true;
@@ -263,7 +263,7 @@ public partial class Act11Ending : Node3D
 			s.Play();
 		}
 		await Cutscene.Wait(this, 0.18, ct);
-		await Subtitle.Instance.Show(line, 0.15f, 2.0f, 0.8f, ct);
+		await PlayerVoice.Say(this, line, 2.0f, ct);
 	}
 
 	/// <summary>The open-channel static under a line: real FM inter-station noise through the little speaker.</summary>
