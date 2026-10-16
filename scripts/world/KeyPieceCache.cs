@@ -209,8 +209,8 @@ public partial class KeyPieceCache : Node3D
 		_half.Visible = false;
 		Audio.AudioDirector.OneShot(this, "item_take", 3, _tin.GlobalPosition, -10f, "Player", 2f);
 		GD.Print($"[story] key half {Piece} taken{(other ? " (both now)" : "")}");
-		// a word, as the digits had: what it is, and whether it's whole
-		_ = StoryBeat.Caption(this, other ? "The other half of the key." : "Half of a key.", 0.3f, 2.2f, 0.8f, CancellationToken.None);
+		// the player says what it is, and whether it's whole (STORY.md Rev 5: a player line)
+		_ = PlayerVoice.Say(this, other ? "key_piece_2" : "key_piece_1", 2.2f);
 	}
 
 	/// <summary>Restore: already taken (the tin open and empty).</summary>
