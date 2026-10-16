@@ -48,6 +48,25 @@ public partial class CabinExitLine : StoryTrigger
 
 	protected override bool AlreadyHappened(StoryManager s) => s.HasFlag(StoryManager.Flag.DawnBroke);
 
+	// The rain now stops when the cap is taken, inside (FriendReveal, Dan 2026-10-13), often after this trigger's one
+	// restore check: the beat is then over, so mark it done the moment the flag lands.
+	public override void _EnterTree()
+	{
+		base._EnterTree();
+		if (StoryManager.Instance is { } s) s.FlagSet += OnFlag;
+	}
+
+	public override void _ExitTree()
+	{
+		base._ExitTree();
+		if (StoryManager.Instance is { } s) s.FlagSet -= OnFlag;
+	}
+
+	private void OnFlag(string flag)
+	{
+		if (flag == StoryManager.Flag.DawnBroke) Fired = true;
+	}
+
 	protected override bool CanFire(StoryManager s, PlayerController p)
 		=> _exiting && p.Inventory is { HasNewelPost: true };
 
