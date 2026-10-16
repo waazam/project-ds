@@ -12,8 +12,10 @@ namespace ProjectDS.UI;
 ///
 /// Eight chapters (docs/outline): 1 Back to Nature (Act 1), 2 The Stairs (Act 2), 3 Root of the Problem (Act 8),
 /// 4 Dawn is Breaking (Act 12), 5 Ever Upward (Act 19), 6 The Great Door (Act 21), 7 Enjoy Your Stay (Act 23), 8 Return
-/// (Act 25). And between the first two, the game's own name, as the trailer has it: when the forest first goes dead silent
-/// round the stairs, DEAD SILENT, in the serif, spaced, bone, and then the second chapter.
+/// (Act 25). And between the first two, the game's own name, DEAD SILENT, in the serif, spaced, bone: since STORY.md Rev 5
+/// (2026-10-16) it plays over the black after the first climb's collapse, hiding the load into the Hollow, on the
+/// <see cref="LoadingVeil"/> (which outlives the level change); it is built by <see cref="TitleLabel"/> here so both
+/// looks stay one. The second chapter's title stays on the first step.
 ///
 /// Each shows once in a playthrough (a story flag, "chapter_N", saved), waits for the screen to be clear of black, and
 /// never stops the game: it fades in over the picture (a dark band behind it so it reads on snow), drifts very slightly
@@ -58,7 +60,8 @@ public partial class ChapterCard : CanvasLayer
 		Spawn(from, n, delay);
 	}
 
-	/// <summary>The game's name (the trailer's title), once in the playthrough: at the foot of the first stairs, in the dead
+	/// <summary>The game's name over the picture, as a card. (Unused since Rev 5: the title plays over the load on
+	/// <see cref="LoadingVeil"/>, under the same flag, <c>Flag(0)</c>.) Before: at the foot of the first stairs, in the dead
 	/// silence there, the player held looking up the flight (2026-10-15, the owner: "when you get to the stairs it shows the
 	/// title right after all sound stops ... the character to be frozen looking at the stairs when the title shows then once
 	/// he goes on the stairs it will say the chapter title"; <see cref="World.FirstClimbEvent"/>). With
@@ -110,32 +113,43 @@ public partial class ChapterCard : CanvasLayer
 		};
 		_band.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_root.AddChild(_band);
-		bool title = _n == 0;
-		var col = title ? UiKit.Bone : Taupe;
-		_title = new Label
+		if (_n == 0) _title = TitleLabel();
+		else
 		{
-			Text = title ? "DEAD SILENT" : Titles[_n], HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-		};
-		Font font = title ? UiKit.SerifTitle : Anton ?? UiKit.SerifTitle;
-		_title.AddThemeFontOverride("font", font);
-		int size = title ? 44 : 92;
-		// one line, always: a long title is set smaller to fit the width (Root of the Problem)
-		if (!title && font != null)
-			while (size > 48 && font.GetStringSize(Titles[_n], HorizontalAlignment.Left, -1, size).X > 500) size -= 4;
-		_title.AddThemeFontSizeOverride("font_size", size);
-		_title.AddThemeColorOverride("font_color", col);
-		// (the owner, 2026-10-11: "way way less shadow and be more subtle", as Alan Wake 2's: a faint soft lift, no
-		// hard dark rim round the letters)
-		_title.AddThemeColorOverride("font_shadow_color", new Color(0.05f, 0.03f, 0.02f, 0.22f));
-		_title.AddThemeConstantOverride("shadow_offset_x", 0);
-		_title.AddThemeConstantOverride("shadow_offset_y", 1);
-		_title.AddThemeConstantOverride("shadow_outline_size", 2);
-		_title.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		_title.OffsetTop = 0;   // (2026-10-13, Dan: "just say the title of the chapter": no "CHAPTER N" line under it)
+			Font font = Anton ?? UiKit.SerifTitle;
+			int size = 92;
+			// one line, always: a long title is set smaller to fit the width (Root of the Problem)
+			if (font != null)
+				while (size > 48 && font.GetStringSize(Titles[_n], HorizontalAlignment.Left, -1, size).X > 500) size -= 4;
+			_title = MakeLabel(Titles[_n], font, size, Taupe);
+		}
 		_root.AddChild(_title);
 		_root.Modulate = new Color(1, 1, 1, 0);
 		Current = this;
+	}
+
+	/// <summary>The game's name, DEAD SILENT, as its title card sets it (full-rect, centred).</summary>
+	public static Label TitleLabel() => MakeLabel("DEAD SILENT", UiKit.SerifTitle, 44, UiKit.Bone);
+
+	private static Label MakeLabel(string text, Font font, int size, Color col)
+	{
+		var l = new Label
+		{
+			Text = text, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		l.AddThemeFontOverride("font", font);
+		l.AddThemeFontSizeOverride("font_size", size);
+		l.AddThemeColorOverride("font_color", col);
+		// (the owner, 2026-10-11: "way way less shadow and be more subtle", as Alan Wake 2's: a faint soft lift, no
+		// hard dark rim round the letters)
+		l.AddThemeColorOverride("font_shadow_color", new Color(0.05f, 0.03f, 0.02f, 0.22f));
+		l.AddThemeConstantOverride("shadow_offset_x", 0);
+		l.AddThemeConstantOverride("shadow_offset_y", 1);
+		l.AddThemeConstantOverride("shadow_outline_size", 2);
+		l.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		l.OffsetTop = 0;   // (2026-10-13, Dan: "just say the title of the chapter": no "CHAPTER N" line under it)
+		return l;
 	}
 
 	public override void _Process(double delta)

@@ -117,7 +117,7 @@ public partial class GameFlow : Node
 			_ = Cutscene.Run(this, ct => WakeUp(quickWake, ct));
 			return;
 		}
-		// A new game opens at the car: the intro cards, the fade-in at the trunk, the camera in hand.
+		// A new game opens on the map of the drive (OpeningAtCar, PrologueMap), dissolving to the trunk: the camera in hand.
 		if (save == null && GetTree().GetFirstNodeInGroup("opening") is OpeningAtCar opening)
 		{
 			var (pos, yaw) = opening.StandPose();
@@ -157,13 +157,15 @@ public partial class GameFlow : Node
 	[Export] public float WakeSeconds = 8f;
 	[Export] public float WakePitchDegrees = -60f;
 	[Export] public float WakeVignette = 2.4f;
-	[Export] public string WakeLine = "";   // was "This isn't the trail." (self-talk removed, Dan 2026-09-22)
+	/// <summary>Black held after the game's title has cleared, before the eyes open (the rain is heard first).</summary>
+	[Export] public float WakeAfterTitleSeconds = 1.4f;
 
 	/// <summary>
 	/// Act 2's end, in the hollow: the stairs have let go of the player somewhere they have never been.
 	/// They come to face down in the dark; their sight comes up out of the black once and clears
 	/// slowly while their head lifts. Input stays locked throughout (the reference GameFlow took in
-	/// _Ready is released only once they are up), then the one line plays.
+	/// _Ready is released only once they are up), then the player's line (STORY.md Rev 5, PlayerVoice "wake").
+	/// The first time, the game's title is up over the load (<see cref="LoadingVeil"/>): the wake waits for it to clear.
 	/// </summary>
 	/// <summary>How long the level took, from being asked for to ready to fade in (the load overhaul, 2026-10-09).</summary>
 	private void LogLoad()
@@ -188,6 +190,12 @@ public partial class GameFlow : Node
 			await Cutscene.Wait(this, quick ? 0.2f : WakeBlackSeconds, ct);
 			await ShaderWarmup.WaitReady(this, ct);
 			LogLoad();
+			// (2026-10-16, Rev 5) DEAD SILENT over the load: its veil goes first, then a little black, then the eyes open
+			if (LoadingVeil.Current is { HasTitle: true })
+			{
+				while (LoadingVeil.Current is { } v && IsInstanceValid(v)) await Cutscene.Frame(this, ct);
+				if (!quick) await Cutscene.Wait(this, WakeAfterTitleSeconds, ct);
+			}
 			// (2026-10-13, the owner: "it wakes you up then blacks out again. It should just wake up from the black out") one
 			// wake, straight out of the black: no blinks (it opened to half, shut again, opened, shut, then cleared, which read
 			// as a second blackout). The black lifts slowly at first, then clears as the head comes up.
@@ -213,7 +221,8 @@ public partial class GameFlow : Node
 			}
 		}
 		GD.Print("[story] Act 2: woke in the hollow");
-		// No thought on waking (Dan, 2026-09-22: the player does not talk to himself); WakeLine is kept for previews only.
+		// (STORY.md Rev 5) as they get up, the player's line; it plays on while they're free to look round
+		if (StoryManager.Instance is { Current: Checkpoint.Act2StairsClimbed }) _ = PlayerVoice.Say(this, "wake", 4.6f);
 		await Cutscene.Wait(this, 1.0, ct);
 	}
 }
