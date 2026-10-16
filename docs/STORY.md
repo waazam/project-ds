@@ -40,7 +40,7 @@ The climb's blackout carries the player from the trailhead into the Hollow, and 
 - his note at the camp, his key cut in two, and his page and photographs in the cabin;
 - his boots in the bunker, his initials inked inside them;
 - six pages torn from his notebook along the way (the lake shore, the station door, Room 3, the sewer's landing, the church crypt, the lodge by Room 203);
-- a missing poster in the lodge's walls: a missing hiker, 41, last seen at the Blackfern trailhead on October 24, a green pack and a camera round his neck, his name torn off and "the steps" pencilled over it.
+- a missing poster in the lodge's walls: a missing hiker, 41, last seen at the Blackfern trailhead on October 25 (the day of his last register entry), a green pack and a camera round his neck, his name torn off and "the steps" pencilled over it.
 
 The player is following his trail without meaning to.
 
@@ -52,7 +52,7 @@ The player is following his trail without meaning to.
 - **R.H.** is never seen, and the stalker never wears him.
 - **Photos.** There is no checklist. The album shows a count of how many of the 69 things have been found, with the points ("N/69 found   N pts"), and the credits say "N of 69" over "N points", but nothing ever lists what is left to find.
 - **Sound.** No sound repeats: many variations, never the same one twice running.
-- **Visuals.** Nothing flashes or strobes, and the camera never shakes hard or snaps.
+- **Visuals.** Nothing flashes or strobes, and the camera never shakes hard or snaps. One exception (Dan, 2026-10-16): the black bird's scream in Act 1 jolts the camera as it hits.
 - **Titles.** Chapter titles are shown alone, with no chapter number.
 
 ### The player's lines
@@ -92,7 +92,7 @@ He chose the trailhead because he loved it as a child. The magazine wanted natur
 - **The album.** Every picture goes into the album, scored for clarity, focus, framing and zoom (one to five stars). The camera zooms (x1 to x4), focuses itself, and fires a soft flash in the dark.
 - **No checklist.** The album's footer keeps count of how many of the 69 things have been photographed, and the points ("N/69 found   N pts"), but never lists what's left.
 - **The player's notes.** After the prints, the album has a page of pencil notes in the photographer's own hand, a line for each thing the first time it's on film.
-- There are only 3 birds in the game (cardinals in red, blue and purple). They are gone from Act 2 on.
+- There are only 3 birds in the game (a northern cardinal, an indigo bunting and a purple finch, as on the park bird card; Dan, 2026-10-16). They are gone from Act 2 on.
 - A 4th bird, black with red eyes, is on the third walk (below).
 - Photographed, a bird flies off through the trees and is gone only once it is out of sight.
 
@@ -112,10 +112,10 @@ A small old cabin stands beside the lot, rented for the shoot. It is the hub of 
 The black shape is only ever in the prints. It is never in the woods in Act 1.
 
 ### Walk 1: The Photo Trip
-Afternoon, clear. A normal walk in golden light, the best the woods will ever look: up the trail, over the footbridge, out to the overlook on its hill and back down the ridge path. The player photographs anything; the first of the three cardinals is on this walk. Nothing is wrong. The only hints are sound: a distant twig snap, a bird that stops mid-song, the distant rifle. Back at the cabin he pins his best shots to the board (stages 1 and 2).
+Afternoon, clear. A normal walk in golden light, the best the woods will ever look: up the trail, over the footbridge, out to the overlook on its hill and back down the ridge path. The player photographs anything; the first of the three birds (the cardinal) is on this walk. Nothing is wrong. The only hints are sound: a distant twig snap, a bird that stops mid-song, the distant rifle. Back at the cabin he pins his best shots to the board (stages 1 and 2).
 
 ### Walk 2: The Place That Mattered
-Late afternoon, the fog rising. The assignment asked for a place that matters. The way leads to the falls and the rock over them, the old favourite spot where he came as a child: off the trail before the footbridge, along the creek and up beside the falls, then down the hillside to the trail by the mile sign. The last of the three cardinals sits by the rock. Mist on the water; the falls are seen in full. He shoots it for the person he lost.
+Late afternoon, the fog rising. The assignment asked for a place that matters. The way leads to the falls and the rock over them, the old favourite spot where he came as a child: off the trail before the footbridge, along the creek and up beside the falls, then down the hillside to the trail by the mile sign. The last of the three birds (the purple finch) sits by the rock. Mist on the water; the falls are seen in full. He shoots it for the person he lost.
 - **The voice.** On the way back, one word in the woods, close and ahead of him: *"come."* Deep, felt more than heard. Turning to it, there is nothing. It is said once.
 - Back at the board: stages 3, 4 and 5.
 

@@ -24,7 +24,7 @@ public partial class SkiLodge
 	private static readonly (string head, string title, string body)[] MissingPosters =
 	{
 		("MISSING", "MISSING", "MISSING\nDANIEL ORTEGA, 34\nLast seen at Hollow Peak Lodge, December 22, leaving on snowshoes for the ridge trail.\nBlue parka, grey wool hat.\nIF YOU HAVE SEEN DANIEL PLEASE CALL"),
-		("MISSING", "MISSING", "MISSING HIKER\nR___ H___, 41\nLast seen at the Blackfern trailhead, October 24.\nGreen pack, a camera round his neck.\n(The name has been torn off. Someone has written over it in pencil: \"the steps\".)"),
+		("MISSING", "MISSING", "MISSING HIKER\nR___ H___, 41\nLast seen at the Blackfern trailhead, October 25.\nGreen pack, a camera round his neck.\n(The name has been torn off. Someone has written over it in pencil: \"the steps\".)"),
 		("HAVE YOU SEEN US?", "Have you seen us?", "HAVE YOU SEEN US?\nTHE MARSH FAMILY\nTom (45), Helen (43), Abby (12), Sam (9)\nCamping at Overlook Park, site 14, August.\nTheir tent was found standing. Their car is still in the lot."),
 		("MISSING", "MISSING", "MISSING\nKAREN BELL, 27\nSeasonal staff, Hollow Peak Lodge (bar).\nDid not return from her shift's end, December 23.\nShe told a friend she could hear someone calling her name outside."),
 		("REWARD", "REWARD", "$5,000 REWARD\nfor information on the disappearance of\nGREG LANNISTER, 52, and his dog Bo.\nLast seen hunting the north slope, November.\nBo came home alone. He will not go back in the woods."),
