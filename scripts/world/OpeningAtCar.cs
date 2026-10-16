@@ -8,10 +8,10 @@ using ProjectDS.UI;
 namespace ProjectDS.World;
 
 /// <summary>
-/// The game's opening, on a new game only. Over black, two short cards say where the player is and
-/// what they are doing (a day of hiking, taking pictures on the way). Then the picture fades in on the
-/// player standing at the open back of their car in the trailhead lot, looking down at the camera in
-/// the trunk. The camera lifts out of the trunk toward them and is in hand (the Act 1 camera; no
+/// The game's opening, on a new game only. First the drive on a parchment map, with the assignment and the
+/// editor's page (<see cref="PrologueMap"/>; STORY.md Rev 5, 2026-10-16: it replaces the two black cards, and
+/// there is no drive scene). The map dissolves straight to the player standing at the open back of their
+/// car in the trailhead lot, looking down at the camera in the trunk. The camera lifts out of the trunk toward them and is in hand (the Act 1 camera; no
 /// pickup on the ground). Their head comes up toward the trail, control returns, and a quiet line
 /// under the picture says how the camera works.
 ///
@@ -24,9 +24,7 @@ namespace ProjectDS.World;
 /// </summary>
 public partial class OpeningAtCar : Node3D
 {
-	[Export] public string Card1Title = "Overlook Park";
-	[Export] public string Card1Subtitle = "The Blackfern Trailhead, late October";
-	[Export] public string Card2Subtitle = "A day of hiking, and a camera for whatever you find on the way.";
+	[Export] public float MapDissolveSeconds = 2.4f;
 	[Export] public string HowToLine = "Right mouse: raise the camera.   Left mouse: take a picture.   Tab: your photos.";
 	[Export] public NodePath StandPath = "Stand";
 	[Export] public NodePath TrunkCameraPath = "TrunkCamera";
@@ -60,18 +58,30 @@ public partial class OpeningAtCar : Node3D
 
 		if (!quick)
 		{
-			await Cutscene.Wait(this, 0.8f, ct);
-			await fader.ShowCaption(Card1Title, Card1Subtitle, 1.4f, 2.8f, 1.2f, ct);
+			// The map over the black, then it dissolves to the trunk: the fader's black is cleared under the map while
+			// the map still covers the whole picture, so the trunk is only ever seen through the map going.
 			await Cutscene.Wait(this, 0.4f, ct);
-			await fader.ShowCaption("", Card2Subtitle, 1.2f, 3.2f, 1.2f, ct);
-			await Cutscene.Wait(this, 0.6f, ct);
+			var map = new PrologueMap { Name = "PrologueMap" };
+			AddChild(map);
+			try
+			{
+				await map.Play(ct);
+				// The rig resets its pitch when the level boots: look into the trunk again right before the picture comes up.
+				rig.SetPitch(Mathf.DegToRad(LookIntoTrunkPitch));
+				// (the level's shaders built before the picture comes up: on a slow machine the map holds on the trailhead)
+				await Systems.ShaderWarmup.WaitReady(this, ct);
+				fader.BlackAlpha = 0f;
+				await map.Dissolve(MapDissolveSeconds, ct);
+			}
+			finally { if (IsInstanceValid(map)) map.QueueFree(); }
+			await Cutscene.Wait(this, 1.0f, ct);
 		}
-		// The rig resets its pitch when the level boots: look into the trunk again right before the picture comes up.
-		rig.SetPitch(Mathf.DegToRad(LookIntoTrunkPitch));
-		// (the level's shaders built before the picture comes up: on a slow machine the cards can end first; the lag pass)
-		await Systems.ShaderWarmup.WaitReady(this, ct);
-		await fader.Fade(0f, quick ? 0.2f : 2.4f, ct);
-		if (!quick) await Cutscene.Wait(this, 1.0f, ct);
+		else
+		{
+			rig.SetPitch(Mathf.DegToRad(LookIntoTrunkPitch));
+			await Systems.ShaderWarmup.WaitReady(this, ct);
+			await fader.Fade(0f, 0.2f, ct);
+		}
 		if (!Alive(player)) return;
 
 		// The camera comes up out of the trunk toward the eye, then it is in hand.

@@ -17,6 +17,11 @@ namespace ProjectDS.UI;
 /// the new level is built, its shaders warmed and its flow begun, then thins away over the black the level holds for the
 /// wake. With <c>mute</c> it also holds every sound silent through the load and lets it back in slowly once the level is
 /// ready (hearing comes back before sight), instead of the new level's sounds starting at full under the black.
+///
+/// The game's title (STORY.md Rev 5, 2026-10-16): the first time the veil carries the player into the Hollow after the
+/// first climb, DEAD SILENT comes up on it (<see cref="ChapterCard.TitleLabel"/>) and hides the load. It holds at least
+/// long enough to read, however quick the load; once the level is ready it clears first, then the veil thins to the
+/// level's black and GameFlow's wake opens the eyes. Once a playthrough (the title's flag, <c>ChapterCard.Flag(0)</c>).
 /// </summary>
 public partial class LoadingVeil : CanvasLayer
 {
@@ -27,6 +32,14 @@ public partial class LoadingVeil : CanvasLayer
 
 	public float FadeOutSeconds = 0.9f;
 	public float SoundInSeconds = 6f;
+	// the title's timing: black first, its fade in, the least it is up, its fade out
+	public float TitleLead = 1.2f, TitleIn = 1.6f, TitleMinUp = 4.2f, TitleOut = 1.5f;
+
+	/// <summary>True while this veil carries the game's title.</summary>
+	public bool HasTitle => _titleLabel != null;
+	private Label _titleLabel;
+	private Control _titleRoot;
+	private float TitleSeconds => (Time.GetTicksMsec() - _shownAt) / 1000f;
 
 	private Node _from;
 	private ColorRect _rect;
@@ -54,6 +67,20 @@ public partial class LoadingVeil : CanvasLayer
 		_rect = new ColorRect { Color = Colors.Black, Material = _mat, MouseFilter = Control.MouseFilterEnum.Ignore };
 		_rect.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_rect);
+		// the game's title, the first time into the Hollow from the first climb
+		if (StoryManager.Instance is { Current: Checkpoint.Act2StairsClimbed } s && !s.HasFlag(ChapterCard.Flag(0)))
+		{
+			s.SetFlag(ChapterCard.Flag(0));
+			if (GameSettings.Instance is { AutoTest: true } && System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--real-timing") < 0)
+			{ TitleLead = 0f; TitleIn = 0.2f; TitleMinUp = 0.3f; TitleOut = 0.2f; }
+			_titleRoot = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Modulate = new Color(1, 1, 1, 0) };
+			_titleRoot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+			AddChild(_titleRoot);
+			_titleLabel = ChapterCard.TitleLabel();
+			_titleRoot.AddChild(_titleLabel);
+			ChapterCard.Shown.Add(0);
+			GD.Print("[story] title: DEAD SILENT, over the load into the Hollow");
+		}
 		if (_mute)
 		{
 			int master = AudioServer.GetBusIndex("Master");
@@ -65,6 +92,15 @@ public partial class LoadingVeil : CanvasLayer
 
 	public override void _Process(double delta)
 	{
+		if (_titleLabel != null)
+		{
+			// (never a jump: it fades up out of the black and drifts very slightly larger while it holds)
+			float tt = TitleSeconds - TitleLead;
+			if (!_released) _titleRoot.Modulate = new Color(1, 1, 1, Mathf.SmoothStep(0f, 1f, Mathf.Clamp(tt / TitleIn, 0f, 1f)));
+			float grow = 1f + Mathf.Min(0.05f, 0.004f * Mathf.Max(tt, 0f));
+			_titleLabel.PivotOffset = _titleLabel.Size * 0.5f;
+			_titleLabel.Scale = new Vector2(grow, grow);
+		}
 		if (_released) return;
 		LoadPump.Frame();
 		var scene = GetTree().CurrentScene;
@@ -77,13 +113,22 @@ public partial class LoadingVeil : CanvasLayer
 	public void Release()
 	{
 		if (_released) return;
+		// the title stays up at least long enough to read (it asks again each frame)
+		if (_titleLabel != null && TitleSeconds < TitleLead + TitleIn + TitleMinUp && Time.GetTicksMsec() - _shownAt < 120_000) return;
 		_released = true;
 		LoadPump.End();
 		LastHeldMs = Time.GetTicksMsec() - _shownAt;
 		GD.Print($"[veil] down after {LastHeldMs} ms ({LoadPump.Pumps} window pumps, the window unanswered at most {LoadPump.MaxGapMs} ms)");
 		var tw = CreateTween().SetParallel();
+		// the title clears first, then the veil thins to the level's own black
+		float titleOut = 0f;
+		if (_titleRoot != null)
+		{
+			titleOut = TitleOut;
+			tw.TweenProperty(_titleRoot, "modulate:a", 0f, TitleOut).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		}
 		tw.TweenMethod(Callable.From<float>(a => _mat.SetShaderParameter("alpha", a)), 1f, 0f, FadeOutSeconds)
-			.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
+			.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In).SetDelay(titleOut);
 		if (_amp != null)
 			tw.TweenMethod(Callable.From<float>(u => { if (_amp != null) _amp.VolumeDb = u >= 1f ? 0f : Mathf.Max(-80f, Mathf.LinearToDb(u * u)); }),
 				0f, 1f, SoundInSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
