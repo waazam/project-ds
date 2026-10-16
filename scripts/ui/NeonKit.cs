@@ -137,7 +137,7 @@ public static class NeonKit
 				Line(c, Box(P(-0.24f, 0.02f), new Vector2(0.14f, 0.12f) * s), w * 0.7f, lit, true);
 				Seg(c, P(0.04f, 0.12f), P(0.26f, 0.12f), w * 0.6f, lit * 0.6f);
 				break;
-			case ToolKind.Key or ToolKind.PantryKey or ToolKind.DiningKey or ToolKind.FontKey:
+			case ToolKind.Key or ToolKind.PantryKey or ToolKind.DiningKey or ToolKind.FontKey or ToolKind.BunkerKey:
 				Circle(c, P(-0.24f, 0), s * 0.13f, w, lit);
 				Seg(c, P(-0.11f, 0), P(0.38f, 0), w, lit);
 				Line(c, new[] { P(0.2f, 0), P(0.2f, 0.12f), P(0.27f, 0.12f), P(0.27f, 0.05f), P(0.33f, 0.05f), P(0.33f, 0.12f) }, w * 0.9f, lit);

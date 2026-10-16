@@ -56,7 +56,7 @@ public partial class MainMenu : Node
 			{
 				StoryManager.Flag.StairsClimbed, StoryManager.Flag.StormStarted, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, "read_camp_note",
 				StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke,
-				StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2), StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4),
+				StoryManager.Flag.KeyPiece(1), StoryManager.Flag.KeyPiece(2), StoryManager.Flag.KeyAssembled,
 				StoryManager.Flag.ClearingVoiceHeard, StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone,
 				StoryManager.Flag.BunkerUnlocked, "dev_spawn_bunker",
 			};
@@ -72,7 +72,7 @@ public partial class MainMenu : Node
 			{
 				StoryManager.Flag.StairsClimbed, StoryManager.Flag.StormStarted, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, "read_camp_note",
 				StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke,
-				StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2), StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4),
+				StoryManager.Flag.KeyPiece(1), StoryManager.Flag.KeyPiece(2), StoryManager.Flag.KeyAssembled,
 				StoryManager.Flag.ClearingVoiceHeard, StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone,
 				StoryManager.Flag.BunkerUnlocked, StoryManager.Flag.CrtPuzzleDone, StoryManager.Flag.WalkieTaken, StoryManager.Flag.BunkerMazeEntered,
 				StoryManager.Flag.BunkerMazeExited, StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated,
@@ -89,7 +89,7 @@ public partial class MainMenu : Node
 			{
 				StoryManager.Flag.StairsClimbed, StoryManager.Flag.StormStarted, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, "read_camp_note",
 				StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke,
-				StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2), StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4),
+				StoryManager.Flag.KeyPiece(1), StoryManager.Flag.KeyPiece(2), StoryManager.Flag.KeyAssembled,
 				StoryManager.Flag.ClearingVoiceHeard, StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone,
 				StoryManager.Flag.BunkerUnlocked, StoryManager.Flag.CrtPuzzleDone, StoryManager.Flag.WalkieTaken, StoryManager.Flag.BunkerMazeEntered,
 				StoryManager.Flag.BunkerMazeExited, StoryManager.Flag.Act11DialogueDone, StoryManager.Flag.NewelSeated,

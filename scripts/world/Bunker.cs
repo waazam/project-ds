@@ -12,8 +12,10 @@ namespace ProjectDS.World;
 /// open for good. Walking in through the doorway (a trigger just
 /// inside the hatch) carries them into the bunker's interior (Act 8) and marks
 /// checkpoint 7. A laminated station card bolted beside the door can be read at
-/// any time, locked or not. The code is entered on a keypad on the face right of
-/// the door (<see cref="BunkerKeypad"/>, used in the world, never a screen overlay).
+/// any time, locked or not. (2026-10-15, the owner: the door code became two halves of a key) The door has a keyhole in
+/// its face: with both halves of R.H.'s key found (<see cref="SurveyLot"/>, <see cref="KeyPieceCache"/>) using it joins
+/// them in the hand and turns the key (<see cref="UseKey"/>); without them it says so. The old keypad
+/// (<see cref="BunkerKeypad"/>) is no longer built.
 /// Group "bunker_marker" so the compass can find it.
 ///
 /// Restore: in _Ready the door is open (silently, no caption) if the story is at
@@ -27,29 +29,30 @@ public partial class Bunker : Node3D
 {
 	[Export] public float OpenRadius = 14f;
 
-	/// <summary>The station card beside the hatch (story-gaps P10). Its last lines are the lot's clue:
-	/// the door's keypad takes the four numbers R.H. nailed to trees along the way, in order (see <see cref="SurveyLot"/>).</summary>
+	/// <summary>The station card beside the hatch (story-gaps P10). Its last lines say the door takes a key (R.H. had it:
+	/// see <see cref="SurveyLot"/>).</summary>
 	public const string StationCardText =
 		"OVERLOOK PARK\n" +
 		"REMOTE MONITORING STATION 3\n" +
 		"AUTHORISED PERSONNEL ONLY\n" +
 		"Unstaffed since 09/98.\n" +
-		"Door code: four numbers, marked on the way in (UV).\n" +
-		"In order.";
+		"Door: keyed lock. Key held by the duty ranger.\n" +
+		"No spare on site.";
 
-	/// <summary>The one line at the locked door, once (the flag's name is kept from the old dial: saves carry it).</summary>
-	public const string DialLine = "Locked. A keypad. Four numbers.";
+	/// <summary>The line at the locked door without the whole key (the flag's name is kept from the old dial: saves carry it).</summary>
+	public const string DialLine = "Locked. The key's in two pieces somewhere.";
 	public const string DialLineFlag = "line_bunker_dial";
+	/// <summary>With one half only.</summary>
+	public const string HalfLine = "Half a key won't turn it. The other half's still out there.";
 
 	public bool IsOpen { get; private set; }
 	/// <summary>The middle of the vault door's face (world).</summary>
 	public Vector3 HatchWorld => ToGlobal(new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ + 0.1f));
-	/// <summary>The code lock beside the door.</summary>
-	public BunkerKeypad Keypad => _keypad;
-	/// <summary>Where the keypad's faceplate is (world): aim here to use it.</summary>
-	public Vector3 KeypadWorld => _keypad?.FaceWorld ?? ToGlobal(KeypadLocal);
-	/// <summary>Where the keypad hangs (local): on the face right of the frame, at hand height, under the station card.</summary>
-	public static Vector3 KeypadLocal => new(1.6f, 1.08f, BunkerExterior.FaceZ);
+	/// <summary>The keyhole in the vault door's face, low and right of the wheel (local, closed): aim here to use it.</summary>
+	public static Vector3 KeyholeLocal => new(0.45f, 0.95f, BunkerExterior.DoorZ + 0.1f);
+	public Vector3 KeyholeWorld => ToGlobal(KeyholeLocal + new Vector3(0, 0, 0.01f));
+	/// <summary>The key's turning in the door right now (between the use and the door swinging).</summary>
+	public bool Unlocking { get; private set; }
 
 	/// <summary>A spot on the apron in front of the door, on the ground (the Act 8 checkpoint's respawn point).</summary>
 	public Vector3 ApproachPointWorld
@@ -79,7 +82,6 @@ public partial class Bunker : Node3D
 	private Node3D _doorNode;
 	private CollisionShape3D _closedCollision, _openCollision;
 	private Area3D _openTrigger, _entryTrigger;
-	private BunkerKeypad _keypad;
 	private bool _entryRetrying;
 	/// <summary>Where the apron's ramp meets lower ground in front (top surface, local), or null when the apron is flat.</summary>
 	private Vector3? _rampEndTop;
@@ -107,7 +109,6 @@ public partial class Bunker : Node3D
 		_doorNode = open ? BuildOpenDoor() : BuildClosedDoor();
 		if (_closedCollision != null) _closedCollision.Disabled = open;
 		if (_openCollision != null) _openCollision.Disabled = !open;
-		_keypad?.SetDoorOpen(open);
 	}
 
 	private static bool StoryAllowsOpening => StoryManager.Instance is { Current: >= Checkpoint.Act7CabinBurning };
@@ -135,26 +136,67 @@ public partial class Bunker : Node3D
 		}
 		if (IsOpen || !StoryAllowsOpening) return;
 		SayDialLine();
-		NudgeMissingNumbers();
+		NudgeMissingPieces();
 	}
-	private ulong _nudgedAt, _numbersNudgedAt;
+	private ulong _nudgedAt, _piecesNudgedAt;
 
 	/// <summary>
-	/// (2026-10-13, the skippable-events audit) The last two numbers stand by the trail's loop from the lookout, but the
-	/// compass points straight across the woods to the bunker, so a player who follows it can reach the dial without
-	/// ever passing them (nor the "something on a tree back there" nudge, which needs them close). At the door with
-	/// either still unread: one short line under the picture, as the trees' own nudges do (at most once a minute).
+	/// (2026-10-13, the skippable-events audit; 2026-10-15 for the key) The second half's trail leaves the path between
+	/// the lookout and here, but the compass points straight across the woods to the bunker, so a player who follows it can
+	/// reach the door without ever passing its start. At the door with a half still missing: one short line under the
+	/// picture saying where to look (at most once a minute).
 	/// </summary>
-	private void NudgeMissingNumbers()
+	private void NudgeMissingPieces()
 	{
 		var s = StoryManager.Instance;
 		if (s == null || s.HasFlag(StoryManager.Flag.BunkerUnlocked)) return;
-		if (s.HasFlag(StoryManager.Flag.CodeDigit(3)) && s.HasFlag(StoryManager.Flag.CodeDigit(4))) return;
-		if (_numbersNudgedAt != 0 && Time.GetTicksMsec() - _numbersNudgedAt < 60000) return;
+		bool has1 = s.HasFlag(StoryManager.Flag.KeyPiece(1)), has2 = s.HasFlag(StoryManager.Flag.KeyPiece(2));
+		if (has1 && has2) return;
+		if (_piecesNudgedAt != 0 && Time.GetTicksMsec() - _piecesNudgedAt < 60000) return;
 		if (UI.Subtitle.Instance is not { } sub) return;
-		_numbersNudgedAt = Time.GetTicksMsec();
-		_ = sub.Show($"His last numbers are on the trees by the path, back toward the lookout.   {UI.KeyHint.Blacklight}: the blacklight.", 0.8f, 5f, 1.2f);
-		GD.Print("[story] Act 7: at the dial with numbers 3-4 unread: the nudge back along the path");
+		_piecesNudgedAt = Time.GetTicksMsec();
+		string where = !has2
+			? "Old paint on a tree by the path, back toward the lookout. His arrows go on from there."
+			: "The other half's off the path between his camp and the cabin. His arrows go on from the old paint.";
+		_ = sub.Show($"{where}   {UI.KeyHint.Blacklight}: the blacklight.", 0.8f, 5.5f, 1.2f);
+		GD.Print($"[story] Act 7: at the door without half {(has2 ? 1 : 2)}: the nudge back");
+	}
+
+	/// <summary>The keyhole used: with both halves, the key's joined in the hand and turned (the pinch, <see cref="HeldUse"/>)
+	/// and the door unlocks as it turns; without them, a line says what's missing.</summary>
+	public void UseKey(PlayerController player)
+	{
+		var s = StoryManager.Instance;
+		if (IsOpen || Unlocking || s == null || !StoryAllowsOpening) return;
+		bool has1 = s.HasFlag(StoryManager.Flag.KeyPiece(1)), has2 = s.HasFlag(StoryManager.Flag.KeyPiece(2));
+		if (!(has1 && has2))
+		{
+			SayDialLine();
+			BunkerKit.OneShot(_gen, $"res://assets/audio/sfx/door_locked_0{1 + (int)(Time.GetTicksMsec() % 2)}.wav", KeyholeLocal, "Events", -4f, 0.8f, 2f, 14f);
+			if (UI.Subtitle.Instance is { } sub && !sub.CurrentlyShowing) _ = sub.Show(has1 || has2 ? HalfLine : DialLine, 0.4f, 3.2f, 0.8f);
+			NudgeMissingPieces();
+			GD.Print($"[story] the bunker's keyhole tried with {(has1 ? 1 : 0) + (has2 ? 1 : 0)} of 2 halves");
+			return;
+		}
+		_ = TurnKey(player);
+	}
+
+	private async System.Threading.Tasks.Task TurnKey(PlayerController player)
+	{
+		Unlocking = true;
+		const float seconds = 3.2f;
+		HeldUse.Do(player, ToolKind.BunkerKey, KeyholeWorld, seconds);
+		// the halves home (the sleeve screwed down onto the stub): a click; then the key in, and the bolts going back
+		await ToSignal(GetTree().CreateTimer(seconds * 0.47f), SceneTreeTimer.SignalName.Timeout);
+		if (!IsInstanceValid(this)) return;
+		StoryManager.Instance?.SetFlag(StoryManager.Flag.KeyAssembled);
+		BunkerKit.OneShot(_gen, "res://assets/audio/sfx/cryptex_click_02.wav", KeyholeLocal, "Events", -6f, 0.9f, 1.4f, 8f);
+		GD.Print("[story] the two halves of R.H.'s key joined");
+		await ToSignal(GetTree().CreateTimer(seconds * 0.45f), SceneTreeTimer.SignalName.Timeout);
+		if (!IsInstanceValid(this)) return;
+		BunkerKit.OneShot(_gen, "res://assets/audio/sfx/door_locked_02.wav", KeyholeLocal, "Events", 0f, 0.62f, 3f, 20f);
+		Unlocking = false;
+		Unlock();
 	}
 
 	/// <summary>Checkpoint 6 could conceivably fire with the player already inside the radius: re-check.</summary>
@@ -172,10 +214,7 @@ public partial class Bunker : Node3D
 		// No spoken line any more (Dan, 2026-09-22: less self-talk); the flag still marks the first look at the dial.
 	}
 
-	/// <summary>The code the keypad opens to: the lot's four numbers.</summary>
-	private string Code() => (GetTree()?.GetFirstNodeInGroup("survey_lot") as SurveyLot)?.Code ?? "0000";
-
-	/// <summary>The right code on the keypad: saved, so the door stays open on Continue, then the door swings.</summary>
+	/// <summary>The key turned: saved, so the door stays open on Continue, then the door swings.</summary>
 	private void Unlock()
 	{
 		if (IsOpen || !StoryAllowsOpening) return;
@@ -247,12 +286,7 @@ public partial class Bunker : Node3D
 		}
 		BunkerExterior.BuildConcrete(_gen, _gen, _rampEndTop);
 		BuildStationCardPlate();
-		// The keypad: built before it joins the tree (its _Ready only wires it up), in the editor too.
-		_keypad = new BunkerKeypad { Name = "Keypad", Position = KeypadLocal };
-		_keypad.Build();
-		_keypad.CodeSource = Code;
-		_keypad.Unlocked += Unlock;
-		_gen.AddChild(_keypad);
+		// (2026-10-15) no keypad any more: the door's own keyhole (BuildClosedDoor) takes R.H.'s key
 
 		if (Engine.IsEditorHint()) return;
 		var body = new StaticBody3D { Name = "BunkerBody", CollisionLayer = 1, CollisionMask = 0 };
@@ -351,12 +385,14 @@ public partial class Bunker : Node3D
 		var dk = new MeshKit();
 		BunkerExterior.VaultDoor(dk, new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ), ProcTextures.MetalMat);
 		var mesh = dk.CommitTo(_gen, "DoorMesh");
+		// the keyhole's brass escutcheon on its face (Blender's: tools/Blender/rh_key.py)
+		KeyPieceCache.AddModel(mesh, "Keyhole", new Transform3D(Basis.Identity, KeyholeLocal), "Keyhole");
 		if (!Engine.IsEditorHint())
 		{
-			// The door itself is never used: it says it's locked (and, once the keypad wakes, where the keypad is).
+			// The door: locked; from the fire on, R.H.'s key goes in its keyhole (UseKey).
 			var hatch = new BunkerLockedHatch
 			{
-				Name = "Hatch", Prompt = "Locked", MaxDistance = 3f, PickRadius = 1.0f,
+				Name = "Hatch", Prompt = "Locked", MaxDistance = 3f, PickRadius = 1.0f, Door = this,
 				Position = new Vector3(0, BunkerExterior.DoorCenterY, BunkerExterior.DoorZ), PickOffset = new Vector3(0, 0, -0.4f),
 			};
 			mesh.AddChild(hatch);
@@ -374,7 +410,11 @@ public partial class Bunker : Node3D
 				new Vector3(-BunkerExterior.DoorRadius, 0f, BunkerExterior.DoorZ)),
 		};
 		BunkerExterior.VaultDoor(leaf, new Vector3(BunkerExterior.DoorRadius, BunkerExterior.DoorCenterY, 0f), ProcTextures.MetalMat);
-		return leaf.CommitTo(_gen, "DoorOpenMesh");
+		var mesh = leaf.CommitTo(_gen, "DoorOpenMesh");
+		// the keyhole swung round with the leaf (its place on the disc, about the hinge)
+		var k = KeyholeLocal;
+		KeyPieceCache.AddModel(mesh, "Keyhole", leaf.Xf * new Transform3D(Basis.Identity, new Vector3(BunkerExterior.DoorRadius + k.X, k.Y, k.Z - BunkerExterior.DoorZ)), "Keyhole");
+		return mesh;
 	}
 
 	private void OnEntered(PlayerController player)

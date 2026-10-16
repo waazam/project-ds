@@ -176,6 +176,19 @@ public static partial class UvInk
 		L(0.2f, 0.1f, 0.3f, 0.9f), L(0.4f, 0.08f, 0.48f, 0.85f), L(0.6f, 0.12f, 0.66f, 0.92f), L(0.78f, 0.1f, 0.82f, 0.8f),
 	}, 0.035f, 77);
 
+	/// <summary>(2026-10-15) R.H.'s arrow: a quick brushed shaft pointing up the mask and an open head, in one of three hands
+	/// (<paramref name="variant"/>). Turned on the trunk to point the way to his next tree (<see cref="OnTrunk"/>'s turn).</summary>
+	public static Texture2D Arrow(int variant)
+	{
+		int v = ((variant % 3) + 3) % 3;
+		float lean = (v - 1) * 0.03f, head = 0.22f + 0.03f * v;
+		return Strokes($"uv_arrow{v}", 48, 64, new List<List<Vector2>>
+		{
+			L(0.5f - lean, 0.92f, 0.5f + lean * 0.3f, 0.5f, 0.5f + lean, 0.1f),
+			L(0.5f + lean - head, 0.1f + head * 1.1f, 0.5f + lean, 0.09f, 0.5f + lean + head * 0.95f, 0.1f + head * 1.15f),
+		}, 0.08f, 960 + v);
+	}
+
 	/// <summary>A decoy chosen by index: a mark that is not a number (or a number struck out).</summary>
 	public static Texture2D Decoy(int i, int avoidDigit)
 	{
@@ -307,11 +320,12 @@ public static partial class UvInk
 	/// <summary>A mark on a trunk: centred at height <paramref name="y"/> on the side facing <paramref name="angle"/>
 	/// (radians round the trunk's local Y, 0 = +Z), <paramref name="w"/> by <paramref name="h"/> metres,
 	/// <paramref name="radius"/> the trunk's radius there, in the trunk node's space. Cast onto the bark from outside it,
-	/// so it lies on the trunk's real faces (it wraps round them).</summary>
-	public static MeshInstance3D OnTrunk(Node3D trunk, float y, float angle, float radius, float w, float h, Texture2D mask, Color ink, float strength = 1.6f, bool mirror = false, float tilt = 0f)
+	/// so it lies on the trunk's real faces (it wraps round them). <paramref name="turn"/> turns it in its plane (radians,
+	/// counter-clockwise as seen facing it: an arrow drawn pointing up then points up and to the left).</summary>
+	public static MeshInstance3D OnTrunk(Node3D trunk, float y, float angle, float radius, float w, float h, Texture2D mask, Color ink, float strength = 1.6f, bool mirror = false, float tilt = 0f, float turn = 0f)
 	{
 		Vector3 d = new(Mathf.Sin(angle), 0, Mathf.Cos(angle));
-		var (right, down) = Frame(d, Mathf.Atan2(tilt, Mathf.Max(w, 0.05f)));
+		var (right, down) = Frame(d, Mathf.Atan2(tilt, Mathf.Max(w, 0.05f)) + turn);
 		// the box reaches from well inside the trunk to a little outside its widest (the bark's corners): the far side
 		// faces away, so the ink never shows through on it
 		float inner = radius * 0.3f, outer = radius + 0.1f;

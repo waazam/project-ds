@@ -28,12 +28,14 @@ public partial class Camp : Node3D
 	[Export] public float GlowEnergy = 3.2f;
 	[Export] public float GlowRange = 11f;
 
-	/// <summary>His note, word for word (Act 3).</summary>
+	/// <summary>His note, word for word (Act 3). (2026-10-15: the door's four numbers became the two halves of its key,
+	/// found by his arrows: <see cref="SurveyLot"/>.)</summary>
 	public const string NoteText =
 		"If you're reading this, it got you too.\n" +
 		"Don't stay out here after dark. There's an old cabin up the hollow. The needle knows the way.\n" +
-		"Past it there's a bunker. Steel door, four numbers.\n" +
-		"I put them on the trees on the way, in the ink only the lantern's black light shows. Look close.\n" +
+		"Past it there's a bunker. Steel door. I had its key.\n" +
+		"I cut it in two so it can't carry it in whole, and hid the halves off the path, one before the cabin, one before the bunker.\n" +
+		"Arrows on the trees take you to each, in the ink only the lantern's black light shows. Look close.\n" +
 		"Not every mark out there is mine.\n" +
 		"Leave the lantern lit. — R.H.";
 

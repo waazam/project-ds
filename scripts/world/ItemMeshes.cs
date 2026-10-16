@@ -243,6 +243,16 @@ public static class ItemMeshes
 	/// pick sphere. False when the item isn't modelled there (or the file is missing): the code below builds it.</summary>
 	private static bool FromBlender(ToolKind kind, Node3D parent, ref Built b)
 	{
+		if (kind == ToolKind.BunkerKey)
+		{
+			// R.H.'s key, its two halves joined (tools/Blender/rh_key.py; only ever seen in the hand, at the bunker's door)
+			var key = KeyPieceCache.AddModel(parent, "RhKey", KeyPieceCache.KeyShelf);
+			if (key == null) return false;
+			b.PickCenter = new Vector3(0, 0.02f, 0);
+			b.PickRadius = 0.14f;
+			b.Triangles = ItemModels.Triangles(key);
+			return true;
+		}
 		(string node, Transform3D xf, Vector3 pick, float radius) = kind switch
 		{
 			ToolKind.Key => ("Key", new Transform3D(new Basis(Vector3.Up, 0.5f), new Vector3(0.01f, 0.083f, 0)), new Vector3(0, 0.1f, 0), 0.3f),

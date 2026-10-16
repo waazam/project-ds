@@ -28,7 +28,7 @@ public partial class HeldUse : HeldItem
 	public static ToolKind Last { get; private set; }
 	public static int Shown { get; private set; }
 
-	private enum Motion { Reach, Swipe, Turn, Prise, Flick, Cut }
+	private enum Motion { Reach, Swipe, Turn, Prise, Flick, Cut, Join }
 
 	private Node3D _pivot, _tool;
 	private OmniLight3D _flame;
@@ -69,9 +69,10 @@ public partial class HeldUse : HeldItem
 			ToolKind.Crowbar => Motion.Prise,
 			ToolKind.Lighter => Motion.Flick,
 			ToolKind.Knife => Motion.Cut,
+			ToolKind.BunkerKey => Motion.Join,
 			_ => Motion.Reach,
 		};
-		_len = seconds > 0f ? seconds : _motion switch { Motion.Prise => 2.3f, Motion.Flick => 2.0f, Motion.Cut => 1.7f, Motion.Turn => 1.5f, _ => 1.3f };
+		_len = seconds > 0f ? seconds : _motion switch { Motion.Join => 3.2f, Motion.Prise => 2.3f, Motion.Flick => 2.0f, Motion.Cut => 1.7f, Motion.Turn => 1.5f, _ => 1.3f };
 		_strokes = _motion == Motion.Prise ? Mathf.Max(1, Mathf.RoundToInt((_len - 0.6f) / 0.55f)) : 2;
 		_t = 0f;
 		// toward the thing, in the camera's space: a nudge of the hand that way (never across the view)
@@ -92,7 +93,7 @@ public partial class HeldUse : HeldItem
 	/// station's three) carried on the open palm; the rest in the fist round their grip (the chalice round its stem).</summary>
 	private static HandPose PoseFor(ToolKind kind) => kind switch
 	{
-		ToolKind.Key or ToolKind.FontKey or ToolKind.PantryKey or ToolKind.DiningKey or ToolKind.Bookmark
+		ToolKind.Key or ToolKind.FontKey or ToolKind.PantryKey or ToolKind.DiningKey or ToolKind.Bookmark or ToolKind.BunkerKey
 			or ToolKind.Keycard201 or ToolKind.Keycard202 or ToolKind.Keycard203 => HandPose.Pinch,
 		ToolKind.Compass or ToolKind.DeadEye or ToolKind.PaleHand or ToolKind.StairTread => HandPose.Cradle,
 		_ => HandPose.Stick,
@@ -104,6 +105,7 @@ public partial class HeldUse : HeldItem
 	private static (Vector3 grip, Vector3 ahead) PinchOf(ToolKind kind) => kind switch
 	{
 		ToolKind.Key => (new Vector3(-0.047f, 0f, 0f), Vector3.Right),            // (the bow's near side, by the collar)
+		ToolKind.BunkerKey => (new Vector3(-0.05f, 0f, 0f), Vector3.Right),       // (R.H.'s: the same, a bigger bow)
 		ToolKind.PantryKey => (new Vector3(-0.066f, 0f, 0.01f), Vector3.Right),   // (its bow, out of the envelope's fold)
 		ToolKind.FontKey => (new Vector3(0f, 0f, -0.088f), Vector3.Back),         // (the trefoil bow's near lobe)
 		ToolKind.DiningKey => (new Vector3(0f, 0f, -0.088f), Vector3.Back),
@@ -161,6 +163,13 @@ public partial class HeldUse : HeldItem
 			// a card goes into the reader's upright slot: the hand turned over (palm down, the thumb in), the card upright
 			if (_motion == Motion.Swipe)
 				_grip = new Basis(new Vector3(0.15f, -0.5f, 0.85f).Normalized(), 1.25f);
+			// R.H.'s key comes in its two halves, screwed together in the fingers before it goes in (Animate)
+			if (_kind == ToolKind.BunkerKey && mesh.GetChildCount() > 0 && mesh.GetChild(0) is Node3D whole)
+			{
+				whole.Visible = false;
+				World.KeyPieceCache.AddModel(mesh, "KeyHalfBow", whole.Transform, "HalfBow");
+				World.KeyPieceCache.AddModel(mesh, "KeyHalfBit", whole.Transform, "HalfBit");
+			}
 			SetLayer(_tool);
 			foreach (var n in _tool.FindChildren("*", "GeometryInstance3D", true, false))
 				((GeometryInstance3D)n).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -265,6 +274,27 @@ public partial class HeldUse : HeldItem
 				off += new Vector3(0, 0.03f - 0.09f * Mathf.SmoothStep(0.25f, 0.6f, u), -0.02f * inOut);
 				rot.X = -0.15f * Mathf.SmoothStep(0.25f, 0.6f, u);
 				break;
+			case Motion.Join:
+			{
+				// the two halves: the bit's sleeve brought up to the stub and screwed down onto it (two turns), the click of
+				// it home, the whole key then on toward the door and turned in it
+				var mesh = _tool?.GetNodeOrNull<Node3D>("Mesh");
+				if (mesh != null && mesh.GetChildCount() > 0 && mesh.GetChild(0) is Node3D whole && mesh.GetNodeOrNull<Node3D>("HalfBit") is { } bit)
+				{
+					float j = Mathf.SmoothStep(0.05f, 0.42f, u);
+					bool home = u >= 0.45f;
+					var screw = new Basis(Vector3.Right, (1f - j) * Mathf.Tau * 2f);
+					bit.Transform = whole.Transform * new Transform3D(screw, new Vector3(0.034f * (1f - j), 0.004f * (1f - j), 0f));
+					bit.Visible = !home;
+					if (mesh.GetNodeOrNull<Node3D>("HalfBow") is { } bow) bow.Visible = !home;
+					whole.Visible = home;
+				}
+				// held up close to be joined, then forward into the lock and turned
+				off += new Vector3(0.02f, 0.05f, 0.06f) * (1f - Mathf.SmoothStep(0.4f, 0.55f, u)) * inOut;
+				off += new Vector3(0, 0, -0.04f * Mathf.SmoothStep(0.5f, 0.7f, u));
+				rot.Z = -Mathf.Pi * 0.5f * Mathf.SmoothStep(0.72f, 0.92f, u);
+				break;
+			}
 			case Motion.Turn:
 				off += new Vector3(0, 0, -0.03f * Mathf.SmoothStep(0f, 0.3f, u));
 				rot.Z = -Mathf.Pi * 0.5f * Mathf.SmoothStep(0.4f, 0.75f, u);

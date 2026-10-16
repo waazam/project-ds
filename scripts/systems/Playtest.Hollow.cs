@@ -110,9 +110,9 @@ public partial class Playtest
 		await Control(ct, 40);
 		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
 		var lot = GetTree().GetFirstNodeInGroup("survey_lot") as SurveyLot;
-		Require("the cabin and the survey notes", cabin != null && lot is { Notes.Count: 4 }, $"{lot?.Notes.Count} notes");
+		Require("the cabin and R.H.'s two arrow trails", cabin != null && lot != null && lot.Trail(1).Count > 0 && lot.Trail(2).Count > 0, $"{lot?.Notes.Count} arrow trees");
 		Check("the storm rages (restored from the save)", StormController.Instance is { Active: true });
-		for (int i = 0; i < 2; i++) await ReadTreeNote(lot, i, ct);
+		await TakeKeyHalf(lot, 1, ct);
 		// the stalker's introduction, and the giant's far footfalls, on a short walk toward the cabin
 		var st = GetTree().GetFirstNodeInGroup("stalker") as Stalker;
 		var giant = _bot.FirstOf<GiantStalkerEvent>();
@@ -132,26 +132,40 @@ public partial class Playtest
 		Shot("storm_walk");
 	}
 
-	/// <summary>Number <paramref name="i"/>'s tree: nothing by the flame, the digit by the blacklight, saved and in the tracker.</summary>
-	private async Task ReadTreeNote(SurveyLot lot, int i, CancellationToken ct)
+	/// <summary>(2026-10-15) Half <paramref name="piece"/> of the key: the trail's first arrow (nothing by the flame, the arrow by
+	/// the blacklight), its last, then the tin at the end glinting under the beam, opened, the half taken and saved.</summary>
+	private async Task TakeKeyHalf(SurveyLot lot, int piece, CancellationToken ct)
 	{
-		var note = lot.Notes[i];
-		var lamp = Player.GetNodeOrNull<Lantern>("Lantern");
-		Vector3 near = note.PlateWorld + TestBot.Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 2.4f;
-		near.Y = note.GlobalPosition.Y;
+		var trail = lot.Trail(piece);
+		var cache = lot.Cache(piece);
+		Require($"trail {piece} and its cache", trail.Count > 0 && cache != null);
+		foreach (var note in new[] { trail[0], trail[^1] })
+		{
+			Vector3 near = note.PlateWorld + TestBot.Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 2.4f;
+			near.Y = note.GlobalPosition.Y;
+			await _bot.LanternMode(false, ct);
+			await _bot.Teleport(near, note.PlateWorld, ct);
+			await _bot.Aim(note.PlateWorld, ct);
+			await _bot.Seconds(0.5, ct);
+			Check($"arrow {note.Label}: nothing to see by the flame", !note.Revealed, $"glow {note.Glow:0.00}");
+			await _bot.LanternMode(true, ct);
+			await _bot.Aim(note.PlateWorld, ct);
+			await _bot.WaitUntil(() => note.Revealed, 4, ct);
+			Check($"arrow {note.Label} shows under the blacklight", note.Revealed, $"glow {note.Glow:0.00}");
+			if (piece == 1 && note == trail[0]) Shot("blacklight_arrow");
+		}
+		Vector3 c = cache.TinWorld;
+		await _bot.Teleport(c + TestBot.Flat(trail[^1].GlobalPosition - c).Normalized() * 1.6f, c, ct);
+		await _bot.Aim(c, ct);
+		await _bot.WaitUntil(() => cache.Glint > 0.3f, 3, ct);
+		Check($"half {piece}'s tin glints under the blacklight", cache.Glint > 0.3f, $"glint {cache.Glint:0.00}");
+		Shot($"key_half_{piece}");
 		await _bot.LanternMode(false, ct);
-		await _bot.Teleport(near, note.PlateWorld, ct);
-		await _bot.Aim(note.PlateWorld, ct);
-		await _bot.Seconds(0.5, ct);
-		Check($"number {note.Label}: nothing to see by the flame", !note.Revealed, $"glow {note.Glow:0.00}");
-		await _bot.LanternMode(true, ct);
-		await _bot.Aim(note.PlateWorld, ct);
-		await _bot.WaitUntil(() => note.Revealed, 4, ct);
-		Check($"number {note.Label} shows under the blacklight", note.Revealed, $"glow {note.Glow:0.00}");
-		if (i == 0) Shot("blacklight_number");
-		await _bot.Seconds(0.5, ct);
-		Check($"digit {i + 1} ({note.Digit}) saved", Story.HasFlag(StoryManager.Flag.CodeDigit(i + 1)));
-		await _bot.LanternMode(false, ct);
+		await _bot.Aim(c, ct);
+		Check($"the tin offers itself", _bot.Prompt == "Open the tin", $"'{_bot.Prompt}'");
+		await _bot.Press(ct);
+		await _bot.WaitUntil(() => Story.HasFlag(StoryManager.Flag.KeyPiece(piece)), 4, ct);
+		Check($"half {piece} taken, saved", cache.Taken && Story.HasFlag(StoryManager.Flag.KeyPiece(piece)));
 	}
 
 	// ------------------------------------------------------------------ Act 5
@@ -402,20 +416,11 @@ public partial class Playtest
 		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
 		Check("the burning cabin is sealed: no way in", cabin.Sealed && await _bot.RayHits(cabin.DoorCenter + fwd * 1.2f, cabin.DoorCenter - fwd * 1.2f, ct));
 		var lot = GetTree().GetFirstNodeInGroup("survey_lot") as SurveyLot;
-		if (lot is { Notes.Count: 4 }) for (int i = 2; i < 4; i++) await ReadTreeNote(lot, i, ct);
-		Check("all four digits known before the bunker", lot != null && lot.ReadCount == 4 && lot.Known == lot.Code, $"known {lot?.Known}, code {lot?.Code}");
+		if (lot != null) await TakeKeyHalf(lot, 2, ct);
+		Check("both halves of the key before the bunker", SurveyLot.PiecesFound == 2, $"{SurveyLot.PiecesFound} of 2");
 	}
 
 	// ------------------------------------------------------------------ Acts 8-10
-
-	/// <summary>One press and release of a keyboard key through the real input pipeline (the bunker's keypad reads the number keys).</summary>
-	private async Task TypeKey(Key key, CancellationToken ct)
-	{
-		Godot.Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = true }); Godot.Input.FlushBufferedEvents();
-		await _bot.Frames(2, ct);
-		Godot.Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = false }); Godot.Input.FlushBufferedEvents();
-		await _bot.Frames(2, ct);
-	}
 
 	private async Task Act8To10(CancellationToken ct)
 	{
@@ -426,56 +431,21 @@ public partial class Playtest
 		await _bot.Teleport(bunker.ApproachPointWorld + (bunker.ApproachPointWorld - bunker.HatchWorld).Normalized() * 5f, bunker.HatchWorld, ct);
 		await _bot.WalkTo(bunker.ToGlobal(new Vector3(0, 0.3f, 2.0f)), 0.6f, ct);
 		Check("the hatch is shut", !bunker.IsOpen);
-		// (2026-10-13) the code goes in on the keypad right of the door, in the world: no overlay, no cursor
-		var pad = bunker.Keypad;
-		Require("the keypad", pad != null);
-		Check("the keypad is awake after the fire", pad.Powered && pad.LampState == BunkerKeypad.Lamp.Locked, $"powered {pad.Powered}, lamp {pad.LampState}");
-		await _bot.WalkTo(bunker.ToGlobal(new Vector3(1.3f, 0.3f, 1.5f)), 0.5f, ct);
-		var mouse = Godot.Input.MouseMode;
-		await _bot.Aim(bunker.KeypadWorld, ct);
-		Shot("keypad");
+		// (2026-10-15) the keyhole in the door: both halves joined in the hand, then turned
+		await _bot.Aim(bunker.KeyholeWorld, ct);
+		Shot("keyhole");
+		bool both = SurveyLot.PiecesFound == 2;
+		Check("the door offers the key", !both || _bot.Prompt.Contains("key"), $"'{_bot.Prompt}'");
+		int shown = HeldUse.Shown;
 		await _bot.Press(ct);
-		await _bot.WaitUntil(() => pad.Engaged, 3, ct);
-		Require("E on the keypad leans in to it", pad.Engaged);
-		await _bot.Seconds(0.8, ct);   // the view eases in
-		Check("a close view of the pad, the mouse untouched", GetViewport().GetCamera3D()?.GetParent() == pad && Godot.Input.MouseMode == mouse && Input.Modal,
-			$"camera {GetViewport().GetCamera3D()?.Name}, mouse {Godot.Input.MouseMode} (was {mouse})");
-		Check("the readout starts empty: the code is the player's to remember", pad.Entered == "", $"'{pad.Entered}'");
-		Shot("keypad_close");
-		if (Player.GetNodeOrNull<Lantern>("Lantern") is { } padLantern)
-		{
-			padLantern.SetBlacklight(true);
-			await _bot.Seconds(0.4, ct);
-			Shot("keypad_blacklight");
-			padLantern.SetBlacklight(false);
-		}
-		// the arrows (the D-pad) and E press the highlighted key; the view's centre sits on it
-		await _bot.Key("move_forward", ct);
-		await _bot.Key("interact", ct);
-		Check("up from 5 and E: 2", pad.Entered == "2" && pad.Selected == 1, $"'{pad.Entered}', on {BunkerKeypad.Keys[pad.Selected]}");
-		await TypeKey(Key.Backspace, ct);
-		Check("Backspace takes it back", pad.Entered == "", $"'{pad.Entered}'");
-		// a wrong code, through the numpad and Enter: a buzz, the red lamp, cleared
-		foreach (var k in new[] { Key.Kp1, Key.Kp3, Key.Kp5, Key.Kp7 }) await TypeKey(k, ct);
-		Check("the number keys type", pad.Entered == "1357", $"'{pad.Entered}'");
-		await TypeKey(Key.Enter, ct);
-		await _bot.Seconds(0.1, ct);
-		Check("a wrong code: the red lamp, still shut", pad.Denying && !bunker.IsOpen, $"lamp {pad.LampState}");
-		await _bot.WaitUntil(() => pad.Entered == "" && pad.LampState == BunkerKeypad.Lamp.Locked, 3, ct);
-		Check("...and it clears", pad.Entered == "" && pad.Engaged, $"'{pad.Entered}'");
-		// the code remembered from the four notes, keyed in on the top-row number keys (which also switch the item in hand, elsewhere)
-		string code = lot?.Code ?? "";
-		var handBefore = Player.Inventory?.InHand; int switchesBefore = PlayerHands.Instance?.Switches ?? 0;
-		foreach (char c in code) await TypeKey(Key.Key0 + (c - '0'), ct);
-		Check("the number keys go to the pad, not the hands", Player.Inventory?.InHand == handBefore && (PlayerHands.Instance?.Switches ?? 0) == switchesBefore, $"in hand {Player.Inventory?.InHand} (was {handBefore})");
-		Check("the remembered code keyed in", pad.Entered == code, $"{pad.Entered} vs {code}");
-		Shot("keypad_code");
-		await TypeKey(Key.KpEnter, ct);
+		await _bot.WaitUntil(() => HeldUse.Shown > shown, 2, ct);
+		Check("the halves come up in the hand", HeldUse.Last == ToolKind.BunkerKey, $"{HeldUse.Last}");
+		await _bot.Seconds(1.0, ct);
+		Shot("key_joining");
 		await _bot.WaitUntil(() => bunker.IsOpen, 5, ct);
-		Check("the code from the notes opens it, saved", bunker.IsOpen && Story.HasFlag(StoryManager.Flag.BunkerUnlocked));
-		Check("the green lamp", pad.LampState == BunkerKeypad.Lamp.Open);
-		await _bot.WaitUntil(() => !pad.ViewUp && !Input.Modal, 4, ct);
-		Check("the view comes back to the eye and control with it", !pad.ViewUp && !Input.Modal && GetViewport().GetCamera3D() == Player.CameraRig.Camera);
+		Check("the key opens it, saved", bunker.IsOpen && Story.HasFlag(StoryManager.Flag.BunkerUnlocked) && Story.HasFlag(StoryManager.Flag.KeyAssembled));
+		await _bot.WaitUntil(() => !HeldUse.Busy && !Input.Modal, 4, ct);
+		Check("control comes back", !HeldUse.Busy && !Input.Modal);
 		await _bot.WalkTo(bunker.EntryPointWorld, 0.3f, ct, () => Story.Current >= Checkpoint.Act8BunkerEntered);
 		await _bot.WaitUntil(() => Story.Current >= Checkpoint.Act8BunkerEntered, 10, ct);
 		Check("checkpoint 7 entering the bunker", Story.Current == Checkpoint.Act8BunkerEntered);

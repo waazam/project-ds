@@ -65,10 +65,17 @@ public partial class StoryManager : Node
 		/// <summary>Legacy (never set since 2026-09-22): the old optional extended climb. Kept so old saves and the
 		/// systems preview still read; <see cref="World.StairsState"/> still honours it.</summary>
 		public const string Act6ExtendedClimb = "act6_extended_climb";
-		/// <summary>Act 7: the bunker door's dial was opened with the survey stakes' code (the door stays open).</summary>
+		/// <summary>Act 7: the bunker door was unlocked (since 2026-10-15 with R.H.'s key, its two halves joined; the door stays open).</summary>
 		public const string BunkerUnlocked = "bunker_unlocked";
-		/// <summary>Acts 3-7: the n-th (1-4) survey stake's digit has been read under the lantern (the HUD tracker and the dial pre-fill from these).</summary>
+		/// <summary>Legacy (never set since 2026-10-15): the n-th (1-4) of R.H.'s door-code digits read under the blacklight. The code
+		/// is gone (two halves of a key now); an old save's digits become the halves (<see cref="MigrateFlags"/>).</summary>
 		public static string CodeDigit(int n) => $"code_digit_{n}";
+		/// <summary>Acts 3-7 (2026-10-15): the n-th (1-2) half of the bunker's key has been taken from R.H.'s hiding place at the
+		/// end of its blacklight arrows (<see cref="World.SurveyLot"/>): 1 off the walk to the cabin, 2 off the walk from the
+		/// lookout to the bunker.</summary>
+		public static string KeyPiece(int n) => $"key_piece_{n}";
+		/// <summary>Act 7: the two halves were joined at the bunker's door (the key turned; <see cref="BunkerUnlocked"/> follows).</summary>
+		public const string KeyAssembled = "key_assembled";
 		/// <summary>Act 11: the newel cap was put back at the foot of the last staircase (it is whole; the climb followed).</summary>
 		public const string NewelSeated = "newel_seated";
 		/// <summary>Act 10: the hallway has turned into the maze (re-entering the bunker lands in the maze).</summary>
@@ -283,6 +290,7 @@ public partial class StoryManager : Node
 		_flags.Clear();
 		foreach (var f in data.Flags) _flags.Add(f);
 		if (data.Checkpoint >= Checkpoint.Act2StairsClimbed) _flags.Add(Flag.StairsClimbed);
+		MigrateFlags(_flags);
 		PendingInventory = data.Inventory;
 		LoadedFromSave = true;
 		ArrivedByTravel = false;
@@ -395,6 +403,16 @@ public partial class StoryManager : Node
 		if (string.IsNullOrEmpty(path) || _packed.ContainsKey(path) || _preloading.Contains(path)) return;
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-preload") >= 0) return;
 		if (ResourceLoader.LoadThreadedRequest(path, "PackedScene", false) == Error.Ok) { _preloading.Add(path); GD.Print($"[load] reading {System.IO.Path.GetFileName(path)} in the background"); }
+	}
+
+	/// <summary>(2026-10-15, the owner: the door code became two halves of a key) An old save's code digits as the halves: a
+	/// digit of the walk to the cabin (1, 2) means that walk was searched, so its half counts as found; the same for the walk
+	/// to the bunker (3, 4). A door already open had both, joined.</summary>
+	public static void MigrateFlags(HashSet<string> flags)
+	{
+		if (flags.Contains(Flag.CodeDigit(1)) || flags.Contains(Flag.CodeDigit(2))) flags.Add(Flag.KeyPiece(1));
+		if (flags.Contains(Flag.CodeDigit(3)) || flags.Contains(Flag.CodeDigit(4))) flags.Add(Flag.KeyPiece(2));
+		if (flags.Contains(Flag.BunkerUnlocked)) { flags.Add(Flag.KeyPiece(1)); flags.Add(Flag.KeyPiece(2)); flags.Add(Flag.KeyAssembled); }
 	}
 
 	/// <summary>Advances the story and checkpoint-saves. Never moves the checkpoint backwards.</summary>

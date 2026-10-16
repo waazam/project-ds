@@ -103,7 +103,7 @@ public partial class UvTour : Node3D
 	private async Task Sites()
 	{
 		var scene = GetTree().CurrentScene;
-		// the Hollow: the first number's tree and the decoys round it, then one close
+		// the Hollow: every other arrow tree of R.H.'s two trails (2026-10-15: arrows, not numbers), then a decoy close
 		if (Find<SurveyLot>(scene) is { } lot)
 		{
 			for (int i = 0; i < lot.Notes.Count; i += 2)

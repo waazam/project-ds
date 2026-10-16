@@ -5,6 +5,8 @@ using ProjectDS.Systems;
 namespace ProjectDS.World;
 
 /// <summary>
+/// (2026-10-15: since the owner's key-halves change, the lot builds these as R.H.'s blacklight arrows (<see cref="Arrow"/>)
+/// and as decoys; the digit mode below is kept but no longer placed.)
 /// One of R.H.'s four code numbers (Acts 3-7, along the Hollow path). The owner's blacklight mechanic
 /// replaced the old paper notes: the digit is brushed big on a bare trunk off the path in ink that only
 /// the lantern's blacklight shows (<see cref="UvInk"/>), and nothing else marks the tree. It can be on
@@ -39,6 +41,15 @@ public partial class TreeNote : Node3D
 	[Export] public float LookDegrees = 45f;
 	/// <summary>The paper winks from this far, so the note is noticed from the path.</summary>
 	[Export] public float NoticeDistance = 20f;
+	/// <summary>(2026-10-15, the owner: the code became two halves of a key, found by "following arrows on trees using the
+	/// blacklight") One of R.H.'s arrows instead of a digit: brushed in the same ink, turned <see cref="ArrowTurn"/> radians
+	/// in its plane (counter-clockwise as faced; 0 points up, straight on past the tree) toward his next tree
+	/// (<see cref="SurveyLot"/>). No nudges of its own: the lot has them.</summary>
+	[Export] public bool Arrow;
+	[Export] public float ArrowTurn;
+	/// <summary>A trace in plain light at the arrow's height: an old paint smear and a knife's notch, dried and dull, the one
+	/// sign under the flame that someone marked this tree (the first tree of each trail, by the path).</summary>
+	[Export] public bool Trace;
 
 	/// <summary>Glow 0..1 of the read (for tests and the reveal state).</summary>
 	public float Glow { get; private set; }
@@ -106,7 +117,14 @@ public partial class TreeNote : Node3D
 		float rAt(float yy) => TrunkRadius * Mathf.Lerp(1.02f, 0.18f, yy / TrunkHeight);
 		var ink = new Node3D { Name = "Ink", Basis = post };
 		AddChild(ink);
-		if (!Decoy)
+		if (Arrow)
+		{
+			float y = NoteHeight;
+			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.36f, 0.48f, UvInk.Arrow(rng.RandiRange(0, 2)), UvInk.Cyan, 1.9f, false, 0f, ArrowTurn);
+			_sheetLocal = post * (new Vector3(Mathf.Sin(MarkAngle), 0, Mathf.Cos(MarkAngle)) * (rAt(y) + 0.02f) + Vector3.Up * y);
+			if (Trace) BuildTrace(post, rAt(y - 0.42f), y - 0.42f, rng);
+		}
+		else if (!Decoy)
 		{
 			float y = NoteHeight;
 			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.42f, 0.52f, UvInk.Digit(Mathf.Clamp(Digit, 0, 9)), UvInk.Cyan, 1.9f, false, rng.RandfRange(-0.04f, 0.04f));
@@ -115,9 +133,10 @@ public partial class TreeNote : Node3D
 		// (2026-10-13, the owner: "too grouped up") one or two to a tree, never overlapping each other or his number;
 		// a hand is often the thing's (it climbs these, its long fingers round the bark), now and then a person's,
 		// at a hand's real size
-		int marks = Decoy ? rng.RandiRange(1, 2) : rng.RandiRange(0, 1);
+		int marks = Decoy ? rng.RandiRange(1, 2) : Arrow ? (rng.Randf() < 0.3f ? 1 : 0) : rng.RandiRange(0, 1);
 		var placed = new System.Collections.Generic.List<(float y, float a, float s)>();
 		if (!Decoy) placed.Add((NoteHeight, MarkAngle, 0.52f));
+		if (Trace) placed.Add((NoteHeight - 0.42f, MarkAngle, 0.3f));
 		for (int i = 0; i < marks; i++)
 		{
 			Texture2D tex;
@@ -155,6 +174,32 @@ public partial class TreeNote : Node3D
 		if (Decoy) _sheetLocal = post * (Vector3.Up * NoteHeight);
 	}
 
+	/// <summary>The trace (<see cref="Trace"/>): a dull, dried smear of the paint, flaking, and a notch cut through the bark
+	/// beside it, a hand's width under the arrow. Plain decals: seen under the flame, from the path, if looked at.</summary>
+	private void BuildTrace(Basis post, float radius, float y, RandomNumberGenerator rng)
+	{
+		Vector3 d = post * new Vector3(Mathf.Sin(MarkAngle), 0, Mathf.Cos(MarkAngle));
+		Vector3 up = post * Vector3.Up;
+		Vector3 right = up.Cross(d).Normalized();
+		// (a decal projects along its -Y: Y out of the bark, X across, Z down the trunk)
+		var basis = new Basis(right, d, -up);
+		Vector3 at = d * (radius * 0.6f) + up * y;
+		AddChild(new Decal
+		{
+			Name = "TraceSmear", TextureAlbedo = UvInk.Smear(rng.RandiRange(0, 20)), Modulate = new Color(0.46f, 0.52f, 0.56f, 0.8f),
+			Size = new Vector3(0.3f, radius * 0.9f + 0.1f, 0.2f), AlbedoMix = 0.85f, UpperFade = 0.2f, LowerFade = 0.2f,
+			DistanceFadeEnabled = true, DistanceFadeBegin = 22f, DistanceFadeLength = 6f, CullMask = 1,
+			Transform = new Transform3D(basis.Rotated(d, rng.RandfRange(-0.3f, 0.3f)), at),
+		});
+		AddChild(new Decal
+		{
+			Name = "TraceNotch", TextureAlbedo = UvInk.Scratches(), Modulate = new Color(0.78f, 0.66f, 0.5f, 0.9f),
+			Size = new Vector3(0.12f, radius * 0.9f + 0.1f, 0.16f), AlbedoMix = 0.9f, UpperFade = 0.2f, LowerFade = 0.2f,
+			DistanceFadeEnabled = true, DistanceFadeBegin = 22f, DistanceFadeLength = 6f, CullMask = 1,
+			Transform = new Transform3D(basis, at + right * 0.2f + up * 0.04f),
+		});
+	}
+
 	public override void _Process(double delta)
 	{
 		if (_player == null || !IsInstanceValid(_player))
@@ -170,7 +215,7 @@ public partial class TreeNote : Node3D
 		Vector3 sheet = PlateWorld;
 		float playerDist = sheet.DistanceTo(_player.GlobalPosition);
 		// The blacklight on it, close enough, looking at it, nothing in the way: the read.
-		if (!Decoy && playerDist < WakeDistance && _player.CameraRig?.Camera is { } cam)
+		if (!Decoy && playerDist < WakeDistance && _player.CameraRig?.Camera is { } cam && (!Arrow || !Read))
 		{
 			Vector3 eye = cam.GlobalPosition;
 			Vector3 to = sheet - eye;
@@ -197,7 +242,7 @@ public partial class TreeNote : Node3D
 		}
 		Glow = Mathf.MoveToward(Glow, target, dt * (target > Glow ? 3f : 1.8f));
 		if (Revealed && !Read) { Read = true; FirstRead?.Invoke(); }
-		if (!Decoy) Hints(dt, playerDist);
+		if (!Decoy && !Arrow) Hints(dt, playerDist);
 	}
 
 	// ------------------------------------------------------------------ the nudges (2026-10-13)

@@ -29,11 +29,11 @@ public partial class ContinueRoundTripTest : Node
 	internal record Scenario(string Name, Checkpoint Cp, string[] Flags, string Inventory);
 
 	private static readonly string[] F2 = { StoryManager.Flag.StairsClimbed };
-	private static readonly string[] F5 = F2.Concat(new[] { StoryManager.Flag.StormStarted, StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2) }).ToArray();
+	private static readonly string[] F5 = F2.Concat(new[] { StoryManager.Flag.StormStarted, StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.KeyPiece(1) }).ToArray();
 	private static readonly string[] F6 = F5.Concat(new[] { StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke }).ToArray();
 	private static readonly string[] F6Voice = F6.Concat(new[] { StoryManager.Flag.ClearingVoiceHeard }).ToArray();
 	// The giant is seen from the Act 7 lookout (after checkpoint 6): a save at the lookout carries it once it has crossed.
-	private static readonly string[] F7 = F6Voice.Concat(new[] { StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone, StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4) }).ToArray();
+	private static readonly string[] F7 = F6Voice.Concat(new[] { StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell, StoryManager.Flag.GiantEventDone, StoryManager.Flag.KeyPiece(2) }).ToArray();
 	private static readonly string[] F9 = F7.Concat(new[] { StoryManager.Flag.CrtPuzzleDone, StoryManager.Flag.WalkieTaken }).ToArray();
 	private static readonly string[] F10Scared = F9.Concat(new[] { StoryManager.Flag.BunkerMazeEntered, BunkerRooms.ScaredFlag }).ToArray();
 	private static readonly string[] F10 = F10Scared.Concat(new[] { StoryManager.Flag.BunkerMazeExited }).ToArray();

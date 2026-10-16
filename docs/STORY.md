@@ -4,6 +4,7 @@ The authoritative outline of the game's story, act by act. Implementation follow
 
 **Revision 4 (2026-10-13): the whole story, as built.** This revision brings the outline up to date with the game through Act 25 and the end. It adds no new story; it describes what the game does, including Dan's changes of 2026-10-13: the falls seen in Act 1 and the title only with the stairs in view, the single wake, the code kept from memory, the clearing and the blood rain coming in at the cabin door, the fall off the edge of the last landing, the new rowing, and the shorter stairwell, hallways and long stair. Earlier revisions:
 - **Revision 4.1 (2026-10-13): owner decisions.** Dan settled the open points against the game as it plays: the rain stops for good when the cap is picked up, still inside the cabin; the code trees stay where they are (two on the walk to the cabin, two on the walk to the bunker) and the code is dialled from memory; the fir holds the player 7 to 9 seconds, and falls anyway after about 25 if they never look; the Act 11 climb stays short (about 32 seconds) and the long stair is 16 flights; the stairwell's music is timed to build to the bottom; every lake crossing has one near miss right behind the boat, and the breach bursts out with no eye opening first; "Who are you!" is the player's own shout; the giant paces its sky lane until the player has watched the fire, its rattle riding with it; and two rules loosened (rare one- or two-word thought captions; the album's and the credits' count of 69).
+- **Revision 4.2 (2026-10-15): the key in two halves.** Dan replaced the four code numbers and the bunker's keypad with two halves of R.H.'s key. Blacklight arrows on the trees lead off the path to each half, one before the cabin and one before the bunker, and the halves are joined and turned in the door's keyhole (Act 3, Act 7). This supersedes 4.1's code trees.
 - Revision 2 (2026-09-22) made the story linear, with no backtracking.
 - Revision 3 (2026-10-04) carried it past Act 11, through the lake, the station, the underground, the church, the winter woods and the lodge.
 
@@ -100,16 +101,24 @@ Nothing is said. A little way ahead, a lantern is burning at someone's camp.
 
 R.H.'s camp: his tent, a cold fire ring and his pack. On a stump are the lantern and the compass, with a note from him written to whoever finds it:
 
-> *"If you're reading this, it got you too. Don't stay out here after dark. There's an old cabin up the hollow. The needle knows the way. Past it there's a bunker. Steel door, four numbers. I put them on the trees on the way, in the ink only the lantern's black light shows. Look close. Not every mark out there is mine. Leave the lantern lit. - R.H."*
+> *"If you're reading this, it got you too. Don't stay out here after dark. There's an old cabin up the hollow. The needle knows the way. Past it there's a bunker. Steel door. I had its key. I cut it in two so it can't carry it in whole, and hid the halves off the path, one before the cabin, one before the bunker. Arrows on the trees take you to each, in the ink only the lantern's black light shows. Look close. Not every mark out there is mine. Leave the lantern lit. - R.H."*
 
-The code is 4729. Its four numbers stand on trees at fixed spots, the same every game: the first two on the walk from the camp to the cabin, the last two on the walk from the lookout to the bunker. There is no tracker of the code on the HUD: the player has to remember the numbers and dial them from memory at the bunker's door, with only the blacklight hints below to help. Nothing is said.
+**The key in two halves (2026-10-15, Dan's change: it replaces the four code numbers).** R.H. cut the bunker's key in two and hid the halves off the path, each at the end of a trail of arrows brushed on dead trunks in the blacklight's ink. The trails are the same every game:
+- **Half 1** is off the walk from the camp to the cabin (Acts 3-4), the first stretch with the lantern. Its trail leaves the path a little before halfway and ends at a hollow stump; the half lies in a rusted tobacco tin on the rot inside it.
+- **Half 2** is off the walk from the lookout to the bunker (Act 7), about halfway. Its trail ends at a cairn; the tin is tucked under the flat stone over a gap at its foot.
+- **The arrows.** Each trail is seven dead trees, 11 to 15 m apart, and runs some 90 to 120 m into the woods. It is never a straight line: it makes two or three real turns of 35 to 60 degrees. Each arrow faces someone coming from the tree before and points at the next tree, or at the hiding place from the last one. The ink fades past about 6 m and is gone at 13, so the next arrow has to be looked for in the direction the last one points.
+- **The trace.** Under the flame a trail is only dead trees. The one sign in plain light is on the first tree of each, a few metres off the path: an old, dried smear of the paint and a knife notch in the bark.
+- **Decoys.** Two trees by each start and one by each end carry marks that aren't his: clawed hands, smears, tallies, an eye, struck-out digits. The ground round each start is marked too.
+- **The hiding place.** Under the blacklight the tin glints from a few metres away; under the flame it is an old tin. One press opens it, the half shows in it, and it is taken: "Half of a key." (or "The other half of the key."). It is saved at once. Each half found turns the stalker's clicking up a notch.
+
+There is no tracker on the HUD; the halves are simply carried. At the bunker they are joined and turned in the door's keyhole (Act 7). Old saves carry over: a code digit from either walk counts as that walk's half, and a door already open had both halves, joined.
 
 **Lantern.** A radial light source:
 - F lights it and puts it out.
 - Its beam can be gathered by holding right mouse, like the other focus mechanic.
 - B switches to its **blacklight**, a steady violet cone that helps little to see by. It shows what is written in ink only it can show, lying on the bark, boards and stone it was put on: words, hands and footprints all over the game. A person's hand prints as a hand; the thing's prints are clawed.
 
-**The flame gutters out.** A few seconds after the lantern is first lit at the camp, the flame gutters out: "The flame's gone out. B: try its blacklight." It won't take again until the blacklight has been on a while and has shown what's written round the camp. Then the wick catches again ("The wick's caught again. B: back to the flame."). It happens once. Once it is over, if no number has been found yet, a short line under the picture says his numbers are on the trees and names the blacklight's key ("His numbers are on the trees.   B: the blacklight shows them."). Walking on past one of them without the blacklight on brings one more ("Something on a tree back there.   B: the blacklight."). Each comes once in a game, and the hints name the keys as the player has bound them.
+**The flame gutters out.** A few seconds after the lantern is first lit at the camp, the flame gutters out: "The flame's gone out. B: try its blacklight." It won't take again until the blacklight has been on a while and has shown what's written round the camp. Then the wick catches again ("The wick's caught again. B: back to the flame."). It happens once. Once it is over, standing by the first tree of either arrow trail (the old paint on it) with only the flame on, before that half is found, brings one short line under the picture that names the blacklight's key ("Old paint on that tree.   B: the blacklight."). It comes once in a game, and the hints name the keys as the player has bound them.
 
 **Compass.** Equipping it points to the player's current objective, but it gradually goes haywire the closer you get to the stairs.
 - It is an unobtrusive little UI element at the very top of the screen, similar to Skyrim's compass but a bit more translucent, with N, S, E, W shown accurately.
@@ -121,9 +130,9 @@ The code is 4729. Its four numbers stand on trees at fixed spots, the same every
 **Leaving the safe zone.** After picking these up, the moment you step outside the camp's radius (the "safe zone"), the game goes dead silent under the rain, as if you were by the stairs. The rain that has fallen since the wake goes on, low thunder rumbles, and lightning crackles across the sky, distant but bright.
 
 All we hear is the patter of the rain while we follow the compass toward the cabin, following the man who wrote the note.
-- Beside the path on the way, the first two of R.H.'s numbers (4 and 7) are brushed big on bare dead trunks in the blacklight's ink, always on the same two trees. Each is a few metres off the path and a little way round its trunk.
-- Round each stand dead trees with marks that aren't his: handprints (most of them clawed), smears, tallies, an eye, struck-out digits. The ground is marked too. They are spread through the trees, not heaped in one spot.
-- Under the flame a number tree is just a dead tree. Only the blacklight on it, from close by, reads it: the number comes up big on screen for a moment, and nothing keeps it for them.
+- A little before halfway, the first arrow trail leaves the path (see "The key in two halves" above). It runs off through the trees to the hollow stump that holds the first half.
+- Round its start stand dead trees with marks that aren't his: handprints (most of them clawed), smears, tallies, an eye, struck-out digits. The ground is marked too, here and now and then along the whole walk.
+- Under the flame an arrow tree is just a dead tree. Only the blacklight on it, from close by, shows the arrow.
 
 ## Act 4: The Storm Walk
 On the way to the cabin, in the storm, nothing big shows itself: this walk is the stalker's introduction as a character.
@@ -144,7 +153,7 @@ Now and then the dark makes a sound of its own, never seen and never the same tw
 - a twig snapping close behind;
 - three knocks on wood.
 
-(The giant is not seen here; it is saved for the lookout in Act 7.) The first two of R.H.'s numbers stand on this walk (Act 3), seen only by the blacklight. The compass keeps pointing to the cabin.
+(The giant is not seen here; it is saved for the lookout in Act 7.) The first half of R.H.'s key lies off this walk at the end of his arrows (Act 3), seen only by the blacklight. The compass keeps pointing to the cabin.
 
 ## Act 5: Let Me In
 **Checkpoint 4**, on getting inside the cabin.
@@ -207,7 +216,7 @@ When they step outside with the cap, the rain is already over and the woods are 
 
 **No whispers on the walk.** The voice is only ever heard where staircases stand (the clearing behind them, the last staircase ahead); the walk to the bunker is silent of it.
 
-**The bunker.** The compass now points onward to a new structure, a bunker deep in the woods beyond the ridge. The last two of his numbers (2 and 9) are on trees beside the path on the way, always the same two, in the same ink, among the same decoys. Bare footprints in the ink lead from the lookout all the way to the bunker's door. At the bunker the dial on the door starts at 0000; with no tracker on screen, the player dials the four from memory, and 4729 in order opens it.
+**The bunker.** The compass now points onward to a new structure, a bunker deep in the woods beyond the ridge. About halfway there his second arrow trail leaves the path, in the same ink and among the same kind of decoys, and leads to the cairn that hides the other half of the key. Bare footprints in the ink lead from the lookout all the way to the bunker's door. The door has a brass keyhole in its face, low and right of the wheel. Without both halves it is "Locked. The key's in two pieces somewhere." (with one, "Half a key won't turn it. The other half's still out there."), and a line under the picture says where the missing half's trail starts. With both, using the door brings the two halves up in the hand, pinched between thumb and finger: the bit's knurled sleeve is screwed down onto the other half's threaded stub with a click, and the whole key goes into the lock and turns. The bolts clunk back and the door swings open and stays open.
 
 ## Act 8: The Bunker
 **Checkpoint 7**, when entering the bunker. Chapter three: *Root of the Problem*.

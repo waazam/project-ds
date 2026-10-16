@@ -103,9 +103,9 @@ public partial class StoryTest : Node
 		const string F = "";
 		string[] f2 = { StoryManager.Flag.StairsClimbed };
 		string[] f3 = f2.Concat(new[] { StoryManager.Flag.StormStarted, StoryManager.Flag.PickupTakenLantern, StoryManager.Flag.PickupTakenCompass, "read_camp_note" }).ToArray();
-		string[] f5 = f3.Concat(new[] { StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke, StoryManager.Flag.CodeDigit(1), StoryManager.Flag.CodeDigit(2) }).ToArray();
+		string[] f5 = f3.Concat(new[] { StoryManager.Flag.CabinDoorOpen, StoryManager.Flag.PickupTakenAxe, StoryManager.Flag.NewelPostTaken, StoryManager.Flag.DawnBroke, StoryManager.Flag.KeyPiece(1) }).ToArray();
 		string[] f7 = f5.Concat(new[] { StoryManager.Flag.ClearingVoiceHeard, StoryManager.Flag.ClearingLoopDone, StoryManager.Flag.Act6NightFell }).ToArray();
-		string[] f8 = f7.Concat(new[] { StoryManager.Flag.GiantEventDone, StoryManager.Flag.CodeDigit(3), StoryManager.Flag.CodeDigit(4) }).ToArray();
+		string[] f8 = f7.Concat(new[] { StoryManager.Flag.GiantEventDone, StoryManager.Flag.KeyPiece(2) }).ToArray();
 		string[] f11 = f8.Concat(new[] { StoryManager.Flag.BunkerUnlocked, StoryManager.Flag.CrtPuzzleDone, StoryManager.Flag.WalkieTaken, StoryManager.Flag.BunkerMazeEntered, "bunker_rooms_scared", StoryManager.Flag.BunkerMazeExited }).ToArray();
 		const string gear3 = "lantern,compass;tool=None", gear5 = "lantern,compass,newel_post;tool=None", gear11 = "lantern,compass,newel_post,radio;tool=None";
 		return act switch
@@ -702,10 +702,10 @@ public partial class StoryTest : Node
 		if (cabin == null) { Check("the cabin exists", false); return; }
 		// No key any more (Dan, 2026-09-22): the shed's hammer is simply there for the taking.
 		Check("no key lies on the way", Pickups(ToolKind.Key).FirstOrDefault() == null);
-		// The code's first two digits: R.H.'s notes 1 and 2 on trees beside the path on the way (read in the lantern's light).
+		// (2026-10-15) The key's first half: R.H.'s blacklight arrows off the path on the way, to a tin in a hollow stump.
 		var lot = FirstInGroup<SurveyLot>("survey_lot");
-		Check("four notes hang on trees along the path", lot is { Notes.Count: 4 }, $"{lot?.Notes.Count}");
-		if (lot != null) for (int i = 0; i < 2; i++) await ReadTreeNote(lot, i, ct);
+		Check("two arrow trails lead off the path", lot != null && lot.Trail(1).Count > 0 && lot.Trail(2).Count > 0, $"{lot?.Notes.Count} arrow trees");
+		if (lot != null) await FollowKeyTrail(lot, 1, ct);
 		await WalkAlongTrail(cabin.GlobalPosition, 60f, ct);
 		// The storm walk is the stalker's now (Dan, 2026-09-22): the giant is seen from the Act 7 lookout instead.
 		// Only its far footfalls reach the walk: a sparse bout of thuds now and then, never a body.
@@ -1269,10 +1269,10 @@ public partial class StoryTest : Node
 			Check("the trail leads on to the bunker without returning to the clearing", sBunk > sLook + 20f && nearestClearing > 60f, $"lookout s {sLook:0}, bunker s {sBunk:0}, nearest the clearing {nearestClearing:0} m");
 			Check("the way on passes by the burning cabin", nearestCabin < 75f, $"nearest the cabin {nearestCabin:0} m");
 		}
-		// The code's last two digits: notes 3 and 4 on trees beside the path on the way to the bunker.
+		// The key's other half: the arrows off the path on the way to the bunker, to a tin under a cairn's stone.
 		var lot = FirstInGroup<SurveyLot>("survey_lot");
-		if (lot is { Notes.Count: 4 }) for (int i = 2; i < 4; i++) await ReadTreeNote(lot, i, ct);
-		Check("all four digits are known before the bunker", lot != null && lot.ReadCount == 4 && lot.Known == lot.Code, $"known {lot?.Known}");
+		if (lot != null) await FollowKeyTrail(lot, 2, ct);
+		Check("both halves of the key are found before the bunker", SurveyLot.PiecesFound == 2, $"{SurveyLot.PiecesFound} of 2");
 	}
 
 	private async Task Act8To10Bunker(CancellationToken ct)
@@ -1284,12 +1284,11 @@ public partial class StoryTest : Node
 		await WalkAlongTrail(bunker.ApproachPointWorld, 40f, ct, Entered);
 		if (!Entered()) await WalkTo(bunker.ApproachPointWorld, 0.8f, ct, stopWhen: Entered);
 		await Seconds(0.5, ct);
-		Check("the hatch stays locked until the code is dialled", !bunker.IsOpen);
+		Check("the hatch stays locked until the key turns it", !bunker.IsOpen);
 
-		// The code was gathered on the way (the four notes on the trees): all four digits are known before the dial.
+		// The key's two halves were found on the way (R.H.'s arrows off the path).
 		var lot = FirstInGroup<SurveyLot>("survey_lot");
-		string read = lot?.Known ?? "";
-		Check("the four notes' digits were read on the way", lot != null && lot.ReadCount == 4 && read == lot.Code, $"known {read}, code {lot?.Code}");
+		Check("both halves of the key were found on the way", SurveyLot.PiecesFound == 2, $"{SurveyLot.PiecesFound} of 2");
 		// the blacklight footprints lead to the door (a look along them)
 		if (lot != null)
 		{
@@ -1305,48 +1304,33 @@ public partial class StoryTest : Node
 			lantern?.SetBlacklight(false);
 		}
 
-		// The keypad (2026-10-13: a real one beside the door, used in the world): a wrong code keeps it shut, the notes' code opens it.
-		await Teleport(bunker.ApproachPointWorld, bunker.KeypadWorld, ct);
-		await WalkTo(bunker.ToGlobal(new Vector3(1.3f, 0.3f, 1.5f)), 0.5f, ct);
-		await Aim(bunker.KeypadWorld, ct);
-		GD.Print($"[storytest] keypad: focused '{_player.Interaction?.Focused?.Name}' prompt '{_player.Interaction?.PromptText}'");
+		// (2026-10-15) The keyhole: no keypad any more; E on the door joins the halves in the hand and turns the key.
+		Check("no keypad by the door", FindUnder<ProjectDS.World.BunkerParts.BunkerKeypad>(bunker, null) == null);
+		Check("a keyhole on the door", bunker.FindChild("Keyhole", true, false) != null);
+		await Teleport(bunker.ApproachPointWorld, bunker.KeyholeWorld, ct);
+		await WalkTo(bunker.ToGlobal(new Vector3(0.3f, 0.3f, 1.6f)), 0.5f, ct);
+		await Aim(bunker.KeyholeWorld, ct);
+		string prompt = _player.Interaction?.PromptText ?? "";
+		GD.Print($"[storytest] keyhole: focused '{_player.Interaction?.Focused?.Name}' prompt '{prompt}'");
+		Check("the door offers the key", prompt.Contains("key"), $"'{prompt}'");
+		int shown = ProjectDS.Player.HeldUse.Shown;
 		await Press(ct);
-		var pad = bunker.Keypad;
-		await WaitUntil(() => pad is { Engaged: true }, 3, ct);
-		Check("E on the keypad leans in to it", pad is { Engaged: true });
-		await Seconds(0.8, ct);
-		Screenshot("keypad");
-		if (pad is { Engaged: true })
-		{
-			// (2026-10-13) the readout starts empty: the code is entered from memory, never filled in
-			Check("the keypad comes up empty, not filled in", pad.Entered == "", $"'{pad.Entered}'");
-			// the player keys a wrong code with the arrows (the D-pad) and E, as on a controller: 5, 5, 5, 5, then #
-			for (int i = 0; i < 4; i++) await Key("interact", ct);
-			await MoveTo(pad, ProjectDS.World.BunkerParts.BunkerKeypad.Enter, ct);
-			await Key("interact", ct);
-			await Seconds(0.1, ct);
-			Check("a wrong code keeps the hatch shut and lights the red lamp", !bunker.IsOpen && pad.Denying, $"lamp {pad.LampState}");
-			await WaitUntil(() => pad.Entered == "" && pad.LampState == ProjectDS.World.BunkerParts.BunkerKeypad.Lamp.Locked, 3, ct);
-			// then the code they remember, key by key through the same keys
-			foreach (char c in lot?.Code ?? "")
-			{
-				await MoveTo(pad, System.Array.IndexOf(ProjectDS.World.BunkerParts.BunkerKeypad.Keys, c.ToString()), ct);
-				await Key("interact", ct);
-			}
-			Check("the remembered code is keyed in", pad.Entered == lot?.Code, $"'{pad.Entered}'");
-			await MoveTo(pad, ProjectDS.World.BunkerParts.BunkerKeypad.Enter, ct);
-			await Key("interact", ct);
-		}
+		await WaitUntil(() => ProjectDS.Player.HeldUse.Shown > shown, 2, ct);
+		Check("the key's two halves come up in the hand, pinched", ProjectDS.Player.HeldUse.Last == ToolKind.BunkerKey && ProjectDS.Player.HeldUse.Shown > shown, $"{ProjectDS.Player.HeldUse.Last}");
+		await Seconds(0.9, ct);
+		Screenshot("key_halves_joining");
+		await WaitUntil(() => StoryManager.Instance.HasFlag(StoryManager.Flag.KeyAssembled), 3, ct);
+		Check("the halves are joined", StoryManager.Instance.HasFlag(StoryManager.Flag.KeyAssembled));
 		await WaitUntil(() => bunker.IsOpen, 5, ct);
-		Check("the notes' code opens the bunker door", bunker.IsOpen);
+		Check("the key opens the bunker door", bunker.IsOpen);
 		{
 			var dressed = AllOf<DecalDresser>().Where(d => d.GetParent()?.GetParent() is BunkerInterior).ToList();
 			Check("the bunker's hall and CRT room are stained (mould, old blood, standing water)", dressed.Count == 2 && dressed.All(d => d.Finished) && dressed.Sum(d => d.Placed) >= 8,
 				string.Join(", ", dressed.Select(d => $"{d.GetParent().Name} {d.Placed}{(d.Finished ? "" : " (laying)")}")));
 		}
-		Check("the code is saved (the door stays open on Continue)", StoryManager.Instance.HasFlag(StoryManager.Flag.BunkerUnlocked));
-		await WaitUntil(() => pad is not { ViewUp: true } && !_input.Modal, 4, ct);
-		Check("the keypad lets go and control is back", pad is not { ViewUp: true } && !_input.Modal);
+		Check("the unlock is saved (the door stays open on Continue)", StoryManager.Instance.HasFlag(StoryManager.Flag.BunkerUnlocked));
+		await WaitUntil(() => !ProjectDS.Player.HeldUse.Busy && !_input.Modal, 4, ct);
+		Check("the key's put away and control is back", !ProjectDS.Player.HeldUse.Busy && !_input.Modal);
 		Screenshot("bunker_open");
 		if (!Entered()) await WalkTo(bunker.EntryPointWorld, 0.3f, ct, stopWhen: Entered);
 		await WaitUntil(Entered, 12, ct);
@@ -4708,55 +4692,82 @@ public partial class StoryTest : Node
 		await Frames(2, ct);
 	}
 
-	/// <summary>Moves the bunker keypad's highlight to key <paramref name="target"/> with the arrows, as a player would.</summary>
-	private async Task MoveTo(ProjectDS.World.BunkerParts.BunkerKeypad pad, int target, CancellationToken ct)
+	/// <summary>(2026-10-15: the owner's key halves) Follows R.H.'s arrow trail <paramref name="piece"/> from the path, tree by
+	/// tree as a player would: each arrow unseen under the flame and shown by the blacklight from a couple of metres, each
+	/// pointing at the next tree (or the cache) 10-20 m on; the trail turning; the cache glinting under the beam; the tin
+	/// opened and the half taken and saved. Back on the path at the end.</summary>
+	private async Task FollowKeyTrail(SurveyLot lot, int piece, CancellationToken ct)
 	{
-		for (int guard = 0; guard < 8 && pad.Selected != target; guard++)
-		{
-			int dc = target % 3 - pad.Selected % 3, dr = target / 3 - pad.Selected / 3;
-			await Key(dr < 0 ? "move_forward" : dr > 0 ? "move_back" : dc < 0 ? "move_left" : "move_right", ct);
-		}
-	}
-
-	private async Task ReadTreeNote(SurveyLot lot, int i, CancellationToken ct)
-	{
-		var note = lot.Notes[i];
+		var trail = lot.Trail(piece);
+		var cache = lot.Cache(piece);
 		var terrain = GroundSnap.FindTerrain(this);
+		Check($"key trail {piece} is laid: {lot.TreesPerTrail} arrow trees to a hiding place", trail.Count == lot.TreesPerTrail && cache != null, $"{trail.Count} trees, cache {(cache != null ? "yes" : "none")}");
+		if (trail.Count == 0 || cache == null || terrain == null) return;
 		var lantern = _player.GetNodeOrNull<ProjectDS.Player.Lantern>("Lantern");
-		Vector3 from = note.GlobalPosition + Vector3.Forward * 6f;
-		if (terrain != null) { terrain.TrailDistance(note.GlobalPosition.X, note.GlobalPosition.Z, out float s); from = terrain.TrailPoint(s - 6f, out _); }
-		await Teleport(from, note.PlateWorld, ct);
-		Check($"number {note.Label}'s tree stands off the path, among decoys", note.GlobalPosition.DistanceTo(from) < 11f && lot.Decoys.Count >= 4 * lot.DecoysPerNote, $"{note.GlobalPosition.DistanceTo(from):0.0} m from the path point, {lot.Decoys.Count} decoys");
-		// Under the flame, even right up to it and looking at it: nothing to read.
+		float walk = lot.TrailLength(piece);
+		Check($"key trail {piece} runs 60-140 m off the path", walk >= 60f && walk <= 140f, $"{walk:0} m");
+		// where it leaves the path: the first tree a few metres off it, with the trace on it in plain light
+		terrain.TrailDistance(trail[0].GlobalPosition.X, trail[0].GlobalPosition.Z, out float s0);
+		Vector3 pathPoint = terrain.TrailPoint(s0, out _);
+		float off = Flat(trail[0].GlobalPosition - pathPoint).Length();
+		Check($"trail {piece}'s first tree stands a few metres off the path, the old paint on it", off is > 3f and < 12f && trail[0].Trace && trail[0].GetNodeOrNull("TraceSmear") != null, $"{off:0.0} m");
+		await Teleport(pathPoint, trail[0].PlateWorld, ct);
 		lantern?.SetBlacklight(false);
-		Vector3 near = note.PlateWorld + Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 2.4f;
-		near.Y = note.GlobalPosition.Y;
-		await Teleport(near, note.PlateWorld, ct);
-		await Aim(note.PlateWorld, ct);
-		await Seconds(0.6, ct);
-		Check($"number {note.Label} can't be seen by the lantern's flame", !note.Revealed, $"glow {note.Glow:0.00}");
-		if (i == 0) Screenshot("number_tree_flame");
-		// The blacklight (B): it shows.
-		await PressLanternMode(lantern, true, ct);
-		Check("B switches the lantern to its blacklight", lantern is { Blacklight: true } && ProjectDS.Player.Lantern.Uv.on, $"{lantern?.Blacklight}");
-		await Aim(note.PlateWorld, ct);
-		await WaitUntil(() => note.Revealed, 4, ct);
-		Check($"number {note.Label} shows under the blacklight, and reads", note.Revealed, $"glow {note.Glow:0.00}, blacklight on it {ProjectDS.Player.Lantern.UvOn(note.PlateWorld):0.00}");
-		if (i == 0)
+		await Aim(trail[0].PlateWorld, ct);
+		await Seconds(0.4, ct);
+		if (piece == 1) Screenshot("arrow_trail_start_flame");
+		int turns = 0;
+		Vector3? lastDir = null;
+		for (int i = 0; i < trail.Count; i++)
 		{
-			Screenshot("number_tree_blacklight");
-			// the decoys, under the blacklight too
-			var decoy = lot.Decoys.OrderBy(d => d.GlobalPosition.DistanceTo(note.GlobalPosition)).FirstOrDefault();
-			if (decoy != null) { await Aim(decoy.GlobalPosition + Vector3.Up * 1.3f, ct); await Frames(3, ct); Screenshot("decoy_tree_blacklight"); }
-			await Aim(note.GlobalPosition + Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 1.2f, ct);
-			await Frames(3, ct);
-			Screenshot("ground_marks_blacklight");
+			var note = trail[i];
+			Vector3 next = i + 1 < trail.Count ? trail[i + 1].GlobalPosition : cache.GlobalPosition;
+			Vector3 dirToNext = Flat(next - note.GlobalPosition);
+			if (i + 1 < trail.Count) Check($"arrow {piece}.{i + 1}: the next tree is 10-20 m on", dirToNext.Length() is >= 10f and <= 20f, $"{dirToNext.Length():0.0} m");
+			if (lastDir is { } ld && Mathf.Abs(ld.SignedAngleTo(dirToNext, Vector3.Up)) > Mathf.DegToRad(30f)) turns++;
+			lastDir = dirToNext;
+			Vector3 near = note.PlateWorld + Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 2.4f;
+			near.Y = note.GlobalPosition.Y;
+			await Teleport(near, note.PlateWorld, ct);
+			if (i == 0)
+			{
+				// under the flame, right up to it: nothing
+				await PressLanternMode(lantern, false, ct);
+				await Aim(note.PlateWorld, ct);
+				await Seconds(0.6, ct);
+				Check($"arrow {piece}.1 can't be seen by the lantern's flame", !note.Revealed, $"glow {note.Glow:0.00}");
+				await PressLanternMode(lantern, true, ct);
+				Check("B switches the lantern to its blacklight", lantern is { Blacklight: true } && ProjectDS.Player.Lantern.Uv.on, $"{lantern?.Blacklight}");
+			}
+			await Aim(note.PlateWorld, ct);
+			await WaitUntil(() => note.Revealed || note.Read, 4, ct);
+			Check($"arrow {piece}.{i + 1} shows under the blacklight", note.Revealed || note.Read, $"glow {note.Glow:0.00}, blacklight on it {ProjectDS.Player.Lantern.UvOn(note.PlateWorld):0.00}");
+			// which way it points, as seen facing it: the arrow (up, turned by ArrowTurn) against the way to the next tree
+			Vector3 face = Flat(note.PlateWorld - note.GlobalPosition).Normalized();
+			Vector3 look = -face, right = look.Cross(Vector3.Up).Normalized();
+			Vector3 says = (look * Mathf.Cos(note.ArrowTurn) - right * Mathf.Sin(note.ArrowTurn)).Normalized();
+			float err = Mathf.RadToDeg(Mathf.Abs(says.SignedAngleTo(dirToNext.Normalized(), Vector3.Up)));
+			Check($"arrow {piece}.{i + 1} points the way on", err < 15f, $"off by {err:0} deg");
+			if (piece == 1 && i == 0) Screenshot("arrow_trail_blacklight");
 		}
-		await Seconds(0.6, ct);
-		Check($"digit {i + 1} is saved", StoryManager.Instance.HasFlag(StoryManager.Flag.CodeDigit(i + 1)));
-		// back to the flame for the walk on
+		Check($"key trail {piece} isn't a straight line (two turns or more)", turns >= 2, $"{turns} turns");
+		// the cache: from the last tree, the glint under the beam, then the tin
+		Vector3 c = cache.TinWorld;
+		Vector3 stand = c + Flat(trail[^1].GlobalPosition - c).Normalized() * 1.6f;
+		await Teleport(stand, c, ct);
+		await Aim(c, ct);
+		await WaitUntil(() => cache.Glint > 0.3f, 3, ct);
+		Check($"half {piece}'s tin glints under the blacklight", cache.Glint > 0.3f, $"glint {cache.Glint:0.00}");
+		Screenshot($"key_half_{piece}_cache");
 		await PressLanternMode(lantern, false, ct);
-		Check("B switches it back to the flame", lantern is { Blacklight: false });
+		await Seconds(0.3, ct);
+		Check($"half {piece}'s tin doesn't glint under the flame", cache.Glint < 0.1f, $"glint {cache.Glint:0.00}");
+		await Aim(c, ct);
+		GD.Print($"[storytest] cache {piece}: focused '{_player.Interaction?.Focused?.Name}' prompt '{_player.Interaction?.PromptText}'");
+		await Press(ct);
+		await WaitUntil(() => StoryManager.Instance.HasFlag(StoryManager.Flag.KeyPiece(piece)), 4, ct);
+		Check($"half {piece} of the key is taken and saved", cache.Taken && StoryManager.Instance.HasFlag(StoryManager.Flag.KeyPiece(piece)));
+		await Teleport(pathPoint, pathPoint + Vector3.Forward, ct);
 	}
 
 	/// <summary>B until the lantern is in the wanted mode (a press made while control is briefly held doesn't count).</summary>

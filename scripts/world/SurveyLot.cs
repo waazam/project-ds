@@ -1,40 +1,42 @@
 using System.Collections.Generic;
-using System.Threading;
 using Godot;
 using ProjectDS.Systems;
 
 namespace ProjectDS.World;
 
 /// <summary>
-/// R.H.'s four numbers on the trees: the bunker door's code, one digit per tree in order, two on the
-/// way from the camp to the cabin and two on the way from the lookout to the bunker. After the owner's
-/// blacklight mechanic, they are brushed in ink that only the lantern's blacklight shows
-/// (<see cref="TreeNote"/>, <see cref="UvInk"/>): a few metres off the path, on any side of the trunk.
-/// Round each real one stand decoy trees with marks that aren't his, the ground round them is marked
-/// too, and more marks are scattered along both stretches, so the player has to look closely. Bare
-/// footprints in the same ink lead from the lookout to the bunker's door. Placement is by trail distance
-/// between the landmarks (<see cref="NoteFractions"/>), so the scene's node transform doesn't matter.
-/// The camp note tells of the ink (and a nudge under the picture names the blacklight's key: <see cref="TreeNote"/>).
+/// R.H.'s way to the bunker's key (2026-10-15, the owner: "instead of finding numbers for the keypad on the bunker, lets add
+/// 2 pieces of a key that need to be found by following arrows on trees using the blacklight ... somewhat obvious to use the
+/// blacklight but not too obvious. and the arrows should not be too easy to follow but not impossibly hard"). It replaces
+/// the four code numbers on the trees.
 ///
-/// Tracking: every digit read is saved as <see cref="StoryManager.Flag.CodeDigit"/>(n) at once and
-/// the digit is shown big on screen for a moment. That's all the player gets: (2026-10-13, the owner: "remove the UI
-/// for the bunker code, the player should have to remember themselves") there's no tracker on the HUD and the door's
-/// keypad (<see cref="BunkerParts.BunkerKeypad"/>) starts empty; <see cref="Known"/> is for tests. Each digit found turns the stalker's
-/// clicking up a notch (Urgency) until the door is open. Group "survey_lot" (the name the bunker's
-/// dial and the HUD look up; kept).
+/// Two trails of arrows brushed in the blacklight's ink (<see cref="TreeNote.Arrow"/>, <see cref="UvInk.Arrow"/>), each
+/// leaving the path at a fixed spot and running off through the woods, <see cref="TreesPerTrail"/> bare trunks
+/// <see cref="StepMin"/>-<see cref="StepMax"/> m apart, never in a straight line (two or three real turns), every arrow
+/// pointing at the next tree, to a hiding place with half of the key in a tin (<see cref="KeyPieceCache"/>):
+/// <list type="bullet">
+/// <item>half 1, off the walk from the camp to the cabin (Act 3, the first stretch with the lantern), in a hollow stump;</item>
+/// <item>half 2, off the walk from the lookout to the bunker (Act 7), under the lintel stone of a cairn.</item>
+/// </list>
+/// The ink shows only under the beam and fades past ~6 m, so each next tree has to be looked for in the arrow's
+/// direction; under the flame a trail is dead trees. The one sign in plain light is on the first tree of each, by the path:
+/// an old smear of the paint and a knife's notch (<see cref="TreeNote.Trace"/>). A few decoy trees with marks that aren't
+/// his stand round each start and by each end. R.H.'s camp note tells of the key and the light (<see cref="Camp.NoteText"/>);
+/// near the first arrow, with the blacklight off, one nudge under the picture names its key, once.
+/// The trails are laid by trail distance between the landmarks and by the ground (off the path, the stream, the clear zones,
+/// the edge), seeded, so they are the same every game.
+///
+/// Kept from the numbers: the scattered ground marks along both stretches and the bare footprints from the lookout to the
+/// bunker's door. Each half found turns the stalker's clicking up a notch (Urgency) until the door is open. Group
+/// "survey_lot" (the name is kept: the bunker and the tests look it up).
 /// </summary>
 [GlobalClass]
 public partial class SurveyLot : Node3D
 {
-	/// <summary>The four-digit code, one digit per note in order.</summary>
-	[Export] public string Code = "4729";
-	/// <summary>Where each note's tree stands, as a fraction of its stretch: 0-1 of camp->cabin for the first two,
-	/// 0-1 of lookout->bunker for the last two.</summary>
-	[Export] public float[] NoteFractions = { 0.35f, 0.7f, 0.35f, 0.7f };
-	/// <summary>Metres off the path edge (alternating sides).</summary>
-	[Export] public float SideOffset = 3.4f;
-	/// <summary>Decoy trees round each real one.</summary>
-	[Export] public int DecoysPerNote = 3;
+	/// <summary>Where each trail leaves the path, as a fraction of its stretch: camp -> cabin, then lookout -> bunker.</summary>
+	[Export] public float[] BranchFractions = { 0.45f, 0.5f };
+	[Export] public int TreesPerTrail = 7;
+	[Export] public float StepMin = 11f, StepMax = 15f;
 	/// <summary>For tests: the decoy trees, and how many UV marks lie on the ground (the footprints separately).</summary>
 	public IReadOnlyList<TreeNote> Decoys => _decoys;
 	private readonly List<TreeNote> _decoys = new();
@@ -44,35 +46,41 @@ public partial class SurveyLot : Node3D
 	public Vector3 FootprintsStart { get; private set; }
 	public Vector3 FootprintsEnd { get; private set; }
 
+	/// <summary>Every arrow tree, both trails in order.</summary>
 	public IReadOnlyList<TreeNote> Notes => _notes;
 	private readonly List<TreeNote> _notes = new();
+	/// <summary>The arrow trees of trail <paramref name="piece"/> (1 or 2), from the path to the cache.</summary>
+	public IReadOnlyList<TreeNote> Trail(int piece) { int i = _caches.FindIndex(c => c.Piece == piece); return i >= 0 ? _trails[i] : System.Array.Empty<TreeNote>(); }
+	private readonly List<List<TreeNote>> _trails = new();
+	/// <summary>The hiding place of half <paramref name="piece"/> (1 or 2), or null if it couldn't be laid.</summary>
+	public KeyPieceCache Cache(int piece) => _caches.Find(c => c.Piece == piece);
+	private readonly List<KeyPieceCache> _caches = new();
+	/// <summary>For tests and the report: the trail metres each trail leaves the path at, and each trail's walk (m).</summary>
+	public IReadOnlyList<float> TrailMetres => _trailMetres;
+	private readonly List<float> _trailMetres = new();
+	private readonly List<float> _trailLengths = new();
+	/// <summary>Trail <paramref name="piece"/>'s walk, from the path past every tree to the cache (m; 0 if not laid).</summary>
+	public float TrailLength(int piece) { int i = _caches.FindIndex(c => c.Piece == piece); return i >= 0 ? _trailLengths[i] : 0f; }
 	private Entities.Stalker _stalker;
 	private bool _stalkerSearched;
 
-	/// <summary>Notes read so far, for the pressure on the player.</summary>
-	public int ReadCount { get { int n = 0; foreach (var s in _notes) if (s.Read) n++; return n; } }
-	/// <summary>The code as the player knows it: found digits in place, "_" for the rest ("4_2_").</summary>
-	public string Known
+	/// <summary>Halves taken so far.</summary>
+	public static int PiecesFound
 	{
 		get
 		{
-			var c = new char[Code.Length];
-			for (int i = 0; i < Code.Length; i++) c[i] = i < _notes.Count && _notes[i].Read ? Code[i] : '_';
-			return new string(c);
+			if (StoryManager.Instance is not { } s) return 0;
+			return (s.HasFlag(StoryManager.Flag.KeyPiece(1)) ? 1 : 0) + (s.HasFlag(StoryManager.Flag.KeyPiece(2)) ? 1 : 0);
 		}
 	}
-	/// <summary>For tests: the trail metres each note's tree was placed at.</summary>
-	public IReadOnlyList<float> TrailMetres => _trailMetres;
-	private readonly List<float> _trailMetres = new();
 
-	/// <summary>Every digit found turns the stalker's clicking up a notch (see <see cref="Entities.Stalker.Urgency"/>),
-	/// until the door is open; then it lets go.</summary>
 	public override void _Process(double delta)
 	{
+		Nudge((float)delta);
 		if (!_stalkerSearched) { _stalkerSearched = true; _stalker = GetTree().GetFirstNodeInGroup("stalker") as Entities.Stalker; }
 		if (_stalker == null || !IsInstanceValid(_stalker)) return;
 		bool open = StoryManager.Instance is { } s && (s.HasFlag(StoryManager.Flag.BunkerUnlocked) || s.Current >= Checkpoint.Act8BunkerEntered);
-		_stalker.Urgency = open || _notes.Count == 0 ? 0f : ReadCount / (float)_notes.Count;
+		_stalker.Urgency = open ? 0f : PiecesFound / 2f;
 	}
 
 	public override void _Ready()
@@ -87,81 +95,26 @@ public partial class SurveyLot : Node3D
 		var lookout = GetTree().GetFirstNodeInGroup("fire_lookout_marker") as Node3D;
 		var bunker = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
 		float sCamp = S(camp, 60f), sCabin = S(cabin, 430f), sLookout = S(lookout, 720f), sBunker = S(bunker, 860f);
-		for (int i = 0; i < 4 && i < Code.Length; i++)
-		{
-			float frac = i < NoteFractions.Length ? NoteFractions[i] : 0.5f;
-			float s = i < 2 ? Mathf.Lerp(sCamp, sCabin, frac) : Mathf.Lerp(sLookout, sBunker, frac);
-			_trailMetres.Add(s);
-			var rng = new RandomNumberGenerator { Seed = (ulong)(4400 + i * 17) };
-			// the number is a little way round the trunk from the path side: it has to be looked for
-			float markAngle = (rng.Randf() < 0.5f ? -1f : 1f) * rng.RandfRange(0.5f, 1.2f);
-			var note = new TreeNote { Name = $"Note{i + 1}", Label = $"{i + 1}", Digit = Code[i] - '0', MarkAngle = markAngle };
-			AddChild(note);
-			_notes.Add(note);
-			if (terrain != null)
-			{
-				Vector3 p = terrain.TrailPoint(s, out Vector3 t);
-				Vector3 right = t.Cross(Vector3.Up).Normalized();
-				float side = (i & 1) == 0 ? 1f : -1f;
-				Vector3 at = p + right * (SideOffset * side);
-				at.Y = terrain.HeightAt(at.X, at.Z);
-				// The sheet (the trunk's +Z) faces the path, turned a little toward the walker coming up the trail.
-				Vector3 lookFrom = p - t.Normalized() * 3f;
-				note.GlobalTransform = new Transform3D(Basis.LookingAt(Flat(at - lookFrom), Vector3.Up), at);
-				var cz = new ClearZone { Name = $"Clear{i + 1}", Radius = 2.2f, ClearFoliage = true };
-				AddChild(cz);
-				cz.GlobalPosition = at;
-				// the decoy trees round it, off the path, facing it the same way
-				// (2026-10-13, the owner: "too grouped up") spread out: 4.5-10 m from it and at least 3.5 m from each other
-				var trees = new List<Vector3> { at };
-				for (int d = 0; d < DecoysPerNote; d++)
-				{
-					Vector3 dp = at;
-					for (int tries = 0; tries < 12; tries++)
-					{
-						float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(4.5f, 10f);
-						dp = at + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
-						if (terrain.RouteDistance(dp.X, dp.Z) < 2.4f) dp = at + right * (side * r);   // never on the path
-						bool clear = true;
-						foreach (var o in trees) if (Flat(o - dp).Length() < 3.5f) clear = false;
-						if (clear) break;
-					}
-					trees.Add(dp);
-					dp.Y = terrain.HeightAt(dp.X, dp.Z);
-					var decoy = new TreeNote { Name = $"Decoy{i + 1}_{d}", Label = $"d{i}{d}", Digit = Code[i] - '0', Decoy = true, MarkAngle = rng.RandfRange(-1.5f, 1.5f), TrunkRadius = rng.RandfRange(0.24f, 0.36f), TrunkHeight = rng.RandfRange(5.5f, 8f) };
-					AddChild(decoy);
-					decoy.GlobalTransform = new Transform3D(Basis.LookingAt(Flat(dp - lookFrom), Vector3.Up), dp);
-					_decoys.Add(decoy);
-					var dz = new ClearZone { Name = $"ClearD{i}{d}", Radius = 1.6f, ClearFoliage = false };
-					AddChild(dz);
-					dz.GlobalPosition = dp;
-				}
-				// a few marks on the ground round them, well apart (they were seven in a heap)
-				var marks = new List<Vector3>();
-				for (int g = 0; g < 4; g++)
-				{
-					Vector3 gp = at;
-					bool clear = false;
-					for (int tries = 0; tries < 12 && !clear; tries++)
-					{
-						float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(1.5f, 9f);
-						gp = at + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
-						clear = true;
-						foreach (var o in marks) if (Flat(o - gp).Length() < 2.5f) clear = false;
-						foreach (var o in trees) if (Flat(o - gp).Length() < 0.9f) clear = false;
-					}
-					if (!clear) continue;
-					marks.Add(gp);
-					GroundMark(terrain, gp, rng, Code[i] - '0');
-				}
-			}
-			// Restore: read in the saved story.
-			int n = i + 1;
-			if (StoryManager.Instance is { } sm && sm.HasFlag(StoryManager.Flag.CodeDigit(n))) note.MarkRead();
-			note.FirstRead += () => OnNoteRead(n);
-		}
 		if (terrain != null)
 		{
+			// the places a trail mustn't run through: the landmarks, and every clear zone already standing (the cabin's, the
+			// bridge's, the props')
+			var avoid = new List<(Vector3 p, float r)>();
+			foreach (var n in new[] { camp, cabin, lookout, bunker }) if (n != null) avoid.Add((n.GlobalPosition, 22f));
+			foreach (var n in GetTree().GetNodesInGroup("clear_zones")) if (n is ClearZone cz && cz.IsInsideTree()) avoid.Add((cz.GlobalPosition, cz.Radius + 4f));
+			for (int piece = 1; piece <= 2; piece++)
+			{
+				float frac = piece - 1 < BranchFractions.Length ? BranchFractions[piece - 1] : 0.5f;
+				float s = piece == 1 ? Mathf.Lerp(sCamp, sCabin, frac) : Mathf.Lerp(sLookout, sBunker, frac);
+				if (LayTrail(terrain, piece, s, avoid, out var trees, out var cache, out float branchS))
+				{
+					_trailMetres.Add(branchS);
+					BuildTrail(terrain, piece, trees, cache, branchS);
+					foreach (var t in trees) avoid.Add((t, 14f));
+					avoid.Add((cache, 14f));
+				}
+				else GD.PushWarning($"[story] key trail {piece}: no way off the path found near trail m {s:0}");
+			}
 			// marks scattered along both stretches, now and then, a little off the path
 			var rngS = new RandomNumberGenerator { Seed = 4477 };
 			foreach (var (a, b) in new[] { (sCamp + 10f, sCabin - 10f), (sLookout + 10f, sBunker - 6f) })
@@ -169,15 +122,246 @@ public partial class SurveyLot : Node3D
 				{
 					Vector3 p = terrain.TrailPoint(s, out Vector3 t);
 					Vector3 right = t.Cross(Vector3.Up).Normalized();
-					GroundMark(terrain, p + right * rngS.RandfRange(-3.5f, 3.5f), rngS, -1);
+					GroundMark(terrain, p + right * rngS.RandfRange(-3.5f, 3.5f), rngS);
 				}
 			// bare footprints in the ink, from the lookout to the bunker's door: someone walked it, barefoot
 			BuildFootprints(terrain, sLookout + 4f, sBunker - 1.5f);
 		}
-		GD.Print($"[story] the blacklight numbers on the trees at trail m: {string.Join(", ", _trailMetres.ConvertAll(m => m.ToString("0")))} ({_decoys.Count} decoy trees, {GroundMarks} ground marks, {Footprints} footprints)");
+		var where = new List<string>();
+		for (int i = 0; i < _caches.Count; i++) where.Add($"{_caches[i].Piece}: off trail m {_trailMetres[i]:0}, {_trails[i].Count} arrows, {_trailLengths[i]:0} m walk, cache at {_caches[i].GlobalPosition.X:0},{_caches[i].GlobalPosition.Z:0}");
+		GD.Print($"[story] the key's arrow trails: {string.Join("; ", where)} ({_decoys.Count} decoy trees, {GroundMarks} ground marks, {Footprints} footprints)");
 	}
 
 	private static Vector3 Flat(Vector3 v) => new(v.X, 0, v.Z);
+	private static Vector3 Turn(Vector3 h, float a) => new Basis(Vector3.Up, a) * h;
+
+	/// <summary>Finds a trail: a first tree a few metres off the path at about <paramref name="s"/>, then each next tree a
+	/// step on with the heading turning now and then (two or three real turns of 35-60 degrees, alternating), every tree
+	/// clear of the path, the stream, the edge, the <paramref name="avoid"/> places and its own trail's earlier trees, on
+	/// ground not too steep; the cache a few metres past the last. Seeded: the same every game.</summary>
+	private bool LayTrail(ForestTerrain terrain, int piece, float s, List<(Vector3 p, float r)> avoid, out List<Vector3> trees, out Vector3 cache, out float branchS)
+	{
+		trees = new List<Vector3>();
+		cache = Vector3.Zero;
+		branchS = s;
+		var play = terrain.PlayRect.Grow(-22f);
+		bool Ok(Vector3 p, float minTrail, List<Vector3> mine, Vector3? from)
+		{
+			if (!play.HasPoint(new Vector2(p.X, p.Z))) return false;
+			terrain.SampleFields(p.X, p.Z, out float dT, out _, out float dS, out float dR);
+			if (dT < minTrail || dS < 7f || dR < 12f) return false;
+			if (terrain.SampleBranch(p.X, p.Z, out _) < 6f) return false;
+			foreach (var (q, r) in avoid) if (Flat(q - p).Length() < r) return false;
+			for (int i = 0; i < mine.Count - 1; i++) if (Flat(mine[i] - p).Length() < 9f) return false;
+			if (from is { } f)
+			{
+				float h0 = terrain.HeightAt(f.X, f.Z), h1 = terrain.HeightAt(p.X, p.Z);
+				if (Mathf.Abs(h1 - h0) / Mathf.Max(1f, Flat(p - f).Length()) > 0.45f) return false;
+				// the way between mustn't cut back across the path or the stream either
+				Vector3 m = (f + p) * 0.5f;
+				terrain.SampleFields(m.X, m.Z, out float mT, out _, out float mS, out _);
+				if (mT < minTrail - 2f || mS < 5f) return false;
+			}
+			return true;
+		}
+		for (int attempt = 0; attempt < 60; attempt++)
+		{
+			var rng = new RandomNumberGenerator { Seed = (ulong)(7100 + piece * 1000 + attempt * 37) };
+			float sAt = s + (attempt < 6 ? 0f : rng.RandfRange(-25f, 25f));
+			float side = ((attempt + piece) & 1) == 0 ? 1f : -1f;
+			Vector3 p = terrain.TrailPoint(sAt, out Vector3 t);
+			Vector3 fwd = Flat(t).Normalized();
+			Vector3 off = fwd.Cross(Vector3.Up).Normalized() * side;
+			var mine = new List<Vector3>();
+			// the first tree: a few metres off the path's edge, the trace on it toward the path
+			Vector3 first = p + off * rng.RandfRange(5.5f, 7f) + fwd * rng.RandfRange(-1.5f, 1.5f);
+			if (!Ok(first, 4.5f, mine, null)) continue;
+			mine.Add(first);
+			// away from the path, slanting on along it or back
+			Vector3 heading = Turn(off, side * rng.RandfRange(-0.5f, 0.5f));
+			// which steps turn: two or three of them, never two in a row, alternating left and right
+			var turns = new float[TreesPerTrail];
+			int nTurns = rng.RandiRange(2, 3);
+			float sign = rng.Randf() < 0.5f ? -1f : 1f;
+			var picks = new List<int>();
+			for (int tries = 0; tries < 40 && picks.Count < nTurns; tries++)
+			{
+				int k = rng.RandiRange(1, TreesPerTrail - 1);
+				if (picks.Contains(k) || picks.Contains(k - 1) || picks.Contains(k + 1)) continue;
+				picks.Add(k);
+			}
+			picks.Sort();
+			foreach (int k in picks) { turns[k] = sign * Mathf.DegToRad(rng.RandfRange(35f, 60f)); sign = -sign; }
+			bool failed = false;
+			int realTurns = 0;
+			for (int i = 1; i < TreesPerTrail && !failed; i++)
+			{
+				Vector3 prev = mine[^1];
+				bool placed = false;
+				// as planned first, then the other way, then gentler, before giving up on this attempt
+				foreach (float a in new[] { turns[i], -turns[i], turns[i] * 0.5f, turns[i] == 0f ? 0.6f : 0f, turns[i] == 0f ? -0.6f : 0f })
+				{
+					Vector3 h = Turn(heading, a + rng.RandfRange(-0.12f, 0.12f));
+					Vector3 c = prev + h * rng.RandfRange(StepMin, StepMax);
+					if (!Ok(c, 9f, mine, prev)) continue;
+					c.Y = terrain.HeightAt(c.X, c.Z);
+					mine.Add(c);
+					heading = h;
+					if (Mathf.Abs(a) >= Mathf.DegToRad(30f)) realTurns++;
+					placed = true;
+					break;
+				}
+				failed = !placed;
+			}
+			if (failed || realTurns < 2) continue;
+			// the cache: a little past the last tree, a little to one side
+			Vector3 last = mine[^1];
+			bool cached = false;
+			foreach (float a in new[] { 0.25f, -0.25f, 0.6f, -0.6f })
+			{
+				Vector3 c = last + Turn(heading, a) * rng.RandfRange(6.5f, 8.5f);
+				if (!Ok(c, 9f, mine, last)) continue;
+				cache = c;
+				cached = true;
+				break;
+			}
+			if (!cached) continue;
+			first.Y = terrain.HeightAt(first.X, first.Z);
+			mine[0] = first;
+			trees = mine;
+			terrain.TrailDistance(first.X, first.Z, out branchS);
+			GD.Print($"[story] key trail {piece}: laid on attempt {attempt + 1} ({realTurns} turns)");
+			return true;
+		}
+		return false;
+	}
+
+	/// <summary>Builds a laid trail: the arrow trees (each faces the one before it, or the path for the first, its arrow turned
+	/// toward the next), the cache, clear zones round them, a couple of decoy trees by the start and one by the end.</summary>
+	private void BuildTrail(ForestTerrain terrain, int piece, List<Vector3> at, Vector3 cachePos, float branchS)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)(5300 + piece * 71) };
+		Vector3 pathPoint = terrain.TrailPoint(branchS, out _);
+		var trail = new List<TreeNote>();
+		float walk = Flat(at[0] - pathPoint).Length();
+		for (int i = 0; i < at.Count; i++)
+		{
+			Vector3 from = i == 0 ? pathPoint : at[i - 1];
+			Vector3 next = i + 1 < at.Count ? at[i + 1] : cachePos;
+			if (i > 0) walk += Flat(at[i] - at[i - 1]).Length();
+			// the trunk's +Z toward the one coming from the last tree (or the path); the arrow a little way round from there
+			var basis = Basis.LookingAt(Flat(at[i] - from), Vector3.Up);
+			float markAngle = rng.RandfRange(-0.4f, 0.4f);
+			// the arrow's turn: where the next tree lies, as seen by someone facing the mark
+			Vector3 d = basis * new Vector3(Mathf.Sin(markAngle), 0, Mathf.Cos(markAngle));
+			Vector3 look = -Flat(d).Normalized();
+			Vector3 right = look.Cross(Vector3.Up).Normalized();
+			Vector3 to = Flat(next - at[i]).Normalized();
+			float turn = -Mathf.Atan2(to.Dot(right), to.Dot(look));
+			var note = new TreeNote
+			{
+				Name = $"Arrow{piece}_{i + 1}", Label = $"a{piece}{i + 1}", Arrow = true, ArrowTurn = turn, Trace = i == 0, MarkAngle = markAngle,
+				TrunkRadius = rng.RandfRange(0.26f, 0.34f), TrunkHeight = rng.RandfRange(5.5f, 8f), NoteHeight = rng.RandfRange(1.45f, 1.7f),
+			};
+			AddChild(note);
+			note.GlobalTransform = new Transform3D(basis, at[i]);
+			trail.Add(note);
+			_notes.Add(note);
+			var cz = new ClearZone { Name = $"Clear{piece}_{i + 1}", Radius = 2.2f, ClearFoliage = true };
+			AddChild(cz);
+			cz.GlobalPosition = at[i];
+		}
+		walk += Flat(cachePos - at[^1]).Length();
+		_trails.Add(trail);
+		_trailLengths.Add(walk);
+
+		// the hiding place, its open side toward the last tree
+		var cache = new KeyPieceCache { Name = $"KeyHalf{piece}", Piece = piece, Hide = piece == 1 ? KeyPieceCache.Place.Stump : KeyPieceCache.Place.Cairn };
+		AddChild(cache);
+		cache.GlobalTransform = new Transform3D(Basis.LookingAt(Flat(cachePos - at[^1]), Vector3.Up), cachePos);
+		_caches.Add(cache);
+		var cc = new ClearZone { Name = $"ClearCache{piece}", Radius = 2.6f, ClearFoliage = true };
+		AddChild(cc);
+		cc.GlobalPosition = cachePos;
+
+		// decoys: two by the start, one by the end, marks that aren't his
+		var spots = new List<(Vector3 near, float rMin, float rMax)> { (at[0], 5f, 9f), (at[1], 5f, 9f), (at[^1], 5f, 8f) };
+		int dn = 0;
+		foreach (var (near, rMin, rMax) in spots)
+		{
+			for (int tries = 0; tries < 16; tries++)
+			{
+				float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(rMin, rMax);
+				Vector3 p = near + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+				terrain.SampleFields(p.X, p.Z, out float dT, out _, out float dS, out _);
+				if (dT < 3.5f || dS < 4f) continue;
+				bool clear = Flat(cachePos - p).Length() > 3.5f;
+				foreach (var o in at) if (Flat(o - p).Length() < 4f) clear = false;
+				if (!clear) continue;
+				p.Y = terrain.HeightAt(p.X, p.Z);
+				var decoy = new TreeNote { Name = $"Decoy{piece}_{dn}", Label = $"d{piece}{dn}", Digit = 4, Decoy = true, MarkAngle = rng.RandfRange(-1.5f, 1.5f), TrunkRadius = rng.RandfRange(0.24f, 0.36f), TrunkHeight = rng.RandfRange(5.5f, 8f) };
+				AddChild(decoy);
+				decoy.GlobalTransform = new Transform3D(Basis.LookingAt(Flat(p - near) + new Vector3(0.001f, 0, 0), Vector3.Up), p);
+				_decoys.Add(decoy);
+				var dz = new ClearZone { Name = $"ClearD{piece}{dn}", Radius = 1.6f, ClearFoliage = false };
+				AddChild(dz);
+				dz.GlobalPosition = p;
+				dn++;
+				break;
+			}
+		}
+		// a few marks on the ground round the start, well apart
+		var marks = new List<Vector3>();
+		for (int g = 0; g < 3; g++)
+		{
+			for (int tries = 0; tries < 12; tries++)
+			{
+				float a = rng.RandfRange(0f, Mathf.Tau), r = rng.RandfRange(1.5f, 8f);
+				Vector3 gp = at[0] + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+				bool clear = Flat(at[0] - gp).Length() >= 0.9f;
+				foreach (var o in marks) if (Flat(o - gp).Length() < 2.5f) clear = false;
+				if (!clear) continue;
+				marks.Add(gp);
+				GroundMark(terrain, gp, rng);
+				break;
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------ the nudge
+
+	/// <summary>Saved once shown (once in a game).</summary>
+	public const string HintArrowFlag = "hint_arrow_blacklight";
+	private float _hintWait;
+
+	/// <summary>(2026-10-15) The one nudge: standing near either trail's first tree (the trace on it in plain light) with the
+	/// flame on, once R.H.'s note is read and the lantern's own lesson at the camp is over, and before that half is found:
+	/// a line under the picture names the blacklight's key. Never over another line, the note, or a cutscene.</summary>
+	private void Nudge(float dt)
+	{
+		if (StoryManager.Instance is not { } s || UI.Subtitle.Instance is not { } sub) return;
+		if (s.HasFlag(HintArrowFlag) || !s.HasFlag(Camp.NoteReadFlag) || s.HasFlag(StoryManager.Flag.BunkerUnlocked)) return;
+		if (!(s.HasFlag(Player.Lantern.FirstRelitFlag) || s.Current >= Checkpoint.Act5CabinEntered)) return;
+		if (GetTree().GetFirstNodeInGroup("player") is not Player.PlayerController player) return;
+		bool near = false;
+		for (int piece = 1; piece <= _trails.Count; piece++)
+		{
+			if (s.HasFlag(StoryManager.Flag.KeyPiece(_caches[piece - 1].Piece)) || _trails[piece - 1].Count == 0) continue;
+			var t = _trails[piece - 1][0];
+			if (Flat(player.GlobalPosition - t.GlobalPosition).Length() < 9f) near = true;
+		}
+		bool hasLantern = player.Inventory?.HasLantern ?? false;
+		bool clear = near && hasLantern && !Player.Lantern.Uv.on && !sub.CurrentlyShowing && !(player.PlayerInput?.Modal ?? false)
+			&& !(player.PlayerInput?.Scripted ?? false) && Cutscene.InputLocks == 0;
+		_hintWait = clear ? _hintWait + dt : 0f;
+		if (_hintWait < 2.5f) return;
+		s.SetFlag(HintArrowFlag);
+		string key = UI.KeyHint.Blacklight;
+		_ = sub.Show($"Old paint on that tree.   {key}: the blacklight.", 0.8f, 5f, 1.2f);
+		GD.Print($"[story] the nudge: old paint on the trail's first tree ({key})");
+	}
+
+	// ------------------------------------------------------------------ the ground
 
 	/// <summary>Lies flat on the ground's slope there.</summary>
 	private static Basis GroundBasis(ForestTerrain terrain, Vector3 p, float yaw)
@@ -191,14 +375,14 @@ public partial class SurveyLot : Node3D
 	}
 
 	/// <summary>One mark on the ground: a smear, a hand, a single print, a struck-out number.</summary>
-	private void GroundMark(ForestTerrain terrain, Vector3 p, RandomNumberGenerator rng, int avoidDigit)
+	private void GroundMark(ForestTerrain terrain, Vector3 p, RandomNumberGenerator rng)
 	{
 		p.Y = terrain.HeightAt(p.X, p.Z);
 		int kind = rng.RandiRange(0, 9);
 		// a hand on the ground: something went on all fours here (the thing's, clawed), or someone fell and dragged
 		HandKind hk = rng.RandiRange(0, 4) switch { 0 => HandKind.Claw, 1 => HandKind.ClawDragged, 2 => HandKind.Dragged, 3 => HandKind.Splayed, _ => HandKind.ClawSplayed };
 		bool clawed = hk is HandKind.Claw or HandKind.ClawDragged or HandKind.ClawSplayed;
-		Texture2D tex = kind switch { 0 or 1 => UvInk.Hand(hk, rng.RandiRange(0, 5)), 2 or 3 => UvInk.Foot(), 4 => UvInk.Digit((avoidDigit + 5 + rng.RandiRange(0, 3)) % 10, true), _ => UvInk.Smear(rng.RandiRange(0, 20)) };
+		Texture2D tex = kind switch { 0 or 1 => UvInk.Hand(hk, rng.RandiRange(0, 5)), 2 or 3 => UvInk.Foot(), 4 => UvInk.Digit(rng.RandiRange(0, 9), true), _ => UvInk.Smear(rng.RandiRange(0, 20)) };
 		float size = kind switch { 2 or 3 => 0.28f, 0 or 1 => clawed ? rng.RandfRange(0.3f, 0.38f) : rng.RandfRange(0.21f, 0.25f), _ => rng.RandfRange(0.3f, 0.6f) };
 		// (2026-10-13) the decal's basis is the ground's slope there (it was a flat card laid over it, set after)
 		UvInk.OnGround(this, p, GroundBasis(terrain, p, rng.RandfRange(0f, Mathf.Tau)), new Vector2(size, kind is 2 or 3 ? size * 2f : size), tex,
@@ -234,15 +418,5 @@ public partial class SurveyLot : Node3D
 		UvInk.Scatter(this, "FootprintsL", left, new Vector2(0.13f, 0.27f), UvInk.Foot(), UvInk.Cyan, 1.3f);
 		UvInk.Scatter(this, "FootprintsR", rightFeet, new Vector2(0.13f, 0.27f), UvInk.Foot(), UvInk.Cyan, 1.3f);
 		Footprints = left.Count + rightFeet.Count;
-	}
-
-	private void OnNoteRead(int n)
-	{
-		var s = StoryManager.Instance;
-		if (s == null || s.HasFlag(StoryManager.Flag.CodeDigit(n))) return;
-		s.SetFlag(StoryManager.Flag.CodeDigit(n));
-		GD.Print($"[story] code digit {n} read: {Known}");
-		// The number, big, for a moment: it is his note, not a thought.
-		_ = StoryBeat.Caption(this, Code[n - 1].ToString(), 0.1f, 0.9f, 0.5f, CancellationToken.None);
 	}
 }

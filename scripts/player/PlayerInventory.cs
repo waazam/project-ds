@@ -3,7 +3,7 @@ using Godot;
 
 namespace ProjectDS.Player;
 
-public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio, Knife, Lighter, DeadEye, PaleHand, StairTread, Bookmark, FontKey, Chalice, Keycard202, PantryKey, Keycard203, DiningKey, Keycard201, Crowbar, Flamethrower }
+public enum ToolKind { None, Lantern, Compass, Axe, Key, Hammer, Camera, NewelPost, Radio, Knife, Lighter, DeadEye, PaleHand, StairTread, Bookmark, FontKey, Chalice, Keycard202, PantryKey, Keycard203, DiningKey, Keycard201, Crowbar, Flamethrower, BunkerKey }
 
 /// <summary>
 /// One inventory, with no hands-full limit. Lantern, Compass, Camera, NewelPost and Radio are gear (picking them up
@@ -205,6 +205,7 @@ public partial class PlayerInventory : Node
 		ToolKind.DiningKey => "Dining Room Key",
 		ToolKind.Keycard201 => "Keycard 201",
 		ToolKind.Flamethrower => "Flamethrower",
+		ToolKind.BunkerKey => "R.H.'s Key",
 		_ => t.ToString(),
 	};
 
