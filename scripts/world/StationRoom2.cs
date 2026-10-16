@@ -382,6 +382,9 @@ public partial class StationRoom2 : Node3D
 		k.Color = Colors.White;
 		k.CommitTo(_table, "Table", true);
 		SignKit.Text(_table, "WHAT YOU WERE TOLD\nNEVER TO GO UP", new Vector3(0, 0.896f, 0.22f), new Basis(Vector3.Right, -Mathf.Pi * 0.5f), 0.022f, new Color(0.18f, 0.12f, 0.05f), shadow: false);
+		// (2026-10-16, STORY.md Rev 5) along the plate's edge, in his father's hand on the wood: what he told him as a boy
+		StationParts.StationStory.HandText(_table, "If you ever see them in the woods, Cam, you don't go up. Not one step.",
+			new Vector3(0, 0.8915f, 0.276f), new Basis(Vector3.Right, -Mathf.Pi * 0.5f), 0.0115f, StationParts.StationStory.PenInk, "HisHand");
 		var body = new StaticBody3D { Name = "TableBody", CollisionLayer = 1, CollisionMask = 0 };
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, 0.45f, 0), Shape = new BoxShape3D { Size = new Vector3(1.2f, 0.9f, 0.7f) } });
 		_table.AddChild(body);

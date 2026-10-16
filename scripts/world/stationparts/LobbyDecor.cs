@@ -155,7 +155,9 @@ public partial class LobbyDecor : Node3D
 			// (the lobby has its own wainscot: the crown only)
 			StationKit.WallAlongX(k, b, -D, -W, 0.2f, H, 0, (StationInterior.EntryGapX, 2.2f), trimSide: 1, panels: false);
 			StationKit.WallAlongX(k, b, -D, 0.2f, W, H, 0, (StationInterior.BasementGapX, 2.2f), trimSide: 1, panels: false);
-			StationKit.WallAlongX(k, b, D, -W, W, H, 0, (0f, 2.4f), 2.5f, trimSide: -1, panels: false);
+			// (2026-10-16) the back wall in two: the iron door's gap, and the narrow door of the room he locked (LockedRoom)
+			StationKit.WallAlongX(k, b, D, -W, LockedRoom.DoorX - 1.05f, H, 0, (0f, 2.4f), 2.5f, trimSide: -1, panels: false);
+			StationKit.WallAlongX(k, b, D, LockedRoom.DoorX - 1.05f, W, H, 0, (LockedRoom.DoorX, LockedRoom.DoorW), LockedRoom.DoorH, trimSide: -1, panels: false);
 			StationKit.WallAlongZ(k, b, W, -D, D, H, 0, (0f, 2.2f), trimSide: -1, panels: false);
 			StationKit.WallAlongZ(k, b, -W, -D, D, H, 0, (0f, 2.2f), trimSide: 1, panels: false);
 		}
@@ -182,6 +184,7 @@ public partial class LobbyDecor : Node3D
 		{
 			(new Vector3(StationInterior.EntryGapX, 0, -IZ), 2.32f), (new Vector3(StationInterior.BasementGapX, 0, -IZ), 2.32f),
 			(new Vector3(0, 0, IZ), 2.4f), (new Vector3(IX, 0, 0), 2.32f), (new Vector3(-IX, 0, 0), 2.32f),
+			(new Vector3(LockedRoom.DoorX, 0, IZ), LockedRoom.DoorW + 0.12f),
 		};
 		float face = 0.014f;
 		foreach (var (run, closed) in TrimKit.Perimeter(corners, doors)) face = TrimKit.Wainscot(wain, run, 1.05f, true, closed, Vector3.Zero, 0.1f);
@@ -675,8 +678,9 @@ public partial class LobbyDecor : Node3D
 		foreach (var (at, n) in new[]
 		{
 			(new Vector3(3.2f, 0.7f, -D + 0.08f), Vector3.Back), (new Vector3(-1f, 0.7f, -D + 0.08f), Vector3.Back),
-			(new Vector3(W - 0.08f, 0.7f, -2.8f), Vector3.Left), (new Vector3(-W + 0.08f, 0.7f, 2.7f), Vector3.Right),
-			(new Vector3(3f, 0.7f, D - 0.08f), Vector3.Forward), (new Vector3(-2.8f, 0.7f, D - 0.08f), Vector3.Forward),
+			// (2026-10-16: two moved off the boarded window on the +X wall and the locked room's door, Headquarters/LockedRoom)
+			(new Vector3(W - 0.08f, 0.7f, -3.75f), Vector3.Left), (new Vector3(-W + 0.08f, 0.7f, 2.7f), Vector3.Right),
+			(new Vector3(1.55f, 0.7f, D - 0.08f), Vector3.Forward), (new Vector3(-2.8f, 0.7f, D - 0.08f), Vector3.Forward),
 		})
 			StationProps.Decal(damp, StationTextures.StainMat, at, n, new Vector2(rng.RandfRange(1.6f, 2.6f), 1.5f));
 		// the ceiling's first stains, over the basement door's corner and the back
@@ -718,9 +722,10 @@ public partial class LobbyDecor : Node3D
 		// (2026-10-14h: the front wall's patch moved up and right, clear of the radio desk's papers)
 		foreach (var (at, n) in new[]
 		{
-			(new Vector3(-2.2f, 2.2f, D - 0.075f), Vector3.Forward), (new Vector3(2.5f, 1.8f, D - 0.075f), Vector3.Forward),
+			// (2026-10-16: the back wall's patch and the front wall's moved clear of the locked room's door and the boarded window)
+			(new Vector3(-2.2f, 2.2f, D - 0.075f), Vector3.Forward), (new Vector3(2.2f, 1.95f, D - 0.075f), Vector3.Forward),
 			(new Vector3(W - 0.075f, 2.0f, 3.6f), Vector3.Left), (new Vector3(-W + 0.075f, 2.3f, -1.8f), Vector3.Right),
-			(new Vector3(0.9f, 2.45f, -D + 0.075f), Vector3.Back),
+			(new Vector3(0.85f, 2.62f, -D + 0.075f), Vector3.Back),
 		})
 		{
 			Vector3 right = Vector3.Up.Cross(n).Normalized();
@@ -783,13 +788,16 @@ public partial class LobbyDecor : Node3D
 			}
 		}
 		Plates(new Vector3(-W, 0, -D), new Vector3(-3.6f, 0, -D), Vector3.Back);
-		Plates(new Vector3(-1.2f, 0, -D), new Vector3(1.4f, 0, -D), Vector3.Back);
+		// (2026-10-16: clear of the boarded windows, the locked room's door and the notice: Headquarters, LockedRoom)
+		Plates(new Vector3(-1.2f, 0, -D), new Vector3(0.3f, 0, -D), Vector3.Back);
 		Plates(new Vector3(3.8f, 0, -D), new Vector3(W, 0, -D), Vector3.Back);
 		Plates(new Vector3(-W, 0, D), new Vector3(-1.3f, 0, D), Vector3.Forward);
-		Plates(new Vector3(1.3f, 0, D), new Vector3(W, 0, D), Vector3.Forward);
-		Plates(new Vector3(W, 0, -D), new Vector3(W, 0, -1.2f), Vector3.Left);
+		Plates(new Vector3(2.05f, 0, D), new Vector3(LockedRoom.DoorX - LockedRoom.DoorW * 0.5f - 0.1f, 0, D), Vector3.Forward);
+		Plates(new Vector3(LockedRoom.DoorX + LockedRoom.DoorW * 0.5f + 0.1f, 0, D), new Vector3(W, 0, D), Vector3.Forward);
+		Plates(new Vector3(W, 0, -D), new Vector3(W, 0, -3.2f), Vector3.Left);
+		Plates(new Vector3(W, 0, -2.0f), new Vector3(W, 0, -1.2f), Vector3.Left);
 		Plates(new Vector3(W, 0, 1.2f), new Vector3(W, 0, D), Vector3.Left);
-		Plates(new Vector3(-W, 0, -D), new Vector3(-W, 0, -1.2f), Vector3.Right);
+		Plates(new Vector3(-W, 0, -D), new Vector3(-W, 0, -1.85f), Vector3.Right);
 		Plates(new Vector3(-W, 0, 1.2f), new Vector3(-W, 0, D), Vector3.Right);
 		k.Color = Colors.White;
 		// pipes along the ceiling edges and down the corners
@@ -817,7 +825,7 @@ public partial class LobbyDecor : Node3D
 			StationProps.Decal(ind, StationTextures.BloodMat, at, Vector3.Up, new Vector2(0.3f + 0.4f * t, 0.3f + 0.2f * t), rng.RandfRange(0, 3f));
 		}
 		// rust weeping down from the plates' bolts, water down from the pipes
-		foreach (var (at, n) in new[] { (new Vector3(-2.4f, 1.6f, D - 0.03f), Vector3.Forward), (new Vector3(3.0f, 1.5f, D - 0.03f), Vector3.Forward), (new Vector3(W - 0.03f, 1.6f, -2.5f), Vector3.Left), (new Vector3(-W + 0.03f, 1.7f, 2.6f), Vector3.Right) })
+		foreach (var (at, n) in new[] { (new Vector3(-2.4f, 1.6f, D - 0.03f), Vector3.Forward), (new Vector3(2.3f, 1.5f, D - 0.03f), Vector3.Forward), (new Vector3(W - 0.03f, 1.6f, -3.75f), Vector3.Left), (new Vector3(-W + 0.03f, 1.7f, 2.6f), Vector3.Right) })
 			DecalDresser.Place(ind, "streak", at, n, new Vector2(0.9f, 2.2f), 0.7f, 0f, 0.12f);
 		// steam hissing from a burst joint, over by the basement door
 		ind.AddChild(Steam(new Vector3(W - 0.3f, H - 0.3f, -D + 0.3f)));
@@ -908,13 +916,13 @@ public partial class LobbyDecor : Node3D
 			(new Vector3(3.9f, 2.6f, -IZ + 0.01f), Vector3.Back, new Vector2(1.5f, 1.1f)), (new Vector3(1.9f, 2.65f, IZ - 0.01f), Vector3.Forward, new Vector2(1.4f, 1.0f)),
 		})
 			DecalDresser.Place(rot, "mould", at, n, size, 0.85f, 0f, 0.12f);
-		foreach (var (at, n) in new[] { (new Vector3(-0.8f, 1.9f, -IZ + 0.01f), Vector3.Back), (new Vector3(-IX + 0.01f, 2.0f, -0.9f), Vector3.Right), (new Vector3(IX - 0.01f, 1.8f, 2.0f), Vector3.Left), (new Vector3(3.8f, 1.8f, IZ - 0.01f), Vector3.Forward) })
+		foreach (var (at, n) in new[] { (new Vector3(-0.8f, 1.9f, -IZ + 0.01f), Vector3.Back), (new Vector3(-IX + 0.01f, 2.0f, -0.9f), Vector3.Right), (new Vector3(IX - 0.01f, 1.8f, 2.0f), Vector3.Left), (new Vector3(4.5f, 1.8f, IZ - 0.01f), Vector3.Forward) })
 			DecalDresser.Place(rot, "streak", at, n, new Vector2(0.8f, 2.4f), 0.8f, 0f, 0.12f);
 		var sag = new MeshKit();
 		sag.Mat(StationTextures.WallpaperStainedMat);
 		sag.Color = new Color(0.7f, 0.66f, 0.58f);
 		// a sheet of paper come away at the top and hanging forward off the back wall, folded once
-		Vector3 s0 = new(3.4f, H - 0.25f, IZ - 0.004f);
+		Vector3 s0 = new(2.3f, H - 0.25f, IZ - 0.004f);   // (2026-10-16: off the locked room's door)
 		float sw = 0.5f;
 		Vector3 s1 = s0 + new Vector3(0, -0.9f, -0.25f), s2 = s1 + new Vector3(0.05f, -0.7f, 0.12f);
 		sag.Quad(s0 + Vector3.Right * sw, s0 + Vector3.Left * sw, s1 + Vector3.Left * sw, s1 + Vector3.Right * sw, Vector3.Forward);

@@ -219,7 +219,8 @@ public partial class StationRoom1 : Node3D
 		var small = new MeshKit();
 		var clutterMat = StationTextures.Flat("st_card", new Color(0.4f, 0.32f, 0.22f), 0.95f, 0.05f);
 		var clutter = new ClutterKit(new Aabb(new Vector3(ix0, 0, -iz), new Vector3(ix1 - ix0, Height, iz * 2f)), 1314, shade, body);
-		clutter.Keep(new Vector3(0.3f, 0, 0.2f), 0.9f).Keep(new Vector3(ix0 + 1.1f, 0, 0), 1.25f).Keep(new Vector3(ix0 + 0.6f, 0, -1.3f), 0.6f);
+		clutter.Keep(new Vector3(0.3f, 0, 0.2f), 0.9f).Keep(new Vector3(ix0 + 1.1f, 0, 0), 1.25f).Keep(new Vector3(ix0 + 0.6f, 0, -1.3f), 0.6f)
+			.Keep(LogTableAt, 0.75f);   // (2026-10-16: his logbook's table)
 		foreach (var (foot, n) in Walls) clutter.Keep(new Aabb(foot + n * 0.75f - new Vector3(Mathf.Abs(n.Z) * 2f + 0.75f * Mathf.Abs(n.X), 0, Mathf.Abs(n.X) * 2f + 0.75f * Mathf.Abs(n.Z)), new Vector3(Mathf.Abs(n.Z) * 4f + 1.5f * Mathf.Abs(n.X), 2.5f, Mathf.Abs(n.X) * 4f + 1.5f * Mathf.Abs(n.Z))));
 		var roles = StationParts.LobbyDecor.Roles;
 		var crate = ClutterKit.Model("crate", roles, canStackOn: true);
@@ -360,6 +361,7 @@ public partial class StationRoom1 : Node3D
 
 		BuildBox(new Vector3(0.3f, 0, 0.2f));
 		BuildPuddles();
+		BuildLogbook();
 
 		// Continue
 		if (s != null && s.HasFlag(StoryManager.Flag.StationRoom1Solved))
@@ -370,6 +372,7 @@ public partial class StationRoom1 : Node3D
 			foreach (var t in _tapes) t.Visible = false;
 			// (the joints pass) open on its hinge as OpenBox leaves it: it was lifted 16 cm and floated over the box
 			_lid.Rotation = new Vector3(Mathf.DegToRad(-100f), 0, 0);
+			BuildContents(false);
 			_boxUse.Enabled = false;
 			foreach (var w in _writing) w.Visible = false;
 			// the runs stay on the walls as they stopped, dried
@@ -390,6 +393,34 @@ public partial class StationRoom1 : Node3D
 		};
 		parent.AddChild(l);
 		return l;
+	}
+
+	// ------------------------------------------------------------------ his logbook (2026-10-16, STORY.md Rev 5)
+
+	/// <summary>Where his logbook's table stands: against the lobby's wall, in the corner left of the door.</summary>
+	public static readonly Vector3 LogTableAt = new(-Half + 0.095f + 0.25f, 0, -2.1f);
+	/// <summary>For tests: his logbook, read page by page.</summary>
+	public Readable Logbook { get; private set; }
+
+	/// <summary>His logbook, open on a little table: the twelve dated entries (his hand, then the other's), then the pages
+	/// of "Come and see." (<see cref="StationStory.LogbookPages"/>).</summary>
+	private void BuildLogbook()
+	{
+		var table = new Node3D { Name = "LogTable", Position = LogTableAt, Rotation = new Vector3(0, Mathf.Pi * 0.5f, 0) };
+		AddChild(table);
+		StationStory.Place(table, "ss_log_table", Transform3D.Identity, StationParts.LobbyDecor.Roles);
+		StationStory.Solid(table, new Vector3(0, 0.37f, 0), new Vector3(0.72f, 0.74f, 0.48f));
+		// the book open on it, turned to whoever stands in the room (its foot toward +X)
+		var book = new Node3D { Name = "Logbook", Position = LogTableAt + new Vector3(0.02f, 0.742f, 0.02f), Rotation = new Vector3(0, -Mathf.Pi * 0.5f + 0.12f, 0) };
+		AddChild(book);
+		StationStory.Place(book, "ss_logbook", Transform3D.Identity);
+		Logbook = new Readable
+		{
+			Name = "Readable", Title = "", Text = StationStory.Entries[0].date, Style = Readable.NoteStyle.Handwritten,
+			Pages = StationStory.LogbookPages(), ReadFlag = StationStory.LogbookRead, Prompt = "Read the logbook",
+			PickRadius = 0.3f, MaxDistance = 2.4f, Position = new Vector3(0, 0.03f, 0),
+		};
+		book.AddChild(Logbook);
 	}
 
 	public override void _Process(double delta)
@@ -502,23 +533,29 @@ public partial class StationRoom1 : Node3D
 		tween.TweenProperty(_lid, "rotation:x", Mathf.DegToRad(-100f), 0.9f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
 		PlayOneShot("res://assets/audio/sfx/door_creak_01.wav", 0f, 1.8f);
 
-		_button = new Node3D { Name = "Button", Position = new Vector3(0, 0.06f, 0) };
+		BuildContents(true);
+		GD.Print("[story] Act 13, room 1: the box is open on a button");
+	}
+
+	/// <summary>What the box holds (2026-10-16, STORY.md Rev 5): on its velvet, two men's things, a watch and a ring
+	/// (Travis's and Nathan's), and the button, a brass button off a ranger's coat (his), its thread torn. It was a red
+	/// button on an iron boss. <paramref name="live"/>: it can be pressed (on Continue past it, it already has been).</summary>
+	private void BuildContents(bool live)
+	{
+		var velvet = new MeshKit();
+		velvet.Mat(StationTextures.Flat("st_velvet", new Color(0.25f, 0.03f, 0.05f), 1f, 0.05f));
+		velvet.Color = Colors.White;
+		BuildKit.Box(velvet, new Vector3(0, 0.04f, 0), new Vector3(0.4f, 0.02f, 0.24f));
+		velvet.CommitTo(_box, "Velvet", false);
+		StationStory.Place(_box, "ss_watch", new Transform3D(new Basis(Vector3.Up, 0.6f), new Vector3(-0.12f, 0.05f, 0.03f)), null, "Watch");
+		StationStory.Place(_box, "ss_ring", new Transform3D(Basis.Identity, new Vector3(0.12f, 0.05f, -0.045f)), null, "Ring");
+		_button = new Node3D { Name = "Button", Position = new Vector3(0, live ? 0.05f : 0.047f, 0) };
 		_box.AddChild(_button);
-		var bk = new MeshKit();
-		bk.Mat(StationTextures.Flat("st_velvet", new Color(0.25f, 0.03f, 0.05f), 1f, 0.05f));
-		bk.Color = Colors.White;
-		BuildKit.Box(bk, new Vector3(0, -0.02f, 0), new Vector3(0.4f, 0.02f, 0.24f));
-		bk.Mat(BuildingTextures.IronMat);
-		bk.Color = new Color(0.25f, 0.24f, 0.22f);
-		bk.Cylinder(new Vector3(0, -0.01f, 0), new Vector3(0, 0.012f, 0), 0.05f, 0.05f, 12, true);
-		bk.Mat(StationTextures.Glow("st_button_red", new Color(0.6f, 0.04f, 0.03f), 0.4f));
-		bk.Color = Colors.White;
-		bk.Cylinder(new Vector3(0, 0.012f, 0), new Vector3(0, 0.03f, 0), 0.036f, 0.036f, 12, true);
-		bk.CommitTo(_button, "ButtonMesh", true);
-		_buttonUse = new Interactable { Name = "Press", Prompt = "Press the button", PickRadius = 0.3f, MaxDistance = 2f, Position = new Vector3(0, 0.03f, 0) };
+		StationStory.Place(_button, "ss_coat_button", new Transform3D(Basis.FromScale(Vector3.One * 1.5f), Vector3.Zero), null, "CoatButton");
+		if (!live) return;
+		_buttonUse = new Interactable { Name = "Press", Prompt = "Press the button", PickRadius = 0.3f, MaxDistance = 2f, Position = new Vector3(0, 0.012f, 0) };
 		_buttonUse.Interacted += OnButtonPressed;
 		_button.AddChild(_buttonUse);
-		GD.Print("[story] Act 13, room 1: the box is open on a button");
 	}
 
 	private void OnButtonPressed(PlayerController player)
@@ -526,7 +563,7 @@ public partial class StationRoom1 : Node3D
 		if (Solved) return;
 		Solved = true;
 		_buttonUse.Enabled = false;
-		_button.Position = _button.Position with { Y = _button.Position.Y - 0.012f };
+		_button.Position = _button.Position with { Y = _button.Position.Y - 0.003f };
 		PlayOneShot("res://assets/audio/sfx/radio_tick_01.wav", 2f, 0.6f);
 		MeltWalls();
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.StationRoom1Solved);

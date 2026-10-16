@@ -28,6 +28,10 @@ namespace ProjectDS.World;
 ///  6. Behind the iron door (<see cref="StationRoom3"/>): Act 14's gallery of burnt portraits, and
 ///     the stairwell down.
 ///
+/// (2026-10-16, STORY.md Rev 5) It is Mitchell Webber's headquarters, the player's father's: his photo, nameplate and key
+/// rack at the desk, the barricades, the relief crew's notice, the lobby changing on every return (<see cref="Headquarters"/>);
+/// his logbook in Room 1; and the room he locked, chained in the back wall right of the web until Room 3 (<see cref="LockedRoom"/>).
+///
 /// Layout (local, floor y=0): lobby x in [-5, 5], z in [-4.5, 4.5], 3.2 m high.
 /// <code>
 ///   front (z=-4.5): the way in at x=-2.4; the basement door at x=+2.6 (stairs go down, -Z)
@@ -62,11 +66,17 @@ public partial class StationInterior : Node3D
 	public static readonly Vector3 BossAt = new(400f, -470f, 330f);
 	public IronDoor Door3 { get; private set; }
 	public LobbyDecor Decor { get; private set; }
+	/// <summary>(2026-10-16) Mitchell Webber's things in the lobby, and its changes on every return.</summary>
+	public Headquarters Story { get; private set; }
+	/// <summary>(2026-10-16) The room he locked (the logbook's December 31st), off the lobby's back wall.</summary>
+	public LockedRoom Locked { get; private set; }
 	/// <summary>For tests: the lobby's current decay stage (0 kept .. 4 hell).</summary>
 	public int Stage => Decor?.Stage ?? 0;
 
 	private StationDoor _room1Door, _room2Door;
 	private Node3D _handMark, _stairMark;
+	private Node3D _desk;
+	private MeshInstance3D[] _deskVariants;
 
 	public override void _EnterTree() => Instance = this;
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
@@ -159,6 +169,14 @@ public partial class StationInterior : Node3D
 		AddChild(Sewer);
 		Boss = new BossRoom { Name = "BossRoom", Position = BossAt };
 		AddChild(Boss);
+		// (2026-10-16, STORY.md Rev 5) his headquarters: the photo, the nameplate, the barricades, the notice, the lobby changing
+		// on every return; and the room he locked, chained until Room 3 is reached
+		Story = new Headquarters { Name = "Headquarters" };
+		AddChild(Story);
+		Story.Build(this, _desk, _deskVariants, _room1Door);
+		Locked = new LockedRoom { Name = "LockedRoom", Position = new Vector3(LockedRoom.DoorX, 0, HalfDepth) };
+		AddChild(Locked);
+		Locked.Build(this, () => Room3 is { Entered: true } || (StoryManager.Instance is { } sm && sm.Current >= Checkpoint.Act13Finished));
 
 		EntranceMarkerWorld = ToGlobal(new Vector3(EntryGapX, 0.05f, -HalfDepth + 1.2f));
 		EntranceYaw = Rotation.Y + Mathf.Pi;   // facing local +Z: into the lobby, toward the desk
@@ -253,10 +271,26 @@ public partial class StationInterior : Node3D
 	{
 		var desk = new Node3D { Name = "Desk", Position = DeskAt };
 		AddChild(desk);
+		_desk = desk;
 		var k = new MeshKit();
 		// the modelled pedestal desk (a moulded top, drawers with brass pulls and label frames, a panelled back; the
 		// fidelity pass, 2026-10-01), its top at the old one's height; a mug and loose papers on it
-		bool modelled = World.FurnitureKit.Add(k, "station_desk", Vector3.Zero, 0f, StationParts.LobbyDecor.Roles, new Vector3(1f, 0.79f / 0.76f, 1f));
+		// (2026-10-16, STORY.md Rev 5: its own piece now, with its drawers-out twins from tools/Blender/station_story.py; the
+		// lobby shows one or another as it changes behind the player's back, Headquarters)
+		var deskScale = new Vector3(1f, 0.79f / 0.76f, 1f);
+		bool modelled;
+		if (World.FurnitureKit.Has("station_desk") && World.FurnitureKit.Has("ss_desk_open1") && World.FurnitureKit.Has("ss_desk_open2"))
+		{
+			var dxf = new Transform3D(Basis.FromScale(deskScale), Vector3.Zero);
+			_deskVariants = new[]
+			{
+				World.FurnitureKit.Place(desk, "station_desk", dxf, StationStory.Roles, "DeskShut"),
+				World.FurnitureKit.Place(desk, "ss_desk_open1", dxf, StationStory.Roles, "DeskOpen1"),
+				World.FurnitureKit.Place(desk, "ss_desk_open2", dxf, StationStory.Roles, "DeskOpen2"),
+			};
+			modelled = true;
+		}
+		else modelled = World.FurnitureKit.Add(k, "station_desk", Vector3.Zero, 0f, StationParts.LobbyDecor.Roles, deskScale);
 		if (modelled)
 		{
 			World.FurnitureKit.Add(k, "mug", new Vector3(-0.78f, 0.79f, -0.05f), 0.8f, StationParts.LobbyDecor.Roles);

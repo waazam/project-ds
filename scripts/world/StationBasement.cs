@@ -671,7 +671,9 @@ public partial class StationBasement : Node3D
 		var k = new MeshKit();
 		// (2026-10-15) the Blender longcase clock (grandfather_clock.glb, the lodge's and the library's), its face to +Z as
 		// the code's, its wood the flood-blackened brown; the code below is its fallback
-		bool modelled = FurnitureKit.Add(k, "grandfather_clock", Vector3.Zero, Mathf.Pi, new()
+		// (2026-10-16, STORY.md Rev 5: its hands stopped at six, the start of his father's shift: ss_station_clock, the same
+		// clock from tools/Blender/station_story.py)
+		bool modelled = FurnitureKit.Add(k, FurnitureKit.Has("ss_station_clock") ? "ss_station_clock" : "grandfather_clock", Vector3.Zero, Mathf.Pi, new()
 		{
 			["wood"] = FixtureModels.Tint(BuildingTextures.BoardsMat, new Color(0.2f, 0.12f, 0.08f)), ["metal"] = FixtureModels.Tint(ItemTextures.BrassMat, new Color(0.7f, 0.6f, 0.4f)),
 			["face"] = new StandardMaterial3D { AlbedoColor = new Color(0.5f, 0.46f, 0.36f), Roughness = 0.85f },

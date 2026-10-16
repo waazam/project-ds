@@ -32,6 +32,10 @@ public partial class Readable : Interactable
 	[Export] public NoteStyle Style = NoteStyle.Handwritten;
 	/// <summary>Optional StoryManager flag set on first read (e.g. "read_door_note").</summary>
 	[Export] public string ReadFlag = "";
+	/// <summary>(2026-10-16) A book read page by page (the father's logbook, Act 13): when set, these are shown in turn
+	/// instead of <see cref="Text"/>, E turning to the next and putting it down after the last. Each page may have its
+	/// own style and ink (a different hand).</summary>
+	public NotePage[] Pages;
 
 	/// <summary>Raised when the player opens it (every time).</summary>
 	public event Action<PlayerController> Read;
@@ -52,4 +56,12 @@ public partial class Readable : Interactable
 		Read?.Invoke(player);
 		base.Interact(player);
 	}
+}
+
+/// <summary>One page of a <see cref="Readable"/> read page by page: its text, its style, and its ink (null: the style's own).</summary>
+public sealed class NotePage
+{
+	public string Text = "";
+	public Readable.NoteStyle Style = Readable.NoteStyle.Handwritten;
+	public Color? Ink;
 }
