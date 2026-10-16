@@ -392,6 +392,17 @@ public static class ProcTextures
 		return new Color(c.R, c.G, c.B, 1);
 	}, alpha: true);
 
+	/// <summary>(2026-10-15) The Blender fern's leaflets: solid, a dark forest green with a faint mottle and the midrib a
+	/// shade lighter down u = 0.5 (a leaflet's u runs edge 0, rib 0.5, edge 1). No alpha: the fronds are geometry now.</summary>
+	public static Texture2D FernLeaf() => Make("fern_leaf", 16, 16, (x, y) =>
+	{
+		float n = Fbm(x, y, 16, 16, 4, 2, 377);
+		float rib = Mathf.Clamp(1f - Mathf.Abs(x - 7.5f) / 1.6f, 0f, 1f);
+		var c = Mix(new Color(0.085f, 0.12f, 0.045f), new Color(0.15f, 0.19f, 0.07f), n);
+		c = Mix(c, new Color(0.19f, 0.22f, 0.1f), rib * 0.5f);
+		return new Color(c.R, c.G, c.B, 1);
+	});
+
 	public static Texture2D TrailMap() => Make("trailmap", 64, 64, (x, y) =>
 	{
 		float n = Fbm(x, y, 64, 64, 4, 3, 181);

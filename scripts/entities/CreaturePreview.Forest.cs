@@ -14,7 +14,8 @@ public partial class CreaturePreview
 		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(400, 400) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.17f, 0.12f) } });
 		var shots = new (string key, System.Func<Mesh> code, float size, float lookY)[]
 		{
-			("fir_young", () => World.ForestScatter.FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f), 7f, 3f),
+			("fern", () => World.ForestScatter.FernMesh(), 1.3f, 0.3f),
+			("fir_young",() => World.ForestScatter.FirMesh(15, 9f, 0.17f, 0.10f, 8, 2.0f, 0.05f), 7f, 3f),
 			("fir_mid", () => World.ForestScatter.FirMesh(13, 18f, 0.31f, 0.26f, 11, 3.0f, 0.15f), 11f, 6f),
 			("snag", () => World.ForestScatter.SnagMesh(6, 9.5f), 7f, 3.5f),
 			("decid_a", () => World.ForestScatter.DeciduousMesh(4), 7f, 3.5f),

@@ -663,6 +663,23 @@ public partial class ForestScatter : Node3D
 
 	/// <summary>The fern's, the grass's and the leaf litter's materials (the code meshes' and the Blender ones', by name: ScatterModels).</summary>
 	internal static ShaderMaterial FernMat => FoliageMat("fern_mat", ProcTextures.Fern(), new Color(0.95f, 1f, 0.9f), 0.04f);
+	/// <summary>(2026-10-15, the owner: ferns "like bright green cobwebs") The Blender fern's solid leaflets: the foliage
+	/// shader (its sway, its winter frost) with nothing cut away and no edge-on fade, the undersides a little darker.</summary>
+	internal static ShaderMaterial FernLeafMat => (ShaderMaterial)ProcTextures.Cached("fern_leaf_mat", () =>
+	{
+		var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/foliage.gdshader") };
+		DetailKit.Hook(m, DetailKit.Kind.Foliage);
+		m.SetShaderParameter("albedo_tex", ProcTextures.FernLeaf());
+		m.SetShaderParameter("tint", Colors.White);
+		m.SetShaderParameter("sway", 0.035f);
+		m.SetShaderParameter("tex_size", new Vector2(16, 16));
+		m.SetShaderParameter("alpha_cut", 0.0f);
+		m.SetShaderParameter("mip_boost", 0.0f);
+		m.SetShaderParameter("edge_fade", 0.0f);
+		m.SetShaderParameter("normal_up", 0.45f);
+		m.SetShaderParameter("back_shade", 0.3f);
+		return m;
+	});
 	internal static ShaderMaterial GrassMat => FoliageMat("grass_mat", ProcTextures.GrassTuft(), new Color(0.95f, 0.95f, 0.85f), 0.07f);
 	internal static ShaderMaterial LitterMat => (ShaderMaterial)ProcTextures.Cached("litter_mat", () =>
 	{

@@ -8,7 +8,7 @@ and Act 6's giant firs, each exported to assets/models/forest/<key>.glb under th
 They keep the conventions the game's materials expect, so the scatter, its colliders, its instance colours and its shaders
 all go on working unchanged:
 - material slots are named for the game's materials (tree_bark, bark, fir_branch, fir_spray, endgrain, tree_endgrain,
-  moss_rock, tree_leaf, ivy, vine_core, moss, fern, grass, litter, wood, metal, palmetto); the game swaps its own in by name
+  moss_rock, tree_leaf, ivy, vine_core, moss, fern, fern_leaf, grass, litter, wood, metal, palmetto); the game swaps its own in by name
   (scripts/world/ScatterModels.cs);
 - UVs as the game laid them (bark: u twice round, v half a unit per metre; foliage cards: v 1 at the root, 0 at the tip, which
   the foliage shader's sway reads); vertex colours as the game's MeshKit gave them (FLOAT_COLOR, written unconverted);
@@ -38,7 +38,7 @@ RIGHT = Vector((1, 0, 0))
 PREVIEW = {
     "tree_bark": (0.32, 0.27, 0.22), "bark": (0.35, 0.3, 0.24), "fir_branch": (0.08, 0.13, 0.08), "fir_spray": (0.1, 0.18, 0.09),
     "endgrain": (0.55, 0.45, 0.32), "tree_endgrain": (0.55, 0.45, 0.32), "moss_rock": (0.4, 0.42, 0.36), "tree_leaf": (0.2, 0.3, 0.12),
-    "ivy": (0.12, 0.2, 0.08), "vine_core": (0.05, 0.08, 0.035), "moss": (0.34, 0.37, 0.3), "fern": (0.2, 0.32, 0.12),
+    "ivy": (0.12, 0.2, 0.08), "vine_core": (0.05, 0.08, 0.035), "moss": (0.34, 0.37, 0.3), "fern": (0.2, 0.32, 0.12), "fern_leaf": (0.15, 0.2, 0.08),
     "grass": (0.3, 0.38, 0.15), "litter": (0.3, 0.24, 0.16), "wood": (0.4, 0.34, 0.26), "metal": (0.42, 0.26, 0.16),
     "palmetto": (0.3, 0.38, 0.2), "stem": (0.25, 0.35, 0.15), "petal": (0.8, 0.8, 0.8), "cap": (0.5, 0.32, 0.18),
     "gill": (0.7, 0.62, 0.5), "fleck": (0.82, 0.78, 0.66), "giant_trunk": (0.32, 0.26, 0.2), "giant_needle": (0.06, 0.1, 0.07),
@@ -766,20 +766,76 @@ def boulder(seed):
 
 
 def fern():
+    """(2026-10-15, the owner: "some of the ferns in act 1 look like bright green cobwebs") Real fronds, not alpha cards: the
+    old two cards per frond carried a 32 px leaflet texture that fell apart into thin bright strands once filtered, scissored
+    and thinned edge-on. Now each frond is an arching stalk with its leaflets (pinnae) as solid little blades in pairs,
+    longest at the middle of the frond, swept toward the tip and a little folded down the midrib; one opaque material
+    ("fern_leaf") lit like the rest of the floor. v runs 1 at the root to 0 at the tip, as the foliage shader's sway wants."""
     k = Kit()
-    k.mat("fern")
-    for i in range(7):
-        a = TAU * i / 7 + (i % 2) * 0.3
+    k.mat("fern_leaf")
+    rnd = random.Random(31)
+    fronds = 9
+    for i in range(fronds):
+        a = TAU * i / fronds + rnd.uniform(-0.25, 0.25)
         d = V(math.cos(a), 0, math.sin(a))
-        side = V(-d.z, 0, d.x) * 0.17
-        ln = 0.75 + (i % 3) * 0.12
-        root = d * 0.05 + V(0, 0.02, 0)
-        mid = d * ln * 0.5 + V(0, 0.42, 0)
-        tip = d * ln + V(0, 0.18, 0)
-        k.col(0.8)
-        k.quad(root - side * 0.4, root + side * 0.4, mid + side, mid - side, UP, (0, 1), (1, 1), (1, 0.5), (0, 0.5))
-        k.col(1.0)
-        k.quad(mid - side, mid + side, tip + side * 0.3, tip - side * 0.3, UP, (0, 0.5), (1, 0.5), (1, 0), (0, 0))
+        side = V(-d.z, 0, d.x)
+        ln = rnd.uniform(0.72, 0.95)
+        rise = rnd.uniform(0.42, 0.6)
+        root = d * 0.04 + V(0, 0.02, 0)
+        ctrl = d * ln * 0.38 + V(0, rise, 0)
+        tip = d * ln + V(0, rnd.uniform(0.05, 0.16), 0)
+        twist = rnd.uniform(-0.25, 0.25)       # the frond's blade rolls a little about its stalk
+
+        def P(t):
+            return root * (1 - t) ** 2 + ctrl * 2 * t * (1 - t) + tip * t * t
+
+        def T(t):
+            return ((ctrl - root) * 2 * (1 - t) + (tip - ctrl) * 2 * t).normalized()
+
+        def frame(t):
+            tt = T(t)
+            s = (side * math.cos(twist) + UP * math.sin(twist))
+            s = (s - tt * s.dot(tt)).normalized()
+            n = s.cross(tt).normalized()
+            if n.y < 0:
+                n = -n
+            return tt, s, n
+
+        segs = 6
+        lum = rnd.uniform(0.82, 1.0)
+        # the stalk: a thin strip, darker
+        sw = 0.006
+        for j in range(segs):
+            t0, t1 = j / segs, (j + 1) / segs
+            _, s0, n0 = frame(t0)
+            _, s1, n1 = frame(t1)
+            p0, p1 = P(t0), P(t1)
+            w0, w1 = sw * (1 - 0.6 * t0), sw * (1 - 0.6 * t1)
+            c = (0.55 * lum, 0.5 * lum, 0.42 * lum, 1.0)
+            k.tri(p0 - s0 * w0, p0 + s0 * w0, p1 + s1 * w1, n0, n0, n1, (0.45, 1 - t0), (0.55, 1 - t0), (0.55, 1 - t1), c, c, c)
+            k.tri(p0 - s0 * w0, p1 + s1 * w1, p1 - s1 * w1, n0, n1, n1, (0.45, 1 - t0), (0.55, 1 - t1), (0.45, 1 - t1), c, c, c)
+        # the leaflets, in pairs from a short bare stipe to the tip
+        pairs = 15
+        for j in range(pairs):
+            t = 0.16 + 0.8 * j / (pairs - 1)
+            tt, s, n = frame(t)
+            base = P(t)
+            L = 0.19 * math.sin(math.pi * min(1.0, (t - 0.1) / 0.92)) ** 0.7 * (1.05 - 0.35 * t) + 0.012
+            for sg in (-1, 1):
+                dd = (s * sg * 0.9 + tt * 0.38 - n * 0.16).normalized()
+                ww = dd.cross(n).normalized()
+                wid = L * 0.46
+                pt = base + dd * L
+                m1 = base + dd * (L * 0.32) + ww * wid * 0.5
+                m2 = base + dd * (L * 0.32) - ww * wid * 0.5
+                m1 -= n * (L * 0.07)   # the halves dip either side of the midrib: a shallow fold
+                m2 -= n * (L * 0.07)
+                g = lum * rnd.uniform(0.85, 1.05)
+                cb = (0.8 * g, 0.82 * g, 0.78 * g, 1.0)        # in by the stalk, shaded
+                ct = (1.0 * g, 1.0 * g, 0.92 * g, 1.0)         # out at the leaflet's point
+                v = 1 - t
+                k.tri(base, m1, pt, n, n, n, (0.5, v), (0.0, v), (0.5, v), cb, cb, ct)
+                k.tri(base, pt, m2, n, n, n, (0.5, v), (0.5, v), (1.0, v), cb, ct, cb)
     return k
 
 

@@ -78,6 +78,7 @@ public static class ScatterModels
 		"vine_core" => ForestScatter.MoundCoreMat,
 		"moss" => ForestScatter.MossMat,
 		"fern" => ForestScatter.FernMat,
+		"fern_leaf" => ForestScatter.FernLeafMat,
 		"grass" => ForestScatter.GrassMat,
 		"litter" => ForestScatter.LitterMat,
 		"wood" => ProcTextures.WoodMat,
