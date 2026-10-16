@@ -22,7 +22,7 @@ namespace ProjectDS.UI;
 /// cancelled caption is taken down at once).
 ///
 /// (2026-10-15) A caption with no title said in play (the screen not black: a
-/// thought, "Pitch black in here. There was a switch by the door.") is a hint, in
+/// thought, "Pitch black. The light switch is by the door.") is a hint, in
 /// the hints' look (<see cref="HintText"/>), low: in the bottom cinema bar, or just
 /// over a hint or a spoken line showing there, never across the middle of the view
 /// or over the prompt. Title cards, the black-screen narration, the death lines and

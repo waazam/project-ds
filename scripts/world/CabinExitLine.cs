@@ -58,6 +58,4 @@ public partial class CabinExitLine : StoryTrigger
 		StoryManager.Instance.SetFlag(StoryManager.Flag.DawnBroke);
 		// No line (Dan, 2026-09-22: no talking to himself): the rain simply stops.
 	}
-
-	public const string Line = "The rain stopped. Like it wanted me to take it.";
 }

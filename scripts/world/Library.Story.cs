@@ -171,7 +171,7 @@ public partial class Library
 		};
 		AddChild(Bookmark);
 		await Cutscene.Wait(this, 1.2, ct);
-		_ = StoryBeat.Caption(this, "It left something behind.", 0.4f, 2f, 1f);
+		_ = StoryBeat.Caption(this, "Left behind.", 0.4f, 1.6f, 1f);
 		GD.Print("[story] Act 19: the box glows and dissolves - a bookmark is left behind");
 	}
 

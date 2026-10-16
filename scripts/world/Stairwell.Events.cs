@@ -121,7 +121,7 @@ public partial class Stairwell
 		_events.Add((R(30), p => { _echoAboveFrom = R(30); _echoAboveTo = Mathf.Max(R(30) + 1, R(32)); _echoPlayer = p; }));
 		_events.Add((R(33), p => AddFigure(p, Mathf.Max(R(33) + 1, R(35)))));
 		_events.Add((R(38), p => Sfx("far_clang", 2, p.GlobalPosition + Vector3.Down * 40f, 4f, 30f)));
-		_events.Add((R(44), p => _ = StoryBeat.Caption(this, "How far down does this go?", 0.8f, 2.6f, 1.2f)));
+		_events.Add((R(44), p => _ = StoryBeat.Caption(this, "Deeper.", 0.8f, 2.0f, 1.2f)));
 		_events.Add((R(50), p => Silence(40f)));
 		_events.Add((R(55), p => Sfx("stair_groan", 3, p.GlobalPosition + Vector3.Up * 2f, 0f, 8f)));
 		_events.Add((R(58), p => { _echoAboveFrom = R(58); _echoAboveTo = Mathf.Max(R(58) + 1, R(60)); _echoPlayer = p; }));

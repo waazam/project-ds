@@ -40,7 +40,7 @@ The climb's blackout carries the player from the trailhead into the Hollow, and 
 - his note at the camp, his key cut in two, and his page and photographs in the cabin;
 - his boots in the bunker, his initials inked inside them;
 - six pages torn from his notebook along the way (the lake shore, the station door, Room 3, the sewer's landing, the church crypt, the lodge by Room 203);
-- a missing poster in the lodge's walls.
+- a missing poster in the lodge's walls: a missing hiker, 41, last seen at the Blackfern trailhead on October 24, a green pack and a camera round his neck, his name torn off and "the steps" pencilled over it.
 
 The player is following his trail without meaning to.
 
@@ -50,7 +50,7 @@ The player is following his trail without meaning to.
 - **The player's lines.** The player says a few short lines aloud, like Ethan Winters, and only these (the list is in "The player's lines" below). Until Dan records them they are shown as text: one line under the picture, in quotes, in the player's own subtitle style (not the hint style), for about as long as it would take to say. When recorded, they are dry and unfiltered (not through the radio). Besides them, a rare thought caption of one or two words stays (like "Trenches." and "So quiet down here."). Nothing else is said to himself.
 - **The stairs** get no backstory. They are never explained.
 - **R.H.** is never seen, and the stalker never wears him.
-- **Photos.** There is no checklist. The album shows a count of how many of the 69 things have been found ("N/69 found") and the credits say "N of 69", but nothing ever lists what is left to find.
+- **Photos.** There is no checklist. The album shows a count of how many of the 69 things have been found, with the points ("N/69 found   N pts"), and the credits say "N of 69" over "N points", but nothing ever lists what is left to find.
 - **Sound.** No sound repeats: many variations, never the same one twice running.
 - **Visuals.** Nothing flashes or strobes, and the camera never shakes hard or snaps.
 - **Titles.** Chapter titles are shown alone, with no chapter number.
@@ -90,7 +90,7 @@ He chose the trailhead because he loved it as a child. The magazine wanted natur
 **Photos.** The player carries a Polaroid-style instant camera, and keeps it for the whole game. Right mouse raises it, left mouse takes the picture and Tab opens the album.
 - **Subjects.** They can take pictures of anything: birds, a doe, a frog by the creek, wildflowers, mushrooms, the waterfall, a strange standing stone, or just the trees.
 - **The album.** Every picture goes into the album, scored for clarity, focus, framing and zoom (one to five stars). The camera zooms (x1 to x4), focuses itself, and fires a soft flash in the dark.
-- **No checklist.** The album's footer keeps count of how many of the 69 things have been photographed ("N/69 found"), but never lists what's left.
+- **No checklist.** The album's footer keeps count of how many of the 69 things have been photographed, and the points ("N/69 found   N pts"), but never lists what's left.
 - **The player's notes.** After the prints, the album has a page of pencil notes in the photographer's own hand, a line for each thing the first time it's on film.
 - There are only 3 birds in the game (cardinals in red, blue and purple). They are gone from Act 2 on.
 - A 4th bird, black with red eyes, is on the third walk (below).
@@ -286,6 +286,7 @@ When they step outside with the cap, the rain is already over and the woods are 
 - **The approach.** Roots and ivy grow through the vault door's frame. Near it the ambience cuts to silence and a hum rises, as at the stairs. The third chapter's title, *Root of the Problem*, comes up over the vault door.
 - **The keyhole.** The door has a brass keyhole in its face, low and right of the wheel. Without both halves it is "Locked. The key's in two pieces somewhere." (with one, "Half a key won't turn it. The other half's still out there."), and a line under the picture says where the missing half's trail starts. With both, using the door brings the two halves up in the hand, pinched between thumb and finger: the bit's knurled sleeve is screwed down onto the other half's threaded stub with a click, and the whole key goes into the lock and turns. The bolts clunk back and the door swings open and stays open.
 - Before the clearing's loop is done, the bunker's door stays shut and sends them back: something is still calling across the creek.
+- If they reach the bunker with the cabin's save missed, the approach saves **Checkpoint 6** there instead, once the clearing's loop is done.
 
 ## Act 8: The Bunker
 **Checkpoint 7**, when entering the bunker.
@@ -592,7 +593,7 @@ A record off the table falls to the nearest ending.
 After the last act come:
 1. The save that marks the story done (**GameFinished**), and the fade.
 2. The end card, DEAD SILENT.
-3. The player's pictures played back as Polaroids, the best of them gathered last, and how many things they photographed ("N of 69"). Every one of them, taken before the reveal or after, develops in the slideshow with the black figure standing behind it.
+3. The player's pictures played back as Polaroids, the best of them gathered last, and how many things they photographed and their points ("N of 69", "N points"). Every one of them, taken before the reveal or after, develops in the slideshow with the black figure standing behind it.
 4. "GLHFDD", "Thanks for playing.", and the main menu.
 
 A Continue afterwards finds the player where the story ended, by the car.
@@ -657,7 +658,7 @@ The crawler in the stairwell and the arm in the lodge's walls never kill: the st
 | 3 | Act3DoorBoarded | R.H.'s camp |
 | 4 | Act5CabinEntered | Inside the cabin (Act 5) |
 | 5 | Act6BridgeCrossed | Across the footbridge |
-| 6 | Act7CabinBurning | Outside the burning cabin (Act 7) |
+| 6 | Act7CabinBurning | Outside the burning cabin (Act 7), or the bunker's approach if that was missed |
 | 7 | Act8BunkerEntered | Into the bunker |
 | 8 | Act10WalkieFound | Outside, the radio alive |
 | 9 | Act11GiantEncounter | The lake's dock |

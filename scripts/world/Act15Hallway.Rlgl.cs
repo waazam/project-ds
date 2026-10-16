@@ -246,7 +246,7 @@ public partial class Act15Hallway
 		GD.Print("[story] Act 15 done: into the janitor's closet, the door shut behind - Act 16 starts here");
 		ArmCloset();
 		await Cutscene.Wait(this, 2.0, ct);
-		_ = StoryBeat.Caption(this, "Pitch black in here. There was a switch by the door.", 0.6f, 2.6f, 1f);
+		_ = StoryBeat.Caption(this, "Pitch black. The light switch is by the door.", 0.6f, 2.6f, 1f);
 	}
 
 	private void Sfx(string name, int variants, Vector3 at, float db, float unit = 5f)

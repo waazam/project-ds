@@ -16,8 +16,8 @@ public static class LorePages
 
 	public static readonly IReadOnlyList<Page> All = new List<Page>
 	{
-		new(1, "respawn_Act11GiantEncounter", "The lake isn't on the map. Neither is whatever's on the far side of it. Got the boat out of the reeds. Something rolled under it while I bailed. A fish. A big fish."),
-		new(2, "respawn_Act12LakeCrossed", "Lights on, nobody here, coffee cold in the cup. Their radio log stops on the 24th. Every entry after the 20th is the same word. I'm not writing it down."),
+		new(1, "respawn_Act11GiantEncounter", "The lake isn't on the map. Neither is whatever's on the far side of it. There's a boat tied at the dock, knotted tight and ugly. I didn't tie it. I don't trust it. I'm going round by the shore."),
+		new(2, "respawn_Act12LakeCrossed", "Barricaded from the inside. Took me an hour to get in. Dust on everything, years of it. A logbook, a name on the desk. I read the first pages and stopped."),
 		new(3, "respawn_Act13Finished", "They burned the faces out of every one of them on purpose. I think it was so it couldn't look out through them. I'm not staying in here."),
 		new(4, "respawn_Act16Finished", "The hand knows the way down. I let it lead. I should have turned round at the steps. I keep saying that like it was a choice."),
 		new(5, "respawn_Act21ChurchReached", "Snow up there. In October. The bells don't ring here, they breathe. If you've come this far you can get out. I couldn't find the way."),
