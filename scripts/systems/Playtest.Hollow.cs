@@ -387,42 +387,127 @@ public partial class Playtest
 		Check("the last landing gives way: the fall, saved", act6.LoopDone && Story.HasFlag(StoryManager.Flag.ClearingLoopDone));
 		Check("the blood stops with the fall", !act6.BloodRaining);
 		Check("woken past the clearing: the stairs and the ring gone", act6 is { WorldReset: true, Fenced: false, MiniStairCount: 0 });
-		CheckObjective("the compass points on to the lookout", "fire_lookout_marker");
+		CheckObjective("the compass points ahead, at the cabin", "cabin");
+		Check("the cabin stands ahead on the trail, in the wrong place", _bot.FirstOf<CabinFireEvent>()?.Cabin is { AtAct7Spot: true });
 		Shot("wake");
 	}
 
 	// ------------------------------------------------------------------ Act 7
 
+	/// <summary>Act 7 (STORY.md Rev 5, the hybrid): the cabin ahead, in at its door, the print, the fire, the cave-in, the
+	/// axe through the beams, out and looking back (checkpoint 6), the giant, the trees herding them up to the lookout,
+	/// and the walk on to the bunker's second half of the key.</summary>
 	private async Task Act7(CancellationToken ct)
 	{
 		await Control(ct, 40);
-		var lookout = GetTree().GetFirstNodeInGroup("fire_lookout_marker") as Node3D;
-		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
 		var fire = _bot.FirstOf<CabinFireEvent>();
-		Require("the lookout, the cabin, its fire", lookout != null && cabin != null && fire != null);
-		Check("the cabin burns already (they woke to it)", cabin.Burning > 0.3f, $"{cabin.Burning:0.00}");
-		await _bot.ApproachAndWalk(lookout.GlobalPosition, 8f, 2.5f, ct, () => Story.Current >= Checkpoint.Act7CabinBurning, from: TrailBefore(lookout.GlobalPosition, 10f));
+		var cabin = fire?.Cabin;
+		var lookout = GetTree().GetFirstNodeInGroup("fire_lookout_marker") as Node3D;
+		var wake = GetTree().GetFirstNodeInGroup(Act6ClearingEvent.WakeMarkerGroup) as Node3D;
+		Require("the cabin, its fire, the lookout, the wake", cabin != null && lookout != null && wake != null);
+		Check("Continued after the fall: on the trail past the clearing, at the wake", TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(wake.GlobalPosition)) < 4f, $"{Player.GlobalPosition}");
+		Check("the cabin stands ahead, in the wrong place, whole, lit, its door open", cabin.AtAct7Spot && !fire.Burning && cabin.IsOpen && cabin.InteriorLightOn,
+			$"at its Act 7 place {cabin.AtAct7Spot}, burning {fire.Burning}, open {cabin.IsOpen}");
+		CheckObjective("the compass points ahead, at the cabin", "cabin");
+		Check("on the board: one print left, of the stairs", cabin.Board is { Prints.Count: 1, StairsPrint: not null }, $"{cabin.Board?.Prints.Count} prints");
+		// up to its door and in (the last few metres walked)
+		await _bot.ApproachAndWalk(cabin.InsidePoint, 7f, 0.7f, ct, () => Story.HasFlag(StoryManager.Flag.Act7CabinDoor), from: cabin.WideApproachPoint);
+		await _bot.WaitUntil(() => Story.HasFlag(StoryManager.Flag.Act7CabinDoor), 3, ct);
+		Check("in at the cabin door: saved, within checkpoint 5", Story.HasFlag(StoryManager.Flag.Act7CabinDoor) && Story.Current == Checkpoint.Act6BridgeCrossed, $"{Story.Current}");
+		await LookAtPrint(cabin, fire, ct);
+		Check("looked at, the print animates", fire.FireStarted);
+		Shot("print");
+		using (Fast(3)) await _bot.WaitUntil(() => fire.CavedIn, 30, ct);
+		Check("the fire spread and the roof caved in over the door: the beams across it", fire.CavedIn && cabin.BeamsLeft == 3, $"{fire.Now}, beams {cabin.BeamsLeft}");
+		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
+		Check("no way out past them", await _bot.RayHits(cabin.DoorwayInside - fwd * 0.9f, cabin.DoorwayInside + fwd * 1.6f, ct));
+		Shot("caved_in");
+		await _bot.UseIt(fire.AxeUse, ct);
+		Check("the axe taken from over the hearth", Inv.HasTool(ToolKind.Axe));
+		for (int i = 0; i < 3 && fire.BeamUse != null; i++) await _bot.UseIt(fire.BeamUse, ct);
+		Check("three held blows and the doorway is clear (the axe spent)", fire.Blows == 3 && cabin.BeamsLeft == 0 && !Inv.HasTool(ToolKind.Axe), $"blows {fire.Blows}, beams {cabin.BeamsLeft}");
+		Check("in time", fire.SecondsLeft > 0f || fire.BrokeOut, $"{fire.SecondsLeft:0} s left");
+		// out, and turn to look back at it
+		await _bot.WalkTo(cabin.WideApproachPoint, 1.2f, ct, () => fire.BrokeOut && TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(cabin.GlobalPosition)) > 7f, giveUp: 10f);
+		Check("out of the burning cabin", fire.BrokeOut);
 		await _bot.Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
-		using (Fast(2)) await _bot.WaitUntil(() => fire.Struck && Story.Current >= Checkpoint.Act7CabinBurning, 10, ct);
-		Check("the burning cabin seen from the lookout: checkpoint 6", fire.Sighted && Story.Current == Checkpoint.Act7CabinBurning, $"struck {fire.Struck}, sighted {fire.Sighted}, {Story.Current}");
+		await _bot.WaitUntil(() => Story.Current >= Checkpoint.Act7CabinBurning, 4, ct);
+		Check("looking back at it burning: checkpoint 6", Story.Current == Checkpoint.Act7CabinBurning && fire.Seen, $"{Story.Current}");
+		Check("it burns, sealed by the fire", fire.Burning && cabin.Sealed && await _bot.RayHits(cabin.DoorCenter + fwd * 1.2f, cabin.DoorCenter - fwd * 1.2f, ct));
 		Check("control kept through it", Input.Enabled);
 		Shot("cabin_burning");
 		var giant = _bot.FirstOf<GiantStalkerEvent>();
-		await _bot.WaitUntil(() => giant?.Body != null || Story.GiantEventDone, 8, ct);
-		Check("the giant crosses beyond the fire", giant?.Body != null || Story.GiantEventDone);
-		if (giant?.Body is { } body)
+		await _bot.WaitUntil(() => giant?.Body != null, 10, ct);
+		Check("the giant out there beyond the fire", giant?.Body != null);
+		if (giant?.Body is StalkerBody gb) { await _bot.Aim(gb.EyesWorld, ct); Shot("giant"); }
+		// up the way to the lookout, the trees coming down
+		var herd = _bot.FirstOf<Act7TreeFalls>();
+		Require("the herding", herd is { Live: true });
+		var t = Terrain;
+		t.TrailDistance(Player.GlobalPosition.X, Player.GlobalPosition.Z, out float s0);
+		t.TrailDistance(lookout.GlobalPosition.X, lookout.GlobalPosition.Z, out float sL);
+		for (float s = s0 + 5f; s < sL; s += 5f)
 		{
-			await _bot.Aim((body as StalkerBody)?.EyesWorld ?? body.GlobalPosition + Vector3.Up * 40f, ct);
-			Shot("giant");
+			await _bot.WalkTo(t.TrailPoint(s, out _), 1.5f, ct, giveUp: 8f);
+			await _bot.Aim(t.TrailPoint(Mathf.Min(s + 9f, sL), out _) + Vector3.Up * 2.5f, ct);
+			await _bot.Seconds(0.6, ct);
 		}
-		using (Fast(4)) await _bot.WaitUntil(() => Story.GiantEventDone, 30, ct);
+		await _bot.WalkTo(lookout.GlobalPosition, 2.5f, ct);
+		using (Fast(2)) await _bot.WaitUntil(() => herd.SideDown >= herd.SideCount, 15, ct);
+		Check("the walls came down beside the way, and behind", herd.SideDown >= 2 && herd.BehindDown >= 1, $"beside {herd.SideDown} of {herd.SideCount}, behind {herd.BehindDown}, seen {herd.SeenFalls}");
+		Check("none of them within reach", herd.NearestAtCrack > 4f, $"{herd.NearestAtCrack:0.0} m");
+		Check("they fell where the giant looked", giant == null || giant.Looks >= 1 || Story.GiantEventDone, $"looks {giant?.Looks}, head snaps {giant?.HeadSnaps}");
+		Shot("herded");
+		await _bot.Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
+		await _bot.WaitUntil(() => giant == null || giant.Released || Story.GiantEventDone, 8, ct);
+		Check("at the lookout watching the fire: its last pass", giant == null || giant.Released || Story.GiantEventDone);
+		using (Fast(4)) await _bot.WaitUntil(() => Story.GiantEventDone, 70, ct);
 		Check("it passes and is gone: saved", Story.GiantEventDone && giant?.Body == null);
 		CheckObjective("the compass points at the bunker", "bunker_marker");
-		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
-		Check("the burning cabin is sealed: no way in", cabin.Sealed && await _bot.RayHits(cabin.DoorCenter + fwd * 1.2f, cabin.DoorCenter - fwd * 1.2f, ct));
+		int downBefore = herd.SideDown + herd.BehindDown + herd.WardDown;
 		var lot = GetTree().GetFirstNodeInGroup("survey_lot") as SurveyLot;
 		if (lot != null) await TakeKeyHalf(lot, 2, ct);
 		Check("both halves of the key before the bunker", SurveyLot.PiecesFound == 2, $"{SurveyLot.PiecesFound} of 2");
+		Check("the walk on from the lookout is open woods (nothing fell on it)", herd.SideDown + herd.BehindDown + herd.WardDown == downBefore);
+	}
+
+	/// <summary>To the board and looking at its one print until it starts.</summary>
+	private async Task LookAtPrint(Cabin cabin, CabinFireEvent fire, CancellationToken ct)
+	{
+		var print = cabin.Board?.StairsPrint;
+		Require("the stairs print", print != null);
+		Vector3 near = print.GlobalPosition + cabin.GlobalBasis.Z.Normalized() * 1.7f;
+		await _bot.WalkTo(near, 0.5f, ct, giveUp: 6f);
+		await _bot.Aim(print.GlobalPosition, ct);
+		await _bot.WaitUntil(() => fire.FireStarted, 4, ct);
+	}
+
+	/// <summary>Act 7, too slow: back at the cabin door (Continue), into the fire, and the smoke takes them: "Burned
+	/// Alive", and back to the door, the cabin whole again.</summary>
+	private async Task Act7Burned(CancellationToken ct)
+	{
+		await Control(ct, 40);
+		var fire = _bot.FirstOf<CabinFireEvent>();
+		var cabin = fire?.Cabin;
+		var door = GetTree().GetFirstNodeInGroup(RespawnPoints.CabinDoorGroup) as Node3D;
+		Require("the cabin, its fire, the door's marker", cabin != null && door != null);
+		Check($"{(Phase == 0 ? "Continued" : "after the death")}: back at the cabin door", TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(door.GlobalPosition)) < 3f, $"{Player.GlobalPosition}");
+		Check("the cabin whole, the print waiting", cabin.AtAct7Spot && !fire.Burning && !fire.FireStarted && cabin.Board?.StairsPrint != null);
+		Check("still within checkpoint 5", Story.Current == Checkpoint.Act6BridgeCrossed && Story.HasFlag(StoryManager.Flag.Act7CabinDoor));
+		if (Phase > 0)
+		{
+			Check("the death counted", PlayerDeath.Deaths >= 1 && Story.TotalDeaths >= 1, $"deaths {Story.TotalDeaths}");
+			return;
+		}
+		await _bot.ApproachAndWalk(cabin.InsidePoint, 3f, 0.7f, ct, from: cabin.WideApproachPoint);
+		await LookAtPrint(cabin, fire, ct);
+		Require("the fire started", fire.FireStarted);
+		using (Fast(4)) await _bot.WaitUntil(() => fire.CavedIn, 30, ct);
+		Check("trapped: no axe, the beams across the door", fire.CavedIn && !Inv.HasTool(ToolKind.Axe));
+		_s.ExpectReload = true;
+		using (Fast(4)) await _bot.WaitUntil(() => PlayerDeath.Dying, 30, ct);
+		Check("too slow: the smoke closes the view", PlayerDeath.Dying);
+		await ExpectReload(ct, 40);
 	}
 
 	// ------------------------------------------------------------------ Acts 8-10

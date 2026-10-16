@@ -72,7 +72,7 @@ public partial class Cabin
 		float wallZ = -(Hd - LogT * 0.5f - LogBulge), wallX = -(Hw - LogT * 0.5f - LogBulge);
 
 		// ---- the board: on the back wall, left of the table, at eye height
-		Board = new PhotoBoard { Name = "PhotoBoard", Mode = Hub ? PhotoBoard.BoardMode.Act1 : PhotoBoard.BoardMode.Hollow, Position = new Vector3(-0.85f, 1.5f, wallZ + 0.004f) };
+		Board = new PhotoBoard { Name = "PhotoBoard", Mode = BurnedOut ? PhotoBoard.BoardMode.Bare : Hub ? PhotoBoard.BoardMode.Act1 : PhotoBoard.BoardMode.Hollow, Position = new Vector3(-0.85f, 1.5f, wallZ + 0.004f) };
 		_gen.AddChild(Board);
 		if (Hub && StoryManager.Instance is { Current: >= Checkpoint.Act24Finished }) Board.GlowOn = false;
 

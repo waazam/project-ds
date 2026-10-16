@@ -27,6 +27,7 @@
 [ext_resource type="Script" path="res://scripts/world/Lake.cs" id="40_lake"]
 [ext_resource type="Script" path="res://scripts/world/LakeCrossingEvent.cs" id="41_lakecrossing"]
 [ext_resource type="Script" path="res://scripts/world/StationInterior.cs" id="42_stationint"]
+[ext_resource type="Script" path="res://scripts/world/Act7TreeFalls.cs" id="43_act7trees"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -65,14 +66,21 @@ fog_sky_affect = 0.7
 
 [sub_resource type="Curve3D" id="Curve_trail"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, -1, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, -20, 0, 0, 0, 0, 0, 0, 5, 0, -48, 0, 0, 0, 0, 0, 0, 12, 0, -75, 0, 0, 0, 0, 0, 0, 9, 0, -104, 0, 0, 0, 0, 0, 0, -2, 0, -130, 0, 0, 0, 0, 0, 0, -10, 0, -158, 0, 0, 0, 0, 0, 0, -8, 0, -188, 0, 0, 0, 0, 0, 0, 2, 0, -215, 0, 0, 0, 0, 0, 0, 10, 0, -242, 0, 0, 0, 0, 0, 0, 9, 0, -270, 0, 0, 0, 0, 0, 0, 2, 0, -298, 0, 0, 0, 0, 0, 0, 0, 0, -325, 0, 0, 0, 0, 0, 0, 5, 0, -350, 0, 0, 0, 0, 0, 0, 11, 0, -372, 0, 0, 0, 0, 0, 0, 12, 0, -392, 0, 0, 0, 0, 0, 0, 10, 0, -415, 0, 0, 0, 0, 0, 0, 7, 0, -440, 0, 0, 0, 0, 0, 0, 6, 0, -463, 0, 0, 0, 0, 0, 0, 8, 0, -487, 0, 0, 0, 0, 0, 0, 8, 0, -510, 0, 0, 0, 0, 0, 0, 4, 0, -535, 0, 0, 0, 0, 0, 0, 0, 0, -560, 0, 0, 0, 0, 0, 0, -1, 0, -580, 0, 0, 0, 0, 0, 0, 3, 0, -598, 0, 0, 0, 0, 0, 0, 16, 0, -604, 0, 0, 0, 0, 0, 0, 32, 0, -594, 0, 0, 0, 0, 0, 0, 44, 0, -574, 0, 0, 0, 0, 0, 0, 54, 0, -550, 0, 0, 0, 0, 0, 0, 62, 0, -526, 0, 0, 0, 0, 0, 0, 65, 0, -504, 0, 0, 0, 0, 0, 0, 63, 0, -484, 0, 0, 0, 0, 0, 0, 61, 0, -468, 0, 0, 0, 0, 0, 0, 56, 0, -450, 0, 0, 0, 0, 0, 0, 64, 0, -432, 0, 0, 0, 0, 0, 0, 84, 0, -418, 0, 0, 0, 0, 0, 0, 108, 0, -412, 0, 0, 0, 0, 0, 0, 128, 0, -436, 0, 0, 0, 0, 0, 0, 140, 0, -470, 0, 0, 0, 0, 0, 0, 146, 0, -510, 0, 0, 0, 0, 0, 0, 148, 0, -552, 0, 0, 0, 0, 0, 0, 152, 0, -572, 0, 0, 0, 0, 0, 0, 146, 0, -596, 0, 0, 0, 0, 0, 0, 133, 0, -616, 0, 0, 0, 0, 0, 0, 121, 0, -634, 0, 0, 0, 0, 0, 0, 113, 0, -649, 0, 0, 0, 0, 0, 0, 110, 0, -659),
-"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, -1, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, -20, 0, 0, 0, 0, 0, 0, 5, 0, -48, 0, 0, 0, 0, 0, 0, 12, 0, -75, 0, 0, 0, 0, 0, 0, 9, 0, -104, 0, 0, 0, 0, 0, 0, -2, 0, -130, 0, 0, 0, 0, 0, 0, -10, 0, -158, 0, 0, 0, 0, 0, 0, -8, 0, -188, 0, 0, 0, 0, 0, 0, 2, 0, -215, 0, 0, 0, 0, 0, 0, 10, 0, -242, 0, 0, 0, 0, 0, 0, 9, 0, -270, 0, 0, 0, 0, 0, 0, 2, 0, -298, 0, 0, 0, 0, 0, 0, 0, 0, -325, 0, 0, 0, 0, 0, 0, 5, 0, -350, 0, 0, 0, 0, 0, 0, 11, 0, -372, 0, 0, 0, 0, 0, 0, 12, 0, -392, 0, 0, 0, 0, 0, 0, 10, 0, -415, 0, 0, 0, 0, 0, 0, 7, 0, -440, 0, 0, 0, 0, 0, 0, 6, 0, -463, 0, 0, 0, 0, 0, 0, 8, 0, -487, 0, 0, 0, 0, 0, 0, 8, 0, -510, 0, 0, 0, 0, 0, 0, 4, 0, -535, 0, 0, 0, 0, 0, 0, 0, 0, -560, 0, 0, 0, 0, 0, 0, -1, 0, -580, 0, 0, 0, 0, 0, 0, 3, 0, -598, 0, 0, 0, 0, 0, 0, 16, 0, -604, 0, 0, 0, 0, 0, 0, 32, 0, -594, 0, 0, 0, 0, 0, 0, 44, 0, -574, 0, 0, 0, 0, 0, 0, 55, 0, -556, 0, 0, 0, 0, 0, 0, 68, 0, -552, 0, 0, 0, 0, 0, 0, 82, 0, -546, 0, 0, 0, 0, 0, 0, 86, 0, -534, 0, 0, 0, 0, 0, 0, 80, 0, -522, 0, 0, 0, 0, 0, 0, 70, 0, -519, 0, 0, 0, 0, 0, 0, 63, 0, -508, 0, 0, 0, 0, 0, 0, 61, 0, -494, 0, 0, 0, 0, 0, 0, 62, 0, -480, 0, 0, 0, 0, 0, 0, 61, 0, -468, 0, 0, 0, 0, 0, 0, 56, 0, -450, 0, 0, 0, 0, 0, 0, 64, 0, -432, 0, 0, 0, 0, 0, 0, 84, 0, -418, 0, 0, 0, 0, 0, 0, 108, 0, -412, 0, 0, 0, 0, 0, 0, 128, 0, -436, 0, 0, 0, 0, 0, 0, 140, 0, -470, 0, 0, 0, 0, 0, 0, 146, 0, -510, 0, 0, 0, 0, 0, 0, 148, 0, -552, 0, 0, 0, 0, 0, 0, 152, 0, -572, 0, 0, 0, 0, 0, 0, 146, 0, -596, 0, 0, 0, 0, 0, 0, 133, 0, -616, 0, 0, 0, 0, 0, 0, 121, 0, -634, 0, 0, 0, 0, 0, 0, 113, 0, -649, 0, 0, 0, 0, 0, 0, 110, 0, -659),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
-point_count = 49
+point_count = 54
 
 [sub_resource type="Curve3D" id="Curve_sight"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, 58, 0, -462, 0, 0, 0, 0, 0, 0, 42.5, 0, -428.5, 0, 0, 0, 0, 0, 0, 28, 0, -396),
+"tilts": PackedFloat32Array(0, 0, 0)
+}
+point_count = 3
+
+[sub_resource type="Curve3D" id="Curve_cabinfloor"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 70, 0, -544, 0, 0, 0, 0, 0, 0, 70, 0, -535, 0, 0, 0, 0, 0, 0, 69, 0, -524),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
@@ -138,7 +146,7 @@ TrailWidth = 1.2
 TrailWidthDeep = 1.1
 NarrowStart = 0.0
 NarrowEnd = 1.0
-ValleyPaths = Array[NodePath]([NodePath("Valleys/SightLine"), NodePath("Valleys/FinalFlight")])
+ValleyPaths = Array[NodePath]([NodePath("Valleys/SightLine"), NodePath("Valleys/FinalFlight"), NodePath("Valleys/CabinFloor")])
 ClearingCenter = Vector2(-4, -592)
 ClearingRadius = 44.0
 ClearingGrass = false
@@ -162,6 +170,9 @@ curve = SubResource("Curve_sight")
 
 [node name="FinalFlight" type="Path3D" parent="Terrain/Valleys"]
 curve = SubResource("Curve_flight")
+
+[node name="CabinFloor" type="Path3D" parent="Terrain/Valleys"]
+curve = SubResource("Curve_cabinfloor")
 
 [node name="Stream" type="Node3D" parent="Terrain"]
 
@@ -419,13 +430,96 @@ script = ExtResource("4_snap")
 Offset = 0
 FootprintRadius = 0
 
+[node name="act7_wake" type="Marker3D" parent="." groups=["act7_wake_marker"]]
+transform = Transform3D(-0.894, 0, -0.447, 0, 1, 0, 0.447, 0, -0.894, 45.4, 0, -571.5)
+
+[node name="Act7Cabin" type="Node3D" parent="." groups=["act7_cabin_spot"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70, 0, -535)
+
+[node name="CabinClear" type="Node3D" parent="Act7Cabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.5)
+script = ExtResource("9_clear")
+Radius = 8.0
+ClearFoliage = true
+
+[node name="FrontClear" type="Node3D" parent="Act7Cabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 10)
+script = ExtResource("9_clear")
+Radius = 4.5
+ClearFoliage = true
+
+[node name="WideClear" type="Node3D" parent="Act7Cabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 14.6)
+script = ExtResource("9_clear")
+Radius = 3.0
+ClearFoliage = true
+
+[node name="respawn_Act7CabinDoor" type="Marker3D" parent="Act7Cabin" groups=["respawn_Act7CabinDoor"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+
+[node name="GroundSnap" type="Node" parent="Act7Cabin/respawn_Act7CabinDoor"]
+script = ExtResource("4_snap")
+Offset = 0
+FootprintRadius = 0
+
+[node name="OldCabinSiteClear" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0, -391.5)
+script = ExtResource("9_clear")
+Radius = 8.0
+ClearFoliage = true
+
 [node name="respawn_Act7CabinBurning" type="Marker3D" parent="." groups=["respawn_Act7CabinBurning"]]
-transform = Transform3D(-0.892, 0, 0.4521, 0, 1, 0, -0.4521, 0, -0.892, 61, 0, -465)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 69.5, 0, -518)
 
 [node name="GroundSnap" type="Node" parent="respawn_Act7CabinBurning"]
 script = ExtResource("4_snap")
 Offset = 0
 FootprintRadius = 0
+
+[node name="Act7Herding" type="Node3D" parent="."]
+script = ExtResource("43_act7trees")
+
+[node name="SightClear0" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.9, 0, -476)
+script = ExtResource("9_clear")
+Radius = 4
+ClearFoliage = false
+
+[node name="SightClear1" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.6, 0, -484)
+script = ExtResource("9_clear")
+Radius = 4.5
+ClearFoliage = false
+
+[node name="SightClear2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 63.4, 0, -492)
+script = ExtResource("9_clear")
+Radius = 5
+ClearFoliage = false
+
+[node name="SightClear3" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64.6, 0, -500)
+script = ExtResource("9_clear")
+Radius = 5
+ClearFoliage = false
+
+[node name="SightClear4" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 0, -508)
+script = ExtResource("9_clear")
+Radius = 5.5
+ClearFoliage = false
+
+[node name="SightClear5" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 67.4, 0, -515)
+script = ExtResource("9_clear")
+Radius = 6
+ClearFoliage = false
+
+[node name="SightClear6" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 68.8, 0, -522)
+script = ExtResource("9_clear")
+Radius = 6.5
+ClearFoliage = false
 
 [node name="ViewClear0" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.04, 0, -459.16)

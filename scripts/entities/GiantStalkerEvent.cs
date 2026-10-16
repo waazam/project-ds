@@ -462,6 +462,7 @@ public partial class GiantStalkerEvent : Node
 				// Roll onto the planted foot (alternating sides), lean into the walk, a breath of yaw with the swing.
 				float swing = Mathf.Sin((float)phase);
 				body.GlobalBasis = Basis.LookingAt(-tangent, Vector3.Up) * Basis.FromEuler(new Vector3(leanAmp, 0.02f * swing, rollAmp * swing));
+				body.GlobalBasis = Act7Snap(body, tangent, dt) * body.GlobalBasis;   // (2026-10-16) its snaps, and where it looks (GiantStalkerEvent.Act7.cs)
 				body.WalkPhase = Mathf.PosMod((float)phase, Mathf.Tau);
 				TickRattle(rattle, body.EyesWorld, dt);
 				if (dissolving && rattle != null) { StopRattle(rattle, DissolveSeconds); rattle = null; }

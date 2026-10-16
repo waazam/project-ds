@@ -14,6 +14,9 @@ namespace ProjectDS.Systems;
 /// </summary>
 public static class RespawnPoints
 {
+	/// <summary>The level's marker outside the Act 7 cabin's door (its -Z toward the door): the cabin-door save.</summary>
+	public const string CabinDoorGroup = "respawn_Act7CabinDoor";
+
 	public static (Vector3 pos, float yaw) For(Node n, SaveData save)
 	{
 		var tree = n.GetTree();
@@ -34,6 +37,15 @@ public static class RespawnPoints
 			&& StoryManager.Instance is { NewelPostTaken: true } s5 && !s5.HasFlag(StoryManager.Flag.DawnBroke))
 			return (cabin.InsidePoint + Vector3.Up * 0.1f, YawToward(cabin.InsidePoint, cabin.ApproachPoint));
 
+		// (2026-10-16, STORY.md Rev 5) Act 7, within checkpoint 5: stepped in at the cabin door ahead on the trail (and the
+		// "Burned Alive" death's way back): outside its door, facing it. Before that, after the fall: the wake, on the trail
+		// past the clearing (never back at the bridge, behind the clearing).
+		if (cp == Checkpoint.Act6BridgeCrossed && System.Array.IndexOf(save.Flags, StoryManager.Flag.Act7CabinDoor) >= 0
+			&& tree.GetFirstNodeInGroup(CabinDoorGroup) is Node3D door)
+			return OnGround(n, door.GlobalPosition, YawOf(-door.GlobalBasis.Z));
+		if (cp == Checkpoint.Act6BridgeCrossed && System.Array.IndexOf(save.Flags, StoryManager.Flag.ClearingLoopDone) >= 0
+			&& tree.GetFirstNodeInGroup(Act6ClearingEvent.WakeMarkerGroup) is Node3D wake)
+			return OnGround(n, wake.GlobalPosition, YawOf(-wake.GlobalBasis.Z));
 		// Act 22's halfway save (a flag within Act 21's end checkpoint): on the road where it was passed
 		if (cp == Checkpoint.Act21Finished && System.Array.IndexOf(save.Flags, StoryManager.Flag.Act22Midway) >= 0
 			&& tree.GetFirstNodeInGroup("respawn_Act22Midway") is Node3D mid)
@@ -72,7 +84,8 @@ public static class RespawnPoints
 				// Just past the bridge on the far (north) bank, facing on up the trail.
 				return OnGround(n, bridge.GlobalPosition + new Vector3(0, 0, -8f), 0f);
 			case Checkpoint.Act7CabinBurning when cabin != null:
-				// Well out in front of the burning cabin, looking at it.
+				// Well out in front of the burning cabin, looking at it. (The level's marker comes first: the cabin may not
+				// have been carried to its Act 7 place yet when Continue asks.)
 				return OnGround(n, cabin.WideApproachPoint, YawToward(cabin.WideApproachPoint, cabin.GlobalPosition));
 			case Checkpoint.Act8BunkerEntered when bunker is Bunker b8:
 				// The apron in front of the open door, facing it (the interior is re-entered by walking in).

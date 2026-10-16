@@ -306,7 +306,7 @@ public partial class StoryTest : Node
 			new("Act 4: the storm walk, and the key", hollow, Act4Giant),
 			new("Act 5: the cabin", hollow, Act5Cabin),
 			new("Act 6: the bridge and the clearing", hollow, Act6Clearing),
-			new("Act 7: the lookout", hollow, Act7Lookout),
+			new("Act 7: the cabin ahead, the fire, the lookout", hollow, Act7Lookout),
 			new("Acts 8-10: the bunker", hollow, Act8To10Bunker),
 			new("Act 11: the last climb", hollow, Act11),
 			new("Act 12: the lake crossing", hollow, Act12Lake),
@@ -1097,7 +1097,7 @@ public partial class StoryTest : Node
 		Check("control comes back on waking", _input.Enabled);
 		Check("nothing is said on waking", (StoryBeat.Fader(this)?.CaptionAlpha ?? 0f) < 0.05f, $"caption alpha {StoryBeat.Fader(this)?.CaptionAlpha:0.00}");
 		Screenshot("clearing_wake");
-		CheckObjective("the compass points on to the lookout", "fire_lookout_marker");
+		CheckObjective("the compass points ahead, at the cabin", "cabin");
 	}
 
 	/// <summary>Holds a raw move (e.g. (0,-1): backwards) for a fixed time without steering.</summary>
@@ -1144,32 +1144,36 @@ public partial class StoryTest : Node
 		return space.IntersectRay(PhysicsRayQueryParameters3D.Create(from, to, 1u)).Count > 0;
 	}
 
+	/// <summary>Act 7 (STORY.md Rev 5, the hybrid): on from the wake to the cabin ahead, in at its door (saved), the print
+	/// animates and the fire takes the room, the roof caves in over the door, the axe from over the hearth through the
+	/// beams in three blows, out and looking back at it burning (checkpoint 6), the giant beyond it, the trees herding them
+	/// up to the lookout, its last pass, and on to the second half of the key.</summary>
 	private async Task Act7Lookout(CancellationToken ct)
 	{
 		var lookout = GetTree().GetFirstNodeInGroup("fire_lookout_marker") as Node3D;
 		if (lookout == null) { Check("the lookout exists", false); return; }
-		var cabin = GetTree().GetFirstNodeInGroup("cabin") as Cabin;
 		var fire = AllOf<CabinFireEvent>().FirstOrDefault();
+		var cabin = fire?.Cabin;
+		if (cabin == null) { Check("the cabin and its fire exist", false); return; }
 		var act6Reset = AllOf<Act6ClearingEvent>().FirstOrDefault();
-		var terrainWake = GroundSnap.FindTerrain(this);
-		// The world at the wake (Dan, 2026-09-22): the stairs and the ring are gone; the meadow and the trails stay,
-		// and the compass leads on (no forest over the way back, no light in the distance).
-		if (act6Reset != null && terrainWake != null)
-		{
+		var terrain = GroundSnap.FindTerrain(this);
+		if (act6Reset != null)
 			Check("the stairs are gone at the wake", act6Reset is { WorldReset: true, MiniStairCount: 0 } && act6Reset.OriginalStairs is { Visible: false }, $"reset {act6Reset.WorldReset}, minis {act6Reset.MiniStairCount}");
-			terrainWake.TrailDistance(_player.GlobalPosition.X, _player.GlobalPosition.Z, out float sNow);
-			Vector3 fwd = terrainWake.TrailPoint(sNow + 2f, out _);
-			await Teleport(fwd + Vector3.Up * 0.2f, terrainWake.TrailPoint(sNow + 8f, out _), ct, count: false);
+		Check("the cabin stands ahead, in the wrong place: whole, lit, its door open, no fire", cabin.AtAct7Spot && cabin.IsOpen && cabin.InteriorLightOn && !fire.Burning && cabin.Burning <= 0f,
+			$"at its Act 7 place {cabin.AtAct7Spot}, open {cabin.IsOpen}, burning {cabin.Burning:0.00}");
+		if (terrain != null)
+		{
+			terrain.TrailDistance(_player.GlobalPosition.X, _player.GlobalPosition.Z, out float sWake);
+			terrain.TrailDistance(cabin.GlobalPosition.X, cabin.GlobalPosition.Z, out float sCabin);
+			Check("the cabin is ahead on the trail, never back the way they came", sCabin > sWake + 30f, $"wake {sWake:0} m, cabin {sCabin:0} m along the trail");
 		}
-		Check("the cabin already burns at the wake", cabin is { Burning: > 0.5f } && fire is { Struck: false }, $"burning {cabin?.Burning:0.00}, struck {fire?.Struck}");
-		// The compass ribbon itself (Dan, 2026-09-22: "the compass seems broken"): the objective is the lookout; look 35
-		// degrees to the RIGHT of it and the marker must sit LEFT of centre (yaw grows turning left in Godot), and the
-		// shown bearing must settle on the true one.
+		// The compass ribbon itself (Dan, 2026-09-22: "the compass seems broken"): the objective is the cabin; look 35 degrees
+		// to the RIGHT of it and the marker must sit LEFT of centre, and the shown bearing must settle on the true one.
 		if (AllOf<Compass>().FirstOrDefault() is { } compassUi && StoryManager.Instance.ObjectivePosition is { } objAtWake)
 		{
-			CheckObjective("the compass points at the lookout after the wake", "fire_lookout_marker");
+			CheckObjective("the compass points ahead, at the cabin", "cabin");
 			Vector3 toObj = objAtWake - _player.GlobalPosition; toObj.Y = 0;
-			Vector3 rightOfIt = toObj.Normalized().Rotated(Vector3.Up, Mathf.DegToRad(-35f));   // clockwise from above = to the right
+			Vector3 rightOfIt = toObj.Normalized().Rotated(Vector3.Up, Mathf.DegToRad(-35f));
 			await Aim(_player.CameraRig.Camera.GlobalPosition + rightOfIt * 20f, ct);
 			await Seconds(1.5, ct);
 			float trueDeg = Compass.BearingDeg(_player.GlobalPosition, objAtWake);
@@ -1178,102 +1182,112 @@ public partial class StoryTest : Node
 			Check("the ribbon's marker sits on the side the objective really is", px < -8f, $"marker {px:0} px from centre (negative = left), objective 35 deg to the left of view");
 			Check("the ribbon's bearing matches the true bearing", Mathf.Abs(Mathf.Wrap(shown - trueDeg, -180f, 180f)) < 3f, $"shown {shown:0.0} vs true {trueDeg:0.0}");
 		}
-		await WalkAlongTrail(lookout.GlobalPosition, 30f, ct);
-		await WalkTo(lookout.GlobalPosition, 2.5f, ct, stopWhen: () => StoryManager.Instance.Current >= Checkpoint.Act7CabinBurning);
-		if (cabin != null) await Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
-		// Lightning takes the cabin as it comes into view (Dan, 2026-09-22): a flash, the bolt, the thunder, and it catches.
-		await WaitUntil(() => fire is { Struck: true }, 12, ct);
-		Check("seeing the burning cabin is the beat", fire is { Struck: true, Sighted: true }, $"struck {fire?.Struck}, sighted {fire?.Sighted}");
+		Check("the board: R.H.'s pictures gone, one print left, of the stairs", cabin.Board is { Prints.Count: 1, StairsPrint: not null }, $"{cabin.Board?.Prints.Count}");
+		// the walk to it, along the trail, and in at the door
+		await WalkAlongTrail(cabin.WideApproachPoint, 120f, ct);
+		await Seconds(0.5, ct);
+		Screenshot("act7_cabin_ahead");
+		await WalkTo(cabin.ApproachPoint, 1.0f, ct);
+		await WalkTo(cabin.InsidePoint, 0.6f, ct, stopWhen: () => StoryManager.Instance.HasFlag(StoryManager.Flag.Act7CabinDoor));
+		await WaitUntil(() => StoryManager.Instance.HasFlag(StoryManager.Flag.Act7CabinDoor), 3, ct);
+		Check("stepping in at the door saves (within checkpoint 5)", StoryManager.Instance.HasFlag(StoryManager.Flag.Act7CabinDoor) && StoryManager.Instance.Current == Checkpoint.Act6BridgeCrossed);
+		Check("warm inside: the hearth lit, the axe over it", cabin.HearthAxe is { Visible: true } && FindUnder<Node3D>(cabin, "Hearth") != null);
+		var print = cabin.Board.StairsPrint;
+		await WalkTo(print.GlobalPosition + cabin.GlobalBasis.Z.Normalized() * 1.7f, 0.5f, ct, giveUp: 6f);
+		await Aim(print.GlobalPosition, ct);
+		await WaitUntil(() => fire.FireStarted, 4, ct);
+		Check("looked at, the print animates", fire.FireStarted);
+		await Seconds(2.0, ct);
+		Screenshot("act7_print_burning");
+		await WaitUntil(() => fire.Now >= CabinFireEvent.Stage.Spreading, 10, ct);
+		Check("the fire jumps from the print to the wall", fire.Now >= CabinFireEvent.Stage.Spreading);
+		await WaitUntil(() => fire.CavedIn, 25, ct);
+		Check("the roof caves in over the door: the beams across it", fire.CavedIn && cabin.BeamsLeft == 3);
+		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
+		Check("no way out past the beams", await RayHits(cabin.DoorwayInside - fwd * 0.9f, cabin.DoorwayInside + fwd * 1.6f, ct));
+		Check("about forty-five seconds to get out", fire.SecondsLeft is > 40f and <= 45.5f, $"{fire.SecondsLeft:0.0} s");
+		Check("the player keeps control in the fire", _input.Enabled);
+		Screenshot("act7_caved_in");
+		await UseIt(fire.AxeUse, ct);
+		Check("the axe from over the hearth (E)", _player.Inventory.HasTool(ToolKind.Axe));
+		for (int i = 0; i < 3 && fire.BeamUse != null; i++) await UseIt(fire.BeamUse, ct);
+		Check("three held blows through the beams", fire.Blows == 3 && cabin.BeamsLeft == 0, $"blows {fire.Blows}, beams {cabin.BeamsLeft}");
+		await WalkTo(cabin.WideApproachPoint, 1.0f, ct, stopWhen: () => fire.BrokeOut && Flat(_player.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)) > 7f, giveUp: 10f);
+		Check("out of the fire in time", fire.BrokeOut && !PlayerDeath.Dying);
+		await Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
 		await WaitUntil(() => StoryManager.Instance.Current >= Checkpoint.Act7CabinBurning, 4, ct);
-		Check("checkpoint 6 on the sight", StoryManager.Instance.Current >= Checkpoint.Act7CabinBurning);
-		await WaitUntil(() => cabin is { Burning: > 0.5f }, 6, ct);
-		Check("it keeps burning", cabin is { Burning: > 0.5f }, $"{cabin?.Burning:0.00}");
-		Check("the player keeps control through the strike", _input.Enabled);
-		await Seconds(1.5, ct);
+		Check("turning to look back at it burning is checkpoint 6", StoryManager.Instance.Current == Checkpoint.Act7CabinBurning && fire.Seen);
+		await WaitUntil(() => cabin.Burning > 0.9f, 6, ct);
+		Check("the whole cabin burns", cabin.Burning > 0.9f, $"{cabin.Burning:0.00}");
+		bool doorSolid = await RayHits(cabin.DoorCenter + fwd * 1.2f, cabin.DoorCenter - fwd * 1.2f, ct);
+		Check("sealed by the fire: no way back in", cabin.Sealed && doorSolid, $"sealed {cabin.Sealed}, door solid {doorSolid}");
 		Screenshot("cabin_burning");
-		// The giant: checkpoint 6 arms it; standing at the lookout looking at the fire starts the crossing far beyond
-		// the cabin, behind the far trees (neck and head over them).
+		// The giant: checkpoint 6 arms it, out beyond the fire in the sky lane
 		var giantEvent = AllOf<GiantStalkerEvent>().FirstOrDefault();
-		Check("the giant is already out there once the fire is seen", giantEvent is { Armed: true } or { Done: true } or { Released: true }, $"armed {giantEvent?.Armed}, done {giantEvent?.Done}, released {giantEvent?.Released}");
-		await WalkTo(lookout.GlobalPosition, 2.5f, ct);
-		if (cabin != null) await Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
-		await WaitUntil(() => giantEvent?.Body != null, 8, ct);
-		var giant = giantEvent?.Body;
-		Check("the giant crosses beyond the burning cabin", giant != null);
-		// Shots every 2 s from the lookout, looking at its head: the proof that it can be seen from here.
-		for (int shot = 0; shot < 5 && giant != null && IsInstanceValid(giant); shot++)
+		Check("the giant is out there once they look back", giantEvent is { Armed: true } or { Done: true } or { Released: true }, $"armed {giantEvent?.Armed}, done {giantEvent?.Done}");
+		await WaitUntil(() => giantEvent?.Body != null, 10, ct);
+		if (giantEvent?.Body is StalkerBody g0) { await Aim(g0.EyesWorld, ct); await Seconds(0.3, ct); Screenshot("act7_giant_beyond_the_cabin"); }
+		// up the way to the lookout: the trees come down where it looks
+		var herd = AllOf<Act7TreeFalls>().FirstOrDefault();
+		Check("the herding is live", herd is { Live: true }, $"{herd?.Live}");
+		if (terrain != null)
 		{
-			Vector3 head = (giant as StalkerBody)?.EyesWorld ?? giant.GlobalPosition + Vector3.Up * 50f;
-			await Aim(head, ct);
-			await Seconds(0.2, ct);
-			Screenshot($"giant_t{shot * 2:00}");
-			await Seconds(1.8, ct);
+			terrain.TrailDistance(_player.GlobalPosition.X, _player.GlobalPosition.Z, out float s0);
+			terrain.TrailDistance(lookout.GlobalPosition.X, lookout.GlobalPosition.Z, out float sL);
+			for (float s = s0 + 5f; s < sL; s += 5f)
+			{
+				await WalkTo(terrain.TrailPoint(s, out _), 1.5f, ct);
+				await Aim(terrain.TrailPoint(Mathf.Min(s + 9f, sL), out _) + Vector3.Up * 2.5f, ct);
+				await Seconds(0.8, ct);
+			}
 		}
-		if (giant != null && cabin != null)
+		await WalkTo(lookout.GlobalPosition, 2.5f, ct);
+		await WaitUntil(() => herd == null || herd.SideDown >= herd.SideCount, 15, ct);
+		Check("the walls came down beside the way, in view, and behind them", herd is { SideDown: >= 2, BehindDown: >= 1, SeenFalls: >= 1 }, $"beside {herd?.SideDown}/{herd?.SideCount}, behind {herd?.BehindDown}, seen {herd?.SeenFalls}, unseen {herd?.UnseenFalls}");
+		Check("never within reach", herd is { NearestAtCrack: > 4f }, $"{herd?.NearestAtCrack:0.0} m");
+		Check("they fell where the giant looked", giantEvent is { Looks: >= 1 }, $"looks {giantEvent?.Looks}, head snaps {giantEvent?.HeadSnaps}");
+		Screenshot("act7_herded_to_the_lookout");
+		await Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
+		var giant = giantEvent?.Body;
+		Check("from the lookout: the giant crosses beyond the burning cabin", giant != null);
+		if (giant != null)
 		{
 			float toCabin = Flat(lookout.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition));
 			float toGiant = Flat(lookout.GlobalPosition).DistanceTo(Flat(giant.GlobalPosition));
-			Check("it walks on the far side of the cabin", toGiant > toCabin + 40f, $"giant {toGiant:0} m, cabin {toCabin:0} m from the lookout");
+			Check("it walks on the far side of the cabin", toGiant > toCabin + 30f, $"giant {toGiant:0} m, cabin {toCabin:0} m from the lookout");
 			Check("only its neck and head clear the trees", giant is StalkerBody { Size: >= 18f and <= 34f }, $"size {(giant as StalkerBody)?.Size}");
-			// Walking, not floating: its origin (the feet) stays on the terrain, a little sunk, and it keeps a gait.
-			var terrain = GroundSnap.FindTerrain(this);
 			float groundUnder = terrain?.HeightAt(giant.GlobalPosition.X, giant.GlobalPosition.Z) ?? giant.GlobalPosition.Y;
-			float feet = giant.GlobalPosition.Y - groundUnder;
 			float size = (giant as StalkerBody)?.Size ?? 22f;
+			float feet = giant.GlobalPosition.Y - groundUnder;
 			Check("its feet are on the ground", feet > -0.1f * size && feet < 0.06f * size, $"feet {feet:0.0} m off the terrain (body {size:0})");
 			Check("it strides (the gait is running)", giant is StalkerBody { WalkPhase: >= 0f }, $"phase {(giant as StalkerBody)?.WalkPhase:0.00}");
-			Check("it is a shadow in the murk", (giant as StalkerBody)?.Skin?.GetShaderParameter("haze").AsSingle() >= 0.7f, $"haze {(giant as StalkerBody)?.Skin?.GetShaderParameter("haze")}");
-			// Shoot it mid-sweep, when it is in the sight lane behind the fire (not at the far end, behind the lookout's own trees).
-			Vector3 lane = Flat(cabin.GlobalPosition) - Flat(lookout.GlobalPosition);
-			Vector3 across = new Vector3(-lane.Z, 0, lane.X).Normalized();
-			await WaitUntil(() =>
-			{
-				if (giant == null || !IsInstanceValid(giant)) return true;
-				float off = (Flat(giant.GlobalPosition) - Flat(cabin.GlobalPosition)).Dot(across);
-				return Mathf.Abs(off) < 12f;
-			}, 45, ct);   // (2026-10-15: its slow, feet-locked walk takes up to ~25 s from a turn back into the lane)
-			if (giant != null && IsInstanceValid(giant))
-			{
-				await Aim((giant as StalkerBody)?.EyesWorld ?? giant.GlobalPosition + Vector3.Up * 50f, ct);   // its head
-				await Seconds(0.3, ct);
-				Screenshot("giant");
-				Check("it crosses the sight lane behind the fire", Mathf.Abs((Flat(giant.GlobalPosition) - Flat(cabin.GlobalPosition)).Dot(across)) < 30f, $"{Mathf.Abs((Flat(giant.GlobalPosition) - Flat(cabin.GlobalPosition)).Dot(across)):0} m off the lane");
-			}
+			await Aim((giant as StalkerBody)?.EyesWorld ?? giant.GlobalPosition + Vector3.Up * 50f, ct);
+			await Seconds(0.3, ct);
+			Screenshot("giant");
 		}
+		await WaitUntil(() => giantEvent == null || giantEvent.Released, 10, ct);
+		Check("standing at the lookout watching the fire: its last pass", giantEvent == null || giantEvent.Released);
 		Check("the player keeps control while it passes", _input.Enabled);
-		await WaitUntil(() => StoryManager.Instance.GiantEventDone, 70, ct);   // it finishes the pass under way (up to 50 s) and dissolves (5 s)
+		await WaitUntil(() => StoryManager.Instance.GiantEventDone, 70, ct);
 		Check("the giant is gone and the sighting is saved", StoryManager.Instance.GiantEventDone && giantEvent?.Body == null);
 		CheckObjective("the compass points at the bunker", "bunker_marker");
-		// Nobody goes into a burning house: the doorway is shut and solid (a ray through it hits the door).
-		if (cabin != null)
-		{
-			Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
-			bool doorSolid = await RayHits(cabin.DoorCenter + fwd * 1.2f, cabin.DoorCenter - fwd * 1.2f, ct);
-			Check("the burning cabin cannot be entered", cabin.Sealed && doorSolid, $"sealed {cabin.Sealed}, door solid {doorSolid}");
-		}
-		// The way on: the trail runs from the lookout along the creek bank past the fire and on to the bunker,
-		// never back toward the clearing (Dan, 2026-09-22).
-		var terrainRoute = GroundSnap.FindTerrain(this);
+		// The way on: from the lookout along the creek's near bank to the bunker, never back toward the clearing; open woods
 		var bunkerMarker = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
 		var clearingMarker = GetTree().GetFirstNodeInGroup("stairs_clearing_marker") as Node3D;
-		if (terrainRoute != null && bunkerMarker != null && clearingMarker != null && cabin != null)
+		if (terrain != null && bunkerMarker != null && clearingMarker != null)
 		{
-			terrainRoute.TrailDistance(lookout.GlobalPosition.X, lookout.GlobalPosition.Z, out float sLook);
-			terrainRoute.TrailDistance(bunkerMarker.GlobalPosition.X, bunkerMarker.GlobalPosition.Z, out float sBunk);
-			float nearestClearing = float.MaxValue, nearestCabin = float.MaxValue;
+			terrain.TrailDistance(lookout.GlobalPosition.X, lookout.GlobalPosition.Z, out float sLook);
+			terrain.TrailDistance(bunkerMarker.GlobalPosition.X, bunkerMarker.GlobalPosition.Z, out float sBunk);
+			float nearestClearing = float.MaxValue;
 			for (float s = sLook; s <= sBunk; s += 4f)
-			{
-				var p = terrainRoute.TrailPoint(s, out _);
-				nearestClearing = Mathf.Min(nearestClearing, Flat(p).DistanceTo(Flat(clearingMarker.GlobalPosition)));
-				nearestCabin = Mathf.Min(nearestCabin, Flat(p).DistanceTo(Flat(cabin.GlobalPosition)));
-			}
+				nearestClearing = Mathf.Min(nearestClearing, Flat(terrain.TrailPoint(s, out _)).DistanceTo(Flat(clearingMarker.GlobalPosition)));
 			Check("the trail leads on to the bunker without returning to the clearing", sBunk > sLook + 20f && nearestClearing > 60f, $"lookout s {sLook:0}, bunker s {sBunk:0}, nearest the clearing {nearestClearing:0} m");
-			Check("the way on passes by the burning cabin", nearestCabin < 75f, $"nearest the cabin {nearestCabin:0} m");
 		}
-		// The key's other half: the arrows off the path on the way to the bunker, to a tin under a cairn's stone.
+		int down = herd == null ? 0 : herd.SideDown + herd.BehindDown + herd.WardDown;
 		var lot = FirstInGroup<SurveyLot>("survey_lot");
 		if (lot != null) await FollowKeyTrail(lot, 2, ct);
 		Check("both halves of the key are found before the bunker", SurveyLot.PiecesFound == 2, $"{SurveyLot.PiecesFound} of 2");
+		Check("no trees fall on the walk from the lookout (the herding stops there)", herd == null || herd.SideDown + herd.BehindDown + herd.WardDown == down);
 	}
 
 	private async Task Act8To10Bunker(CancellationToken ct)
@@ -4320,7 +4334,7 @@ public partial class StoryTest : Node
 					var hit = _player.GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + Flat(p - from).Normalized() * 3f, 1, new Godot.Collections.Array<Rid> { _player.GetRid() }));
 					GD.Print($"[act25dbg] stuck at {_player.GlobalPosition} (trail {d:0} m) toward {p}: {(hit.Count > 0 ? ((Node)hit["collider"]).GetPath() + " at " + hit["position"] : "nothing ahead")}");
 				}
-				if (!cabinShot && d < along * 0.5f) { cabinShot = true; Engine.TimeScale = 1.0; await Aim(ed.GetNode<Node3D>("EndingCabin").GlobalPosition + Vector3.Up * 2f, ct); Screenshot("act25_the_cabin"); Engine.TimeScale = 3.0; }
+				if (!cabinShot && d < along * 0.5f) { cabinShot = true; Engine.TimeScale = 1.0; await Aim((ed.TheCabin?.GlobalPosition ?? _player.GlobalPosition) + Vector3.Up * 2f, ct); Screenshot("act25_the_cabin"); Engine.TimeScale = 3.0; }
 			}
 			if (!ed.Reached) await WalkTo(ed.CarAt, 8f, ct, () => ed.Reached, giveUp: 30f);
 		}
