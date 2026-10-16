@@ -25,6 +25,7 @@
 [ext_resource type="Script" path="res://scripts/world/OpeningAtCar.cs" id="34_opening"]
 [ext_resource type="Script" path="res://scripts/entities/Squirrel.cs" id="35_squirrel"]
 [ext_resource type="Script" path="res://scripts/world/TrailheadDressing.cs" id="42_thdress"]
+[ext_resource type="Script" path="res://scripts/world/Act1Walks.cs" id="43_walks"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -71,6 +72,20 @@ _data = {
 }
 point_count = 9
 
+[sub_resource type="Curve3D" id="Curve_ridge"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 3.5, 0, -173.5, 0, 0, 0, 0, 0, 0, 16, 0, -176, 0, 0, 0, 0, 0, 0, 32, 0, -178.5, 0, 0, 0, 0, 0, 0, 48, 0, -185, 0, 0, 0, 0, 0, 0, 62, 0, -197, 0, 0, 0, 0, 0, 0, 74, 0, -212, 0, 0, 0, 0, 0, 0, 84, 0, -230, 0, 0, 0, 0, 0, 0, 88, 0, -248, 0, 0, 0, 0, 0, 0, 84, 0, -261, 0, 0, 0, 0, 0, 0, 78, 0, -268),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 10
+
+[sub_resource type="Curve3D" id="Curve_falls"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 6.6, 0, -152, 0, 0, 0, 0, 0, 0, 0, 0, -155, 0, 0, 0, 0, 0, 0, -8, 0, -156.3, 0, 0, 0, 0, 0, 0, -16, 0, -156.8, 0, 0, 0, 0, 0, 0, -23, 0, -157.3, 0, 0, 0, 0, 0, 0, -30, 0, -157.2, 0, 0, 0, 0, 0, 0, -36, 0, -153, 0, 0, 0, 0, 0, 0, -39, 0, -145, 0, 0, 0, 0, 0, 0, -38, 0, -134, 0, 0, 0, 0, 0, 0, -34, 0, -122, 0, 0, 0, 0, 0, 0, -27, 0, -110, 0, 0, 0, 0, 0, 0, -19, 0, -97, 0, 0, 0, 0, 0, 0, -13, 0, -88, 0, 0, 0, 0, 0, 0, -9.6, 0, -83.4),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 14
+
 [sub_resource type="Curve3D" id="Curve_route"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, 3, 0, -461.5, 0, 0, 0, 0, 0, 0, 12, 0, -462.5, 0, 0, 0, 0, 0, 0, 13.5, 0, -471, 0, 0, 0, 0, 0, 0, 18, 0, -486, 0, 0, 0, 0, 0, 0, 24, 0, -502, 0, 0, 0, 0, 0, 0, 29, 0, -516, 0, 0, 0, 0, 0, 0, 31, 0, -527),
@@ -113,9 +128,9 @@ MinXZ = Vector2(-160, -650)
 MaxXZ = Vector2(180, 170)
 NarrowStart = 380.0
 NarrowEnd = 500.0
-BranchPaths = Array[NodePath]([NodePath("Branches/Overlook")])
-BranchWidths = PackedFloat32Array(0.8)
-BranchFadeFrom = PackedFloat32Array(0.3)
+BranchPaths = Array[NodePath]([NodePath("Branches/Overlook"), NodePath("Branches/RidgePath"), NodePath("Branches/FallsPath")])
+BranchWidths = PackedFloat32Array(0.9, 0.9, 1.0)
+BranchFadeFrom = PackedFloat32Array(1.0, 1.0, 1.0)
 AutotestRoutePath = NodePath("AutotestRoute")
 AutotestBranch = -1
 ClearingCenter = Vector2(30, -540)
@@ -139,6 +154,12 @@ curve = SubResource("Curve_road")
 
 [node name="Overlook" type="Path3D" parent="Terrain/Branches" groups=["trail_branch"]]
 curve = SubResource("Curve_overlook")
+
+[node name="RidgePath" type="Path3D" parent="Terrain/Branches" groups=["trail_branch"]]
+curve = SubResource("Curve_ridge")
+
+[node name="FallsPath" type="Path3D" parent="Terrain/Branches" groups=["trail_branch"]]
+curve = SubResource("Curve_falls")
 
 [node name="AutotestRoute" type="Path3D" parent="Terrain" groups=["autotest_route"]]
 curve = SubResource("Curve_route")
@@ -250,16 +271,13 @@ Radius = 1.6
 ClearFoliage = true
 
 [node name="Bird3" type="Node3D" parent="."]
+transform = Transform3D(0.7071, 0, 0.7071, 0, 1, 0, -0.7071, 0, 0.7071, -32.8, 0, -150.4)
 script = ExtResource("17_bird")
 Color = 2
 Perch = 5
 
-[node name="TrailAnchor" type="Node" parent="Bird3"]
-script = ExtResource("6_anchor")
-Distance = 290.0
-Offset = 4.6
-YawDegrees = 0.0
-HeightOffset = 0.0
+[node name="GroundSnap" type="Node" parent="Bird3"]
+script = ExtResource("4_snap")
 
 [node name="Clearing" type="Node3D" parent="Bird3"]
 script = ExtResource("9_clear")
@@ -1097,6 +1115,9 @@ ItemAt = PackedFloat32Array()
 
 [node name="TreeFalls" type="Node3D" parent="."]
 script = ExtResource("41_treefalls")
+
+[node name="Act1Walks" type="Node3D" parent="."]
+script = ExtResource("43_walks")
 
 [node name="Clearing" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 9.5, -540)

@@ -100,7 +100,7 @@ He chose the trailhead because he loved it as a child. The magazine wanted natur
 A small old cabin stands beside the lot, rented for the shoot. It is the hub of Act 1, the only warm, safe place in it, and it is the same cabin the player will find boarded in the Hollow (Act 5), burning (Act 7) and burned (Act 25). It is one model, the same inside and out wherever it stands.
 - **Inside.** Warm light in the window. On the table: the assignment sheet (its themes, not a list of subjects: autumn light, wildlife, a place that matters) and a framed photo of two people, a man and a boy, the man's face turned away or out of the frame. On the wall: a backlit photo board, empty and glowing.
 - **The board.** Standing at it, E pins the player's photos: the best-scored prints taken since the last visit go up (up to eight, the highest stars first), filling the board. It is a display, never a list of what to take. The first visit has no pictures yet ("Nothing to pin yet." as a hint), so he goes out. The door stays open behind him as he leaves.
-- **The walks.** Act 1 is three walks, each a loop out from the cabin and back to it, then out along the third and never back. Pinning at the board after a walk moves the day on: the light and fog go to the next walk's, and the next way out opens. (Before, the next walk's way is not open; the walks share the trail where they overlap.)
+- **The walks.** Act 1 is three walks, each a loop out from the cabin and back to it, then out along the third and never back. Pinning at the board after a walk moves the day on: the light and fog go to the next walk's, and the next way out opens. (Before, the next walk's way is not open: an old trunk lies across it. The walks share the trail where they overlap.)
 
 **The photo board.** What the board shows over Act 1:
 1. After walk 1: the pictures as taken, in good light.
@@ -112,10 +112,10 @@ A small old cabin stands beside the lot, rented for the shoot. It is the hub of 
 The black shape is only ever in the prints. It is never in the woods in Act 1.
 
 ### Walk 1: The Photo Trip
-Afternoon, clear. A normal walk in golden light, the best the woods will ever look. The player photographs anything; the first of the three cardinals is on this walk. Nothing is wrong. The only hints are sound: a distant twig snap, a bird that stops mid-song, the distant rifle. Back at the cabin he pins his best shots to the board (stages 1 and 2).
+Afternoon, clear. A normal walk in golden light, the best the woods will ever look: up the trail, over the footbridge, out to the overlook on its hill and back down the ridge path. The player photographs anything; the first of the three cardinals is on this walk. Nothing is wrong. The only hints are sound: a distant twig snap, a bird that stops mid-song, the distant rifle. Back at the cabin he pins his best shots to the board (stages 1 and 2).
 
 ### Walk 2: The Place That Mattered
-Late afternoon, the fog rising. The assignment asked for a place that matters. The way leads to the falls and the rock over them, the old favourite spot where he came as a child. Mist on the water; the falls are seen in full. He shoots it for the person he lost.
+Late afternoon, the fog rising. The assignment asked for a place that matters. The way leads to the falls and the rock over them, the old favourite spot where he came as a child: off the trail before the footbridge, along the creek and up beside the falls, then down the hillside to the trail by the mile sign. The last of the three cardinals sits by the rock. Mist on the water; the falls are seen in full. He shoots it for the person he lost.
 - **The voice.** On the way back, one word in the woods, close and ahead of him: *"come."* Deep, felt more than heard. Turning to it, there is nothing. It is said once.
 - Back at the board: stages 3, 4 and 5.
 

@@ -24,6 +24,11 @@ namespace ProjectDS.World;
 /// is gone by the footbridge, from where the usual look stands. It is a grade on
 /// the auto blend only, and only in Act 1: never during a storm, a scripted mood or
 /// once the first stairs have been climbed.
+///
+/// Since Rev 5 (2026-10-16) Act 1 is three walks out from the trailhead cabin, and the grade and the Act 1 fog follow
+/// the walk (<see cref="Act1Walks.Stage"/>) as well as the distance: walk 1 golden and clear all the way round, walk 2 a
+/// lower sun and the fog rising, walk 3 dusk (<see cref="Act1Dusk"/>), the fog thick from the cabin and closing in to the
+/// fir as it always did.
 /// </summary>
 [GlobalClass]
 public partial class ForestAtmosphere : Node
@@ -107,6 +112,32 @@ public partial class ForestAtmosphere : Node
 	public float FallFogScale { get; set; } = 1f;
 	private float _act1, _act1Target;
 	private bool _act1On, _act1Applied;
+
+	[ExportGroup("Act 1 walks (the day moving on)")]
+	/// <summary>Rev 5 (2026-10-16): Act 1 is three walks from the cabin, and the light follows the walk, not only how far
+	/// along the trail they are (<see cref="Act1Walks.Stage"/>): a clear golden afternoon, then a late afternoon with the
+	/// fog rising, then dusk and thick fog. Off: the old look by distance alone.</summary>
+	[Export] public bool Act1StageLight = true;
+	/// <summary>Walk 1: how far the fog closes in at most (0..1 of the Act 1 fog), far out past the overlook.</summary>
+	[Export] public float Act1FogWalk1 = 0.12f;
+	/// <summary>Walk 2: the fog at the cabin, and by the falls and on.</summary>
+	[Export] public Vector2 Act1FogWalk2 = new(0.26f, 0.46f);
+	/// <summary>Walk 3: the fog is at least this thick everywhere (it thickens on from there to the fir as before).</summary>
+	[Export] public float Act1FogWalk3 = 0.55f;
+	/// <summary>Walk 2: how much of the open-trail grade (the warm sun) is left.</summary>
+	[Export] public float Act1OpenWalk2 = 0.55f;
+	/// <summary>How far toward dusk walk 2 is (0..1; walk 3 is all of it).</summary>
+	[Export] public float Act1LateDusk = 0.35f;
+	/// <summary>Dusk: the sun's, the ambient's and the sky's share left, and the low sun's colour.</summary>
+	[Export] public float DuskSunKeep = 0.4f, DuskAmbientKeep = 0.72f, DuskSkyKeep = 0.55f;
+	[Export] public Color DuskSunColor = new(1f, 0.52f, 0.34f);
+	/// <summary>Dusk's fog: a cooler, darker grey than the afternoon's.</summary>
+	[Export] public Color DuskAct1FogColor = new(0.24f, 0.245f, 0.28f);
+	private int _stage;
+	private float _dusk, _duskTarget;
+	/// <summary>For tests: the walk the light is following now (1-3; 0 outside Act 1), and how far toward dusk it is.</summary>
+	public int Act1Stage => _stage;
+	public float Act1Dusk => _dusk;
 	/// <summary>Past the fallen fir the fog keeps thickening the nearer the staircase (the owner, 2026-10-04: "more dense the
 	/// closer you get to the staircase, it needs like a 35% increase"): denser by this share at the stairs' foot, from
 	/// <see cref="StairsFogFrom"/> metres out (the way's end, <see cref="FriendTrail"/>).</summary>
@@ -488,11 +519,22 @@ public partial class ForestAtmosphere : Node
 			var cam = GetViewport().GetCamera3D();
 			_openTarget = cam == null ? 0f : OpenTarget(cam.GlobalPosition);
 			_act1On = cam != null && Act1FogActive();
+			_stage = Act1Walks.InAct1 ? Act1Walks.Stage : 0;
+			_duskTarget = !Act1StageLight || _stage <= 1 ? 0f : _stage == 2 ? Act1LateDusk : 1f;
 			if (_act1On)
 			{
 				float along = TrailAlong(cam.GlobalPosition);
 				float end = _terrain != null && IsInstanceValid(_terrain) ? _terrain.TrailLength : 480f;
-				_act1Target = Mathf.SmoothStep(OpenHoldMeters * 0.5f, Mathf.Max(end - 15f, OpenHoldMeters + 20f), along);
+				float byDistance = Mathf.SmoothStep(OpenHoldMeters * 0.5f, Mathf.Max(end - 15f, OpenHoldMeters + 20f), along);
+				// (2026-10-16, Rev 5's walks: the light follows the walk, not only the distance) the first walk keeps the woods
+				// clear, the second has the fog rising, the third is dusk with the fog thick from the cabin on and thickest
+				// at the fir
+				_act1Target = !Act1StageLight || _stage == 0 ? byDistance : _stage switch
+				{
+					1 => Act1FogWalk1 * Mathf.SmoothStep(40f, 320f, along),
+					2 => Mathf.Lerp(Act1FogWalk2.X, Act1FogWalk2.Y, Mathf.SmoothStep(30f, 200f, along)),
+					_ => Mathf.Max(Act1FogWalk3, byDistance),
+				};
 				if (Act1FogOverride is float f) _act1Target = f;
 				if (!_waySearched) { _waySearched = true; _way = GetTree().CurrentScene?.FindChild("FriendTrail", true, false) as FriendTrail; }
 				_stairsTarget = 0f;
@@ -506,6 +548,7 @@ public partial class ForestAtmosphere : Node
 		}
 		_open = Mathf.Lerp(_open, _openTarget, 1f - Mathf.Exp(-dt / Mathf.Max(OpenSmoothing, 0.01f)));
 		_act1 = Mathf.Lerp(_act1, _act1Target, 1f - Mathf.Exp(-dt / 1.5f));
+		_dusk = Mathf.Lerp(_dusk, _duskTarget, 1f - Mathf.Exp(-dt / 2.5f));
 		_stairs = Mathf.Lerp(_stairs, _stairsTarget, 1f - Mathf.Exp(-dt / 1.5f));
 	}
 
@@ -526,6 +569,15 @@ public partial class ForestAtmosphere : Node
 		float along = TrailAlong(p);
 		float end = _openFadeEnd > 0f ? _openFadeEnd : OpenFadeEndMeters;
 		float open = 1f - Mathf.SmoothStep(OpenHoldMeters, Mathf.Max(end, OpenHoldMeters + 1f), along);
+		// the walks (2026-10-16): the first is the golden afternoon the whole way round (a touch less of it past the
+		// overlook's fork), the second a lower, weaker sun, the third none of it (dusk)
+		if (Act1StageLight && Act1Walks.InAct1)
+			open = Act1Walks.Stage switch
+			{
+				1 => 1f - 0.2f * Mathf.SmoothStep(210f, 320f, along),
+				2 => Act1OpenWalk2 * (1f - 0.45f * Mathf.SmoothStep(OpenHoldMeters, Mathf.Max(end, OpenHoldMeters + 1f), along)),
+				_ => 0f,
+			};
 		return open * (1f - Mathf.Clamp(Storm, 0f, 1f));
 	}
 
@@ -570,6 +622,16 @@ public partial class ForestAtmosphere : Node
 		_baseSunEnergy = Mathf.Lerp(SunOpen, SunDeep, t);
 		_baseSkyEnergy = Mathf.Lerp(1f, SkyEnergyDeep, t);
 		_baseSunColor = _sunBaseColor;
+		// the walks' day going on (2026-10-16): toward dusk the sun sinks low and red-gold and weak, the sky and the ambient dim
+		float dusk = Mathf.Clamp(_dusk, 0f, 1f);
+		if (dusk > 0.001f)
+		{
+			_baseSunEnergy *= Mathf.Lerp(1f, DuskSunKeep, dusk);
+			_baseAmbient *= Mathf.Lerp(1f, DuskAmbientKeep, dusk);
+			_baseSkyEnergy *= Mathf.Lerp(1f, DuskSkyKeep, dusk);
+			_baseSunColor = _sunBaseColor.Lerp(DuskSunColor, 0.7f * dusk);
+			_baseFog = _baseFog.Lerp(DuskAct1FogColor, dusk);
+		}
 
 		// The open-trail grade: sunnier, warmer, thinner and lighter fog near the start of the walk.
 		float open = _open;
@@ -619,7 +681,7 @@ public partial class ForestAtmosphere : Node
 			Mood.Night => (new Color(0.5f, 0.62f, 0.9f), 0.02f, 0.3f),
 			Mood.Menacing => (new Color(0.75f, 0.45f, 0.5f), 0.018f, 0.2f),
 			Mood.Dawn => (new Color(1f, 0.78f, 0.55f), 0.12f, 0.6f),
-			_ => (new Color(1f, 0.88f, 0.66f), 0.075f, Mathf.Lerp(0.55f, 1f, _open)),   // (2026-10-13: was 0.16, the shafts read as solid pale columns)
+			_ => (new Color(1f, 0.88f, 0.66f).Lerp(new Color(1f, 0.6f, 0.42f), _dusk), 0.075f, Mathf.Lerp(0.55f, 1f, _open) * (1f - 0.65f * _dusk)),   // (2026-10-13: was 0.16, the shafts read as solid pale columns)
 		};
 		bool indoors = Audio.ForestAmbienceManager.Instance is { IsIndoor: true };
 		float strength = indoors || _winterSunOn ? 0f : target.strength * (1f - 0.85f * storm) * ShaftScale;   // (the dawn sun lies too low for shafts)
@@ -853,7 +915,7 @@ public partial class ForestAtmosphere : Node
 				_env.FogDepthEnd = Mathf.Lerp(Act1FarEnd, Act1NearEnd, Mathf.Sqrt(e)) / k;
 				_env.FogDepthCurve = Mathf.Lerp(1.4f, 0.75f, e);
 				_env.FogDensity = Mathf.Lerp(0.35f, 1f, e);
-				_env.FogLightColor = fog.Lerp(Act1FogColor, e);
+				_env.FogLightColor = fog.Lerp(Act1FogColor.Lerp(DuskAct1FogColor, 0.4f * Mathf.Clamp(_dusk, 0f, 1f)), e);
 				_env.FogSkyAffect = Mathf.Lerp(_baseSkyFog, 1f, e);
 			}
 			else

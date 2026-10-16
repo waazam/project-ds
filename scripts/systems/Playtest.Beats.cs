@@ -60,7 +60,7 @@ public partial class Playtest
 		return new List<Beat>
 		{
 			new("0", 0, "Systems: movement, run and stamina, crouch, the pause menu, settings, key rebinding, quit to menu", Seed.Fresh, 150, SystemsBeat),
-			new("1", 1, "Act 1: the opening, the register, the album, photographs (and the omen), the fir, the stairs found", Seed.Fresh, 160, Act1),
+			new("1", 1, "Act 1: the opening, the register, the album, photographs, the three walks (and the omen), the fir, the stairs found", Seed.Fresh, 240, Act1),
 			new("1b", 1, "Act 1: the gunshot, for a player who wades the creek beside the footbridge", At(Checkpoint.Act1Start, new string[0], "camera;tool=None"), 60, Act1Creek),
 			new("1c", 1, "Act 1: the dead fir with their back to it: stopped, turned, and it comes down", Seed.Fresh, 90, Act1FirUnseen),
 			new("2", 2,"Act 2: onto the stairs, the float, no way down, the post, the collapse; the wake in the Hollow", At(Checkpoint.Act1Start, new string[0], "camera;tool=None"), 150, Act2),

@@ -467,6 +467,7 @@ public partial class StoryTest : Node
 	private async Task Act1ToStairs(CancellationToken ct)
 	{
 		var terrain = GroundSnap.FindTerrain(this);
+		StoryManager.Instance?.SetFlag(Act1Walks.Stage3Flag);   // (Rev 5: the way to the stairs is walk 3's; the cabin's board sets it)
 		var climb = AllOf<FirstClimbEvent>().FirstOrDefault();
 		Check("the first staircase is in the trailhead level", climb != null);
 		if (terrain == null || climb == null) return;
