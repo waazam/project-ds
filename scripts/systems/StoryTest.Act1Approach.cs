@@ -49,6 +49,7 @@ public partial class StoryTest
 	{
 		await WaitUntil(() => _input.Enabled, 30, ct);
 		StoryManager.Instance?.SetFlag(ChapterCard.Flag(1));   // (the first chapter's card belongs to the trailhead, not to these frames)
+		StoryManager.Instance?.SetFlag(Act1Walks.Stage3Flag);   // (Rev 5: the way to the stairs is walk 3's)
 		var terrain = GroundSnap.FindTerrain(this);
 		var fir = AllOf<FallenTree>().FirstOrDefault();
 		var falls = AllOf<Act1TreeFalls>().FirstOrDefault();

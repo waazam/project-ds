@@ -233,6 +233,8 @@ public partial class Playtest
 		// the album has it
 		await Album(ct);
 		Check("the album holds the picture", (PhotoLog.Instance?.RecordedCount ?? 0) > before, $"{before} -> {PhotoLog.Instance?.RecordedCount}");
+		// the three walks (Rev 5): the board's flags move the day on; set here as the board would
+		await Act1ThreeWalks(ct);
 		// the omen: the black bird screams and every bird is gone
 		var omen = _bot.AllOf<Bird>().FirstOrDefault(b => b.IsOmen && !b.Photographed && b.IsVisibleInTree());
 		if (omen != null)
@@ -299,12 +301,88 @@ public partial class Playtest
 		Shot("stairs_found");
 	}
 
+	/// <summary>Act 1's three walks (STORY Rev 5, 2026-10-16), the board's flags set as the board sets them: walk 1 golden,
+	/// the trail past the overlook's fork shut (a trunk across it, and no way round it through the woods); walk 2 the fog
+	/// up, the falls' climb open, and "come." on the way back from them; walk 3 dusk, every way open, "come and see" calling
+	/// along the way, and the way back to the cabin closed by a tree that comes down in front of them, in view.</summary>
+	private async Task Act1ThreeWalks(CancellationToken ct)
+	{
+		var walks = World.Act1Walks.Instance;
+		var terrain = GroundSnap.FindTerrain(this);
+		var atmo = GetTree().GetFirstNodeInGroup("atmosphere") as ForestAtmosphere;
+		Require("the walks and the trail", walks != null && terrain != null);
+		// ---- walk 1
+		Check("walk 1 first (no board flag yet)", World.Act1Walks.Stage == 1 && atmo is not { Act1Stage: not 1 }, $"stage {World.Act1Walks.Stage}, light {atmo?.Act1Stage}");
+		Check("walk 1: trunks across the ways not open yet (the trail on past the fork, the falls' climb), and the woods round the first walled",
+			walks.GatesDown == 3 && walks.WallPieces > 20, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		float gate = walks.NorthGateAt;
+		var g0 = terrain.TrailPoint(gate - 8f, out var gt);
+		await _bot.Teleport(g0, g0 + gt * 10f, ct);
+		using (Fast(3)) await _bot.Seconds(2.0, ct);
+		Check("walk 1 by the overlook's fork: a clear golden afternoon", atmo == null || (atmo.OpenAmount > 0.7f && atmo.Act1FogAmount < 0.2f), $"open {atmo?.OpenAmount:0.00}, fog {atmo?.Act1FogAmount:0.00}");
+		using (Fast(3)) await _bot.WalkFor(terrain.TrailPoint(gate + 30f, out _), 5, ct);
+		terrain.TrailDistance(Player.GlobalPosition.X, Player.GlobalPosition.Z, out float got);
+		Check("walk 1: the trail past the fork can't be walked (the trunk)", got < gate + 3f, $"got to {got:0} m (the trunk at {gate:0} m)");
+		// round it through the trees: 25 m off the trail, pressing north
+		var side = g0 + Vector3.Up.Cross(gt).Normalized() * 25f;   // (the west side: the overlook spur is on the east)
+		await _bot.Teleport(side, side + gt * 10f, ct);
+		using (Fast(3)) await _bot.PushFor(new Vector2(0, 1), 8, ct);
+		_bot.Release();
+		terrain.TrailDistance(Player.GlobalPosition.X, Player.GlobalPosition.Z, out got);
+		Check("walk 1: nor round it through the woods", got < gate + 6f, $"got to level with {got:0} m");
+		// ---- walk 2
+		Story.SetFlag(World.Act1Walks.Stage2Flag);
+		await _bot.Frames(2, ct);
+		Check("walk 2: the falls' climb opens (its trunks gone), the trail on past the fork still shut", walks.GatesDown == 1 && walks.WallPieces > 20, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		var falls = walks.WayLine(World.Act1Walks.Way.FallsB);
+		Require("the falls path", falls != null && falls.Length > 40f);
+		var top = falls.At(4f, out var fd);
+		await _bot.Teleport(new Vector3(top.X, terrain.HeightAt(top.X, top.Y), top.Y), new Vector3(top.X + fd.X * 10f, 0, top.Y + fd.Y * 10f), ct);
+		using (Fast(3)) { await _bot.WaitUntilGame(() => walks.ReachedFalls, 4, ct); await _bot.WaitUntilGame(() => atmo == null || (atmo.OpenAmount < 0.45f && atmo.Act1FogAmount > 0.38f), 10, ct); }
+		Check("walk 2: at the falls, the fog rising", walks.ReachedFalls && (atmo == null || (atmo.Act1FogAmount > 0.3f && atmo.OpenAmount < 0.5f)), $"at the falls {walks.ReachedFalls}, fog {atmo?.Act1FogAmount:0.00}, open {atmo?.OpenAmount:0.00}");
+		Shot("walk2_falls");
+		var back = falls.At(falls.Length * 0.6f, out var bd);
+		await _bot.Teleport(new Vector3(back.X, terrain.HeightAt(back.X, back.Y), back.Y), new Vector3(back.X + bd.X * 10f, 0, back.Y + bd.Y * 10f), ct);
+		using (Fast(3)) await _bot.WalkFor(new Vector3(back.X + bd.X * 12f, 0, back.Y + bd.Y * 12f), 2.5, ct);
+		Check("walk 2, on the way back: one word ahead of them (\"come.\"), once", walks.ComeHeard && Story.HasFlag(World.Act1Walks.ComeFlag));
+		// ---- walk 3
+		Story.SetFlag(World.Act1Walks.Stage3Flag);
+		await _bot.Frames(2, ct);
+		using (Fast(3)) await _bot.WaitUntilGame(() => walks.WallPieces == 0, 3, ct);
+		Check("walk 3: every way open (no trunks, no walls)", walks.GatesDown == 0 && walks.WallPieces == 0, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		// turning back for the cabin: a tree beside the trail creaks, waits for them to look, and comes down in front of them
+		var closer = walks.Closers().FirstOrDefault(c => c.way == World.Act1Walks.Way.Back).tree;
+		Require("the way back's tree", closer != null);
+		var b0 = terrain.TrailPoint(walks.BackCloserAt + 24f, out var bt);
+		await _bot.Teleport(b0, b0 - bt * 10f, ct);
+		await _bot.WalkTo(terrain.TrailPoint(walks.BackCloserAt + 9f, out _), 1f, ct, stopWhen: () => closer.Falling, giveUp: 12f);
+		Check("walk 3, turning back: the tree over the way back creaks", closer.Falling);
+		_bot.Release();
+		await _bot.Aim(closer.TrunkPoint(0.4f), ct);
+		using (Fast(3)) await _bot.WaitUntilGame(() => closer.Down, 12, ct);
+		Check("it comes down across the way back, in view, never on them", closer.Down && walks.ClosersSeen >= 1
+			&& TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(closer.LieSegment.a.Lerp(closer.LieSegment.b, 0.3f))) > 4f, $"down {closer.Down}, seen {walks.ClosersSeen}");
+		using (Fast(3)) await _bot.WaitUntilGame(() => walks.WallPieces > 0, 4, ct);
+		Check("the way back is walled off behind it", walks.IsClosed(World.Act1Walks.Way.Back) && walks.WallPieces > 0, $"{walks.WallPieces} pieces");
+		Shot("walk3_way_back_closed");
+		// on up the trail at dusk: the voices call along the way
+		var v0 = terrain.TrailPoint(300f, out var vt);
+		await _bot.Teleport(v0, v0 + vt * 10f, ct);
+		int calls0 = walks.CallsHeard;
+		using (Fast(3)) await _bot.WaitUntilGame(() => walks.CallsHeard > calls0, 16, ct);
+		Check("walk 3: \"come and see\", calling along the way", walks.CallsHeard > calls0, $"{walks.CallsHeard} calls");
+		Check("walk 3: dusk, the fog thick", atmo == null || (atmo.Act1Dusk > 0.6f && atmo.Act1FogAmount > 0.45f && atmo.OpenAmount < 0.1f), $"dusk {atmo?.Act1Dusk:0.00}, fog {atmo?.Act1FogAmount:0.00}, open {atmo?.OpenAmount:0.00}");
+		Shot("walk3_dusk");
+	}
+
 	/// <summary>The dead fir with their back to it (Dan, 2026-10-13: nobody gets stuck waiting on it): stood near it
 	/// looking back down the trail, then wandering off that way, never turning, it still comes down after its long
 	/// wait (about 25 s), with its crack and its fall heard, and lets them go on.</summary>
 	private async Task Act1FirUnseen(CancellationToken ct)
 	{
 		await Control(ct, 40);
+		// (the fir is walk 3's: the board's last flag, as the board sets it)
+		Story.SetFlag(World.Act1Walks.Stage3Flag);
 		var terrain = GroundSnap.FindTerrain(this);
 		var fir = _bot.FirstOf<FallenTree>();
 		var falls = _bot.FirstOf<Act1TreeFalls>();
