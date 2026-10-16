@@ -13,6 +13,10 @@ namespace ProjectDS.UI;
 /// a soft shadow, tilted as if dropped on a table) somewhere on the screen, a little over the ones still
 /// there; each fades in, sits, and fades away while the next ones come. The last handful stay together
 /// a moment as a collage, then go. Slow fades only: nothing flashes.
+///
+/// (STORY.md Rev 5, "The end") Every print, taken before the reveal or after, develops here with the black figure
+/// standing behind it (<see cref="PhotoLog.WithFigure"/>, composited as each card comes up: its pose, side, size and
+/// darkness drawn fresh each time, so it's never the same twice). The album's own prints are untouched.
 /// </summary>
 public partial class PolaroidMontage : CanvasLayer
 {
@@ -28,6 +32,8 @@ public partial class PolaroidMontage : CanvasLayer
 	private sealed class Card
 	{
 		public PhotoLog.Photo Photo;
+		/// <summary>Its print as shown: the black figure developed into it.</summary>
+		public Texture2D Tex;
 		public Vector2 At;
 		public float Tilt, Born, Life;
 	}
@@ -36,10 +42,12 @@ public partial class PolaroidMontage : CanvasLayer
 	private Control _draw;
 	private float _t;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 2026 };
+	private readonly RandomNumberGenerator _figureRng = new();
 
 	public override void _Ready()
 	{
 		Layer = 22;   // over the fader's black (20), under the pause menu
+		_figureRng.Randomize();
 		ProcessMode = ProcessModeEnum.Always;
 		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, TextureFilter = CanvasItem.TextureFilterEnum.Linear };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.FullRect);
@@ -85,6 +93,7 @@ public partial class PolaroidMontage : CanvasLayer
 				_cards.Add(new Card
 				{
 					Photo = photos[next],
+					Tex = PhotoLog.WithFigure(photos[next], _figureRng),
 					At = Place(size, next),
 					Tilt = _rng.RandfRange(-11f, 11f),
 					Born = _t,
@@ -137,7 +146,7 @@ public partial class PolaroidMontage : CanvasLayer
 			_draw.DrawRect(new Rect2(card.Position + new Vector2(3, 4), card.Size), new Color(0, 0, 0, 0.5f * a));
 			_draw.DrawRect(card, new Color(0.95f, 0.94f, 0.9f, a));
 			var img = new Rect2(-imgW * 0.5f, -imgH * 0.5f, imgW, imgH);
-			if (c.Photo.Texture != null) _draw.DrawTextureRect(c.Photo.Texture, img, false, new Color(1, 1, 1, a));
+			if (c.Tex != null) _draw.DrawTextureRect(c.Tex, img, false, new Color(1, 1, 1, a));
 			else _draw.DrawRect(img, new Color(0.3f, 0.3f, 0.32f, a));
 			// the pencil on the bottom border: what it is, and how good
 			var ink = new Color(0.25f, 0.25f, 0.28f, 0.85f * a);

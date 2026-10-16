@@ -35,6 +35,8 @@ public partial class PhotoLog : Node
 		public string SubjectId = "";
 		public ImageTexture Texture;
 		public bool Wrong;
+		/// <summary>(Rev 5) Taken after the reveal: it developed with the black figure standing behind.</summary>
+		public bool Figure;
 		/// <summary>How good a picture it is (0-100 each; all 0 for a picture of nothing on the list).</summary>
 		public int Clarity, Focus, Framing, Zoom;
 		public bool Scored => SubjectId.Length > 0 && PhotoCatalog.Contains(SubjectId);
@@ -101,6 +103,7 @@ public partial class PhotoLog : Node
 
 	public override void _Ready()
 	{
+		_figureRng.Randomize();
 		var story = StoryManager.Instance;
 		if (story != null)
 			foreach (var f in story.Flags)
@@ -145,7 +148,10 @@ public partial class PhotoLog : Node
 			if (WrongPhotos && id == "bird_black") DarkenWithEyes(img, _shotEyes);
 			else if (WrongPhotos && id == "stairs") Multiply(img, 0.3f);
 			else if (!World.SaveLamps.InPhoto(img, _frameCam, _frameRect)) World.SecondLook.MaybeFigure(img, id);
-			var photo = new Photo { Number = _photos.Count + 1, SubjectId = id, Texture = ImageTexture.CreateFromImage(img), Wrong = IsWrong(id),
+			// (Rev 5) after the reveal, every picture develops with it standing behind the subject: never in the world,
+			// only in the print
+			bool figure = StalkerRevealed && StalkerInPrint(img, _figureRng);
+			var photo = new Photo { Number = _photos.Count + 1, SubjectId = id, Texture = ImageTexture.CreateFromImage(img), Wrong = IsWrong(id), Figure = figure,
 				Clarity = _shotScore.Clarity, Focus = _shotScore.Focus, Framing = _shotScore.Framing, Zoom = _shotScore.Zoom };
 			_photos.Add(photo);
 			NoteBest(photo);
@@ -180,7 +186,7 @@ public partial class PhotoLog : Node
 		using var f = FileAccess.Open(Folder + IndexFile, exists ? FileAccess.ModeFlags.ReadWrite : FileAccess.ModeFlags.Write);
 		if (f == null) return;
 		f.SeekEnd();
-		f.StoreLine($"{p.Number}|{p.SubjectId}|{(p.Wrong ? 1 : 0)}|{p.Clarity}|{p.Focus}|{p.Framing}|{p.Zoom}");
+		f.StoreLine($"{p.Number}|{p.SubjectId}|{(p.Wrong ? 1 : 0)}|{p.Clarity}|{p.Focus}|{p.Framing}|{p.Zoom}|{(p.Figure ? 1 : 0)}");
 	}
 
 	private void LoadFolder()
@@ -200,6 +206,7 @@ public partial class PhotoLog : Node
 				int.TryParse(parts[3], out ph.Clarity); int.TryParse(parts[4], out ph.Focus);
 				int.TryParse(parts[5], out ph.Framing); int.TryParse(parts[6], out ph.Zoom);
 			}
+			ph.Figure = parts.Length >= 8 && parts[7] == "1";
 			_photos.Add(ph);
 			NoteBest(ph);
 		}
@@ -212,6 +219,110 @@ public partial class PhotoLog : Node
 		if (dir == null) return;
 		foreach (var file in dir.GetFiles())
 			if (file == IndexFile || (file.StartsWith("photo_") && file.EndsWith(".png"))) dir.Remove(file);
+	}
+
+	// ------------------------------------------------------------------ the figure behind (Rev 5)
+
+	/// <summary>Set at the reveal (Act 25: the wendigo's mask burns off and the stalker stands in the flames). From then
+	/// on every picture develops with it standing behind the subject.</summary>
+	public const string StalkerFlag = "stalker_revealed";
+	public static bool StalkerRevealed => StoryManager.Instance?.HasFlag(StalkerFlag) == true;
+
+	/// <summary>The cut-outs of it: the real stalker (stalker.glb) rendered flat from the front in a few of its poses by
+	/// tools/Blender/wendigo_story.py; alpha its silhouette, red the pale plane of its face.</summary>
+	public const string CutoutDir = "res://assets/textures/stalker_prints/";
+	private static List<Image> _cutouts;
+	private static int _lastCutout = -1, _lastSide;
+	private readonly RandomNumberGenerator _figureRng = new();
+
+	private static List<Image> Cutouts()
+	{
+		if (_cutouts != null) return _cutouts;
+		_cutouts = new List<Image>();
+		for (int i = 1; i <= 12; i++)
+		{
+			string path = $"{CutoutDir}stalker_print_{i:00}.png";
+			if (!ResourceLoader.Exists(path)) break;
+			var img = GD.Load<Texture2D>(path)?.GetImage();
+			if (img == null || img.IsEmpty()) continue;
+			if (img.IsCompressed()) img.Decompress();
+			img.Convert(Image.Format.Rgba8);
+			_cutouts.Add(img);
+		}
+		return _cutouts;
+	}
+
+	/// <summary>
+	/// Develops the black figure into a print (STORY.md Act 25, "the photos after"; and the credits' slideshow): standing
+	/// somewhere behind the subject at the edge of the frame, tall and black with only the faint pale plane of its face,
+	/// fogged into the picture's own light (never pure black, never bright: nothing flashes). Its pose, its side, how far
+	/// back it stands and how dark it comes out are drawn from <paramref name="rng"/>, and never the same pose twice
+	/// running. False if there was nothing to draw it with.
+	/// </summary>
+	public static bool StalkerInPrint(Image img, RandomNumberGenerator rng)
+	{
+		var cuts = Cutouts();
+		if (img == null || img.IsEmpty() || cuts.Count == 0) return false;
+		rng ??= new RandomNumberGenerator();
+		if (img.GetFormat() != Image.Format.Rgb8 && img.GetFormat() != Image.Format.Rgba8) img.Convert(Image.Format.Rgba8);
+		int w = img.GetWidth(), h = img.GetHeight();
+		int k = rng.RandiRange(0, cuts.Count - 1);
+		if (cuts.Count > 1 && k == _lastCutout) k = (k + 1 + rng.RandiRange(0, cuts.Count - 2)) % cuts.Count;
+		_lastCutout = k;
+		var cut = (Image)cuts[k].Duplicate();
+		if (rng.Randf() < 0.5f) cut.FlipX();
+		// how far back it stands (its height in the frame); the cut-out's figure fills about 0.83 of it, its feet at 0.93
+		float tall = h * rng.RandfRange(0.3f, 0.66f);
+		int ch = Mathf.Max(10, Mathf.RoundToInt(tall / 0.83f));
+		int cw = Mathf.Max(5, Mathf.RoundToInt(ch * cut.GetWidth() / (float)cut.GetHeight()));
+		cut.Resize(cw, ch, Image.Interpolation.Bilinear);
+		// at the edge of the frame (more often than not the other side from the last), its feet low in it
+		int side = rng.Randf() < 0.5f ? -1 : 1;
+		if (side == _lastSide && rng.Randf() < 0.5f) side = -side;
+		_lastSide = side;
+		float cx = w * (side < 0 ? rng.RandfRange(0.07f, 0.25f) : rng.RandfRange(0.75f, 0.93f));
+		float feet = h * rng.RandfRange(0.66f, 0.98f);
+		int x0 = Mathf.RoundToInt(cx - cw * 0.5f), y0 = Mathf.RoundToInt(feet - ch * 0.93f);
+		// the print's own light where it stands: what the fog over it is
+		Color mean = new(0, 0, 0);
+		int n = 0;
+		for (int y = Mathf.Max(0, y0); y < Mathf.Min(h, y0 + ch); y += 2)
+			for (int x = Mathf.Max(0, x0); x < Mathf.Min(w, x0 + cw); x += 2) { mean += img.GetPixel(x, y); n++; }
+		if (n == 0) return false;
+		mean /= n;
+		var fog = new Color(mean.R * 0.3f, mean.G * 0.3f, mean.B * 0.32f);
+		var pale = new Color(0.62f, 0.62f, 0.6f).Lerp(mean, 0.45f);
+		float dark = rng.RandfRange(0.62f, 0.86f);
+		for (int j = 0; j < ch; j++)
+		{
+			int y = y0 + j;
+			if (y < 0 || y >= h) continue;
+			// (its feet lost in the ground's murk)
+			float low = 1f - 0.55f * Mathf.SmoothStep(0.84f, 0.95f, j / (float)ch);
+			for (int i = 0; i < cw; i++)
+			{
+				int x = x0 + i;
+				if (x < 0 || x >= w) continue;
+				var s = cut.GetPixel(i, j);
+				float a = s.A * dark * low;
+				if (a <= 0.003f) continue;
+				var c = img.GetPixel(x, y);
+				var o = c.Lerp(fog, a).Lerp(pale, s.R * 0.3f * dark);
+				img.SetPixel(x, y, new Color(o.R, o.G, o.B, 1f));
+			}
+		}
+		return true;
+	}
+
+	/// <summary>The credits' print of <paramref name="p"/>: as it was taken, with the black figure developed into it (a
+	/// copy; its album print untouched), unless it was taken with it already.</summary>
+	public static Texture2D WithFigure(Photo p, RandomNumberGenerator rng)
+	{
+		if (p?.Texture == null || p.Figure) return p?.Texture;
+		var img = p.Texture.GetImage();
+		if (img == null || img.IsEmpty()) return p.Texture;
+		img = (Image)img.Duplicate();
+		return StalkerInPrint(img, rng) ? ImageTexture.CreateFromImage(img) : p.Texture;
 	}
 
 	// ------------------------------------------------------------------ wrong prints

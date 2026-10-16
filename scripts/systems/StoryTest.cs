@@ -3893,6 +3893,12 @@ public partial class StoryTest : Node
 			lodge.LanternThrust && lodge.LanternStruck && lodge.OnFire && _player.GetNodeOrNull<Lantern>("Lantern") is { IsOn: false }, $"fires {lodge.FiresBurning}");
 		await Seconds(1.6, ct);
 		Screenshot("act23_the_tree_burns");
+		// (Rev 5) what it wears, in the firelight: his badge and name plate; "Dad?"; "Come and see." in his father's voice
+		await WaitUntil(() => lodge.FinaleBadgeSeen, 12, ct);
+		Screenshot("act23_what_it_wears");
+		await WaitUntil(() => lodge.FinaleFatherAnswered, 12, ct);
+		Check("in the firelight, his father's badge and name plate on it; \"Dad?\"; it answers in his father's voice",
+			lodge.FinaleBadgeSeen && lodge.FinaleFatherAnswered && lodge.FinaleWendigo is { WearsMitchell: true });
 		await WaitUntil(() => lodge.FinaleRams >= 1, 15, ct);
 		await Seconds(0.15, ct);
 		Screenshot("act23_first_blow");
@@ -4261,6 +4267,12 @@ public partial class StoryTest : Node
 		s.CheckpointReached -= OnFinished;
 		await Seconds(4.0, ct);
 		Screenshot("act25_it_burns_through");
+		// (Rev 5) the reveal, and the badge in the ash: E takes it, and on out
+		await WaitUntil(() => World.SnowMaze.Act25Ending.BadgeUse != null && _input.Enabled, 40, ct);
+		Check("Act 25: the mask burns off - the stalker stands in the flames, and is gone", World.SnowMaze.Act25Ending.Revealed && s.HasFlag(PhotoLog.StalkerFlag));
+		Screenshot("act25_badge_in_ash");
+		await UseIt(World.SnowMaze.Act25Ending.BadgeUse, ct);
+		Check("Act 25: E takes Mitchell's badge from the ash", World.SnowMaze.Act25Ending.BadgeTaken);
 		await WaitUntil(() => false, 40, ct);   // (the trailhead's StoryTest carries on)
 	}
 

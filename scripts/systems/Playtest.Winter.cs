@@ -372,7 +372,11 @@ public partial class Playtest
 			Shot("it_lands");
 			await _bot.WaitUntil(() => lodge.OnFire, 20, ct);
 			Check("the lantern in its face, struck away, the lodge catches", lodge.LanternThrust && lodge.LanternStruck && lodge.OnFire);
-			await _bot.WaitUntil(() => lodge.FrontBroken, 20, ct);
+			await _bot.WaitUntil(() => lodge.FinaleBadgeSeen, 15, ct);
+			Shot("what_it_wears");
+			await _bot.WaitUntil(() => lodge.FrontBroken, 30, ct);
+			Check("in the firelight what it wears (his badge, his name plate); \"Dad?\"; his father's voice: \"Come and see.\"",
+				lodge.FinaleBadgeSeen && lodge.FinaleFatherAnswered && lodge.FinaleWendigo is { WearsMitchell: true });
 			Check("it strikes the doors, again, and goes through them", lodge.FrontBroken && lodge.FinaleRams == 2);
 			await _bot.WaitUntil(() => lodge.FinaleDone, 30, ct);
 		}
@@ -608,6 +612,15 @@ public partial class Playtest
 		}
 		Check("four burns: it's finished (checkpoint 34)", hunter.Dead && Story.Current == Checkpoint.Act24Finished, $"{Story.Current}");
 		Shot("finished");
+		// (Rev 5) the mask burns off; the stalker stands in the flames and is gone; the badge in the ash, E, and out
+		_s.ExpectReload = false;
+		using (Fast(2)) await _bot.WaitUntil(() => World.SnowMaze.Act25Ending.BadgeUse != null && Input.Enabled, 50, ct);
+		Check("the mask burns off: the stalker stands in the flames (photos haunted from here)", World.SnowMaze.Act25Ending.Revealed && Story.HasFlag(PhotoLog.StalkerFlag));
+		Require("Mitchell's badge in the ash, to take", World.SnowMaze.Act25Ending.BadgeUse != null);
+		Shot("badge_in_ash");
+		_s.ExpectReload = true;
+		await _bot.UseAround(World.SnowMaze.Act25Ending.BadgeUse, ct, 1.3f, snapToTerrain: false);
+		Check("E takes the badge", World.SnowMaze.Act25Ending.BadgeTaken && Story.HasFlag(World.SnowMaze.Act25Ending.BadgeFlag));
 		using (Fast(2)) await ExpectReload(ct, 60);
 	}
 

@@ -133,6 +133,7 @@ public partial class SkiLodge
 		var walkTop = ToGlobal(BalconyPerch);
 		FinaleWendigo = new Wendigo { Name = "FinaleWendigo" };
 		AddChild(FinaleWendigo);
+		FinaleWendigo.WearMitchell();   // (Rev 5: his badge and his name plate on its chest, seen in the firelight below)
 		FinaleWendigo.StandAt(walkTop, player.GlobalPosition);
 		AudioDirector.OneShot(this, "wendigo_howl_04", 1, walkTop + Vector3.Up * 3f, 7.5f, "Unnatural", 12f, 0.02f);
 		GD.Print("[story] Act 23: a howl behind them - it's on the balcony, watching");
@@ -153,7 +154,8 @@ public partial class SkiLodge
 		await Cutscene.Wait(this, 0.4, ct);
 		// from here the view stays on it, eased round after it wherever it goes (gently: the owner's comfort)
 		bool follow = true;
-		_ = StoryBeat.Follow(this, player, () => IsInstanceValid(FinaleWendigo) ? FinaleWendigo.ChestWorld : player.GlobalPosition + Vector3.Forward,
+		_finaleLook = null;
+		_ = StoryBeat.Follow(this, player, () => _finaleLook?.Invoke() ?? (IsInstanceValid(FinaleWendigo) ? FinaleWendigo.ChestWorld : player.GlobalPosition + Vector3.Forward),
 			() => !follow || !IsInstanceValid(FinaleWendigo) || !FinaleWendigo.Visible, ct, 3.5f, 0.04f);
 		// it comes to the edge, and up onto the rail: crouched on the log handrail over the hall, the rail groaning
 		var rail = ToGlobal(BalconyRail);
@@ -219,6 +221,8 @@ public partial class SkiLodge
 		// causing the ski lodge to go up in flames") they thrust the lantern up into its face; the light on it, it flinches
 		// back from the flame with a hiss, and then it strikes: the lantern torn out of the hand and flung across the hall
 		await LanternInItsFace(player, ct);
+		// (Rev 5) in the firelight, what it wears: his father's badge and name plate. "Dad?" And it answers in his voice
+		await WhatItWears(player, ct);
 		// then away from them and from the fire, to the doors: up off the boards, drawn back, the arms cocked
 		GD.Print("[story] Act 23: it turns from them to the doors");
 		await TurnWendigo(ToGlobal(FrontDoorInside), 0.7f * Pace, ct);
@@ -352,6 +356,76 @@ public partial class SkiLodge
 		AudioDirector.OneShot(this, "wendigo_howl_03", 1, FinaleWendigo.MouthWorld, 5f, "Unnatural", 10f, 0.02f);
 		await StoryBeat.PanTowards(this, player, FinaleWendigo.ChestWorld, 0.7f, ct);
 		await Cutscene.Wait(this, 0.6, ct);
+	}
+
+	/// <summary>For the tests: the badge seen in the firelight, "Dad?", and its answer in his father's voice.</summary>
+	public bool FinaleBadgeSeen { get; private set; }
+	public bool FinaleFatherAnswered { get; private set; }
+	/// <summary>Where the view is held while it's followed (null: its chest).</summary>
+	private System.Func<Vector3> _finaleLook;
+
+	/// <summary>
+	/// (STORY.md Rev 5, Act 23's front doors, 5: "What it wears") The tree up behind them, it turns back to them and
+	/// straightens in the firelight, and the light is on its chest, steady (a warm light of its own over the fire's, eased
+	/// up and held, never flickering): Mitchell's ranger badge, and a name plate like the one on his father's desk. The
+	/// player's line, "Dad?". It answers in his father's borrowed voice, the voice that called him up the stairs in Act 1
+	/// (come_and_see, deep): "Come and see." Then it turns to the doors, as before.
+	/// </summary>
+	private async Task WhatItWears(PlayerController player, CancellationToken ct)
+	{
+		var w = FinaleWendigo;
+		if (w == null || !IsInstanceValid(w)) return;
+		w.WearMitchell();
+		// it turns back to them from the fire, and up to its height
+		await TurnWendigo(player.GlobalPosition, 0.8f * Pace, ct);
+		w.Play("idle", 4f, 0.7 * Pace);
+		// the firelight on its chest: steady
+		var toThem = ((player.GlobalPosition - w.GlobalPosition) with { Y = 0 }).Normalized();
+		var glow = new OmniLight3D
+		{
+			Name = "FirelightOnIt", LightColor = new Color(1f, 0.6f, 0.32f), LightEnergy = 0f, OmniRange = 4.5f, OmniAttenuation = 1.4f,
+			ShadowEnabled = false, LightSpecular = 0.6f,
+		};
+		AddChild(glow);
+		glow.GlobalPosition = w.BadgeWorld + toThem * 1.5f + Vector3.Up * 0.2f;
+		var up = CreateTween();
+		up.TweenProperty(glow, "light_energy", 1.5f, 1.4f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		// the view down to what's on its chest, and held there
+		_finaleLook = () => IsInstanceValid(w) ? w.BadgeWorld + Vector3.Down * 0.1f : player.GlobalPosition + Vector3.Forward;
+		await Cutscene.Wait(this, 1.8, ct);
+		FinaleBadgeSeen = true;
+		GD.Print("[story] Act 23: in the firelight, what it wears - his father's ranger badge, a name plate like the one on his desk");
+		await Cutscene.Wait(this, 1.4, ct);
+		await PlayerVoice.Say(this, "dad", 1.8f, ct);
+		// it answers: up to its face, and his father's voice out of it, close
+		_finaleLook = () => IsInstanceValid(w) ? w.MouthWorld : player.GlobalPosition + Vector3.Forward;
+		await Cutscene.Wait(this, 0.9, ct);
+		FatherSays(w);
+		FinaleFatherAnswered = true;
+		GD.Print("[story] Act 23: it answers in his father's borrowed voice - \"Come and see.\"");
+		await StoryBeat.Caption(this, "Come and see.", 0.3f, 2.0f, 0.8f, ct);
+		await Cutscene.Wait(this, 0.6, ct);
+		_finaleLook = null;
+		var down = CreateTween();
+		down.TweenProperty(glow, "light_energy", 0f, 2.5f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+		down.TweenCallback(Callable.From(glow.QueueFree));
+	}
+
+	/// <summary>His father's borrowed voice from its mouth: the take the stairs called him up with (Act 1), deep.</summary>
+	private void FatherSays(Wendigo w)
+	{
+		const string path = "res://assets/audio/voice/come_and_see_medium.mp3";
+		w.Speak(2.2f);
+		if (!ResourceLoader.Exists(path)) return;
+		var voice = new AudioStreamPlayer3D
+		{
+			Name = "FathersVoice", Stream = GD.Load<AudioStream>(path), Bus = "Voice", UnitSize = 6f, MaxDistance = 40f, VolumeDb = 2f,
+			PitchScale = 0.86f,
+		};
+		AddChild(voice);
+		voice.GlobalPosition = w.MouthWorld;
+		voice.Finished += voice.QueueFree;
+		voice.Play();
 	}
 
 	// (the finale's marks, lodge-local: the walk over the hall's west-back side (the west-front's was behind the
