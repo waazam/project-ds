@@ -36,7 +36,7 @@ public partial class Lake : Node3D
 	public Vector3 FarDockWorld { get; private set; }
 	/// <summary>On the path, a few metres short of the station's porch (world).</summary>
 	public Vector3 StationApproachWorld { get; private set; }
-	/// <summary>Just inside the station's open front door (world).</summary>
+	/// <summary>Just inside the station's front door, once it's open (world).</summary>
 	public Vector3 StationDoorWorld { get; private set; }
 	/// <summary>The station's door threshold itself (world).</summary>
 	public Vector3 StationThresholdWorld { get; private set; }
@@ -96,6 +96,8 @@ public partial class Lake : Node3D
 		Dressing.Build(Seed + 7);
 		LakeStructures.BuildDock(this, rng);
 		Station = LakeStructures.BuildStation(this, rng);
+		BuildStationFrontDoor();
+		if (Systems.StoryManager.Instance is { Current: >= Systems.Checkpoint.Act12LakeCrossed }) OpenStationDoor(instant: true);
 		LakeStructures.BuildFences(this);
 		BuildMist(rng);
 		BuildSound();

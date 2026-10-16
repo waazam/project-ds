@@ -194,9 +194,12 @@ public partial class BunkerHallway : Node3D
 
 		// Entrance end wall (Z 0). A solid slab rather than a fan: the vault's shell masks everything
 		// outside its own outline, so the cap can never show a gap (the old fan skipped the bottom band).
-		k.Mat(BunkerTextures.HallWallMat);
-		k.Color = new Color(0.88f, 0.88f, 0.86f);
-		k.Box(new Vector3(0, HallHeight * 0.5f, 0.15f), new Vector3(HallHalfWidth * 2f + 0.4f, HallHeight + 0.4f, 0.3f));
+		// (2026-10-15, the doors pass) its own mesh: the vault door's vestibule looks through it into the hall (DoorPortal)
+		var end = new MeshKit();
+		end.Mat(BunkerTextures.HallWallMat);
+		end.Color = new Color(0.88f, 0.88f, 0.86f);
+		end.Box(new Vector3(0, HallHeight * 0.5f, 0.15f), new Vector3(HallHalfWidth * 2f + 0.4f, HallHeight + 0.4f, 0.3f));
+		DoorPortal.Hide(end.CommitTo(this, "HallwayEndWall"));
 		k.CommitTo(this, "HallwayShell");
 	}
 

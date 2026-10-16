@@ -57,6 +57,32 @@ public partial class LookShots : Node
 		Callable.From(Begin).CallDeferred();
 	}
 
+	/// <summary>(2026-10-15, the doors pass) --look-call=Node.Method[@K];...: calls a method on the first node of that name
+	/// before pose K (default 0), private or not; parameters take their defaults, a bool true, anything else null (opening a
+	/// door for the shots).</summary>
+	private async System.Threading.Tasks.Task LookCalls(int k)
+	{
+		bool any = false;
+		foreach (var a in OS.GetCmdlineUserArgs())
+		{
+			if (!a.StartsWith("--look-call=")) continue;
+			foreach (var call in a["--look-call=".Length..].Split(';', StringSplitOptions.RemoveEmptyEntries))
+			{
+				var at = call.Split('@');
+				if ((at.Length > 1 ? int.Parse(at[1]) : 0) != k) continue;
+				var nm = at[0].Split('.');
+				if (GetTree().Root.FindChild(nm[0], true, false) is not { } node) { GD.PrintErr($"[look] no node {nm[0]}"); continue; }
+				var mi = node.GetType().GetMethod(nm[1], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+				if (mi == null) { GD.PrintErr($"[look] no method {call}"); continue; }
+				var args = Array.ConvertAll(mi.GetParameters(), p => p.HasDefaultValue ? p.DefaultValue : p.ParameterType == typeof(bool) ? true : null);
+				mi.Invoke(node, args);
+				GD.Print($"[look] called {call}");
+				any = true;
+			}
+		}
+		if (any) await Wait(0.3f);
+	}
+
 	private static void SetAutoTest(bool v) =>
 		typeof(GameSettings).GetProperty(nameof(GameSettings.AutoTest))!.SetValue(GameSettings.Instance, v);
 
@@ -125,8 +151,10 @@ public partial class LookShots : Node
 				GD.Print($"[look] relative to {rn.Name} at {rn.GlobalPosition}");
 			}
 		float relYaw = rel.Basis.GetEuler().Y;
+		int poseIndex = 0;
 		foreach (var (lpos, lyaw, pitch) in _poses)
 		{
+			await LookCalls(poseIndex++);
 			var pos = rel * lpos;
 			// a y of 9999 or more: dropped onto whatever is under that x, z (a long road, its heights unknown)
 			if (lpos.Y >= 9999f)

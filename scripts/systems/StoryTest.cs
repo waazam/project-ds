@@ -1708,7 +1708,13 @@ public partial class StoryTest : Node
 		try
 		{
 			await WalkTo(lake.StationApproachWorld, 1.5f, ct, giveUp: 20f);
-			await WalkTo(lake.StationDoorWorld, 1.0f, ct, giveUp: 15f);
+			// (2026-10-15) the door is shut now: open it, the lobby in the doorway, and step in
+			Check("the station's door is shut until it's opened", !lake.StationDoorOpen);
+			await UseIt(lake.StationDoorUse, ct);
+			await Seconds(1.4, ct);
+			Check("opened, the doorway shows the lobby", lake.StationDoorOpen && lake.LobbyShowing);
+			Screenshot("station_doorway");
+			await WalkTo(lake.StationDoorWorld, 0.3f, ct, stopWhen: () => reached, giveUp: 15f);
 			await WaitUntil(() => reached, 10, ct);
 			if (!reached) Check("checkpoint 10: reached the rescue station", false, "trigger never fired");
 		}
@@ -2445,17 +2451,17 @@ public partial class StoryTest : Node
 		double took = 3.3 + (Time.GetTicksMsec() - t0) / 1000.0;
 		Check("the light settles, red to green to white, in about six seconds", hw.LightsSettled && took > 5 && took < 7.5, $"{took:0.0} s");
 		Screenshot("closet_lit");
-		// now the door: pitch black beyond it
+		// now the door: the sewer's landing beyond it (2026-10-15: it was pitch black)
 		await UseIt(hw.InsideDoorUse, ct);
 		Check("with the light on, the door opens", hw.ClosetDoorOpen);
 		await Seconds(1.6, ct);
 		await Aim(hw.DoorWorld + Vector3.Up * 1.2f, ct);
-		Screenshot("pitch_black_threshold");
+		Screenshot("sewer_threshold");
 		var sewer = StationInterior.Instance.Sewer;
 		await WalkTo(hw.DoorWorld, 0.3f, ct, stopWhen: () => hw.Through, giveUp: 6f);
 		await WaitUntil(() => s.Current == Checkpoint.Act16Finished && _input.Enabled, 8, ct);
 		await Frames(10, ct);
-		Check("through the black and out into the sewer (Act 17's save)", s.Current == Checkpoint.Act16Finished
+		Check("through the doorway onto the sewer's landing (Act 17's save)", s.Current == Checkpoint.Act16Finished
 			&& _player.GlobalPosition.DistanceTo(sewer.EntranceWorld) < 1.5f, $"{s.Current} at {_player.GlobalPosition}");
 	}
 

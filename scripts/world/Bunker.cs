@@ -354,6 +354,14 @@ public partial class Bunker : Node3D
 		_openTrigger = StoryBeat.MakeTrigger(_gen, new CylinderShape3D { Radius = OpenRadius, Height = 30f }, Vector3.Zero, OnApproach, "OpenTrigger");
 		// A proper doorway trigger: just inside the hatch, so only walking in through the door counts.
 		_entryTrigger = StoryBeat.MakeTrigger(_gen, new BoxShape3D { Size = new Vector3(0.9f, 1.7f, 1.1f) }, new Vector3(0, fy + 0.95f, -1.05f), OnEntered, "EntryTrigger");
+		// (2026-10-15, Dan: doors open onto the next area, never a black room) the vestibule's back opens onto the hall
+		// it leads to (the round door's inside once the hall has become the rooms), its lamps and all; it was a black wall
+		if (!Engine.IsEditorHint())
+			_gen.AddChild(new DoorPortal
+			{
+				Name = "InsideView", Position = new Vector3(0, fy, back + 0.06f), Size = new Vector2(2.3f, 2.2f),
+				OnWhen = () => IsOpen, TargetWhen = () => BunkerInterior.Instance?.EntranceView,
+			});
 
 		// The station card: laminated, bolted to the face right of the frame, readable while the hatch is still locked.
 		PaperKit.Pinned(_gen, StationCardLocal + Vector3.Back * 0.012f, Vector3.Back, new Vector2(0.16f, 0.11f), PaperKit.Look.Card,

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using ProjectDS.Audio;
 using ProjectDS.Player;
+using ProjectDS.Systems;
 using ProjectDS.World.BunkerParts;
 using static ProjectDS.World.BunkerParts.BunkerLayout;
 
@@ -86,6 +87,12 @@ public partial class BunkerInterior : Node3D
 		AddChild(_entranceMarker);
 		_entranceMarker.AddToGroup("bunker_entrance_marker");
 
+		// what the vault door's vestibule looks into (DoorPortal): just inside the hall's entrance wall, or the round door
+		_hallView = new Node3D { Name = "HallView", Position = new Vector3(0, 0, -0.02f) };
+		AddChild(_hallView);
+		_exitView = new Node3D { Name = "ExitHallView", Position = BunkerRooms.RoundDoorInsideLocal };
+		AddChild(_exitView);
+
 		Flow = new BunkerFlow { Name = "Flow" };
 		Flow.Setup(this, Hallway, VineDoor, Crt, Rooms);
 		AddChild(Flow);
@@ -140,6 +147,12 @@ public partial class BunkerInterior : Node3D
 				break;
 		}
 	}
+
+	private Node3D _hallView, _exitView;
+
+	/// <summary>(2026-10-15) What the open vault door looks into, where the admit will put them: the hallway's entrance,
+	/// or, once the hallway has become the rooms, the exit hall from its round door.</summary>
+	public Node3D EntranceView => Hallway is { Visible: true } && StoryManager.Instance?.HasFlag(StoryManager.Flag.BunkerMazeEntered) != true ? _hallView : _exitView;
 
 	/// <summary>The entrance calls this when the player walks in through the open hatch.</summary>
 	public void AdmitPlayer(PlayerController player) => Flow?.Admit(player);

@@ -12,8 +12,8 @@ namespace ProjectDS.World;
 /// The ski lodge at the end of Act 22's plowed road (the owner's references: a great mountain lodge, stone
 /// below and dark timber above, steep snow-heavy roofs, a tall hexagonal hall at its heart with a lantern and a
 /// vane on top; Act 23 happens inside). Winter has it: snow deep on every roof, icicles along every eave, the
-/// windows black. The front doors are chained shut from inside; round the back, a service door stands open a
-/// crack, drifted up and iced into its frame. Forcing it (a short cutscene: three shoves, the ice cracking, the
+/// windows black. The front doors are chained shut from inside; round the back, a service door, shut, drifted up
+/// and iced into its frame. Forcing it (a short cutscene: three shoves, the ice cracking, the
 /// last one splitting it off the frame, the door swinging in on the dark) is Act 22's end.
 ///
 /// Local space: the hall's centre at ground level; the front faces +Z (up the road the player came down).
@@ -493,8 +493,9 @@ public partial class SkiLodge : Node3D
 		k.Mat(RoofSnow);
 		k.Box(new Vector3(BackDoorX, BackDoorH + 0.45f, z - 0.75f), new Vector3(BackDoorW + 1f, 0.2f, 0.9f), 1f, new Basis(Vector3.Right, -0.25f));
 		k.CommitTo(this, "BackDoorFrame", true);
-		// the leaf, hung on its left jamb, open a crack (it swings in)
-		_backHinge = new Node3D { Name = "BackDoorHinge", Position = new Vector3(BackDoorX - BackDoorW * 0.5f, 0, z - 0.3f), Rotation = new Vector3(0, -0.14f, 0) };
+		// the leaf, hung on its left jamb, shut and iced into its frame (it swings in) (2026-10-15, Dan: every door shut until
+		// it's opened; it stood open a crack onto the dark mudroom)
+		_backHinge = new Node3D { Name = "BackDoorHinge", Position = new Vector3(BackDoorX - BackDoorW * 0.5f, 0, z - 0.3f) };
 		AddChild(_backHinge);
 		var d = new MeshKit();
 		d.Mat(LodgeDoor);

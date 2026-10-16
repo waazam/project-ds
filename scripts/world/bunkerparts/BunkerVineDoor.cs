@@ -7,15 +7,17 @@ using static ProjectDS.World.BunkerParts.BunkerLayout;
 namespace ProjectDS.World.BunkerParts;
 
 /// <summary>
-/// The end of the hallway: a weathered plank door in the bulkhead, barely
-/// cracked open and overgrown with ivy (real stems and leaf cards) that has
-/// crept in over the last stretch of clean floor. "Push through the vines"
-/// (an <see cref="Interactable"/>) swings it open into the CRT room.
+/// The end of the hallway: a weathered plank door in the bulkhead, shut and
+/// overgrown with ivy (real stems and leaf cards) that has crept in over the
+/// last stretch of clean floor. "Push through the vines" (an
+/// <see cref="Interactable"/>) swings it open into the CRT room, lit and
+/// built right behind it.
 /// </summary>
 public partial class BunkerVineDoor : Node3D
 {
 	private const float Z = -HallLength - BulkheadThickness * 0.5f;   // the door sits mid-bulkhead
-	private const float AjarDegrees = 7f, OpenDegrees = 100f;
+	// (2026-10-15, Dan: every door shut until it's opened) it stood 7 degrees open, a crack onto the CRT room
+	private const float AjarDegrees = 0f, OpenDegrees = 100f;
 
 	private Node3D _leaf;
 	private CollisionShape3D _leafCollision;

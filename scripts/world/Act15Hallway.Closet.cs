@@ -11,8 +11,11 @@ namespace ProjectDS.World;
 /// It is dark, and the handle can't be found in the dark: first the light switch by the door. The
 /// light comes on with the hallway's low siren, red, then green, then settles to an ordinary
 /// yellowish white over about six seconds, as if it had to remember what it was. Then the door, which
-/// they came in by, opens onto nothing: pitch black where the hallway was. Stepping into it is
-/// Act 16's end, and the black lifts on the sewer (<see cref="Sewer"/>, <see cref="Checkpoint.Act16Finished"/>).
+/// they came in by, opens, and the hallway is gone: past the threshold is the sewer's landing (<see cref="Sewer"/>),
+/// its brick pipe and its lamps, wet concrete steps going down into the water. Stepping through is Act 16's end
+/// (<see cref="Checkpoint.Act16Finished"/>), with no cut: they are simply on the landing, the door shut behind them.
+/// (2026-10-15, Dan: doors open onto the next area, never a black room; it opened onto pitch black, and the black
+/// lifted on the sewer. The black is kept only if the sewer isn't there to look at.)
 /// </summary>
 public partial class Act15Hallway
 {
@@ -28,7 +31,10 @@ public partial class Act15Hallway
 	private Interactable _switchUse, _insideUse;
 	private Node3D _switchLever;
 	private MeshInstance3D _void;
+	private DoorPortal _view;
 	private bool _warned;
+	/// <summary>For tests and the shots: the doorway is drawing the sewer.</summary>
+	public bool ViewShowing => _view is { Rendering: true };
 
 	private void BuildClosetAct16()
 	{
@@ -68,7 +74,11 @@ public partial class Act15Hallway
 		_insideUse = new Interactable { Name = "InsideDoor", Prompt = "Open the door", PickRadius = 0.45f, MaxDistance = 2f, Position = new Vector3(0.25f, 1.1f, End + 0.2f), Enabled = false };
 		_insideUse.Interacted += OnInsideDoor;
 		AddChild(_insideUse);
-		// what is on the other side now: nothing
+		// what is on the other side now: the sewer's landing (the door's own plane, just behind the leaf)
+		_view = new DoorPortal { Name = "SewerView", Position = new Vector3(0, 0, End + 0.02f), Size = new Vector2(DoorWidth, 2.14f), On = false };
+		_view.Crossed += GoThrough;
+		AddChild(_view);
+		// (only if there were no sewer to look at: nothing)
 		_void = new MeshInstance3D
 		{
 			Name = "Void", Mesh = new BoxMesh { Size = new Vector3(DoorWidth + 0.4f, 2.4f, 1.2f) }, Position = new Vector3(0, 1.1f, End - 0.55f),
@@ -76,7 +86,8 @@ public partial class Act15Hallway
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false,
 		};
 		AddChild(_void);
-		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(DoorWidth, 2f, 0.4f) }, new Vector3(0, 1f, End - 0.15f), OnThreshold, "Threshold");
+		// (the eye crossing the doorway carries them through; this is the backstop, a step further on)
+		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(DoorWidth, 2f, 0.4f) }, new Vector3(0, 1f, End - 0.6f), OnThreshold, "Threshold");
 	}
 
 	/// <summary>Called once they are shut in (or Continue puts them here): the switch and the door can be found.</summary>
@@ -136,21 +147,38 @@ public partial class Act15Hallway
 		}
 		ClosetDoorOpen = true;
 		_insideUse.Enabled = false;
-		_void.Visible = true;
+		var target = StationInterior.Instance?.Sewer?.PortalTarget;
+		if (target != null) { _view.Target = target; _view.On = true; }
+		else _void.Visible = true;
 		Sfx("door_creak", 1, _doorHinge.GlobalPosition + Vector3.Up, -2f, 3f);
 		var tw = CreateTween();
 		tw.TweenProperty(_doorHinge, "rotation", new Vector3(0, -1.65f, 0), 1.4f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
-		GD.Print("[story] Act 16: the door opens on pitch black");
+		GD.Print(target != null ? "[story] Act 16: the door opens, and the hallway is gone: the sewer's landing" : "[story] Act 16: the door opens on pitch black");
 	}
 
 	private void OnThreshold(PlayerController player)
 	{
 		if (!ClosetDoorOpen || Through) return;
-		Through = true;
-		_ = Cutscene.Run(this, ct => IntoTheBlack(player, ct), lockInput: true, freezeBody: true);
+		GoThrough(player);
 	}
 
-	/// <summary>Into the black, and out of it somewhere else: the sewer.</summary>
+	/// <summary>Through the doorway: onto the sewer's landing as they step (no cut), the save made there.</summary>
+	private void GoThrough(PlayerController player)
+	{
+		if (!ClosetDoorOpen || Through || player == null) return;
+		Through = true;
+		if (_view.Target == null || !IsInstanceValid(_view.Target))
+		{
+			_ = Cutscene.Run(this, ct => IntoTheBlack(player, ct), lockInput: true, freezeBody: true);
+			return;
+		}
+		_view.Carry(player, 0.32f);
+		_view.On = false;
+		GD.Print("[story] Act 16 done: through the door onto the sewer's landing");
+		StoryBeat.ReachCheckpoint(player, Checkpoint.Act16Finished);
+	}
+
+	/// <summary>(No sewer to look at) Into the black, and out of it somewhere else: the sewer.</summary>
 	private async Task IntoTheBlack(PlayerController player, CancellationToken ct)
 	{
 		var fader = StoryBeat.Fader(this);

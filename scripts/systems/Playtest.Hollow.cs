@@ -187,6 +187,11 @@ public partial class Playtest
 		{
 			Vector3 inShed = shed.GlobalTransform * new Vector3(0, 0.1f, 0f), yard = shed.GlobalTransform * new Vector3(0, 0, shed.Depth * 0.5f + 3f);
 			await _bot.Teleport(yard, inShed, ct);
+			// (2026-10-15) its door is shut now: opened first
+			Check("the shed's door shut until opened", !shed.DoorOpen);
+			await _bot.UseIt(shed.DoorUse, ct);
+			await _bot.Seconds(1.0, ct);
+			Check("the shed's door opened", shed.DoorOpen);
 			bool walkedIn = await _bot.WalkTo(inShed, 0.5f, ct, giveUp: 10f);
 			Check("the shed walked into from the yard", walkedIn, $"stopped at {_bot.Player.GlobalPosition}, wanted {inShed}");
 		}
@@ -708,7 +713,13 @@ public partial class Playtest
 		Check("stood up on the far beach", Player.CameraRig.EyeHeight > 1.5f);
 		Shot("landed");
 		await _bot.WalkTo(lake.StationApproachWorld, 1.5f, ct, giveUp: 20f);
-		await _bot.WalkTo(lake.StationDoorWorld, 1.0f, ct, () => Story.Current >= Checkpoint.Act12LakeCrossed, giveUp: 15f);
+		// (2026-10-15) the door is shut: open it (the lobby in the doorway), then step in
+		Check("the station's door shut until opened", !lake.StationDoorOpen);
+		await _bot.UseIt(lake.StationDoorUse, ct);
+		await _bot.WaitUntil(() => lake.LobbyShowing, 4, ct);
+		Check("opened onto the lobby, not a black box", lake.StationDoorOpen && lake.LobbyShowing);
+		Shot("station_doorway");
+		await _bot.WalkTo(lake.StationDoorWorld, 0.3f, ct, () => Story.Current >= Checkpoint.Act12LakeCrossed, giveUp: 15f);
 		await _bot.WaitUntil(() => Story.Current >= Checkpoint.Act12LakeCrossed, 10, ct);
 		Check("checkpoint 10 at the station's door", Story.Current == Checkpoint.Act12LakeCrossed);
 		await _bot.WaitUntil(() => Input.Enabled, 8, ct);

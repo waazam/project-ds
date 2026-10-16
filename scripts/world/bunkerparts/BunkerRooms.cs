@@ -40,6 +40,9 @@ public partial class BunkerRooms : Node3D
 	public static Vector3 LoopLocal => MazeOffset + new Vector3(0, 1f, -RoomD + 0.4f);
 	/// <summary>The round door at the exit hall's end (interior-local): the way out once it has shown itself.</summary>
 	public static Vector3 ExitLocal => MazeOffset + new Vector3(0, 1f, HallZ1 - 1.2f);
+	/// <summary>(2026-10-15) Just inside the round door, on the floor, facing out (interior-local): what the bunker's vault
+	/// door looks into once the hallway has become the rooms (<see cref="DoorPortal"/>).</summary>
+	public static Vector3 RoundDoorInsideLocal => MazeOffset + new Vector3(0, 0, HallZ1 - 0.3f);
 
 	/// <summary>The rooms are live: doors work, the lamp drifts.</summary>
 	public bool Active { get; set; }
@@ -653,7 +656,12 @@ public partial class BunkerRooms : Node3D
 		k.Color = Colors.White;
 		k.Box(new Vector3(-HallHalfW - 0.15f, RoomH * 0.5f, mid), new Vector3(0.3f, RoomH, len + 0.6f));
 		k.Box(new Vector3(HallHalfW + 0.15f, RoomH * 0.5f, mid), new Vector3(0.3f, RoomH, len + 0.6f));
-		k.Box(new Vector3(0, RoomH * 0.5f, HallZ1 + 0.15f), new Vector3(HallHalfW * 2f + 0.6f, RoomH, 0.3f));
+		// (2026-10-15) the end wall its own mesh: the vault door outside looks in through it (DoorPortal)
+		var endWall = new MeshKit();
+		endWall.Mat(BunkerTextures.MazeWallMat);
+		endWall.Color = Colors.White;
+		endWall.Box(new Vector3(0, RoomH * 0.5f, HallZ1 + 0.15f), new Vector3(HallHalfW * 2f + 0.6f, RoomH, 0.3f));
+		DoorPortal.Hide(endWall.CommitTo(this, "ExitHallEnd"));
 		k.Color = new Color(0.8f, 0.8f, 0.8f);
 		k.Box(new Vector3(0, RoomH + 0.05f, mid), new Vector3(HallHalfW * 2f, 0.1f, len));
 		// its end wall shares the room's wall plane: set a hair back behind it (the clip audit)
@@ -681,7 +689,7 @@ public partial class BunkerRooms : Node3D
 			Vector3 d0 = new(Mathf.Cos(a0), Mathf.Sin(a0), 0), d1 = new(Mathf.Cos(a1), Mathf.Sin(a1), 0);
 			rk.Beam(ringC + d0 * 1.2f + Vector3.Forward * 0.05f, ringC + d1 * 1.2f + Vector3.Forward * 0.05f, 0.18f, 0.1f, 1f, Vector3.Forward);
 		}
-		rk.CommitTo(this, "ExitDoorFrame");
+		DoorPortal.Hide(rk.CommitTo(this, "ExitDoorFrame"));
 		var night = new StandardMaterial3D { AlbedoColor = new Color(0.02f, 0.03f, 0.05f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
 		var nk = new MeshKit();
 		nk.Mat(night);
@@ -692,7 +700,7 @@ public partial class BunkerRooms : Node3D
 			nk.Tri(ringC + Vector3.Forward * 0.01f, ringC + new Vector3(Mathf.Cos(a1), Mathf.Sin(a1), 0) * 1.12f + Vector3.Forward * 0.01f,
 				ringC + new Vector3(Mathf.Cos(a0), Mathf.Sin(a0), 0) * 1.12f + Vector3.Forward * 0.01f, Vector3.Forward, Vector2.Zero, Vector2.Zero, Vector2.Zero);
 		}
-		nk.CommitTo(this, "ExitNight", false);
+		DoorPortal.Hide(nk.CommitTo(this, "ExitNight", false));
 		var leaf = new MeshKit { Xf = new Transform3D(Basis.FromEuler(new Vector3(0, Mathf.DegToRad(95f), 0)), ringC + new Vector3(1.1f, -1.25f, -0.1f)) };
 		BunkerExterior.VaultDoor(leaf, new Vector3(-BunkerExterior.DoorRadius, 1.25f, 0f), ProcTextures.MetalMat);
 		leaf.CommitTo(this, "ExitDoorLeaf");

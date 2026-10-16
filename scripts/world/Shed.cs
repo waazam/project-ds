@@ -6,8 +6,8 @@ namespace ProjectDS.World;
 /// <summary>
 /// A small board-and-batten tool shed near the cabin: stud-framed walls (the frame
 /// shows inside), corner posts, a lean-to roof sloping to the back, a framed
-/// doorway whose plank door hangs open (nothing blocks entry; the hammer is gated
-/// by its own Pickup), a workbench along the back wall with a vise and a few tools,
+/// doorway whose plank door is shut, unlocked (the padlock hangs open on its hasp; E opens it,
+/// <see cref="OpenDoor"/>; the hammer is gated by its own Pickup), a workbench along the back wall with a vise and a few tools,
 /// a pegboard of hanging tools, a shelf of tins and jars, and floor clutter.
 ///
 /// Local frame: front (the doorway) faces +Z; y = 0 is the plank floor top. At
@@ -40,6 +40,23 @@ public partial class Shed : Node3D
 
 	/// <summary>Where the hammer lies on the workbench (world).</summary>
 	public Vector3 BenchSpot => GlobalTransform * new Vector3(0.15f, BenchTop, -Hd + 0.36f);
+
+	/// <summary>(2026-10-15) The door has been opened (it stays open: not saved, a Continue finds it shut again).</summary>
+	public bool DoorOpen { get; private set; }
+	/// <summary>E on the shut door.</summary>
+	public Systems.Interactable DoorUse { get; private set; }
+	private const float DoorOpenAngle = 1.83f;   // 105 degrees, out against the front wall
+	private Node3D _doorHinge;
+
+	/// <summary>Swings the door out against the front wall, with a creak.</summary>
+	public void OpenDoor()
+	{
+		if (DoorOpen || _doorHinge == null) return;
+		DoorOpen = true;
+		if (DoorUse != null) DoorUse.Enabled = false;
+		Audio.AudioDirector.OneShot(this, "door_creak", 1, _doorHinge.GlobalPosition + Vector3.Up, -6f);
+		_doorHinge.CreateTween().TweenProperty(_doorHinge, "rotation:y", DoorOpenAngle, 0.9f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+	}
 
 	private ForestTerrain _terrain;
 	private bool _grounded;
@@ -345,22 +362,36 @@ public partial class Shed : Node3D
 		for (float x = -hw + 0.3f; x < hw; x += 0.6f)
 			k.Beam(new Vector3(x, rb.Y - 0.05f, rb.Z + 0.05f), new Vector3(x, rf.Y - 0.05f, rf.Z - 0.05f), 0.05f, 0.1f, 1.4f, n);
 
-		// ---- the door, hanging open against the front wall
-		k.Mat(BuildingTextures.ShedDoorMat);
-		k.Color = new Color(0.9f, 0.86f, 0.82f);
-		var doorBasis = new Basis(Vector3.Up, Mathf.DegToRad(105f));
-		Vector3 hinge = new(dw, 0.03f, hd + 0.05f);
-		BuildKit.Box(k, hinge + doorBasis * new Vector3(-DoorW * 0.5f + 0.02f, DoorH * 0.5f - 0.02f, 0.02f), new Vector3(DoorW - 0.04f, DoorH - 0.06f, 0.04f), 1.3f, BuildKit.Face.None, doorBasis);
-		k.Mat(BuildingTextures.ShedDoorMat);
-		k.Color = new Color(0.8f, 0.76f, 0.72f);
+		// ---- the door: shut in its frame (2026-10-15, Dan: every door shut until it's opened; it hung open against the
+		// front wall), its own hinged leaf; E swings it out against the wall, onto the bench and the tools
+		_doorHinge = new Node3D { Name = "Door", Position = new Vector3(dw, 0.03f, hd + 0.05f), Rotation = new Vector3(0, DoorOpen ? DoorOpenAngle : 0f, 0) };
+		gen.AddChild(_doorHinge);
+		var dk = new MeshKit();
+		dk.Mat(BuildingTextures.ShedDoorMat);
+		dk.Color = new Color(0.9f, 0.86f, 0.82f);
+		BuildKit.Box(dk, new Vector3(-DoorW * 0.5f + 0.02f, DoorH * 0.5f - 0.02f, 0.02f), new Vector3(DoorW - 0.04f, DoorH - 0.06f, 0.04f), 1.3f);
+		dk.Color = new Color(0.8f, 0.76f, 0.72f);
 		foreach (float y in new[] { 0.3f, DoorH - 0.35f })
-			BuildKit.Box(k, hinge + doorBasis * new Vector3(-DoorW * 0.5f + 0.02f, y, 0.055f), new Vector3(DoorW - 0.12f, 0.12f, 0.03f), 1.4f, BuildKit.Face.None, doorBasis);
+			BuildKit.Box(dk, new Vector3(-DoorW * 0.5f + 0.02f, y, 0.055f), new Vector3(DoorW - 0.12f, 0.12f, 0.03f), 1.4f);
+		dk.CommitTo(_doorHinge, "Leaf");
+		if (BuildCollision && !Engine.IsEditorHint())
+		{
+			var leafBody = new StaticBody3D { Name = "LeafBody", CollisionLayer = 1, CollisionMask = 0 };
+			leafBody.SetMeta("surface", "wood");
+			leafBody.AddChild(new CollisionShape3D { Position = new Vector3(-DoorW * 0.5f, DoorH * 0.5f, 0.02f), Shape = new BoxShape3D { Size = new Vector3(DoorW, DoorH, 0.06f) } });
+			_doorHinge.AddChild(leafBody);
+		}
+		if (!Engine.IsEditorHint())
+		{
+			DoorUse = new Systems.Interactable { Name = "Use", Prompt = "Open the door", PickRadius = 0.5f, MaxDistance = 2.4f, Position = new Vector3(-DoorW + 0.18f, 1.0f, 0.1f), Enabled = !DoorOpen };
+			DoorUse.Interacted += _ => OpenDoor();
+			_doorHinge.AddChild(DoorUse);
+		}
 		// hasp with an open padlock hanging from it
 		k.Mat(BuildingTextures.IronMat);
 		k.Color = new Color(0.45f, 0.42f, 0.38f);
 		BuildKit.Box(k, new Vector3(-dw - 0.12f, 1.05f, hd + 0.06f), new Vector3(0.1f, 0.04f, 0.015f), 3f);
 		BuildKit.Box(k, new Vector3(-dw - 0.17f, 0.99f, hd + 0.07f), new Vector3(0.05f, 0.06f, 0.025f), 3f);
-		cols.Add((hinge + doorBasis * new Vector3(-DoorW * 0.5f, DoorH * 0.5f, 0.02f), new Vector3(DoorW, DoorH, 0.06f), doorBasis));
 
 		// ---- workbench along the back wall: a thick top black with oil, a shelf under it, square legs, an apron
 		float bz = -hd + 0.34f, bw = Width - 0.3f;
@@ -480,7 +511,13 @@ public partial class Shed : Node3D
 		lk.CommitTo(gen, "ShedLining", false);
 		small.CommitTo(gen, "ShedSmall", false);
 
-		// dim bulb-less interior: the shed is lit only from outside (and the lantern)
+		// dim bulb-less interior: the shed is lit only from outside (and the lantern); (2026-10-15) a faint cold fill from the
+		// doorway, so the door opens on the bench and the tools, never a black box
+		gen.AddChild(new OmniLight3D
+		{
+			Name = "DoorFill", LightColor = new Color(0.6f, 0.66f, 0.76f), LightEnergy = 0.35f, OmniRange = 2.8f, OmniAttenuation = 1.2f,
+			ShadowEnabled = false, Position = new Vector3(0, 1.6f, hd - 0.7f),
+		});
 
 		if (BuildCollision && !Engine.IsEditorHint())
 		{

@@ -52,7 +52,8 @@ public partial class Cabin : Node3D
 	/// <summary>Ground depth below the floor used in the editor (no terrain there).</summary>
 	[Export] public float EditorGroundDepth = 0.55f;
 	/// <summary>(2026-10-14) Act 25's cabin by the trail home (<see cref="SnowMaze.EndingDirector"/>): the same cabin, long
-	/// left: dark inside, no papers, the door off its top hinge and hanging open into the room. Not the story's cabin: it
+	/// left: dark inside (a little cold light from the window), no papers, the door off its top hinge and pushed to in its
+	/// frame until it's pushed in (2026-10-15: it hung open into the room). Not the story's cabin: it
 	/// stays out of the "cabin" group.</summary>
 	[Export] public bool Derelict = false;
 
@@ -823,6 +824,13 @@ public partial class Cabin : Node3D
 			Position = new Vector3(0.1f, 1.5f, Hd - 0.9f),
 		};
 		_gen.AddChild(doorFill);
+		// (2026-10-15) the derelict's room isn't a black hole behind its door: a little cold daylight in it from the window
+		if (Derelict)
+			_gen.AddChild(new OmniLight3D
+			{
+				Name = "DerelictFill", LightColor = new Color(0.62f, 0.68f, 0.78f), LightEnergy = 0.35f, OmniRange = 4.2f, OmniAttenuation = 1.1f,
+				ShadowEnabled = false, Position = new Vector3(-WinCx * 0.5f, 1.6f, 0.2f),
+			});
 	}
 
 	private void UpdateLamp()
@@ -922,10 +930,11 @@ public partial class Cabin : Node3D
 		k.CommitTo(_door, "DoorMesh");
 		if (Derelict)
 		{
-			// off its top pintle: swung in, its free edge sagged to the floor, the hinge side lifted a little off the sill
-			const float sag = 3.5f;
-			_door.Rotation = new Vector3(0, Mathf.DegToRad(62f), Mathf.DegToRad(-sag));
-			_door.Position += Vector3.Up * (w * Mathf.Sin(Mathf.DegToRad(sag)) - 0.005f);
+			// off its top pintle: pushed to in its frame, sagging (2026-10-15, Dan: every door shut until it's opened; it hung
+			// open on a black room). E pushes it in: its free edge drags down to the floor, the hinge side lifts off the sill.
+			_derelictHinge = _door.Position;
+			_derelictW = w;
+			SetDerelictPose(DerelictDoorOpen ? 1f : 0f);
 			if (BuildCollision && !Engine.IsEditorHint())
 			{
 				var leaf = new StaticBody3D { Name = "DoorBody", CollisionLayer = 1, CollisionMask = 0 };
@@ -933,7 +942,37 @@ public partial class Cabin : Node3D
 				leaf.AddChild(new CollisionShape3D { Position = new Vector3(w * 0.5f, h * 0.5f, 0), Shape = new BoxShape3D { Size = new Vector3(w, h, 0.08f) } });
 				_door.AddChild(leaf);
 			}
+			if (!Engine.IsEditorHint() && !DerelictDoorOpen)
+			{
+				var use = new Interactable { Name = "PushDoor", Prompt = "Push the door", MaxDistance = 2.6f, PickRadius = 0.6f, Position = new Vector3(w * 0.6f, 1.0f, 0.1f), HighlightRoot = new NodePath("NoHighlight") };
+				use.Interacted += _ => OpenDerelictDoor();
+				_door.AddChild(use);
+			}
 		}
+	}
+
+	/// <summary>(2026-10-15) Act 25's derelict cabin: its door has been pushed in.</summary>
+	public bool DerelictDoorOpen { get; private set; }
+	private Vector3 _derelictHinge;
+	private float _derelictW;
+
+	/// <summary>0 pushed to in the frame (sagging a little), 1 swung in and dragged down to the floor.</summary>
+	private void SetDerelictPose(float t)
+	{
+		if (_door == null || !IsInstanceValid(_door)) return;
+		float sag = Mathf.Lerp(1.2f, 3.5f, t);
+		_door.Rotation = new Vector3(0, Mathf.DegToRad(Mathf.Lerp(0f, 62f, t)), Mathf.DegToRad(-sag));
+		_door.Position = _derelictHinge + Vector3.Up * (_derelictW * Mathf.Sin(Mathf.DegToRad(sag)) - 0.005f);
+	}
+
+	/// <summary>Pushed: it scrapes in on the floor, onto the dark room (a little cold light in it from the window).</summary>
+	public void OpenDerelictDoor()
+	{
+		if (!Derelict || DerelictDoorOpen || _door == null) return;
+		DerelictDoorOpen = true;
+		if (_door.GetNodeOrNull<Interactable>("PushDoor") is { } use) use.Enabled = false;
+		Audio.AudioDirector.OneShot(this, "door_creak", 1, _door.GlobalPosition + Vector3.Up, -4f);
+		_door.CreateTween().TweenMethod(Callable.From<float>(SetDerelictPose), 0f, 1f, 1.6f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
 	}
 
 	// ---- the prints (P5)

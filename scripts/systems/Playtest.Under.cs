@@ -433,12 +433,12 @@ public partial class Playtest
 		Check("red, green, then white", hw.LightsSettled);
 		Shot("closet");
 		await _bot.UseIt(hw.InsideDoorUse, ct);
-		Check("with the light on the door opens: black beyond", hw.ClosetDoorOpen);
+		Check("with the light on the door opens: the sewer beyond", hw.ClosetDoorOpen);
 		await _bot.Seconds(1.2, ct);
 		var sewer = StationInterior.Instance.Sewer;
 		await _bot.WalkTo(hw.DoorWorld, 0.3f, ct, () => hw.Through, giveUp: 6f);
 		await _bot.WaitUntil(() => Story.Current == Checkpoint.Act16Finished && Input.Enabled, 10, ct);
-		Check("through the black into the sewer: checkpoint 16", Story.Current == Checkpoint.Act16Finished && Player.GlobalPosition.DistanceTo(sewer.EntranceWorld) < 2f, $"{Story.Current}");
+		Check("through the doorway into the sewer: checkpoint 16", Story.Current == Checkpoint.Act16Finished && Player.GlobalPosition.DistanceTo(sewer.EntranceWorld) < 2f, $"{Story.Current}");
 	}
 
 	private async Task Act17(CancellationToken ct)

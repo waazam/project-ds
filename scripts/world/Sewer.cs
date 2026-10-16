@@ -33,6 +33,8 @@ public partial class Sewer : Node3D
 	public static readonly Vector3 PlatformLocal = new(0, PlatTop + 0.05f, HoleLocal.Z - 3f);
 
 	public Vector3 EntranceWorld => ToGlobal(EntranceLocal);
+	/// <summary>The far side of the closet's doorway (<see cref="DoorPortal"/>): the landing, seen from the door.</summary>
+	public Node3D PortalTarget { get; private set; }
 	public float EntranceYaw => GlobalRotation.Y + Mathf.Pi;   // facing +Z
 	public Vector3 HoleWorld => ToGlobal(HoleLocal);
 	public Vector3 TunnelEndWorld => ToGlobal(new Vector3(0, 0.05f, TunnelLen + 2f));
@@ -139,7 +141,11 @@ public partial class Sewer : Node3D
 		// (2026-10-14c: stained wet concrete; it was the pipes' rust, so the wall round the door read as a rusted plate)
 		var con = new MeshKit();
 		con.Mat(BulkheadMat);
-		Slab(con, _stone, new Vector3(0, PipeCy, -0.1f), new Vector3(PipeR * 2f + 0.4f, PipeR * 2f + 0.4f, 0.2f), 0.8f);
+		// (2026-10-15, the doors pass) the wall its own mesh: the closet's doorway looks through it (DoorPortal)
+		var wall = new MeshKit();
+		wall.Mat(BulkheadMat);
+		Slab(wall, _stone, new Vector3(0, PipeCy, -0.1f), new Vector3(PipeR * 2f + 0.4f, PipeR * 2f + 0.4f, 0.2f), 0.8f);
+		DoorPortal.Hide(wall.CommitTo(this, "BulkheadWall", true));
 		// the landing and four steps down into the water
 		Slab(con, _stone, new Vector3(0, 0.4f, 0.6f), new Vector3(2.2f, 0.8f, 1.2f), 0.85f);
 		for (int i = 0; i < 4; i++)
@@ -175,12 +181,17 @@ public partial class Sewer : Node3D
 		// (hinged on the left seen from the landing: the leaf's hinge edge at +X, its face toward +Z)
 		door.Xf = doorHw.Xf = new Transform3D(new Basis(Vector3.Up, Mathf.Pi), new Vector3(0.488f, 0.8f, 0.035f));
 		HallwayParts.ServiceDoor.Leaf(door, doorHw, 0.976f, 2.12f, 0.05f);
-		MeshKit.Solidify(door.CommitTo(this, "Door", true), Vector3.One, "metal");
-		doorHw.CommitTo(this, "DoorHardware", true);
+		var doorMesh = door.CommitTo(this, "Door", true);
+		MeshKit.Solidify(doorMesh, Vector3.One, "metal");
+		DoorPortal.Hide(doorMesh);
+		DoorPortal.Hide(doorHw.CommitTo(this, "DoorHardware", true));
 		var frame = new MeshKit();
 		frame.Mat(HallwayParts.ServiceDoor.FrameMat);
 		HallwayParts.ServiceDoor.Frame(frame, new Vector3(0, 0.8f, 0), 1.0f, 2.15f, -0.2f, 0.0f, 0.075f, 0.06f);
-		frame.CommitTo(this, "DoorFrame", true);
+		DoorPortal.Hide(frame.CommitTo(this, "DoorFrame", true));
+		// what the closet's doorway opens onto: the landing, from this door (facing out through it, the DoorPortal frame)
+		PortalTarget = new Node3D { Name = "ClosetView", Position = new Vector3(0, 0.8f, 0.08f), Rotation = new Vector3(0, Mathf.Pi, 0) };
+		AddChild(PortalTarget);
 		brick.CommitTo(this, "Pipe", true);
 	}
 

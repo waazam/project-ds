@@ -740,6 +740,13 @@ public partial class Act11Ending : Node3D
 		const float levelPitch = 0f;
 		float downPitch = Mathf.DegToRad(-45f);
 		rig.SetPitch(downPitch);
+		// (2026-10-15) the station across the water built now, in this black, so its front door opens onto its lobby
+		// (it was built in the black after the door; Lake.FrontDoor.cs)
+		if (StationInterior.Instance is { Built: false } station)
+		{
+			station.EnsureBuilt();
+			await station.WhenBuilt(ct);
+		}
 		await Cutscene.Wait(this, 1.2, ct);
 		if (fader != null) await fader.Fade(0f, 3.2f, ct);
 		const double riseSeconds = 3.0;

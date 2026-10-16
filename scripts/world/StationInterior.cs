@@ -47,6 +47,8 @@ public partial class StationInterior : Node3D
 	/// hands the player off to when they walk into the station.</summary>
 	public Vector3 EntranceMarkerWorld { get; private set; }
 	public float EntranceYaw { get; private set; }
+	/// <summary>(2026-10-15) The far side of the lake station's front doorway (<see cref="DoorPortal"/>, Lake.FrontDoor.cs).</summary>
+	public Node3D LakeView { get; private set; }
 
 	public StationBasement Basement { get; private set; }
 	public StationRoom1 Room1 { get; private set; }
@@ -70,11 +72,13 @@ public partial class StationInterior : Node3D
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
 
 	/// <summary>Built (the station and everything under it: the rooms, the stairwell, the hallway, the sewer, the pit, the
-	/// library, the round room, the long stair, the church). A new game, or a save before the lake's crossing, leaves it
-	/// unbuilt at load and builds it in the black of the crossing's end (the owner, 2026-10-07: the load from Act 1 to the
-	/// Hollow took too long; this was six of its seconds). The overlays and the Hollow-wide passes are set up either way.</summary>
+	/// library, the round room, the long stair, the church). A new game, or a save before the giant, leaves it unbuilt at
+	/// load and builds it in the black of the wake-up at the lake (the owner, 2026-10-07: the load from Act 1 to the
+	/// Hollow took too long; this was six of its seconds). (2026-10-15: it was built in the black of the crossing's end,
+	/// after the door; now it's there to be seen through the station's opened door.) The overlays and the Hollow-wide
+	/// passes are set up either way.</summary>
 	public bool Built { get; private set; }
-	public static bool DeferAtLoad => StoryManager.Instance is { } st && st.Current < Checkpoint.Act12LakeCrossed
+	public static bool DeferAtLoad => StoryManager.Instance is { } st && st.Current < Checkpoint.Act11GiantEncounter
 		&& System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-defer") < 0 && !NeverDefer;
 	/// <summary>Everything built at load, always (the audits: they look at the whole level).</summary>
 	public static bool NeverDefer;
@@ -159,6 +163,9 @@ public partial class StationInterior : Node3D
 		EntranceMarkerWorld = ToGlobal(new Vector3(EntryGapX, 0.05f, -HalfDepth + 1.2f));
 		EntranceYaw = Rotation.Y + Mathf.Pi;   // facing local +Z: into the lobby, toward the desk
 		Marker("EntranceMarker", EntranceMarkerWorld, EntranceYaw, "respawn_Act12LakeCrossed");
+		// what the station's front door at the lake opens onto (DoorPortal): the lobby, from just inside this door
+		LakeView = new Node3D { Name = "LakeView", Position = new Vector3(EntryGapX, 0, -HalfDepth + 0.06f), Rotation = new Vector3(0, Mathf.Pi, 0) };
+		AddChild(LakeView);
 		// Room 1 solved: back by Room 2's door, facing it, when the flood takes them.
 		Marker("Room2Marker", ToGlobal(new Vector3(-HalfWidth + 1.6f, 0.05f, 0.6f)), Rotation.Y + Mathf.Pi * 0.5f, "respawn_Act13Room1Solved");
 		// Act 14's start: just inside Room 3's corridor, facing down it
@@ -361,7 +368,7 @@ public partial class StationInterior : Node3D
 		k.Color = new Color(0.8f, 0.65f, 0.4f);
 		k.Cylinder(new Vector3(0.85f, 1.02f, 0), new Vector3(0.85f, 1.02f, 0.08f), 0.03f, 0.03f, 8, true);
 		k.Color = Colors.White;
-		k.CommitTo(front, "Leaf", true);
+		DoorPortal.Hide(k.CommitTo(front, "Leaf", true));   // (the lake's doorway looks in past it)
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.1f, 0), Shape = new BoxShape3D { Size = new Vector3(2.2f, 2.2f, 0.14f) } });

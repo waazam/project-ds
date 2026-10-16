@@ -587,7 +587,8 @@ public partial class EndingDirector : Node3D
 		return false;
 	}
 
-	/// <summary>An old cabin beside the trail on the way down, its door hanging open (theirs, if they'd stayed): the Hollow's
+	/// <summary>An old cabin beside the trail on the way down, its door off a hinge and pushed to (theirs, if they'd stayed;
+	/// 2026-10-15: it hung open on the dark room, now E pushes it in): the Hollow's
 	/// cabin itself (<see cref="Cabin.Derelict"/>), so it grounds itself the same way, a fieldstone footing down to the lowest
 	/// ground under it and as many porch steps as the slope wants, its porch to the trail. The woods' scatter is kept off it.</summary>
 	private void BuildCabin()

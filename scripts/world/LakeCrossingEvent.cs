@@ -279,9 +279,11 @@ public partial class LakeCrossingEvent : Node3D
 		Cutscene.SceneRoot(this).AddChild(_prompt);
 		BuildSound();
 
-		// The trigger sits in the doorway itself: stepping through it (not just onto the porch) ends the act.
-		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(2f, 2.6f, 1.6f) },
-			ToLocal(_lake.StationDoorWorld) + new Vector3(0, 1.2f, 0), OnArrival, "LakeArrival");
+		// The trigger sits in the doorway itself: stepping through it (not just onto the porch) ends the act. (2026-10-15:
+		// behind the door's leaf now, from the threshold in, so only the opened door lets them reach it; the lobby is
+		// in the doorway as they step, Lake.FrontDoor.cs.)
+		StoryBeat.MakeTrigger(this, new BoxShape3D { Size = new Vector3(2f, 2.6f, 1.0f) },
+			ToLocal(_lake.StationDoorWorld) + new Vector3(0, 1.2f, -0.35f), OnArrival, "LakeArrival");
 	}
 
 	private void BuildRedGrade()
