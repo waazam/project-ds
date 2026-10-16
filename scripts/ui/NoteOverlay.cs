@@ -114,14 +114,35 @@ public partial class NoteOverlay : CanvasLayer
 		_closing = false;
 		Current = note;
 		_player = player;
+		_page = 0;
+		Lay(note);
 
-		var (paper, ink, font, size) = note.Style switch
+		_player?.PlayerInput.BeginModal();
+		_root.Visible = true;
+		_root.Modulate = new Color(1, 1, 1, 0);
+		_tween?.Kill();
+		_tween = CreateTween();
+		_tween.TweenProperty(_root, "modulate:a", 1f, 0.15f);
+	}
+
+	/// <summary>(2026-10-16) The page shown of a book read page by page (<see cref="Readable.Pages"/>).</summary>
+	private int _page;
+	private int PageCount => Current?.Pages?.Length ?? 0;
+
+	/// <summary>Lays the note's text (or its current page) on the card, in its style and ink.</summary>
+	private void Lay(Readable note)
+	{
+		var pg = note.Pages is { Length: > 0 } pages ? pages[Mathf.Clamp(_page, 0, pages.Length - 1)] : null;
+		var style = pg?.Style ?? note.Style;
+		string text = pg != null ? pg.Text ?? "" : note.Text ?? "";
+		var (paper, ink, font, size) = style switch
 		{
 			Readable.NoteStyle.Typed => (new Color(0.78f, 0.75f, 0.63f), new Color(0.13f, 0.12f, 0.13f), UiKit.Mono, 11),
 			Readable.NoteStyle.Printed => (new Color(0.84f, 0.83f, 0.78f), new Color(0.12f, 0.12f, 0.14f), UiKit.Serif, 12),
 			Readable.NoteStyle.Smudged => (new Color(0.74f, 0.7f, 0.6f), new Color(0.2f, 0.17f, 0.22f), UiKit.SerifItalic, 13),
 			_ => (new Color(0.80f, 0.76f, 0.66f), new Color(0.17f, 0.15f, 0.20f), UiKit.SerifItalic, 12),
 		};
+		if (pg?.Ink is Color own) ink = own;
 		_cardStyle.BgColor = paper;
 		_title.Text = note.Title ?? "";
 		_title.Visible = !string.IsNullOrEmpty(note.Title);
@@ -129,9 +150,9 @@ public partial class NoteOverlay : CanvasLayer
 		_body.AddThemeFontOverride("normal_font", font);
 		_body.AddThemeFontSizeOverride("normal_font_size", size);
 		_body.AddThemeColorOverride("default_color", ink);
-		_body.BbcodeEnabled = note.Style == Readable.NoteStyle.Smudged;
-		_body.Text = note.Style == Readable.NoteStyle.Smudged ? Smudge(note.Text ?? "", ink) : note.Text ?? "";
-		if (note.Style == Readable.NoteStyle.Smudged)
+		_body.BbcodeEnabled = style == Readable.NoteStyle.Smudged;
+		_body.Text = style == Readable.NoteStyle.Smudged ? Smudge(text, ink) : text;
+		if (style == Readable.NoteStyle.Smudged)
 		{
 			// the ink run and rubbed: a soft doubled shadow under every stroke
 			_body.AddThemeColorOverride("font_shadow_color", new Color(ink, 0.35f));
@@ -143,20 +164,13 @@ public partial class NoteOverlay : CanvasLayer
 		_body.ScrollToLine(0);
 
 		// A handwritten sheet is held a little askew; cards and logs sit square.
-		_card.RotationDegrees = note.Style == Readable.NoteStyle.Handwritten ? -1.2f : 0f;
+		_card.RotationDegrees = style == Readable.NoteStyle.Handwritten ? -1.2f : 0f;
 		var vis = GetViewport().GetVisibleRect().Size;
-		_width = Mathf.Min(note.Style == Readable.NoteStyle.Typed ? TypedWidth : CardWidth, vis.X - 32f);
+		_width = Mathf.Min(style == Readable.NoteStyle.Typed ? TypedWidth : CardWidth, vis.X - 32f);
 		_body.CustomMinimumSize = new Vector2(_width - Pad * 2, 40f);
 		Place(_width, 120f);
 		_layoutTries = 0;
 		Callable.From(FitCard).CallDeferred();
-
-		_player?.PlayerInput.BeginModal();
-		_root.Visible = true;
-		_root.Modulate = new Color(1, 1, 1, 0);
-		_tween?.Kill();
-		_tween = CreateTween();
-		_tween.TweenProperty(_root, "modulate:a", 1f, 0.15f);
 	}
 
 	/// <summary>Smudged handwriting: each word's ink a different strength (some nearly rubbed away), a letter
@@ -205,7 +219,9 @@ public partial class NoteOverlay : CanvasLayer
 		float maxBody = Mathf.Max(60f, vis.Y - ScreenMargin * 2f - chrome);
 		float bodyH = Mathf.Min(content + 4f, maxBody);
 		bool scrolls = content + 4f > maxBody;
-		_hint.Text = scrolls ? "wheel  more      E  put it down" : "E   put it down";
+		string put = PageCount > 1 && _page < PageCount - 1 ? "E  turn the page" : "E  put it down";
+		if (PageCount > 1) put = $"{_page + 1}/{PageCount}      " + put;
+		_hint.Text = scrolls ? "wheel  more      " + put : put;
 		_body.CustomMinimumSize = new Vector2(_width - Pad * 2f, bodyH);
 		Place(_width, chrome + bodyH);
 	}
@@ -246,6 +262,16 @@ public partial class NoteOverlay : CanvasLayer
 	public override void _Input(InputEvent e)
 	{
 		if (!IsOpen || _closing) return;
+		// (2026-10-16) a book: E (or right) turns to the next page, left back; E on the last puts it down
+		int turn = e.IsActionPressed("interact") || e.IsActionPressed("ui_right") ? 1 : e.IsActionPressed("ui_left") ? -1 : 0;
+		if (turn != 0 && PageCount > 1 && _page + turn >= 0 && _page + turn < PageCount)
+		{
+			_page += turn;
+			Lay(Current);
+			Audio.AudioDirector.OneShot(Current, "paper_rustle", 3, null, -14f, "Player");
+			GetViewport().SetInputAsHandled();
+			return;
+		}
 		if (e.IsActionPressed("interact") || e.IsActionPressed("pause") || e.IsActionPressed("ui_cancel"))
 		{
 			Close();

@@ -33,6 +33,8 @@ public partial class IronDoor : Node3D
 	private readonly bool[] _set = new bool[3];
 	private readonly Node3D[] _hollowPieces = new Node3D[3];
 	private static readonly string[] Words = { "LOOK", "TOUCH", "CLIMB" };
+	/// <summary>(2026-10-16) His rules, pencilled by the hollows.</summary>
+	private static readonly string[] Rules = { "don't look\nwhen it looks", "don't touch\nwhat's cold", "don't climb" };
 	private static readonly ToolKind[] Needs = { ToolKind.DeadEye, ToolKind.PaleHand, ToolKind.StairTread };
 	private static readonly string[] SetFlags = { StoryManager.Flag.StationEyeSet, StoryManager.Flag.StationHandSet, StoryManager.Flag.StationStepSet };
 
@@ -89,6 +91,10 @@ public partial class IronDoor : Node3D
 		k.CommitTo(_leaf, "Door", true);
 		for (int i = 0; i < 3; i++)
 			SignKit.Text(_leaf, Words[i], HollowAt(i) + new Vector3(0, 0.22f, -0.062f), new Basis(Vector3.Up, Mathf.Pi), 0.09f, new Color(0.62f, 0.5f, 0.4f));
+		// (2026-10-16, STORY.md Rev 5) pencilled beside each hollow, in his father's hand: a rule
+		for (int i = 0; i < 3; i++)
+			StationStory.HandText(_leaf, Rules[i], HollowAt(i) + new Vector3(0, -0.205f, -0.0565f), new Basis(Vector3.Up, Mathf.Pi), 0.034f,
+				new Color(0.5f, 0.5f, 0.52f), $"Rule{i}", HorizontalAlignment.Center, -8f);
 
 		_blocker = new StaticBody3D { Name = "Blocker", CollisionLayer = 1, CollisionMask = 0 };
 		_blocker.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.25f, 0.05f), Shape = new BoxShape3D { Size = new Vector3(2.4f, 2.5f, 0.14f) } });

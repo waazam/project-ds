@@ -28,6 +28,13 @@ public partial class Playtest
 		Require("the knife stuck in the desk", knife != null);
 		await _bot.UseIt(knife, ct);
 		Check("the knife in hand", Inv.HasTool(ToolKind.Knife));
+		// (2026-10-16) his desk: the photo the player brought, the nameplate; the notice pinned up
+		var hq = station.Story;
+		Require("his headquarters", hq?.PhotoUse != null);
+		await _bot.UseIt(hq.PhotoUse, ct);
+		Check("the photo on his desk: \"That's... mine.\"", Story.HasFlag(StationStory.PhotoSeen));
+		Check("the relief crew's notice pinned up (February 1988)", hq.Notice != null && hq.Notice.Text.Contains("MITCHELL WEBBER") && hq.Notice.Text.Contains("declared dead"));
+		Check("the locked room's door chained shut", station.Locked is { Chained: true });
 		// the tape over the basement door: the cut close-up
 		var tapeUse = basement.GetNode<Interactable>("Door/Use");
 		await _bot.Inside(station.ToGlobal(new Vector3(StationInterior.BasementGapX, 0, -StationInterior.HalfDepth + 1.5f)), tapeUse.GlobalPosition, ct);
@@ -60,6 +67,8 @@ public partial class Playtest
 		// Room 1
 		await _bot.Inside(station.ToGlobal(new Vector3(StationInterior.HalfWidth - 1.6f, 0, 0.3f)), station.ToGlobal(new Vector3(StationInterior.HalfWidth, 1f, 0)), ct);
 		Check("the lobby has rotted a stage", station.Stage == 1, $"stage {station.Stage}");
+		await _bot.WaitUntil(() => Story.HasFlag(StationStory.LobbyChangedSaid), 4, ct);
+		Check("back in the lobby, changed (the nameplate turned): \"Dad... what happened here?\"", hq.Changes >= 1 && Story.HasFlag(StationStory.LobbyChangedSaid), $"{hq.Changes} changes");
 		var door1 = station.GetNode<StationDoor>("Room1Door");
 		await _bot.UseIt(door1.GetNode<Interactable>("Use"), ct);
 		Check("the key opens Room 1", door1 is { Locked: false, IsOpen: true });
@@ -70,6 +79,13 @@ public partial class Playtest
 		await _bot.UseIt(boxUse, ct);
 		for (int i = 0; i < 40 && TapeCutOverlay.Instance is { IsOpen: true }; i++) { TapeCutOverlay.Instance.TestCompleteCut(); await _bot.Frames(2, ct); }
 		Check("the taped cigar box cut open on three sides: a button", room1.BoxOpen && room1.BoxCutsDone == 3, $"{room1.BoxCutsDone} cuts");
+		Check("in the box: a watch, a ring and a coat button", room1.GetNodeOrNull("CigarBox/Watch") != null && room1.GetNodeOrNull("CigarBox/Ring") != null && room1.GetNodeOrNull("CigarBox/Button/CoatButton") != null);
+		// his logbook, read through the note overlay page by page
+		Require("his logbook", room1.Logbook != null);
+		await _bot.UseIt(room1.Logbook, ct);
+		Check("his logbook opens: twelve entries, then the pages of \"Come and see.\"", NoteOverlay.Instance is { IsOpen: true } && room1.Logbook.Pages.Length >= 15, $"{room1.Logbook.Pages?.Length} pages");
+		NoteOverlay.Instance?.Close();
+		await _bot.Seconds(0.3, ct);
 		await _bot.Seconds(0.8, ct);
 		var button = room1.GetNodeOrNull<Interactable>("CigarBox/Button/Press");
 		if (button != null) await _bot.UseIt(button, ct);
@@ -184,6 +200,8 @@ public partial class Playtest
 		await _bot.WalkTo(room3.ToGlobal(new Vector3(0, 0, 2.2f)), 0.6f, ct, () => Story.Current >= Checkpoint.Act13Finished, giveUp: 8f);
 		await _bot.WaitUntil(() => Story.Current >= Checkpoint.Act13Finished, 5, ct);
 		Check("through it into Room 3: Act 13's end (checkpoint 13)", Story.Current == Checkpoint.Act13Finished && room3.Entered && station.Stage == 4, $"{Story.Current}, stage {station.Stage}");
+		await _bot.WaitUntil(() => station.Locked is { Chained: false }, 3, ct);
+		Check("behind them, the locked room's chain hangs cut, its door ajar", station.Locked is { Chained: false });
 	}
 
 	// ------------------------------------------------------------------ Act 14

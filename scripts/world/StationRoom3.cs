@@ -403,15 +403,19 @@ public partial class StationRoom3 : Node3D
 		// (their backs 15 mm off the plate, at 0.15 from the wall's middle; they hung 5 cm out in the air, 2026-10-15)
 		Wall(-HallHalf + 0.165f, CorridorEnd + 0.6f, HallEnd - 0.4f, Mathf.Pi * 0.5f);
 		Wall(HallHalf - 0.165f, CorridorEnd + 0.6f, HallEnd - 0.4f, -Mathf.Pi * 0.5f);
-		// the back wall, either side of where the hole leads
+		// the back wall, either side of where the hole leads. (2026-10-16, STORY.md Rev 5: these few survive as what they
+		// were, the station's staff photographs, the rangers in a row in their hats, every face scratched out; Blender,
+		// tools/Blender/station_story.py ss_staff_photo_a/_b. Named apart, so the second look's eyes never land on them.)
 		for (int i = 0; i < 4; i++)
 		{
 			float x = -4.2f + i * 1.1f, w = rng.RandfRange(0.5f, 0.8f), h = w * 1.3f;
 			if (x > -1.2f) x += 3.4f;
-			var p = new Node3D { Name = $"Portrait{n}", Position = new Vector3(x, rng.RandfRange(2.2f, 3.4f), HallEnd - 0.165f) };
+			var p = new Node3D { Name = $"StaffPhoto{i}", Position = new Vector3(x, rng.RandfRange(2.2f, 3.4f), HallEnd - 0.165f) };
 			AddChild(p);
 			p.Rotation = new Vector3(0, Mathf.Pi, vr.Randf() < 0.5f ? vr.RandfRange(-0.06f, 0.06f) : 0f);
-			PortraitKit.Build(p, n, w, h);
+			if (StationParts.StationStory.Place(p, i % 2 == 0 ? "ss_staff_photo_a" : "ss_staff_photo_b",
+				new Transform3D(new Basis(Vector3.Up, Mathf.Pi), new Vector3(0, 0, -0.015f)), StationParts.StationStory.StaffRoles) == null)
+				PortraitKit.Build(p, n, w, h);
 			n++;
 		}
 		// a big one over the corridor door, looking down the hall at the hole
