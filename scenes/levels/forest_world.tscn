@@ -25,6 +25,7 @@
 [ext_resource type="Script" path="res://scripts/world/OpeningAtCar.cs" id="34_opening"]
 [ext_resource type="Script" path="res://scripts/entities/Squirrel.cs" id="35_squirrel"]
 [ext_resource type="Script" path="res://scripts/world/TrailheadDressing.cs" id="42_thdress"]
+[ext_resource type="Script" path="res://scripts/world/Cabin.cs" id="cabin_hub_script"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("13_sky")
@@ -525,6 +526,20 @@ Offset = 0.3
 
 [node name="LineClear" type="Node3D" parent="Trailhead"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 15.1)
+script = ExtResource("9_clear")
+Radius = 3.2
+
+[node name="TrailheadCabin" type="Node3D" parent="Trailhead"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 16.5, 0, 27.5)
+script = ExtResource("cabin_hub_script")
+Hub = true
+
+[node name="CabinClear" type="Node3D" parent="Trailhead/TrailheadCabin"]
+script = ExtResource("9_clear")
+Radius = 6.2
+
+[node name="PorchClear" type="Node3D" parent="Trailhead/TrailheadCabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.5)
 script = ExtResource("9_clear")
 Radius = 3.2
 

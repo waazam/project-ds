@@ -15,8 +15,10 @@ namespace ProjectDS.World;
 /// floor, open rafters under the roof boards, a cast-iron stove, a cot, a shelf and a
 /// hanging lamp (warm light). What the friend left at his table (friend.tscn: his chair pushed
 /// back, the bandage, the stains, his page, the newel post) sits on the floor at his spot.
-/// Papers: R.H.'s four prints over his chair; the page on the table is
-/// FriendBody's. All of them join <see cref="PapersGroup"/> and burn away with the cabin.
+/// Papers: R.H.'s four prints, pinned across the player's own photo board on the back wall (2026-10-16, Cabin.Story.cs);
+/// the page on the table is FriendBody's. All of them join <see cref="PapersGroup"/> and burn away with the cabin.
+/// The story's things are the same in every cabin (Cabin.Story.cs): the board, the assignment sheet and the framed photo
+/// on the table, the axe on its pegs over the hearth. <see cref="Hub"/> is Act 1's cabin by the lot.
 ///
 /// Local frame: front (the door) faces +Z, same convention as ParkProp. y = 0 is the
 /// INTERIOR FLOOR TOP. At runtime the cabin grounds itself: floor at sill height above
@@ -56,6 +58,11 @@ public partial class Cabin : Node3D
 	/// frame until it's pushed in (2026-10-15: it hung open into the room). Not the story's cabin: it
 	/// stays out of the "cabin" group.</summary>
 	[Export] public bool Derelict = false;
+	/// <summary>(2026-10-16, STORY.md Rev 5) Act 1's cabin by the trailhead's lot, rented for the shoot: the same cabin, warm
+	/// and lit, its door shut until E opens it (and open from then on, saved), the player's own photo board on the wall, a
+	/// clean table and chair (nothing of R.H.'s), the assignment sheet and the framed photo on the table, the axe over the
+	/// hearth (<see cref="BuildStory"/>). It joins <see cref="HubGroup"/>, not "cabin" (that's the Hollow's).</summary>
+	[Export] public bool Hub = false;
 
 	public bool DoorBoarded { get; private set; }
 	public bool IsOpen { get; private set; }
@@ -110,7 +117,7 @@ public partial class Cabin : Node3D
 	private float WinCx => (Dw + Hw) * 0.5f + 0.02f;
 	private const float WinW = 0.7f, StepW = 1.4f, StepRun = 0.3f;
 
-	private Node3D _gen, _planks, _door, _windowBoards, _debris, _fire, _sashes, _panes, _papers;
+	private Node3D _gen, _planks, _door, _windowBoards, _debris, _fire, _sashes, _panes;
 	private Readable _sheet;
 	private CollisionShape3D _doorCollision;
 
@@ -131,6 +138,16 @@ public partial class Cabin : Node3D
 	public override void _Ready()
 	{
 		if (Derelict) { _lightOn = false; IsOpen = true; }
+		else if (Hub)
+		{
+			AddToGroup(HubGroup);
+			if (!Engine.IsEditorHint() && StoryManager.Instance is { } s)
+			{
+				IsOpen = s.HasFlag(HubDoorFlag);
+				// (on the way home in Act 25 it stands dark; what the fire left of it is Act 25's to show)
+				if (s.Current >= Checkpoint.Act24Finished) _lightOn = false;
+			}
+		}
 		else AddToGroup("cabin");
 		if (!Engine.IsEditorHint())
 		{
@@ -187,7 +204,7 @@ public partial class Cabin : Node3D
 		if (old != null) { RemoveChild(old); old.QueueFree(); }
 		_gen = new Node3D { Name = "Generated" };
 		AddChild(_gen);
-		_planks = _door = _windowBoards = _debris = _sashes = _panes = _papers = null;
+		_planks = _door = _windowBoards = _debris = _sashes = _panes = null;
 		_sheet = null;
 		_doorCollision = null;
 
@@ -231,9 +248,9 @@ public partial class Cabin : Node3D
 
 		BuildDoor();
 		if (DoorBoarded && !IsOpen) BuildPlanks();
-		if (IsOpen && !Derelict) BuildDebris();
+		if (IsOpen && !Derelict && !Hub) BuildDebris();
 		RefreshWindowBoards();
-		if (!Derelict) BuildPapers();
+		if (!Derelict) BuildStory();
 		if (!Engine.IsEditorHint())
 		{
 			// webs in the top corners and bark, dirt and leaves blown in along the walls' feet (the interiors pass, 2026-10-03)
@@ -928,6 +945,13 @@ public partial class Cabin : Node3D
 		k.Color = new Color(0.02f, 0.02f, 0.02f);
 		BuildKit.Box(k, new Vector3(lx, ly - 0.255f, face + 0.0065f), new Vector3(0.008f, 0.025f, 0.001f), 3f);
 		k.CommitTo(_door, "DoorMesh");
+		if (Hub && !IsOpen && !Engine.IsEditorHint())
+		{
+			// (2026-10-16) Act 1's cabin: shut until it's opened (Dan's rule, c522e73), and it stays open behind him
+			var use = new Interactable { Name = "OpenDoor", Prompt = "Open the door", MaxDistance = 2.6f, PickRadius = 0.6f, Position = new Vector3(w * 0.6f, 1.0f, 0.1f), HighlightRoot = new NodePath("NoHighlight") };
+			use.Interacted += _ => OpenHubDoor();
+			_door.AddChild(use);
+		}
 		if (Derelict)
 		{
 			// off its top pintle: pushed to in its frame, sagging (2026-10-15, Dan: every door shut until it's opened; it hung
@@ -975,57 +999,6 @@ public partial class Cabin : Node3D
 		_door.CreateTween().TweenMethod(Callable.From<float>(SetDerelictPose), 0f, 1f, 1.6f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
 	}
 
-	// ---- the prints (P5)
-
-	/// <summary>
-	/// R.H.'s four prints in a row on the back wall over his chair: the three birds he came for
-	/// and the first staircase at night. Props only, no text on them.
-	/// </summary>
-	private void BuildPapers()
-	{
-		if (_papers != null && IsInstanceValid(_papers)) _papers.QueueFree();
-		_papers = null;
-		_sheet = null;
-		if (Engine.IsEditorHint()) return;
-		float iz = Hd - LogT * 0.5f;
-		var root = new Node3D { Name = "Papers" };
-		root.AddToGroup(PapersGroup);
-
-		// tacks: one per print (the prints' are red pushpins, the stairs' a plain one)
-		var tacks = new MeshKit();
-		tacks.Mat(BuildingTextures.IronMat);
-
-		float pz = -iz + 0.012f, py = 1.64f;
-		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 17 + 29) };
-		for (int i = 0; i < 4; i++)
-		{
-			Vector3 at = new(0.3f + (i - 1.5f) * 0.19f, py + rng.RandfRange(-0.012f, 0.012f), pz);
-			Print(root, at, Vector3.Back, i, rng.RandfRange(-4f, 4f));
-			tacks.Color = i == 3 ? new Color(0.4f, 0.38f, 0.35f) : new Color(0.6f, 0.12f, 0.1f);
-			BuildKit.Box(tacks, at + new Vector3(0, 0.045f, 0.009f), new Vector3(0.011f, 0.011f, 0.011f), 1f);
-		}
-		tacks.CommitTo(root, "Tacks", false);
-		_gen.AddChild(root);
-		_papers = root;
-	}
-
-	/// <summary>One pinned photographic print (3:2 like the viewfinder), image side out.</summary>
-	private static void Print(Node3D parent, Vector3 at, Vector3 outward, int kind, float tiltDeg)
-	{
-		Vector3 z = outward.Normalized();
-		Vector3 x = Vector3.Up.Cross(z).Normalized();
-		var b = new Basis(x, Vector3.Up, z);
-		if (tiltDeg != 0f) b = b.Rotated(z, Mathf.DegToRad(tiltDeg));
-		parent.AddChild(new MeshInstance3D
-		{
-			Name = $"Print{kind}",
-			Mesh = new QuadMesh { Size = new Vector2(0.15f, 0.10f) },
-			MaterialOverride = BuildingTextures.PrintMat(kind),
-			Transform = new Transform3D(b, at + z * 0.006f),
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-		});
-	}
-
 	/// <summary>Paper burns first: every note and print in the cabin (group <see cref="PapersGroup"/>) is gone while it burns.</summary>
 	private void UpdatePapers()
 	{
@@ -1055,7 +1028,7 @@ public partial class Cabin : Node3D
 		if (_gen != null) RefreshWindowBoards();
 		if (_door != null && IsInstanceValid(_door)) _door.Rotation = new Vector3(0, Mathf.DegToRad(96f), 0);
 		if (_doorCollision != null) _doorCollision.Disabled = true;
-		if (_gen != null) BuildDebris();
+		if (_gen != null && !Hub) BuildDebris();
 	}
 
 	/// <summary>Save-restore helper: open (same as <see cref="OpenDoor"/>) or closed.</summary>
