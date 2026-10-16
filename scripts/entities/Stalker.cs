@@ -358,7 +358,8 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 		{
 			LoadSet("res://assets/audio/sfx/creature_rattle_tick_{0:00}.wav", 12),
 			LoadSet("res://assets/audio/sfx/creature_rattle_run_{0:00}.wav", 16),
-			LoadSet("res://assets/audio/sfx/creature_rattle_long_{0:00}.wav", 12),
+			// (2026-10-15, the owner: get rid of it) the long family is gone; its slot falls back to the runs
+			System.Array.Empty<AudioStream>(),
 			LoadSet("res://assets/audio/sfx/creature_rattle_stutter_{0:00}.wav", 8),
 		};
 		_phrasePick = new RecentPicker[_phrases.Length];

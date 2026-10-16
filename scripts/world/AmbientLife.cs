@@ -105,7 +105,7 @@ public partial class FrogChorus : Node3D
 		var wav = (AudioStreamWav)GD.Load<AudioStreamWav>("res://assets/audio/ambient/frogs_loop.wav").Duplicate();
 		wav.LoopMode = AudioStreamWav.LoopModeEnum.Forward;
 		wav.LoopEnd = Mathf.RoundToInt(wav.GetLength() * wav.MixRate);
-		_p = new AudioStreamPlayer3D { Name = "Frogs", Stream = wav, Bus = "Nature", VolumeDb = -80f, UnitSize = 6f, MaxDistance = 60f };
+		_p = new AudioStreamPlayer3D { Name = "Frogs", Stream = wav, Bus = "Nature", VolumeDb = -80f, UnitSize = 6f, MaxDistance = 60f, PitchScale = 0.72f };   // (2026-10-15, the owner) deeper
 		AddChild(_p);
 		_p.Play((float)GD.RandRange(0.0, wav.GetLength()));
 	}

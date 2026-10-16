@@ -407,7 +407,7 @@ public partial class Lantern : Node3D
 			Blacklight = !Blacklight;
 			_lit = true;
 			Audio.AudioDirector.OneShot(this, "lantern_off", 1, null, -16f, "Player", 3f, 0.02f);
-			Audio.AudioDirector.OneShot(this, Blacklight ? "uv_hum" : "lantern_on", 1, null, Blacklight ? -14f : -12f, "Player");
+			if (!Blacklight) Audio.AudioDirector.OneShot(this, "lantern_on", 1, null, -12f, "Player");   // (2026-10-15, the owner) no uv hum
 		}
 		// Restored with the lantern already in hand: no how-to. Taken in play: say it once.
 		if (_firstFrame) { _firstFrame = false; _hinted = _inv.HasLantern; }

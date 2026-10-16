@@ -186,7 +186,6 @@ public partial class SkiLodge
 			tw.TweenInterval(1.4f);
 			tw.TweenProperty(l, "light_energy", e, 2.5f).SetTrans(Tween.TransitionType.Sine);
 		}
-		AudioDirector.OneShot(this, "uv_hum", 1, null, -22f, "Events");
 	}
 
 	private void Knock()

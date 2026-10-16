@@ -343,7 +343,7 @@ public partial class RainVfx : Node3D
 			_dripT = (float)GD.RandRange(2.5, 7.0) / Mathf.Max(dripping, 0.3f) * (_intensity > 0.3f ? 1f : 1.8f);
 			float a = (float)GD.RandRange(0.0, Mathf.Tau), r = (float)GD.RandRange(3.0, 9.0);
 			var at = cp + new Vector3(Mathf.Cos(a) * r, (float)GD.RandRange(1.0, 3.0), Mathf.Sin(a) * r);
-			Audio.AudioDirector.OneShot(this, "canopy_drip", 6, at, -20f + 3f * _intensity, "Weather", 3f, 0.06f);
+			// (2026-10-15, the owner) no canopy drip
 		}
 		// the streaks are Weather's now (the weather pass): wrapping round the camera, slanting with the shared wind,
 		// never under a roof or the trees; a touch fewer than full (Dan, 2026-09-22)

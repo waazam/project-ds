@@ -70,7 +70,7 @@ Gain = 0.0
 [node name="BirdCalls" type="Node3D" parent="."]
 script = ExtResource("3_emit")
 VolumeDb = -19.0
-SkipSamples = PackedInt32Array(2, 4, 5, 6)
+SkipSamples = PackedInt32Array(2, 4, 5, 6, 7)
 IntervalSeconds = Vector2(10, 25)
 
 [node name="Crickets" type="Node3D" parent="."]

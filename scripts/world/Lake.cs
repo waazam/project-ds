@@ -213,7 +213,7 @@ public partial class Lake : Node3D
 		// A sparse dawn chorus from the treeline, and now and then a loon somewhere far out on the water.
 		_birds = new OneShotEmitter
 		{
-			Name = "DawnBirds", SamplePattern = "res://assets/audio/sfx/bird_{0:00}.wav", SampleCount = 8,
+			Name = "DawnBirds", SamplePattern = "res://assets/audio/sfx/bird_{0:00}.wav", SampleCount = 8, SkipSamples = new[] { 7 },   // (2026-10-15) no bird 7
 			Bus = "Birds", LifeCategory = OneShotEmitter.Life.Birds,
 			IntervalSeconds = new Vector2(2.5f, 8f), DistanceRange = new Vector2(24f, 60f), HeightRange = new Vector2(5f, 16f),
 			VolumeDb = -8f, Voices = 3,

@@ -669,6 +669,9 @@ public partial class Bird : Node3D
 	private float _singTimer = -1f;
 	private Node3D _listener;
 
+	/// <summary>A songbird call, 1-8 but never 7 (the owner, 2026-10-15).</summary>
+	private static int BirdCall(RandomNumberGenerator rng) { int n = rng.RandiRange(1, 7); return n >= 7 ? 8 : n; }
+
 	private void Sing(float dt)
 	{
 		if (_singTimer < 0f) _singTimer = _rng.RandfRange(1f, 5f);
@@ -680,7 +683,7 @@ public partial class Bird : Node3D
 		if (_listener == null || !IsInstanceValid(_listener)) _listener = GetTree().GetFirstNodeInGroup("player") as Node3D;
 		if (_listener == null || _listener.GlobalPosition.DistanceTo(GlobalPosition) > SingRange) return;
 
-		string path = IsOmen ? $"res://assets/audio/sfx/raven_0{_rng.RandiRange(1, 2)}.wav" : $"res://assets/audio/sfx/bird_0{_rng.RandiRange(1, 8)}.wav";
+		string path = IsOmen ? $"res://assets/audio/sfx/raven_0{_rng.RandiRange(1, 2)}.wav" : $"res://assets/audio/sfx/bird_0{BirdCall(_rng)}.wav";
 		if (!ResourceLoader.Exists(path)) return;
 		var voice = new AudioStreamPlayer3D
 		{
