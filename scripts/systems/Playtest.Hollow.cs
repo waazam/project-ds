@@ -162,6 +162,7 @@ public partial class Playtest
 		Shot($"key_half_{piece}");
 		await _bot.LanternMode(false, ct);
 		await _bot.Aim(c, ct);
+		await _bot.WaitUntil(() => _bot.Prompt == "Open the tin", 1.5, ct);
 		Check($"the tin offers itself", _bot.Prompt == "Open the tin", $"'{_bot.Prompt}'");
 		// (2026-10-16) up to three tries, each re-aimed and waiting for the tin's own E-point to be in focus; whatever keeps the
 		// press from reaching it is logged ([keydbg]) and the check below fails
