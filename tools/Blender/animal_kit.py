@@ -131,23 +131,26 @@ def roughen(ob, amp, freq, seed=0.0):
 
 # ------------------------------------------------------------------ fur
 
-def hair_image(name, w=64, h=128, strands=60, seed=7):
+def hair_image(name, w=64, h=128, strands=90, seed=7):
     """White hair strands with alpha (tinted by the vertex colour in the game): strands of different lengths and leans,
-    tapering to their tips, roots at the bottom of the image."""
+    tapering to their tips, roots at the bottom of the image. Soft-edged and close together (2026-10-15: sharp, sparse
+    strands with gaps between read as stripes and a noisy edge)."""
     rng = random.Random(seed)
     a = np.zeros((h, w), np.float32)
     lum = np.zeros((h, w), np.float32)
     for _ in range(strands):
-        x0, lean, ln, l = rng.uniform(1, w - 2), rng.uniform(-6, 6), rng.uniform(0.5, 1.0), rng.uniform(0.7, 1.0)
+        x0, lean, ln, l = rng.uniform(1, w - 2), rng.uniform(-5, 5), rng.uniform(0.55, 1.0), rng.uniform(0.8, 1.0)
         for y in range(h):
             v = y / (h - 1)   # 0 at the root (row 0 is the bottom in Blender's pixels)
             if v > ln:
                 break
             x = x0 + lean * v * v
-            half = 1.6 * (1 - v / ln) + 0.4
-            for xi in range(int(x - half - 1), int(x + half + 2)):
+            half = 2.2 * (1 - v / ln) + 0.6
+            fade = 1.0 - 0.6 * (v / ln) ** 2   # the tips thinner and fainter
+            for xi in range(int(x - half - 2), int(x + half + 3)):
                 if 0 <= xi < w:
-                    al = max(0.0, min(1.0, half - abs(xi - x) + 0.5))
+                    d = abs(xi - x) / half
+                    al = min(1.0, 1.15 * fade * math.exp(-1.6 * d * d))
                     if al > a[y, xi]:
                         a[y, xi] = al
                         lum[y, xi] = l
@@ -184,7 +187,7 @@ def hair_material(img):
     bsdf.inputs["Roughness"].default_value = 1.0
     mt.blend_method = "CLIP"
     mt.alpha_threshold = 0.45
-    mt.use_backface_culling = False
+    mt.use_backface_culling = True   # (each card is two faces, one each way)
     return mt
 
 
@@ -194,16 +197,27 @@ class Cards:
     def __init__(self):
         self.bm = bmesh.new()
         self.col = []
+        self.nrm = []
 
-    def card(self, root, direction, across, length, width, root_col, tip_col):
+    def card(self, root, direction, across, length, width, root_col, tip_col, normal=None):
+        """`normal`: what the card is lit as (the skin's at its root): lit by its own facing, a card came out a bright
+        bluish sheet against a dark ground (2026-10-15)."""
         across = across.normalized() * width * 0.5
         tip = root + direction.normalized() * length
-        vs = [self.bm.verts.new(p) for p in (root - across, root + across, tip + across * 0.75, tip - across * 0.75)]
-        f = self.bm.faces.new(vs)
+        # both faces as geometry, each lit by the same normal (a two-sided material flips the normal on the back face,
+        # and a card seen from behind came out dark)
         uv = self.bm.loops.layers.uv.verify()
-        for lp, t in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
-            lp[uv].uv = t
-        self.col.extend([root_col, root_col, tip_col, tip_col])
+        n = (normal if normal is not None else direction).normalized()
+        corners = (root - across, root + across, tip + across * 0.75, tip - across * 0.75)
+        uvs = ((0, 0), (1, 0), (1, 1), (0, 1))
+        cols = (root_col, root_col, tip_col, tip_col)
+        for order in ((0, 1, 2, 3), (3, 2, 1, 0)):
+            vs = [self.bm.verts.new(corners[i]) for i in order]
+            f = self.bm.faces.new(vs)
+            for lp, i in zip(f.loops, order):
+                lp[uv].uv = uvs[i]
+            self.col.extend([cols[i] for i in order])
+            self.nrm.extend([n, n, n, n])
 
     def object(self, name, material):
         ob = obj_from_bmesh(self.bm, name, material)
@@ -211,7 +225,38 @@ class Cards:
         attr = me.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
         cols = np.array([(*c, 1.0) for c in self.col], np.float32)
         attr.data.foreach_set("color", cols.ravel())
+        if hasattr(me, "use_auto_smooth"):
+            me.use_auto_smooth = True
+        me.normals_split_custom_set_from_vertices([tuple(n) for n in self.nrm])
         return ob
+
+
+def smooth_weights(ob, repeat=8, factor=0.5):
+    """The nearest-bone weights relaxed over the surface and limited to four bones: no hard step at a joint for a bend
+    to crease (the doe's chest crumpled where the neck bent down to graze)."""
+    me = ob.data
+    nv, groups = len(me.vertices), list(ob.vertex_groups)
+    Wm = np.zeros((nv, len(groups)), np.float32)
+    for v in me.vertices:
+        for g in v.groups:
+            Wm[v.index, g.group] = g.weight
+    e = np.array([ed.vertices[:] for ed in me.edges], np.int64)
+    deg = np.bincount(e.ravel(), minlength=nv).astype(np.float32)[:, None]
+    for _ in range(repeat):
+        acc = np.zeros_like(Wm)
+        np.add.at(acc, e[:, 0], Wm[e[:, 1]])
+        np.add.at(acc, e[:, 1], Wm[e[:, 0]])
+        Wm = np.where(deg > 0, (1 - factor) * Wm + factor * acc / np.maximum(deg, 1), Wm)
+    # the four strongest, normalised
+    if Wm.shape[1] > 4:
+        cut = np.sort(Wm, axis=1)[:, -4][:, None]
+        Wm = np.where(Wm >= cut, Wm, 0.0)
+    Wm /= np.maximum(Wm.sum(axis=1, keepdims=True), 1e-6)
+    for gi, vg in enumerate(groups):
+        idx = np.nonzero(Wm[:, gi] > 1e-4)[0]
+        vg.remove(list(range(nv)))
+        for i in idx:
+            vg.add([int(i)], float(Wm[i, gi]), "REPLACE")
 
 
 def surface_points(ob, pick, every):
@@ -230,7 +275,7 @@ def surface_points(ob, pick, every):
 
 # ------------------------------------------------------------------ the bake (sized to the animal)
 
-def bake_maps(low, high, prefix, size, extrusion, dist):
+def bake_maps(low, high, prefix, size, extrusion, dist, ao=0.3):
     """W.bake_maps with the cage and the ray sized to the animal: the wendigo's 2 cm cage and 5 cm reach, on a squirrel
     five centimetres through, found the far side of the body and the tail, and the coat came out in patches."""
     keep = [s.material for s in high.material_slots]
@@ -250,7 +295,7 @@ def bake_maps(low, high, prefix, size, extrusion, dist):
     a = np.array(aimg.pixels[:], np.float32).reshape(size, size, 4)[:, :, 0]
     for _ in range(3):
         a = (a + np.roll(a, 1, 0) + np.roll(a, -1, 0) + np.roll(a, 1, 1) + np.roll(a, -1, 1)) / 5.0
-    c[:, :, :3] *= (0.7 + 0.3 * a)[:, :, None]
+    c[:, :, :3] *= (1.0 - ao + ao * a)[:, :, None]   # (kept light: a crease dark in the rest pose, opened by a bend, showed as a dark patch)
     cimg.pixels = c.ravel()
     for img in (cimg, nimg):
         img.filepath_raw = os.path.join(PREV, img.name + ".png")

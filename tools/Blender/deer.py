@@ -25,7 +25,7 @@ from mathutils import Vector, Matrix, Quaternion, noise
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kit import clear, mat, join, apply_mods, add_mod, obj_from_bmesh, ROOT
 import wendigo as W
-from animal_kit import P, G, key, bell, sup, catmull, loft, fuse, roughen, hair_image, hair_material, Cards, surface_points, bones_fk, pose, clip, bake_maps
+from animal_kit import P, G, key, bell, sup, catmull, loft, fuse, roughen, hair_image, hair_material, Cards, surface_points, bones_fk, pose, clip, bake_maps, smooth_weights
 
 V = Vector
 OUT = os.path.join(ROOT, "assets", "models", "deer")
@@ -183,22 +183,36 @@ def ear_part(sx):
 
 
 def hooves(sx, hind):
+    """The cloven hoof: two claws, each a half-heart in plan (its outer wall rounded, its inner face flat against the
+    other's, its toe a point), sloping forward from the coronet to a flat sole, a little apart at the toes; and the
+    two dew claws behind the fetlock, small pointed horns angled down and back. Their own glossy material."""
     s = -1 if sx == "L" else 1
     x = s * LEGX
     z = 0.455 if hind else -0.37
+    zl = 0.47 if hind else -0.352   # the leg's centre at the fetlock
     parts = []
     for k in (-1, 1):
-        pts = [P(x + k * 0.008, 0.052, z), P(x + k * 0.0088, 0.025, z - 0.012), P(x + k * 0.009, 0.004, z - 0.03)]
+        # (round 2: the first ones stood above the pastern as a wide cuff, a boot: now they rise no higher than its end,
+        # narrow at the coronet where the leg goes in and flaring to the ground, the cleft between them open at the toe)
+        pts = [P(x + k * 0.0072, 0.046, z + 0.006), P(x + k * 0.0078, 0.022, z - 0.004), P(x + k * 0.0084, 0.0, z - 0.013)]
 
         def sec(u, th, k=k):
-            w = key(u, [(0, 0.011), (1, 0.008)])
-            d = key(u, [(0, 0.016), (1, 0.012)])
-            return sup(th, w, d, 2.6)
+            L = key(u, [(0, 0.012), (1, 0.025)])     # half its length, heel to toe
+            W_ = key(u, [(0, 0.0062), (1, 0.009)])   # half its width
+            c, sn = math.cos(th), math.sin(th)
+            xx, e = W_ * c, L * sn
+            if xx * k < 0:
+                xx *= 0.22                            # the inner face, flat, the cleft between
+            if e > 0:
+                f = (e / L) ** 1.4
+                xx *= 1 - 0.85 * f                    # the toe drawn to a point
+            return xx, e
 
-        parts.append(loft(f"Hoof{sx}{k}", pts, sec, rings=7, sides=10, close=(0.0, 0.2)))
-        # the dew claw behind the fetlock
-        dc = [P(x + k * 0.012, 0.1, z + 0.028), P(x + k * 0.013, 0.085, z + 0.036)]
-        parts.append(loft(f"Dew{sx}{k}", dc, lambda u, th: sup(th, 0.0055, 0.006, 2.2), rings=6, sides=10, close=(0.3, 0.4)))
+        parts.append(loft(f"Hoof{sx}{k}", pts, sec, rings=9, sides=20, close=(0.0, 0.0)))
+        # the dew claw on the back of the fetlock, set into it, short
+        dc = [P(x + k * 0.008, 0.104, zl + 0.012), P(x + k * 0.0095, 0.092, zl + 0.019), P(x + k * 0.0105, 0.083, zl + 0.025)]
+        parts.append(loft(f"Dew{sx}{k}", dc, lambda u, th: sup(th, key(u, [(0, 0.0045), (1, 0.0014)]), key(u, [(0, 0.005), (1, 0.0016)]), 2.2),
+                          rings=8, sides=12, close=(0.0, 0.25)))
     return parts
 
 
@@ -270,28 +284,35 @@ def flat(rgb):
 def fur(skin):
     cards = Cards()
     pts = surface_points(skin, lambda co, n: True, 0.016)
+
+    def put(root, d, across, length, width, col, n):
+        # each card turned a little about its own hair and its length varied: cards all in one plane and one length read
+        # as a comb of stripes (2026-10-15)
+        d = d.normalized()
+        across = Quaternion(d, rnd.uniform(-0.6, 0.6)) @ across
+        tipc = tuple(ch * 1.04 for ch in col)
+        cards.card(root, P(*(d + V((rnd.uniform(-0.15, 0.15), rnd.uniform(-0.1, 0.1), rnd.uniform(-0.15, 0.15)))).normalized()),
+                   P(*across), length * rnd.uniform(0.75, 1.1), width, col, tipc, normal=n)
+
     for co, n in pts:
         g, gn = G(co), G(n)
         back = V((0, 0, 1))
         root = co - n * 0.002
         col = coat(co, n)
-        tipc = tuple(min(1.0, ch * 1.15) for ch in col)
         # where the silhouette is: along the spine, under the belly, the throat, the backs of the thighs, the tail
         if gn.y > 0.8 and 0.55 < g.y < 1.1 and -0.5 < g.z < 0.62:
-            d = (G(n) * 0.35 + back).normalized()
-            cards.card(root, P(*d), P(1, 0, 0), 0.03, 0.03, col, tipc)
+            put(root, gn * 0.35 + back, V((1, 0, 0)), 0.03, 0.03, col, n)
         elif gn.y < -0.75 and 0.6 < g.y < 0.8 and -0.45 < g.z < 0.35:
-            d = (V((0, -1, 0.5))).normalized()
-            cards.card(root, P(*d), P(1, 0, 0), 0.034, 0.032, col, tipc)
+            # the belly: fewer, shorter, the coat's own colour toward the hide (its pale paint, brightened at the tips,
+            # read as a bluish-white comb against the dark ground)
+            if rnd.random() < 0.45:
+                put(root, V((0, -1, 0.5)), V((1, 0, 0)), 0.024, 0.028, mix(col, HIDE, 0.55), n)
         elif g.y > 0.95 and g.y < 1.32 and gn.z < -0.55 and g.z < -0.38:
-            d = (gn * 0.5 + V((0, -1, 0))).normalized()
-            cards.card(root, P(*d), P(1, 0, 0), 0.028, 0.028, col, tipc)
+            put(root, gn * 0.5 + V((0, -1, 0)), V((1, 0, 0)), 0.026, 0.028, mix(col, HIDE, 0.25), n)
         elif 0.5 < g.y < 0.85 and g.z > 0.42 and gn.z > 0.55:
-            d = (gn + V((0, -0.8, 0))).normalized()
-            cards.card(root, P(*d), P(0, 1, 0), 0.026, 0.026, col, tipc)
+            put(root, gn + V((0, -0.8, 0)), V((0, 1, 0)), 0.024, 0.026, col, n)
         elif g.z > 0.58 and g.y > 0.78 and g.y < 0.95 and abs(gn.x) > 0.7:
-            d = (gn * 0.6 + V((0, -0.6, 0.2))).normalized()
-            cards.card(root, P(*d), P(0, 1, 0), 0.024, 0.024, col, tipc)
+            put(root, gn * 0.6 + V((0, -0.6, 0.2)), V((0, 1, 0)), 0.022, 0.024, col, n)
     print(f"[deer] fur cards: {len(cards.col) // 4}")
     return cards
 
@@ -336,7 +357,8 @@ def animate(ao):
     def graze(t):
         chew = math.sin(t * math.tau * 4) * 0.03
         sway = math.sin(t * math.tau) * 0.03
-        return merge({"neck": [("X", 0.42)], "neck2": [("X", 0.9 + sway)], "head": [("X", 0.05 + chew)], "chest": [("X", 0.12)],
+        # (the bend shared down the neck's length, the least at its root: all at the root folded the chest's front in)
+        return merge({"neck": [("X", 0.7)], "neck2": [("X", 0.62 + sway)], "head": [("X", 0.22 + chew)], "chest": [("X", 0.08)],
                       "tail": [("X", 0.05 * math.sin(t * math.tau * 2))]}), V((0, 0, 0))
 
     def head_up(t):
@@ -385,10 +407,11 @@ def main():
     W.detail_attr(skin, 0.35)
     W.tag(skin, "flesh")
     print(f"[deer] fused skin: {W.tri_count(skin)} triangles")
-    hair = hair_material(hair_image("deer_hair"))
+    hair = hair_material(hair_image("deer_hair", strands=110))
     cards = fur(skin).object("DeerFur", hair)
-    # the rigid parts: ears, hooves, eyes
+    # the rigid parts: ears, eyes (baked with the skin); the hooves their own mesh, dark glossy keratin
     rigid = []
+    hoof_parts = []
     for sx in ("L", "R"):
         e = ear_part(sx)
         W.paint(e, lambda co, n: mix(coat(co, n), INNER, ss(-0.2, -0.7, G(n).z) * 0.8))
@@ -397,10 +420,14 @@ def main():
         rigid.append(e)
         for hind, past in ((False, f"fpastern_{sx}"), (True, f"hpastern_{sx}")):
             for h in hooves(sx, hind):
-                W.paint(h, flat(HOOF))
-                W.detail_attr(h, 0.1)
                 W.tag(h, past)
-                rigid.append(h)
+                hoof_parts.append(h)
+    hoof_mat = mat("DeerHoof", (0.022, 0.018, 0.016), rough=0.28)
+    hoof_ob = join(hoof_parts, "DeerHooves")
+    hoof_ob.data.materials.clear()
+    hoof_ob.data.materials.append(hoof_mat)
+    for p in hoof_ob.data.polygons:
+        p.use_smooth = True
     for e in eyes():
         W.paint(e, flat((0.004, 0.003, 0.003)))
         W.detail_attr(e, 0.0)
@@ -432,7 +459,7 @@ def main():
     bpy.ops.object.mode_set(mode="OBJECT")
     print(f"[deer] low {W.tri_count(low)} triangles, high {W.tri_count(high)}, fur {W.tri_count(cards)}")
     cards.hide_render = True   # (its cards out of the bake: their shadows baked into the coat read as camouflage)
-    albedo, normal = bake_maps(low, high, "deer", TEXSIZE, extrusion=0.005, dist=0.012)
+    albedo, normal = bake_maps(low, high, "deer", TEXSIZE, extrusion=0.005, dist=0.012, ao=0.16)
     cards.hide_render = False
     bpy.data.objects.remove(high, do_unlink=True)
     W.final_materials(low, albedo, normal)
@@ -440,12 +467,14 @@ def main():
     ao = W.make_armature("Deer", bones)
     W.skin_weights(low, ao, bones)
     W.skin_weights(cards, ao, bones)
-    for ob in (low, cards):
+    W.skin_weights(hoof_ob, ao, bones)
+    for ob in (low, cards, hoof_ob):
         for vg in list(ob.vertex_groups):
             if vg.name.startswith("P_"):
                 ob.vertex_groups.remove(vg)
+    smooth_weights(low)
     animate(ao)
-    W.export_glb([ao, low, cards], os.path.join(OUT, "deer.glb"))
+    W.export_glb([ao, low, cards, hoof_ob], os.path.join(OUT, "deer.glb"))
     if "--no-preview" not in sys.argv:
         previews(ao)
 

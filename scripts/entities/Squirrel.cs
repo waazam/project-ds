@@ -212,7 +212,7 @@ public partial class Squirrel : Node3D
 		_phase = phase;
 		if (_rigged)
 		{
-			string clip = which switch { 0 => "forage", 1 => "sit_up", 2 => "hop", _ => "climb" };
+			string clip = which switch { 0 => "forage", 1 => "sit_up", 2 => "hop", 4 => "run", _ => "climb" };
 			Clip(clip, 0f);
 			_anim.Seek(phase % (float)_anim.GetAnimation(clip).Length, true);
 			return;

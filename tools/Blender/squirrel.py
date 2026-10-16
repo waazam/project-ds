@@ -24,7 +24,7 @@ from mathutils import Vector, Matrix, Quaternion, noise
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kit import clear, mat, join, apply_mods, add_mod, obj_from_bmesh, ROOT
 import wendigo as W
-from animal_kit import P, G, key, bell, sup, catmull, loft, fuse, roughen, hair_image, hair_material, Cards, surface_points, bones_fk, pose, clip, bake_maps
+from animal_kit import P, G, key, bell, sup, catmull, loft, fuse, roughen, hair_image, hair_material, Cards, surface_points, bones_fk, pose, clip, bake_maps, smooth_weights
 
 V = Vector
 OUT = os.path.join(ROOT, "assets", "models", "squirrel")
@@ -47,10 +47,10 @@ BONES_G = [
 for s, sx in ((-1, "L"), (1, "R")):
     BONES_G += [
         (f"ear_{sx}", (s * 0.017, 0.128, -0.11), (s * 0.02, 0.152, -0.108), "head", 0.008),
-        (f"arm_{sx}", (s * 0.02, 0.07, -0.075), (s * 0.021, 0.04, -0.092), "chest", 0.01),
-        (f"paw_{sx}", (s * 0.021, 0.04, -0.092), (s * 0.021, 0.006, -0.108), f"arm_{sx}", 0.008),
-        (f"thigh_{sx}", (s * 0.03, 0.08, 0.07), (s * 0.034, 0.035, 0.075), "hips", 0.02),
-        (f"foot_{sx}", (s * 0.034, 0.035, 0.075), (s * 0.03, 0.003, -0.01), f"thigh_{sx}", 0.01),
+        (f"arm_{sx}", (s * 0.02, 0.07, -0.072), (s * 0.022, 0.018, -0.094), "chest", 0.012),
+        (f"paw_{sx}", (s * 0.022, 0.018, -0.094), (s * 0.021, 0.004, -0.114), f"arm_{sx}", 0.008),
+        (f"thigh_{sx}", (s * 0.03, 0.08, 0.07), (s * 0.034, 0.012, 0.088), "hips", 0.022),
+        (f"foot_{sx}", (s * 0.034, 0.012, 0.088), (s * 0.03, 0.004, 0.02), f"thigh_{sx}", 0.008),
     ]
 
 
@@ -69,10 +69,10 @@ def body_part():
     def sec(u, th):
         f = 1 - u   # 0 the chest .. 1 the rump
         w = key(f, [(0, 0.012), (0.15, 0.027), (0.4, 0.034), (0.62, 0.044), (0.8, 0.047), (0.93, 0.034), (1, 0.012)])
-        h = key(f, [(0, 0.014), (0.15, 0.03), (0.4, 0.036), (0.62, 0.044), (0.8, 0.046), (0.93, 0.035), (1, 0.014)])
+        h = key(f, [(0, 0.016), (0.15, 0.035), (0.4, 0.04), (0.62, 0.045), (0.8, 0.047), (0.93, 0.035), (1, 0.014)])
         x, e = sup(th, w, h, 2.3)
         if e < 0:
-            e *= 0.9
+            e *= 0.93   # (a deeper chest: less bare leg under it)
         haunch = key(f, [(0.6, 0), (0.78, 1), (0.95, 0)])
         out = 0.011 * haunch * (bell(th, -0.2, 0.55) + bell(th, math.pi + 0.2, 0.55))
         r = math.hypot(x, e) or 1e-6
@@ -91,39 +91,63 @@ def head_part():
     pts = [P(0, 0.111, -0.093), P(0, 0.113, -0.118), P(0, 0.106, -0.148), P(0, 0.096, -0.172), P(0, 0.091, -0.184)]
 
     def sec(u, th):
-        w = key(u, [(0, 0.02), (0.22, 0.031), (0.45, 0.028), (0.75, 0.016), (1, 0.008)])
-        h = key(u, [(0, 0.02), (0.22, 0.029), (0.45, 0.024), (0.75, 0.013), (1, 0.007)])
+        # (2026-10-15: the snout was a soft cone) a blunt, boxy muzzle: whisker pads either side, the upper lip over a
+        # chin set back beneath it, the mouth's line along each side; the nose its own piece on the end
+        w = key(u, [(0, 0.02), (0.22, 0.031), (0.45, 0.028), (0.72, 0.018), (0.9, 0.0135), (1, 0.0115)])
+        h = key(u, [(0, 0.02), (0.22, 0.029), (0.45, 0.024), (0.72, 0.0155), (0.9, 0.0125), (1, 0.0105)])
         top = math.sin(th) > 0
-        x, e = sup(th, w, h, 3.6 if top else 2.2)   # the flat top
+        x, e = sup(th, w, h, 3.6 if top else 2.7)   # the flat top
         cheek = key(u, [(0.25, 0), (0.4, 1), (0.6, 0)])
         x += math.copysign(0.004, x) * cheek * bell(th, -0.45 if x > 0 else math.pi + 0.45, 0.5)
-        return x, e
+        pad = key(u, [(0.66, 0), (0.84, 1), (1, 0.5)])
+        x += math.copysign(0.0026, x) * pad * bell(th, -0.3 if x > 0 else math.pi + 0.3, 0.45)
+        if e < 0:
+            e *= key(u, [(0.74, 1.0), (1, 0.62)])   # the chin behind the lip
+        mouth = key(u, [(0.6, 0), (0.72, 1)])
+        k = 1 - 0.16 * mouth * (bell(th, -0.8, 0.13) + bell(th, math.pi + 0.8, 0.13))
+        return x * k, e * k
 
-    return loft("Head", pts, sec, rings=28, sides=28, close=(0.1, 0.08))
+    return loft("Head", pts, sec, rings=34, sides=36, close=(0.1, 0.05))
+
+
+def nose():
+    """The nose: a dark, slightly glossy pad, a rounded triangle point-down, on the end of the muzzle."""
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=10, radius=1.0)
+    for v in bm.verts:
+        z = v.co.z
+        v.co = V((v.co.x * 0.0058 * (1 - 0.4 * max(0.0, -z)), v.co.y * 0.0032, z * 0.0042))
+    ob = obj_from_bmesh(bm, "Nose")
+    ob.location = P(0, 0.0935, -0.1868)
+    return ob
 
 
 def arm_part(sx):
+    # (2026-10-15: long thin sticks) a thick upper arm out of the shoulder, a short forearm, a small flat paw on the ground
     s = -1 if sx == "L" else 1
-    pts = [P(s * 0.02, 0.074, -0.072), P(s * 0.021, 0.045, -0.088), P(s * 0.021, 0.018, -0.1), P(s * 0.021, 0.006, -0.108)]
+    pts = [P(s * 0.019, 0.076, -0.066), P(s * 0.022, 0.046, -0.08), P(s * 0.022, 0.018, -0.094), P(s * 0.021, 0.006, -0.103), P(s * 0.021, 0.004, -0.114)]
 
     def sec(u, th):
-        w = key(u, [(0, 0.011), (0.4, 0.008), (0.8, 0.0062), (1, 0.007)])
-        d = key(u, [(0, 0.013), (0.4, 0.0095), (0.8, 0.0068), (1, 0.008)])
-        return sup(th, w, d, 2.2)
+        w = key(u, [(0, 0.016), (0.3, 0.0115), (0.62, 0.008), (0.8, 0.0072), (1, 0.0068)])
+        d = key(u, [(0, 0.019), (0.3, 0.0135), (0.62, 0.0085), (0.8, 0.0062), (1, 0.0042)])
+        return sup(th, w, d, 2.3)
 
-    return loft(f"Arm{sx}", pts, sec, rings=20, sides=16, close=(0.0, 0.12))
+    return loft(f"Arm{sx}", pts, sec, rings=26, sides=18, close=(0.0, 0.1))
 
 
 def foot_part(sx):
+    # (2026-10-15: long thin sticks) the hind leg folded as a squirrel's is: the haunch's mass down to the heel, the long
+    # foot flat on the ground from the heel forward
     s = -1 if sx == "L" else 1
-    pts = [P(s * 0.033, 0.05, 0.078), P(s * 0.034, 0.016, 0.06), P(s * 0.032, 0.005, 0.02), P(s * 0.03, 0.004, -0.012)]
+    pts = [P(s * 0.03, 0.086, 0.072), P(s * 0.034, 0.052, 0.066), P(s * 0.035, 0.024, 0.08), P(s * 0.034, 0.01, 0.088),
+           P(s * 0.033, 0.005, 0.068), P(s * 0.031, 0.0042, 0.042), P(s * 0.03, 0.0042, 0.018)]
 
     def sec(u, th):
-        w = key(u, [(0, 0.014), (0.4, 0.008), (0.7, 0.0075), (1, 0.0065)])
-        d = key(u, [(0, 0.016), (0.4, 0.009), (0.7, 0.0045), (1, 0.004)])
+        w = key(u, [(0, 0.02), (0.18, 0.018), (0.36, 0.011), (0.5, 0.008), (0.62, 0.0085), (0.85, 0.008), (1, 0.0072)])
+        d = key(u, [(0, 0.026), (0.18, 0.022), (0.36, 0.012), (0.5, 0.0085), (0.62, 0.0048), (0.85, 0.0042), (1, 0.0038)])
         return sup(th, w, d, 2.4)
 
-    return loft(f"Foot{sx}", pts, sec, rings=20, sides=16, close=(0.0, 0.12))
+    return loft(f"Foot{sx}", pts, sec, rings=36, sides=18, close=(0.0, 0.08))
 
 
 def tail_core():
@@ -185,7 +209,11 @@ def coat(co, nrm):
             de = (g - V((sx * 0.0275, 0.114, -0.136))).length
             c = mix(c, PALE, ss(0.012, 0.007, de) * 0.85)                            # the eye ring
         c = mix(c, PALE, ss(0.1, 0.09, g.y) * ss(-0.15, -0.18, g.z) * 0.6)          # the chin
-        c = mix(c, DARK, ss(-0.18, -0.185, g.z) * ss(0.096, 0.09, g.y))              # the nose
+        # the mouth's line along the lower muzzle and the cleft up from it to the nose
+        if g.z < -0.152:
+            yl = 0.0868 + (g.z + 0.186) * (0.0055 / 0.03)
+            c = mix(c, (0.035, 0.028, 0.025), ss(0.0009, 0.0003, abs(g.y - yl)) * ss(-0.158, -0.166, g.z) * 0.8)
+            c = mix(c, (0.035, 0.028, 0.025), ss(0.0012, 0.0005, abs(g.x)) * ss(-0.6, -0.85, n.z) * ss(yl - 0.001, yl + 0.0005, g.y) * ss(0.092, 0.0905, g.y) * 0.85)
     d = 0.5 + 0.5 * noise.noise(V((g.x * 12, g.y * 12, g.z * 12)))   # (faint and broad: a fine strong one read as camouflage)
     return tuple(ch * (0.95 + 0.1 * d) for ch in c)
 
@@ -201,43 +229,50 @@ def fur(skin):
     # the plume: cards fanned in the tail's plane (its broad side to the sides), long in the middle, pale at their tips
     tail = [P(*p) for p in TAIL]
     X = V((1, 0, 0))
-    n = 44
+    # (2026-10-15: random angles and lengths gave a ragged, noisy edge) laid out in order: at each station along the core,
+    # layers at set angles either side, each as long as reaches one smooth outline (the plume's half-width there), so
+    # the edge is an even curve of soft tips; two more turned out sideways for its depth from behind or above; a few short
+    # ones wrapped round the core
+    n = 36
     for i in range(n):
         u = (i + 0.5) / n
         c = catmull(tail, u)
         t = (catmull(tail, min(1, u + 0.02)) - catmull(tail, max(0, u - 0.02))).normalized()
-        L = 0.03 + 0.028 * math.sin(math.pi * min(1.0, u * 1.1))
-        # the plume: hair swept out to both sides and on toward the tip (not straight out: that read as a fan of spines)
-        for k in range(10):
-            side = -1 if k % 2 == 0 else 1
-            a = side * rnd.uniform(0.25, 1.1)
-            d = Quaternion(X, a) @ t
-            across = X.cross(d) if k < 8 else X.copy()   # (most face the sides; a few turned, for its depth seen from behind)
-            root = c + X * rnd.uniform(-0.005, 0.005)
-            base = mix(GREY, RUST, rnd.uniform(0.0, 0.5))
-            tip = mix(base, PALE, rnd.uniform(0.5, 0.8))
-            cards.card(root, d, across, L * rnd.uniform(0.8, 1.1), 0.028, base, tip)
-        # short hair wrapped round the core, every way, so no bare stem shows through
-        for k in range(4):
+        R = 0.024 + 0.026 * math.sin(math.pi * min(1.0, 0.15 + u * 0.95))   # the outline's half-width
+        up = t.cross(X).normalized()
+        stag = 0.12 * (i % 2)
+        for side in (-1, 1):
+            for k in range(4):
+                a = 0.32 + 0.24 * k + stag + rnd.uniform(-0.04, 0.04)
+                d = Quaternion(X, side * a) @ t
+                length = min(R / max(math.sin(a), 0.3), 2.4 * R) * rnd.uniform(0.95, 1.03)
+                base = mix(GREY, RUST, 0.15 + 0.2 * k / 3)
+                tip = mix(base, PALE, 0.42)
+                out = (d - t * d.dot(t)).normalized()
+                cards.card(c, d, X.cross(d), length, 0.032, base, tip, normal=out)
+            d = Quaternion(up, side * 0.75) @ t
+            cards.card(c, d, up, R * 1.2, 0.03, mix(GREY, RUST, 0.25), mix(GREY, PALE, 0.4), normal=(d - t * d.dot(t)).normalized())
+        for k in range(3):
             roll = rnd.uniform(0, math.tau)
             perp = Quaternion(t, roll) @ X
             d = (t * 0.6 + perp * 0.8).normalized()
-            base = mix(GREY, RUST, rnd.uniform(0.0, 0.4))
-            cards.card(c, d, perp.cross(d), 0.02, 0.022, base, mix(base, PALE, 0.4))
-        # and a tuft off its end
+            base = mix(GREY, RUST, 0.2)
+            cards.card(c, d, perp.cross(d), 0.018, 0.022, base, mix(base, PALE, 0.3), normal=perp)
+    # and a tuft off its end
     end = tail[-1]
-    for k in range(10):
-        d = (Quaternion(X, rnd.uniform(-0.6, 0.6)) @ (tail[-1] - tail[-2]).normalized())
-        cards.card(end, d, X.cross(d), 0.035, 0.026, GREY, PALE)
+    tdir = (tail[-1] - tail[-2]).normalized()
+    for k in range(7):
+        d = Quaternion(X, -0.45 + 0.15 * k) @ tdir
+        cards.card(end, d, X.cross(d), 0.03, 0.028, GREY, mix(GREY, PALE, 0.45), normal=d)
     # fringe along the back and the belly, and the ear tufts
     for co, nrm in surface_points(skin, lambda co, n: True, 0.007):
         g, gn = G(co), G(nrm)
         col = coat(co, nrm)
-        tipc = tuple(min(1.0, ch * 1.2) for ch in col)
-        if gn.y > 0.75 and -0.09 < g.z < 0.1:
-            cards.card(co - nrm * 0.001, P(*(gn * 0.4 + V((0, 0, 1))).normalized()), P(1, 0, 0), 0.012, 0.012, col, tipc)
-        elif gn.y < -0.7 and -0.08 < g.z < 0.08 and g.y > 0.03:
-            cards.card(co - nrm * 0.001, P(0, -1, 0.4), P(1, 0, 0), 0.012, 0.012, col, tipc)
+        tipc = tuple(ch * 1.04 for ch in col)
+        if gn.y > 0.75 and -0.055 < g.z < 0.1 and g.y > 0.09:   # (the back only: not the tops of the feet and arms)
+            cards.card(co - nrm * 0.001, P(*(gn * 0.4 + V((0, 0, 1))).normalized()), P(1, 0, 0), 0.012, 0.012, col, tipc, normal=nrm)
+        elif gn.y < -0.7 and -0.07 < g.z < 0.06 and g.y > 0.03 and abs(g.x) < 0.02:
+            cards.card(co - nrm * 0.001, P(0, -1, 0.4), P(1, 0, 0), 0.01, 0.012, mix(col, GREY, 0.4), mix(col, GREY, 0.3), normal=nrm)
     for s in (-1, 1):
         tipp = P(s * 0.023, 0.156, -0.107)
         for k in range(4):
@@ -278,7 +313,7 @@ def animate(ao):
         nib = math.sin(t * math.tau * 5) * 0.1
         return merge({"hips": [("X", 0.95)], "chest": [("X", 0.35)], "neck": [("X", -0.55)], "head": [("X", -0.45 + nib * 0.4)],
                       "arm_L": [("X", 1.0 + nib)], "arm_R": [("X", 1.0 + nib)], "paw_L": [("X", 0.9)], "paw_R": [("X", 0.9)],
-                      "thigh_L": [("X", -0.9)], "thigh_R": [("X", -0.9)], "foot_L": [("X", 0.2)], "foot_R": [("X", 0.2)]},
+                      "thigh_L": [("X", -0.92)], "thigh_R": [("X", -0.92)], "foot_L": [("X", 0.0)], "foot_R": [("X", 0.0)]},
                      tail_wave(t, 0.05, -0.6)), V((0, 0, 0.02))
 
     def bounding(t, reach):
@@ -332,6 +367,11 @@ def main():
         W.detail_attr(e, 0.1)
         W.tag(e, f"ear_{sx}")
         rigid.append(e)
+    nz = nose()
+    W.paint(nz, flat((0.045, 0.03, 0.03)))
+    W.detail_attr(nz, 0.0)
+    W.tag(nz, "head")
+    rigid.append(nz)
     for e in eyes():
         W.paint(e, flat(DARK))
         W.detail_attr(e, 0.0)
@@ -362,7 +402,7 @@ def main():
     bpy.ops.object.mode_set(mode="OBJECT")
     print(f"[squirrel] low {W.tri_count(low)} triangles, high {W.tri_count(high)}, fur {W.tri_count(cards)}")
     cards.hide_render = True   # (its cards out of the bake: their shadows baked into the coat read as marks)
-    albedo, normal = bake_maps(low, high, "squirrel", TEXSIZE, extrusion=0.0012, dist=0.003)
+    albedo, normal = bake_maps(low, high, "squirrel", TEXSIZE, extrusion=0.0012, dist=0.003, ao=0.15)
     cards.hide_render = False
     bpy.data.objects.remove(high, do_unlink=True)
     W.final_materials(low, albedo, normal)
@@ -374,6 +414,7 @@ def main():
         for vg in list(ob.vertex_groups):
             if vg.name.startswith("P_"):
                 ob.vertex_groups.remove(vg)
+    smooth_weights(low)
     animate(ao)
     W.export_glb([ao, low, cards], os.path.join(OUT, "squirrel.glb"))
     if "--no-preview" not in sys.argv:

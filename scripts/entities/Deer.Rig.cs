@@ -74,14 +74,37 @@ public partial class Deer
 				m.VertexColorUseAsAlbedo = hair;
 				if (hair)
 				{
-					m.Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor;
-					m.AlphaScissorThreshold = 0.45f;
-					m.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+					// soft-edged (the solid middles of the strands write depth first, their fading edges blend over): a
+					// hard alpha cut made a noisy, ragged edge. Each card is two faces, each lit by the skin's normal at
+					// its root, so the back faces are culled rather than flipped dark.
+					m.Transparency = BaseMaterial3D.TransparencyEnum.AlphaDepthPrePass;
+					m.CullMode = BaseMaterial3D.CullModeEnum.Back;
 					m.Roughness = 1f;
+					m.MetallicSpecular = 0.2f;
 				}
 				mi.SetSurfaceOverrideMaterial(s, m);
 			}
 		}
+	}
+
+	/// <summary>For the preview: held in one clip at time t, the head turned by yaw (as the behaviour turns it toward a
+	/// noise: positive to the doe's left).</summary>
+	public void PreviewClip(string clip, float t, float yaw = 0f)
+	{
+		if (!_rigged) return;
+		SetProcess(false);
+		Play(clip, 0f);
+		_anim.Seek(t % (float)_anim.GetAnimation(clip).Length, true);
+		_lookYaw = yaw;
+		if (_headBone >= 0 && Mathf.Abs(_lookYaw) > 0.001f)
+			_skel.SetBonePoseRotation(_headBone, _skel.GetBonePoseRotation(_headBone) * new Quaternion(Vector3.Back, _lookYaw));
+	}
+
+	/// <summary>The yaw the behaviour would turn the head by to look at a point (as in Alert).</summary>
+	public float YawToward(Vector3 globalPoint)
+	{
+		Vector3 to = ToLocal(globalPoint);
+		return Mathf.Clamp(Mathf.Atan2(-to.X, -to.Z), -0.9f, 0.9f);
 	}
 
 	private void Play(string clip, float blend, float speed = 1f)
