@@ -206,7 +206,7 @@ public partial class WendigoArm : Node3D
 		if (Phase is State.Withdraw or State.Gone or State.Waiting) return;
 		Phase = State.Withdraw;
 		_t = 0f;
-		AudioDirector.OneShot(this, "claw_scrape", 2, GlobalPosition, -2f, "Events", 3f, 0.08f);
+		// (2026-10-15, the owner) no claw scrapes
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -263,7 +263,7 @@ public partial class WendigoArm : Node3D
 					{
 						_hunt = Hunt.Snatch;
 						_huntUntil = _clock + 0.32;
-						if (_rng.Randf() < 0.6f) AudioDirector.OneShot(this, "claw_scrape", 2, GlobalPosition + GlobalBasis.X * 0.6f, -4f, "Events", 3f, 0.12f);
+						// (2026-10-15, the owner) no claw scrapes
 					}
 					else { _hunt = hunting ? Hunt.Creep : Hunt.Feel; _huntUntil = _clock + 0.8; }
 					break;

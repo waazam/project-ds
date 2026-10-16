@@ -797,17 +797,9 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	/// its weight or its nails drag on it, from where the hand is. Never a voice (Dan, 2026-09-22); never as it goes.</summary>
 	private void Creaks(StalkerBody sb, float dist, bool seen, float dt)
 	{
-		if (seen || sb.GripPoint is not { } at || dist > 18f) return;
-		if ((_creakIn -= dt) > 0f) return;
-		_creakIn = _rng.RandfRange(5f, 12f);
-		_creaks ??= new[] { "claw_scrape_01", "claw_scrape_02" };   // (2026-10-15, the owner: no tree creaks; its claws on the bark stay)
-		string path = $"res://assets/audio/sfx/{_creaks[_rng.RandiRange(0, _creaks.Length - 1)]}.wav";
-		if (!ResourceLoader.Exists(path)) return;
-		Play(GD.Load<AudioStream>(path), at, -19f + 6f * (1f - dist / 18f), _rng.RandfRange(0.8f, 0.95f));
-		CreakCount++;
+		// (2026-10-15, the owner: the buzzing was the claw scrapes, get rid of them completely) silent now: no tree
+		// creaks (removed earlier) and no claw scrapes
 	}
-	private float _creakIn = 3f;
-	private static string[] _creaks;
 	/// <summary>For tests: creaks and scrapes from its hand on the bark.</summary>
 	public int CreakCount { get; private set; }
 

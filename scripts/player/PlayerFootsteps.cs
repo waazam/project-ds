@@ -166,7 +166,7 @@ public partial class PlayerFootsteps : Node
 		Play(LastStep, StepVolumeDb + loudness, _rng.RandfRange(0.965f, 1.035f));
 		if (_cloth.Length > 0 && _rng.Randf() < 0.45f)
 			Play(_cloth[_clothPicker.Next(_rng, _cloth.Length)], ClothVolumeDb + loudness, _rng.RandfRange(0.95f, 1.05f));
-		Kit(loudness);
+		// (2026-10-15, the owner: no gear creaks while walking) the kit is silent: Kit() is no longer called
 		Brush(loudness);
 		StepsPlayed++;
 		EmitSignal(SignalName.Stepped);
