@@ -80,6 +80,7 @@ public partial class WendigoHunter : Node3D
 		cave.AddChild(Body);
 		// (the tunnels' roofs are three metres up: at its full height it stood through them)
 		Body.SetSize(BodyScale);
+		Body.WearMitchell();   // (Rev 5: his badge and name plate still on it; they fall into the ash in Act 25)
 		Body.StandAt(cave.ToGlobal(startLocal), cave.ToGlobal(startLocal + Vector3.Back));
 		Body.Play("walk", 1.4f, 0.2);
 		var tag = new WendigoHunterBodyTag { Name = "DreadTag", Hunter = this };

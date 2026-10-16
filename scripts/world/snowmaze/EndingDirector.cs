@@ -18,7 +18,7 @@ namespace ProjectDS.World.SnowMaze;
 /// <item>The camera back in the trunk. Black. The credits.</item>
 /// <item>The camera back in the trunk. Black, held five seconds; far off, it howls. The credits.</item>
 /// <item>Nearly at the car, it comes down on it from the trees and crushes it flat; burning, it shambles at them; they
-/// turn from it, and the stalker is there, lunging. Black.</item>
+/// turn, the burning mask drops away, and the stalker stands behind it (Rev 5). Black.</item>
 /// <item>The fog closes in as they near the car, and where it should be: the stairs from the first act. Blood runs down
 /// them, step by step to the bottom; and they go up, slowly, then faster and faster, nearly at the top. Black.</item>
 /// <item>The fog closes in; but the car really is there. The camera in the trunk; black, five seconds; then behind the
@@ -53,6 +53,8 @@ public partial class EndingDirector : Node3D
 		_trunkCam = _opening?.GetNodeOrNull<Node3D>("TrunkCamera");
 		_stairs = GetTree().CurrentScene?.FindChild("Stairs", true, false) as Node3D;
 		Ending = Act25Ending.Chosen(StoryManager.Instance);
+		// (Rev 5) past the reveal: the figure in every picture from here (also when a quit in the maze skipped the rest of it)
+		if (StoryManager.Instance is { } story && !story.HasFlag(PhotoLog.StalkerFlag)) story.SetFlag(PhotoLog.StalkerFlag);
 		CarAt = _car?.GlobalPosition ?? Vector3.Zero;
 		// the walk starts a good way back up the trail (the trail's last third), out of a hole in a snowbank
 		float len = _terrain?.TrailLength ?? 400f;
@@ -748,18 +750,24 @@ public partial class EndingDirector : Node3D
 		w.Play("walk", Mathf.Clamp(2.55f / pace, 0.9f, 3.5f), 0.3);
 		var tw = CreateTween();
 		tw.TweenProperty(w, "global_position", to with { Y = player.GlobalPosition.Y }, 3.6f);
-		await StoryBeat.PanTowards(this, player, to + Vector3.Up * 2.5f, 2.5f, ct, pitch: true);
-		// they turn away from it, and the stalker is right there
-		var behind = player.GlobalPosition + (player.GlobalPosition - CarAt).Normalized() * 2.2f;
-		var st = new StalkerBody { Name = "EndingStalker", Size = 1.1f };
-		AddChild(st);
-		st.GlobalPosition = behind with { Y = player.GlobalPosition.Y };
-		st.LookAt(player.GlobalPosition with { Y = st.GlobalPosition.Y }, Vector3.Up);
-		await StoryBeat.PanTowards(this, player, behind + Vector3.Up * 1.7f, 0.6f, ct, pitch: true);
-		AudioDirector.OneShot(this, "stalker_seen_01", 1, behind, 6f, "Unnatural", 6f, 0.02f);
-		var lunge = CreateTween();
-		lunge.TweenProperty(st, "global_position", player.GlobalPosition + (behind - player.GlobalPosition).Normalized() * 0.5f, 0.22f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
-		await Cutscene.Tween(this, lunge, ct);
+		// (STORY.md Rev 5, ending 3: "They turn, the burning mask drops away, and the stalker stands behind it") they turn
+		// from it, and back: it's nearly on them, and the burning mask drops away; behind it, in its flames, the stalker
+		// stands, unburned, and watches them. Black.
+		var away = player.GlobalPosition + (player.GlobalPosition - CarAt).Normalized() * 6f + Vector3.Up * 1.5f;
+		await StoryBeat.PanTowards(this, player, away, 0.9f, ct);
+		await Cutscene.Tween(this, tw, ct);
+		w.Play("idle", 4f, 0.4);
+		await Cutscene.Wait(this, 0.5, ct);
+		await StoryBeat.PanTowards(this, player, w.GlobalPosition + Vector3.Up * 2.6f, 0.9f, ct, pitch: true);
+		// (the flames stay where it falls; the stalker stands up just behind them)
+		var fallAt = w.GlobalPosition;
+		var fire2 = new NapalmBurn { Name = "Pyre", LightRange = 6f, LightEnergy = 1.8f };
+		AddChild(fire2);
+		fire2.GlobalPosition = fallAt;
+		var behind = fallAt + ((fallAt - player.GlobalPosition) with { Y = 0 }).Normalized() * 0.9f;
+		var st = await Act25Ending.MaskBurnsOff(this, player, w, behind, 1.1f, ct);
+		AudioDirector.OneShot(this, "creature_rattle_long", 12, st.GlobalPosition + Vector3.Up * 1.8f, -2f, "Unnatural", 5f, 0.04f);
+		await Cutscene.Wait(this, 2.6, ct);
 		StoryBeat.Fader(this)?.SetBlack(true);
 		await Cutscene.Wait(this, 2.5, ct);
 		await Credits(ct);

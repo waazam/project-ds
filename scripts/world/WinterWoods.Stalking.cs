@@ -53,6 +53,7 @@ public partial class WinterWoods
 	{
 		Wendigo = new Wendigo { Name = "Wendigo", Visible = false };
 		AddChild(Wendigo);
+		Wendigo.WearMitchell();   // (Rev 5: it wears Mitchell; too far off in the murk here to make out)
 		_voice = new AudioStreamPlayer3D { Name = "MimicVoice", Bus = "Voice", UnitSize = 9f, MaxDistance = 90f, VolumeDb = -3f };
 		AddChild(_voice);
 		_snowDump = new GpuParticles3D
@@ -363,14 +364,28 @@ public partial class WinterWoods
 	{
 		if (_stalkClock < _nextVoice || _voice.Playing) return;
 		_nextVoice = _stalkClock + _rng.RandfRange(34f, 62f);
+		var fwd = -cam.GlobalBasis.Z; fwd.Y = 0; fwd = fwd.Normalized();
+		float a = _rng.RandfRange(100f, 170f) * (_rng.Randf() < 0.5f ? 1f : -1f);
+		var dir = fwd.Rotated(Vector3.Up, Mathf.DegToRad(a));
+		// (Rev 5) once, among them, a voice he almost knows: his father's, borrowed (the third voice, once a game)
+		if (Mimics >= 2 && StoryManager.Instance is { } story && !story.HasFlag(FatherVoiceFlag) && ResourceLoader.Exists(FatherVoice))
+		{
+			story.SetFlag(FatherVoiceFlag);
+			_voice.Stream = GD.Load<AudioStream>(FatherVoice);
+			_voice.GlobalPosition = player.GlobalPosition + dir * _rng.RandfRange(18f, 26f) + Vector3.Up * _rng.RandfRange(1.5f, 3f);
+			// (not copied badly like the rest: his own deep voice, only far off through the trees; no caption, like them)
+			_voice.PitchScale = 0.88f;
+			_voice.Play();
+			Mimics++;
+			FatherVoiced = true;
+			GD.Print("[story] Act 22: a voice from the trees he almost knows - his father's, borrowed");
+			return;
+		}
 		if (_voicesLeft.Count == 0) for (int i = 1; i <= 14; i++) _voicesLeft.Add(i);
 		int pick = _voicesLeft[_rng.RandiRange(0, _voicesLeft.Count - 1)];
 		_voicesLeft.Remove(pick);
 		var path = $"res://assets/audio/sfx/wendigo_mimic_{pick:00}.wav";
 		if (!ResourceLoader.Exists(path)) return;
-		var fwd = -cam.GlobalBasis.Z; fwd.Y = 0; fwd = fwd.Normalized();
-		float a = _rng.RandfRange(100f, 170f) * (_rng.Randf() < 0.5f ? 1f : -1f);
-		var dir = fwd.Rotated(Vector3.Up, Mathf.DegToRad(a));
 		_voice.Stream = GD.Load<AudioStream>(path);
 		_voice.GlobalPosition = player.GlobalPosition + dir * _rng.RandfRange(22f, 38f) + Vector3.Up * _rng.RandfRange(1.5f, 6f);
 		_voice.PitchScale = _rng.RandfRange(0.96f, 1.02f);
@@ -378,6 +393,12 @@ public partial class WinterWoods
 		Mimics++;
 		GD.Print($"[story] Act 22: a voice from the trees (mimic {pick})");
 	}
+
+	/// <summary>Its one borrowed voice that isn't a stranger's: his father's (the take that called him up the stairs).</summary>
+	public const string FatherVoice = "res://assets/audio/voice/come_and_see_distant.mp3";
+	public const string FatherVoiceFlag = "act22_father_voice";
+	/// <summary>For tests: his father's voice came out of the trees.</summary>
+	public bool FatherVoiced { get; private set; }
 
 	/// <summary>Its steps: a few soft ones behind them while they walk, stopping when they stop.</summary>
 	private void Steps(PlayerController player, Camera3D cam)
