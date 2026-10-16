@@ -74,6 +74,8 @@ public partial class Cabin : Node3D
 	private bool _lightOn = true;
 	/// <summary>The hanging lamp inside (and the lit window). Off automatically while burning.</summary>
 	public bool InteriorLightOn { get => _lightOn; set { _lightOn = value; UpdateLamp(); } }
+	/// <summary>Act 1's walk 3: the cabin's light goes out behind them (Act1Walks calls this by name).</summary>
+	public void PutOutLight() => InteriorLightOn = false;
 
 	/// <summary>World-space centre of the door, for triggers to line up against.</summary>
 	public Vector3 DoorCenter => GlobalTransform * new Vector3(0, DoorHeight * 0.5f, Hd);
