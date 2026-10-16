@@ -163,8 +163,28 @@ public partial class Playtest
 		await _bot.LanternMode(false, ct);
 		await _bot.Aim(c, ct);
 		Check($"the tin offers itself", _bot.Prompt == "Open the tin", $"'{_bot.Prompt}'");
-		await _bot.Press(ct);
-		await _bot.WaitUntil(() => Story.HasFlag(StoryManager.Flag.KeyPiece(piece)), 4, ct);
+		// (2026-10-16) up to three tries, each re-aimed and waiting for the tin's own E-point to be in focus; whatever keeps the
+		// press from reaching it is logged ([keydbg]) and the check below fails
+		for (int tryN = 0; tryN < 3 && !Story.HasFlag(StoryManager.Flag.KeyPiece(piece)); tryN++)
+		{
+			Vector3 at = Player.GlobalPosition;
+			await _bot.Aim(c, ct);
+			await _bot.WaitUntil(() => Player.Interaction?.Focused == cache.Use, 1.5, ct);
+			var before = Player.Interaction?.Focused;
+			await _bot.Press(ct);
+			await _bot.WaitUntil(() => Story.HasFlag(StoryManager.Flag.KeyPiece(piece)), 2, ct);
+			if (Story.HasFlag(StoryManager.Flag.KeyPiece(piece))) break;
+			var cam = Player.CameraRig.Camera;
+			var q = PhysicsRayQueryParameters3D.Create(cam.GlobalPosition, c + Vector3.Up * 0.02f, uint.MaxValue);
+			q.CollideWithAreas = true;
+			q.Exclude = new Godot.Collections.Array<Rid> { Player.GetRid() };
+			var hit = Player.GetWorld3D().DirectSpaceState.IntersectRay(q);
+			string by = hit.Count == 0 ? "nothing" : $"{(hit["collider"].AsGodotObject() as Node)?.GetPath()} at {cam.GlobalPosition.DistanceTo((Vector3)hit["position"]):0.00} m";
+			var f = Player.Interaction?.Focused;
+			GD.Print($"[keydbg] try {tryN}: focused before {(before != null ? before.GetPath() : "none")} now {(f != null ? f.GetPath() : "none")} (the tin's {cache.Use?.GetPath()}), "
+				+ $"ray to the tin hits {by}; eye {cam.GlobalPosition}, moved {Player.GlobalPosition.DistanceTo(at):0.00} m, velocity {Player.Velocity}, floor {Player.IsOnFloor()}; "
+				+ $"enabled {Input.Enabled} modal {Input.Modal} locks {Cutscene.InputLocks} active {Cutscene.ActiveCount} useEnabled {cache.Use?.Enabled} taken {cache.Taken} heldUse {HeldUse.Busy} inHand {Inv.InHand} prompt '{_bot.Prompt}'");
+		}
 		Check($"half {piece} taken, saved", cache.Taken && Story.HasFlag(StoryManager.Flag.KeyPiece(piece)));
 	}
 
