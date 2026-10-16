@@ -42,4 +42,39 @@ public partial class CreaturePreview
 			x += 60f;
 		}
 	}
+
+	/// <summary>`--forest-trunks[=tag]`: the Blender trunks close up at night under a torch-like light (2026-10-15, the owner:
+	/// "the tree line still needs to be fixed", a dark ring round the trunk), the base, a few metres up and from behind
+	/// (ftrunk_*.png).</summary>
+	private async Task ForestTrunkShots()
+	{
+		string tag = "";
+		foreach (var a in OS.GetCmdlineUserArgs()) if (a.StartsWith("--forest-trunks=")) tag = "_" + a[16..];
+		env.BackgroundColor = new Color(0.04f, 0.05f, 0.07f);
+		env.AmbientLightEnergy = 0.25f;
+		foreach (var n in GetChildren()) if (n is DirectionalLight3D d) { d.LightEnergy = 0.25f; d.LightColor = new Color(0.6f, 0.68f, 0.85f); }
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(480, 480) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.17f, 0.12f) } });
+		var torch = new SpotLight3D { LightEnergy = 6f, SpotRange = 20f, SpotAngle = 35f, ShadowEnabled = true };
+		AddChild(torch);
+		var keys = new (string key, float r)[] { ("fir_mid", 0.31f), ("fir_tall", 0.42f), ("fir_giant", 0.52f), ("fir_young", 0.17f), ("decid_a", 0.3f), ("snag", 0.3f), ("sapling_b", 0.08f) };
+		float x = 0f;
+		foreach (var (key, r) in keys)
+		{
+			var mi = new MeshInstance3D { Mesh = World.ScatterModels.Load(key), Position = new Vector3(x, 0, 0) };
+			AddChild(mi);
+			float dist = Mathf.Max(1.2f, r * 5f);
+			foreach (var (shot, eye, look) in new[] {
+				("base", new Vector3(x + dist * 0.6f, 1.2f, dist), new Vector3(x, 0.5f, 0)),
+				("up", new Vector3(x + dist * 0.5f, 1.4f, dist * 0.8f), new Vector3(x, 3.5f, 0)),
+				("back", new Vector3(x - dist * 0.7f, 1.0f, -dist * 0.8f), new Vector3(x, 0.8f, 0)) })
+			{
+				torch.Position = eye + new Vector3(0.2f, -0.3f, 0);
+				torch.LookAt(look, Vector3.Up);
+				await Seconds(0.25);
+				await Shot($"ftrunk_{key}_{shot}{tag}", eye, look);
+			}
+			mi.QueueFree();
+			x += 30f;
+		}
+	}
 }

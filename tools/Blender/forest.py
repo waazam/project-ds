@@ -135,10 +135,12 @@ class Kit:
                 if r1 > 1e-4:
                     self.tri(p1, p1 + d0 * r1, p1 + d1 * r1, z, z, z, (0.5, 0.5), cu(d0, r1), cu(d1, r1))
 
-    def loft(self, rings, sides, uvs=1.0, lobes=0.0, seed=0, relief=0.0, sub=2):
+    def loft(self, rings, sides, uvs=1.0, lobes=0.0, seed=0, relief=0.0, sub=2, flare=None):
         """A trunk as one smooth tube through rings [(centre, radius, colour)] (bottom to top), interpolated (Catmull-Rom)
         to `sub` times the rings, with low lobes round it (strongest at the foot) and a bark relief from noise; normals the
-        surface's own; bark UVs running on unbroken (u twice round, v half a unit per metre)."""
+        surface's own; bark UVs running on unbroken (u twice round, v half a unit per metre). `flare` (root_flare's) swells
+        the foot out into root buttresses running down into the ground, part of the same tube: the roots were separate
+        lofts stuck into the trunk, and where they went in the owner saw a dark line round the trunk (2026-10-15)."""
         if len(rings) < 2:
             return
         def cr(p0, p1, p2, p3, t):
@@ -175,6 +177,16 @@ class Kit:
             for s in range(sides):
                 a = TAU * s / sides
                 lobe = amp * (0.5 * math.sin(3 * a + ph[0]) + 0.3 * math.sin(5 * a + ph[1]) + 0.35 * math.sin(2 * a + ph[2])) if lobes > 0 else 0.0
+                if flare:
+                    # the buttresses: by the axis's height (not the ring's index), so the interpolated rings swell smoothly
+                    t = max(0.0, min(1.1, (flare["top"] - R[i][0].y) / flare["top"]))  # below ground the roots dive, not skim it
+                    if t > 0:
+                        w = max(flare["w"], 0.75 * TAU / sides)
+                        bump = 0.0
+                        for (ra, reach) in flare["roots"]:
+                            da = (a - ra + math.pi) % TAU - math.pi
+                            bump += reach * math.exp(-(da / w) ** 2)
+                        lobe += t * t * bump
                 p = R[i][0] + dirs[i][s] * R[i][1] * (1 + lobe)
                 if relief > 0 and R[i][1] > 0.02:
                     # the bark's ridges run along the trunk: stretched noise
@@ -344,25 +356,13 @@ def spray(k, at, d, ln, w, roll, sag, lum, crossed=False):
         card(roll + math.pi * 0.5, 0.7)
 
 
-def roots(k, r, seed, col):
+def root_flare(seed, top=1.0):
+    """4-6 root buttresses round the foot, for loft(flare=): each an angle and how far it swells (times the radius at
+    ground level), fading out by `top` metres up and running on down below the ground."""
     rnd = random.Random(seed * 6007 + 17)
     n = rnd.randint(4, 6)
     a0 = rnd.uniform(0, TAU)
-    dark = tuple(c * 0.85 for c in col[:3]) + (1.0,)
-    for i in range(n):
-        a = a0 + TAU * i / n + rnd.uniform(-0.3, 0.3)
-        d = V(math.cos(a), 0, math.sin(a))
-        side = V(-d.z, 0, d.x)
-        reach = r * rnd.uniform(2.2, 3.4) + 0.3
-        bend = rnd.uniform(-0.25, 0.25)
-        rr = r * rnd.uniform(0.32, 0.45)
-        k.loft([
-            (d * r * 0.55 + UP * 0.42, rr * 0.9, col),
-            (d * r * 1.05 + UP * 0.16, rr, col),
-            (d * reach * 0.5 + side * bend * reach * 0.3 + DOWN * 0.02, rr * 0.72, dark),
-            (d * reach * 0.85 + side * bend * reach * 0.5 + DOWN * rr * 0.75, rr * 0.5, dark),
-            (d * reach + side * bend * reach * 0.6 + DOWN * (rr + 0.25), rr * 0.3, dark),
-        ], 6, 1.0, 0.0, seed + i, relief=0.06, sub=1)
+    return {"top": top, "w": 0.3, "roots": [(a0 + TAU * i / n + rnd.uniform(-0.3, 0.3), rnd.uniform(0.9, 1.5)) for i in range(n)]}
 
 
 def moss_card(k, at, ln, width, rnd):
@@ -455,8 +455,7 @@ def fir(seed, height, trunkR, crownStart, tiers, maxR, ragged, moss=0.0):
     for fy in (0.3, 0.46, 0.62, 0.78, 1.0):
         y = topY * fy
         rings.append((axis(y), trunkR * lerp(1.02, 0.08, y / topY), tuple(lerp(a, b, fy) for a, b in zip((0.62, 0.6, 0.58), (0.68, 0.66, 0.63)))))
-    k.loft(rings, max(10, min(20, round(10 + trunkR * 18))), 1.0, 0.07, seed, relief=0.05, sub=2)
-    roots(k, trunkR * 1.42, seed, rings[1][2] + (1.0,))
+    k.loft(rings, max(12, min(22, round(12 + trunkR * 18))), 1.0, 0.07, seed, relief=0.05, sub=2, flare=root_flare(seed, max(0.8, trunkR * 2.4)))
     mrnd = random.Random(seed * 977 + 13)
     stubs = round(crownStart * height * 0.55)
     k.col(0.5, 0.48, 0.46)
@@ -489,16 +488,15 @@ def deciduous(seed):
     lean = rnd.uniform(-0.25, 0.25)
     top = V(lean, 4.2, rnd.uniform(-0.2, 0.2))
     k.mat("tree_bark")
-    k.loft([(V(0, -0.4, 0), 0.34, base), (V(0, 0, 0), 0.29, base), (V(0, 0.35, 0), 0.245, base), (top * 0.35 + V(0, 0.1, 0), 0.2, base), (top, 0.13, base)],
-           18, 1.0, 0.06, seed, relief=0.05)
-    roots(k, 0.29, seed, base + (1.0,))
+    k.loft([(V(0, -0.4, 0), 0.34, base), (V(0, 0, 0), 0.29, base), (V(0, 0.35, 0), 0.245, base), (top * 0.35 + V(0, 0.1, 0), 0.2, base), (top, 0.13, base),
+            (top + V(0, 0.8, 0), 0.09, base), (top + V(0, 1.6, 0), 0.05, base)],
+           18, 1.0, 0.06, seed, relief=0.05, flare=root_flare(seed, 0.8))
     k.col(*base)
     for _ in range(3):
         a = rnd.uniform(0, TAU)
         fr = top * rnd.uniform(0.55, 0.9)
         to = fr + V(math.cos(a) * 1.6, rnd.uniform(1.0, 1.8), math.sin(a) * 1.6)
         k.mat("tree_bark").loft([(fr, 0.09, base), ((fr + to) * 0.5 + V(0, 0.15, 0), 0.065, base), (to, 0.04, base)], 7, 1.0, sub=3)
-    k.mat("tree_bark").loft([(top, 0.13, base), (top + V(0, 0.8, 0), 0.09, base), (top + V(0, 1.6, 0), 0.05, base)], 7, 1.0, sub=2)
     k.mat("tree_leaf")
     for i in range(9):
         a = TAU * i / 9 * 2.3 + rnd.uniform(-0.4, 0.4)
@@ -518,8 +516,7 @@ def snag(seed, h, moss=0.0):
     top = V(0.02 * h, h, 0.01 * h)
     k.mat("tree_bark")
     k.loft([(V(0, -0.4, 0), r * 1.5, (0.56, 0.55, 0.54)), (V(0, 0, 0), r * 1.3, (0.58, 0.57, 0.56)), (V(0, 0.4, 0), r * 1.1, (0.58, 0.57, 0.56)),
-            (top * 0.5, r * 0.7, (0.62, 0.61, 0.59)), (top, r * 0.25, (0.66, 0.65, 0.62))], 18, 1.0, 0.06, seed, relief=0.08)
-    roots(k, r * 1.3, seed, (0.56, 0.55, 0.54, 1.0))
+            (top * 0.5, r * 0.7, (0.62, 0.61, 0.59)), (top, r * 0.25, (0.66, 0.65, 0.62))], 18, 1.0, 0.06, seed, relief=0.08, flare=root_flare(seed, 0.9))
     k.col(0.62, 0.6, 0.56)
     k.mat("tree_endgrain").cylinder(top, top + V(0.05, 0.08, 0), r * 0.25, 0.02, 7, False, 1.0)
     mrnd = random.Random(seed * 977 + 29)
