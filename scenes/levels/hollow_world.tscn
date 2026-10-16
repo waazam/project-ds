@@ -479,46 +479,88 @@ FootprintRadius = 0
 [node name="Act7Herding" type="Node3D" parent="."]
 script = ExtResource("43_act7trees")
 
-[node name="ViewClear0" type="Node3D" parent="."]
+[node name="SightClear0" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.9, 0, -476)
 script = ExtResource("9_clear")
 Radius = 4
 ClearFoliage = false
 
-[node name="ViewClear1" type="Node3D" parent="."]
+[node name="SightClear1" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.6, 0, -484)
 script = ExtResource("9_clear")
 Radius = 4.5
 ClearFoliage = false
 
-[node name="ViewClear2" type="Node3D" parent="."]
+[node name="SightClear2" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 63.4, 0, -492)
 script = ExtResource("9_clear")
 Radius = 5
 ClearFoliage = false
 
-[node name="ViewClear3" type="Node3D" parent="."]
+[node name="SightClear3" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64.6, 0, -500)
 script = ExtResource("9_clear")
 Radius = 5
 ClearFoliage = false
 
-[node name="ViewClear4" type="Node3D" parent="."]
+[node name="SightClear4" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 0, -508)
 script = ExtResource("9_clear")
 Radius = 5.5
 ClearFoliage = false
 
-[node name="ViewClear5" type="Node3D" parent="."]
+[node name="SightClear5" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 67.4, 0, -515)
 script = ExtResource("9_clear")
 Radius = 6
 ClearFoliage = false
 
-[node name="ViewClear6" type="Node3D" parent="."]
+[node name="SightClear6" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 68.8, 0, -522)
 script = ExtResource("9_clear")
 Radius = 6.5
+ClearFoliage = false
+
+[node name="ViewClear0" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.04, 0, -459.16)
+script = ExtResource("9_clear")
+Radius = 5
+ClearFoliage = false
+
+[node name="ViewClear1" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53.23, 0, -449.67)
+script = ExtResource("9_clear")
+Radius = 6.6
+ClearFoliage = false
+
+[node name="ViewClear2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.42, 0, -440.18)
+script = ExtResource("9_clear")
+Radius = 8.2
+ClearFoliage = false
+
+[node name="ViewClear3" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.61, 0, -430.69)
+script = ExtResource("9_clear")
+Radius = 9.8
+ClearFoliage = false
+
+[node name="ViewClear4" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.8, 0, -421.2)
+script = ExtResource("9_clear")
+Radius = 11.4
+ClearFoliage = false
+
+[node name="ViewClear5" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.99, 0, -411.71)
+script = ExtResource("9_clear")
+Radius = 13
+ClearFoliage = false
+
+[node name="ViewClear6" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.18, 0, -402.22)
+script = ExtResource("9_clear")
+Radius = 14.6
 ClearFoliage = false
 
 [node name="Bunker" type="Node3D" parent="."]
