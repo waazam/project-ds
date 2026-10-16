@@ -344,9 +344,22 @@ public partial class AudioDirector : Node
 
 	/// <summary>A one-shot at a world point (<paramref name="name"/>_01.._nn, or the bare name), freed when it
 	/// ends. Null world point: in the listener's head (2D), for the player's own hands.</summary>
+	private static readonly Dictionary<string, RecentPicker> TakePickers = new();
+	private static readonly RandomNumberGenerator TakeRng = new();
+
+	/// <summary>The path of a take of <paramref name="name"/>_01.._nn that avoids the last few played (per name, game-wide):
+	/// the owner's rule, no sound coming round again too soon.</summary>
+	public static string Take(string name, int variants)
+	{
+		TakePickers.TryGetValue(name, out var pick);
+		int k = pick.Next(TakeRng, Mathf.Max(1, variants)) + 1;
+		TakePickers[name] = pick;
+		return $"res://assets/audio/sfx/{name}_{k:00}.wav";
+	}
+
 	public static void OneShot(Node from, string name, int variants, Vector3? at, float db, string bus = "Events", float unit = 3f, float pitchJitter = 0.05f)
 	{
-		string path = $"res://assets/audio/sfx/{name}_{GD.RandRange(1, Mathf.Max(1, variants)):00}.wav";
+		string path = Take(name, variants);
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/sfx/{name}.wav";
 		if (!ResourceLoader.Exists(path) || from?.GetTree()?.CurrentScene is not { } root) return;
 		UI.SoundCaption.Heard(from, name, at);

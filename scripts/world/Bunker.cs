@@ -226,7 +226,7 @@ public partial class Bunker : Node3D
 	private void Open()
 	{
 		SetOpen(true);
-		BunkerKit.OneShot(_gen, "res://assets/audio/sfx/trunk_creak_02.wav", new Vector3(0, 1f, 0.3f), "Events", 3f, 0.6f, 4f, 40f);
+		BunkerKit.OneShot(_gen, Audio.AudioDirector.Take("bunker_door_grind", 4), new Vector3(0, 1f, 0.3f), "Events", 2f, (float)GD.RandRange(0.94, 1.04), 4f, 40f);   // its own rusted-steel grind (was a forest trunk's creak)
 		GD.Print("[story] the bunker door stands open");
 		// Only ever from here (a restore opens it silently through SetOpen), so the line plays once.
 		// No "It's open." line (Dan, 2026-09-22: less self-talk); the creak and the swinging door say it.

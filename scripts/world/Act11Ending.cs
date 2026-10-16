@@ -254,7 +254,7 @@ public partial class Act11Ending : Node3D
 	private async Task PlayerShout(string line, CancellationToken ct)
 	{
 		if (Subtitle.Instance == null) return;
-		const string breath = "res://assets/audio/sfx/breath_in_04.wav";
+		string breath = Audio.AudioDirector.Take("pbreath_gasp", 16);   // the player's own gasp set (was the one breath_in_04)
 		if (ResourceLoader.Exists(breath))
 		{
 			var s = new AudioStreamPlayer { Stream = GD.Load<AudioStream>(breath), Bus = "Player", VolumeDb = ShoutBreathDb, PitchScale = 1.12f };

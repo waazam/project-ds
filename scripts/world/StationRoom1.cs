@@ -539,7 +539,8 @@ public partial class StationRoom1 : Node3D
 	/// wide at each wall's foot. The runs stay as stains; a faint ghost of the words stays on each wall.</summary>
 	private void MeltWalls()
 	{
-		PlayOneShot("res://assets/audio/sfx/squelch_open_01.wav", 0f, 0.6f);
+		// the blood letting go and sheeting down (2026-10-15: the blood here was the radio's squelch, which is static)
+		PlayOneShot(Audio.AudioDirector.Take("blood_slide", 4), 0f, (float)GD.RandRange(0.9, 1.0));
 		var rng = new RandomNumberGenerator { Seed = 1333 };
 		for (int i = 0; i < 3; i++)
 		{
@@ -609,7 +610,7 @@ public partial class StationRoom1 : Node3D
 		if (which == 1)
 		{
 			// DO NOT TOUCH THEM: here it is
-			PlayOneShot("res://assets/audio/sfx/squelch_open_02.wav", 2f, 0.8f);
+			PlayOneShot(Audio.AudioDirector.Take("blood_plunge", 6), 0f, (float)GD.RandRange(0.92, 1.02));
 			player?.Inventory?.TryPickup(ToolKind.PaleHand);
 			s.SetFlag(StoryManager.Flag.StationHandTaken);
 			_ = StoryBeat.Caption(this, "A hand. Cold. Its fingers close round yours.", 0.4f, 2.6f, 1f);
@@ -619,7 +620,7 @@ public partial class StationRoom1 : Node3D
 		WrongReaches++;
 		_ = Cutscene.Run(this, async ct =>
 		{
-			PlayOneShot("res://assets/audio/sfx/squelch_close_02.wav", 3f, 0.7f);
+			PlayOneShot(Audio.AudioDirector.Take("blood_plunge", 6), 1f, (float)GD.RandRange(0.85, 0.95));
 			PlayOneShot($"res://assets/audio/sfx/whisper_voice_0{1 + WrongReaches % 3}.wav", -2f, 0.8f);
 			var rig = player.CameraRig;
 			float from = rig.Pitch;

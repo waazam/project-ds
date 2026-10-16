@@ -1071,7 +1071,7 @@ public partial class Cabin : Node3D
 			// from the door (panned to it, full weight), and a flat body under it
 			Audio.AudioDirector.Directional(this, $"res://assets/audio/sfx/cabin_slam_{take:00}.wav", _door.GlobalPosition + Vector3.Up * 1.1f, SlamDb, 0.97f);
 			PlayFlat($"res://assets/audio/sfx/cabin_slam_{take:00}.wav", SlamDb - 8f, 0.97f);
-			PlayFlat("res://assets/audio/sfx/steel_door_slam_01.wav", SlamDb - 6f, 0.9f);
+			PlayFlat(Audio.AudioDirector.Take("door_frame_thud", 4), SlamDb - 6f, (float)GD.RandRange(0.92, 1.0));   // the slab hitting its frame (was a steel door's slam)
 			if (StoryBeat.Player(this) is { } p)
 			{
 				p.PlayerInput?.AddCutsceneLook(new Vector2((float)GD.RandRange(-0.05, 0.05), 0.14f));
@@ -1091,7 +1091,7 @@ public partial class Cabin : Node3D
 		if (_door == null || !IsInstanceValid(_door)) return;
 		if (_doorCollision != null && IsInstanceValid(_doorCollision)) _doorCollision.Disabled = true;
 		_door.CreateTween().TweenProperty(_door, "rotation:y", Mathf.DegToRad(96f), 0.6f).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
-		StoryBeat.PlayAt(this, "res://assets/audio/sfx/trunk_creak_01.wav", "Events", new Vector3(0, 1.0f, Hd), volumeDb: -2f, unitSize: 3f, maxDistance: 25f, pitch: 0.8f);
+		StoryBeat.PlayAt(this, Audio.AudioDirector.Take("hinge_creak", 6), "Events", new Vector3(0, 1.0f, Hd), volumeDb: -4f, unitSize: 3f, maxDistance: 25f, pitch: (float)GD.RandRange(0.92, 1.05));   // its iron hinges (was a forest trunk's creak)
 		if (_reopen != null) { _reopen.QueueFree(); _reopen = null; }
 	}
 

@@ -123,7 +123,7 @@ public static class GiantRise
 			float pr = Progress(clock);
 			// a lurch is heard: the creak of something that size bending
 			if (pr - lastP > 0.02f && rng.Randf() < 0.5f)
-				st.Sound?.Invoke($"res://assets/audio/sfx/trunk_creak_0{rng.RandiRange(1, 3)}.wav", body.EyesWorld, 2f, rng.RandfRange(0.35f, 0.5f));
+				st.Sound?.Invoke(ProjectDS.Audio.AudioDirector.Take("giant_sinew_creak", 8), body.EyesWorld, 4f, rng.RandfRange(0.85f, 1.05f));   // sinew over bone (was a forest trunk's creak pitched down)
 			lastP = pr;
 			body.GlobalPosition = new Vector3(spot.X, Mathf.Lerp(yDown, yUp, pr), spot.Z);
 			// bent double, unbending in steps; the head upside down, snapping over a quarter at a time; a shoulder hitched

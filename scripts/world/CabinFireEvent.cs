@@ -318,10 +318,10 @@ public partial class CabinFireEvent : Node
 		if (_clock >= _nextGroan)
 		{
 			_nextGroan = _clock + _rng.RandfRange(5.0f, 11.0f);
-			string path = $"res://assets/audio/sfx/trunk_creak_{_rng.RandiRange(1, 3):00}.wav";
+			string path = Audio.AudioDirector.Take("fire_timber_groan", 10);   // a charring beam's own groan and crack (was a forest trunk's creak)
 			StoryBeat.PlayAt(_cabin, path, "Events",
 				new Vector3(_rng.RandfRange(-1.5f, 1.5f), 1.2f, _rng.RandfRange(-1.5f, 1.5f)),
-				volumeDb: _rng.RandfRange(2f, 6f), unitSize: 6f, maxDistance: 45f, pitch: _rng.RandfRange(0.55f, 0.7f));
+				volumeDb: _rng.RandfRange(0f, 4f), unitSize: 6f, maxDistance: 45f, pitch: _rng.RandfRange(0.88f, 1.05f));
 		}
 
 		if (_postMat != null && d >= 0f)

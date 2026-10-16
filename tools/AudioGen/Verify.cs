@@ -109,6 +109,19 @@ public static class Verify
 		_ when name.StartsWith("wave_slap") => (0.4, 1.1),
 		_ when name.StartsWith("breach_erupt") => (2.5, 4.6),
 		_ when name.StartsWith("tentacle_slam") => (1.2, 2.6),
+		_ when name.StartsWith("bunker_door_grind") => (2.4, 6.5),
+		_ when name.StartsWith("vine_strain") => (0.8, 2.4),
+		_ when name.StartsWith("vine_rattle") => (0.25, 0.9),
+		_ when name.StartsWith("hinge_creak") => (0.5, 2.0),
+		_ when name.StartsWith("door_frame_thud") => (0.3, 1.4),
+		_ when name.StartsWith("log_wall_shudder") => (0.3, 1.2),
+		_ when name.StartsWith("fire_timber_groan") => (1.0, 3.8),
+		_ when name.StartsWith("giant_sinew_creak") => (0.9, 3.2),
+		_ when name.StartsWith("flesh_squelch") => (0.15, 0.7),
+		_ when name.StartsWith("blood_plunge") => (0.4, 1.2),
+		_ when name.StartsWith("blood_slide") => (1.2, 3.0),
+		_ when name.StartsWith("stalker_step") => (0.08, 0.45),
+		_ when name.StartsWith("drawer_slide") => (0.25, 0.9),
 		_ when name.StartsWith("loon") => (2.0, 6.0),
 		_ => (0, 1e9),
 	};
@@ -129,6 +142,11 @@ public static class Verify
 		if (name.StartsWith("twig_snap") && b[2] + b[3] < 0.4) yield return "twig not broadband";
 		if (name.StartsWith("rustle") && b[2] + b[3] + b[4] < 0.5) yield return "rustle not crunchy";
 		if (name.StartsWith("underwater_thoom") && b[0] + b[1] < 0.9) yield return "thoom not low";
+		if (name.StartsWith("giant_sinew_creak") && b[0] + b[1] < 0.75) yield return "giant creak not deep";
+		if (name.StartsWith("hinge_creak") && b[1] + b[2] < 0.6) yield return "hinge squeak not in its band";
+		if (name.StartsWith("log_wall_shudder") && b[0] + b[1] < 0.7) yield return "wall not low";
+		if (name.StartsWith("door_frame_thud") && b[0] + b[1] < 0.7) yield return "door thud not low";
+		if (name.StartsWith("stalker_step_stone") && b[3] + b[4] < 0.03) yield return "no nail clicks";
 		if (name.StartsWith("boat_creak") && (b[1] < 0.5 || centroid > 900)) yield return "hull creak not low/woody";
 	}
 

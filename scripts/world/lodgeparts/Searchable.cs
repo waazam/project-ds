@@ -63,7 +63,8 @@ public partial class Searchable : Node3D
 		if (instant) { if (Type == Kind.Drawer) Part.Position = Part.Position with { Z = to }; else Part.Rotation = Part.Rotation with { Y = to }; }
 		else
 		{
-			AudioDirector.OneShot(this, Type == Kind.Drawer ? "wood_take" : "door_creak", Type == Kind.Drawer ? 3 : 1, GlobalPosition, Type == Kind.Drawer ? -10f : -14f, "Events", 2f, 0.1f);
+			// a drawer slides on its runners (2026-10-15: it was the library's "take a book" foley)
+			AudioDirector.OneShot(this, Type == Kind.Drawer ? "drawer_slide" : "door_creak", Type == Kind.Drawer ? 6 : 1, GlobalPosition, Type == Kind.Drawer ? -10f : -14f, "Events", 2f, 0.06f);
 			CreateTween().TweenProperty(Part, prop, to, Type == Kind.Drawer ? 0.35f : 0.7f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
 		}
 		OnOpened?.Invoke(this);

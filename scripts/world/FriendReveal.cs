@@ -120,7 +120,7 @@ public partial class FriendReveal : StoryTrigger
 			// from the wall itself (panned to it, full weight), with a flat body under it so it still shakes you
 			Audio.AudioDirector.Directional(this, $"res://assets/audio/sfx/wall_pound_{take:00}.wav", _cabin.ToGlobal(at), PoundDb + (i == 2 ? 1.5f : 0f), (float)GD.RandRange(0.9, 1.0));
 			PlayFlat($"res://assets/audio/sfx/wall_pound_{take:00}.wav", PoundDb - 8f, (float)GD.RandRange(0.9, 1.0));
-			PlayFlat("res://assets/audio/sfx/steel_door_slam_02.wav", PoundDb - 14f, 0.8f);
+			PlayFlat(Audio.AudioDirector.Take("log_wall_shudder", 4), PoundDb - 10f, (float)GD.RandRange(0.92, 1.02));   // the logs shuddering (was a steel door's slam)
 			player?.PlayerInput?.AddCutsceneLook(new Vector2((float)GD.RandRange(-0.02, 0.02), (float)GD.RandRange(0.015, 0.03)));
 			if (i < 2) await Cutscene.Wait(this, KnockGap, ct);
 		}

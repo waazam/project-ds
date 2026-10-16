@@ -649,7 +649,7 @@ public partial class StationBasement : Node3D
 			player.PlayerInput.AddCutsceneLook(new Vector2(Mathf.AngleDifference(rig.Yaw, yawWant) * Mathf.Min(1f, dt * 3f), 0));
 			rig.SetPitch(Mathf.Lerp(rig.Pitch, Mathf.Atan2(to.Y, new Vector2(to.X, to.Z).Length()), Mathf.Min(1f, dt * 3f)));
 		}
-		PlayOneShot("res://assets/audio/sfx/squelch_close_01.wav", drainW, -2f, 0.8f);
+		PlayOneShot(Audio.AudioDirector.Take("flesh_squelch", 10), drainW, -2f, (float)GD.RandRange(0.85, 0.95));   // wet flesh (was the radio's squelch)
 		Eye.Position = new Vector3(Drain.X, Floor + EyeRest, Drain.Y);
 		Eye.Frozen = false;
 		_draining = false;

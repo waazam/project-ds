@@ -1234,7 +1234,7 @@ public partial class Act6ClearingEvent : Node3D
 			// teleport you about 100 yds above the scene and then you fall and hit the ground and then cue the trippy stuff")
 			// A blink to high over the clearing, a long free fall onto it, and the ground giving way under them into the void
 			// (SkyFall, ThroughTheGround). The old fall off the back of the landing (PlanFall/PlayFall) is kept for reference.
-			StoryBeat.PlayAt(this, "res://assets/audio/sfx/breath_in_02.wav", "Events", Vector3.Zero, -8f, pitch: 0.9f);
+			StoryBeat.PlayAt(this, Audio.AudioDirector.Take("pbreath_gasp", 16), "Events", Vector3.Zero, -8f, pitch: (float)GD.RandRange(0.92, 1.0));   // a gasp from the player's own set (was the one breath_in_02)
 			_falling = true;
 			StopDaze();
 			// the void's materials drawn once now (they're needed in a few seconds), so entering it never stalls

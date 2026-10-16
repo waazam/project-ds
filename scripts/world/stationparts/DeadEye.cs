@@ -99,7 +99,7 @@ public partial class DeadEye : Node3D
 
 	private void Slap()
 	{
-		string path = $"res://assets/audio/sfx/squelch_close_{_rng.RandiRange(1, 2):00}.wav";
+		string path = Audio.AudioDirector.Take("flesh_squelch", 10);   // wet flesh (was the radio's squelch)
 		if (!ResourceLoader.Exists(path)) return;
 		var s = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(path), Bus = "Unnatural", VolumeDb = -8f, UnitSize = 3f, MaxDistance = 20f, PitchScale = _rng.RandfRange(0.8f, 1.0f) };
 		AddChild(s);

@@ -240,6 +240,21 @@ jobs.Add(("power_surge_01", sfx, false, Lo, (r, sr) => LibrarySounds.PowerSurge(
 for (int i = 1; i <= 3; i++) jobs.Add(($"candle_ignite_{i:00}", sfx, false, Lo, (r, sr) => LibrarySounds.CandleIgnite(r, sr)));
 jobs.Add(("ring_charge_01", sfx, false, Lo, (r, sr) => LibrarySounds.RingCharge(r, sr)));
 for (int i = 1; i <= 6; i++) jobs.Add(($"step_snow_{i:00}", sfx, false, Lo, (r, sr) => Steps.Snow(r, sr)));
+// Dedicated sounds for things that had been borrowing another sound's sample (2026-10-15, Reworked.cs)
+for (int i = 1; i <= 4; i++) jobs.Add(($"bunker_door_grind_{i:00}", sfx, false, Lo, (r, sr) => Reworked.BunkerDoorGrind(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"vine_strain_{i:00}", sfx, false, Lo, (r, sr) => Reworked.VineStrain(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"vine_rattle_{i:00}", sfx, false, Lo, (r, sr) => Reworked.VineRattle(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"hinge_creak_{i:00}", sfx, false, Lo, (r, sr) => Reworked.HingeCreak(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"door_frame_thud_{i:00}", sfx, false, Lo, (r, sr) => Reworked.DoorFrameThud(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"log_wall_shudder_{i:00}", sfx, false, Lo, (r, sr) => Reworked.LogWallShudder(r, sr)));
+for (int i = 1; i <= 10; i++) jobs.Add(($"fire_timber_groan_{i:00}", sfx, false, Lo, (r, sr) => Reworked.FireTimberGroan(r, sr)));
+for (int i = 1; i <= 8; i++) jobs.Add(($"giant_sinew_creak_{i:00}", sfx, false, Lo, (r, sr) => Reworked.GiantSinewCreak(r, sr)));
+for (int i = 1; i <= 10; i++) jobs.Add(($"flesh_squelch_{i:00}", sfx, false, Lo, (r, sr) => Reworked.FleshSquelch(r, sr)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"blood_plunge_{i:00}", sfx, false, Lo, (r, sr) => Reworked.BloodPlunge(r, sr)));
+for (int i = 1; i <= 4; i++) jobs.Add(($"blood_slide_{i:00}", sfx, false, Lo, (r, sr) => Reworked.BloodSlide(r, sr)));
+for (int i = 1; i <= 10; i++) jobs.Add(($"stalker_step_stone_{i:00}", sfx, false, Lo, (r, sr) => Reworked.StalkerStep(r, sr, true)));
+for (int i = 1; i <= 10; i++) jobs.Add(($"stalker_step_dirt_{i:00}", sfx, false, Lo, (r, sr) => Reworked.StalkerStep(r, sr, false)));
+for (int i = 1; i <= 6; i++) jobs.Add(($"drawer_slide_{i:00}", sfx, false, Lo, (r, sr) => Reworked.DrawerSlide(r, sr)));
 jobs.Add(("winter_wind_loop", ambient, true, Lo, (r, sr) => ChurchSounds.WinterWind(r, sr, 38)));
 jobs.Add(("church_tone_loop", ambient, true, Lo, (r, sr) => ChurchSounds.ChurchTone(r, sr, 36)));
 

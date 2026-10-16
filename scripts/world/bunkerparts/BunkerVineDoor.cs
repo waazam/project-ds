@@ -53,7 +53,8 @@ public partial class BunkerVineDoor : Node3D
 		SetOpenState();
 		var tw = CreateTween();
 		tw.TweenProperty(_leaf, "rotation:y", Mathf.DegToRad(OpenDegrees), 1.1f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
-		BunkerKit.OneShot(this, "res://assets/audio/sfx/trunk_creak_02.wav", new Vector3(0, 1.2f, Z), "Events", -2f, 0.8f, 3f, 25f);
+		// the vines' own strain and leaf-thrash (2026-10-15: these three were a forest trunk's creak)
+		BunkerKit.OneShot(this, Audio.AudioDirector.Take("vine_strain", 8), new Vector3(0, 1.2f, Z), "Events", -2f, (float)GD.RandRange(0.9, 1.05), 3f, 25f);
 		Opened?.Invoke();
 	}
 
@@ -78,10 +79,10 @@ public partial class BunkerVineDoor : Node3D
 		tw.TweenProperty(_leaf, "rotation:y", 0f, 0.9f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
 		tw.TweenCallback(Callable.From(() =>
 		{
-			BunkerKit.OneShot(this, "res://assets/audio/sfx/wall_knock_02.wav", new Vector3(0, 1.0f, Z), "Events", 2f, 0.7f, 3f, 25f);
+			BunkerKit.OneShot(this, Audio.AudioDirector.Take("door_frame_thud", 4), new Vector3(0, 1.0f, Z), "Events", -2f, (float)GD.RandRange(0.95, 1.05), 3f, 25f);
 			SetShutState();
 		}));
-		BunkerKit.OneShot(this, "res://assets/audio/sfx/trunk_creak_01.wav", new Vector3(0, 1.2f, Z), "Events", -1f, 0.85f, 3f, 25f);
+		BunkerKit.OneShot(this, Audio.AudioDirector.Take("vine_strain", 8), new Vector3(0, 1.2f, Z), "Events", -1f, (float)GD.RandRange(0.85, 0.95), 3f, 25f);
 		GD.Print("[story] Act 9: the vine door swings shut behind them");
 	}
 
@@ -98,7 +99,7 @@ public partial class BunkerVineDoor : Node3D
 	/// <summary>Stuck: E from the inside before the screens are done only rattles it.</summary>
 	public void Rattle()
 	{
-		BunkerKit.OneShot(this, "res://assets/audio/sfx/trunk_creak_03.wav", new Vector3(0, 1.2f, Z), "Events", -3f, 1.05f, 3f, 20f);
+		BunkerKit.OneShot(this, Audio.AudioDirector.Take("vine_rattle", 6), new Vector3(0, 1.2f, Z), "Events", -3f, (float)GD.RandRange(0.95, 1.08), 3f, 20f);
 		if (_leaf == null) return;
 		var tw = CreateTween();
 		tw.TweenProperty(_leaf, "rotation:y", Mathf.DegToRad(1.5f), 0.08f);

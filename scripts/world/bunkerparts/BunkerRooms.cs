@@ -258,7 +258,7 @@ public partial class BunkerRooms : Node3D
 		float yaw = Mathf.Atan2(-hallDir.X, -hallDir.Z);
 		Vector3 start = ToGlobal(new Vector3(0, 0, -0.6f));
 		player.Teleport(new Vector3(start.X, player.GlobalPosition.Y, start.Z), yaw);
-		BunkerKit.OneShot(this, "res://assets/audio/sfx/breath_in_03.wav", new Vector3(0, 1.5f, -0.6f), "Events", -4f, 0.9f, 3f, 20f);
+		BunkerKit.OneShot(this, Audio.AudioDirector.Take("pbreath_gasp", 16), new Vector3(0, 1.5f, -0.6f), "Player", -4f, (float)GD.RandRange(0.95, 1.05), 3f, 20f);   // the player's own gasp set (was the one breath_in_03)
 		player.PlayerInput.AddCutsceneLook(new Vector2((GD.Randf() - 0.5f) * 0.1f, -0.12f));   // a stumble
 		Vector3 to = ToGlobal(new Vector3(0, 0, 3.2f));
 		to.Y = player.GlobalPosition.Y;
@@ -315,14 +315,15 @@ public partial class BunkerRooms : Node3D
 			_stepTimer = GD.RandRange(0.26, 0.34);
 			_stepFoot = (_stepFoot + 1) % 6;
 			Vector3 at = new(Mathf.Clamp(local.X, -1f, 1f) + (_stepFoot % 2 == 0 ? -0.25f : 0.25f), 0.1f, local.Z - 4f);
-			BunkerKit.OneShot(this, $"res://assets/audio/sfx/step_stone_{_stepFoot + 1:00}.wav", at, "Unnatural", 2f, (float)GD.RandRange(0.78, 0.86), 3f, 30f);
+			// its own bare, nailed feet on the concrete (2026-10-15: these were the player's boots on stone)
+			BunkerKit.OneShot(this, Audio.AudioDirector.Take("stalker_step_stone", 10), at, "Unnatural", 0f, (float)GD.RandRange(0.88, 1.0), 3f, 30f);
 		}
 		_snarlTimer -= dt;
 		if (_snarlTimer <= 0)
 		{
+			// the stalker makes only its rattle (the owner's rule): no snarls
 			_snarlTimer = GD.RandRange(4.0, 8.0);
-			int take = new[] { 1, 2, 4 }[(int)(GD.Randi() % 3)];
-			BunkerKit.OneShot(this, $"res://assets/audio/sfx/creature_snarl_{take:00}.wav", new Vector3(local.X, 1.4f, local.Z - 3.5f), "Unnatural", 0f, 0.9f, 4f, 30f);
+			BunkerKit.OneShot(this, Audio.AudioDirector.Take("creature_rattle_stutter", 16), new Vector3(local.X, 1.4f, local.Z - 3.5f), "Unnatural", 0f, (float)GD.RandRange(0.95, 1.05), 4f, 30f);
 		}
 	}
 

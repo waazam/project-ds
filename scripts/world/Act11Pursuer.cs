@@ -129,7 +129,7 @@ public partial class Act11Pursuer : Node3D
 			Body.WalkPhase = _phase;
 			Body.WalkAmount = Mathf.Clamp(speed / 2.2f, 0.4f, 1f);
 			_stepT -= speed * dt;
-			if (_stepT <= 0f) { _stepT = Body.Rigged ? Body.StepLength : 1.3f; Sfx("step_dirt", 4, -14f); if (_rng.Randf() < 0.5f) Sfx("cloth", 4, -24f); }
+			if (_stepT <= 0f) { _stepT = Body.Rigged ? Body.StepLength : 1.3f; Sfx("stalker_step_dirt", 10, -12f); if (_rng.Randf() < 0.5f) Sfx("cloth", 4, -24f); }
 		}
 		else
 		{
@@ -181,7 +181,7 @@ public partial class Act11Pursuer : Node3D
 		GD.Print($"[story] Act 11: it caught them up - a shove toward the stairs ({Shoves})");
 		Body.WalkPhase = -1f;
 		Body.Play("shove", 0.08f);   // both arms flung at them
-		Sfx("creature_snarl", 3, -2f);
+		Sfx("creature_rattle_stutter", 16, -2f);   // the stalker makes only its rattle (the owner's rule): no snarl
 		Sfx("body_thump", 2, -4f);
 		Vector3 toStairs = FootWorld - player.GlobalPosition;
 		toStairs.Y = 0;
@@ -213,7 +213,7 @@ public partial class Act11Pursuer : Node3D
 
 	private void Sfx(string name, int variants, float db)
 	{
-		string path = $"res://assets/audio/sfx/{name}_{_rng.RandiRange(1, variants):00}.wav";
+		string path = Audio.AudioDirector.Take(name, variants);
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/sfx/{name}_01.wav";
 		if (!ResourceLoader.Exists(path)) return;
 		var s = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(path), Bus = "Events", VolumeDb = db, UnitSize = 4f, MaxDistance = 40f };
