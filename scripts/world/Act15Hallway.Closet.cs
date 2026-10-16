@@ -142,7 +142,7 @@ public partial class Act15Hallway
 		if (!LightsOn)
 		{
 			if (!_warned) { _warned = true; }
-			_ = StoryBeat.Caption(this, "Can't find the handle in the dark. There was a switch by the door.", 0.3f, 2.4f, 0.8f);
+			_ = StoryBeat.Caption(this, "Too dark to find the handle. The light switch is by the door.", 0.3f, 2.4f, 0.8f);
 			return;
 		}
 		ClosetDoorOpen = true;

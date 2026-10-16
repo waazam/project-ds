@@ -27,11 +27,19 @@ public partial class CrtRoom : Node3D
 
 	private static readonly Color GlowCold = new(0.55f, 0.62f, 0.7f);
 
-	/// <summary>The station log's three entries, the last unfinished (story-gaps P11).</summary>
+	/// <summary>The station log: a terse watch log of the feeds, sightings noted and never explained, the last line
+	/// unfinished. (2026-10-16, STORY.md Rev 5: the stairs get no history, so the log no longer mentions them.)</summary>
 	public const string LogText =
-		"09/19  0300  Steps on 3 lit again. Two went up. Recorded.\n" +
-		"09/20  0310  One came down. Did not answer. Recorded.\n" +
-		"09/21  0314  I am going up to see";
+		"WATCH LOG\n\n" +
+		"0200  CAM 1  trail  clear\n" +
+		"0230  CAM 2  footbridge  clear\n" +
+		"0300  CAM 3  sign at the fork  clear\n" +
+		"0314  CAM 5  tunnel  figure in the trees, tall\n" +
+		"0315  CAM 5  tunnel  clear\n" +
+		"0340  CAM 4  door  figure at the door\n" +
+		"0341  CAM 4  door  clear\n" +
+		"0402  CAM 6  lake shore  figure, standing, facing camera\n" +
+		"0403  CAM 6  lake shore";
 
 	private ShaderMaterial _normalMat, _targetMat, _pathMat, _arrivalMat;
 	private ShaderMaterial[] AllMats => new[] { _normalMat, _targetMat, _pathMat, _arrivalMat };

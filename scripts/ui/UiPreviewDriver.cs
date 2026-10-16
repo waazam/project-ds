@@ -254,7 +254,7 @@ public partial class UiPreviewDriver : Node
 				await Seconds(2.0);
 				// 5. the lantern's how-to (many keys), a thought caption and a prompt: the worst stack
 				_ = Subtitle.Instance?.Show("F: lantern on and off.   B: its blacklight.   Right mouse: gather its beam.   Wheel: the camera.", 0.2f, 2.4f, 0.2f);
-				_ = fader?.ShowCaption("", "Pitch black in here. There was a switch by the door.", 0.2f, 2.4f, 0.2f);
+				_ = fader?.ShowCaption("", "Pitch black. The light switch is by the door.", 0.2f, 2.4f, 0.2f);
 				await Seconds(0.8);
 				await Snap("5_howto_thought_prompt");
 				await Seconds(2.2);
@@ -279,7 +279,7 @@ public partial class UiPreviewDriver : Node
 				{
 					// (with a hint and a thought up too: playtest 14 caught the hint under the choice's controls)
 					_ = Subtitle.Instance?.Show($"Something's there the ember won't show.   {KeyHint.Blacklight}: the blacklight.", 0.2f, 2.2f, 0.2f);
-					_ = fader?.ShowCaption("", "How far down does this go?", 0.2f, 2.2f, 0.2f);
+					_ = fader?.ShowCaption("", "Deeper.", 0.2f, 2.2f, 0.2f);
 					var ask = ChoicePrompt.Instance.Ask(player, "Jump across?", "Jump down?");
 					await Seconds(0.8);
 					await Snap("9_choice");
@@ -314,7 +314,7 @@ public partial class UiPreviewDriver : Node
 			await Seconds(2.0);
 			it.Prompt = "Throw the switch"; it.HoldSeconds = 3f;
 			_ = Subtitle.Instance?.Show($"Something's there the ember won't show.   {KeyHint.Blacklight}: the blacklight.", 0.2f, 2.2f, 0.2f);
-			_ = fader?.ShowCaption("", "Pitch black in here. There was a switch by the door.", 0.2f, 2.2f, 0.2f);
+			_ = fader?.ShowCaption("", "Pitch black. The light switch is by the door.", 0.2f, 2.2f, 0.2f);
 			await Seconds(0.9);
 			await Shot2($"{name}_2_hold_hint_thought");
 			await Seconds(2.0);

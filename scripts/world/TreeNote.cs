@@ -247,19 +247,17 @@ public partial class TreeNote : Node3D
 
 	// ------------------------------------------------------------------ the nudges (2026-10-13)
 
-	/// <summary>Saved once shown: the nudge after the camp note (the lantern's lesson done), and the one after walking past a number
-	/// in the dark. Each comes once in a game.</summary>
-	public const string HintFirstFlag = "hint_code_blacklight", HintPassedFlag = "hint_code_passed";
+	/// <summary>Saved once shown: the nudge after walking past a number in the dark. It comes once in a game.</summary>
+	public const string HintPassedFlag = "hint_code_passed";
 	/// <summary>"Walked past it": within this far (m, flat), then beyond <see cref="PassFar"/>, the blacklight never on.
 	/// (2026-10-13, the skippable-events audit: 9 m let anyone a few steps off the path walk by unnoticed.)</summary>
 	private const float PassNear = 14f, PassFar = 21f;
-	private float _hintWait, _passWait;
+	private float _passWait;
 	private bool _near, _nearUv, _passPending;
 
-	/// <summary>(2026-10-13, the owner: "Show text that nudges the player to use the blacklight to find the code") Two short
-	/// lines under the picture, in the game's hint style, with the blacklight's key as bound:
+	/// <summary>(2026-10-13, the owner: "Show text that nudges the player to use the blacklight to find the code") A short
+	/// line under the picture, in the game's hint style, with the blacklight's key as bound:
 	/// <list type="bullet">
-	/// <item>once R.H.'s camp note (a bunker, four numbers, the ink) is read and the lantern's own lesson at the camp is over, while no digit's been found;</item>
 	/// <item>once, if they walk on past one of his numbers without the blacklight on near it (within 9 m, then 16 m on).</item>
 	/// </list>
 	/// Never over another line, the note, or a cutscene; neither again once a digit's found that way or the door's open.</summary>
@@ -269,23 +267,8 @@ public partial class TreeNote : Node3D
 		if (s.HasFlag(StoryManager.Flag.BunkerUnlocked) || s.Current >= Checkpoint.Act8BunkerEntered || !s.HasFlag(Camp.NoteReadFlag)) return;
 		bool hasLantern = _player.Inventory?.HasLantern ?? false;
 		bool clear = !sub.CurrentlyShowing && !(_player.PlayerInput?.Modal ?? false) && !_player.PlayerInput.Scripted && hasLantern && Systems.Cutscene.InputLocks == 0;   // (input locks: a long-running ambient beat counts as a cutscene too)
-		bool anyRead = false;
-		for (int n = 1; n <= 4; n++) if (s.HasFlag(StoryManager.Flag.CodeDigit(n))) { anyRead = true; break; }
 		string key = UI.KeyHint.Blacklight;
-		// the first: the first note's tree drives it (one line, not four)
-		// (after the lantern's own lesson at the camp, if it's still to come: the flame guttering, "B: try its blacklight", and lit
-		// again; three lines about B in a row would be too many)
-		bool lessonDone = s.HasFlag(Player.Lantern.FirstRelitFlag) || s.Current >= Checkpoint.Act5CabinEntered;
-		if (Label == "1" && !s.HasFlag(HintFirstFlag) && !anyRead && lessonDone)
-		{
-			_hintWait = clear ? _hintWait + dt : 0f;
-			if (_hintWait > 3.5f)
-			{
-				s.SetFlag(HintFirstFlag);
-				_ = sub.Show($"His numbers are on the trees.   {key}: the blacklight shows them.", 0.8f, 5f, 1.2f);
-				GD.Print($"[story] the nudge: his numbers are on the trees ({key})");
-			}
-		}
+		// (2026-10-16: the first nudge, "His numbers are on the trees", is gone: no tree was labelled "1" for it any more)
 		// walked past this one in the dark
 		if (Read || s.HasFlag(HintPassedFlag)) { _near = false; _passPending = false; return; }
 		float flat = new Vector2(_player.GlobalPosition.X - GlobalPosition.X, _player.GlobalPosition.Z - GlobalPosition.Z).Length();
