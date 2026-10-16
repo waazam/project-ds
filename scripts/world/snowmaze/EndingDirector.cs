@@ -587,12 +587,22 @@ public partial class EndingDirector : Node3D
 		return false;
 	}
 
-	/// <summary>An old cabin beside the trail on the way down, its door off a hinge and pushed to (theirs, if they'd stayed;
-	/// 2026-10-15: it hung open on the dark room, now E pushes it in): the Hollow's
-	/// cabin itself (<see cref="Cabin.Derelict"/>), so it grounds itself the same way, a fieldstone footing down to the lowest
-	/// ground under it and as many porch steps as the slope wants, its porch to the trail. The woods' scatter is kept off it.</summary>
+	/// <summary>(2026-10-16, STORY.md Rev 5) The cabin passed on the way down: the Chapter 1 cabin by the lot (group
+	/// <see cref="Cabin.HubGroup"/>), burned out from Act 7's fire (<see cref="Cabin.SetBurnedOut"/>): charred, its door shut
+	/// until E pushes it in, the board charred and the assignment sheet ash on the table. One cabin: no second one is built.</summary>
+	public Cabin TheCabin { get; private set; }
+
+	/// <summary>The trailhead's own cabin, burned (above). Only a level without one (never the game's) gets the old stand-in,
+	/// a derelict cabin (<see cref="Cabin.Derelict"/>) set beside the trail on the flattest ground, its porch to the trail.</summary>
 	private void BuildCabin()
 	{
+		if (GetTree().GetFirstNodeInGroup(Cabin.HubGroup) is Cabin hub)
+		{
+			TheCabin = hub;
+			hub.SetBurnedOut();
+			GD.Print($"[story] Act 25: the trailhead's cabin, burned, at {hub.GlobalPosition.Snapped(Vector3.One * 0.1f)}");
+			return;
+		}
 		if (_terrain == null) return;
 		// where along the walk down: the flattest ground beside the trail (on the first spot's slope its porch stood a man's
 		// height off the ground on eight steps), clear of the trail's other bends and the creek, near halfway
@@ -623,7 +633,8 @@ public partial class EndingDirector : Node3D
 		AddChild(new ClearZone { Name = "EndingCabinClear", Radius = 6.2f, Position = at });
 		AddChild(new ClearZone { Name = "EndingCabinFrontClear", Radius = 3.2f, Position = at + facing.Z * 5.5f });
 		// its front (+Z: the door, the porch) to the trail
-		AddChild(new Cabin { Name = "EndingCabin", Derelict = true, Seed = 11, Transform = new Transform3D(facing, at) });
+		TheCabin = new Cabin { Name = "EndingCabin", Derelict = true, Seed = 11, Transform = new Transform3D(facing, at) };
+		AddChild(TheCabin);
 	}
 
 	private void BuildTrunkUse()

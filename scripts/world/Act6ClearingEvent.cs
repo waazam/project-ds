@@ -67,6 +67,9 @@ public partial class Act6ClearingEvent : Node3D
 	[Export] public Vector2I LoopClimbRange = new(4, 6);
 	/// <summary>How far past the clearing (along the trail) the player wakes after the fall: outside the ring.</summary>
 	[Export] public float WakeTrailMetres = 72f;   // the trail bends: well past the ring by road as well as by air
+	/// <summary>(2026-10-16) The level's wake spot after the fall (its -Z the way they face); without one, <see cref="WakeTrailMetres"/>
+	/// along the trail.</summary>
+	public const string WakeMarkerGroup = "act7_wake_marker";
 	/// <summary>How far short of the clearing's centre, along the trail, the trail staircase stands (Dan,
 	/// 2026-09-22: one whole flight right in the middle of the trail as it enters the clearing).</summary>
 	[Export] public float TrailStairMetres = 24f;
@@ -1265,7 +1268,16 @@ public partial class Act6ClearingEvent : Node3D
 			TearDownLoop();
 			// Wake on the trail past the clearing (outside the ring), facing onward (toward the ridge), in thick fog.
 			Vector3 wake = _player.GlobalPosition;
-			if (terrain != null && IsInstanceValid(_player))
+			// (2026-10-16, STORY.md Rev 5 Act 7) the level's wake marker, where the trail past the clearing comes round to the
+			// cabin ahead (the same spot Continue puts them after the fall: RespawnPoints)
+			if (GetTree().GetFirstNodeInGroup(WakeMarkerGroup) is Node3D mark && IsInstanceValid(_player))
+			{
+				wake = mark.GlobalPosition;
+				if (terrain != null) wake.Y = terrain.HeightAt(wake.X, wake.Z) + 0.2f;
+				var f = -mark.GlobalBasis.Z;
+				_player.Teleport(wake, Mathf.Atan2(-f.X, -f.Z));
+			}
+			else if (terrain != null && IsInstanceValid(_player))
 			{
 				terrain.TrailDistance(GlobalPosition.X, GlobalPosition.Z, out float sc);
 				wake = terrain.TrailPoint(sc + WakeTrailMetres, out var tan);

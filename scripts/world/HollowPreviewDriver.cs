@@ -539,10 +539,10 @@ public partial class HollowPreviewDriver : Node
 		var cabin = First<Cabin>("cabin");
 		var fire = AllOf<CabinFireEvent>().FirstOrDefault();
 		Check(cabin.Burning > 0.5f && fire is { Burning: true }, "lookout: the cabin is burning (restored)");
-		Check(fire?.Lookout == lookout, "lookout: the fire's checkpoint belongs to the lookout");
+		Check(fire is { Seen: true }, "lookout: the fire restored as already looked back at (checkpoint 6)");
 		Check(StoryBeat.Atmosphere(this)?.CurrentMood == ForestAtmosphere.Mood.Night, $"lookout: night ({StoryBeat.Atmosphere(this)?.CurrentMood})");
 		var respawn = First<Node3D>("respawn_Act7CabinBurning");
-		Check(Flat(_player.GlobalPosition).DistanceTo(Flat(lookout.GlobalPosition)) < 3f, "lookout: Continue at checkpoint 6 stands the player at the lookout");
+		Check(Flat(_player.GlobalPosition).DistanceTo(Flat(respawn?.GlobalPosition ?? lookout.GlobalPosition)) < 3f, "lookout: Continue at checkpoint 6 stands the player outside the burning cabin");
 		await Seconds(3.0);
 		Vector3 roof = cabin.GlobalPosition + Vector3.Up * 3.5f;
 		await Stand(lookout.GlobalPosition, roof);

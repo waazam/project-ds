@@ -143,7 +143,7 @@ public partial class Cabin : Node3D
 			AddToGroup(HubGroup);
 			if (!Engine.IsEditorHint() && StoryManager.Instance is { } s)
 			{
-				IsOpen = s.HasFlag(HubDoorFlag);
+				IsOpen = !BurnedOut && s.HasFlag(HubDoorFlag);
 				// (on the way home in Act 25 it stands dark; what the fire left of it is Act 25's to show)
 				if (s.Current >= Checkpoint.Act24Finished) _lightOn = false;
 			}
@@ -251,6 +251,9 @@ public partial class Cabin : Node3D
 		if (IsOpen && !Derelict && !Hub) BuildDebris();
 		RefreshWindowBoards();
 		if (!Derelict) BuildStory();
+		// (2026-10-16) Act 7's lit stove, Act 25's burned room (Cabin.Act7.cs)
+		if (_hearthLit && !BurnedOut) BuildHearth();
+		if (BurnedOut) ApplyBurnedOut();
 		if (!Engine.IsEditorHint())
 		{
 			// webs in the top corners and bark, dirt and leaves blown in along the walls' feet (the interiors pass, 2026-10-03)
@@ -756,7 +759,7 @@ public partial class Cabin : Node3D
 		if (_panes != null && IsInstanceValid(_panes)) _panes.QueueFree();
 		_sashes = _panes = null;
 		_litPane = null;
-		if (Burning > 0f) return;   // sash burned/blown out, glass gone, so smoke can pour out
+		if (Burning > 0f || BurnedOut) return;   // sash burned/blown out, glass gone, so smoke can pour out
 		var ks = new MeshKit();
 		ks.Mat(BuildingTextures.CabinTrimMat);
 		ks.Color = new Color(0.8f, 0.78f, 0.74f);
@@ -945,7 +948,8 @@ public partial class Cabin : Node3D
 		k.Color = new Color(0.02f, 0.02f, 0.02f);
 		BuildKit.Box(k, new Vector3(lx, ly - 0.255f, face + 0.0065f), new Vector3(0.008f, 0.025f, 0.001f), 3f);
 		k.CommitTo(_door, "DoorMesh");
-		if (Hub && !IsOpen && !Engine.IsEditorHint())
+		if (BurnedOut) BuildBurnedDoorUse(w);   // (Act 25: shut until E pushes it in)
+		else if (Hub && !IsOpen && !Engine.IsEditorHint())
 		{
 			// (2026-10-16) Act 1's cabin: shut until it's opened (Dan's rule, c522e73), and it stays open behind him
 			var use = new Interactable { Name = "OpenDoor", Prompt = "Open the door", MaxDistance = 2.6f, PickRadius = 0.6f, Position = new Vector3(w * 0.6f, 1.0f, 0.1f), HighlightRoot = new NodePath("NoHighlight") };

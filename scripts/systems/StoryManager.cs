@@ -62,6 +62,9 @@ public partial class StoryManager : Node
 		public const string Act6NightFell = "act6_night_fell";
 		/// <summary>Act 6: the clearing's stair loop ended in the fall (the player woke at night on the trail past the clearing).</summary>
 		public const string ClearingLoopDone = "clearing_loop_done";
+		/// <summary>(2026-10-16, STORY.md Rev 5) Act 7: stepped in through the cabin's door ahead on the trail. A save within
+		/// checkpoint 5: Continue (and the "Burned Alive" death) puts them back at the cabin door.</summary>
+		public const string Act7CabinDoor = "act7_cabin_door";
 		/// <summary>Legacy (never set since 2026-09-22): the old optional extended climb. Kept so old saves and the
 		/// systems preview still read; <see cref="World.StairsState"/> still honours it.</summary>
 		public const string Act6ExtendedClimb = "act6_extended_climb";
@@ -200,7 +203,7 @@ public partial class StoryManager : Node
 	/// Where the compass points, along the hollow's one forward route (Acts 3-11): the cabin from the
 	/// camp on (through the storm and the giant), the footbridge once the newel post is in hand, the
 	/// clearing once the bridge is crossed, the lit staircase of the clearing's loop once the voice has
-	/// spoken (until the loop's fall, or until night falls on its own), then the lookout over the cabin,
+	/// spoken (until the loop's fall, or until night falls on its own), then the cabin ahead on the trail (Act 7),
 	/// the bunker once the cabin has been seen burning, the CRT room's marked screen once inside,
 	/// back toward the way out once the screens have shown the stairs, and the last staircase once the
 	/// radio has spoken. Nothing before the compass is picked up (Acts 1-2) and nothing after the ending.
@@ -215,7 +218,8 @@ public partial class StoryManager : Node
 			if (!ClearingVoiceHeard) return MarkerPos("stairs_clearing_marker");
 			if (Current < Checkpoint.Act7CabinBurning && !HasFlag(Flag.ClearingLoopDone) && !HasFlag(Flag.Act6NightFell))
 				return MarkerPos("clearing_loop_marker") ?? MarkerPos("fire_lookout_marker");   // the lit staircase (null only before it is lit)
-			if (Current < Checkpoint.Act7CabinBurning) return MarkerPos("fire_lookout_marker");
+			// (2026-10-16, STORY.md Rev 5) after the fall the trail comes round to the cabin, ahead
+			if (Current < Checkpoint.Act7CabinBurning) return MarkerPos("cabin");
 			if (Current < Checkpoint.Act8BunkerEntered) return MarkerPos("bunker_marker");
 			if (!CrtPuzzleDone) return MarkerPos("crt_target_marker");
 			if (Current < Checkpoint.Act10WalkieFound && !HasFlag(Flag.WalkieTaken)) return MarkerPos("walkie_marker") ?? MarkerPos("bunker_entrance_marker");   // the dead walkie on the console first

@@ -70,6 +70,8 @@ public partial class ContinueRoundTripTest : Node
 		new("act6_voice_heard", Checkpoint.Act6BridgeCrossed, F6Voice, "lantern,compass,newel_post;tool=None"),
 		// The loop is never saved mid-way: a save after the voice reloads with the loop lit again; one after the fall is Act 7 in all but checkpoint.
 		new("act6_loop_done", Checkpoint.Act6BridgeCrossed, F7, "lantern,compass,newel_post;tool=None"),
+		// (2026-10-16, STORY.md Rev 5) in at the Act 7 cabin's door: a save within checkpoint 5 (and the fire's death's way back)
+		new("act7_cabin_door", Checkpoint.Act6BridgeCrossed, F7.Append(StoryManager.Flag.Act7CabinDoor).ToArray(), "lantern,compass,newel_post;tool=None"),
 		new("act7_cabin_burning", Checkpoint.Act7CabinBurning, F7, "lantern,compass,newel_post;tool=None"),
 		new("act8_bunker_entered", Checkpoint.Act8BunkerEntered, F7, "lantern,compass,newel_post;tool=None"),
 		// The dead walkie-talkie is taken off the CRT console (Act 9) and wakes only outside; a save after the rooms' scare
@@ -339,9 +341,22 @@ public partial class ContinueRoundTripTest : Node
 			return;
 		}
 		var fire = FindFirst<CabinFireEvent>();
-		// burning from the wake after the fall (the loop's end), not only from checkpoint 6 on: they wake to it (Dan, 2026-09-22)
-		bool wantFire = story.Current >= Checkpoint.Act7CabinBurning || story.HasFlag(StoryManager.Flag.ClearingLoopDone);
-		Check("cabin fire state", fire != null && fire.Burning == wantFire, $"burning {fire?.Burning} (want {wantFire})");
+		// (2026-10-16, STORY.md Rev 5) burning from checkpoint 6 on (out of its fire, looked back at); after the fall it stands
+		// whole at its Act 7 place ahead on the trail, the print waiting
+		bool wantFire = story.Current >= Checkpoint.Act7CabinBurning;
+		bool wantAhead = wantFire || story.HasFlag(StoryManager.Flag.ClearingLoopDone);
+		Check("cabin fire state", fire != null && fire.Burning == wantFire && !fire.FireStarted == !wantFire, $"burning {fire?.Burning}, started {fire?.FireStarted} (want {wantFire})");
+		Check("the cabin where the story left it (ahead on the trail after the fall)", cabin != null && cabin.AtAct7Spot == wantAhead, $"at its Act 7 place {cabin?.AtAct7Spot} (want {wantAhead})");
+		if (sc.Cp == Checkpoint.Act6BridgeCrossed && story.HasFlag(StoryManager.Flag.ClearingLoopDone))
+		{
+			bool door = story.HasFlag(StoryManager.Flag.Act7CabinDoor);
+			var mark = GetTree().GetFirstNodeInGroup(door ? RespawnPoints.CabinDoorGroup : Act6ClearingEvent.WakeMarkerGroup) as Node3D;
+			Check(door ? "the cabin-door save: outside its door" : "after the fall: on the trail at the wake, not back at the bridge",
+				mark != null && TestBot.Flat(before).DistanceTo(TestBot.Flat(mark.GlobalPosition)) < 3f, $"{before} vs {mark?.GlobalPosition}");
+			if (door) Check("the print waiting on the board", cabin?.Board?.StairsPrint != null && cabin.Board.Prints.Count == 1);
+		}
+		if (sc.Cp == Checkpoint.Act7CabinBurning && GetTree().GetFirstNodeInGroup("respawn_Act7CabinBurning") is Node3D out6)
+			Check("checkpoint 6: outside the burning cabin", TestBot.Flat(before).DistanceTo(TestBot.Flat(out6.GlobalPosition)) < 3f && cabin != null && TestBot.Flat(before).DistanceTo(TestBot.Flat(cabin.GlobalPosition)) < 25f, $"{before}");
 
 		var act6 = FindFirst<Act6ClearingEvent>();
 		// up from the cabin door with the cap (a Continue with it taken: at once), gone for good after the fall (Act 7)
