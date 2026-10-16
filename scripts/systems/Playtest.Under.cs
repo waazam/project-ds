@@ -33,6 +33,7 @@ public partial class Playtest
 		Require("his headquarters", hq?.PhotoUse != null);
 		await _bot.UseIt(hq.PhotoUse, ct);
 		Check("the photo on his desk: \"That's... mine.\"", Story.HasFlag(StationStory.PhotoSeen));
+		Shot("desk_photo");
 		Check("the relief crew's notice pinned up (February 1988)", hq.Notice != null && hq.Notice.Text.Contains("MITCHELL WEBBER") && hq.Notice.Text.Contains("declared dead"));
 		Check("the locked room's door chained shut", station.Locked is { Chained: true });
 		// the tape over the basement door: the cut close-up

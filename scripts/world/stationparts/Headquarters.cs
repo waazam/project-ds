@@ -75,6 +75,7 @@ public partial class Headquarters : Node3D
 		_photo = new Node3D { Name = "Photo", Position = new Vector3(0.8f, 0.79f, 0.02f), Rotation = new Vector3(0, 0.35f, 0) };
 		desk.AddChild(_photo);
 		StationStory.Place(_photo, "ss_desk_photo", Transform3D.Identity, StationStory.PhotoRoles);
+		AddAgedPrint(_photo);
 		PhotoUse = new Interactable { Name = "Look", Prompt = "A photograph", PickRadius = 0.22f, MaxDistance = 2.2f, Position = new Vector3(0, 0.085f, 0.0f) };
 		PhotoUse.Interacted += _ => SeePhoto();
 		_photo.AddChild(PhotoUse);
@@ -87,6 +88,42 @@ public partial class Headquarters : Node3D
 		var n = new Vector3(0, 0.646f, -0.763f);
 		var b = new Basis(new Vector3(-1, 0, 0), slope, n);
 		SignKit.Text(_nameplate, "M. WEBBER\nCHIEF RANGER", new Vector3(0, 0.0255f, -0.0085f) + n * 0.0016f, b, 0.0115f, new Color(0.09f, 0.07f, 0.04f), shadow: false);
+	}
+
+	/// <summary>
+	/// The print in the desk frame is the very picture in the Act 1 cabin's frame (PhotoBoard.TwoPersonPhoto: the falls,
+	/// the man and the boy on the rock), aged: yellowed, faded, and the top corner his thumb held rubbed to the pale card.
+	/// It lies just in front of the Blender model's own painted layers, inside the frame's lip (2026-10-16: the two copies
+	/// had come out as different pictures).
+	/// </summary>
+	private static void AddAgedPrint(Node3D photo)
+	{
+		const float iw = 0.094f, ih = 0.13f, bw = 0.018f, d = -0.005f;
+		float c = Mathf.Cos(Mathf.DegToRad(12f)), s = Mathf.Sin(Mathf.DegToRad(12f));
+		float v = bw + ih * 0.5f;
+		var at = new Vector3(0, v * c - d * s + 0.0014f, v * s + d * c);
+		var basis = new Basis(new Vector3(-1, 0, 0), new Vector3(0, c, s), new Vector3(0, s, -c));
+		var img = PhotoBoard.TwoPersonPhoto(false);
+		var rng = new RandomNumberGenerator { Seed = 1988 };
+		for (int y = 0; y < img.GetHeight(); y++)
+			for (int x = 0; x < img.GetWidth(); x++)
+			{
+				var col = img.GetPixel(x, y);
+				float grey = col.R * 0.3f + col.G * 0.59f + col.B * 0.11f;
+				col = col.Lerp(new Color(grey, grey, grey), 0.45f).Lerp(new Color(0.78f, 0.66f, 0.45f), 0.28f);
+				// the corner his thumb wore (the viewer's top left): soft-edged, down to the card
+				float du = x / (float)img.GetWidth(), dv = y / (float)img.GetHeight();
+				float rub = 1f - Mathf.SmoothStep(0.18f, 0.42f, Mathf.Sqrt(du * du + dv * dv * 0.6f) + rng.RandfRange(-0.03f, 0.03f));
+				col = col.Lerp(new Color(0.8f, 0.74f, 0.62f), rub * 0.85f);
+				img.SetPixel(x, y, col);
+			}
+		var print = new MeshInstance3D
+		{
+			Name = "AgedPrint", Mesh = new QuadMesh { Size = new Vector2(iw, ih) }, Transform = new Transform3D(basis, at),
+			MaterialOverride = new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(img), Roughness = 0.6f,
+				TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps },
+		};
+		photo.AddChild(print);
 	}
 
 	/// <summary>"That's... mine." (once): on E, or on a long enough look at it from close.</summary>
