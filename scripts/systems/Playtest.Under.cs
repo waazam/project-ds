@@ -395,6 +395,8 @@ public partial class Playtest
 		{
 			await HallWalkUntil(hw, Act15Hallway.End - Act15Hallway.DoorKeepClear - 4f, () => hw.FrontReds > front0 && hw.State == Act15Hallway.Phase.Green, ct, 120);
 			Check("from halfway the reds put him in front of them: stand still, go round", hw.FrontReds > front0 && !PlayerDeath.Dying, $"{hw.FrontReds - front0} in front");
+			// (2026-10-19) and in the reds he came at them the giant's way, a lurch at a time, not a jump
+			Check("he comes at them in lurches (the giant's stop-motion)", hw.Lurches >= 2, $"{hw.Lurches} lurches");
 			await _bot.WaitUntil(() => hw.State == Act15Hallway.Phase.Green, 30, ct);
 		}
 		await _bot.Inside(hw.AlongWorld(Act15Hallway.End - 5f), hw.DoorWorld, ct);

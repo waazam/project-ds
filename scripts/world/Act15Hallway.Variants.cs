@@ -59,6 +59,131 @@ public partial class Act15Hallway
 	private Vector3 _lungeFrom, _lungeTo;
 	private readonly List<HallStalker> _copies = new();
 
+	// ---- (2026-10-19, the owner: "jankily being animated towards them like a real freak show", as the giant moves in Act 11)
+	// Each step closer is no longer a jump: he comes the whole way in the giant's stop-motion (GiantRise), holds, an instant's
+	// lurch, now and then a sink back before the next; and all through the red his body is wrong the giant's way: the
+	// animation let through a frame at a time at an uneven rate, the head snapping over a quarter turn at a time, the spine
+	// bowing and unbowing in jerks, a list to one side flipped at each lurch, the head jolting while the rest hangs still.
+	private Vector3 _jankFrom, _jankTo;
+	private float _jankU0 = -1f, _jankU1;
+	private readonly List<(float t, float p)> _jankKeys = new();
+	private readonly RandomNumberGenerator _jankRng = NewTurnRng();
+	private float _frameIn, _snapIn, _joltIn, _bowIn;
+	/// <summary>For tests: lurches made this session.</summary>
+	public int Lurches { get; private set; }
+
+	/// <summary>He comes from <paramref name="from"/> to <paramref name="to"/> (local) between these fractions of the red.</summary>
+	private void BeginJank(Vector3 from, Vector3 to, float u0, float u1)
+	{
+		_jankFrom = from; _jankTo = to; _jankU0 = u0; _jankU1 = Mathf.Max(u1, u0 + 0.05f);
+		_jankKeys.Clear();
+		_jankKeys.Add((0f, 0f));
+		float t = 0f, p = 0f;
+		while (p < 1f)
+		{
+			t += _jankRng.RandfRange(0.35f, 1.0f);   // held
+			_jankKeys.Add((t, p));
+			if (p > 0.15f && _jankRng.Randf() < 0.25f)   // sinking back a little first
+			{
+				t += 0.12f; p = Mathf.Max(0f, p - _jankRng.RandfRange(0.04f, 0.08f));
+				_jankKeys.Add((t, p));
+				t += 0.25f; _jankKeys.Add((t, p));
+			}
+			t += _jankRng.RandfRange(0.05f, 0.12f);   // the lurch: an instant
+			p = Mathf.Min(1f, p + _jankRng.RandfRange(0.18f, 0.34f));
+			_jankKeys.Add((t, p));
+		}
+		for (int k = 0; k < _jankKeys.Count; k++) _jankKeys[k] = (_jankKeys[k].t / t, _jankKeys[k].p);
+	}
+
+	private float JankProgress(float x)
+	{
+		for (int k = 1; k < _jankKeys.Count; k++)
+			if (x <= _jankKeys[k].t)
+			{
+				var (ta, pa) = _jankKeys[k - 1];
+				var (tb, pb) = _jankKeys[k];
+				return Mathf.Lerp(pa, pb, tb > ta ? (x - ta) / (tb - ta) : 1f);
+			}
+		return 1f;
+	}
+
+	private float _lastJankP;
+
+	/// <summary>Each frame of a red: his way toward them, and his body wrong.</summary>
+	private void Jank(PlayerController player, float u, float dt)
+	{
+		var body = _shadow.Body;
+		if (_jankU0 >= 0f)
+		{
+			float pr = JankProgress(Mathf.Clamp((u - _jankU0) / (_jankU1 - _jankU0), 0f, 1f));
+			if (pr - _lastJankP > 0.05f)
+			{
+				Lurches++;
+				// a lurch: the list flips, a creak of something bending that shouldn't
+				if (body != null) body.ChestRoll = 0.3f * (_jankRng.Randf() < 0.5f ? -1f : 1f);
+				if (_jankRng.Randf() < 0.45f) Creak();
+			}
+			_lastJankP = pr;
+			Stand(_jankFrom.Lerp(_jankTo, pr), player);
+			if (pr >= 1f) _jankU0 = -1f;
+		}
+		if (body == null) return;
+		// the animation a frame at a time, at an uneven rate (as the giant's grab)
+		body.Hold = true;
+		_frameIn -= dt;
+		if (_frameIn <= 0f) { body.Step(); _frameIn = _jankRng.RandfRange(0.05f, 0.22f); }
+		// the head over a quarter turn at a time, and back
+		_snapIn -= dt;
+		if (_snapIn <= 0f)
+		{
+			float[] rolls = { 0f, 0.5f, -0.5f, 0.95f, 1.55f, -0.95f };
+			body.HeadRoll = rolls[_jankRng.RandiRange(0, rolls.Length - 1)];
+			_snapIn = _jankRng.RandfRange(0.4f, 1.4f);
+		}
+		// the spine bowing and unbowing in jerks, the neck drawn out
+		_bowIn -= dt;
+		if (_bowIn <= 0f)
+		{
+			body.SpineBow = _jankRng.RandfRange(0.05f, 0.45f);
+			body.NeckStretch = _jankRng.RandfRange(0.15f, 0.5f);
+			_bowIn = _jankRng.RandfRange(0.3f, 1.0f);
+		}
+		// the head jolting, one frame out of place, while the rest hangs still
+		_joltIn -= dt;
+		if (_joltIn <= 0f)
+		{
+			body.HeadJolt = new Vector3(_jankRng.RandfRange(-0.25f, 0.25f), _jankRng.RandfRange(-0.3f, 0.3f), _jankRng.RandfRange(-0.35f, 0.35f));
+			body.Step();
+			_joltIn = _jankRng.RandfRange(0.5f, 1.4f);
+		}
+		else body.HeadJolt = Vector3.Zero;
+	}
+
+	/// <summary>Sinew over bone at a lurch, quiet (its own dice: the hall's time the lights).</summary>
+	private void Creak()
+	{
+		string path = $"res://assets/audio/sfx/giant_sinew_creak_{_jankRng.RandiRange(1, 8):00}.wav";
+		if (!ResourceLoader.Exists(path)) return;
+		var s = new AudioStreamPlayer3D { Stream = GD.Load<AudioStream>(path), Bus = "Events", VolumeDb = -16f, UnitSize = 3f, MaxDistance = 40f, PitchScale = _jankRng.RandfRange(1.15f, 1.4f) };
+		Systems.Cutscene.SceneRoot(this).AddChild(s);
+		s.GlobalPosition = _shadow.EyesAt;
+		s.Finished += s.QueueFree;
+		s.Play();
+	}
+
+	/// <summary>His body his own again (the green, a new red).</summary>
+	private void Unjank()
+	{
+		_jankU0 = -1f;
+		_lastJankP = 0f;
+		var body = _shadow?.Body;
+		if (body == null) return;
+		body.Hold = false;
+		body.SpineBow = body.ChestRoll = body.NeckStretch = body.HeadRoll = 0f;
+		body.HeadJolt = Vector3.Zero;
+	}
+
 	private Turn PickTurn()
 	{
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--autotest") >= 0)
@@ -112,6 +237,7 @@ public partial class Act15Hallway
 			else if (_turnStep == 0) _turnStep = 1;
 		}
 		else if (_turnStep + 1 < TurnAt.Length && u >= TurnAt[_turnStep + 1]) { _turnStep++; TurnStep(player, _turnStep); }
+		Jank(player, u, dt);
 		// a lunge: metres in a blink, easing in hard (jerked, not walked)
 		if (_lungeT >= 0f)
 		{
@@ -189,7 +315,9 @@ public partial class Act15Hallway
 		{
 			case Turn.Inch:
 			case Turn.Looming:
-				Stand(Ahead(FrontDist[i]), player);
+				// (2026-10-19) after the first, each step is come the whole way, the giant's way, by the time of the next
+				if (i == 0) Stand(Ahead(FrontDist[i]), player);
+				else BeginJank(ToLocal(_shadow.GlobalPosition) with { Y = 0f }, Ahead(FrontDist[i]), TurnAt[i], i + 1 < TurnAt.Length ? TurnAt[i + 1] : 0.94f);
 				if (CurrentTurn == Turn.Looming) _shadow.Scale = Vector3.One * (1f + 0.2f * i);
 				// (each jump closer, his eyes burn a little brighter and his breath is louder: the last one right on them)
 				_shadow.Glare = Mathf.Lerp(0.3f, 0.85f, i / 3f);
@@ -250,7 +378,8 @@ public partial class Act15Hallway
 			{
 				// three of him, all a step nearer each time; he is the nearest
 				float[] near = { 6f, 4.6f, 3.2f, 2.0f };
-				Stand(Ahead(near[i], -0.3f * _turnSide), player);
+				if (i == 0) Stand(Ahead(near[i], -0.3f * _turnSide), player);
+				else BeginJank(ToLocal(_shadow.GlobalPosition) with { Y = 0f }, Ahead(near[i], -0.3f * _turnSide), TurnAt[i], i + 1 < TurnAt.Length ? TurnAt[i + 1] : 0.94f);
 				while (_copies.Count < 2)
 				{
 					var c = new HallStalker { Name = $"ShadowCopy{_copies.Count}" };
@@ -300,7 +429,8 @@ public partial class Act15Hallway
 			{
 				float[] ds = { 5.2f, 4.0f, 2.9f, 1.9f };
 				float[] xs = { -1.4f, 1.4f, -0.9f, 0.3f };
-				Stand(Ahead(ds[i], xs[i] * _turnSide), player);
+				if (i == 0) Stand(Ahead(ds[i], xs[i] * _turnSide), player);
+				else BeginJank(ToLocal(_shadow.GlobalPosition) with { Y = 0f }, Ahead(ds[i], xs[i] * _turnSide), TurnAt[i], i + 1 < TurnAt.Length ? TurnAt[i + 1] : 0.94f);
 				Breath(i == 3 ? -4f : -12f);
 				break;
 			}
@@ -320,6 +450,7 @@ public partial class Act15Hallway
 			Stand(new Vector3(Mathf.Clamp(l.X, -W2 * 0.5f + 0.45f, W2 * 0.5f - 0.45f), 0f, Mathf.Clamp(l.Z, PlayerZ + 0.9f, End - DoorKeepClear)), player);
 		}
 		_lungeT = -1f;
+		Unjank();
 		foreach (var c in _copies) c.Visible = false;
 		_shadow.EyeColor(HallStalker.EyeDefault);
 		_shadow.EyeDrips(false, Colors.White);
@@ -329,6 +460,7 @@ public partial class Act15Hallway
 	private void ResetPose()
 	{
 		_shadow.Scale = Vector3.One;
+		Unjank();
 		_shadow.Rotation = new Vector3(0, _shadow.Rotation.Y, 0);
 		foreach (var c in _copies) c.Visible = false;
 		_shadow.EyeColor(HallStalker.EyeDefault);

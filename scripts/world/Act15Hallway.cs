@@ -451,7 +451,8 @@ public partial class Act15Hallway : Node3D
 		}
 		bracket.CommitTo(this, "WallBulbBrackets", false);
 		foreach (float z in new[] { Part1 + 4f, Part1 + 16f, Part1 + 28f })
-			AddChild(new OmniLight3D { Position = new Vector3(0, 6f, z), LightColor = new Color(0.45f, 0.85f, 0.48f), LightEnergy = 2.0f, OmniRange = 22f, ShadowEnabled = false });
+			// (2026-10-19: out of the fog: green whatever the phase, they lit the floor fog green under the red)
+			AddChild(new OmniLight3D { Position = new Vector3(0, 6f, z), LightColor = new Color(0.45f, 0.85f, 0.48f), LightEnergy = 2.0f, OmniRange = 22f, ShadowEnabled = false, LightVolumetricFogEnergy = 0f });
 
 		_lampMat = Glow(Green, 3f);
 		var cable = new StandardMaterial3D { AlbedoColor = new Color(0.02f, 0.02f, 0.02f), Roughness = 0.6f };

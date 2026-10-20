@@ -682,7 +682,7 @@ Seed = 6
 [node name="TrailAnchor" type="Node" parent="Props/Wildflowers"]
 script = ExtResource("6_anchor")
 Distance = 38.0
-Offset = 4.2
+Offset = 3.0
 YawDegrees = 0.0
 HeightOffset = 0.0
 
@@ -964,8 +964,9 @@ Variety = 1
 
 [node name="TrailAnchor" type="Node" parent="Props/Mushrooms7"]
 script = ExtResource("6_anchor")
-Distance = 352
-Offset = 4.0
+Distance = -6.0
+Offset = 3.0
+Branch = "Overlook"
 YawDegrees = 137.0
 HeightOffset = 0.0
 

@@ -23,7 +23,32 @@ public partial class ForestScatter
 	[Export] public float CorridorOuter = 60f;
 	/// <summary>How full a cell is at its thickest (on the 1.7 m grid).</summary>
 	[Export] public float CorridorDensity = 0.72f;
+	/// <summary>(2026-10-19, the level pass: the lookout-to-bunker walk was open woods to drift off in) only along the trail
+	/// between the markers of these two groups (each's nearest trail point), easing in and out over
+	/// <see cref="CorridorEase"/> metres; empty: the whole trail, as in Act 1.</summary>
+	[Export] public string CorridorFromGroup = "", CorridorToGroup = "";
+	[Export] public float CorridorEase = 25f;
 	public int CorridorCount { get; private set; }
+	private float _corA = float.NegativeInfinity, _corB = float.PositiveInfinity;
+
+	/// <summary>The stretch of trail the corridor fills (along, metres), from the marker groups; whole trail if unset.</summary>
+	private void CorridorRange()
+	{
+		_corA = float.NegativeInfinity; _corB = float.PositiveInfinity;
+		if (string.IsNullOrEmpty(CorridorFromGroup) || string.IsNullOrEmpty(CorridorToGroup)) return;
+		if (GetTree().GetFirstNodeInGroup(CorridorFromGroup) is not Node3D a || GetTree().GetFirstNodeInGroup(CorridorToGroup) is not Node3D b) { _corB = float.NegativeInfinity; return; }
+		_terrain.TrailDistance(a.GlobalPosition.X, a.GlobalPosition.Z, out float sa);
+		_terrain.TrailDistance(b.GlobalPosition.X, b.GlobalPosition.Z, out float sb);
+		_corA = Mathf.Min(sa, sb); _corB = Mathf.Max(sa, sb);
+	}
+
+	/// <summary>0..1 how much of the corridor a point at <paramref name="along"/> metres of trail gets.</summary>
+	private float CorridorWeight(float along)
+	{
+		if (float.IsNegativeInfinity(_corA)) return float.IsNegativeInfinity(_corB) ? 0f : 1f;
+		float e = Mathf.Max(CorridorEase, 0.01f);
+		return Mathf.Clamp(Mathf.Min(along - _corA, _corB - along) / e, 0f, 1f);
+	}
 
 	private readonly List<(Vector2 p, float r, bool lane)> _keep = new();
 	private readonly List<(Vector2 a, Vector2 b, float w)> _keepSeg = new();
@@ -70,6 +95,23 @@ public partial class ForestScatter
 					break;
 				}
 				case FriendTrail tr: foreach (var w in tr.Waypoints) _line.Add(w); break;
+				case SurveyLot lot:
+				{
+					// (2026-10-19) R.H.'s arrow trails: a lane down each, from the path to the first tree, tree to tree, and on to
+					// the tin, so the filling never stands between one arrow and the next
+					foreach (int piece in new[] { 1, 2 })
+					{
+						var trail = lot.Trail(piece);
+						if (trail.Count == 0) continue;
+						Vector2 F(Vector3 v) => new(v.X, v.Z);
+						_terrain.TrailDistance(trail[0].GlobalPosition.X, trail[0].GlobalPosition.Z, out float a0);
+						var start = _terrain.TrailPoint(a0, out _);
+						_keepSeg.Add((F(start), F(trail[0].GlobalPosition), 4f));
+						for (int i = 1; i < trail.Count; i++) _keepSeg.Add((F(trail[i - 1].GlobalPosition), F(trail[i].GlobalPosition), 4f));
+						if (lot.Cache(piece) is { } cache) { _keepSeg.Add((F(trail[^1].GlobalPosition), F(cache.TinWorld), 4f)); _keep.Add((F(cache.TinWorld), 5f, false)); }
+					}
+					break;
+				}
 			}
 			if (n3.IsInGroup("bridge_marker")) _keep.Add((p, 18f, true));
 		}
@@ -118,6 +160,7 @@ public partial class ForestScatter
 	{
 		if (!Corridor) return;
 		GatherKeepClear();
+		CorridorRange();
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 71 + 13) };
 		var wander = new FastNoiseLite { Seed = Seed + 1307, Frequency = 0.03f, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, FractalOctaves = 2 };
 		var gaps = new FastNoiseLite { Seed = Seed + 1931, Frequency = 0.06f, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth, FractalOctaves = 2 };
@@ -131,15 +174,17 @@ public partial class ForestScatter
 				float roll = rng.Randf(), kind = rng.Randf();
 				float e = Mathf.Min(Mathf.Min(px - rect.Position.X, rect.End.X - px), Mathf.Min(pz - rect.Position.Y, rect.End.Y - pz));
 				if (e < inner) continue;
-				_terrain.SampleFields(px, pz, out float dT, out _, out float dS, out float dR);
+				_terrain.SampleFields(px, pz, out float dT, out float sT, out float dS, out float dR);
 				if (dT > CorridorOuter + 20f && _line.Count == 0) continue;
+				float stretch = CorridorWeight(sT);
+				if (stretch <= 0f) continue;
 				float d = WayDistance(px, pz, dT);
 				if (d > CorridorOuter) continue;
 				float wv = wander.GetNoise2D(px, pz);
 				float s0 = CorridorStart + CorridorWander * wv, s1 = CorridorFull + CorridorWander * 1.25f * wv;
 				if (d < s0) continue;
 				float t = Mathf.SmoothStep(s0, s1, d);
-				float p = CorridorDensity * Mathf.Pow(t, 1.3f);
+				float p = CorridorDensity * Mathf.Pow(t, 1.3f) * stretch;
 				// natural gaps: openings in it here and there (never a hedge)
 				if (gaps.GetNoise2D(px, pz) > 0.42f) p *= 0.3f;
 				if (roll > p) continue;

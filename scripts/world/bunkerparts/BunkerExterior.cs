@@ -403,7 +403,9 @@ public static class BunkerExterior
 			BunkerKit.LampGlass(lampParent, xf, BunkerTextures.NewLampGlass(new Color(1f, 0.8f, 0.5f), 1.6f), x < 0 ? "LampGlassL" : "LampGlassR");
 			lampParent.AddChild(new OmniLight3D
 			{
-				Name = x < 0 ? "LampL" : "LampR", LightColor = new Color(1f, 0.8f, 0.5f), LightEnergy = 1.6f, OmniRange = 6f,
+				Name = x < 0 ? "LampL" : "LampR", LightColor = new Color(1f, 0.8f, 0.5f), LightEnergy = 1.6f, OmniRange = 9f,
+				// (2026-10-19, the level pass: lights where they're meant to go) a halo in the fog round each, seen from the woods
+				LightVolumetricFogEnergy = 3f,
 				Position = new Vector3(x, 1.95f, FaceZ + 0.45f),
 			});
 		}

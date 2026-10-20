@@ -1,5 +1,6 @@
 using Godot;
 using ProjectDS.Audio;
+using ProjectDS.Systems;
 
 namespace ProjectDS.Entities;
 
@@ -67,6 +68,9 @@ public partial class Stalker
 		GD.Print($"[stalker] {p} for {_phaseUntil - _clock:0} s (menace {Menace:0.00})");
 	}
 
+	/// <summary>The stretch it leaves alone: checkpoint 6, the cabin burning, until the bunker (the herding and the walk on).</summary>
+	public static bool QuietStretch => StoryManager.Instance is { Current: Checkpoint.Act7CabinBurning };
+
 	/// <summary>Its sound was just heard (a step or a phrase): the menace climbs faster while it's heard.</summary>
 	private void Heard() => _lastHeard = _clock;
 
@@ -74,6 +78,15 @@ public partial class Stalker
 	{
 		if (!_awake || Inert) return;
 		if (_phaseUntil < 0) EnterPhase(Phase.Build);
+		// (2026-10-19, the level pass) from the burning cabin to the bunker it keeps away: the giant has the herding to itself,
+		// and the walk on from the lookout is the breath before Acts 8 to 11 (it was peaking under the trees coming down)
+		if (QuietStretch)
+		{
+			if (Pacing != Phase.Relax) EnterPhase(Phase.Relax);
+			_phaseUntil = System.Math.Max(_phaseUntil, _clock + 5.0);
+			Menace = Mathf.Max(0f, Menace - dt / 20f);
+			return;
+		}
 		float near = Present ? Mathf.Clamp(1f - Flat(GlobalPosition).DistanceTo(Flat(_player.GlobalPosition)) / 30f, 0f, 1f) : 0f;
 		bool heard = _clock - _lastHeard < 2.0;
 		if (Pacing == Phase.Relax) Menace = Mathf.Max(0f, Menace - dt / 20f);

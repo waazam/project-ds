@@ -161,6 +161,16 @@ public partial class Stairwell : Node3D
 		SetProcess(true);
 		// the shaft: a cavern of a space, all the way down
 		AudioDirector.Zone(this, new Vector3(0, BottomY * 0.5f, 0), new Vector3(2f * H + 3f, -BottomY + 6f, 2f * H + 3f), AudioDirector.Space.Cavern, "ShaftVerb");
+		// (2026-10-19, the level pass: fog hides distance) a fog pooled in the bottom of the shaft, thick at the floor and gone
+		// some thirty metres up: looked down over the rail, the bottom is never seen, only grey going darker; on the way down
+		// it rises round them a flight at a time
+		AddChild(new FogZone
+		{
+			Name = "ShaftFog", Mode = FogZone.Kind.Layer, Density = 0.06f, LayerHeight = 30f, FloorY = -17f,
+			NoiseAmount = 0.45f, NoiseScale = 0.08f, Wind = new Vector3(0.02f, 0.12f, 0.03f), Albedo = new Color(0.42f, 0.42f, 0.4f),
+			Edge = 0.05f, VolumetricLength = 100f,
+			Size = new Vector3(2f * H + 3f, 34f, 2f * H + 3f), Position = new Vector3(0, BottomY + 15f, 0),
+		});
 		GD.Print($"[story] Act 14: the stairwell - {Revolutions} turns, {Flights} flights, {-CornerY(GapCorner):0} m down");
 	}
 

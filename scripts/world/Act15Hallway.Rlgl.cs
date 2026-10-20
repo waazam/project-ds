@@ -79,7 +79,11 @@ public partial class Act15Hallway
 				_redT += dt;
 				// he closes in, a jump at a time, until he is at their back (in front of them: one of the turns, Variants)
 				if (_turnActive) UpdateTurn(player, dt);
-				else if (_step < ApproachAt.Length && _redT >= ApproachAt[_step] * _timer) { StepCloser(player); _step++; }
+				else
+				{
+					if (_step < ApproachAt.Length && _redT >= ApproachAt[_step] * _timer) { StepCloser(player); _step++; }
+					Jank(player, _redT / Mathf.Max(_timer, 0.01f), dt);   // (2026-10-19: come the giant's way, not jumped)
+				}
 				// moving means the keys (WASD), a jump, or still sliding: looking round with the mouse is fine
 				bool moving = new Vector2(player.Velocity.X, player.Velocity.Z).Length() > MoveThreshold || !player.IsOnFloor()
 					|| player.PlayerInput.Move.LengthSquared() > 0.04f;
@@ -151,13 +155,17 @@ public partial class Act15Hallway
 		}
 		la.X = Mathf.Clamp(la.X, -W2 * 0.5f + 0.45f, W2 * 0.5f - 0.45f);
 		la.Y = 0f;
-		_shadow.StandAt(ToGlobal(la), player.GlobalPosition);
+		// (2026-10-19) where he first shows, he's simply there; after that each step nearer is come the whole way in the
+		// giant's stop-motion, there by the time of the next (Jank)
+		if (_step == 0) _shadow.StandAt(ToGlobal(la), player.GlobalPosition);
+		else BeginJank(ToLocal(_shadow.GlobalPosition) with { Y = 0f }, la, ApproachAt[_step], _step + 1 < ApproachAt.Length ? ApproachAt[_step + 1] : 0.94f);
 		Rattle(_step == ApproachDist.Length - 1 ? -4f : -12f);
 	}
 
 	private void GoGreen(PlayerController player)
 	{
 		if (_turnActive) { EndTurn(player); _turnActive = false; }
+		Unjank();   // (frozen in the green, and himself)
 		State = Phase.Green;
 		_firstRed = false;
 		_timer = _rng.RandfRange(GreenSeconds.X, GreenSeconds.Y);

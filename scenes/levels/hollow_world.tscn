@@ -238,6 +238,12 @@ DeepStart = 0.0
 DeepEnd = 1.0
 EdgeThicket = true
 EdgeBand = 12.0
+Corridor = true
+CorridorStart = 16.0
+CorridorFull = 34.0
+CorridorDensity = 0.6
+CorridorFromGroup = "fire_lookout_marker"
+CorridorToGroup = "bunker_marker"
 
 [node name="PlayerSpawn" type="Marker3D" parent="." groups=["player_spawn"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)

@@ -50,6 +50,9 @@ public partial class TreeNote : Node3D
 	/// <summary>A trace in plain light at the arrow's height: an old paint smear and a knife's notch, dried and dull, the one
 	/// sign under the flame that someone marked this tree (the first tree of each trail, by the path).</summary>
 	[Export] public bool Trace;
+	/// <summary>(2026-10-19, the level pass) the knife's notch alone, no smear: halfway down a trail, the one sign under the
+	/// flame that a lost player is still on it (the ink fades at 13 m; the trail runs 90 to 120).</summary>
+	[Export] public bool Notch;
 
 	/// <summary>Glow 0..1 of the read (for tests and the reveal state).</summary>
 	public float Glow { get; private set; }
@@ -122,7 +125,7 @@ public partial class TreeNote : Node3D
 			float y = NoteHeight;
 			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.36f, 0.48f, UvInk.Arrow(rng.RandiRange(0, 2)), UvInk.Cyan, 1.9f, false, 0f, ArrowTurn);
 			_sheetLocal = post * (new Vector3(Mathf.Sin(MarkAngle), 0, Mathf.Cos(MarkAngle)) * (rAt(y) + 0.02f) + Vector3.Up * y);
-			if (Trace) BuildTrace(post, rAt(y - 0.42f), y - 0.42f, rng);
+			if (Trace || Notch) BuildTrace(post, rAt(y - 0.42f), y - 0.42f, rng, smear: Trace);
 		}
 		else if (!Decoy)
 		{
@@ -136,7 +139,7 @@ public partial class TreeNote : Node3D
 		int marks = Decoy ? rng.RandiRange(1, 2) : Arrow ? (rng.Randf() < 0.3f ? 1 : 0) : rng.RandiRange(0, 1);
 		var placed = new System.Collections.Generic.List<(float y, float a, float s)>();
 		if (!Decoy) placed.Add((NoteHeight, MarkAngle, 0.52f));
-		if (Trace) placed.Add((NoteHeight - 0.42f, MarkAngle, 0.3f));
+		if (Trace || Notch) placed.Add((NoteHeight - 0.42f, MarkAngle, 0.3f));
 		for (int i = 0; i < marks; i++)
 		{
 			Texture2D tex;
@@ -176,7 +179,7 @@ public partial class TreeNote : Node3D
 
 	/// <summary>The trace (<see cref="Trace"/>): a dull, dried smear of the paint, flaking, and a notch cut through the bark
 	/// beside it, a hand's width under the arrow. Plain decals: seen under the flame, from the path, if looked at.</summary>
-	private void BuildTrace(Basis post, float radius, float y, RandomNumberGenerator rng)
+	private void BuildTrace(Basis post, float radius, float y, RandomNumberGenerator rng, bool smear = true)
 	{
 		Vector3 d = post * new Vector3(Mathf.Sin(MarkAngle), 0, Mathf.Cos(MarkAngle));
 		Vector3 up = post * Vector3.Up;
@@ -184,12 +187,24 @@ public partial class TreeNote : Node3D
 		// (a decal projects along its -Y: Y out of the bark, X across, Z down the trunk)
 		var basis = new Basis(right, d, -up);
 		Vector3 at = d * (radius * 0.6f) + up * y;
-		AddChild(new Decal
+		int smearSeed = rng.RandiRange(0, 20);   // (drawn either way: the dice after it as they were)
+		float smearTurn = rng.RandfRange(-0.3f, 0.3f);
+		// (2026-10-19, the level pass) at the trail's start, a hiker's reflective tack pushed into the bark by the smear: dull
+		// in the dark, a bright pinprick when the lantern's light finds it, so the old paint is looked for (no light of its own)
+		if (smear)
+			AddChild(new MeshInstance3D
+			{
+				Name = "TraceTack", Mesh = new CylinderMesh { TopRadius = 0.014f, BottomRadius = 0.014f, Height = 0.006f, RadialSegments = 10, Rings = 1 },
+				MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.82f, 0.8f, 0.72f), Metallic = 1f, Roughness = 0.12f, MetallicSpecular = 1f },
+				Transform = new Transform3D(new Basis(right, d, -up), d * (radius + 0.002f) + up * (y + 0.06f) - right * 0.12f),   // (its face out of the bark, on its surface)
+				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			});
+		if (smear) AddChild(new Decal
 		{
-			Name = "TraceSmear", TextureAlbedo = UvInk.Smear(rng.RandiRange(0, 20)), Modulate = new Color(0.46f, 0.52f, 0.56f, 0.8f),
+			Name = "TraceSmear", TextureAlbedo = UvInk.Smear(smearSeed), Modulate = new Color(0.46f, 0.52f, 0.56f, 0.8f),
 			Size = new Vector3(0.3f, radius * 0.9f + 0.1f, 0.2f), AlbedoMix = 0.85f, UpperFade = 0.2f, LowerFade = 0.2f,
 			DistanceFadeEnabled = true, DistanceFadeBegin = 22f, DistanceFadeLength = 6f, CullMask = 1,
-			Transform = new Transform3D(basis.Rotated(d, rng.RandfRange(-0.3f, 0.3f)), at),
+			Transform = new Transform3D(basis.Rotated(d, smearTurn), at),
 		});
 		AddChild(new Decal
 		{

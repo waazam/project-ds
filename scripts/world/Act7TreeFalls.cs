@@ -37,6 +37,9 @@ public partial class Act7TreeFalls : Node3D
 	[Export] public float[] BehindAt = { -7f, 12f, 30f };
 	/// <summary>Along the way (m): trees out in the woods either side, for a stray.</summary>
 	[Export] public float[] WardAt = { 8f, 24f, 38f };
+	/// <summary>(2026-10-19, the level pass) one more wall tree on the right, this far along (m; 0: none): the walls began at
+	/// 7 m on the left and 14 on the right, and the right stood open the first stretch.</summary>
+	[Export] public float FirstRightAt = 3.5f;
 	[Export] public float SideOffset = 4.6f, WardOffset = 15f;
 	[Export] public float AheadTrigger = 14f, BehindTrigger = 11f;
 	/// <summary>How far off the trail (m) still counts as on the way.</summary>
@@ -118,6 +121,13 @@ public partial class Act7TreeFalls : Node3D
 			var foot = p + left * side * SideOffset;
 			if (Flat(foot + fall * h).DistanceTo(lookXZ) < 10f) fall = (left * side + tan * 0.4f).Normalized();
 			Add(foot, fall, mi, h, s, Kind.Side, side, seed++, cabinXZ, lookXZ, p);
+		}
+		if (FirstRightAt > 0f && _sA + FirstRightAt < _sB - StopShort)
+		{
+			// (its own seed, after the others': theirs stay as they were)
+			var p = _terrain.TrailPoint(_sA + FirstRightAt, out var tan);
+			var left = new Vector3(tan.Z, 0, -tan.X).Normalized();
+			Add(p - left * SideOffset, (tan - left * 0.22f).Normalized(), 1, 22f, FirstRightAt, Kind.Side, -1, 40, cabinXZ, lookXZ, p);
 		}
 		for (int i = 0; i < BehindAt.Length; i++)
 		{

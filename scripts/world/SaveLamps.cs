@@ -56,6 +56,19 @@ public static class SaveLamps
 			lamp.GlobalPosition = m.GlobalPosition;
 			Lamps.Add(lamp);
 		}
+		// (2026-10-19, the level pass: warm light always means a save) a lamp at every save that has a ceiling over it (a lamp
+		// hangs only where one is in reach; out of doors there is none); never haunted, those are the four above. Not the
+		// cabins': their hearth is their light, and one of them burns.
+		foreach (var cp in System.Enum.GetValues<Checkpoint>())
+		{
+			string g = "respawn_" + cp;
+			if (System.Array.IndexOf(At, g) >= 0 || cp is Checkpoint.None or Checkpoint.Act5CabinEntered or Checkpoint.Act7CabinBurning) continue;
+			if (host.GetTree().GetFirstNodeInGroup(g) is not Node3D m) continue;
+			var lamp = new SaveLamp { Name = "SaveLamp_" + cp };
+			host.AddChild(lamp);
+			lamp.GlobalPosition = m.GlobalPosition;
+			Lamps.Add(lamp);
+		}
 	}
 }
 

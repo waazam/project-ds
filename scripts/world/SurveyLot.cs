@@ -260,7 +260,7 @@ public partial class SurveyLot : Node3D
 			float turn = -Mathf.Atan2(to.Dot(right), to.Dot(look));
 			var note = new TreeNote
 			{
-				Name = $"Arrow{piece}_{i + 1}", Label = $"a{piece}{i + 1}", Arrow = true, ArrowTurn = turn, Trace = i == 0, MarkAngle = markAngle,
+				Name = $"Arrow{piece}_{i + 1}", Label = $"a{piece}{i + 1}", Arrow = true, ArrowTurn = turn, Trace = i == 0, Notch = i == at.Count / 2, MarkAngle = markAngle,
 				TrunkRadius = rng.RandfRange(0.26f, 0.34f), TrunkHeight = rng.RandfRange(5.5f, 8f), NoteHeight = rng.RandfRange(1.45f, 1.7f),
 			};
 			AddChild(note);

@@ -102,6 +102,8 @@ public partial class LongStair : Node3D
 	}
 
 	public override void _Ready() => Build();
+	/// <summary>For tests: the haze up the flights.</summary>
+	public FogZone Haze { get; private set; }
 
 	// ---- (2026-10-14c, the graphics pass: "its concrete walls past the arch are still pale and bright under bulbs/lantern")
 	/// <summary>The walls and the ceiling: the deep places' stained concrete, the top room's own tone.</summary>
@@ -138,6 +140,15 @@ public partial class LongStair : Node3D
 		AddChild(Church);
 		// the sound of it: a long hollow throat of a stairwell, a cold draught from far above
 		AudioDirector.Zone(this, new Vector3(0, TopY * 0.5f, (StartZ + TopZ0) * 0.5f), new Vector3(2.4f, TopY + 6f, TopZ0 - StartZ + 6f), AudioDirector.Space.Tunnel, "StairVerb");
+		// (2026-10-19, the level pass: fog hides distance) a cold haze in the throat of it, clear round them and thick a few
+		// metres up the flights: how far the stair still climbs is never seen, only the hatch's thin light in it at the end
+		AddChild(Haze = new FogZone
+		{
+			Name = "StairHaze", Mode = FogZone.Kind.Veil, Density = 0.07f, RevealAbove = 2.5f, VeilRamp = 6f,
+			NoiseAmount = 0.4f, NoiseScale = 0.09f, Wind = new Vector3(0f, -0.15f, -0.2f),   // (the draught from above, coming down)
+			Albedo = new Color(0.5f, 0.53f, 0.58f), Edge = 0.03f, VolumetricLength = 70f,
+			Size = new Vector3(2.6f, TopY + 8f, TopZ0 - StartZ + TopLanding + 6f), Position = new Vector3(0, TopY * 0.5f, (StartZ + TopZ0 + TopLanding) * 0.5f),
+		});
 		var along = new List<Vector3>();
 		for (int f = 6; f < Flights; f += 9) along.Add(new Vector3(0, f * FlightRise + 3f, StartZ + f * Pitch + 4f));
 		AudioDirector.Haunt(this, along.ToArray(), new[] { "haunt_moan", "haunt_boards", "haunt_drip" }, new Vector2(18f, 34f), -12f, 30f,

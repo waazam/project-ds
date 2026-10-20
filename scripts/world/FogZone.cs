@@ -82,11 +82,12 @@ public partial class FogZone : FogVolume
 	public void SetGlow(Color color, float energy, Vector3 linesX, float width = 0.6f, float height = 1f)
 	{
 		if (_mat == null) return;
-		_mat.SetShaderParameter("glow_color", new Vector3(color.R, color.G, color.B));
-		_mat.SetShaderParameter("glow_energy", energy);
-		_mat.SetShaderParameter("glow_x", linesX);
-		_mat.SetShaderParameter("glow_width", width);
-		_mat.SetShaderParameter("glow_height", height);
+		// (set every frame by the hall's strips: only what has changed goes to the material, rounded so a flicker's tail doesn't)
+		Set("glow_color", new Vector3(Mathf.Snapped(color.R, 0.004f), Mathf.Snapped(color.G, 0.004f), Mathf.Snapped(color.B, 0.004f)));
+		Set("glow_energy", Mathf.Snapped(energy, 0.01f));
+		Set("glow_x", linesX);
+		Set("glow_width", width);
+		Set("glow_height", height);
 	}
 
 	public override void _Process(double delta)
@@ -95,30 +96,52 @@ public partial class FogZone : FogVolume
 		Apply();
 	}
 
+	/// <summary>How far outside its box the camera may be (m) and it still draws: past the furthest the froxels reach.</summary>
+	private const float DrawMargin = 120f;
+
+	// (2026-10-19, the full playtest: "not enough room in the RESOURCES descriptor heap" by Act 23) every parameter set
+	// every frame rebuilt the material's uniforms each frame, for every zone in the level, however far off: now a value goes
+	// to the material only when it has changed, and a zone the camera is nowhere near isn't drawn at all
+	private readonly Dictionary<string, object> _sent = new();
+
+	private void Set(string name, float v)
+	{
+		if (_sent.TryGetValue(name, out var old) && old is float f && f == v) return;
+		_sent[name] = v;
+		_mat.SetShaderParameter(name, v);
+	}
+
+	private void Set(string name, Vector3 v)
+	{
+		if (_sent.TryGetValue(name, out var old) && old is Vector3 o && o == v) return;
+		_sent[name] = v;
+		_mat.SetShaderParameter(name, v);
+	}
+
 	private void Apply()
 	{
 		if (_mat == null) return;
-		bool on = Strength > 0.005f;
+		var cam = GetViewport()?.GetCamera3D();
+		bool on = Strength > 0.005f && (cam == null || Contains(cam.GlobalPosition, DrawMargin));
 		if (Visible != on) Visible = on;
 		if (!on) return;
-		_mat.SetShaderParameter("density", Density);
-		_mat.SetShaderParameter("strength", Strength);
-		_mat.SetShaderParameter("albedo", new Vector3(Albedo.R, Albedo.G, Albedo.B));
-		_mat.SetShaderParameter("emission", new Vector3(Emission.R, Emission.G, Emission.B));
-		_mat.SetShaderParameter("emission_energy", EmissionEnergy);
-		_mat.SetShaderParameter("noise_amount", NoiseAmount);
-		_mat.SetShaderParameter("noise_scale", NoiseScale);
-		_mat.SetShaderParameter("wind", Wind);
-		_mat.SetShaderParameter("edge", Edge);
-		float floorWorld = GlobalPosition.Y + FloorY;
-		_mat.SetShaderParameter("floor_y", floorWorld);
-		_mat.SetShaderParameter("layer_height", Mode == Kind.Layer ? LayerHeight : 0f);
-		if (Mode == Kind.Veil && GetViewport()?.GetCamera3D() is { } cam)
+		Set("density", Density);
+		Set("strength", Mathf.Snapped(Strength, 0.002f));
+		Set("albedo", new Vector3(Albedo.R, Albedo.G, Albedo.B));
+		Set("emission", new Vector3(Emission.R, Emission.G, Emission.B));
+		Set("emission_energy", EmissionEnergy);
+		Set("noise_amount", NoiseAmount);
+		Set("noise_scale", NoiseScale);
+		Set("wind", Wind);
+		Set("edge", Edge);
+		Set("floor_y", GlobalPosition.Y + FloorY);
+		Set("layer_height", Mode == Kind.Layer ? LayerHeight : 0f);
+		if (Mode == Kind.Veil && cam != null)
 		{
-			_mat.SetShaderParameter("reveal_y", cam.GlobalPosition.Y + RevealAbove);
-			_mat.SetShaderParameter("veil_ramp", VeilRamp);
+			Set("reveal_y", Mathf.Snapped(cam.GlobalPosition.Y + RevealAbove, 0.05f));
+			Set("veil_ramp", VeilRamp);
 		}
-		else _mat.SetShaderParameter("veil_ramp", 0f);
+		else Set("veil_ramp", 0f);
 	}
 
 	/// <summary>Whether a world point is inside its box (with a margin).</summary>

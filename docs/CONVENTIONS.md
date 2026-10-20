@@ -33,6 +33,14 @@ One architecture for everyone (human or agent) working on this repo.
 - `player`: the player body
 - `terrain`: the node that answers `HeightAt(x, z)`
 
+## Level language
+One visual vocabulary, so the player reads a place without being told (2026-10-19, the level pass):
+- **A fallen trunk means closed.** Shut a way with a tree across it (`FallingTree`, `FallenTree`), never a bare invisible wall or a fence that appears from nowhere. A trunk across a way is always solid and too tall to climb.
+- **Warm light is a save.** Every save with a ceiling over it gets a `SaveLamp`; the cabins' hearths are theirs. Don't put a warm, steady light anywhere that isn't safe.
+- **Light leads.** What the player must reach shows in the fog by its light (the cabin's window, the lookout's fire, the bunker door's lamps, the doors in the church). R.H.'s trails are found by his tack and his ink, never by a light.
+- **Fog hides distance, not the way.** A `FogZone` may swallow how far a hall runs or how high a flight climbs, never the next step. The thickest fog sits above the eye or ahead, never at the player's feet on a route.
+- **The woods' stalker belongs to the Hollow (Acts 3 to 12).** From the lake on, each mask brings its own sounds; the free stalker is silent.
+
 ## Git
 - Commit after each working phase with a short imperative message (`Add player controller`).
 - Never commit `.godot/`, `bin/`, `obj/`, or build output.
