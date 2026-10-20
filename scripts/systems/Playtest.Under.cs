@@ -362,6 +362,8 @@ public partial class Playtest
 			Check("he stands frozen in the green", hw.State == Act15Hallway.Phase.Waiting);
 			await HallWalk(hw, Act15Hallway.ShadowZ + 3f, false, ct, 30);
 			Check("past him: red light, green light begins, a save", hw.State != Act15Hallway.Phase.Waiting && Story.HasFlag(StoryManager.Flag.Act15PastShadow));
+			await _bot.Aim(hw.AlongWorld(Act15Hallway.ShadowZ + 60f) + Vector3.Up * 1.2f, ct);
+			await FogProbe(hw.FloorFog, "hall_fog", ct);
 			// walking on into the red: taken
 			_s.ExpectReload = true;
 			using (Fast(3))
@@ -469,6 +471,8 @@ public partial class Playtest
 		await _bot.WalkTo(sewer.AlongWorld(5f), 0.5f, ct, giveUp: 8f);
 		await _bot.Seconds(0.8, ct);
 		Check("ankle-deep: wading, dragged", sewer.PlayerWading && Player.WadeScale < 0.75f, $"scale {Player.WadeScale:0.00}");
+		await _bot.Aim(sewer.AlongWorld(40f) + Vector3.Up * 1.2f, ct);
+		await FogProbe(sewer.FloorFog, "sewer_fog", ct);
 		// jumped down the pipe, the platform's last step walked
 		await _bot.Inside(sewer.TunnelEndWorld, sewer.PlatformEdgeWorld, ct);
 		await _bot.WalkTo(sewer.PlatformEdgeWorld, 0.5f, ct, giveUp: 20f);

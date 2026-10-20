@@ -390,7 +390,8 @@ public partial class StalkerBody
 	/// <summary>Turns a bone about an axis given in the skeleton's space (its pose after the clip), carrying its children.</summary>
 	private void TurnBone(int bone, Vector3 axisSkel, float angle)
 	{
-		if (Mathf.Abs(angle) < 1e-6f || axisSkel.LengthSquared() < 1e-8f) return;
+		// (written as !(x >= y) so a NaN turns nothing: one NaN turn poisoned the bone, and every pose after it)
+		if (!(Mathf.Abs(angle) >= 1e-6f) || !(axisSkel.LengthSquared() >= 1e-8f) || !axisSkel.IsFinite()) return;
 		Basis g = _skel.GetBoneGlobalPose(bone).Basis.Orthonormalized();
 		Vector3 local = (g.Inverse() * axisSkel).Normalized();
 		_skel.SetBonePoseRotation(bone, (_skel.GetBonePoseRotation(bone) * new Quaternion(local, angle)).Normalized());
@@ -403,7 +404,7 @@ public partial class StalkerBody
 		Vector3 want = dirSkel.Normalized();
 		Vector3 axis = now.Cross(want);
 		float s = axis.Length();
-		if (s < 1e-5f) return;
+		if (!(s >= 1e-5f)) return;
 		float angle = Mathf.Atan2(s, now.Dot(want)) * w;
 		TurnBone(bone, axis / s, angle);
 	}
@@ -441,21 +442,34 @@ public partial class StalkerBody
 	{
 		Vector3 axis = from.Cross(to);
 		float s = axis.Length();
-		if (s < 1e-6f) return;
+		if (!(s >= 1e-6f)) return;
 		TurnBone(bone, axis / s, Mathf.Atan2(s, from.Dot(to)));
+	}
+
+	/// <summary>For tests: how many frames a rag chain was caught with a non-finite value and reset.</summary>
+	public int RagFaults { get; private set; }
+
+	private void RagFault(string what)
+	{
+		if (RagFaults++ == 0)
+			GD.PushWarning($"[stalker] rags: {what} went non-finite on {GetPath()}; skipped (further ones counted in RagFaults)");
 	}
 
 	/// <summary>The rags: each chain's bones swing toward where the clip holds them, pulled down by gravity, thrown by
 	/// the body's movement (the chain's root's acceleration) and stirred by a little wind; damped, so they settle.</summary>
 	private void Rags(float dt)
 	{
-		if (_rags.Count == 0 || dt <= 0f) return;
-		var basisInv = _skel.GlobalBasis.Inverse();
+		if (_rags.Count == 0 || dt <= 1e-4f) return;
+		// (a skeleton with no size, or an unreadable one, has no inverse: skip the frame rather than swing on NaN)
+		var skelBasis = _skel.GlobalBasis;
+		if (!(Mathf.Abs(skelBasis.Determinant()) >= 1e-9f) || !_skel.GlobalPosition.IsFinite()) { RagFault("the skeleton's transform"); return; }
+		var basisInv = skelBasis.Inverse();
 		Vector3 down = (basisInv * Vector3.Down).Normalized();
 		float scale = Mathf.Max(Size, 0.1f);
 		foreach (var rag in _rags)
 		{
 			Vector3 root = _skel.GlobalTransform * _skel.GetBoneGlobalPose(rag.Bones[0]).Origin;
+			if (!root.IsFinite()) { RagFault("a chain's root"); rag.Started = false; continue; }
 			Vector3 acc = Vector3.Zero;
 			if (rag.Started)
 			{
@@ -490,6 +504,13 @@ public partial class StalkerBody
 				rag.Vel[j] += (target - rag.Dir[j]) * stiff * dt;
 				rag.Vel[j] *= Mathf.Exp(-damp * dt);
 				rag.Dir[j] = (rag.Dir[j] + rag.Vel[j] * dt).Normalized();
+				// (a bad frame never sticks: back to where the clip holds it, at rest)
+				if (!rag.Dir[j].IsFinite() || !rag.Vel[j].IsFinite())
+				{
+					RagFault(!target.IsFinite() ? "the pull on a chain" : "a chain's swing");
+					rag.Dir[j] = clipDir.IsFinite() ? clipDir : down;
+					rag.Vel[j] = Vector3.Zero;
+				}
 				// never folded back up through the body: no more than 75 degrees off the clip's way
 				if (rag.Dir[j].Dot(clipDir) < 0.26f) rag.Dir[j] = Turn(clipDir, rag.Dir[j], 0.75f);
 				if (rag.Started) RagSwingDegrees = Mathf.Max(RagSwingDegrees * (1f - dt * 0.2f), Mathf.RadToDeg(rag.Dir[j].AngleTo(clipDir)));

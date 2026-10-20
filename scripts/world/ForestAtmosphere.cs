@@ -728,6 +728,10 @@ public partial class ForestAtmosphere : Node
 		d = Mathf.Lerp(d, VolumetricEnclosed, Enclosed * (1f - under));
 		d = Mathf.Lerp(d, VolumetricUnderground, under);
 		_env.VolumetricFogDensity = d * (1f + 0.4f * storm) + 0.02f * Mathf.Clamp(Blizzard, 0f, 1f);
+		// (2026-10-19) a fog zone the eye is in may need the froxels to reach further (the long hall's far door, the stairs' top)
+		var eyeCam = GetViewport()?.GetCamera3D();
+		float wantLen = eyeCam != null ? Mathf.Max(48f, FogZone.WantedLength(eyeCam.GlobalPosition)) : 48f;
+		if (!Mathf.IsEqualApprox(_env.VolumetricFogLength, wantLen)) _env.VolumetricFogLength = wantLen;
 		Color hue = Lum(fog) > 0.001f ? fog * (0.6f / Mathf.Max(Lum(fog), 0.001f)) : new Color(0.6f, 0.6f, 0.6f);
 		_env.VolumetricFogAlbedo = new Color(0.6f, 0.6f, 0.6f).Lerp(hue.Clamp(), 0.35f);
 		if (_sun != null) _sun.LightVolumetricFogEnergy = SunInFog;

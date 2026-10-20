@@ -5,7 +5,7 @@ namespace ProjectDS.Systems;
 /// <summary>
 /// The textures drawn in code, kept on disk once drawn (the load overhaul, 2026-10-09: drawing them pixel by pixel took
 /// about seven seconds of every launch's first load). Raw image data, mipmaps and all, under user://texcache/, keyed by
-/// this build of the game (a change to the code that draws one may change it). `--no-tex-cache` draws them all afresh.
+/// the code that draws them (<see cref="SourceKey"/>; an exported game, by its build). `--no-tex-cache` draws them all afresh.
 /// </summary>
 public static class TexCache
 {
@@ -18,7 +18,7 @@ public static class TexCache
 		get
 		{
 			if (_dir != null) return _dir;
-			string build = typeof(TexCache).Assembly.ManifestModule.ModuleVersionId.ToString("N")[..12];
+			string build = SourceKey() ?? typeof(TexCache).Assembly.ManifestModule.ModuleVersionId.ToString("N")[..12];
 			_dir = $"user://texcache/{build}";
 			DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(_dir));
 			// (older builds' caches cleared away)
@@ -28,6 +28,40 @@ public static class TexCache
 					if (d != build) { var path = ProjectSettings.GlobalizePath($"user://texcache/{d}"); foreach (var f in DirAccess.GetFilesAt(path)) DirAccess.RemoveAbsolute($"{path}/{f}"); DirAccess.RemoveAbsolute(path); }
 			return _dir;
 		}
+	}
+
+	/// <summary>The drawing code's own fingerprint (2026-10-19): keyed by the build, any C# change at all threw the whole
+	/// cache away, and the next load drew every texture again (135 of them, 40 s of the Hollow's). Where the scripts are
+	/// on disk (the editor, the tests) it's a hash of the ones that draw: every script that sets pixels, starts a timed draw
+	/// or saves to the cache, and the helpers they draw with. An exported game has no scripts to read and keeps the build's key.</summary>
+	private static readonly string[] Helpers = { "SurfaceKit.cs", "SurfaceSets.cs", "TexelBoost.cs", "DetailKit.cs" };
+
+	private static string SourceKey()
+	{
+		if (!DirAccess.DirExistsAbsolute("res://scripts")) return null;
+		var files = new System.Collections.Generic.List<string>();
+		void Walk(string dir)
+		{
+			foreach (var d in DirAccess.GetDirectoriesAt(dir)) Walk($"{dir}/{d}");
+			foreach (var f in DirAccess.GetFilesAt(dir)) if (f.EndsWith(".cs")) files.Add($"{dir}/{f}");
+		}
+		Walk("res://scripts");
+		if (files.Count == 0) return null;
+		files.Sort(System.StringComparer.Ordinal);
+		using var sha = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA1);
+		int n = 0;
+		foreach (var path in files)
+		{
+			string text = FileAccess.GetFileAsString(path);
+			// (the drawing sites only: a script that just reads the counters, TexGen.Ms, is not drawing code)
+			if (System.Array.IndexOf(Helpers, path.GetFile()) < 0 && !text.Contains("SetPixel(") && !text.Contains("TexCache.Save(") && !text.Contains("TexGen.Start(")) continue;
+			sha.AppendData(System.Text.Encoding.UTF8.GetBytes(path));
+			sha.AppendData(System.Text.Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n")));
+			n++;
+		}
+		string key = "src" + System.Convert.ToHexString(sha.GetHashAndReset())[..12].ToLowerInvariant();
+		GD.Print($"[texcache] keyed by the drawing code: {n} scripts, {key}");
+		return key;
 	}
 
 	public static int Hits { get; private set; }

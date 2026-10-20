@@ -465,7 +465,12 @@ public partial class Stalker : Node3D, ShaderWarmup.IWarmUp
 	/// interior 300 m away. The bunker's own scripted scares (BunkerFlow / BunkerRooms) are the only stalker in there.
 	/// </summary>
 	public static bool Inert => Indoors || UnderOrInside
-		|| (StoryManager.Instance is { } s && s.Current >= Checkpoint.Act8BunkerEntered && s.Current < Checkpoint.Act10WalkieFound);
+		|| (StoryManager.Instance is { } s && ((s.Current >= Checkpoint.Act8BunkerEntered && s.Current < Checkpoint.Act10WalkieFound) || PastTheWoods(s)));
+
+	/// <summary>(2026-10-19, the owner in Act 22: its rattle went on under the wendigo, "out of place") the free stalker is
+	/// the Hollow woods' (Acts 3 to 12, STORY.md): from the lake crossed on, its masks have the game (the crawler, the
+	/// hall's thing, the wendigo, their own sounds), and the woods' one is gone for good, out of doors or not.</summary>
+	private static bool PastTheWoods(StoryManager s) => s.Current >= Checkpoint.Act12LakeCrossed;
 
 	/// <summary>(2026-10-15, the owner in Act 15's hall: "the rattling ... is too loud and constant": the woods' stalker,
 	/// Hunted from checkpoint 8, went on rattling under the station, where the ambience's indoor flag isn't set) inside or

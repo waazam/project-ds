@@ -166,6 +166,8 @@ public partial class Headquarters : Node3D
 		AddChild(_doorChair);
 		var chairXf = Transform3D.Identity;
 		if (StationStory.Place(_doorChair, "dining_chair", chairXf, LobbyDecor.Roles) == null) return;
+		// (2026-10-19, the clip audit: walked through) solid, wedged or knocked over (the body goes with it)
+		StationStory.Solid(_doorChair, new Vector3(0, 0.45f, 0), new Vector3(0.44f, 0.9f, 0.44f), "wood", "ChairBody");
 		_chairWedged = new Transform3D(new Basis(Vector3.Up, Mathf.Pi * 0.5f) * new Basis(Vector3.Right, -0.32f), new Vector3(W - 0.42f, 0.04f, 0.8f));
 		_chairFallen = new Transform3D(new Basis(Vector3.Up, 2.3f) * new Basis(Vector3.Right, -1.5f), new Vector3(W - 0.95f, 0.24f, 1.65f));
 		bool open = StoryManager.Instance?.HasFlag(StoryManager.Flag.StationRoom1Open) ?? false;

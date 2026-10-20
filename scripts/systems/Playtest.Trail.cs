@@ -364,6 +364,9 @@ public partial class Playtest
 			&& TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(closer.LieSegment.a.Lerp(closer.LieSegment.b, 0.3f))) > 4f, $"down {closer.Down}, seen {walks.ClosersSeen}");
 		using (Fast(3)) await _bot.WaitUntilGame(() => walks.WallPieces > 0, 4, ct);
 		Check("the way back is walled off behind it", walks.IsClosed(World.Act1Walks.Way.Back) && walks.WallPieces > 0, $"{walks.WallPieces} pieces");
+		// (2026-10-19) and the trunk itself holds: walked straight into, they stay on the near side of it
+		float across = await TrunkHolds(closer, ct);
+		Check("the fallen trunk holds: walked into, it doesn't let them through", across > 0f, $"{across:0.0} m on their side");
 		Shot("walk3_way_back_closed");
 		// on up the trail at dusk: the voices call along the way
 		var v0 = terrain.TrailPoint(300f, out var vt);

@@ -684,22 +684,19 @@ public class MeshKit
 		var full = Xf * xf;
 		var nb = full.Basis.Inverse().Transposed();
 		bool mirrored = full.Basis.Determinant() < 0f;
-		for (int si = 0; si < mesh.GetSurfaceCount(); si++)
+		var surfs = Surfaces(mesh);
+		for (int si = 0; si < surfs.Length; si++)
 		{
-			var arr = mesh.SurfaceGetArrays(si);
-			var mat = mesh.SurfaceGetMaterial(si);
+			var sd = surfs[si];
+			var mat = sd.Mat;
 			Color? tint = null;
 			if (tints != null && mat != null && tints.TryGetValue(mat, out var tc)) tint = tc;
 			if (materials != null && mat != null && materials.TryGetValue(mat, out var swap)) mat = swap;
 			if (mat == null) continue;
-			var col = tint != null && arr[(int)Mesh.ArrayType.Color].VariantType != Variant.Type.Nil ? (Color[])arr[(int)Mesh.ArrayType.Color] : null;
+			var col = tint != null ? sd.Col : null;
 			Mat(mat);
-			var v = (Vector3[])arr[(int)Mesh.ArrayType.Vertex];
-			var n = arr[(int)Mesh.ArrayType.Normal].VariantType == Variant.Type.Nil ? null : (Vector3[])arr[(int)Mesh.ArrayType.Normal];
-			var uv = arr[(int)Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil ? null : (Vector2[])arr[(int)Mesh.ArrayType.TexUV];
-			var t = arr[(int)Mesh.ArrayType.Tangent].VariantType == Variant.Type.Nil ? null : (float[])arr[(int)Mesh.ArrayType.Tangent];
-			var uv2 = arr[(int)Mesh.ArrayType.TexUV2].VariantType == Variant.Type.Nil ? null : (Vector2[])arr[(int)Mesh.ArrayType.TexUV2];
-			var idx = arr[(int)Mesh.ArrayType.Index].VariantType == Variant.Type.Nil ? null : (int[])arr[(int)Mesh.ArrayType.Index];
+			var v = sd.V; var n = sd.N; var uv = sd.UV; var t = sd.T; var uv2 = sd.UV2; var idx = sd.Idx;
+			float tSign = mirrored ? -1f : 1f;
 			int b = _cur.V.Count;
 			for (int i = 0; i < v.Length; i++)
 			{
@@ -711,7 +708,7 @@ public class MeshKit
 				if (t != null)
 				{
 					var tv = (full.Basis * new Vector3(t[i * 4], t[i * 4 + 1], t[i * 4 + 2])).Normalized();
-					_cur.T.Add(tv.X); _cur.T.Add(tv.Y); _cur.T.Add(tv.Z); _cur.T.Add(t[i * 4 + 3] * (full.Basis.Determinant() < 0 ? -1f : 1f));
+					_cur.T.Add(tv.X); _cur.T.Add(tv.Y); _cur.T.Add(tv.Z); _cur.T.Add(t[i * 4 + 3] * tSign);
 				}
 			}
 			int count = idx?.Length ?? v.Length;
@@ -723,6 +720,50 @@ public class MeshKit
 				_cur.I.Add(b + i0); _cur.I.Add(b + i1); _cur.I.Add(b + i2);
 			}
 		}
+	}
+
+	/// <summary>A modelled mesh's surfaces as C# arrays, read out of the engine once per mesh (2026-10-19): read afresh for
+	/// every placing, a wildflower patch's 450 stems, leaves and heads took two seconds of the trailhead's load each. Kept
+	/// with the mesh (weakly: gone with it); read again if its surfaces have changed since.</summary>
+	private sealed class SurfaceData
+	{
+		public Vector3[] V, N; public Vector2[] UV, UV2; public float[] T; public int[] Idx; public Color[] Col; public Material Mat;
+		public int Len, IdxLen;
+	}
+	private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Mesh, SurfaceData[]> _surfaces = new();
+
+	private static SurfaceData[] Surfaces(Mesh mesh)
+	{
+		int count = mesh.GetSurfaceCount();
+		if (_surfaces.TryGetValue(mesh, out var known) && known.Length == count)
+		{
+			bool same = true;
+			if (mesh is ArrayMesh am)
+				for (int si = 0; si < count && same; si++)
+					same = am.SurfaceGetArrayLen(si) == known[si].Len && am.SurfaceGetArrayIndexLen(si) == known[si].IdxLen;
+			if (same) return known;
+		}
+		var all = new SurfaceData[count];
+		for (int si = 0; si < count; si++)
+		{
+			var arr = mesh.SurfaceGetArrays(si);
+			Variant At(Mesh.ArrayType a) => arr[(int)a];
+			var d = new SurfaceData
+			{
+				Mat = mesh.SurfaceGetMaterial(si),
+				V = (Vector3[])At(Mesh.ArrayType.Vertex),
+				N = At(Mesh.ArrayType.Normal).VariantType == Variant.Type.Nil ? null : (Vector3[])At(Mesh.ArrayType.Normal),
+				UV = At(Mesh.ArrayType.TexUV).VariantType == Variant.Type.Nil ? null : (Vector2[])At(Mesh.ArrayType.TexUV),
+				T = At(Mesh.ArrayType.Tangent).VariantType == Variant.Type.Nil ? null : (float[])At(Mesh.ArrayType.Tangent),
+				UV2 = At(Mesh.ArrayType.TexUV2).VariantType == Variant.Type.Nil ? null : (Vector2[])At(Mesh.ArrayType.TexUV2),
+				Idx = At(Mesh.ArrayType.Index).VariantType == Variant.Type.Nil ? null : (int[])At(Mesh.ArrayType.Index),
+				Col = At(Mesh.ArrayType.Color).VariantType == Variant.Type.Nil ? null : (Color[])At(Mesh.ArrayType.Color),
+			};
+			if (mesh is ArrayMesh am2) { d.Len = am2.SurfaceGetArrayLen(si); d.IdxLen = am2.SurfaceGetArrayIndexLen(si); }
+			all[si] = d;
+		}
+		_surfaces.AddOrUpdate(mesh, all);
+		return all;
 	}
 
 	/// <summary>For the load's log: time spent separating coplanar faces, and committing meshes, so far.</summary>

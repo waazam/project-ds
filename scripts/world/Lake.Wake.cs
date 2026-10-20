@@ -41,7 +41,20 @@ public partial class Lake
 		Vector2 c = o + d * CraterBeyond;
 		Furrow = LayToGround("Furrow", new Transform3D(basis, new Vector3(o.X, LakeShape.Ground(o.X, o.Y), o.Y)));
 		Crater = LayToGround("Crater", new Transform3D(basis, new Vector3(c.X, LakeShape.Ground(c.X, c.Y), c.Y)));
+		// (2026-10-19, the owner: "a very light fog at the beginning of act 12") the dawn's mist: thin, low and pale, lying on
+		// the water and the shore round the dock where he wakes, drifting off the lake; the crossing's own fog takes over out
+		// on the water
+		AddChild(DawnMist = new FogZone
+		{
+			Name = "DawnMist", Mode = FogZone.Kind.Layer, Density = 0.025f, LayerHeight = 2.5f, FloorY = -2f,
+			NoiseAmount = 0.65f, NoiseScale = 0.035f, Wind = new Vector3(0.12f, 0f, 0.3f),
+			Albedo = new Color(0.86f, 0.83f, 0.8f), Emission = new Color(0.06f, 0.05f, 0.045f), EmissionEnergy = 0.6f, Edge = 0.25f,
+			Size = new Vector3(120f, 8f, 120f), Position = new Vector3(WakeSpot.X, 2f, WakeSpot.Y - 30f),
+		});
 	}
+
+	/// <summary>For tests: the dawn's mist at the dock.</summary>
+	public FogZone DawnMist { get; private set; }
 
 	private static StandardMaterial3D _soil, _soilDark, _turf;
 

@@ -213,6 +213,9 @@ public partial class FallingTree : Node3D
 	/// <summary>Comes down without its creak (2026-10-15, the owner: "we dont need to hear every tree creak"): only the
 	/// crack, the rush and the landing.</summary>
 	public bool QuietCreak;
+	/// <summary>A point on the side of it the player belongs (the way they're kept to, 2026-10-19). Caught inside its length
+	/// as it lands, they're put out on this side, never across it; unset, on the nearer side.</summary>
+	public Vector3? KeepToward;
 	public bool Down => _m.State == TreeFallMotion.Phase.Down;
 	public bool Falling => _m.State is TreeFallMotion.Phase.Creak or TreeFallMotion.Phase.Fall or TreeFallMotion.Phase.Settle;
 	public TreeFallMotion Motion => _m;
@@ -239,6 +242,9 @@ public partial class FallingTree : Node3D
 	public override void _Ready()
 	{
 		_terrain = GroundSnap.FindTerrain(this);
+		// (its fall and its lying collision are measured from where it stands now: placed after it readies, they were laid at
+		// the origin's ground, and the player walked through the fallen trunk)
+		if (GlobalPosition.IsEqualApprox(Vector3.Zero)) GD.PushWarning($"FallingTree {Name} readied at the origin: set its Position before AddChild");
 		FallDir = new Vector3(FallDir.X, 0, FallDir.Z).Normalized();
 		_m.Length = Height;
 		// (down until the trunk itself lies on the ground, the boughs under it pressed into the earth: with room left for them it
@@ -252,10 +258,11 @@ public partial class FallingTree : Node3D
 		_pivot = new Node3D { Name = "Pivot" };
 		AddChild(_pivot);
 		_pivot.AddChild(new MeshInstance3D { Name = "Tree", Mesh = Mesh, Rotation = new Vector3(0, Seed * 1.3f, 0) });
-		// standing: the trunk
-		_stand = new StaticBody3D { Name = "Standing", CollisionLayer = 1, CollisionMask = 0 };
+		// standing: the trunk; on the hinge, so as it falls its solid leans with it (2026-10-19: it stood upright at the foot
+		// while the trunk came down through the air beside it)
+		_stand = new AnimatableBody3D { Name = "Standing", CollisionLayer = 1, CollisionMask = 0 };
 		_stand.AddChild(new CollisionShape3D { Position = Vector3.Up * 3f, Shape = new CylinderShape3D { Radius = TrunkR, Height = 6f } });
-		AddChild(_stand);
+		_pivot.AddChild(_stand);
 		// down: its length, a chain of boxes too tall to climb, wider over the crown
 		_lie = new StaticBody3D { Name = "Lying", CollisionLayer = 0, CollisionMask = 0 };
 		_lie.SetMeta("surface", "wood");
@@ -284,6 +291,7 @@ public partial class FallingTree : Node3D
 		{
 			var land = GlobalPosition + axisDir * Height * 0.55f;
 			TreeFallMotion.Sound(this, ev, GlobalPosition, GlobalPosition + Vector3.Up * Height * 0.5f, land, Seed);
+			if (ev == "crack") Brace();
 			if (ev == "impact") Landed();
 		};
 		Pose();
@@ -320,31 +328,52 @@ public partial class FallingTree : Node3D
 		return GlobalPosition + (new Basis(axis, _m.Angle) * Vector3.Up) * (Height * u);
 	}
 
+	/// <summary>The player is inside where it lies (along its length, within its width), and how far off its axis.</summary>
+	private bool Inside(PlayerController p, out float off)
+	{
+		Vector3 rel = p.GlobalPosition - GlobalPosition;
+		float along = rel.Dot(FallDir);
+		off = rel.Dot(Vector3.Up.Cross(FallDir).Normalized());
+		return along > -1f && along < Height && Mathf.Abs(off) < 2.2f;
+	}
+
+	private PlayerController Player => GetTree().GetFirstNodeInGroup("player") as PlayerController;
+
+	/// <summary>As it cracks, where it will lie turns solid (2026-10-19): there was nothing there through the fall, and
+	/// the player could step in under it and be put out on its far side as it landed. Not while they're in there.</summary>
+	private void Brace()
+	{
+		if (_lie.CollisionLayer != 0) return;
+		if (Player is { } p && Inside(p, out _)) return;
+		_lie.CollisionLayer = 1;
+	}
+
 	private void Landed()
 	{
 		_stand.CollisionLayer = 0;
-		_lie.CollisionLayer = 1;
-		// never pinned under it: a player inside its length is put out beside it
-		if (GetTree().GetFirstNodeInGroup("player") is PlayerController p)
+		// never pinned under it: a player inside its length is put out beside it, on their own side of it
+		if (Player is { } p && Inside(p, out float off))
 		{
-			var axisDir = (FallDir * Mathf.Sin(_m.End) + Vector3.Up * Mathf.Cos(_m.End)).Normalized();
-			Vector3 rel = p.GlobalPosition - GlobalPosition;
-			float along = rel.Dot(FallDir);
 			Vector3 side = Vector3.Up.Cross(FallDir).Normalized();
-			float off = rel.Dot(side);
-			if (along > -1f && along < Height && Mathf.Abs(off) < 2.2f)
+			float sign = off >= 0 ? 1f : -1f;
+			if (KeepToward is { } keep)
 			{
-				var to = p.GlobalPosition + side * ((off >= 0 ? 1f : -1f) * 2.6f - off);
-				to.Y = (_terrain?.HeightAt(to.X, to.Z) ?? to.Y) + 0.05f;
-				p.GlobalPosition = to;
+				float k = (keep - GlobalPosition).Dot(side);
+				if (Mathf.Abs(k) > 0.3f) sign = k >= 0 ? 1f : -1f;
 			}
+			var to = p.GlobalPosition + side * (sign * 2.6f - off);
+			to.Y = (_terrain?.HeightAt(to.X, to.Z) ?? to.Y) + 0.05f;
+			p.GlobalPosition = to;
 		}
+		_lie.CollisionLayer = 1;
 	}
 
 	public override void _Process(double delta)
 	{
 		if (_m.State is TreeFallMotion.Phase.Standing or TreeFallMotion.Phase.Down) return;
 		_m.Step((float)delta);
+		// (inside it as it cracked: solid the moment they step out)
+		if (_m.State == TreeFallMotion.Phase.Fall) Brace();
 		Pose();
 	}
 

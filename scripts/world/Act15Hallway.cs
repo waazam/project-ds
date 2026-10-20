@@ -208,6 +208,7 @@ public partial class Act15Hallway : Node3D
 
 		BuildStrips();
 		BuildLights();
+		BuildFogLayer();
 		BuildDressing(body);
 		BuildCloset(body);
 
@@ -340,10 +341,39 @@ public partial class Act15Hallway : Node3D
 		return m;
 	}
 
+	/// <summary>For tests: the fog lying over the floor of the hall's second half.</summary>
+	public FogZone FloorFog { get; private set; }
+	/// <summary>How strongly the fog over the strips takes their light.</summary>
+	[Export] public float FogGlow = 0.7f;
+
+	/// <summary>(2026-10-19, the owner: "a light fog layer ... halfway through act 15 so the lights from the floor can
+	/// illuminate the light layer of fog with their colors, obscuring how far the door is away") from where the hall opens
+	/// out to the closet door, a fog lying on the floor, about chest deep, banked and drifting: the strips under it light
+	/// it their colour (green, then red with the lights; the strips are lit meshes, so the fog's glow is set from their
+	/// signal, SyncStrips), the hanging lamps light it from above, and the far end of the hall goes into it.</summary>
+	private void BuildFogLayer()
+	{
+		float z0 = Part1 + Taper, len = End - z0 + 6f;
+		FloorFog = new FogZone
+		{
+			Name = "FloorFog", Mode = FogZone.Kind.Layer, Density = 0.12f, LayerHeight = 2.4f, FloorY = -2.5f,   // (the hall's floor, from the box's middle)
+			NoiseAmount = 0.5f, NoiseScale = 0.06f, Wind = new Vector3(0.05f, 0f, -0.25f),   // (a draught down the hall toward them)
+			Albedo = new Color(0.55f, 0.58f, 0.55f), Edge = 0.08f, VolumetricLength = 80f,
+			Size = new Vector3(W2 + 0.4f, 7f, len), Position = new Vector3(0, -1f + 3.5f, z0 + len * 0.5f - 3f),
+		};
+		AddChild(FloorFog);
+		SyncStrips();
+	}
+
 	/// <summary>The strips' signal, from what red light, green light last set (<c>SetLights</c>) and the centre row's dips.</summary>
 	private void SyncStrips()
 	{
 		if (_strip2 == null) return;
+		if (FloorFog != null)
+		{
+			float x = W2 * 0.5f - 0.5f;
+			FloorFog.SetGlow(_stripMat2.Emission, _stripMat2.EmissionEnergyMultiplier / 1.3f * FogGlow, new Vector3(-x, 0f, x), 0.45f, 0.7f);
+		}
 		float flick = (GameSettings.Instance?.ReduceFlashing ?? false) ? 0f : 1f;
 		_strip2.SetShaderParameter("signal_color", _stripMat2.Emission);
 		_strip2.SetShaderParameter("level", _stripMat2.EmissionEnergyMultiplier / 1.3f);

@@ -33,7 +33,49 @@ public partial class GameFlow : Node
 	private ScreenFader _fader;
 	private PauseMenu _pause;
 
-	public override void _EnterTree() { Instance = this; StoryManager.LoadStage("the level loaded and in the tree"); }
+	public override void _EnterTree()
+	{
+		Instance = this;
+		StoryManager.LoadStage("the level loaded and in the tree");
+		if (StoryManager.LoadAskedMsec > 0) WatchReadies();
+	}
+
+	// (2026-10-19) Where the load's "nodes ready" goes: the level's nodes have all entered the tree by now and none is ready
+	// yet; each one's ready, in the order they come (children before their parent), is timed from the one before, and the
+	// slowest are listed as the level comes up. A node's figure is its own _Ready and any deeper node readied with it.
+	private readonly System.Collections.Generic.List<(string what, double ms)> _readies = new();
+	private ulong _lastReady;
+
+	private void WatchReadies()
+	{
+		_lastReady = Time.GetTicksUsec();
+		void Watch(Node n, int depth)
+		{
+			foreach (var c in n.GetChildren())
+			{
+				if (c == this) continue;
+				var node = c;
+				node.Ready += () =>
+				{
+					ulong now = Time.GetTicksUsec();
+					_readies.Add((node.Name, (now - _lastReady) / 1000.0));
+					_lastReady = now;
+				};
+				if (depth < 3) Watch(c, depth + 1);
+			}
+		}
+		if (GetParent() is { } root) Watch(root, 1);
+	}
+
+	private void ReportReadies()
+	{
+		if (_readies.Count == 0) return;
+		_readies.Sort((a, b) => b.ms.CompareTo(a.ms));
+		var top = new System.Text.StringBuilder();
+		for (int i = 0; i < _readies.Count && i < 12 && _readies[i].ms >= 100.0; i++) top.Append($"{_readies[i].what} {_readies[i].ms:0} ms; ");
+		if (top.Length > 0) GD.Print($"[load-ready] slowest: {top}");
+		_readies.Clear();
+	}
 	public override void _ExitTree()
 	{
 		if (Instance == this) Instance = null;
@@ -52,6 +94,7 @@ public partial class GameFlow : Node
 	public override void _Ready()
 	{
 		StoryManager.LoadStage("the level's nodes ready (their own builds done)");
+		ReportReadies();
 		_player = GetNode<PlayerController>(PlayerPath);
 		_fader = GetNode<ScreenFader>(FaderPath);
 		_pause = GetNode<PauseMenu>(PauseMenuPath);

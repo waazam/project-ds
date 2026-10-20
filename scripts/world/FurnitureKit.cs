@@ -51,6 +51,10 @@ public static class FurnitureKit
 	private static Texture2D Lifted(Texture2D tex)
 	{
 		if (tex == null) return null;
+		// (2026-10-19) lifted once and kept, compressed like its import (TexCache): every load decompressed, re-lit pixel by
+		// pixel and uploaded each one raw (19 of them for Act 1 alone). The source's own hash in the key: a re-baked map is lifted afresh.
+		string key = $"Cavity_{tex.ResourcePath.GetFile().GetBaseName()}_{FileAccess.GetMd5(tex.ResourcePath)}_{CavityFloor:0.00}";
+		if (Systems.TexCache.Load(key) is { } done) return done.GetWidth() <= 1 ? tex : ImageTexture.CreateFromImage(done);
 		var img = tex.GetImage();
 		if (img == null) return tex;
 		if (img.IsCompressed()) img.Decompress();
@@ -61,7 +65,7 @@ public static class FurnitureKit
 		float sum = 0f;
 		for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++) sum += small.GetPixel(x, y).R;
 		float mean = sum / 4096f;
-		if (mean >= CavityFloor) return tex;
+		if (mean >= CavityFloor) { Systems.TexCache.Save(key, Image.CreateEmpty(1, 1, false, Image.Format.L8)); return tex; }   // (a 1 px mark: bright enough as it is)
 		float k = (1f - CavityFloor) / Mathf.Max(1f - mean, 0.01f);
 		var data = img.GetData();
 		for (int i = 0; i < data.Length; i += 4)
@@ -69,7 +73,10 @@ public static class FurnitureKit
 				data[i + c] = (byte)Mathf.Clamp(255f - (255f - data[i + c]) * k, 0f, 255f);
 		var lifted = Image.CreateFromData(img.GetWidth(), img.GetHeight(), false, Image.Format.Rgba8, data);
 		lifted.GenerateMipmaps();
-		GD.Print($"[furniture] cavity lifted: {tex.ResourcePath.GetFile()} (average {mean:0.00} -> {CavityFloor:0.00})");
+		// (as the import had it, block-compressed: a quarter of the memory of the raw map; raw if the compressor isn't there)
+		if (lifted.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Generic) != Error.Ok) lifted.Decompress();
+		Systems.TexCache.Save(key, lifted);
+		GD.Print($"[furniture] cavity lifted: {tex.ResourcePath.GetFile()} (average {mean:0.00} -> {CavityFloor:0.00}), kept");
 		return ImageTexture.CreateFromImage(lifted);
 	}
 

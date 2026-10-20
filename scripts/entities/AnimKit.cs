@@ -18,15 +18,19 @@ namespace ProjectDS.Entities;
 public static class AnimKit
 {
 	/// <summary>A critically damped spring on one value: <paramref name="omega"/> is how quickly it follows (about 4/omega
-	/// seconds to settle).</summary>
+	/// seconds to settle).
+	/// (2026-10-19) Stepped exactly, not by Euler: an Euler step overshoots once omega * dt passes about 2, so one long frame
+	/// (a hitch over 0.15 s, for the feet's springs) threw it to infinity and then NaN, and NaN never settles; the Act 7
+	/// giant's skeleton was planted at NaN and its every bone after it. Stable for any dt; a bad value starts it over.</summary>
 	public struct Spring1
 	{
 		public float X, V;
 		public void Step(float target, float omega, float dt)
 		{
-			float a = (target - X) * omega * omega - V * 2f * omega;
-			V += a * dt;
-			X += V * dt;
+			if (!float.IsFinite(X) || !float.IsFinite(V)) { X = float.IsFinite(target) ? target : 0f; V = 0f; }
+			float x = X - target, e = Mathf.Exp(-omega * dt), k = (V + omega * x) * dt;
+			X = target + (x + k) * e;
+			V = (V - omega * k) * e;
 		}
 	}
 
@@ -35,9 +39,11 @@ public static class AnimKit
 		public Vector3 X, V;
 		public void Step(Vector3 target, float omega, float dt)
 		{
-			Vector3 a = (target - X) * omega * omega - V * 2f * omega;
-			V += a * dt;
-			X += V * dt;
+			if (!X.IsFinite() || !V.IsFinite()) { X = target.IsFinite() ? target : Vector3.Zero; V = Vector3.Zero; }
+			Vector3 x = X - target, k = (V + omega * x) * dt;
+			float e = Mathf.Exp(-omega * dt);
+			X = target + (x + k) * e;
+			V = (V - omega * k) * e;
 		}
 	}
 

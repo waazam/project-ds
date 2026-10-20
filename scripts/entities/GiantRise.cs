@@ -48,6 +48,10 @@ public static class GiantRise
 		/// <summary>The rise's length (seconds at Speed 1).</summary>
 		public float RiseSeconds = 11f;
 		public float StareSeconds = 2.2f;
+		/// <summary>(2026-10-19, the owner: "you sometimes cant see him if you are too far back onto the stairs") where its
+		/// eyes are when the rise begins (world Y; NaN: from under the trees). Set at the landing's line, it comes up already
+		/// past the stairs' threshold, and the whole rise is in view from the top treads, not its last part only.</summary>
+		public float HeadStartY = float.NaN;
 	}
 
 	/// <summary>How big it must be for its eyes to stand <paramref name="lookUpDeg"/> above the eye at
@@ -64,6 +68,14 @@ public static class GiantRise
 		Vector3 spot = new Vector3(eye0.X, 0f, eye0.Z) + fwd * st.Distance;
 		float yUp = st.GroundY - 0.12f * S, yDown = st.GroundY - 2.15f * S;   // standing in the undergrowth .. wholly under it
 		body.GlobalPosition = new Vector3(spot.X, yDown, spot.Z);
+		// (2026-10-19) begun with its eyes at HeadStartY: under the trees counts from there
+		if (!float.IsNaN(st.HeadStartY))
+		{
+			float eyesUp = 1.93f * S * 0.85f;   // (stooped, the neck drawn out: a little under its standing eye height)
+			float p0 = Mathf.Clamp((st.HeadStartY - eyesUp - yDown) / Mathf.Max(yUp - yDown, 0.01f), 0f, 0.7f);
+			yDown = Mathf.Lerp(yDown, yUp, p0);
+			body.GlobalPosition = new Vector3(spot.X, yDown, spot.Z);
+		}
 		Vector3 toP = eye0 - body.GlobalPosition;
 		body.Rotation = new Vector3(0f, Mathf.Atan2(toP.X, toP.Z), 0f);
 		body.TrackTarget = eye0;

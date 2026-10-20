@@ -474,9 +474,33 @@ public partial class Act11Ending : Node3D
 		_fogZone.QueueFree();
 		_fogZone = null;
 		StoryBeat.Atmosphere(this)?.SetHeightFog(_original.GlobalPosition.Y + _original.TotalHeight * 0.4f, 0.1f, 9f);
+		Veil();
 		// (the radio's "Don't go up." and the stairs' first call wait until they're under the stairs, UnderTheStairs:
 		// 2026-10-13, both came here, at the fog's edge 70 m out)
 		_askUnder = ask;
+	}
+
+	/// <summary>For tests: the fog that swallows the flight above the eye.</summary>
+	public FogZone StairsVeil { get; private set; }
+
+	/// <summary>(2026-10-19, the owner: "the fog should be obscuring how tall the staircase actually is until the player
+	/// traverses it") a veil of thick fog over the whole flight and the woods round it: clear to a few metres above the
+	/// eye, solid above, the line rising with them as they climb, so the top is never seen until it's reached. A dim body
+	/// of its own: at night it reads as a pale wall, not as plain dark.</summary>
+	private void Veil()
+	{
+		if (StairsVeil != null || _original == null) return;
+		float h = _original.TotalHeight;
+		StairsVeil = new FogZone
+		{
+			Name = "StairsVeil", Mode = FogZone.Kind.Veil, Density = 0.2f, NoiseAmount = 0.35f, NoiseScale = 0.03f,
+			Albedo = new Color(0.62f, 0.64f, 0.68f), Emission = new Color(0.05f, 0.055f, 0.065f), EmissionEnergy = 1.8f,
+			RevealAbove = 5f, VeilRamp = 8f, Edge = 0.2f, VolumetricLength = 90f, StartStrength = 0f,
+			Size = new Vector3(FogRampRadius * 2f, h + 80f, FogRampRadius * 2f),
+			Position = new Vector3(0, h * 0.5f, _original.BackZ * 0.5f),
+		};
+		_original.AddChild(StairsVeil);
+		StairsVeil.FadeTo(1f, 6f);
 	}
 
 	private Area3D _underZone;
@@ -531,6 +555,9 @@ public partial class Act11Ending : Node3D
 		if (Pursuer != null && IsInstanceValid(Pursuer)) { Pursuer.QueueFree(); Pursuer = null; }
 		player.Inventory.ConsumeNewelPost();
 		RampFog(false);
+		// (the veil thins to a third: the treetops still deep in fog, the giant a shape coming up through it, never lost in it)
+		Veil();
+		StairsVeil?.FadeTo(0.35f, 2.5f);
 		_ = Cutscene.Run(this, async ct =>
 		{
 			await SeatCap(player, ct);
@@ -671,6 +698,8 @@ public partial class Act11Ending : Node3D
 			Forward = fwd,
 			GroundY = groundY,
 			Distance = GiantDistance,
+			// (2026-10-19) up from the landing's line, not the forest floor: seen from the top treads too, the whole rise
+			HeadStartY = _original.NewelSeatGlobal.Origin.Y + 1.5f,
 			Speed = auto ? 0.5f : 1f,
 			Look = target => DriveView(player, target, 0.09f, 0.05f),
 			Tremble = u => { Trembled = true; Shiver(player, u * TrembleRadians); },

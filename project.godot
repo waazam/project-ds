@@ -71,6 +71,8 @@ scaling_3d/scale=1.5
 mesh_lod/lod_change/threshold_pixels=0.5
 anti_aliasing/quality/screen_space_aa=0
 occlusion_culling/use_occlusion_culling=false
+environment/volumetric_fog/volume_size=96
+environment/volumetric_fog/volume_depth=96
 
 [shader_globals]
 

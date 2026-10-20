@@ -121,7 +121,8 @@ public partial class KeyPieceCache : Node3D
 
 		_use = new Interactable
 		{
-			Name = "Use", Prompt = "Open the tin", MaxDistance = 2.4f, PickRadius = 0.17f, PickOffset = new Vector3(0, 0.02f, 0),
+			// (2026-10-19: 0.17 m was a fiddly target down in the snag, found a second late even by the test's aim; about the glint's size now)
+			Name = "Use", Prompt = "Open the tin", MaxDistance = 2.4f, PickRadius = 0.26f, PickOffset = new Vector3(0, 0.04f, 0),
 		};
 		_tin.AddChild(_use);
 		_use.Interacted += OnUse;

@@ -160,7 +160,7 @@ public partial class Act1TreeFalls : Node3D
 			float h = mi == 0 ? 18f : mi == 1 ? 22f : 26f;
 			// lengthwise along the edge, forward, a little outward; near the stairs (it would reach the clearing) outward
 			Vector3 fall = s + h * 0.95f < L - 4f ? (tan + outward * 0.22f).Normalized() : (outward + tan * 0.35f).Normalized();
-			Add(p + new Vector2(outward.X, outward.Z) * SideOffset, fall, mi, h, s, Kind.Side, (int)sideSign, i + 1);
+			Add(p + new Vector2(outward.X, outward.Z) * SideOffset, fall, mi, h, s, Kind.Side, (int)sideSign, i + 1, p);
 		}
 		// the first of the walls, near the trail's end on the near side of the way: the one they watch come down after the
 		// fir (close enough to read through the fog), along the way's outer edge past the corner, closing the woods there
@@ -169,7 +169,7 @@ public partial class Act1TreeFalls : Node3D
 			var p = _line.At(FirstWallAt, out Vector2 d2);
 			var tan = new Vector3(d2.X, 0, d2.Y);
 			Vector3 outward = new Vector3(d2.Y, 0, -d2.X) * FirstWallSide;
-			Add(p + new Vector2(outward.X, outward.Z) * SideOffset, (tan + outward * 0.22f).Normalized(), 1, 22f, FirstWallAt, Kind.Side, FirstWallSide, 9);
+			Add(p + new Vector2(outward.X, outward.Z) * SideOffset, (tan + outward * 0.22f).Normalized(), 1, 22f, FirstWallAt, Kind.Side, FirstWallSide, 9, p);
 		}
 		for (int i = 0; i < BehindAt.Length; i++)
 		{
@@ -181,7 +181,7 @@ public partial class Act1TreeFalls : Node3D
 			// across the line from one side to the other, slanting back the way they came
 			var tan = new Vector3(d2.X, 0, d2.Y);
 			Vector3 fall = (-left * sideSign - tan * 0.25f).Normalized();
-			Add(p + new Vector2(left.X, left.Z) * sideSign * (SideOffset + 0.6f), fall, 2, 26f, s, Kind.Behind, (int)sideSign, 20 + i);
+			Add(p + new Vector2(left.X, left.Z) * sideSign * (SideOffset + 0.6f), fall, 2, 26f, s, Kind.Behind, (int)sideSign, 20 + i, p + d2 * 6f);   // (kept on the side toward the stairs)
 		}
 		// out in the woods either side: standing well off the way, falling along it (across the way of anyone walking
 		// out from it); none where it would lie near the line, the fir, the trail or the stairs
@@ -197,7 +197,7 @@ public partial class Act1TreeFalls : Node3D
 				const float h = 22f;
 				var tip = foot + fall2 * h * 0.95f;
 				if (!WardFits(foot, tip, stairsXZ)) continue;
-				Add(foot, new Vector3(fall2.X, 0, fall2.Y), 1, h, s, Kind.Ward, side, 40 + i * 2 + (side > 0 ? 0 : 1));
+				Add(foot, new Vector3(fall2.X, 0, fall2.Y), 1, h, s, Kind.Ward, side, 40 + i * 2 + (side > 0 ? 0 : 1), p);
 				WardCount++;
 			}
 	}
@@ -217,13 +217,13 @@ public partial class Act1TreeFalls : Node3D
 		return true;
 	}
 
-	private void Add(Vector2 at, Vector3 fall, int mesh, float h, float s, Kind kind, int side, int seed)
+	private void Add(Vector2 at, Vector3 fall, int mesh, float h, float s, Kind kind, int side, int seed, Vector2 keep)
 	{
 		var foot = new Vector3(at.X, _terrain.HeightAt(at.X, at.Y) - 0.05f, at.Y);
-		var t = new FallingTree { Name = $"{kind}Tree{seed}", Mesh = _meshes[mesh], Height = h, TrunkR = 0.36f + mesh * 0.04f, FallDir = fall, Seed = seed };
+		var t = new FallingTree { Name = $"{kind}Tree{seed}", Mesh = _meshes[mesh], Height = h, TrunkR = 0.36f + mesh * 0.04f, FallDir = fall, Seed = seed, KeepToward = new Vector3(keep.X, foot.Y, keep.Y) };
 		t.Reserve(this, _terrain, foot);
+		t.Position = foot;   // (this node is top level at the origin: local is world; set before it readies, which measures its fall and lays its lying collision from there)
 		AddChild(t);
-		t.GlobalPosition = foot;
 		_trees.Add(new Entry { Tree = t, At = s, Kind = kind, Side = side });
 	}
 

@@ -16,6 +16,21 @@ public partial class Playtest
 {
 	private ForestTerrain Terrain => GroundSnap.FindTerrain(this);
 
+	/// <summary>(2026-10-19) A fallen trunk is a wall: put beside it on the side it keeps them to, walked straight at it and on
+	/// for three seconds, they never come out on its far side (the trunks were walked through, laid at the origin's ground).
+	/// Where they ended up across it (metres; positive is still on their own side).</summary>
+	private async Task<float> TrunkHolds(FallingTree tree, CancellationToken ct)
+	{
+		var (a, b) = tree.LieSegment;
+		Vector3 mid = a.Lerp(b, 0.35f);
+		Vector3 side = Vector3.Up.Cross(tree.FallDir).Normalized();
+		float own = tree.KeepToward is { } k && (k - a).Dot(side) < 0f ? -1f : 1f;
+		Vector3 from = mid + side * own * 3.5f, to = mid - side * own * 5f;
+		await _bot.Teleport(from, to, ct);
+		await _bot.WalkFor(to, 3, ct);
+		return (Player.GlobalPosition - a).Dot(side) * own;
+	}
+
 	/// <summary>A point on the trail <paramref name="metres"/> before (negative: after) the trail point nearest <paramref name="target"/>.</summary>
 	private Vector3 TrailBefore(Vector3 target, float metres)
 	{
@@ -161,8 +176,13 @@ public partial class Playtest
 		Check($"half {piece}'s tin glints under the blacklight", cache.Glint > 0.3f, $"glint {cache.Glint:0.00}");
 		Shot($"key_half_{piece}");
 		await _bot.LanternMode(false, ct);
-		await _bot.Aim(c, ct);
-		await _bot.WaitUntil(() => _bot.Prompt == "Open the tin", 1.5, ct);
+		// (looked at as a player would, the eye kept on it: right after the lantern's switch the first aim is sometimes
+		// carried off it, and a single aim and a wait failed this though the press a moment later took the tin)
+		for (int look = 0; look < 6 && _bot.Prompt != "Open the tin"; look++)
+		{
+			await _bot.Aim(c, ct);
+			await _bot.WaitUntil(() => _bot.Prompt == "Open the tin", 0.5, ct);
+		}
 		Check($"the tin offers itself", _bot.Prompt == "Open the tin", $"'{_bot.Prompt}'");
 		// (2026-10-16) up to three tries, each re-aimed and waiting for the tin's own E-point to be in focus; whatever keeps the
 		// press from reaching it is logged ([keydbg]) and the check below fails
@@ -479,6 +499,18 @@ public partial class Playtest
 		Check("none of them within reach", herd.NearestAtCrack > 4f, $"{herd.NearestAtCrack:0.0} m");
 		Check("they fell where the giant looked", giant == null || giant.Looks >= 1 || Story.GiantEventDone, $"looks {giant?.Looks}, head snaps {giant?.HeadSnaps}");
 		Shot("herded");
+		// (2026-10-19) and the walls hold: walked straight at, none lets them through
+		Vector3 atLookout = Player.GlobalPosition;
+		var held = new System.Collections.Generic.List<string>();
+		bool allHold = true;
+		foreach (var wall in herd.SideTreesDown.Take(3))
+		{
+			float across = await TrunkHolds(wall, ct);
+			held.Add($"{wall.Name} {across:0.0} m");
+			allHold &= across > 0f;
+		}
+		Check("the fallen walls hold: walked into, none lets them through", held.Count >= 2 && allHold, string.Join(", ", held));
+		await _bot.Teleport(atLookout, cabin.GlobalPosition, ct);
 		await _bot.Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
 		await _bot.WaitUntil(() => giant == null || giant.Released || Story.GiantEventDone, 8, ct);
 		Check("at the lookout watching the fire: its last pass", giant == null || giant.Released || Story.GiantEventDone);
@@ -652,6 +684,11 @@ public partial class Playtest
 		var foot = stairs.GlobalPosition;
 		await _bot.Teleport(act11.ApproachWorld ?? foot + stairs.GlobalBasis.Z * 6f, foot, ct);
 		await _bot.WalkTo(foot, 0.6f, ct, giveUp: 10f);
+		// (2026-10-19) from the foot, looking up the flight: its top lost in the veil
+		await _bot.WaitUntil(() => act11.StairsVeil is { Strength: > 0.95f }, 8, ct);
+		Check("at the foot: the fog swallows the flight above the eye", act11.StairsVeil is { Strength: > 0.95f, Visible: true }, $"{act11.StairsVeil?.Strength:0.00}");
+		await _bot.Aim(stairs.ToGlobal(new Vector3(0, stairs.TotalHeight * 0.6f, stairs.BackZ * 0.6f)), ct);
+		await FogProbe(act11.StairsVeil, "stairs_veil", ct);
 		Vector3 Tread(float frac) { float t = stairs.Steps * frac; return stairs.ToGlobal(new Vector3(0, t * stairs.Rise + 0.1f, -t * stairs.Run)); }
 		await _bot.Inside(Tread(0.38f), Tread(0.6f), ct);
 		await _bot.WalkTo(Tread(0.5f), 0.5f, ct, giveUp: 10f);

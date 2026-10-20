@@ -288,6 +288,9 @@ public partial class StationInterior : Node3D
 				World.FurnitureKit.Place(desk, "ss_desk_open1", dxf, StationStory.Roles, "DeskOpen1"),
 				World.FurnitureKit.Place(desk, "ss_desk_open2", dxf, StationStory.Roles, "DeskOpen2"),
 			};
+			// (2026-10-19) placed on their own, the desks aren't in the kit's mesh below, whose collision was the desk's: it
+			// was walked through. Its body as the drawn desk's (the top at 0.79 m, 1.9 x 0.8)
+			StationStory.Solid(desk, new Vector3(0, 0.4f, 0), new Vector3(1.9f, 0.8f, 0.8f), "wood", "DeskBody");
 			modelled = true;
 		}
 		else modelled = World.FurnitureKit.Add(k, "station_desk", Vector3.Zero, 0f, StationParts.LobbyDecor.Roles, deskScale);

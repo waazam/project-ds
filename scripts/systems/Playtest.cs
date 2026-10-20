@@ -425,6 +425,23 @@ public partial class Playtest : Node
 
 	// ------------------------------------------------------------------ output
 
+	/// <summary>(2026-10-19) A fog zone: its state in the log, and the view with it and without it (label_on, label_off).</summary>
+	private async Task FogProbe(World.FogZone zone, string label, CancellationToken ct)
+	{
+		var env = GetViewport().World3D?.Environment ?? GetTree().Root.GetCamera3D()?.Environment;
+		var cam = GetViewport().GetCamera3D();
+		GD.Print($"[fog] {label}: zone {(zone != null ? "there" : "MISSING")} visible {zone?.Visible} strength {zone?.Strength:0.00} camera in {(zone != null && cam != null ? zone.Contains(cam.GlobalPosition) : false)}; "
+			+ $"env volumetric {env?.VolumetricFogEnabled} density {env?.VolumetricFogDensity:0.000} length {env?.VolumetricFogLength:0}");
+		if (zone == null) return;
+		await _bot.Seconds(0.6, ct);
+		Shot(label + "_on");
+		float s = zone.Strength;
+		zone.FadeTo(0f, 0f);
+		await _bot.Seconds(0.6, ct);
+		Shot(label + "_off");
+		zone.FadeTo(s, 0f);
+	}
+
 	private void Shot(string label)
 	{
 		var r = Result;

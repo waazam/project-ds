@@ -77,6 +77,8 @@ public partial class Act7TreeFalls : Node3D
 	public float Progress { get; private set; }
 	public float Length => _sB - _sA;
 	public bool Live { get; private set; }
+	/// <summary>For tests: the walls beside the way that have come down.</summary>
+	public IEnumerable<FallingTree> SideTreesDown { get { foreach (var e in _trees) if (e.Kind == Kind.Side && e.Tree.Down) yield return e.Tree; } }
 
 	public override void _Ready()
 	{
@@ -115,7 +117,7 @@ public partial class Act7TreeFalls : Node3D
 			// (never over the lookout: it falls shorter of it, outward)
 			var foot = p + left * side * SideOffset;
 			if (Flat(foot + fall * h).DistanceTo(lookXZ) < 10f) fall = (left * side + tan * 0.4f).Normalized();
-			Add(foot, fall, mi, h, s, Kind.Side, side, seed++, cabinXZ, lookXZ);
+			Add(foot, fall, mi, h, s, Kind.Side, side, seed++, cabinXZ, lookXZ, p);
 		}
 		for (int i = 0; i < BehindAt.Length; i++)
 		{
@@ -125,7 +127,7 @@ public partial class Act7TreeFalls : Node3D
 			int side = i % 2 == 0 ? -1 : 1;
 			// across the way from one side to the other, slanting back the way they came
 			var fall = (-left * side - tan * 0.25f).Normalized();
-			Add(p + left * side * (SideOffset + 0.6f), fall, 2, 26f, s, Kind.Behind, side, seed++, cabinXZ, lookXZ);
+			Add(p + left * side * (SideOffset + 0.6f), fall, 2, 26f, s, Kind.Behind, side, seed++, cabinXZ, lookXZ, p + tan * 6f);   // (kept on the side toward the lookout)
 		}
 		for (int i = 0; i < WardAt.Length; i++)
 			foreach (int side in new[] { 1, -1 })
@@ -134,7 +136,7 @@ public partial class Act7TreeFalls : Node3D
 				var p = _terrain.TrailPoint(_sA + s, out var tan);
 				var left = new Vector3(tan.Z, 0, -tan.X).Normalized();
 				var fall = (tan + left * side * 0.12f).Normalized();
-				Add(p + left * side * WardOffset, fall, 1, 22f, s, Kind.Ward, side, seed++, cabinXZ, lookXZ);
+				Add(p + left * side * WardOffset, fall, 1, 22f, s, Kind.Ward, side, seed++, cabinXZ, lookXZ, p);
 			}
 		Callable.From(Restore).CallDeferred();
 		if (StoryManager.Instance is { } sm) sm.CheckpointReached += OnCheckpoint;
@@ -155,7 +157,7 @@ public partial class Act7TreeFalls : Node3D
 	}
 
 	/// <summary>A tree, unless where it would lie crosses the cabin, the lookout or (a ward) the way itself.</summary>
-	private void Add(Vector3 at, Vector3 fall, int mesh, float h, float s, Kind kind, int side, int seed, Vector2 cabin, Vector2 lookout)
+	private void Add(Vector3 at, Vector3 fall, int mesh, float h, float s, Kind kind, int side, int seed, Vector2 cabin, Vector2 lookout, Vector3 keep)
 	{
 		var foot = new Vector3(at.X, _terrain.HeightAt(at.X, at.Z) - 0.05f, at.Z);
 		Vector2 a = Flat(foot), b = Flat(foot + fall * h * 0.95f);
@@ -166,7 +168,7 @@ public partial class Act7TreeFalls : Node3D
 				var q = a.Lerp(b, u);
 				if (_terrain.TrailDistance(q.X, q.Y, out _) < 6f) return;
 			}
-		var t = new FallingTree { Name = $"Act7{kind}Tree{seed}", Mesh = _meshes[mesh], Height = h, TrunkR = 0.36f + mesh * 0.04f, FallDir = fall, Seed = 60 + seed };
+		var t = new FallingTree { Name = $"Act7{kind}Tree{seed}", Mesh = _meshes[mesh], Height = h, TrunkR = 0.36f + mesh * 0.04f, FallDir = fall, Seed = 60 + seed, KeepToward = keep };
 		t.Reserve(this, _terrain, foot);
 		t.Position = foot;   // (this node is top level at the origin: local is world; set before it readies, which measures its fall from there)
 		AddChild(t);

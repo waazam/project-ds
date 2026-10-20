@@ -249,8 +249,8 @@ public partial class Act1Walks : Node3D
 		var foot = new Vector3(at.X, _terrain.HeightAt(at.X, at.Y) - 0.05f, at.Y);
 		var t = new FallingTree { Name = name, Mesh = _meshes[mesh], Height = h, TrunkR = mesh == 2 ? 0.26f : 0.36f + mesh * 0.04f, FallDir = fall, Seed = seed };
 		t.Reserve(this, _terrain, foot);
+		t.Position = foot;   // (top level at the origin: local is world; set before it readies, as in Act7TreeFalls)
 		AddChild(t);
-		t.GlobalPosition = foot;
 		return t;
 	}
 
@@ -269,6 +269,8 @@ public partial class Act1Walks : Node3D
 		if (into == null || into.Length < at + 2f) return;
 		var (foot, fall) = Across(into, at, side, 5.2f);
 		var t = MakeTree(foot, fall, mesh, mesh == 0 ? 18f : 22f, seed, $"Closer{closes}");
+		var mouth = into.At(0f, out _);
+		t.KeepToward = new Vector3(mouth.X, t.Position.Y, mouth.Y);   // (anyone caught under it is put out at the way's mouth, not shut in)
 		_closers.Add(new Closer { Tree = t, Closes = closes, Into = into, At = at });
 	}
 

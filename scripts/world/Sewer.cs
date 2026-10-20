@@ -47,6 +47,8 @@ public partial class Sewer : Node3D
 	private ShaderMaterial _waterMat;
 	private readonly List<Node3D> _floaters = new();
 	private readonly List<OmniLight3D> _lamps = new();
+	/// <summary>For tests: the fog lying on the water.</summary>
+	public World.FogZone FloorFog { get; private set; }
 	private bool _ambient;
 	private SpotLight3D _holeLight;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 1717 };
@@ -96,6 +98,17 @@ public partial class Sewer : Node3D
 		BuildDebris();
 		BuildLights();
 		BuildHole();
+		// (2026-10-19, the owner: a light fog layer in the sewer, the lamps lighting it) lying on the water down the pipe and
+		// over the cistern, about chest deep at its thickest, drifting; the sodium lamps colour it, the far end goes into it
+		AddChild(FloorFog = new World.FogZone
+		{
+			Name = "FloorFog", Mode = World.FogZone.Kind.Layer, Density = 0.16f, LayerHeight = 1.8f, FloorY = Water - 2f,
+			NoiseAmount = 0.55f, NoiseScale = 0.07f, Wind = new Vector3(0.08f, 0f, 0.22f), Albedo = new Color(0.66f, 0.62f, 0.55f),
+			// (a breath of the lamps' amber of its own: the lamps are few, and between them it has to read, not just darken)
+			Emission = new Color(0.05f, 0.035f, 0.02f), EmissionEnergy = 0.6f,
+			Edge = 0.04f, VolumetricLength = 70f,
+			Size = new Vector3(RoomX * 2f + 2f, 6f, RoomZ1 + 4f), Position = new Vector3(0, 2f, RoomZ1 * 0.5f),
+		});
 
 		// the pipe is a long tunnel, the cistern a cavern: drips and a chain somewhere far off in it
 		AudioDirector.Zone(this, new Vector3(0, PipeCy, TunnelLen * 0.5f), new Vector3(PipeR * 2f, PipeR * 2f, TunnelLen), AudioDirector.Space.Tunnel, "PipeVerb");
