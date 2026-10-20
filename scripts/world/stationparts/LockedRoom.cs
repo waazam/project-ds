@@ -96,6 +96,8 @@ public partial class LockedRoom : Node3D
 		StationStory.Place(_stackUp, "dining_chair", new Transform3D(new Basis(Vector3.Up, 0.3f) * new Basis(Vector3.Back, Mathf.Pi), new Vector3(-0.1f, 0.995f + 0.95f, -0.36f)), roles);
 		StationStory.Solid(_stackUp, new Vector3(-0.02f, 0.2f, -0.3f), new Vector3(0.82f, 0.4f, 0.44f));
 		StationStory.Solid(_stackUp, new Vector3(-0.08f, 0.7f, -0.36f), new Vector3(0.62f, 0.62f, 0.62f), "wood", "CrateBody");
+		// (2026-10-19, the clip audit: walked through) the chair upended on the crate, at head height
+		StationStory.Solid(_stackUp, new Vector3(-0.1f, 1.47f, -0.36f), new Vector3(0.5f, 0.92f, 0.5f), "wood", "ChairBody");
 
 		_stackDown = new Node3D { Name = "StackShoved", Visible = false };
 		AddChild(_stackDown);
@@ -104,6 +106,7 @@ public partial class LockedRoom : Node3D
 		StationStory.Place(_stackDown, "dining_chair", new Transform3D(new Basis(Vector3.Up, 2.2f) * new Basis(Vector3.Right, -1.5f), new Vector3(-0.45f, 0.24f, -1.2f)), roles);
 		StationStory.Solid(_stackDown, new Vector3(-1.1f, 0.2f, -0.5f), new Vector3(0.82f, 0.4f, 0.44f));
 		StationStory.Solid(_stackDown, new Vector3(-1.55f, 0.3f, -1.15f), new Vector3(0.62f, 0.6f, 0.62f), "wood", "CrateBody");
+		StationStory.Solid(_stackDown, new Vector3(-0.45f, 0.24f, -1.2f), new Vector3(0.9f, 0.48f, 0.5f), "wood", "ChairBody");   // (on its back on the floor)
 	}
 
 	// ------------------------------------------------------------------ the room
