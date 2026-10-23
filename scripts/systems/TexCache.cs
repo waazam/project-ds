@@ -87,6 +87,8 @@ public static class TexCache
 		get
 		{
 			if (_bakedOk is { } ok) return ok;
+			// (2026-10-23) never while baking: a bake that read the copy it replaces drew only what that lacked, and kept only that
+			if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bake-texcache") >= 0) return (_bakedOk = false).Value;
 			string keyFile = $"{BakedDir}/key.txt";
 			if (!FileAccess.FileExists(keyFile)) return (_bakedOk = false).Value;
 			string baked = FileAccess.GetFileAsString(keyFile).Trim();
