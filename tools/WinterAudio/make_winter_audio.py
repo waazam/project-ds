@@ -192,5 +192,6 @@ def gen_steps():
 
 
 if __name__ == "__main__":
-    gen_mimics(); gen_leap(); gen_whump(); gen_ice_crack(); gen_tinkle(); gen_steps()
+    # (2026-10-22) the leap is tools/AudioGen's now (WendigoVoice.cs: its bough here buzzed like a motor); gen_leap() kept for reference
+    gen_mimics(); gen_whump(); gen_ice_crack(); gen_tinkle(); gen_steps()
     print("done")

@@ -89,6 +89,12 @@ for (int i = 1; i <= 3; i++) jobs.Add(($"tree_fall_impact_{i:00}", sfx, false, L
 // Act 23's end (2026-10-04): the wendigo on the balcony's rail, landing on the floor, ramming and clawing the doors.
 for (int i = 1; i <= 2; i++) jobs.Add(($"lodge_rail_groan_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.RailGroan(r, sr)));
 for (int i = 1; i <= 2; i++) jobs.Add(($"wendigo_land_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Land(r, sr)));
+// (2026-10-22) its howl, an animal's now (WendigoVoice.cs; it was make_crawl_audio.py's revving sawtooth): 01..04 each worse,
+// and far off through walls and trees
+for (int i = 1; i <= 4; i++) { int k = i; jobs.Add(($"wendigo_howl_{k:00}", sfx, false, Hi, (r, sr) => Creature.WendigoHowl(r, sr, k, false))); }
+for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"wendigo_howl_far_{k:00}", sfx, false, Lo, (r, sr) => Creature.WendigoHowl(r, sr, k, true))); }
+// its leap into the trees (make_winter_audio.py's had a motor's buzz for the bough)
+for (int i = 1; i <= 3; i++) { int k = i; jobs.Add(($"wendigo_leap_{k:00}", sfx, false, Hi, (r, sr) => Creature.WendigoLeap(r, sr, k))); }
 for (int i = 1; i <= 2; i++) jobs.Add(($"door_ram_{i:00}", sfx, false, Lo, (r, sr) => LodgeDoor.Ram(r, sr, false)));
 jobs.Add(("door_ram_burst", sfx, false, Lo, (r, sr) => LodgeDoor.Ram(r, sr, true)));
 jobs.Add(("fly_buzz_loop", ambient, true, Lo, (r, sr) => LodgeDoor.FlyBuzz(r, sr)));

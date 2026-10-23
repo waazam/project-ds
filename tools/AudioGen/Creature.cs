@@ -13,7 +13,7 @@ using static Dsp;
 /// at the mouth, then tanh saturation and a room. All of it stays deep: fundamentals 30-110 Hz,
 /// screeches capped under 4 kHz and given a sub layer, so nothing reads as thin or high.
 /// </summary>
-public static class Creature
+public static partial class Creature
 {
 	static double[] Buf(int sr, double sec) => new double[(int)(sec * sr)];
 

@@ -249,7 +249,9 @@ def gen_dive():
 
 
 if __name__ == "__main__":
-    gen_howls()
+    # (2026-10-22) the howls are tools/AudioGen's now (WendigoVoice.cs: an animal's throat, not this revving sawtooth);
+    # gen_howls() is left for reference and no longer writes them
+    # gen_howls()
     gen_forever()
     gen_wall_burst()
     gen_claw_scrape()
