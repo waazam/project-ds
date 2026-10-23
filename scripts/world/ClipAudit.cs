@@ -92,6 +92,7 @@ public partial class ClipAudit : Node
 				await AuditLevel("hollow", "res://scenes/levels/hollow_world.tscn");
 			}
 			WriteReport();
+			if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bake-texcache") >= 0) ProjectDS.Systems.TexCache.BakeToProject();
 		}
 		catch (Exception e) { GD.PushError("[clip] " + e); }
 		finally

@@ -556,6 +556,9 @@ public partial class Playtest
 			return;
 		}
 		Check("all ten valves turned, never crushed", boss.ValvesTurned == BossRoom.ValvesToTurn, $"{boss.ValvesTurned} valves, {boss.Slams} slams, {evades} dodged");
+		// (2026-10-22) the fight in blood: the catwalk, walls, pipes and wheels stained, and blood on the lens
+		Check("the slams leave blood: pools, sprays, runs", boss.BloodDecals >= Mathf.Min(boss.Slams * 3, 200) && boss.Slams > 0, $"{boss.BloodDecals} stains for {boss.Slams} slams");
+		Check("blood on the lens from a slam close by", ProjectDS.UI.StyleFx.LensHits > 0, $"{ProjectDS.UI.StyleFx.LensHits} hits");
 		Check("with every valve it rotted: fully gone", boss.Beast.Rot > 0.99f, $"rot {boss.Beast.Rot:0.00}");
 		using (Fast(3)) await _bot.WaitUntil(() => boss.DoorOpen, 45, ct);
 		Check("its eyes burst, it dies, the far door opens", boss.Beast.Dead && boss.DoorOpen);

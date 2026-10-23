@@ -12,8 +12,10 @@ Run from the project folder, with `dotnet build` first after any C# change. Argu
 ```sh
 dotnet build
 Godot_v4.7.2-stable_mono_win64.exe --path .                     # play
+Godot_v4.7.2-stable_mono_win64_console.exe --path . res://scenes/levels/clip_audit.tscn -- --bake-texcache   # before a release: ship the drawn textures (assets/texcache_baked)
 Godot_v4.7.2-stable_mono_win64_console.exe --headless --path . --export-release "Windows Desktop" build/windows/DeadSilent.exe   # release build
 ```
+Bake after any change to the texture-drawing code, then export: the game draws a texture itself only if the shipped copy hasn't it. F9 in game saves a bug report (screenshot, state, log) under `%APPDATA%\Godot\app_userdata\Project DS\bug_reports`.
 
 ## Tests
 All of them write to `test-output/` and exit with code 1 on any failed check. Use the `_console.exe` so the log shows.

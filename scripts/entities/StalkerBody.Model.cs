@@ -68,6 +68,7 @@ public partial class StalkerBody
 		public int[] Fingers;
 		public Vector3 Target, Wrap;
 		public bool On, Wrong;
+		public bool Fitted;
 		public float W;
 	}
 	private readonly List<Grip> _grips = new();
@@ -421,6 +422,19 @@ public partial class StalkerBody
 		Vector3 Wr = _skel.GetBoneGlobalPose(g.Hand).Origin;
 		Vector3 T = Wr.Lerp(inv * g.Target, g.W);
 		float l1 = S.DistanceTo(E), l2 = E.DistanceTo(Wr);
+		// (2026-10-23, the lag-meter run: a hand 0.22 m short of the bark) a grip set out of the arm's reach slides along the
+		// trunk's edge (up or down it, so still on the bark) until it's within it; once, as the hand first goes to it
+		if (!g.Fitted)
+		{
+			g.Fitted = true;
+			float reach = (l1 + l2) * 0.96f;
+			Vector3 up = (inv.Basis * Vector3.Up).Normalized();
+			Vector3 off = inv * g.Target - S;
+			float along = off.Dot(up);
+			Vector3 flat = off - up * along;
+			if (off.Length() > reach && flat.Length() < reach * 0.98f)
+				g.Target = _skel.GlobalTransform * (S + flat + up * Mathf.Sqrt(reach * reach - flat.LengthSquared()) * (along >= 0f ? 1f : -1f));
+		}
 		Vector3 toT = T - S;
 		float d = Mathf.Clamp(toT.Length(), Mathf.Abs(l1 - l2) + 1e-3f, l1 + l2 - 1e-3f);
 		Vector3 dir = toT.Normalized();

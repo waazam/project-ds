@@ -30,6 +30,8 @@ SaveIndicator="*res://scripts/ui/SaveIndicator.cs"
 CinemaFrame="*res://scripts/ui/CinemaFrame.cs"
 DetailSweep="*res://scripts/world/DetailSweep.cs"
 PerfProbe="*res://scripts/systems/PerfProbe.cs"
+BugReport="*res://scripts/ui/BugReport.cs"
+StyleFx="*res://scripts/ui/StyleFx.cs"
 
 [display]
 

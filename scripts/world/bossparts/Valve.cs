@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using ProjectDS.Systems;
 
@@ -145,5 +146,20 @@ public partial class Valve : Node3D
 		if (_wheel == null) return;
 		_wheel.Rotation = new Vector3(0, 0, -Progress * Mathf.Tau * 3f);
 		_needle.Rotation = new Vector3(0, 0, Mathf.Lerp(-2.0f, 1.6f, 1f - Progress) * -1f);
+	}
+
+	/// <summary>(2026-10-22) Spattered from a slam at <paramref name="from"/>: the wheel's face (the stain turns with it) and
+	/// the body behind it; the streaks thrown away from the blow.</summary>
+	public List<Decal> Bloody(ulong seed, Vector3 from)
+	{
+		var made = new List<Decal>();
+		if (_wheel == null) return made;
+		var rng = new RandomNumberGenerator { Seed = seed };
+		Vector3 face = (WheelWorld - GlobalPosition).Normalized();
+		Vector3 away = WheelWorld - from;
+		made.Add(World.Blood.Splat(_wheel, WheelWorld + face * 0.05f + GlobalBasis.X * rng.RandfRange(-0.15f, 0.15f), face, rng.RandfRange(0.6f, 0.95f), World.Blood.Kind.Spray, 0f, away, depth: 0.3f));
+		if (rng.Randf() < 0.7f)
+			made.Add(World.Blood.Splat(this, GlobalPosition + face * 0.25f + Vector3.Down * rng.RandfRange(0f, 0.5f), face, rng.RandfRange(0.5f, 0.9f), World.Blood.Kind.Drip, 0f, Vector3.Down, depth: 0.7f, length: 1.6f));
+		return made;
 	}
 }

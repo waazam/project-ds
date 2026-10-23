@@ -19,6 +19,14 @@ namespace ProjectDS.Entities;
 public static class CreatureDetail
 {
 	private static readonly Dictionary<Mesh, ArrayMesh> _done = new();
+	private static readonly Dictionary<string, float[]> _curv = new();
+
+	private static string TopologyKey(int verts, int[] idx)
+	{
+		ulong h = 1469598103934665603UL;
+		foreach (int i in idx) h = (h ^ (uint)i) * 1099511628211UL;
+		return $"{verts}:{idx.Length}:{h:x}";
+	}
 	private static Texture2D _normal, _mask;
 
 	public static Texture2D NormalMap => _normal ??= GD.Load<Texture2D>("res://assets/textures/creatures/flesh_detail_normal.png");
@@ -86,7 +94,11 @@ public static class CreatureDetail
 				madeTangents = true;
 			}
 			ulong tc = Time.GetTicksUsec();
-			float[] curv = Curvature(v, n, idx);
+			// (2026-10-23, the lag meter: the lake's limbs, each laid along its own length from the one Blender limb, worked
+			// their creases out afresh every breach, 25-40 ms mid-crossing) the creases kept by the mesh's topology: stretched to
+			// another length, a limb's ribs and knuckles are the same vertices
+			string ck = idx == null ? null : TopologyKey(v.Length, idx);
+			if (ck == null || !_curv.TryGetValue(ck, out var curv)) { curv = Curvature(v, n, idx); if (ck != null) _curv[ck] = curv; }
 			curvUs += Time.GetTicksUsec() - tc;
 			var c0 = new float[v.Length * 4];
 			var c1 = new float[v.Length * 4];

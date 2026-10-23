@@ -69,6 +69,8 @@ public partial class StoryTest : Node
 		/// (an act that fails doesn't take the rest of the run down with it).</summary>
 		public int FailsAtActStart;
 		public int ReseededAt = -1;
+		/// <summary>The step --story-from seeded the run at (it starts from its own save already).</summary>
+		public int SeededStep = -1;
 	}
 
 	private static Session _s;
@@ -152,6 +154,7 @@ public partial class StoryTest : Node
 		var (cp, flags, inventory) = StateFor(act);
 		SaveSystem.Save(new SaveData { Checkpoint = cp, Flags = flags, Inventory = inventory });
 		_s.Step = index;
+		_s.SeededStep = index;
 		_s.CurrentAct = _steps[index].Act;
 		GD.Print($"[storytest] --story-from={act}: continuing into '{_steps[index].Act}' at {cp} with {flags.Length} flags, gear '{inventory}'");
 		if (StoryManager.Instance?.ContinueGame() == true) return true;
@@ -211,7 +214,11 @@ public partial class StoryTest : Node
 					int fails = _s.Checks.Count(c => !c.ok);
 					bool failed = fails > _s.FailsAtActStart;
 					_s.FailsAtActStart = fails;
-					if (failed && ActOf(step) >= 3 && _s.ReseededAt != _s.Step)
+					// (2026-10-22) and in --measure-walks, every act with a walk to time starts from its own save: the other acts'
+					// steps are skipped, so the story never got there (a range's Act 14 found no stairwell built, and the hall's
+					// red light, green light still running took the walker in the sewer)
+					bool measure = MeasureWalks && ActOf(step) is 11 or 14 or 15 or 17 or 21 or 24;
+					if ((failed || measure) && ActOf(step) >= 3 && _s.ReseededAt != _s.Step && !(measure && _s.Step == _s.SeededStep))
 					{
 						_s.ReseededAt = _s.Step;
 						var (cp, flags, inventory) = StateFor(ActOf(step));
@@ -739,7 +746,7 @@ public partial class StoryTest : Node
 				$"closest {st.MinAnswerGap * 1000f:0} ms");
 			Check("its steps sit a little under the player's own", st.ShadowStepsAnswered == 0 || st.LastStepRelDb is >= -14f and <= 0f,
 				$"{st.LastStepRelDb:0.0} dB relative");
-			Check("it comes from at least three directions", st.DirectionsUsed >= 3, $"{st.DirectionsUsed} sectors, peeks {st.PeekCount}");
+			Check("it comes from at least three directions (or one for each peek, when it peeked less)", st.DirectionsUsed >= Mathf.Min(3, st.PeekCount), $"{st.DirectionsUsed} sectors, peeks {st.PeekCount}");
 			Check("no snarl ever", st.SnarlCount == 0);
 			// (in the walk's first stretch it's only heard, not drawn, so its hands aren't posed: then no grip is measured yet)
 			Check("its long fingers go round the bark at a trunk's edge", st.Body is { GripCount: >= 1 } bg && (bg.LastGripError is >= 0f and < 0.06f || st.SoundOnly && bg.LastGripError < 0f),
@@ -2576,8 +2583,9 @@ public partial class StoryTest : Node
 		int w0 = sewer.Whispers;
 		await Seconds(8.0, ct);
 		var atmo = StoryBeat.Atmosphere(this);
-		Check("the second no: a hazy teal light, and the whispers multiply", sewer.Noes == 2 && sewer.Teal && sewer.Whispers >= w0 + 3
-			&& (atmo == null || atmo.UndergroundFogColor.G > atmo.UndergroundFogColor.R * 2f), $"{sewer.Whispers - w0} more whispers, fog {atmo?.UndergroundFogColor}");
+		Check("the second no: the brown-out's murk comes up, and the whispers multiply", sewer.Noes == 2 && sewer.Teal && sewer.Whispers >= w0 + 3
+			// (since 2026-10-14h a brown murk, not the teal it was: red over green over blue)
+			&& (atmo == null || atmo.UndergroundFogColor.R > atmo.UndergroundFogColor.G && atmo.UndergroundFogColor.G > atmo.UndergroundFogColor.B && atmo.UndergroundFogColor.R > 0.05f), $"{sewer.Whispers - w0} more whispers, fog {atmo?.UndergroundFogColor}");
 		await Aim(sewer.ToGlobal(new Vector3(-12f, 3f, Sewer.RoomZ0 + 10f)), ct);
 		Screenshot("teal_haze");
 		// yes, and yes
@@ -3288,7 +3296,7 @@ public partial class StoryTest : Node
 			var weather = Weather.Instance;
 			var layers = weather?.FindChildren("Snow*", "GPUParticles3D", false, false);
 			Check("the snow falls in layers round the camera (near flakes, the many beyond, the far curtain), sheltered by roofs and boughs",
-				weather is { Snow: > 0.6f } && layers?.Count == 2 && layers.All(l => ((GpuParticles3D)l).Emitting) && weather.FindChild("Shelter", false, false) != null && weather.FindChild("Curtain0", false, false) is MeshInstance3D { Visible: true },
+				weather is { Snow: > 0.6f } && layers?.Count >= 2 && layers.Where(l => l.Name != "SnowLens").All(l => ((GpuParticles3D)l).Emitting) && weather.FindChild("Shelter", false, false) != null && weather.FindChild("Curtain0", false, false) is MeshInstance3D { Visible: true },
 				$"snow {weather?.Snow:0.00}, layers {layers?.Count}");
 			float clear = weather?.VisibilityMetres ?? 0f;
 			weather?.SetBlizzard(1f, 0.01f);
@@ -3332,13 +3340,14 @@ public partial class StoryTest : Node
 		Check("and it's gone", !woods.Wendigo.Visible);
 		// behind them, by a tree: turn round and it goes
 		await Aim(R(along + 40f) + Vector3.Up * 1.6f, ct);
+		int leaps0 = woods.Wendigo.Leaps;
 		bool behind = false;
 		for (int i = 0; i < 20 && !behind; i++) { behind = woods.DebugAppearBehind(); if (!behind) await Seconds(0.3, ct); }
 		Check("it takes its place behind them, by a tree", behind && woods.Wendigo.Visible, $"at {woods.Wendigo.GlobalPosition}");
 		float dist = woods.Wendigo.GlobalPosition.DistanceTo(_player.GlobalPosition);
 		Check("16-40 m back", dist > 12f && dist < 44f, $"{dist:0.0} m");
 		await Seconds(1.0, ct);
-		Check("while they look away, it stays", woods.Wendigo.Visible && woods.Wendigo.Leaps == 1);
+		Check("while they look away, it stays", woods.Wendigo.Visible && woods.Wendigo.Leaps == leaps0, $"visible {woods.Wendigo.Visible}, leaps {woods.Wendigo.Leaps - leaps0} since");
 		int leaps = woods.Wendigo.Leaps;
 		await Aim(woods.Wendigo.ChestWorld, ct);
 		Screenshot("act22_wendigo_behind");
@@ -4672,7 +4681,7 @@ public partial class StoryTest : Node
 		// (out of reach, or something between: a step closer, and look again)
 		if (focus == null && Flat(_player.GlobalPosition).DistanceTo(Flat(aim)) > 1.2f)
 		{
-			await WalkTo(aim, 1.0f, ct, giveUp: 6f);
+			await WalkTo(aim, 1.0f, ct, giveUp: _player.WadeScale < 0.8f ? 14f : 6f);   // (deep snow: slow going)
 			await Aim(aim, ct);
 			focus = _player.Interaction?.Focused;
 		}
@@ -4776,7 +4785,8 @@ public partial class StoryTest : Node
 			await WaitUntil(() => note.Revealed || note.Read, 4, ct);
 			Check($"arrow {piece}.{i + 1} shows under the blacklight", note.Revealed || note.Read, $"glow {note.Glow:0.00}, blacklight on it {ProjectDS.Player.Lantern.UvOn(note.PlateWorld):0.00}");
 			// which way it points, as seen facing it: the arrow (up, turned by ArrowTurn) against the way to the next tree
-			Vector3 face = Flat(note.PlateWorld - note.GlobalPosition).Normalized();
+			// (2026-10-23) the mark's own facing, as the trail laid it: base-to-plate tilted with the trunk's lean and read up to 16 deg off
+			Vector3 face = Flat(note.GlobalBasis * new Vector3(Mathf.Sin(note.MarkAngle), 0, Mathf.Cos(note.MarkAngle))).Normalized();
 			Vector3 look = -face, right = look.Cross(Vector3.Up).Normalized();
 			Vector3 says = (look * Mathf.Cos(note.ArrowTurn) - right * Mathf.Sin(note.ArrowTurn)).Normalized();
 			float err = Mathf.RadToDeg(Mathf.Abs(says.SignedAngleTo(dirToNext.Normalized(), Vector3.Up)));
@@ -4796,6 +4806,8 @@ public partial class StoryTest : Node
 		await Seconds(0.3, ct);
 		Check($"half {piece}'s tin doesn't glint under the flame", cache.Glint < 0.1f, $"glint {cache.Glint:0.00}");
 		await Aim(c, ct);
+		// (2026-10-23: once the focus had gone off the tin in the lantern's switch, as the screenshot showed its prompt up) aim again till it's back
+		for (int r = 0; r < 4 && _player.Interaction?.Focused == null; r++) { await Seconds(0.3, ct); await Aim(c, ct); }
 		GD.Print($"[storytest] cache {piece}: focused '{_player.Interaction?.Focused?.Name}' prompt '{_player.Interaction?.PromptText}'");
 		await Press(ct);
 		await WaitUntil(() => StoryManager.Instance.HasFlag(StoryManager.Flag.KeyPiece(piece)), 4, ct);

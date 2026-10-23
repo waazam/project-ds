@@ -70,6 +70,8 @@ public partial class PlayerBreathing : Node
 		if (_instance == null || !IsInstanceValid(_instance)) return;
 		_instance.Fear = Mathf.Max(_instance.Fear, amount);
 		_instance.Gasp(amount);
+		// (2026-10-22, the style pass) a hard scare: the red beat
+		if (amount >= 0.65f) ProjectDS.UI.StyleFx.RedBeat(amount);
 	}
 
 	public override void _EnterTree() => _instance = this;

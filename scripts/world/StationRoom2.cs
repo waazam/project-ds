@@ -68,13 +68,14 @@ public partial class StationRoom2 : Node3D
 	private bool _dying, _winning, _stepSequence;
 	private Area3D _entry, _stairTop;
 	private readonly RandomNumberGenerator _rng = new() { Seed = 2222 };
-	private static readonly Color Lake = new(0.07f, 0.1f, 0.08f), BloodC = new(0.28f, 0.01f, 0.01f);
+	private static readonly Color Lake = new(0.07f, 0.1f, 0.08f), BloodC = new(0.34f, 0.006f, 0.018f);   // (2026-10-22: toward the blood system's rich red; was 0.28, 0.01, 0.01)
 
 	public override void _Ready() => Callable.From(Build).CallDeferred();
 
 	private void Build()
 	{
 		using var __timer = Systems.BuildTimer.Time("StationRoom2");
+		World.Blood.Prewarm();   // (2026-10-22: its splashes' look drawn now, in the load, not at the first one)
 		var s = StoryManager.Instance;
 		BuildShell();
 		BuildWindow();
@@ -91,6 +92,7 @@ public partial class StationRoom2 : Node3D
 			Box.SlideOpen();
 			_boxUse.Enabled = false;
 			PlaceLighter();
+			BloodLeft(false);
 		}
 		SetProcess(true);
 	}
@@ -546,6 +548,7 @@ public partial class StationRoom2 : Node3D
 	private void Flood(float dt)
 	{
 		Level = Mathf.Min(Height, Level + Height / FloodSeconds * dt);
+		_peak = Mathf.Max(_peak, Level);
 		_water.Visible = Level > 0.01f;
 		_water.Position = _water.Position with { Y = Level };
 		if (!Blood && Level >= KneeHeight)
@@ -665,10 +668,64 @@ public partial class StationRoom2 : Node3D
 		_boxUse.Enabled = false;
 		await Cutscene.Wait(this, 1.0, ct);
 		PlaceLighter();
+		BloodLeft(true);
 		Solved = true;
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.StationRoom2Solved);
 		StationInterior.Instance?.Room2Door?.Unlock();
 		GD.Print("[story] Act 13, room 2: solved - the blood goes back out of the window; the cryptex opens");
+	}
+
+	/// <summary>How high the flood came (for the mark it leaves).</summary>
+	private float _peak;
+
+	/// <summary>(2026-10-22, the owner: use the blood system "in the room with the puzzle box that fills up with water that
+	/// changes into blood") It went back out of the window, but not all of it: a tide line round the walls where it stood,
+	/// runs down from it, and pools left on the marble, glossy and slowly drying (<see cref="World.Blood"/>). Put back as
+	/// it was (dry) on a Continue.</summary>
+	private void BloodLeft(bool fresh)
+	{
+		float peak = Mathf.Clamp(fresh ? _peak : 1.3f, 0.6f, Height - 0.3f);
+		var rng = new RandomNumberGenerator { Seed = 1388 };
+		const float h = Half - 0.01f;
+		var walls = new (Vector3 n, Vector3 along, System.Func<float, float, Vector3> at)[]
+		{
+			(Vector3.Right, Vector3.Back, (u, y) => new Vector3(-h, y, u)), (Vector3.Forward, Vector3.Right, (u, y) => new Vector3(u, y, h)),
+			(Vector3.Back, Vector3.Right, (u, y) => new Vector3(u, y, -h)), (Vector3.Left, Vector3.Back, (u, y) => new Vector3(h, y, u)),
+		};
+		foreach (var (n, along, at) in walls)
+		{
+			// the tide line: smeared along the wall where the surface stood, broken
+			for (float u = -Half + 0.4f; u < Half - 0.3f; u += rng.RandfRange(0.7f, 1.1f))
+			{
+				if (n == Vector3.Left && Mathf.Abs(u) < 0.7f) continue;   // the doorway
+				var d = World.Blood.Splat(this, ToGlobal(at(u, peak + rng.RandfRange(-0.05f, 0.04f)) + n * 0.01f), GlobalBasis * n, rng.RandfRange(0.7f, 1.1f),
+					World.Blood.Kind.Caked, 0f, GlobalBasis * along, depth: 0.3f, length: 0.28f);
+				Settle(d, fresh, 90f);
+			}
+			// runs down from it
+			int runs = rng.RandiRange(2, 4);
+			for (int i = 0; i < runs; i++)
+			{
+				float u = rng.RandfRange(-Half + 0.4f, Half - 0.4f);
+				if (n == Vector3.Left && Mathf.Abs(u) < 0.7f) continue;
+				var d = World.Blood.Run(this, ToGlobal(at(u, peak - 0.03f) + n * 0.01f), GlobalBasis * n, rng.RandfRange(0.3f, 0.5f), peak * rng.RandfRange(0.4f, 0.95f), fresh ? rng.RandfRange(6f, 14f) : 0f);
+				Settle(d, fresh, 120f);
+			}
+		}
+		// pools left on the floor, round the table's feet and in the corners
+		for (int i = 0; i < 7; i++)
+		{
+			var p = new Vector3(rng.RandfRange(-Half + 0.5f, Half - 0.5f), 0.02f, rng.RandfRange(-Half + 0.5f, Half - 0.5f));
+			var d = World.Blood.Splat(this, ToGlobal(p), GlobalBasis.Y, rng.RandfRange(0.6f, 1.5f), rng.Randf() < 0.4f ? World.Blood.Kind.Caked : World.Blood.Kind.Pool,
+				rng.RandfRange(0, Mathf.Tau), spread: fresh ? rng.RandfRange(2f, 5f) : 0f, depth: 0.2f);
+			Settle(d, fresh, 150f);
+		}
+	}
+
+	private static void Settle(Decal d, bool fresh, float dry)
+	{
+		if (fresh) World.Blood.Dry(d, dry, 0.7f);
+		else d.Modulate = new Color(0.7f, 0.64f, 0.64f);
 	}
 
 	private bool _shardsReturning;

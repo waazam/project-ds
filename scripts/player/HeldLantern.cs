@@ -118,7 +118,20 @@ public partial class HeldLantern : HeldItem
 	// (2026-10-12) only while it gives light: with the flame dead and the blacklight off it showed a lit flame in the hand that
 	// lit nothing (the owner, Act 17's pipe: "your lantern literally doesnt light up anything"); dark, it's lowered
 	// (2026-10-13j) and hung at the belt while both hands are on the flamethrower's wand
-	protected override bool Wanted => _lantern != null && _lantern.IsOn && (_lantern.Shining || _lantern.Dying) && !CameraUp && !PlayerHands.BothHandsOnWand(Player);
+	protected override bool Wanted
+	{
+		get
+		{
+			bool rowing = PlayerHands.Instance?.Rowing ?? false;
+			_sinceRowing = rowing ? 0f : _sinceRowing + (float)GetProcessDeltaTime();
+			return !rowing && _lantern != null && _lantern.IsOn && (_lantern.Shining || _lantern.Dying) && !CameraUp && !PlayerHands.BothHandsOnWand(Player);
+		}
+	}
+	// (2026-10-22, the owner: "it makes no sense for the player to be paddling the boat with his arm visible and holding a
+	// lantern": both hands on the oars in the boat, the lantern down at the belt (still lit); out of the boat it comes back
+	// up slowly, eased, not snapped in)
+	private float _sinceRowing = 99f;
+	protected override float RaiseSeconds => _sinceRowing < 3f ? 1.1f : 0.5f;
 
 	/// <summary>The left hand round the top of the bail, from above (the pivot is the bail's top, its wire along X): the
 	/// back of the gloved hand up, four fingers curled over the wire and under it, the thumb round it from behind; the cuff,

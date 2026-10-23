@@ -469,6 +469,9 @@ public partial class BossRoom
 		float d = new Vector2(player.GlobalPosition.X - at.X, player.GlobalPosition.Z - at.Z).Length();
 		if (d < 7f) _ = Shake(player, Mathf.Lerp(0.03f, 0.008f, d / 7f));
 		if (d < 7f) PlayerBreathing.Startle(Mathf.Lerp(0.7f, 0.3f, d / 7f));
+		// (2026-10-22, the style pass) blood on the lens from a blow beside them; a near miss, the red beat
+		if (d < 6f) ProjectDS.UI.StyleFx.LensBlood(1 + (int)((6f - d) * 0.8f), 1f - d / 6f);
+		if (!t.Second && d < SlamRadius + 1.6f && d >= SlamRadius) ProjectDS.UI.StyleFx.RedBeat(0.9f);
 		// (a double's second blow: on the spot the first already hit, after its circle's gone: it shakes, it can't crush)
 		if (t.Second) return;
 		bool demo = false;

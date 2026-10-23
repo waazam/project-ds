@@ -107,7 +107,32 @@ public partial class BlacklightSecrets : Node
 		Color C = UvInk.Cyan, G = UvInk.Green, P = UvInk.Pale;
 		{
 			W(st, new Vector3(-3f, 2.1f, StationInterior.HalfDepth - 0.1f), Vector3.Forward, "IT WAS ALWAYS STAIRS", 2f, C);
-			if (st.Room2 is { } r2) W(r2, new Vector3(0, StationRoom2.Height - 0.03f, 0.2f), Vector3.Down, "S  T  A  I  R  S", 1.6f, G, Mathf.Pi * 0.5f);
+			if (st.Room2 is { } r2)
+			{
+				W(r2, new Vector3(0, StationRoom2.Height - 0.03f, 0.2f), Vector3.Down, "S  T  A  I  R  S", 1.6f, G, Mathf.Pi * 0.5f);
+				// (2026-10-22, the owner: "there is currently no hint in the divinci puzzle box room for the code, we should put
+				// images of stairs all over the walls that you can only see with the blacklight") staircases drawn all over
+				// its walls, in four hands, clear of the doorway (+X, z 0) and the window (-Z, x -1.3..0.5)
+				var sr = new RandomNumberGenerator { Seed = 1302 };
+				const float h = StationRoom2.Half - 0.02f;
+				var walls = new (Vector3 n, System.Func<float, float, Vector3> at, float lo, float hi)[]
+				{
+					(Vector3.Right, (u, y) => new Vector3(-h, y, u), -2.9f, 2.9f),
+					(Vector3.Forward, (u, y) => new Vector3(u, y, h), -2.9f, 2.9f),
+					(Vector3.Back, (u, y) => new Vector3(u, y, -h), -2.9f, 2.9f),
+					(Vector3.Left, (u, y) => new Vector3(h, y, u), -2.9f, 2.9f),
+				};
+				int drawn = 0;
+				for (int tries = 0; tries < 200 && drawn < 22; tries++)
+				{
+					var (n, at, lo, hi) = walls[tries % 4];
+					float u = sr.RandfRange(lo, hi), y = sr.RandfRange(0.55f, 2.6f);
+					if (n == Vector3.Left && Mathf.Abs(u) < 0.85f) continue;   // the doorway
+					if (n == Vector3.Back && u > -1.5f && u < 0.7f && y > 0.75f) continue;   // the window
+					Mark(r2, at(u, y), n, UvInk.Stairs(drawn), sr.RandfRange(0.32f, 0.6f), drawn % 3 == 0 ? C : drawn % 3 == 1 ? G : P, sr.RandfRange(-0.15f, 0.15f), sr.Randf() < 0.3f, true);
+					drawn++;
+				}
+			}
 			if (st.Room1 is { } r1)
 			{
 				var rng = new RandomNumberGenerator { Seed = 1301 };

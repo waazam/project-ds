@@ -155,7 +155,10 @@ public static class Act25Ending
 		var sink = owner.CreateTween();
 		sink.TweenMethod(Callable.From<float>(v => { if (GodotObject.IsInstanceValid(fire)) fire.Intensity = v; }), 1f, 0.18f, 3.5f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
 		await Cutscene.Wait(owner, 1.2, ct);
-		Badge = LayBadge(cave, ground, (player.GlobalPosition - ground) with { Y = 0 });
+		// (2026-10-23, the story test: where it fell can be in among the wreckage, behind the fence and the crates, 3.5 m off
+		// and out of sight) in the ash nearest where it fell that they can see and reach: on the floor, nothing in between
+		var badgeAt = ReachableSpot(player, ground);
+		Badge = LayBadge(cave, badgeAt, (player.GlobalPosition - badgeAt) with { Y = 0 });
 		if (BadgeUse is { } take)
 			take.Interacted += p => { if (!_out) _ = Cutscene.Run(owner, c => TakeBadgeAndGo(owner, p, wall, wallN, stop, c), lockInput: true); };
 		await StoryBeat.PanTowards(owner, player, ground, 1.0f, ct, pitch: true);
@@ -175,6 +178,31 @@ public static class Act25Ending
 
 	/// <summary>The badge, lying face up in the ash where the mask fell (the ash and the badge are Blender's:
 	/// tools/Blender/wendigo_story.py), and E on it.</summary>
+	/// <summary>From where it fell toward the player, the first spot with floor under it and a clear line from their eyes
+	/// (no wall, no wreckage, no other thing to take in the way).</summary>
+	private static Vector3 ReachableSpot(PlayerController player, Vector3 fell)
+	{
+		var space = player.GetWorld3D().DirectSpaceState;
+		var eye = player.CameraRig?.Camera?.GlobalPosition ?? player.GlobalPosition + Vector3.Up * 1.6f;
+		var me = new Godot.Collections.Array<Rid> { player.GetRid() };
+		Vector3 feet = player.GlobalPosition;
+		for (int k = 0; k <= 12; k++)
+		{
+			var c = fell.Lerp(feet with { Y = fell.Y }, k / 12f);
+			if ((c - feet).Length() > 3.6f && k < 12) continue;
+			var down = PhysicsRayQueryParameters3D.Create(c + Vector3.Up * 0.8f, c + Vector3.Down * 1.2f);
+			down.Exclude = me;
+			var floor = space.IntersectRay(down);
+			if (floor.Count == 0 || ((Vector3)floor["normal"]).Y < 0.7f) continue;
+			var at = (Vector3)floor["position"];
+			var look = PhysicsRayQueryParameters3D.Create(eye, at + Vector3.Up * 0.15f);
+			look.Exclude = me;
+			look.CollideWithAreas = true;
+			if (space.IntersectRay(look).Count == 0) return at;
+		}
+		return feet + ((fell - feet) with { Y = 0 }).LimitLength(1.2f);
+	}
+
 	private static Node3D LayBadge(Node3D parent, Vector3 at, Vector3 toPlayer)
 	{
 		var root = new Node3D { Name = "BadgeInTheAsh" };
@@ -212,7 +240,8 @@ public static class Act25Ending
 		root.AddChild(new OmniLight3D { Name = "Glint", LightColor = new Color(1f, 0.7f, 0.42f), LightEnergy = 0.35f, OmniRange = 1.1f, ShadowEnabled = false, Position = badge.Position + new Vector3(0, 0.35f, 0.2f) });
 		var take = new PickupInteractable
 		{
-			Name = "Take", PickRadius = 0.5f, MaxDistance = 2.8f, Position = badge.Position + Vector3.Up * 0.22f,
+			Name = "Take", PickRadius = 0.6f, MaxDistance = 4.5f,   // (2026-10-23: where it fell can be against the snow, 3.5 m off: in reach from where they stand)
+			 Position = badge.Position + Vector3.Up * 0.22f,
 			PromptFor = _ => "Take the badge", CanUse = _ => !_out,
 		};
 		root.AddChild(take);

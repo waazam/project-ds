@@ -783,6 +783,24 @@ public class MeshKit
 		return mesh;
 	}
 
+	/// <summary>For the load's log: zero-area triangles left out at commit so far.</summary>
+	public static int SliversDropped;
+
+	/// <summary>(2026-10-22, the clip audit: 167,000 zero-area triangles in the Hollow, 130,000 of them in the CRT room's
+	/// sets) the indices without the triangles that have no area (a repeated corner, or three corners in a line): drawn
+	/// for nothing, and the sparkles a sliver catches. The threshold is far under a square millimetre.</summary>
+	private static int[] WithoutSlivers(List<Vector3> v, List<int> idx)
+	{
+		var keep = new List<int>(idx.Count);
+		for (int i = 0; i + 2 < idx.Count; i += 3)
+		{
+			int a = idx[i], b = idx[i + 1], c = idx[i + 2];
+			if (a == b || b == c || a == c || (v[b] - v[a]).Cross(v[c] - v[a]).LengthSquared() < 1e-14f) { SliversDropped++; continue; }
+			keep.Add(a); keep.Add(b); keep.Add(c);
+		}
+		return keep.ToArray();
+	}
+
 	private ArrayMesh CommitArrays()
 	{
 		var mesh = new ArrayMesh();
@@ -790,13 +808,15 @@ public class MeshKit
 		{
 			var s = _surfs[m];
 			if (s.I.Count == 0) continue;
+			int[] idx = WithoutSlivers(s.V, s.I);
+			if (idx.Length == 0) continue;
 			var arr = new Godot.Collections.Array();
 			arr.Resize((int)Mesh.ArrayType.Max);
 			arr[(int)Mesh.ArrayType.Vertex] = s.V.ToArray();
 			arr[(int)Mesh.ArrayType.Normal] = s.N.ToArray();
 			arr[(int)Mesh.ArrayType.TexUV] = s.UV.ToArray();
 			arr[(int)Mesh.ArrayType.Color] = s.C.ToArray();
-			arr[(int)Mesh.ArrayType.Index] = s.I.ToArray();
+			arr[(int)Mesh.ArrayType.Index] = idx;
 			if (s.T.Count == s.V.Count * 4 && s.T.Count > 0) arr[(int)Mesh.ArrayType.Tangent] = s.T.ToArray();
 			if (s.UV2.Count == s.V.Count && s.UV2.Count > 0) arr[(int)Mesh.ArrayType.TexUV2] = s.UV2.ToArray();
 			mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arr);

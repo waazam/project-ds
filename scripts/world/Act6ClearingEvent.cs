@@ -153,6 +153,8 @@ public partial class Act6ClearingEvent : Node3D
 	public bool BloodRaining => _blood != null && IsInstanceValid(_blood) && _blood.Active;
 	/// <summary>For tests: how hard it rains blood (0..1).</summary>
 	public float BloodIntensity => BloodRaining ? _blood.Intensity : 0f;
+	/// <summary>(2026-10-22) Puddles of it on the ground so far.</summary>
+	public int BloodPuddles => _blood != null && IsInstanceValid(_blood) ? _blood.PuddleCount : 0;
 	/// <summary>For tests: world position at the foot of a staircase, where an up-leg starts and a down-leg ends.</summary>
 	public static Vector3 FootOf(StaircaseBuilder s) => s.ToGlobal(new Vector3(0, 0.05f, 1.4f));
 	/// <summary>For tests: world position on a staircase's top landing.</summary>

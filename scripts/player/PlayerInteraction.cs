@@ -17,7 +17,7 @@ namespace ProjectDS.Player;
 /// </summary>
 public partial class PlayerInteraction : Node
 {
-	[Export] public float ProbeDistance = 4f;
+	[Export] public float ProbeDistance = 5f;   // (2026-10-23: each thing keeps its own MaxDistance; 4 m cut off the Act 25 badge's longer reach)
 
 	public Interactable Focused { get; private set; }
 	/// <summary>True while a hold-to-use interaction is being held (the feet planted, the head drawn in).</summary>

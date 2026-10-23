@@ -41,6 +41,7 @@ public partial class StationRoom1 : Node3D
 	/// <summary>Per wall: the writing (a node holding its scrawled lines), its lines, and its faint ghost.</summary>
 	private readonly List<Node3D> _writing = new();
 	private readonly List<List<Label3D>> _lines = new();
+	private readonly List<List<Decal>> _smears = new();
 	private readonly List<Node3D> _ghosts = new();
 	/// <summary>Per wall: its drips, each a run of blood from under a letter and the bead at its end.</summary>
 	private readonly List<List<Drip>> _drips = new();
@@ -175,15 +176,18 @@ public partial class StationRoom1 : Node3D
 
 	public override void _Ready() => Callable.From(Build).CallDeferred();
 
-	private static Font Scrawl => _scrawl ??= new SystemFont
+	// (2026-10-22, the owner: "the font also needs to look thicker and more hand painted on the walls") emboldened hard (the
+	// strokes as broad as a brush loaded with it, not a pen's), and the brushiest hands first
+	private static Font Scrawl => _scrawl ??= new FontVariation
 	{
-		FontNames = new[] { "Chiller", "Ink Free", "Segoe Print", "Comic Sans MS", "serif" },
-		FontWeight = 700,
+		BaseFont = new SystemFont { FontNames = new[] { "Chiller", "Ink Free", "Segoe Print", "Comic Sans MS", "serif" }, FontWeight = 800 },
+		VariationEmbolden = 1.25f,
 	};
 
 	private void Build()
 	{
 		using var __timer = Systems.BuildTimer.Time("StationRoom1");
+		Blood.Prewarm();   // (2026-10-22: its splashes' look drawn now, in the load, not at the first one)
 		var s = StoryManager.Instance;
 		// (2026-10-14h, the station pass, with the interiors kit: drawn finely for the bake; the paper, boards and plaster
 		// weathered; the room's dark in its corners and seams, its light a pool under one bare bulb)
@@ -280,7 +284,7 @@ public partial class StationRoom1 : Node3D
 		// little crooked, with blood running from under the letters. (2026-10-15, the scan: letter by letter now, each
 		// at its own lean, size and height, the brush's second pass off it, the red browned as old blood dries; and a
 		// few runs to a line, not a comb of them: see Drip)
-		var red = new Color(0.44f, 0.035f, 0.025f);
+		var red = new Color(0.47f, 0.018f, 0.028f);   // (2026-10-22: the blood system's rich red, Blood.Rich, a shade dried; was 0.44, 0.035, 0.025)
 		var rng = new RandomNumberGenerator { Seed = 1331 };
 		var drng = new RandomNumberGenerator { Seed = 1334 };
 		float[] lineY = { 2.42f, 1.52f, 0.66f };
@@ -294,6 +298,7 @@ public partial class StationRoom1 : Node3D
 			AddChild(ghost);
 			var labels = new List<Label3D>();
 			var drips = new List<Drip>();
+			var smears = new List<Decal>();
 			int reachFloor = 0;
 			for (int li = 0; li < 3; li++)
 			{
@@ -322,7 +327,21 @@ public partial class StationRoom1 : Node3D
 					// a second pass of the brush, a hair off the first: thick, smeared strokes
 					labels.Add(Scrawled(wall, ch, la + n * 0.001f + right * em * rng.RandfRange(0.01f, 0.03f) + Vector3.Down * em * rng.RandfRange(0.015f, 0.035f),
 						lb * new Basis(Vector3.Back, rng.RandfRange(-0.03f, 0.03f)), em * size * rng.RandfRange(0.97f, 1.04f), new Color(0.3f, 0.02f, 0.015f, 0.6f)));
+					// (2026-10-22) and the brush's dry edge dragged the other way: the stroke broad and uneven, painted, not printed
+					labels.Add(Scrawled(wall, ch, la + n * 0.0015f - right * em * rng.RandfRange(0.012f, 0.03f) + Vector3.Up * em * rng.RandfRange(0.004f, 0.016f),
+						lb * new Basis(Vector3.Back, rng.RandfRange(-0.04f, 0.04f)), em * size * rng.RandfRange(1.0f, 1.05f), new Color(0.36f, 0.012f, 0.02f, 0.42f)));
 					Scrawled(ghost, ch, la - n * 0.002f, lb, em * size, new Color(0.3f, 0.07f, 0.05f, 0.14f));
+				}
+				// (2026-10-22) the blood itself under the letters (Blood: glossy, a raised edge): flecks flung off the brush
+				// round the line and a heavier daub on a letter or two, where it was loaded
+				for (int f = 0; f < 3; f++)
+				{
+					var (_, fx, fy, _, fs) = letters[rng.RandiRange(0, letters.Count - 1)];
+					var fa = at + b * new Vector3(fx + rng.RandfRange(-0.3f, 0.3f) * em, fy + rng.RandfRange(-0.25f, 0.25f) * em, 0f);
+					var dk = Blood.Splat(wall, ToGlobal(fa), GlobalBasis * n, em * fs * (f == 0 ? 0.32f : 0.5f), f == 0 ? Blood.Kind.Pool : Blood.Kind.Spray, 0f,
+						GlobalBasis * (right * rng.RandfRange(-1f, 1f) + Vector3.Down * 0.6f), depth: 0.25f);
+					dk.Modulate = new Color(1.1f, 1f, 1f);   // (small: flecks round the strokes, never over the words)
+					smears.Add(dk);
 				}
 				// a few runs from under the letters (a line's worth of wet paint, not a comb): most short, one or two
 				// a wall going on to the skirting once the writing lets go
@@ -355,6 +374,7 @@ public partial class StationRoom1 : Node3D
 			}
 			_writing.Add(wall);
 			_lines.Add(labels);
+			_smears.Add(smears);
 			_ghosts.Add(ghost);
 			_drips.Add(drips);
 		}
@@ -600,6 +620,8 @@ public partial class StationRoom1 : Node3D
 			tw.TweenProperty(wall, "scale", new Vector3(1.03f, 1.5f, 1f), 5.5f).SetDelay(delay + 0.6f);
 			foreach (var l in _lines[i])
 				tw.TweenProperty(l, "modulate:a", 0f, 5.5f).SetDelay(delay + 0.6f).SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.In);
+			foreach (var sm in _smears[i])
+				tw.TweenProperty(sm, "modulate:a", 0f, 5.5f).SetDelay(delay + 0.6f).SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.In);
 			puddle.Visible = true;
 			puddle.Scale = Vector3.One * 0.05f;
 			tw.TweenProperty(puddle, "scale", Vector3.One, 4.5f).SetDelay(delay + 1.2f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);

@@ -74,7 +74,8 @@ public static class FurnitureKit
 		var lifted = Image.CreateFromData(img.GetWidth(), img.GetHeight(), false, Image.Format.Rgba8, data);
 		lifted.GenerateMipmaps();
 		// (as the import had it, block-compressed: a quarter of the memory of the raw map; raw if the compressor isn't there)
-		if (lifted.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Generic) != Error.Ok) lifted.Decompress();
+		// (only where the compressor is: an exported game has none, and reads these compressed from the shipped cache)
+		if (OS.HasFeature("editor") && lifted.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Generic) != Error.Ok) lifted.Decompress();
 		Systems.TexCache.Save(key, lifted);
 		GD.Print($"[furniture] cavity lifted: {tex.ResourcePath.GetFile()} (average {mean:0.00} -> {CavityFloor:0.00}), kept");
 		return ImageTexture.CreateFromImage(lifted);

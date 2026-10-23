@@ -39,6 +39,7 @@ public partial class BossRoom
 		while (_scars.Count > MaxDents) _scars.RemoveAt(0);
 		DentAt(at, seed, true);
 		Sparks(world);
+		Bleed(at, seed);
 	}
 
 	/// <summary>The damage from earlier tries, put back as the room is built (or forgotten, the fight won).</summary>

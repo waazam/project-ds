@@ -91,6 +91,7 @@ public partial class BossRoom : Node3D
 	private void Build()
 	{
 		using var __timer = Systems.BuildTimer.Time("BossRoom");
+		Blood.Prewarm();   // (2026-10-22: its splashes' look drawn now, in the load, not at the first one)
 		_body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		_body.SetMeta("surface", "metal");
 		AddChild(_body);
@@ -99,6 +100,7 @@ public partial class BossRoom : Node3D
 		RestoreScars();
 		BuildPipes();
 		BuildValves();
+		RestoreBlood();
 		BuildRig();
 		BuildBlood();
 		BuildDoor();
@@ -415,7 +417,9 @@ public partial class BossRoom : Node3D
 			}
 			else _body.AddChild(new CollisionShape3D { Position = o + inw * 0.4f + Vector3.Up * (Ceil * 0.5f + 0.1f), Shape = new BoxShape3D { Size = along.Abs() * len + inw.Abs() * 0.8f + Vector3.Up * Ceil } });
 		}
-		for (int i = 0; i < kits.Length; i++) kits[i].CommitTo(this, $"Pipes{i}", true);
+		// (2026-10-22, the clip audit: the runs' ends met at the corners in one plane, kit against kit) each set a different
+		// hair aside, so no two share a face's plane (5 mm at the most, never seen)
+		for (int i = 0; i < kits.Length; i++) MeshKit.Nudge(kits[i].CommitTo(this, $"Pipes{i}", true), new Vector3(1f, 0.6f, 0.8f), 0.0008f * i);
 		bracket.CommitTo(this, "Brackets", false);
 		cable.CommitTo(this, "Cables", false);
 		// caged work lamps on the walls, dim, old: one dead, one guttering, one buzzing
@@ -774,7 +778,7 @@ public partial class BossRoom : Node3D
 			BuildKit.Box(d, new Vector3(0, y, -0.055f), new Vector3(1.18f, 0.09f, 0.03f));
 		d.Color = Colors.White * 0.65f;
 		d.Cylinder(new Vector3(-0.08f, 0.2f, -0.06f), new Vector3(0.08f, 0.2f, -0.06f), 0.025f, 0.025f, 8, true);
-		d.CommitTo(_door, "Slab", true);
+		MeshKit.Shrink(d.CommitTo(_door, "Slab", true));   // (its edges a hair inside the frame's faces, not in their planes: the clip audit)
 		var frame = new MeshKit();
 		frame.Mat(HallwayParts.ServiceDoor.FrameMat);
 		HallwayParts.ServiceDoor.Frame(frame, Vector3.Zero, 1.3f, 2.4f, Half, Half + 0.02f, 0.04f, 0.11f);

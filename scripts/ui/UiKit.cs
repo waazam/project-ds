@@ -294,6 +294,7 @@ public static class UiKit
 			v => { var r = res[Mathf.Clamp(Mathf.RoundToInt(v), 0, res.Length - 1)]; return $"{r.X}x{r.Y}"; });
 		AddToggle(box, "CRT filter", s.CrtFilter, on => s.CrtFilter = on);
 		AddToggle(box, "Light in the fog", s.FogLighting, on => s.FogLighting = on);
+		AddToggle(box, "Fine fog", s.FineFog, on => s.FineFog = on);   // (off: a coarser fog, for a slower graphics card)
 		AddSlider(box, "Shadows", 0, 2, s.Shadows, v => s.Shadows = Mathf.RoundToInt(v), 1, v => GameSettings.ShadowNames[Mathf.Clamp(Mathf.RoundToInt(v), 0, 2)]);
 		// the keys (2026-10-11): each action's key, pressed to change it
 		box.AddChild(MakeLabel("KEYS", HeadingLabel, HorizontalAlignment.Center));

@@ -75,6 +75,7 @@ public partial class Rowboat : Node3D
 	{
 		if (_model?.FindChild(name, true, false) is not MeshInstance3D mi) return null;
 		mi.GetParent().RemoveChild(mi);
+		mi.Owner = null;   // (out of the model's scene: no "owner inconsistent" warning)
 		mi.Transform = Transform3D.Identity;
 		into.AddChild(mi);
 		for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)

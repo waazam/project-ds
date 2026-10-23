@@ -340,46 +340,55 @@ public partial class ContinueRoundTripTest : Node
 			Screenshot(sc.Name);
 			return;
 		}
-		var fire = FindFirst<CabinFireEvent>();
-		// (2026-10-16, STORY.md Rev 5) burning from checkpoint 6 on (out of its fire, looked back at); after the fall it stands
-		// whole at its Act 7 place ahead on the trail, the print waiting
-		bool wantFire = story.Current >= Checkpoint.Act7CabinBurning;
-		bool wantAhead = wantFire || story.HasFlag(StoryManager.Flag.ClearingLoopDone);
-		Check("cabin fire state", fire != null && fire.Burning == wantFire && !fire.FireStarted == !wantFire, $"burning {fire?.Burning}, started {fire?.FireStarted} (want {wantFire})");
-		Check("the cabin where the story left it (ahead on the trail after the fall)", cabin != null && cabin.AtAct7Spot == wantAhead, $"at its Act 7 place {cabin?.AtAct7Spot} (want {wantAhead})");
-		if (sc.Cp == Checkpoint.Act6BridgeCrossed && story.HasFlag(StoryManager.Flag.ClearingLoopDone))
+		// (2026-10-23) past the lake the woods are let go of (ChapterRetire): nothing of them to check but that they're gone
+		if (story.Current >= Checkpoint.Act12LakeCrossed && ChapterRetire.Present)
 		{
-			bool door = story.HasFlag(StoryManager.Flag.Act7CabinDoor);
-			var mark = GetTree().GetFirstNodeInGroup(door ? RespawnPoints.CabinDoorGroup : Act6ClearingEvent.WakeMarkerGroup) as Node3D;
-			Check(door ? "the cabin-door save: outside its door" : "after the fall: on the trail at the wake, not back at the bridge",
-				mark != null && TestBot.Flat(before).DistanceTo(TestBot.Flat(mark.GlobalPosition)) < 3f, $"{before} vs {mark?.GlobalPosition}");
-			if (door) Check("the print waiting on the board", cabin?.Board?.StairsPrint != null && cabin.Board.Prints.Count == 1);
+			for (int f = 0; f < 900 && (ChapterRetire.Busy || FindFirst<CabinFireEvent>() != null); f++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			Check("the woods let go of after the lake", FindFirst<CabinFireEvent>() == null && FindFirst<Act6ClearingEvent>() == null && FindFirst<Act11Ending>() == null, $"{ChapterRetire.Retired} let go");
 		}
-		if (sc.Cp == Checkpoint.Act7CabinBurning && GetTree().GetFirstNodeInGroup("respawn_Act7CabinBurning") is Node3D out6)
-			Check("checkpoint 6: outside the burning cabin", TestBot.Flat(before).DistanceTo(TestBot.Flat(out6.GlobalPosition)) < 3f && cabin != null && TestBot.Flat(before).DistanceTo(TestBot.Flat(cabin.GlobalPosition)) < 25f, $"{before}");
+		else
+		{
+			var fire = FindFirst<CabinFireEvent>();
+			// (2026-10-16, STORY.md Rev 5) burning from checkpoint 6 on (out of its fire, looked back at); after the fall it stands
+			// whole at its Act 7 place ahead on the trail, the print waiting
+			bool wantFire = story.Current >= Checkpoint.Act7CabinBurning;
+			bool wantAhead = wantFire || story.HasFlag(StoryManager.Flag.ClearingLoopDone);
+			Check("cabin fire state", fire != null && fire.Burning == wantFire && !fire.FireStarted == !wantFire, $"burning {fire?.Burning}, started {fire?.FireStarted} (want {wantFire})");
+			Check("the cabin where the story left it (ahead on the trail after the fall)", cabin != null && cabin.AtAct7Spot == wantAhead, $"at its Act 7 place {cabin?.AtAct7Spot} (want {wantAhead})");
+			if (sc.Cp == Checkpoint.Act6BridgeCrossed && story.HasFlag(StoryManager.Flag.ClearingLoopDone))
+			{
+				bool door = story.HasFlag(StoryManager.Flag.Act7CabinDoor);
+				var mark = GetTree().GetFirstNodeInGroup(door ? RespawnPoints.CabinDoorGroup : Act6ClearingEvent.WakeMarkerGroup) as Node3D;
+				Check(door ? "the cabin-door save: outside its door" : "after the fall: on the trail at the wake, not back at the bridge",
+					mark != null && TestBot.Flat(before).DistanceTo(TestBot.Flat(mark.GlobalPosition)) < 3f, $"{before} vs {mark?.GlobalPosition}");
+				if (door) Check("the print waiting on the board", cabin?.Board?.StairsPrint != null && cabin.Board.Prints.Count == 1);
+			}
+			if (sc.Cp == Checkpoint.Act7CabinBurning && GetTree().GetFirstNodeInGroup("respawn_Act7CabinBurning") is Node3D out6)
+				Check("checkpoint 6: outside the burning cabin", TestBot.Flat(before).DistanceTo(TestBot.Flat(out6.GlobalPosition)) < 3f && cabin != null && TestBot.Flat(before).DistanceTo(TestBot.Flat(cabin.GlobalPosition)) < 25f, $"{before}");
 
-		var act6 = FindFirst<Act6ClearingEvent>();
-		// up from the cabin door with the cap (a Continue with it taken: at once), gone for good after the fall (Act 7)
-		int wantMinis = story.NewelPostTaken && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) && story.Current < Checkpoint.Act7CabinBurning ? 15 : 0;
-		Check("clearing mini stairs", act6 != null && act6.MiniStairCount == wantMinis, $"{act6?.MiniStairCount} (want {wantMinis})");
-		Check("no leftover clearing spotlight", act6 is { SpotlightActive: false }, "");
-		// The loop is armed again (nothing lit until a flight is chosen) whenever the voice has spoken but the fall has not come.
-		bool wantLoop = story.ClearingVoiceHeard && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) && story.Current < Checkpoint.Act7CabinBurning;
-		Check("clearing loop armed", act6 != null && act6.LoopArmed == wantLoop && act6.LoopTarget == null && act6.LoopDone == story.HasFlag(StoryManager.Flag.ClearingLoopDone),
-			$"armed {act6?.LoopArmed}, target {act6?.LoopTarget?.Name ?? "none"}, done {act6?.LoopDone} (want armed {wantLoop})");
-		if (wantLoop) Check("compass has somewhere to point in the clearing", story.ObjectivePosition != null, $"{story.ObjectivePosition}");
+			var act6 = FindFirst<Act6ClearingEvent>();
+			// up from the cabin door with the cap (a Continue with it taken: at once), gone for good after the fall (Act 7)
+			int wantMinis = story.NewelPostTaken && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) && story.Current < Checkpoint.Act7CabinBurning ? 15 : 0;
+			Check("clearing mini stairs", act6 != null && act6.MiniStairCount == wantMinis, $"{act6?.MiniStairCount} (want {wantMinis})");
+			Check("no leftover clearing spotlight", act6 is { SpotlightActive: false }, "");
+			// The loop is armed again (nothing lit until a flight is chosen) whenever the voice has spoken but the fall has not come.
+			bool wantLoop = story.ClearingVoiceHeard && !story.HasFlag(StoryManager.Flag.ClearingLoopDone) && story.Current < Checkpoint.Act7CabinBurning;
+			Check("clearing loop armed", act6 != null && act6.LoopArmed == wantLoop && act6.LoopTarget == null && act6.LoopDone == story.HasFlag(StoryManager.Flag.ClearingLoopDone),
+				$"armed {act6?.LoopArmed}, target {act6?.LoopTarget?.Name ?? "none"}, done {act6?.LoopDone} (want armed {wantLoop})");
+			if (wantLoop) Check("compass has somewhere to point in the clearing", story.ObjectivePosition != null, $"{story.ObjectivePosition}");
 
-		var act11 = FindFirst<Act11Ending>();
-		Check("Act 11 stairs height", act11 != null && act11.StairsTall == story.Act11DialogueDone, $"tall {act11?.StairsTall} (want {story.Act11DialogueDone})");
-		bool wantClimbTrigger = story.Act11DialogueDone && story.Current < Checkpoint.Act11GiantEncounter;
-		// The way up is open once the radio has spoken: the cap's E-point waits on the top landing until the ending.
-		Check("Act 11 climb trigger", (act11?.CapSeat != null) == wantClimbTrigger, $"seat {act11?.CapSeat != null} (want {wantClimbTrigger})");
+			var act11 = FindFirst<Act11Ending>();
+			Check("Act 11 stairs height", act11 != null && act11.StairsTall == story.Act11DialogueDone, $"tall {act11?.StairsTall} (want {story.Act11DialogueDone})");
+			bool wantClimbTrigger = story.Act11DialogueDone && story.Current < Checkpoint.Act11GiantEncounter;
+			// The way up is open once the radio has spoken: the cap's E-point waits on the top landing until the ending.
+			Check("Act 11 climb trigger", (act11?.CapSeat != null) == wantClimbTrigger, $"seat {act11?.CapSeat != null} (want {wantClimbTrigger})");
 
-		// One-shot beats know they already happened.
-		CheckFired<FirstClimbEvent>(story.Current >= Checkpoint.Act2StairsClimbed);
-		CheckFired<FriendReveal>(story.Current >= Checkpoint.Act5CabinEntered);
-		CheckFired<CabinExitLine>(story.HasFlag(StoryManager.Flag.DawnBroke));
-		CheckFired<BridgeCrossEvent>(story.Current >= Checkpoint.Act6BridgeCrossed);
+			// One-shot beats know they already happened.
+			CheckFired<FirstClimbEvent>(story.Current >= Checkpoint.Act2StairsClimbed);
+			CheckFired<FriendReveal>(story.Current >= Checkpoint.Act5CabinEntered);
+			CheckFired<CabinExitLine>(story.HasFlag(StoryManager.Flag.DawnBroke));
+			CheckFired<BridgeCrossEvent>(story.Current >= Checkpoint.Act6BridgeCrossed);
+		}
 
 		// World pickups already taken in the saved story stay gone.
 		var reappeared = new List<string>();

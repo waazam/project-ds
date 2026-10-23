@@ -98,7 +98,7 @@ public partial class StationRoom3 : Node3D
 		foreach (var kit in new[] { k, under, over }) { hallShade.Apply(kit); corridorShade.Apply(kit); }
 		MeshKit.Nudge(k.CommitTo(this, "Plate", true), Vector3.Left);   // flush on the lobby's wall: a hair proud of it (the clip audit)
 		under.CommitTo(this, "CorridorFloor", true);
-		over.CommitTo(this, "Ceilings", false);
+		MeshKit.Nudge(over.CommitTo(this, "Ceilings", false), Vector3.Back);   // (behind the plate's face, not in its plane: the clip audit)
 
 		// the floor: steel plate, with the hole cut out of it
 		var f = new MeshKit { Tess = 0.6f };

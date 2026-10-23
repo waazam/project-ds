@@ -26,6 +26,7 @@ public static class PlayerDeath
 	public static async Task Reload(Node owner, string line, CancellationToken ct)
 	{
 		Dying = true;
+		ProjectDS.UI.StyleFx.DeathDrips();
 		var fader = StoryBeat.Fader(owner);
 		if (fader != null)
 		{
@@ -35,6 +36,7 @@ public static class PlayerDeath
 			await Cutscene.Wait(owner, 0.6, ct);
 		}
 		GD.Print($"[story] death: '{line}' - back to the last checkpoint");
+		ProjectDS.UI.StyleFx.Clear();
 		Dying = false;
 		if (StoryManager.Instance?.ContinueGame() != true) StoryManager.Instance?.ReturnToMenu();
 	}

@@ -63,7 +63,7 @@ public partial class PlayerHands : Node
 		get
 		{
 			var scene = GetTree().CurrentScene;
-			if (scene != _lakeScene) { _lakeScene = scene; _lake = scene?.GetNodeOrNull<World.LakeCrossingEvent>("LakeCrossing"); }
+			if (scene != _lakeScene || (_lake != null && !IsInstanceValid(_lake))) { _lakeScene = scene; _lake = scene?.GetNodeOrNull<World.LakeCrossingEvent>("LakeCrossing") ?? scene?.GetNodeOrNull<World.LakeCrossingEvent>("HollowWorld/LakeCrossing"); }   // (2026-10-23: it lives in the Hollow's world; looked for at the root only, it was never found)
 			return _lake != null && IsInstanceValid(_lake) && _lake.Boarded && !_lake.Landed;
 		}
 	}

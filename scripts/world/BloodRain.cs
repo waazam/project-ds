@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using ProjectDS.Systems;
 
@@ -83,7 +84,7 @@ public partial class BloodRain : Node3D
 			ParticleFlagAlignY = true,
 		};
 		var mat = DropMaterial();
-		mat.AlbedoColor = new Color(0.36f, 0.02f, 0.02f, 0.8f);
+		mat.AlbedoColor = new Color(0.44f, 0.012f, 0.025f, 0.85f);
 		var e = new GpuParticles3D
 		{
 			Name = "Splash", Amount = 260, Lifetime = 0.28, Preprocess = 0.3f, Randomness = 1f,
@@ -102,7 +103,7 @@ public partial class BloodRain : Node3D
 	{
 		ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 		Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-		AlbedoColor = new Color(0.42f, 0.02f, 0.02f, 0.85f),
+		AlbedoColor = new Color(0.5f, 0.015f, 0.03f, 0.88f),   // (2026-10-22: the blood system's rich red, Blood.Rich; was 0.42, 0.02, 0.02)
 		AlbedoTexture = RainVfx.StreakTexture(),
 		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 		BillboardMode = BaseMaterial3D.BillboardModeEnum.FixedY,
@@ -149,6 +150,7 @@ public partial class BloodRain : Node3D
 	public void Start()
 	{
 		if (Active) return;
+		Blood.Prewarm();
 		Active = true;
 		_applied = 0f;
 		// The main box: tall, so drops are streaking at every height from the moment it starts, falling faster.
@@ -177,6 +179,7 @@ public partial class BloodRain : Node3D
 		var near = _near; _near = null;
 		var splash = _splash; _splash = null;
 		var audio = _audio; _audio = null;
+		DrainPuddles(Mathf.Max(8f, fadeSeconds * 6f));
 		var atmo = StoryBeat.Atmosphere(this);
 		var tw = CreateTween().SetParallel();
 		float f = Mathf.Max(0.05f, fadeSeconds * 0.6f);
@@ -215,7 +218,54 @@ public partial class BloodRain : Node3D
 		}
 		if (_audio != null) _audio.VolumeDb = Mathf.Lerp(-34f, LevelDb, _applied) + (pr > 0.001f ? Mathf.LinearToDb(pr) : -60f);
 		if (StoryBeat.Atmosphere(this) is { } atmo) atmo.BloodTint = Mathf.Clamp(TintMax * _applied * TintPulse * pr, 0f, 1f);
+		Puddles((float)delta, pr);
 		Place((float)delta);
+	}
+
+	// ------------------------------------------------------------------ (2026-10-22) where it lands
+	// (the owner: blood "used more throughout the game like when it is raining blood in the early stairs sections") The
+	// ground pools with it while it rains: puddles of it gathering round them and ahead, spreading slowly and joining up,
+	// more and bigger the longer it falls (Blood: rich red, glossy, a raised edge). They stay a while after it stops,
+	// then sink in.
+	private readonly Queue<Decal> _puddles = new();
+	private float _puddleT;
+	private int _puddled;
+	private readonly RandomNumberGenerator _prng = new() { Seed = 6606 };
+	private const int MaxPuddles = 90;
+	public int PuddleCount => _puddles.Count;
+
+	private void Puddles(float dt, float presence)
+	{
+		if (_applied < 0.15f || presence < 0.2f || Follow == null || !IsInstanceValid(Follow)) return;
+		_puddleT -= dt * _applied * presence;
+		if (_puddleT > 0f) return;
+		_puddleT = 0.45f;
+		// (the style pass) now and then a drop of it on the lens
+		if (_applied > 0.5f && _prng.Randf() < 0.06f) ProjectDS.UI.StyleFx.LensBlood(1, 0.5f);
+		var space = GetWorld3D()?.DirectSpaceState;
+		if (space == null) return;
+		float a = _prng.RandfRange(0, Mathf.Tau), r = Mathf.Sqrt(_prng.Randf()) * 11f;
+		Vector3 p = Follow.GlobalPosition + _lead * 0.6f + new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+		var q = PhysicsRayQueryParameters3D.Create(p + Vector3.Up * 4f, p + Vector3.Down * 40f, 1);   // (up the flights: the treads, or the ground far under them)
+		if (Follow is CollisionObject3D co) q.Exclude = new Godot.Collections.Array<Rid> { co.GetRid() };
+		var hit = space.IntersectRay(q);
+		if (hit.Count == 0) return;
+		var n = (Vector3)hit["normal"];
+		if (n.Y < 0.65f) return;   // (a trunk or a rock face: not where it pools)
+		float grown = Mathf.Clamp(_puddled / 60f, 0f, 1f);
+		var d = Blood.Splat(this, (Vector3)hit["position"], n, _prng.RandfRange(0.5f, 1.3f) * (1f + 1.1f * grown),
+			_prng.Randf() < 0.3f ? Blood.Kind.Caked : Blood.Kind.Pool, _prng.RandfRange(0, Mathf.Tau), spread: _prng.RandfRange(3f, 7f), depth: 0.9f);
+		_puddles.Enqueue(d);
+		_puddled++;
+		while (_puddles.Count > MaxPuddles) { var old = _puddles.Dequeue(); if (IsInstanceValid(old)) old.QueueFree(); }
+	}
+
+	/// <summary>The puddles sink into the ground over <paramref name="seconds"/>.</summary>
+	private void DrainPuddles(float seconds)
+	{
+		foreach (var d in _puddles)
+			if (IsInstanceValid(d)) { var tw = d.CreateTween(); tw.TweenProperty(d, "modulate:a", 0f, seconds); tw.TweenCallback(Callable.From(d.QueueFree)); }
+		_puddles.Clear();
 	}
 
 	private void Place(float dt)

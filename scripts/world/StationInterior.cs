@@ -387,7 +387,8 @@ public partial class StationInterior : Node3D
 		StationKit.DoorFrame(frames, new Vector3(BasementGapX, 0, -HalfDepth), Vector3.Right, 2.2f, 2.2f);
 		StationKit.DoorFrame(frames, new Vector3(EntryGapX, 0, -HalfDepth), Vector3.Right, 2.2f, 2.2f);
 		frames.Color = Colors.White;
-		frames.CommitTo(this, "DoorFrames", true);
+		// (2026-10-22, the clip audit: the thresholds lay in the rooms' floors' plane) a hair up off them
+		MeshKit.Nudge(frames.CommitTo(this, "DoorFrames", true), Vector3.Up);
 		BuildFrontDoor();
 	}
 

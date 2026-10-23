@@ -24,6 +24,42 @@ public partial class SkiLodge
 	/// <summary>The table's dragged blood (UV.x across the run, UV.y metres along it, toward the table's end).</summary>
 	private static ShaderMaterial BloodRunMat => _bloodRun ??= FlowFx.BloodMat(run: true, speed: 0.035f, scale: 1.6f);
 
+	/// <summary>(2026-10-22, the owner: blood "on the table in the lodge when we do the table cloths") Under the blood's
+	/// sheet and the bleeding head's (the n-th pulled, 2 and 4): it had soaked through. Spatter and pools over the table
+	/// top round what was under it, smears run down the table's sides, spots on the floor round it, and the linen pulled
+	/// off it lies in a stain of its own on the floor (<see cref="Blood"/>).</summary>
+	private void TableBlood(int t, int n, Vector3 heapWorld)
+	{
+		var rng = new RandomNumberGenerator { Seed = (ulong)(9300 + t * 17 + n) };
+		Vector3 top = ToGlobal(TableCentre(t) + new Vector3(0, TableH + FloorY, 0));
+		Vector3 up = GlobalBasis.Y.Normalized(), across = GlobalBasis.Z.Normalized(), along = GlobalBasis.X.Normalized();
+		int pools = n == 2 ? 7 : 5;
+		for (int i = 0; i < pools; i++)
+		{
+			Vector3 p = top + along * rng.RandfRange(-TableLen * 0.45f, TableLen * 0.45f) + across * rng.RandfRange(-TableW * 0.35f, TableW * 0.35f);
+			var d = Blood.Splat(this, p + up * 0.03f, up, rng.RandfRange(0.35f, 0.8f), rng.Randf() < 0.5f ? Blood.Kind.Pool : Blood.Kind.Spray,
+				rng.RandfRange(0, Mathf.Tau), spread: rng.RandfRange(1.5f, 4f), depth: 0.12f);
+			Blood.Dry(d, 120f, 0.8f);
+		}
+		// over the long edges and down the sides
+		for (int i = 0; i < 4; i++)
+		{
+			float side = rng.Randf() < 0.5f ? -1f : 1f;
+			Vector3 edge = top + along * rng.RandfRange(-TableLen * 0.4f, TableLen * 0.4f) + across * side * (TableW * 0.5f + 0.01f);
+			Blood.Run(this, edge, across * side, rng.RandfRange(0.25f, 0.4f), TableH * rng.RandfRange(0.4f, 0.9f), rng.RandfRange(6f, 12f));
+		}
+		// spots on the floor round it
+		Vector3 floor = top - up * TableH;
+		for (int i = 0; i < 6; i++)
+		{
+			float side = rng.Randf() < 0.5f ? -1f : 1f;
+			Vector3 p = floor + along * rng.RandfRange(-TableLen * 0.5f, TableLen * 0.5f) + across * side * rng.RandfRange(TableW * 0.55f, TableW * 0.55f + 0.8f);
+			Blood.Splat(this, p + up * 0.03f, up, rng.RandfRange(0.25f, 0.6f), Blood.Kind.Pool, rng.RandfRange(0, Mathf.Tau), spread: 2f, depth: 0.1f);
+		}
+		// the linen on the floor, soaked through where it lay
+		Blood.Splat(this, heapWorld with { Y = floor.Y } + up * 0.25f, up, 1.1f, Blood.Kind.Caked, rng.RandfRange(0, Mathf.Tau), spread: 5f, depth: 0.7f);
+	}
+
 	/// <summary>Over the end of the table and down: a slow heavy sheet, two rivulets, drops off the lip.</summary>
 	private static void BloodRunOff(Node3D holder)
 	{

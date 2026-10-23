@@ -424,9 +424,11 @@ public partial class Playtest
 		}
 		Check("no backing down a flight", blocked);
 		Check("at every top the fog hands them on to another flight, still walking", handOffs);
+		int puddles = act6.BloodPuddles;
 		using (Fast(3)) await _bot.WaitUntil(() => act6.LoopDone && Input.Enabled, 25, ct);
 		Check("the last landing gives way: the fall, saved", act6.LoopDone && Story.HasFlag(StoryManager.Flag.ClearingLoopDone));
 		Check("the blood stops with the fall", !act6.BloodRaining);
+		Check("the blood rain pooled on the ground as it fell", puddles >= 5, $"{puddles} puddles");
 		Check("woken past the clearing: the stairs and the ring gone", act6 is { WorldReset: true, Fenced: false, MiniStairCount: 0 });
 		CheckObjective("the compass points ahead, at the cabin", "cabin");
 		Check("the cabin stands ahead on the trail, in the wrong place", _bot.FirstOf<CabinFireEvent>()?.Cabin is { AtAct7Spot: true });
@@ -835,7 +837,9 @@ public partial class Playtest
 				Check("the old way still rows: alternating A and D", crossing.StrokeCount >= 4 && crossing.Speed > 1.2f, $"{crossing.StrokeCount} strokes, {crossing.Speed:0.0} m/s");
 				await RowUntil(crossing, () => false, ct, 3.0);
 				Check("holding W rows on its own steady rhythm", crossing.Speed > 2.6f && !crossing.RowingHard, $"{crossing.Speed:0.0} m/s");
-				await RowUntil(crossing, () => false, ct, 2.5, hard: true);
+				// (2026-10-22, a flake: a bump under the hull can take the controls for a moment in a fixed 2.5 s, and the check
+				// then saw half a second of hard rowing) rowed hard until the breath shows it, as a player would
+				await RowUntil(crossing, () => crossing.Breath < 0.75f && crossing.Speed > 3.6f, ct, 6.0, hard: true);
 				Check("Shift with W rows hard: quicker, and it spends breath", crossing.Speed > 3.6f && crossing.Breath < 0.8f, $"{crossing.Speed:0.0} m/s, breath {crossing.Breath:0.00}");
 				await RowUntil(crossing, () => false, ct, 1.6, steer: 1);
 				Check("D steers the boat across", Mathf.Abs(crossing.Sideways) > 0.8f, $"{crossing.Sideways:0.0} m off the line");
@@ -844,6 +848,8 @@ public partial class Playtest
 			Check("rowed out to the breach: bumps under the hull on the way", crossing.InBreach && crossing.Bumps >= 1, $"progress {crossing.Progress:0.00}, {crossing.Bumps} bumps, {crossing.Glimpses} limbs");
 		// (2026-10-22) the oars are the recorded strokes, one a stroke (both oars together are one)
 		Check("the oars: recorded strokes, one a stroke", crossing.StrokeSounds >= 3 && crossing.StrokeSounds <= crossing.StrokeCount + 1, $"{crossing.StrokeSounds} sounds for {crossing.StrokeCount} strokes");
+		// (2026-10-22) both hands on the oars: the lantern's arm is down out of view the whole crossing
+		Check("rowing: the lantern arm is down, both hands on the oars", Player.CameraRig.Camera.GetNodeOrNull<HeldLantern>(nameof(HeldLantern)) is not { Raise: > 0.05f }, $"raise {Player.CameraRig.Camera.GetNodeOrNull<HeldLantern>(nameof(HeldLantern))?.Raise:0.00}");
 			await _bot.WaitUntil(() => crossing.LastCreature is { ColossusUp: true }, 15, ct);
 			Check("limbs covered in eyes breach the water", crossing.LastCreature is { Breaching: true } or { ColossusUp: true });
 			Shot("breach");
@@ -871,6 +877,8 @@ public partial class Playtest
 		Check("rowed hard: across the current, landed", crossing.Landed, $"progress {crossing.Progress:0.00}");
 		await _bot.WaitUntil(() => Input.Enabled, 10, ct);
 		Check("stood up on the far beach", Player.CameraRig.EyeHeight > 1.5f);
+		await _bot.WaitUntil(() => Player.CameraRig.Camera.GetNodeOrNull<HeldLantern>(nameof(HeldLantern)) is { Raise: > 0.95f } || Player.GetNodeOrNull<Lantern>("Lantern") is not { IsOn: true, Shining: true }, 5, ct);
+		Check("ashore: the lantern arm comes back up", Player.CameraRig.Camera.GetNodeOrNull<HeldLantern>(nameof(HeldLantern)) is { Raise: > 0.95f } || Player.GetNodeOrNull<Lantern>("Lantern") is not { IsOn: true, Shining: true }, $"raise {Player.CameraRig.Camera.GetNodeOrNull<HeldLantern>(nameof(HeldLantern))?.Raise:0.00}");
 		Shot("landed");
 		await _bot.WalkTo(lake.StationApproachWorld, 1.5f, ct, giveUp: 20f);
 		// (2026-10-15) the door is shut: open it (the lobby in the doorway), then step in

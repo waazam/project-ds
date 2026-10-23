@@ -723,6 +723,9 @@ public partial class ForestAtmosphere : Node
 		bool on = ProjectDS.Systems.GameSettings.Instance?.FogLighting ?? true;
 		if (_env.VolumetricFogEnabled != on) _env.VolumetricFogEnabled = on;
 		if (!on) return;
+		// (2026-10-22) the fog's grain, from the setting (fine 96, standard 64): set once, and again if it's changed
+		int grid = (ProjectDS.Systems.GameSettings.Instance?.FineFog ?? true) ? 96 : 64;
+		if (grid != _fogGrid) { _fogGrid = grid; RenderingServer.EnvironmentSetVolumetricFogVolumeSize(grid, grid); }
 		float d = Mathf.Lerp(VolumetricOpen, VolumetricWinter, winter);
 		d = Mathf.Lerp(d, VolumetricInterior, Mathf.Max(inside, lodge));
 		d = Mathf.Lerp(d, VolumetricEnclosed, Enclosed * (1f - under));
@@ -746,6 +749,8 @@ public partial class ForestAtmosphere : Node
 			_banks.Tint(_env.VolumetricFogAlbedo);
 		}
 	}
+
+	private static int _fogGrid;
 
 	/// <summary>Fog banks drifting through the volumetric fog outdoors (FogBanks).</summary>
 	[Export] public bool DriftingFog = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-fogbanks") < 0;

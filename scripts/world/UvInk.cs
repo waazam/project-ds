@@ -189,6 +189,39 @@ public static partial class UvInk
 		}, 0.08f, 960 + v);
 	}
 
+	/// <summary>(2026-10-22, the owner: the cryptex room needs a hint, "images of stairs all over the walls that you can only
+	/// see with the blacklight") A staircase, drawn quickly by hand: the steps rising from the lower left, in one of four
+	/// hands (plain; with a doorway at the top; with a figure climbing; with an arrow up them).</summary>
+	public static Texture2D Stairs(int variant)
+	{
+		int v = ((variant % 4) + 4) % 4;
+		var steps = new List<Vector2>();
+		int n = 4 + v % 2;
+		float x = 0.1f, y = 0.9f, sx = 0.78f / n, sy = 0.62f / n;
+		steps.Add(new Vector2(x, y));
+		for (int i = 0; i < n; i++)
+		{
+			y -= sy; steps.Add(new Vector2(x + 0.01f * (i % 2), y));
+			x += sx; steps.Add(new Vector2(x, y + 0.012f * ((i + v) % 2)));
+		}
+		var s = new List<List<Vector2>> { steps, L(0.1f, 0.9f, x, 0.9f), L(x, y, x, 0.9f) };
+		switch (v)
+		{
+			case 1: s.Add(L(x - sx * 0.85f, y, x - sx * 0.85f, y - 0.2f, x - sx * 0.1f, y - 0.2f, x - sx * 0.1f, y)); break;   // a door at the top
+			case 2:   // a figure two steps up, climbing
+			{
+				var f = new Vector2(0.1f + sx * 2.5f, 0.9f - sy * 2f);
+				s.Add(new List<Vector2> { f + new Vector2(0f, -0.2f) });
+				s.Add(L(f.X, f.Y - 0.16f, f.X + 0.01f, f.Y - 0.06f));
+				s.Add(L(f.X + 0.01f, f.Y - 0.06f, f.X - 0.04f, f.Y, f.X + 0.05f, f.Y - 0.06f + 0.02f, f.X + 0.07f, f.Y - sy));
+				s.Add(L(f.X - 0.05f, f.Y - 0.1f, f.X, f.Y - 0.13f, f.X + 0.06f, f.Y - 0.11f));
+				break;
+			}
+			case 3: s.Add(L(0.18f, 0.72f, 0.62f, 0.28f)); s.Add(L(0.48f, 0.27f, 0.63f, 0.27f, 0.62f, 0.42f)); break;   // an arrow up them
+		}
+		return Strokes($"uv_stairs{v}", 64, 64, s, 0.05f, 980 + v);
+	}
+
 	/// <summary>A decoy chosen by index: a mark that is not a number (or a number struck out).</summary>
 	public static Texture2D Decoy(int i, int avoidDigit)
 	{

@@ -38,6 +38,9 @@ public partial class GameSettings : Node
 	/// <summary>Light in the fog (volumetric fog: the lantern's beam, the lamps' haloes, shafts through the trees).
 	/// The heaviest effect there is; off for a slower machine. `--no-volfog` turns it off for a run.</summary>
 	public bool FogLighting = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-volfog") < 0;
+	/// <summary>(2026-10-22) The fog's grain: fine (a 96 x 96 x 96 grid: the dense banks and the lit layers smooth) or standard
+	/// (Godot's 64: about a third of the cost, for a slower graphics card). Applied by ForestAtmosphere.</summary>
+	public bool FineFog = true;
 	/// <summary>The picture's brightness: a gamma over the finished image (1 as designed, 0.7 darker to 1.5 lighter;
 	/// it lifts the dark and the mids, not the whites). For a dark monitor or a bright room.</summary>
 	public float Brightness = 1f;
@@ -245,6 +248,7 @@ public partial class GameSettings : Node
 		cfg.SetValue("accessibility", "head_motion", HeadMotion);
 		cfg.SetValue("display", "cinema_bars", CinemaBars);
 		cfg.SetValue("display", "fog_lighting", FogLighting);
+		cfg.SetValue("display", "fine_fog", FineFog);
 		cfg.SetValue("display", "brightness", Brightness);
 		cfg.SetValue("display", "brightness_calibrated", BrightnessCalibrated);
 		cfg.SetValue("display", "lantern_brightness", LanternBrightness);
@@ -286,6 +290,7 @@ public partial class GameSettings : Node
 		HeadMotion = (bool)cfg.GetValue("accessibility", "head_motion", HeadMotion);
 		CinemaBars = (bool)cfg.GetValue("display", "cinema_bars", CinemaBars);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-volfog") < 0) FogLighting = (bool)cfg.GetValue("display", "fog_lighting", FogLighting);
+		FineFog = (bool)cfg.GetValue("display", "fine_fog", FineFog);
 		Brightness = Mathf.Clamp((float)cfg.GetValue("display", "brightness", Brightness), BrightnessMin, BrightnessMax);
 		BrightnessCalibrated = (bool)cfg.GetValue("display", "brightness_calibrated", BrightnessCalibrated);
 		LanternBrightness = Mathf.Clamp((float)cfg.GetValue("display", "lantern_brightness", LanternBrightness), LanternMin, LanternMax);
@@ -377,12 +382,12 @@ public partial class GameSettings : Node
 	// ------------------------------------------------------------------ the settings' round trip (a test)
 
 	/// <summary>Every setting the menus save, as it is now (name: value), for the round trip.</summary>
-	private System.Collections.Generic.Dictionary<string, string> Snapshot() => new()
+	public System.Collections.Generic.Dictionary<string, string> Snapshot() => new()
 	{
 		["mouse"] = MouseSensitivity.ToString("0.00000"), ["stick"] = StickSensitivity.ToString("0.000"), ["invert_y"] = InvertY.ToString(),
 		["distance"] = CameraDistance.ToString("0.000"), ["camera"] = Camera.ToString(), ["volume"] = _masterVolume.ToString("0.000"),
 		["reduce_flashing"] = ReduceFlashing.ToString(), ["head_motion"] = HeadMotion.ToString(), ["bars"] = CinemaBars.ToString(),
-		["fog_lighting"] = FogLighting.ToString(), ["brightness"] = Brightness.ToString("0.000"), ["lantern"] = LanternBrightness.ToString("0.000"),
+		["fog_lighting"] = FogLighting.ToString(), ["fine_fog"] = FineFog.ToString(),["brightness"] = Brightness.ToString("0.000"), ["lantern"] = LanternBrightness.ToString("0.000"),
 		["crt"] = _crtFilter.ToString(), ["shadows"] = _shadows.ToString(), ["windowed"] = _windowed.ToString(), ["window"] = _windowSize.ToString(),
 		["hud_color"] = HudColor.ToString(), ["shake"] = ScreenShake.ToString("0.00"), ["captions"] = SoundCaptions.ToString(), ["hold_crouch"] = HoldToCrouch.ToString(), ["body"] = BodyInView.ToString(), ["hud_contextual"] = ContextualHud.ToString(), ["focus_pull"] = FocusPull.ToString(), ["hint_size"] = HintSize.ToString(),
 	};

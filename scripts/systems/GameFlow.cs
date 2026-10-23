@@ -121,6 +121,11 @@ public partial class GameFlow : Node
 		AddChild(new Audio.SongCues { Name = "SongCues" });
 		// where a play-through stalls, written quietly to user://pacing.txt (nothing on screen)
 		AddChild(new PacingLog { Name = "PacingLog" });
+		// (2026-10-22) the Hollow lets go of each chapter's places once they're behind for good (ChapterRetire); not for the
+		// audits, which look at the whole level, nor with --no-retire
+		if (GetTree().CurrentScene?.SceneFilePath == StoryManager.HollowScene && !World.StationInterior.NeverDefer
+			&& System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-retire") < 0)
+			AddChild(new ChapterRetire { Name = "ChapterRetire" });
 		AddChild(new UI.SoundCaption { Name = "SoundCaption" });
 		AddChild(new Achievements { Name = "Achievements" });
 		// the next level read in the background while this one's played (StoryManager.PreloadLevel): the hollow from the

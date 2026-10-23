@@ -552,6 +552,7 @@ public partial class SkiLodge
 			hand.QueueFree();
 			AudioDirector.OneShot(this, "cloth", 4, sheet.ToGlobal(p3), -8f, "Events", 3f, 0.1f);
 			GD.Print($"[story] Act 23: sheet {n} off (table {t})");
+			if (n is 2 or 4) TableBlood(t, n, sheet.ToGlobal(p3));
 			await Cutscene.Wait(this, 0.4, ct);
 		}
 		finally { _pulling = false; }

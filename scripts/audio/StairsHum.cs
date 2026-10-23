@@ -66,12 +66,12 @@ public partial class StairsHum : Node
 				float d = z.GlobalPosition.DistanceSquaredTo(_listener.GlobalPosition);
 				if (d < bestD) { bestD = d; best = z; }
 			}
-			if (best != null) _zone = best;
+			_zone = best;   // (2026-10-22: null once the stairs are behind them, freed with their chapter: ChapterRetire)
 		}
 
 		float target = -80f;
 		if (_override.HasValue) target = _override.Value;
-		else if (_zone != null && _listener != null)
+		else if (_zone != null && IsInstanceValid(_zone) && _listener != null)
 		{
 			float prox = _zone.SilenceAt(_listener.GlobalPosition) / Mathf.Max(_zone.Strength, 0.01f);
 			if (prox > 0.001f) target = Mathf.Lerp(EdgeDb, CloseDb, prox);

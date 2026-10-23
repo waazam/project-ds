@@ -38,7 +38,8 @@ public static class TexCache
 
 	private static string SourceKey()
 	{
-		if (!DirAccess.DirExistsAbsolute("res://scripts")) return null;
+		// (an exported game carries the scripts as stubs: it keys by its build, and trusts the shipped copy)
+		if (!OS.HasFeature("editor") || !DirAccess.DirExistsAbsolute("res://scripts")) return null;
 		var files = new System.Collections.Generic.List<string>();
 		void Walk(string dir)
 		{
@@ -65,15 +66,88 @@ public static class TexCache
 	}
 
 	public static int Hits { get; private set; }
+	/// <summary>For the log and tests: textures found in the copy shipped with the game.</summary>
+	public static int BakedHits { get; private set; }
 
-	private static string PathFor(string key) => $"{Dir}/{key.Replace('/', '_').Replace(':', '_')}.img";
+	private static string FileName(string key) => $"{key.Replace('/', '_').Replace(':', '_')}.img";
+	private static string PathFor(string key) => $"{Dir}/{FileName(key)}";
+
+	// ------------------------------------------------------------------ the copy shipped with the game
+	// (2026-10-22, for the playtests: an exported game's cache starts empty, so a tester's first load into the Hollow drew
+	// every texture, half a minute of it) `--bake-texcache` (with the clip audit, which builds every level) copies the cache
+	// into the project, beside the drawing code's key; an exported game reads from it whenever its own cache hasn't the
+	// texture yet. In the editor it's used only while its key is the drawing code's own (a stale copy is never read).
+
+	private const string BakedDir = "res://assets/texcache_baked";
+	private static bool? _bakedOk;
+	private static System.Collections.Generic.Dictionary<string, string> _bakedByPrefix;
+
+	private static bool BakedOk
+	{
+		get
+		{
+			if (_bakedOk is { } ok) return ok;
+			string keyFile = $"{BakedDir}/key.txt";
+			if (!FileAccess.FileExists(keyFile)) return (_bakedOk = false).Value;
+			string baked = FileAccess.GetFileAsString(keyFile).Trim();
+			string src = SourceKey();
+			_bakedOk = src == null || src == baked;   // (exported: no scripts to check it by; it was baked for this build)
+			if (_bakedOk == false) GD.Print($"[texcache] the shipped copy ({baked}) isn't this drawing code's ({src}): not used");
+			return _bakedOk.Value;
+		}
+	}
+
+	/// <summary>A shipped file for the key, exactly, or (a cavity map, whose key carries its source PNG's hash, which an
+	/// exported game can't read) by its map's name.</summary>
+	private static string BakedPath(string key)
+	{
+		string exact = $"{BakedDir}/{FileName(key)}z";
+		if (FileAccess.FileExists(exact)) return exact;
+		if (!key.StartsWith("Cavity_")) return null;
+		if (_bakedByPrefix == null)
+		{
+			_bakedByPrefix = new();
+			foreach (var f in DirAccess.GetFilesAt(BakedDir))
+				if (f.StartsWith("Cavity_") && f.EndsWith(".imgz")) _bakedByPrefix[WithoutHash(f[..^5])] = $"{BakedDir}/{f}";
+		}
+		return _bakedByPrefix.TryGetValue(WithoutHash(FileName(key)[..^4]), out var p) ? p : null;
+	}
+
+	// (Cavity_<png>_<its md5>_<floor> to Cavity_<png>__<floor>: an exported game reads the md5 as "")
+	private static string WithoutHash(string name) => System.Text.RegularExpressions.Regex.Replace(name, "_[0-9a-f]{32}_", "__");
+
+	/// <summary>`--bake-texcache`: this run's cache copied into the project as the shipped copy (the editor only).</summary>
+	public static void BakeToProject()
+	{
+		string from = ProjectSettings.GlobalizePath(Dir), to = ProjectSettings.GlobalizePath(BakedDir);
+		DirAccess.MakeDirRecursiveAbsolute(to);
+		foreach (var f in DirAccess.GetFilesAt(to)) DirAccess.RemoveAbsolute($"{to}/{f}");
+		int n = 0;
+		// (zstd: the raw drawn textures came to 166 MB; the game reads them back through the same compression)
+		foreach (var f in DirAccess.GetFilesAt(from))
+		{
+			var bytes = FileAccess.GetFileAsBytes($"{from}/{f}");
+			using var w = FileAccess.OpenCompressed($"{BakedDir}/{f}z", FileAccess.ModeFlags.Write, FileAccess.CompressionMode.Zstd);
+			if (w == null) continue;
+			w.StoreBuffer(bytes);
+			n++;
+		}
+		using (var k = FileAccess.Open($"{BakedDir}/key.txt", FileAccess.ModeFlags.Write)) k?.StoreString(System.IO.Path.GetFileName(Dir));
+		GD.Print($"[texcache] baked {n} textures into {BakedDir} for {System.IO.Path.GetFileName(Dir)}");
+	}
 
 	public static Image Load(string key)
 	{
 		if (!On) return null;
 		string p = PathFor(key);
-		if (!FileAccess.FileExists(p)) return null;
-		using var f = FileAccess.Open(p, FileAccess.ModeFlags.Read);
+		bool baked = false;
+		if (!FileAccess.FileExists(p))
+		{
+			if (!BakedOk || BakedPath(key) is not { } bp) return null;
+			p = bp; baked = true;
+		}
+		if (baked) BakedHits++;
+		using var f = baked ? FileAccess.OpenCompressed(p, FileAccess.ModeFlags.Read, FileAccess.CompressionMode.Zstd) : FileAccess.Open(p, FileAccess.ModeFlags.Read);
 		if (f == null) return null;
 		int w = (int)f.Get32(), h = (int)f.Get32(), fmt = (int)f.Get32();
 		bool mips = f.Get8() != 0;
