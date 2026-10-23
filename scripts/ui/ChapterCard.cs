@@ -126,10 +126,27 @@ public partial class ChapterCard : CanvasLayer
 				while (size > 48 && font.GetStringSize(Titles[_n], HorizontalAlignment.Left, -1, size).X > 500) size -= 4;
 			_title = MakeLabel(Titles[_n], font, size, Taupe);
 		}
-		_root.AddChild(_title);
+		// (2026-10-22, the owner: "when the chapter titles come up on screen it looks like they are shaking around a little
+		// bit") the push-in scaled the label itself: laid out again every frame at a new size on the 640 x 360 picture, each
+		// letter snapped to the coarse pixels on its own, and they jittered against each other. The title is drawn once into
+		// its own picture now, and that picture is what pushes in, smoothly filtered: the letters move as one.
+		var screen = GetViewport().GetVisibleRect().Size;
+		_titleView = new SubViewport { Name = "TitleView", TransparentBg = true, Disable3D = true, Size = new Vector2I(Mathf.CeilToInt(screen.X), Mathf.CeilToInt(screen.Y)), RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
+		_titleView.AddChild(_title);
+		_root.AddChild(_titleView);
+		_titleRect = new TextureRect
+		{
+			Texture = _titleView.GetTexture(), StretchMode = TextureRect.StretchModeEnum.Scale, MouseFilter = Control.MouseFilterEnum.Ignore,
+			TextureFilter = CanvasItem.TextureFilterEnum.Linear,
+		};
+		_titleRect.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_root.AddChild(_titleRect);
 		_root.Modulate = new Color(1, 1, 1, 0);
 		Current = this;
 	}
+
+	private SubViewport _titleView;
+	private TextureRect _titleRect;
 
 	/// <summary>The game's name, DEAD SILENT, as its title card sets it (full-rect, centred).</summary>
 	public static Label TitleLabel() => MakeLabel("DEAD SILENT", UiKit.SerifTitle, 44, UiKit.Bone);
@@ -182,8 +199,8 @@ public partial class ChapterCard : CanvasLayer
 		_root.Modulate = new Color(1, 1, 1, Mathf.Clamp(a, 0f, 1f));
 		// a slow push in while it holds (never a jump)
 		float grow = 1f + 0.035f * Mathf.Clamp((t - lead) / (FadeIn + Hold + FadeOut), 0f, 1f);
-		_title.PivotOffset = _title.Size * 0.5f;
-		_title.Scale = new Vector2(grow, grow);
+		_titleRect.PivotOffset = _titleRect.Size * 0.5f;
+		_titleRect.Scale = new Vector2(grow, grow);
 		if (t > lead + FadeIn + Hold + FadeOut)
 		{
 			if (Current == this) Current = null;

@@ -738,6 +738,10 @@ public partial class Act11Ending : Node3D
 			postMat?.SetShaderParameter("vignette", baseVignette);
 		}
 		GD.Print("[story] Act 11: thrown, into black");
+		// (2026-10-22, the debug run: built after the chapter card, the station and all under it held the wake-up on black for
+		// up to half a minute on a busy machine) begun now, at the start of this black: the silence, the radio's last line
+		// and the chapter's title cover most of it, and the wake waits only for what's left (WhenBuilt)
+		if (StationInterior.Instance is { Built: false } underground) underground.EnsureBuilt();
 		HumOut = true;
 		await Cutscene.Wait(this, HumOutSeconds * 0.6f, ct);   // silence over black
 		ForestAmbienceManager.Instance?.ReleaseSilence(this);

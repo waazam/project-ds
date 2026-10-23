@@ -311,10 +311,9 @@ public partial class LakeCrossingEvent : Node3D
 
 	private void BuildSound()
 	{
-		_lap = Loop3D("res://assets/audio/ambient/hull_lap_loop.wav", "Water", -8f, 3f);
+		// (2026-10-22, the owner's "human burps": the made-up lap along the planks, "a gulp in each lap", and the chuckle of
+		// water along the hull as she makes way are gone; the recorded strokes are the boat's water, StrokeSound)
 		_rough = Loop3D("res://assets/audio/ambient/lake_rough_loop.wav", "Weather", -80f, 10f);
-		// the water chuckling along the planks while she makes way (raised with her speed)
-		_glide = Loop3D("res://assets/audio/ambient/hull_glide_loop.wav", "Water", -80f, 3f);
 		const string heart = "res://assets/audio/ambient/heartbeat_loop.wav";
 		if (ResourceLoader.Exists(heart))
 		{
@@ -1021,11 +1020,9 @@ public partial class LakeCrossingEvent : Node3D
 		LakeFx.Splash(Cutscene.SceneRoot(this), w, rough ? 0.7f : 0.45f, rough ? 12 : 7);
 		LakeFx.Ripple(Cutscene.SceneRoot(this), w, 1.3f, 1.4f, 0.35f);
 		float dur = _strokeDur[side < 0 ? 0 : 1];
-		Sfx("row_catch", 10, w, "Player", (rough ? -7f : -11f) - (_pair ? 2.5f : 0f), 4f);
-		var pull = Sfx("row_pull", 10, w, "Player", (rough ? -6f : -10f) - (_pair ? 2.5f : 0f), 4f);
-		// (2026-10-13, the "bouncy" sweep: up to 1.35 a hurried stroke's water went a fifth up, a chipmunk splash; the
-		// stroke's speed shows in it, but only a little)
-		if (pull != null) pull.PitchScale = Mathf.Clamp(0.62f / Mathf.Max(0.25f, dur), 0.93f, 1.1f) * _rng.RandfRange(0.97f, 1.03f);
+		// (2026-10-22, the owner: the made-up catch and pull "sounds like a human burping") a real stroke from the owner's
+		// recording, the oars in, the pull and the release in one; one for both oars together (the right blade's skipped)
+		if (!(_pair && side > 0)) StrokeSound(_pair ? _boat.GlobalPosition with { Y = w.Y } : w, (rough ? -5f : -8f) + (_pair ? 0f : -2f), dur);
 		// the loom knocking home in its lock as the oar loads, and turning in it (often, not always)
 		Vector3 lockAt = _boat.ToGlobal(Rowboat.OarlockLocal(side));
 		if (_rng.Randf() < 0.6f) Sfx("row_lock_knock", 8, lockAt, "Player", (rough ? -14f : -17f) - (_pair ? 2f : 0f), 2f);
@@ -1035,10 +1032,47 @@ public partial class LakeCrossingEvent : Node3D
 	private void OnBladeOut(int side, Vector3 at)
 	{
 		Vector3 w = at with { Y = _lake.WaterHeightAt(at, out _) };
-		Sfx("row_release", 10, w, "Player", (InCurrent ? -9f : -13f) - (_pair ? 2.5f : 0f), 4f);
+		// (the release is in the recorded stroke now: StrokeSound)
 		// the oar swinging back seats in its lock now and then
 		if (_rng.Randf() < 0.3f) Sfx("row_lock_knock", 8, _boat.ToGlobal(Rowboat.OarlockLocal(side)), "Player", -20f, 2f);
 		LakeFx.Ripple(Cutscene.SceneRoot(this), w, 0.7f, 1.0f, 0.25f);
+	}
+
+	/// <summary>The strokes in the owner's rowing recording (rowing_strokes.mp3, 14.5 s of a real boat): where each one
+	/// starts (s) and how long it runs, oars in to the release's tail. Found from the file's loudness (each granule's
+	/// gain): the eight cleanest swells over the water.</summary>
+	private static readonly Vector2[] RecordedStrokes =
+	{
+		new(0.00f, 1.00f), new(2.35f, 1.00f), new(3.77f, 0.85f), new(4.87f, 1.15f),
+		new(6.07f, 1.00f), new(7.55f, 1.00f), new(10.25f, 1.05f), new(12.60f, 1.00f),
+	};
+	private AudioStream _strokeStream;
+	private int _lastStroke = -1;
+	/// <summary>For tests: recorded strokes played this crossing.</summary>
+	public int StrokeSounds { get; private set; }
+	// (its own dice: the crossing's are its creature's and its timings)
+	private readonly RandomNumberGenerator _strokeRng = new();
+
+	/// <summary>One recorded stroke at <paramref name="at"/>, never the same as the last, a hurried stroke a touch
+	/// quicker (only a touch: never a chipmunk splash); faded off at its end, never cut.</summary>
+	private void StrokeSound(Vector3 at, float db, float strokeSeconds)
+	{
+		_strokeStream ??= ResourceLoader.Exists("res://assets/audio/sfx/rowing_strokes.mp3") ? GD.Load<AudioStream>("res://assets/audio/sfx/rowing_strokes.mp3") : null;
+		if (_strokeStream == null) return;
+		int k = _strokeRng.RandiRange(0, RecordedStrokes.Length - 1);
+		if (k == _lastStroke) k = (k + 1 + _strokeRng.RandiRange(0, RecordedStrokes.Length - 2)) % RecordedStrokes.Length;
+		_lastStroke = k;
+		StrokeSounds++;
+		float pitch = Mathf.Clamp(0.62f / Mathf.Max(0.25f, strokeSeconds), 0.95f, 1.06f) * _strokeRng.RandfRange(0.97f, 1.03f);
+		var p = new AudioStreamPlayer3D { Name = "OarStroke", Stream = _strokeStream, Bus = "Player", VolumeDb = db, UnitSize = 4f, MaxDistance = 40f, PitchScale = pitch };
+		Cutscene.SceneRoot(this).AddChild(p);
+		p.GlobalPosition = at;
+		p.Play(RecordedStrokes[k].X);
+		float len = RecordedStrokes[k].Y / pitch;
+		var tw = p.CreateTween();
+		tw.TweenInterval(Mathf.Max(0.05f, len - 0.18f));
+		tw.TweenProperty(p, "volume_db", -60f, 0.18f);
+		tw.TweenCallback(Callable.From(p.QueueFree));
 	}
 
 	/// <summary>A faint V of ripples spreading behind the boat while it makes way.</summary>
@@ -1826,12 +1860,19 @@ public partial class LakeCrossingEvent : Node3D
 	/// / <c>{name}_01.wav</c> for a single take), placed in the world, on a bus.</summary>
 	private readonly System.Collections.Generic.Dictionary<string, int> _lastTake = new();
 
+	/// <summary>(2026-10-22, the owner: "i still hear the human burps while you are rowing, you need to eliminate that sound
+	/// entirely") the made-up water and wood sounds of the boat that gulp and croak: the oarlock's stick-slip creak, the
+	/// bilge's slosh, and the old catch, pull and release. None of them plays; the recorded strokes are the boat's water
+	/// now (with the hull's lap and glide loops, which aren't made at all, BuildSound).</summary>
+	private static readonly System.Collections.Generic.HashSet<string> Burps = new() { "row_lock_creak", "bilge_slosh", "row_catch", "row_pull", "row_release" };
+
 	private AudioStreamPlayer3D Sfx(string name, int variants, Vector3 at, string bus, float db, float unit = 5f, float maxDistance = 70f)
 	{
 		// never the same take twice running (the owner's rule: no repetitive sounds)
 		int n = Mathf.Max(1, variants), take = _rng.RandiRange(1, n);
 		if (n > 1 && _lastTake.TryGetValue(name, out int last) && take == last) take = take % n + 1;
 		_lastTake[name] = take;
+		if (Burps.Contains(name)) return null;   // (after the dice: the crossing's other timings stay as they were)
 		string path = $"res://assets/audio/sfx/{name}_{take:00}.wav";
 		if (!ResourceLoader.Exists(path)) path = $"res://assets/audio/sfx/{name}.wav";
 		if (!ResourceLoader.Exists(path)) return null;

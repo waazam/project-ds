@@ -14,4 +14,5 @@ Dead Silent is made by GLHFDD. Third-party material used in the game, and what i
 | The owner's snow textures, tablecloth jacquard, songs and samples | throughout | the owner | the owner's own |
 | "Petty Theft" (the song, cut into loops, impacts and synth stabs) | Act 24's score and the cues for finds and progress (`assets/audio/music/petty_theft/`) | the owner (soundcloud.com/alf452/petty-theft) | the owner's own |
 | The player's body | the first-person body and its shadow (`assets/models/player/player_body.glb`) | our own, modelled in code (`tools/Blender/player_body.py`) | ours |
+| "Oarsmanship" (a real rowboat's strokes) | Act 12's crossing, each oar stroke (`assets/audio/sfx/rowing_strokes.mp3`, cut at play time, `LakeCrossingEvent.RecordedStrokes`) | freesound_community, via Pixabay (supplied by the owner) | Pixabay Content License (free for commercial use; no attribution required) |
 | Climb loop, lullaby, church bell | the load after the stairs, the lodge's music box, the winter's bell, the radio | our own, mixed from the game's sounds and synthesised (`tools/audio/make_climb_loop.py`, `tools/AudioGen/Motifs.cs`) | ours |

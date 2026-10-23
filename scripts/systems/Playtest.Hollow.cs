@@ -714,7 +714,8 @@ public partial class Playtest
 			Check("the view never flipped through it", !act11.ViewFlipped);
 			Check("lifted over the treetops and thrown", act11.Thrown && act11.LiftHeight > 15f && act11.ThrowDistance > 100f,
 				$"thrown {act11.Thrown}, lifted {act11.LiftHeight:0} m, carried {act11.ThrowDistance:0} m");
-			await _bot.WaitUntil(() => Input.Enabled, 20, ct);
+			// (the station and all under it build in this black: some 15 s on a quiet machine, half a minute on a busy one)
+			await _bot.WaitUntil(() => Input.Enabled, 45, ct);
 		}
 		var lake = GetTree().GetFirstNodeInGroup("lake_marker") as Lake;
 		Check("they come to at the lake, with control", Input.Enabled && lake != null && Player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 30f);
@@ -841,6 +842,8 @@ public partial class Playtest
 			}
 			await RowUntil(crossing, () => crossing.InBreach || !crossing.Paddling, ct, 60, smart: true);
 			Check("rowed out to the breach: bumps under the hull on the way", crossing.InBreach && crossing.Bumps >= 1, $"progress {crossing.Progress:0.00}, {crossing.Bumps} bumps, {crossing.Glimpses} limbs");
+		// (2026-10-22) the oars are the recorded strokes, one a stroke (both oars together are one)
+		Check("the oars: recorded strokes, one a stroke", crossing.StrokeSounds >= 3 && crossing.StrokeSounds <= crossing.StrokeCount + 1, $"{crossing.StrokeSounds} sounds for {crossing.StrokeCount} strokes");
 			await _bot.WaitUntil(() => crossing.LastCreature is { ColossusUp: true }, 15, ct);
 			Check("limbs covered in eyes breach the water", crossing.LastCreature is { Breaching: true } or { ColossusUp: true });
 			Shot("breach");
