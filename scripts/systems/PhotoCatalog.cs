@@ -18,7 +18,7 @@ public static class PhotoCatalog
 	{
 		// Act 1: the trail
 		new("bird_red", "a red bird", 0.15f), new("bird_blue", "a blue bird", 0.15f), new("bird_purple", "a purple bird", 0.15f),
-		new("bird_black", "a black bird", 0.15f), new("deer", "a deer", 0.8f), new("frog", "a frog", 0.06f),
+		new("bird_black", "a black bird", 0.15f), new("deer", "a deer", 0.8f), new("frog", "a frog", 0.06f), new("squirrel", "a squirrel", 0.2f),
 		new("wildflowers", "wildflowers", 1.1f), new("mushrooms", "mushrooms", 0.2f), new("waterfall", "the waterfall", 3.5f),
 		new("weird_stone", "a strange stone", 1.2f), new("stairs", "stairs?", 1.6f),
 		// the Hollow
@@ -50,7 +50,7 @@ public static class PhotoCatalog
 		new("wendigo", "it wears antlers", 1.8f, true),
 	};
 
-	public const int Total = 69;   // sixty, and the winter woods' nine (Act 22)
+	public const int Total = 70;   // sixty, the winter woods' nine (Act 22), and the squirrel (2026-10-23)
 
 	/// <summary>(2026-10-10) The album's notes: a line in pencil for each thing on the list the first time it's on film, in the
 	/// photographer's own hand (dry, tired, more frightened as it goes). Shown on the album's last page.</summary>
@@ -62,6 +62,7 @@ public static class PhotoCatalog
 		["bird_black"] = "The black one came out wrong. Red eyes. Lens flare?",
 		["deer"] = "Doe on the trail. She didn't run.",
 		["frog"] = "Tiny frog. Took me five tries.",
+		["squirrel"] = "Squirrel. Wouldn't hold still.",
 		["wildflowers"] = "Wildflowers. Something normal.",
 		["mushrooms"] = "Didn't touch them.",
 		["waterfall"] = "The falls. Louder than I thought.",

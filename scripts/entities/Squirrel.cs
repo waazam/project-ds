@@ -18,7 +18,7 @@ public partial class Squirrel : Node3D
 {
 	[Export] public float RoamRadius = 9f;
 	[Export] public float FleeDistance = 6.5f;
-	[Export] public float ModelScale = 1.35f;
+	[Export] public float ModelScale = 1.7f;   // (2026-10-23: was 1.35, too small to make out up a trunk)
 	[Export] public int Seed = 1;
 
 	private enum Mode { Forage, Dash, SitUp, ToTree, Climb, Cling, Descend, Flee }
@@ -26,6 +26,8 @@ public partial class Squirrel : Node3D
 	private float _timer, _phase, _speed;
 	private Vector3 _home, _target, _trunkHit, _trunkNormal;
 	private float _climbTop, _climbY;
+	/// <summary>The trunk it's on as drawn (its centre and bark), when the forest has it; else the collider's face is used.</summary>
+	private TreeTrunks.Trunk? _trunk;
 	private bool _fleeing;
 	private Node3D _model, _body, _head, _tail;
 	private ForestTerrain _terrain;
@@ -42,6 +44,15 @@ public partial class Squirrel : Node3D
 		TopLevel = true;
 		GlobalPosition = Ground(_home);
 		if (!TryLoadRig()) BuildModel();   // (the Blender model; the code-built squirrel only if it's missing)
+		// (2026-10-23, the owner: "we cant take pictures of them") on the album's list now: a small subject, so near, and
+		// framed tight (its look points follow it up the trunk)
+		// (on the model, so its look points turn with the body: up a trunk head down, they stay on its back and head)
+		(_model ?? this).AddChild(new PhotoSubject
+		{
+			Name = "PhotoSubject", Id = "squirrel",
+			LookPoints = new[] { new Vector3(0, 0.1f, 0), new Vector3(0, 0.1f, -0.12f) },
+			MinDistance = 0.8f, MaxDistance = 18f, ConeDegrees = 12f, OwnerPath = "..",
+		});
 		_timer = _rng.RandfRange(0.5f, 3f);
 		if (Systems.StoryManager.Instance is { } story && story.Current >= Systems.Checkpoint.Act2StairsClimbed) { Visible = false; SetProcess(false); }
 	}
@@ -104,6 +115,18 @@ public partial class Squirrel : Node3D
 		if (_rigged) RigAdvance(dt);
 	}
 
+	/// <summary>For tests: sends it to the nearest trunk and up it now (false if there's none round it).</summary>
+	public bool TestClimb()
+	{
+		if (!FindTrunk(GlobalPosition, 12f, out _trunkHit, out _trunkNormal)) return false;
+		_fleeing = false; _mode = Mode.ToTree; _target = _trunkHit + _trunkNormal * 0.12f; _speed = 3.2f;
+		return true;
+	}
+	/// <summary>For tests: up a trunk (climbing or clinging), and which way the bark faces it.</summary>
+	public bool OnATrunk => _mode is Mode.Climb or Mode.Cling;
+	public bool Clinging => _mode == Mode.Cling;
+	public Vector3 TrunkNormal => _trunkNormal;
+
 	private void Next()
 	{
 		float r = _rng.Randf();
@@ -143,7 +166,7 @@ public partial class Squirrel : Node3D
 		float d = to.Length();
 		if (d < 0.15f)
 		{
-			if (_mode == Mode.ToTree) { _mode = Mode.Climb; _climbY = 0f; _climbTop = _rng.RandfRange(_fleeing ? 3.2f : 1.4f, _fleeing ? 5f : 3f); return; }
+			if (_mode == Mode.ToTree) { _mode = Mode.Climb; _climbY = 0f; _climbTop = _rng.RandfRange(_fleeing ? 2.2f : 1.2f, _fleeing ? 3.2f : 2.2f); return; }   // (2026-10-23: climbs lower, in sight and in reach of the camera; it went up to 5 m, a speck overhead)
 			if (_mode == Mode.Flee) _fleeing = false;
 			_mode = _rng.Randf() < 0.5f ? Mode.SitUp : Mode.Forage;
 			_timer = _rng.RandfRange(0.7f, 2.5f);
@@ -181,8 +204,15 @@ public partial class Squirrel : Node3D
 	private void OnTrunk(float y, bool up, float dt)
 	{
 		var foot = Ground(_trunkHit);
-		// (trunks thin a little going up: it keeps to the bark)
-		GlobalPosition = foot + new Vector3(0, y + 0.05f, 0) + _trunkNormal * (0.06f - 0.012f * y);
+		if (_trunk is { } t)
+		{
+			// (2026-10-23) on the bark as drawn at this height: out from the trunk's axis by its radius there
+			var c = new Vector3(t.Centre.X, foot.Y, t.Centre.Y);
+			GlobalPosition = c + new Vector3(0, y + 0.05f, 0) + _trunkNormal * (TreeTrunks.RadiusAt(t, y + 0.05f) + 0.035f);
+		}
+		else
+			// (trunks thin a little going up: it keeps to the bark)
+			GlobalPosition = foot + new Vector3(0, y + 0.05f, 0) + _trunkNormal * (0.06f - 0.012f * y);
 		Rotation = new Vector3(0, Yaw(-_trunkNormal), 0);
 		_model.Position = Vector3.Zero;
 		// belly to the bark either way: head up climbing, turned end over end (about the trunk's normal) head down
@@ -283,6 +313,13 @@ public partial class Squirrel : Node3D
 			if (lo == null) continue;
 			var (p, n) = lo.Value;
 			if (Mathf.Abs(n.Y) > 0.3f) continue;
+			// (2026-10-23, the owner: squirrels "floating on the trees") a trunk is round: two rays a hand apart either side meet
+			// its bark at different angles; a flat face (Act 1's invisible walls, a sign, a rock face) at the same one
+			var sideV = new Vector3(-dir.Z, 0, dir.X) * 0.12f;
+			var l = Ray(space, origin + Vector3.Up * 0.4f + sideV, dir, range);
+			var r = Ray(space, origin + Vector3.Up * 0.4f - sideV, dir, range);
+			if (l == null || r == null || Flat(l.Value.n).Normalized().AngleTo(Flat(r.Value.n).Normalized()) < Mathf.DegToRad(6f)) continue;
+			if (Flat(l.Value.p - p).Length() > 0.4f || Flat(r.Value.p - p).Length() > 0.4f) continue;
 			var hi = Ray(space, origin + Vector3.Up * 2.2f, dir, range);
 			if (hi == null || Mathf.Abs(Flat(hi.Value.p - p).Length()) > 0.45f) continue;
 			float d = Flat(p - origin).Length();
@@ -290,6 +327,15 @@ public partial class Squirrel : Node3D
 		}
 		if (best == float.MaxValue) return false;
 		hit = Ground(hit);
+		// the bark as drawn: its centre, and the side of it toward where it came from
+		_trunk = TreeTrunks.Nearest(this, new Vector2(hit.X, hit.Z), 0.7f);
+		if (_trunk is { } t)
+		{
+			var c = new Vector3(t.Centre.X, hit.Y, t.Centre.Y);
+			var outward = Flat(origin - c);
+			normal = outward.LengthSquared() > 1e-4f ? outward.Normalized() : normal;
+			hit = Ground(c + normal * TreeTrunks.RadiusAt(t, 0.3f));
+		}
 		return true;
 	}
 

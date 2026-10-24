@@ -129,6 +129,9 @@ public partial class PhotoSubject : Node3D
 		if (player is CollisionObject3D co) q.Exclude = new Godot.Collections.Array<Rid> { co.GetRid() };
 		var hit = space.IntersectRay(q);
 		if (hit.Count == 0) return true;
+		// (2026-10-23) a hit right at the subject is what it's on (a squirrel on a trunk, inside the trunk's collision
+		// cylinder where that stands proud of the bark), not cover in front of it
+		if (((Vector3)hit["position"]).DistanceTo(to) < 0.3f) return true;
 		// A hit on the subject's own geometry (the sign's plank, the cabin's wall) is the subject, not cover.
 		var col = hit["collider"].AsGodotObject() as Node;
 		var self = GetNodeOrNull<Node>(OwnerPath) ?? this;

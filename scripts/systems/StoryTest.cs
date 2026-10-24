@@ -432,7 +432,7 @@ public partial class StoryTest : Node
 		var last = PhotoLog.Instance?.Photos.LastOrDefault();
 		Check("the bird's picture is scored: clarity, focus, framing, zoom, and stars", last is { Scored: true, Stars: >= 1 } && last.Focus > 50,
 			last == null ? "none" : $"{last.SubjectId}: clarity {last.Clarity} focus {last.Focus} framing {last.Framing} zoom {last.Zoom}, {last.Stars} stars");
-		Check("sixty-nine pictures on the list (the winter woods added nine)", PhotoCatalog.All.Count == PhotoCatalog.Total && PhotoCatalog.Total == 69, $"{PhotoCatalog.All.Count}");
+		Check("seventy pictures on the list (the winter woods added nine, the squirrel one)", PhotoCatalog.All.Count == PhotoCatalog.Total && PhotoCatalog.Total == 70, $"{PhotoCatalog.All.Count}");
 		// it flies off: up and away through the trees, its wings beating, and goes only far off and out of sight
 		var flown = AllOf<Bird>().Where(b => b.Photographed && !b.IsOmen && (b.Flying || b.GoneAtDistance > 0f))
 			.OrderBy(b => b.GlobalPosition.DistanceTo(_player.GlobalPosition)).FirstOrDefault();

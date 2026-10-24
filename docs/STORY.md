@@ -50,7 +50,7 @@ The player is following his trail without meaning to.
 - **The player's lines.** The player says a few short lines aloud, like Ethan Winters, and only these (the list is in "The player's lines" below). Until Dan records them they are shown as text: one line under the picture, in quotes, in the player's own subtitle style (not the hint style), for about as long as it would take to say. When recorded, they are dry and unfiltered (not through the radio). Besides them, a rare thought caption of one or two words stays (like "Trenches." and "So quiet down here."). Nothing else is said to himself.
 - **The stairs** get no backstory. They are never explained.
 - **R.H.** is never seen, and the stalker never wears him.
-- **Photos.** There is no checklist. The album shows a count of how many of the 69 things have been found, with the points ("N/69 found   N pts"), and the credits say "N of 69" over "N points", but nothing ever lists what is left to find.
+- **Photos.** There is no checklist. The album shows a count of how many of the 70 things have been found, with the points ("N/70 found   N pts"), and the credits say "N of 70" over "N points", but nothing ever lists what is left to find.
 - **Sound.** No sound repeats: many variations, never the same one twice running.
 - **Visuals.** Nothing flashes or strobes, and the camera never shakes hard or snaps. One exception (Dan, 2026-10-16): the black bird's scream in Act 1 jolts the camera as it hits.
 - **Titles.** Chapter titles are shown alone, with no chapter number.
@@ -90,7 +90,7 @@ He chose the trailhead because he loved it as a child. The magazine wanted natur
 **Photos.** The player carries a Polaroid-style instant camera, and keeps it for the whole game. Right mouse raises it, left mouse takes the picture and Tab opens the album.
 - **Subjects.** They can take pictures of anything: birds, a doe, a frog by the creek, wildflowers, mushrooms, the waterfall, a strange standing stone, or just the trees.
 - **The album.** Every picture goes into the album, scored for clarity, focus, framing and zoom (one to five stars). The camera zooms (x1 to x4), focuses itself, and fires a soft flash in the dark.
-- **No checklist.** The album's footer keeps count of how many of the 69 things have been photographed, and the points ("N/69 found   N pts"), but never lists what's left.
+- **No checklist.** The album's footer keeps count of how many of the 70 things have been photographed, and the points ("N/70 found   N pts"), but never lists what's left.
 - **The player's notes.** After the prints, the album has a page of pencil notes in the photographer's own hand, a line for each thing the first time it's on film.
 - There are only 3 birds in the game (a northern cardinal, an indigo bunting and a purple finch, as on the park bird card; Dan, 2026-10-16). They are gone from Act 2 on.
 - A 4th bird, black with red eyes, is on the third walk (below).
@@ -593,7 +593,7 @@ A record off the table falls to the nearest ending.
 After the last act come:
 1. The save that marks the story done (**GameFinished**), and the fade.
 2. The end card, DEAD SILENT.
-3. The player's pictures played back as Polaroids, the best of them gathered last, and how many things they photographed and their points ("N of 69", "N points"). Every one of them, taken before the reveal or after, develops in the slideshow with the black figure standing behind it.
+3. The player's pictures played back as Polaroids, the best of them gathered last, and how many things they photographed and their points ("N of 70", "N points"). Every one of them, taken before the reveal or after, develops in the slideshow with the black figure standing behind it.
 4. "GLHFDD", "Thanks for playing.", and the main menu.
 
 A Continue afterwards finds the player where the story ended, by the car.

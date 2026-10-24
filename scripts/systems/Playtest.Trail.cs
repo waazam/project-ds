@@ -220,6 +220,40 @@ public partial class Playtest
 		var register = _bot.AllOf<Readable>().FirstOrDefault(r => (r.Text ?? "").Contains("R.H.  the steps"));
 		Check("the trail register carries R.H.'s last entry", register != null);
 		if (register != null) await ReadIt(register, ct);
+		// (2026-10-23, the owner: squirrels "floating on the trees ... and we cant take pictures of them") one up a trunk, its
+		// belly to the bark, and photographed
+		var sq = _bot.AllOf<ProjectDS.Entities.Squirrel>().OrderBy(q => q.GlobalPosition.DistanceTo(Player.GlobalPosition)).FirstOrDefault(q => q.TestClimb());
+		Check("a squirrel finds a tree to climb (a round trunk, not a flat wall)", sq != null);
+		if (sq != null)
+		{
+			await _bot.Teleport(sq.GlobalPosition + Vector3.Back * 6f, sq.GlobalPosition, ct);
+			using (Fast(2)) await _bot.WaitUntil(() => sq.OnATrunk, 10, ct);
+			using (Fast(2)) await _bot.WaitUntil(() => sq.Clinging, 6, ct);
+			await _bot.Seconds(0.8, ct);
+			var n = sq.TrunkNormal;
+			// against the bark as it's drawn: its distance from the trunk's axis less the bark's radius there
+			var sp2 = new Vector2(sq.GlobalPosition.X, sq.GlobalPosition.Z);
+			var tk = TreeTrunks.Nearest(sq, sp2, 1.5f);
+			float up = sq.GlobalPosition.Y - (Terrain?.HeightAt(sq.GlobalPosition.X, sq.GlobalPosition.Z) ?? sq.GlobalPosition.Y);
+			float gap = tk is { } tt ? tt.Centre.DistanceTo(sp2) - TreeTrunks.RadiusAt(tt, up) : 99f;
+			Check("up the trunk, on the bark as drawn (not in it, not floating off it)", sq.OnATrunk && gap is > 0f and < 0.12f, $"on a trunk {sq.OnATrunk}, {gap:0.00} m off the bark");
+			// a spot in front of it with nothing between (as a player would step round a tree in the way)
+			Vector3 view = sq.GlobalPosition + n * 3.2f;
+			foreach (float ang in new[] { 0f, 0.35f, -0.35f, 0.7f, -0.7f, 1.0f, -1.0f })
+				foreach (float dd in new[] { 3.2f, 2.4f, 4.2f })
+				{
+					var v = sq.GlobalPosition + n.Rotated(Vector3.Up, ang) * dd;
+					v.Y = (Terrain?.HeightAt(v.X, v.Z) ?? v.Y) + 1.6f;
+					var rq = PhysicsRayQueryParameters3D.Create(v, sq.GlobalPosition + n * 0.15f, 1u);
+					if (Player.GetWorld3D().DirectSpaceState.IntersectRay(rq).Count == 0) { view = v; goto found; }
+				}
+			found:
+			await _bot.Teleport(view with { Y = Terrain?.HeightAt(view.X, view.Z) ?? view.Y }, sq.GlobalPosition, ct);
+			int b0 = PhotoLog.Instance?.RecordedCount ?? 0;
+			var sp = await _bot.TakePicture(sq.GlobalPosition + n * 0.08f, 0, ct);
+			Shot("squirrel_on_tree");
+			Check("the squirrel photographed: on the list", sp is { SubjectId: "squirrel" }, Describe(sp));
+		}
 		// a bird, photographed
 		var bird = _bot.AllOf<Bird>().Where(b => b.IsInGroup("photo_birds") && !b.IsOmen && !b.Photographed).OrderBy(b => b.GlobalPosition.DistanceTo(Player.GlobalPosition)).FirstOrDefault();
 		Check("birds to photograph", bird != null);
