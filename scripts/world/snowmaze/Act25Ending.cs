@@ -195,12 +195,27 @@ public static class Act25Ending
 			var floor = space.IntersectRay(down);
 			if (floor.Count == 0 || ((Vector3)floor["normal"]).Y < 0.7f) continue;
 			var at = (Vector3)floor["position"];
-			var look = PhysicsRayQueryParameters3D.Create(eye, at + Vector3.Up * 0.15f);
-			look.Exclude = me;
-			look.CollideWithAreas = true;
-			if (space.IntersectRay(look).Count == 0) return at;
+			if (Clear(space, eye, at + Vector3.Up * 0.15f, me)) return at;
 		}
 		return feet + ((fell - feet) with { Y = 0 }).LimitLength(1.2f);
+	}
+
+	/// <summary>Nothing between: no wall, no wreckage, no other thing's pick sphere (one that's disabled or hidden is looked
+	/// past, as <see cref="PlayerInteraction"/> does: the opened crate's must not push the badge under their feet).</summary>
+	private static bool Clear(PhysicsDirectSpaceState3D space, Vector3 from, Vector3 to, Godot.Collections.Array<Rid> me)
+	{
+		var skip = new Godot.Collections.Array<Rid>(me);
+		for (int cast = 0; cast < 4; cast++)
+		{
+			var look = PhysicsRayQueryParameters3D.Create(from, to);
+			look.Exclude = skip;
+			look.CollideWithAreas = true;
+			var hit = space.IntersectRay(look);
+			if (hit.Count == 0) return true;
+			if (hit["collider"].AsGodotObject() is not Area3D area || area.GetParent() is not Interactable i || (i.Enabled && i.IsVisibleInTree())) return false;
+			skip.Add(area.GetRid());
+		}
+		return false;
 	}
 
 	private static Node3D LayBadge(Node3D parent, Vector3 at, Vector3 toPlayer)

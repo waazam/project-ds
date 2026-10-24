@@ -480,7 +480,7 @@ public partial class Act24Maze : Node3D
 		FurnitureKit.Clean(() => FurnitureKit.Place(_crate, crateOpen ? "flame_crate_open" : "flame_crate", Transform3D.Identity, SnowMazeDressing.Roles, "Crate"));
 		CrateUse = new PickupInteractable
 		{
-			Name = "CrateUse", PickRadius = 0.8f, MaxDistance = 2.4f, Position = new Vector3(0, 0.45f, 0),
+			Name = "CrateUse", PickRadius = 0.8f, MaxDistance = 2.4f, Position = new Vector3(0, 0.45f, 0), Enabled = !crateOpen,
 			PromptFor = p => crateOpenNow() ? "" : p?.Inventory is { } inv && inv.HasTool(ToolKind.Crowbar) ? "Prise the crate open" : "Nailed shut. \"FLAME THROWER, PORTABLE\".",
 			CanUse = p => !crateOpenNow() && p?.Inventory is { } inv && inv.HasTool(ToolKind.Crowbar),
 		};
@@ -524,6 +524,9 @@ public partial class Act24Maze : Node3D
 		foreach (var c in _crate.GetChildren()) if (c is MeshInstance3D) c.QueueFree();
 		FurnitureKit.Clean(() => FurnitureKit.Place(_crate, "flame_crate_open", Transform3D.Identity, SnowMazeDressing.Roles, "CrateOpen"));
 		S?.SetFlag(FlagCrate);
+		// (2026-10-24: open, its 0.8 m sphere has nothing to say, and must not swallow the look at what lies past it: the
+		// Act 25 badge was laid under their feet, and looked at from the far side the crate took the focus)
+		if (CrateUse != null) CrateUse.Enabled = false;
 		await Cutscene.Wait(this, 0.6, ct);
 		EnsureFlamethrower(player);
 		AudioDirector.OneShot(this, "flame_ready", 1, null, -4f, "Player");
