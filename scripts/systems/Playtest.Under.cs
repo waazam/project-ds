@@ -41,6 +41,10 @@ public partial class Playtest
 		await _bot.Inside(station.ToGlobal(new Vector3(StationInterior.BasementGapX, 0, -StationInterior.HalfDepth + 1.5f)), tapeUse.GlobalPosition, ct);
 		await _bot.UseIt(tapeUse, ct);
 		Check("cut the tape: the close-up opens", TapeCutOverlay.Instance is { IsOpen: true });
+		// (2026-10-23) mid-cut: the knife in the slit, the tape split open behind it
+		TapeCutOverlay.Instance?.TestProgress(0.55f);
+		await _bot.Seconds(0.3, ct);
+		Shot("tape_cut_door");
 		for (int i = 0; i < 40 && TapeCutOverlay.Instance is { IsOpen: true }; i++) { TapeCutOverlay.Instance.TestCompleteCut(); await _bot.Frames(2, ct); }
 		Check("the tape cut, the door open", basement.TapeCut);
 		await _bot.Seconds(0.8, ct);
@@ -78,6 +82,9 @@ public partial class Playtest
 		await _bot.Inside(room1.ToGlobal(new Vector3(-1.2f, 0, 0.2f)), boxUse.GlobalPosition, ct);
 		Shot("room1");
 		await _bot.UseIt(boxUse, ct);
+		TapeCutOverlay.Instance?.TestProgress(0.55f);
+		await _bot.Seconds(0.3, ct);
+		Shot("tape_cut_box");
 		for (int i = 0; i < 40 && TapeCutOverlay.Instance is { IsOpen: true }; i++) { TapeCutOverlay.Instance.TestCompleteCut(); await _bot.Frames(2, ct); }
 		Check("the taped cigar box cut open on three sides: a button", room1.BoxOpen && room1.BoxCutsDone == 3, $"{room1.BoxCutsDone} cuts");
 		Check("in the box: a watch, a ring and a coat button", room1.GetNodeOrNull("CigarBox/Watch") != null && room1.GetNodeOrNull("CigarBox/Ring") != null && room1.GetNodeOrNull("CigarBox/Button/CoatButton") != null);
@@ -129,6 +136,11 @@ public partial class Playtest
 		// the cryptex: six rings to STAIRS
 		await _bot.UseIt(room2.BoxUse, ct);
 		Check("the cryptex close-up opens", CryptexOverlay.Instance is { IsOpen: true });
+		// (2026-10-23) let the blood come up over their eyes while they work at it: the view washed red
+		using (Fast(4)) await _bot.WaitUntil(() => room2.Blood && room2.Level > Player.CameraRig.Camera.GlobalPosition.Y - room2.GlobalPosition.Y + 0.2f, 40, ct);
+		await _bot.Seconds(0.4, ct);
+		Shot("cryptex_under_blood");
+		Check("over their eyes in the blood: the view washed red, the rings still readable", UnderwaterView.For(room2).RedWash > 0.6f, $"red wash {UnderwaterView.For(room2).RedWash:0.00}");
 		var box = room2.Box;
 		int stuck = 0;
 		for (int r = 0; r < Cryptex.Rings && !box.Solved; r++)

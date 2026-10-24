@@ -58,6 +58,7 @@ public partial class StationBasement : Node3D
 
 	private StationDoor _door;
 	private MeshInstance3D _water, _tape;
+	private TapeStrip _slitTape;
 	private ShaderMaterial _waterMat;
 	private Node3D _wheel, _wheelSpokes, _clock;
 	private StaticBody3D _clockBody, _floorBody;
@@ -106,7 +107,7 @@ public partial class StationBasement : Node3D
 		// Continue: put everything back the way the story left it.
 		if (s != null)
 		{
-			if (s.HasFlag(StoryManager.Flag.StationBasementTapeCut)) { TapeCut = true; _tape.Visible = false; _door.Unlock(); }
+			if (s.HasFlag(StoryManager.Flag.StationBasementTapeCut)) { TapeCut = true; _tape.Visible = false; _slitTape.Visible = false; _door.Unlock(); }
 			if (s.HasFlag(StoryManager.Flag.StationLightsDead)) { LightsDead = true; _lightsStarted = true; SetBulbs(0f); }
 			if (s.HasFlag(StoryManager.Flag.StationBasementDrained)) { Drained = true; Turns = TurnsNeeded; SetDrained(); }
 			if (s.HasFlag(StoryManager.Flag.StationClockBroken)) { ClockBroken = true; BreakClock(false); }
@@ -177,8 +178,12 @@ public partial class StationBasement : Node3D
 		var tape = BuildingTextures.Plain("s_tape", new Color(0.62f, 0.6f, 0.56f), 0.6f);
 		k.Mat(tape);
 		k.Box(new Vector3(1.05f, 2.16f, 0.04f), new Vector3(2.2f, 0.1f, 0.012f), 2f);
-		foreach (float x in new[] { 0.03f, 2.07f })
-			k.Box(new Vector3(x, 1.1f, 0.04f), new Vector3(0.1f, 2.2f, 0.012f), 2f);
+		k.Box(new Vector3(0.03f, 1.1f, 0.04f), new Vector3(0.1f, 2.2f, 0.012f), 2f);
+		// (2026-10-23) the strip down the latch side, over the slit between door and frame, is the one the knife goes down:
+		// a TapeStrip (it splits down its middle under the blade)
+		_slitTape = new TapeStrip { Name = "SlitTape", Length = 2.05f, Width = 0.09f, CutFrom = 0.33f, CutTo = 0.6f, TapeMaterial = tape,
+			Transform = new Transform3D(new Basis(Vector3.Down, Vector3.Right, Vector3.Back), new Vector3(2.07f, 2.15f, 0.047f)) };
+		_door.AddChild(_slitTape);
 		for (int i = 0; i < 2; i++)
 			k.Box(new Vector3(1.05f, 1.1f, 0.045f), new Vector3(2.7f, 0.09f, 0.012f), 2f, new Basis(Vector3.Back, (i == 0 ? 1 : -1) * 0.8f));
 		for (int i = 0; i < 4; i++)
@@ -201,9 +206,11 @@ public partial class StationBasement : Node3D
 				new TapeCutOverlay.CutSpec
 				{
 					CameraView = view,
-					Direction = Vector2.Down,
+					Direction = TapeCutOverlay.CutSpec.ScreenDir(view, _door.GlobalBasis * Vector3.Down),
 					PixelsNeeded = 300f,
-					OnProgress = p => { if (IsInstanceValid(_tape)) _tape.Scale = new Vector3(1f, Mathf.Lerp(1f, 0.02f, p), 1f); },
+					OnActive = () => _slitTape?.ShowKnife(true),
+					OnProgress = p => _slitTape?.SetProgress(p),
+					OnCut = () => _slitTape?.CutAll(),
 				},
 			}, () => OnTapeCut());
 		};
@@ -213,6 +220,7 @@ public partial class StationBasement : Node3D
 	{
 		TapeCut = true;
 		if (IsInstanceValid(_tape)) _tape.Visible = false;
+		if (IsInstanceValid(_slitTape)) _slitTape.Visible = false;
 		_door.Unlock();
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.StationBasementTapeCut);
 		GD.Print("[story] Act 13: the basement tape is cut");

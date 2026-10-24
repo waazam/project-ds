@@ -9,6 +9,9 @@ uniform float amount : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 water_color : source_color = vec3(0.06, 0.1, 0.09);
 /// 0..1: how dark it has got (sinking, running out of air)
 uniform float darkness : hint_range(0.0, 1.0) = 0.0;
+/// 0..1 (2026-10-23, the owner: under the blood "the screen needs to be tinted more red so you feel like you are in the
+/// blood lake") the picture multiplied toward a deep red: everything red, the contrast kept (the cryptex's letters read)
+uniform float red_wash : hint_range(0.0, 1.0) = 0.0;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
@@ -27,6 +30,8 @@ void fragment() {
 	vec2 g = floor((uv + vec2(0.0, t * 0.03)) * vec2(64.0, 36.0));
 	float mote = step(0.992, hash(g)) * amount * 0.25;
 	c += vec3(mote);
+	vec3 washed = c * vec3(1.35, 0.26, 0.22) + vec3(0.07, 0.0, 0.004);
+	c = mix(c, washed, red_wash);
 	c *= 1.0 - darkness;
 	COLOR = vec4(c, 1.0);
 }

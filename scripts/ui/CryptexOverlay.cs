@@ -24,6 +24,13 @@ public partial class CryptexOverlay : CanvasLayer
 	private System.Action _onClose;
 
 	public override void _EnterTree() => Instance = this;
+	/// <summary>(2026-10-23) The close-up keeps the view while it's open: a beat ending under it (the room's entry line) handed
+	/// the view back to the player's eyes, and the cut went on unseen.</summary>
+	public override void _Process(double delta)
+	{
+		if (IsOpen && _cam != null && GodotObject.IsInstanceValid(_cam) && !_cam.Current) _cam.Current = true;
+	}
+
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
 
 	public override void _Ready()

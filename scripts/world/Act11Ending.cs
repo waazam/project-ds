@@ -766,16 +766,18 @@ public partial class Act11Ending : Node3D
 	/// <summary>For tests: how high over the landing the lift took them (m), and how far the throw carried them (m).</summary>
 	public float LiftHeight { get; private set; }
 	public float ThrowDistance { get; private set; }
+	/// <summary>For tests: the highest they were over the ground from 40% of the flight on (m): in among the crowns, not over them.</summary>
+	public float LateClearance { get; private set; }
 
 	[ExportGroup("The throw")]
 	/// <summary>Seconds: the hand closing, the lift over the treetops, the swing back, and the flight.</summary>
 	[Export] public float CloseSeconds = 0.7f;
 	[Export] public float LiftSeconds = 3.2f;
 	[Export] public float WindSeconds = 1.3f;
-	[Export] public float FlightSeconds = 4.6f;
-	/// <summary>How far the throw carries them (m, level), and how high the arc rises over where it starts.</summary>
-	[Export] public float ThrowReach = 170f;
-	[Export] public float ThrowRise = 9f;
+	[Export] public float FlightSeconds = 3.6f;   // (2026-10-23: was 4.6, a long glide over the canopy)
+	/// <summary>How far the throw carries them (m, level). (2026-10-23, the owner: "they look too high up and can see the open
+	/// game world space above the trees": thrown down, not up and over; see Arc)</summary>
+	[Export] public float ThrowReach = 120f;
 	/// <summary>How far above the woods' floor the fall ends, in among the crowns, when the black comes.</summary>
 	[Export] public float FallEndsAbove = 9f;
 
@@ -835,7 +837,7 @@ public partial class Act11Ending : Node3D
 		Vector3 fromShoulder = (eye0 - shoulder) with { Y = 0f };
 		fromShoulder = fromShoulder.LengthSquared() > 0.01f ? fromShoulder.Normalized() : Vector3.Forward;
 		Vector3 lifted = shoulder + Vector3.Up * reach * 0.8f + fromShoulder * reach * 0.4f;
-		lifted.Y = Mathf.Max(lifted.Y, eye0.Y + 22f);   // high over the treetops, whatever its size
+		lifted.Y = Mathf.Max(lifted.Y, eye0.Y + 14f);   // over the treetops, whatever its size (2026-10-23: was 22 m, the open sky round the world's edge in view)
 		Vector3 liftCtrl = eye0.Lerp(lifted, 0.5f) + Vector3.Up * 4f;
 		Vector3 throwDir = ThrowDirection(eye0, fingers);
 		Vector3 view0 = -rig.GlobalBasis.Z;
@@ -875,16 +877,16 @@ public partial class Act11Ending : Node3D
 		Vector3 start = wound;
 		Vector3 end = start + throwDir * ThrowReach;
 		end.Y = Ground(end) + FallEndsAbove;
-		Vector3 apex = start.Lerp(end, 0.4f) with { Y = start.Y + ThrowRise };
-		// (never through a hill on the way: the arc held over the ground under it)
-		for (int i = 1; i < 10; i++)
+		// (2026-10-23, the owner: thrown "a little lower than the tree tops") the way out level, the height falling away at once:
+		// down to the crowns within the first 40% of it (the stair's top stands far over the woods: an arc from up there flew
+		// them 40 m over the canopy, the open sky round the world's edge in view), then on through them; never into a hill
+		Vector3 Arc(float u)
 		{
-			float u = i / 10f;
-			Vector3 p = (1 - u) * (1 - u) * start + 2 * (1 - u) * u * apex + u * u * end;
-			float floor = Ground(p) + FallEndsAbove * 0.8f;
-			if (p.Y < floor) { float lift = floor - p.Y; apex.Y += lift * 1.5f; end.Y += lift * 0.6f; }
+			Vector3 p = start.Lerp(end, u);
+			float fall = 1f - Mathf.Pow(1f - u, 4f);
+			p.Y = Mathf.Lerp(start.Y, end.Y, fall);
+			return p with { Y = Mathf.Max(p.Y, Ground(p) + FallEndsAbove * 0.8f) };
 		}
-		Vector3 Arc(float u) => (1 - u) * (1 - u) * start + 2 * (1 - u) * u * apex + u * u * end;
 		var open = CreateTween().SetParallel();
 		open.TweenProperty(_slitTop, "anchor_bottom", 0f, 0.5f * sp).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
 		open.TweenProperty(_slitBottom, "anchor_top", 1f, 0.5f * sp).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.In);
@@ -898,12 +900,14 @@ public partial class Act11Ending : Node3D
 			await Cutscene.Frame(this, ct);
 			t += GetProcessDeltaTime();
 			float s = Mathf.Clamp((float)(t / flightT), 0f, 1f);
-			// a throw's arc: quick off the hand, easing over the top, then faster and faster down
-			float u = Mathf.Lerp(s, s * s, 0.45f);
+			// thrown down: quick off the hand, falling at once (the height's own ease in Arc)
+			float u = s;
 			Vector3 eye = Arc(u);
 			PutEye(eye);
+			if (s > 0.4f) LateClearance = Mathf.Max(LateClearance, eye.Y - Ground(eye));
 			Vector3 vel = Arc(Mathf.Min(1f, u + 0.02f)) - Arc(Mathf.Max(0f, u - 0.02f));
-			Look(vel, 0.03f, 0.016f);
+			// (looking down along the way they go: the woods coming up, not the sky over them)
+			Look(vel.Normalized() + Vector3.Down * 0.35f, 0.03f, 0.016f);
 			// the speed in the view: a little wider as they fall (eased, never a jump)
 			rig.FovSwim = Mathf.Lerp(0f, 12f, Mathf.SmoothStep(0.45f, 1f, s));
 			if (!blacking && s > 0.86f && fader != null)

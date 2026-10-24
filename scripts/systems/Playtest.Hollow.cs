@@ -159,7 +159,7 @@ public partial class Playtest
 		if (Terrain is { } tr && piece - 1 < lot.TrailMetres.Count)
 		{
 			float bs = lot.TrailMetres[piece - 1];
-			Vector3 back = tr.TrailPoint(bs - 13f, out _), turnAt = tr.TrailPoint(bs, out _), mark = tr.TrailPoint(bs - 8f, out _);
+			Vector3 back = tr.TrailPoint(bs - 16f, out _), turnAt = tr.TrailPoint(bs, out _), mark = tr.TrailPoint(bs - 12f, out _);
 			await _bot.LanternMode(true, ct);
 			await _bot.Teleport(back, turnAt, ct);
 			await _bot.Aim(mark, ct);
@@ -169,7 +169,7 @@ public partial class Playtest
 			{
 				Vector3 from = trail[1].GlobalPosition, to = trail[2].GlobalPosition;
 				Vector3 dir = TestBot.Flat(to - from).Normalized();
-				Vector3 stand = from + dir * 0.6f + dir.Cross(Vector3.Up) * 0.9f, aimAt = from + dir * 3.6f;
+				Vector3 stand = from + dir * 2.6f + dir.Cross(Vector3.Up) * 0.9f, aimAt = from + dir * 5.6f;
 				aimAt.Y = from.Y;
 				await _bot.Teleport(stand, to, ct);
 				await _bot.Aim(aimAt, ct);
@@ -549,7 +549,7 @@ public partial class Playtest
 		if (lot != null) await TakeKeyHalf(lot, 2, ct);
 		Check("both halves of the key before the bunker", SurveyLot.PiecesFound == 2, $"{SurveyLot.PiecesFound} of 2");
 		// (2026-10-23) the ink leads the way to both halves: arrows up the path to each turn, tree to tree, round the cache
-		Check("the blacklight leads to both halves: arrows on the ground up the path, tree to tree, round each cache", lot is { LeadMarkCount: >= 40 }, $"{lot?.LeadMarkCount} ground arrows");
+		Check("the blacklight leads to both halves: arrows on the ground up the path, tree to tree, round each cache", lot is { LeadMarkCount: >= 25 }, $"{lot?.LeadMarkCount} ground arrows");
 	}
 
 	/// <summary>To the board and looking at its one print until it starts.</summary>
@@ -740,8 +740,10 @@ public partial class Playtest
 			Check("the giant rises and reaches: checkpoint 9", Story.Current == Checkpoint.Act11GiantEncounter && act11.EndingStarted && act11.Grabbed, $"{Story.Current}, started {act11.EndingStarted}, grabbed {act11.Grabbed}");
 			Check("they looked up into its eyes, trembling", act11.LookedUp && act11.Trembled, $"looked up {act11.LookedUp}, trembled {act11.Trembled}, passed out {act11.PassedOut}");
 			Check("the view never flipped through it", !act11.ViewFlipped);
-			Check("lifted over the treetops and thrown", act11.Thrown && act11.LiftHeight > 15f && act11.ThrowDistance > 100f,
+			Check("lifted over the treetops and thrown", act11.Thrown && act11.LiftHeight > 10f && act11.ThrowDistance > 80f,
 				$"thrown {act11.Thrown}, lifted {act11.LiftHeight:0} m, carried {act11.ThrowDistance:0} m");
+			// (2026-10-23, the owner: thrown "a little lower than the tree tops": the open sky over the woods out of view)
+			Check("down among the crowns from the middle of the flight on, not over them", act11.LateClearance < 28f, $"{act11.LateClearance:0} m over the ground at the highest");
 			// (the station and all under it build in this black: some 15 s on a quiet machine, half a minute on a busy one)
 			await _bot.WaitUntil(() => Input.Enabled, 45, ct);
 		}

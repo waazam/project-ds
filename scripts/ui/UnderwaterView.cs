@@ -33,10 +33,15 @@ public partial class UnderwaterView : CanvasLayer
 
 	/// <summary>0 = in the air, 1 = fully under. <paramref name="color"/> is the water's own colour
 	/// (peaty lake green, or blood).</summary>
-	public void Set(float amount, Color color, float darkness = 0f)
+	/// <summary>For tests: how red the blood washes the view (0..1).</summary>
+	public float RedWash { get; private set; }
+
+	public void Set(float amount, Color color, float darkness = 0f, float redWash = 0f)
 	{
 		Amount = amount;
-		_rect.Visible = amount > 0.001f || darkness > 0.001f;
+		RedWash = redWash;
+		_rect.Visible = amount > 0.001f || darkness > 0.001f || redWash > 0.001f;
+		_mat.SetShaderParameter("red_wash", redWash);
 		_mat.SetShaderParameter("amount", amount);
 		_mat.SetShaderParameter("water_color", new Vector3(color.R, color.G, color.B));
 		_mat.SetShaderParameter("darkness", darkness);

@@ -571,9 +571,10 @@ public partial class StationRoom2 : Node3D
 		// under it: the view goes red and muffled
 		float eye = player.CameraRig.Camera.GlobalPosition.Y - GlobalPosition.Y;
 		float under = Mathf.Clamp((Level - eye + 0.05f) / 0.15f, 0f, 1f);
-		// bent over the cryptex, keep the murk light enough to read the rings through
-		if (CryptexOverlay.Instance is { IsOpen: true }) under = Mathf.Min(under, 0.3f);
-		UnderwaterView.For(this).Set(under, Blood ? new Color(0.3f, 0.02f, 0.02f) : Lake);
+		// bent over the cryptex, keep the murk light enough to read the rings through (the red wash keeps the contrast: full)
+		float murk = CryptexOverlay.Instance is { IsOpen: true } ? Mathf.Min(under, 0.3f) : under;
+		// (2026-10-23, the owner: in the blood the screen "tinted more red so you feel like you are in the blood lake")
+		UnderwaterView.For(this).Set(murk, Blood ? new Color(0.38f, 0.008f, 0.02f) : Lake, 0f, Blood ? under * 0.85f : 0f);
 		if (Level >= Height - 0.12f && !_dying) _ = Cutscene.Run(this, ct => Drown(player, ct), lockInput: true, freezeBody: true);
 	}
 

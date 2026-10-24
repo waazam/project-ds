@@ -33,6 +33,16 @@ public partial class TapeCutOverlay : CanvasLayer
 		public float PixelsNeeded = 260f;
 		public Action<float> OnProgress;
 		public Action OnCut;
+		/// <summary>(2026-10-23) As this cut comes up (the knife brought to its start).</summary>
+		public Action OnActive;
+
+		/// <summary>The screen direction of a world direction <paramref name="along"/> as <paramref name="view"/> sees it (down = +Y):
+		/// the way to drag to cut along it.</summary>
+		public static Vector2 ScreenDir(Transform3D view, Vector3 along)
+		{
+			var d = new Vector2(along.Dot(view.Basis.X), -along.Dot(view.Basis.Y));
+			return d.LengthSquared() > 1e-6f ? d.Normalized() : Vector2.Down;
+		}
 	}
 
 	public bool IsOpen { get; private set; }
@@ -51,6 +61,13 @@ public partial class TapeCutOverlay : CanvasLayer
 	private Label _hint;
 
 	public override void _EnterTree() => Instance = this;
+	/// <summary>(2026-10-23) The close-up keeps the view while it's open: a beat ending under it (the room's entry line) handed
+	/// the view back to the player's eyes, and the cut went on unseen.</summary>
+	public override void _Process(double delta)
+	{
+		if (IsOpen && _cam != null && GodotObject.IsInstanceValid(_cam) && !_cam.Current) _cam.Current = true;
+	}
+
 	public override void _ExitTree() { if (Instance == this) Instance = null; }
 
 	public override void _Ready()
@@ -94,6 +111,7 @@ public partial class TapeCutOverlay : CanvasLayer
 		_cam.Current = true;
 		_root.Visible = true;
 		_hint.Text = HintFor(cuts[0].Direction);
+		cuts[0].OnActive?.Invoke();
 	}
 
 	/// <summary>Ends the minigame. <paramref name="completed"/> false means the player backed out
@@ -154,6 +172,7 @@ public partial class TapeCutOverlay : CanvasLayer
 		ActiveIndex = _index;
 		var next = _cuts[_index];
 		_hint.Text = HintFor(next.Direction);
+		next.OnActive?.Invoke();
 		Transform3D from = _cam.GlobalTransform;
 		var tween = CreateTween();
 		tween.TweenMethod(Callable.From<float>(t => { if (_cam != null && GodotObject.IsInstanceValid(_cam)) _cam.GlobalTransform = from.InterpolateWith(next.CameraView, t); }), 0f, 1f, 0.5f)
@@ -161,8 +180,8 @@ public partial class TapeCutOverlay : CanvasLayer
 	}
 
 	private static string HintFor(Vector2 dir) => Mathf.Abs(dir.Y) >= Mathf.Abs(dir.X)
-		? "Hold [Left Click] and drag down to cut"
-		: "Hold [Left Click] and drag across to cut";
+		? (dir.Y > 0 ? "Hold [Left Click] and drag down the tape to cut" : "Hold [Left Click] and drag up the tape to cut")
+		: (dir.X > 0 ? "Hold [Left Click] and drag right along the tape to cut" : "Hold [Left Click] and drag left along the tape to cut");
 
 	private void PlaySlice()
 	{
@@ -172,6 +191,14 @@ public partial class TapeCutOverlay : CanvasLayer
 		Cutscene.SceneRoot(this).AddChild(s);
 		s.Finished += s.QueueFree;
 		s.Play();
+	}
+
+	/// <summary>For tests: the active cut dragged part of the way (0..1).</summary>
+	public void TestProgress(float p)
+	{
+		if (!IsOpen) return;
+		Progress = Mathf.Clamp(p, 0f, 0.99f);
+		_cuts[_index].OnProgress?.Invoke(Progress);
 	}
 
 	/// <summary>For tests: completes the active cut instantly, as a full drag would.</summary>

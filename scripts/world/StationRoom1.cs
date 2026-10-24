@@ -164,8 +164,8 @@ public partial class StationRoom1 : Node3D
 	};
 	private Node3D _box, _lid, _button;
 	private Interactable _boxUse, _buttonUse;
-	private Transform3D _leftCam, _rightCam, _frontCam;
-	private MeshInstance3D[] _tapes;
+	private System.Func<(Transform3D left, Transform3D right, Transform3D front)> _boxViews;
+	private TapeStrip[] _tapes;
 	private static Font _scrawl;
 
 	/// <summary>The three walls' feet (local) and their inward normals: 0 = +Z (LOOK), 1 = +X (TOUCH), 2 = -Z (UP).</summary>
@@ -389,7 +389,7 @@ public partial class StationRoom1 : Node3D
 			Solved = true;
 			BoxOpen = true;
 			BoxCutsDone = 3;
-			foreach (var t in _tapes) t.Visible = false;
+			foreach (var t in _tapes) t.Visible = false;   // (cut, and the lid up: gone with it)
 			// (the joints pass) open on its hinge as OpenBox leaves it: it was lifted 16 cm and floated over the box
 			_lid.Rotation = new Vector3(Mathf.DegToRad(-100f), 0, 0);
 			BuildContents(false);
@@ -483,23 +483,29 @@ public partial class StationRoom1 : Node3D
 			BuildKit.Box(lk, new Vector3(0, 0, hd), new Vector3(hw * 2f + 0.01f, 0.015f, hd * 2f + 0.01f), 3f);
 			lk.Color = Colors.White;
 		}
-		k.CommitTo(_box, "BoxMesh", true);
+		var boxMi = k.CommitTo(_box, "BoxMesh", true);
+		// (2026-10-23) the box as it's drawn (the Blender model is bigger than the sizes above): the tape and the close-ups
+		// laid by its own bounds
+		var bb = boxMi?.Mesh?.GetAabb() ?? new Aabb(new Vector3(-hw, 0, -hd), new Vector3(hw * 2f, hh * 2f, hd * 2f));
+		float bw = bb.Size.X * 0.5f, bd = bb.Size.Z * 0.5f, seam = bb.End.Y;
+		Vector3 bc = bb.GetCenter() with { Y = 0 };
 		lk.CommitTo(_lid, "LidMesh", true);
 
 		var tapeMat = BuildingTextures.Plain("s_tape2", new Color(0.62f, 0.6f, 0.56f), 0.6f);
-		_tapes = new MeshInstance3D[3];
-		void Tape(int i, Vector3 pos, Vector3 size)
+		// (2026-10-23, the owner: the knife cutting "look horrible") a strip of tape down each of three sides over the lid's
+		// seam, cut down its middle as the knife is drawn along it (TapeStrip): the left side and the right along the box's
+		// depth, the front along its width; each in its own space, the tape along its +X, its face out
+		_tapes = new TapeStrip[3];
+		void Tape(int i, Vector3 start, Vector3 along, Vector3 outward, float length)
 		{
-			var tk = new MeshKit();
-			tk.Mat(tapeMat);
-			tk.Color = Colors.White;
-			tk.Box(pos, size, 3f);
-			_tapes[i] = tk.CommitTo(_box, $"Tape{i}", false);
+			var x = along.Normalized(); var z = outward.Normalized(); var y = z.Cross(x).Normalized();
+			var t = new TapeStrip { Name = $"Tape{i}", Length = length, Width = 0.032f, TapeMaterial = tapeMat, Transform = new Transform3D(new Basis(x, y, z), start) };
+			_box.AddChild(t);
+			_tapes[i] = t;
 		}
-		// (their tops 4 mm over the lid's, not in its plane: they z-fought; the scan's clip audit, 2026-10-15)
-		Tape(0, new Vector3(-hw - 0.004f, hh * 1.4f + 0.002f, 0), new Vector3(0.012f, hh * 1.4f + 0.004f, hd * 1.9f));
-		Tape(1, new Vector3(hw + 0.004f, hh * 1.4f + 0.002f, 0), new Vector3(0.012f, hh * 1.4f + 0.004f, hd * 1.9f));
-		Tape(2, new Vector3(0, hh * 1.4f + 0.002f, hd + 0.006f), new Vector3(hw * 1.9f, hh * 1.4f + 0.004f, 0.012f));
+		Tape(0, bc + new Vector3(-bw - 0.003f, seam, -bd * 0.92f), Vector3.Back, Vector3.Left, bd * 1.84f);
+		Tape(1, bc + new Vector3(bw + 0.003f, seam, bd * 0.92f), Vector3.Forward, Vector3.Right, bd * 1.84f);
+		Tape(2, bc + new Vector3(-bw * 0.92f, seam, bd + 0.003f), Vector3.Right, Vector3.Back, bw * 1.84f);
 
 		var body = new StaticBody3D { Name = "BoxBody", CollisionLayer = 1, CollisionMask = 0 };
 		body.AddChild(new CollisionShape3D { Position = new Vector3(0, hh, 0), Shape = new BoxShape3D { Size = new Vector3(hw * 2f, hh * 2f, hd * 2f) } });
@@ -518,37 +524,46 @@ public partial class StationRoom1 : Node3D
 			Vector3 focus = _box.ToGlobal(focusLocal), eye = _box.ToGlobal(focusLocal + eyeOffsetLocal);
 			return new Transform3D(Basis.LookingAt(focus - eye, Vector3.Up), eye);
 		}
-		_leftCam = Look(new Vector3(-hw, hh, 0), new Vector3(-0.38f, 0.18f, 0.12f));
-		_rightCam = Look(new Vector3(hw, hh, 0), new Vector3(0.38f, 0.18f, 0.12f));
-		_frontCam = Look(new Vector3(0, hh, hd), new Vector3(0, 0.22f, 0.45f));
+		// (2026-10-23: the views are worked out as the box is used, not here: the room is moved after it's built (the station
+		// placed as it loads), and the close-ups were taken of where the box had been)
+		float reach = Mathf.Max(bw, bd) * 1.25f + 0.12f;
+		_boxViews = () => (Look(bc + new Vector3(-bw, seam, 0), new Vector3(-reach, reach * 0.4f, reach * 0.22f)), Look(bc + new Vector3(bw, seam, 0), new Vector3(reach, reach * 0.4f, reach * 0.22f)), Look(bc + new Vector3(0, seam, bd), new Vector3(reach * 0.08f, reach * 0.45f, reach * 1.05f)));
 	}
 
 	private void OnBoxUsed(PlayerController player)
 	{
 		if (BoxOpen || TapeCutOverlay.Instance == null) return;
 		if (player?.Inventory is not { } inv || !inv.HasTool(ToolKind.Knife)) return;
-		var cuts = new List<TapeCutOverlay.CutSpec>
+		var alongs = new[] { Vector3.Back, Vector3.Forward, Vector3.Right };
+		var (vl, vr, vf) = _boxViews();
+		var views = new[] { vl, vr, vf };
+		var cuts = new List<TapeCutOverlay.CutSpec>();
+		for (int i = 0; i < 3; i++)
 		{
-			new() { CameraView = _leftCam, Direction = Vector2.Down, PixelsNeeded = 220f,
-				OnProgress = p => { if (IsInstanceValid(_tapes[0])) _tapes[0].Scale = new Vector3(1f, 1f, 1f - p); }, OnCut = () => CutSide(0) },
-			new() { CameraView = _rightCam, Direction = Vector2.Down, PixelsNeeded = 220f,
-				OnProgress = p => { if (IsInstanceValid(_tapes[1])) _tapes[1].Scale = new Vector3(1f, 1f, 1f - p); }, OnCut = () => CutSide(1) },
-			new() { CameraView = _frontCam, Direction = Vector2.Right, PixelsNeeded = 220f,
-				OnProgress = p => { if (IsInstanceValid(_tapes[2])) _tapes[2].Scale = new Vector3(1f - p, 1f, 1f); }, OnCut = () => CutSide(2) },
-		};
+			int side = i;
+			cuts.Add(new TapeCutOverlay.CutSpec
+			{
+				CameraView = views[i], Direction = TapeCutOverlay.CutSpec.ScreenDir(views[i], _box.GlobalBasis * alongs[i]), PixelsNeeded = 260f,
+				OnActive = () => { if (IsInstanceValid(_tapes[side])) _tapes[side].ShowKnife(true); },
+				OnProgress = p => { if (IsInstanceValid(_tapes[side])) _tapes[side].SetProgress(p); },
+				OnCut = () => CutSide(side),
+			});
+		}
 		TapeCutOverlay.Instance.Open(player, cuts, OpenBox);
 	}
 
 	private void CutSide(int i)
 	{
 		BoxCutsDone++;
-		if (IsInstanceValid(_tapes[i])) _tapes[i].Visible = false;
+		if (IsInstanceValid(_tapes[i])) _tapes[i].CutAll();
 	}
 
 	private void OpenBox()
 	{
 		BoxOpen = true;
 		_boxUse.Enabled = false;
+		// (the cut tape goes up with the lid it was over)
+		foreach (var t in _tapes) if (IsInstanceValid(t)) t.Visible = false;
 		var tween = CreateTween();
 		tween.TweenProperty(_lid, "rotation:x", Mathf.DegToRad(-100f), 0.9f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
 		PlayOneShot("res://assets/audio/sfx/door_creak_01.wav", 0f, 1.8f);

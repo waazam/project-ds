@@ -389,7 +389,7 @@ public partial class SurveyLot : Node3D
 			var b = GroundBasis(terrain, p, Mathf.Atan2(dir.X, dir.Z) + Mathf.Pi);
 			return new Transform3D(b, p + b.Y * 0.02f);
 		}
-		for (float s = branchS - 36f; s < branchS - 2f; s += 4f)
+		for (float s = branchS - 36f; s < branchS - 2f; s += 8f)   // (2026-10-23, the owner: "tone them down 50%": every 8 m, was 4)
 		{
 			Vector3 p = terrain.TrailPoint(s, out Vector3 t);
 			path.Add(Mark(p, Flat(t).Normalized()));
@@ -405,12 +405,12 @@ public partial class SurveyLot : Node3D
 			float len = d.Length();
 			if (len < 0.5f) continue;
 			d /= len;
-			for (float x = 1.6f; x < len - 1.2f; x += 2f) line.Add(Mark(a + d * x, d));
+			for (float x = 1.6f; x < len - 1.2f; x += 4f) line.Add(Mark(a + d * x, d));   // (every 4 m, was 2)
 		}
 		var ring = new List<Transform3D>();
-		for (int k = 0; k < 8; k++)
+		for (int k = 0; k < 4; k++)   // (four, was eight)
 		{
-			float ang = k / 8f * Mathf.Tau;
+			float ang = k / 4f * Mathf.Tau;
 			Vector3 o = new(Mathf.Cos(ang), 0, Mathf.Sin(ang));
 			ring.Add(Mark(cachePos + o * (piece == 2 ? 3.2f : 1.7f), -o));   // (the cairn is big: the ring out round its foot)
 		}
