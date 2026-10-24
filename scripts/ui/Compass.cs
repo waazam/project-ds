@@ -62,6 +62,15 @@ public partial class Compass : CanvasLayer
 	private double _wantedUntil;
 	private bool _wasShown;
 	private Vector3? _lastObjective;
+	// (2026-10-24, the openings' pass) the first time it's in hand at R.H.'s camp, the needle swings off into the trees,
+	// holds there a moment, trembling, then comes round to the cabin
+	public const string TwitchFlag = "act3_compass_twitched";
+	[Export] public float TwitchDegrees = 65f, TwitchSeconds = 2.6f;
+	private double _twitchAt = -1;
+	private bool _twitchChecked;
+	/// <summary>For tests: the swing off into the trees has happened (or is happening), and how far off it is now (deg).</summary>
+	public bool Twitched { get; private set; }
+	public float TwitchNow { get; private set; }
 
 	public override void _Ready()
 	{
@@ -106,6 +115,11 @@ public partial class Compass : CanvasLayer
 		if (obj is { } o && (_lastObjective == null || _lastObjective.Value.DistanceTo(o) > 3f)) _wantedUntil = _clock + 6.0;
 		_lastObjective = obj;
 		if (!_wasShown) _wantedUntil = _clock + 6.0;
+		if (!_twitchChecked && Systems.StoryManager.Instance is { } st)
+		{
+			_twitchChecked = true;
+			if (st.Current == Systems.Checkpoint.Act3DoorBoarded && !st.HasFlag(TwitchFlag)) { _twitchAt = _clock + 1.6; st.SetFlag(TwitchFlag); }
+		}
 		_wasShown = true;
 		// (2026-10-23, the owner: "after you pick it up, it disappears, should be on the top of the screen the whole time") always
 		// up once carried; it faded out whenever they walked (the contextual HUD), and read as lost
@@ -269,10 +283,20 @@ public partial class Compass : CanvasLayer
 		Vector3 d = target.Value - _player.GlobalPosition; d.Y = 0;
 		if (d.LengthSquared() < 0.01f) return;   // standing on it: keep the last heading
 		float trueDeg = Mathf.Wrap(Mathf.RadToDeg(Mathf.Atan2(-d.X, -d.Z)), 0f, 360f);
+		bool twitching = _twitchAt >= 0 && _clock >= _twitchAt && _clock < _twitchAt + TwitchSeconds;
+		if (twitching)
+		{
+			if (!Twitched) { Twitched = true; GD.Print("[story] Act 3: the compass's needle swings off into the trees"); }
+			float u = (float)(_clock - _twitchAt);
+			float env = Mathf.SmoothStep(0f, 0.25f, u) * (1f - Mathf.SmoothStep(TwitchSeconds - 0.9f, TwitchSeconds, u));
+			TwitchNow = TwitchDegrees * env + 6f * Mathf.Sin(u * 23f) * env;
+			trueDeg = Mathf.Wrap(trueDeg + TwitchNow, 0f, 360f);
+		}
+		else TwitchNow = 0f;
 		if (!_hasBearing) { _shownBearing = trueDeg; _hasBearing = true; return; }
 		float diff = Mathf.Wrap(trueDeg - _shownBearing, -180f, 180f);
 		// A new objective in another direction altogether (the story moved it): snap rather than sweep a half-turn.
-		if (Mathf.Abs(diff) > 60f) { _shownBearing = trueDeg; return; }
+		if (Mathf.Abs(diff) > 60f && !twitching && !(_twitchAt >= 0 && _clock < _twitchAt + TwitchSeconds + 1.0)) { _shownBearing = trueDeg; return; }
 		// Otherwise close the gap fast when it is big and calmly when it is small (an exponential settle plus the
 		// linear sweep): within a third of a second of any change the marker is within a degree or two.
 		float step = MaxSweepDegPerSec * delta + Mathf.Abs(diff) * Mathf.Min(1f, 8f * delta);

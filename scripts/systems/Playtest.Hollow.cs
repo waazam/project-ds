@@ -42,6 +42,8 @@ public partial class Playtest
 
 	// ------------------------------------------------------------------ Act 3
 
+	private bool _twitchShot;
+
 	private async Task Act3(CancellationToken ct)
 	{
 		await Control(ct, 40);
@@ -57,12 +59,18 @@ public partial class Playtest
 		else Check("R.H.'s note at the camp", false);
 		await _bot.Seconds(0.5, ct);
 		Check("the camp note read (no code tracker on the HUD: the player remembers the digits)", Story.HasFlag(Camp.NoteReadFlag));
+		Check("the fire ring still smoking, two embers in the ash (he's only just gone)", _bot.FirstOf<Camp>() is { Smoke: not null });
 		await _bot.UseIt(lantern, ct);
 		await _bot.UseIt(compass, ct);
 		Check("lantern and compass picked up", Inv.HasLantern && Inv.HasCompass);
 		Check("the compass shows at the top of the screen", _bot.FirstOf<Compass>() is { ShowingCompass: true });
 		CheckObjective("the compass points at the cabin", "cabin");
 		Shot("camp");
+		// (2026-10-24) the needle swings off into the trees once, holds, and comes round
+		var needle = _bot.FirstOf<Compass>();
+		float most = 0f;
+		for (int f = 0; f < 400 && needle != null && !(needle.Twitched && needle.TwitchNow == 0f); f++) { most = Mathf.Max(most, Mathf.Abs(needle.TwitchNow)); await _bot.Frames(1, ct); if (Mathf.Abs(needle.TwitchNow) > 55f && !_twitchShot) { _twitchShot = true; Shot("compass_twitch"); } }
+		Check("the compass's needle swings off into the trees, then settles on the cabin", needle is { Twitched: true, TwitchNow: 0f } && most > 50f, $"swung {most:0} deg");
 		// the inventory: the wheel moves through what's carried
 		var hud = GetTree().GetFirstNodeInGroup("equipped_item_hud") as EquippedItemHud;
 		await Control(ct, 8);
@@ -303,6 +311,8 @@ public partial class Playtest
 		Check("the storm breaks with the cap taken", StormController.Instance is not { Active: true } && Story.HasFlag(StoryManager.Flag.DawnBroke));
 		CheckObjective("the compass swings to the footbridge", "bridge_marker");
 		Shot("cabin_inside");
+		Check("on the table beside the player's assignment: R.H.'s own copy, every shot ticked, and \"the steps\" under them", cabin.RHSheet != null && cabin.RHSheet.Text.Contains("[x]  the steps"));
+		if (cabin.RHSheet?.GetParent() is Node3D rh) { await _bot.Aim(rh.GlobalPosition, ct); await _bot.Seconds(0.4, ct); Shot("rh_assignment"); }
 		await _bot.WalkTo(cabin.DoorCenter, 1.5f, ct);
 		if (cabin.DoorReopen != null) await _bot.UseIt(cabin.DoorReopen, ct);
 		await _bot.Seconds(0.6, ct);

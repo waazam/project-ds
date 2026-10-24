@@ -76,7 +76,7 @@ Morning. Chapter one: *Back to Nature* comes later, after the camera.
 
 The game opens on a parchment map, drawn like the map travel in Indiana Jones. A red dotted line draws itself from the magazine's office to the Blackfern Trailhead in Overlook Park, and a small car icon travels along it. Over the map, typed like a sheet from the office, the assignment: *[magazine TBD]: Autumnal Delights*, the October feature, a nature photographer's trip into the woods. As the car nears the trailhead, a pager's small green screen comes up at a corner of the picture with a page from the editor: "Take your time up there. It's been a rough month." It cuts out mid-glow, as if the signal died. Nothing more is said about it; the loss is carried by the photo in the cabin and by what he chooses to photograph.
 
-The map dissolves straight to the trunk (there is no drive scene). This replaces the two black cards.
+As the car reaches the trailhead, a short flight of stairs is pencilled into the woods north of it on the map, in a hand that isn't the map's, labelled "the steps"; it fades when the pager's signal dies (2026-10-24). The map dissolves straight to the trunk (there is no drive scene). This replaces the two black cards.
 
 He chose the trailhead because he loved it as a child. The magazine wanted nature shots. He is not looking for his father.
 
@@ -122,10 +122,11 @@ Afternoon, clear, golden light, the best the woods will ever look. Two ways out 
 - **The prints.** On the trail below the bridge, on the way down: two sets of boot prints going out, his own and another, bigger, right beside them, step for step ("Two sets. One of them's mine.").
 - **The register.** Its last page is torn out. The page lies on the cabin's table by the assignment: R.H.'s two lines, and a third in the same hand, his own name: "Cameron, the steps".
 And two moments felt underfoot: a plank cracks and sags under him on the way back over the footbridge (it holds), and the climb beside the falls is wet rock, edged along slowly, a foot going once.
-Back at the cabin he pins his best shots to the board (stages 1 to 5, as he looks).
+Back at the cabin a print is already on the board that nobody pinned: the cabin itself, from the trees off the porch, taken while he was out ("I didn't take that."). He pins his best shots over it (stages 1 to 5, as he looks). A while after the first pinning, three knocks on the front wall; out of the door there is nobody, only the big boot prints again, down the steps and across the stones and off into the trees ("The same boots.").
 
 ### The last walk: Come and See
 Dusk, thick fog. The cabin's light is gone behind him once he is a little way out; there is no going back to it.
+- **The rifle.** The far rifle of the first walk fires once more, much nearer, and never again.
 - **The black bird.** The fourth bird, black with red eyes, sits on a branch, its eyes catching the light. Photographing it brings a distant but harsh, loud scream: every bird vanishes, and it lunges straight at the player as it goes. Its print comes out dark, with its eyes in it.
 - **The voices.** Now they are plain: *"come and see"*, deep, many of them, from the trees and from behind. If he follows them they lead on toward the stairs. If he doesn't, they lead on anyway: fallen trunks close the other paths, each falling as the walls do below (creaking first, falling only in view). The voices stop at the stairs.
 
@@ -164,7 +165,7 @@ As they get up, the player's line: *"Where the fuck am I? ... Was I... floating?
 ## Act 3: Homebase
 **Checkpoint 3**, on reaching R.H.'s camp.
 
-R.H.'s camp: his tent, a cold fire ring and his pack. On a stump are the lantern and the compass, with a note from him written to whoever finds it:
+R.H.'s camp: his tent, a fire ring and his pack. The ring isn't cold: a thread of smoke still rises from the ash over two embers, as if he'd only just gone. The first time the compass is in hand its needle swings off into the trees, holds there trembling, and only then comes round to the cabin. On a stump are the lantern and the compass, with a note from him written to whoever finds it:
 
 > *"If you're reading this, it got you too. Don't stay out here after dark. There's an old cabin up the hollow. The needle knows the way. Past it there's a bunker. Steel door. I had its key. I cut it in two so it can't carry it in whole, and hid the halves off the path, one before the cabin, one before the bunker. Arrows on the trees take you to each, in the ink only the lantern's black light shows. Look close. Not every mark out there is mine. Leave the lantern lit. - R.H."*
 
@@ -230,7 +231,7 @@ A cabin stands beside the path in the hollow, and it is the cabin from Act 1, by
 - **Axe:** round the far side of the cabin, stuck in the chopping block beside the woodpile, no glint: the player has to walk round the cabin to find it. With it, the player can cut the wood planks barricading the front door to get in.
 - **Hammer:** in the open shed beside the cabin (its door shut until E opens it). With it you can pry the boards loose from the front door. It's a long hold, so it takes longer to get in than the axe.
 
-**Inside.** R.H. is not there. What is there tells the story: his chair pushed back from the table, a roll of bandage and dark stains, and his last page on the table, signed R.H. The player's own photo board from Act 1 hangs on the wall, with R.H.'s photographs pinned across it (the three birds, and the stairs at night). The assignment sheet and the two-person photo lie on the table beside the cap. A second axe hangs on pegs over the hearth: it is only dressing here (it can't be taken), planted for Act 7.
+**Inside.** R.H. is not there. What is there tells the story: his chair pushed back from the table, a roll of bandage and dark stains, and his last page on the table, signed R.H. The player's own photo board from Act 1 hangs on the wall, with R.H.'s photographs pinned across it (the three birds, and the stairs at night). The assignment sheet and the two-person photo lie on the table beside the cap, and beside them a second copy of the assignment, soft with handling, "R.H." in its corner: the same shot list, every line ticked, and one more pencilled under them, pressed hard: "the steps". He was on this assignment before you. A second axe hangs on pegs over the hearth: it is only dressing here (it can't be taken), planted for Act 7.
 
 > *"It came away in my hand at the top like it wanted to. The cap off the post. The hand hasn't been mine since. I kept the rest of me. The door won't open from in here. I didn't do that. Don't take it back up. Don't take it anywhere. If you get in and I'm gone, I went up."*
 

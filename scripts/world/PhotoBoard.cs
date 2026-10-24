@@ -71,6 +71,10 @@ public partial class PhotoBoard : Node3D
 	/// <summary>Seconds the board must be out of the player's view before it changes, and in it before that counts.</summary>
 	[Export] public float AwaySeconds = 2.5f, SeenSeconds = 1.2f;
 
+	/// <summary>The prints' render layer (11): everything sees them but the board's own glow.</summary>
+	private const uint PrintLayer = 1u << 10;
+	/// <summary>The panel's glow (0.85 until 2026-10-24: a little lower, so the prints read against it).</summary>
+	private const float PanelGlow = 0.6f;
 	public const float Width = 1.04f, Height = 0.74f, PanelFace = 0.042f;
 	/// <summary>The size of a print on the board (the card with its border).</summary>
 	public static readonly Vector2 PrintSize = new(0.2f, 0.16f);
@@ -115,10 +119,10 @@ public partial class PhotoBoard : Node3D
 		set
 		{
 			_glowOn = value;
-			if (_panelMat != null) _panelMat.EmissionEnergyMultiplier = value ? 0.85f : 0f;
+			if (_panelMat != null) _panelMat.EmissionEnergyMultiplier = value ? PanelGlow : 0f;
 			if (_glow != null) _glow.Visible = value;
 			foreach (var p in _prints)
-				if (IsInstanceValid(p) && p.MaterialOverride is StandardMaterial3D m) m.EmissionEnergyMultiplier = value ? 0.32f : 0f;
+				if (IsInstanceValid(p) && p.MaterialOverride is StandardMaterial3D m) m.AlbedoColor = value ? PrintTone : PrintDark;
 		}
 	}
 
@@ -139,6 +143,9 @@ public partial class PhotoBoard : Node3D
 				Name = "PinUse", Prompt = "Pin your photos", MaxDistance = 2.8f, PickRadius = 0.5f, Position = new Vector3(0, 0, 0.1f),
 				HighlightRoot = new NodePath("../Board"),
 				PromptFor = _ => Pinnable ? "Pin your photos" : "",
+				// (2026-10-24) no white line: its grown hull round the board's backing was drawn over the prints a few
+				// millimetres in front of it, washing every one of them out to white
+				Outline = false,
 			};
 			Use.Interacted += OnUse;
 			AddChild(Use);
@@ -160,7 +167,7 @@ public partial class PhotoBoard : Node3D
 		_panelMat = new StandardMaterial3D
 		{
 			ResourceName = "board_glow", AlbedoColor = new Color(0.93f, 0.91f, 0.85f), Roughness = 0.5f,
-			EmissionEnabled = true, Emission = new Color(1f, 0.95f, 0.84f), EmissionEnergyMultiplier = 0.85f,
+			EmissionEnabled = true, Emission = new Color(1f, 0.95f, 0.84f), EmissionEnergyMultiplier = PanelGlow,
 		};
 		var panelMesh = ItemModels.Get("cabin_story", "PhotoBoardPanel");
 		_panel = new MeshInstance3D
@@ -173,6 +180,7 @@ public partial class PhotoBoard : Node3D
 		{
 			Name = "Glow", LightColor = new Color(1f, 0.93f, 0.8f), LightEnergy = 0.3f, OmniRange = 1.9f, OmniAttenuation = 1.4f,
 			ShadowEnabled = false, Position = new Vector3(0, 0, 0.32f),
+			LightCullMask = 0xFFFFFu & ~PrintLayer,   // (2026-10-24: it lit the prints so close it blew them out to white)
 		};
 		AddChild(_glow);
 		_printRoot = new Node3D { Name = "Prints" };
@@ -222,7 +230,7 @@ public partial class PhotoBoard : Node3D
 			Mesh = new QuadMesh { Size = size },
 			MaterialOverride = PrintMaterial(tex),
 			Transform = new Transform3D(basis, new Vector3(at.X, at.Y, PanelFace + 0.002f + lift + _prints.Count * 0.0004f)),
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Layers = PrintLayer,
 		};
 		_printRoot.AddChild(print);
 		var pinMesh = ItemModels.Get("cabin_story", "BoardPin");
@@ -237,12 +245,15 @@ public partial class PhotoBoard : Node3D
 		return print;
 	}
 
+	/// <summary>(2026-10-24) Unlit, as a print on a lightbox reads: lit, they took the panel's glow (a few mm behind them)
+	/// as bounce light and burned out to white. Dimmed when the board's light is off.</summary>
 	private StandardMaterial3D PrintMaterial(Texture2D tex) => new()
 	{
-		AlbedoTexture = tex, Roughness = 0.6f, MetallicSpecular = 0.3f,
-		EmissionEnabled = true, EmissionTexture = tex, EmissionEnergyMultiplier = _glowOn ? 0.32f : 0f,
+		AlbedoTexture = tex, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, AlbedoColor = _glowOn ? PrintTone : PrintDark,
 		TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps,
 	};
+
+	private static readonly Color PrintTone = new(0.86f, 0.84f, 0.8f), PrintDark = new(0.16f, 0.15f, 0.14f);
 
 	private static void SetPicture(MeshInstance3D print, Texture2D tex)
 	{
@@ -347,6 +358,20 @@ public partial class PhotoBoard : Node3D
 		_ = UI.Subtitle.Instance?.Show("Nothing to pin yet.", 0.4f, 2.4f, 0.8f);
 	}
 
+	/// <summary>(2026-10-24) A print nobody pinned: the cabin from the trees, taken while he was out on the first walk
+	/// (Act1Walks). Pinned over whatever else is up.</summary>
+	public bool HasStrangerPrint => _stranger != null;
+	private Texture2D _stranger;
+
+	public void SetStrangerPrint(Image photo)
+	{
+		_stranger = ImageTexture.CreateFromImage(Card(photo));
+		Restore();
+	}
+
+	/// <summary>The board in the player's view now (close, in the middle of the picture, in the room).</summary>
+	public bool InView => Seen();
+
 	/// <summary>Raised on a pinning of new prints (its number, 1 on).</summary>
 	public event Action<int> Pinned;
 
@@ -356,7 +381,7 @@ public partial class PhotoBoard : Node3D
 		if (_panelMat == null || !_glowOn) return;
 		var tw = CreateTween();
 		tw.TweenProperty(_panelMat, "emission_energy_multiplier", 1.9f, 0.18f).SetTrans(Tween.TransitionType.Sine);
-		tw.TweenProperty(_panelMat, "emission_energy_multiplier", 0.85f, 0.9f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		tw.TweenProperty(_panelMat, "emission_energy_multiplier", PanelGlow, 0.9f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
 		if (_glow != null)
 		{
 			var t2 = CreateTween();
@@ -423,6 +448,7 @@ public partial class PhotoBoard : Node3D
 			PinPrint(Picture(p), Slots[i], SlotTilt[i], $"Print{i}");
 		}
 		if (Stage >= 5) StairsPrint = PinPrint(StairsPrintTexture, StairsSlot, -7f, "StairsPrint", 0.003f);
+		if (_stranger != null && Pinnable) PinPrint(_stranger, pins.Count == 0 ? new Vector2(0.01f, 0.02f) : new Vector2(0.03f, -0.01f), 4f, "StrangerPrint", 0.005f);
 		if (OwnerCabin is { } cabin) cabin.SetFramedPhotoChanged(Stage >= 3);
 		UpdateHum();
 		if (changedStage) StageChanged?.Invoke(Stage);

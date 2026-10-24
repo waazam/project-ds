@@ -38,6 +38,9 @@ public partial class Cabin
 	public Transform3D HearthAxeRest { get; private set; }
 	/// <summary>The assignment sheet on the table (a Readable).</summary>
 	public Readable AssignmentSheet { get; private set; }
+	/// <summary>(2026-10-24) The Hollow's: R.H.'s own copy of the assignment beside the player's, its shot list all ticked,
+	/// and one more line pencilled under it (null elsewhere).</summary>
+	public Readable RHSheet { get; private set; }
 	/// <summary>The photo in the standing frame on the table (its material's albedo is the picture).</summary>
 	public MeshInstance3D FramedPhoto { get; private set; }
 	public bool FramedPhotoChanged { get; private set; }
@@ -65,6 +68,23 @@ public partial class Cabin
 		"   wildlife\n" +
 		"   a place that matters\n\n" +
 		"Shoot what the woods give you. Prints back to the office by the first.";
+
+	private const string RHAssignmentText =
+		"October feature: Autumnal Delights\n" +
+		"\n" +
+		"A nature photographer's trip into the woods, at the turn of the season.\n" +
+		"\n" +
+		"Shoot what the woods give you. Prints back to the office by the first.\n" +
+		"\n" +
+		"Shot list (pencilled in):\n" +
+		"   [x]  the valley from the overlook, in the afternoon light\n" +
+		"   [x]  the falls, up close\n" +
+		"   [x]  the trail at last light\n" +
+		"   [x]  the steps\n" +
+		"\n" +
+		"(the last line in a different pencil, pressed hard enough to tear)\n" +
+		"\n" +
+		"                                                  R.H.";
 
 	private void BuildStory()
 	{
@@ -96,6 +116,17 @@ public partial class Cabin
 		AssignmentSheet = PaperKit.Flat(sheetRoot, new Vector3(0.004f, 0.0005f, 0.004f), -3f, new Vector2(0.2f, 0.26f), PaperKit.Look.Note,
 			$"{StoryNames.Magazine}: Autumnal Delights", AssignmentText, Readable.NoteStyle.Typed, prompt: "Read the assignment", seed: 23);
 		AssignmentSheet.PickRadius = 0.12f;   // (clear of the cap's on the Hollow's table)
+		// the Hollow's (and so Act 7's): his copy beside it. He was on this assignment before you.
+		if (!Hub && !BurnedOut)
+		{
+			var rhAt = table * new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(-14f)), new Vector3(-0.08f, TableTop, 0.24f));
+			var rhRoot = new Node3D { Name = "RHAssignmentSheet", Transform = rhAt };
+			rhRoot.AddToGroup(PapersGroup);
+			_gen.AddChild(rhRoot);
+			RHSheet = PaperKit.Flat(rhRoot, new Vector3(0, 0.0012f, 0), 0f, new Vector2(0.2f, 0.26f), PaperKit.Look.Note,
+				$"Another copy of the assignment, soft with handling: \"R.H.\" in the corner", RHAssignmentText, Readable.NoteStyle.Typed, prompt: "Read the other assignment", seed: 29);
+			RHSheet.PickRadius = 0.12f;
+		}
 		ItemModels.Add(_gen, "cabin_story", "Pencil", table * new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(78f)), new Vector3(-0.17f, TableTop, 0.17f)), "Pencil", paint, false);
 
 		// ---- the framed photo, standing, turned a little toward the door

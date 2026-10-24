@@ -433,9 +433,38 @@ public partial class Playtest
 		// ---- (2026-10-24) walk 1 is the overlook and the falls both; its beats
 		await Act1Beats(walks, terrain, ct);
 		// ---- back at the cabin: pinned once (the shape), out again without the second look: sent back
+		// back at the cabin from walk 1: a print on the board nobody pinned
+		var hub = GetTree().GetFirstNodeInGroup(World.Cabin.HubGroup) as World.Cabin;
+		Require("the cabin and its board", hub?.Board != null);
+		await _bot.WaitUntil(() => hub.Board.HasStrangerPrint, 5, ct);
+		Check("while they were out a print went up on the board that nobody pinned (the cabin, from the trees)", hub.Board.HasStrangerPrint);
+		var boardAt = hub.Board.GlobalPosition;
+		var stand = boardAt + hub.Board.GlobalBasis.Z.Normalized() * 1.5f;
+		await _bot.Teleport(new Vector3(stand.X, hub.GlobalPosition.Y, stand.Z), boardAt, ct, snapToTerrain: false);
+		await _bot.Aim(boardAt, ct);
+		await _bot.WaitUntil(() => walks.StrangerThought, 3, ct);
+		await _bot.Seconds(0.3, ct);
+		Check("looking at it: \"I didn't take that.\"", walks.StrangerThought);
+		Shot("act1_stranger_print");
 		Story.SetFlag(World.Act1Walks.Stage2Flag);
 		await _bot.Frames(2, ct);
 		Check("pinned once: still walk 1's ways (the trail past the fork shut)", walks.GatesDown == 1 && walks.WallPieces > 20, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		// in the cabin a while after: three knocks on the front wall; outside, only the boots going off into the trees
+		using (Fast(3)) await _bot.WaitUntilGame(() => walks.Knocked, 14, ct);
+		Check("a while after pinning: three knocks on the cabin's front wall", walks.Knocked);
+		var porch = hub.ToGlobal(new Vector3(0.3f, 0f, hub.Depth * 0.5f + hub.PorchDepth + 3.2f));
+		await _bot.Teleport(new Vector3(porch.X, terrain.HeightAt(porch.X, porch.Z), porch.Z), hub.ToGlobal(new Vector3(5f, 0f, hub.Depth * 0.5f + hub.PorchDepth + 3.5f)), ct);
+		await _bot.WaitUntil(() => walks.PorchThought, 3, ct);
+		{
+			float zf = hub.Depth * 0.5f + hub.PorchDepth;
+			var standAt = hub.ToGlobal(new Vector3(1.6f, 0f, zf + 3.4f));
+			await _bot.Teleport(new Vector3(standAt.X, terrain.HeightAt(standAt.X, standAt.Z), standAt.Z), hub.ToGlobal(new Vector3(0.2f, 0f, zf + 0.8f)), ct);
+			var look = hub.ToGlobal(new Vector3(0.6f, 0f, zf + 1.6f));
+			await _bot.Aim(new Vector3(look.X, terrain.HeightAt(look.X, look.Z), look.Z), ct);
+			await _bot.Seconds(0.3, ct);
+		}
+		Check("out of the door: nobody, only boot prints off the steps into the trees (\"The same boots.\")", walks.PorchPrints > 10 && walks.PorchThought, $"{walks.PorchPrints} prints");
+		Shot("act1_porch_prints");
 		var n0 = terrain.TrailPoint(70f, out var nt);
 		await _bot.Teleport(n0, n0 + nt * 10f, ct);
 		using (Fast(3)) await _bot.WalkFor(terrain.TrailPoint(85f, out _), 3, ct);
@@ -465,6 +494,11 @@ public partial class Playtest
 		float across = await TrunkHolds(closer, ct);
 		Check("the fallen trunk holds: walked into, it doesn't let them through", across > 0f, $"{across:0.0} m on their side");
 		Shot("walk3_way_back_closed");
+		// up the trail at dusk: the far rifle again, nearer
+		var r0 = terrain.TrailPoint(115f, out var rt);
+		await _bot.Teleport(r0, r0 + rt * 10f, ct);
+		using (Fast(3)) await _bot.WalkFor(terrain.TrailPoint(150f, out _), 4, ct);
+		Check("the dusk walk: the rifle from the first walk again, nearer", walks.RifleAgain);
 		// on up the trail at dusk: the voices call along the way
 		var v0 = terrain.TrailPoint(300f, out var vt);
 		await _bot.Teleport(v0, v0 + vt * 10f, ct);
@@ -480,6 +514,15 @@ public partial class Playtest
 	/// on the way back over the bridge, the two sets of boot prints and the register's torn-out page on the cabin's table.</summary>
 	private async Task Act1Beats(World.Act1Walks walks, ForestTerrain terrain, CancellationToken ct)
 	{
+		// (2026-10-24) the cold open's map: the stairs pencilled into the woods by the trailhead as the car arrives, gone
+		// when the pager's signal dies
+		var map = new UI.PrologueMap { Name = "PrologueMapCheck" };
+		GetTree().Root.AddChild(map);
+		using (Fast(4)) await _bot.WaitUntilGame(() => map.StairsInk > 0.9f, 20, ct);
+		Shot("opening_map_stairs");
+		using (Fast(4)) await _bot.WaitUntilGame(() => map.Elapsed > UI.PrologueMap.EndAt - 0.3f, 20, ct);
+		Check("the opening map: the stairs drawn in by the trailhead as the car arrives, and gone with the pager's signal", map.StairsShown > 0.9f && map.StairsInk < 0.05f, $"shown {map.StairsShown:0.00}, now {map.StairsInk:0.00}");
+		map.QueueFree();
 		await _bot.WaitUntil(() => walks.Poster != null, 3, ct);
 		Check("at the lot: a missing poster over the board's map (R.H., 41, last seen Oct 25)", walks.Poster != null && walks.Poster.Text.Contains("41"));
 		if (walks.Poster?.GetParent() is Node3D poster)

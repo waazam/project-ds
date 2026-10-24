@@ -29,6 +29,7 @@ public partial class Act1Walks
 	public int CallsHeard { get; private set; }
 	public bool CallsOver { get; private set; }
 	public bool CabinDark { get; private set; }
+	public bool RifleAgain { get; private set; }
 
 	[ExportGroup("Walk 3's voices")]
 	/// <summary>Seconds between the calls (a burst of one to four voices each), and how near the stairs (m) they stop.</summary>
@@ -96,6 +97,16 @@ public partial class Act1Walks
 				}
 				break;
 			case 3:
+				// (2026-10-24) the far rifle of the first walk, once more, nearer, and then never again
+				if (!RifleAgain && s > 120f && s < 210f && offT < 12f)
+				{
+					RifleAgain = true;
+					var side = new Vector2(vel.Y, -vel.X).Normalized() * (_rng.Randf() < 0.5f ? 1f : -1f);
+					if (side == Vector2.Zero) side = Vector2.Right;
+					var at = q + side * _rng.RandfRange(45f, 60f);
+					PlayWorld("res://assets/audio/sfx/rifle_distant_01.wav", "Events", at, 1.5f, 4f, 22f, 600f, 0.94f);
+					GD.Print("[story] Act 1 dusk walk: the rifle again, nearer");
+				}
 				UpdateCalls(player, q, s, dt);
 				if (!CabinDark && s > CabinDarkFrom) PutOutCabinLight();
 				break;

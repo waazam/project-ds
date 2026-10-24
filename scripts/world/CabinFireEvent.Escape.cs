@@ -221,7 +221,7 @@ public partial class CabinFireEvent
 				if (n is CollisionShape3D cs && cs.Shape is BoxShape3D bx && bx.Size.Y > 0.9f) cs.SetDeferred("disabled", true);
 		}
 		// the cabin's things on the table go with it
-		foreach (string n in new[] { "AssignmentFolder", "AssignmentSheet", "Pencil", "PictureFrame", "FramedPhoto" })
+		foreach (string n in new[] { "AssignmentFolder", "AssignmentSheet", "Pencil", "PictureFrame", "FramedPhoto", "RHAssignmentSheet" })
 			if (_cabin.FindChild(n, true, false) is Node3D t)
 				t.CreateTween().TweenProperty(t, "position", t.Position + off, 0.7f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
 		if (_gapPlug != null && IsInstanceValid(_gapPlug)) _gapPlug.SetDeferred("disabled", true);

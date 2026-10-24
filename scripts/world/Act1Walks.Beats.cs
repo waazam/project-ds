@@ -31,6 +31,7 @@ public partial class Act1Walks
 	public const string PrintsFlag = "act1_boot_prints", RegisterTornFlag = "act1_register_torn";
 	public const string PlankFlag = "act1_plank_cracked", SlipFlag = "act1_falls_slip";
 	private const string OverlookFlag = "act1_overlook_reached";
+	public const string StrangerFlag = "act1_board_stranger", KnockFlag = "act1_cabin_knock";
 
 	/// <summary>For tests: what's out there, and what has happened.</summary>
 	public Readable Poster { get; private set; }
@@ -45,6 +46,11 @@ public partial class Act1Walks
 	public float WetRockDrag { get; private set; } = 1f;
 	public bool BoardNudged { get; private set; }
 	public string LastPinLine { get; private set; } = "";
+	/// <summary>For tests: the print nobody pinned is up (and its thought), the knock, the porch prints and their thought.</summary>
+	public bool StrangerThought { get; private set; }
+	public bool Knocked { get; private set; }
+	public int PorchPrints { get; private set; }
+	public bool PorchThought { get; private set; }
 	/// <summary>For tests: where the boot prints run (trail metres) and where the wet rock is (falls path metres).</summary>
 	public const float PrintsFrom = 30f, PrintsTo = 100f;
 	public float WetFrom => FallsSplitAt + 2f;
@@ -58,6 +64,8 @@ public partial class Act1Walks
 	private Node3D _bridge;
 	private double _plankT = -1, _slipT = -1;
 	private float _wetSway;
+	private bool _capturing;
+	private double _stage2At = -1;
 	private bool _swaying;
 
 	private static bool Flag(string f) => StoryManager.Instance?.HasFlag(f) ?? false;
@@ -84,6 +92,7 @@ public partial class Act1Walks
 		if (Stage == 1 && !Flag(Deer.StaredFlag)) PlaceStaringDeer();
 		if (Flag(PrintsFlag)) LayBootPrints();
 		if (Flag(RegisterTornFlag)) TearRegister();
+		if (Flag(KnockFlag)) { Knocked = true; LayPorchPrints(); }
 		BuildWetRocks();
 	}
 
@@ -125,12 +134,122 @@ public partial class Act1Walks
 			UpdatePlank(player);
 			UpdateWetRocks(player, dt);
 		}
+		// (2026-10-24, the openings' pass) the board while he's out: a print nobody pinned, the cabin from the trees
+		if (!_capturing && _hub?.Board is { HasStrangerPrint: false } && Stage <= 2 && InAct1
+			&& ((Flag(StrangerFlag) && _clock > 3.0) || (away && pp.DistanceTo(_hub.GlobalPosition) > 90f)))
+			CaptureCabin();
+		if (!StrangerThought && _hub?.Board is { HasStrangerPrint: true, InView: true } && UI.Subtitle.Instance is { CurrentlyShowing: false } ssub)
+		{
+			StrangerThought = true;
+			_ = ssub.Show("I didn't take that.", 0.5f, 3.0f, 1.0f);
+			GD.Print("[story] Act 1: the print nobody pinned - seen");
+		}
+		// pinned once: a while later, three knocks on the front wall, and outside only boot prints going off into the trees
+		if (_builtStage == 2 && _stage2At < 0) _stage2At = _clock;
+		if (!Knocked && _builtStage == 2 && _clock - _stage2At > 8.0 && InHub(pp, out var lp) && lp.Z < _hub.Depth * 0.5f - 1.2f) Knock();
+		if (!PorchThought && PorchPrints > 0 && _hub != null)
+		{
+			var l = _hub.ToLocal(pp);
+			if (l.Z > _hub.Depth * 0.5f + _hub.PorchDepth + 0.2f && Mathf.Abs(l.X) < 6f && UI.Subtitle.Instance is { CurrentlyShowing: false } psub)
+			{
+				PorchThought = true;
+				_ = psub.Show("The same boots.", 0.4f, 2.6f, 1.0f);
+			}
+		}
 		// pinned once and out again without a second look: sent back
 		if (_builtStage == 2 && !Flag(PhotoBoard.RepinFlag) && !BoardNudged && s > 45f && UI.Subtitle.Instance is { CurrentlyShowing: false } nsub)
 		{
 			BoardNudged = true;
 			_ = nsub.Show("I should give those prints another look.", 0.6f, 3.4f, 1.2f);
 			GD.Print("[story] Act 1: out of the cabin before the board's done - the thought");
+		}
+	}
+
+	// ------------------------------------------------------------------ the cabin, watched
+
+	private bool InHub(Vector3 world, out Vector3 local)
+	{
+		local = Vector3.Zero;
+		if (_hub == null || !IsInstanceValid(_hub)) return false;
+		local = _hub.ToLocal(world);
+		var room = _hub.InteriorBounds;
+		return local.X > room.Position.X && local.X < room.End.X && local.Z > room.Position.Z && local.Z < room.End.Z && local.Y > -0.5f && local.Y < 2.5f;
+	}
+
+	/// <summary>The cabin photographed from the trees off its porch (a camera of its own on the same world, one frame),
+	/// and pinned to the board.</summary>
+	private async void CaptureCabin()
+	{
+		_capturing = true;
+		if (!Flag(StrangerFlag)) SetStoryFlag(StrangerFlag);
+		var cabin = _hub;
+		var front = cabin.GlobalBasis.Z.Normalized();
+		var side = cabin.GlobalBasis.X.Normalized();
+		var from = cabin.GlobalPosition + front * 15f + side * 7.5f;
+		from.Y = _terrain.HeightAt(from.X, from.Z) + 1.45f;
+		var vp = new SubViewport { Name = "StrangerCamera", Size = new Vector2I(480, 360), World3D = GetViewport().World3D, RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
+		var cam = new Camera3D { Fov = 48f, Current = true, Far = 400f };
+		vp.AddChild(cam);
+		AddChild(vp);
+		cam.GlobalPosition = from;
+		cam.LookAt(cabin.GlobalPosition + Vector3.Up * 1.2f - side * 0.6f, Vector3.Up);
+		cam.RotateObjectLocal(Vector3.Back, Mathf.DegToRad(-3f));   // (held by hand, a little crooked)
+		for (int i = 0; i < 4; i++) await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+		if (!IsInstanceValid(this) || !IsInstanceValid(vp)) return;
+		var img = vp.GetTexture().GetImage();
+		vp.QueueFree();
+		if (img == null || cabin == null || !IsInstanceValid(cabin) || cabin.Board == null) return;
+		img.Convert(Image.Format.Rgba8);
+		cabin.Board.SetStrangerPrint(img);
+		GD.Print("[story] Act 1: a print on the board nobody pinned - the cabin, from the trees");
+	}
+
+	private void Knock()
+	{
+		Knocked = true;
+		SetStoryFlag(KnockFlag);
+		var door = new Vector3(0.9f, 1.3f, _hub.Depth * 0.5f + 0.2f);
+		var at = _hub.ToGlobal(door);
+		_ = Cutscene.Run(this, async ct =>
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				Audio.AudioDirector.OneShot(this, "wall_knock", 3, at, -2f, "Events", 4f, 0.04f);
+				await Cutscene.Wait(this, 0.55, ct);
+			}
+		});
+		LayPorchPrints();
+		GD.Print("[story] Act 1: three knocks on the cabin's front wall");
+	}
+
+	/// <summary>The other boots: off the bottom of the porch steps and away round the cabin into the trees.</summary>
+	private void LayPorchPrints()
+	{
+		if (PorchPrints > 0 || _hub == null) return;
+		var root = new Node3D { Name = "PorchPrints" };
+		AddChild(root);
+		var tex = BootTexture();
+		// from the bottom step, across the pale stone of the path (wet mud shows on it), then off over the dirt into the trees
+		float z0 = _hub.Depth * 0.5f + _hub.PorchDepth + 0.45f;
+		bool left = true;
+		for (int i = 0; i < 16; i++)
+		{
+			float u = i / 15f;
+			// out from the steps, then turning off to the side and away
+			var local = new Vector3(0.05f + 7.5f * u * u, 0f, z0 + 3.2f * u - 1.4f * u * u);
+			var ahead = new Vector3(15f * u + 0.05f, 0f, 3.2f - 2.8f * u).Normalized();
+			var side = ahead.Cross(Vector3.Up).Normalized();
+			var w = _hub.ToGlobal(local + side * (left ? -0.14f : 0.14f));
+			var dir = _hub.GlobalBasis * ahead;
+			var d = new Decal
+			{
+				Name = $"Porch{i}", TextureAlbedo = tex, Size = new Vector3(0.17f, 0.9f, 0.4f), CullMask = 1, Modulate = new Color(0.35f, 0.3f, 0.26f),
+				Position = new Vector3(w.X, _terrain.HeightAt(w.X, w.Z) + 0.15f, w.Z), Rotation = new Vector3(0, Mathf.Atan2(dir.X, dir.Z) + Mathf.Pi, 0),
+				UpperFade = 0.3f, LowerFade = 0.3f,
+			};
+			root.AddChild(d);
+			PorchPrints++;
+			left = !left;
 		}
 	}
 

@@ -67,6 +67,13 @@ public partial class PrologueMap : CanvasLayer
 	/// <summary>Seconds since the map started (for the tests).</summary>
 	public float Elapsed => (float)_t;
 	/// <summary>The drive's progress, 0 at the office to 1 at the trailhead.</summary>
+	/// <summary>(2026-10-24, the openings' pass) The stairs, drawn in the woods north of the trailhead in a hand that
+	/// isn't the map's: they ink themselves in as the car arrives and are gone when the pager's signal dies. 0..1 now,
+	/// and the most they've shown (for the tests).</summary>
+	public float StairsInk { get; private set; }
+	public float StairsShown { get; private set; }
+	private static readonly Vector2 StairsAt = new(548, 66);
+
 	public float Drive => Mathf.SmoothStep(0f, 1f, Mathf.Clamp(((float)_t - DriveFrom) / (DriveTo - DriveFrom), 0f, 1f));
 
 	public override void _Ready()
@@ -96,6 +103,7 @@ public partial class PrologueMap : CanvasLayer
 		{
 			var p = new Vector2(rng.RandfRange(440, 620), rng.RandfRange(40, 200));
 			if (p.DistanceTo(new Vector2(530, 110)) > 92f || p.DistanceTo(RouteKeys[^1]) < 12f) continue;
+			if (p.DistanceTo(StairsAt + new Vector2(0, -8)) < 28f) continue;   // (a gap in the woods round the stairs)
 			if (NearRoute(p, 7f) || new Rect2(466, 88, 108, 30).HasPoint(p) || new Rect2(490, 182, 92, 24).HasPoint(p)) continue;   // (clear of the route and the names)
 			_trees.Add(p);
 		}
@@ -190,6 +198,7 @@ public partial class PrologueMap : CanvasLayer
 		DrawWoods();
 		DrawCompass(new Vector2(58, 304));
 		DrawPlaces();
+		DrawStairs(t);
 		DrawDrive();
 		DrawAssignment(map, t);
 		_ink.DrawSetTransformMatrix(Transform2D.Identity);
@@ -277,6 +286,34 @@ public partial class PrologueMap : CanvasLayer
 		_ink.DrawArc(end, 5f, 0f, Mathf.Tau, 20, ink, 1f, true);
 		Text(UiKit.SerifItalic, StoryNames.Trailhead, end + new Vector2(-50, -10), 10, ink);
 		Text(UiKit.SerifHeading, StoryNames.Park.ToUpperInvariant(), new Vector2(536, 196), 9, new Color(Ink, 0.5f), center: true);
+	}
+
+	private void DrawStairs(float t)
+	{
+		float inAt = DriveFrom + (DriveTo - DriveFrom) * 0.84f;
+		float a = Mathf.SmoothStep(0f, 1f, (t - inAt) / 1.6f);
+		if (_pagerFrom >= 0f)
+		{
+			float cut = _pagerFrom + PagerIn + PagerHold;
+			a *= 1f - Mathf.SmoothStep(cut, cut + 0.5f, t);
+		}
+		StairsInk = a;
+		StairsShown = Mathf.Max(StairsShown, a);
+		if (a <= 0.01f) return;
+		// pencil, not the map's ink: a short flight going up to nothing, its two strings, a newel at the foot
+		var pencil = new Color(0.22f, 0.22f, 0.25f, 0.8f * a);
+		var p = StairsAt;
+		var pts = new List<Vector2>();
+		for (int i = 0; i < 6; i++)
+		{
+			pts.Add(p + new Vector2(i * 3.4f, -i * 3.4f));
+			pts.Add(p + new Vector2(i * 3.4f, -(i + 1) * 3.4f));
+		}
+		pts.Add(p + new Vector2(6 * 3.4f, -6 * 3.4f));
+		_ink.DrawPolyline(pts.ToArray(), pencil, 0.9f, true);
+		_ink.DrawLine(p + new Vector2(0, 2.5f), p + new Vector2(21f, -18.5f), new Color(pencil, pencil.A * 0.6f), 0.6f, true);
+		_ink.DrawLine(p, p + new Vector2(0, -6f), pencil, 1.1f, true);
+		Text(UiKit.SerifItalic, "the steps", p + new Vector2(-34, -10), 8, new Color(0.3f, 0.3f, 0.33f, 0.75f * a));
 	}
 
 	private void DrawDrive()

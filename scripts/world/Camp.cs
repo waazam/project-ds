@@ -70,6 +70,7 @@ public partial class Camp : Node3D
 		AddChild(gen);
 		BuildFireRing(gen);
 		BuildStump(gen);
+		if (!Engine.IsEditorHint() && Systems.StoryManager.Instance is not { Current: > Systems.Checkpoint.Act3DoorBoarded }) BuildStillWarm(gen);
 		_lantern = GetNodeOrNull<Node3D>(LanternPath);
 		SetProcess(_glow != null);
 	}
@@ -82,6 +83,40 @@ public partial class Camp : Node3D
 	}
 
 	// ------------------------------------------------------------------ the fire ring
+
+	/// <summary>(2026-10-24, the openings' pass) The ring isn't as cold as it looks: a thread of smoke still rising from
+	/// the ash and two embers under it, as if he'd only just left it (a day gone, by the register).</summary>
+	public CpuParticles3D Smoke { get; private set; }
+
+	private void BuildStillWarm(Node3D gen)
+	{
+		Vector3 c = FireRingLocal;
+		float gy = GroundLocal(c);
+		Smoke = new CpuParticles3D
+		{
+			Name = "AshSmoke", Amount = 24, Lifetime = 5f, Position = c + new Vector3(0.05f, gy + 0.08f, -0.03f),
+			EmissionShape = CpuParticles3D.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.04f, Direction = Vector3.Up, Spread = 6f,
+			InitialVelocityMin = 0.18f, InitialVelocityMax = 0.28f, Gravity = new Vector3(0.03f, 0.05f, 0f),
+			ScaleAmountMin = 0.5f, ScaleAmountMax = 1.6f, Mesh = new QuadMesh { Size = new Vector2(0.22f, 0.22f) },
+			ScaleAmountCurve = new Curve(),
+			MaterialOverride = new StandardMaterial3D
+			{
+				AlbedoColor = new Color(0.62f, 0.62f, 0.6f, 0.16f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
+				AlbedoTexture = SoftPuff.Texture, VertexColorUseAsAlbedo = true,
+			},
+		};
+		Smoke.ScaleAmountCurve.AddPoint(new Vector2(0f, 0.4f));
+		Smoke.ScaleAmountCurve.AddPoint(new Vector2(1f, 1.6f));
+		gen.AddChild(Smoke);
+		var k = new MeshKit();
+		k.Color = Colors.White;
+		k.Mat(new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.05f, 0.02f), EmissionEnabled = true, Emission = new Color(1f, 0.32f, 0.08f), EmissionEnergyMultiplier = 2.2f });
+		k.Blob(c + new Vector3(0.06f, gy + 0.045f, -0.02f), new Vector3(0.05f, 0.025f, 0.04f), 7301, 0.3f, true, 1f, 0.3f);
+		k.Blob(c + new Vector3(-0.08f, gy + 0.04f, 0.05f), new Vector3(0.035f, 0.02f, 0.03f), 7302, 0.3f, true, 1f, 0.3f);
+		k.CommitTo(gen, "Embers", false);
+		gen.AddChild(new OmniLight3D { Name = "EmberGlow", LightColor = new Color(1f, 0.4f, 0.12f), LightEnergy = 0.35f, OmniRange = 1.1f, ShadowEnabled = false, Position = c + new Vector3(0, gy + 0.15f, 0) });
+	}
 
 	private void BuildFireRing(Node3D gen)
 	{
