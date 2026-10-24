@@ -364,10 +364,11 @@ public partial class Playtest
 		Shot("stairs_found");
 	}
 
-	/// <summary>Act 1's three walks (STORY Rev 5, 2026-10-16), the board's flags set as the board sets them: walk 1 golden,
-	/// the trail past the overlook's fork shut (a trunk across it, and no way round it through the woods); walk 2 the fog
-	/// up, the falls' climb open, and "come." on the way back from them; walk 3 dusk, every way open, "come and see" calling
-	/// along the way, and the way back to the cabin closed by a tree that comes down in front of them, in view.</summary>
+	/// <summary>Act 1's walks (STORY Rev 5, 2026-10-16; two since 2026-10-24), the board's flags set as the board sets them:
+	/// walk 1 golden, the overlook and the falls both, the trail past the overlook's fork shut (a trunk across it, and no way
+	/// round it through the woods), "come." on the way back from the falls, and its beats (<see cref="Act1Beats"/>); then the
+	/// last walk at dusk, every way open, "come and see" calling along the way, and the way back to the cabin closed by a
+	/// tree that comes down in front of them, in view.</summary>
 	private async Task Act1ThreeWalks(CancellationToken ct)
 	{
 		var walks = World.Act1Walks.Instance;
@@ -376,8 +377,8 @@ public partial class Playtest
 		Require("the walks and the trail", walks != null && terrain != null);
 		// ---- walk 1
 		Check("walk 1 first (no board flag yet)", World.Act1Walks.Stage == 1 && atmo is not { Act1Stage: not 1 }, $"stage {World.Act1Walks.Stage}, light {atmo?.Act1Stage}");
-		Check("walk 1: trunks across the ways not open yet (the trail on past the fork, the falls' climb), and the woods round the first walled",
-			walks.GatesDown == 3 && walks.WallPieces > 20, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		Check("walk 1: the trail on past the fork shut by its trunk (the falls' climb open now: two walks), the woods round it walled",
+			walks.GatesDown == 1 && walks.WallPieces > 20 && !walks.IsClosed(World.Act1Walks.Way.FallsB), $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
 		// ---- (2026-10-23) the wayfinding: blazes, the sign past the bridge, the overlook's platform, and the pull back
 		using (Fast(3)) await _bot.WaitUntil(() => walks.BlazeCount > 0, 25, ct);
 		Check("walk 1: the way shown in the woods: blazes on the trees, the overlook's platform", walks.BlazeCount >= 30 && walks.Platform != null, $"{walks.BlazeCount} blazes, platform {walks.Platform != null}");
@@ -429,22 +430,19 @@ public partial class Playtest
 		_bot.Release();
 		terrain.TrailDistance(Player.GlobalPosition.X, Player.GlobalPosition.Z, out got);
 		Check("walk 1: nor round it through the woods", got < gate + 6f, $"got to level with {got:0} m");
-		// ---- walk 2
+		// ---- (2026-10-24) walk 1 is the overlook and the falls both; its beats
+		await Act1Beats(walks, terrain, ct);
+		// ---- back at the cabin: pinned once (the shape), out again without the second look: sent back
 		Story.SetFlag(World.Act1Walks.Stage2Flag);
 		await _bot.Frames(2, ct);
-		Check("walk 2: the falls' climb opens (its trunks gone), the trail on past the fork still shut", walks.GatesDown == 1 && walks.WallPieces > 20, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
-		var falls = walks.WayLine(World.Act1Walks.Way.FallsB);
-		Require("the falls path", falls != null && falls.Length > 40f);
-		var top = falls.At(4f, out var fd);
-		await _bot.Teleport(new Vector3(top.X, terrain.HeightAt(top.X, top.Y), top.Y), new Vector3(top.X + fd.X * 10f, 0, top.Y + fd.Y * 10f), ct);
-		using (Fast(3)) { await _bot.WaitUntilGame(() => walks.ReachedFalls, 4, ct); await _bot.WaitUntilGame(() => atmo == null || (atmo.OpenAmount < 0.45f && atmo.Act1FogAmount > 0.38f), 10, ct); }
-		Check("walk 2: at the falls, the fog rising", walks.ReachedFalls && (atmo == null || (atmo.Act1FogAmount > 0.3f && atmo.OpenAmount < 0.5f)), $"at the falls {walks.ReachedFalls}, fog {atmo?.Act1FogAmount:0.00}, open {atmo?.OpenAmount:0.00}");
-		Shot("walk2_falls");
-		var back = falls.At(falls.Length * 0.6f, out var bd);
-		await _bot.Teleport(new Vector3(back.X, terrain.HeightAt(back.X, back.Y), back.Y), new Vector3(back.X + bd.X * 10f, 0, back.Y + bd.Y * 10f), ct);
-		using (Fast(3)) await _bot.WalkFor(new Vector3(back.X + bd.X * 12f, 0, back.Y + bd.Y * 12f), 2.5, ct);
-		Check("walk 2, on the way back: one word ahead of them (\"come.\"), once", walks.ComeHeard && Story.HasFlag(World.Act1Walks.ComeFlag));
-		// ---- walk 3
+		Check("pinned once: still walk 1's ways (the trail past the fork shut)", walks.GatesDown == 1 && walks.WallPieces > 20, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		var n0 = terrain.TrailPoint(70f, out var nt);
+		await _bot.Teleport(n0, n0 + nt * 10f, ct);
+		using (Fast(3)) await _bot.WalkFor(terrain.TrailPoint(85f, out _), 3, ct);
+		await _bot.WaitUntil(() => walks.BoardNudged, 3, ct);
+		Check("out of the cabin before pinning again: the thought sends them back to the board", walks.BoardNudged);
+		Story.SetFlag(World.PhotoBoard.RepinFlag);
+		// ---- the last walk, at dusk (pinned again: the board sets it)
 		Story.SetFlag(World.Act1Walks.Stage3Flag);
 		await _bot.Frames(2, ct);
 		using (Fast(3)) await _bot.WaitUntilGame(() => walks.WallPieces == 0, 3, ct);
@@ -475,6 +473,105 @@ public partial class Playtest
 		Check("walk 3: \"come and see\", calling along the way", walks.CallsHeard > calls0, $"{walks.CallsHeard} calls");
 		Check("walk 3: dusk, the fog thick", atmo == null || (atmo.Act1Dusk > 0.6f && atmo.Act1FogAmount > 0.45f && atmo.OpenAmount < 0.1f), $"dusk {atmo?.Act1Dusk:0.00}, fog {atmo?.Act1FogAmount:0.00}, open {atmo?.OpenAmount:0.00}");
 		Shot("walk3_dusk");
+	}
+
+	/// <summary>(2026-10-24) Walk 1's beats: the poster at the lot, the shot list, the falls (the wet rock edged along, a
+	/// foot going, "come." on the way back), the doe that doesn't run, R.H.'s thermos at the overlook, the plank cracking
+	/// on the way back over the bridge, the two sets of boot prints and the register's torn-out page on the cabin's table.</summary>
+	private async Task Act1Beats(World.Act1Walks walks, ForestTerrain terrain, CancellationToken ct)
+	{
+		await _bot.WaitUntil(() => walks.Poster != null, 3, ct);
+		Check("at the lot: a missing poster over the board's map (R.H., 41, last seen Oct 25)", walks.Poster != null && walks.Poster.Text.Contains("41"));
+		if (walks.Poster?.GetParent() is Node3D poster)
+		{
+			var face = poster.GlobalPosition + poster.GlobalBasis.Z.Normalized() * 1.3f;
+			await _bot.Teleport(new Vector3(face.X, poster.GlobalPosition.Y - 1.4f, face.Z), poster.GlobalPosition, ct);
+			await _bot.Aim(poster.GlobalPosition, ct);
+			await _bot.Seconds(0.5, ct);
+			Shot("act1_poster");
+		}
+		var hub = GetTree().GetFirstNodeInGroup(World.Cabin.HubGroup) as World.Cabin;
+		Check("the assignment's shot list: one shot a walk", hub?.AssignmentSheet?.Text.Contains("Shot list") == true && hub.AssignmentSheet.Text.Contains("the falls"));
+		// the falls: up the climb beside them over the wet rock
+		var falls = walks.WayLine(World.Act1Walks.Way.FallsB);
+		var fallsA = walks.FallsLine;
+		Require("the falls path", falls != null && fallsA != null && fallsA.Length > walks.WetTo + 4f);
+		var w0 = fallsA.At(walks.WetFrom - 3f, out var wd);
+		await _bot.Teleport(new Vector3(w0.X, terrain.HeightAt(w0.X, w0.Y), w0.Y), new Vector3(w0.X + wd.X * 10f, 0, w0.Y + wd.Y * 10f), ct);
+		float slowest = 1f;
+		bool shot = false;
+		for (float sw = walks.WetFrom; sw < walks.WetTo + 2f && !walks.Slipped; sw += 3f)
+		{
+			var p = fallsA.At(sw, out _);
+			await _bot.WalkTo(new Vector3(p.X, terrain.HeightAt(p.X, p.Y), p.Y), 1.2f, ct, giveUp: 6f);
+			slowest = Mathf.Min(slowest, Player.WadeScale);
+			if (!shot) { shot = true; Shot("act1_wet_rocks"); }
+		}
+		Check("by the falls: the wet rock edged along slowly, and once a foot goes", slowest < 0.7f && walks.Slipped, $"pace {slowest:0.00}, slipped {walks.Slipped}");
+		using (Fast(3)) await _bot.WaitUntilGame(() => walks.ReachedFalls, 4, ct);
+		Check("walk 1 reaches the falls", walks.ReachedFalls);
+		Shot("walk1_falls");
+		var back = falls.At(falls.Length * 0.6f, out var bd);
+		await _bot.Teleport(new Vector3(back.X, terrain.HeightAt(back.X, back.Y), back.Y), new Vector3(back.X + bd.X * 10f, 0, back.Y + bd.Y * 10f), ct);
+		using (Fast(3)) await _bot.WalkFor(new Vector3(back.X + bd.X * 12f, 0, back.Y + bd.Y * 12f), 2.5, ct);
+		Check("walk 1, on the way back from the falls: one word ahead of them (\"come.\"), once", walks.ComeHeard && Story.HasFlag(World.Act1Walks.ComeFlag));
+		// the doe in the Ridge Path: it lifts its head and stares, turning to keep facing them; looked away from, it's gone
+		var deer = walks.StaringDeer;
+		Require("the doe on the Ridge Path", deer != null);
+		var dp = deer.GlobalPosition;
+		var ridge = walks.WayLine(World.Act1Walks.Way.Ridge);
+		ridge.Closest(new Vector2(dp.X, dp.Z), out float rs);
+		var r0 = ridge.At(Mathf.Max(0f, rs - 16f), out _);
+		var stand = new Vector3(r0.X, terrain.HeightAt(r0.X, r0.Y), r0.Y);
+		await _bot.Teleport(stand, dp, ct);
+		await _bot.Aim(dp + Vector3.Up * 1.1f, ct);
+		using (Fast(2)) await _bot.WaitUntilGame(() => deer.StaredFor > 2f, 6, ct);
+		Check("the doe doesn't run: head up, staring at them", deer.Current == Entities.Deer.State.Alert && deer.StaredFor > 1.5f && deer.Visible, $"{deer.Current}, stared {deer.StaredFor:0.0} s");
+		Shot("act1_deer_stares");
+		var side = stand + (stand - dp).Cross(Vector3.Up).Normalized() * 6f;
+		await _bot.Teleport(side, side + (side - dp), ct);
+		using (Fast(2)) await _bot.WaitUntilGame(() => !deer.Visible, 6, ct);
+		await _bot.Aim(dp + Vector3.Up * 1.1f, ct);
+		Check("looked away from and back: it's gone", !deer.Visible);
+		// the overlook: R.H.'s thermos on the platform, still warm
+		Require("the platform", walks.Platform != null);
+		var plat = walks.Platform.GlobalPosition;
+		var spur = walks.WayLine(World.Act1Walks.Way.Spur);
+		var up = spur.At(Mathf.Max(0f, spur.Length - 5f), out _);
+		await _bot.Teleport(new Vector3(up.X, terrain.HeightAt(up.X, up.Y), up.Y), plat, ct);
+		await _bot.WaitUntil(() => walks.OverlookReached && walks.Thermos != null, 3, ct);
+		Check("at the overlook: R.H.'s thermos on the platform, still warm", walks.OverlookReached && walks.Thermos != null && walks.Thermos.Text.Contains("warm"));
+		if (walks.Thermos != null) { await _bot.Aim(walks.Thermos.GlobalPosition, ct); await _bot.Seconds(0.5, ct); Shot("act1_thermos"); }
+		// back over the bridge: a plank cracks underfoot (it holds)
+		if (GetTree().GetFirstNodeInGroup("bridge_marker") is Node3D bridge)
+		{
+			terrain.TrailDistance(bridge.GlobalPosition.X, bridge.GlobalPosition.Z, out float sb);
+			var bfar = terrain.TrailPoint(sb + 8f, out _);
+			await _bot.Teleport(bfar, terrain.TrailPoint(sb - 8f, out _), ct);
+			await _bot.WalkTo(terrain.TrailPoint(sb - 7f, out _), 1f, ct, stopWhen: () => walks.PlankCracked, giveUp: 10f);
+			await _bot.Seconds(0.15, ct);
+			Shot("act1_plank_cracks");
+			Check("back over the footbridge: a plank cracks under them, and holds", walks.PlankCracked && Player.IsOnFloor());
+			await _bot.Seconds(1.5, ct);
+		}
+		// below the bridge on the way down: two sets of prints, and the register's page gone
+		await _bot.WaitUntil(() => walks.BootPrints > 0, 3, ct);
+		Check("while they were out: two sets of boot prints laid on the trail below the bridge", walks.BootPrints > 60, $"{walks.BootPrints} prints");
+		var p0 = terrain.TrailPoint(World.Act1Walks.PrintsTo - 6f, out _);
+		await _bot.Teleport(p0, terrain.TrailPoint(World.Act1Walks.PrintsTo - 30f, out _), ct);
+		await _bot.Aim(terrain.TrailPoint(World.Act1Walks.PrintsTo - 9f, out _), ct);
+		await _bot.Seconds(0.4, ct);
+		Shot("act1_boot_prints");
+		using (Fast(2)) await _bot.WalkFor(terrain.TrailPoint(World.Act1Walks.PrintsFrom + 10f, out _), 4, ct);
+		Check("walking down over them: the thought (two sets, one his)", walks.PrintsThought);
+		Check("the register's last page torn out; it lies on the cabin's table, his own name added under R.H.'s", walks.TornPage != null && walks.TornPage.Text.Contains("Cameron"));
+		if (walks.TornPage?.GetParent() is Node3D page)
+		{
+			await _bot.Teleport(page.GlobalPosition + new Vector3(0.6f, -0.74f, 0.6f), page.GlobalPosition, ct, snapToTerrain: false);
+			await _bot.Aim(page.GlobalPosition, ct);
+			await _bot.Seconds(0.5, ct);
+			Shot("act1_torn_page");
+		}
 	}
 
 	/// <summary>The dead fir with their back to it (Dan, 2026-10-13: nobody gets stuck waiting on it): stood near it

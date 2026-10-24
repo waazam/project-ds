@@ -5,7 +5,7 @@
 **Revision 5 (2026-10-16): the revised outline adopted.** Dan's revised outline (the "fourth pass" of 2026-10-15, *Dead Silent: Revised full story outline*) replaces Revision 4 as the story, with his decisions on where it met the game. What changed:
 - **Who the player is.** Cameron Webber, a young photographer, in late October 1996, shooting an assignment for a magazine. His father, Mitchell Webber, was the chief ranger at the forester station and died there in the winter of 1987 to 1988.
 - **The opening.** A drawn map of the drive, the assignment and a page on the pager replace the two black cards.
-- **Act 1 is longer.** A cabin by the lot is its hub: three walks out and back, and a backlit photo board that shows the wrongness. Voices lead the player to the stairs on the last walk.
+- **Act 1 is longer.** A cabin by the lot is its hub: two walks (since 2026-10-24: the overlook and the falls in one, then the last at dusk), and a backlit photo board that shows the wrongness. Voices lead the player to the stairs on the last walk.
 - **The title.** DEAD SILENT plays after the first climb, over the load into the Hollow. The second chapter's title plays on the first step.
 - **The cabin.** It is one cabin all game: the Act 1 hub, boarded in the Hollow in Act 5, burning around the player in Act 7, and standing burned in Act 25.
 - **Act 7 (the hybrid).** The player walks on to the cabin, is trapped by the board's fire, and breaks out with the axe (a seventh death, "Burned Alive"). Falling trees herd them up to the lookout, where the giant still paces its sky lane over the burning cabin. The walk from the lookout to the bunker stays open.
@@ -31,7 +31,7 @@ Earlier revisions:
 
 The climb's blackout carries the player from the trailhead into the Hollow, and the wendigo's burn-through carries them back.
 
-**Time.** Act 1 runs from a sunny afternoon (the first walk), into a late afternoon with the fog rising (the second), into dusk and thick fog (the third). The Hollow's woods are one night, from the wake to the giant (Acts 2 to 11). The player wakes at the lake at sunrise. From the end of Act 20 it is winter everywhere: grey snow light, dusk on the road, noon behind the snow in the lodge, and night in the storm. Act 25 is the autumn woods again.
+**Time.** Act 1 runs from a sunny afternoon (the first walk), through a late afternoon with the fog rising (back at the cabin, at the board), into dusk and thick fog (the last walk). The Hollow's woods are one night, from the wake to the giant (Acts 2 to 11). The player wakes at the lake at sunrise. From the end of Act 20 it is winter everywhere: grey snow light, dusk on the road, noon behind the snow in the lodge, and night in the storm. Act 25 is the autumn woods again.
 
 **Chapters.** The story is told in eight chapters: *Back to Nature*, *The Stairs*, *Root of the Problem*, *Dawn is Breaking*, *Ever Upward*, *The Great Door*, *Enjoy Your Stay* and *Return*. Each opens with its title alone, big over the picture, with no chapter number.
 
@@ -93,33 +93,38 @@ He chose the trailhead because he loved it as a child. The magazine wanted natur
 - **No checklist.** The album's footer keeps count of how many of the 70 things have been photographed, and the points ("N/70 found   N pts"), but never lists what's left.
 - **The player's notes.** After the prints, the album has a page of pencil notes in the photographer's own hand, a line for each thing the first time it's on film.
 - There are only 3 birds in the game (a northern cardinal, an indigo bunting and a purple finch, as on the park bird card; Dan, 2026-10-16). They are gone from Act 2 on.
-- A 4th bird, black with red eyes, is on the third walk (below).
+- A 4th bird, black with red eyes, is on the last walk (below).
 - Photographed, a bird flies off through the trees and is gone only once it is out of sight.
 
 ### The cabin
 A small old cabin stands beside the lot, rented for the shoot. It is the hub of Act 1, the only warm, safe place in it, and it is the same cabin the player will find boarded in the Hollow (Act 5), burning (Act 7) and burned (Act 25). It is one model, the same inside and out wherever it stands.
-- **Inside.** Warm light in the window. On the table: the assignment sheet (its themes, not a list of subjects: autumn light, wildlife, a place that matters) and a framed photo of two people, a man and a boy, the man's face turned away or out of the frame. On the wall: a backlit photo board, empty and glowing.
+- **Inside.** Warm light in the window. On the table: the assignment sheet (its themes: autumn light, wildlife, a place that matters; and pencilled under them a short shot list, one shot a walk: the valley from the overlook, the falls up close, the trail at last light, each ticked as it's taken) and a framed photo of two people, a man and a boy, the man's face turned away or out of the frame. On the wall: a backlit photo board, empty and glowing.
 - **The board.** Standing at it, E pins the player's photos: the best-scored prints taken since the last visit go up (up to eight, the highest stars first), filling the board. It is a display, never a list of what to take. The first visit has no pictures yet ("Nothing to pin yet." as a hint), so he goes out. The door stays open behind him as he leaves.
-- **The walks.** Act 1 is three walks, each a loop out from the cabin and back to it, then out along the third and never back. Pinning at the board after a walk moves the day on: the light and fog go to the next walk's, and the next way out opens. (Before, the next walk's way is not open: an old trunk lies across it. The walks share the trail where they overlap.)
+- **The walks.** Act 1 is two walks (2026-10-24: three was one out-and-back too many). The first is a loop out from the cabin and back to it, taking in both the overlook and the falls; the second goes out at dusk and never comes back. Pinning at the board after the first walk moves the day on, and pinning again once the shape has shown opens the last walk (before it, an old trunk lies across the trail past the overlook's fork). Pinning reads the shot list back ("The overlook. The falls. Two off the list.") and the board's light swells.
+- **The poster.** At the lot, stapled over the trailhead board's map: a missing hiker, 41, last seen at the Blackfern trailhead on October 25, a green pack and a camera round his neck. The name has run in the rain; only an R and an H are left.
 
 **The photo board.** What the board shows over Act 1:
 1. After walk 1: the pictures as taken, in good light.
 2. After walk 1, looked at again: in one frame, small and at the edge of the trees, something tall and black that wasn't there. A second frame is slightly blurred in the middle where nothing moved. Pin again (E) and look: the black shape is gone from the picture. The hum is faintly there, only in this room.
-3. After walk 2: the falls print comes out surreal and old, faded like a photograph decades old, its colour gone, and a figure stands on the rock where he once stood with someone. The two-person photo on the table has changed the same way.
-4. After walk 2, looked at again: the black shape is back, closer, in a frame he took facing the other way.
-5. Last: a picture he does not remember taking, the stairs, shot from the cabin window.
+3. Looked at again after the second pinning: the falls print comes out surreal and old, faded like a photograph decades old, its colour gone, and a figure stands on the rock where he once stood with someone. The two-person photo on the table has changed the same way.
+4. Looked at again: the black shape is back, closer, in a frame he took facing the other way.
+5. Last: a picture he does not remember taking, the stairs, shot from the cabin window; and in yet another frame the shape right up close, its shoulder filling the side of it.
+
+All of it happens in the one visit after the first walk: each change waits for him to look away and back. Out of the door after the first pinning without pinning again, a thought sends him back ("I should give those prints another look.").
 
 The black shape is only ever in the prints. It is never in the woods in Act 1.
 
 ### Walk 1: The Photo Trip
-Afternoon, clear. A normal walk in golden light, the best the woods will ever look: up the trail, over the footbridge, out to the overlook on its hill and back down the ridge path. The player photographs anything; the first of the three birds (the cardinal) is on this walk. Nothing is wrong. The only hints are sound: a distant twig snap, a bird that stops mid-song, the distant rifle. Back at the cabin he pins his best shots to the board (stages 1 and 2).
+Afternoon, clear, golden light, the best the woods will ever look. Two ways out from the trail, in either order: over the footbridge to the overlook on its hill and back down the ridge path; and off the trail before the footbridge, along the creek and up beside the falls to the rock over them (the old favourite spot where he came as a child, the place that matters), then down the hillside to the trail by the mile sign. The first and last of the three birds (the cardinal, the purple finch by the rock) are on it. The hints are sound at first: a distant twig snap, a bird that stops mid-song, the distant rifle. Then, one thing visibly wrong after another:
+- **The doe** standing in the ridge path that doesn't run: it lifts its head and stares, turning to keep facing him. Looked away from and back, it's gone.
+- **R.H.'s thermos** stood against a post on the overlook's platform, "R.H." on tape round it. Half full. Still warm.
+- **The voice.** On the way back from the falls, one word in the woods, close and ahead of him: *"come."* Deep, felt more than heard. Turning to it, there is nothing. It is said once.
+- **The prints.** On the trail below the bridge, on the way down: two sets of boot prints going out, his own and another, bigger, right beside them, step for step ("Two sets. One of them's mine.").
+- **The register.** Its last page is torn out. The page lies on the cabin's table by the assignment: R.H.'s two lines, and a third in the same hand, his own name: "Cameron, the steps".
+And two moments felt underfoot: a plank cracks and sags under him on the way back over the footbridge (it holds), and the climb beside the falls is wet rock, edged along slowly, a foot going once.
+Back at the cabin he pins his best shots to the board (stages 1 to 5, as he looks).
 
-### Walk 2: The Place That Mattered
-Late afternoon, the fog rising. The assignment asked for a place that matters. The way leads to the falls and the rock over them, the old favourite spot where he came as a child: off the trail before the footbridge, along the creek and up beside the falls, then down the hillside to the trail by the mile sign. The last of the three birds (the purple finch) sits by the rock. Mist on the water; the falls are seen in full. He shoots it for the person he lost.
-- **The voice.** On the way back, one word in the woods, close and ahead of him: *"come."* Deep, felt more than heard. Turning to it, there is nothing. It is said once.
-- Back at the board: stages 3, 4 and 5.
-
-### Walk 3: Come and See
+### The last walk: Come and See
 Dusk, thick fog. The cabin's light is gone behind him once he is a little way out; there is no going back to it.
 - **The black bird.** The fourth bird, black with red eyes, sits on a branch, its eyes catching the light. Photographing it brings a distant but harsh, loud scream: every bird vanishes, and it lunges straight at the player as it goes. Its print comes out dark, with its eyes in it.
 - **The voices.** Now they are plain: *"come and see"*, deep, many of them, from the trees and from behind. If he follows them they lead on toward the stairs. If he doesn't, they lead on anyway: fallen trunks close the other paths, each falling as the walls do below (creaking first, falling only in view). The voices stop at the stairs.
@@ -266,8 +271,14 @@ When they step outside with the cap, the rain is already over and the woods are 
 **Inside.** It is warm and safe: the hearth lit, the axe over the hearth, the assignment sheet and the two-person photo on the table. Stepping in through the door saves the player's place (**the cabin door**, a save within checkpoint 5). At the photo board, the pictures are gone. One print is left, of the stairs.
 - **The fire.** Looking at it, the print animates: its edges curl and the stairs in it begin to burn, and the fire jumps from the photo to the wall. Smoke fills the room from the ceiling down and the roof beams groan.
 - **Trapped.** Part of the roof caves in over the door, burning beams across the doorway. There is no other way out.
-- **The axe.** The axe over the hearth can now be taken (E). With it the player chops through the fallen beams in the doorway (held E, three blows) and breaks out.
-- **Too slow.** The fire gives them about forty-five seconds from the cave-in. Past that the smoke closes the view to black: "Burned Alive". Back to the cabin door.
+- **The way out** (2026-10-24, more than the one door):
+  - A second beam crashes down burning across the left of the room, cutting the front (the door, the window, a washstand and its bucket) off from the back (the stove and the axe over it).
+  - **The smoke** settles as a layer at head height. Standing up in it the eyes go (blurred, browned), they cough and slow, and in the end it takes them; crouched under it they can breathe. A wet rag from the washstand's basin over the mouth makes it come half as slowly.
+  - **The table.** Held E shoves the heavy table back (the chair goes over behind it): a way past the beam.
+  - **The hearth.** The stove has burst into the room, the flames all round the axe. The bucket of water thrown on it: a hiss, a wall of steam, and the axe can be taken (E).
+  - **The window.** The obvious way: smashed in with the axe, it is boarded across from outside ("Boarded. From the outside.").
+  - **The door.** The beams' flames rise and fall. A blow lands only while they're down; swung into them while they're up, the fire roars back up the haft. Three good blows and the doorway is clear.
+- **Too slow.** The fire gives them about two minutes from the cave-in, and the smoke comes down to the floor over the last of it. Past that, or stood up in the smoke too long, the view closes to black: "Burned Alive". Back to the cabin door.
 
 **Outside.** Out of the cabin, they turn to look back at it burning. That is **Checkpoint 6**. The cabin is sealed by the fire from here on.
 

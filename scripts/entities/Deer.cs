@@ -43,6 +43,14 @@ public partial class Deer : Node3D
 	[Export] public float BoundsPerSecond = 2.3f;
 	[Export] public float ModelScale = 1.05f;
 	[Export] public int Seed = 5;
+	/// <summary>(2026-10-24, Act 1's first walk: something visibly wrong) It doesn't run. Come near, it lifts its head and
+	/// stares, turning to keep facing them wherever they go, a shutter and all; looked away from a while and back, it's gone.
+	/// Its own saved flag (<see cref="StaredFlag"/>), not the shy doe's.</summary>
+	[Export] public bool Stares;
+	public const string StaredFlag = "act1_deer_stared";
+	/// <summary>For tests: it has stared at them, and how long (s).</summary>
+	public float StaredFor { get; private set; }
+	private float _unseenFor;
 
 	public enum State { Grazing, Alert, Fleeing, Gone }
 	public State Current { get; private set; } = State.Grazing;
@@ -100,12 +108,13 @@ public partial class Deer : Node3D
 		_terrain = GroundSnap.FindTerrain(this);
 		_yaw = GlobalRotation.Y;
 		var story = StoryManager.Instance;
+		if (Stares) { if (story != null && story.HasFlag(StaredFlag)) Vanish(); return; }
 		if (story != null && (story.HasFlag(FledFlag) || story.HasFlag(StoryManager.Flag.Photo("deer")))) Vanish();
 	}
 
 	private void OnPhotoTaken(Camera3D cam)
 	{
-		if (Current != State.Grazing || cam == null || !IsInsideTree()) return;
+		if (Stares || Current != State.Grazing || cam == null || !IsInsideTree()) return;
 		if (cam.GlobalPosition.DistanceTo(GlobalPosition) < ShutterSpookRadius) Spook();
 	}
 
@@ -115,8 +124,8 @@ public partial class Deer : Node3D
 		if (Current != State.Grazing) return;
 		Current = State.Alert;
 		_stateTime = 0f;
-		StoryManager.Instance?.SetFlag(FledFlag);
-		GD.Print("[deer] spooked");
+		StoryManager.Instance?.SetFlag(Stares ? StaredFlag : FledFlag);
+		GD.Print(Stares ? "[deer] it lifts its head and stares" : "[deer] spooked");
 	}
 
 	private void Vanish()
@@ -151,7 +160,7 @@ public partial class Deer : Node3D
 		if (_player != null && IsInstanceValid(_player))
 		{
 			float d = _player.GlobalPosition.DistanceTo(GlobalPosition);
-			if (d < SpookRadius || (_player.IsRunning && d < RunSpookRadius)) { Spook(); return; }
+			if (d < (Stares ? 26f : SpookRadius) || (_player.IsRunning && d < RunSpookRadius)) { Spook(); return; }
 		}
 		_headTimer -= dt;
 		if (_headTimer <= 0f)
@@ -206,6 +215,7 @@ public partial class Deer : Node3D
 			_legs[i].Rotation = _legs[i].Rotation.Lerp(Vector3.Zero, 1f - Mathf.Exp(-dt * 14f));
 			if (_legs[i].GetNodeOrNull<Node3D>("Lower") is { } lower) lower.Rotation = lower.Rotation.Lerp(Vector3.Zero, 1f - Mathf.Exp(-dt * 14f));
 		}
+		if (Stares) { Stare(dt); return; }
 		if (_stateTime < AlertSeconds) return;
 		// away from the player, bent a little so it doesn't run straight down the line of sight
 		Vector3 away = GlobalPosition - (_player?.GlobalPosition ?? GlobalPosition + GlobalBasis.Z);
@@ -214,6 +224,20 @@ public partial class Deer : Node3D
 		_fleeDir = away.Normalized().Rotated(Vector3.Up, _rng.RandfRange(0.25f, 0.5f) * (_rng.Randf() < 0.5f ? -1f : 1f));
 		Current = State.Fleeing;
 		_stateTime = 0f;
+	}
+
+	/// <summary>The one that doesn't run: the body turned slowly to face them, the head on them; gone once it has been out
+	/// of their view a while (never while they look).</summary>
+	private void Stare(float dt)
+	{
+		if (_player == null || !IsInstanceValid(_player)) return;
+		Vector3 to = _player.GlobalPosition - GlobalPosition;
+		float want = Mathf.Atan2(-to.X, -to.Z);
+		_yaw = Mathf.LerpAngle(_yaw, want, 1f - Mathf.Exp(-dt * 0.6f));
+		GlobalRotation = new Vector3(0, _yaw, 0);
+		if (InView()) { StaredFor += dt; _unseenFor = 0f; return; }
+		_unseenFor += dt;
+		if (StaredFor > 1.5f && _unseenFor > 2.5f) { GD.Print("[deer] looked back: it's gone"); Vanish(); }
 	}
 
 	private void Flee(float dt)

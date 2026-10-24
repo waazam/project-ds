@@ -7,16 +7,18 @@ using ProjectDS.Systems;
 namespace ProjectDS.World;
 
 /// <summary>
-/// Act 1 as three walks out from the trailhead cabin and back (STORY.md Rev 5, 2026-10-16). Pinning at the cabin's photo
-/// board moves the day on (the board sets the flags): no flag is walk 1, <see cref="Stage2Flag"/> walk 2,
-/// <see cref="Stage3Flag"/> walk 3. The light and the fog follow the walk (<see cref="ForestAtmosphere"/>).
+/// Act 1 as walks out from the trailhead cabin (STORY.md Rev 5, 2026-10-16; two walks since 2026-10-24, the owner: "make
+/// the opening acts better" - three walks out and back was one too many). Pinning at the cabin's photo board moves the
+/// day on (the board sets the flags): no flag is walk 1; <see cref="Stage2Flag"/> (the first pinning) is the time in the
+/// cabin after it, the ways as walk 1's; <see cref="Stage3Flag"/> (pinned again, once the shape has shown) the last walk,
+/// at dusk, still called walk 3 here. The light and the fog follow the stage (<see cref="ForestAtmosphere"/>).
 ///
 /// The ways (the trail and its branches, all in the terrain's data):
 /// - <b>Walk 1, the Overlook Loop</b>: up the trail from the cabin, over the footbridge, right at the fork to the
 ///   overlook on its hill, and down the Ridge Path back to the trail just past the bridge; back over it to the cabin.
-/// - <b>Walk 2, the Falls Path</b>: up the trail to the creek, left before the bridge along the bank to the foot of the
+/// - <b>Also walk 1, the Falls Path</b>: up the trail to the creek, left before the bridge along the bank to the foot of the
 ///   falls, up beside them to the rock over them, and down the hillside back to the trail by the mile sign; on down to the
-///   cabin. Before walk 2 two old trunks lie across it (at the foot of the falls, and by the mile sign).
+///   cabin. (It was walk 2's, behind two trunks; open from the start now.)
 /// - <b>Walk 3</b>: the trail on past the overlook's fork to the TRAIL CLOSED board, the dead fir and the stairs. Before walk
 ///   3 a trunk lies across the trail past the fork, and the woods either side of the way on are walled off
 ///   (<see cref="RebuildWalls"/>: nobody gets round it through the trees). The trunks that close a walk are cleared
@@ -115,6 +117,7 @@ public partial class Act1Walks : Node3D
 	{
 		if (Instance == this) Instance = null;
 		if (StoryManager.Instance is { } s) s.FlagSet -= OnFlag;
+		if (_beatsReady) ExitBeats();
 	}
 
 	public override void _Ready()
@@ -204,7 +207,6 @@ public partial class Act1Walks : Node3D
 	private static bool Open(Way w, int stage) => w switch
 	{
 		Way.North => stage >= 3,
-		Way.FallsB => stage >= 2,
 		_ => true,
 	};
 
@@ -214,13 +216,7 @@ public partial class Act1Walks : Node3D
 	{
 		// before walk 3: the trunk across the trail past the fork
 		AddGate(_trail, NorthGateAt, 1, 18f, +1, 3, 61);
-		if (_falls != null)
-		{
-			// before walk 2: a short one down across the path at the foot of the falls (the creek is right there: it lies
-			// from the bank above to the water's edge), and a big one near the trail by the mile sign
-			AddGate(_falls, FallsSplitAt + 1f, 2, 10f, +1, 2, 62);
-			AddGate(Reverse(_falls), 10f, 0, 18f, -1, 2, 63);
-		}
+		// (2026-10-24: the falls' two trunks are gone with walk 2: the falls are walk 1's)
 		// walk 3's: standing beside each way's mouth until he turns into it
 		// (each a way in from its mouth: far enough in that they're well off the trail, and still short of it, when it begins)
 		AddCloser(Way.Back, Reverse(Sub(_trail, 0f, BackCloserAt + 12f)), 12f, 1, -1, 71);
@@ -305,6 +301,7 @@ public partial class Act1Walks : Node3D
 		if (player == null) return;
 		if (_builtStage >= 3) UpdateClosers(player);
 		UpdateSounds(player, (float)delta);
+		UpdateBeats(player, (float)delta);
 	}
 
 	// ------------------------------------------------------------------ walk 3: the ways closing

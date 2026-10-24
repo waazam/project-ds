@@ -1212,13 +1212,48 @@ public partial class StoryTest : Node
 		Check("the roof caves in over the door: the beams across it", fire.CavedIn && cabin.BeamsLeft == 3);
 		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
 		Check("no way out past the beams", await RayHits(cabin.DoorwayInside - fwd * 0.9f, cabin.DoorwayInside + fwd * 1.6f, ct));
-		Check("about forty-five seconds to get out", fire.SecondsLeft is > 40f and <= 45.5f, $"{fire.SecondsLeft:0.0} s");
+		Check("about two minutes to get out", fire.SecondsLeft is > 110f and <= 120.5f, $"{fire.SecondsLeft:0.0} s");
 		Check("the player keeps control in the fire", _input.Enabled);
 		Screenshot("act7_caved_in");
+		// (2026-10-24) the way out: to the front (the second beam comes down behind), the rag and the bucket, crouched under
+		// the smoke, the table shoved, the stove put out, the axe, the window (boarded), the beams chopped as the flames drop
+		Vector3 L(Vector3 local) => cabin.ToGlobal(local);
+		Check("the axe can't be had while the stove's fire is round it", fire.AxeUse == null);
+		await WalkTo(L(CabinFireEvent.FrontSpot), 0.5f, ct, giveUp: 8f);
+		await WaitUntil(() => fire.MidBeamDown, 4, ct);
+		Check("a second beam down across the room, cutting off the stove", fire.MidBeamDown);
+		for (int i = 0; i < 4 && !_player.Crouching; i++) { _input.ScriptedCrouch = true; await Frames(3, ct); _input.ScriptedCrouch = false; await Frames(3, ct); }
+		await UseIt(fire.BasinUse, ct);
+		await UseIt(fire.BucketUse, ct);
+		Check("the rag soaked and the bucket of water taken", fire.HasRag && fire.HasBucket);
+		await WalkTo(L(CabinFireEvent.FrontSpot), 0.5f, ct, giveUp: 8f);
+		await UseIt(fire.TableUse, ct);
+		await Seconds(0.9, ct);
+		Check("the table shoved back (held E)", fire.TableShoved);
+		await WalkTo(L(CabinFireEvent.GapSpot), 0.45f, ct, giveUp: 10f);
+		await WalkTo(L(CabinFireEvent.StoveSpot), 0.45f, ct, giveUp: 10f);
+		await UseIt(fire.HearthUse, ct);
+		await Seconds(0.4, ct);
+		Check("the water thrown on the stove", fire.HearthDoused && fire.AxeUse != null);
 		await UseIt(fire.AxeUse, ct);
 		Check("the axe from over the hearth (E)", _player.Inventory.HasTool(ToolKind.Axe));
-		for (int i = 0; i < 3 && fire.BeamUse != null; i++) await UseIt(fire.BeamUse, ct);
-		Check("three held blows through the beams", fire.Blows == 3 && cabin.BeamsLeft == 0, $"blows {fire.Blows}, beams {cabin.BeamsLeft}");
+		await WalkTo(L(CabinFireEvent.GapSpot), 0.45f, ct, giveUp: 10f);
+		await WalkTo(L(CabinFireEvent.FrontSpot), 0.45f, ct, giveUp: 10f);
+		await UseIt(fire.WindowUse, ct);
+		await Seconds(0.5, ct);
+		Check("the window smashed: boarded from outside", fire.WindowSmashed);
+		Check("crouched under the smoke the whole way: never taken by it", !PlayerDeath.Dying && fire.Exposure < 0.9f, $"exposure {fire.Exposure:0.00}");
+		await WalkTo(cabin.DoorwayInside - fwd * 1.3f, 0.4f, ct, giveUp: 6f);
+		for (int i = 0; i < 6 && fire.Blows < 3 && fire.BeamUse != null; i++)
+		{
+			await WaitUntil(() => !fire.FlamesLow, 5, ct);
+			await WaitUntil(() => fire.FlamesLow, 5, ct);
+			await Aim(fire.BeamUse.GlobalPosition, ct);
+			await Press(ct, fire.BlowSeconds + 0.1);
+			await Seconds(0.3, ct);
+		}
+		Check("three blows through the beams, each as the flames dropped", fire.Blows == 3 && cabin.BeamsLeft == 0, $"blows {fire.Blows}, beams {cabin.BeamsLeft}");
+		for (int i = 0; i < 4 && _player.Crouching; i++) { _input.ScriptedCrouch = true; await Frames(3, ct); _input.ScriptedCrouch = false; await Frames(3, ct); }
 		await WalkTo(cabin.WideApproachPoint, 1.0f, ct, stopWhen: () => fire.BrokeOut && Flat(_player.GlobalPosition).DistanceTo(Flat(cabin.GlobalPosition)) > 7f, giveUp: 10f);
 		Check("out of the fire in time", fire.BrokeOut && !PlayerDeath.Dying);
 		await Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);

@@ -11,7 +11,8 @@ namespace ProjectDS.World;
 /// - <b>Walk 1</b>: nothing is wrong, only sound: a distant twig snap off in the trees behind, once, on the way up to the
 ///   bridge; and out on the overlook's paths a bird that stops mid-song, the woods hushing after it. (The far rifle is
 ///   the footbridge's, as before.)
-/// - <b>Walk 2</b>: on the way back from the falls, one word, close and ahead of him: "come." Once (a saved flag).
+/// - <b>Walk 1, from the falls</b> (walk 2's until 2026-10-24): on the way back from them, one word, close and ahead of
+///   him: "come." Once (a saved flag).
 /// - <b>Walk 3</b>: "come and see", many of them, from the trees ahead along the way to the stairs and now and then from
 ///   behind, more of them the further he goes; if he's off the way they call from the way. They stop at the stairs.
 ///   The cabin's light goes out behind him once he is a little way out.
@@ -79,12 +80,12 @@ public partial class Act1Walks
 					BirdCutOff = true;
 					CutOffSong(q, vel);
 				}
-				break;
+				goto case 2;
 			case 2:
 				if (!ReachedFalls && (_waterfall != null && IsInstanceValid(_waterfall) ? pp.DistanceTo(_waterfall.LipCenter) < 14f : Near(_falls, q, 6f, FallsSplitAt)))
 				{
 					ReachedFalls = true;
-					GD.Print("[story] Act 1 walk 2: at the falls");
+					GD.Print("[story] Act 1 walk 1: at the falls");
 				}
 				// on the way back: down the falls path's far side (or anywhere well away from the falls again), walking on
 				if (ReachedFalls && !ComeHeard && vel.Length() > 1f && (Near(_falls, q, 6f, FallsSplitAt + 45f) || AwayFromFalls(pp, 55f)))

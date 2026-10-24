@@ -27,8 +27,10 @@ public partial class StyleFx : Node
 	public static float BeatAmount => Instance?._beat ?? 0f;
 	public static int DropsOnLens => Instance?._drops.Count ?? 0;
 
-	private ShaderMaterial _lens, _red, _drips;
-	private ColorRect _lensRect, _redRect, _dripRect;
+	private ShaderMaterial _lens, _red, _drips, _smoke;
+	private ColorRect _lensRect, _redRect, _dripRect, _smokeRect;
+	/// <summary>For tests: the smoke in the eyes now (0..1).</summary>
+	public static float SmokeAmount { get; private set; }
 	private bool _off;
 
 	private sealed class Drop { public Vector2 P; public float R, Alpha = 1f, Top, Wait, Speed, Age, Life; }
@@ -44,6 +46,7 @@ public partial class StyleFx : Node
 	{
 		ProcessMode = ProcessModeEnum.Always;
 		_off = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-style") >= 0;
+		(_smoke, _smokeRect) = Layer("SmokeEyes", 7, "res://assets/shaders/smoke_eyes.gdshader");
 		(_lens, _lensRect) = Layer("Lens", 8, "res://assets/shaders/lens_blood.gdshader");
 		(_red, _redRect) = Layer("RedBeat", 9, "res://assets/shaders/red_beat.gdshader");
 		(_drips, _dripRect) = Layer("DeathDrips", 19, "res://assets/shaders/death_drips.gdshader");
@@ -61,6 +64,18 @@ public partial class StyleFx : Node
 	}
 
 	// ------------------------------------------------------------------ the calls
+
+	/// <summary>(2026-10-24, the cabin fire) Smoke in the eyes, 0..1: blurred, browned, the edges closing in. 0 clears it.</summary>
+	public static void SmokeEyes(float amount)
+	{
+		var s = Instance;
+		if (s == null || s._smoke == null) return;
+		amount = s._off ? 0f : Mathf.Clamp(amount, 0f, 1f);
+		SmokeAmount = amount;
+		s._smokeRect.Visible = amount > 0.004f;
+		s._smoke.SetShaderParameter("amount", amount);
+		s._smoke.SetShaderParameter("time_s", (float)(Time.GetTicksMsec() / 1000.0));
+	}
 
 	/// <summary>Blood hits the lens: <paramref name="drops"/> drops, the bigger the nearer (<paramref name="strength"/> 0..1).</summary>
 	public static void LensBlood(int drops, float strength = 1f)

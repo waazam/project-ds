@@ -47,8 +47,8 @@ public partial class Act1Walks
 	{
 		Way.Back or Way.Mid => (1 | 2 | 4, BlazeWhite),
 		Way.North => (4, BlazeWhite),
-		Way.Spur or Way.Ridge => (1, BlazeYellow),
-		Way.FallsA or Way.FallsB => (2, BlazeBlue),
+		Way.Spur or Way.Ridge => (1 | 2, BlazeYellow),
+		Way.FallsA or Way.FallsB => (1 | 2, BlazeBlue),
 		_ => null,
 	};
 
@@ -261,7 +261,7 @@ public partial class Act1Walks
 		sign.GlobalPosition = new Vector3(at.X, _terrain.HeightAt(at.X, at.Y) - 0.03f, at.Y);
 		// its boards facing back down the trail, to whoever comes off the bridge
 		sign.Rotation = new Vector3(0, Mathf.Atan2(dir.X, dir.Y) + Mathf.Pi, 0);   // (turned: its boards were seen from behind)
-		_blazes.Add((sign, 1));
+		_blazes.Add((sign, 1 | 2));
 	}
 
 	// ------------------------------------------------------------------ the pull back

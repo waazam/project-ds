@@ -498,23 +498,7 @@ public partial class Playtest
 		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
 		Check("no way out past them", await _bot.RayHits(cabin.DoorwayInside - fwd * 0.9f, cabin.DoorwayInside + fwd * 1.6f, ct));
 		Shot("caved_in");
-		await _bot.UseIt(fire.AxeUse, ct);
-		Check("the axe taken from over the hearth", Inv.HasTool(ToolKind.Axe));
-		// (2026-10-23) the first blow watched: drawn back over the shoulder as E is held, then into the wood
-		if (fire.BeamUse is { } bu)
-		{
-			await _bot.UseIt(bu, ct, holdOnly: true);
-			var press = _bot.Press(ct, hold: fire.BlowSeconds + 0.4);
-			await _bot.Seconds(fire.BlowSeconds * 0.85, ct);
-			Shot("chop_windup");
-			await _bot.Seconds(fire.BlowSeconds * 0.15 + 0.17, ct);
-			Shot("chop_bite");
-			await press;
-			Check("the blow: drawn back, then swung into the beams (not handed over)", HeldTool.Strikes >= 1 && fire.Blows >= 1, $"{HeldTool.Strikes} strikes, {fire.Blows} blows");
-			await _bot.Seconds(0.6, ct);
-		}
-		for (int i = 0; i < 3 && fire.BeamUse != null; i++) await _bot.UseIt(fire.BeamUse, ct);
-		Check("three held blows and the doorway is clear (the axe spent)", fire.Blows == 3 && cabin.BeamsLeft == 0 && !Inv.HasTool(ToolKind.Axe), $"blows {fire.Blows}, beams {cabin.BeamsLeft}");
+		await EscapeFire(fire, cabin, ct);
 		Check("in time", fire.SecondsLeft > 0f || fire.BrokeOut, $"{fire.SecondsLeft:0} s left");
 		// out, and turn to look back at it
 		await _bot.WalkTo(cabin.WideApproachPoint, 1.2f, ct, () => fire.BrokeOut && TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(cabin.GlobalPosition)) > 7f, giveUp: 10f);
@@ -552,6 +536,84 @@ public partial class Playtest
 		Check("the blacklight leads to both halves: arrows on the ground up the path, tree to tree, round each cache", lot is { LeadMarkCount: >= 25 }, $"{lot?.LeadMarkCount} ground arrows");
 	}
 
+	/// <summary>(2026-10-24) The way out of the fire, step by step: the second beam, the smoke stood up in and crouched
+	/// under, the bucket and the rag, the table shoved, the stove put out, the axe, the boarded window, a blow into the
+	/// flames while they're up (it does nothing), then three timed to their drop.</summary>
+	private async Task EscapeFire(CabinFireEvent fire, Cabin cabin, CancellationToken ct)
+	{
+		Vector3 L(Vector3 local) => cabin.ToGlobal(local);
+		Check("the axe can't be had yet: the stove's fire is all round it", fire.AxeUse == null && fire.HearthUse != null);
+		await _bot.WalkTo(L(CabinFireEvent.FrontSpot), 0.5f, ct, giveUp: 8f);
+		await _bot.WaitUntil(() => fire.MidBeamDown, 4, ct);
+		await _bot.Seconds(0.8, ct);
+		Check("a second beam comes down across the room behind them, cutting off the stove", fire.MidBeamDown
+			&& await _bot.RayHits(L(new Vector3(-1.0f, 0.6f, 0.2f)), L(new Vector3(-1.0f, 0.6f, -0.9f)), ct)
+			&& await _bot.RayHits(L(new Vector3(0.35f, 0.4f, 0.2f)), L(new Vector3(0.35f, 0.4f, -0.85f)), ct));
+		await _bot.Aim(L(new Vector3(-1.0f, 0.8f, -0.4f)), ct);
+		Shot("fire_mid_beam");
+		// stood up in the smoke: it takes hold; crouched under it, it lets go
+		await _bot.Crouch(false, ct);
+		using (Fast(2)) await _bot.WaitUntilGame(() => fire.Exposure > 0.3f, 6, ct);
+		Check("standing, the smoke layer's in their eyes: blurred, coughing, slowed", fire.Exposure > 0.25f && UI.StyleFx.SmokeAmount > 0.2f && Player.WadeScale < 0.95f,
+			$"exposure {fire.Exposure:0.00}, eyes {UI.StyleFx.SmokeAmount:0.00}, pace {Player.WadeScale:0.00}, layer {fire.SmokeLevelLocal:0.00} m");
+		Shot("fire_smoke_standing");
+		float e0 = fire.Exposure;
+		await _bot.Crouch(true, ct);
+		await _bot.Seconds(2.0, ct);
+		Check("crouched under it, it eases", fire.Exposure < e0 - 0.2f, $"{e0:0.00} -> {fire.Exposure:0.00}");
+		Shot("fire_smoke_crouched");
+		// the bucket and the rag by the door
+		await _bot.UseIt(fire.BasinUse, ct);
+		Check("a wet rag over the mouth", fire.HasRag);
+		await _bot.UseIt(fire.BucketUse, ct);
+		Check("the bucket of water taken", fire.HasBucket);
+		Shot("fire_bucket");
+		// the table shoved back: the way past the beam
+		await _bot.WalkTo(L(CabinFireEvent.FrontSpot), 0.5f, ct, giveUp: 8f);
+		await _bot.UseIt(fire.TableUse, ct);
+		await _bot.Seconds(0.9, ct);
+		Check("held E shoves the table back: a way opens past the beam", fire.TableShoved
+			&& !await _bot.RayHits(L(new Vector3(0.35f, 0.4f, 0.2f)), L(new Vector3(0.35f, 0.4f, -0.85f)), ct));
+		Shot("fire_table_shoved");
+		await _bot.WalkTo(L(CabinFireEvent.GapSpot), 0.45f, ct, giveUp: 10f);
+		await _bot.WalkTo(L(CabinFireEvent.StoveSpot), 0.45f, ct, giveUp: 10f);
+		Check("round behind the beam to the stove", TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(L(CabinFireEvent.StoveSpot))) < 0.8f, $"{cabin.ToLocal(Player.GlobalPosition)}");
+		await _bot.UseIt(fire.HearthUse, ct);
+		await _bot.Seconds(0.5, ct);
+		Check("the water on the stove: the flames round the axe out", fire.HearthDoused && fire.AxeUse != null);
+		Shot("fire_hearth_doused");
+		await _bot.UseIt(fire.AxeUse, ct);
+		Check("the axe taken from over the hearth", Inv.HasTool(ToolKind.Axe));
+		// back to the front, the window first: boarded from outside
+		await _bot.WalkTo(L(CabinFireEvent.GapSpot), 0.45f, ct, giveUp: 10f);
+		await _bot.WalkTo(L(CabinFireEvent.FrontSpot), 0.45f, ct, giveUp: 10f);
+		await _bot.UseIt(fire.WindowUse, ct);
+		await _bot.Seconds(0.6, ct);
+		Check("the window smashed in: boarded over from outside", fire.WindowSmashed);
+		Shot("fire_window_boarded");
+		// the door: a blow into the flames while they're up does nothing
+		var bu = fire.BeamUse;
+		Require("the beams' E", bu != null);
+		await _bot.UseIt(bu, ct, holdOnly: true);
+		using (Fast(2)) { await _bot.WaitUntilGame(() => fire.FlamesLow, 5, ct); await _bot.WaitUntilGame(() => !fire.FlamesLow, 5, ct); }
+		await _bot.Press(ct, hold: fire.BlowSeconds + 0.1);
+		await _bot.Seconds(0.3, ct);
+		Check("swung while the flames are up: the fire roars back, no blow lands", fire.FlaredBlows >= 1 && fire.Blows == 0, $"flared {fire.FlaredBlows}, blows {fire.Blows}");
+		// three timed to the drop (the first watched: drawn back, then the bite)
+		for (int i = 0; i < 6 && fire.Blows < 3 && fire.BeamUse != null; i++)
+		{
+			using (Fast(2)) { await _bot.WaitUntilGame(() => !fire.FlamesLow, 5, ct); await _bot.WaitUntilGame(() => fire.FlamesLow, 5, ct); }
+			await _bot.Aim(fire.BeamUse.GlobalPosition, ct);
+			var press = _bot.Press(ct, hold: fire.BlowSeconds + 0.1);
+			if (i == 0) { await _bot.Seconds(fire.BlowSeconds * 0.8, ct); Shot("chop_windup"); await _bot.Seconds(fire.BlowSeconds * 0.2 + 0.17, ct); Shot("chop_bite"); }
+			await press;
+			await _bot.Seconds(0.35, ct);
+		}
+		Check("the blow: drawn back, then swung into the beams (not handed over)", HeldTool.Strikes >= 2 && fire.Blows >= 1, $"{HeldTool.Strikes} strikes, {fire.Blows} blows");
+		Check("three blows timed to the flames dropping and the doorway is clear (the axe spent)", fire.Blows == 3 && cabin.BeamsLeft == 0 && !Inv.HasTool(ToolKind.Axe), $"blows {fire.Blows}, beams {cabin.BeamsLeft}");
+		await _bot.Crouch(false, ct);
+	}
+
 	/// <summary>To the board and looking at its one print until it starts.</summary>
 	private async Task LookAtPrint(Cabin cabin, CabinFireEvent fire, CancellationToken ct)
 	{
@@ -587,7 +649,7 @@ public partial class Playtest
 		Check("trapped: no axe, the beams across the door", fire.CavedIn && !Inv.HasTool(ToolKind.Axe));
 		_s.ExpectReload = true;
 		using (Fast(4)) await _bot.WaitUntil(() => PlayerDeath.Dying, 30, ct);
-		Check("too slow: the smoke closes the view", PlayerDeath.Dying);
+		Check("stood up in the smoke layer: it takes them (Burned Alive)", PlayerDeath.Dying && fire.Exposure >= 0.99f, $"exposure {fire.Exposure:0.00}");
 		await ExpectReload(ct, 40);
 	}
 

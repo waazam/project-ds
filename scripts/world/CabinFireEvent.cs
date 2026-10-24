@@ -20,8 +20,12 @@ namespace ProjectDS.World;
 /// stairs in it begin to burn, and it burns away; the fire jumps to the wall and spreads up it to the roof; smoke fills
 /// the room from the ceiling down; the beams groan.</item>
 /// <item><b>Trapped.</b> <see cref="CaveInAfter"/> seconds after the jump part of the roof caves in over the door: burning
-/// beams across the doorway, no other way out. The axe over the hearth can be taken now (E).</item>
-/// <item><b>The axe.</b> Held E on the beams, three blows, each knocking one away; then the doorway is clear.</item>
+/// beams across the doorway, no other way out.</item>
+/// <item><b>The way out</b> (2026-10-24; CabinFireEvent.Escape.cs): a second beam cuts the room in two, the table shoved
+/// back opens a way past it, the stove's fire round the axe put out with the bucket, a wet rag, the smoke layer stayed
+/// under, the window smashed in on boards, then the beams chopped through in time with their flames dropping.</item>
+/// <item><b>The axe.</b> Held E on the beams, three blows landed while the flames are down, each knocking one away; then
+/// the doorway is clear.</item>
 /// <item><b>Too slow.</b> <see cref="SecondsToEscape"/> from the cave-in the smoke closes the view to black: "Burned
 /// Alive", and back to the cabin door (<see cref="PlayerDeath"/>).</item>
 /// <item><b>Outside.</b> Out of the door the whole cabin goes up, sealed by the fire; turning to look back at it is
@@ -52,9 +56,9 @@ public partial class CabinFireEvent : Node
 	/// <summary>From the fire jumping to the wall to the roof caving in over the door.</summary>
 	[Export] public float CaveInAfter = 13f;
 	/// <summary>From the cave-in to the smoke closing the view (STORY.md: about forty-five seconds).</summary>
-	[Export] public float SecondsToEscape = 45f;
-	/// <summary>Each blow of the axe is a hold of E this long.</summary>
-	[Export] public float BlowSeconds = 1.1f;
+	[Export] public float SecondsToEscape = 120f;
+	/// <summary>Each blow of the axe is a hold of E this long (short: it's timed to the flames dropping).</summary>
+	[Export] public float BlowSeconds = 0.4f;
 	/// <summary>Out of the door, looking back: or this long after, or this far away, it is checkpoint 6 anyway.</summary>
 	[Export] public float LookBackFallbackSeconds = 12f;
 	[Export] public float LookBackFallbackMetres = 22f;
@@ -104,6 +108,7 @@ public partial class CabinFireEvent : Node
 		if (StoryManager.Instance is { } s) { s.FlagSet -= OnFlag; s.CheckpointReached -= OnCheckpoint; }
 		// the post material is a shared resource: never leave the heat tint baked into it
 		_postMat?.SetShaderParameter("shadow_tint", _postBaseTint);
+		if (_caveAt >= 0) UI.StyleFx.SmokeEyes(0f);   // (an autoload: it outlives the level)
 	}
 
 	// ------------------------------------------------------------------ restore, and the cabin carried ahead
@@ -208,7 +213,7 @@ public partial class CabinFireEvent : Node
 			case Stage.CavedIn:
 			case Stage.Cleared:
 				if (_stage == Stage.Cleared && local.Z > _cabin.Depth * 0.5f + 0.5f) { BreakOut(); break; }
-				UpdateChop();
+				UpdateEscape((float)delta);
 				if (_clock >= _deadline && !PlayerDeath.Dying) { _ = Cutscene.Run(this, Die, lockInput: true); _deadline = double.MaxValue; }
 				break;
 			case Stage.Out:
@@ -401,13 +406,8 @@ public partial class CabinFireEvent : Node
 			_beamFires[b] = f;
 			Ramp(f, 0.75f, 1.2f);
 		}
-		// the axe over the hearth: E takes it now
-		if (_cabin.HearthAxe is { } axe && IsInstanceValid(axe))
-		{
-			_axeUse = new PickupInteractable { Name = "TakeAxe", Prompt = "Take the axe", MaxDistance = 2.8f, PickRadius = 0.35f };
-			_axeUse.Interacted += TakeAxe;
-			axe.AddChild(_axeUse);
-		}
+		// the way out (the axe over the hearth is behind the stove's fire now: CabinFireEvent.Escape.cs)
+		BuildEscape();
 		_chop = new BeamChop { Name = "ChopBeams", Owner_ = this, MaxDistance = 2.6f, PickRadius = 0.6f, Position = new Vector3(0, 1.0f, _cabin.Depth * 0.5f - 0.8f), HighlightRoot = new NodePath("NoHighlight") };
 		_cabin.AddChild(_chop);
 		GD.Print($"[story] Act 7: the roof caves in over the door ({SecondsToEscape:0} s to get out)");
@@ -434,27 +434,6 @@ public partial class CabinFireEvent : Node
 		_axeUse.QueueFree();
 		_axeUse = null;
 		GD.Print("[story] Act 7: the axe taken from over the hearth");
-	}
-
-	private void UpdateChop()
-	{
-		if (_chop == null || !IsInstanceValid(_chop)) return;
-		bool axe = _player.Inventory?.HasTool(ToolKind.Axe) == true;
-		_chop.HoldSeconds = axe ? BlowSeconds : 0f;
-		// (2026-10-23) the axe drawn back over the shoulder as E is held, swung on the blow (HeldTool.Chop)
-		if (axe && _chop.HoldProgress > 0f && _player.Inventory is { } inv && inv.InHand != ToolKind.Axe) inv.Select(ToolKind.Axe);
-		if (PlayerHands.Instance?.Tool is { } tool) tool.WindUp = axe && tool.Shown == ToolKind.Axe && _chop.HoldProgress > 0f ? _chop.HoldProgress : 0f;
-	}
-
-	/// <summary>One blow: a beam knocked away; the third clears the doorway (the axe is spent).</summary>
-	private void Blow(PlayerController p)
-	{
-		if (_stage != Stage.CavedIn || p.Inventory?.HasTool(ToolKind.Axe) != true) return;
-		Blows++;
-		// the swing (it bites 0.13 s on: the beam gives then, with the thud and the chips)
-		if (PlayerHands.Instance?.Tool is { Shown: ToolKind.Axe } tool) { tool.WindUp = 0f; tool.Strike(); }
-		else HeldUse.Do(p, ToolKind.Axe, _cabin.DoorwayInside, 0.7f);
-		GetTree().CreateTimer(0.13).Timeout += () => { if (IsInstanceValid(this)) Bite(p); };
 	}
 
 	/// <summary>The blade in the wood: the thud, the chips, the beam knocked away; the third clears the doorway.</summary>
@@ -502,14 +481,15 @@ public partial class CabinFireEvent : Node
 		public CabinFireEvent Owner_;
 		public override string GetPrompt(PlayerController player)
 		{
-			bool axe = player?.Inventory?.HasTool(ToolKind.Axe) == true;
+			bool axe = player?.Inventory?.HasTool(ToolKind.Axe) == true && Owner_.BeamsChoppable;
 			HoldSeconds = axe ? Owner_.BlowSeconds : 0f;
 			if (!axe) return "Burning beams across the door.";
-			return HoldProgress > 0f ? $"Chopping... {HoldProgress * 100f:0}%" : "Chop through the beams";
+			if (HoldProgress > 0f) return "Swing...";
+			return Owner_.FlamesLow ? "Chop now - the flames are down" : "Wait for the flames to drop";
 		}
 		public override void Interact(PlayerController player)
 		{
-			Owner_.Blow(player);
+			if (player?.Inventory?.HasTool(ToolKind.Axe) == true && Owner_.BeamsChoppable) Owner_.Blow(player);
 			base.Interact(player);
 		}
 	}
@@ -540,9 +520,13 @@ public partial class CabinFireEvent : Node
 		}
 		float top = _cabin.WallHeight + 1.25f;
 		// down from the roof to above the head by the cave-in, then down to the floor by the time they run out
+		// (2026-10-24) after the cave-in it settles as a layer at head height (crouch under it), and only in the last quarter
+		// of the time comes on down to the floor
+		float since = (float)(_clock - _caveAt), last = Mathf.Clamp((since / SecondsToEscape - 0.75f) / 0.25f, 0f, 1f);
 		float level = _caveAt < 0
 			? Mathf.Lerp(top, 1.75f, Mathf.Clamp((float)((_clock - _fireAt) / CaveInAfter), 0f, 1f))
-			: Mathf.Lerp(1.75f, 0.3f, Mathf.Clamp((float)((_clock - _caveAt) / SecondsToEscape), 0f, 1f));
+			: Mathf.Lerp(Mathf.Lerp(1.75f, SmokeLayer, Mathf.Clamp(since / 6f, 0f, 1f)), 0.3f, last);
+		SmokeLevelLocal = level;
 		float thick = _caveAt < 0 ? Mathf.Clamp((float)((_clock - _fireAt) / CaveInAfter), 0.2f, 1f) : 1f + Mathf.Clamp((float)((_clock - _caveAt) / SecondsToEscape), 0f, 1f);
 		for (int i = 0; i < _smoke.Count; i++)
 		{
@@ -556,7 +540,7 @@ public partial class CabinFireEvent : Node
 		if (_caveAt >= 0 && StoryBeat.Fader(this) is { } fader && !PlayerDeath.Dying)
 		{
 			float u = Mathf.Clamp((float)((_clock - _caveAt) / SecondsToEscape), 0f, 1f);
-			float want = 0.12f * u + 0.6f * Mathf.Pow(Mathf.Clamp((u - 0.6f) / 0.4f, 0f, 1f), 1.6f);
+			float want = 0.08f * u + 0.6f * Mathf.Pow(Mathf.Clamp((u - 0.75f) / 0.25f, 0f, 1f), 1.6f);
 			_fade = Mathf.MoveToward(_fade, want, (float)GetProcessDeltaTime() * 0.4f);
 			fader.BlackAlpha = _fade;
 		}
@@ -587,6 +571,7 @@ public partial class CabinFireEvent : Node
 		if (_axeUse != null && IsInstanceValid(_axeUse)) _axeUse.QueueFree();
 		if (_chop != null && IsInstanceValid(_chop)) _chop.QueueFree();
 		_axeUse = null; _chop = null;
+		EndEscape();
 	}
 
 	/// <summary>Out through the door: the clock stops, the view clears, and the whole cabin goes up behind them.</summary>

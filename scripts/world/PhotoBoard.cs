@@ -57,6 +57,9 @@ public partial class PhotoBoard : Node3D
 	public const string ShapeFlag = "act1_board_shape";
 	/// <summary>Pinned again after the shape: it's gone, and the room hums.</summary>
 	public const string RepinFlag = "act1_board_repinned";
+	/// <summary>(2026-10-24, two walks) Looked away from after the repin and back: the falls print decades old, the framed
+	/// photo changed (stage 3).</summary>
+	public const string AgedFlag = "act1_board_aged";
 	/// <summary>Stage 4 seen: the shape closer.</summary>
 	public const string CloserFlag = "act1_board_closer";
 	/// <summary>Stage 5 seen: the stairs print.</summary>
@@ -103,7 +106,7 @@ public partial class PhotoBoard : Node3D
 	/// <summary>(Act 1) which photo (album number) is in each slot, and the picture shown for it (after the darkroom).</summary>
 	private readonly PhotoLog.Photo[] _slotPhoto = new PhotoLog.Photo[8];
 	private readonly Dictionary<int, Texture2D> _shown = new();
-	private int _shapePhoto = -1, _blurPhoto = -1, _fallsPhoto = -1, _closerPhoto = -1;
+	private int _shapePhoto = -1, _blurPhoto = -1, _fallsPhoto = -1, _closerPhoto = -1, _closestPhoto = -1;
 
 	/// <summary>The board's light: the panel glowing and its spill on the wall. Off: a dull grey panel.</summary>
 	public bool GlowOn
@@ -324,6 +327,8 @@ public partial class PhotoBoard : Node3D
 			if (n == 2) Story?.SetFlag(Stage3Flag);
 			_seenFor = 0f;
 			_awayFor = 0f;
+			Pinned?.Invoke(n);
+			PulseGlow();
 			return;
 		}
 		if (Stage == 2 && !Has(RepinFlag))
@@ -331,11 +336,33 @@ public partial class PhotoBoard : Node3D
 			// pinned again: the black shape is gone from the picture, and the room hums
 			Story?.SetFlag(RepinFlag);
 			Audio.AudioDirector.OneShot(this, "paper_rustle", 3, GlobalPosition + GlobalBasis.Z * 0.2f, -12f, "Events", 2f, 0.08f);
-			GD.Print("[story] Act 1: the board pinned again - the shape is gone; the hum");
+			GD.Print("[story] Act 1: the board pinned again - the shape is gone; the hum; the last walk opens");
 			Restore();
+			// (2026-10-24: Act 1 is two walks now) the pinning again is what sends him out the last time, at dusk
+			Story?.SetFlag(Stage3Flag);
+			_seenFor = 0f;
+			_awayFor = 0f;
 			return;
 		}
 		_ = UI.Subtitle.Instance?.Show("Nothing to pin yet.", 0.4f, 2.4f, 0.8f);
+	}
+
+	/// <summary>Raised on a pinning of new prints (its number, 1 on).</summary>
+	public event Action<int> Pinned;
+
+	/// <summary>The pinning felt: the board's light swells and settles.</summary>
+	private void PulseGlow()
+	{
+		if (_panelMat == null || !_glowOn) return;
+		var tw = CreateTween();
+		tw.TweenProperty(_panelMat, "emission_energy_multiplier", 1.9f, 0.18f).SetTrans(Tween.TransitionType.Sine);
+		tw.TweenProperty(_panelMat, "emission_energy_multiplier", 0.85f, 0.9f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		if (_glow != null)
+		{
+			var t2 = CreateTween();
+			t2.TweenProperty(_glow, "light_energy", 0.85f, 0.18f);
+			t2.TweenProperty(_glow, "light_energy", 0.3f, 0.9f).SetEase(Tween.EaseType.Out);
+		}
 	}
 
 	/// <summary>Rebuilds the board from the saved flags and the album (on load, and after every change).</summary>
@@ -361,20 +388,28 @@ public partial class PhotoBoard : Node3D
 				_shapePhoto = order.Count > 0 ? order[0].Number : -1;
 				_blurPhoto = order.Count > 1 ? order[1].Number : -1;
 			}
-			if (n == 2)
+			// (2026-10-24) one walk out before the last now: the falls are walk 1's, so the falls print and the shape's later
+			// frames come from the first pinning (a second, from an old save, picks them again from its own)
+			if (n == 1 || n == 2)
 			{
 				// the falls print (the best of the falls, else the best of the walk), and the shape back in the print taken
 				// furthest from it (out along the way, as against back: facing the other way)
 				var falls = best.Where(p => p.SubjectId == "waterfall").OrderByDescending(p => p.Total).FirstOrDefault() ?? best.FirstOrDefault();
 				_fallsPhoto = falls?.Number ?? -1;
-				var other = best.Where(p => p != falls).OrderByDescending(p => Mathf.Abs(p.Number - _fallsPhoto)).FirstOrDefault()
+				var other = best.Where(p => p != falls && p.Number != _shapePhoto).OrderByDescending(p => Mathf.Abs(p.Number - _fallsPhoto)).FirstOrDefault()
 					?? _slotPhoto.FirstOrDefault(p => p != null && p != falls);
 				_closerPhoto = other?.Number ?? -1;
+				// the shape's last frame: yet another print, right up close in it
+				var last = best.Where(p => p != falls && p != other && p.Number != _shapePhoto && p.Number != _blurPhoto).OrderByDescending(p => p.Number).FirstOrDefault()
+					?? best.FirstOrDefault(p => p != falls && p != other);
+				_closestPhoto = last?.Number ?? -1;
 			}
 			after = upto;
 			lastBest = best;
 		}
-		int stage = pins.Count == 0 ? 0 : pins.Count == 1 ? (Has(ShapeFlag) ? 2 : 1) : (Has(StairsFlag) ? 5 : Has(CloserFlag) ? 4 : 3);
+		// (2026-10-24, two walks) after the one pinning: the shape (2), pinned again (the walk at dusk opens), looked away
+		// from and back: the falls print aged (3), then the shape closer (4), then the stairs and the shape right up close (5)
+		int stage = pins.Count == 0 ? 0 : pins.Count == 1 && !Has(AgedFlag) ? (Has(ShapeFlag) ? 2 : 1) : (Has(StairsFlag) ? 5 : Has(CloserFlag) ? 4 : 3);
 		bool changedStage = stage != Stage;
 		Stage = stage;
 
@@ -388,7 +423,7 @@ public partial class PhotoBoard : Node3D
 			PinPrint(Picture(p), Slots[i], SlotTilt[i], $"Print{i}");
 		}
 		if (Stage >= 5) StairsPrint = PinPrint(StairsPrintTexture, StairsSlot, -7f, "StairsPrint", 0.003f);
-		if (OwnerCabin is { } cabin) cabin.SetFramedPhotoChanged(pins.Count >= 2);
+		if (OwnerCabin is { } cabin) cabin.SetFramedPhotoChanged(Stage >= 3);
 		UpdateHum();
 		if (changedStage) StageChanged?.Invoke(Stage);
 	}
@@ -400,11 +435,13 @@ public partial class PhotoBoard : Node3D
 		bool blur = p.Number == _blurPhoto && Has(ShapeFlag);
 		bool falls = p.Number == _fallsPhoto && Stage >= 3;
 		bool closer = p.Number == _closerPhoto && Stage >= 4 && !falls;
-		if (!shape && !blur && !falls && !closer) return ImageTexture.CreateFromImage(Card(Copy(p.Texture)));
+		bool closest = p.Number == _closestPhoto && Stage >= 5 && !falls && !closer;
+		if (!shape && !blur && !falls && !closer && !closest) return ImageTexture.CreateFromImage(Card(Copy(p.Texture)));
 		var img = Copy(p.Texture);
 		if (blur) img = BlurMiddle(img);
 		if (shape) img = WithShape(img, new Vector2(0.93f, 0.68f), 0.24f, 0.35f);   // small, at the edge of the trees
 		if (closer) img = WithShape(img, new Vector2(0.16f, 0.97f), 0.62f, 0.08f);  // nearer, at the other edge
+		if (closest) img = WithShape(img, new Vector2(0.78f, 1.25f), 1.15f, 0.02f); // right up close: its shoulder filling a side
 		if (falls) img = Aged(img, p.Number, true, new Vector2(0.5f, 0.74f), 0.3f);
 		return ImageTexture.CreateFromImage(Card(img));
 	}
@@ -443,7 +480,7 @@ public partial class PhotoBoard : Node3D
 	{
 		if (Mode != BoardMode.Act1 || !_restored || Engine.IsEditorHint()) return;
 		// only the looks that change it: after the first pinning (to stage 2), after the second (to 4, then 5)
-		bool waiting = (Stage == 1) || (Stage == 3) || (Stage == 4);
+		bool waiting = (Stage == 1) || (Stage == 2 && Has(RepinFlag)) || (Stage == 3) || (Stage == 4);
 		if (!waiting) return;
 		float dt = (float)delta;
 		if (Seen()) { _seenFor += dt; _awayFor = 0f; return; }
@@ -451,7 +488,7 @@ public partial class PhotoBoard : Node3D
 		if (_seenFor < SeenSeconds || _awayFor < AwaySeconds) return;
 		_seenFor = 0f;
 		_awayFor = 0f;
-		string flag = Stage == 1 ? ShapeFlag : Stage == 3 ? CloserFlag : StairsFlag;
+		string flag = Stage == 1 ? ShapeFlag : Stage == 2 ? AgedFlag : Stage == 3 ? CloserFlag : StairsFlag;
 		GD.Print($"[story] Act 1: the board changed while unseen ({flag})");
 		Story?.SetFlag(flag);
 		Restore();
