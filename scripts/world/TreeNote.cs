@@ -123,7 +123,7 @@ public partial class TreeNote : Node3D
 		if (Arrow)
 		{
 			float y = NoteHeight;
-			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.36f, 0.48f, UvInk.Arrow(rng.RandiRange(0, 2)), UvInk.Cyan, 1.9f, false, 0f, ArrowTurn);
+			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.5f, 0.66f, UvInk.Arrow(rng.RandiRange(0, 2)), UvInk.Cyan, 1.9f, false, 0f, ArrowTurn);
 			_sheetLocal = post * (new Vector3(Mathf.Sin(MarkAngle), 0, Mathf.Cos(MarkAngle)) * (rAt(y) + 0.02f) + Vector3.Up * y);
 			if (Trace || Notch) BuildTrace(post, rAt(y - 0.42f), y - 0.42f, rng, smear: Trace);
 		}

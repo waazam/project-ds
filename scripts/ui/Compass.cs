@@ -39,6 +39,8 @@ public partial class Compass : CanvasLayer
 
 	/// <summary>For the autotest: whether the compass ribbon is currently drawn.</summary>
 	public bool ShowingCompass => _draw?.Visible ?? false;
+	/// <summary>For tests: how far faded in it is (0..1).</summary>
+	public float Presence => _presence;
 
 	private Control _draw;
 	private PlayerController _player;
@@ -105,7 +107,9 @@ public partial class Compass : CanvasLayer
 		_lastObjective = obj;
 		if (!_wasShown) _wantedUntil = _clock + 6.0;
 		_wasShown = true;
-		bool wanted = !HudPresence.Contextual || HudPresence.StillFor(this, delta) > 1.3f || _clock < _wantedUntil || _jitter > 0.1f || Dead;
+		// (2026-10-23, the owner: "after you pick it up, it disappears, should be on the top of the screen the whole time") always
+		// up once carried; it faded out whenever they walked (the contextual HUD), and read as lost
+		bool wanted = true;
 		_presence = HudPresence.Ease(_presence, wanted, delta);
 		_draw.Modulate = new Color(1, 1, 1, _presence);
 		Dead = Systems.StoryManager.Instance?.CompassDead ?? false;

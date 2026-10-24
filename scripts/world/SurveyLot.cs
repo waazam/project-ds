@@ -37,6 +37,9 @@ public partial class SurveyLot : Node3D
 	[Export] public float[] BranchFractions = { 0.45f, 0.5f };
 	[Export] public int TreesPerTrail = 7;
 	[Export] public float StepMin = 11f, StepMax = 15f;
+	/// <summary>(2026-10-23, the owner: "finding the key to the bunker is way too hard I looked everywhere and couldnt find it.
+	/// add more blacklight clues") Decoy trees round the trails (off: they only hid the real ones).</summary>
+	[Export] public bool DecoyTrees = false;
 	/// <summary>For tests: the decoy trees, and how many UV marks lie on the ground (the footprints separately).</summary>
 	public IReadOnlyList<TreeNote> Decoys => _decoys;
 	private readonly List<TreeNote> _decoys = new();
@@ -284,7 +287,12 @@ public partial class SurveyLot : Node3D
 		AddChild(cc);
 		cc.GlobalPosition = cachePos;
 
+		// the way in the ink on the ground: up the path to the turn, and tree to tree to the cache (LeadMarks)
+		LeadMarks(terrain, piece, branchS, at, cachePos);
+
 		// decoys: two by the start, one by the end, marks that aren't his
+		if (DecoyTrees)
+		{
 		var spots = new List<(Vector3 near, float rMin, float rMax)> { (at[0], 5f, 9f), (at[1], 5f, 9f), (at[^1], 5f, 8f) };
 		int dn = 0;
 		foreach (var (near, rMin, rMax) in spots)
@@ -309,6 +317,7 @@ public partial class SurveyLot : Node3D
 				dn++;
 				break;
 			}
+		}
 		}
 		// a few marks on the ground round the start, well apart
 		var marks = new List<Vector3>();
@@ -363,6 +372,55 @@ public partial class SurveyLot : Node3D
 
 	// ------------------------------------------------------------------ the ground
 
+	/// <summary>(2026-10-23, more blacklight clues) The way to a cache drawn on the ground in the ink, so the beam finds it:
+	/// arrows down the middle of the path for the last 36 m before the turn (pointing on along it), a big one on the turn
+	/// itself pointing off into the woods, then a line of arrows every few metres from the path to the first tree and tree to
+	/// tree to the cache, and a ring of them round the cache pointing in. The trees' own arrows still say which way.</summary>
+	private void LeadMarks(ForestTerrain terrain, int piece, float branchS, List<Vector3> at, Vector3 cachePos)
+	{
+		var path = new List<Transform3D>();
+		var line = new List<Transform3D>();
+		Transform3D Mark(Vector3 p, Vector3 dir)
+		{
+			p.Y = terrain.HeightAt(p.X, p.Z);
+			// (the mask's top lies toward the decal's -Z: turned half round, it points the way)
+			var b = GroundBasis(terrain, p, Mathf.Atan2(dir.X, dir.Z) + Mathf.Pi);
+			return new Transform3D(b, p + b.Y * 0.02f);
+		}
+		for (float s = branchS - 36f; s < branchS - 2f; s += 4f)
+		{
+			Vector3 p = terrain.TrailPoint(s, out Vector3 t);
+			path.Add(Mark(p, Flat(t).Normalized()));
+		}
+		Vector3 turn = terrain.TrailPoint(branchS, out _);
+		var big = new List<Transform3D> { Mark(turn, Flat(at[0] - turn).Normalized()) };
+		var stops = new List<Vector3> { turn };
+		stops.AddRange(at);
+		stops.Add(cachePos);
+		for (int i = 0; i + 1 < stops.Count; i++)
+		{
+			Vector3 a = stops[i], b = stops[i + 1], d = Flat(b - a);
+			float len = d.Length();
+			if (len < 0.5f) continue;
+			d /= len;
+			for (float x = 1.6f; x < len - 1.2f; x += 2f) line.Add(Mark(a + d * x, d));
+		}
+		var ring = new List<Transform3D>();
+		for (int k = 0; k < 8; k++)
+		{
+			float ang = k / 8f * Mathf.Tau;
+			Vector3 o = new(Mathf.Cos(ang), 0, Mathf.Sin(ang));
+			ring.Add(Mark(cachePos + o * 1.7f, -o));
+		}
+		UvInk.Scatter(this, $"LeadPath{piece}", path, new Vector2(0.7f, 0.92f), UvInk.Arrow(1), UvInk.Green, 2.4f);
+		UvInk.Scatter(this, $"LeadTurn{piece}", big, new Vector2(1.4f, 1.85f), UvInk.Arrow(0), UvInk.Green, 2.6f);
+		UvInk.Scatter(this, $"LeadLine{piece}", line, new Vector2(0.6f, 0.8f), UvInk.Arrow(2), UvInk.Cyan, 2.4f);
+		UvInk.Scatter(this, $"LeadRing{piece}", ring, new Vector2(0.55f, 0.72f), UvInk.Arrow(1), UvInk.Pale, 2.4f);
+		LeadMarkCount += path.Count + big.Count + line.Count + ring.Count;
+	}
+	/// <summary>For tests: the arrows laid on the ground leading to the caches.</summary>
+	public int LeadMarkCount { get; private set; }
+
 	/// <summary>Lies flat on the ground's slope there.</summary>
 	private static Basis GroundBasis(ForestTerrain terrain, Vector3 p, float yaw)
 	{
@@ -406,7 +464,8 @@ public partial class SurveyLot : Node3D
 			float wander = 0.7f * Mathf.Sin(s * 0.09f) + 0.25f * Mathf.Sin(s * 0.31f + 1f);
 			Vector3 at = p + side * (wander + (l ? -half : half));
 			at.Y = terrain.HeightAt(at.X, at.Z);
-			float yaw = Mathf.Atan2(fwd.X, fwd.Z) + rng.RandfRange(-0.12f, 0.12f) + (l ? 0.08f : -0.08f);
+			// (2026-10-23: + pi, toes forward: the mask's top lies toward the decal's -Z, and they walked heel first)
+			float yaw = Mathf.Atan2(fwd.X, fwd.Z) + Mathf.Pi + rng.RandfRange(-0.12f, 0.12f) + (l ? 0.08f : -0.08f);
 			var basis = GroundBasis(terrain, at, yaw);
 			// a left foot is the right one mirrored
 			if (l) basis = basis * Basis.FromScale(new Vector3(-1f, 1f, 1f));

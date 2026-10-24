@@ -1234,9 +1234,9 @@ public partial class StoryTest : Node
 		Check("the giant is out there once they look back", giantEvent is { Armed: true } or { Done: true } or { Released: true }, $"armed {giantEvent?.Armed}, done {giantEvent?.Done}");
 		await WaitUntil(() => giantEvent?.Body != null, 10, ct);
 		if (giantEvent?.Body is StalkerBody g0) { await Aim(g0.EyesWorld, ct); await Seconds(0.3, ct); Screenshot("act7_giant_beyond_the_cabin"); }
-		// up the way to the lookout: the trees come down where it looks
+		// up the way to the lookout (2026-10-23, the owner: the falling-tree herding taken out: open woods now)
 		var herd = AllOf<Act7TreeFalls>().FirstOrDefault();
-		Check("the herding is live", herd is { Live: true }, $"{herd?.Live}");
+		Check("no trees come down to herd them: the way to the lookout is open", herd == null);
 		if (terrain != null)
 		{
 			terrain.TrailDistance(_player.GlobalPosition.X, _player.GlobalPosition.Z, out float s0);
@@ -1249,11 +1249,7 @@ public partial class StoryTest : Node
 			}
 		}
 		await WalkTo(lookout.GlobalPosition, 2.5f, ct);
-		await WaitUntil(() => herd == null || herd.SideDown >= herd.SideCount, 15, ct);
-		Check("the walls came down beside the way, in view, and behind them", herd is { SideDown: >= 2, BehindDown: >= 1, SeenFalls: >= 1 }, $"beside {herd?.SideDown}/{herd?.SideCount}, behind {herd?.BehindDown}, seen {herd?.SeenFalls}, unseen {herd?.UnseenFalls}");
-		Check("never within reach", herd is { NearestAtCrack: > 4f }, $"{herd?.NearestAtCrack:0.0} m");
-		Check("they fell where the giant looked", giantEvent is { Looks: >= 1 }, $"looks {giantEvent?.Looks}, head snaps {giantEvent?.HeadSnaps}");
-		Screenshot("act7_herded_to_the_lookout");
+		Screenshot("act7_to_the_lookout");
 		await Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
 		var giant = giantEvent?.Body;
 		Check("from the lookout: the giant crosses beyond the burning cabin", giant != null);

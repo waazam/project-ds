@@ -405,7 +405,9 @@ public static partial class UvInk
 			var box = new Basis(b.X.Normalized() * size.X, b.Y.Normalized() * GroundDepth, b.Z.Normalized() * size.Y);
 			mm.SetInstanceTransform(i, new Transform3D(box, xforms[i].Origin));
 		}
-		var mmi = new MultiMeshInstance3D { Name = name, Multimesh = mm, MaterialOverride = Mat(mask, ink, strength, mirror), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, GIMode = GeometryInstance3D.GIModeEnum.Disabled };
+		// (2026-10-23) the transforms are the world's: top level, so a parent moved or turned (the survey lot stands at
+		// 166, -566, turned a quarter) doesn't carry them off into the woods (the footprints to the bunker lay elsewhere)
+		var mmi = new MultiMeshInstance3D { Name = name, Multimesh = mm, MaterialOverride = Mat(mask, ink, strength, mirror), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, GIMode = GeometryInstance3D.GIModeEnum.Disabled, TopLevel = true };
 		parent.AddChild(mmi);
 		return mmi;
 	}

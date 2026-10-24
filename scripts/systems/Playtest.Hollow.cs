@@ -144,6 +144,7 @@ public partial class Playtest
 		Check("it never snarls", st is { SnarlCount: 0 });
 		Check("the giant's far footfalls, never its body", giant is { FarFootfallBouts: >= 1 } && TestBot.FindUnder<Node3D>(GetTree().CurrentScene, "Act7Giant") == null, $"bouts {giant?.FarFootfallBouts}");
 		CheckObjective("the compass still points at the cabin", "cabin");
+		Check("the compass stays on screen after the walk (it no longer fades while walking)", _bot.FirstOf<Compass>() is { ShowingCompass: true, Presence: > 0.9f }, $"{_bot.FirstOf<Compass>()?.Presence:0.00}");
 		Shot("storm_walk");
 	}
 
@@ -154,6 +155,28 @@ public partial class Playtest
 		var trail = lot.Trail(piece);
 		var cache = lot.Cache(piece);
 		Require($"trail {piece} and its cache", trail.Count > 0 && cache != null);
+		// (2026-10-23) the ink on the ground leading in: from the path short of the turn, and on from the second tree, beam on
+		if (Terrain is { } tr && piece - 1 < lot.TrailMetres.Count)
+		{
+			float bs = lot.TrailMetres[piece - 1];
+			Vector3 back = tr.TrailPoint(bs - 13f, out _), turnAt = tr.TrailPoint(bs, out _), mark = tr.TrailPoint(bs - 8f, out _);
+			await _bot.LanternMode(true, ct);
+			await _bot.Teleport(back, turnAt, ct);
+			await _bot.Aim(mark, ct);
+			await _bot.Seconds(0.5, ct);
+			Shot($"lead_path_{piece}");
+			if (trail.Count > 2)
+			{
+				Vector3 from = trail[1].GlobalPosition, to = trail[2].GlobalPosition;
+				Vector3 dir = TestBot.Flat(to - from).Normalized();
+				Vector3 stand = from + dir * 0.6f + dir.Cross(Vector3.Up) * 0.9f, aimAt = from + dir * 3.6f;
+				aimAt.Y = from.Y;
+				await _bot.Teleport(stand, to, ct);
+				await _bot.Aim(aimAt, ct);
+				await _bot.Seconds(0.5, ct);
+				Shot($"lead_line_{piece}");
+			}
+		}
 		foreach (var note in new[] { trail[0], trail[^1] })
 		{
 			Vector3 near = note.PlateWorld + TestBot.Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 2.4f;
@@ -483,35 +506,15 @@ public partial class Playtest
 		await _bot.WaitUntil(() => giant?.Body != null, 10, ct);
 		Check("the giant out there beyond the fire", giant?.Body != null);
 		if (giant?.Body is StalkerBody gb) { await _bot.Aim(gb.EyesWorld, ct); Shot("giant"); }
-		// up the way to the lookout, the trees coming down
-		var herd = _bot.FirstOf<Act7TreeFalls>();
-		Require("the herding", herd is { Live: true });
+		// up the way to the lookout (2026-10-23, the owner: the falling-tree herding taken out, "it didnt work": open woods now)
+		Check("no trees come down to herd them: the way to the lookout is open", _bot.FirstOf<Act7TreeFalls>() == null);
 		var t = Terrain;
 		t.TrailDistance(Player.GlobalPosition.X, Player.GlobalPosition.Z, out float s0);
 		t.TrailDistance(lookout.GlobalPosition.X, lookout.GlobalPosition.Z, out float sL);
-		for (float s = s0 + 5f; s < sL; s += 5f)
-		{
-			await _bot.WalkTo(t.TrailPoint(s, out _), 1.5f, ct, giveUp: 8f);
-			await _bot.Aim(t.TrailPoint(Mathf.Min(s + 9f, sL), out _) + Vector3.Up * 2.5f, ct);
-			await _bot.Seconds(0.6, ct);
-		}
+		for (float s = s0 + 5f; s < sL; s += 5f) await _bot.WalkTo(t.TrailPoint(s, out _), 1.5f, ct, giveUp: 8f);
 		await _bot.WalkTo(lookout.GlobalPosition, 2.5f, ct);
-		using (Fast(2)) await _bot.WaitUntil(() => herd.SideDown >= herd.SideCount, 15, ct);
-		Check("the walls came down beside the way, and behind", herd.SideDown >= 2 && herd.BehindDown >= 1, $"beside {herd.SideDown} of {herd.SideCount}, behind {herd.BehindDown}, seen {herd.SeenFalls}");
-		Check("none of them within reach", herd.NearestAtCrack > 4f, $"{herd.NearestAtCrack:0.0} m");
-		Check("they fell where the giant looked", giant == null || giant.Looks >= 1 || Story.GiantEventDone, $"looks {giant?.Looks}, head snaps {giant?.HeadSnaps}");
-		Shot("herded");
-		// (2026-10-19) and the walls hold: walked straight at, none lets them through
+		Shot("to_the_lookout");
 		Vector3 atLookout = Player.GlobalPosition;
-		var held = new System.Collections.Generic.List<string>();
-		bool allHold = true;
-		foreach (var wall in herd.SideTreesDown.Take(3))
-		{
-			float across = await TrunkHolds(wall, ct);
-			held.Add($"{wall.Name} {across:0.0} m");
-			allHold &= across > 0f;
-		}
-		Check("the fallen walls hold: walked into, none lets them through", held.Count >= 2 && allHold, string.Join(", ", held));
 		await _bot.Teleport(atLookout, cabin.GlobalPosition, ct);
 		await _bot.Aim(cabin.GlobalPosition + Vector3.Up * 2f, ct);
 		await _bot.WaitUntil(() => giant == null || giant.Released || Story.GiantEventDone, 8, ct);
@@ -519,11 +522,11 @@ public partial class Playtest
 		using (Fast(4)) await _bot.WaitUntil(() => Story.GiantEventDone, 70, ct);
 		Check("it passes and is gone: saved", Story.GiantEventDone && giant?.Body == null);
 		CheckObjective("the compass points at the bunker", "bunker_marker");
-		int downBefore = herd.SideDown + herd.BehindDown + herd.WardDown;
 		var lot = GetTree().GetFirstNodeInGroup("survey_lot") as SurveyLot;
 		if (lot != null) await TakeKeyHalf(lot, 2, ct);
 		Check("both halves of the key before the bunker", SurveyLot.PiecesFound == 2, $"{SurveyLot.PiecesFound} of 2");
-		Check("the walk on from the lookout is open woods (nothing fell on it)", herd.SideDown + herd.BehindDown + herd.WardDown == downBefore);
+		// (2026-10-23) the ink leads the way to both halves: arrows up the path to each turn, tree to tree, round the cache
+		Check("the blacklight leads to both halves: arrows on the ground up the path, tree to tree, round each cache", lot is { LeadMarkCount: >= 40 }, $"{lot?.LeadMarkCount} ground arrows");
 	}
 
 	/// <summary>To the board and looking at its one print until it starts.</summary>
