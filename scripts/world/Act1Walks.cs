@@ -291,6 +291,7 @@ public partial class Act1Walks : Node3D
 		_gates.RemoveAll(g => !IsInstanceValid(g.Tree) || g.Tree.IsQueuedForDeletion());
 		GD.Print($"[story] Act 1: walk {stage}{(first ? " (loaded)" : "")}; {_gates.Count} trunks across the ways");
 		_wallsDirty = true;
+		if (_blazed) ShowBlazes(stage);
 	}
 
 	public override void _Process(double delta)
@@ -300,6 +301,7 @@ public partial class Act1Walks : Node3D
 		_clock += delta;
 		var player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
 		if (_wallsDirty && _clock >= _nextWallTry) TryRebuildWalls(player);
+		UpdateWayfinding(player, (float)delta);
 		if (player == null) return;
 		if (_builtStage >= 3) UpdateClosers(player);
 		UpdateSounds(player, (float)delta);

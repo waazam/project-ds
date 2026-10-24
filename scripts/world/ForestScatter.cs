@@ -1093,10 +1093,12 @@ public partial class ForestScatter : Node3D
 				var p2 = new Vector2(px, pz);
 				_terrain.SampleFields(px, pz, out float dT, out float sT, out float dS, out float dR);
 				float half = 0.9f;
-				if (dT < half + 0.35f || dR < 2.6f || ParkDist(p2) < 0.3f) continue;
+				// (2026-10-23, the wayfinding pass: the owner lost the trail past the footbridge) a clear verge each side of the
+				// trail and its branches: the ferns' fronds met over a 1.8 m path and hid where it went
+				if (dT < half + 1.1f || dR < 2.6f || ParkDist(p2) < 0.3f) continue;
 				if (Cleared(p2, 0.2f, true)) continue;
 				float fdB = _terrain.SampleBranch(px, pz, out float fbHalf);
-				if (fbHalf > 0.08f && fdB < fbHalf + 0.15f) continue;
+				if (fbHalf > 0.08f && fdB < fbHalf + 0.9f) continue;
 				float cd = ClearingDist(p2);
 				float clump = _clump.GetNoise2D(px * 2.3f, pz * 2.3f) * 0.5f + 0.5f;
 				string mesh = null; float p = 0;
@@ -1119,7 +1121,7 @@ public partial class ForestScatter : Node3D
 					else
 					{
 						mesh = "fern";
-						float band = Mathf.SmoothStep(1.3f, 3f, dT) * (1f - 0.55f * Mathf.SmoothStep(8f, 25f, dT));
+						float band = Mathf.SmoothStep(2.1f, 3.6f, dT) * (1f - 0.55f * Mathf.SmoothStep(8f, 25f, dT));
 						p = (0.12f + 0.55f * band) * (0.3f + 1.1f * clump) * (1f - 0.35f * Deep(sT));
 					}
 				}

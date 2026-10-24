@@ -24,8 +24,8 @@ uniform float litter_tile = 0.6;
 uniform vec3 litter_tint = vec3(1.0);
 uniform vec3 mud_color : source_color = vec3(0.10, 0.08, 0.065);
 uniform float moss_amount = 0.5;
-uniform float trail_leaf_cover = 0.55;
-uniform float trail_bright = 1.3;
+uniform float trail_leaf_cover = 0.3;   // (2026-10-23, the wayfinding pass: was 0.55, the path buried and lost under the leaves)
+uniform float trail_bright = 1.42;   // (was 1.3: the worn dirt a shade lighter than the floor round it)
 /// North of this (world z, more negative) the trail is bare dirt; south of it, gravel.
 uniform float gravel_trail_z = -125.0;
 uniform float puddles = 1.0;

@@ -1026,6 +1026,24 @@ script = ExtResource("9_clear")
 Radius = 4.0
 ClearFoliage = false
 
+[node name="SightUp0" type="Node3D" parent="Overlook"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 69.6, 0, -252.0)
+script = ExtResource("9_clear")
+Radius = 4.5
+ClearFoliage = false
+
+[node name="SightUp1" type="Node3D" parent="Overlook"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 71.0, 0, -258.5)
+script = ExtResource("9_clear")
+Radius = 4.5
+ClearFoliage = false
+
+[node name="SightUp2" type="Node3D" parent="Overlook"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 72.3, 0, -265.0)
+script = ExtResource("9_clear")
+Radius = 4.5
+ClearFoliage = false
+
 [node name="ViewClear0" type="Node3D" parent="Overlook"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70.2, 0, -276.4)
 script = ExtResource("9_clear")

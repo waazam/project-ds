@@ -315,6 +315,42 @@ public partial class Playtest
 		Check("walk 1 first (no board flag yet)", World.Act1Walks.Stage == 1 && atmo is not { Act1Stage: not 1 }, $"stage {World.Act1Walks.Stage}, light {atmo?.Act1Stage}");
 		Check("walk 1: trunks across the ways not open yet (the trail on past the fork, the falls' climb), and the woods round the first walled",
 			walks.GatesDown == 3 && walks.WallPieces > 20, $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		// ---- (2026-10-23) the wayfinding: blazes, the sign past the bridge, the overlook's platform, and the pull back
+		using (Fast(3)) await _bot.WaitUntil(() => walks.BlazeCount > 0, 25, ct);
+		Check("walk 1: the way shown in the woods: blazes on the trees, the overlook's platform", walks.BlazeCount >= 30 && walks.Platform != null, $"{walks.BlazeCount} blazes, platform {walks.Platform != null}");
+		if (GetTree().GetFirstNodeInGroup("bridge_marker") is Node3D bridgeAt)
+		{
+			terrain.TrailDistance(bridgeAt.GlobalPosition.X, bridgeAt.GlobalPosition.Z, out float sb);
+			var a = terrain.TrailPoint(sb + 4f, out _);
+			await _bot.Teleport(a, terrain.TrailPoint(sb + 13f, out _) + Vector3.Up * 1.1f, ct);
+			await _bot.Seconds(0.6, ct);
+			Shot("way_past_bridge");
+		}
+		if (walks.WayLine(World.Act1Walks.Way.Spur) is { } spur && spur.Points.Count > 1)
+		{
+			var f0 = spur.At(0f, out _);
+			terrain.TrailDistance(f0.X, f0.Y, out float sf);
+			var fa = terrain.TrailPoint(sf - 9f, out _);
+			var look = spur.At(10f, out _);
+			await _bot.Teleport(fa, new Vector3(look.X, fa.Y + 1.4f, look.Y), ct);
+			await _bot.Seconds(0.6, ct);
+			Shot("way_fork");
+			var up = spur.At(Mathf.Max(0f, spur.Length - 30f), out _);
+			var upAt = new Vector3(up.X, terrain.HeightAt(up.X, up.Y), up.Y);
+			if (walks.Platform != null) { await _bot.Teleport(upAt, walks.Platform.GlobalPosition + Vector3.Up * 5f, ct); await _bot.Aim(walks.Platform.GlobalPosition + Vector3.Up * 5f, ct); await _bot.Seconds(0.6, ct); Shot("way_overlook"); }
+		}
+		var tr0 = terrain.TrailPoint(95f, out _);
+		await _bot.Teleport(tr0, terrain.TrailPoint(112f, out _) + Vector3.Up * 1.2f, ct);
+		await _bot.Seconds(0.6, ct);
+		Shot("way_trail");
+		// off the way a while: a bird calls from it, then the thought
+		var so = terrain.TrailPoint(120f, out var sot);
+		var off = so + Vector3.Up.Cross(sot).Normalized() * -18f;
+		await _bot.Teleport(off, off + sot * 10f, ct);
+		using (Fast(3))
+			for (int r = 0; r < 4 && !walks.StrayThought; r++) { await _bot.PushFor(new Vector2(0, 1), 5, ct); await _bot.PushFor(new Vector2(0, -1), 5, ct); }
+		_bot.Release();
+		Check("walk 1: wandered off the way, a bird calls from it, then the thought: the trail's back that way", walks.StrayCalls >= 1 && walks.StrayThought, $"{walks.StrayCalls} calls, thought {walks.StrayThought}");
 		float gate = walks.NorthGateAt;
 		var g0 = terrain.TrailPoint(gate - 8f, out var gt);
 		await _bot.Teleport(g0, g0 + gt * 10f, ct);
