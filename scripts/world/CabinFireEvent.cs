@@ -441,6 +441,9 @@ public partial class CabinFireEvent : Node
 		if (_chop == null || !IsInstanceValid(_chop)) return;
 		bool axe = _player.Inventory?.HasTool(ToolKind.Axe) == true;
 		_chop.HoldSeconds = axe ? BlowSeconds : 0f;
+		// (2026-10-23) the axe drawn back over the shoulder as E is held, swung on the blow (HeldTool.Chop)
+		if (axe && _chop.HoldProgress > 0f && _player.Inventory is { } inv && inv.InHand != ToolKind.Axe) inv.Select(ToolKind.Axe);
+		if (PlayerHands.Instance?.Tool is { } tool) tool.WindUp = axe && tool.Shown == ToolKind.Axe && _chop.HoldProgress > 0f ? _chop.HoldProgress : 0f;
 	}
 
 	/// <summary>One blow: a beam knocked away; the third clears the doorway (the axe is spent).</summary>
@@ -448,8 +451,17 @@ public partial class CabinFireEvent : Node
 	{
 		if (_stage != Stage.CavedIn || p.Inventory?.HasTool(ToolKind.Axe) != true) return;
 		Blows++;
-		HeldUse.Do(p, ToolKind.Axe, _cabin.DoorwayInside, 0.7f);
+		// the swing (it bites 0.13 s on: the beam gives then, with the thud and the chips)
+		if (PlayerHands.Instance?.Tool is { Shown: ToolKind.Axe } tool) { tool.WindUp = 0f; tool.Strike(); }
+		else HeldUse.Do(p, ToolKind.Axe, _cabin.DoorwayInside, 0.7f);
+		GetTree().CreateTimer(0.13).Timeout += () => { if (IsInstanceValid(this)) Bite(p); };
+	}
+
+	/// <summary>The blade in the wood: the thud, the chips, the beam knocked away; the third clears the doorway.</summary>
+	private void Bite(PlayerController p)
+	{
 		var at = _cabin.ToLocal(_cabin.DoorwayInside);
+		Chips(_cabin.DoorwayInside + Vector3.Up * 0.3f);
 		Sound(Blows % 2 == 1 ? "door_frame_thud" : "wood_bump", Blows % 2 == 1 ? 4 : 3, at, 2f, 4f, 0.08f);
 		Sound("dust_trickle", 3, at + Vector3.Up * 0.6f, -8f, 3f);
 		Node3D gone = null;
@@ -462,6 +474,26 @@ public partial class CabinFireEvent : Node
 		p.Inventory?.Consume(ToolKind.Axe);
 		if (_chop != null && IsInstanceValid(_chop)) _chop.QueueFree();
 		_chop = null;
+	}
+
+	/// <summary>Chips of charred wood knocked off the beam by a blow, and a puff of ash.</summary>
+	private void Chips(Vector3 world)
+	{
+		var pm = new ParticleProcessMaterial
+		{
+			Direction = Vector3.Up, Spread = 75f, InitialVelocityMin = 1.5f, InitialVelocityMax = 4.5f, Gravity = new Vector3(0, -9.8f, 0),
+			AngularVelocityMin = -720f, AngularVelocityMax = 720f, ScaleMin = 0.5f, ScaleMax = 1.4f,
+		};
+		var p = new GpuParticles3D
+		{
+			Name = "Chips", Amount = 26, Lifetime = 0.9, OneShot = true, Explosiveness = 0.95f, ProcessMaterial = pm,
+			DrawPass1 = new BoxMesh { Size = new Vector3(0.04f, 0.012f, 0.025f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.13f, 0.08f), Roughness = 0.95f } },
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, LocalCoords = false,
+		};
+		AddChild(p);
+		p.GlobalPosition = world;
+		p.Emitting = true;
+		GetTree().CreateTimer(1.6).Timeout += () => { if (IsInstanceValid(p)) p.QueueFree(); };
 	}
 
 	/// <summary>The doorway's E-point: the beams. With the axe, held E is a blow; without, it only says what's there.</summary>

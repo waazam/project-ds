@@ -500,6 +500,19 @@ public partial class Playtest
 		Shot("caved_in");
 		await _bot.UseIt(fire.AxeUse, ct);
 		Check("the axe taken from over the hearth", Inv.HasTool(ToolKind.Axe));
+		// (2026-10-23) the first blow watched: drawn back over the shoulder as E is held, then into the wood
+		if (fire.BeamUse is { } bu)
+		{
+			await _bot.UseIt(bu, ct, holdOnly: true);
+			var press = _bot.Press(ct, hold: fire.BlowSeconds + 0.4);
+			await _bot.Seconds(fire.BlowSeconds * 0.85, ct);
+			Shot("chop_windup");
+			await _bot.Seconds(fire.BlowSeconds * 0.15 + 0.17, ct);
+			Shot("chop_bite");
+			await press;
+			Check("the blow: drawn back, then swung into the beams (not handed over)", HeldTool.Strikes >= 1 && fire.Blows >= 1, $"{HeldTool.Strikes} strikes, {fire.Blows} blows");
+			await _bot.Seconds(0.6, ct);
+		}
 		for (int i = 0; i < 3 && fire.BeamUse != null; i++) await _bot.UseIt(fire.BeamUse, ct);
 		Check("three held blows and the doorway is clear (the axe spent)", fire.Blows == 3 && cabin.BeamsLeft == 0 && !Inv.HasTool(ToolKind.Axe), $"blows {fire.Blows}, beams {cabin.BeamsLeft}");
 		Check("in time", fire.SecondsLeft > 0f || fire.BrokeOut, $"{fire.SecondsLeft:0} s left");

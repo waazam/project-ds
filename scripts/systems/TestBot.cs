@@ -337,7 +337,7 @@ public sealed class TestBot
 	}
 
 	/// <summary>Looks at an object's Interactable and presses (or holds) E. Returns the prompt it was focused on.</summary>
-	public async Task<string> UseIt(Node3D obj, CancellationToken ct)
+	public async Task<string> UseIt(Node3D obj, CancellationToken ct, bool holdOnly = false)
 	{
 		if (obj == null || !GodotObject.IsInstanceValid(obj) || !obj.IsInsideTree() || obj is Pickup { Taken: true }) return null;
 		var use = obj as Interactable ?? obj.FindChildren("*", "", true, false).OfType<Interactable>().FirstOrDefault()
@@ -357,6 +357,8 @@ public sealed class TestBot
 		}
 		string prompt = Prompt;
 		GD.Print($"[playtest] use {obj.Name}: focused '{focus?.GetParent()?.Name}' prompt '{prompt}'");
+		// (holdOnly: walked up to it and looking at it, the press left to the caller)
+		if (holdOnly) return prompt;
 		await Press(ct, hold: use != null && use.HoldSeconds > 0 ? use.HoldSeconds + 0.3 : 0.08);
 		await Seconds(0.3, ct);
 		return prompt;

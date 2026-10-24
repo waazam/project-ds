@@ -109,6 +109,82 @@ public partial class HeldTool : HeldItem
 	private int _dressed;
 	private ToolKind _lastTarget = ToolKind.None;
 
+	// ------------------------------------------------------------------ the chop (2026-10-23)
+	// (the owner: the axe "is animated like shit in the house fire section and needs a rework") It was the generic hand-off
+	// (reached out and let go). A chop now, on the axe as it's carried: drawn back up over the right shoulder as E is held
+	// (WindUp), and on the blow (Strike) brought down hard and across into the beams, the view jolting as it bites, the
+	// blade held in the wood a beat, then wrenched free and back to the ready.
+
+	/// <summary>0..1: how far the axe is drawn back (set each frame by the chop being held).</summary>
+	public float WindUp { get; set; }
+	private float _wind, _strikeT = -1f;
+	/// <summary>For tests: blows struck.</summary>
+	public static int Strikes { get; private set; }
+
+	/// <summary>The blow: down and across from wherever the wind-up had it.</summary>
+	public void Strike()
+	{
+		_strikeT = 0f;
+		Strikes++;
+	}
+
+	private const float SwingDown = 0.13f, Bite = 0.12f, Wrench = 0.42f;
+
+	/// <summary>This frame's chop offset (camera space) and turn (radians) on top of the carry.</summary>
+	private (Vector3 at, Vector3 turn) Chop(float dt)
+	{
+		_wind = Mathf.MoveToward(_wind, _strikeT >= 0f ? 0f : WindUp, dt * (WindUp > _wind ? 2.2f : 6f));
+		// drawn back: the hand up by the shoulder and back, the head tipped back over it, the wrist cocked
+		float w = Mathf.SmoothStep(0f, 1f, _wind);
+		float tremble = w > 0.9f ? Mathf.Sin(_strikeT < 0f ? Time.GetTicksMsec() * 0.045f : 0f) * 0.004f : 0f;
+		var back = new Vector3(0.04f, 0.15f + tremble, 0.07f);
+		var backTurn = new Vector3(0.85f, 0.3f, -0.25f);   // (the head kept in the top right of the view as it draws back)
+		// the impact: the hand forward, down and in toward the middle, the head down and forward into the wood
+		var hit = new Vector3(-0.1f, -0.06f, -0.22f);
+		var hitTurn = new Vector3(-0.85f, -0.35f, 0.45f);
+		if (_strikeT < 0f) return (back * w, backTurn * w);
+		_strikeT += dt;
+		float t = _strikeT;
+		Vector3 at, turn;
+		if (t < SwingDown)
+		{
+			// fast, accelerating: from full draw to the bite
+			float k = t / SwingDown;
+			k *= k;
+			at = back.Lerp(hit, k);
+			turn = backTurn.Lerp(hitTurn, k);
+		}
+		else if (t < SwingDown + Bite)
+		{
+			// in the wood: the jolt back up the arm, a shudder
+			if (t - dt < SwingDown) Jolt();
+			float j = 1f - (t - SwingDown) / Bite;
+			at = hit + new Vector3(0, 0.01f, 0.012f) * Mathf.Sin(t * 120f) * j;
+			turn = hitTurn;
+		}
+		else if (t < SwingDown + Bite + Wrench)
+		{
+			// wrenched free (a tug up and back first), then eased back to the carry
+			float k = (t - SwingDown - Bite) / Wrench;
+			var tug = new Vector3(0.02f, 0.05f, 0.05f) * Mathf.Sin(Mathf.Min(k * 3f, 1f) * Mathf.Pi);
+			float e = Mathf.SmoothStep(0f, 1f, k);
+			at = hit.Lerp(Vector3.Zero, e) + tug;
+			turn = hitTurn.Lerp(Vector3.Zero, e);
+		}
+		else { _strikeT = -1f; at = Vector3.Zero; turn = Vector3.Zero; }
+		return (at, turn);
+	}
+
+	/// <summary>The bite felt: the view knocked a little down and to the side, and settling.</summary>
+	private void Jolt()
+	{
+		var rig = Player?.CameraRig;
+		if (rig == null) return;
+		var tw = rig.CreateTween();
+		tw.TweenMethod(Callable.From<float>(v => { if (IsInstanceValid(rig)) rig.Shake = new Vector3(0.012f * v, -0.02f * v, 0f); }), 1f, 0f, 0.28f)
+			.SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.Out);
+	}
+
 	protected override void Animate(float dt)
 	{
 		if (_grip == null) return;
@@ -126,7 +202,9 @@ public partial class HeldTool : HeldItem
 		// (2026-10-14g) carried ready: leaning forward in the hand's own frame (toward the knuckles and the working end, about
 		// the axis the Fist pose's forearm is built turned back on, so only the wrist cocks), then turned as the spec says
 		float lean = Mathf.DegToRad(_spec.Lean) * (1f - e);
-		_grip.Basis = Basis.FromEuler(turn * (Mathf.Pi / 180f)) * new Basis(Vector3.Right, -lean);
+		var (chopAt, chopTurn) = Chop(dt);
+		Hold += chopAt;
+		_grip.Basis = Basis.FromEuler(chopTurn) * Basis.FromEuler(turn * (Mathf.Pi / 180f)) * new Basis(Vector3.Right, -lean);
 		_grip.Visible = eye < 0.55f;
 		// the walkie's LED: alive from the bunker's door on
 		if (_shown == ToolKind.Radio && _model != null)
