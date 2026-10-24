@@ -1,0 +1,22 @@
+{
+ "walk": {
+  "seconds": 1.3333,
+  "cycle_m": 3.2901,
+  "loop": true
+ },
+ "run": {
+  "seconds": 0.6667,
+  "cycle_m": 13.9195,
+  "loop": true
+ },
+ "idle": {
+  "seconds": 2.5,
+  "cycle_m": 0.0,
+  "loop": true
+ },
+ "stalk": {
+  "seconds": 2.0,
+  "cycle_m": 3.7962,
+  "loop": true
+ }
+}

@@ -34,3 +34,4 @@ __pycache__/
 
 # the shipped texture cache: made by the bake before a release (README), not kept in git (~MBs a bake)
 assets/texcache_baked/
+_incoming/

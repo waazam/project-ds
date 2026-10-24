@@ -1,0 +1,47 @@
+{
+ "character": "wendigo",
+ "source": "assets/animations/ual/UAL1_Standard.glb",
+ "target": "assets/models/wendigo/wendigo.glb",
+ "map": "tools/Blender/data/retarget/ual_to_house.json",
+ "source_yaw": 180.0,
+ "out": "assets/animations/wendigo/wendigo_anims.glb",
+ "style": {
+  "amplitude": {
+   "f": 0.6
+  },
+  "mode": {
+   "clav": "dir",
+   "upper": "dir",
+   "fore": "dir",
+   "hand": "dir",
+   "f": "dir",
+   "thigh": "dir",
+   "shin": "dir",
+   "foot": "dir",
+   "toe": "dir"
+  }
+ },
+ "clips": [
+  {
+   "source": "Walk_Loop",
+   "name": "walk",
+   "loop": true
+  },
+  {
+   "source": "Sprint_Loop",
+   "name": "run",
+   "loop": true
+  },
+  {
+   "source": "Idle_Loop",
+   "name": "idle",
+   "loop": true
+  },
+  {
+   "source": "Crouch_Fwd_Loop",
+   "name": "stalk",
+   "loop": true
+  }
+ ],
+ "root_motion_source": "assets/animations/ual/UAL1_Standard_RM.glb"
+}
