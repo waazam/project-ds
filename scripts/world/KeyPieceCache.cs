@@ -20,6 +20,8 @@ namespace ProjectDS.World;
 public partial class KeyPieceCache : Node3D
 {
 	public enum Place { Stump, Cairn }
+	/// <summary>How much bigger than its model the cairn is built.</summary>
+	public const float CairnScale = 4f;
 
 	/// <summary>Which half (1 or 2).</summary>
 	[Export] public int Piece = 1;
@@ -82,11 +84,17 @@ public partial class KeyPieceCache : Node3D
 		}
 		else
 		{
-			if (AddModel(this, "Cairn", Transform3D.Identity, "Cairn") == null) FallbackCairn();
+			// (2026-10-23, the owner: "make the stone cairn way bigger it is so small and easy to miss") a waist-high-plus pile,
+			// CairnScale times the model; the tin stays its own size, in the gap at the front of its foot
+			const float S = CairnScale;
+			if (AddModel(this, "Cairn", new Transform3D(Basis.Identity.Scaled(Vector3.One * S), Vector3.Zero), "Cairn") is { } cairn)
+				// paler stone than the woods' (it read as a dark lump in the storm's murk)
+				cairn.MaterialOverlay = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.53f, 0.48f, 0.1f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.95f, BlendMode = BaseMaterial3D.BlendModeEnum.Add };
+			else FallbackCairn(S);
 			body.SetMeta("surface", "stone");
 			// (behind the tin's gap, so nothing stands between it and a look from the front)
-			body.AddChild(new CollisionShape3D { Position = new Vector3(0, 0.33f, -0.12f), Shape = new BoxShape3D { Size = new Vector3(0.75f, 0.66f, 0.5f) } });
-			tinAt = new Transform3D(new Basis(Vector3.Up, -0.12f), new Vector3(0f, 0.0f, 0.19f));
+			body.AddChild(new CollisionShape3D { Position = new Vector3(0, 0.33f * S, -0.12f * S), Shape = new BoxShape3D { Size = new Vector3(0.75f, 0.66f, 0.5f) * S } });
+			tinAt = new Transform3D(new Basis(Vector3.Up, -0.12f), new Vector3(0f, 0.0f, 0.19f * S + 0.06f));
 		}
 		_tin = new Node3D { Name = "Tin", Transform = tinAt };
 		AddChild(_tin);
@@ -137,12 +145,12 @@ public partial class KeyPieceCache : Node3D
 		k.CommitTo(this, "Stump");
 	}
 
-	private void FallbackCairn()
+	private void FallbackCairn(float s)
 	{
 		var k = new MeshKit();
 		k.Mat(ProcTextures.RockMat);
 		k.Color = new Color(0.7f, 0.7f, 0.66f);
-		k.Box(new Vector3(0, 0.3f, -0.12f), new Vector3(0.7f, 0.6f, 0.45f), 1f, Basis.Identity);
+		k.Box(new Vector3(0, 0.3f, -0.12f) * s, new Vector3(0.7f, 0.6f, 0.45f) * s, 1f, Basis.Identity);
 		k.CommitTo(this, "Cairn");
 	}
 

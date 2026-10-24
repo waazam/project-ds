@@ -224,6 +224,8 @@ public partial class SurveyLot : Node3D
 			{
 				Vector3 c = last + Turn(heading, a) * rng.RandfRange(6.5f, 8.5f);
 				if (!Ok(c, 9f, mine, last)) continue;
+				// (2026-10-23, the owner: the cairn hung in the air) on the ground here, not at the last tree's height
+				c.Y = terrain.HeightAt(c.X, c.Z);
 				cache = c;
 				cached = true;
 				break;
@@ -410,7 +412,7 @@ public partial class SurveyLot : Node3D
 		{
 			float ang = k / 8f * Mathf.Tau;
 			Vector3 o = new(Mathf.Cos(ang), 0, Mathf.Sin(ang));
-			ring.Add(Mark(cachePos + o * 1.7f, -o));
+			ring.Add(Mark(cachePos + o * (piece == 2 ? 3.2f : 1.7f), -o));   // (the cairn is big: the ring out round its foot)
 		}
 		UvInk.Scatter(this, $"LeadPath{piece}", path, new Vector2(0.7f, 0.92f), UvInk.Arrow(1), UvInk.Green, 2.4f);
 		UvInk.Scatter(this, $"LeadTurn{piece}", big, new Vector2(1.4f, 1.85f), UvInk.Arrow(0), UvInk.Green, 2.6f);

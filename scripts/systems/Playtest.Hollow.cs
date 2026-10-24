@@ -192,6 +192,16 @@ public partial class Playtest
 			Check($"arrow {note.Label} shows under the blacklight", note.Revealed, $"glow {note.Glow:0.00}");
 			if (piece == 1 && note == trail[0]) Shot("blacklight_arrow");
 		}
+		// (2026-10-23, the owner: the cairn hung in the air, and was too small to see) on the ground, and seen from the last tree
+		if (Terrain is { } tg)
+			Check($"half {piece}'s hiding place stands on the ground", Mathf.Abs(cache.GlobalPosition.Y - tg.HeightAt(cache.GlobalPosition.X, cache.GlobalPosition.Z)) < 0.15f, $"{cache.GlobalPosition.Y - tg.HeightAt(cache.GlobalPosition.X, cache.GlobalPosition.Z):0.00} m off it");
+		Vector3 wide = cache.GlobalPosition + TestBot.Flat(trail[^1].GlobalPosition - cache.GlobalPosition).Normalized() * 8f;
+		await _bot.LanternMode(false, ct);
+		await _bot.Teleport(wide, cache.GlobalPosition + Vector3.Up * 0.8f, ct);
+		await _bot.Aim(cache.GlobalPosition + Vector3.Up * 0.8f, ct);
+		await _bot.Seconds(0.6, ct);
+		Shot($"cache_{piece}_wide");
+		await _bot.LanternMode(true, ct);
 		Vector3 c = cache.TinWorld;
 		await _bot.Teleport(c + TestBot.Flat(trail[^1].GlobalPosition - c).Normalized() * 1.6f, c, ct);
 		await _bot.Aim(c, ct);
