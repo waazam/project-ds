@@ -24,6 +24,13 @@ public partial class Cabin
 	{
 		float yc = (y0 + y1) * 0.5f, ry = (y1 - y0) * 0.5f + 0.004f, rd = LogT * 0.5f + LogBulge;
 		float thC = Mathf.Acos(Mathf.Clamp((ChinkDepth - 0.006f) / rd, 0f, 1f));
+		// (2026-10-24, the art pass) no two logs alike: each its own girth, tapering from butt to top, a little bowed
+		// (they were identical straight cylinders, and read as made by machine). The height stays within the course,
+		// so the chinking still closes every joint.
+		var lr = new RandomNumberGenerator { Seed = (ulong)(Mathf.Abs(a0 * 131.7f + a1 * 17.3f + line * 73.1f + y0 * 977.9f) * 1000f) + (ulong)Seed * 7919UL };
+		float girth = lr.RandfRange(0.84f, 1.1f), taper = lr.RandfRange(-0.14f, 0.14f), bow = lr.RandfRange(-0.024f, 0.024f);
+		float Grow(float a) { float f = Mathf.Abs(a1 - a0) > 1e-4f ? (a - a0) / (a1 - a0) : 0f; return girth * (1f + taper * (0.5f - f)); }
+		float Bow(float a) { float f = Mathf.Abs(a1 - a0) > 1e-4f ? (a - a0) / (a1 - a0) : 0f; return bow * Mathf.Sin(f * Mathf.Pi); }
 		Vector3 along = alongZ ? Vector3.Back : Vector3.Right;
 		Vector3 Base(float a) => alongZ ? new Vector3(line, 0, a) : new Vector3(a, 0, line);
 		const float vLen = 3.2f;   // metres of log to the texture's height (its grain runs along V)
@@ -37,7 +44,7 @@ public partial class Cabin
 			for (int i = 0; i < LogSegs; i++)
 			{
 				float t0 = Mathf.Lerp(thLo, thHi, i / (float)LogSegs), t1 = Mathf.Lerp(thLo, thHi, (i + 1) / (float)LogSegs);
-				Vector3 P(float a, float th) => Base(a) + d * (rd * Mathf.Cos(th)) + Vector3.Up * (yc + ry * Mathf.Sin(th));
+				Vector3 P(float a, float th) => Base(a) + d * (rd * Grow(a) * Mathf.Cos(th)) + Vector3.Up * (yc + Bow(a) + ry * Mathf.Min(1f, Grow(a)) * Mathf.Sin(th));
 				Vector3 N(float th) => (d * (Mathf.Cos(th) / rd) + Vector3.Up * (Mathf.Sin(th) / ry)).Normalized();
 				float u0 = uShift + (side > 0 ? 0f : 0.5f) + t0 / Mathf.Tau * circ, u1 = uShift + (side > 0 ? 0f : 0.5f) + t1 / Mathf.Tau * circ;
 				// darker where the log turns away into the joint
@@ -63,13 +70,14 @@ public partial class Cabin
 		foreach (var (at, sgn, want) in new[] { (a0, -1f, endA), (a1, 1f, endB) })
 		{
 			if (!want) continue;
-			Vector3 c0 = Base(at) + Vector3.Up * yc;
+			Vector3 c0 = Base(at) + Vector3.Up * (yc + Bow(at));
+			float er = Grow(at);
 			Vector3 nrm = along * sgn;
 			const int ring = 14;
 			for (int i = 0; i < ring; i++)
 			{
 				float p0 = Mathf.Tau * i / ring, p1 = Mathf.Tau * (i + 1) / ring;
-				Vector3 Q(float p) => c0 + outward * (rd * Mathf.Cos(p)) + Vector3.Up * (ry * Mathf.Sin(p));
+				Vector3 Q(float p) => c0 + outward * (rd * er * Mathf.Cos(p)) + Vector3.Up * (ry * Mathf.Min(1f, er) * Mathf.Sin(p));
 				Vector2 U(float p) => new(0.5f + 0.48f * Mathf.Cos(p), 0.5f + 0.48f * Mathf.Sin(p));
 				shell.Tri(c0, Q(p0), Q(p1), nrm, new Vector2(0.5f, 0.5f), U(p0), U(p1));
 			}

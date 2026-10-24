@@ -270,6 +270,20 @@ public static class BuildingTextures
 	public static StandardMaterial3D LogEndMat => Std("b_logend", LogEnd());
 	public static StandardMaterial3D ShingleMat => Std("b_shingle", Shingles(), 0.85f, 0.3f);
 	public static StandardMaterial3D StoneMat => _stoneDamp ??= DampStone();
+	/// <summary>(2026-10-24, the art pass) The cabin's foundation and chimney: real laid fieldstone (Poly Haven's
+	/// rustic_stone_wall scan, CC0), a stone about a hand and a half across, damp toward the ground. Was the drawn
+	/// stone, whose even pattern read as tile. Falls back to it without the scan.</summary>
+	public static StandardMaterial3D CabinFieldstoneMat => _fieldstone ??= World.SurfaceSets.Tex("ph_rustic_stone_wall") == null ? StoneMat : Fieldstone();
+	private static StandardMaterial3D _fieldstone;
+	private static StandardMaterial3D Fieldstone()
+	{
+		var m = Std("b_cabin_fieldstone", null, 0.92f, 0.2f);
+		World.SurfaceSets.Apply(m, "ph_rustic_stone_wall", 1.25f);
+		m.Uv1Scale = new Vector3(0.5f, 0.5f, 0.5f);
+		m.AlbedoColor = new Color(0.84f, 0.8f, 0.75f);
+		ProcTextures.Damp(m, 0.95f);
+		return m;
+	}
 	private static StandardMaterial3D _stoneDamp;
 	/// <summary>(the Hollow's stone, the stairs' above all: damp in patches)</summary>
 	private static StandardMaterial3D DampStone()

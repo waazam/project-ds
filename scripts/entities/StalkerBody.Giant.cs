@@ -229,7 +229,7 @@ public partial class StalkerBody
 	public System.Collections.Generic.List<WalkSample> SampleWalk(int samples = 64)
 	{
 		var list = new System.Collections.Generic.List<WalkSample>();
-		if (_anim == null || _skel == null || _anim.GetAnimation("walk") is not { } walk) return list;
+		if (_anim == null || _skel == null || _anim.GetAnimation(R("walk")) is not { } walk) return list;
 		int fr = Bone("foot_R"), fl = Bone("foot_L");
 		if (fr < 0 || fl < 0) return list;
 		float len = (float)walk.Length;
@@ -239,7 +239,7 @@ public partial class StalkerBody
 		{
 			float u = (float)i / samples;
 			_skel.ResetBonePoses();
-			_anim.Play("walk", 0.0);
+			_anim.Play(R("walk"), 0.0);
 			_anim.Seek(u * len, true);
 			_anim.Advance(0.0);
 			list.Add(new WalkSample(u * Mathf.Tau, toBody * _skel.GetBoneGlobalPose(fr).Origin * k, toBody * _skel.GetBoneGlobalPose(fl).Origin * k));

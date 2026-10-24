@@ -13,6 +13,24 @@ namespace ProjectDS.Systems;
 public static class AnimLibraries
 {
 	private static readonly Dictionary<string, AnimationLibrary> _cache = new();
+	private static readonly Dictionary<string, Dictionary<string, (float seconds, float cycle)>> _meta = new();
+
+	/// <summary>The library's sidecar (written beside the GLB by the retargeter: each clip's length, and for a gait how far
+	/// one cycle carries the character at scale 1, in metres). Exported with the game (export_presets' include filter).</summary>
+	public static Dictionary<string, (float seconds, float cycle)> Meta(string glbPath)
+	{
+		if (_meta.TryGetValue(glbPath, out var m)) return m;
+		m = new();
+		string side = glbPath[..glbPath.LastIndexOf('.')] + ".json";
+		if (FileAccess.FileExists(side) && Json.ParseString(FileAccess.GetFileAsString(side)).AsGodotDictionary() is { } d)
+			foreach (var key in d.Keys)
+			{
+				var e = d[key].AsGodotDictionary();
+				m[key.AsString()] = ((float)e.GetValueOrDefault("seconds", 0f).AsDouble(), (float)e.GetValueOrDefault("cycle_m", 0f).AsDouble());
+			}
+		_meta[glbPath] = m;
+		return m;
+	}
 
 	/// <summary>The library at <paramref name="path"/> (loaded once), or null if it isn't there.</summary>
 	public static AnimationLibrary Load(string path)

@@ -29,14 +29,16 @@ Style layers (per clip, over a character's defaults; all optional):
   amplitude   {bone_prefix: 0..1.5}   how much of the motion that bone takes (1 all of it; 0 holds rest)
   offset      {bone: [x, y, z]}        an extra pose rotation, degrees, in the bone's local frame (a hunch, a head tilt)
   noise       {bone_prefix: degrees}   a slow coherent tremble (the stalker's tics), baked
+  replace     {prefix: true}           with a base: these bones point where their source points (legs), blended from
+                                       the base pose by amplitude, instead of adding the source's motion
   hips_scale  float                    the hips' travel scale on top of the height ratio
   frames      [start, end]             the slice of the source action
   step        int                      sample every n-th source frame (key density; the rate is the game's to set)
   loop        bool                     blend the last few frames into the first so it cycles cleanly
-  base        clip name                the character's own (old) clip, read at the same phase, in place of the rest
-                                       pose: its posture and its unmapped bones' motion stay, the source's dynamics go
-                                       on top (delta bones: the source's turn scaled by amplitude; dir bones: blended
-                                       from the base's direction toward the source's by amplitude)
+  base        clip name                additive: the character's own (old) clip, read at the same phase, is the pose;
+                                       the source's motion, measured from its own mean pose over the clip, goes on top,
+                                       scaled by amplitude (its posture never does). The unmapped bones keep the base's
+                                       motion. hips_amplitude scales the hips' bob.
 """
 import bpy, json, math, os, sys
 from mathutils import Matrix, Quaternion, Vector, noise
@@ -81,6 +83,14 @@ def rest_matrices(arm):
 def evaluated_pose(arm):
     """Armature-space pose matrices of every bone, as evaluated now."""
     return {pb.name: pb.matrix.copy() for pb in arm.pose.bones}
+
+
+def qscale(q, k):
+    """The rotation q taken k times as far (k may exceed 1: an exaggeration)."""
+    if q.w < 0:
+        q = -q
+    axis, angle = q.to_axis_angle()
+    return Quaternion(axis, angle * k)
 
 
 def style_get(table, bone, default):
@@ -148,6 +158,23 @@ def transfer_clip(src, tgt, bone_map, clip, defaults, yaw):
             base_basis.append({pb.name: pb.matrix_basis.copy() for pb in tgt.pose.bones})
         tgt.animation_data.action = act
     baked = {b.name: [] for b in order}
+    # additive (with a base): the source's motion is measured from its own mean pose over the clip, so only the motion
+    # goes across (its posture is the base's)
+    mean_q, mean_dir, mean_hips = {}, {}, None
+    if base_poses:
+        acc_q, acc_d, acc_h = {}, {}, Vector()
+        for f in frames:
+            scene.frame_set(f)
+            for pb in src.pose.bones:
+                q = pb.matrix.to_quaternion()
+                if pb.name in acc_q and acc_q[pb.name].dot(q) < 0:
+                    q = -q
+                acc_q[pb.name] = acc_q.get(pb.name, Quaternion((0, 0, 0, 0))) + q if pb.name in acc_q else q.copy()
+                acc_d[pb.name] = acc_d.get(pb.name, Vector()) + pb.matrix.to_3x3() @ Vector((0.0, 1.0, 0.0))
+            acc_h += src.pose.bones[s_hips].matrix.translation
+        mean_q = {k: Quaternion(v).normalized() for k, v in acc_q.items()}
+        mean_dir = {k: v.normalized() for k, v in acc_d.items()}
+        mean_hips = acc_h / len(frames)
     hips_loc = []
     for fi, f in enumerate(frames):
         scene.frame_set(f)
@@ -165,6 +192,7 @@ def transfer_clip(src, tgt, bone_map, clip, defaults, yaw):
                 chain = parent_pose @ rel_rest   # where the parent puts this bone at its own rest rotation
             else:
                 chain = rest.copy()
+            rest_chain = chain   # (what the keyed basis is relative to: the parent's pose, this bone at rest)
             if bb is not None:
                 # unmapped bones take the base clip's own motion (a jaw, the rags, a second neck bone)
                 chain = chain @ bb[name]
@@ -172,7 +200,28 @@ def transfer_clip(src, tgt, bone_map, clip, defaults, yaw):
             if name in mapping:
                 sname = mapping[name]
                 amp = style_get(style.get("amplitude"), name, 1.0)
-                if style_get(style.get("mode"), name, "delta") == "dir":
+                if bp is not None and style_get(style.get("replace"), name, False):
+                    # with a base, but this bone points where its source points (legs: the step pattern must be one
+                    # clip's, or two out-of-phase swings cancel), blended from the base pose by amplitude
+                    sd = (Cq @ (sp[sname].to_3x3() @ Vector((0.0, 1.0, 0.0)))).normalized()
+                    cur = (chain.to_3x3() @ Vector((0.0, 1.0, 0.0))).normalized()
+                    full = cur.rotation_difference(sd) @ chain.to_quaternion()
+                    want_rot = chain.to_quaternion().slerp(full, min(1.0, amp))
+                elif bp is not None:
+                    # additive: the source's turn from its mean, scaled, on the base clip's pose
+                    if style_get(style.get("mode"), name, "delta") == "dir":
+                        sd = (Cq @ (sp[sname].to_3x3() @ Vector((0.0, 1.0, 0.0)))).normalized()
+                        md = (Cq @ mean_dir[sname]).normalized()
+                        r = qscale(md.rotation_difference(sd), amp)
+                        bd = (bp[name].to_3x3() @ Vector((0.0, 1.0, 0.0))).normalized()
+                        d = (r @ bd).normalized()
+                        cur = (chain.to_3x3() @ Vector((0.0, 1.0, 0.0))).normalized()
+                        want_rot = cur.rotation_difference(d) @ chain.to_quaternion()
+                    else:
+                        dq = sp[sname].to_quaternion() @ mean_q[sname].inverted()
+                        dq = Cq @ qscale(dq, amp) @ Cq.inverted()
+                        want_rot = dq @ bp[name].to_quaternion()
+                elif style_get(style.get("mode"), name, "delta") == "dir":
                     # the limb points where the source's points (a swing from where its parent's pose leaves it): rest
                     # poses that don't match (a T-posed library, an A-posed creature) don't matter
                     sd = (Cq @ (sp[sname].to_3x3() @ Vector((0.0, 1.0, 0.0)))).normalized()
@@ -184,7 +233,7 @@ def transfer_clip(src, tgt, bone_map, clip, defaults, yaw):
                     # hunch stays a hunch. With a base, the amount scales the source's turn, not a blend back to rest.
                     delta = Cq @ sp[sname].to_quaternion() @ src_rest[sname].to_quaternion().inverted() @ Cq.inverted()
                     if amp != 1.0:
-                        delta = Quaternion().slerp(delta, amp)
+                        delta = qscale(delta, amp)
                     anchor = bp[name].to_quaternion() if bp is not None else rest.to_quaternion()
                     want_rot = delta @ anchor
             # a slow tremble, coherent over time
@@ -201,11 +250,15 @@ def transfer_clip(src, tgt, bone_map, clip, defaults, yaw):
             pos = chain.translation.copy()
             if name == t_hips:
                 d = C @ (sp[s_hips].translation - src_rest[s_hips].translation)
-                pos = (bp[name].translation if bp is not None else rest.translation) + d * ratio
+                if bp is not None:
+                    d = C @ (sp[s_hips].translation - mean_hips)
+                    pos = bp[name].translation + d * ratio * style.get("hips_amplitude", 1.0)
+                else:
+                    pos = rest.translation + d * ratio
             M = Matrix.Translation(pos) @ want_rot.to_matrix().to_4x4()
             pose[name] = M
             # basis = (parent_pose @ rel_rest)^-1 @ M
-            basis = chain.inverted() @ M if bone.parent else rest.inverted() @ M
+            basis = rest_chain.inverted() @ M
             baked[name].append(basis)
         hips_loc.append(None)
 

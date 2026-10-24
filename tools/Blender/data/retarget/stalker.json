@@ -1,0 +1,112 @@
+{
+ "character": "stalker",
+ "source": "assets/animations/ual/UAL1_Standard.glb",
+ "root_motion_source": "assets/animations/ual/UAL1_Standard_RM.glb",
+ "target": "assets/models/stalker/stalker.glb",
+ "map": "tools/Blender/data/retarget/ual_to_house.json",
+ "source_yaw": 180.0,
+ "out": "assets/animations/stalker/stalker_anims.glb",
+ "style": {
+  "mode": {
+   "clav": "dir",
+   "upper": "dir",
+   "fore": "dir",
+   "hand": "dir",
+   "f": "dir",
+   "thigh": "dir",
+   "shin": "dir",
+   "foot": "dir",
+   "toe": "dir"
+  },
+  "amplitude": {
+   "f": 0.5
+  },
+  "noise": {
+   "head": 5,
+   "neck": 2,
+   "hand": 2
+  },
+  "replace": {
+   "thigh": true,
+   "shin": true,
+   "foot": true,
+   "toe": true
+  }
+ },
+ "clips": [
+  {
+   "source": "Walk_Loop",
+   "name": "walk",
+   "loop": true,
+   "base": "walk",
+   "style": {
+    "amplitude": {
+     "upper": 0.4,
+     "fore": 0.4,
+     "hand": 0.35,
+     "clav": 0.3,
+     "thigh": 0.85,
+     "shin": 0.85,
+     "foot": 0.7,
+     "toe": 0.6,
+     "spine": 0.7,
+     "chest": 0.7,
+     "neck": 0.5,
+     "head": 0.5
+    }
+   }
+  },
+  {
+   "source": "Idle_Loop",
+   "name": "idle",
+   "loop": true,
+   "base": "idle",
+   "style": {
+    "amplitude": {
+     "upper": 0.4,
+     "fore": 0.4,
+     "hand": 0.4,
+     "clav": 0.5,
+     "thigh": 0.4,
+     "shin": 0.4,
+     "foot": 0.3,
+     "toe": 0.3,
+     "spine": 1.2,
+     "chest": 1.2,
+     "neck": 1.0,
+     "head": 1.0
+    },
+    "noise": {
+     "head": 7,
+     "neck": 3,
+     "hand": 3
+    }
+   }
+  },
+  {
+   "source": "Push_Loop",
+   "name": "shove",
+   "base": "shove",
+   "frames": [
+    0,
+    40
+   ],
+   "style": {
+    "amplitude": {
+     "upper": 0.7,
+     "fore": 0.7,
+     "hand": 0.6,
+     "clav": 0.6,
+     "thigh": 0.5,
+     "shin": 0.5,
+     "foot": 0.4,
+     "toe": 0.3,
+     "spine": 0.8,
+     "chest": 0.8,
+     "neck": 0.6,
+     "head": 0.6
+    }
+   }
+  }
+ ]
+}

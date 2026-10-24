@@ -293,7 +293,10 @@ public partial class Cabin : Node3D
 		{
 			float y0 = FloorBottom + c * LogH, y1 = y0 + LogH;
 			bool frontLong = c % 2 == 0;
-			float shade = rng.RandfRange(0.82f, 1.06f);
+			// (2026-10-24, the art pass) weathered by height: the courses near the ground dark with damp and splash, the
+			// upper ones bleached by the sun and rain; each log its own on top of that
+			float up = Courses > 1 ? c / (float)(Courses - 1) : 1f;
+			float shade = rng.RandfRange(0.86f, 1.04f) * Mathf.Lerp(0.74f, 1.08f, Mathf.SmoothStep(0f, 1f, up));
 			float jit = rng.RandfRange(-0.012f, 0.012f);
 
 			// front and back (along X)
@@ -330,7 +333,7 @@ public partial class Cabin : Node3D
 			float za = frontLong ? -Hd + LogT * 0.5f : -Hd - Ext, zb = -za;
 			foreach (int side in new[] { 1, -1 })
 			{
-				float s2 = rng.RandfRange(0.84f, 1.05f);
+				float s2 = rng.RandfRange(0.86f, 1.04f) * Mathf.Lerp(0.74f, 1.08f, Mathf.SmoothStep(0f, 1f, up));
 				float x = side * Hw + jit * 0.5f;
 				RoundLog(k, lk, true, za, zb, x, y0, y1, Vector3.Right * side, true, true, c == Courses - 1, c == 0,
 					new Color(s2, s2 * 0.98f, s2 * 0.95f), rng.Randf());
@@ -345,7 +348,8 @@ public partial class Cabin : Node3D
 						foreach (var (pa, pb) in below)
 						{
 							float lo = Mathf.Max(a, pa), hi = Mathf.Min(b, pb);
-							if (hi - lo > 0.05f) Chink(k, lk, alongZ, lo, hi, line, y, outward, rng.RandfRange(0.85f, 1.02f));
+							// (2026-10-24) old lime, patched over the years: each run its own shade, dirtier low down
+							if (hi - lo > 0.05f) Chink(k, lk, alongZ, lo, hi, line, y, outward, rng.RandfRange(0.62f, 0.95f) * Mathf.Lerp(0.78f, 1f, up));
 						}
 				prev[wall] = spans;
 			}
@@ -462,7 +466,7 @@ public partial class Cabin : Node3D
 
 	private void BuildChimney(MeshKit k, List<(Vector3, Vector3, Basis)> cols)
 	{
-		var stone = BuildingTextures.StoneMat;
+		var stone = BuildingTextures.CabinFieldstoneMat;
 		float cx = -Hw - LogT * 0.5f - 0.38f, cz = -1.0f;
 		float g = LowestLocal(cx - 0.4f, cz - 0.55f, cx + 0.4f, cz + 0.55f) - 0.25f;
 		k.Mat(stone);
@@ -492,7 +496,7 @@ public partial class Cabin : Node3D
 
 	private void BuildFoundationAndPorch(MeshKit k, List<(Vector3, Vector3, Basis)> cols)
 	{
-		var stone = BuildingTextures.StoneMat;
+		var stone = BuildingTextures.CabinFieldstoneMat;
 		var deck = BuildingTextures.PorchDeckMat;
 		var post = BuildingTextures.TimberUpMat;
 		var boards = BuildingTextures.GableBoardsMat;

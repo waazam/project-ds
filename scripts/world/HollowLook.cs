@@ -49,7 +49,7 @@ public static class HollowLook
 
 	/// <summary>The logs' outside faces: silver-brown, weathered by the rain (mottled, not baked).</summary>
 	public static Material CabinLogOut => Cache("h_log_out", () =>
-		RoomSurface.Of(RoundWood("h_cabinlog_out", new Color(0.56f, 0.55f, 0.53f)), RoomSurface.Wood with { Desaturate = 0.8f, Mottle = 0.45f, Grime = 1f }, 31));
+		RoomSurface.Of(RoundWood("h_cabinlog_out", new Color(0.6f, 0.54f, 0.47f)), RoomSurface.Wood with { Desaturate = 0.5f, Mottle = 0.5f, Grime = 1f }, 31));   // (2026-10-24: warmer, less washed out: it sat apart from every other wood on the cabin)
 	/// <summary>The logs' inside faces: a step darker and browner (smoke, hands), baked by the room's shade.</summary>
 	public static Material CabinLogIn => Cache("h_log_in", () =>
 		RoomSurface.Of(RoundWood("h_cabinlog_in", new Color(0.5f, 0.49f, 0.47f)), RoomSurface.Wood with { Desaturate = 0.78f, Mottle = 0.4f, Streaks = 0.2f, Tide = 0.15f, Grime = 1.05f }, 32));
@@ -70,7 +70,7 @@ public static class HollowLook
 		m.AlbedoColor = tint;
 		return m;
 	}
-	public static Material ChinkOut => Cache("h_chink_out", () => RoomSurface.Of(Mortar("h_chink_out", new Color(0.7f, 0.68f, 0.62f)), RoomSurface.Plaster with { Desaturate = 0.3f, Streaks = 0.5f }, 34));
+	public static Material ChinkOut => Cache("h_chink_out", () => RoomSurface.Of(Mortar("h_chink_out", new Color(0.6f, 0.57f, 0.5f)), RoomSurface.Plaster with { Desaturate = 0.3f, Streaks = 0.5f }, 34));
 	public static Material ChinkIn => Cache("h_chink_in", () => RoomSurface.Of(Mortar("h_chink_in", new Color(0.6f, 0.58f, 0.52f)), RoomSurface.Plaster with { Desaturate = 0.3f, Streaks = 0.3f }, 35));
 
 	/// <summary>The cabin's floor: wide old boards, near black with dirt and oil, grey where feet went.</summary>

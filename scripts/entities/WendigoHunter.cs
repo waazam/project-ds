@@ -529,9 +529,9 @@ public partial class WendigoHunter : Node3D
 		if (clip != "idle") _stillFor = 0f;
 		float rate = shown switch
 		{
-			"walk" => s / (2.55f * BodyScale) * Body.ClipLength("walk"),
-			"approach" => s / (2.1f * BodyScale) * Body.ClipLength("approach"),
-			"run" => s / (3.5f * BodyScale) * Body.ClipLength("run"),
+			"walk" => s / (Body.CycleMetres("walk", 2.55f) * BodyScale) * Body.ClipLength("walk"),
+			"approach" => s / (Body.CycleMetres("approach", 2.1f) * BodyScale) * Body.ClipLength("approach"),
+			"run" => s / (Body.CycleMetres("run", 3.5f) * BodyScale) * Body.ClipLength("run"),
 			_ => 1f,
 		};
 		Body.Gait(shown, rate, shown == _shownGait ? 0.0 : 0.35);

@@ -115,6 +115,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--frog") >= 0) { await FrogShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--dump-lake-winter") >= 0) { DumpLakeWinter(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lake-winter") >= 0) { await LakeWinterShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--gaits") >= 0) { await GaitShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--wendigo") >= 0) { await WendigoShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker") >= 0) { await StalkerShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--stalker-motion") >= 0) { await StalkerMotion(); GetTree().Quit(); return; }
@@ -993,6 +994,52 @@ public partial class CreaturePreview : Node3D
 		w.Hold("air", 0.45f);
 		await Seconds(0.5);
 		await Shot("wendigo_climbing", new Vector3(6f, 3.5f, 5f), new Vector3(0, 5f, -2.6f));
+	}
+
+	/// <summary>(2026-10-24, the animation overhaul) The gaits in the game's own renderer, the hand-keyed clips beside the
+	/// retargeted ones: each creature held at four moments of each cycle, side on (<c>--gaits</c>; gait_&lt;who&gt;_&lt;clip&gt;_&lt;old|new&gt;_&lt;k&gt;.png).</summary>
+	private async Task GaitShots()
+	{
+		env.BackgroundColor = new Color(0.12f, 0.13f, 0.15f);
+		env.AmbientLightEnergy = 0.45f;
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(40, 40) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.26f, 0.25f, 0.23f) } });
+		foreach (bool retargeted in new[] { false, true })
+		{
+			var w = new Wendigo { Name = "Wendigo", RetargetedGaits = retargeted };
+			AddChild(w);
+			w.StandAt(Vector3.Zero, new Vector3(0, 0, -10));
+			await Seconds(0.6);
+			foreach (string clip in new[] { "walk", "run", "approach", "idle" })
+				for (int k = 0; k < 4; k++)
+				{
+					w.Hold(clip, k / 4f);
+					await Seconds(0.25);
+					await Shot($"gait_wendigo_{clip}_{(retargeted ? "new" : "old")}_{k}", new Vector3(8.5f, 2.4f, 0f), new Vector3(0, 2.2f, 0));
+				}
+			w.QueueFree();
+			await Frames(2);
+			var skin = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/stalker_skin.gdshader") };
+			skin.SetShaderParameter("albedo", new Color(0.026f, 0.028f, 0.034f));
+			skin.SetShaderParameter("face_tint", new Color(0.21f, 0.215f, 0.22f));
+			var b = new StalkerBody { Name = "Stalker", Size = 1.1f, Skin = skin, RetargetedClips = retargeted };
+			AddChild(b);
+			await Frames(3);
+			for (int k = 0; k < 4; k++)
+			{
+				b.WalkPhase = k / 4f * Mathf.Tau + 0.001f;
+				await Seconds(0.3);
+				await Shot($"gait_stalker_walk_{(retargeted ? "new" : "old")}_{k}", new Vector3(4.6f, 1.3f, 0f), new Vector3(0, 1.1f, 0));
+			}
+			b.WalkPhase = -1f;
+			b.Play("shove", 0.0f);
+			for (int k = 0; k < 4; k++)
+			{
+				await Seconds(0.35);
+				await Shot($"gait_stalker_shove_{(retargeted ? "new" : "old")}_{k}", new Vector3(3.2f, 1.4f, -3.2f), new Vector3(0, 1.2f, 0));
+			}
+			b.QueueFree();
+			await Frames(2);
+		}
 	}
 
 	/// <summary>The ski lodge's interior (Act 23), standing alone: the lobby, the bar, the pantry, the corridor, the rooms, the dining hall.</summary>

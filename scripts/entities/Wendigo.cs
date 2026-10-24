@@ -43,6 +43,20 @@ public partial class Wendigo : Node3D
 	private Node3D _body, _model, _head, _headOnlyModel;
 	private Skeleton3D _skel;
 	private AnimationPlayer _anim;
+	/// <summary>(2026-10-24, the animation overhaul) Its gaits from the retargeted library (tools/Blender/retarget.py: the
+	/// reference library's captured motion layered on its own clips' posture). Off: the hand-keyed clips, as before.</summary>
+	[Export] public bool RetargetedGaits = true;
+	public const string AnimLibPath = "res://assets/animations/wendigo/wendigo_anims.glb";
+	private readonly System.Collections.Generic.Dictionary<string, string> _remap = new();
+	/// <summary>The clip actually played for a clip name (its retargeted version when there is one).</summary>
+	public string Clip(string name) => _remap.TryGetValue(name, out var r) ? r : name;
+	/// <summary>How far one cycle of a gait carries it at full size (metres): the retargeted clip's measured stride, else
+	/// <paramref name="fallback"/> (the hand-keyed clip's).</summary>
+	public float CycleMetres(string name, float fallback)
+	{
+		if (!_remap.ContainsKey(name)) return fallback;
+		return Systems.AnimLibraries.Meta(AnimLibPath).TryGetValue(_remap[name]["ual/".Length..], out var m) && m.cycle > 0.01f ? m.cycle : fallback;
+	}
 	private int _headBone = -1, _jawBone = -1, _chest = -1;
 	private bool _headOnly;
 	private GpuParticles3D _breath;
@@ -109,7 +123,10 @@ public partial class Wendigo : Node3D
 			_anim.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual;
 			foreach (var loop in new[] { "idle", "walk", "run", "lurk", "approach", "crawl", "sniff" })
 				if (_anim.GetAnimation(loop) is { } a) a.LoopMode = Animation.LoopModeEnum.Linear;
-			_anim.Play("idle");
+			if (RetargetedGaits && System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-retarget") < 0 && Systems.AnimLibraries.Attach(_anim, "ual", AnimLibPath, "walk", "run", "idle", "stalk"))
+				foreach (var (from, to) in new[] { ("walk", "ual/walk"), ("run", "ual/run"), ("idle", "ual/idle"), ("approach", "ual/stalk") })
+					if (_anim.HasAnimation(to)) _remap[from] = to;
+			_anim.Play(Clip("idle"));
 		}
 		Tune(_model);
 		BuildBreath();
@@ -345,8 +362,8 @@ public partial class Wendigo : Node3D
 		_visSet = false;
 		if (_anim != null && !_headOnly)
 		{
-			_anim.Play("idle", 0.0);
-			_anim.Seek(_rng.RandfRange(0f, 3.5f), true);
+			_anim.Play(Clip("idle"), 0.0);
+			_anim.Seek(_rng.RandfRange(0f, (float)_anim.GetAnimation(Clip("idle")).Length), true);
 		}
 		Visible = true;
 	}
@@ -355,6 +372,7 @@ public partial class Wendigo : Node3D
 	/// on a wall's top, clinging to a trunk mid-climb). The head's twitch goes on over it.</summary>
 	public void Hold(string clip, float at, double blend = 0.0)
 	{
+		clip = Clip(clip);
 		if (_anim == null || _headOnly || !_anim.HasAnimation(clip)) return;
 		_leapT = -1f;
 		_anim.Play(clip, Mathf.Max(blend, MinBlend), 0f);
@@ -396,6 +414,7 @@ public partial class Wendigo : Node3D
 	/// rate from how fast it's really going, each frame, so its feet keep to the ground.</summary>
 	public void Gait(string name, float rate, double blend)
 	{
+		name = Clip(name);
 		if (_anim == null || _headOnly || !_anim.HasAnimation(name)) return;
 		_leapT = -1f;
 		if (_anim.CurrentAnimation != name) _anim.Play(name, Mathf.Max(blend, 0.3), 1f);
@@ -403,10 +422,11 @@ public partial class Wendigo : Node3D
 	}
 
 	/// <summary>A clip's length in seconds (0 if it isn't there).</summary>
-	public float ClipLength(string name) => _anim != null && _anim.HasAnimation(name) ? (float)_anim.GetAnimation(name).Length : 0f;
+	public float ClipLength(string name) => _anim != null && _anim.HasAnimation(Clip(name)) ? (float)_anim.GetAnimation(Clip(name)).Length : 0f;
 
 	private void PlayClip(string name, float seconds, double blend)
 	{
+		name = Clip(name);
 		if (_anim == null || _headOnly || !_anim.HasAnimation(name)) return;
 		_anim.SpeedScale = 1f;   // (a gait's rate off: this clip's own timing)
 		float len = (float)_anim.GetAnimation(name).Length;
@@ -437,7 +457,7 @@ public partial class Wendigo : Node3D
 				{
 					GlobalPosition = _leapTo;
 					if (_landClip != null) PlayClip(_landClip, _landSeconds, 0.05);
-					else if (_anim != null && !_headOnly) _anim.Play("idle", 0.6);
+					else if (_anim != null && !_headOnly) _anim.Play(Clip("idle"), 0.6);
 				}
 				else Visible = false;
 				var cb = _landed; _landed = null;

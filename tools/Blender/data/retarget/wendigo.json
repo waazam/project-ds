@@ -7,7 +7,7 @@
  "out": "assets/animations/wendigo/wendigo_anims.glb",
  "style": {
   "amplitude": {
-   "f": 0.6
+   "f": 0.5
   },
   "mode": {
    "clav": "dir",
@@ -19,28 +19,109 @@
    "shin": "dir",
    "foot": "dir",
    "toe": "dir"
+  },
+  "replace": {
+   "thigh": true,
+   "shin": true,
+   "foot": true,
+   "toe": true
   }
  },
  "clips": [
   {
    "source": "Walk_Loop",
    "name": "walk",
-   "loop": true
+   "loop": true,
+   "base": "walk",
+   "style": {
+    "amplitude": {
+     "upper": 0.35,
+     "fore": 0.35,
+     "hand": 0.3,
+     "clav": 0.3,
+     "thigh": 0.8,
+     "shin": 0.8,
+     "foot": 0.7,
+     "toe": 0.6,
+     "spine": 0.7,
+     "chest": 0.7,
+     "neck": 0.5,
+     "head": 0.4
+    }
+   }
   },
   {
    "source": "Sprint_Loop",
    "name": "run",
-   "loop": true
+   "loop": true,
+   "base": "run",
+   "style": {
+    "amplitude": {
+     "upper": 0.45,
+     "fore": 0.45,
+     "hand": 0.35,
+     "clav": 0.3,
+     "thigh": 0.95,
+     "shin": 0.95,
+     "foot": 0.8,
+     "toe": 0.6,
+     "spine": 0.6,
+     "chest": 0.6,
+     "neck": 0.4,
+     "head": 0.3
+    }
+   }
   },
   {
    "source": "Idle_Loop",
    "name": "idle",
-   "loop": true
+   "loop": true,
+   "base": "idle",
+   "style": {
+    "amplitude": {
+     "upper": 0.3,
+     "fore": 0.3,
+     "hand": 0.3,
+     "clav": 0.4,
+     "thigh": 0.4,
+     "shin": 0.4,
+     "foot": 0.3,
+     "toe": 0.3,
+     "spine": 1.0,
+     "chest": 1.0,
+     "neck": 0.8,
+     "head": 0.8
+    },
+    "noise": {
+     "head": 4,
+     "neck": 2
+    }
+   }
   },
   {
    "source": "Crouch_Fwd_Loop",
    "name": "stalk",
-   "loop": true
+   "loop": true,
+   "base": "approach",
+   "style": {
+    "amplitude": {
+     "upper": 0.35,
+     "fore": 0.35,
+     "hand": 0.3,
+     "clav": 0.3,
+     "thigh": 0.75,
+     "shin": 0.75,
+     "foot": 0.6,
+     "toe": 0.5,
+     "spine": 0.6,
+     "chest": 0.6,
+     "neck": 0.4,
+     "head": 0.4
+    },
+    "noise": {
+     "head": 5
+    }
+   }
   }
  ],
  "root_motion_source": "assets/animations/ual/UAL1_Standard_RM.glb"

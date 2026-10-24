@@ -25,7 +25,14 @@ public partial class StalkerBody
 	/// <summary>True when it's the remodel (a skeleton and clips), false for the old pieces (the editor).</summary>
 	public bool Rigged => _skel != null;
 	/// <summary>The clip playing (tests).</summary>
-	public string Clip => _anim?.AssignedAnimation ?? "";
+	public string Clip => (_anim?.AssignedAnimation.ToString() ?? "").Replace("ual/", "");
+	/// <summary>(2026-10-24, the animation overhaul) Its walk, idle and shove from the retargeted library (the reference
+	/// library's captured motion layered on its own clips' posture). Off: the hand-keyed clips.</summary>
+	[Export] public bool RetargetedClips = true;
+	public const string AnimLibPath = "res://assets/animations/stalker/stalker_anims.glb";
+	private readonly System.Collections.Generic.Dictionary<string, string> _remap = new();
+	/// <summary>The clip actually played for a clip name (its retargeted version when there is one).</summary>
+	private string R(string name) => _remap.TryGetValue(name, out var r) ? r : name;
 	/// <summary>A step of the walk clip (metres at this size): walkers advance <see cref="WalkPhase"/> by pi per step.</summary>
 	public float StepLength => 0.6f * Size;
 	/// <summary>World point the near hand is on (null: not gripping).</summary>
@@ -146,8 +153,11 @@ public partial class StalkerBody
 			_anim.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual;
 			foreach (var clip in new[] { "idle", "walk" })
 				if (_anim.GetAnimation(clip) is { } a) a.LoopMode = Animation.LoopModeEnum.Linear;
-			_anim.Play("idle");
-			_anim.Seek(_idleRng.RandfRange(0f, 5.5f), true);
+			if (RetargetedClips && !Engine.IsEditorHint() && Systems.AnimLibraries.Attach(_anim, "ual", AnimLibPath, "walk", "idle"))
+				foreach (var c in new[] { "walk", "idle", "shove" })
+					if (_anim.HasAnimation("ual/" + c)) _remap[c] = "ual/" + c;
+			_anim.Play(R("idle"));
+			_anim.Seek(_idleRng.RandfRange(0f, (float)_anim.GetAnimation(R("idle")).Length), true);
 		}
 		FindJawHinge();
 		return true;
@@ -222,18 +232,18 @@ public partial class StalkerBody
 	/// <summary>Plays a clip (blended in); one that doesn't loop holds its last frame.</summary>
 	public void Play(string clip, float blend = 0.2f, float speed = 1f)
 	{
-		if (_anim == null || !_anim.HasAnimation(clip)) return;
+		if (_anim == null || !_anim.HasAnimation(R(clip))) return;
 		_hold = clip is "idle" or "walk" ? null : clip;
-		_anim.Play(clip, blend, speed);
+		_anim.Play(R(clip), blend, speed);
 	}
 
 	/// <summary>Straight into a held pose (out of view: no blend), e.g. the peek it is found in.</summary>
 	public void Snap(string clip)
 	{
-		if (_anim == null || !_anim.HasAnimation(clip)) return;
+		if (_anim == null || !_anim.HasAnimation(R(clip))) return;
 		_hold = clip is "idle" or "walk" ? null : clip;
-		_anim.Play(clip, 0.0);
-		_anim.Seek(_anim.GetAnimation(clip).Length, true);
+		_anim.Play(R(clip), 0.0);
+		_anim.Seek(_anim.GetAnimation(R(clip)).Length, true);
 		_anim.Advance(0.0);
 		Capture();
 		foreach (var r in _rags) r.Started = false;
@@ -300,10 +310,10 @@ public partial class StalkerBody
 			// walking: the clip's feet locked to the walker's phase (a footfall at every pi)
 			if (WalkPhase >= 0f)
 			{
-				var walk = _anim.GetAnimation("walk");
+				var walk = _anim.GetAnimation(R("walk"));
 				if (walk != null)
 				{
-					if (_anim.CurrentAnimation != "walk") { _hold = null; _anim.Play("walk", 0.3); _lastPhase = WalkPhase; }
+					if (_anim.CurrentAnimation != R("walk")) { _hold = null; _anim.Play(R("walk"), 0.3); _lastPhase = WalkPhase; }
 					float len = (float)walk.Length;
 					float rate = (WalkPhase - _lastPhase) / Mathf.Max(dt, 1e-4f) / Mathf.Tau * len;   // clip seconds a second
 					_walkRate = Mathf.Lerp(_walkRate, rate, 1f - Mathf.Exp(-6f * dt));
@@ -315,7 +325,7 @@ public partial class StalkerBody
 			else
 			{
 				_anim.SpeedScale = 1f;
-				if (_anim.CurrentAnimation == "walk") _anim.Play("idle", 0.4);
+				if (_anim.CurrentAnimation == R("walk")) _anim.Play(R("idle"), 0.4);
 			}
 			_lastPhase = WalkPhase;
 			// a clip that's run its course holds its last frame: the player stops writing the bones then, so its pose is

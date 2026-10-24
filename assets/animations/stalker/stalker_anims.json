@@ -1,0 +1,17 @@
+{
+ "walk": {
+  "seconds": 1.3333,
+  "cycle_m": 1.4749,
+  "loop": true
+ },
+ "idle": {
+  "seconds": 2.5,
+  "cycle_m": 0.0,
+  "loop": true
+ },
+ "shove": {
+  "seconds": 1.6667,
+  "cycle_m": 0.5673,
+  "loop": false
+ }
+}
