@@ -589,55 +589,80 @@ def leaves(k, rnd, tips, per, size):
 
 
 def vine_mound(seed, size):
+    """(2026-10-23, the owner: the bushes "are too round ... they look like mesh with fake leaves like a fake house plant") A
+    shrub, not a ball wearing leaves: woody stems fanning up and out of the ground from a tight base, bowed and drooping
+    at their tips under their own weight, side twigs off them; the leaves in clusters along the outer part of every stem
+    and twig at all angles, sizes and shades, a few yellowing; no solid core, so the outline is ragged, the light gets in
+    and you can see into it. The same footprint as before (the scatter's colliders are fitted to `size`)."""
     rnd = random.Random(seed * 9973)
     k = Kit()
-    k.mat("vine_core").col(1.0)
-    lumps = []
+    stems = []   # (points along it)
+    n = rnd.randint(12, 17)
     leanA = rnd.uniform(0, TAU)
-    lean = V(math.cos(leanA), 0, math.sin(leanA))
-    for i in range(6):
-        a = 0.0 if i == 0 else leanA + rnd.uniform(-1.4, 1.4) + (math.pi if i % 3 == 0 else 0.0)
-        d = 0.0 if i == 0 else rnd.uniform(0.3, 0.65)
-        hy = rnd.uniform(0.5, 0.7) if i == 1 else rnd.uniform(0.18, 0.38) * (1.2 if i == 0 else 0.85)
-        c = V(math.cos(a) * size.x * d, size.y * hy, math.sin(a) * size.z * d) - lean * size.x * 0.12
-        rr = V(size.x, size.y * (0.75 if i == 1 else 0.62), size.z) * rnd.uniform(0.38, 0.58) * (1.1 if i == 0 else 0.85)
-        lumps.append((c, rr))
-        k.blob(c, rr * 0.9, seed * 7 + i, 0.3, False, 0.6, 0.6, 2, 1.6)
+    for i in range(n):
+        a = rnd.uniform(0, TAU)
+        base = V(math.cos(a), 0, math.sin(a)) * rnd.uniform(0.02, 0.18) * size.x
+        # out and up: a few nearly upright, most leaning out, one or two reaching far and low
+        tilt = rnd.uniform(0.05, 0.35) if i < 5 else rnd.uniform(0.3, 0.85)
+        out = V(math.cos(a) * size.x, 0, math.sin(a) * size.z).normalized() if (size.x + size.z) > 0 else RIGHT.copy()
+        out = (out + V(math.cos(leanA), 0, math.sin(leanA)) * 0.25).normalized()
+        length = size.y * rnd.uniform(0.95, 1.35) * (1.15 if tilt > 0.7 else 1.0)
+        pts = [base]
+        d = (UP * math.cos(tilt) + out * math.sin(tilt)).normalized()
+        seg = 5
+        for s_ in range(seg):
+            # bowing over as it goes: the tip sags
+            d = (d + out * 0.1 + DOWN * (0.03 + 0.06 * s_ / seg) + V(rnd.uniform(-0.12, 0.12), 0, rnd.uniform(-0.12, 0.12))).normalized()
+            pts.append(pts[-1] + d * length / seg)
+        # keep it inside its footprint (the collider's)
+        for q in pts:
+            q.x = max(-size.x * 0.55, min(size.x * 0.55, q.x)); q.z = max(-size.z * 0.55, min(size.z * 0.55, q.z))
+            q.y = max(0.03, min(size.y * 1.02, q.y))
+        stems.append((pts, 0.022 * (1.2 if i < 3 else 1.0)))
+        # side twigs off the outer half
+        for _ in range(rnd.randint(2, 4)):
+            at = rnd.randint(2, seg - 1)
+            p0 = pts[at]
+            td = (d + V(rnd.uniform(-1, 1), rnd.uniform(0.0, 0.8), rnd.uniform(-1, 1))).normalized()
+            tl = length * rnd.uniform(0.18, 0.35)
+            tw = [p0, p0 + td * tl * 0.5, p0 + (td + DOWN * 0.25).normalized() * tl]
+            stems.append((tw, 0.009))
+    # the wood: grey-brown, thin, tapering
+    k.mat("bark").col(0.4, 0.35, 0.29)
+    for pts, r in stems:
+        for a_, b_ in zip(pts, pts[1:]):
+            k.cylinder(a_, b_, r, r * 0.7, 4, False, 2.0)
+    # the leaves: clusters along the outer two thirds of each stem and twig
     k.mat("ivy")
-    n = int(260 * size.x * size.z) + 300
-    for _ in range(n):
-        c, r = lumps[rnd.randint(0, len(lumps) - 1)]
-        th = rnd.uniform(0, TAU)
-        ph = math.acos(rnd.uniform(-0.35, 1.0))
-        dd = V(math.sin(ph) * math.cos(th), math.cos(ph), math.sin(ph) * math.sin(th))
-        at = c + V(dd.x * r.x, dd.y * r.y, dd.z * r.z)
-        if at.y < 0.05:
-            continue
-        nrm = V(dd.x / r.x, dd.y / r.y, dd.z / r.z).normalized()
-        nrm = (nrm + V(rnd.uniform(-0.4, 0.4), rnd.uniform(-0.2, 0.4), rnd.uniform(-0.4, 0.4))).normalized()
-        down = DOWN - nrm * DOWN.dot(nrm)
-        t = down.normalized() if down.length_squared > 0.01 else RIGHT.copy()
-        ang = rnd.uniform(-0.8, 0.8)
-        t = (t * math.cos(ang) + nrm.cross(t) * math.sin(ang)).normalized()
-        side = nrm.cross(t).normalized()
-        sz = rnd.uniform(0.26, 0.42)
-        hs = sz * 0.5
-        b0 = at - t * sz * 0.2
-        top = b0 + t * sz
-        cell = 0 if rnd.random() < 0.5 else (1 if rnd.random() < 0.6 else (3 if rnd.random() < 0.7 else 2))
-        u0, v0 = (cell % 2) * 0.5, (cell // 2) * 0.5
-        l = rnd.uniform(0.55, 0.92)
-        if at.y < size.y * 0.25 and rnd.random() < 0.45:
-            continue
-        k.col(l, l * rnd.uniform(0.95, 1.08), l * 0.9)
-        k.quad(b0 - side * hs, b0 + side * hs, top + side * hs + nrm * 0.03, top - side * hs + nrm * 0.03, nrm,
-               (u0, v0 + 0.5), (u0 + 0.5, v0 + 0.5), (u0 + 0.5, v0), (u0, v0))
-    k.mat("bark").col(0.42, 0.38, 0.33)
-    for _ in range(4):
-        c, r = lumps[rnd.randint(0, len(lumps) - 1)]
-        b = c + UP * r.y * 0.6
-        d = V(rnd.uniform(-0.6, 0.6), 1, rnd.uniform(-0.6, 0.6)).normalized()
-        k.cylinder(b, b + d * rnd.uniform(0.5, 1.0) * size.y * 0.6, 0.02, 0.004, 4, False, 2.0)
+    for pts, r in stems:
+        for idx in range(max(1, len(pts) // 5), len(pts)):
+            at = pts[idx]
+            per = rnd.randint(7, 11) if r > 0.015 else rnd.randint(5, 8)
+            for _ in range(per):
+                p = at + V(rnd.uniform(-0.2, 0.2), rnd.uniform(-0.14, 0.16), rnd.uniform(-0.2, 0.2))
+                if p.y < 0.06:
+                    continue
+                # every way about, a bias up and out (leaves turn to the light), drooping a little
+                nrm = (UP * 0.5 + V(rnd.uniform(-1, 1), rnd.uniform(-0.4, 0.8), rnd.uniform(-1, 1))).normalized()
+                t = (V(rnd.uniform(-1, 1), rnd.uniform(-0.6, 0.3), rnd.uniform(-1, 1))).normalized()
+                t = t - nrm * t.dot(nrm)
+                if t.length_squared < 0.05:
+                    continue
+                t.normalize()
+                side = nrm.cross(t).normalized()
+                sz = rnd.uniform(0.14, 0.32)
+                hs = sz * rnd.uniform(0.4, 0.55)
+                b0 = p - t * sz * 0.15
+                top = b0 + t * sz
+                # a curl: the far end lifted off the leaf's plane
+                curl = nrm * sz * rnd.uniform(0.0, 0.12)
+                cell = 0 if rnd.random() < 0.5 else (1 if rnd.random() < 0.6 else (3 if rnd.random() < 0.7 else 2))
+                u0, v0 = (cell % 2) * 0.5, (cell // 2) * 0.5
+                l = rnd.uniform(0.5, 0.95)
+                yel = rnd.uniform(0.3, 0.8) if rnd.random() < 0.12 else 0.0
+                k.col(lerp(l, l * 1.9, yel), lerp(l * rnd.uniform(0.95, 1.1), l * 1.4, yel), lerp(l * 0.88, l * 0.35, yel))
+                k.quad(b0 - side * hs, b0 + side * hs, top + side * hs + curl, top - side * hs + curl, nrm,
+                       (u0, v0 + 0.5), (u0 + 0.5, v0 + 0.5), (u0 + 0.5, v0), (u0, v0))
     return k
 
 

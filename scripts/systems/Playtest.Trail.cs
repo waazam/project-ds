@@ -254,6 +254,35 @@ public partial class Playtest
 			Shot("squirrel_on_tree");
 			Check("the squirrel photographed: on the list", sp is { SubjectId: "squirrel" }, Describe(sp));
 		}
+		// (2026-10-23, the owner: the bushes "too round ... like a fake house plant") the nearest shrub, seen from a few metres
+		{
+			Vector3? bush = null; float bd = float.MaxValue;
+			foreach (var inst in GetTree().CurrentScene.FindChildren("Instances", "Node3D", true, false))
+				foreach (var c in inst.GetChildren())
+					if (c is MultiMeshInstance3D mmi && mmi.Name.ToString().StartsWith("vinemound") && mmi.Multimesh is { } mm)
+						for (int i = 0; i < mm.InstanceCount; i++)
+						{
+							var o = mmi.GlobalTransform * mm.GetInstanceTransform(i).Origin;
+							float d = o.DistanceTo(Player.GlobalPosition);
+							if (d < bd) { bd = d; bush = o; }
+						}
+			Check("shrubs in the woods", bush != null);
+			if (bush is { } b)
+			{
+				var standAt = b + TestBot.Flat(Player.GlobalPosition - b).Normalized() * 4.5f;
+				for (int k = 0; k < 12; k++)
+				{
+					var v = b + new Vector3(Mathf.Cos(k * Mathf.Tau / 12f), 0, Mathf.Sin(k * Mathf.Tau / 12f)) * 4f;
+					v.Y = (Terrain?.HeightAt(v.X, v.Z) ?? v.Y) + 1.6f;
+					var rq = PhysicsRayQueryParameters3D.Create(v, b + Vector3.Up * 2f, 1u);
+					if (Player.GetWorld3D().DirectSpaceState.IntersectRay(rq).Count == 0) { standAt = v; break; }
+				}
+				await _bot.Teleport(standAt with { Y = Terrain?.HeightAt(standAt.X, standAt.Z) ?? standAt.Y }, b + Vector3.Up * 0.8f, ct);
+				await _bot.Aim(b + Vector3.Up * 0.8f, ct);
+				await _bot.Seconds(0.5, ct);
+				Shot("shrub");
+			}
+		}
 		// a bird, photographed
 		var bird = _bot.AllOf<Bird>().Where(b => b.IsInGroup("photo_birds") && !b.IsOmen && !b.Photographed).OrderBy(b => b.GlobalPosition.DistanceTo(Player.GlobalPosition)).FirstOrDefault();
 		Check("birds to photograph", bird != null);

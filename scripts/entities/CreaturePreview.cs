@@ -85,10 +85,30 @@ public partial class CreaturePreview : Node3D
 		lev.QueueFree();
 	}
 
+	/// <summary>`--shrubs` (2026-10-23): the three shrubs (the scatter's vine mounds) on bare ground in daylight, in a row
+	/// and close on one.</summary>
+	private async Task ShrubShots()
+	{
+		AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(30, 30) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.27f, 0.22f, 0.15f) } });
+		AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-50, 30, 0), LightEnergy = 1.2f, ShadowEnabled = true });
+		AddChild(new WorldEnvironment { Environment = new Godot.Environment { BackgroundMode = Godot.Environment.BGMode.Color, BackgroundColor = new Color(0.55f, 0.6f, 0.66f), AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = new Color(0.5f, 0.52f, 0.5f), AmbientLightEnergy = 0.8f } });
+		float x = -3.2f;
+		foreach (var key in new[] { "vinemound_a", "vinemound_b", "vinemound_c" })
+		{
+			var mesh = World.ScatterModels.Get(key, () => new BoxMesh());
+			AddChild(new MeshInstance3D { Name = key, Mesh = mesh, Position = new Vector3(x, 0, 0) });
+			x += 3.2f;
+		}
+		await Seconds(0.5);
+		await Shot("shrubs_row", new Vector3(0, 1.7f, 7f), new Vector3(0, 0.8f, 0));
+		await Shot("shrub_close", new Vector3(0.6f, 1.6f, 3f), new Vector3(0, 0.8f, 0));
+	}
+
 	private async void Run()
 	{
 		await Frames(10);
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--deer") >= 0) { await DeerShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--shrubs") >= 0) { await ShrubShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--squirrel") >= 0) { await SquirrelShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--figures") >= 0) { await FigureShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--birds") >= 0) { await BirdShots(); GetTree().Quit(); return; }
