@@ -1160,6 +1160,14 @@ public partial class CreaturePreview : Node3D
 		await Lit("maze_cavern", cc + new Vector3(-12f, 2.2f, -9f), cc);
 		await Lit("maze_trench", cave.Trenches[0].a + new Vector3(0.2f, -0.4f, 0.2f), cave.Trenches[0].b + Vector3.Down * 1.0f);
 		await Lit("maze_trench_props", crow + new Vector3(1.2f, 1.2f, 1.2f), crow);
+		for (int ri = 0; ri < cave.Ramps.Count && ri < 3; ri++)
+		{
+			var (ra, rb) = cave.Ramps[ri];
+			var dir = ((rb - ra) with { Y = 0 }).Normalized();
+			var sd = new Vector3(dir.Z, 0, -dir.X);
+			await Lit($"maze_ramp_{ri}", ra - dir * 0.5f + sd * 0.4f + Vector3.Up * -0.4f + Vector3.Up * 2f, rb + Vector3.Up * 0.5f);
+			await Lit($"maze_ramp_{ri}_above", rb + dir * 2.5f + sd * 2f + Vector3.Up * 1.8f, (ra + rb) * 0.5f);
+		}
 		await Lit("maze_crate", crate + new Vector3(0f, 1.4f, -1.6f), crate);
 		await Lit("maze_cavern_roof", cc + new Vector3(0, 1.6f, 0), cc + new Vector3(4f, 8f, 3f));
 		GD.Print($"[creature-preview] maze: {cave.Triangles} triangles, {cave.Icicles} icicles, {cave.Posts} posts");

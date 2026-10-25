@@ -74,7 +74,7 @@ public partial class SnowMazeCave
 			var side = new Vector3(along.Z, 0, -along.X);
 			var basis = Basis.LookingAt(along, Vector3.Up);
 			// (nothing where another trench opens off this one: the shoring there would wall the way through)
-			bool Open(Vector3 q) => InOtherTrench(q, ti);
+			bool Open(Vector3 q) => InOtherTrench(q, ti) || InRamp(q, 0.15f);
 			// posts both sides, every metre or so; planks stacked behind them; snow on the tops that stand clear of the lip.
 			// (2026-10-15, the scan: posts at an even pitch, all standing a hand over the lip with one cap of snow each, read
 			// as a castle's battlements) Spaced as they were driven, not measured; most cut off near the lip, some rotted
@@ -117,7 +117,7 @@ public partial class SnowMazeCave
 				foreach (float sd in new[] { -1f, 1f })
 				{
 					var c0 = a + along * (s + l * 0.5f) + side * sd * (w + 0.06f);
-					if (Open(c0)) continue;
+					if (Open(c0) || Open(c0 - along * l * 0.5f) || Open(c0 + along * l * 0.5f)) continue;
 					// (no two bays alike: the top boards gone from some, the rest a little out of true, sprung, warped)
 					int rows = dr.Randf() < 0.3f ? dr.RandiRange(5, 6) : 7;
 					for (int row = 0; row < rows; row++)
@@ -165,25 +165,25 @@ public partial class SnowMazeCave
 			for (float s = 1.2f; s < len - 1.2f; s += rng.RandfRange(1.6f, 3f))
 				spots.Add((a + along * s + Vector3.Up * (floor + 0.12f), along, side));
 		}
-		// ramps up out of each line's ends (on the cavern's floor side), so they can be got into and out of
-		var ends = new List<(Vector3 at, Vector3 dir)>();
-		var counts = new Dictionary<Vector3, int>();
-		foreach (var (a, b) in Trenches) { counts[a] = counts.GetValueOrDefault(a) + 1; counts[b] = counts.GetValueOrDefault(b) + 1; }
-		foreach (var (a, b) in Trenches)
+		// (2026-10-24) the ramps cut up out of the trenches (SnowMazeCave.Ramps): planks laid up each from the trench's wall to
+		// the lip, cleated across so a boot holds, two posts at the top; the slope's own collision under them
+		foreach (var (ra, rb) in Ramps)
 		{
-			if (counts[a] == 1) ends.Add((a, (a - b).Normalized()));
-			if (counts[b] == 1) ends.Add((b, (b - a).Normalized()));
-		}
-		foreach (var (at, dir) in ends)
-		{
-			if (at.IsEqualApprox(Trenches[^1].b)) continue;   // (the crate's spur: a dead end, the crate across it)
-			// a slope from the trench's floor to the cavern's, running on out of the trench's end
-			var basis = Basis.LookingAt(dir, Vector3.Up);
-			float run = 3.4f, ang = Mathf.Atan2(TrenchDepth, run);
-			var mid = at - dir * 0.6f + dir * (run * 0.5f) + Vector3.Up * (floor * 0.5f);
-			var tilt = basis * new Basis(Vector3.Right, ang);
-			planks.Box(mid, new Vector3(1.2f, 0.08f, run / Mathf.Cos(ang)), 1f, tilt);
-			body.AddChild(new CollisionShape3D { Position = mid - tilt.Y * 0.04f, Basis = tilt, Shape = new BoxShape3D { Size = new Vector3(1.4f, 0.12f, run / Mathf.Cos(ang)) } });
+			var dir = ((rb - ra) with { Y = 0 }).Normalized();
+			// (from flush with the duckboards' top a little out from the trench's middle, so there's no lip to step up)
+			var p0 = ra + dir * 0.15f + Vector3.Up * 0.1f;
+			var p1 = rb;
+			float ang = Mathf.Atan2(p1.Y - p0.Y, ((p1 - p0) with { Y = 0 }).Length());
+			var basis = Basis.LookingAt(dir, Vector3.Up) * new Basis(Vector3.Right, ang);
+			float l = p0.DistanceTo(p1);
+			var mid = (p0 + p1) * 0.5f + basis.Y * 0.025f;
+			foreach (float off in new[] { -0.42f, 0f, 0.42f })
+				planks.Box(mid + basis.X * off + basis.Y * dr.RandfRange(-0.008f, 0.008f), new Vector3(0.38f, 0.05f, l), 1f, basis * new Basis(Vector3.Up, dr.RandfRange(-0.015f, 0.015f)));
+			for (float c = 0.5f; c < l - 0.2f; c += 0.55f)
+				planks.Box(p0 + (p1 - p0).Normalized() * c + basis.Y * 0.06f, new Vector3(1.2f, 0.025f, 0.05f), 1f, basis);
+			foreach (float sd in new[] { -1f, 1f })
+				logs.Cylinder(rb + basis.X * sd * 0.72f + Vector3.Down * 0.3f, rb + basis.X * sd * 0.72f + Vector3.Up * 0.55f, 0.08f, 0.07f, 8, true, 0.5f);
+			body.AddChild(new CollisionShape3D { Position = mid - basis.Y * 0.035f, Basis = basis, Shape = new BoxShape3D { Size = new Vector3(1.3f, 0.12f, l + 0.3f) } });
 		}
 		logs.CommitTo(this, "TrenchPosts", false);
 		planks.CommitTo(this, "TrenchPlanks", false);
@@ -283,6 +283,18 @@ public partial class SnowMazeCave
 			var ab = (b - a) with { Y = 0 };
 			float t = Mathf.Clamp(((p - a) with { Y = 0 }).Dot(ab) / ab.LengthSquared(), 0f, 1f);
 			if (((a + ab * t - p) with { Y = 0 }).Length() < TrenchHalfW + 0.05f) return true;
+		}
+		return false;
+	}
+
+	/// <summary>Inside a ramp's cut (within its half width, plus <paramref name="pad"/>, of its line).</summary>
+	public bool InRamp(Vector3 p, float pad = 0f)
+	{
+		foreach (var (a, b) in Ramps)
+		{
+			var ab = (b - a) with { Y = 0 };
+			float t = Mathf.Clamp(((p - a) with { Y = 0 }).Dot(ab) / ab.LengthSquared(), 0f, 1f);
+			if (t > 0f && ((a + ab * t - p) with { Y = 0 }).Length() < RampHalfW + pad) return true;
 		}
 		return false;
 	}

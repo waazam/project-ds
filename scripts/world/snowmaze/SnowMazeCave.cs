@@ -27,6 +27,11 @@ public partial class SnowMazeCave : Node3D
 	/// <summary>The trench lines (local, on the cavern floor), for the dressing and the props.</summary>
 	public readonly List<(Vector3 a, Vector3 b)> Trenches = new();
 	public readonly List<Vector3> Skylights = new();
+	/// <summary>(2026-10-24, the owner: "when the player is inside of the trenches they cant get back out") The ramps cut up
+	/// out of the trenches: each from <c>a</c> (the trench's floor, on its line) to <c>b</c> (the cavern's floor), local.</summary>
+	public readonly List<(Vector3 a, Vector3 b)> Ramps = new();
+	/// <summary>A ramp's run (metres along it for the trench's full depth: about 25 degrees) and its half width.</summary>
+	public const float RampRun = 4.3f, RampHalfW = 0.7f;
 	public readonly List<(Vector3 at, Vector3 outward)> Alcoves = new();
 	public readonly List<Vector3> Mounds = new();
 	/// <summary>The way in: the end of the entrance tunnel (where the player arrives) and the direction in.</summary>
@@ -36,7 +41,7 @@ public partial class SnowMazeCave : Node3D
 
 	private struct Prim
 	{
-		public int Kind;          // 0 capsule (tunnel), 1 ellipsoid (junction, alcove), 2 mound (solid), 3 trench box, 4 shaft (vertical capsule)
+		public int Kind;          // 0 capsule (tunnel), 1 ellipsoid (junction, alcove), 2 mound (solid), 3 trench box, 4 shaft (vertical capsule), 5 ramp (a sloped cut, A low to B high)
 		public Vector3 A, B, R;   // capsule ends / centre; radii
 	}
 	private readonly List<Prim> _prims = new();
@@ -129,6 +134,7 @@ public partial class SnowMazeCave : Node3D
 				Trenches.Add((line[i], line[i + 1]));
 				Add(new Prim { Kind = 3, A = line[i], B = line[i + 1], R = new Vector3(TrenchHalfW, TrenchDepth, 0) });
 			}
+		LayRamps();
 		// skylights: holes up through the roof at a handful of junctions, a cold light down each
 		var picks = new List<int>();
 		for (int v = 0; v < L.Nodes.Count; v++) if (v != L.Cavern && rng.Randf() < 0.12f) picks.Add(v);
@@ -157,6 +163,58 @@ public partial class SnowMazeCave : Node3D
 				if (!_buckets.TryGetValue(k, out var l)) _buckets[k] = l = new List<int>();
 				l.Add(idx);
 			}
+	}
+
+	/// <summary>Ramps up out of the trenches: off each open end, and off the side of every long stretch, each cut up into the
+	/// cavern's floor wherever there's room (inside the cavern, clear of the other trenches). The crate's spur has none at
+	/// its end (the crate stands across it).</summary>
+	private void LayRamps()
+	{
+		var counts = new Dictionary<Vector3, int>();
+		foreach (var (a, b) in Trenches) { counts[a] = counts.GetValueOrDefault(a) + 1; counts[b] = counts.GetValueOrDefault(b) + 1; }
+		bool Clear(Vector3 from, Vector3 dir, int self)
+		{
+			for (float s = 1.2f; s <= RampRun + 0.8f; s += 0.5f)
+			{
+				var q = from + dir * s;
+				var d = q - SnowMazeLayout.CavernCentre;
+				if (d.X * d.X / ((SnowMazeLayout.CavernRX - 1.6f) * (SnowMazeLayout.CavernRX - 1.6f)) + d.Z * d.Z / ((SnowMazeLayout.CavernRZ - 1.6f) * (SnowMazeLayout.CavernRZ - 1.6f)) > 1f) return false;
+				foreach (var side in new[] { -1f, 1f })
+					if (InOtherTrench(q + new Vector3(dir.Z, 0, -dir.X) * side * RampHalfW, self) && s > 1f) return false;
+				foreach (var (ra, rb) in Ramps)
+				{
+					var ab = (rb - ra) with { Y = 0 };
+					float t = Mathf.Clamp(((q - ra) with { Y = 0 }).Dot(ab) / ab.LengthSquared(), 0f, 1f);
+					if (((ra + ab * t - q) with { Y = 0 }).Length() < RampHalfW * 2f + 0.6f) return false;
+				}
+			}
+			return true;
+		}
+		void Try(Vector3 at, Vector3[] dirs, int self)
+		{
+			foreach (var d in dirs)
+				if (Clear(at, d, self))
+				{
+					Ramps.Add((at with { Y = -TrenchDepth }, (at + d * (RampRun + 0.3f)) with { Y = 0 }));
+					Add(new Prim { Kind = 5, A = at with { Y = -TrenchDepth }, B = (at + d * (RampRun + 0.3f)) with { Y = 0 }, R = new Vector3(RampHalfW, 0, 0) });
+					return;
+				}
+		}
+		var crateEnd = Trenches[^1].b;
+		for (int ti = 0; ti < Trenches.Count; ti++)
+		{
+			var (a, b) = Trenches[ti];
+			var along = ((b - a) with { Y = 0 }).Normalized();
+			var side = new Vector3(along.Z, 0, -along.X);
+			if (counts[a] == 1) Try(a + along * 0.2f, new[] { -along, side, -side }, ti);
+			if (counts[b] == 1 && !b.IsEqualApprox(crateEnd)) Try(b - along * 0.2f, new[] { along, side, -side }, ti);
+			float len = ((b - a) with { Y = 0 }).Length();
+			if (len >= 4f)
+			{
+				var mid = a + along * (len * 0.5f);
+				Try(mid, ti % 2 == 0 ? new[] { side, -side } : new[] { -side, side }, ti);
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ the field
@@ -205,6 +263,17 @@ public partial class SnowMazeCave : Node3D
 					trench = Mathf.Min(trench, Mathf.Max(h, yb));
 					break;
 				}
+				case 5:
+				{
+					// a sloped cut: open above a floor rising from A's height to B's, within its half width of the line
+					var ab = (q.B - q.A) with { Y = 0 };
+					float t = Mathf.Clamp(((p - q.A) with { Y = 0 }).Dot(ab) / Mathf.Max(ab.LengthSquared(), 1e-4f), 0f, 1f);
+					var c = q.A + ab * t;
+					float h = new Vector2(p.X - c.X, p.Z - c.Z).Length() - q.R.X;
+					float fy = Mathf.Lerp(q.A.Y, q.B.Y, t);
+					trench = Mathf.Min(trench, Mathf.Max(h, Mathf.Max(fy - p.Y, p.Y - 0.6f)));
+					break;
+				}
 				case 4:
 				{
 					if (p.Y < q.A.Y - 2f || p.Y > q.B.Y + 1f) break;
@@ -240,7 +309,7 @@ public partial class SnowMazeCave : Node3D
 	// Keyed by this build of the game (any change to the code can change the cave) and the cave's own sizes.
 
 	private static string CachePath => ProjectSettings.GlobalizePath("user://snowmaze_cache.bin");
-	private static string CacheKey => $"v1|{typeof(SnowMazeCave).Assembly.ManifestModule.ModuleVersionId}|{Step}|{TunnelRH}|{TunnelRV}|{TunnelY}|{TrenchDepth}|{SnowMazeLayout.N}|{SnowMazeLayout.Spacing}";
+	private static string CacheKey => $"v2|{typeof(SnowMazeCave).Assembly.ManifestModule.ModuleVersionId}|{Step}|{TunnelRH}|{TunnelRV}|{TunnelY}|{TrenchDepth}|{SnowMazeLayout.N}|{SnowMazeLayout.Spacing}";
 	public bool FromCache { get; private set; }
 
 	private bool LoadCache()

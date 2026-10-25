@@ -546,6 +546,27 @@ public partial class Playtest
 		await _bot.WalkTo(mouthAt, 0.9f, ct, () => maze.InCavern, giveUp: 25f);
 		await _bot.WaitUntil(() => Story.Current == Checkpoint.Act24Trenches, 3, ct);
 		Check("into the cavern of trenches (checkpoint 32)", maze.InCavern && Story.Current == Checkpoint.Act24Trenches, $"{Story.Current}");
+		// (2026-10-24, the owner: "when the player is inside of the trenches they cant get back out") down in a trench at the
+		// foot of each ramp, walked up it: out on the cavern's floor
+		Require("ramps up out of the trenches", cave.Ramps.Count >= 6);
+		int climbed = 0;
+		for (int ri = 0; ri < cave.Ramps.Count; ri++)
+		{
+			var (ra, rb) = cave.Ramps[ri];
+			var dir = ((rb - ra) with { Y = 0 }).Normalized();
+			await _bot.Inside(cave.ToGlobal(ra - dir * 0.3f + Vector3.Up * 0.2f), cave.ToGlobal(rb), ct);
+			await _bot.WalkTo(cave.ToGlobal(rb + dir * 1.2f), 0.6f, ct, giveUp: 8f);
+			float y = cave.ToLocal(Player.GlobalPosition).Y;
+			if (y > -0.3f) climbed++;
+			else GD.Print($"[playtest] ramp {ri} at {ra} -> {rb}: stuck at local y {y:0.00}");
+			if (ri == 0)
+			{
+				await _bot.Inside(cave.ToGlobal(ra - dir * 0.6f + Vector3.Up * 0.2f), cave.ToGlobal(rb + Vector3.Up * 1.2f), ct);
+				await _bot.Seconds(0.4, ct);
+				Shot("trench_ramp");
+			}
+		}
+		Check("every ramp walks up out of the trench onto the cavern's floor", climbed == cave.Ramps.Count, $"{climbed} of {cave.Ramps.Count}");
 		await _bot.Inside(cave.ToGlobal(maze.CrowbarLocal + new Vector3(0.8f, 0.2f, 0)), cave.ToGlobal(maze.CrowbarLocal), ct);
 		await _bot.Aim(cave.ToGlobal(maze.CrowbarLocal), ct);
 		await _bot.Press(ct);
