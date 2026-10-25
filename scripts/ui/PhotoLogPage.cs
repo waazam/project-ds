@@ -187,12 +187,17 @@ public partial class PhotoLogPage : CanvasLayer
 		_draw.DrawString(UiKit.SerifItalic, new Vector2(14f, 22f), $"R.H.'s pages  ({PagesRead} of {World.LorePages.All.Count})", HorizontalAlignment.Left, -1, 12, new Color(UiKit.Bone, 0.9f));
 		float y = 36f;
 		var s = Systems.StoryManager.Instance;
+		// (2026-10-24: twelve pages now) each read one gets as many lines as the page can spare: three when few are read,
+		// down to one (its opening) when many are
+		int read = PagesRead, unread = World.LorePages.All.Count - read;
+		float room = PageH - 36f - 18f - unread * 12f;
+		int lines = Mathf.Clamp((int)(room / Mathf.Max(1, read) / 11f), 1, 3);
 		foreach (var p in World.LorePages.All)
 		{
-			bool read = s != null && s.HasFlag(World.LorePages.Flag(p.N));
-			string text = read ? p.Text : "...";
-			_draw.DrawMultilineString(UiKit.SerifItalic, new Vector2(16f, y), text, HorizontalAlignment.Left, PageW - 32f, 8, 3, new Color(UiKit.Bone, read ? 0.8f : 0.3f));
-			y += read ? 35f : 12f;
+			bool isRead = s != null && s.HasFlag(World.LorePages.Flag(p.N));
+			string text = isRead ? p.Text : "...";
+			_draw.DrawMultilineString(UiKit.SerifItalic, new Vector2(16f, y), text, HorizontalAlignment.Left, PageW - 32f, 8, isRead ? lines : 1, new Color(UiKit.Bone, isRead ? 0.8f : 0.3f));
+			y += isRead ? lines * 11f + 2f : 12f;
 		}
 		_draw.DrawString(UiKit.Mono, new Vector2(12f, PageH - 9f), $"{Page + 1} / {PageCount}", HorizontalAlignment.Right, PageW - 24f, 9, footer);
 	}

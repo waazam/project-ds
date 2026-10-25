@@ -695,10 +695,10 @@ public partial class SkiLodge
 		WeatheredProps.Put(root, "Tin_Tea", new Vector3(px0 + 2.9f, wy, wz - 0.05f), 200f, 0f, false);
 		WeatheredProps.Put(root, "Matchbox_C", new Vector3(px0 + 3.15f, wy + 0.001f, wz - 0.22f), 120f, 0f, false);
 		WeatheredProps.Put(root, "Kettle_Copper", new Vector3(px0 + 5.6f, wy, wz - 0.08f), 160f);
-		WeatheredProps.Put(root, "Crock_Jug", new Vector3(px0 + 0.3f, FloorY, -InnerZ + 0.75f), 30f);
+		LorePages.Stash(WeatheredProps.Put(root, "Crock_Jug", new Vector3(px0 + 0.3f, FloorY, -InnerZ + 0.75f), 30f), 10, "crock", new Vector3(0f, 0.22f, 0f));
 		// the bar's top (1.155), well up the counter from 202's card (under the lip at z 3.9)
 		WeatheredProps.Put(root, "Matchbox_A", new Vector3(BarCounterX - 0.22f, 1.156f, 2.3f), 62f, 0f, false);
-		WeatheredProps.Put(root, "Tin_Tobacco", new Vector3(BarCounterX - 0.4f, 1.155f, 5.9f), 15f, 0f, false);
+		LorePages.Stash(WeatheredProps.Put(root, "Tin_Tobacco", new Vector3(BarCounterX - 0.4f, 1.155f, 5.9f), 15f, 0f, false), 12, "tobacco tin", new Vector3(0f, 0.03f, 0f));
 		// the back bar's top (1.02): a matchbox by the till's end
 		WeatheredProps.Put(root, "Matchbox_B", new Vector3(BarX0 + 0.42f, FloorY + 1.001f, 1.9f), 100f, 0f, false);
 		// the cowbells, on a nail in the counter's far end, under the bar top's overhang (where a barman reaches to ring them)

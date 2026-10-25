@@ -257,7 +257,7 @@ public partial class Cabin : Node3D
 		if (!Derelict && !BurnedOut && !Engine.IsEditorHint())
 		{
 			float wix = Hw - LogT * 0.5f, wiz = Hd - LogT * 0.5f;
-			WeatheredProps.DressCabin(_gen, wix, wiz, Hd, -wix + 0.42f, -1.0f, true);
+			WeatheredProps.DressCabin(_gen, wix, wiz, Hd, -wix + 0.42f, -1.0f, true, stash: Hub);
 			// two cowbells on the porch header; and on the Hollow's copy (not the hub: that one's ours), NO TRESPASSING on
 			// the post by the steps
 			WeatheredProps.HangBells(_gen, _bellNail, 0f);

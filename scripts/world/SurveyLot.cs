@@ -58,6 +58,8 @@ public partial class SurveyLot : Node3D
 	/// <summary>The hiding place of half <paramref name="piece"/> (1 or 2), or null if it couldn't be laid.</summary>
 	public KeyPieceCache Cache(int piece) => _caches.Find(c => c.Piece == piece);
 	private readonly List<KeyPieceCache> _caches = new();
+	/// <summary>The lean-to past the lookout (<see cref="RestShelter"/>).</summary>
+	public RestShelter Shelter { get; private set; }
 	/// <summary>For tests and the report: the trail metres each trail leaves the path at, and each trail's walk (m).</summary>
 	public IReadOnlyList<float> TrailMetres => _trailMetres;
 	private readonly List<float> _trailMetres = new();
@@ -105,6 +107,28 @@ public partial class SurveyLot : Node3D
 			var avoid = new List<(Vector3 p, float r)>();
 			foreach (var n in new[] { camp, cabin, lookout, bunker }) if (n != null) avoid.Add((n.GlobalPosition, 22f));
 			foreach (var n in GetTree().GetNodesInGroup("clear_zones")) if (n is ClearZone cz && cz.IsInsideTree()) avoid.Add((cz.GlobalPosition, cz.Radius + 4f));
+			// (2026-10-24, the game-loop pass) the lean-to past the lookout: a fire to rest by before the bunker
+			if (lookout != null && bunker != null)
+			{
+				// on the straight way from the lookout to the bunker (the compass's way: the trail wanders north first), a quarter
+				// of the way along, a few steps to the side
+				Vector3 lo = lookout.GlobalPosition, bu = bunker.GlobalPosition;
+				Vector3 dir = Flat(bu - lo).Normalized();
+				Vector3 right = dir.Cross(Vector3.Up).Normalized();
+				Vector3 on = lo + Flat(bu - lo) * 0.27f;
+				Vector3 at = terrain.GroundPoint((on + right * 6f).X, (on + right * 6f).Z);
+				var xf = new Transform3D(Basis.LookingAt(right, Vector3.Up), at);   // (its fire, its +Z, toward the path)
+				Shelter = new RestShelter { Name = "RestShelter", Transform = GetParent() is Node3D host ? host.GlobalTransform.AffineInverse() * xf : xf };
+				GetParent().CallDeferred(Node.MethodName.AddChild, Shelter);   // (the level's still setting up its children)
+				var level = GetParent();
+				Callable.From(() => FilmGhost.HauntHollow(level)).CallDeferred();   // (what only the camera sees)
+				avoid.Add((at, 10f));
+				// its clearing now, before the woods are scattered (they read the clear zones in their own deferred build)
+				var clear = new ClearZone { Name = "ShelterClear", Radius = 5f };
+				AddChild(clear);
+				clear.GlobalPosition = at;
+				GD.Print($"[story] the lean-to past the lookout: at {at.X:0.0},{at.Y:0.0},{at.Z:0.0}, facing the way to the bunker");
+			}
 			for (int piece = 1; piece <= 2; piece++)
 			{
 				float frac = piece - 1 < BranchFractions.Length ? BranchFractions[piece - 1] : 0.5f;

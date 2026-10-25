@@ -220,7 +220,8 @@ public partial class WendigoHunter : Node3D
 		_senseT = 0.25f;
 		float reach = Noise();
 		if (reach <= 0f || State is Mode.Chase or Mode.Burning or Mode.Flee) return;
-		if (Behind(p)) reach *= 0.5f;
+		if (Doing == Beat.Listen) reach *= 2f;   // (it's listening: everywhere, twice as far)
+		else if (Behind(p)) reach *= 0.5f;
 		float along = TunnelDistance(Pos, p);
 		if (along > reach) return;
 		Heard++;
@@ -282,6 +283,12 @@ public partial class WendigoHunter : Node3D
 		float speed = m switch { Mode.Chase or Mode.Ambush => ChaseSpeed, Mode.Flee => FleeSpeed, Mode.Investigate or Mode.Search => HuntSpeed, _ => WalkSpeed };
 		if (m is Mode.Burning or Mode.Kill) return;
 		if (m is Mode.Hide) { Body.Hold("crouch", 0.7f, 0.4); _gait = null; _vel = Vector3.Zero; return; }
+		// (2026-10-24, the game-loop pass) its tells, the same every time so they can be learned: a short huff as it turns to
+		// a noise; a far, sullen howl as it gives up a search and goes back to walking its rounds
+		if (Body != null && m == Mode.Investigate && _prevMode is Mode.Patrol or Mode.Search)
+			AudioDirector.OneShot(this, "wendigo_mumble", 4, Body.GlobalPosition + Vector3.Up * 2.6f, -6f, "Voice", 5f, 0.12f);
+		if (Body != null && m == Mode.Patrol && _prevMode == Mode.Search)
+			AudioDirector.OneShot(this, "wendigo_howl_far", 3, Body.GlobalPosition + Vector3.Up * 3f, -10f, "Unnatural", 10f, 0.03f);
 		// spotting them: it stops dead, rears and screams, and then it comes (the gait follows its real speed)
 		if (m is Mode.Chase or Mode.Ambush && _prevMode is not (Mode.Chase or Mode.Ambush)) _rearT = m == Mode.Ambush ? 0.35f : 0.65f;
 	}

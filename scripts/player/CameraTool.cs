@@ -60,6 +60,11 @@ public partial class CameraTool : Node
 	private float _raise;
 	private int _framesLeft;
 	private bool _pendingShot;
+	/// <summary>(2026-10-24) The shutter's frame is about to be drawn (with this camera): things that show only on film
+	/// make themselves visible for it (<see cref="World.FilmGhost"/>).</summary>
+	public static event System.Action<Camera3D> ShutterOpening;
+	/// <summary>The frame's been taken: they're gone again.</summary>
+	public static event System.Action ShutterClosed;
 	// the autofocus and the steadiness of the shot
 	private Node3D _focusOn;
 	private float _focus, _angSpeed, _subjSpeed;
@@ -90,7 +95,7 @@ public partial class CameraTool : Node
 			c.A = Mathf.MoveToward(c.A, 0f, (float)delta * 3.5f);
 			_flash.Color = c;
 		}
-		if (_pendingShot) { _pendingShot = false; GrabThenShoot(); _viewfinder.HideMarks = false; ShowOverlays(); }
+		if (_pendingShot) { _pendingShot = false; GrabThenShoot(); _viewfinder.HideMarks = false; ShowOverlays(); ShutterClosed?.Invoke(); }
 		var input = _player.PlayerInput;
 		// (2026-10-13j) only with the camera in the right hand (and up there): otherwise right mouse gathers the lantern's beam
 		bool raising = _inv.HasCamera && PlayerHands.CameraReady(_player) && input.Enabled && input.Focus;
@@ -115,6 +120,7 @@ public partial class CameraTool : Node
 			_pendingShot = true;
 			_viewfinder.HideMarks = true;
 			HideOverlays();
+			ShutterOpening?.Invoke(_player.CameraRig.Camera);   // (what only film sees steps into the frame it grabs: FilmGhost)
 			// in the dark, the flash: a burst of light from the camera that lights the frame it takes, then fades (one
 			// soft flash, never a strobe; dimmer with "reduce flashing")
 			if (InTheDark()) Flash();

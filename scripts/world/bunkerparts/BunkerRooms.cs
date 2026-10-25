@@ -562,8 +562,9 @@ public partial class BunkerRooms : Node3D
 		}
 		// (2026-10-24, the weathered props) a green filing cabinet against the far wall, a NO TRESPASSING sign over the
 		// footlocker, a coffee can left on the footlocker and film on the crates: the same every time
-		if (WeatheredProps.Put(this, "FilingCabinet", new Vector3(-hw + 0.9f, 0f, -RoomD), 0f) != null)
+		if (WeatheredProps.Put(this, "FilingCabinet", new Vector3(-hw + 0.9f, 0f, -RoomD), 0f) is { } cabinet)
 		{
+			LorePages.Stash(cabinet, 8, "filing cabinet", new Vector3(0f, 1.36f, 0.31f)).PickRadius = 0.3f;   // (R.H.'s page, on its files)
 			AddBox(new Vector3(-hw + 0.9f, 0.66f, -RoomD + 0.31f), new Vector3(0.48f, 1.32f, 0.64f));
 			WeatheredProps.Put(this, "Sign_Tin", new Vector3(hw - 1.1f, 1.45f, -RoomD), 0f, 0f, false);
 			WeatheredProps.Put(this, "CoffeeCan_Yellow", new Vector3(hw - 0.85f, 0.4f, -RoomD + 0.36f), 210f, 0f, false);

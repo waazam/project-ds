@@ -321,3 +321,23 @@ def boxes():
 
 for f in (scribble_head, stairs, pines, eye, antlers, trail_map, cabin, moon, tally, footprints, flame, camera, spiral, key, heart, figure, boxes):
     f()
+
+
+def cairn():
+    """(the shelter's page) stones piled up, a little arrow scratched on a trunk beside it: where he hid the key's other
+    half (KeyPieceCache, the cairn)."""
+    p = Pen(18)
+    stones = [(60, 80, 22, 8), (58, 66, 17, 7), (61, 54, 13, 6), (59, 44, 9, 5)]
+    for (x, y, rx, ry) in stones:
+        p.curve(ellipse(x, y, rx, ry), 0, 1.04, width=1.0)
+    p.wob([(30, 88), (92, 88)], width=0.8, amt=1.0)
+    p.wob([(100, 88), (100, 14)], width=1.0)
+    p.wob([(106, 88), (106, 14)], width=1.0)
+    p.wob([(97, 46), (91, 40), (97, 34)], width=1.1)
+    p.wob([(91, 40), (103, 40)], width=1.1)
+    p.wob([(34, 36), (40, 30), (34, 24)], width=0.8)   # (a key's bow, small, in the corner)
+    p.curve(ellipse(28, 30, 5, 5), 0, 1.04, width=0.8)
+    p.save("cairn")
+
+
+cairn()

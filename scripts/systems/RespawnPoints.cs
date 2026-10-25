@@ -46,6 +46,10 @@ public static class RespawnPoints
 		if (cp == Checkpoint.Act6BridgeCrossed && System.Array.IndexOf(save.Flags, StoryManager.Flag.ClearingLoopDone) >= 0
 			&& tree.GetFirstNodeInGroup(Act6ClearingEvent.WakeMarkerGroup) is Node3D wake)
 			return OnGround(n, wake.GlobalPosition, YawOf(-wake.GlobalBasis.Z));
+		// (2026-10-24) rested by the fire in the lean-to past the lookout (a flag within checkpoint 6): in front of its fire
+		if (cp == Checkpoint.Act7CabinBurning && System.Array.IndexOf(save.Flags, World.RestShelter.Flag) >= 0
+			&& tree.GetFirstNodeInGroup(World.RestShelter.MarkerGroup) is Node3D rest)
+			return OnGround(n, rest.GlobalPosition, YawOf(-rest.GlobalBasis.Z));
 		// Act 22's halfway save (a flag within Act 21's end checkpoint): on the road where it was passed
 		if (cp == Checkpoint.Act21Finished && System.Array.IndexOf(save.Flags, StoryManager.Flag.Act22Midway) >= 0
 			&& tree.GetFirstNodeInGroup("respawn_Act22Midway") is Node3D mid)

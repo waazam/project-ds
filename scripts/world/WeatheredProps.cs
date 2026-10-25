@@ -30,13 +30,14 @@ public static class WeatheredProps
 	/// tin on the shelf's lower board, the tea tin and three film canisters (a photographer's cabin) on the upper, the
 	/// copper kettle on the stove's top, a jug on the floor by it, matches and a tobacco tin on the table, a rusted watering
 	/// can at the porch's corner.</summary>
-	public static void DressCabin(Node3D cabin, float ix, float iz, float hd, float sx, float sz, bool porch)
+	public static void DressCabin(Node3D cabin, float ix, float iz, float hd, float sx, float sz, bool porch, bool stash = false)
 	{
 		var root = new Node3D { Name = "Weathered" };
 		cabin.AddChild(root);
 		float shx = ix - 0.14f;
 		// the shelf's lower board (its top at 1.066), past the jars: two cans and the spice tin
-		Put(root, "CoffeeCan_Red", new Vector3(shx - 0.03f, 1.066f, 1.2f), 200f, 0f, false);
+		var can = Put(root, "CoffeeCan_Red", new Vector3(shx - 0.03f, 1.066f, 1.2f), 200f, 0f, false);
+		if (stash) LorePages.Stash(can, 11, "coffee can", new Vector3(0f, 0.1f, 0f));   // (the hub's: R.H.'s first page, his spare film)
 		Put(root, "CoffeeCan_Blue", new Vector3(shx - 0.05f, 1.066f, 1.35f), 150f, 0f, false);
 		Put(root, "SpiceTin_Cinnamon", new Vector3(shx - 0.02f, 1.066f, 1.48f), 260f, 0f, false);
 		// the upper board (1.516): the yellow can, the tea tin, the film

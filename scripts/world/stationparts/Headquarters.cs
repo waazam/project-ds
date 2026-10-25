@@ -76,7 +76,8 @@ public partial class Headquarters : Node3D
 	private void BuildWeathered()
 	{
 		float fz = -1.42f;
-		WeatheredProps.Put(this, "FilingCabinet", new Vector3(IX, 0f, fz), -90f);
+		if (WeatheredProps.Put(this, "FilingCabinet", new Vector3(IX, 0f, fz), -90f) is { } cabinet)
+			LorePages.Stash(cabinet, 9, "filing cabinet", new Vector3(0f, 1.36f, 0.31f)).PickRadius = 0.3f;   // (R.H.'s page: the rangers knew)
 		StationStory.Solid(this, new Vector3(IX - 0.31f, 0.66f, fz), new Vector3(0.64f, 1.32f, 0.48f), "metal", "FilingCabinetBody");
 		WeatheredProps.Put(this, "CoffeeCan_Blue", new Vector3(IX - 0.32f, 1.32f, fz + 0.06f), 200f, 0f, false);
 		WeatheredProps.Put(this, "CoffeeCan_Red", new Vector3(-0.15f + 0.45f, 0.78f, -IZ + 0.36f), 20f, 0f, false);

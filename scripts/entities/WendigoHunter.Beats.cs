@@ -65,8 +65,13 @@ public partial class WendigoHunter
 			}
 			default:
 			{
+				// listening: its head cocked to one side, and the tell (2026-10-24, the game-loop pass: "make the creatures
+				// readable so they can be played against"): a long wet intake of breath. Freeze. It hears twice as far
+				// while it listens, behind it as well (Senses)
 				var side = fwd.Cross(Vector3.Up).Normalized() * (_rng.Randf() < 0.5f ? 1f : -1f);
 				_beatLook = head + side * 3f + Vector3.Up * 0.4f;
+				AudioDirector.OneShot(this, "breath_in", 5, head, -4f, "Voice", 6f, 0.02f);
+				_beatT = 3.2f;
 				break;
 			}
 		}

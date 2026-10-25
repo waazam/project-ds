@@ -91,6 +91,9 @@ public partial class Playtest
 		// his logbook, read through the note overlay page by page
 		Require("his logbook", room1.Logbook != null);
 		await _bot.UseIt(room1.Logbook, ct);
+		// (2026-10-24: one run in three the bot came off the cigar box close to the book but not looking at it, and gave
+		// up unfocused; then it tries the book from each side, as a player would step round the table)
+		if (NoteOverlay.Instance is not { IsOpen: true }) await _bot.UseAround(room1.Logbook, ct, 1.1f, snapToTerrain: false);
 		Check("his logbook opens: twelve entries, then the pages of \"Come and see.\"", NoteOverlay.Instance is { IsOpen: true } && room1.Logbook.Pages.Length >= 15, $"{room1.Logbook.Pages?.Length} pages");
 		NoteOverlay.Instance?.Close();
 		await _bot.Seconds(0.3, ct);
