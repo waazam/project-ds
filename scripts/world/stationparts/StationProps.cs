@@ -106,27 +106,97 @@ public static class StationProps
 	/// <summary>The dead eye: one of the lake thing's eyeballs, fist-sized, the lid hanging half shut and
 	/// slack over a dull, filmed iris, a ragged stump of tentacle behind it. Built facing -Z (its gaze)
 	/// under <paramref name="parent"/>, <paramref name="r"/> = the ball's radius.</summary>
+	private static StandardMaterial3D _deadEyeMat;
+
+	/// <summary>The dead eye's painted ball: wet and glossy over the front, duller toward the torn back (its roughness
+	/// map), a clear coat for the wet. Null if the paintings aren't there.</summary>
+	private static StandardMaterial3D DeadEyeMat()
+	{
+		if (_deadEyeMat != null) return _deadEyeMat;
+		const string dir = "res://assets/models/items/deadeye/";
+		if (!ResourceLoader.Exists(dir + "deadeye_albedo.png")) return null;
+		_deadEyeMat = new StandardMaterial3D
+		{
+			AlbedoTexture = GD.Load<Texture2D>(dir + "deadeye_albedo.png"),
+			RoughnessTexture = ResourceLoader.Exists(dir + "deadeye_rough.png") ? GD.Load<Texture2D>(dir + "deadeye_rough.png") : null,
+			Roughness = 1f, MetallicSpecular = 0.6f,
+			ClearcoatEnabled = true, Clearcoat = 0.8f, ClearcoatRoughness = 0.08f,
+			// (a little light of its own: in the basement's dark it should still be seen looking at them)
+			EmissionEnabled = true, EmissionTexture = GD.Load<Texture2D>(dir + "deadeye_albedo.png"), EmissionEnergyMultiplier = 0.03f,
+			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+		};
+		return _deadEyeMat;
+	}
+
 	public static Node3D DeadEye(Node3D parent, float r = 0.13f, bool stump = true)
 	{
 		var root = new Node3D { Name = "DeadEye" };
 		parent.AddChild(root);
 		var ball = new Node3D { Name = "Ball", Scale = Vector3.One * r };
 		root.AddChild(ball);
-		LakeCreature.BuildEye(ball);
-		// a milky film over it: dead. Clear of the iris and pupil (which stand to 1.07 of the radius): at 1.03 they poked
-		// through its facets and read as something clipping through the eye. (2026-10-15: its sphere and the torn stump are
-		// Blender's, tools/Blender/items_small.py; the primitive and MeshKit below are the fallback.)
-		ball.AddChild(new MeshInstance3D
+		// (2026-10-24, the owner: "make the eyeball look way better, you can see it has like a ring around it") its own eye,
+		// not the lake thing's stock one (a ball with an iris and a pupil stood on its front, and a torus lid round it that
+		// read as a band cut round the ball): the whole eye painted onto one smooth sphere (tools/Textures/make_deadeye.py:
+		// the yellowed white, the veins, the clouded iris, the slit), so nothing stands proud of it and nothing rings it
+		if (DeadEyeMat() is { } eyeMat)
+			ball.AddChild(new MeshInstance3D { Name = "Eye", Mesh = new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 48, Rings = 24 }, MaterialOverride = eyeMat });
+		else LakeCreature.BuildEye(ball);
+		bool painted = ball.GetNodeOrNull("Eye") != null;
+		if (!painted)
 		{
-			Mesh = ItemModels.Get("station_items", "DeadEyeFilm") ?? new SphereMesh { Radius = 1.12f, Height = 2.24f, RadialSegments = 16, Rings = 10 },
-			MaterialOverride = new StandardMaterial3D
+			// a milky film over it: dead (the stock eye's; the painted one has its cataract in it, and a shell round it read
+			// as a glass ring at its edge)
+			ball.AddChild(new MeshInstance3D
 			{
-				AlbedoColor = new Color(0.8f, 0.8f, 0.72f, 0.28f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-				Roughness = 0.3f, MetallicSpecular = 0.6f,
-			},
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-		});
+				Mesh = ItemModels.Get("station_items", "DeadEyeFilm") ?? new SphereMesh { Radius = 1.12f, Height = 2.24f, RadialSegments = 16, Rings = 10 },
+				MaterialOverride = new StandardMaterial3D
+				{
+					AlbedoColor = new Color(0.8f, 0.8f, 0.72f, 0.28f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+					Roughness = 0.3f, MetallicSpecular = 0.6f,
+				},
+				CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			});
+		}
 		if (!stump) return root;       // set in the iron door: the stump would come out through the back of it
+		if (painted)
+		{
+			// (2026-10-24) what it was torn out by: a ragged fringe of red tissue clinging round the back of the ball, and
+			// the optic nerve, a pale cord as thick as a pencil, trailing off behind and sagging to the floor, its end torn
+			// (it was a fat plug of flesh as wide as the eye: a sausage behind it)
+			var t = new MeshKit();
+			t.Mat(StationTextures.MeatMat);
+			t.Color = new Color(0.78f, 0.3f, 0.28f);
+			var rr = new RandomNumberGenerator { Seed = 1313 };
+			// (the torn back is painted red into the ball itself; here only what still clings round the nerve's root, a few
+			// uneven shreds bunched to one side, not a ring)
+			for (int i = 0; i < 4; i++)
+			{
+				float a = 0.6f + i * 1.1f + rr.RandfRange(-0.3f, 0.3f);
+				float d = r * rr.RandfRange(0.16f, 0.3f);
+				var at = new Vector3(Mathf.Cos(a) * d, Mathf.Sin(a) * d, Mathf.Sqrt(Mathf.Max(0f, r * r - d * d)) * 0.98f);
+				t.Blob(at, new Vector3(r * rr.RandfRange(0.14f, 0.22f), r * rr.RandfRange(0.1f, 0.16f), r * rr.RandfRange(0.07f, 0.12f)), 40 + i, 0.25f, false, 1f, 0f, 3);
+			}
+			var nerve = new MeshKit();
+			nerve.Mat(StationTextures.Flat("st_nerve", new Color(0.78f, 0.62f, 0.58f), 0.35f, 0.4f));
+			nerve.Color = Colors.White;
+			Vector3 prev = new(0f, 0f, r * 0.85f);
+			float rad = r * 0.17f;
+			for (int i = 1; i <= 6; i++)
+			{
+				float f = i / 6f;
+				var next = new Vector3(Mathf.Sin(f * 2.2f) * r * 0.35f, -f * f * r * 0.85f, r * (0.85f + 1.9f * f));
+				nerve.Cylinder(prev, next, rad, rad * 0.93f, 8, i == 6, 1f);
+				nerve.Blob(next, Vector3.One * rad * 0.93f, 60 + i, 0.05f, false, 1f);   // (the joints rounded over)
+				prev = next;
+				rad *= 0.93f;
+			}
+			t.Color = new Color(0.5f, 0.12f, 0.1f);
+			t.Blob(prev, new Vector3(rad * 1.3f, rad * 1.3f, rad * 0.7f), 70, 0.45f, false, 1f);   // (the torn end, raw)
+			t.Color = Colors.White;
+			t.CommitTo(root, "Tissue", true);
+			nerve.CommitTo(root, "Nerve", true);
+			return root;
+		}
 		// (modelled for a 0.13 m ball, scaled to this one's)
 		if (ItemModels.Add(root, "station_items", "DeadEyeStump", new Transform3D(Basis.Identity.Scaled(Vector3.One * (r / 0.13f)), Vector3.Zero), "LidAndStump",
 			n => n == "meat" ? StationTextures.MeatMat : null) != null)

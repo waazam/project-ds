@@ -142,6 +142,7 @@ public partial class CreaturePreview : Node3D
 		if (System.Array.Exists(OS.GetCmdlineUserArgs(), a => a.StartsWith("--detail"))) { await DetailShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--export-bodies") >= 0) { await ExportBodies(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--leviathan") >= 0) { await LeviathanShots(); GetTree().Quit(); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--deadeye") >= 0) { await DeadEyeShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--window-tentacle") >= 0) { await WindowTentacleShots(); GetTree().Quit(); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--bench") >= 0) { await Bench(); GetTree().Quit(); return; }
 		// the crawler (Act 14), on a floor, walking a few metres so its gait shows
