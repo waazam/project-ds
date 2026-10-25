@@ -15,11 +15,21 @@ namespace ProjectDS.UI;
 /// Lookups are cached: the player and inventory once (re-acquired only if
 /// freed), the silence zones refreshed once a second, and the distortion is
 /// computed once per frame in _Process rather than in the draw.
+///
+/// (2026-10-25, the owner, with Oblivion's framed bar as the example: "make our own custom model that fits the theme of the
+/// game for the compass ... smooth out the animations in the compass") Now an instrument of its own: a band of old dark
+/// leather in a tarnished brass rim, drawn out to points at both ends, a brass lubber pointer hanging over its middle
+/// (assets/ui/hud, painted by tools/Textures/make_hud.py). Its marks are engraved into the leather, bone-coloured with a
+/// dark line under each; north in red enamel. The objective keeps the HUD's neon (the colour setting), the one lit thing
+/// on it. The heading and the marker are eased once a frame in _Process (the draw only reads them), the marks fade into
+/// the band's ends instead of popping, and the bearing's marker slides on its own spring.
 /// </summary>
 public partial class Compass : CanvasLayer
 {
-	[Export] public float StripWidth = 220f;
-	[Export] public float StripHeight = 13f;
+	[Export] public float StripWidth = 260f;
+	[Export] public float StripHeight = 22f;
+	/// <summary>The band's inside, where the marks run (the painting's leather, inside the rim and short of the points).</summary>
+	private const float BandInset = 17f, BandTop = 4.5f, BandBottom = 17.5f;
 	/// <summary>Total degrees of heading shown across the strip.</summary>
 	[Export] public float VisibleDegrees = 140f;
 	/// <summary>Fastest the objective marker may sweep around the ribbon, in degrees per second.</summary>
@@ -79,7 +89,7 @@ public partial class Compass : CanvasLayer
 		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, CustomMinimumSize = new Vector2(StripWidth, StripHeight) };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.CenterTop);
 		_draw.OffsetLeft = -StripWidth * 0.5f; _draw.OffsetRight = StripWidth * 0.5f;
-		_draw.OffsetTop = 8; _draw.OffsetBottom = 8 + StripHeight;
+		_draw.OffsetTop = 5; _draw.OffsetBottom = 5 + StripHeight;
 		_draw.Draw += OnDraw;
 		AddChild(_draw);
 	}
@@ -129,6 +139,23 @@ public partial class Compass : CanvasLayer
 		Dead = Systems.StoryManager.Instance?.CompassDead ?? false;
 		if (Dead) UpdateDead((float)delta);
 		UpdateShownBearing((float)delta);
+		// the heading, eased here once a frame (it was eased in the draw, with whatever delta the draw happened to see)
+		if (_player.CameraRig != null) _drawYaw = SmoothYaw(Dead ? _deadYaw : Mathf.RadToDeg(_player.CameraRig.Yaw), (float)delta);
+		// the marker on its own soft spring after the bearing (no stepping when the bearing settles in jumps)
+		if (_hasBearing)
+		{
+			if (!_markSet) { _markDeg = _shownBearing; _markVel = 0f; _markSet = true; }
+			float md = Mathf.Wrap(_shownBearing - _markDeg, -180f, 180f);
+			if (Mathf.Abs(md) > 60f) { _markDeg = _shownBearing; _markVel = 0f; }
+			else
+			{
+				const float mw = 14f;
+				_markVel += (md * mw * mw - _markVel * 2f * mw) * (float)delta;
+				_markDeg = Mathf.Wrap(_markDeg + _markVel * (float)delta, 0f, 360f);
+			}
+		}
+		else _markSet = false;
+		_markAlpha = Mathf.MoveToward(_markAlpha, _hasBearing ? 1f : 0f, (float)delta * 3f);
 		_draw.QueueRedraw();
 	}
 
@@ -137,8 +164,11 @@ public partial class Compass : CanvasLayer
 	// neon (NeonKit, the colour chosen in the settings). Its heading follows the view on a critically damped spring (fast
 	// enough never to lag a turn, smooth enough that a flick of the mouse doesn't stutter it across), and nothing is snapped
 	// to whole pixels any more (at the game's 640 px every tick stepped a pixel at a time as you turned).
-	private float _shownYaw, _yawVel;
+	private float _shownYaw, _yawVel, _drawYaw;
 	private bool _yawSet;
+	private float _markDeg, _markVel, _markAlpha;
+	private bool _markSet;
+	private static Texture2D _barTex, _pointerTex;
 
 	private float SmoothYaw(float want, float dt)
 	{
@@ -151,74 +181,95 @@ public partial class Compass : CanvasLayer
 		return _shownYaw;
 	}
 
+	private static readonly Color Engrave = new(0.86f, 0.79f, 0.62f);
+	private static readonly Color EngraveShadow = new(0f, 0f, 0f, 0.7f);
+	private static readonly Color NorthRed = new(0.82f, 0.22f, 0.15f);
+
 	private void OnDraw()
 	{
 		if (_player == null || !IsInstanceValid(_player) || _player.CameraRig == null) return;
 		var size = _draw.Size;
-		float cx = size.X * 0.5f, cy = size.Y * 0.5f;
-		float rawYaw = Dead ? _deadYaw : Mathf.RadToDeg(_player.CameraRig.Yaw);
-		float yawDeg = SmoothYaw(rawYaw, (float)GetProcessDeltaTime());
+		float cx = size.X * 0.5f, cy = (BandTop + BandBottom) * 0.5f;
+		float yawDeg = _drawYaw;
 		float jitter = Dead ? 0.35f : _jitter;
 		float t = (float)_clock;
-		float breath = 0.82f + 0.12f * Mathf.Sin(t * 1.7f) - (Dead ? 0.25f * Mathf.Abs(Mathf.Sin(t * 0.8f)) : 0f);
 
-		// the baseline: a neon tube fading out at both ends
-		const int segments = 14;
-		for (int i = 0; i < segments; i++)
-		{
-			float x0 = size.X * i / segments, x1 = size.X * (i + 1) / segments;
-			float mid = (i + 0.5f) / segments;
-			float fade = 1f - Mathf.Pow(Mathf.Abs(mid - 0.5f) * 2f, 2f);
-			NeonKit.Seg(_draw, new Vector2(x0, cy), new Vector2(x1, cy), 0.5f, 0.32f * fade * breath);
-		}
-		// the centre mark, a small notch over the line
-		NeonKit.Line(_draw, new[] { new Vector2(cx - 2.5f, cy - 6.5f), new Vector2(cx, cy - 4f), new Vector2(cx + 2.5f, cy - 6.5f) }, 0.6f, 0.55f * breath);
+		// the instrument itself
+		_barTex ??= ResourceLoader.Exists("res://assets/ui/hud/compass_bar.png") ? GD.Load<Texture2D>("res://assets/ui/hud/compass_bar.png") : null;
+		_pointerTex ??= ResourceLoader.Exists("res://assets/ui/hud/compass_pointer.png") ? GD.Load<Texture2D>("res://assets/ui/hud/compass_pointer.png") : null;
+		if (_barTex != null) _draw.DrawTextureRect(_barTex, new Rect2(Vector2.Zero, size), false);
 
-		float PxFor(float deg) => cx + OffsetPx(deg, yawDeg);
+		float half = cx - BandInset;
 		var font = _font ??= new FontVariation { BaseFont = ChapterCard.Anton ?? UiKit.Serif, SpacingGlyph = 1 };
-		// every 15 degrees a tick; the cardinals and the half-winds named
+		// every 15 degrees a mark; the cardinals and the half-winds named, engraved: bone, a dark line under each
 		for (int d = 0; d < 360; d += 15)
 		{
 			float shown = d;
-			if (jitter > 0.5f && _rng.Randf() < 0.02f) shown += _rng.RandfRange(-40f, 40f);   // a tick briefly lies
+			if (jitter > 0.5f && _rng.Randf() < 0.02f) shown += _rng.RandfRange(-40f, 40f);   // a mark briefly lies
 			float delta = Mathf.Wrap(yawDeg - shown, -180f, 180f);
 			if (Mathf.Abs(delta) > VisibleDegrees * 0.5f) continue;
-			float x = cx + delta / (VisibleDegrees * 0.5f) * (StripWidth * 0.5f) + JitterPx(jitter, 2f);
-			if (x < 0 || x > size.X) continue;
+			float x = cx + delta / (VisibleDegrees * 0.5f) * half + JitterPx(jitter, 2f);
+			float off = Mathf.Abs(x - cx) / half;
+			if (off > 1f) continue;
+			float edge = 1f - Mathf.Pow(off, 4f);                 // fading into the band's ends, never popping
 			string label = null;
 			foreach (var (l, deg) in Ticks) if (Mathf.IsEqualApprox(deg, d)) label = l;
 			bool major = label is "N" or "S" or "E" or "W";
-			float edge = 1f - Mathf.Pow(Mathf.Abs(x - cx) / cx, 3f);
-			float lit = (label == "N" ? 1f : major ? 0.8f : label != null ? 0.5f : 0.28f) * edge * breath;
-			float half = major ? 3.5f : label != null ? 2.5f : 1.5f;
-			NeonKit.Seg(_draw, new Vector2(x, cy - half), new Vector2(x, cy + half), 0.55f, lit);
-			if (major)
-				NeonKit.Text(_draw, font, new Vector2(x - 10.5f, cy - half - 1.8f), label, HorizontalAlignment.Center, 21, 8, lit);
+			var ink = new Color(label == "N" ? NorthRed : Engrave, (major ? 0.95f : label != null ? 0.7f : 0.45f) * edge);
+			if (label == null)
+			{
+				Mark(new Vector2(x, cy + 2.2f), new Vector2(x, BandBottom - 1.2f), 0.7f, ink);
+				continue;
+			}
+			if (!major) Mark(new Vector2(x, cy + 3.4f), new Vector2(x, BandBottom - 1.2f), 0.7f, ink);
+			int fs = major ? 10 : 7;
+			var tsz = font.GetStringSize(label, HorizontalAlignment.Left, -1, fs);
+			var at = new Vector2(x - tsz.X * 0.5f, cy + fs * 0.36f - (major ? 0f : 1.5f));
+			_draw.DrawString(font, at + new Vector2(0, 0.6f), label, HorizontalAlignment.Left, -1, fs, new Color(EngraveShadow, EngraveShadow.A * edge));
+			_draw.DrawString(font, at, label, HorizontalAlignment.Left, -1, fs, ink);
 		}
 
-		// the objective: a neon diamond riding the line (its core filled, breathing a little brighter), or an arrow at
-		// the edge when it's behind
-		if (!_hasBearing) return;
-		float bearing = _shownBearing;
-		if (jitter > 0.05f)
+		// the objective: the one lit thing on it, a neon diamond riding the band (or a chevron in the point it's past)
+		if (_hasBearing || _markAlpha > 0.01f)
 		{
-			if (_clock >= _nextFalseBearing) { _falseBearing = _rng.RandfRange(0f, 360f); _nextFalseBearing = _clock + Mathf.Lerp(3.0, 0.4, jitter); }
-			bearing = Mathf.RadToDeg(Mathf.LerpAngle(Mathf.DegToRad(bearing), Mathf.DegToRad(_falseBearing), jitter));
+			float bearing = _markDeg;
+			if (jitter > 0.05f)
+			{
+				if (_clock >= _nextFalseBearing) { _falseBearing = _rng.RandfRange(0f, 360f); _nextFalseBearing = _clock + Mathf.Lerp(3.0, 0.4, jitter); }
+				bearing = Mathf.RadToDeg(Mathf.LerpAngle(Mathf.DegToRad(bearing), Mathf.DegToRad(_falseBearing), jitter));
+			}
+			float bx = cx + Mathf.Wrap(yawDeg - bearing, -180f, 180f) / (VisibleDegrees * 0.5f) * half + JitterPx(jitter, 6f);
+			float mlit = Mathf.Lerp(1f, 0.45f, jitter) * (0.88f + 0.12f * Mathf.Sin(t * 3.1f)) * _markAlpha;
+			if (Mathf.Abs(bx - cx) <= half)
+			{
+				var dia = new[] { new Vector2(bx, cy - 4.6f), new Vector2(bx + 3.4f, cy), new Vector2(bx, cy + 4.6f), new Vector2(bx - 3.4f, cy) };
+				_draw.DrawColoredPolygon(new[] { dia[0] + new Vector2(0, 0.8f), dia[1] + new Vector2(0.4f, 0.8f), dia[2] + new Vector2(0, 0.8f), dia[3] + new Vector2(-0.4f, 0.8f) }, new Color(0, 0, 0, 0.5f * mlit));
+				NeonKit.Line(_draw, dia, 0.8f, mlit, true);
+				_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 2.2f), new Vector2(bx + 1.6f, cy), new Vector2(bx, cy + 2.2f), new Vector2(bx - 1.6f, cy) }, new Color(NeonKit.Core, 0.85f * mlit));
+			}
+			else
+			{
+				// behind them: a lit chevron in the point on that side
+				float dir = bx < cx ? -1f : 1f;
+				float ex = cx + dir * (half + 6f);
+				NeonKit.Line(_draw, new[] { new Vector2(ex - dir * 2.5f, cy - 3.5f), new Vector2(ex + dir * 1.5f, cy), new Vector2(ex - dir * 2.5f, cy + 3.5f) }, 0.8f, mlit);
+			}
 		}
-		float bx = PxFor(bearing) + JitterPx(jitter, 6f);
-		float mlit = Mathf.Lerp(1f, 0.45f, jitter) * (0.88f + 0.12f * Mathf.Sin(t * 3.1f));
-		if (bx >= 4 && bx <= size.X - 4)
+
+		// the lubber pointer over the middle, last (over the marks), a slight sway on a turn
+		if (_pointerTex != null)
 		{
-			var dia = new[] { new Vector2(bx, cy - 4.2f), new Vector2(bx + 3.2f, cy), new Vector2(bx, cy + 4.2f), new Vector2(bx - 3.2f, cy) };
-			NeonKit.Line(_draw, dia, 0.7f, mlit, true);
-			_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 2f), new Vector2(bx + 1.5f, cy), new Vector2(bx, cy + 2f), new Vector2(bx - 1.5f, cy) }, new Color(NeonKit.Core, 0.85f * mlit));
+			float sway = Mathf.Clamp(_yawVel * 0.004f, -1.2f, 1.2f);
+			_draw.DrawTextureRect(_pointerTex, new Rect2(cx - 5f + sway, -2.2f, 10f, 7.5f), false);
 		}
-		else
-		{
-			float ex = Mathf.Clamp(bx, 4, size.X - 4);
-			float dir = bx < 4 ? -1f : 1f;
-			NeonKit.Line(_draw, new[] { new Vector2(ex, cy - 3.5f), new Vector2(ex + dir * 4.5f, cy), new Vector2(ex, cy + 3.5f) }, 0.7f, mlit, true);
-		}
+		else _draw.DrawColoredPolygon(new[] { new Vector2(cx - 3f, 0f), new Vector2(cx + 3f, 0f), new Vector2(cx, 4f) }, Engrave);
+	}
+
+	/// <summary>An engraved line: the bone stroke, a dark line a hair under it.</summary>
+	private void Mark(Vector2 a, Vector2 b, float w, Color ink)
+	{
+		_draw.DrawLine(a + new Vector2(0.45f, 0.6f), b + new Vector2(0.45f, 0.6f), new Color(EngraveShadow, EngraveShadow.A * ink.A), w, true);
+		_draw.DrawLine(a, b, ink, w, true);
 	}
 
 	private static FontVariation _font;

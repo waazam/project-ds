@@ -328,18 +328,38 @@ public partial class HintText : Control
 		}
 	}
 
-	/// <summary>A key cap: a dark cap edged with a neon tube, its letter lit in the middle.</summary>
+	private static Texture2D _keycap;
+
+	/// <summary>A key cap: (2026-10-25, the HUD's reskin) an old typewriter key, a nickel ring round a dished, yellowed
+	/// celluloid face (assets/ui/hud/keycap.png, tools/Textures/make_hud.py), drawn in three slices so a long key's name
+	/// fits (its round ends kept, its middle stretched), the letter inked dark into it. Without the painting, the old dark
+	/// cap edged in neon.</summary>
 	private void DrawKey(Vector2 at, string key, float w, int size, float capH, Color ink)
 	{
 		float h = CapHeight(size);
-		var rect = new Rect2(at.X, Mathf.Round(at.Y - capH * 0.5f - h * 0.5f), w, h);
-		DrawRect(rect.Grow(1f), new Color(0, 0, 0, 0.45f));
-		DrawRect(rect, new Color(0.03f, 0.035f, 0.045f, 0.75f));
-		NeonKit.Line(this, NeonKit.Box(rect.Position, rect.Size, Mathf.Min(2.5f, h * 0.2f)), 0.75f, 0.8f, true);
 		int ks = Mathf.RoundToInt(KeySize(size));
 		string label = key.ToUpperInvariant();
 		var font = HintStyle.Font;
 		float tw = font.GetStringSize(label, HorizontalAlignment.Left, -1, ks).X;
+		_keycap ??= ResourceLoader.Exists("res://assets/ui/hud/keycap.png") ? GD.Load<Texture2D>("res://assets/ui/hud/keycap.png") : null;
+		if (_keycap != null)
+		{
+			// a little bigger than the text's cap height (the ring), at least round
+			float kh = h + 4f, kw = Mathf.Max(kh, w + 4f);
+			var r = new Rect2(at.X - (kw - w) * 0.5f, Mathf.Round(at.Y - capH * 0.5f - kh * 0.5f), kw, kh);
+			float tex = _keycap.GetWidth(), half = tex * 0.5f, endW = kh * 0.5f;
+			var tint = new Color(1, 1, 1, ink.A);
+			DrawTextureRectRegion(_keycap, new Rect2(r.Position, new Vector2(endW, kh)), new Rect2(0, 0, half, tex), tint);
+			if (kw > kh) DrawTextureRectRegion(_keycap, new Rect2(r.Position + new Vector2(endW, 0), new Vector2(kw - kh, kh)), new Rect2(half - 1, 0, 2, tex), tint);
+			DrawTextureRectRegion(_keycap, new Rect2(r.Position + new Vector2(kw - endW, 0), new Vector2(endW, kh)), new Rect2(half, 0, half, tex), tint);
+			var lp = new Vector2(Mathf.Round(r.GetCenter().X - tw * 0.5f), Mathf.Round(r.GetCenter().Y + ks * 0.74f * 0.5f));
+			DrawString(font, lp, label, HorizontalAlignment.Left, -1, ks, new Color(0.13f, 0.1f, 0.08f, ink.A));
+			return;
+		}
+		var rect = new Rect2(at.X, Mathf.Round(at.Y - capH * 0.5f - h * 0.5f), w, h);
+		DrawRect(rect.Grow(1f), new Color(0, 0, 0, 0.45f));
+		DrawRect(rect, new Color(0.03f, 0.035f, 0.045f, 0.75f));
+		NeonKit.Line(this, NeonKit.Box(rect.Position, rect.Size, Mathf.Min(2.5f, h * 0.2f)), 0.75f, 0.8f, true);
 		var p = new Vector2(Mathf.Round(rect.GetCenter().X - tw * 0.5f), Mathf.Round(rect.GetCenter().Y + ks * 0.74f * 0.5f));
 		DrawString(font, p, label, HorizontalAlignment.Left, -1, ks, ink);
 	}

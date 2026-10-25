@@ -155,7 +155,7 @@ public partial class PerfProbe : Node
 		if (_t < 2) return;
 		_t = 0;
 		var p = StoryBeat.Player(this);
-		GD.Print($"[perf] fps {Engine.GetFramesPerSecond()} process {Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000:0.0}ms physics {Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000:0.0}ms draws {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame)} objs {Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame)} prims {Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame) / 1000:0}k nodes {Performance.GetMonitor(Performance.Monitor.ObjectNodeCount)} at {p?.GlobalPosition}");
+		GD.Print($"[perf] fps {Engine.GetFramesPerSecond()} process {Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000:0.0}ms physics {Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000:0.0}ms draws {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame)} objs {Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame)} prims {Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame) / 1000:0}k nodes {Performance.GetMonitor(Performance.Monitor.ObjectNodeCount)} bodies {Performance.GetMonitor(Performance.Monitor.Physics3DActiveObjects)} pairs {Performance.GetMonitor(Performance.Monitor.Physics3DCollisionPairs)} islands {Performance.GetMonitor(Performance.Monitor.Physics3DIslandCount)} at {p?.GlobalPosition}");
 	}
 
 	// ------------------------------------------------------------------ what the garbage is

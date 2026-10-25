@@ -60,6 +60,8 @@ public partial class StaminaBar : CanvasLayer
 		if (_draw.Visible) _draw.QueueRedraw();
 	}
 
+	private static Texture2D _groove;
+
 	private void OnDraw()
 	{
 		if (_stamina == null || !IsInstanceValid(_stamina)) return;   // the first draw can come before the player exists
@@ -68,7 +70,10 @@ public partial class StaminaBar : CanvasLayer
 		bool spent = !_stamina.CanRun;
 		bool running = _player.IsRunning || Preview != null;
 		float breath = 0.85f + 0.15f * Mathf.Sin(t * (running ? 5.5f : 1.8f));
-		// (no bracket round it, 2026-10-11, the owner: the little [ ] "look bad")
+		// (no bracket round it, 2026-10-11, the owner: the little [ ] "look bad") (2026-10-25, the HUD's reskin) the tube runs
+		// in a groove of dark old brass (assets/ui/hud/stamina_groove.png)
+		_groove ??= ResourceLoader.Exists("res://assets/ui/hud/stamina_groove.png") ? GD.Load<Texture2D>("res://assets/ui/hud/stamina_groove.png") : null;
+		if (_groove != null) _draw.DrawTextureRect(_groove, new Rect2(x0 - 3f, cy - 3.5f, len + 6f, 7f), false);
 		// the ghost of the whole tube, and what's just drained lingering
 		NeonKit.Seg(_draw, new Vector2(x0, cy), new Vector2(x1, cy), 0.8f, 0.12f);
 		if (_ghost > _shown + 0.005f) NeonKit.Seg(_draw, new Vector2(x0 + len * _shown, cy), new Vector2(x0 + len * _ghost, cy), 1.0f, 0.3f);

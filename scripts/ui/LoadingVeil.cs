@@ -117,6 +117,13 @@ public partial class LoadingVeil : CanvasLayer
 		if (_titleLabel != null && TitleSeconds < TitleLead + TitleIn + TitleMinUp && Time.GetTicksMsec() - _shownAt < 120_000) return;
 		_released = true;
 		LoadPump.End();
+		// (2026-10-25, the polish sweep) the build's garbage swept up now, in the black: a level's build (the Hollow builds
+		// the church, the winter woods and the lodge ahead) leaves gigabytes of spent arrays behind, and left to itself the
+		// collector came for them in the first minute of play, in 60-100 ms pauses every few seconds (Act 18's fight)
+		ulong gc0 = Time.GetTicksMsec();
+		System.GC.Collect(2, System.GCCollectionMode.Forced, true, true);
+		System.GC.WaitForPendingFinalizers();
+		GD.Print($"[veil] the build's garbage collected in the black: {Time.GetTicksMsec() - gc0} ms");
 		LastHeldMs = Time.GetTicksMsec() - _shownAt;
 		GD.Print($"[veil] down after {LastHeldMs} ms ({LoadPump.Pumps} window pumps, the window unanswered at most {LoadPump.MaxGapMs} ms)");
 		var tw = CreateTween().SetParallel();

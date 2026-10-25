@@ -146,18 +146,41 @@ public static class UiKit
 		t.SetColor("font_pressed_color", "CheckBox", Bone);
 		t.SetColor("font_hover_pressed_color", "CheckBox", Bone);
 		t.SetConstant("h_separation", "CheckBox", 6);
-		t.SetIcon("unchecked", "CheckBox", Box(false, Dim));
-		t.SetIcon("checked", "CheckBox", Box(true, Eye));
-		t.SetIcon("unchecked_disabled", "CheckBox", Box(false, FogSoft));
-		t.SetIcon("checked_disabled", "CheckBox", Box(true, FogSoft));
+		// (2026-10-25, the HUD's reskin) a little brass-framed leather well, ticked with a red ink cross (tools/Textures/
+		// make_hud.py); the drawn boxes when the paintings aren't there
+		t.SetIcon("unchecked", "CheckBox", HudIcon("check_off", 10, 10) ?? Box(false, Dim));
+		t.SetIcon("checked", "CheckBox", HudIcon("check_on", 10, 10) ?? Box(true, Eye));
+		t.SetIcon("unchecked_disabled", "CheckBox", HudIcon("check_off_dim", 10, 10) ?? Box(false, FogSoft));
+		t.SetIcon("checked_disabled", "CheckBox", HudIcon("check_on_dim", 10, 10) ?? Box(true, FogSoft));
 
 		// Sliders: a 1 px fog line, a bone fill, a small bone tick that turns eye-yellow on focus.
-		t.SetStylebox("slider", "HSlider", new StyleBoxLine { Color = new Color(Fog, 0.55f), Thickness = 1, GrowBegin = 0, GrowEnd = 0 });
-		t.SetStylebox("grabber_area", "HSlider", new StyleBoxLine { Color = new Color(Bone, 0.55f), Thickness = 1, GrowBegin = 0, GrowEnd = 0 });
-		t.SetStylebox("grabber_area_highlight", "HSlider", new StyleBoxLine { Color = new Color(Bone, 0.8f), Thickness = 1, GrowBegin = 0, GrowEnd = 0 });
+		// (2026-10-25, the HUD's reskin) a groove in dark old brass, filled with worn gold up to a brass slider-plate
+		t.SetStylebox("slider", "HSlider", new StyleBoxFlat
+		{
+			BgColor = new Color(0.035f, 0.03f, 0.025f, 0.9f), BorderColor = new Color(0.42f, 0.33f, 0.17f, 0.9f),
+			BorderWidthTop = 1, BorderWidthBottom = 1, BorderWidthLeft = 1, BorderWidthRight = 1,
+			CornerRadiusTopLeft = 2, CornerRadiusTopRight = 2, CornerRadiusBottomLeft = 2, CornerRadiusBottomRight = 2,
+			ContentMarginTop = 2, ContentMarginBottom = 2,
+		});
+		t.SetStylebox("grabber_area", "HSlider", new StyleBoxFlat
+		{
+			BgColor = new Color(0.62f, 0.5f, 0.27f, 0.75f), CornerRadiusTopLeft = 2, CornerRadiusBottomLeft = 2, CornerRadiusTopRight = 2, CornerRadiusBottomRight = 2,
+			ContentMarginTop = 2, ContentMarginBottom = 2,
+		});
+		t.SetStylebox("grabber_area_highlight", "HSlider", new StyleBoxFlat
+		{
+			BgColor = new Color(0.78f, 0.63f, 0.33f, 0.9f), CornerRadiusTopLeft = 2, CornerRadiusBottomLeft = 2, CornerRadiusTopRight = 2, CornerRadiusBottomRight = 2,
+			ContentMarginTop = 2, ContentMarginBottom = 2,
+		});
 		t.SetStylebox("focus", "HSlider", empty);
-		t.SetIcon("grabber", "HSlider", Tick(new Color(Bone, 0.85f)));
-		t.SetIcon("grabber_highlight", "HSlider", Tick(Eye));
+		// the settings' scrollbar: a brass handle in a dark groove, like the sliders
+		StyleBoxFlat Bar(Color c) => new() { BgColor = c, CornerRadiusTopLeft = 2, CornerRadiusTopRight = 2, CornerRadiusBottomLeft = 2, CornerRadiusBottomRight = 2, ContentMarginLeft = 2, ContentMarginRight = 2 };
+		t.SetStylebox("scroll", "VScrollBar", Bar(new Color(0.035f, 0.03f, 0.025f, 0.6f)));
+		t.SetStylebox("grabber", "VScrollBar", Bar(new Color(0.55f, 0.43f, 0.22f, 0.8f)));
+		t.SetStylebox("grabber_highlight", "VScrollBar", Bar(new Color(0.72f, 0.58f, 0.3f, 0.9f)));
+		t.SetStylebox("grabber_pressed", "VScrollBar", Bar(new Color(0.8f, 0.65f, 0.34f, 1f)));
+		t.SetIcon("grabber", "HSlider", HudIcon("slider_knob", 6, 11) ?? Tick(new Color(Bone, 0.85f)));
+		t.SetIcon("grabber_highlight", "HSlider", HudIcon("slider_knob_hi", 6, 11) ?? Tick(Eye));
 		t.SetIcon("grabber_disabled", "HSlider", Tick(Dim));
 
 		t.SetStylebox("panel", "Panel", new StyleBoxFlat { BgColor = new Color(Night, 0.8f) });
@@ -171,6 +194,18 @@ public static class UiKit
 		t.SetFont("font", name, font);
 		t.SetFontSize("font_size", name, size);
 		t.SetColor("font_color", name, color);
+	}
+
+	/// <summary>(2026-10-25) One of the HUD's paintings (assets/ui/hud/<paramref name="name"/>.png, painted at 4x), shown at
+	/// <paramref name="w"/> x <paramref name="h"/> (an icon is laid out at its texture's size: the override keeps its
+	/// detail at the window's resolution). Null if it isn't there.</summary>
+	public static Texture2D HudIcon(string name, int w, int h)
+	{
+		string path = $"res://assets/ui/hud/{name}.png";
+		if (!ResourceLoader.Exists(path) || GD.Load<Texture2D>(path)?.GetImage() is not { } img) return null;
+		var tex = ImageTexture.CreateFromImage(img);
+		tex.SetSizeOverride(new Vector2I(w, h));
+		return tex;
 	}
 
 	private static ImageTexture Box(bool filled, Color c)

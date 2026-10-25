@@ -117,6 +117,8 @@ public partial class EquippedItemHud : CanvasLayer
 		_draw.QueueRedraw();
 	}
 
+	private static Texture2D _strip;
+
 	private void OnDraw()
 	{
 		int i = System.Array.FindIndex(_items, it => it.Kind == _held);
@@ -128,6 +130,14 @@ public partial class EquippedItemHud : CanvasLayer
 		float u = _strike;
 		float strike = u >= 1f ? 1f : Mathf.SmoothStep(0f, 1f, Mathf.Clamp(u / 0.3f, 0f, 1f)) * (1f - 0.35f * Mathf.Exp(-Mathf.Pow((u - 0.45f) / 0.12f, 2f)));
 		float lit = breath * strike;
+		// (2026-10-25, the HUD's reskin) laid on a strip of old stitched leather, a brass rivet at its end, fading out to
+		// the left (assets/ui/hud/item_strip.png): the neon is the lit thing on it, the strip the thing it's set in
+		_strip ??= ResourceLoader.Exists("res://assets/ui/hud/item_strip.png") ? GD.Load<Texture2D>("res://assets/ui/hud/item_strip.png") : null;
+		if (_strip != null)
+		{
+			float sw = Mathf.Min(size.X + 6f, 150f), sh = Mathf.Min(size.Y + 4f, 34f);
+			_draw.DrawTextureRect(_strip, new Rect2(size.X - sw + 6f, size.Y * 0.5f - sh * 0.5f, sw, sh), false, new Color(1, 1, 1, 0.9f * Mathf.Clamp(strike + 0.3f, 0f, 1f)));
+		}
 		// the icon at the right (no bracket round it, 2026-10-11, the owner: the corners "look bad")
 		float icon = 16f;   // (smaller and quieter, the owner: "shrunk a little to be made more subtle")
 		var ic = new Vector2(size.X - icon * 0.5f - 2f, size.Y * 0.5f - 1f);
