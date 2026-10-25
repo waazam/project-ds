@@ -113,6 +113,10 @@ public partial class LakeCreature : Node3D
 
 	private Limb BuildLimb(Vector3 localRoot, float length, float baseR, int eyes)
 	{
+		// (2026-10-24, the owner: "make the octopus tentacles skinnier they look way too fat and chody ... still vary them
+		// in sizes") a little over half the girth they were, each limb its own 0.75-1.25 of that (by its place in the
+		// order, so the creature's random draws are as they were)
+		baseR *= Slim * (0.75f + 0.5f * Mathf.PosMod(_limbs.Count * 0.618034f + 0.3f, 1f));
 		var limb = new Limb
 		{
 			Length = length, Phase = _rng.RandfRange(0, Mathf.Tau), Curl = _rng.RandfRange(0.09f, 0.17f),
@@ -247,7 +251,9 @@ public partial class LakeCreature : Node3D
 
 	/// <summary>The limb's radius a fraction f of the way up: thick most of the way, narrowing late
 	/// into a blunt, curling tip (a tentacle, not a spike).</summary>
-	private static float Radius(float baseR, float f) => Mathf.Lerp(baseR, Mathf.Max(0.12f, baseR * 0.3f), Mathf.Pow(f, 1.7f));   // thick enough at the tip to carry its mouth
+	private const float Slim = 0.56f;
+
+	private static float Radius(float baseR, float f) => Mathf.Lerp(baseR, Mathf.Max(0.08f, baseR * 0.26f), Mathf.Pow(f, 1.5f));   // thick enough at the tip to carry its mouth
 
 	/// <summary>Gooey, grimy octopus flesh (<see cref="TentacleKit.Flesh"/>): maroon underneath, green-teal down the back.</summary>
 	private static ShaderMaterial Skin()

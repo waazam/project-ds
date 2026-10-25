@@ -298,7 +298,9 @@ public partial class Leviathan : Node3D
 		var t = new Tentacle
 		{
 			Angle = i / (float)LimbCount * Mathf.Tau + 0.2f + _rng.RandfRange(-0.12f, 0.12f), Phase = _rng.RandfRange(0, Mathf.Tau),
-			BaseR = build switch { 'T' => _rng.RandfRange(1.45f, 1.75f), 'M' => _rng.RandfRange(0.9f, 1.15f), _ => _rng.RandfRange(0.3f, 0.46f) },
+			// (2026-10-24, the owner: "make the octopus tentacles skinnier they look way too fat and chody ... still vary them in
+			// sizes": about two thirds of what they were, the spread between thick and whip kept)
+			BaseR = build switch { 'T' => _rng.RandfRange(0.85f, 1.12f), 'M' => _rng.RandfRange(0.5f, 0.7f), _ => _rng.RandfRange(0.18f, 0.3f) },
 			Skinny = build == 'S',
 			Reach = build switch { 'T' => _rng.RandfRange(0.95f, 1.05f), 'M' => _rng.RandfRange(0.9f, 1.15f), _ => _rng.RandfRange(0.8f, 1.3f) },
 			Whip = build switch { 'T' => 0.8f, 'M' => 1.1f, _ => 1.9f },
@@ -515,9 +517,9 @@ public partial class Leviathan : Node3D
 	/// mouth, thick enough to carry it, or for a skinny one, to a fine point.</summary>
 	private static float Radius(Tentacle t, float f)
 	{
-		float tipR = t.Skinny ? 0.05f : Mathf.Max(0.3f, t.BaseR * 0.3f);
-		float r = Mathf.Lerp(t.BaseR, tipR, Mathf.Pow(f, t.Skinny ? 0.85f : 1.4f));
-		return r * (1f + 0.75f * (1f - Mathf.SmoothStep(0f, 0.12f, f)));
+		float tipR = t.Skinny ? 0.04f : Mathf.Max(0.16f, t.BaseR * 0.24f);
+		float r = Mathf.Lerp(t.BaseR, tipR, Mathf.Pow(f, t.Skinny ? 0.85f : 1.25f));
+		return r * (1f + 0.55f * (1f - Mathf.SmoothStep(0f, 0.12f, f)));
 	}
 
 	// ------------------------------------------------------------------ the fight's API
