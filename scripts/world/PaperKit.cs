@@ -92,6 +92,29 @@ public static class PaperKit
 		return m;
 	}
 
+	private static readonly Dictionary<string, Image> _painted = new();
+
+	/// <summary>A painted paper (assets/ui/paper/<paramref name="name"/>.png) shrunk to w x h, its torn edge filled
+	/// (the quad is square-edged), or null if it isn't there.</summary>
+	private static Image Painted(string name, int w, int h)
+	{
+		string key = $"{name}:{w}x{h}";
+		if (_painted.TryGetValue(key, out var img)) return img;
+		string path = $"res://assets/ui/paper/{name}.png";
+		img = ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path)?.GetImage() : null;
+		if (img != null)
+		{
+			img = (Image)img.Duplicate();
+			if (img.IsCompressed()) img.Decompress();
+			// crop off the ragged border, then shrink
+			int m = 16;
+			img = img.GetRegion(new Rect2I(m, m, img.GetWidth() - m * 2, img.GetHeight() - m * 2));
+			img.Resize(w, h, Image.Interpolation.Lanczos);
+		}
+		_painted[key] = img;
+		return img;
+	}
+
 	/// <summary>32 x 40 px: paper grain, an edge darkening, faint scrawl lines. Lines are the only ink; there is no legible text.</summary>
 	private static ImageTexture Texture(Look look, int seed)
 	{
@@ -109,10 +132,19 @@ public static class PaperKit
 		var __tg = Systems.TexGen.Start();
 		var img = Image.CreateEmpty(w, h, false, Image.Format.Rgba8);
 		var px = new Color[w, h];
+		// (2026-10-24) the same painted paper the note is read on (assets/ui/paper: its stains, foxing and folds), brought
+		// down to the sheet's size, tinted to its look
+		var painted = Painted(look switch { Look.Card => "card", Look.Ledger => "typed", Look.Board => "rough", _ => "note" }, w, h);
 		for (int y = 0; y < h; y++)
 			for (int x = 0; x < w; x++)
 			{
 				float grain = 1f + (rng.Randf() - 0.5f) * 0.10f;
+				if (painted != null)
+				{
+					var pc = painted.GetPixel(x, y);
+					px[x, y] = new Color(pc.R, pc.G, pc.B) * (paper / 0.8f) * grain;
+					continue;
+				}
 				// edges and corners a little darker and browner: handled paper
 				float ex = Mathf.Min(x, w - 1 - x) / (float)w, ey = Mathf.Min(y, h - 1 - y) / (float)h;
 				float edge = Mathf.Clamp(Mathf.Min(ex, ey) * 6f, 0f, 1f);

@@ -98,6 +98,7 @@ public partial class UiPreviewDriver : Node
 			return;
 		}
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--hints") >= 0) { await HintShots(player, inv); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--notes") >= 0) { await NoteShots(player); return; }
 		inv.TryPickup(ToolKind.Compass);
 		inv.TryPickup(ToolKind.Lantern);
 		await Seconds(1.0);
@@ -188,6 +189,31 @@ public partial class UiPreviewDriver : Node
 	/// <summary>`-- --hints [--hints-tag=before]` (2026-10-15): every kind of hint at 1920x1080 and 2560x1440, in the day and in
 	/// the dark, the window's real frame (2D at the window's resolution with the CRT filter on). Shots go to
 	/// test-output/hints/&lt;tag&gt;/.</summary>
+	/// <summary>(2026-10-24) "-- --notes": the note card in each paper and hand, with and without a doodle (R.H.'s pages,
+	/// a typed log, a printed card, a smudged note, one in block capitals), each shot as test-output/ui/note_*.</summary>
+	private async Task NoteShots(PlayerController player)
+	{
+		var samples = new System.Collections.Generic.List<(string name, string title, string text, Readable.NoteStyle style)>();
+		foreach (var pg in World.LorePages.All) samples.Add(($"rh{pg.N}", "", pg.Text, Readable.NoteStyle.Handwritten));
+		samples.Add(("typed", "Ranger station log", "OCT 9  0600  Two hikers signed in at the trailhead. Did not sign out.\nOCT 9  1900  Search called off for the night. Weather closing.\nOCT 10 0700  Their car is still in the lot. Keys in it.", Readable.NoteStyle.Typed));
+		samples.Add(("printed", "Overlook Park", "Trails close at dusk. Stay on marked paths. Do not feed the wildlife.", Readable.NoteStyle.Printed));
+		samples.Add(("smudged", "", "It was at the window again last night. I counted the days since it started. Eleven. It knows my name now. It says it in my mother's voice. Don't open the door for anyone. Not even me.", Readable.NoteStyle.Smudged));
+		samples.Add(("caps", "", "THE MONSTERS WERE NEVER UNDER MY BED.\nBECAUSE THE MONSTERS WERE INSIDE MY HEAD.\nI FEAR NO MONSTERS, FOR NO MONSTERS I SEE.", Readable.NoteStyle.Handwritten));
+		samples.Add(("long", "", string.Join(" ", System.Linq.Enumerable.Repeat("The trail goes on past where the map ends, and the trees close in, and the path forks where it shouldn't.", 6)), Readable.NoteStyle.Handwritten));
+		foreach (var (name, title, text, style) in samples)
+		{
+			var r = new Readable { Name = "PreviewNote", Title = title, Text = text, Style = style, Enabled = false, Visible = false };
+			AddChild(r);
+			NoteOverlay.Instance?.Open(r, player);
+			await Seconds(0.6);
+			Shot($"note_{name}");
+			NoteOverlay.Instance?.Close();
+			await Seconds(0.3);
+			r.QueueFree();
+		}
+		GetTree().Quit(0);
+	}
+
 	private async Task HintShots(PlayerController player, PlayerInventory inv)
 	{
 		string tag = "now";

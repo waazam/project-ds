@@ -14,8 +14,8 @@ namespace ProjectDS.Systems;
 /// makes their input idle while the page is up (<see cref="PlayerInput.Modal"/>).
 ///
 /// Text is shown verbatim, so write the lines exactly as the paper would carry
-/// them. <see cref="Style"/> picks the face: handwritten notes in the italic
-/// serif, typed logs in the monospace, printed cards and signs in the plain serif.
+/// them. <see cref="Style"/> picks the paper and the hand (NoteOverlay): handwritten notes in a pen hand on
+/// notebook paper, typed logs on a typewriter, printed cards and signs in the plain serif.
 ///
 /// If <see cref="ReadFlag"/> is set, that story flag is set the first time the
 /// player reads it (saved; other systems and the autotest can key off it).
@@ -30,6 +30,9 @@ public partial class Readable : Interactable
 	[Export] public string Title = "";
 	[Export(PropertyHint.MultilineText)] public string Text = "";
 	[Export] public NoteStyle Style = NoteStyle.Handwritten;
+	/// <summary>(2026-10-24) The pen drawing on it (a name in assets/ui/doodles): "" lets the words pick one
+	/// (<see cref="UI.NoteDoodles"/>), "none" for none.</summary>
+	[Export] public string Doodle = "";
 	/// <summary>Optional StoryManager flag set on first read (e.g. "read_door_note").</summary>
 	[Export] public string ReadFlag = "";
 	/// <summary>(2026-10-16) A book read page by page (the father's logbook, Act 13): when set, these are shown in turn
@@ -64,4 +67,6 @@ public sealed class NotePage
 	public string Text = "";
 	public Readable.NoteStyle Style = Readable.NoteStyle.Handwritten;
 	public Color? Ink;
+	/// <summary>The drawing on this page (a name in assets/ui/doodles): "" picks one from what it says, "none" none.</summary>
+	public string Doodle = "";
 }

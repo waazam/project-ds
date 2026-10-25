@@ -11,9 +11,16 @@ namespace ProjectDS.UI;
 /// player's input is made idle through <see cref="PlayerInput.BeginModal"/>
 /// while the page is up, and a cutscene taking control closes it.
 ///
-/// Sized for 640x360: the card is 300 px wide, the text 12 px serif (italic for
-/// handwriting, mono for typed), never smaller. Long texts grow the card down
+/// Sized for 640x360: the card is 300 px wide. Long texts grow the card down
 /// to 300 px and then scroll with the mouse wheel or stick.
+///
+/// (2026-10-24, the owner: "retexture the paper for all the notes to make it look more rustic and textured", the font
+/// "more like handwriting", "some drawings thrown in") Each style is its own paper (assets/ui/paper, painted by
+/// tools/Textures/make_paper.py, laid on as a nine-patch so its torn and scorched edges keep): a page torn from a
+/// ruled notebook (its lines, margin and punched holes drawn here, in step with the text) for the handwritten, a
+/// stained and scorched sheet for the smudged, yellowed typing paper, card stock. The hands are real fonts
+/// (<see cref="UiKit.Hand"/>, Scrawl, Caps, Typewriter), and a handwritten note about something gets a pen doodle of
+/// it under the writing (<see cref="NoteDoodles"/>).
 /// </summary>
 public partial class NoteOverlay : CanvasLayer
 {
@@ -29,6 +36,19 @@ public partial class NoteOverlay : CanvasLayer
 	/// <summary>Space kept clear above and below the card.</summary>
 	private const float ScreenMargin = 18f;
 	private const float Pad = 18f;
+	/// <summary>The paper's border kept unstretched (its torn or scorched edge; tools/Textures/make_paper.py EDGE).</summary>
+	private const int PaperEdge = 14;
+	private static readonly Vector2 DoodleSize = new(96f, 72f);
+	private static readonly System.Collections.Generic.Dictionary<string, Texture2D> _papers = new();
+
+	private static Texture2D Paper(string name)
+	{
+		if (_papers.TryGetValue(name, out var t)) return t;
+		string path = $"res://assets/ui/paper/{name}.png";
+		t = ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
+		_papers[name] = t;
+		return t;
+	}
 
 	private Control _root;
 	private ColorRect _wash;
@@ -37,6 +57,12 @@ public partial class NoteOverlay : CanvasLayer
 	private Label _title;
 	private RichTextLabel _body;
 	private Label _hint;
+	private StyleBoxTexture _paper;
+	private HBoxContainer _doodleRow;
+	private TextureRect _doodle;
+	private VBoxContainer _box;
+	private bool _ruled;
+	private int _seed;
 	private PlayerController _player;
 	private Tween _tween;
 
@@ -62,14 +88,20 @@ public partial class NoteOverlay : CanvasLayer
 			ShadowOffset = new Vector2(2, 3),
 			ContentMarginLeft = Pad, ContentMarginRight = Pad, ContentMarginTop = Pad - 4, ContentMarginBottom = Pad - 4,
 		};
+		_paper = new StyleBoxTexture
+		{
+			TextureMarginLeft = PaperEdge, TextureMarginRight = PaperEdge, TextureMarginTop = PaperEdge, TextureMarginBottom = PaperEdge,
+			ContentMarginLeft = Pad, ContentMarginRight = Pad, ContentMarginTop = Pad - 2, ContentMarginBottom = Pad - 4,
+		};
 		_card = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
 		_card.AddThemeStyleboxOverride("panel", _cardStyle);
+		_card.Draw += DrawRuling;
 		_card.SetAnchorsPreset(Control.LayoutPreset.Center);
 		_card.GrowHorizontal = Control.GrowDirection.Both;
 		_card.GrowVertical = Control.GrowDirection.Both;
 		_root.AddChild(_card);
 
-		var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+		var box = _box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
 		box.AddThemeConstantOverride("separation", 6);
 		_card.AddChild(box);
 
@@ -94,6 +126,18 @@ public partial class NoteOverlay : CanvasLayer
 		};
 		_body.AddThemeConstantOverride("line_separation", 3);
 		box.AddChild(_body);
+		_body.GetVScrollBar().ValueChanged += _ => _card.QueueRedraw();
+
+		_doodleRow = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+		_doodle = new TextureRect
+		{
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+			StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+			CustomMinimumSize = DoodleSize,
+		};
+		_doodleRow.AddChild(_doodle);
+		box.AddChild(_doodleRow);
 
 		_hint = new Label
 		{
@@ -135,15 +179,40 @@ public partial class NoteOverlay : CanvasLayer
 		var pg = note.Pages is { Length: > 0 } pages ? pages[Mathf.Clamp(_page, 0, pages.Length - 1)] : null;
 		var style = pg?.Style ?? note.Style;
 		string text = pg != null ? pg.Text ?? "" : note.Text ?? "";
-		var (paper, ink, font, size) = style switch
+		var (paper, sheet, ink, font, size) = style switch
 		{
-			Readable.NoteStyle.Typed => (new Color(0.78f, 0.75f, 0.63f), new Color(0.13f, 0.12f, 0.13f), UiKit.Mono, 11),
-			Readable.NoteStyle.Printed => (new Color(0.84f, 0.83f, 0.78f), new Color(0.12f, 0.12f, 0.14f), UiKit.Serif, 12),
-			Readable.NoteStyle.Smudged => (new Color(0.74f, 0.7f, 0.6f), new Color(0.2f, 0.17f, 0.22f), UiKit.SerifItalic, 13),
-			_ => (new Color(0.80f, 0.76f, 0.66f), new Color(0.17f, 0.15f, 0.20f), UiKit.SerifItalic, 12),
+			Readable.NoteStyle.Typed => (new Color(0.78f, 0.75f, 0.63f), "typed", new Color(0.13f, 0.12f, 0.13f), UiKit.Typewriter, 11),
+			Readable.NoteStyle.Printed => (new Color(0.84f, 0.83f, 0.78f), "card", new Color(0.12f, 0.12f, 0.14f), UiKit.Serif, 12),
+			Readable.NoteStyle.Smudged => (new Color(0.74f, 0.7f, 0.6f), "rough", new Color(0.2f, 0.17f, 0.22f), UiKit.Scrawl, 17),
+			_ => (new Color(0.80f, 0.76f, 0.66f), "note", new Color(0.17f, 0.15f, 0.20f), UiKit.Hand, 13),
 		};
+		// a note written all in capitals is in shaky block capitals
+		if (style == Readable.NoteStyle.Handwritten && Shouting(text)) (font, size) = (UiKit.Caps, 10);
 		if (pg?.Ink is Color own) ink = own;
 		_cardStyle.BgColor = paper;
+		_seed = (int)(Hash(text) & 0x7fffffff);
+		var tex = Paper(sheet);
+		if (tex != null)
+		{
+			_paper.Texture = tex;
+			_card.AddThemeStyleboxOverride("panel", _paper);
+		}
+		else _card.AddThemeStyleboxOverride("panel", _cardStyle);
+		_ruled = tex != null && style == Readable.NoteStyle.Handwritten;
+		bool hand = style is Readable.NoteStyle.Handwritten or Readable.NoteStyle.Smudged;
+		_title.AddThemeFontOverride("font", hand ? UiKit.Hand : UiKit.SerifHeading);
+		_title.AddThemeFontSizeOverride("font_size", hand ? 11 : 9);
+		// the drawing: under the writing, to one side or the middle, a little askew
+		var doodle = NoteDoodles.For(text, note.Title, pg != null ? pg.Doodle : note.Doodle, style);
+		_doodleRow.Visible = doodle != null;
+		if (doodle != null)
+		{
+			_doodle.Texture = doodle;
+			_doodle.Modulate = new Color(ink, style == Readable.NoteStyle.Smudged ? 0.75f : 0.9f);
+			_doodleRow.Alignment = (_seed % 3) switch { 0 => BoxContainer.AlignmentMode.Begin, 1 => BoxContainer.AlignmentMode.Center, _ => BoxContainer.AlignmentMode.End };
+			_doodle.PivotOffset = DoodleSize * 0.5f;
+			_doodle.RotationDegrees = (_seed % 9) - 4f;
+		}
 		_title.Text = note.Title ?? "";
 		_title.Visible = !string.IsNullOrEmpty(note.Title);
 		_title.AddThemeColorOverride("font_color", new Color(ink, 0.65f));
@@ -162,6 +231,9 @@ public partial class NoteOverlay : CanvasLayer
 		}
 		else _body.RemoveThemeColorOverride("font_shadow_color");
 		_body.ScrollToLine(0);
+		_lineFont = font;
+		_lineSize = size;
+		_card.QueueRedraw();
 
 		// A handwritten sheet is held a little askew; cards and logs sit square.
 		_card.RotationDegrees = style == Readable.NoteStyle.Handwritten ? -1.2f : 0f;
@@ -198,6 +270,53 @@ public partial class NoteOverlay : CanvasLayer
 
 	private static string Esc(char c) => c == '[' ? "[lb]" : c.ToString();
 
+	private static uint Hash(string text)
+	{
+		uint h = 2166136261;
+		foreach (char ch in text ?? "") h = (h ^ ch) * 16777619;
+		return h;
+	}
+
+	/// <summary>Mostly capitals (a note printed in block letters, like the refs' "THE MONSTERS WERE NEVER UNDER MY BED").</summary>
+	private static bool Shouting(string text)
+	{
+		int up = 0, low = 0;
+		foreach (char c in text ?? "") { if (char.IsUpper(c)) up++; else if (char.IsLower(c)) low++; }
+		return up > 12 && up > low * 3;
+	}
+
+	private Font _lineFont;
+	private int _lineSize = 13;
+
+	/// <summary>The notebook's ruling over the paper (under the writing): pale blue lines in step with the text's lines
+	/// (scrolling with it), the red margin down the left, three punched holes.</summary>
+	private void DrawRuling()
+	{
+		if (!_ruled || _lineFont == null) return;
+		var size = _card.Size;
+		// the text's own line pitch, as laid out (the font's metrics alone came out at half of it)
+		float lh = _body.GetLineCount() > 1 ? _body.GetLineOffset(1) - _body.GetLineOffset(0) : _lineFont.GetHeight(_lineSize) + _body.GetThemeConstant("line_separation");
+		if (lh < 6f) lh = _lineFont.GetHeight(_lineSize) + _body.GetThemeConstant("line_separation");
+		float top = _box.Position.Y + _body.Position.Y + (_body.GetLineCount() > 0 ? _body.GetLineOffset(0) : 0f);
+		float scroll = (float)_body.GetVScrollBar().Value;
+		// each line sits on a rule: the rule a little under the line's baseline
+		float phase = top - scroll + _lineFont.GetAscent(_lineSize) + 2f;
+		float y0 = 20f, y1 = size.Y - 10f;
+		float first = phase - Mathf.Ceil((phase - y0) / lh) * lh;
+		var rule = new Color(0.36f, 0.5f, 0.72f, 0.32f);
+		for (float y = first; y < y1; y += lh)
+			if (y >= y0) _card.DrawLine(new Vector2(6f, Mathf.Round(y) + 0.5f), new Vector2(size.X - 6f, Mathf.Round(y) + 0.5f), rule, 1f);
+		var margin = new Color(0.72f, 0.24f, 0.22f, 0.38f);
+		_card.DrawLine(new Vector2(Pad - 4f, 12f), new Vector2(Pad - 4f, size.Y - 8f), margin, 1f);
+		// the holes: the dark of what's behind, a lip of shadow under each
+		foreach (float t in new[] { 0.2f, 0.5f, 0.8f })
+		{
+			var c = new Vector2(8f, Mathf.Round(size.Y * t));
+			_card.DrawCircle(c + new Vector2(0.5f, 0.8f), 3.6f, new Color(0.25f, 0.2f, 0.14f, 0.35f));
+			_card.DrawCircle(c, 3.2f, new Color(UiKit.Night, 0.92f));
+		}
+	}
+
 	private float _width = CardWidth;
 	private int _layoutTries;
 
@@ -215,8 +334,16 @@ public partial class NoteOverlay : CanvasLayer
 		var vis = GetViewport().GetVisibleRect().Size;
 		float titleH = _title.Visible ? _title.GetMinimumSize().Y + 6f : 0f;
 		float hintH = _hint.GetMinimumSize().Y + 6f;
-		float chrome = (Pad - 4f) * 2f + titleH + hintH;
+		float doodleH = _doodleRow.Visible ? DoodleSize.Y + 6f : 0f;
+		float chrome = (Pad - 2f) + (Pad - 4f) + titleH + hintH + doodleH;
 		float maxBody = Mathf.Max(60f, vis.Y - ScreenMargin * 2f - chrome);
+		// a page long enough to scroll keeps its room for the words: no drawing
+		if (_doodleRow.Visible && content + 4f > maxBody)
+		{
+			_doodleRow.Visible = false;
+			chrome -= doodleH;
+			maxBody += doodleH;
+		}
 		float bodyH = Mathf.Min(content + 4f, maxBody);
 		bool scrolls = content + 4f > maxBody;
 		string put = PageCount > 1 && _page < PageCount - 1 ? "E  turn the page" : "E  put it down";
@@ -224,6 +351,7 @@ public partial class NoteOverlay : CanvasLayer
 		_hint.Text = scrolls ? "wheel  more      " + put : put;
 		_body.CustomMinimumSize = new Vector2(_width - Pad * 2f, bodyH);
 		Place(_width, chrome + bodyH);
+		_card.QueueRedraw();
 	}
 
 	private void Place(float w, float h)

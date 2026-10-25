@@ -56,6 +56,29 @@ public static class UiKit
 	public static Font Mono => _mono ??= MakeSystemFont(new[] { "Consolas", "Courier New", "DejaVu Sans Mono", "Liberation Mono", "monospace" }, true);
 	public static Font MonoSpaced => _monoSpaced ??= Spaced(Mono, 1);
 
+	// (2026-10-24, the owner: the notes' font "to look more like handwriting") the notes' hands, shipped with the game
+	// (assets/fonts, OFL / Apache 2.0: their licences beside them)
+	private static Font _hand, _scrawl, _caps, _typewriter;
+	/// <summary>A clear, quick hand: most handwritten notes (Patrick Hand).</summary>
+	public static Font Hand => _hand ??= LoadFont("PatrickHand-Regular.ttf");
+	/// <summary>A hurried, slanting scrawl: smudged and frantic notes (Reenie Beanie; needs a size a third bigger).</summary>
+	public static Font Scrawl => _scrawl ??= LoadFont("ReenieBeanie.ttf");
+	/// <summary>Shaky block capitals: a note written all in caps (Rock Salt; set it small).</summary>
+	public static Font Caps => _caps ??= LoadFont("RockSalt-Regular.ttf");
+	/// <summary>A worn typewriter, the ribbon uneven: typed logs and reports (Special Elite).</summary>
+	public static Font Typewriter => _typewriter ??= LoadFont("SpecialElite-Regular.ttf");
+
+	private static Font LoadFont(string file)
+	{
+		var f = GD.Load<FontFile>("res://assets/fonts/" + file);
+		if (f == null) return Serif;
+		f.Antialiasing = TextServer.FontAntialiasing.Gray;
+		f.Hinting = TextServer.Hinting.Light;
+		f.SubpixelPositioning = TextServer.SubpixelPositioning.Disabled;
+		f.GenerateMipmaps = false;
+		return f;
+	}
+
 	private static Font MakeSystemFont(string[] names, bool mono, bool italic = false)
 	{
 		return new SystemFont
