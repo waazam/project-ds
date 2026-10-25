@@ -189,6 +189,7 @@ public partial class GameFlow : Node
 		_ = Cutscene.Run(this, async ct =>
 		{
 			await ShaderWarmup.WaitReady(this, ct);
+			await SettleInTheBlack(ct);
 			LogLoad();
 			Cutscene.Unlock(_player, input: true);
 			Started = true;
@@ -215,6 +216,24 @@ public partial class GameFlow : Node
 	/// _Ready is released only once they are up), then the player's line (STORY.md Rev 5, PlayerVoice "wake").
 	/// The first time, the game's title is up over the load (<see cref="LoadingVeil"/>): the wake waits for it to clear.
 	/// </summary>
+	/// <summary>(2026-10-25, the polish sweep) what a Continue's load leaves to do, done before the fade-in: the places
+	/// behind the checkpoint let go of (ChapterRetire), the blacklight's marks settled on their walls (UvInkSettler), and
+	/// the garbage of it all collected. They ran in the first seconds on screen: Act 18's catwalk held 200-500 ms frames.
+	/// (Under the loading veil, the veil collects as it lifts.)</summary>
+	private async Task SettleInTheBlack(CancellationToken ct)
+	{
+		ulong t0 = Time.GetTicksMsec();
+		await ChapterRetire.Settle(this, ct);
+		await World.UvInkSettler.Settle(this, ct);
+		ulong settled = Time.GetTicksMsec();
+		if (LoadingVeil.Current == null)
+		{
+			System.GC.Collect(2, System.GCCollectionMode.Forced, true, true);
+			System.GC.WaitForPendingFinalizers();
+		}
+		GD.Print($"[load] settled in the black: {settled - t0} ms (places let go of {ChapterRetire.Retired}), collected in {Time.GetTicksMsec() - settled} ms");
+	}
+
 	/// <summary>How long the level took, from being asked for to ready to fade in (the load overhaul, 2026-10-09).</summary>
 	private void LogLoad()
 	{

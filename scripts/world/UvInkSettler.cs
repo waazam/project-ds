@@ -38,6 +38,19 @@ public partial class UvInkSettler : Node
 
 	public override void _ExitTree() { if (_instance == this) _instance = null; }
 
+	/// <summary>For a Continue: waits (in the black) until the marks placed at the load have settled, at most
+	/// <paramref name="maxSeconds"/> (2026-10-25: settling them walks the whole tree and reads the meshes round each, a
+	/// 500 ms frame at Act 18's catwalk just after the fade-in).</summary>
+	public static async System.Threading.Tasks.Task Settle(Node from, System.Threading.CancellationToken ct, double maxSeconds = 5)
+	{
+		ulong t0 = Time.GetTicksMsec();
+		while (_pending.Count > 0 && _instance != null && IsInstanceValid(_instance) && Time.GetTicksMsec() - t0 < maxSeconds * 1000)
+		{
+			ct.ThrowIfCancellationRequested();
+			await from.ToSignal(from.GetTree(), SceneTree.SignalName.ProcessFrame);
+		}
+	}
+
 	public override void _Process(double delta)
 	{
 		if (_pending.Count == 0) return;

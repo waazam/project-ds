@@ -69,9 +69,25 @@ public partial class ChapterRetire : Node
 
 	private async System.Threading.Tasks.Task AfterLoad()
 	{
-		while (IsInsideTree() && GameFlow.Instance is not { Started: true }) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-		for (int i = 0; i < 30 && IsInsideTree(); i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		// (2026-10-25, the polish sweep) once the level's builds and shader warm-up are done, while it's still black: it
+		// waited for the fade-in to begin, and a Continue at Act 18 let go of the whole woods and station on screen, the
+		// frames of the first seconds at the catwalk held 200-500 ms (GameFlow waits on Settle before it fades in)
+		while (IsInsideTree() && !(ShaderWarmup.Ready && GameFlow.Instance != null)) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		if (StoryManager.Instance is { } s) Enqueue(s.Current);
+		_loaded = true;
+	}
+	private bool _loaded;
+
+	/// <summary>For a Continue: waits (in the black) until the places its checkpoint is past are let go of, at most
+	/// <paramref name="maxSeconds"/>.</summary>
+	public static async System.Threading.Tasks.Task Settle(Node from, System.Threading.CancellationToken ct, double maxSeconds = 20)
+	{
+		ulong t0 = Time.GetTicksMsec();
+		while (Present && (!_instance._loaded || Busy) && Time.GetTicksMsec() - t0 < maxSeconds * 1000)
+		{
+			ct.ThrowIfCancellationRequested();
+			await from.ToSignal(from.GetTree(), SceneTree.SignalName.ProcessFrame);
+		}
 	}
 
 	private void OnCheckpoint(Checkpoint cp) => Enqueue(cp);
@@ -123,7 +139,8 @@ public partial class ChapterRetire : Node
 	{
 		// a big place taken apart a few hundred nodes a frame (2026-10-23, the lag meter: the woods, 8000 nodes freed in one
 		// frame, held it 66 ms); a new place only once the last is gone
-		if (_dismantle.Count > 0) { Dismantle(450); return; }
+		// (behind black, as a Continue settles, thousands a frame: no one sees the frame)
+		if (_dismantle.Count > 0) { Dismantle(StoryBeat.Fader(this) is { IsBlack: true } ? 6000 : 450); return; }
 		if (_queue.Count == 0 || GetTree().CurrentScene is not { } root) return;
 		var r = _queue.Dequeue();
 		if (root.GetNodeOrNull(r.Path) is not Node n) return;

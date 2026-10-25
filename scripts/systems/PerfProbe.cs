@@ -61,6 +61,7 @@ public partial class PerfProbe : Node
 		_physTailEnd = 0;
 	}
 	private long _lastAlloc;
+	private System.TimeSpan _lastPause;
 	private readonly int[] _lastGc = new int[3];
 	private Vector3 _lastPlayer;
 	private ulong _teleportUsec;
@@ -256,6 +257,7 @@ public partial class PerfProbe : Node
 		ulong nodes = (ulong)Performance.GetMonitor(Performance.Monitor.ObjectNodeCount);
 		int g0 = System.GC.CollectionCount(0), g1 = System.GC.CollectionCount(1), g2 = System.GC.CollectionCount(2);
 		long alloc = System.GC.GetAllocatedBytesForCurrentThread();
+		var pause = System.GC.GetTotalPauseDuration();
 		var player = StoryBeat.Player(this);
 		Vector3 pp = player != null && IsInstanceValid(player) ? player.GlobalPosition : _lastPlayer;
 		if (pp.DistanceTo(_lastPlayer) > 4f) _teleportUsec = now;   // (a jump, not a walk: the test's teleports, a respawn)
@@ -286,7 +288,13 @@ public partial class PerfProbe : Node
 				why.Append($", {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame):0} draws {Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame) / 1000:0}k tris"
 					+ $", render cpu {RenderingServer.ViewportGetMeasuredRenderTimeCpu(vp) + RenderingServer.GetFrameSetupTimeCpu():0} gpu {RenderingServer.ViewportGetMeasuredRenderTimeGpu(vp):0} ms");
 				if (compiles > _lastCompiles) why.Append($", {compiles - _lastCompiles} pipeline compiles");
-				if (g0 != _lastGc[0] || g1 != _lastGc[1] || g2 != _lastGc[2]) why.Append($", GC gen0/1/2 +{g0 - _lastGc[0]}/{g1 - _lastGc[1]}/{g2 - _lastGc[2]}");
+				if (g0 != _lastGc[0] || g1 != _lastGc[1] || g2 != _lastGc[2])
+				{
+					// (the collector's own pause, and the last one's heap: what it kept, and what waits on the finalizer)
+					var gi = System.GC.GetGCMemoryInfo(System.GCKind.Any);
+					why.Append($", GC gen0/1/2 +{g0 - _lastGc[0]}/{g1 - _lastGc[1]}/{g2 - _lastGc[2]} paused {(pause - _lastPause).TotalMilliseconds:0} ms"
+						+ $" (heap {gi.HeapSizeBytes >> 20} MB, promoted {gi.PromotedBytes >> 10} KB, {gi.FinalizationPendingCount} to finalize)");
+				}
 				long dn = (long)nodes - (long)_lastNodes, dobj = (long)objs - (long)_lastObjs;
 				if (dn != 0 || System.Math.Abs(dobj) > 20) why.Append($", nodes {dn:+0;-0} objects {dobj:+0;-0}");
 				foreach (var (w, bms) in _builds.OrderByDescending(b => b.ms).Take(4)) why.Append($", built {w} {bms:0} ms");
@@ -317,7 +325,7 @@ public partial class PerfProbe : Node
 		_builds.Clear();
 		_physUsec = 0; _stepUsec = 0;
 		_frameStart = now; _lastCompiles = compiles; _lastObjs = objs; _lastNodes = nodes; _lastPlayer = pp;
-		_lastGc[0] = g0; _lastGc[1] = g1; _lastGc[2] = g2; _lastAlloc = alloc;
+		_lastGc[0] = g0; _lastGc[1] = g1; _lastGc[2] = g2; _lastAlloc = alloc; _lastPause = pause;
 	}
 
 	private void ActEnded()

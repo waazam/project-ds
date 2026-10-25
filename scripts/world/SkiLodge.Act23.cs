@@ -394,17 +394,10 @@ public partial class SkiLodge
 		if (Has(LodgeFlag.DiningOpen)) { DiningDoorL.Open(null, instant: true); DiningDoorR.Open(null, instant: true); }
 		// what's under the sheets read in now, as the lodge builds (in the black), not as each sheet comes off (the lag pass,
 		// 2026-10-13: the first sheet's dishes, read and their maps lifted on the spot, held the game a third of a second);
-		// and the dishes' shaders drawn once with the rest
+		// their meshes built after the tables (PrebuildReveals)
 		if (!Has(LodgeFlag.Table(0, 1)) && !Has(LodgeFlag.Table(1, 1)) && !Has(LodgeFlag.Table(2, 1)) && !Has(LodgeFlag.Table(3, 1)) && !Has(LodgeFlag.Table(4, 1)) && !Has(LodgeFlag.Table(5, 1)))
-		{
 			foreach (var m in new[] { "setting_meat", "setting_soup", "candelabrum", "carcass_dish", "cloche", "dining_leg", "dining_top_half", "silver_platter", "skeleton_headless", "soup_tureen_bowl" })
 				FurnitureKit.Has(m);
-			var dishes = new MeshKit { Color = Colors.White };
-			Dishes(dishes);
-			var warm = new Node3D { Name = "DishesWarmUp" };
-			if (!dishes.IsEmpty) dishes.CommitTo(warm, "Mesh", false);
-			Systems.ShaderWarmup.Prewarm(this, warm);
-		}
 		for (int t = 0; t < 6; t++)
 		{
 			_tables[t] = BuildTable(t);
@@ -428,6 +421,7 @@ public partial class SkiLodge
 			// its white outline round the sheet itself (not the long table under it)
 			SheetUses[t].HighlightRoot = SheetUses[t].GetPathTo(_sheets[t]);
 		}
+		if (TablesPulled < 6) PrebuildReveals();
 	}
 
 	/// <summary>A dining table as its own node (so one can fall apart): the top, the legs, collision.</summary>
@@ -566,19 +560,63 @@ public partial class SkiLodge
 		var c = TableCentre(t) + new Vector3(0, TableH + FloorY, 0);
 		var holder = new Node3D { Name = $"Under{t}", Position = c };
 		AddChild(holder);
-		var k = new MeshKit();
-		k.Color = Colors.White;
+		switch (n)
+		{
+			case 2: BloodRunOff(holder); break;
+			case 3: Flies(holder); break;
+			case 4: Platter(holder, instant); break;
+			case 5: if (instant) _tables[t].Visible = false; break;
+			case 6: SnowBowl(holder); break;
+		}
+		// (2026-10-25, the polish sweep) its mesh built with the lodge, in the black (PrebuildReveals); it was built here,
+		// as the sheet came off: the first sheet's dishes held a frame 166 ms, the fourth's platter 111
+		if (!instant && _revealMesh[n] is { } pre)
+		{
+			_revealMesh[n] = null;
+			holder.AddChild(new MeshInstance3D { Name = "Mesh", Mesh = pre, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+		}
+		else
+		{
+			var k = new MeshKit();
+			k.Color = Colors.White;
+			RevealKit(k, n, instant);
+			if (!k.IsEmpty) k.CommitTo(holder, "Mesh", false);
+		}
+		if (n == 5 && !instant) holder.Visible = false;
+	}
+
+	/// <summary>The meshes of what's under the n-th sheet (the nodes with them are made in <see cref="Reveal"/>).</summary>
+	private static void RevealKit(MeshKit k, int n, bool instant)
+	{
 		switch (n)
 		{
 			case 1: Dishes(k); break;
-			case 2: BloodStreak(k); BloodRunOff(holder); break;
-			case 3: Skeleton(k); Flies(holder); break;
-			case 4: Platter(k, holder, instant); break;
-			case 5: if (instant) { _tables[t].Visible = false; Wreckage(k); } break;
-			case 6: SnowBowl(k, holder, instant); break;
+			case 2: BloodStreak(k); break;
+			case 3: Skeleton(k); break;
+			case 4: PlatterKit(k, instant); break;
+			case 5: if (instant) Wreckage(k); break;
+			case 6: SnowBowlKit(k); break;
 		}
-		if (!k.IsEmpty) k.CommitTo(holder, "Mesh", false);
-		if (n == 5 && !instant) holder.Visible = false;
+	}
+
+	private readonly ArrayMesh[] _revealMesh = new ArrayMesh[7];
+
+	/// <summary>What's under the sheets still on, built now, with the lodge (in the black); the first's shaders drawn
+	/// once with the rest (the lag pass, 2026-10-13: the dishes, read and their maps lifted on the spot, held the game).</summary>
+	private void PrebuildReveals()
+	{
+		using var __t = Systems.BuildTimer.Time("SkiLodge.PrebuildReveals");
+		var warm = new Node3D { Name = "RevealWarmUp" };
+		for (int n = TablesPulled + 1; n <= 6; n++)
+		{
+			var k = new MeshKit { Color = Colors.White };
+			RevealKit(k, n, instant: false);
+			if (k.IsEmpty) continue;
+			_revealMesh[n] = k.Commit();
+			warm.AddChild(new MeshInstance3D { Name = $"W{n}", Mesh = _revealMesh[n] });
+		}
+		if (warm.GetChildCount() > 0) Systems.ShaderWarmup.Prewarm(this, warm);
+		else warm.Free();
 	}
 
 	private async Task Aftermath(int t, int n)
@@ -785,7 +823,7 @@ public partial class SkiLodge
 
 	/// <summary>A silver platter, and on it the head of a wendigo (its elk skull, its man's jaw, one antler snapped),
 	/// blood pouring from its mouth and spreading over the plate and the linen.</summary>
-	private void Platter(MeshKit k, Node3D holder, bool instant)
+	private static void PlatterKit(MeshKit k, bool instant)
 	{
 		if (FurnitureKit.Has("silver_platter"))
 		{
@@ -803,6 +841,10 @@ public partial class SkiLodge
 			k.Mat(StationParts.StationTextures.BloodPoolMat);
 			k.Cylinder(new Vector3(0.05f, 0.026f, -0.1f), new Vector3(0.05f, 0.028f, -0.1f), instant ? 0.42f : 0.2f, instant ? 0.42f : 0.2f, 14, true);
 		}
+	}
+
+	private void Platter(Node3D holder, bool instant)
+	{
 		// (2026-10-11, the owner: "needs to be larger": three-quarters of its full size, not a half)
 		PlatterSkull = new Wendigo { Name = "Skull", Position = new Vector3(0, 0.12f, 0.05f), Scale = Vector3.One * 0.75f };
 		holder.AddChild(PlatterSkull);
@@ -998,7 +1040,7 @@ public partial class SkiLodge
 	private Node3D _bowlSnow;
 
 	/// <summary>A porcelain bowl heaped with snow, and standing up out of the snow, 201's keycard.</summary>
-	private void SnowBowl(MeshKit k, Node3D holder, bool instant)
+	private static void SnowBowlKit(MeshKit k)
 	{
 		if (!FurnitureKit.Add(k, "soup_tureen_bowl", Vector3.Zero, 0f, Dining))
 		{
@@ -1006,6 +1048,10 @@ public partial class SkiLodge
 			k.Cylinder(Vector3.Zero, new Vector3(0, 0.1f, 0), 0.1f, 0.17f, 16, false);
 			k.Cylinder(Vector3.Zero, new Vector3(0, 0.005f, 0), 0.1f, 0.1f, 16, true);
 		}
+	}
+
+	private void SnowBowl(Node3D holder)
+	{
 		_bowlSnow = new Node3D { Name = "BowlSnow" };
 		holder.AddChild(_bowlSnow);
 		var s = new MeshKit();
