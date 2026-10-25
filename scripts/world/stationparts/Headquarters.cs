@@ -57,6 +57,7 @@ public partial class Headquarters : Node3D
 		Notice = PaperKit.Pinned(this, new Vector3(-IX, 1.5f, -1.58f), Vector3.Right, new Vector2(0.21f, 0.28f), PaperKit.Look.Note,
 			"", StationStory.NoticeText, Readable.NoteStyle.Typed, 1.2f, "Read the notice", 88);
 		Notice.ReadFlag = StationStory.NoticeRead;
+		BuildWeathered();
 		// Continue: as many changes as the story so far has sent the player out and back
 		var s = StoryManager.Instance;
 		if (s != null)
@@ -65,6 +66,20 @@ public partial class Headquarters : Node3D
 				if (s.HasFlag(f)) Changes++;
 		ApplyChanges();
 		SetProcess(true);
+	}
+
+	// ------------------------------------------------------------------ the weathered things (2026-10-24)
+
+	/// <summary>(2026-10-24, the owner: "populate the game with more weathered objects") The station's own: a green steel
+	/// filing cabinet against the east wall between the window and Room 1's door (the warden's records, years of them),
+	/// and a can of coffee by the radio.</summary>
+	private void BuildWeathered()
+	{
+		float fz = -1.42f;
+		WeatheredProps.Put(this, "FilingCabinet", new Vector3(IX, 0f, fz), -90f);
+		StationStory.Solid(this, new Vector3(IX - 0.31f, 0.66f, fz), new Vector3(0.64f, 1.32f, 0.48f), "metal", "FilingCabinetBody");
+		WeatheredProps.Put(this, "CoffeeCan_Blue", new Vector3(IX - 0.32f, 1.32f, fz + 0.06f), 200f, 0f, false);
+		WeatheredProps.Put(this, "CoffeeCan_Red", new Vector3(-0.15f + 0.45f, 0.78f, -IZ + 0.36f), 20f, 0f, false);
 	}
 
 	// ------------------------------------------------------------------ the desk

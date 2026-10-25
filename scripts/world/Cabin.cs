@@ -258,6 +258,10 @@ public partial class Cabin : Node3D
 		{
 			float wix = Hw - LogT * 0.5f, wiz = Hd - LogT * 0.5f;
 			WeatheredProps.DressCabin(_gen, wix, wiz, Hd, -wix + 0.42f, -1.0f, true);
+			// two cowbells on the porch header; and on the Hollow's copy (not the hub: that one's ours), NO TRESPASSING on
+			// the post by the steps
+			WeatheredProps.HangBells(_gen, _bellNail, 0f);
+			if (!Hub) WeatheredProps.Put(_gen, "Sign_Tin", _signNail, 0f, 0f, false);
 		}
 		// (2026-10-16) Act 7's lit stove, Act 25's burned room (Cabin.Act7.cs)
 		if (_hearthLit && !BurnedOut) BuildHearth();
@@ -498,6 +502,10 @@ public partial class Cabin : Node3D
 		cols.Add((new Vector3(cx, (g + top) * 0.5f, cz), new Vector3(0.76f, top - g, 1.05f), Basis.Identity));
 	}
 
+	/// <summary>(the weathered props) Under the porch header, inside its right-hand post, where the cowbells hang; and the
+	/// face of the left post by the steps, where a stranger's cabin has its sign nailed up.</summary>
+	private Vector3 _bellNail, _signNail;
+
 	// ---- stone foundation skirt, porch deck, posts, rails, porch roof, bench, steps
 
 	private void BuildFoundationAndPorch(MeshKit k, List<(Vector3, Vector3, Basis)> cols)
@@ -566,6 +574,8 @@ public partial class Cabin : Node3D
 		float postZ = z1 - 0.1f;
 		float roofAtPost = PorchRoofBottom(postZ);
 		float[] postX = { -px + 0.08f, -sw - 0.08f, sw + 0.08f, px - 0.08f };
+		_bellNail = new Vector3(px - 0.6f, roofAtPost - 0.18f, postZ);
+		_signNail = new Vector3(-sw - 0.08f, 1.5f, postZ + 0.071f);
 		k.Mat(post);
 		k.Color = new Color(0.8f, 0.74f, 0.66f);
 		foreach (float x in postX)

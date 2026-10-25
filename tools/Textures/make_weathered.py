@@ -292,3 +292,100 @@ def can():
 
 
 can()
+
+
+# ---- the second batch (2026-10-24, the owner: "painted signs, a filing cabinet and cowbells")
+def wood(h, w, seed, base=(0.6, 0.56, 0.5)):
+    """Old board gone silver-grey: grain along u, darker in the rings, checked along the grain."""
+    yy, xx = np.mgrid[0:h, 0:w]
+    grain = noise(h * 8, w, 6, 4, seed)[::8] * 0.6 + noise(h, w // 8, 40, 2, seed + 1).repeat(8, 1)[:, :w] * 0.4
+    rings = 0.5 + 0.5 * np.sin(grain * 40)
+    img = np.array(base) * (0.75 + 0.3 * rings)[..., None] * (0.85 + 0.2 * noise(h, w, 8, 3, seed + 2))[..., None]
+    check = (np.abs(np.sin(grain * 23 + yy / h * 3)) < 0.03) & (noise(h, w, 6, 2, seed + 3) > 0.55)
+    return np.where(check[..., None], img * 0.4, img)
+
+
+def wood_weather(paint, bare, seed, peel=0.35, fade=0.45, grime=0.3):
+    """Paint on a board left out: faded chalky, peeled back to the grey wood in long flakes along the grain, grime
+    low down, the edges of what's left darker where the weather got under."""
+    h, w, _ = paint.shape
+    yy = np.mgrid[0:h, 0:w][0] / (h - 1)
+    f = np.clip(fade * (0.6 + 0.8 * noise(h, w, 5, 3, seed)), 0, 0.85)
+    out = paint * (1 - f[..., None]) + np.array([0.86, 0.84, 0.78]) * f[..., None]
+    streak = noise(h * 6, w, 18, 3, seed + 1)[::6] * 0.55 + noise(h, w, 30, 3, seed + 2) * 0.45     # long along u
+    xx = np.mgrid[0:h, 0:w][1] / (w - 1)
+    edge = np.clip(1 - np.minimum(np.minimum(xx, 1 - xx) * 6, np.minimum(yy, 1 - yy) * 4), 0, 1)
+    streak = streak + 0.35 * noise(h, w, 3, 2, seed + 4) + 0.18 * edge     # worse in patches and toward the edges
+    cut = np.quantile(streak, 1 - peel)                      # (peel: the share of the board gone to wood)
+    gone = streak > cut
+    rim = (streak > cut - 0.025) & ~gone
+    out = np.where(rim[..., None], out * 0.62, out)
+    out = np.where(gone[..., None], bare, out)
+    g = np.clip((yy - 0.6) * 2.5, 0, 1) * grime * (0.5 + 0.6 * noise(h, w, 9, 3, seed + 3))
+    out = out * (1 - 0.5 * g[..., None]) + np.array([0.14, 0.12, 0.08]) * 0.5 * g[..., None]
+    return np.clip(out, 0, 1)
+
+
+def sign_arrow():
+    """A hand-lettered arrow board (the refs' painted signpost): white gone chalky, red letters, an edge line."""
+    h, w = 256, 1024
+    img = np.zeros((h, w, 3)) + np.array([0.9, 0.88, 0.82])
+    img[10:22, :] = img[234:246, :] = np.array([0.55, 0.12, 0.08])
+    m = text_mask(w, h, [(430, 36, "LAKE TRAIL", 112, 1, True), (430, 172, "1/2 MILE", 40, 1, True)])
+    img = ink(img, m, (0.6, 0.12, 0.08))
+    save("sign_arrow", wood_weather(img, wood(h, w, 1101), 1102, peel=0.14))
+
+
+def sign_firewood():
+    """A roadside board, green with cream letters, the honour box's terms under."""
+    h, w = 512, 1024
+    img = np.zeros((h, w, 3)) + np.array([0.18, 0.36, 0.26])
+    img[24:36, 24:1000] = img[476:488, 24:1000] = np.array([0.88, 0.82, 0.62])
+    m = text_mask(w, h, [(512, 60, "FIREWOOD", 200, 1, True), (512, 300, "$2 A BUNDLE", 80, 1, True), (512, 400, "HONOR BOX  ·  THANK YOU", 44, 0.95, True)])
+    img = ink(img, m, (0.9, 0.85, 0.66))
+    save("sign_firewood", wood_weather(img, wood(h, w, 1201), 1202, peel=0.12, fade=0.45))
+
+
+def sign_tin():
+    """An enamelled tin sign: cream, a red border and red letters; chipped to rust at the nail holes and the edges,
+    crazed."""
+    h, w = 256, 512
+    img = np.zeros((h, w, 3)) + np.array([0.9, 0.86, 0.72])
+    red = np.array([0.66, 0.1, 0.07])
+    img[8:22, 8:504] = img[234:248, 8:504] = red
+    img[8:248, 8:22] = img[8:248, 490:504] = red
+    m = text_mask(w, h, [(256, 34, "NO", 70, 1, True), (256, 104, "TRESPASSING", 76, 1, True), (256, 194, "VIOLATORS WILL BE PROSECUTED", 22, 1, True)])
+    img = ink(img, m, red)
+    save("sign_tin", weather(img, 1301, fade=0.3, grime=0.35, chips=0.5, rusty=0.85, rim_rows=[(0, 10), (245, 255)], craze=0.35))
+
+
+def filing():
+    """A steel filing cabinet's green enamel (the refs' green cabinet): scuffed, chipped at the edges, rust in the chips;
+    the image tiles a metre, the box mapped onto it."""
+    h, w = 512, 512
+    img = np.zeros((h, w, 3)) + np.array([0.3, 0.42, 0.33])
+    img = img * (0.9 + 0.15 * noise(h, w, 6, 3, 1401))[..., None]
+    save("filing_green", weather(img, 1402, fade=0.25, grime=0.25, chips=0.45, rusty=0.8, sun_top=False))
+
+
+def cowbell(name, metal, seed, green=False):
+    """A bell's sheet iron gone to rust, the black paint hanging on in flecks; or brass, dark, verdigris in the dents."""
+    h, w = 256, 512
+    n = noise(h, w, 6, 4, seed)
+    base = np.array(metal) * (0.75 + 0.4 * n)[..., None]
+    if green:
+        verd = np.clip((noise(h, w, 30, 3, seed + 1) - 0.6) * 6, 0, 1)[..., None]
+        base = base * (1 - 0.6 * verd) + np.array([0.3, 0.5, 0.42]) * 0.6 * verd
+    else:
+        rr = rust(h, w, seed + 2)
+        paint = np.clip((noise(h, w, 40, 3, seed + 3) - 0.55) * 5, 0, 1)[..., None]
+        base = rr * (1 - paint) + np.array([0.1, 0.09, 0.08]) * paint
+    save(name, base)
+
+
+sign_arrow()
+sign_firewood()
+sign_tin()
+filing()
+cowbell("cowbell_rust", (0.4, 0.22, 0.1), 1501)
+cowbell("cowbell_brass", (0.62, 0.48, 0.24), 1502, green=True)

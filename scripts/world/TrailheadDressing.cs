@@ -47,6 +47,7 @@ public partial class TrailheadDressing : Node3D
 		HighwaySign();
 		CurveSign();
 		BurnBarrel();
+		Boards();
 		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");	}
 
 	/// <summary>(2026-10-24, the weathered props) An old oil drum by the vault toilet, rusted through its blue paint, used to
@@ -73,6 +74,20 @@ public partial class TrailheadDressing : Node3D
 		smoke.ScaleAmountCurve.AddPoint(new Vector2(0f, 0.4f));
 		smoke.ScaleAmountCurve.AddPoint(new Vector2(1f, 2.2f));
 		_gen.AddChild(smoke);
+	}
+
+	/// <summary>(2026-10-24, the weathered props: "painted signs") Two hand-painted boards older than the park's: a white
+	/// arrow, LAKE TRAIL, by the trail's mouth, turned to the lot and pointing up the trail; and by the burn barrel, a
+	/// green FIREWOOD board on its stakes (an honour box long gone).</summary>
+	private void Boards()
+	{
+		var arrow = G(-1.6f, 18.0f, -0.05f);
+		if (WeatheredProps.Put(_gen, "Sign_Arrow", arrow, 60f) != null)
+			Col(arrow + Vector3.Up * 0.66f, new Vector3(0.12f, 1.32f, 0.12f), Basis.Identity);
+		var wood = G(-6.5f, 21.6f, -0.05f);
+		var yaw = new Basis(Vector3.Up, Mathf.DegToRad(73f));
+		if (WeatheredProps.Put(_gen, "Sign_Firewood", wood, 73f) != null)
+			Col(wood + yaw * new Vector3(0f, 0.62f, -0.04f), new Vector3(0.86f, 1.24f, 0.08f), yaw);
 	}
 
 	// ---------------------------------------------------------------- helpers

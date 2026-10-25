@@ -560,6 +560,16 @@ public partial class BunkerRooms : Node3D
 			AddBox(new Vector3(-hw + 0.45f, 0.68f, -0.85f), new Vector3(0.66f, 1.36f, 0.66f));
 			AddBox(new Vector3(hw - 1.1f, 0.2f, -RoomD + 0.35f), new Vector3(0.84f, 0.4f, 0.46f));
 		}
+		// (2026-10-24, the weathered props) a green filing cabinet against the far wall, a NO TRESPASSING sign over the
+		// footlocker, a coffee can left on the footlocker and film on the crates: the same every time
+		if (WeatheredProps.Put(this, "FilingCabinet", new Vector3(-hw + 0.9f, 0f, -RoomD), 0f) != null)
+		{
+			AddBox(new Vector3(-hw + 0.9f, 0.66f, -RoomD + 0.31f), new Vector3(0.48f, 1.32f, 0.64f));
+			WeatheredProps.Put(this, "Sign_Tin", new Vector3(hw - 1.1f, 1.45f, -RoomD), 0f, 0f, false);
+			WeatheredProps.Put(this, "CoffeeCan_Yellow", new Vector3(hw - 0.85f, 0.4f, -RoomD + 0.36f), 210f, 0f, false);
+			WeatheredProps.Put(this, "Film_Orange", new Vector3(-hw + 0.38f, 1.36f, -0.92f), 40f, 0f, false);
+			WeatheredProps.Put(this, "Film_Brown", new Vector3(-hw + 0.52f, 1.36f, -0.8f), 0f, 90f, false);
+		}
 		BuildRoomTrim();
 	}
 

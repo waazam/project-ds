@@ -8,7 +8,10 @@ namespace ProjectDS.World;
 /// barrel): modelled and painted by tools/Blender/weathered.py (labels and wear from tools/Textures/make_weathered.py), in
 /// assets/models/items/weathered.glb. Each keeps its own painted material. Names: CoffeeCan_Red/_Blue/_Yellow,
 /// SpiceTin_Cinnamon, Tin_Tobacco, Tin_Tea, Film_Brown/_Orange/_Green, Matchbox_A/_B/_C, BurnBarrel, Kettle_Copper,
-/// Crock_Jug, WateringCan.
+/// Crock_Jug, WateringCan; and the second batch (the owner: "painted signs, a filing cabinet and cowbells"): Sign_Arrow
+/// (a hand-lettered arrow board on its post), Sign_Firewood (a roadside board on two stakes), Sign_Tin (an enamelled
+/// NO TRESPASSING sign, its back at its origin), FilingCabinet (green steel, its back at its origin, drawers out along
+/// +Z), Cowbell_Rust/_Brass (each hung from its strap's top at its origin).
 /// </summary>
 public static class WeatheredProps
 {
@@ -49,5 +52,15 @@ public static class WeatheredProps
 		Put(root, "Matchbox_A", new Vector3(0.66f, 0.741f, -1.12f), 23f, 0f, false);
 		Put(root, "Tin_Tobacco", new Vector3(0.08f, 0.741f, -1.13f), 75f, 0f, false);
 		if (porch) Put(root, "WateringCan", new Vector3(-(ix + 0.22f) + 0.45f, 0.0f, hd + 0.55f), 35f);
+	}
+
+	/// <summary>Two cowbells, the rusted one and the brass, on one nail at <paramref name="nail"/>, their flat sides
+	/// turned <paramref name="yawDeg"/> (0: to +Z), the second a little behind and lower, swung a touch.</summary>
+	public static void HangBells(Node3D parent, Vector3 nail, float yawDeg)
+	{
+		var b = new Basis(Vector3.Up, Mathf.DegToRad(yawDeg));
+		Put(parent, "Cowbell_Rust", nail, yawDeg, 0f, false);
+		var brass = Put(parent, "Cowbell_Brass", nail + b * new Vector3(0.05f, -0.03f, -0.012f), yawDeg + 8f, 0f, false);
+		if (brass != null) brass.Basis = brass.Basis * new Basis(Vector3.Forward, 0.12f);
 	}
 }

@@ -7,7 +7,7 @@ together to assets/models/items/weathered.glb, one named mesh each (the game pla
     python tools/Textures/make_weathered.py
     blender -b --python tools/Blender/weathered.py
 
-Each sits on its base at the origin, its front (the label's first face) toward Blender's +Y (the game's -Z). A preview
+Each sits on its base at the origin, its front (the label's first face) toward Blender's -Y (the game's +Z). A preview
 of them all lined up goes to build/blender/weathered.png.
 """
 import bpy, bmesh, math, os
@@ -210,6 +210,121 @@ def watering(name):
     return o
 
 
+def slab(bm, uv, outline, t, mi, uv_rect, y0=0.0):
+    """A flat board cut to <outline> (points in X/Z) and <t> thick, from y0 to y0 + t; the image reads from -Y (the
+    side the cans' labels face), mirrored on the +Y side (uv_rect: x0, z0, x1, z1 of the image),
+    the edges a sliver of it."""
+    x0, z0, x1, z1 = uv_rect
+    def puv(x, z, back=False):
+        u = (x - x0) / (x1 - x0)
+        return (1 - u if back else u, (z - z0) / (z1 - z0))
+    fr = [bm.verts.new((x, y0 + t, z)) for (x, z) in outline]
+    bk = [bm.verts.new((x, y0, z)) for (x, z) in outline]
+    f = bm.faces.new(list(reversed(fr)))
+    f.material_index = mi
+    for l in f.loops:
+        l[uv].uv = puv(l.vert.co.x, l.vert.co.z, True)
+    f = bm.faces.new(bk)
+    f.material_index = mi
+    for l in f.loops:
+        l[uv].uv = puv(l.vert.co.x, l.vert.co.z)
+    n = len(outline)
+    for i in range(n):
+        j = (i + 1) % n
+        f = bm.faces.new((fr[i], fr[j], bk[j], bk[i]))
+        f.material_index = mi
+        for l in f.loops:
+            l[uv].uv = (0.5 + 0.001 * i, 0.98)
+
+
+def block(bm, uv, c, size, mi, scale=1.0):
+    """An axis-aligned box centred at c, box-mapped (scale: image repeats per metre)."""
+    bmesh_ret = bmesh.ops.create_cube(bm, size=1.0)
+    vs = bmesh_ret["verts"]
+    for v in vs:
+        v.co = Vector((c[0] + v.co.x * size[0], c[1] + v.co.y * size[1], c[2] + v.co.z * size[2]))
+    faces = {f for v in vs for f in v.link_faces}
+    for f in faces:
+        f.material_index = mi
+        nrm = f.normal
+        ax = max(range(3), key=lambda k: abs(nrm[k]))
+        a, b = [(1, 2), (0, 2), (0, 1)][ax]
+        for l in f.loops:
+            l[uv].uv = (l.vert.co[a] * scale, l.vert.co[b] * scale)
+
+
+def sign_arrow(name):
+    """A painted arrow board nailed to a grey post, pointing right (game +X), its face to the front."""
+    bm, uv = new_bm()
+    L, H, P = 0.9, 0.2, 0.13
+    out = [(-L / 2, -H / 2), (L / 2 - P, -H / 2), (L / 2, 0.0), (L / 2 - P, H / 2), (-L / 2, H / 2)]
+    out = [(x + 0.32, z + 1.18) for (x, z) in out]
+    slab(bm, uv, out, 0.024, 0, (-L / 2 + 0.32, -H / 2 + 1.18, L / 2 + 0.32 - 0.07, H / 2 + 1.18), y0=-0.069)
+    block(bm, uv, (0, 0, 0.66), (0.09, 0.09, 1.32), 1, 1.6)
+    return obj(name, bm, [mat(name, "sign_arrow", rough=0.9), mat("post_grey", None, (0.3, 0.28, 0.25), 0.95)])
+
+
+def sign_firewood(name):
+    """A roadside board on two stakes."""
+    bm, uv = new_bm()
+    W, H = 0.84, 0.42
+    slab(bm, uv, [(-W / 2, 0.5), (W / 2, 0.5), (W / 2, 0.5 + H), (-W / 2, 0.5 + H)], 0.022, 0, (-W / 2, 0.5, W / 2, 0.5 + H), y0=-0.052)
+    for x in (-W / 2 + 0.1, W / 2 - 0.1):
+        block(bm, uv, (x, 0, 0.47), (0.06, 0.05, 0.94), 1, 1.6)
+    return obj(name, bm, [mat(name, "sign_firewood", rough=0.9), mat("post_grey", None, (0.3, 0.28, 0.25), 0.95)])
+
+
+def sign_tin(name):
+    """An enamelled tin sign, its back at the origin (it hangs on a wall, reading out along -Y), its middle at the
+    origin's height."""
+    bm, uv = new_bm()
+    W, H = 0.5, 0.25
+    slab(bm, uv, [(-W / 2, -H / 2), (W / 2, -H / 2), (W / 2, H / 2), (-W / 2, H / 2)], 0.004, 0, (-W / 2, -H / 2, W / 2, H / 2), y0=-0.004)
+    for x in (-W / 2 + 0.02, W / 2 - 0.02):
+        for z in (-H / 2 + 0.02, H / 2 - 0.02):
+            block(bm, uv, (x, -0.006, z), (0.008, 0.004, 0.008), 1)
+    return obj(name, bm, [mat(name, "sign_tin", rough=0.45, metal=0.2), mat("iron_dark", None, (0.06, 0.055, 0.05), 0.6, 0.6)])
+
+
+def filing_cabinet(name):
+    """A four-drawer steel filing cabinet in chipped green enamel, its back at the origin, its drawers out along -Y:
+    drawer fronts proud of the carcass, a pull and a
+    card holder on each, one drawer left an inch open."""
+    bm, uv = new_bm()
+    W, D, H = 0.46, 0.62, 1.32
+    block(bm, uv, (0, D / 2, H / 2 + 0.02), (W, D, H - 0.04), 0)
+    block(bm, uv, (0, D / 2, 0.02), (W - 0.03, D - 0.03, 0.04), 2)        # the plinth, dark
+    dh = (H - 0.08) / 4
+    for i in range(4):
+        z = 0.06 + dh * (i + 0.5)
+        y = -0.008 - (0.03 if i == 2 else 0.0)
+        block(bm, uv, (0, y, z), (W - 0.03, 0.02, dh - 0.016), 0)
+        block(bm, uv, (0, y - 0.022, z + 0.02), (0.14, 0.03, 0.018), 2)   # the pull
+        block(bm, uv, (0, y - 0.012, z + 0.085), (0.08, 0.004, 0.036), 3)  # the card holder
+    return obj(name, bm, [mat(name, "filing_green", rough=0.55, metal=0.3), mat("filing_trim", None, (0.2, 0.2, 0.19), 0.5, 0.6),
+                          mat("iron_dark", None, (0.06, 0.055, 0.05), 0.6, 0.6), mat("card", None, (0.62, 0.58, 0.48), 0.9)])
+
+
+def cowbell(name, tex):
+    """A cowbell hung from its strap: its origin the strap's top (the nail), the bell's mouth 0.25 below."""
+    bm, uv = new_bm()
+    prof = [(0.072, 0.0), (0.07, 0.006), (0.06, 0.06), (0.05, 0.12), (0.032, 0.15), (0.0, 0.152)]
+    rings = lathe(bm, uv, prof, 24, 0, v_map=lambda z: z / 0.152)
+    for ring in rings:
+        for v in ring:
+            v.co.y *= 0.62
+    # (the inside, dark: a second skin a hair in)
+    inner = lathe(bm, uv, [(0.0, 0.14), (0.045, 0.12), (0.055, 0.06), (0.066, 0.006)], 24, 1)
+    for ring in inner:
+        for v in ring:
+            v.co.y *= 0.62
+    tube(bm, uv, [Vector((-0.02, 0, 0.145)), Vector((-0.02, 0, 0.175)), Vector((0.0, 0, 0.19)), Vector((0.02, 0, 0.175)), Vector((0.02, 0, 0.145))], [0.004] * 5, 0, 6)
+    block(bm, uv, (0, 0, 0.25), (0.022, 0.006, 0.14), 2)
+    for v in bm.verts:
+        v.co.z -= 0.32
+    return obj(name, bm, [mat(name, tex, rough=0.7, metal=0.5), mat("bell_in", None, (0.03, 0.025, 0.02), 0.9), mat("leather", None, (0.2, 0.12, 0.07), 0.8)])
+
+
 props = [
     can("CoffeeCan_Red", "coffee_red", 0.064, 0.14),
     can("CoffeeCan_Blue", "coffee_blue", 0.064, 0.14),
@@ -222,6 +337,8 @@ props = [
     box("Matchbox_B", "match_b", 0.052, 0.036, 0.016, rough=0.9, metal=0.0),
     box("Matchbox_C", "match_c", 0.052, 0.036, 0.016, rough=0.9, metal=0.0),
     barrel("BurnBarrel"), kettle("Kettle_Copper"), crock("Crock_Jug"), watering("WateringCan"),
+    sign_arrow("Sign_Arrow"), sign_firewood("Sign_Firewood"), sign_tin("Sign_Tin"), filing_cabinet("FilingCabinet"),
+    cowbell("Cowbell_Rust", "cowbell_rust"), cowbell("Cowbell_Brass", "cowbell_brass"),
 ]
 
 # the preview: all of them in a row, the small ones scaled up beside to be seen

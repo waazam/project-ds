@@ -32,6 +32,7 @@ public partial class SkiLodge
 		BuildBar();
 		BuildDetailSounds();
 		BuildServiceAndPantry();
+		BuildWeathered();
 		BuildRooms();
 		BuildDiningFurniture();
 		BuildOverhaul();   // (2026-10-10b: the paintings, rugs, gear, books, clutter, the fire's embers, Christmas in the dining hall)
@@ -674,6 +675,34 @@ public partial class SkiLodge
 		// (2026-10-10b) a wardrobe big enough to hide in
 		if (what == "wardrobe" && int.TryParse(name.Replace("Room", "").Replace("Wardrobe", ""), out int num)) BuildHides(s, solid, at, facing, size, num);
 		return s;
+	}
+
+	// ------------------------------------------------------------------ the weathered things (2026-10-24)
+
+	/// <summary>(2026-10-24, the owner: "populate the game with more weathered objects to make it feel more lived in")
+	/// The staff's own things among the lodge's: on the pantry's worktop, the coffee and the spice they used, the tea,
+	/// matches, the copper kettle, a crock at the end of the run; on the bar, matches and a tobacco tin; at the counter's end,
+	/// two old cowbells on a nail (the ski lodge's, rung at the end of a race).</summary>
+	private void BuildWeathered()
+	{
+		var root = new Node3D { Name = "Weathered" };
+		AddChild(root);
+		// the pantry's worktop (its top at 0.96, back to the wall at PantryZ1): along the run, clear of the drawers' fronts
+		float wy = 0.96f, wz = PantryZ1 - 0.2f, px0 = BarX0 + 0.3f;
+		WeatheredProps.Put(root, "CoffeeCan_Red", new Vector3(px0 + 0.55f, wy, wz - 0.02f), 190f, 0f, false);
+		WeatheredProps.Put(root, "CoffeeCan_Yellow", new Vector3(px0 + 0.72f, wy, wz + 0.01f), 160f, 0f, false);
+		WeatheredProps.Put(root, "SpiceTin_Cinnamon", new Vector3(px0 + 0.86f, wy, wz - 0.04f), 175f, 0f, false);
+		WeatheredProps.Put(root, "Tin_Tea", new Vector3(px0 + 2.9f, wy, wz - 0.05f), 200f, 0f, false);
+		WeatheredProps.Put(root, "Matchbox_C", new Vector3(px0 + 3.15f, wy + 0.001f, wz - 0.22f), 120f, 0f, false);
+		WeatheredProps.Put(root, "Kettle_Copper", new Vector3(px0 + 5.6f, wy, wz - 0.08f), 160f);
+		WeatheredProps.Put(root, "Crock_Jug", new Vector3(px0 + 0.3f, FloorY, -InnerZ + 0.75f), 30f);
+		// the bar's top (1.155), well up the counter from 202's card (under the lip at z 3.9)
+		WeatheredProps.Put(root, "Matchbox_A", new Vector3(BarCounterX - 0.22f, 1.156f, 2.3f), 62f, 0f, false);
+		WeatheredProps.Put(root, "Tin_Tobacco", new Vector3(BarCounterX - 0.4f, 1.155f, 5.9f), 15f, 0f, false);
+		// the back bar's top (1.02): a matchbox by the till's end
+		WeatheredProps.Put(root, "Matchbox_B", new Vector3(BarX0 + 0.42f, FloorY + 1.001f, 1.9f), 100f, 0f, false);
+		// the cowbells, on a nail in the counter's far end, under the bar top's overhang (where a barman reaches to ring them)
+		WeatheredProps.HangBells(root, new Vector3(BarCounterX - 0.3f, 1.08f, 6.64f), 0f);
 	}
 
 	// ------------------------------------------------------------------ the rooms
