@@ -46,7 +46,34 @@ public partial class TrailheadDressing : Node3D
 		Gate();
 		HighwaySign();
 		CurveSign();
+		BurnBarrel();
 		if (!_k.IsEmpty) _k.CommitTo(_gen, "Mesh");	}
+
+	/// <summary>(2026-10-24, the weathered props) An old oil drum by the vault toilet, rusted through its blue paint, used to
+	/// burn rubbish: a thin smoke still going up out of it.</summary>
+	private void BurnBarrel()
+	{
+		var at = G(-7.4f, 20.6f, -0.03f);
+		var b = WeatheredProps.Put(_gen, "BurnBarrel", at, 37f);
+		if (b == null) return;
+		Col(at + Vector3.Up * 0.44f, new Vector3(0.56f, 0.88f, 0.56f), Basis.Identity);
+		var smoke = new CpuParticles3D
+		{
+			Name = "BarrelSmoke", Amount = 26, Lifetime = 6.5f, Position = at + Vector3.Up * 0.75f,
+			EmissionShape = CpuParticles3D.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.16f, Direction = Vector3.Up, Spread = 10f,
+			InitialVelocityMin = 0.28f, InitialVelocityMax = 0.45f, Gravity = new Vector3(0.05f, 0.04f, 0.02f),
+			ScaleAmountMin = 0.7f, ScaleAmountMax = 1.8f, ScaleAmountCurve = new Curve(), Mesh = new QuadMesh { Size = new Vector2(0.55f, 0.55f) },
+			MaterialOverride = new StandardMaterial3D
+			{
+				AlbedoColor = new Color(0.74f, 0.73f, 0.7f, 0.1f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
+				AlbedoTexture = SoftPuff.Texture, VertexColorUseAsAlbedo = true,
+			},
+		};
+		smoke.ScaleAmountCurve.AddPoint(new Vector2(0f, 0.4f));
+		smoke.ScaleAmountCurve.AddPoint(new Vector2(1f, 2.2f));
+		_gen.AddChild(smoke);
+	}
 
 	// ---------------------------------------------------------------- helpers
 

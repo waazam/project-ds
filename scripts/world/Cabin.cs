@@ -253,6 +253,12 @@ public partial class Cabin : Node3D
 		if (IsOpen && !Derelict && !Hub) BuildDebris();
 		RefreshWindowBoards();
 		if (!Derelict) BuildStory();
+		// (2026-10-24) lived in: the weathered tins, cans, film, kettle and jug (WeatheredProps)
+		if (!Derelict && !BurnedOut && !Engine.IsEditorHint())
+		{
+			float wix = Hw - LogT * 0.5f, wiz = Hd - LogT * 0.5f;
+			WeatheredProps.DressCabin(_gen, wix, wiz, Hd, -wix + 0.42f, -1.0f, true);
+		}
 		// (2026-10-16) Act 7's lit stove, Act 25's burned room (Cabin.Act7.cs)
 		if (_hearthLit && !BurnedOut) BuildHearth();
 		if (BurnedOut) ApplyBurnedOut();
