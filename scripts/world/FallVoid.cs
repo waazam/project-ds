@@ -34,6 +34,7 @@ uniform float breathe = 0.0;
 uniform float hue = 0.0;
 uniform float density = 0.74;
 uniform float ghost = 0.35;
+uniform float flames = 0.0;   // (2026-10-24, Act 24's end: the wendigo blown apart) 1 = the colours of fire, flickering and licking
 float h(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 void vertex() {
 	float along = VERTEX.y;
@@ -68,7 +69,17 @@ void fragment() {
 	cold = mix(cold, cold * vec3(1.0, 0.7, 0.45), hue * 0.35);   // (the hue drift stays in the warm range)
 	float d = length(VERTEX);
 	float fade = smoothstep(0.6, 6.0, d) * exp(-d / 55.0);
-	ALBEDO = cold * (s1 + s2) * fade * glow * (1.0 + 2.0 * flash);
+	// fire: each streak deep red to orange, the rare one white-hot, flickering; and the tube's wall itself licked with
+	// flame rolling past (a low, slow red-orange wash, brighter in tongues)
+	vec3 fire = mix(vec3(0.85, 0.06, 0.01), vec3(1.0, 0.3, 0.02), smoothstep(0.15, 0.6, r1));
+	fire = mix(fire, vec3(1.0, 0.58, 0.08), step(0.72, r1));
+	fire = mix(fire, vec3(1.0, 0.86, 0.6), step(0.94, r2));
+	float flick = 0.7 + 0.3 * sin(TIME * (14.0 + 9.0 * r2) + r1 * 40.0);
+	vec3 col = mix(cold, fire * flick * 1.25, flames);
+	float tongue = sin(UV.y * 34.0 - travel * 1.7 + sin(UV.x * 31.4 + TIME * 1.3) * 2.2) * 0.5 + 0.5;
+	tongue *= sin(UV.x * 18.85 + UV.y * 9.0 - travel * 0.6 + TIME * 0.8) * 0.5 + 0.5;
+	vec3 lick = mix(vec3(0.55, 0.03, 0.0), vec3(1.0, 0.36, 0.03), tongue) * pow(tongue, 2.0) * 0.3 * flames;
+	ALBEDO = (col * (s1 + s2) + lick) * fade * glow * (1.0 + 2.0 * flash);
 }";
 
 	// The ground giving way: litter spiralling into a black middle that widens as it opens (drawn over the floor's own
@@ -232,6 +243,98 @@ void fragment() {
 			n.AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.025f, Height = 0.05f, RadialSegments = 8, Rings = 4 }, MaterialOverride = _eyeMat, Position = new Vector3(x, 0, 0) });
 		return n;
 	}
+
+	/// <summary>
+	/// (2026-10-24, the owner: Act 24's end, "have the wendigo explode and use the transition from ... falling back down to
+	/// earth with that transition space spiral effect ... the colors of flames") Blown into the void: the same tube and
+	/// screen swirl as Act 6's fall, in the colours of fire, rushing at full force and slowing, then a fade to black (held:
+	/// the caller moves on). The player is taken far below the world for it (the next level loads over them).
+	/// </summary>
+	public static async System.Threading.Tasks.Task FlameFall(Node owner, Player.PlayerController player, float seconds, System.Threading.CancellationToken ct)
+	{
+		var rig = player?.CameraRig;
+		var cam = rig?.Camera;
+		if (cam == null) return;
+		bool reduce = Systems.GameSettings.Instance?.ReduceFlashing ?? false;
+		bool motion = Systems.GameSettings.Instance?.HeadMotion ?? true;
+		cam.CullMask &= ~Player.HeldItem.HeldLayer;
+		foreach (var n in owner.GetTree().Root.FindChildren("*", nameof(CanvasLayer), true, false))
+			if (n is UI.Compass or UI.EquippedItemHud or UI.InteractPrompt or UI.StaminaBar or UI.FlamethrowerGauge) ((CanvasLayer)n).Visible = false;
+		// (the flamethrower's wand is its own, not on the held layer: put away with it)
+		if (Player.Flamethrower.Instance is { } ft && GodotObject.IsInstanceValid(ft)) ft.ProcessMode = Node.ProcessModeEnum.Disabled;
+		if (cam.GetNodeOrNull<Node3D>("FlamethrowerWand") is { } wand) wand.Visible = false;
+		player.SetPhysicsProcess(false);
+		player.Velocity = Vector3.Zero;
+		float down = -1500f - player.GlobalPosition.Y;
+		player.GlobalPosition += Vector3.Up * down;
+		rig.ShiftBy(Vector3.Up * down);
+		var tunnel = Tunnel(cam);
+		tunnel.Streaks.SetShaderParameter("flames", 1f);
+		var root = Systems.Cutscene.SceneRoot(owner);
+		var wash = Flash(root);
+		wash.Color = new Color(1f, 0.42f, 0.1f, 0f);
+		var warp = Warp(root);
+		var sounds = new List<AudioStreamPlayer>();
+		AudioStreamPlayer Play(string path, float db, float pitch, bool loop)
+		{
+			if (!ResourceLoader.Exists(path)) return null;
+			var st = GD.Load<AudioStream>(path);
+			if (loop && st is AudioStreamWav w) { w = (AudioStreamWav)w.Duplicate(); w.LoopMode = AudioStreamWav.LoopModeEnum.Forward; w.LoopEnd = Mathf.RoundToInt(w.GetLength() * w.MixRate); st = w; }
+			var a = new AudioStreamPlayer { Stream = st, VolumeDb = db, PitchScale = pitch, Bus = "Events" };
+			root.AddChild(a);
+			a.Play();
+			sounds.Add(a);
+			return a;
+		}
+		var rng = new RandomNumberGenerator();
+		var rush = Play($"res://assets/audio/sfx/fall_void_{rng.RandiRange(1, 3):00}.wav", 0f, 1.1f, false);
+		var roar = Play("res://assets/audio/ambient/fire_crackle_loop.wav", 2f, 0.7f, true);
+		var drone = Play("res://assets/audio/ambient/pressure_loop.wav", -30f, 0.6f, true);
+		var fader = Systems.StoryBeat.Fader(owner);
+		double burst = 2.2, slowing = 2.0, fadeAt = seconds - 2.4, t = 0, nextFlash = 0.0;
+		float travel = 0f, spin = 0f, flash = 0f, speed = 38f;
+		bool fading = false;
+		while (t < seconds)
+		{
+			float dt = (float)owner.GetProcessDeltaTime();
+			float calm = Mathf.SmoothStep(0f, 1f, (float)((t - burst) / slowing));
+			speed = Mathf.Lerp(speed, Mathf.Lerp(38f, 4f, calm), 1f - Mathf.Exp(-dt * 1.6f));
+			travel += speed * dt;
+			if (t >= nextFlash && t < fadeAt)
+			{
+				flash = (reduce ? 0.3f : rng.RandfRange(0.7f, 1f)) * Mathf.Lerp(1f, 0.4f, calm);
+				nextFlash = t + (reduce ? rng.RandfRange(0.9f, 1.5f) : Mathf.Lerp(rng.RandfRange(0.1f, 0.3f), rng.RandfRange(1.2f, 2.2f), calm));
+			}
+			flash = Mathf.MoveToward(flash, 0f, dt * 4f);
+			wash.Color = wash.Color with { A = flash * (reduce ? 0.07f : Mathf.Lerp(0.42f, 0.16f, calm)) };
+			float twist = Mathf.Lerp(3.8f, 2.2f, calm) * Mathf.Sin((float)t * Mathf.Lerp(1f, 0.4f, calm));
+			spin += dt * Mathf.Lerp(2.0f, 0.6f, calm);
+			tunnel.Set(travel, flash * (reduce ? 0.3f : 1f), Mathf.Lerp(1.45f, 0.85f, calm), twist, Mathf.Lerp(0.3f, 0.6f, calm), 0.5f, Mathf.Lerp(0.45f, 0.7f, calm), Mathf.Lerp(0.25f, 0.6f, calm));
+			tunnel.Root.Rotation = new Vector3(0f, 0f, spin);
+			tunnel.Root.Position = motion ? new Vector3(rng.RandfRange(-1f, 1f), rng.RandfRange(-1f, 1f), 0f) * (0.008f + 0.0012f * speed) : Vector3.Zero;
+			warp.SetShaderParameter("swirl", (motion ? 1f : 0.4f) * Mathf.Lerp(2.8f * Mathf.Sin((float)t * 2.2f), 0.8f * Mathf.Sin((float)t * 0.45f), calm));
+			warp.SetShaderParameter("pinch", Mathf.Lerp(0.55f, 0.3f, calm));
+			warp.SetShaderParameter("dark", Mathf.Lerp(0f, 0.12f, calm));
+			warp.SetShaderParameter("flash", flash * (reduce ? 0.3f : 0.6f));
+			rig.FovSwim = motion ? Mathf.Lerp(42f, 24f, calm) + 0.4f * speed : 26f;
+			if (GodotObject.IsInstanceValid(rush)) rush.VolumeDb = Mathf.Lerp(0f, -12f, calm);
+			if (GodotObject.IsInstanceValid(roar)) roar.VolumeDb = Mathf.Lerp(2f, -8f, calm);
+			if (GodotObject.IsInstanceValid(drone)) drone.VolumeDb = Mathf.Lerp(-30f, -8f, calm);
+			if (!fading && t >= fadeAt)
+			{
+				fading = true;
+				if (fader != null) _ = Systems.Cutscene.Run(owner, c => fader.Fade(1f, 2.2f, c));
+			}
+			if (fading) foreach (var a in sounds) if (GodotObject.IsInstanceValid(a)) a.VolumeDb -= dt * 14f;
+			await Systems.Cutscene.Frame(owner, ct);
+			t += dt;
+		}
+		FlameFalls++;
+		GD.Print($"[story] blown into the void: {seconds:0.0} s of the flame spiral");
+	}
+
+	/// <summary>For tests: how many flame falls have run.</summary>
+	public static int FlameFalls { get; private set; }
 
 	/// <summary>The flashes' screen wash: on a layer under the post-process (10), so the tape look stays on top.</summary>
 	public static ColorRect Flash(Node parent)

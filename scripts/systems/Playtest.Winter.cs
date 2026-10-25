@@ -642,6 +642,16 @@ public partial class Playtest
 		_s.ExpectReload = true;
 		await _bot.UseAround(World.SnowMaze.Act25Ending.BadgeUse, ct, 1.3f, snapToTerrain: false);
 		Check("E takes the badge", World.SnowMaze.Act25Ending.BadgeTaken && Story.HasFlag(World.SnowMaze.Act25Ending.BadgeFlag));
+		// (2026-10-24) the husk blows apart, and the blast throws them into the spiral of fire
+		int falls0 = World.FallVoid.FlameFalls;
+		await _bot.WaitUntil(() => World.SnowMaze.Act25Ending.Exploded, 10, ct);
+		await _bot.Seconds(0.35, ct);
+		Shot("husk_explodes");
+		Check("the wendigo's husk blows apart in a ball of fire", World.SnowMaze.Act25Ending.Exploded);
+		await _bot.Seconds(2.2, ct);
+		Shot("flame_spiral");
+		await _bot.Seconds(2.5, ct);
+		Shot("flame_spiral_slowing");
 		using (Fast(2)) await ExpectReload(ct, 60);
 	}
 

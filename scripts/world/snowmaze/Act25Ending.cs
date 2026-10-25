@@ -86,7 +86,10 @@ public static class Act25Ending
 	public static async Task Play(Node owner, PlayerController player, WendigoHunter hunter, SnowMazeCave cave, CancellationToken ct)
 	{
 		var body = hunter.Body;
-		Revealed = BadgeTaken = _out = false;
+		Revealed = BadgeTaken = _out = Exploded = false;
+		_husk = null;
+		_pyre = null;
+		_fellAt = null;
 		Badge = null;
 		BadgeUse = null;
 		int ending = Decide(StoryManager.Instance);
@@ -138,7 +141,10 @@ public static class Act25Ending
 		fire.Reparent(cave);   // (the flames stay where it fell)
 		var side = away.Cross(Vector3.Up).Normalized();
 		var ground = body.GlobalPosition;
-		var stalker = await MaskBurnsOff(owner, player, body, ground, 1.05f, ct);
+		var stalker = await MaskBurnsOff(owner, player, body, ground, 1.05f, ct, keepHusk: true);
+		_husk = body;
+		_pyre = fire;
+		_fellAt = ground;
 		Revealed = true;
 		await Cutscene.Wait(owner, 3.4, ct);
 		// it steps back, into the snow beside the burned hole, and is gone (the snow closes round it)
@@ -175,6 +181,12 @@ public static class Act25Ending
 	/// <summary>E on the badge (tests use it).</summary>
 	public static PickupInteractable BadgeUse { get; private set; }
 	private static bool _out;
+	/// <summary>(2026-10-24) The burned husk lying in its fire, and the fire: what blows apart when the badge is taken.</summary>
+	private static Wendigo _husk;
+	private static FireVfx _pyre;
+	private static Vector3? _fellAt;
+	/// <summary>For tests: the husk blew apart.</summary>
+	public static bool Exploded { get; private set; }
 
 	/// <summary>The badge, lying face up in the ash where the mask fell (the ash and the badge are Blender's:
 	/// tools/Blender/wendigo_story.py), and E on it.</summary>
@@ -269,6 +281,9 @@ public static class Act25Ending
 	{
 		if (_out) return;
 		_out = true;
+		// (held where they stand from here: the cutscene keeps them there, and nothing under them can let them drop)
+		player.Velocity = Vector3.Zero;
+		player.SetPhysicsProcess(false);
 		if (Badge != null && GodotObject.IsInstanceValid(Badge))
 		{
 			AudioDirector.OneShot(owner, "item_take", 3, Badge.GlobalPosition, -6f, "Player", 2f, 0.05f);
@@ -283,14 +298,11 @@ public static class Act25Ending
 		await Cutscene.Wait(owner, 0.6, ct);
 		await PlayerVoice.Say(owner, "rest_now", 2.6f, ct);
 		await Cutscene.Wait(owner, 0.5, ct);
-		// they walk out through it, past it, into the light
-		var through = wall - wallN * 1.6f;
-		var walk = player.CreateTween();
-		walk.TweenProperty(player, "global_position", (stop + (through - stop) * 0.4f) with { Y = player.GlobalPosition.Y } + (player.GlobalPosition - stop).Normalized() * 0.6f, 2.4f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
-		await StoryBeat.PanTowards(owner, player, through + Vector3.Up * 1.2f, 1.2f, ct);
-		await Cutscene.Tween(owner, walk, ct);
-		var fader = StoryBeat.Fader(owner);
-		if (fader != null) await fader.Fade(1f, 2.2f, ct);
+		// (2026-10-24, the owner: "the player gets like sucked in to the wendigo ... have the wendigo explode and use the
+		// transition from ... falling back down to earth with that transition space spiral effect ... the colors of
+		// flames") the husk blows apart in a ball of fire, and the blast throws them into the spiral of fire
+		await Explode(owner, player, ct);
+		await FallVoid.FlameFall(owner, player, 7.5f, ct);
 		// out: on in the trailhead, where it began
 		StoryBeat.ReachCheckpoint(player, Checkpoint.Act24Finished);
 		GD.Print("[story] Act 25: out through the hole, into the woods it all began in");
@@ -299,13 +311,104 @@ public static class Act25Ending
 
 	public const string BadgeFlag = "mitchell_badge";
 
+	/// <summary>The husk in its fire blows apart: a white-orange flash, a ball of fire rolling up and out, burning scraps and
+	/// embers thrown wide, the blast felt (the view knocked, the red beat, the screen washed with fire).</summary>
+	private static async Task Explode(Node owner, PlayerController player, CancellationToken ct)
+	{
+		bool husk = _husk != null && GodotObject.IsInstanceValid(_husk);
+		var host = Cutscene.SceneRoot(owner) as Node3D ?? (Node3D)owner;
+		// (where it fell: the husk's own node can have been moved off by its hunter since)
+		Vector3 at = _fellAt is { } fell ? fell + Vector3.Up * 0.8f
+			: _pyre != null && GodotObject.IsInstanceValid(_pyre) ? _pyre.GlobalPosition + Vector3.Up * 0.6f
+			: player.GlobalPosition + ((-player.CameraRig.Camera.GlobalBasis.Z) with { Y = 0 }).Normalized() * 3f;
+		// a breath first: the fire under it swelling, a groan in it
+		if (_pyre != null && GodotObject.IsInstanceValid(_pyre)) owner.CreateTween().TweenProperty(_pyre, "Intensity", 1f, 0.7f);
+		AudioDirector.OneShot(owner, "fire_timber_groan", 10, at, 4f, "Events", 6f, 0.05f);
+		await StoryBeat.PanTowards(owner, player, at, 0.7f, ct, pitch: true);
+		Exploded = true;
+		if (husk) _husk.Visible = false;
+		if (_pyre != null && GodotObject.IsInstanceValid(_pyre)) _pyre.Intensity = 0f;
+		AudioDirector.OneShot(owner, "door_explode", 1, at, 8f, "Events", 14f, 0.02f);
+		AudioDirector.OneShot(owner, "breach_erupt", 1, at, 6f, "Events", 14f, 0.02f);
+		AudioDirector.OneShot(owner, "boss_death", 2, at, 4f, "Unnatural", 12f, 0.03f);
+		AudioDirector.OneShot(owner, "flame_ignite", 2, at, 8f, "Events", 10f, 0.05f);
+		var root = new Node3D { Name = "Blast" };
+		host.AddChild(root);
+		root.GlobalPosition = at;
+		var light = new OmniLight3D { LightColor = new Color(1f, 0.62f, 0.3f), LightEnergy = 14f, OmniRange = 22f, ShadowEnabled = false };
+		root.AddChild(light);
+		owner.CreateTween().TweenProperty(light, "light_energy", 0f, 1.6f).SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.Out);
+		root.AddChild(Burst("Fireball", 70, 1.3f, 4f, 11f, 0.45f, 2.4f, new Color(1f, 0.55f, 0.15f, 0.9f), new Color(0.35f, 0.05f, 0.0f, 0f), 0.3f, 1.2f));
+		root.AddChild(Burst("Core", 24, 0.5f, 2f, 6f, 0.5f, 1.4f, new Color(1f, 0.92f, 0.7f, 1f), new Color(1f, 0.4f, 0.05f, 0f), 0.0f, 0.4f));
+		root.AddChild(Burst("Embers", 160, 2.4f, 6f, 16f, 0.04f, 0.09f, new Color(1f, 0.7f, 0.3f, 1f), new Color(1f, 0.2f, 0.0f, 0f), -6f, 0.2f));
+		root.AddChild(Burst("Smoke", 40, 3.2f, 1.5f, 4f, 0.8f, 3.4f, new Color(0.08f, 0.07f, 0.06f, 0.55f), new Color(0.05f, 0.05f, 0.05f, 0f), 1.4f, 0.6f, unshaded: false));
+		var scraps = new GpuParticles3D
+		{
+			Name = "Scraps", Amount = 26, Lifetime = 1.8, OneShot = true, Explosiveness = 1f, LocalCoords = false,
+			ProcessMaterial = new ParticleProcessMaterial
+			{
+				Direction = Vector3.Up, Spread = 85f, InitialVelocityMin = 5f, InitialVelocityMax = 12f, Gravity = new Vector3(0, -9.8f, 0),
+				AngularVelocityMin = -900f, AngularVelocityMax = 900f, ScaleMin = 0.6f, ScaleMax = 1.8f,
+			},
+			DrawPass1 = new BoxMesh { Size = new Vector3(0.12f, 0.04f, 0.22f), Material = new StandardMaterial3D { AlbedoColor = new Color(0.06f, 0.05f, 0.045f), Roughness = 0.9f, EmissionEnabled = true, Emission = new Color(0.9f, 0.25f, 0.04f), EmissionEnergyMultiplier = 1.2f } },
+		};
+		root.AddChild(scraps);
+		foreach (var n in root.GetChildren()) if (n is GpuParticles3D gp) gp.Emitting = true;
+		// felt: the view knocked back, the heart's beat, the screen washed with fire
+		if (player.CameraRig is { } rig)
+		{
+			var tw = rig.CreateTween();
+			tw.TweenMethod(Callable.From<float>(v => { if (GodotObject.IsInstanceValid(rig)) rig.Shake = new Vector3(0.05f * v * Mathf.Sin(v * 40f), 0.06f * v, 0.12f * v); }), 1f, 0f, 1.1f);
+		}
+		UI.StyleFx.RedBeat(1f);
+		var wash = FallVoid.Flash(Cutscene.SceneRoot(owner));
+		bool reduce = GameSettings.Instance?.ReduceFlashing ?? false;
+		wash.Color = new Color(1f, 0.6f, 0.25f, reduce ? 0.25f : 0.5f);
+		var fade = owner.CreateTween();
+		fade.TweenProperty(wash, "color:a", 0f, 0.9f).SetTrans(Tween.TransitionType.Expo).SetEase(Tween.EaseType.Out);
+		fade.TweenCallback(Callable.From(() => { if (GodotObject.IsInstanceValid(wash)) wash.GetParent().QueueFree(); }));
+		GD.Print("[story] Act 24: the husk blows apart in a ball of fire");
+		await Cutscene.Wait(owner, 0.75, ct);
+	}
+
+	private static GpuParticles3D Burst(string name, int amount, float life, float vMin, float vMax, float sMin, float sMax, Color from, Color to, float rise, float spread, bool unshaded = true)
+	{
+		var ramp = new Gradient { Colors = new[] { from, to }, Offsets = new[] { 0f, 1f } };
+		var grow = new Curve();
+		grow.AddPoint(new Vector2(0f, 0.35f));
+		grow.AddPoint(new Vector2(1f, 1f));
+		return new GpuParticles3D
+		{
+			Name = name, Amount = amount, Lifetime = life, OneShot = true, Explosiveness = 0.95f, LocalCoords = false,
+			ProcessMaterial = new ParticleProcessMaterial
+			{
+				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = spread,
+				Direction = Vector3.Up, Spread = 180f, InitialVelocityMin = vMin, InitialVelocityMax = vMax,
+				Gravity = new Vector3(0, rise, 0), DampingMin = 3f, DampingMax = 6f, ScaleMin = sMin, ScaleMax = sMax,
+				ColorRamp = new GradientTexture1D { Gradient = ramp }, ScaleCurve = new CurveTexture { Curve = grow },
+			},
+			DrawPass1 = new QuadMesh
+			{
+				Size = Vector2.One,
+				Material = new StandardMaterial3D
+				{
+					ShadingMode = unshaded ? BaseMaterial3D.ShadingModeEnum.Unshaded : BaseMaterial3D.ShadingModeEnum.PerPixel,
+					BlendMode = unshaded ? BaseMaterial3D.BlendModeEnum.Add : BaseMaterial3D.BlendModeEnum.Mix,
+					Transparency = BaseMaterial3D.TransparencyEnum.Alpha, VertexColorUseAsAlbedo = true,
+					AlbedoTexture = SoftPuff.Texture, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, DisableFog = unshaded,
+				},
+			},
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		};
+	}
+
 	/// <summary>
 	/// (STORY.md Rev 5: "the burning mask drops away, and the stalker stands behind it") The burning wendigo goes down: it
 	/// sinks and falls, blackened, and is gone in its flames; out of it the stalker stands up, its true form, black and
 	/// unburned in the fire, and watches the player (its head on them). Sets the flag that puts it in every picture from
 	/// here on (<see cref="PhotoLog.StalkerFlag"/>). Returns it, standing, for the caller to take away.
 	/// </summary>
-	public static async Task<StalkerBody> MaskBurnsOff(Node owner, PlayerController player, Wendigo mask, Vector3 at, float size, CancellationToken ct)
+	public static async Task<StalkerBody> MaskBurnsOff(Node owner, PlayerController player, Wendigo mask, Vector3 at, float size, CancellationToken ct, bool keepHusk = false)
 	{
 		StoryManager.Instance?.SetFlag(PhotoLog.StalkerFlag);
 		var host = mask.GetParent() as Node3D ?? (Node3D)owner;
@@ -330,7 +433,7 @@ public static class Act25Ending
 			float e = u * u;
 			// (about the axis across its front: positive tips its top away from them)
 			mask.GlobalBasis = new Basis(fallAxis.LengthSquared() > 0.001f ? fallAxis.Normalized() : Vector3.Right, 1.1f * e) * b0;
-			mask.GlobalPosition = p0 + Vector3.Down * 1.4f * e;
+			mask.GlobalPosition = p0 + Vector3.Down * (keepHusk ? 0.55f : 1.4f) * e;
 		}), 0f, 1f, 2.0f);
 		// and out of it, up through the flames, the black figure stands
 		var rise = owner.CreateTween();
@@ -339,7 +442,8 @@ public static class Act25Ending
 		st.TrackTarget = player.CameraRig?.Camera?.GlobalPosition ?? player.GlobalPosition + Vector3.Up * 1.6f;
 		var look = StoryBeat.PanTowards(owner, player, ground + Vector3.Up * 1.9f * size, 2.6f, ct, pitch: true);
 		await Cutscene.Tween(owner, fall, ct);
-		if (GodotObject.IsInstanceValid(mask)) mask.Visible = false;
+		// (with keepHusk: the burned husk stays lying in its fire, for what comes after)
+		if (GodotObject.IsInstanceValid(mask) && !keepHusk) mask.Visible = false;
 		await Cutscene.Tween(owner, rise, ct);
 		await look;
 		GD.Print("[story] the mask burns off: the stalker stands in the flames, unburned, watching");
