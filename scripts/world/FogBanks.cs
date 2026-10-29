@@ -52,4 +52,15 @@ public partial class FogBanks : FogVolume
 
 	/// <summary>The banks' tint, from the scene's fog (a pale grey of its hue).</summary>
 	public void Tint(Color c) => _mat?.SetShaderParameter("tint", new Vector3(c.R, c.G, c.B));
+
+	/// <summary>(2026-10-29, the fog wall from Act 2) The low fog: <paramref name="layer"/> 0..1 a mist lying on the ground between
+	/// the banks, <paramref name="glow"/> its own faint light (unlit, the night's mist still reads), <paramref name="height"/> how
+	/// high it reaches (the rain raises it).</summary>
+	public void Low(float layer, Color glow, float height)
+	{
+		if (_mat == null) return;
+		_mat.SetShaderParameter("ground_layer", layer);
+		_mat.SetShaderParameter("glow", new Vector3(glow.R, glow.G, glow.B));
+		_mat.SetShaderParameter("height", height);
+	}
 }

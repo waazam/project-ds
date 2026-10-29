@@ -17,12 +17,16 @@ public partial class CinemaFrame : CanvasLayer
 	/// <summary>The bottom bar's height now, in the 640x360 canvas's pixels (0: none), for the hints that sit on it (HintStyle).</summary>
 	public static float Bar { get; private set; }
 	private ColorRect _top, _bottom;
+	/// <summary>Dev (`--hdr2d-test`): the finish's HDR path (linear light in and out) on a screen without HDR, the 2D in linear
+	/// light and the peak at the paper white, so it should look just as SDR does.</summary>
+	private static readonly bool HdrLinearTest = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--hdr2d-test") >= 0;
 	private float _amount;
 
 	public override void _Ready()
 	{
 		Layer = 11;
 		ProcessMode = ProcessModeEnum.Always;
+		if (HdrLinearTest) GetTree().Root.UseHdr2D = true;
 		_top = new ColorRect { Color = Colors.Black, MouseFilter = Control.MouseFilterEnum.Ignore };
 		_bottom = new ColorRect { Color = Colors.Black, MouseFilter = Control.MouseFilterEnum.Ignore };
 		AddChild(_top);
@@ -56,7 +60,13 @@ public partial class CinemaFrame : CanvasLayer
 			bool crt = s.CrtFilter && !s.Trailer;
 			post.SetShaderParameter("crt", crt ? 1f : 0f);
 			post.SetShaderParameter("px_scale", crt ? s.LineScale : 1f);
-			post.SetShaderParameter("gamma", s.Trailer ? 1f : s.Brightness);
+			// (2026-10-29) the calibration: without HDR the brightness; with it the black level, and the linear light out with
+			// the top highlights lifted toward the peak
+			bool hdr = !s.Trailer && (s.HdrActive || HdrLinearTest);
+			post.SetShaderParameter("gamma", s.Trailer || hdr ? 1f : s.Brightness);
+			post.SetShaderParameter("black_gamma", hdr && !HdrLinearTest ? s.HdrBlackLevel : 1f);
+			post.SetShaderParameter("hdr_out", hdr ? 1f : 0f);
+			post.SetShaderParameter("hdr_peak", hdr && !HdrLinearTest ? Mathf.Max(1f, s.HdrPeak / Mathf.Max(s.HdrPaperWhite, 1f)) : 1f);
 		}
 	}
 }

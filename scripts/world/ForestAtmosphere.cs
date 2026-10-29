@@ -745,12 +745,26 @@ public partial class ForestAtmosphere : Node
 			if (_banks == null) { _banks = new FogBanks { Name = "FogBanks" }; AddChild(_banks); }
 			float act1 = _act1On ? Mathf.Clamp(_act1, 0f, 1f) * (1f + 0.35f * _stairs) : 0f;
 			float s = (1f - under) * (1f - inside) * (1f - lodge) * (1f - Enclosed) * (1f - 0.4f * winter) * (0.7f + 0.6f * act1);
+			// (2026-10-29) after Act 1: thicker, with a ground layer and a glow; the rain thickens and raises it (the far gone in it)
+			float rain = Mathf.Clamp(RainVfx.Instance?.Intensity ?? 0f, 0f, 1f);
+			s *= Mathf.Lerp(1f, LowFogBanks * (1f + 0.5f * Mathf.Max(rain, storm)), _lowFog);
 			_banks.Follow(GetViewport().GetCamera3D(), s);
 			_banks.Tint(_env.VolumetricFogAlbedo);
+			_banks.Low(_lowFog, fog * LowFogGlow * _lowFog, Mathf.Lerp(7f, 10f, Mathf.Max(rain, storm) * _lowFog));
 		}
 	}
 
 	private static int _fogGrid;
+
+	[ExportGroup("Low fog (after Act 1)")]
+	/// <summary>(2026-10-29) How much of the distance fog is kept outdoors after Act 1 (the rest lies low, in the banks).</summary>
+	[Export] public float LowFogDistanceScale = 0.45f;
+	/// <summary>How much thicker the banks are there (their ground layer included).</summary>
+	[Export] public float LowFogBanks = 1.0f;
+	/// <summary>The low mist's own glow, as a share of the fog's colour (so it reads at night, unlit).</summary>
+	[Export] public float LowFogGlow = 0.1f;
+	/// <summary>0..1, how much of the low fog is on now (outdoors after Act 1; 0 elsewhere).</summary>
+	private float _lowFog;
 
 	/// <summary>Fog banks drifting through the volumetric fog outdoors (FogBanks).</summary>
 	[Export] public bool DriftingFog = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-fogbanks") < 0;
@@ -950,6 +964,20 @@ public partial class ForestAtmosphere : Node
 			_act1Applied = false;
 			_env.FogMode = _levelFogMode;
 			_env.FogDepthBegin = _levelDepthBegin; _env.FogDepthEnd = _levelDepthEnd; _env.FogDepthCurve = _levelDepthCurve;
+		}
+		// (2026-10-29, the friend's playtest: from Act 2 on "the fog reads as a wall": the trunks went into one flat pale band
+		// from the floor to the sky some 30 m out) out in the woods after Act 1 the distance fog is thinned, so the far trunks
+		// sink into the dark slowly instead of into a pale wall, and its pale is carried by the low mist (the fog banks, given
+		// a ground layer and a faint glow of their own, ApplyVolumetric); the rain thickens and raises that mist round the
+		// camera, so the far distance is lost in it. Only with the banks on (the light-in-the-fog setting): else as before.
+		float outdoors = (1f - under) * (1f - inside) * (1f - lodge) * (1f - encl);
+		bool banksOn = DriftingFog && (ProjectDS.Systems.GameSettings.Instance?.FogLighting ?? true);
+		_lowFog = !_act1On && woods <= 0.01f && banksOn && _env.FogMode == Environment.FogModeEnum.Exponential
+			&& Systems.StoryManager.Instance is { Current: >= Systems.Checkpoint.Act2StairsClimbed } ? outdoors : 0f;
+		if (_lowFog > 0.001f)
+		{
+			density *= Mathf.Lerp(1f, LowFogDistanceScale, _lowFog);
+			_env.FogDensity = density;
 		}
 		// the blizzard (Weather's): the snow-fog closes the view in, whatever the place's own fog was
 		float bliz = Mathf.Clamp(Blizzard, 0f, 1f) * (1f - under) * (1f - inside) * (1f - encl);

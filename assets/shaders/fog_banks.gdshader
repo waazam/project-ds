@@ -12,6 +12,10 @@ uniform vec3 wind = vec3(0.55, 0.0, 0.22);
 uniform float ground_y = 0.0;        // the ground under the camera (world)
 uniform float height = 7.0;          // how high the banks reach above it
 uniform vec3 tint : source_color = vec3(0.72, 0.74, 0.77);
+// (2026-10-29, the fog wall from Act 2) after Act 1 the distance fog thins and its pale lies low here instead: a mist on the
+// ground between the banks (0 none), with a faint glow of its own so it reads unlit at night
+uniform float ground_layer = 0.0;
+uniform vec3 glow = vec3(0.0);
 
 void fog() {
 	vec3 w = WORLD_POSITION;
@@ -22,6 +26,10 @@ void fog() {
 	float low = clamp(1.0 - (w.y - ground_y) / height, 0.0, 1.0);
 	low *= low;
 	float side = smoothstep(0.0, 0.22, min(min(UVW.x, 1.0 - UVW.x), min(UVW.z, 1.0 - UVW.z)));
-	DENSITY = density * banks * low * side;
+	// (out between the trees, not round the player: from 6 m off, whole by 20 m, where the lantern doesn't reach)
+	float r = length(UVW.xz - vec2(0.5)) * 2.0;
+	float layer = ground_layer * 0.55 * low * low * smoothstep(0.15, 0.48, r);
+	DENSITY = density * (banks * low + layer) * side;
 	ALBEDO = tint;
+	EMISSION = glow;
 }

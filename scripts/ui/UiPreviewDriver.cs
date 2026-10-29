@@ -182,6 +182,20 @@ public partial class UiPreviewDriver : Node
 		await Frames(20);
 		Check(FindButton(GetTree().CurrentScene, "Back") is { } back && back.IsVisibleInTree(), "Settings opens after Quit to Menu");
 		Shot("menu_02_settings", "ui_02_settings.png");
+		// (2026-10-29) the brightness calibration, from the settings' "Brightness..." (with --calib-hdr its HDR rows too)
+		var calibrate = FindButton(GetTree().CurrentScene, "Brightness...");
+		calibrate?.EmitSignal(BaseButton.SignalName.Pressed);
+		await Frames(20);
+		Check(GetTree().CurrentScene.FindChild("BrightnessCalibration", true, false) is Control cal && cal.IsVisibleInTree(), "the brightness calibration opens from the settings");
+		Shot("menu_03_calibration");
+		if (BrightnessCalibration.ForceHdrLayout)
+		{
+			GameSettings.Instance.HdrOutput = true;
+			if (GetTree().CurrentScene.FindChild("BrightnessCalibration", true, false) is BrightnessCalibration bc) bc.Refresh();
+			await Frames(10);
+			Shot("menu_04_calibration_hdr");
+			GameSettings.Instance.HdrOutput = false;
+		}
 
 		GD.Print($"[ui-preview] done, {_fails} failure(s)");
 		GetTree().Quit(_fails == 0 ? 0 : 1);

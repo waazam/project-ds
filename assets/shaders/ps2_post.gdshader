@@ -36,6 +36,16 @@ uniform float crt_fringe = 0.67;        // in game pixels: red a touch left, blu
 /// The brightness setting: a gamma on the graded image (1 = as designed; up lifts the shadows and mids, not the
 /// whites, so a dark monitor can see into the dark without the brights glaring).
 uniform float gamma = 1.0;
+/// (2026-10-29, the friend's playtest: "the brightness slider is bullshit and needs calibrations for HDR and without HDR")
+/// HDR's black level: a gamma on the shadows only (fading out by the mid-greys), so the near-black can be set to just
+/// visible without the paper white moving. 1 = none (SDR, where `gamma` does the job).
+uniform float black_gamma = 1.0;
+/// HDR output (GameSettings.HdrOutput): the screen reads and writes linear light (the viewport's HDR 2D), so the grade
+/// runs on the sRGB-encoded picture as before and goes back to linear at the end, where only the brightest few percent
+/// (the lantern's flame, the lightning, a lit window) are lifted toward the display's peak. 1.0 out = the paper white.
+uniform float hdr_out = 0.0;
+/// The peak over the paper white (peak nits / paper-white nits): how far the top highlights may climb in HDR.
+uniform float hdr_peak = 1.0;
 /// Local contrast (2026-10-04, the owner: "make everything stand out more"): the fine detail in the brightness (a
 /// texture's grain, a model's creases) drawn out a little before the softness and the dither eat it. Brightness only, so
 /// it never shifts a colour; small, and clamped, so there's no halo round an edge.
@@ -52,6 +62,21 @@ const float BAYER[16] = float[16](
 	12.0, 4.0, 14.0, 6.0,
 	3.0, 11.0, 1.0, 9.0,
 	15.0, 7.0, 13.0, 5.0);
+
+vec3 to_srgb(vec3 l) {
+	l = max(l, vec3(0.0));
+	return mix(l * 12.92, 1.055 * pow(l, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), l));
+}
+
+vec3 to_linear(vec3 s) {
+	s = max(s, vec3(0.0));
+	return mix(s / 12.92, pow((s + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), s));
+}
+
+/// A screen sample as the grade expects it (sRGB-encoded), whether the screen is linear (HDR output) or not.
+vec3 src(vec3 v) {
+	return hdr_out > 0.5 ? to_srgb(v) : v;
+}
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -70,9 +95,11 @@ void fragment() {
 	c.r = texture(screen_tex, uv + d * fringe * edge * 4.0 - cf).r;
 	c.g = texture(screen_tex, uv).g;
 	c.b = texture(screen_tex, uv - d * fringe * edge * 4.0 + cf).b;
+	c = src(c);
 	// the lens goes soft toward the edges (a small tap blur: the screen has no mip levels to borrow)
 	vec3 soft1 = (texture(screen_soft, uv + px * vec2(1.5, 0.5)).rgb + texture(screen_soft, uv + px * vec2(-1.5, -0.5)).rgb
 		+ texture(screen_soft, uv + px * vec2(-0.5, 1.5)).rgb + texture(screen_soft, uv + px * vec2(0.5, -1.5)).rgb) * 0.25;
+	soft1 = src(soft1);
 	// local contrast: the detail (this pixel against the small blur round it) drawn out, before the edges go soft
 	float detail = dot(c - soft1, vec3(0.299, 0.587, 0.114));
 	c += vec3(clamp(detail * clarity, -0.06, 0.06)) * (1.0 - clamp(edge * 0.8, 0.0, 0.8));
@@ -85,7 +112,7 @@ void fragment() {
 		float r = (i % 2 == 0) ? 7.0 : 14.0;
 		glow += texture(screen_soft, uv + vec2(cos(a), sin(a)) * px * r).rgb;
 	}
-	glow /= 12.0;
+	glow = src(glow / 12.0);
 	float gl = dot(glow, vec3(0.299, 0.587, 0.114));
 	c += max(glow - vec3(halation_threshold), vec3(0.0)) * halation * vec3(1.1, 0.95, 0.85) * smoothstep(halation_threshold, 1.0, gl + 0.3);
 
@@ -104,8 +131,9 @@ void fragment() {
 		c = mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 0.92);
 	}
 
-	// the player's brightness
+	// the player's brightness (SDR: a gamma over it all; HDR: the black level, a gamma on the shadows alone)
 	c = pow(clamp(c, vec3(0.0), vec3(1.0)), vec3(1.0 / gamma));
+	if (black_gamma != 1.0) c = mix(pow(c, vec3(1.0 / black_gamma)), c, smoothstep(vec3(0.0), vec3(0.5), c));
 
 	// vignette
 	c *= 1.0 - vignette * dot(d, d) * 1.6;
@@ -128,5 +156,12 @@ void fragment() {
 	float b = (BAYER[p.y * 4 + p.x] + 0.5) / 16.0 - 0.5;
 	c = floor(c * levels + 0.5 + b * dither_strength) / levels;
 
-	COLOR = vec4(clamp(c, 0.0, 1.0), 1.0);
+	c = clamp(c, 0.0, 1.0);
+	if (hdr_out > 0.5) {
+		// back to linear light, and the top few percent lifted toward the peak (the rest stays at the paper white's scale)
+		c = to_linear(c);
+		float top = smoothstep(0.62, 1.0, max(c.r, max(c.g, c.b)));
+		c *= 1.0 + (hdr_peak - 1.0) * top * top * top;
+	}
+	COLOR = vec4(c, 1.0);
 }
