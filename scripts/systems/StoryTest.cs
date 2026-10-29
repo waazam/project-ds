@@ -1406,6 +1406,8 @@ public partial class StoryTest : Node
 		// Act 8: the hallway.
 		bool reached = await WalkTo(bi.VineDoorApproachWorld + new Vector3(0, 0, -4f), 0.6f, ct);
 		Check("walked the hallway", reached);
+		// (2026-10-29) the scare runs some seven seconds now (the dark, the red, the lunge): let it finish before the vine door
+		await WaitUntil(() => bi.Flow is { JumpscareDone: true }, 12, ct);
 		Check("the lights have gone red", bi.RedTriggered);
 		Check("the stalker stepped out in the flickering hallway", bi.JumpscareFired);
 		Check("the lamps died for the scare, and came back", bi.Hallway is { BlackoutCount: >= 1, BlackedOut: false }, $"{bi.Hallway?.BlackoutCount}");
@@ -1460,7 +1462,7 @@ public partial class StoryTest : Node
 			t += GetProcessDeltaTime();
 		}
 		_input.ScriptedMove = Vector2.Zero;
-		Check("the hallway is gone: a room with three doors", bi.MazeActive);
+		Check("the hallway is gone: a room with three doors", bi.MazeActive, bi.MazeActive ? "" : $"stood at {bi.ToLocal(_player.GlobalPosition)}, input {_input.Enabled}, {Cutscene.InputLocks} locks, {Cutscene.ActiveCount} cutscenes");
 		// The rooms: every door leads to the same room again, until the one with the stalker in it.
 		var rooms = bi.Rooms;
 		int opened = 0;
@@ -1521,13 +1523,40 @@ public partial class StoryTest : Node
 		if (act11 == null || target == null) return;
 		await WaitUntil(() => act11.Pursuer != null, 10, ct);
 		Check("the thing from the bunker follows them out", act11.Pursuer != null);
-		await WalkAlongTrail(target.GlobalPosition, 40f, ct);
-		if (act11.ApproachWorld is { } approach) await WalkTo(approach, 1f, ct);
+		// (2026-10-29) the chase: run from light to light (blue, purple, green, red), getting the breath back in each, then
+		// on to the stairs; it never sets foot in a light, and goes round, shielding its eyes
+		var lights = act11.Lights;
+		Check("the four lights are lit on the way to the stairs", lights is { On: true });
+		if (lights != null)
+		{
+			for (int i = 0; i < Act11Lights.Count; i++)
+			{
+				await WalkTo(lights.Centres[i], 1.2f, ct, giveUp: 12f, run: true);
+				await WaitUntil(() => lights.Reached > i, 2, ct);
+				Check($"into the {Act11Lights.Names[i]} light: a save", lights.Reached > i && StoryManager.Instance.HasFlag(Act11Lights.Flag(i)), $"reached {lights.Reached}");
+				_input.ScriptedMove = Vector2.Zero;
+				// breath back, standing in it while it comes round the rim
+				await WaitUntil(() => _player.Stamina is not { } st || st.Value > 0.9f, 8, ct);
+				if (i == 1 && act11.Pursuer is { } waiting)
+				{
+					await WaitUntil(() => waiting.Body is { ShieldAmount: > 0.8f }, 6, ct);
+					Check("it waits at the light's rim, its forearms over its eyes", waiting.Body is { ShieldAmount: > 0.8f } && waiting.ClosestToLight > 0f,
+						$"shield {waiting.Body?.ShieldAmount:0.00}, {waiting.ClosestToLight:0.0} m off the light at the closest");
+					await Aim(waiting.GlobalPosition + Vector3.Up * 1.7f, ct);
+					await Frames(3, ct);
+					Screenshot("it_shields_its_eyes");
+					await Aim(lights.Centres[2] + Vector3.Up * 2f, ct);
+				}
+			}
+		}
+		if (act11.ApproachWorld is { } approach) await WalkTo(approach, 1f, ct, run: true);
 		Screenshot("last_stairs");
 		if (act11.Pursuer is { } chaser)
 		{
+			Check("it never set foot in a light", chaser.ClosestToLight > 0f, $"{chaser.ClosestToLight:0.00} m off a light's edge at the closest");
+			Check("it never caught them on the way", chaser.Grabs == 0 && PlayerDeath.Deaths == 0, $"grabs {chaser.Grabs}");
 			Check("it kept to their trail all the way to the stairs, never far behind", chaser.DistanceToPlayer < 30f, $"{chaser.DistanceToPlayer:0.0} m behind");
-			Check("it walks on its legs (the remodel's walk)", chaser.Body is { Rigged: true } && (chaser.Body.Clip == "walk" || chaser.Body.Clip == "idle" || chaser.Body.Clip == "shove" || chaser.Body.Clip == "stare"), $"clip '{chaser.Body?.Clip}', shoves {chaser.Shoves}");
+			Check("it walks on its legs (the remodel's walk)", chaser.Body is { Rigged: true } && (chaser.Body.Clip == "walk" || chaser.Body.Clip == "idle" || chaser.Body.Clip == "loom" || chaser.Body.Clip == "stare"), $"clip '{chaser.Body?.Clip}'");
 			var facing = _player.CameraRig.Yaw;
 			await Aim(chaser.GlobalPosition + Vector3.Up * 1.6f, ct);
 			await Frames(3, ct);
@@ -1557,7 +1586,7 @@ public partial class StoryTest : Node
 		if (act11.Pursuer is { } stuck)
 		{
 			await WaitUntil(() => stuck.StuckAtFoot, 20, ct);
-			Check("it can't climb: stuck at the foot of the stairs, staring up after them", stuck.StuckAtFoot, $"{stuck.GlobalPosition.DistanceTo(stuck.FootWorld):0.0} m from the foot, {stuck.Shoves} shoves");
+			Check("it can't climb: stuck at the foot of the stairs, staring up after them", stuck.StuckAtFoot, $"{stuck.GlobalPosition.DistanceTo(stuck.FootWorld):0.0} m from the foot");
 			await WaitUntil(() => stuck.Body?.Clip == "stare", 4, ct);
 			Check("drawn up at the foot, staring", stuck.Body?.Clip == "stare", $"clip '{stuck.Body?.Clip}'");
 			await Aim(stuck.GlobalPosition + Vector3.Up * 1.8f, ct);
@@ -4573,7 +4602,7 @@ public partial class StoryTest : Node
 
 	// ------------------------------------------------------------------ bot
 
-	private async Task<bool> WalkTo(Vector3 target, float radius, CancellationToken ct, Func<bool> stopWhen = null, float giveUp = 8f)
+	private async Task<bool> WalkTo(Vector3 target, float radius, CancellationToken ct, Func<bool> stopWhen = null, float giveUp = 8f, bool run = false)
 	{
 		double stuck = 0, sidestep = 0; float best = float.MaxValue, dir = 1f;
 		try
@@ -4589,7 +4618,7 @@ public partial class StoryTest : Node
 				stuck += GetProcessDeltaTime();
 				if (stuck > giveUp) return false;
 				Steer(target);
-				_input.ScriptedRun = d > 8f;
+				_input.ScriptedRun = run || d > 8f;
 				if (stuck > 1.2 && sidestep <= 0) { sidestep = 0.9; dir = -dir; }
 				if (sidestep > 0) { sidestep -= GetProcessDeltaTime(); _input.ScriptedMove = new Vector2(dir, 0.4f); }
 				else _input.ScriptedMove = new Vector2(0, 1);

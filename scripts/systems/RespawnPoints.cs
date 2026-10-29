@@ -50,6 +50,12 @@ public static class RespawnPoints
 		if (cp == Checkpoint.Act7CabinBurning && System.Array.IndexOf(save.Flags, World.RestShelter.Flag) >= 0
 			&& tree.GetFirstNodeInGroup(World.RestShelter.MarkerGroup) is Node3D rest)
 			return OnGround(n, rest.GlobalPosition, YawOf(-rest.GlobalBasis.Z));
+		// (2026-10-29) Act 11's lights (flags within checkpoint 8): in the pool of the furthest one reached, facing on toward
+		// the stairs (the chase's death comes back here)
+		if (cp == Checkpoint.Act10WalkieFound)
+			for (int i = World.Act11Lights.Count - 1; i >= 0; i--)
+				if (System.Array.IndexOf(save.Flags, World.Act11Lights.Flag(i)) >= 0 && tree.GetFirstNodeInGroup(World.Act11Lights.RespawnGroup(i)) is Node3D lit)
+					return (lit.GlobalPosition + Vector3.Up * 0.1f, YawOf(-lit.GlobalBasis.Z));
 		// Act 22's halfway save (a flag within Act 21's end checkpoint): on the road where it was passed
 		if (cp == Checkpoint.Act21Finished && System.Array.IndexOf(save.Flags, StoryManager.Flag.Act22Midway) >= 0
 			&& tree.GetFirstNodeInGroup("respawn_Act22Midway") is Node3D mid)

@@ -84,6 +84,8 @@ public partial class BunkerFlow : Node
 			_hallway.SetRedInstant();
 		}
 		_jumpscared = s.HasFlag(JumpscareFlag) || s.CrtPuzzleDone;
+		// (2026-10-29) past the scare, the lamps came back red for good
+		if (s.HasFlag(JumpscareFlag)) _hallway.SetRedInstant();
 		// the scare's body built now, as the bunker builds, and kept still and hidden till its moment (the lag pass,
 		// 2026-10-13: built on the spot, it held the frame it appears in for 60 ms)
 		if (!_jumpscared && _scareBody == null)
@@ -135,10 +137,9 @@ public partial class BunkerFlow : Node
 	public bool JumpscareFired => _jumpscared;
 
 	/// <summary>
-	/// Once the lamps have started to fail, at a point down the hall, the stalker is suddenly standing a
-	/// few metres in front of the player, facing them, the lamps jolting, with its screech; half a second
-	/// later it is gone and the hallway is as it was. Once only (saved), and only while they are looking
-	/// down the hall: it steps into their sight, never behind their back.
+	/// Once the lamps have started to fail, at a point down the hall (and only while they are looking down it), the
+	/// lights cut out, all but one red lamp far ahead; then the red comes on, every lamp; then it is there. Once only
+	/// (saved).
 	/// </summary>
 	private void CheckJumpscare(Vector3 local, PlayerController player)
 	{
@@ -149,55 +150,105 @@ public partial class BunkerFlow : Node
 		if (fwd.Z > -0.4f) return;
 		_jumpscared = true;
 		StoryManager.Instance?.SetFlag(JumpscareFlag);
-		_ = Cutscene.Run(this, ct => Jumpscare(local, player, ct), lockInput: true, freezeBody: true);
+		_ = Cutscene.Run(this, ct => Jumpscare(player, ct));
 	}
 
+	/// <summary>How long the hall stands dark with only the far red lamp (s), and how long it stands all red before it comes.</summary>
+	[Export] public float DarkHold = 3.2f, RedHold = 1.4f;
+	/// <summary>How far down the hall, ahead of the player, the one red lamp burns (m).</summary>
+	[Export] public float SoloLampAhead = 26f;
+	/// <summary>For tests: the stages the scare went through (1 dark with one red lamp, 2 all red, 3 it lunged).</summary>
+	public int JumpscareStage { get; private set; }
+	/// <summary>For tests: the scare has run its course (the lamps steady red, control back).</summary>
+	public bool JumpscareDone { get; private set; }
+
 	/// <summary>
-	/// As hard as the rooms' scare (Dan, 2026-09-22): every lamp dies at once, it is standing two
-	/// metres in front with its eyes lit, the burst and the roar, it lunges at the face, a second
-	/// kick, then in one frame it is gone and the lamps flash back on, jolting red, as if nothing happened.
-	/// Input is held for the 1.2 s.
+	/// (2026-10-29, the owner: "the lights should cut out so it's dark, with just one red light in the distance; then all
+	/// the red lights come on; then the jumpscare triggers") the breaker's clunk and every lamp dies at once, but for one,
+	/// far down the hall, that sputters back on red; the dark holds; then the red comes on, lamp by lamp, from that one
+	/// back toward them and on to the entrance; a breath of all-red quiet; then, in one frame, it is standing two metres in
+	/// front of them with its eyes lit, the burst and the roar, the lunge at the face (input held for that second), the
+	/// lamps jolting, and it is gone. The walk is theirs through the dark and the red: only the lunge holds them.
 	/// </summary>
-	private async System.Threading.Tasks.Task Jumpscare(Vector3 local, PlayerController player, System.Threading.CancellationToken ct)
+	private async System.Threading.Tasks.Task Jumpscare(PlayerController player, System.Threading.CancellationToken ct)
 	{
 		var body = _scareBody != null && IsInstanceValid(_scareBody) ? _scareBody : new StalkerBody { Name = "HallwayScare", Seed = 2077, Size = 1.08f };
 		_scareBody = null;
 		if (body.GetParent() == null) _interior.AddChild(body);
-		body.ProcessMode = ProcessModeEnum.Inherit;
-		body.Visible = true;
-		Vector3 at = new(Mathf.Clamp(local.X, -1f, 1f) * 0.3f, 0f, local.Z - 2.0f);
-		body.Position = at;
-		body.Rotation = new Vector3(0, Mathf.Atan2(local.X - at.X, local.Z - at.Z), 0);
-		body.GlowEyes(new Color(1f, 0.16f, 0.05f), 8f);
-		body.Snap("loom");   // drawn up over them, the arms out, the mouth's slit open
-		body.TrackTarget = player.CameraRig?.Camera?.GlobalPosition;   // its face straight at theirs
-		body.Watched = true;
-		_hallway.Blackout(true);
-		BunkerRooms.ScareVoice(_interior, at + Vector3.Up * 1.7f);
-		GD.Print("[story] Act 8: it is in the hallway");
+		Vector3 Local() => _interior.ToLocal(player.GlobalPosition);
+		bool locked = false;
 		try
 		{
-			// Frame 0: lamps dead and it is THERE, full visibility (StalkerBody sets the skin's visibility
-			// to 1 in _Ready; nothing tweens it). 0.0-0.15 s it stands, eyes only; 0.15-0.45 s the lunge to
-			// 0.6 m, the head coming down at the face.
+			// 1. the lights cut out: dark, but for one red lamp far down the hall
+			float depth = -Local().Z;
+			int solo = _hallway.LampAt(Mathf.Min(depth + SoloLampAhead, HallLength - LightSpacing));
+			_hallway.Blackout(true);
+			JumpscareStage = 1;
+			GD.Print("[story] Act 8: the lamps cut out, one red one left far down the hall");
+			BunkerKit.OneShot(_interior, "res://assets/audio/sfx/relay_clunk_01.wav", Local() + new Vector3(0, HallHeight - 0.3f, -4f), "Events", 2f, 0.85f, 6f, 60f);
+			await Cutscene.Wait(this, 0.7, ct);
+			_hallway.SoloRed(solo);
+			int sp = (int)(GD.Randi() % 3) + 1;
+			BunkerKit.OneShot(_interior, $"res://assets/audio/sfx/bulb_sputter_{sp:00}.wav", new Vector3(0, HallHeight - 0.3f, _hallway.SoloLampZ), "Events", 0f, 0.9f, 10f, 80f);
+			await Cutscene.Wait(this, DarkHold, ct);
+
+			// 2. all the red lights come on: from that lamp back toward them, one by one, and on to the entrance
+			JumpscareStage = 2;
+			GD.Print("[story] Act 8: the red comes on, every lamp");
+			BunkerKit.OneShot(_interior, "res://assets/audio/sfx/power_surge_01.wav", Local() + new Vector3(0, HallHeight - 0.3f, -6f), "Events", -2f, 0.8f, 8f, 60f);
+			for (int i = solo; i >= 0; i--)
+			{
+				_hallway.AllRed(i);
+				if (Mathf.Abs(_hallway.LampAt(-Local().Z) - i) <= 3)
+				{
+					int lt = (int)(GD.Randi() % 2) + 1;
+					BunkerKit.OneShot(_interior, $"res://assets/audio/sfx/light_switch_{lt:00}.wav", new Vector3(0, HallHeight - 0.3f, -LightSpacing * (i + 0.5f)), "Events", -6f, 0.6f, 4f, 30f);
+				}
+				await Cutscene.Wait(this, 0.07, ct);
+			}
+			_hallway.RedOn();
+			await Cutscene.Wait(this, RedHold, ct);
+
+			// 3. then it is there, two metres in front of their face (whichever way down the hall they look now)
+			JumpscareStage = 3;
+			Cutscene.Lock(player, true, true);
+			locked = true;
+			Vector3 local = Local();
+			var cam = player.CameraRig?.Camera;
+			float dir = cam != null && (_interior.GlobalBasis.Inverse() * (-cam.GlobalBasis.Z)).Z > 0.2f ? 1f : -1f;
+			Vector3 at = new(Mathf.Clamp(local.X, -1f, 1f) * 0.3f, 0f, Mathf.Clamp(local.Z + dir * 2.0f, -HallLength + 0.5f, -0.5f));
+			body.ProcessMode = ProcessModeEnum.Inherit;
+			body.Visible = true;
+			body.Position = at;
+			body.Rotation = new Vector3(0, Mathf.Atan2(local.X - at.X, local.Z - at.Z), 0);
+			body.GlowEyes(new Color(1f, 0.16f, 0.05f), 8f);
+			body.Snap("loom");   // drawn up over them, the arms out, the mouth's slit open
+			body.TrackTarget = cam?.GlobalPosition;   // its face straight at theirs
+			body.Watched = true;
+			_hallway.Jolt(_clock + 0.45);
+			BunkerRooms.ScareVoice(_interior, at + Vector3.Up * 1.7f);
+			GD.Print("[story] Act 8: it is in the hallway");
+			// 0.0-0.15 s it stands; 0.15-0.45 s the lunge to 0.6 m, the head coming down at the face
 			await Cutscene.Wait(this, 0.15, ct);
-			Vector3 lunge = new(at.X, 0f, local.Z - 0.6f);
+			Vector3 lunge = new(at.X, 0f, local.Z + dir * 0.6f);
 			var tw = body.CreateTween().SetParallel();
 			tw.TweenProperty(body, "position", lunge, 0.3f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
 			tw.TweenProperty(body, "rotation:x", -0.35f, 0.3f);
 			await Cutscene.Wait(this, 0.3, ct);
-			// 0.45 s, one frame: it is gone (no fade) and the lamps flash back at the same instant, then jolt red.
+			// 0.45 s, one frame: it is gone (no fade), the lamps jolting red a moment more
 			player.PlayerInput.AddCutsceneLook(new Vector2((GD.Randf() - 0.5f) * 0.16f, 0.14f));
 			body.Visible = false;
 			body.QueueFree();
-			_hallway.Blackout(false);
-			_hallway.Jolt(_clock + 0.6);
+			_hallway.Jolt(_clock + 0.5);
 			await Cutscene.Wait(this, 0.75, ct);
 		}
 		finally
 		{
-			_hallway.Blackout(false);
+			_hallway.AllRed();
+			_hallway.RedOn();
 			if (IsInstanceValid(body)) body.QueueFree();
+			if (locked && IsInstanceValid(player) && player.IsInsideTree()) Cutscene.Unlock(player, true, true);
+			JumpscareDone = true;
 		}
 	}
 

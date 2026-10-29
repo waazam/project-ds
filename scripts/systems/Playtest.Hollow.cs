@@ -796,13 +796,15 @@ public partial class Playtest
 		Require("the last staircase, tall now", act11 is { StairsTall: true } && act11.OriginalStairs != null);
 		await _bot.WaitUntil(() => act11.Pursuer != null, 10, ct);
 		Check("the thing from the bunker follows them out", act11.Pursuer != null);
+		await RunTheLights(act11, ct);
 		var stairs = act11.OriginalStairs;
 		var top = stairs.GetNodeOrNull<Node3D>("TopTrigger");
 		Require("its top landing", top != null);
-		// to its foot (the last stretch walked), then up: jumped to a third of the way, walked through the half-way call, jumped near the top
+		// from the red light to its foot at a run, then up: jumped to a third of the way, walked through the half-way call, jumped near the top
 		var foot = stairs.GlobalPosition;
-		await _bot.Teleport(act11.ApproachWorld ?? foot + stairs.GlobalBasis.Z * 6f, foot, ct);
+		await _bot.WalkTo(act11.ApproachWorld ?? foot + stairs.GlobalBasis.Z * 6f, 1f, ct, giveUp: 12f, run: true);
 		await _bot.WalkTo(foot, 0.6f, ct, giveUp: 10f);
+		Check("from the red light to the stairs: never caught", act11.Pursuer is { Grabs: 0 } && !PlayerDeath.Dying, $"{act11.Pursuer?.DistanceToPlayer:0.0} m behind at the foot");
 		// (2026-10-19) from the foot, looking up the flight: its top lost in the veil
 		await _bot.WaitUntil(() => act11.StairsVeil is { Strength: > 0.95f }, 8, ct);
 		Check("at the foot: the fog swallows the flight above the eye", act11.StairsVeil is { Strength: > 0.95f, Visible: true }, $"{act11.StairsVeil?.Strength:0.00}");
@@ -841,6 +843,134 @@ public partial class Playtest
 		var lake = GetTree().GetFirstNodeInGroup("lake_marker") as Lake;
 		Check("they come to at the lake, with control", Input.Enabled && lake != null && Player.GlobalPosition.DistanceTo(lake.WakeSpotWorld) < 30f);
 		Shot("lake");
+	}
+
+	/// <summary>(2026-10-29) The chase: from the radio spot, light to light at a run (blue, purple, green, red), the breath
+	/// got back standing in each while it comes round the rim and waits there, shielding its eyes.</summary>
+	private async Task RunTheLights(Act11Ending act11, CancellationToken ct)
+	{
+		var lights = act11.Lights;
+		var chaser = act11.Pursuer;
+		Require("the four lights, and it after them", lights != null && chaser != null);
+		await _bot.WaitUntil(() => lights.On, 3, ct);
+		Check("the four lights come on as it comes out", lights.On);
+		await _bot.Seconds(1.6, ct);
+		await _bot.Aim(lights.Centres[1] + Vector3.Up * 2.5f, ct);
+		Shot("four_lights");
+		for (int i = 0; i < Act11Lights.Count; i++)
+		{
+			await _bot.WalkTo(lights.Centres[i], 1.2f, ct, giveUp: 12f, run: true);
+			await _bot.WaitUntil(() => lights.Reached > i, 2, ct);
+			Check($"into the {Act11Lights.Names[i]} light: a save", lights.Reached > i && Story.HasFlag(Act11Lights.Flag(i)) && Story.Current == Checkpoint.Act10WalkieFound,
+				$"reached {lights.Reached}, {chaser.DistanceToPlayer:0.0} m behind");
+			await _bot.WaitUntil(() => Player.Stamina is not { } st || st.Value > 0.9f, 9, ct);
+			if (i == 1)
+			{
+				await _bot.WaitUntil(() => chaser.Body is { ShieldAmount: > 0.8f } && chaser.DistanceToPlayer < lights.BeamRadius * 2f + 2f, 25, ct);
+				Check("it comes round to the rim nearest them and waits, its forearms over its eyes", chaser.Body is { ShieldAmount: > 0.8f } && chaser.ClosestToLight > 0f,
+					$"shield {chaser.Body?.ShieldAmount:0.00}, {chaser.DistanceToPlayer:0.0} m off, {chaser.ClosestToLight:0.00} m off a light at the closest");
+				await _bot.Aim(chaser.GlobalPosition + Vector3.Up * 1.8f, ct);
+				await _bot.Seconds(0.3, ct);
+				Shot("shields_its_eyes");
+			}
+			if (i < Act11Lights.Count - 1)
+			{
+				await _bot.Aim(lights.Centres[i + 1] + Vector3.Up * 2.5f, ct);
+				Shot($"light_{Act11Lights.Names[i + 1]}_ahead");
+			}
+		}
+		Check("it never set foot in a light", chaser.ClosestToLight > 0f, $"{chaser.ClosestToLight:0.00} m off a light's edge at the closest");
+		Check("light to light: never caught", chaser.Grabs == 0 && !PlayerDeath.Dying, $"shielded {chaser.ShieldSeconds:0} s");
+	}
+
+	/// <summary>(2026-10-29) Standing still with their back to it: it has them from behind (the death, the reload at the radio
+	/// spot); then into the blue light, and out of it again the way they came: caught, and back standing in the blue light,
+	/// where it can't come.</summary>
+	private async Task Act11Caught(CancellationToken ct)
+	{
+		var act11 = _bot.FirstOf<Act11Ending>();
+		Require("the last staircase's ending", act11 != null);
+		if (Phase == 0) using (Fast(3)) await _bot.WaitUntil(() => Story.Act11DialogueDone, 40, ct);
+		await Control(ct, 40);
+		await _bot.WaitUntil(() => act11.Pursuer != null, 12, ct);
+		var chaser = act11.Pursuer;
+		var lights = act11.Lights;
+		Require("it comes after them, the lights lit", chaser != null && lights is { On: true });
+		if (Phase == 0)
+		{
+			_s.ExpectReload = true;
+			await _bot.WaitUntil(() => chaser.Grabbing, 25, ct);
+			Check("standing still, their back to it: it has them from behind", chaser.Grabbing && PlayerDeath.Dying, $"{chaser.DistanceToPlayer:0.0} m");
+			await _bot.WaitUntil(() => chaser.HandsOverEyes, 1.5, ct);
+			Shot("grabbed");
+			Check("the view thrown back into its face, its hands over their eyes", chaser.HandsOverEyes && Player.CameraRig.Pitch > 1.2f, $"pitch {Player.CameraRig.Pitch:0.00}");
+			await ExpectReload(ct, 40);
+			return;
+		}
+		if (Phase == 1)
+		{
+			var spot = GetTree().GetFirstNodeInGroup("respawn_Act10WalkieFound") as Node3D;
+			Check("caught: \"It caught you.\", back at the radio spot (checkpoint 8), the death counted",
+				Story.Current == Checkpoint.Act10WalkieFound && Story.Act11DialogueDone && PlayerDeath.Deaths >= 1 && Story.TotalDeaths >= 1
+				&& spot != null && TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(spot.GlobalPosition)) < 3f, $"{Player.GlobalPosition}, deaths {Story.TotalDeaths}");
+			await _bot.WalkTo(lights.Centres[0], 1.2f, ct, giveUp: 12f, run: true);
+			await _bot.WaitUntil(() => Story.HasFlag(Act11Lights.Flag(0)), 2, ct);
+			Check("into the blue light: a save", Story.HasFlag(Act11Lights.Flag(0)));
+			// back out the way they came, toward it, and stood there
+			_s.ExpectReload = true;
+			Vector3 from = spot?.GlobalPosition ?? lights.Centres[0] + Vector3.Back * 10f;
+			Vector3 back = lights.Centres[0] + (from - lights.Centres[0]).Normalized() * (lights.BeamRadius + 3f);
+			await _bot.WalkTo(back, 0.8f, ct, () => chaser.Grabbing, giveUp: 6f);
+			await _bot.WaitUntil(() => chaser.Grabbing, 20, ct);
+			Check("out of the light: it has them again", chaser.Grabbing, $"{chaser.DistanceToPlayer:0.0} m off, them in light {lights.BeamAt(Player.GlobalPosition)}, {TestBot.Flat(Player.GlobalPosition).DistanceTo(TestBot.Flat(lights.Centres[0])):0.0} m from its middle, it {chaser.GlobalPosition}, them {Player.GlobalPosition}");
+			await ExpectReload(ct, 40);
+			return;
+		}
+		Check("caught after the blue light: back standing in it, the lights lit at once", lights.On && lights.BeamAt(Player.GlobalPosition) == 0 && PlayerDeath.Deaths >= 2,
+			$"{Player.GlobalPosition}, in light {lights.BeamAt(Player.GlobalPosition)}, deaths {PlayerDeath.Deaths}");
+		int deaths = PlayerDeath.Deaths;
+		await _bot.WaitUntil(() => chaser.DistanceToPlayer < lights.BeamRadius * 2f + 2f, 20, ct);
+		await _bot.Seconds(4, ct);
+		Check("safe in the light: it waits at the rim and never comes in", chaser.Grabs == 0 && PlayerDeath.Deaths == deaths && chaser.ClosestToLight > 0f && chaser.Body is { ShieldAmount: > 0.8f },
+			$"{chaser.DistanceToPlayer:0.0} m off, {chaser.ClosestToLight:0.00} m off the light, shield {chaser.Body?.ShieldAmount:0.00}");
+		await _bot.Aim(chaser.GlobalPosition + Vector3.Up * 1.8f, ct);
+		Shot("waits_at_the_rim");
+	}
+
+	/// <summary>(2026-10-29) Flat out for the stairs, never stopping for a light: it can't catch them, but it keeps right on
+	/// their heels, and at the foot of the flight it's locked out.</summary>
+	private async Task Act11Sprint(CancellationToken ct)
+	{
+		using (Fast(3)) await _bot.WaitUntil(() => Story.Act11DialogueDone, 40, ct);
+		await Control(ct, 20);
+		var act11 = _bot.FirstOf<Act11Ending>();
+		await _bot.WaitUntil(() => act11?.Pursuer != null, 12, ct);
+		var chaser = act11?.Pursuer;
+		var stairs = act11?.OriginalStairs;
+		Require("it comes after them; the stairs", chaser != null && stairs != null);
+		var foot = stairs.GlobalPosition;
+		var gaps = new System.Collections.Generic.List<float>();
+		ulong start = Time.GetTicksMsec();
+		double clock = 0;
+		bool Sample()
+		{
+			clock = (Time.GetTicksMsec() - start) / 1000.0;
+			if (clock > 6 && !chaser.Grabbing) gaps.Add(chaser.DistanceToPlayer);
+			return chaser.Grabbing;
+		}
+		await _bot.WalkTo(act11.ApproachWorld ?? foot + stairs.GlobalBasis.Z * 6f, 1f, ct, Sample, giveUp: 15f, run: true);
+		await _bot.WalkTo(foot, 0.6f, ct, Sample, giveUp: 10f, run: true);
+		Vector3 up = stairs.ToGlobal(new Vector3(0, stairs.Steps * 0.06f * stairs.Rise + 0.1f, -stairs.Steps * 0.06f * stairs.Run));
+		await _bot.WalkTo(up, 0.6f, ct, Sample, giveUp: 10f);
+		gaps.Sort();
+		float median = gaps.Count > 0 ? gaps[gaps.Count / 2] : 999f, worst = gaps.Count > 0 ? gaps[^1] : 999f;
+		Check("flat out, never stopping: it never caught them", chaser.Grabs == 0 && !PlayerDeath.Dying, $"{(PlayerDeath.Dying ? "caught " : "")}after {clock:0} s");
+		Check("but it stayed right on their heels", median < 10f && worst < 22f, $"median {median:0.0} m, worst {worst:0.0} m, nearest {(gaps.Count > 0 ? gaps[0] : 0):0.0} m over {clock:0} s");
+		await _bot.WaitUntil(() => chaser.StuckAtFoot, 12, ct);
+		Check("locked out at the bottom of the big staircase", chaser.StuckAtFoot, $"{chaser.GlobalPosition.DistanceTo(chaser.FootWorld):0.0} m from the foot");
+		await _bot.Aim(chaser.GlobalPosition + Vector3.Up * 1.8f, ct);
+		await _bot.Seconds(0.5, ct);
+		Shot("locked_out");
 	}
 
 	// ------------------------------------------------------------------ Act 12

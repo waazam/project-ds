@@ -308,9 +308,12 @@ Inside, the player is in a long hallway with overhead fluorescent tubes lining t
 
 **The boots.** Just inside stands a pair of boots with nobody in them, R.H.'s initials inked inside their tops: he took them off here and walked on barefoot (the bare footprints outside are his).
 
-**The lights.** The further the player walks down the hallway, the white tubes start to flicker, then eventually transition to a deep, unsettling fluorescent red.
-- If the player turns around after the red-light trigger, all the lights behind them back to the entrance change to red too, to add to the feeling of the player's sanity slipping.
-- Part way down, once the lamps have begun to fail, they all die at once and the creature is standing right in front of the player. It lunges at their face, and is gone the same instant the lamps snap back red.
+**The lights.** The further the player walks down the hallway, the white tubes start to flicker. Part way down, once the lamps have begun to fail:
+1. The lights cut out with a breaker's clunk. It is dark, but for one lamp far down the hall that sputters back on, red.
+2. The dark holds a few seconds. Then all the red lights come on, one after another, from that far lamp back toward the player and on to the entrance.
+3. A breath of red quiet, then the creature is standing right in front of the player. It lunges at their face and is gone, the red lamps jolting.
+
+The walk stays the player's through the dark and the red; only the lunge holds them. From then on every lamp, back to the entrance, is red.
 
 **The end.** At the end of the hallway, the clean industrial bunker floor gives way to an overgrown, viny door, shut, waiting for the player to push it open (E to interact) and walk inside.
 
@@ -352,10 +355,18 @@ With the screens done and the walkie-talkie in hand, the shut door gives: pushin
 
 The compass points onward, deeper into the woods beyond the bunker, to the stairs: the first staircase is standing there again. On the walk the radio asks *"Are you alone out there?"*
 
-**It followed them out.** The stalker from the bunker's rooms comes out of the bunker's door behind them and keeps to their trail.
-- It is only ever seen when they turn round. Looked at, it freezes where it stands, its head tipping; looked away from, it comes on faster.
-- Near the last staircase it matches their pace. If it gets close it shoves them, hard, spinning them round to face the stairs.
-- It cannot climb: at the foot of the flight it stops, to one side, and stands staring up after them, eyes glowing. It is gone once the cap is back on.
+**It followed them out.** The stalker from the bunker's rooms comes out of the bunker's door behind them. It stands in the doorway a moment, rattling, then it runs them down to the stairs.
+- It keeps to their trail, faster than a walk and slower than a run. Further back than a few strides, it closes. Looked at, its head follows them and its mouth opens, but it does not stop.
+- If it reaches them out of the light, it grabs them from behind and kills them: see *The four lights* below.
+- A player who sprints flat out for the stairs and ignores the lights can still outrun it, but it stays right on their heels the whole way.
+- It cannot climb: at the foot of the flight it is locked out. It stops to one side and stands staring up after them, eyes glowing. It is gone once the cap is back on.
+
+**The four lights.** As it comes out, four spotlights come on one after another, each with a breaker's clunk, beaming straight down from somewhere high in the dark. In order along the way to the big staircase they are blue, purple, a sickly green and blood red.
+- Each is a pool of light on the ground under a shaft of coloured air. The stalker cannot enter a beam. Near one it slows, raises its forearms over its eyes and walks slowly round the rim to keep after them.
+- Standing in a light, the player is safe and gets their breath back. It comes round to the side nearest them and waits there, cringing. Leaving by the far side buys the time it takes to come round.
+- Reaching each light is a checkpoint: a save within checkpoint 8. A death after one comes back standing in the furthest light reached, facing on toward the stairs. Before the first, it comes back at the radio spot.
+
+**The grab.** In reach of them out of the light, it has them from behind. Its rattle is at their ear and the view is yanked back, thrown up and over until they are looking up into its face, upside down, its eyes on theirs. Its long hands come round over their face from either side. Then black, *"It caught you."*, and the latest save.
 
 **The climb.** This time the stairs are far bigger and go impossibly high up into the trees, their top lost in the fog.
 - The player climbs them on their own feet, no pull. The climb is short, about thirty-two seconds, and there is no way back down (a couple of treads up, the way behind is closed).
@@ -648,11 +659,12 @@ None of this is said outright in the game. It is what the game shows, for the te
 ---
 
 ## Deaths
-The game has seven deaths. Each is black and one line, and then the latest save:
+The game has eight deaths. Each is black and one line, and then the latest save:
 
 | Death line | Where | Back to |
 |---|---|---|
 | "Burned Alive" | Act 7, the cabin fire | The cabin door |
+| "It caught you." | Act 11, the chase to the stairs | The furthest light reached, or the radio spot |
 | "The lake took you." | Act 12 | The lake shore |
 | "You drowned." | Act 13, Room 2 | Room 1's button |
 | "It Taketh" | Act 15 | Just past where it first stood |
@@ -701,7 +713,7 @@ The crawler in the stairwell and the arm in the lodge's walls never kill: the st
 | 34 | Act24Finished | The wendigo finished |
 | 1000 | GameFinished | The end |
 
-Three more saves are kept within a checkpoint: at the cabin door in Act 7 (within 5, new), past the stalker in the hall (within 14) and halfway down the road (within 22). Number 11 is retired.
+More saves are kept within a checkpoint: at the cabin door in Act 7 (within 5, new), in each of Act 11's four lights (within 8), past the stalker in the hall (within 14) and halfway down the road (within 22). Number 11 is retired.
 
 ## Stress by act
 From the pacing and tension map (docs/pacing-tension-map.md). 1 is quiet, 5 can kill. Never more than two 4-to-5 acts in a row without a quiet beat.
