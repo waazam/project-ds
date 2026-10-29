@@ -8,8 +8,9 @@ namespace ProjectDS.World.BunkerParts;
 /// Act 8's hallway: a long barrel-vaulted concrete tunnel (Z 0 .. -90) with a
 /// rib every 2.5 m, conduits and sagging cable runs, wet floor strips and
 /// joint lines, and a caged white lamp every 5 m. The lamps follow the story's
-/// light sequence: deeper in they start to flicker, then commit to deep red,
-/// and every lamp behind the player (back to the entrance) goes red with them.
+/// light sequence: deeper in they start to flicker; part way down they all cut out but one, burning red far
+/// down the hall; then every lamp comes back on red, from that one back to the entrance, for good
+/// (BunkerFlow's scare drives that part: <see cref="SoloRed"/>, <see cref="AllRed"/>, <see cref="RedOn"/>).
 /// The far end is swallowed by fog so the tunnel seems to go on forever.
 /// </summary>
 public partial class BunkerHallway : Node3D
@@ -44,7 +45,39 @@ public partial class BunkerHallway : Node3D
 	{
 		if (on && !BlackedOut) BlackoutCount++;
 		BlackedOut = on;
+		if (!on) _soloLamp = -1;
 	}
+
+	/// <summary>(2026-10-29, the owner: "the lights should cut out so it's dark, with just one red light in the distance")
+	/// the one lamp left burning in the blackout, red (-1: none).</summary>
+	private int _soloLamp = -1;
+	/// <summary>For tests: the lamp burning red alone in the dark (-1: none), and how far down the hall it hangs.</summary>
+	public int SoloLamp => _soloLamp;
+	public float SoloLampZ => _soloLamp >= 0 && _soloLamp < _lamps.Count ? _lamps[_soloLamp].Z : 0f;
+
+	/// <summary>The lamp hanging nearest <paramref name="metresIn"/> metres down the hall.</summary>
+	public int LampAt(float metresIn) => Mathf.Clamp(Mathf.RoundToInt(metresIn / LightSpacing - 0.5f), 0, _lamps.Count - 1);
+
+	/// <summary>In the blackout, one lamp comes on red, alone.</summary>
+	public void SoloRed(int lamp)
+	{
+		_soloLamp = lamp;
+		if (lamp >= 0 && lamp < _lamps.Count) _lamps[lamp].Red = true;
+	}
+
+	/// <summary>Every lamp red for good, down the whole hall; <paramref name="litTo"/> limits it to those with an index
+	/// at or above it (the cascade coming back toward the player: lamps past it stay dark till it reaches them).</summary>
+	public void AllRed(int litTo = 0)
+	{
+		RedTriggered = true;
+		_maxDepth = HallLength;
+		_litFrom = litTo;
+		foreach (var l in _lamps) l.Red = true;
+	}
+	/// <summary>While the red comes on lamp by lamp in the blackout: lamps with an index below this are still dark.</summary>
+	private int _litFrom = int.MaxValue;
+	/// <summary>The cascade done: the blackout lifted, every lamp red.</summary>
+	public void RedOn() { _litFrom = int.MaxValue; Blackout(false); }
 
 	public override void _Ready()
 	{
@@ -56,7 +89,7 @@ public partial class BunkerHallway : Node3D
 		BuildDressing();
 	}
 
-	// ------------------------------------------------------------------ light sequence (story: unchanged)
+	// ------------------------------------------------------------------ light sequence
 
 	/// <summary>Only the lamps within this many metres of the player cast light (the glass glows regardless).</summary>
 	public const float LampLightRange = 22f;
@@ -69,8 +102,9 @@ public partial class BunkerHallway : Node3D
 		float frac = Mathf.Clamp(_maxDepth / HallLength, 0f, 1f);
 		if (frac >= RedTriggerFrac) RedTriggered = true;
 
-		foreach (var l in _lamps)
+		for (int i = 0; i < _lamps.Count; i++)
 		{
+			var l = _lamps[i];
 			float depthHere = -l.Z;
 			// Eighteen omnis overlap three deep along the tunnel; only the few near the player need to be lit
 			// (a preview with no player leaves them all on).
@@ -95,7 +129,14 @@ public partial class BunkerHallway : Node3D
 				energy = GD.Randf() < 0.55f ? 0.05f : 2.2f;
 				target = GD.Randf() < 0.7f ? Red : White;
 			}
-			if (BlackedOut) { energy = 0f; target = Colors.Black; }
+			if (BlackedOut)
+			{
+				// dark, but for the one red lamp far down the hall, and then the red coming back on, lamp by lamp
+				bool lit = i == _soloLamp || (i >= _litFrom && _litFrom != int.MaxValue);
+				energy = lit ? 1.6f : 0f;
+				target = lit ? Red : Colors.Black;
+				if (i == _soloLamp) l.Light.Visible = true;   // (out past the lit range: it is all there is to see)
+			}
 			l.Mat.Emission = target;
 			l.Mat.AlbedoColor = target;
 			l.Mat.EmissionEnergyMultiplier = energy;

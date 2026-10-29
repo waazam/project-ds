@@ -80,6 +80,8 @@ public partial class ContinueRoundTripTest : Node
 		new("act10_rooms_scared", Checkpoint.Act8BunkerEntered, F10Scared, "lantern,compass,newel_post,radio;tool=None"),
 		new("act10_walkie_found", Checkpoint.Act10WalkieFound, F10, "lantern,compass,newel_post,radio;tool=None"),
 		new("act10_after_radio", Checkpoint.Act10WalkieFound, F11, "lantern,compass,newel_post,radio;tool=None"),
+		// (2026-10-29) the chase to the stairs: into the purple light (a save within checkpoint 8, the chase's way back)
+		new("act11_light2", Checkpoint.Act10WalkieFound, F11.Concat(new[] { Act11Lights.Flag(0), Act11Lights.Flag(1) }).ToArray(), "lantern,compass,newel_post,radio;tool=None"),
 		new("act11_giant_encounter", Checkpoint.Act11GiantEncounter, F11.Append(StoryManager.Flag.NewelSeated).ToArray(), "lantern,compass,radio;tool=None"),
 		// Act 14's start (Room 3, through the iron door) and end (the chamber under the stairwell)
 		new("act13_finished", Checkpoint.Act13Finished, F13, "lantern,compass,radio;tool=None"),
@@ -248,6 +250,8 @@ public partial class ContinueRoundTripTest : Node
 		await Drive(input, new Vector2(0, 1), 0.6);
 		if (_player.GlobalPosition.DistanceTo(before) < 0.2f) await Drive(input, new Vector2(0, -1), 0.6);
 		Check("player can move", _player.GlobalPosition.DistanceTo(before) > 0.2f, $"{_player.GlobalPosition.DistanceTo(before):0.00} m");
+		if (System.Array.IndexOf(sc.Flags, Act11Lights.Flag(1)) >= 0 && Act11Lights.Instance is { } lights)
+			Check("Act 11's purple light respawns standing in it, all four lit", lights.On && lights.BeamAt(before) == 1, $"{before} vs {lights.Centres[1]}, lit {lights.On}");
 		if (sc.Cp == Checkpoint.Act13Finished && StationInterior.Instance?.Room3 is { } r3)
 			Check("Act 14's start respawns just inside Room 3", before.DistanceTo(r3.EntryWorld) < 1.5f, $"{before} vs {r3.EntryWorld}");
 		bool pastShadow = System.Array.IndexOf(sc.Flags, StoryManager.Flag.Act15PastShadow) >= 0;

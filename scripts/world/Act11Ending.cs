@@ -132,6 +132,14 @@ public partial class Act11Ending : Node3D
 			Systems.ShaderWarmup.Prewarm(this, new Entities.StalkerBody { Name = "PursuerWarmUp", Seed = 2077, Size = 1.08f, Idle = true },
 				b => ((Entities.StalkerBody)b).GlowEyes(new Color(1f, 0.16f, 0.05f), 6f));
 		_original = GetNodeOrNull<StaircaseBuilder>(OriginalStairsPath);
+		// (2026-10-29, the owner: "four spotlights beaming straight down from above ... along the way to the big staircase")
+		// laid out at load, dark: Continue's respawn looks for their markers, and the scatter keeps its trees out of them
+		if (_original != null && GetTree().GetFirstNodeInGroup("bunker_marker") is Node3D bunkerAt)
+		{
+			Lights = new Act11Lights { Name = "Act11Lights" };
+			AddChild(Lights);
+			Lights.Build(bunkerAt.GlobalTransform * new Vector3(0, 0, 16f), _original.ToGlobal(new Vector3(0, 0, 1.5f)));
+		}
 		SetProcess(false);   // only while the way up is open
 		Callable.From(Restore).CallDeferred();
 		if (StoryManager.Instance is { } s)
@@ -407,6 +415,8 @@ public partial class Act11Ending : Node3D
 
 	/// <summary>For tests: the thing from the bunker, following them to the stairs.</summary>
 	public Act11Pursuer Pursuer { get; private set; }
+	/// <summary>The four lights on the way to the stairs (null: no bunker in this level).</summary>
+	public Act11Lights Lights { get; private set; }
 
 	/// <summary>The thing from the bunker's rooms comes out after them (the owner's addition): out of the
 	/// bunker's door if they are still near it, otherwise somewhere behind them, well back.</summary>
@@ -417,7 +427,8 @@ public partial class Act11Ending : Node3D
 		if (player == null) return;
 		var bunker = GetTree().GetFirstNodeInGroup("bunker_marker") as Node3D;
 		Vector3 at;
-		if (bunker != null && bunker.GlobalPosition.DistanceTo(player.GlobalPosition) < 45f) at = bunker.GlobalTransform * new Vector3(0, 0, 3f);
+		bool outOfTheDoor = bunker != null && bunker.GlobalPosition.DistanceTo(player.GlobalPosition) < 45f;
+		if (outOfTheDoor) at = bunker.GlobalTransform * new Vector3(0, 0, 3f);
 		else
 		{
 			Vector3 back = player.CameraRig != null ? player.CameraRig.GlobalBasis.Z with { Y = 0 } : Vector3.Back;
@@ -425,9 +436,11 @@ public partial class Act11Ending : Node3D
 		}
 		var terrain = GroundSnap.FindTerrain(this);
 		if (terrain != null) at.Y = terrain.HeightAt(at.X, at.Z);
-		Pursuer = new Act11Pursuer { Name = "Act11Pursuer", Stairs = _original };
+		Pursuer = new Act11Pursuer { Name = "Act11Pursuer", Stairs = _original, Lights = Lights, OutOfTheDoor = outOfTheDoor };
 		Cutscene.SceneRoot(this).AddChild(Pursuer);
 		Pursuer.GlobalPosition = at;
+		// the way drawn in coloured light as it comes out (lit at once on a Continue: the chase is already on)
+		Lights?.SwitchOn(!outOfTheDoor);
 		GD.Print("[story] Act 11: the thing from the bunker follows them out");
 	}
 
