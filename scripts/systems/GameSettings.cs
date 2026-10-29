@@ -41,13 +41,39 @@ public partial class GameSettings : Node
 	/// <summary>(2026-10-22) The fog's grain: fine (a 96 x 96 x 96 grid: the dense banks and the lit layers smooth) or standard
 	/// (Godot's 64: about a third of the cost, for a slower graphics card). Applied by ForestAtmosphere.</summary>
 	public bool FineFog = true;
-	/// <summary>The picture's brightness: a gamma over the finished image (1 as designed, 0.7 darker to 1.5 lighter;
-	/// it lifts the dark and the mids, not the whites). For a dark monitor or a bright room.</summary>
+	/// <summary>The picture's brightness without HDR: a gamma over the finished image (1 as designed; up lifts the dark and
+	/// the mids, not the whites). Set on the calibration screen against three marks just above black (2026-10-29, the
+	/// friend's playtest: "the brightness slider is bullshit and needs calibrations for HDR and without HDR": the old
+	/// 0.7-1.5 range barely moved the game's near-black, which the finish's 40 colour steps round to black).</summary>
 	public float Brightness = 1f;
-	public const float BrightnessMin = 0.7f, BrightnessMax = 1.5f;
+	public const float BrightnessMin = 0.6f, BrightnessMax = 2.4f;
 	/// <summary>(2026-10-12, the owner's suggestion B) Whether the brightness has been set on the screen before the first new
 	/// game (shown once).</summary>
 	public bool BrightnessCalibrated;
+	/// <summary>(2026-10-29) HDR output, asked of the display (only offered where the screen and the driver support it; off
+	/// by default, so a player without HDR never meets it). On, the picture is set by the three below instead of
+	/// <see cref="Brightness"/>.</summary>
+	public bool HdrOutput
+	{
+		get => _hdrOutput;
+		set { _hdrOutput = value; ApplyHdr(); }
+	}
+	private bool _hdrOutput;
+	/// <summary>HDR: the paper white, in nits: how bright the game's white (and so the whole picture, and the HUD) is.</summary>
+	public float HdrPaperWhite = 200f;
+	public const float PaperWhiteMin = 80f, PaperWhiteMax = 500f;
+	/// <summary>HDR: the peak, in nits: how far the brightest highlights (the flame, the lightning) may climb. Set where the
+	/// calibration's bright mark stops getting brighter (the display's own limit).</summary>
+	public float HdrPeak = 1000f;
+	public const float PeakMin = 400f, PeakMax = 4000f;
+	/// <summary>HDR: the black level, a gamma on the shadows only (1 as designed; up lifts the near-black).</summary>
+	public float HdrBlackLevel = 1f;
+	public const float BlackLevelMin = 0.6f, BlackLevelMax = 2.4f;
+	/// <summary>Whether this screen can show HDR (the display server has it and the window's screen reports it).</summary>
+	public static bool HdrSupported =>
+		DisplayServer.GetName() != "headless" && DisplayServer.HasFeature(DisplayServer.Feature.HdrOutput) && DisplayServer.WindowIsHdrOutputSupported();
+	/// <summary>Whether HDR is on right now (asked for and the display gave it).</summary>
+	public bool HdrActive => _hdrOutput && DisplayServer.GetName() != "headless" && DisplayServer.WindowIsHdrOutputEnabled();
 	/// <summary>The lantern's strength (1 as designed): its glow and its beam, for a dark monitor (2026-10-07).</summary>
 	public float LanternBrightness = 1f;
 	/// <summary>The HUD's neon (UI.NeonKit.Names): 0 white (the default), green, red, purple, blue, yellow, orange.</summary>
@@ -56,8 +82,12 @@ public partial class GameSettings : Node
 	/// compass and the inventory only while they're wanted (standing still, a new objective, a switch, a pickup), else
 	/// faded out. Off: always shown.</summary>
 	public bool ContextualHud = true;
-	/// <summary>The camera's focus pulled to what's looked at (a soft depth of field).</summary>
-	public bool FocusPull = true;
+	/// <summary>(2026-10-29, the friend's playtest: the depth of field "looks horrible") How much the focus pull softens what's
+	/// off focus: 0 off, 1 low (the default: a hint, past the focus only), 2 medium, 3 high (the old strength).</summary>
+	public int DepthOfField = 1;
+	public static readonly string[] DepthOfFieldNames = { "off", "low", "medium", "high" };
+	/// <summary>The camera's focus pulled to what's looked at (a soft depth of field): any depth of field at all.</summary>
+	public bool FocusPull => DepthOfField > 0;
 	/// <summary>(2026-10-11, accessibility) How much the camera shakes (0 none .. 1 full).</summary>
 	public float ScreenShake = 1f;
 	/// <summary>(2026-10-11, accessibility) Captions for the sounds that matter: "[knocking]", "[a howl, far off]".</summary>
@@ -115,6 +145,42 @@ public partial class GameSettings : Node
 		}
 		else DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
 	}
+	/// <summary>(2026-10-29) Asks the display for HDR (or gives it back) and sets its paper white and peak from the calibration;
+	/// the 2D goes to linear light with headroom past white while it's on. The finish (ps2_post, through CinemaFrame) follows
+	/// <see cref="HdrActive"/>. A screen without HDR is never touched.</summary>
+	public void ApplyHdr()
+	{
+		if (!IsInsideTree() || AutoTest || Trailer || DisplayServer.GetName() == "headless") return;
+		bool want = _hdrOutput && HdrSupported;
+		if (DisplayServer.WindowIsHdrOutputRequested() != want) DisplayServer.WindowRequestHdrOutput(want);
+		if (want)
+		{
+			DisplayServer.WindowSetHdrOutputReferenceLuminance(HdrPaperWhite);
+			DisplayServer.WindowSetHdrOutputMaxLuminance(HdrPeak);
+		}
+		// the 2D in linear light only once the display has really gone HDR (a screen that can, with the system's HDR off,
+		// says it's supported and then never turns it on: the menus would wash out): checked again a moment later
+		SyncHdr2D();
+		GetTree().CreateTimer(0.6, true, false, true).Timeout += SyncHdr2D;
+	}
+
+	private void SyncHdr2D()
+	{
+		if (!IsInsideTree()) return;
+		var root = GetTree().Root;
+		bool on = HdrActive;
+		if (root.UseHdr2D != on) root.UseHdr2D = on;
+	}
+
+	/// <summary>The paper white and the peak the display itself reports (where the HDR calibration starts).</summary>
+	public void HdrFromDisplay()
+	{
+		if (DisplayServer.GetName() == "headless") return;
+		float paper = DisplayServer.WindowGetHdrOutputCurrentReferenceLuminance(), peak = DisplayServer.WindowGetHdrOutputCurrentMaxLuminance();
+		if (paper > 1f) HdrPaperWhite = Mathf.Clamp(paper, PaperWhiteMin, PaperWhiteMax);
+		if (peak > 1f) HdrPeak = Mathf.Clamp(peak, PeakMin, PeakMax);
+	}
+
 	private bool _crtFilter = true;
 	/// <summary>The CRT look: the game's 360 lines drawn as a TV's scanlines, a slight colour fringe and a darker
 	/// grade. It draws the 2D and the finish at the window's full resolution, while the 3D still renders at 360
@@ -251,10 +317,14 @@ public partial class GameSettings : Node
 		cfg.SetValue("display", "fine_fog", FineFog);
 		cfg.SetValue("display", "brightness", Brightness);
 		cfg.SetValue("display", "brightness_calibrated", BrightnessCalibrated);
+		cfg.SetValue("display", "hdr_output", _hdrOutput);
+		cfg.SetValue("display", "hdr_paper_white", HdrPaperWhite);
+		cfg.SetValue("display", "hdr_peak", HdrPeak);
+		cfg.SetValue("display", "hdr_black_level", HdrBlackLevel);
 		cfg.SetValue("display", "lantern_brightness", LanternBrightness);
 		cfg.SetValue("display", "hud_neon", HudColor);
 		cfg.SetValue("display", "hud_contextual", ContextualHud);
-		cfg.SetValue("display", "focus_pull", FocusPull);
+		cfg.SetValue("display", "depth_of_field", DepthOfField);
 		cfg.SetValue("accessibility", "screen_shake", ScreenShake);
 		cfg.SetValue("accessibility", "sound_captions", SoundCaptions);
 		cfg.SetValue("accessibility", "hint_size", HintSize);
@@ -293,10 +363,17 @@ public partial class GameSettings : Node
 		FineFog = (bool)cfg.GetValue("display", "fine_fog", FineFog);
 		Brightness = Mathf.Clamp((float)cfg.GetValue("display", "brightness", Brightness), BrightnessMin, BrightnessMax);
 		BrightnessCalibrated = (bool)cfg.GetValue("display", "brightness_calibrated", BrightnessCalibrated);
+		// (a file from before the calibration screen: the brightness asked for again, on it)
+		if (!cfg.HasSectionKey("display", "hdr_output")) BrightnessCalibrated = false;
+		_hdrOutput = (bool)cfg.GetValue("display", "hdr_output", _hdrOutput);
+		HdrPaperWhite = Mathf.Clamp((float)cfg.GetValue("display", "hdr_paper_white", HdrPaperWhite), PaperWhiteMin, PaperWhiteMax);
+		HdrPeak = Mathf.Clamp((float)cfg.GetValue("display", "hdr_peak", HdrPeak), PeakMin, PeakMax);
+		HdrBlackLevel = Mathf.Clamp((float)cfg.GetValue("display", "hdr_black_level", HdrBlackLevel), BlackLevelMin, BlackLevelMax);
 		LanternBrightness = Mathf.Clamp((float)cfg.GetValue("display", "lantern_brightness", LanternBrightness), LanternMin, LanternMax);
 		HudColor = Mathf.Clamp((int)cfg.GetValue("display", "hud_neon", HudColor), 0, 6);
 		ContextualHud = (bool)cfg.GetValue("display", "hud_contextual", ContextualHud);
-		FocusPull = (bool)cfg.GetValue("display", "focus_pull", FocusPull);
+		// (the old on/off focus pull: off stays off)
+		DepthOfField = Mathf.Clamp((int)cfg.GetValue("display", "depth_of_field", (bool)cfg.GetValue("display", "focus_pull", true) ? DepthOfField : 0), 0, 3);
 		ScreenShake = Mathf.Clamp((float)cfg.GetValue("accessibility", "screen_shake", ScreenShake), 0f, 1f);
 		SoundCaptions = (bool)cfg.GetValue("accessibility", "sound_captions", SoundCaptions);
 		HintSize = Mathf.Clamp((int)cfg.GetValue("accessibility", "hint_size", HintSize), 0, 2);
@@ -377,6 +454,7 @@ public partial class GameSettings : Node
 		ApplyShadows();
 		GetTree().Root.SizeChanged += OnRootSizeChanged;
 		ApplyDisplay();
+		if (_hdrOutput) Callable.From(ApplyHdr).CallDeferred();
 	}
 
 	// ------------------------------------------------------------------ the settings' round trip (a test)
@@ -387,9 +465,9 @@ public partial class GameSettings : Node
 		["mouse"] = MouseSensitivity.ToString("0.00000"), ["stick"] = StickSensitivity.ToString("0.000"), ["invert_y"] = InvertY.ToString(),
 		["distance"] = CameraDistance.ToString("0.000"), ["camera"] = Camera.ToString(), ["volume"] = _masterVolume.ToString("0.000"),
 		["reduce_flashing"] = ReduceFlashing.ToString(), ["head_motion"] = HeadMotion.ToString(), ["bars"] = CinemaBars.ToString(),
-		["fog_lighting"] = FogLighting.ToString(), ["fine_fog"] = FineFog.ToString(),["brightness"] = Brightness.ToString("0.000"), ["lantern"] = LanternBrightness.ToString("0.000"),
+		["fog_lighting"] = FogLighting.ToString(), ["fine_fog"] = FineFog.ToString(),["brightness"] = Brightness.ToString("0.000"), ["hdr"] = _hdrOutput.ToString(), ["paper_white"] = HdrPaperWhite.ToString("0"), ["peak"] = HdrPeak.ToString("0"), ["black_level"] = HdrBlackLevel.ToString("0.000"), ["lantern"] = LanternBrightness.ToString("0.000"),
 		["crt"] = _crtFilter.ToString(), ["shadows"] = _shadows.ToString(), ["windowed"] = _windowed.ToString(), ["window"] = _windowSize.ToString(),
-		["hud_color"] = HudColor.ToString(), ["shake"] = ScreenShake.ToString("0.00"), ["captions"] = SoundCaptions.ToString(), ["hold_crouch"] = HoldToCrouch.ToString(), ["body"] = BodyInView.ToString(), ["hud_contextual"] = ContextualHud.ToString(), ["focus_pull"] = FocusPull.ToString(), ["hint_size"] = HintSize.ToString(),
+		["hud_color"] = HudColor.ToString(), ["shake"] = ScreenShake.ToString("0.00"), ["captions"] = SoundCaptions.ToString(), ["hold_crouch"] = HoldToCrouch.ToString(), ["body"] = BodyInView.ToString(), ["hud_contextual"] = ContextualHud.ToString(), ["depth_of_field"] = DepthOfField.ToString(), ["hint_size"] = HintSize.ToString(),
 	};
 
 	private void SetFields(float mouse, float stick, bool inv, float dist, float vol, bool flash, bool head, bool bars, bool fog, float bright, float lantern, bool crt, int shadows, bool windowed, Vector2I size)
@@ -412,13 +490,16 @@ public partial class GameSettings : Node
 		string backup = Godot.FileAccess.FileExists(SavePath) ? Godot.FileAccess.GetFileAsString(SavePath) : null;
 		var before = Snapshot();
 		var keep = (MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera);
-		int keepHud = HudColor; bool keepCtx = ContextualHud, keepFocus = FocusPull, keepCap = SoundCaptions, keepHold = HoldToCrouch, keepBody = BodyInView; float keepShake = ScreenShake; int keepHint = HintSize;
+		int keepHud = HudColor; bool keepCtx = ContextualHud, keepCap = SoundCaptions, keepHold = HoldToCrouch, keepBody = BodyInView; float keepShake = ScreenShake; int keepHint = HintSize, keepDof = DepthOfField;
+		var keepHdr = (_hdrOutput, HdrPaperWhite, HdrPeak, HdrBlackLevel);
 		SetFields(0.0042f, 3.3f, !InvertY, 3.1f, 0.63f, !ReduceFlashing, !HeadMotion, !CinemaBars, !FogLighting, 1.25f, 1.35f, !_crtFilter, (_shadows + 1) % 3, !_windowed, new Vector2I(1280, 720));
-		HudColor = (keepHud + 3) % 7; ContextualHud = !keepCtx; FocusPull = !keepFocus; SoundCaptions = !keepCap; HoldToCrouch = !keepHold; BodyInView = !keepBody; ScreenShake = 0.35f; HintSize = (keepHint + 1) % 3;
+		HudColor = (keepHud + 3) % 7; ContextualHud = !keepCtx; DepthOfField = (keepDof + 2) % 4; SoundCaptions = !keepCap; HoldToCrouch = !keepHold; BodyInView = !keepBody; ScreenShake = 0.35f; HintSize = (keepHint + 1) % 3;
+		_hdrOutput = !keepHdr._hdrOutput; HdrPaperWhite = 310f; HdrPeak = 1450f; HdrBlackLevel = 1.3f;
 		var want = Snapshot();
 		Save();
 		SetFields(0.001f, 1f, false, 2f, 1f, false, true, true, true, 1f, 1f, true, 1, false, new Vector2I(1600, 900));
-		HudColor = 0; ContextualHud = keepCtx; FocusPull = keepFocus; SoundCaptions = keepCap; HoldToCrouch = keepHold; BodyInView = keepBody; ScreenShake = 1f; HintSize = keepHint;
+		HudColor = 0; ContextualHud = keepCtx; DepthOfField = keepDof; SoundCaptions = keepCap; HoldToCrouch = keepHold; BodyInView = keepBody; ScreenShake = 1f; HintSize = keepHint;
+		(_hdrOutput, HdrPaperWhite, HdrPeak, HdrBlackLevel) = keepHdr;
 		LoadFile();
 		var got = Snapshot();
 		int bad = 0;
@@ -430,7 +511,8 @@ public partial class GameSettings : Node
 		}
 		// the player's own settings back, and their file
 		(MouseSensitivity, StickSensitivity, InvertY, CameraDistance, _masterVolume, ReduceFlashing, HeadMotion, CinemaBars, FogLighting, Brightness, LanternBrightness, _crtFilter, _shadows, _windowed, _windowSize, Camera) = keep;
-		HudColor = keepHud; ContextualHud = keepCtx; FocusPull = keepFocus; SoundCaptions = keepCap; HoldToCrouch = keepHold; BodyInView = keepBody; ScreenShake = keepShake; HintSize = keepHint;
+		HudColor = keepHud; ContextualHud = keepCtx; DepthOfField = keepDof; SoundCaptions = keepCap; HoldToCrouch = keepHold; BodyInView = keepBody; ScreenShake = keepShake; HintSize = keepHint;
+		(_hdrOutput, HdrPaperWhite, HdrPeak, HdrBlackLevel) = keepHdr;
 		if (backup != null) { using var f = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Write); f?.StoreString(backup); }
 		else DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
 		GD.Print($"[settings-test] {want.Count - bad}/{want.Count} settings survive a restart; the player's own put back ({(Snapshot()["brightness"] == before["brightness"] ? "unchanged" : "CHANGED")})");

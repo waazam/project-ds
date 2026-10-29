@@ -332,16 +332,20 @@ public static class UiKit
 		AddToggle(box, "Hold to crouch", s.HoldToCrouch, on => s.HoldToCrouch = on);
 		AddToggle(box, "Body in view", s.BodyInView, on => s.BodyInView = on);
 		AddToggle(box, "Head motion", s.HeadMotion, on => s.HeadMotion = on);
-		var strip = new BrightnessStrip { Gamma = s.Brightness };
-		AddSlider(box, "Brightness", GameSettings.BrightnessMin, GameSettings.BrightnessMax, s.Brightness, v => { s.Brightness = (float)v; strip.Gamma = (float)v; strip.QueueRedraw(); }, 0.05,
-			v => $"{Mathf.RoundToInt((float)v * 100f)}%");
-		box.AddChild(strip);
+		// (2026-10-29, the friend's playtest: "the brightness slider is bullshit and needs calibrations for HDR and without
+		// HDR") the brightness set on its own calibration screen, the HDR's paper white and peak there too
+		var calibrate = new MenuItem { Text = "Brightness..." };
+		calibrate.Pressed += () => BrightnessCalibration.Open(calibrate, () => calibrate.CallDeferred(Control.MethodName.GrabFocus));
+		calibrate.MouseEntered += () => calibrate.GrabFocus();
+		box.AddChild(calibrate);
 		AddSlider(box, "Lantern", GameSettings.LanternMin, GameSettings.LanternMax, s.LanternBrightness, v => s.LanternBrightness = (float)v, 0.05,
 			v => $"{Mathf.RoundToInt((float)v * 100f)}%");
 		AddSlider(box, "HUD glow", 0, NeonKit.Names.Length - 1, s.HudColor, v => s.HudColor = Mathf.RoundToInt(v), 1,
 			v => NeonKit.Names[Mathf.Clamp(Mathf.RoundToInt(v), 0, NeonKit.Names.Length - 1)]);
 		AddToggle(box, "HUD only when needed", s.ContextualHud, on => s.ContextualHud = on);
-		AddToggle(box, "Focus pull", s.FocusPull, on => s.FocusPull = on);
+		// (2026-10-29, the friend's playtest: the depth of field "looks horrible") off to subtle, low by default
+		AddSlider(box, "Depth of field", 0, GameSettings.DepthOfFieldNames.Length - 1, s.DepthOfField, v => s.DepthOfField = Mathf.RoundToInt(v), 1,
+			v => GameSettings.DepthOfFieldNames[Mathf.Clamp(Mathf.RoundToInt(v), 0, GameSettings.DepthOfFieldNames.Length - 1)]);
 		AddToggle(box, "Cinematic bars", s.CinemaBars, on => s.CinemaBars = on);
 		// the window: fullscreen at the screen's own resolution, or a window of a chosen size
 		AddToggle(box, "Windowed", s.Windowed, on => s.Windowed = on);
@@ -396,43 +400,4 @@ public static class UiKit
 		SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
 		MouseFilter = Control.MouseFilterEnum.Ignore,
 	};
-}
-
-/// <summary>(2026-10-12) The brightness screen's mark: a hooded figure's outline (the game's own dread) drawn in a grey only just
-/// above black, through the picture's gamma, on black. Set right, it's barely there.</summary>
-public partial class CalibrationMark : Control
-{
-	public float Gamma = 1f;
-	public CalibrationMark() { CustomMinimumSize = new Vector2(0, 120); MouseFilter = MouseFilterEnum.Ignore; }
-
-	public override void _Draw()
-	{
-		float v = Mathf.Pow(0.035f, 1f / Mathf.Max(Gamma, 0.1f));
-		var c = new Color(v, v, v);
-		var mid = new Vector2(Size.X * 0.5f, 8f);
-		// the head and the shoulders, a figure standing in the dark
-		DrawCircle(mid + new Vector2(0, 22f), 15f, c);
-		DrawColoredPolygon(new[] { mid + new Vector2(-12f, 34f), mid + new Vector2(12f, 34f), mid + new Vector2(34f, 66f), mid + new Vector2(40f, 110f), mid + new Vector2(-40f, 110f), mid + new Vector2(-34f, 66f) }, c);
-	}
-}
-
-/// <summary>Under the brightness slider: six squares from black up through the darkest greys, drawn through the same gamma as
-/// the picture, and a line saying how to set it ("the second square just visible"). For a dark monitor (2026-10-07).</summary>
-public partial class BrightnessStrip : Control
-{
-	public float Gamma = 1f;
-	private static readonly float[] Levels = { 0.0f, 0.02f, 0.045f, 0.08f, 0.14f, 0.24f };
-
-	public BrightnessStrip() { CustomMinimumSize = new Vector2(0, 30); MouseFilter = MouseFilterEnum.Ignore; }
-
-	public override void _Draw()
-	{
-		float sz = 14f, gap = 4f, x = 122f;
-		for (int i = 0; i < Levels.Length; i++)
-		{
-			float v = Mathf.Pow(Levels[i], 1f / Mathf.Max(Gamma, 0.1f));
-			DrawRect(new Rect2(x + i * (sz + gap), 1f, sz, sz), new Color(v, v, v));
-		}
-		DrawString(ThemeDB.FallbackFont, new Vector2(x, 28f), "set it so the second square is only just visible", HorizontalAlignment.Left, -1, 9, new Color(0.6f, 0.6f, 0.62f));
-	}
 }

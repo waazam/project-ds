@@ -17,8 +17,6 @@ public partial class MainMenu : Node
 	private Control _settingsShade;
 	private Control _firstItem;
 	private Control _firstSetting;
-	private Control _calibBox;
-	private Control _calibFirst;
 
 	public override void _Ready()
 	{
@@ -129,54 +127,14 @@ public partial class MainMenu : Node
 		_settingsBox.Visible = false;
 		root.AddChild(_settingsBox);
 
-		_calibBox = BuildCalibration();
-		_calibBox.Visible = false;
-		root.AddChild(_calibBox);
-
 		_firstItem.CallDeferred(Control.MethodName.GrabFocus);
 	}
 
-	/// <summary>The brightness, set before the first game: a black screen, a mark drawn only just above black, and the
-	/// slider; "Begin" saves it and starts. (The game is dark by design; on a dark monitor it's unplayably so.)</summary>
-	private Control BuildCalibration()
-	{
-		var s = GameSettings.Instance;
-		var shade = new ColorRect { Color = Colors.Black };
-		shade.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-		box.SetAnchorsPreset(Control.LayoutPreset.Center);
-		box.OffsetLeft = -170; box.OffsetRight = 170; box.OffsetTop = -150; box.OffsetBottom = 150;
-		box.GrowHorizontal = Control.GrowDirection.Both; box.GrowVertical = Control.GrowDirection.Both;
-		box.AddThemeConstantOverride("separation", 8);
-		shade.AddChild(box);
-		box.AddChild(UiKit.MakeLabel("BRIGHTNESS", UiKit.HeadingLabel, HorizontalAlignment.Center));
-		box.AddChild(UiKit.Rule(150));
-		var mark = new CalibrationMark { Gamma = s.Brightness };
-		box.AddChild(mark);
-		box.AddChild(UiKit.MakeLabel("Raise it until the mark is only just visible.", null, HorizontalAlignment.Center));
-		var strip = new BrightnessStrip { Gamma = s.Brightness };
-		var slider = UiKit.AddSlider(box, "Brightness", GameSettings.BrightnessMin, GameSettings.BrightnessMax, s.Brightness, v =>
-		{
-			s.Brightness = (float)v; strip.Gamma = mark.Gamma = (float)v; strip.QueueRedraw(); mark.QueueRedraw();
-		}, 0.05, v => $"{Mathf.RoundToInt((float)v * 100f)}%");
-		_calibFirst = slider;
-		box.AddChild(strip);
-		box.AddChild(new Control { CustomMinimumSize = new Vector2(0, 6) });
-		box.AddChild(UiKit.MakeButton("Begin", () =>
-		{
-			s.BrightnessCalibrated = true;
-			s.Save();
-			StoryManager.Instance.StartNewGame();
-		}, true));
-		return shade;
-	}
-
-	private void ShowCalibration()
-	{
-		_calibBox.Visible = true;
-		_menuBox.Visible = false;
-		_calibFirst?.CallDeferred(Control.MethodName.GrabFocus);
-	}
+	/// <summary>The brightness, set before the first game on the calibration screen (2026-10-29: three figures just above
+	/// black, and HDR's own where the screen has it); "Begin" saves it and starts. (The game is dark by design; on a dark
+	/// monitor it's unplayably so.)</summary>
+	private void ShowCalibration() =>
+		BrightnessCalibration.Open(_menuBox, () => _firstItem?.CallDeferred(Control.MethodName.GrabFocus), () => StoryManager.Instance.StartNewGame(), "Begin");
 
 	private Control BuildMenu()
 	{
@@ -239,15 +197,7 @@ public partial class MainMenu : Node
 
 	public override void _UnhandledInput(InputEvent e)
 	{
-		// Esc / B backs out of the brightness screen, or the settings.
-		if (_calibBox != null && _calibBox.Visible && e.IsActionPressed("ui_cancel"))
-		{
-			_calibBox.Visible = false;
-			_menuBox.Visible = true;
-			_firstItem?.CallDeferred(Control.MethodName.GrabFocus);
-			GetViewport().SetInputAsHandled();
-			return;
-		}
+		// Esc / B backs out of the settings (the brightness screen backs out of itself).
 		if (_settingsBox != null && _settingsBox.Visible && e.IsActionPressed("ui_cancel"))
 		{
 			GameSettings.Instance.Save();
