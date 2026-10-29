@@ -53,17 +53,36 @@ public partial class KeyPieceCache : Node3D
 		{
 			"metal" => ProcTextures.MetalMat,
 			"rust" => RustMat,
+			"moss_rock" => CairnMoss,
 			_ => null,
 		});
 
 	private static StandardMaterial3D _rust;
 	private static StandardMaterial3D RustMat => _rust ??= new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.19f, 0.1f), Roughness = 0.95f, Metallic = 0.15f };
+	/// <summary>(2026-10-29, the playtest: "the cairn should look older: greener mossy stones") the woods' mossy stone, carpeted.</summary>
+	private static ShaderMaterial _moss;
+	private static ShaderMaterial CairnMoss => _moss ??= MossierRock();
+	private static ShaderMaterial MossierRock()
+	{
+		var m = (ShaderMaterial)ProcTextures.MossRockMat.Duplicate();
+		m.SetShaderParameter("moss_amount", 0.82f);
+		return m;
+	}
 
 	public override void _Ready()
 	{
 		var terrain = GroundSnap.FindTerrain(this);
 		if (terrain != null) GlobalPosition = GlobalPosition with { Y = terrain.HeightAt(GlobalPosition.X, GlobalPosition.Z) };
 		Build();
+		// (2026-10-29: the cairn's tin lies most of a metre out from its middle: on a slope it was under the ground there, or over
+		// it; on the ground where it lies, once the lot has set this down where it goes, after this)
+		if (terrain != null && Hide == Place.Cairn && _tin != null)
+			Callable.From(() =>
+			{
+				if (!IsInstanceValid(_tin)) return;
+				var t = _tin.GlobalPosition;
+				_tin.GlobalPosition = t with { Y = terrain.HeightAt(t.X, t.Z) + 0.01f };
+			}).CallDeferred();
 		if (StoryManager.Instance is { } s && s.HasFlag(StoryManager.Flag.KeyPiece(Piece))) SetTaken();
 	}
 
@@ -77,6 +96,9 @@ public partial class KeyPieceCache : Node3D
 			// the hollow snag, its torn-low side toward the last arrow (this node's +Z); the tin on the rot inside, nailed
 			// through its back into the wall
 			if (AddModel(this, "HollowStump", Transform3D.Identity, "Stump") == null) FallbackStump();
+			// (2026-10-29, the playtest: this half "took too long" to find) the trail's last diamond on the stump itself, facing the
+			// last tree, its long point down into it
+			UvInk.OnTrunk(this, 0.5f, 0f, 0.38f, 0.26f, 0.34f, UvInk.Diamond(0), UvInk.Cyan, 2.8f, false, 0f, Mathf.Pi);
 			body.SetMeta("surface", "wood");
 			// (low, so the look down into it isn't stopped: the pick sphere sits over its top)
 			body.AddChild(new CollisionShape3D { Position = new Vector3(0, 0.22f, 0), Shape = new CylinderShape3D { Radius = 0.4f, Height = 0.44f } });
@@ -88,8 +110,8 @@ public partial class KeyPieceCache : Node3D
 			// CairnScale times the model; the tin stays its own size, in the gap at the front of its foot
 			const float S = CairnScale;
 			if (AddModel(this, "Cairn", new Transform3D(Basis.Identity.Scaled(Vector3.One * S), Vector3.Zero), "Cairn") is { } cairn)
-				// paler stone than the woods' (it read as a dark lump in the storm's murk)
-				cairn.MaterialOverlay = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.53f, 0.48f, 0.1f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.95f, BlendMode = BaseMaterial3D.BlendModeEnum.Add };
+				// a little lighter than the woods' stone (it read as a dark lump in the storm's murk), toward the moss's green
+				cairn.MaterialOverlay = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.5f, 0.36f, 0.1f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.95f, BlendMode = BaseMaterial3D.BlendModeEnum.Add };
 			else FallbackCairn(S);
 			body.SetMeta("surface", "stone");
 			// (behind the tin's gap, so nothing stands between it and a look from the front)
@@ -130,7 +152,8 @@ public partial class KeyPieceCache : Node3D
 		_use = new Interactable
 		{
 			// (2026-10-19: 0.17 m was a fiddly target down in the snag, found a second late even by the test's aim; about the glint's size now)
-			Name = "Use", Prompt = "Open the tin", MaxDistance = 2.4f, PickRadius = 0.26f, PickOffset = new Vector3(0, 0.04f, 0),
+			Name = "Use", Prompt = "Open the tin", MaxDistance = 2.8f,   // (2026-10-29: 2.4 m didn't reach a tin on the ground from a standing eye on a slope)
+			PickRadius = 0.26f, PickOffset = new Vector3(0, 0.04f, 0),
 		};
 		_tin.AddChild(_use);
 		_use.Interacted += OnUse;

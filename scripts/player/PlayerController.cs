@@ -31,6 +31,9 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float CrouchTime = 0.25f;
 	/// <summary>0..1 drag on the player's speed from wading (Act 17's sewer water sets it; 1 = none).</summary>
 	public float WadeScale { get; set; } = 1f;
+	/// <summary>(2026-10-29, the playtest: the hammer "looks like a mini hammer"; it is a sledge now, and "carrying it slows the
+	/// walk") The pace with the sledge in hand, walking or running: a ten-pound head on a long handle.</summary>
+	[Export] public float SledgeSpeedScale = 0.72f;
 	/// <summary>How quickly speed builds toward the target (an exponential rate per second: 3.5 reaches
 	/// about 70% in a third of a second, all of it in about a second).</summary>
 	[Export] public float Acceleration = 3.5f;
@@ -194,6 +197,7 @@ public partial class PlayerController : CharacterBody3D
 		// holding still to work something (a held interaction) plants the feet
 		bool planted = Interaction?.Holding ?? false;
 		float pace = IsRunning ? RunSpeed : WalkSpeed * Mathf.Lerp(1f, CrouchSpeedScale, CrouchAmount);
+		if (Inventory?.InHand == ToolKind.Hammer) pace *= SledgeSpeedScale;
 		float targetSpeed = planted ? 0f : pace * move.Length() * dirScale * WadeScale;
 		Vector3 targetVel = wish.LengthSquared() > 0.0001f ? wish.Normalized() * targetSpeed : Vector3.Zero;
 

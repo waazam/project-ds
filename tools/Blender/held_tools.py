@@ -162,8 +162,11 @@ class Part:
             sm = ob.modifiers.new("subd", "SUBSURF")
             sm.levels = subdiv
             sm.render_levels = subdiv
-        me.use_auto_smooth = True
-        me.auto_smooth_angle = math.radians(50)
+        if hasattr(me, "use_auto_smooth"):
+            me.use_auto_smooth = True
+            me.auto_smooth_angle = math.radians(50)
+        elif hasattr(me, "set_sharp_from_angle"):   # (Blender 4.1+: the auto smooth is gone; the same edges marked sharp)
+            me.set_sharp_from_angle(angle=math.radians(50))
         if weighted:
             wn = ob.modifiers.new("wn", "WEIGHTED_NORMAL")
             wn.keep_sharp = True
@@ -246,46 +249,54 @@ def axe(M):
     return p.finish(M)
 
 
-# ------------------------------------------------------------------ the hammer
+# ------------------------------------------------------------------ the hammer (a sledge)
 
 
 def hammer(M):
+    """(2026-10-29, the owner's friend: "the hammer looks like a mini hammer") A ten-pound sledge, weathered: a long hickory
+    handle gone grey and grimy, the fist choked up under the head and the rest of it hanging below; a square-faced
+    double head, the struck faces mushroomed at their lips, scale and rust blotched over it; a steel wedge in the eye."""
     p = Part("Hammer")
-    sec = [(-0.105, 0.008, 0.011, 0.003), (-0.102, 0.0125, 0.0175, 0.003), (-0.09, 0.0142, 0.0205, 0.002), (-0.065, 0.0128, 0.0172, 0.001),
-           (-0.02, 0.0123, 0.0165, 0.0), (0.02, 0.0118, 0.0158, 0.0), (0.07, 0.0111, 0.0148, -0.0005), (0.12, 0.0104, 0.0138, -0.001),
-           (0.175, 0.0108, 0.0148, 0.0), (0.21, 0.0112, 0.0158, 0.0)]
+    # the handle: the fist at y 0 just under the head, its butt 0.6 m below (a knob), oval, a little fatter toward the butt
+    sec = [(-0.615, 0.011, 0.015, 0.0), (-0.61, 0.0175, 0.023, 0.0), (-0.595, 0.0195, 0.026, 0.0), (-0.57, 0.0178, 0.0235, 0.0),
+           (-0.45, 0.0168, 0.0225, 0.0), (-0.3, 0.0162, 0.0218, 0.0), (-0.12, 0.0156, 0.021, 0.0), (0.05, 0.0152, 0.0205, 0.0),
+           (0.17, 0.0158, 0.0215, 0.0), (0.215, 0.0168, 0.023, 0.0), (0.297, 0.0168, 0.023, 0.0)]
 
     def handle_col(q, r):
         y = q.z
-        grip = math.exp(-((y + 0.05) / 0.08) ** 2)
-        grain = 0.92 + 0.08 * math.sin(q.y * 900 + q.x * 250)
-        return wear((0.95 * grain, 0.92 * grain, 0.86 * grain), 0.5 * grip + 0.1 * hsh(q, 0.3))
+        # grey, weathered hickory: darker where both hands go (choked up under the head, and at the knob for the swing),
+        # streaks of old grime along the grain, a pale split here and there
+        grip = math.exp(-((y - 0.0) / 0.09) ** 2) + 0.8 * math.exp(-((y + 0.56) / 0.07) ** 2)
+        grain = 0.88 + 0.12 * math.sin(q.y * 700 + q.x * 210 + y * 30)
+        streak = 0.25 * max(0.0, math.sin(y * 47.0 + q.x * 400) - 0.6)
+        base = (0.82 * grain, 0.8 * grain, 0.76 * grain)
+        return wear(base, 0.55 * grip + 0.25 * hsh(q, 0.25) + streak)
     p.loft([g(0, y, z) for y, _, _, z in sec], [(hx, hz) for _, hx, hz, _ in sec], RIGHT, BACK, 2.6, 20, "hickory", True, True, handle_col)
-    hy = 0.214
+    hy = 0.255
 
     def steel(q, r):
-        return wear((0.9, 0.9, 0.92), 0.25 + 0.35 * hsh(q, 0.6))
-    # the eye's cheeks round the handle's top: a rounded block along Z
-    zs = [0.022, 0.0215, 0.019, -0.015, -0.0185, -0.019]
-    ws = [(0.0095, 0.013), (0.0115, 0.0155), (0.01275, 0.017), (0.01275, 0.017), (0.0118, 0.016), (0.0105, 0.0145)]
-    p.loft([g(0, hy, z) for z in zs], ws, RIGHT, UP, 5.0, 24, "forged", True, False, steel)
-    # the neck forward to the round face, its chamfer, the honed face
-    prof = [(0.0125, 0.0), (0.0118, 0.015), (0.0128, 0.03), (0.0158, 0.043), (0.0158, 0.05), (0.0146, 0.0525), (0.0128, 0.0534)]
-    rings = p.lathe(g(0, hy, -0.018), FWD, RIGHT, prof, 28, "forged", False, False, steel)
-    face_c = g(0, hy, -0.018 - 0.0536)
-    fv = p.vert(face_c, (1, 1, 1))
-    last = rings[-1]
-    for i in range(len(last)):
-        p.face([last[i], last[(i + 1) % len(last)], fv], "honed")
-    # the claw: two prongs curling back (+Z) and down, a V between them
-    for s in (-1, 1):
-        pc, ph = [], []
-        for i in range(13):
-            t = i / 12
-            a = t * 1.05
-            pc.append(g(s * lerp(0.0062, 0.0078, t), hy + 0.006 + math.sin(a) * 0.004 - t * t * 0.036, 0.02 + math.sin(a * 1.2) * 0.052))
-            ph.append((lerp(0.0062, 0.0045, t), lerp(0.0145, 0.0022, t)))
-        p.loft(pc, ph, RIGHT, UP, 3.0, 16, "forged", False, True, steel)
+        # forge scale gone to rust in blotches, the edges worn brighter
+        # (patches, not a coat: the steel has to read dark and hard against the wood)
+        rust = smooth((hsh(q, 0.45) - 0.66) * 5.0) * 0.55
+        k = 0.35 + 0.35 * hsh(q, 1.3)
+        c = wear((0.9, 0.9, 0.92), k)
+        return (lerp(c[0], 0.55, rust), lerp(c[1], 0.32, rust), lerp(c[2], 0.2, rust))
+    # the head: a long rounded-square block across the handle's top, the faces at both ends (-Z ahead, +Z behind), each
+    # face's lip mushroomed out by years of blows, a slight waist at the eye
+    zs = [-0.106, -0.1, -0.09, -0.06, -0.025, 0.0, 0.025, 0.06, 0.09, 0.1, 0.106]
+    ws = [(0.0335, 0.0335), (0.0405, 0.0405), (0.0382, 0.0382), (0.037, 0.037), (0.0378, 0.0385), (0.0395, 0.04),
+          (0.0378, 0.0385), (0.037, 0.037), (0.0382, 0.0382), (0.0405, 0.0405), (0.0335, 0.0335)]
+    rings = p.loft([g(0, hy, z) for z in zs], ws, RIGHT, UP, 6.0, 28, "forged", False, False, steel)
+    # the struck faces, flat and honed bright where they meet the work (a fan to the middle, a little domed)
+    for ring, z in ((rings[0], -0.106), (rings[-1], 0.106)):
+        cv = p.vert(g(0, hy, z + (0.0025 if z > 0 else -0.0025)), (0.85, 0.82, 0.8))
+        n = len(ring)
+        for i in range(n):
+            a, b = ring[i], ring[(i + 1) % n]
+            p.face([a, b, cv] if z > 0 else [b, a, cv], "honed")
+    # the wedge driven into the eye's top: a steel slip across the handle's end grain
+    p.box(g(0, hy + 0.0405, 0), (0.007, 0.034, 0.003), "black")
+    p.box(g(0, hy + 0.0405, 0), (0.026, 0.008, 0.0024), "forged", (0.6, 0.55, 0.5))
     return p.finish(M)
 
 
@@ -518,9 +529,13 @@ def export(root, name):
         stack.extend(o.children)
     bpy.context.view_layer.objects.active = root
     path = os.path.join(OUT, name + ".glb")
-    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_yup=True, export_apply=True,
-                              export_texcoords=True, export_normals=True, export_colors=True, export_materials="EXPORT",
-                              export_image_format="NONE")
+    args = dict(filepath=path, export_format="GLB", use_selection=True, export_yup=True, export_apply=True,
+                export_texcoords=True, export_normals=True, export_materials="EXPORT", export_image_format="NONE")
+    try:
+        bpy.ops.export_scene.gltf(**args, export_colors=True)
+    except TypeError:
+        # (Blender 4.2+ renamed it: the active colour layer, the wear, by name)
+        bpy.ops.export_scene.gltf(**args, export_vertex_color="ACTIVE")
     tris = 0
     for o in [root] + list(root.children_recursive):
         dg = bpy.context.evaluated_depsgraph_get()

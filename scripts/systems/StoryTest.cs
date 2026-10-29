@@ -4767,7 +4767,7 @@ public partial class StoryTest : Node
 
 	/// <summary>(2026-10-15: the owner's key halves) Follows R.H.'s arrow trail <paramref name="piece"/> from the path, tree by
 	/// tree as a player would: each arrow unseen under the flame and shown by the blacklight from a couple of metres, each
-	/// pointing at the next tree (or the cache) 10-20 m on; the trail turning; the cache glinting under the beam; the tin
+	/// pointing at the next tree (or the cache) 7-13 m on (2026-10-29: was 10-20); the trail turning; the cache glinting under the beam; the tin
 	/// opened and the half taken and saved. Back on the path at the end.</summary>
 	private async Task FollowKeyTrail(SurveyLot lot, int piece, CancellationToken ct)
 	{
@@ -4796,7 +4796,7 @@ public partial class StoryTest : Node
 			var note = trail[i];
 			Vector3 next = i + 1 < trail.Count ? trail[i + 1].GlobalPosition : cache.GlobalPosition;
 			Vector3 dirToNext = Flat(next - note.GlobalPosition);
-			if (i + 1 < trail.Count) Check($"arrow {piece}.{i + 1}: the next tree is 10-20 m on", dirToNext.Length() is >= 10f and <= 20f, $"{dirToNext.Length():0.0} m");
+			if (i + 1 < trail.Count) Check($"arrow {piece}.{i + 1}: the next tree is 7-13 m on", dirToNext.Length() is >= 7f and <= 13f, $"{dirToNext.Length():0.0} m");
 			if (lastDir is { } ld && Mathf.Abs(ld.SignedAngleTo(dirToNext, Vector3.Up)) > Mathf.DegToRad(30f)) turns++;
 			lastDir = dirToNext;
 			Vector3 near = note.PlateWorld + Flat(note.PlateWorld - note.GlobalPosition).Normalized() * 2.4f;

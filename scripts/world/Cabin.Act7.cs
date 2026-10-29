@@ -173,14 +173,111 @@ public partial class Cabin
 				tw.TweenProperty(pivot, "transform", Transform3D.Identity, seconds).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
 			}
 		}
+		BuildJam(drop);
 		if (BuildCollision)
 		{
 			_fallenBody = new StaticBody3D { Name = "Blocked", CollisionLayer = 1, CollisionMask = 0 };
 			_fallenBody.SetMeta("surface", "wood");
-			_fallenBody.AddChild(new CollisionShape3D { Position = new Vector3(0, 1.05f, -0.3f), Shape = new BoxShape3D { Size = new Vector3(DoorWidth + 0.3f, 2.1f, 0.55f) } });
+			// (2026-10-29, the playtest: someone "clipped straight out through the door when the fire started") solid from the moment
+			// it falls: the whole doorway and well past it, wider than the opening, up to the roof, from inside the beams to
+			// outside the wall (the old one was a thin slab a body could be squeezed through, or shoved out past)
+			_fallenBody.AddChild(new CollisionShape3D { Name = "Plug", Position = new Vector3(0, WallHeight * 0.5f, BlockZ0 + (BlockZ1 - BlockZ0) * 0.5f), Shape = new BoxShape3D { Size = new Vector3(DoorWidth + 0.5f, WallHeight + 0.2f, BlockZ1 - BlockZ0) } });
 			_fallen.AddChild(_fallenBody);
 		}
 		return _fallen;
+	}
+
+	/// <summary>The cave-in's solid plug, in the threshold's frame (z: inside the beams to outside the wall).</summary>
+	private const float BlockZ0 = -0.95f, BlockZ1 = 0.45f;
+	private Node3D _jam;
+
+	/// <summary>Whether a point in the cabin's frame is in the cave-in's plug (while it stands).</summary>
+	public bool InFallenBlock(Vector3 local)
+	{
+		if (_fallenBody == null || !IsInstanceValid(_fallenBody)) return false;
+		float z = local.Z - Hd;
+		return z > BlockZ0 - 0.4f && Mathf.Abs(local.X) < DoorWidth * 0.5f + 0.25f + 0.4f && local.Y < WallHeight;
+	}
+
+	/// <summary>Where someone caught in the plug is put: inside, clear of it, in front of the door.</summary>
+	public Vector3 InsideTheBlock => new(0, 0.05f, Hd + BlockZ0 - 0.55f);
+
+	/// <summary>
+	/// (2026-10-29, the playtest: "make the cave-in over the door more dramatic and solid") Behind the burning beams the doorway
+	/// itself is jammed full: the roof's charred boards and two of its rafters come down into the opening, wedged on end and
+	/// across, embers in their cracks, rubble heaped on the sill, so not a crack of the night shows through. It gives with the
+	/// last beam (<see cref="JamGives"/>).
+	/// </summary>
+	private void BuildJam(bool drop)
+	{
+		_jam = new Node3D { Name = "DoorJam" };
+		_fallen.AddChild(_jam);
+		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 97 + 25) };
+		float hw = DoorWidth * 0.5f;
+		int i = 0;
+		void Piece(Vector3 at, Vector3 size, Vector3 euler, bool embers)
+		{
+			var k = new MeshKit();
+			k.Mat(FirePaint("char"));
+			k.Color = Colors.White;
+			k.Box(Vector3.Zero, size, 1f, Basis.Identity);
+			if (embers)
+			{
+				// a glowing crack down its face, toward the room
+				k.Mat(FirePaint("ember"));
+				k.Box(new Vector3(rng.RandfRange(-0.3f, 0.3f) * size.X, rng.RandfRange(-0.2f, 0.2f) * size.Y, -size.Z * 0.5f - 0.004f),
+					new Vector3(size.X * 0.18f, size.Y * rng.RandfRange(0.3f, 0.6f), 0.008f), 1f, Basis.Identity);
+			}
+			var node = new Node3D { Name = $"Jam{i++}", Position = at, Rotation = euler };
+			_jam.AddChild(node);
+			k.CommitTo(node, "Mesh");
+			node.SetMeta("rest", node.Transform);
+		}
+		// the roof's boards, on end in the opening, leaning every way, overlapping (no gap between them)
+		for (int b = 0; b < 7; b++)
+		{
+			float x = Mathf.Lerp(-hw + 0.08f, hw - 0.08f, b / 6f) + rng.RandfRange(-0.04f, 0.04f);
+			float len = rng.RandfRange(1.9f, 2.25f);
+			Piece(new Vector3(x, len * 0.5f - 0.05f, rng.RandfRange(-0.08f, 0.06f)), new Vector3(rng.RandfRange(0.22f, 0.3f), len, 0.05f),
+				new Vector3(rng.RandfRange(-0.12f, 0.12f), rng.RandfRange(-0.3f, 0.3f), rng.RandfRange(-0.28f, 0.28f)), b % 2 == 0);
+		}
+		// two rafters across it, from the lintel down to the sill, crossed
+		Piece(new Vector3(0, 1.05f, -0.16f), new Vector3(0.13f, 2.4f, 0.16f), new Vector3(0.1f, 0f, 0.62f), true);
+		Piece(new Vector3(0.05f, 0.95f, -0.12f), new Vector3(0.12f, 2.3f, 0.15f), new Vector3(-0.08f, 0f, -0.55f), false);
+		// rubble heaped on the sill
+		for (int r = 0; r < 6; r++)
+			Piece(new Vector3(rng.RandfRange(-hw, hw), rng.RandfRange(0.05f, 0.25f), rng.RandfRange(-0.45f, 0.1f)),
+				new Vector3(rng.RandfRange(0.3f, 0.6f), rng.RandfRange(0.08f, 0.16f), rng.RandfRange(0.1f, 0.25f)),
+				new Vector3(rng.RandfRange(-0.4f, 0.4f), rng.RandfRange(-1f, 1f), rng.RandfRange(-0.3f, 0.3f)), r == 2);
+		if (!drop) return;
+		// down out of the roof with the beams: each piece from a metre and more above, a shade apart, landing hard
+		int n = 0;
+		foreach (var c in _jam.GetChildren())
+		{
+			if (c is not Node3D p) continue;
+			var rest = p.Transform;
+			p.Position = rest.Origin + new Vector3(0, 1.4f + rng.RandfRange(0f, 0.6f), -0.2f);
+			p.Rotation += new Vector3(rng.RandfRange(-0.4f, 0.4f), 0, rng.RandfRange(-0.4f, 0.4f));
+			var tw = p.CreateTween();
+			tw.TweenInterval(0.05f + 0.04f * n++);
+			tw.TweenProperty(p, "transform", rest, 0.42f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+		}
+	}
+
+	/// <summary>The last beam chopped away: the jam in the doorway gives, falling out across the porch.</summary>
+	private void JamGives()
+	{
+		if (_jam == null || !IsInstanceValid(_jam)) return;
+		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 31 + 4) };
+		foreach (var c in _jam.GetChildren())
+		{
+			if (c is not Node3D p) continue;
+			var tw = p.CreateTween();
+			tw.TweenInterval(rng.RandfRange(0f, 0.15f));
+			tw.TweenProperty(p, "position", p.Position + new Vector3(rng.RandfRange(-0.5f, 0.5f), -p.Position.Y + 0.05f, rng.RandfRange(0.9f, 1.8f)), 0.4f)
+				.SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+			tw.Parallel().TweenProperty(p, "rotation", new Vector3(Mathf.Pi * 0.5f, p.Rotation.Y + rng.RandfRange(-0.6f, 0.6f), 0f), 0.4f);
+		}
 	}
 
 	/// <summary>One blow's worth: the next beam knocked away (it drops to the floor and goes dark). True when the doorway is
@@ -204,6 +301,7 @@ public partial class Cabin
 			_fallenBody.QueueFree();
 			_fallenBody = null;
 		}
+		if (left == 0) JamGives();
 		return left == 0;
 	}
 
@@ -211,6 +309,7 @@ public partial class Cabin
 	public void ClearFallenBeams()
 	{
 		foreach (var b in _beams) if (IsInstanceValid(b)) { b.SetMeta("chopped", true); b.Visible = false; }
+		if (_jam != null && IsInstanceValid(_jam)) _jam.Visible = false;
 		if (_fallenBody != null && IsInstanceValid(_fallenBody)) _fallenBody.QueueFree();
 		_fallenBody = null;
 	}

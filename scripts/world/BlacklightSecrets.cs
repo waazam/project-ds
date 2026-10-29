@@ -53,8 +53,19 @@ public partial class BlacklightSecrets : Node
 		if (scene?.FindChild("Camp", true, false) is Camp camp)
 		{
 			Vector3 at = camp.StumpLocal + new Vector3(-0.2f, 0, 1.1f);
-			if (terrain != null) at.Y = terrain.HeightAt(camp.ToGlobal(at).X, camp.ToGlobal(at).Z) - camp.GlobalPosition.Y + 0.02f;
-			W(camp, at, Vector3.Up, "HE COUNTS THE STEPS", 1.6f, G, 0.4f);
+			// (2026-10-29, the playtest: the ink "sticks through the ground and is sometimes unreadable") on the ground's own slope,
+			// the decal deep enough to find every face of the bumpy ground under it (it was a flat 10 cm box at one height: the
+			// ground rose through it, the words broken into patches)
+			if (terrain != null)
+			{
+				Vector3 g = camp.ToGlobal(at);
+				float e = 0.5f, hx = terrain.HeightAt(g.X + e, g.Z) - terrain.HeightAt(g.X - e, g.Z), hz = terrain.HeightAt(g.X, g.Z + e) - terrain.HeightAt(g.X, g.Z - e);
+				g.Y = terrain.HeightAt(g.X, g.Z);
+				var basis = UvInk.GroundBasis(new Vector3(-hx, 2f * e, -hz), camp.GlobalRotation.Y + 0.4f + Mathf.Pi);
+				UvInk.OnGround(camp, g, basis, new Vector2(1.6f, 0.5f), UvInk.Text(camp, "HE COUNTS THE STEPS"), G, 2.3f);
+				Written++;
+			}
+			else W(camp, at, Vector3.Up, "HE COUNTS THE STEPS", 1.6f, G, 0.4f);
 			// a hand on the stump's side, wrapped round it (it was a flat card at a guessed height, off the bark)
 			var stump = new Node3D { Name = "StumpInk", Position = camp.ToLocal(camp.StumpTopWorld) - Vector3.Up * camp.StumpHeight };
 			camp.AddChild(stump);
@@ -95,8 +106,40 @@ public partial class BlacklightSecrets : Node
 		// the lake
 		if (GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
 			W(lake, new Vector3(0, LakeShape.DockDeck + 0.02f, LakeShape.DockEndZ + 1.3f), Vector3.Up, "ROW. DON'T STOP.", 1.5f, C, Mathf.Pi);
+		Nods(scene);
 		// the station (built later, at the lake's crossing, in a new game: then from PlaceStation)
 		if (StationInterior.Instance is { Built: true } st) Station(st);
+	}
+
+	/// <summary>
+	/// (2026-10-29, the playtest: "add references to horror movies and games") A few nods for whoever sweeps every wall with the
+	/// beam, each a few words at most and on a flat, built surface (never the ground's slope): in the cabin, "REDRUM" on the
+	/// side wall, "HEEERE'S..." by the door, "JOIN US" on the boards by the hearth, and "THERE WAS A HOLE HERE" on the floor in
+	/// the far corner; "ROOM 237" over the shed's bench; "WE ALL FLOAT" on the lake's dock.
+	/// </summary>
+	private void Nods(Node scene)
+	{
+		Color C = UvInk.Cyan, G = UvInk.Green, P = UvInk.Pale;
+		if (GetTree().GetFirstNodeInGroup("cabin") is Cabin cabin)
+		{
+			float hd = cabin.Depth * 0.5f - 0.11f, hw = cabin.Width * 0.5f - 0.11f;
+			W(cabin, new Vector3(hw - 0.02f, 1.35f, -0.9f), Vector3.Left, "REDRUM", 1.1f, P);
+			W(cabin, new Vector3(-1.35f, 1.55f, hd - 0.02f), Vector3.Forward, "HEEERE'S...", 1.0f, G, 0.06f);
+			W(cabin, new Vector3(-0.85f, 0.012f, -1.55f), Vector3.Up, "JOIN US", 0.9f, C, 0.4f);
+			W(cabin, new Vector3(1.25f, 0.012f, -1.9f), Vector3.Up, "THERE WAS A HOLE HERE", 1.2f, P, -0.3f);
+		}
+		if (Find<Shed>(scene) is { } shed)
+			W(shed, new Vector3(-0.55f, 1.45f, -shed.Depth * 0.5f + 0.06f), Vector3.Back, "ROOM 237", 0.8f, G);
+		if (GetTree().GetFirstNodeInGroup("lake_marker") is Lake lake)
+			W(lake, new Vector3(0.35f, LakeShape.DockDeck + 0.02f, LakeShape.DockEndZ + 3.2f), Vector3.Up, "WE ALL FLOAT", 1.2f, P, Mathf.Pi - 0.2f);
+	}
+
+	private static T Find<T>(Node n) where T : class
+	{
+		if (n == null) return null;
+		if (n is T t) return t;
+		foreach (var c in n.GetChildren()) if (Find<T>(c) is { } f) return f;
+		return null;
 	}
 
 	/// <summary>The station's writing, for a station built after the rest (see <see cref="StationInterior.EnsureBuilt"/>).</summary>
@@ -177,7 +220,8 @@ public partial class BlacklightSecrets : Node
 
 	private void W(Node3D parent, Vector3 local, Vector3 normal, string text, float width, Color ink, float spin = 0f)
 	{
-		UvInk.Write(parent, local, normal, text, width, ink, spin);
+		// (2026-10-29, the playtest: "sometimes unreadable") brighter than a mark: words have to read at a glance
+		UvInk.Write(parent, local, normal, text, width, ink, spin, 2.3f);
 		Written++;
 	}
 
