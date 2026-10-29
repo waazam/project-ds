@@ -58,8 +58,9 @@ public partial class Act1Walks : Node3D
 	/// <summary>Falls Path metres: where its first stretch (along the creek to the foot of the falls) ends and the climb
 	/// beside them begins.</summary>
 	[Export] public float FallsSplitAt = 24f;
-	/// <summary>Trail metres: on walk 3, the tree that comes down across the way back to the cabin.</summary>
-	[Export] public float BackCloserAt = 150f;
+	/// <summary>Trail metres: on walk 3, the tree that comes down across the way back to the cabin (2026-10-29: the cabin at
+	/// about 140 m now, up the trail; the tree past it, out of sight of the porch).</summary>
+	[Export] public float BackCloserAt = 165f;
 	[ExportGroup("Walls")]
 	/// <summary>The hidden walls stand on a grid of this size (m), this far (m) into the closed side of the line between
 	/// the open ways and the closed ones, this tall.</summary>

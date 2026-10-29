@@ -35,8 +35,9 @@ public partial class Act1Walks
 	/// <summary>Seconds between the calls (a burst of one to four voices each), and how near the stairs (m) they stop.</summary>
 	[Export] public Vector2 CallEvery = new(7f, 13f);
 	[Export] public float CallsStopAt = 45f;
-	/// <summary>How far out from the cabin (m along the trail) walk 3's calls begin, and the cabin's light goes.</summary>
-	[Export] public float CallsFrom = 28f, CabinDarkFrom = 60f;
+	/// <summary>How far out from the cabin (m along the trail past it, <see cref="CabinS"/>) walk 3's calls begin, and the
+	/// cabin's light goes.</summary>
+	[Export] public float CallsFrom = 28f, CabinDarkFrom = 35f;
 
 	// the recorded take holds five deliveries of the line (stream seconds): each is a take of its own
 	private static readonly (float from, float to)[] Phrases = { (0f, 1.8f), (2.8f, 4.15f), (5f, 6.1f), (6.75f, 7.5f), (8.55f, 9.6f) };
@@ -98,7 +99,7 @@ public partial class Act1Walks
 				break;
 			case 3:
 				// (2026-10-24) the far rifle of the first walk, once more, nearer, and then never again
-				if (!RifleAgain && s > 120f && s < 210f && offT < 12f)
+				if (!RifleAgain && s > CabinS + 15f && s < 225f && offT < 12f)
 				{
 					RifleAgain = true;
 					var side = new Vector2(vel.Y, -vel.X).Normalized() * (_rng.Randf() < 0.5f ? 1f : -1f);
@@ -108,7 +109,7 @@ public partial class Act1Walks
 					GD.Print("[story] Act 1 dusk walk: the rifle again, nearer");
 				}
 				UpdateCalls(player, q, s, dt);
-				if (!CabinDark && s > CabinDarkFrom) PutOutCabinLight();
+				if (!CabinDark && s > CabinS + CabinDarkFrom) PutOutCabinLight();
 				break;
 		}
 	}
@@ -199,7 +200,7 @@ public partial class Act1Walks
 			GD.Print($"[story] Act 1 walk 3: the voices stop at the stairs ({CallsHeard} calls)");
 			return;
 		}
-		if (u < CallsFrom && off < 12f) return;
+		if (u < CabinS + CallsFrom && off < 12f) return;
 		if (_nextCall < 0) _nextCall = _clock + 1.5;
 		if (_clock < _nextCall) return;
 		_nextCall = _clock + _rng.RandfRange(CallEvery.X, CallEvery.Y);

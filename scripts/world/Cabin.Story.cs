@@ -27,6 +27,13 @@ public partial class Cabin
 	public const string HubGroup = "trailhead_cabin";
 	/// <summary>Act 1: the cabin's door has been opened (it stays open).</summary>
 	public const string HubDoorFlag = "act1_cabin_door_open";
+	/// <summary>(2026-10-29) Act 1: the key taken from under the door mat (the door is locked until then).</summary>
+	public const string HubKeyFlag = "act1_cabin_key";
+	/// <summary>(2026-10-29) Act 1: the door shut again behind him while he was out (the alarm's beat, Act1Walks.Alarm.cs)
+	/// until it slams open.</summary>
+	public const string HubDoorShutFlag = "act1_cabin_door_shut";
+	/// <summary>(2026-10-29) Act 1: ... and slammed open again (open from then on).</summary>
+	public const string HubDoorSlamFlag = "act1_cabin_door_slammed";
 
 	/// <summary>The photo board on the back wall.</summary>
 	public PhotoBoard Board { get; private set; }
@@ -170,6 +177,7 @@ public partial class Cabin
 		// ---- the hub: the room is indoors (the forest heard through the walls)
 		if (Hub)
 		{
+			if (!BurnedOut) BuildDoorMat();
 			var zone = new Audio.IndoorZone { Name = "IndoorZone", Position = new Vector3(0, WallHeight * 0.5f, 0) };
 			zone.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(Width - 0.25f, WallHeight, Depth - 0.25f) } });
 			_gen.AddChild(zone);
@@ -213,7 +221,127 @@ public partial class Cabin
 	/// <summary>Act 1: whether the hub's door has been opened.</summary>
 	public bool HubDoorOpen => Hub && IsOpen;
 
-	/// <summary>Act 1: E on the hub's door. It swings in on its iron hinges and stays open (saved).</summary>
+	/// <summary>For tests: the mat's E-point (null once the key's out), and the key taken.</summary>
+	public Interactable MatUse { get; private set; }
+	public bool HasHubKey => StoryManager.Instance?.HasFlag(HubKeyFlag) ?? false;
+	/// <summary>For tests: tried the door while it was locked; the door's E-point while it's shut.</summary>
+	public bool TriedLocked { get; private set; }
+	public Interactable HubDoorUse => _door != null && IsInstanceValid(_door) ? _door.GetNodeOrNull<Interactable>("OpenDoor") : null;
+
+	private Node3D _mat;
+
+	/// <summary>(2026-10-29, the owner's friend's playtest: "the cabin door is locked; a key is under the cabin's door mat")
+	/// A worn coir mat on the porch before the door; E lifts its far edge, and the key under it is taken.</summary>
+	private void BuildDoorMat()
+	{
+		const float w = 0.78f, d = 0.46f;
+		// (hinged along its door-side edge: lifting it turns it up off the boards toward the door)
+		_mat = new Node3D { Name = "DoorMat", Position = new Vector3(0f, 0.003f, FrontFace + 0.12f) };
+		_gen.AddChild(_mat);
+		var k = new MeshKit();
+		k.Color = Colors.White;
+		k.Mat(ProcTextures.Flat("hub_mat", new Color(0.36f, 0.27f, 0.16f), 1f, 0.05f));
+		k.BevelBox(new Vector3(0f, 0.008f, d * 0.5f), new Vector3(w, 0.016f, d), 0.006f, 2f);
+		k.Mat(ProcTextures.Flat("hub_mat_edge", new Color(0.2f, 0.15f, 0.09f), 1f, 0.05f));
+		k.BevelBox(new Vector3(0f, 0.0165f, d * 0.5f), new Vector3(w - 0.08f, 0.002f, d - 0.08f), 0.001f, 2f);
+		k.CommitTo(_mat, "Mesh", false);
+		if (HasHubKey || (StoryManager.Instance?.HasFlag(HubDoorFlag) ?? false)) return;
+		// the key, under it (seen only as it lifts)
+		var key = new MeshKit();
+		key.Color = Colors.White;
+		key.Mat(ProcTextures.Flat("hub_key", new Color(0.62f, 0.5f, 0.24f), 0.35f, 0.7f));
+		key.Cylinder(new Vector3(-0.03f, 0.003f, 0f), new Vector3(-0.03f, 0.006f, 0f), 0.017f, 0.017f, 10);
+		key.Box(new Vector3(0.015f, 0.004f, 0f), new Vector3(0.06f, 0.004f, 0.007f));
+		key.Box(new Vector3(0.036f, 0.004f, 0.007f), new Vector3(0.01f, 0.004f, 0.01f));
+		var keyNode = new Node3D { Name = "Key", Position = new Vector3(0.12f, -0.002f, FrontFace + 0.12f + d * 0.6f), Rotation = new Vector3(0, 0.5f, 0) };
+		_gen.AddChild(keyNode);
+		key.CommitTo(keyNode, "Mesh", false);
+		MatUse = new Interactable { Name = "LiftMat", Prompt = "Lift the mat", MaxDistance = 2.4f, PickRadius = 0.35f, Position = new Vector3(0f, 0.05f, d * 0.5f), HighlightRoot = new NodePath("..") };
+		_mat.AddChild(MatUse);
+		MatUse.Interacted += _ => LiftMat(keyNode);
+	}
+
+	private void LiftMat(Node3D key)
+	{
+		if (HasHubKey) return;
+		StoryManager.Instance?.SetFlag(HubKeyFlag);
+		if (MatUse != null && IsInstanceValid(MatUse)) MatUse.QueueFree();
+		MatUse = null;
+		AudioDirector.OneShot(this, "cloth", 4, _mat.GlobalPosition, -10f, "Events", 2f, 0.06f);
+		var tw = _mat.CreateTween();
+		tw.TweenProperty(_mat, "rotation:x", Mathf.DegToRad(-62f), 0.45f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		tw.TweenInterval(0.7f);
+		tw.TweenCallback(Callable.From(() =>
+		{
+			if (IsInstanceValid(key)) key.QueueFree();
+			AudioDirector.OneShot(this, "book_handle", 3, _mat.GlobalPosition, -14f, "Events", 2f, 0.1f);
+		}));
+		tw.TweenProperty(_mat, "rotation:x", 0f, 0.35f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+		_ = UI.Subtitle.Instance?.Show("The key. Right where they said.", 0.4f, 2.6f, 0.9f);
+		GD.Print("[story] Act 1: the key from under the cabin's mat");
+	}
+
+	/// <summary>Act 1: E on the hub's door: locked without the key (a rattle, the thought), opened with it.</summary>
+	public void UseHubDoor()
+	{
+		if (!Hub || IsOpen) return;
+		if (!HasHubKey && !(StoryManager.Instance?.HasFlag(HubDoorFlag) ?? false))
+		{
+			TriedLocked = true;
+			StoryBeat.PlayAt(this, AudioDirector.Take("door_locked", 2), "Events", new Vector3(0, 1.0f, Hd), volumeDb: -6f, unitSize: 3f, maxDistance: 20f, pitch: (float)GD.RandRange(0.95, 1.05));
+			_ = UI.Subtitle.Instance?.Show("Locked. They said they'd leave a key out.", 0.4f, 3.0f, 1.0f);
+			GD.Print("[story] Act 1: the cabin door is locked");
+			return;
+		}
+		OpenHubDoor();
+	}
+
+	/// <summary>(2026-10-29) Act 1: shut again behind him, quietly, while he's far off (the alarm's beat): saved, the door
+	/// solid, E opens it (he has the key).</summary>
+	public void ShutHubDoor()
+	{
+		if (!Hub || BurnedOut) return;
+		StoryManager.Instance?.SetFlag(HubDoorShutFlag);
+		if (!IsOpen) return;
+		IsOpen = false;
+		if (_doorCollision != null && IsInstanceValid(_doorCollision)) _doorCollision.Disabled = false;
+		if (_door != null && IsInstanceValid(_door))
+		{
+			_door.Rotation = Vector3.Zero;
+			if (_door.GetNodeOrNull<Interactable>("OpenDoor") == null)
+			{
+				var use = new Interactable { Name = "OpenDoor", Prompt = "Open the door", MaxDistance = 2.6f, PickRadius = 0.6f, Position = new Vector3(DoorWidth * 0.3f, 1.0f, 0.1f), HighlightRoot = new NodePath("NoHighlight") };
+				use.Interacted += _ => UseHubDoor();
+				_door.AddChild(use);
+			}
+		}
+		GD.Print("[story] Act 1: the cabin door shut again behind him");
+	}
+
+	/// <summary>(2026-10-29) Act 1: the door slams open on its own, hard back against the wall, as he comes level with the
+	/// cabin on the way back (the alarm stops).</summary>
+	public void SlamHubDoorOpen()
+	{
+		if (!Hub) return;
+		StoryManager.Instance?.SetFlag(HubDoorFlag);
+		StoryManager.Instance?.SetFlag(HubDoorSlamFlag);
+		if (IsOpen) return;
+		IsOpen = true;
+		if (_doorCollision != null && IsInstanceValid(_doorCollision)) _doorCollision.Disabled = true;
+		if (_door != null && IsInstanceValid(_door))
+		{
+			if (_door.GetNodeOrNull<Interactable>("OpenDoor") is { } use) use.QueueFree();
+			var tw = _door.CreateTween();
+			tw.TweenProperty(_door, "rotation:y", Mathf.DegToRad(104f), 0.16f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.In);
+			tw.TweenProperty(_door, "rotation:y", Mathf.DegToRad(92f), 0.25f).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+		}
+		int take = (int)(GD.Randi() % 2) + 1;
+		StoryBeat.PlayAt(this, $"res://assets/audio/sfx/door_slam_{take:00}.wav", "Events", new Vector3(0, 1.1f, Hd), volumeDb: 2f, unitSize: 8f, maxDistance: 120f, pitch: 0.95f);
+		StoryBeat.PlayAt(this, AudioDirector.Take("door_frame_thud", 4), "Events", new Vector3(-DoorWidth * 0.5f, 1.0f, Hd - 1f), volumeDb: -2f, unitSize: 6f, maxDistance: 90f, pitch: 0.9f);
+		GD.Print("[story] Act 1: the cabin door slams open");
+	}
+
+	/// <summary>Act 1: the hub's door opened (unlocked with the key). It swings in on its iron hinges and stays open (saved).</summary>
 	public void OpenHubDoor()
 	{
 		if (!Hub || IsOpen) return;

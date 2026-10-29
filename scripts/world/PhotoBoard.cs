@@ -9,7 +9,7 @@ namespace ProjectDS.World;
 
 /// <summary>
 /// The backlit photo board on the cabin's wall (2026-10-16, STORY.md Rev 5: "a backlit photo board, empty and glowing"). The
-/// one cabin carries it everywhere: in Act 1 by the lot it is the player's own board, in the Hollow (Act 5) it hangs with
+/// one cabin carries it everywhere: in Act 1 (up the trail) it is the player's own board, in the Hollow (Act 5) it hangs with
 /// R.H.'s photographs pinned across it, and in Act 7 its last print burns. The board is Blender's (tools/Blender/
 /// cabin_story.py: PhotoBoard, PhotoBoardPanel, BoardPin); the prints are quads with the pictures on them, lit a little
 /// from behind.
@@ -57,6 +57,9 @@ public partial class PhotoBoard : Node3D
 	public const string ShapeFlag = "act1_board_shape";
 	/// <summary>Pinned again after the shape: it's gone, and the room hums.</summary>
 	public const string RepinFlag = "act1_board_repinned";
+	/// <summary>(2026-10-29, the owner's friend's playtest) The van's alarm has stopped and the door slammed open: "Post
+	/// Pictures." (Act1Walks.Alarm.cs). The first pinning waits for it.</summary>
+	public const string PostFlag = "act1_post_pictures";
 	/// <summary>(2026-10-24, two walks) Looked away from after the repin and back: the falls print decades old, the framed
 	/// photo changed (stage 3).</summary>
 	public const string AgedFlag = "act1_board_aged";
@@ -327,6 +330,11 @@ public partial class PhotoBoard : Node3D
 		var pins = Pinnings();
 		int upto = pins.Count > 0 ? pins[^1].upto : 0;
 		int last = LastPhoto;
+		if (last > upto && pins.Count == 0 && !Has(PostFlag))
+		{
+			_ = UI.Subtitle.Instance?.Show("Not yet. There's more out there to shoot.", 0.4f, 2.6f, 0.8f);
+			return;
+		}
 		if (last > upto)
 		{
 			int n = pins.Count + 1;
