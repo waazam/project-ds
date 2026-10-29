@@ -1406,6 +1406,8 @@ public partial class StoryTest : Node
 		// Act 8: the hallway.
 		bool reached = await WalkTo(bi.VineDoorApproachWorld + new Vector3(0, 0, -4f), 0.6f, ct);
 		Check("walked the hallway", reached);
+		// (2026-10-29) the scare runs some seven seconds now (the dark, the red, the lunge): let it finish before the vine door
+		await WaitUntil(() => bi.Flow is { JumpscareDone: true }, 12, ct);
 		Check("the lights have gone red", bi.RedTriggered);
 		Check("the stalker stepped out in the flickering hallway", bi.JumpscareFired);
 		Check("the lamps died for the scare, and came back", bi.Hallway is { BlackoutCount: >= 1, BlackedOut: false }, $"{bi.Hallway?.BlackoutCount}");
@@ -1460,7 +1462,7 @@ public partial class StoryTest : Node
 			t += GetProcessDeltaTime();
 		}
 		_input.ScriptedMove = Vector2.Zero;
-		Check("the hallway is gone: a room with three doors", bi.MazeActive);
+		Check("the hallway is gone: a room with three doors", bi.MazeActive, bi.MazeActive ? "" : $"stood at {bi.ToLocal(_player.GlobalPosition)}, input {_input.Enabled}, {Cutscene.InputLocks} locks, {Cutscene.ActiveCount} cutscenes");
 		// The rooms: every door leads to the same room again, until the one with the stalker in it.
 		var rooms = bi.Rooms;
 		int opened = 0;

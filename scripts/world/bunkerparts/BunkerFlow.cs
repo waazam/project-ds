@@ -159,6 +159,8 @@ public partial class BunkerFlow : Node
 	[Export] public float SoloLampAhead = 26f;
 	/// <summary>For tests: the stages the scare went through (1 dark with one red lamp, 2 all red, 3 it lunged).</summary>
 	public int JumpscareStage { get; private set; }
+	/// <summary>For tests: the scare has run its course (the lamps steady red, control back).</summary>
+	public bool JumpscareDone { get; private set; }
 
 	/// <summary>
 	/// (2026-10-29, the owner: "the lights should cut out so it's dark, with just one red light in the distance; then all
@@ -246,6 +248,7 @@ public partial class BunkerFlow : Node
 			_hallway.RedOn();
 			if (IsInstanceValid(body)) body.QueueFree();
 			if (locked && IsInstanceValid(player) && player.IsInsideTree()) Cutscene.Unlock(player, true, true);
+			JumpscareDone = true;
 		}
 	}
 
