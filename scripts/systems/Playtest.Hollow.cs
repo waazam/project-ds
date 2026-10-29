@@ -524,6 +524,9 @@ public partial class Playtest
 		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();
 		Check("no way out past them", await _bot.RayHits(cabin.DoorwayInside - fwd * 0.9f, cabin.DoorwayInside + fwd * 1.6f, ct));
 		Shot("caved_in");
+		// (the rush puts them at the door from the moment it lights: down under the smoke now, as a player would, or it takes
+		// them before the escape's own steps begin)
+		await _bot.Crouch(true, ct);
 		await EscapeFire(fire, cabin, ct);
 		Check("in time", fire.SecondsLeft > 0f || fire.BrokeOut, $"{fire.SecondsLeft:0} s left");
 		// out, and turn to look back at it
