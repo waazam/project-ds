@@ -51,8 +51,9 @@ public partial class Act1Walks
 	public bool Knocked { get; private set; }
 	public int PorchPrints { get; private set; }
 	public bool PorchThought { get; private set; }
-	/// <summary>For tests: where the boot prints run (trail metres) and where the wet rock is (falls path metres).</summary>
-	public const float PrintsFrom = 30f, PrintsTo = 100f;
+	/// <summary>For tests: where the boot prints run (trail metres) and where the wet rock is (falls path metres).
+	/// (2026-10-29: the cabin up the trail now, at about 140 m: the prints between it and the bridge, the way he walks out)</summary>
+	public const float PrintsFrom = 146f, PrintsTo = 178f;
 	public float WetFrom => FallsSplitAt + 2f;
 	public float WetTo => FallsSplitAt + 16f;
 	/// <summary>For tests: the whole falls path (metres from its trail end), as the wet rock's metres count.</summary>
@@ -94,6 +95,7 @@ public partial class Act1Walks
 		if (Flag(RegisterTornFlag)) TearRegister();
 		if (Flag(KnockFlag)) { Knocked = true; LayPorchPrints(); }
 		BuildWetRocks();
+		SetupAlarm();
 	}
 
 	private void ExitBeats()
@@ -111,6 +113,7 @@ public partial class Act1Walks
 		var q = new Vector2(pp.X, pp.Z);
 		float s = TrailS(q, out float offT);
 		bool away = ReachedFalls || OverlookReached;
+		UpdateAlarm(player, s, offT);
 		// the overlook reached (its platform, or the spur's far end)
 		if (!OverlookReached && Platform != null && pp.DistanceTo(Platform.GlobalPosition) < 9f)
 		{
@@ -157,7 +160,7 @@ public partial class Act1Walks
 			}
 		}
 		// pinned once and out again without a second look: sent back
-		if (_builtStage == 2 && !Flag(PhotoBoard.RepinFlag) && !BoardNudged && s > 45f && UI.Subtitle.Instance is { CurrentlyShowing: false } nsub)
+		if (_builtStage == 2 && !Flag(PhotoBoard.RepinFlag) && !BoardNudged && Mathf.Abs(s - CabinS) > 25f && UI.Subtitle.Instance is { CurrentlyShowing: false } nsub)
 		{
 			BoardNudged = true;
 			_ = nsub.Show("I should give those prints another look.", 0.6f, 3.4f, 1.2f);

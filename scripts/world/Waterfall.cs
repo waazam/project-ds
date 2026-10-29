@@ -15,6 +15,9 @@ namespace ProjectDS.World;
 ///   three strands of it standing out over the curtain;
 /// - where it lands: a churning boil of white water, spray thrown up off it, a thin mist (the flat foam patch
 ///   that drifted below it is gone: the creek's own foam streaks carry the white water on down);
+/// - (2026-10-29, the owner's friend's playtest: it "looks like molten metal") its own shader, waterfall.gdshader: a
+///   lighter glass body you see the rock through, white aerated foam from just over the lip, fine streaks sliding
+///   faster than before, a soft sheen and no metal glints; and more spray and a mist that rises and drifts at its foot;
 /// - a quiet looping water sound on the Water bus (the creek's own loop, pitched down: the
 ///   stream audio already along the creek carries most of it);
 /// - clear zones along the creek down to the bridge so the fall can be seen from the deck.
@@ -184,6 +187,9 @@ public partial class Waterfall : Node3D
 		// (over the creek's own surface and its waves: it writes depth, and would hide a churn sat on it)
 		FlowFx.Churn(this, P(sCurt + 0.25f, 0, Level(sCurt + 0.25f) + 0.1f), 1.35f, FlowFx.Liquid.Creek, 1f, "FootChurn");
 		FlowFx.Spray(this, P(sCurt, 0, curtBottom + 0.05f), FlowFx.Liquid.Creek, CurtainWidth * 0.9f, 56, 2.4f, "FootSpray");
+		// (2026-10-29) more spray off it, finer and higher, and the white haze of it hanging round the foot
+		FlowFx.Spray(this, P(sCurt + 0.15f, 0, curtBottom + 0.1f), FlowFx.Liquid.Creek, CurtainWidth * 1.1f, 40, 3.2f, "FootSprayFine");
+		FlowFx.Mist(this, P(sCurt + 0.6f, 0, curtBottom + 0.4f), new Vector3(flow.X, 0.25f, flow.Y) * 0.25f, 2.2f, 14, 0.14f, "FootHaze");
 		BuildSound(P(sCurt, 0, curtBottom + 0.5f));
 		BuildClearZones(sLip, sPool, sCross);
 
@@ -225,9 +231,9 @@ public partial class Waterfall : Node3D
 		// water over the lip, then ropes of it, whitening as they fall, surging and breaking up at the sides
 		float lipLen = 0f;
 		for (int i = 0; i < lipSteps; i++) lipLen += path[i].DistanceTo(path[i + 1]);
-		var mat = FlowFx.PourMat(FlowFx.Liquid.Creek, speed: 2.6f, strands: 7f, wobble: 0.11f, aerateLen: 2.0f);
-		mat.SetShaderParameter("aerate_start", lipLen - 0.2f);
-		mat.SetShaderParameter("rope", 1.5f);
+		var mat = FallMat(speed: 4.2f, strands: 8f, wobble: 0.1f, aerateLen: 1.3f);
+		mat.SetShaderParameter("aerate_start", lipLen - 0.35f);
+		mat.SetShaderParameter("rope", 1.0f);
 		var k = new MeshKit();
 		k.Mat(mat);
 		const int across = 8;
@@ -262,7 +268,7 @@ public partial class Waterfall : Node3D
 		AddChild(mi);
 		// ropes over the curtain: thick strands standing out of it, two at its ragged sides, so it's never a flat sheet
 		var fall = path.GetRange(lipSteps, path.Count - lipSteps);
-		var rope = FlowFx.PourMat(FlowFx.Liquid.Creek, speed: 2.9f, strands: 3f, tube: true, wobble: 0.05f, aerateLen: 1.0f);
+		var rope = FallMat(speed: 4.6f, strands: 3f, tube: true, wobble: 0.05f, aerateLen: 0.7f);
 		float[] lats = { -0.47f, 0.12f, 0.49f };
 		for (int r = 0; r < lats.Length; r++)
 		{
@@ -279,6 +285,24 @@ public partial class Waterfall : Node3D
 	}
 
 	private Vector3 Right(float s) { Flat(s, out Vector2 d); return new Vector3(-d.Y, 0, d.X); }
+
+	private static Shader _fallShader;
+
+	/// <summary>(2026-10-29) The curtain's and the ropes' material: waterfall.gdshader (water, not FlowFx's pour, which
+	/// read as molten metal here).</summary>
+	private static ShaderMaterial FallMat(float speed, float strands, bool tube = false, float wobble = 0.05f, float aerateLen = 1.2f)
+	{
+		var m = new ShaderMaterial { Shader = _fallShader ??= GD.Load<Shader>("res://assets/shaders/waterfall.gdshader") };
+		m.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
+		m.SetShaderParameter("speed", speed);
+		m.SetShaderParameter("strands", strands);
+		m.SetShaderParameter("tube", tube ? 1f : 0f);
+		m.SetShaderParameter("wobble", wobble);
+		m.SetShaderParameter("aerate_len", aerateLen);
+		// (the ropes stand out of the curtain: less of the rock seen through them)
+		m.SetShaderParameter("glass_alpha", tube ? 0.55f : 0.42f);
+		return m;
+	}
 
 	/// <summary>A thin, slow mist off the foot of the fall.</summary>
 	private void BuildMist(Vector3 at, Vector2 flow)
@@ -305,7 +329,7 @@ public partial class Waterfall : Node3D
 		draw.Material = new StandardMaterial3D
 		{
 			AlbedoTexture = PropTextures.Puff(),
-			AlbedoColor = new Color(0.92f, 0.94f, 0.95f, 0.08f),   // (fainter: unshaded, at night the puffs glowed as balls)
+			AlbedoColor = new Color(0.92f, 0.94f, 0.95f, 0.11f),   // (fainter: unshaded, at night the puffs glowed as balls; 2026-10-29 a touch more: spray at the base)
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
@@ -315,7 +339,7 @@ public partial class Waterfall : Node3D
 		var mist = new GpuParticles3D
 		{
 			Name = "Mist",
-			Amount = 10,
+			Amount = 16,
 			Lifetime = 3.2,
 			Preprocess = 3.0,
 			ProcessMaterial = pm,

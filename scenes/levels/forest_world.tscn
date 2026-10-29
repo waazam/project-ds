@@ -139,6 +139,7 @@ ClearingRadius = 10.0
 ClearingGrass = false
 Basin = Vector3(5, -540, 80)
 Hills = Array[Vector4]([Vector4(77, -267, 22, 30), Vector4(-22, 122, 16, 26), Vector4(-70, 95, 12, 30), Vector4(20, 160, 18, 32)])
+Pads = Array[Vector4]([Vector4(13.6, -110.9, 5.2, 2.3)])
 DeepShadeZ = Vector2(-280, -440)
 GravelTrailZ = -125.0
 WalkMaxZ = 80.0
@@ -548,7 +549,7 @@ script = ExtResource("9_clear")
 Radius = 3.2
 
 [node name="TrailheadCabin" type="Node3D" parent="Trailhead"]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 16.5, 0, 27.5)
+transform = Transform3D(0.34, 0, -0.94, 0, 1, 0, 0.94, 0, 0.34, 15.3, 0, -111.5)
 script = ExtResource("cabin_hub_script")
 Hub = true
 
@@ -560,6 +561,11 @@ Radius = 6.2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.5)
 script = ExtResource("9_clear")
 Radius = 3.2
+
+[node name="PathClear" type="Node3D" parent="Trailhead/TrailheadCabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8.5)
+script = ExtResource("9_clear")
+Radius = 2.6
 
 [node name="TrailMarkers" type="Node3D" parent="."]
 script = ExtResource("7_markers")

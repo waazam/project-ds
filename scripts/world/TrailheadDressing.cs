@@ -88,6 +88,147 @@ public partial class TrailheadDressing : Node3D
 		var yaw = new Basis(Vector3.Up, Mathf.DegToRad(73f));
 		if (WeatheredProps.Put(_gen, "Sign_Firewood", wood, 73f) != null)
 			Col(wood + yaw * new Vector3(0f, 0.62f, -0.04f), new Vector3(0.86f, 1.24f, 0.08f), yaw);
+		Firewood(wood, yaw);
+	}
+
+	// ---------------------------------------------------------------- the firewood for sale
+
+	/// <summary>(2026-10-29, the owner's friend's playtest: by the green "FIREWOOD $2 A BUNDLE" board, "add actual stacked
+	/// firewood bundles ... and a small honour box") Bundles of split logs, each tied round twice with twine, stacked three,
+	/// two and one on a pair of skids beside the board (toward the burn barrel, clear of the van's tailgate); and the honour box on its
+	/// post at the stack's end, a slot in its lid, HONOR BOX stencilled on it. <paramref name="sign"/> and
+	/// <paramref name="yaw"/> are the board's foot and turn (its face +Z).</summary>
+	private void Firewood(Vector3 sign, Basis yaw)
+	{
+		const float len = 0.42f, br = 0.16f;   // a bundle's length (its logs') and girth
+		// the stack's middle: along the board's line, past its right end, a little back from its face
+		var mid = sign + yaw * new Vector3(1.4f, 0f, -0.05f);
+		mid.Y = H(mid.X, mid.Z);
+		var stack = yaw;   // the stack runs along the board (its X); the bundles lie across it, their ends to the lot (its Z)
+		var bark = BuildingTextures.BarkScanMat;
+		var split = BuildingTextures.FreshPlankMat;
+		var endGrain = BuildingTextures.LogEndMat;
+		var twine = ProcTextures.Flat("th_twine", new Color(0.52f, 0.43f, 0.29f), 0.95f, 0.1f);
+		var k = new MeshKit();
+		k.Color = Colors.White;
+		// the skids: two old 2x4s on the ground, under the bundles' ends
+		k.Mat(PropTextures.WetPostMat);
+		foreach (float z in new[] { -len * 0.32f, len * 0.32f })
+			k.Box(mid + stack * new Vector3(0f, 0.04f, z), new Vector3(1.15f, 0.08f, 0.09f), 1.5f, stack);
+		// three, two and one: each in the hollow between two below
+		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 31 + 5) };
+		int n = 0;
+		for (int row = 0; row < 3; row++)
+			for (int i = 0; i < 3 - row; i++)
+			{
+				float x = (i - (2 - row) * 0.5f) * br * 2.05f;
+				float y = 0.08f + br + row * br * 1.75f;
+				var c = mid + stack * new Vector3(x + rng.RandfRange(-0.02f, 0.02f), y, rng.RandfRange(-0.03f, 0.03f));
+				var turn = stack * new Basis(Vector3.Back, rng.RandfRange(0f, Mathf.Tau)) * new Basis(Vector3.Up, rng.RandfRange(-0.06f, 0.06f));
+				Bundle(k, c, turn, len, br, bark, split, endGrain, twine, rng);
+				n++;
+			}
+		k.CommitTo(_gen, "Firewood", true);
+		// the stack, solid (one box round it; its top a slope you can't climb)
+		Col(mid + stack * new Vector3(0f, 0.08f + br * 1.9f, 0f), new Vector3(br * 6.2f, br * 3.8f, len), stack);
+		Clear(mid, 1.3f);
+		HonourBox(mid + stack * new Vector3(br * 3.1f + 0.32f, 0f, 0.1f), yaw);
+		GD.Print($"[trailhead] firewood: {n} bundles stacked by the board, and the honour box");
+	}
+
+	/// <summary>One bundle: split logs packed round a middle, each a wedge of a round (bark on its curve, pale split faces,
+	/// end grain at its ends), a little proud of or short of its neighbours; two bands of twine round it.</summary>
+	private static void Bundle(MeshKit k, Vector3 c, Basis b, float len, float r, Material bark, Material split, Material end, Material twine, RandomNumberGenerator rng)
+	{
+		// the logs: a middle one and a ring of wedges round it, their bark outward
+		const int ring = 7;
+		for (int i = 0; i < ring; i++)
+		{
+			float a0 = i * Mathf.Tau / ring;
+			float a = a0 + rng.RandfRange(-0.1f, 0.1f);
+			float lr = r * rng.RandfRange(0.9f, 1.02f);
+			float slide = rng.RandfRange(-0.025f, 0.025f);
+			SplitLog(k, c + b * new Vector3(0, 0, slide), b, a, a + Mathf.Tau / ring * rng.RandfRange(0.92f, 1.05f), r * 0.22f, lr, len * rng.RandfRange(0.95f, 1.03f), bark, split, end);
+		}
+		SplitLog(k, c, b, 0.3f, 0.3f + Mathf.Pi * 0.5f, 0f, r * 0.36f, len * 0.98f, bark, split, end);
+		// the twine: two bands round it, a third of the way in from each end
+		k.Mat(twine);
+		foreach (float z in new[] { -len * 0.27f, len * 0.27f })
+			k.Cylinder(c + b * new Vector3(0, 0, z - 0.008f), c + b * new Vector3(0, 0, z + 0.008f), r * 1.035f, r * 1.035f, 12, false);
+	}
+
+	/// <summary>A wedge split off a round: the arc from <paramref name="a0"/> to <paramref name="a1"/> (round the bundle's
+	/// Z, in <paramref name="b"/>) between radii <paramref name="r0"/> and <paramref name="r1"/>, <paramref name="len"/> long.</summary>
+	private static void SplitLog(MeshKit k, Vector3 c, Basis b, float a0, float a1, float r0, float r1, float len, Material bark, Material split, Material end)
+	{
+		const int seg = 3;
+		Vector3 P(float a, float r, float z) => c + b * new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, z);
+		float hz = len * 0.5f;
+		void Face(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 n, float w, float h)
+		{
+			if ((p1 - p0).Cross(p2 - p0).Dot(n) < 0f) { (p1, p3) = (p3, p1); }
+			k.Quad(p0, p1, p2, p3, n, new Vector2(0, h), new Vector2(w, h), new Vector2(w, 0), new Vector2(0, 0));
+		}
+		// the bark round its outside
+		k.Mat(bark);
+		for (int s = 0; s < seg; s++)
+		{
+			float u0 = Mathf.Lerp(a0, a1, s / (float)seg), u1 = Mathf.Lerp(a0, a1, (s + 1) / (float)seg);
+			var n = b * new Vector3(Mathf.Cos((u0 + u1) * 0.5f), Mathf.Sin((u0 + u1) * 0.5f), 0f);
+			Face(P(u0, r1, -hz), P(u1, r1, -hz), P(u1, r1, hz), P(u0, r1, hz), n, (u1 - u0) * r1 * 2f, len * 2f);
+		}
+		// the split faces either side (and its inner face, when it doesn't come to a point)
+		k.Mat(split);
+		foreach (float a in new[] { a0, a1 })
+		{
+			var n = b * new Vector3(-Mathf.Sin(a), Mathf.Cos(a), 0f) * (a == a0 ? -1f : 1f);
+			Face(P(a, r0, -hz), P(a, r1, -hz), P(a, r1, hz), P(a, r0, hz), n, (r1 - r0) * 2f, len * 2f);
+		}
+		if (r0 > 0.001f)
+			Face(P(a0, r0, -hz), P(a1, r0, -hz), P(a1, r0, hz), P(a0, r0, hz), b * new Vector3(-Mathf.Cos((a0 + a1) * 0.5f), -Mathf.Sin((a0 + a1) * 0.5f), 0f), (a1 - a0) * r0 * 2f, len * 2f);
+		// the ends: the cut grain
+		k.Mat(end);
+		foreach (float z in new[] { -hz, hz })
+		{
+			var n = b * new Vector3(0, 0, Mathf.Sign(z));
+			for (int s = 0; s < seg; s++)
+			{
+				float u0 = Mathf.Lerp(a0, a1, s / (float)seg), u1 = Mathf.Lerp(a0, a1, (s + 1) / (float)seg);
+				var q0 = P(u0, r0, z); var q1 = P(u0, r1, z); var q2 = P(u1, r1, z); var q3 = P(u1, r0, z);
+				Vector2 Uv(Vector3 q) { var l = b.Inverse() * (q - c); return new Vector2(l.X * 2f + 0.5f, l.Y * 2f + 0.5f); }
+				if ((q1 - q0).Cross(q2 - q0).Dot(n) < 0f) { (q1, q3) = (q3, q1); }
+				k.Quad(q0, q1, q2, q3, n, Uv(q0), Uv(q1), Uv(q2), Uv(q3));
+			}
+		}
+	}
+
+	/// <summary>The honour box: a small slat box on a post, a padlocked hasp, a slot in its sloped lid; HONOR BOX and the
+	/// price stencilled on its face to the lot.</summary>
+	private void HonourBox(Vector3 at, Basis yaw)
+	{
+		at.Y = H(at.X, at.Z);
+		var k = new MeshKit();
+		k.Color = Colors.White;
+		k.Mat(PropTextures.PostMat);
+		k.Box(at + Vector3.Up * 0.42f, new Vector3(0.09f, 0.9f, 0.09f), 1.5f, yaw);
+		var box = at + Vector3.Up * 0.98f;
+		k.Mat(BuildingTextures.CabinTrimMat);
+		k.BevelBox(box, new Vector3(0.3f, 0.24f, 0.22f), 0.012f, 1.5f, yaw);
+		var lid = yaw * new Basis(Vector3.Right, Mathf.DegToRad(-8f));
+		k.BevelBox(box + Vector3.Up * 0.135f, new Vector3(0.34f, 0.03f, 0.26f), 0.008f, 1.5f, lid);
+		k.Mat(ProcTextures.Flat("th_slot", new Color(0.02f, 0.02f, 0.02f), 1f, 0f));
+		k.Box(box + Vector3.Up * 0.152f + yaw.Z * 0.02f, new Vector3(0.12f, 0.004f, 0.016f), 1f, lid);
+		// the hasp and its padlock on the front
+		k.Mat(ProcTextures.MetalMat);
+		k.Color = new Color(0.45f, 0.4f, 0.35f);
+		k.Box(box + yaw.Z * 0.114f + Vector3.Up * 0.06f, new Vector3(0.03f, 0.08f, 0.008f), 1f, yaw);
+		k.Box(box + yaw.Z * 0.125f + Vector3.Up * 0.0f, new Vector3(0.045f, 0.05f, 0.02f), 1f, yaw);
+		k.Color = Colors.White;
+		k.CommitTo(_gen, "HonourBox", true);
+		Col(at + Vector3.Up * 0.55f, new Vector3(0.32f, 1.1f, 0.24f), yaw);
+		var face = box + yaw.Z * 0.112f;
+		SignKit.Text(_gen, "HONOR BOX", face + Vector3.Up * 0.05f, yaw, 0.045f, SignKit.Paint);
+		SignKit.Text(_gen, "$2 a bundle - pay here", face - Vector3.Up * 0.04f, yaw, 0.026f, SignKit.Paint * 0.9f);
 	}
 
 	// ---------------------------------------------------------------- helpers

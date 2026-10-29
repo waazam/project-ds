@@ -18,7 +18,7 @@ namespace ProjectDS.World;
 /// Papers: R.H.'s four prints, pinned across the player's own photo board on the back wall (2026-10-16, Cabin.Story.cs);
 /// the page on the table is FriendBody's. All of them join <see cref="PapersGroup"/> and burn away with the cabin.
 /// The story's things are the same in every cabin (Cabin.Story.cs): the board, the assignment sheet and the framed photo
-/// on the table, the axe on its pegs over the hearth. <see cref="Hub"/> is Act 1's cabin by the lot.
+/// on the table, the axe on its pegs over the hearth. <see cref="Hub"/> is Act 1's cabin (up the trail before the footbridge since 2026-10-29; it was by the lot).
 ///
 /// Local frame: front (the door) faces +Z, same convention as ParkProp. y = 0 is the
 /// INTERIOR FLOOR TOP. At runtime the cabin grounds itself: floor at sill height above
@@ -58,7 +58,7 @@ public partial class Cabin : Node3D
 	/// frame until it's pushed in (2026-10-15: it hung open into the room). Not the story's cabin: it
 	/// stays out of the "cabin" group.</summary>
 	[Export] public bool Derelict = false;
-	/// <summary>(2026-10-16, STORY.md Rev 5) Act 1's cabin by the trailhead's lot, rented for the shoot: the same cabin, warm
+	/// <summary>(2026-10-16, STORY.md Rev 5) Act 1's cabin up the Blackfern trail before the footbridge (2026-10-29: moved from the lot, the owner's friend's playtest), rented for the shoot: the same cabin, warm
 	/// and lit, its door shut until E opens it (and open from then on, saved), the player's own photo board on the wall, a
 	/// clean table and chair (nothing of R.H.'s), the assignment sheet and the framed photo on the table, the axe over the
 	/// hearth (<see cref="BuildStory"/>). It joins <see cref="HubGroup"/>, not "cabin" (that's the Hollow's).</summary>
@@ -145,7 +145,7 @@ public partial class Cabin : Node3D
 			AddToGroup(HubGroup);
 			if (!Engine.IsEditorHint() && StoryManager.Instance is { } s)
 			{
-				IsOpen = !BurnedOut && s.HasFlag(HubDoorFlag);
+				IsOpen = !BurnedOut && s.HasFlag(HubDoorFlag) && !(s.HasFlag(HubDoorShutFlag) && !s.HasFlag(HubDoorSlamFlag));   // (2026-10-29: shut again while the alarm goes)
 				// (on the way home in Act 25 it stands dark; what the fire left of it is Act 25's to show)
 				if (s.Current >= Checkpoint.Act24Finished) _lightOn = false;
 			}
@@ -975,7 +975,7 @@ public partial class Cabin : Node3D
 		{
 			// (2026-10-16) Act 1's cabin: shut until it's opened (Dan's rule, c522e73), and it stays open behind him
 			var use = new Interactable { Name = "OpenDoor", Prompt = "Open the door", MaxDistance = 2.6f, PickRadius = 0.6f, Position = new Vector3(w * 0.6f, 1.0f, 0.1f), HighlightRoot = new NodePath("NoHighlight") };
-			use.Interacted += _ => OpenHubDoor();
+			use.Interacted += _ => UseHubDoor();   // (2026-10-29: locked until the key's out from under the mat)
 			_door.AddChild(use);
 		}
 		if (Derelict)

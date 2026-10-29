@@ -379,6 +379,26 @@ public partial class Playtest
 		Check("walk 1 first (no board flag yet)", World.Act1Walks.Stage == 1 && atmo is not { Act1Stage: not 1 }, $"stage {World.Act1Walks.Stage}, light {atmo?.Act1Stage}");
 		Check("walk 1: the trail on past the fork shut by its trunk (the falls' climb open now: two walks), the woods round it walled",
 			walks.GatesDown == 1 && walks.WallPieces > 20 && !walks.IsClosed(World.Act1Walks.Way.FallsB), $"{walks.GatesDown} trunks, {walks.WallPieces} wall pieces");
+		// ---- (2026-10-29, the owner's friend's playtest) the cabin up the trail before the bridge: check in, locked, the key
+		// under the mat
+		using (Fast(2)) await _bot.WaitUntilGame(() => walks.CheckInThought, 20, ct);
+		Check("the camera in hand: \"I should check into the cabin.\"", walks.CheckInThought);
+		var cab = GetTree().GetFirstNodeInGroup(World.Cabin.HubGroup) as World.Cabin;
+		Require("the cabin", cab != null);
+		Check("the cabin stands up the trail in the woods, before the footbridge", walks.CabinS > 100f && walks.CabinS < 175f
+			&& TestBot.Flat(cab.GlobalPosition).DistanceTo(TestBot.Flat(terrain.TrailPoint(walks.CabinS, out _))) < 16f, $"{walks.CabinS:0} m up the trail, at {cab.GlobalPosition}");
+		await _bot.Teleport(cab.ApproachPoint, cab.DoorCenter, ct, snapToTerrain: false);
+		await _bot.Seconds(0.4, ct);
+		Shot("act1_cabin_in_the_woods");
+		await _bot.UseIt(cab.HubDoorUse, ct);
+		Check("its door is locked", cab.TriedLocked && !cab.HubDoorOpen);
+		await _bot.UseIt(cab.MatUse, ct);
+		using (Fast(2)) await _bot.WaitUntilGame(() => cab.HasHubKey, 4, ct);
+		Check("the key under the door mat (lift the mat)", cab.HasHubKey && cab.MatUse == null);
+		await _bot.Seconds(1.6, ct);
+		await _bot.UseIt(cab.HubDoorUse, ct);
+		using (Fast(2)) await _bot.WaitUntilGame(() => cab.HubDoorOpen, 3, ct);
+		Check("unlocked with it: the door opens", cab.HubDoorOpen);
 		// ---- (2026-10-23) the wayfinding: blazes, the sign past the bridge, the overlook's platform, and the pull back
 		using (Fast(3)) await _bot.WaitUntil(() => walks.BlazeCount > 0, 25, ct);
 		Check("walk 1: the way shown in the woods: blazes on the trees, the overlook's platform", walks.BlazeCount >= 30 && walks.Platform != null, $"{walks.BlazeCount} blazes, platform {walks.Platform != null}");
@@ -411,8 +431,9 @@ public partial class Playtest
 		var so = terrain.TrailPoint(120f, out var sot);
 		var off = so + Vector3.Up.Cross(sot).Normalized() * -18f;
 		await _bot.Teleport(off, off + sot * 10f, ct);
+		// (2026-10-29: on until the thought, up to ten rounds: under load the pushes give less game time)
 		using (Fast(3))
-			for (int r = 0; r < 4 && !walks.StrayThought; r++) { await _bot.PushFor(new Vector2(0, 1), 5, ct); await _bot.PushFor(new Vector2(0, -1), 5, ct); }
+			for (int r = 0; r < 10 && !walks.StrayThought; r++) { await _bot.PushFor(new Vector2(0, 1), 5, ct); await _bot.PushFor(new Vector2(0, -1), 5, ct); }
 		_bot.Release();
 		Check("walk 1: wandered off the way, a bird calls from it, then the thought: the trail's back that way", walks.StrayCalls >= 1 && walks.StrayThought, $"{walks.StrayCalls} calls, thought {walks.StrayThought}");
 		float gate = walks.NorthGateAt;
@@ -423,6 +444,26 @@ public partial class Playtest
 		using (Fast(3)) await _bot.WalkFor(terrain.TrailPoint(gate + 30f, out _), 5, ct);
 		terrain.TrailDistance(Player.GlobalPosition.X, Player.GlobalPosition.Z, out float got);
 		Check("walk 1: the trail past the fork can't be walked (the trunk)", got < gate + 3f, $"got to {got:0} m (the trunk at {gate:0} m)");
+		// (2026-10-29) pictures taken, at the trunk: the van's alarm far off, the cabin's door shut behind them; louder on
+		// the way back; level with the cabin it stops dead, the door slams open, "Post Pictures."; the van gone from the lot
+		using (Fast(2)) await _bot.WaitUntilGame(() => walks.AlarmOn, 4, ct);
+		float far = walks.AlarmDb;
+		Check("at the trunk past the bridge: the van's alarm, far off; the cabin shut behind them", walks.AlarmOn && far < -20f && !cab.HubDoorOpen, $"on {walks.AlarmOn}, {far:0} dB, door open {cab.HubDoorOpen}");
+		var ab = terrain.TrailPoint(walks.CabinS + 40f, out var abt);
+		await _bot.Teleport(ab, ab - abt * 10f, ct);
+		await _bot.Seconds(0.3, ct);
+		Check("walking back: louder", walks.AlarmOn && walks.AlarmDb > far + 6f, $"{far:0} -> {walks.AlarmDb:0} dB");
+		using (Fast(2)) await _bot.WalkTo(terrain.TrailPoint(walks.CabinS - 2f, out _), 1.5f, ct, stopWhen: () => walks.AlarmStopped, giveUp: 25f);
+		_bot.Release();
+		Check("level with the cabin: the alarm stops dead, the door slams open", walks.AlarmStopped && !walks.AlarmOn && cab.HubDoorOpen, $"stopped {walks.AlarmStopped}, door {cab.HubDoorOpen}");
+		await _bot.Aim(cab.DoorCenter, ct);
+		await _bot.Seconds(1.8, ct);
+		Shot("act1_door_slammed_open");
+		Check("the van gone from the lot", walks.VanGone);
+		await _bot.Teleport(walks.VanSpot + Vector3.Back * 4f, walks.VanSpot, ct);
+		using (Fast(2)) await _bot.WaitUntilGame(() => walks.VanGoneThought, 6, ct);
+		Check("back at its bay: \"The van's gone.\"", walks.VanGoneThought);
+		Shot("act1_van_gone");
 		// round it through the trees: 25 m off the trail, pressing north
 		var side = g0 + Vector3.Up.Cross(gt).Normalized() * 25f;   // (the west side: the overlook spur is on the east)
 		await _bot.Teleport(side, side + gt * 10f, ct);
@@ -442,7 +483,7 @@ public partial class Playtest
 		var stand = boardAt + hub.Board.GlobalBasis.Z.Normalized() * 1.5f;
 		await _bot.Teleport(new Vector3(stand.X, hub.GlobalPosition.Y, stand.Z), boardAt, ct, snapToTerrain: false);
 		await _bot.Aim(boardAt, ct);
-		await _bot.WaitUntil(() => walks.StrangerThought, 3, ct);
+		await _bot.WaitUntil(() => walks.StrangerThought, 7, ct);   // (the boot prints' thought can still be up)
 		await _bot.Seconds(0.3, ct);
 		Check("looking at it: \"I didn't take that.\"", walks.StrangerThought);
 		Shot("act1_stranger_print");
@@ -479,7 +520,7 @@ public partial class Playtest
 		// turning back for the cabin: a tree beside the trail creaks, waits for them to look, and comes down in front of them
 		var closer = walks.Closers().FirstOrDefault(c => c.way == World.Act1Walks.Way.Back).tree;
 		Require("the way back's tree", closer != null);
-		var b0 = terrain.TrailPoint(walks.BackCloserAt + 24f, out var bt);
+		var b0 = terrain.TrailPoint(walks.BackCloserAt + 18f, out var bt);
 		await _bot.Teleport(b0, b0 - bt * 10f, ct);
 		await _bot.WalkTo(terrain.TrailPoint(walks.BackCloserAt + 9f, out _), 1f, ct, stopWhen: () => closer.Falling, giveUp: 12f);
 		Check("walk 3, turning back: the tree over the way back creaks", closer.Falling);
@@ -495,9 +536,9 @@ public partial class Playtest
 		Check("the fallen trunk holds: walked into, it doesn't let them through", across > 0f, $"{across:0.0} m on their side");
 		Shot("walk3_way_back_closed");
 		// up the trail at dusk: the far rifle again, nearer
-		var r0 = terrain.TrailPoint(115f, out var rt);
+		var r0 = terrain.TrailPoint(walks.CabinS + 12f, out var rt);
 		await _bot.Teleport(r0, r0 + rt * 10f, ct);
-		using (Fast(3)) await _bot.WalkFor(terrain.TrailPoint(150f, out _), 4, ct);
+		using (Fast(3)) await _bot.WalkFor(terrain.TrailPoint(walks.CabinS + 50f, out _), 4, ct);
 		Check("the dusk walk: the rifle from the first walk again, nearer", walks.RifleAgain);
 		// on up the trail at dusk: the voices call along the way
 		var v0 = terrain.TrailPoint(300f, out var vt);

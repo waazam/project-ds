@@ -74,6 +74,11 @@ public partial class ForestTerrain : Node3D
 	[Export] public Vector3 Basin = Vector3.Zero;
 	/// <summary>Round hills added on top of everything else: (x, z, height, radius).</summary>
 	[Export] public Vector4[] Hills = System.Array.Empty<Vector4>();
+	/// <summary>(2026-10-29, Act 1's cabin moved up the trail into the woods: the owner's friend's playtest) Flat pads cut
+	/// into the valley's side for a building: (x, z, radius, height), level at that height inside the radius, blended back
+	/// into the ground over <see cref="PadBlend"/> m.</summary>
+	[Export] public Vector4[] Pads = System.Array.Empty<Vector4>();
+	[Export] public float PadBlend = 5f;
 
 	[ExportGroup("Shape")]
 	[Export] public float ValleyDepth = 17f;
@@ -364,6 +369,13 @@ public partial class ForestTerrain : Node3D
 		float rc = p.DistanceTo(ClearingCenter);
 		float tc = 1f - Mathf.SmoothStep(ClearingRadius * 0.7f, ClearingRadius * 1.2f, rc);
 		if (tc > 0) h = Mathf.Lerp(h, _clearH + _nMid.GetNoise2D(x * 2f, z * 2f) * 0.18f * Mathf.SmoothStep(3f, 12f, rc), tc);
+
+		// building pads: level, a little of the ground's grain left on them
+		foreach (var pad in Pads)
+		{
+			float tpd = 1f - Mathf.SmoothStep(pad.Z, pad.Z + PadBlend, p.DistanceTo(new Vector2(pad.X, pad.Y)));
+			if (tpd > 0) h = Mathf.Lerp(h, pad.W + fine * 0.3f, tpd);
+		}
 		return h;
 	}
 

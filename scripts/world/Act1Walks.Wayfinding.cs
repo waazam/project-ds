@@ -194,7 +194,7 @@ public partial class Act1Walks
 
 	// ------------------------------------------------------------------ the overlook's platform
 
-	/// <summary>A timber viewing platform at the overlook (the Overlook spur's end): a deck on posts up three steps, a rail
+	/// <summary>A timber viewing platform at the overlook (the Overlook spur's end): a deck on posts up a ramp, a rail
 	/// round the far sides, and a mast with a faded pennant standing over the brush to be seen coming up the hill.</summary>
 	private void BuildPlatform()
 	{
@@ -216,9 +216,19 @@ public partial class Act1Walks
 			k.Box(new Vector3(px * 0.92f, (deck + 1.1f) * 0.5f - 0.3f, pz * 0.92f), new Vector3(0.16f, deck + 1.1f + 0.6f, 0.16f));
 		k.Mat(PropTextures.DeckMat);
 		k.Box(new Vector3(0, deck, 0), new Vector3(half * 2f, 0.1f, half * 2f), 0.6f);
-		// three steps up on the near side (+Z: back down the spur)
-		for (int i = 0; i < 3; i++)
-			k.Box(new Vector3(0, deck * (i + 1) / 4f - 0.05f, half + 0.35f + (2 - i) * 0.32f), new Vector3(1.2f, 0.08f, 0.32f), 0.6f);
+		// (2026-10-29, the owner's friend's playtest: walking up it "clips into the platform's foundation") a ramp up on the
+		// near side (+Z: back down the spur) in place of the three steps, which floated or sank with the hill and left the
+		// deck's edge to walk into: it runs from the deck's top down to the ground where it lands, however the hill falls
+		float top = deck + 0.05f;
+		var (rampLen, foot) = RampFit(root, half, top);
+		bool ramp = rampLen > 0f;
+		if (ramp) RampMesh(k, half, top, rampLen, foot);
+		// the skirt: boards round the deck's sides down into the ground, so there is nothing under it to see or catch on
+		k.Mat(PropTextures.PostMat);
+		float low = Mathf.Min(0f, Mathf.Min(LocalGround(root, -half, -half), Mathf.Min(LocalGround(root, half, -half), Mathf.Min(LocalGround(root, -half, half), LocalGround(root, half, half))))) - 0.25f;
+		float sh = top - 0.06f - low;
+		foreach (var (px, pz, sx, sz) in new[] { (0f, -half, half * 2f, 0.04f), (-half, 0f, 0.04f, half * 2f), (half, 0f, 0.04f, half * 2f), (0f, half, half * 2f, 0.04f) })
+			k.Box(new Vector3(px, low + sh * 0.5f, pz), new Vector3(sx, sh, sz), 0.6f);
 		// the rail on the far side and the two ends
 		k.Mat(PropTextures.PostMat);
 		k.Box(new Vector3(0, deck + 1.0f, -half * 0.92f), new Vector3(half * 2f, 0.08f, 0.08f));
@@ -232,12 +242,83 @@ public partial class Act1Walks
 		k.CommitTo(root, "Mesh", true);
 		var body = new StaticBody3D { Name = "Body", CollisionLayer = 1, CollisionMask = 0 };
 		body.SetMeta("surface", "wood");
-		body.AddChild(new CollisionShape3D { Position = new Vector3(0, deck - 0.4f, 0), Shape = new BoxShape3D { Size = new Vector3(half * 2f, 0.9f, half * 2f) } });
-		for (int i = 0; i < 3; i++)
-			body.AddChild(new CollisionShape3D { Position = new Vector3(0, deck * (i + 1) / 4f - 0.3f, half + 0.35f + (2 - i) * 0.32f), Shape = new BoxShape3D { Size = new Vector3(1.2f, 0.5f, 0.32f) } });
+		// the deck solid down to the skirt's foot, and the ramp one smooth slab (its top the planks' line, its foot below the
+		// ground) running a little under the deck's edge, so the foot meets nothing on the way up
+		body.AddChild(new CollisionShape3D { Position = new Vector3(0, (top + low) * 0.5f, 0), Shape = new BoxShape3D { Size = new Vector3(half * 2f, top - low, half * 2f) } });
+		if (ramp) body.AddChild(RampCollision(half, top, rampLen, foot));
 		foreach (var (px, pz, sx, sz) in new[] { (0f, -half * 0.92f, half * 2f, 0.1f), (-half * 0.92f, 0f, 0.1f, half * 2f), (half * 0.92f, 0f, 0.1f, half * 2f) })
 			body.AddChild(new CollisionShape3D { Position = new Vector3(px, deck + 0.55f, pz), Shape = new BoxShape3D { Size = new Vector3(sx, 1.1f, sz) } });
 		root.AddChild(body);
+	}
+
+	/// <summary>Ground height under the platform's local (x, z), relative to its origin.</summary>
+	private float LocalGround(Node3D root, float x, float z)
+	{
+		var w = root.GlobalTransform * new Vector3(x, 0f, z);
+		return _terrain.HeightAt(w.X, w.Z) - root.GlobalPosition.Y;
+	}
+
+	/// <summary>The platform's ramp: how long (m, out from the deck's edge at z = half), and the height of the ground where
+	/// it lands (local). As gentle as a park's ramp (about 1 in 3.3) whatever the hill does under it; none when the
+	/// ground is near the deck's top there.</summary>
+	private (float len, float foot) RampFit(Node3D root, float half, float top)
+	{
+		const float slope = 0.3f;   // rise over run (about 17 degrees)
+		float len = 2f, foot = LocalGround(root, 0f, half + len);
+		for (int i = 0; i < 4; i++)
+		{
+			float rise = top - foot;
+			if (rise < 0.12f) return (0f, foot);
+			len = Mathf.Clamp(rise / slope, 0.6f, 6f);
+			foot = LocalGround(root, 0f, half + len);
+		}
+		return (len, foot);
+	}
+
+	private const float RampW = 1.3f;
+
+	/// <summary>The ramp's look: two stringers, planks across, a cleat every few planks for the grip, posts at its foot.</summary>
+	private static void RampMesh(MeshKit k, float half, float top, float len, float foot)
+	{
+		float rise = top - foot;
+		float run = Mathf.Sqrt(len * len + rise * rise);
+		var down = new Vector3(0f, -rise, len) / run;   // down the ramp
+		var tilt = new Basis(Vector3.Right, Mathf.Atan2(rise, len));   // (its Z down the slope, its Y off the planks)
+		Vector3 At(float t, float x, float up) => new Vector3(x, top, half) + down * t + tilt.Y * up;
+		k.Mat(PropTextures.PostMat);
+		foreach (float x in new[] { -RampW * 0.5f + 0.05f, RampW * 0.5f - 0.05f })
+			k.Box(At(run * 0.5f, x, -0.11f), new Vector3(0.07f, 0.16f, run + 0.04f), 0.6f, tilt);
+		k.Mat(PropTextures.DeckMat);
+		int planks = Mathf.Max(2, Mathf.RoundToInt(run / 0.16f));
+		for (int i = 0; i < planks; i++)
+		{
+			float t = (i + 0.5f) * run / planks;
+			k.Box(At(t, 0f, -0.02f), new Vector3(RampW, 0.04f, run / planks - 0.012f), 0.6f, tilt);
+			if (i % 3 == 1) k.Box(At(t, 0f, 0.012f), new Vector3(RampW - 0.2f, 0.025f, 0.035f), 0.6f, tilt);
+		}
+		k.Mat(PropTextures.PostMat);
+		foreach (float x in new[] { -RampW * 0.5f + 0.05f, RampW * 0.5f - 0.05f })
+			k.Box(new Vector3(x, foot - 0.1f, half + len - 0.1f), new Vector3(0.1f, 0.3f, 0.1f), 0.6f);
+	}
+
+	/// <summary>The ramp's collision: one slab, its top on the planks' line from the deck's edge to below the ground at the
+	/// foot, carried a little back under the deck (no lip to walk into).</summary>
+	private static CollisionShape3D RampCollision(float half, float top, float len, float foot)
+	{
+		float rise = top - foot;
+		float ang = Mathf.Atan2(rise, len);
+		float over = 0.4f, past = 0.6f;   // (under the deck, and on into the ground)
+		float run = Mathf.Sqrt(len * len + rise * rise) + over + past;
+		const float thick = 0.5f;
+		var dir = new Vector3(0f, -Mathf.Sin(ang), Mathf.Cos(ang));
+		var n = new Vector3(0f, Mathf.Cos(ang), Mathf.Sin(ang));
+		var start = new Vector3(0f, top, half) - dir * over;
+		var centre = start + dir * run * 0.5f - n * thick * 0.5f;
+		return new CollisionShape3D
+		{
+			Name = "Ramp", Transform = new Transform3D(new Basis(Vector3.Right, ang), centre),
+			Shape = new BoxShape3D { Size = new Vector3(RampW, thick, run) },
+		};
 	}
 
 	// ------------------------------------------------------------------ the sign past the bridge
