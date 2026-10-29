@@ -74,6 +74,15 @@ public partial class KeyPieceCache : Node3D
 		var terrain = GroundSnap.FindTerrain(this);
 		if (terrain != null) GlobalPosition = GlobalPosition with { Y = terrain.HeightAt(GlobalPosition.X, GlobalPosition.Z) };
 		Build();
+		// (2026-10-29: the cairn's tin lies most of a metre out from its middle: on a slope it was under the ground there, or over
+		// it; on the ground where it lies, once the lot has set this down where it goes, after this)
+		if (terrain != null && Hide == Place.Cairn && _tin != null)
+			Callable.From(() =>
+			{
+				if (!IsInstanceValid(_tin)) return;
+				var t = _tin.GlobalPosition;
+				_tin.GlobalPosition = t with { Y = terrain.HeightAt(t.X, t.Z) + 0.01f };
+			}).CallDeferred();
 		if (StoryManager.Instance is { } s && s.HasFlag(StoryManager.Flag.KeyPiece(Piece))) SetTaken();
 	}
 
@@ -143,7 +152,8 @@ public partial class KeyPieceCache : Node3D
 		_use = new Interactable
 		{
 			// (2026-10-19: 0.17 m was a fiddly target down in the snag, found a second late even by the test's aim; about the glint's size now)
-			Name = "Use", Prompt = "Open the tin", MaxDistance = 2.4f, PickRadius = 0.26f, PickOffset = new Vector3(0, 0.04f, 0),
+			Name = "Use", Prompt = "Open the tin", MaxDistance = 2.8f,   // (2026-10-29: 2.4 m didn't reach a tin on the ground from a standing eye on a slope)
+			PickRadius = 0.26f, PickOffset = new Vector3(0, 0.04f, 0),
 		};
 		_tin.AddChild(_use);
 		_use.Interacted += OnUse;

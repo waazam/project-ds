@@ -512,6 +512,8 @@ public partial class Playtest
 		// (2026-10-29, the playtest: someone "clipped straight out through the door when the fire started") made for the door the
 		// moment it lights: the roof comes down in front of them, and they are still inside
 		Vector3 outside = cabin.ToGlobal(new Vector3(0, 0, cabin.Depth * 0.5f + 3f));
+		// (from the open middle of the room, where the table isn't in the way)
+		await _bot.Teleport(cabin.ToGlobal(new Vector3(0.2f, 0f, 0.3f)), outside, ct);
 		await _bot.WalkTo(outside, 0.5f, ct, giveUp: 6f);
 		Check("rushing the door as the print burns: it caves in in front of them", fire.CavedIn, $"{fire.Now}");
 		Check("and they are still in the room", cabin.ToLocal(Player.GlobalPosition).Z < cabin.Depth * 0.5f - 0.3f, $"{cabin.ToLocal(Player.GlobalPosition)}");
