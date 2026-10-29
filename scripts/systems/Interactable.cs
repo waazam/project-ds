@@ -37,6 +37,20 @@ public partial class Interactable : Node3D
 	/// <summary>Raised when the player uses it (after a press, or once the hold completes).</summary>
 	public event Action<PlayerController> Interacted;
 
+	/// <summary>(2026-10-29, the playtest: "used interactables turn light red") It has been used (a note read, a thing
+	/// looked at, a door opened): its outline turns from white to a light red, so the player knows they've seen it. Set by
+	/// <see cref="PlayerInteraction"/> on every use (<see cref="MarkUsed"/>); a note keeps it across a Continue
+	/// (<see cref="Readable"/>: its read flag, or one made from its words).</summary>
+	public virtual bool Used { get => _used; set => _used = value; }
+	private bool _used;
+
+	/// <summary>The player has used it: <see cref="Used"/>, and its outline told.</summary>
+	public void MarkUsed()
+	{
+		Used = true;
+		if (OutlineFor() is { } o) o.User = this;
+	}
+
 	/// <summary>0..1 while E is being held on a hold-to-use interactable.</summary>
 	public float HoldProgress { get; internal set; }
 	public bool Focused { get; private set; }
@@ -103,7 +117,9 @@ public partial class Interactable : Node3D
 
 	private void SetupOutline()
 	{
-		if (!IsInsideTree() || Outline == false || OutlineFor() != null) return;
+		if (!IsInsideTree() || Outline == false) return;
+		// (one set up by its owner, a pickup's: told whose use turns it red)
+		if (OutlineFor() is { } own) { own.User ??= this; return; }
 		if (Outline == null && IsOpening()) return;
 		if (OutlineProxy != null)
 		{
@@ -119,7 +135,7 @@ public partial class Interactable : Node3D
 				},
 			};
 			AddChild(proxy);
-			World.ItemOutline.Attach(this, proxy, OutlineActive);
+			World.ItemOutline.Attach(this, proxy, OutlineActive).User = this;
 			return;
 		}
 		var root = HighlightRoot.IsEmpty ? GetParent() as Node3D : GetNodeOrNull(HighlightRoot) as Node3D;
@@ -127,7 +143,7 @@ public partial class Interactable : Node3D
 		// no highlight root of its own: its parent is the thing if that's a small thing (a valve, a cigar box, a switch);
 		// a room or a level, then only the small meshes right at it (the room round it is not the thing)
 		bool whole = !HighlightRoot.IsEmpty || IsSmallThing(root);
-		World.ItemOutline.Attach(this, root, OutlineActive, null, whole ? null : () => MeshesAt(root));
+		if (World.ItemOutline.Attach(this, root, OutlineActive, null, whole ? null : () => MeshesAt(root)) is { } line) line.User = this;
 	}
 
 	/// <summary>At most a couple of dozen meshes, none of them bigger than a piece of furniture (looked at no further
@@ -228,6 +244,7 @@ public partial class Interactable : Node3D
 		if (OutlineFor() is { } outline)
 		{
 			outline.Focused = on;
+			outline.User ??= this;
 			_meshes.Clear();
 			_previousOverlay.Clear();
 			return;

@@ -112,6 +112,7 @@ public partial class NoteOverlay : CanvasLayer
 		};
 		_title.AddThemeFontOverride("font", UiKit.SerifHeading);
 		_title.AddThemeFontSizeOverride("font_size", 9);
+		Plain(_title);
 		box.AddChild(_title);
 
 		_body = new RichTextLabel
@@ -148,7 +149,19 @@ public partial class NoteOverlay : CanvasLayer
 		_hint.AddThemeFontOverride("font", UiKit.Mono);
 		_hint.AddThemeFontSizeOverride("font_size", 8);
 		_hint.AddThemeColorOverride("font_color", new Color(0.30f, 0.28f, 0.26f, 0.8f));
+		Plain(_hint);
 		box.AddChild(_hint);
+	}
+
+	/// <summary>(2026-10-29, the playtest: the title and the footnote "still render in a shadowed bold font") Ink on paper
+	/// has no drop shadow: the theme's label shadow (there so words read over the dark woods) is taken off.</summary>
+	private static void Plain(Label l)
+	{
+		l.AddThemeColorOverride("font_shadow_color", Colors.Transparent);
+		l.AddThemeConstantOverride("shadow_offset_x", 0);
+		l.AddThemeConstantOverride("shadow_offset_y", 0);
+		l.AddThemeConstantOverride("shadow_outline_size", 0);
+		l.AddThemeConstantOverride("outline_size", 0);
 	}
 
 	public void Open(Readable note, PlayerController player)
@@ -199,9 +212,14 @@ public partial class NoteOverlay : CanvasLayer
 		}
 		else _card.AddThemeStyleboxOverride("panel", _cardStyle);
 		_ruled = tex != null && style == Readable.NoteStyle.Handwritten;
-		bool hand = style is Readable.NoteStyle.Handwritten or Readable.NoteStyle.Smudged;
-		_title.AddThemeFontOverride("font", hand ? UiKit.Hand : UiKit.SerifHeading);
-		_title.AddThemeFontSizeOverride("font_size", hand ? 11 : 9);
+		// (2026-10-29, the playtest) the title and the footnote in the note's own hand, as if written on it: the body's
+		// font, the title a touch bigger, the footnote smaller and paler (the block capitals and the scrawl run large,
+		// so they're brought down to sit with the rest)
+		_title.AddThemeFontOverride("font", font);
+		_title.AddThemeFontSizeOverride("font_size", font == UiKit.Caps ? 10 : size + 1);
+		_hint.AddThemeFontOverride("font", font);
+		_hint.AddThemeFontSizeOverride("font_size", font == UiKit.Scrawl ? 13 : font == UiKit.Caps ? 7 : Mathf.Max(8, size - 1));
+		_hint.AddThemeColorOverride("font_color", new Color(ink, 0.55f));
 		// the drawing: under the writing, to one side or the middle, a little askew
 		var doodle = NoteDoodles.For(text, note.Title, pg != null ? pg.Doodle : note.Doodle, style);
 		_doodleRow.Visible = doodle != null;
@@ -215,7 +233,7 @@ public partial class NoteOverlay : CanvasLayer
 		}
 		_title.Text = note.Title ?? "";
 		_title.Visible = !string.IsNullOrEmpty(note.Title);
-		_title.AddThemeColorOverride("font_color", new Color(ink, 0.65f));
+		_title.AddThemeColorOverride("font_color", new Color(ink, 0.85f));
 		_body.AddThemeFontOverride("normal_font", font);
 		_body.AddThemeFontSizeOverride("normal_font_size", size);
 		_body.AddThemeColorOverride("default_color", ink);

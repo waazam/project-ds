@@ -64,16 +64,23 @@ public partial class PlayerInteraction : Node
 
 		if (Focused.HoldSeconds <= 0f)
 		{
-			if (_buffered > 0f) { _buffered = 0f; Focused.Interact(_player); }
+			if (_buffered > 0f) { _buffered = 0f; Use(Focused); }
 			return;
 		}
 		if (input.InteractHeld)
 		{
 			Holding = true;
 			Focused.HoldProgress = Mathf.Min(1f, Focused.HoldProgress + (float)delta / Focused.HoldSeconds);
-			if (Focused.HoldProgress >= 1f) { Focused.HoldProgress = 0f; Focused.Interact(_player); }
+			if (Focused.HoldProgress >= 1f) { Focused.HoldProgress = 0f; Use(Focused); }
 		}
 		else Focused.HoldProgress = 0f;
+	}
+
+	/// <summary>Uses it, and marks it used (its outline goes light red: 2026-10-29).</summary>
+	private void Use(Interactable it)
+	{
+		it.Interact(_player);
+		if (IsInstanceValid(it)) it.MarkUsed();
 	}
 
 	private Interactable Probe()

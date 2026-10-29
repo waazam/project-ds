@@ -40,7 +40,8 @@ public partial class EquippedItemHud : CanvasLayer
 	{
 		AddToGroup("equipped_item_hud");
 		Layer = 13;
-		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+		// (mipmapped: the painted hand is 4x the size it is drawn at, 2026-10-29)
+		_draw = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false, TextureFilter = CanvasItem.TextureFilterEnum.LinearWithMipmaps };
 		_draw.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
 		_draw.Draw += OnDraw;
 		AddChild(_draw);

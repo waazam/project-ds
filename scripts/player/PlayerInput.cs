@@ -21,6 +21,9 @@ public partial class PlayerInput : Node
 	public bool Run { get; private set; }
 	/// <summary>Held to focus on something (right mouse / right trigger): a slight zoom.</summary>
 	public bool Focus { get; private set; }
+	/// <summary>(2026-10-29, the playtest: "make photography more dynamic and fun") Held to rack the camera's focus while it's
+	/// at the eye (Space / left trigger): the lens turns from soft to sharp on what's in the middle (CameraTool).</summary>
+	public bool LensFocus { get; private set; }
 	/// <summary>Leaning to peek: -1 left (Q), +1 right (R), 0 upright.</summary>
 	public float Lean { get; private set; }
 
@@ -57,6 +60,9 @@ public partial class PlayerInput : Node
 	public Vector2 ScriptedMove;
 	public bool ScriptedRun;
 	public bool ScriptedFocus;
+	/// <summary>The lens's focus button for scripted input; null follows <see cref="ScriptedFocus"/> (the bots that raise the
+	/// camera and wait for the lock know nothing of the button: they focus as they raise it).</summary>
+	public bool? ScriptedLens;
 	/// <summary>Scripted buttons are "held" while true; the Pressed edge fires on the frame they turn true.</summary>
 	public bool ScriptedInteract, ScriptedLight, ScriptedPhoto, ScriptedItemNext, ScriptedItemPrev, ScriptedPhotoLog, ScriptedLanternMode, ScriptedCrouch, ScriptedThrow, ScriptedBreath;
 
@@ -102,7 +108,7 @@ public partial class PlayerInput : Node
 		_enabled = enabled;
 		if (!enabled)
 		{
-			Move = Vector2.Zero; Run = false; Focus = false; _pendingLook = Vector2.Zero;
+			Move = Vector2.Zero; Run = false; Focus = false; LensFocus = false; _pendingLook = Vector2.Zero;
 			System.Array.Clear(_held); System.Array.Clear(_pressed);
 			System.Array.Clear(_pendingPhysics); System.Array.Clear(_pressedPhysics);
 		}
@@ -112,7 +118,7 @@ public partial class PlayerInput : Node
 	public void BeginModal()
 	{
 		_modal++;
-		Move = Vector2.Zero; Run = false; Focus = false; _pendingLook = Vector2.Zero;
+		Move = Vector2.Zero; Run = false; Focus = false; LensFocus = false; _pendingLook = Vector2.Zero;
 	}
 
 	/// <summary>The overlay closed. Buttons still held from the closing press count as already held,
@@ -161,12 +167,13 @@ public partial class PlayerInput : Node
 	{
 		if (!_enabled) return;
 		UpdateButtons();
-		if (_modal > 0) { Move = Vector2.Zero; Run = false; Focus = false; Lean = 0f; _pendingLook = Vector2.Zero; return; }
+		if (_modal > 0) { Move = Vector2.Zero; Run = false; Focus = false; LensFocus = false; Lean = 0f; _pendingLook = Vector2.Zero; return; }
 		if (Scripted)
 		{
 			Move = ScriptedMove.LimitLength(1f);
 			Run = ScriptedRun;
 			Focus = ScriptedFocus;
+			LensFocus = ScriptedLens ?? ScriptedFocus;
 			Lean = 0f;
 			return;
 		}
@@ -175,8 +182,11 @@ public partial class PlayerInput : Node
 		Move = new Vector2(
 			Input.GetAxis("move_left", "move_right"),
 			Input.GetAxis("move_back", "move_forward")).LimitLength(1f);
-		Run = Input.IsActionPressed("run");
 		Focus = Input.IsActionPressed("focus");
+		LensFocus = Input.IsActionPressed("focus_lens");
+		// (the pad's left trigger runs, and with the camera at the eye it racks the focus instead: nobody sprints looking
+		// through a viewfinder)
+		Run = Input.IsActionPressed("run") && !(Focus && LensFocus);
 
 		var s = GameSettings.Instance;
 		var stick = new Vector2(

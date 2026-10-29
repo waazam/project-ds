@@ -21,6 +21,14 @@ namespace ProjectDS.Player;
 /// frame is read back one render frame after the press, with the viewfinder's marks and every
 /// on-screen word (titles, subtitles, prompts, hints, the HUD) hidden for that frame, so the print
 /// holds only what the camera saw.
+///
+/// <para>(2026-10-29, the playtest's first ask: "make photography more dynamic and fun") The focus is the player's now, not
+/// an autofocus: the lens has a focus distance of its own, and holding the focus button (<see cref="PlayerInput.LensFocus"/>,
+/// Space / the left trigger) racks it onto what's in the middle of the frame, quicker the steadier the view. Let go and it
+/// stays where it was put: walk in, or let the bird hop away, and the picture goes soft again. The deeper the zoom, the
+/// thinner the slice that's sharp. The view through the viewfinder is as soft as the lens is (<see cref="UI.CameraViewfinder"/>
+/// blurs its frame, and its iris closes down while the focus racks), and so is the print: a shot taken sharp comes out
+/// crisper than the screen, one taken soft comes out soft, and the album's pencil says which.</para>
 /// </summary>
 public partial class CameraTool : Node
 {
@@ -46,12 +54,19 @@ public partial class CameraTool : Node
 	public int FramesLeft => _framesLeft;
 	public int ZoomIndex { get; private set; }
 	public float Zoom => ZoomSteps[ZoomIndex];
-	/// <summary>How far the autofocus has pulled in on what's in the middle (0..1).</summary>
+	/// <summary>How sharp the lens is on what's in the middle (0..1): its focus distance against the subject's.</summary>
 	public float FocusLevel => _focus;
+	/// <summary>The focus button held with the camera up: the lens racking.</summary>
+	public bool Racking { get; private set; }
+	/// <summary>Where the lens is focused (metres), and the distance to what's in the middle of the frame.</summary>
+	public float FocusDistance => _focusDist;
+	public float SubjectDistance => _subjDist;
+	/// <summary>Tests: put the lens's focus somewhere (metres).</summary>
+	public void SetFocusDistance(float metres) => _focusDist = Mathf.Max(0.3f, metres);
 	/// <summary>The last shot's score (tests read it).</summary>
 	public PhotoLog.Score LastScore { get; private set; }
 	/// <summary>Tests: set the zoom directly.</summary>
-	public void SetZoom(int index) { ZoomIndex = Mathf.Clamp(index, 0, ZoomSteps.Length - 1); _focus *= 0.35f; }
+	public void SetZoom(int index) => ZoomIndex = Mathf.Clamp(index, 0, ZoomSteps.Length - 1);
 
 	private PlayerController _player;
 	private PlayerInventory _inv;
@@ -65,9 +80,13 @@ public partial class CameraTool : Node
 	public static event System.Action<Camera3D> ShutterOpening;
 	/// <summary>The frame's been taken: they're gone again.</summary>
 	public static event System.Action ShutterClosed;
-	// the autofocus and the steadiness of the shot
+	// the lens's focus and the steadiness of the shot
 	private Node3D _focusOn;
 	private float _focus, _angSpeed, _subjSpeed;
+	/// <summary>The lens's focus distance and the distance to what's in the middle (metres): far off until racked.</summary>
+	private float _focusDist = 30f, _subjDist = 30f;
+	private bool _wasSharp;
+	private PhysicsRayQueryParameters3D _ray;
 	private Vector3 _lastFwd, _lastSubjDir;
 	private bool _haveLast;
 
@@ -108,11 +127,12 @@ public partial class CameraTool : Node
 			int was = ZoomIndex;
 			if (input.ItemPrevPressed) ZoomIndex = Mathf.Min(ZoomIndex + 1, ZoomSteps.Length - 1);
 			if (input.ItemNextPressed) ZoomIndex = Mathf.Max(ZoomIndex - 1, 0);
-			if (ZoomIndex != was) { _focus *= 0.35f; PlayOneShot("res://assets/audio/sfx/cryptex_click_01.wav", "Player", _player, -20f); }
+			if (ZoomIndex != was) { PlayOneShot("res://assets/audio/sfx/cryptex_click_01.wav", "Player", _player, -20f); }
 		}
 		Track((float)delta);
 		_viewfinder.Zoom = Zoom;
 		_viewfinder.FocusLevel = _focus;
+		_viewfinder.Racking = Racking;
 		if (_raise > 0.01f) _viewfinder.FocusLocked = _focusOn != null && _focus > 0.85f;
 		if (IsRaised && input.PhotoPressed && _framesLeft > 0 && !_pendingShot && !_grabbing)
 		{
@@ -184,9 +204,10 @@ public partial class CameraTool : Node
 		return best;
 	}
 
-	/// <summary>Each frame: how fast the view is swinging, how fast the subject moves across it, and the
-	/// autofocus pulling in on what's in the middle (slower the more the view shakes; a new subject
-	/// starts it over, a zoom step sets it back).</summary>
+	/// <summary>Each frame: how fast the view is swinging, how fast the subject moves across it, and the lens: held, the
+	/// focus button racks its focus distance onto what's in the middle (the subject, else whatever the centre of the frame
+	/// rests on), slower the more the view shakes; let go, it stays put. How sharp the picture is: how near the focus
+	/// distance is to the subject's, against a depth of field that thins as the zoom goes in.</summary>
 	private void Track(float dt)
 	{
 		var cam = _player.CameraRig?.Camera;
@@ -204,13 +225,42 @@ public partial class CameraTool : Node
 			_subjSpeed = Mathf.Lerp(_subjSpeed, sub, k);
 		}
 		_lastFwd = fwd; _lastSubjDir = subjDir; _haveLast = true;
-		if (node != _focusOn) { _focusOn = node; _focus = Mathf.Min(_focus, 0.25f); }
-		if (node != null)
+		_focusOn = node;
+		if (_raise <= 0.01f) { Racking = false; _wasSharp = false; return; }
+		// what's in the middle, and how far: the subject, else what the frame's centre rests on (a ray, not through the
+		// player), else the distance
+		float want = at is Vector3 q ? cam.GlobalPosition.DistanceTo(q) : CentreDistance(cam);
+		_subjDist = Mathf.Lerp(_subjDist, Mathf.Max(0.3f, want), 1f - Mathf.Exp(-14f * dt));
+		Racking = IsRaised && _player.PlayerInput.LensFocus;
+		if (Racking)
 		{
-			float steady = Mathf.Clamp(1f - _angSpeed * Zoom / 1.6f, 0.12f, 1f);
-			_focus = Mathf.Min(1f, _focus + dt / 0.55f * steady);
+			// the ring turns at a steady rate in log distance (as a lens's focus scale is marked): from the far distance
+			// to a bird a few metres off in about two thirds of a second held still; a shaking view or a deep zoom slows it
+			float steady = Mathf.Clamp(1f - _angSpeed * Zoom / 1.6f, 0.15f, 1f);
+			float rate = 3.6f * steady / Mathf.Sqrt(Zoom);
+			_focusDist = Mathf.Exp(Mathf.MoveToward(Mathf.Log(_focusDist), Mathf.Log(_subjDist), rate * dt));
 		}
-		else _focus = Mathf.MoveToward(_focus, 0.3f, dt);
+		// the depth of field: wide open at 35mm it's forgiving; at 140mm a step closer is out of focus
+		float dof = 0.42f / Mathf.Sqrt(Zoom);
+		float off = Mathf.Abs(Mathf.Log(_focusDist) - Mathf.Log(_subjDist));
+		float sharp = Mathf.Clamp(1f - off / dof, 0f, 1f);
+		sharp = sharp * sharp * (3f - 2f * sharp);
+		_focus = Mathf.Lerp(_focus, sharp, 1f - Mathf.Exp(-18f * dt));
+		// a tick in the lens as it comes sharp on a subject (the confirmation a real camera beeps)
+		bool locked = node != null && _focus > 0.85f;
+		if (locked && !_wasSharp && Racking) PlayOneShot("res://assets/audio/sfx/cryptex_click_01.wav", "Player", _player, -24f);
+		_wasSharp = locked;
+	}
+
+	/// <summary>How far off the middle of the frame is: the first thing a ray down the view meets (60 m if nothing).</summary>
+	private float CentreDistance(Camera3D cam)
+	{
+		_ray ??= PhysicsRayQueryParameters3D.Create(Vector3.Zero, Vector3.Zero, 1);
+		_ray.Exclude = new Godot.Collections.Array<Rid> { _player.GetRid() };
+		_ray.From = cam.GlobalPosition;
+		_ray.To = cam.GlobalPosition - cam.GlobalBasis.Z * 60f;
+		var hit = cam.GetWorld3D().DirectSpaceState.IntersectRay(_ray);
+		return hit.Count > 0 ? Mathf.Max(0.3f, cam.GlobalPosition.DistanceTo((Vector3)hit["position"])) : 60f;
 	}
 
 	private static Vector3? SubjectPoint(Node3D node) => node switch
@@ -223,7 +273,7 @@ public partial class CameraTool : Node
 	/// <summary>
 	/// How good the shot of <paramref name="centre"/> (a subject <paramref name="radius"/> metres across) is:
 	/// <b>clarity</b> - a steady camera and a still subject (at the zoom's magnification), in enough light;
-	/// <b>focus</b> - how far the autofocus had pulled in; <b>framing</b> - the whole subject in the frame,
+	/// <b>focus</b> - how sharp the lens was on it (the player's racking); <b>framing</b> - the whole subject in the frame,
 	/// near the middle or a third; <b>zoom</b> - the subject filling a good share of the frame, not a speck,
 	/// not cut off.
 	/// </summary>
@@ -275,6 +325,28 @@ public partial class CameraTool : Node
 		float f = 1f + amount * 5f;
 		img.Resize(Mathf.Max(4, Mathf.RoundToInt(w / f)), Mathf.Max(4, Mathf.RoundToInt(h / f)), Image.Interpolation.Bilinear);
 		img.Resize(w, h, Image.Interpolation.Bilinear);
+	}
+
+	/// <summary>(2026-10-29) A print taken in focus: an unsharp mask (the edges drawn crisper, as a good lens and a careful
+	/// hand give), <paramref name="amount"/> 0..1. The print is small (192x128), so it's done by hand on its bytes.</summary>
+	private static void Sharpen(Image img, float amount)
+	{
+		if (img == null || amount <= 0.01f || img.GetFormat() != Image.Format.Rgba8) return;
+		int w = img.GetWidth(), h = img.GetHeight();
+		byte[] src = img.GetData(), dst = (byte[])src.Clone();
+		float k = 0.7f * Mathf.Clamp(amount, 0f, 1f);
+		for (int y = 1; y < h - 1; y++)
+			for (int x = 1; x < w - 1; x++)
+			{
+				int i = (y * w + x) * 4;
+				for (int c = 0; c < 3; c++)
+				{
+					float blur = (src[i - 4 + c] + src[i + 4 + c] + src[i - w * 4 + c] + src[i + w * 4 + c]) * 0.25f;
+					float v = src[i + c] + (src[i + c] - blur) * k;
+					dst[i + c] = (byte)Mathf.Clamp(Mathf.RoundToInt(v), 0, 255);
+				}
+			}
+		img.SetData(w, h, false, Image.Format.Rgba8, dst);
 	}
 
 	/// <summary>Pass two, only when no bird qualifies: the most central PhotoSubject that scores, or null.</summary>
@@ -347,7 +419,12 @@ public partial class CameraTool : Node
 		var score = default(PhotoLog.Score);
 		if (best != null) score = Judge(cam, best.GlobalPosition, PhotoCatalog.Get("bird_" + ColourName(best.Color))?.Radius ?? 0.15f, frame);
 		else if (other != null) score = Judge(cam, other.Centre, other.SubjectRadius, frame);
-		if (best != null || other != null) Soften(frame, 1f - Mathf.Min(score.Clarity, score.Focus) / 100f);
+		// (2026-10-29) the lens's focus shows on every print, subject or not: soft as the view was; one racked sharp on a
+		// steady subject comes out crisper than the screen
+		bool scored = best != null || other != null;
+		float focus = scored ? score.Focus / 100f : _focus;
+		Soften(frame, 1f - (scored ? Mathf.Min(score.Clarity / 100f, focus) : focus));
+		if (focus > 0.85f && (!scored || score.Clarity > 70)) Sharpen(frame, (focus - 0.85f) / 0.15f);
 		LastScore = score;
 		var log = PhotoLog.Instance;
 		log?.BeginShot(frame, cam, _viewfinder.FrameRect);

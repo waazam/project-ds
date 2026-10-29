@@ -46,7 +46,10 @@ public partial class PhotoLog : Node
 		public bool Monster => PhotoCatalog.Get(SubjectId)?.Monster ?? false;
 		/// <summary>Points: the total, doubled for a monster.</summary>
 		public int Points => Total * (Monster ? 2 : 1);
-		public string Caption => CaptionFor(SubjectId);
+		/// <summary>Its pencil caption; (2026-10-29, focus as a skill) a word after it on how the focus came out: one racked
+		/// sharp on a steady hand is "sharp", one taken without focusing "soft" (the wrong prints have nothing to say).</summary>
+		public string Caption => CaptionFor(SubjectId) + (!Scored || Wrong ? ""
+			: Focus >= 90 && Clarity >= 70 ? ", sharp" : Focus < 35 ? " (soft)" : "");
 	}
 
 	/// <summary>How a scored shot came out (CameraTool works it out at the press).</summary>

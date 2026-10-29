@@ -35,6 +35,13 @@ public partial class ItemOutline : Node
 	public const float Alpha = 0.8f;
 	private const int MaskPriority = 120, LinePriority = 121;
 
+	/// <summary>(2026-10-29, the playtest) The light red a used thing's line turns (<see cref="Systems.Interactable.Used"/>):
+	/// pale enough to read as "seen", never as danger.</summary>
+	public static readonly Color UsedColor = new(1f, 0.6f, 0.58f);
+	/// <summary>The interactable whose use turns the line red (null: always white).</summary>
+	public Systems.Interactable User;
+	private float _used = -1f;
+
 	/// <summary>Whether the item is there to take right now (revealed, not taken); null = whenever it's visible.</summary>
 	public Func<bool> Active;
 	public bool Focused;
@@ -236,6 +243,10 @@ public partial class ItemOutline : Node
 		if (!show) return;
 		float a = Mathf.Clamp(_alpha * Mathf.Lerp(Alpha, 1f, _focus), 0f, 1f), w = Mathf.Lerp(Width, FocusWidth, _focus);
 		var l = _line;
+		// white until it's been used, then a light red (eased over, not snapped)
+		float used = User != null && IsInstanceValid(User) && User.Used ? 1f : 0f;
+		_used = _used < 0f ? used : Mathf.MoveToward(_used, used, dt * 3f);
+		l.SetShaderParameter("line_color", Colors.White.Lerp(UsedColor, _used));
 		{
 			l.SetShaderParameter("alpha", a);
 			l.SetShaderParameter("width_px", w);

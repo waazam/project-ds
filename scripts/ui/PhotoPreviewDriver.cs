@@ -146,6 +146,8 @@ public partial class PhotoPreviewDriver : Node
 	private async Task Shoot(string tag, string expectId, bool? expectLock, bool expectRecord, double settle = 2.2)
 	{
 		await Raise(true);
+		// (2026-10-29: the focus is racked by hand now, held with the camera up: give it the moment it takes)
+		for (int i = 0; i < 30 && expectLock == true && !_viewfinder.FocusLocked; i++) await Seconds(0.05);
 		if (expectLock is bool lockOn) Check(_viewfinder.FocusLocked == lockOn, $"{tag}: focus lock {(lockOn ? "on" : "off")}");
 		Shot($"viewfinder_{tag}");
 		int film = _camera.FramesLeft;
@@ -518,6 +520,7 @@ public partial class PhotoPreviewDriver : Node
 		await Seconds(0.5);
 		Check(deer.Current == Entities.Deer.State.Grazing, $"deer still grazing with the player on the trail ({deer.Current})");
 		await Raise(true);
+		for (int i = 0; i < 30 && !_viewfinder.FocusLocked; i++) await Seconds(0.05);   // (racked by hand: 2026-10-29)
 		Check(_viewfinder.FocusLocked, "deer: focus lock on");
 		Shot("viewfinder_deer");
 		await Press(v => _pin.ScriptedPhoto = v);
@@ -590,6 +593,9 @@ public partial class PhotoPreviewDriver : Node
 		{
 			await Press(v => _pin.ScriptedItemNext = v);
 			await Seconds(0.15);
+			await Press(v => _pin.ScriptedItemNext = v);
+			await Seconds(0.2);
+			Check(_page.OnJournal, "after the prints, the shot list (2026-10-29)");
 			await Press(v => _pin.ScriptedItemNext = v);
 			await Seconds(0.2);
 			Check(_page.OnNotes, $"after the prints, the notes: a line for each thing found ({_page.NotesFound})");

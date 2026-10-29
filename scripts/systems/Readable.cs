@@ -45,6 +45,21 @@ public partial class Readable : Interactable
 
 	public bool HasBeenRead => !string.IsNullOrEmpty(ReadFlag) && (StoryManager.Instance?.HasFlag(ReadFlag) ?? false);
 
+	/// <summary>(2026-10-29) Read: its outline is light red, and stays so on a Continue. A note with a read flag has it
+	/// already; any other keeps a flag of its own, named from its words (a note is where it is, and says what it says).</summary>
+	public override bool Used
+	{
+		get => base.Used || HasBeenRead || (StoryManager.Instance?.HasFlag(SeenFlag) ?? false);
+		set
+		{
+			base.Used = value;
+			if (value && string.IsNullOrEmpty(ReadFlag) && StoryManager.Instance is { } s && !s.HasFlag(SeenFlag)) s.SetFlag(SeenFlag);
+		}
+	}
+
+	private string _seenFlag;
+	private string SeenFlag => _seenFlag ??= "seen_note_" + ((Title ?? "") + "|" + (Pages is { Length: > 0 } p ? p[0].Text : Text ?? "")).Hash().ToString("x8");
+
 	public override void _Ready()
 	{
 		if (Prompt == "Interact") Prompt = "Read";

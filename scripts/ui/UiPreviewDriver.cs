@@ -99,6 +99,7 @@ public partial class UiPreviewDriver : Node
 		}
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--hints") >= 0) { await HintShots(player, inv); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--notes") >= 0) { await NoteShots(player); return; }
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--camera") >= 0) { await CameraShots(player, inv); return; }
 		inv.TryPickup(ToolKind.Compass);
 		inv.TryPickup(ToolKind.Lantern);
 		await Seconds(1.0);
@@ -189,12 +190,102 @@ public partial class UiPreviewDriver : Node
 	/// <summary>`-- --hints [--hints-tag=before]` (2026-10-15): every kind of hint at 1920x1080 and 2560x1440, in the day and in
 	/// the dark, the window's real frame (2D at the window's resolution with the CRT filter on). Shots go to
 	/// test-output/hints/&lt;tag&gt;/.</summary>
+	/// <summary>(2026-10-29) "-- --camera": the camera at the eye, soft before it's focused, the iris working while the
+	/// focus button's held, sharp once it's racked in, at x1 and x3; the empty hand on the HUD in two colours; then the
+	/// album's shot list with some of it ticked and printed (test-output/ui/camera_*, journal_*).</summary>
+	private async Task CameraShots(PlayerController player, PlayerInventory inv)
+	{
+		inv.TryPickup(ToolKind.Compass);
+		inv.TryPickup(ToolKind.Camera);
+		await Seconds(0.6);
+		inv.Select(ToolKind.None);
+		await Seconds(1.2);
+		Shot("camera_empty_hand");
+		GameSettings.Instance.HudColor = 4;
+		await Seconds(0.4);
+		Shot("camera_empty_hand_blue");
+		GameSettings.Instance.HudColor = 0;
+		inv.Select(ToolKind.Camera);
+		await Seconds(1.2);
+		var pin = player.PlayerInput;
+		var cam = player.GetNodeOrNull<CameraTool>("CameraTool");
+		pin.Scripted = true;
+		pin.ScriptedLens = false;
+		pin.ScriptedFocus = true;
+		cam?.SetFocusDistance(60f);
+		player.CameraRig.SetPitch(Mathf.DegToRad(-8f));
+		await Seconds(0.8);
+		Shot("camera_01_soft");
+		Check(cam != null && cam.FocusLevel < 0.5f, $"the lens is soft before it's focused ({cam?.FocusLevel:0.00}, focus at {cam?.FocusDistance:0.0} m on {cam?.SubjectDistance:0.0} m)");
+		pin.ScriptedLens = true;
+		await Seconds(0.2);
+		Shot("camera_02_racking");
+		await Seconds(1.4);
+		Shot("camera_03_sharp");
+		Check(cam != null && cam.FocusLevel > 0.85f, $"held, the focus racks in ({cam?.FocusLevel:0.00}, focus at {cam?.FocusDistance:0.0} m on {cam?.SubjectDistance:0.0} m)");
+		pin.ScriptedLens = false;
+		await Seconds(0.5);
+		Shot("camera_04_released");
+		cam?.SetZoom(3);
+		cam?.SetFocusDistance(1.5f);
+		await Seconds(0.6);
+		Shot("camera_05_zoom_soft");
+		pin.ScriptedLens = true;
+		await Seconds(0.25);
+		Shot("camera_06_zoom_racking");
+		await Seconds(1.8);
+		Shot("camera_07_zoom_sharp");
+		pin.ScriptedLens = false;
+		cam?.SetZoom(0);
+		pin.ScriptedFocus = false;
+		pin.ScriptedLens = null;
+		await Seconds(0.6);
+
+		// the shot list: the overlook ticked by a shot (its print the shot that ticked it), three subjects on film
+		// (the preview's world has no album of its own: one in a test folder, never the player's photos)
+		if (PhotoLog.Instance == null)
+		{
+			PhotoLog.FolderOverride = "user://test_photos_ui_preview/";
+			AddChild(new PhotoLog { Name = "PhotoLog" });
+			await Frames(2);
+		}
+		var log = PhotoLog.Instance;
+		var page = GetTree().GetFirstNodeInGroup("photo_log_page") as PhotoLogPage;
+		Check(log != null && page != null, "the album and its page are there");
+		if (log != null && page != null)
+		{
+			StoryManager.Instance?.SetFlag(World.Act1Walks.ShotOverlookFlag);
+			foreach (var id in new[] { "", "waterfall", "bird_red", "deer" })
+			{
+				var img = GetViewport().GetTexture().GetImage();
+				img.Convert(Image.Format.Rgba8);
+				img.Resize(PhotoLog.ThumbWidth, PhotoLog.ThumbHeight, Image.Interpolation.Bilinear);
+				log.BeginShot(img, player.CameraRig.Camera, new Rect2(0, 0, 640, 360));
+				if (id != "") log.Record(id, null, new PhotoLog.Score { Clarity = 90, Focus = 95, Framing = 80, Zoom = 80 });
+				log.EndShot();
+				player.Teleport(player.GlobalPosition, player.Rotation.Y + 0.9f);
+				await Seconds(0.3);
+			}
+			page.OpenJournal();
+			await Seconds(0.5);
+			Shot("journal_01_some_ticked");
+			Check(PhotoJournal.DoneCount == 4, $"the shot list has four ticked ({PhotoJournal.DoneCount})");
+			Check(PhotoJournal.PrintFor(PhotoJournal.All[0]) != null, "the overlook's line has the shot that ticked it");
+			page.OpenJournal();
+			await Seconds(0.1);
+		}
+		pin.Scripted = false;
+		GD.Print($"[ui-preview] camera: {(_fails == 0 ? "PASS" : $"{_fails} FAILED")}");
+		GetTree().Quit(_fails == 0 ? 0 : 1);
+	}
+
 	/// <summary>(2026-10-24) "-- --notes": the note card in each paper and hand, with and without a doodle (R.H.'s pages,
 	/// a typed log, a printed card, a smudged note, one in block capitals), each shot as test-output/ui/note_*.</summary>
 	private async Task NoteShots(PlayerController player)
 	{
 		var samples = new System.Collections.Generic.List<(string name, string title, string text, Readable.NoteStyle style)>();
 		foreach (var pg in World.LorePages.All) samples.Add(($"rh{pg.N}", "", pg.Text, Readable.NoteStyle.Handwritten));
+		samples.Add(("titled", "Blackfern Trail", "Came up the old way. The steps are further than I remembered. Back by dark. - R.H.", Readable.NoteStyle.Handwritten));
 		samples.Add(("typed", "Ranger station log", "OCT 9  0600  Two hikers signed in at the trailhead. Did not sign out.\nOCT 9  1900  Search called off for the night. Weather closing.\nOCT 10 0700  Their car is still in the lot. Keys in it.", Readable.NoteStyle.Typed));
 		samples.Add(("printed", "Overlook Park", "Trails close at dusk. Stay on marked paths. Do not feed the wildlife.", Readable.NoteStyle.Printed));
 		samples.Add(("smudged", "", "It was at the window again last night. I counted the days since it started. Eleven. It knows my name now. It says it in my mother's voice. Don't open the door for anyone. Not even me.", Readable.NoteStyle.Smudged));

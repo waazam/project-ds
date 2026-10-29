@@ -14,7 +14,7 @@ public static class KeyRebinds
 		("move_forward", "Forward"), ("move_back", "Back"), ("move_left", "Left"), ("move_right", "Right"),
 		("run", "Run"), ("crouch", "Crouch"), ("interact", "Use"), ("flashlight_toggle", "Lantern"),
 		("lantern_mode", "Blacklight"), ("photo_log", "Album"), ("hold_breath", "Hold breath"), ("throw", "Throw"),
-		("lean_left", "Lean left"), ("lean_right", "Lean right"),
+		("lean_left", "Lean left"), ("lean_right", "Lean right"), ("focus_lens", "Focus lens"),
 	};
 
 	/// <summary>The key on an action now (its first keyboard one), or None.</summary>

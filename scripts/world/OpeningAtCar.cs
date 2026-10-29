@@ -25,7 +25,7 @@ namespace ProjectDS.World;
 public partial class OpeningAtCar : Node3D
 {
 	[Export] public float MapDissolveSeconds = 2.4f;
-	[Export] public string HowToLine = "Right mouse: raise the camera.   Left mouse: take a picture.   Tab: your photos.";
+	[Export] public string HowToLine = "Right mouse: raise the camera.   Space: focus.   Left mouse: take a picture.   Tab: your photos.";
 	[Export] public NodePath StandPath = "Stand";
 	[Export] public NodePath TrunkCameraPath = "TrunkCamera";
 	/// <summary>Where the head turns to once the camera is in hand (usually the trailhead sign). Empty: straight ahead of Stand, turned half round.</summary>

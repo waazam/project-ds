@@ -13,7 +13,7 @@ public static class KeyHint
 	{
 		["interact"] = "A", ["flashlight_toggle"] = "Y", ["photo"] = "X", ["photo_log"] = "View", ["lantern_mode"] = "D-pad down",
 		["lean_left"] = "D-pad left", ["lean_right"] = "D-pad right", ["crouch"] = "RS", ["throw"] = "B", ["hold_breath"] = "D-pad up",
-		["item_next"] = "RB", ["item_prev"] = "LB", ["focus"] = "RT", ["run"] = "LT", ["wheel"] = "LB / RB",
+		["item_next"] = "RB", ["item_prev"] = "LB", ["focus"] = "RT", ["focus_lens"] = "LT", ["run"] = "LT", ["wheel"] = "LB / RB",
 	};
 
 	public static string Of(string action, string fallback)
@@ -33,6 +33,7 @@ public static class KeyHint
 	private static readonly (string Written, string Action)[] Written =
 	{
 		("F", "flashlight_toggle"), ("B", "lantern_mode"), ("Right mouse", "focus"), ("Left mouse", "photo"), ("Wheel", "wheel"), ("Tab", "photo_log"),
+		("Space", "focus_lens"),
 	};
 
 	/// <summary>A how-to line ("F: lantern on and off.   B: its blacklight.   Right mouse: ...") with each lead key as the

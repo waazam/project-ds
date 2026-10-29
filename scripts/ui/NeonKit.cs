@@ -89,6 +89,20 @@ public static class NeonKit
 		c.DrawString(font, pos, text, align, width, size, new Color(Core, 0.97f * lit));
 	}
 
+	private static Texture2D _hand, _handGlow;
+	private static bool _handLooked;
+
+	/// <summary>The painted hand (assets/ui/hud/hand.png and its glow), or null.</summary>
+	private static Texture2D HandIcon()
+	{
+		if (_handLooked) return _hand;
+		_handLooked = true;
+		const string path = "res://assets/ui/hud/hand.png", glow = "res://assets/ui/hud/hand_glow.png";
+		_hand = ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
+		_handGlow = ResourceLoader.Exists(glow) ? GD.Load<Texture2D>(glow) : null;
+		return _hand;
+	}
+
 	/// <summary>The thing's icon, line art in neon, <paramref name="s"/> across, centred on <paramref name="c0"/>;
 	/// <paramref name="t"/> runs its little life (the lantern's flame, the compass's needle).</summary>
 	public static void Icon(CanvasItem c, ToolKind kind, Vector2 c0, float s, float lit, float t)
@@ -187,6 +201,15 @@ public static class NeonKit
 				Line(c, new[] { P(-0.1f, 0.24f), P(-0.06f, 0.34f), P(0f, 0.28f), P(0.05f, 0.36f), P(0.1f, 0.24f) }, w * 0.8f, lit * 0.8f);
 				break;
 			case ToolKind.None:        // an empty hand: an open palm, four fingers and the thumb
+				// (2026-10-29, the playtest: the line-drawn hand "looks horrible") a painted hand, a real one's outline as a
+				// tube (tools/Textures/make_hand_icon.py), tinted the HUD's colour, its glow under it; the old lines if missing
+				if (HandIcon() is { } hand)
+				{
+					var r = new Rect2(c0 - Vector2.One * s * 0.5f, Vector2.One * s);
+					if (_handGlow != null) c.DrawTextureRect(_handGlow, r.Grow(s * 0.06f), false, new Color(Glow, 0.55f * lit));
+					c.DrawTextureRect(hand, r, false, new Color(Core, 0.97f * lit));
+					break;
+				}
 				Line(c, new[] { P(-0.2f, 0.36f), P(-0.22f, 0.04f), P(-0.36f, -0.1f), P(-0.3f, -0.15f), P(-0.17f, -0.05f) }, w, lit);
 				for (int i = 0; i < 4; i++)
 				{

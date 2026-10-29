@@ -448,6 +448,7 @@ public partial class GameSettings : Node
 		AddKeys("pause", Key.Escape);
 		AddKeys("interact", Key.E);
 		AddMouse("focus", MouseButton.Right);
+		AddKeys("focus_lens", Key.Space);   // (2026-10-29) held with the camera up: the lens racks into focus
 		AddKeys("flashlight_toggle", Key.F);
 		AddMouse("photo", MouseButton.Left);
 		AddMouse("item_next", MouseButton.WheelDown);
@@ -475,6 +476,7 @@ public partial class GameSettings : Node
 		AddButton("pause", JoyButton.Start);
 		AddButton("interact", JoyButton.A);
 		AddAxis("focus", JoyAxis.TriggerRight, 1);
+		AddAxis("focus_lens", JoyAxis.TriggerLeft, 1);   // (the run trigger: it runs only with the camera down)
 		AddButton("flashlight_toggle", JoyButton.Y);
 		AddButton("photo", JoyButton.X);
 		AddButton("photo_log", JoyButton.Back);
