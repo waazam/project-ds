@@ -221,7 +221,8 @@ def box(name, centre, size, material=None, bevel=0.0, segs=2, rot=(0, 0, 0)):
         apply_mods(ob)
         for p in ob.data.polygons:
             p.use_smooth = True
-        ob.data.use_auto_smooth = True if hasattr(ob.data, "use_auto_smooth") else None
+        if hasattr(ob.data, "use_auto_smooth"):   # (gone in Blender 4.1+)
+            ob.data.use_auto_smooth = True
     return ob
 
 

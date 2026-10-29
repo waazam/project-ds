@@ -282,12 +282,18 @@ public partial class Playtest
 		await _bot.Teleport(cabin.ApproachPoint, cabin.DoorCenter, ct);
 		await _bot.WalkTo(cabin.DoorCenter, 1.6f, ct);
 		await _bot.Aim(cabin.DoorCenter, ct);
-		Check("with the hammer: pry the boards loose (a hold)", _bot.Prompt == "Pry the boards loose", $"'{_bot.Prompt}'");
-		using (Fast(3))
-		{
-			await _bot.Press(ct, hold: 9.6);
-			await _bot.WaitUntil(() => cabin.IsOpen, 6, ct);
-		}
+		Check("with the sledge: smash the boards off (a hold)", _bot.Prompt == "Smash the boards off with the sledge", $"'{_bot.Prompt}'");
+		// (2026-10-29, the playtest) the sledge slams them off one by one as the ring fills; let go part way, the boards off stay off
+		var breaker = TestBot.FindUnder<DoorBreakEvent>(cabin, null) ?? _bot.FirstOf<DoorBreakEvent>();
+		await _bot.Press(ct, hold: 4.2);
+		Shot("sledge_boards_part");
+		int partway = breaker?.BoardsKnocked ?? -1;
+		Check("part way through the hold, boards knocked off by the sledge", partway is >= 2 and < 7, $"{partway} off");
+		await _bot.Seconds(0.5, ct);
+		Check("let go, the ring keeps the boards already off", breaker is { HoldProgress: > 0.2f }, $"{breaker?.HoldProgress:0.00}");
+		await _bot.Press(ct, hold: 6.5);
+		await _bot.WaitUntil(() => cabin.IsOpen, 6, ct);
+		Check("every board off before the door opened", breaker is { BoardsKnocked: 7 }, $"{breaker?.BoardsKnocked}");
 		Check("held long enough, the boards come away: the door open, the hammer used up", cabin.IsOpen && !Inv.HasTool(ToolKind.Hammer) && Story.HasFlag(StoryManager.Flag.CabinDoorOpen));
 		Shot("door_open");
 		// in: checkpoint 4, the knocks, the slam
@@ -503,6 +509,14 @@ public partial class Playtest
 		await LookAtPrint(cabin, fire, ct);
 		Check("looked at, the print animates", fire.FireStarted);
 		Shot("print");
+		// (2026-10-29, the playtest: someone "clipped straight out through the door when the fire started") made for the door the
+		// moment it lights: the roof comes down in front of them, and they are still inside
+		Vector3 outside = cabin.ToGlobal(new Vector3(0, 0, cabin.Depth * 0.5f + 3f));
+		await _bot.WalkTo(outside, 0.5f, ct, giveUp: 6f);
+		Check("rushing the door as the print burns: it caves in in front of them", fire.CavedIn, $"{fire.Now}");
+		Check("and they are still in the room", cabin.ToLocal(Player.GlobalPosition).Z < cabin.Depth * 0.5f - 0.3f, $"{cabin.ToLocal(Player.GlobalPosition)}");
+		await _bot.Seconds(1.2, ct);
+		Shot("caved_in_rushed");
 		using (Fast(3)) await _bot.WaitUntil(() => fire.CavedIn, 30, ct);
 		Check("the fire spread and the roof caved in over the door: the beams across it", fire.CavedIn && cabin.BeamsLeft == 3, $"{fire.Now}, beams {cabin.BeamsLeft}");
 		Vector3 fwd = cabin.GlobalBasis.Z.Normalized();

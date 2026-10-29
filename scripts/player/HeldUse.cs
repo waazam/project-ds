@@ -13,6 +13,8 @@ namespace ProjectDS.Player;
 /// <item><b>the crowbar</b> worked in under the lid and levered down, once for each nail;</item>
 /// <item><b>the lighter</b> raised and lit, held to the wick or the web a moment;</item>
 /// <item><b>the knife</b> drawn across, twice;</item>
+/// <item><b>the sledge</b> heaved back over the shoulder and slammed down into the boards, one blow a call (2026-10-29: the
+/// boarded door's hold, <see cref="DoorBreakEvent"/>, calls it in time with its ring filling);</item>
 /// <item>anything else (a chalice, a bookmark): reached out and let go.</item>
 /// </list>
 /// The tool is built here from its own mesh (<see cref="ItemMeshes"/>), so it shows even when the use spends it.
@@ -28,7 +30,10 @@ public partial class HeldUse : HeldItem
 	public static ToolKind Last { get; private set; }
 	public static int Shown { get; private set; }
 
-	private enum Motion { Reach, Swipe, Turn, Prise, Flick, Cut, Join }
+	private enum Motion { Reach, Swipe, Turn, Prise, Flick, Cut, Join, Slam }
+
+	/// <summary>Seconds into a sledge blow (<see cref="Motion.Slam"/>) that its head lands.</summary>
+	public const float SlamImpact = 0.62f;
 
 	private Node3D _pivot, _tool;
 	private OmniLight3D _flame;
@@ -70,9 +75,10 @@ public partial class HeldUse : HeldItem
 			ToolKind.Lighter => Motion.Flick,
 			ToolKind.Knife => Motion.Cut,
 			ToolKind.BunkerKey => Motion.Join,
+			ToolKind.Hammer => Motion.Slam,
 			_ => Motion.Reach,
 		};
-		_len = seconds > 0f ? seconds : _motion switch { Motion.Join => 3.2f, Motion.Prise => 2.3f, Motion.Flick => 2.0f, Motion.Cut => 1.7f, Motion.Turn => 1.5f, _ => 1.3f };
+		_len = seconds > 0f ? seconds : _motion switch { Motion.Slam => 1.3f, Motion.Join => 3.2f, Motion.Prise => 2.3f, Motion.Flick => 2.0f, Motion.Cut => 1.7f, Motion.Turn => 1.5f, _ => 1.3f };
 		_strokes = _motion == Motion.Prise ? Mathf.Max(1, Mathf.RoundToInt((_len - 0.6f) / 0.55f)) : 2;
 		_t = 0f;
 		// toward the thing, in the camera's space: a nudge of the hand that way (never across the view)
@@ -224,6 +230,10 @@ public partial class HeldUse : HeldItem
 				};
 				_tool.AddChild(_flameMesh);
 				break;
+			case Motion.Slam:    // the sledge as it's carried: its shelf lay undone (grip space: the handle up, a face ahead)
+				if (mesh.GetChildCount() > 0 && mesh.GetChild(0) is Node3D sledge) sledge.Transform = Transform3D.Identity;
+				_tool.Rotation = new Vector3(0f, 0.25f, 0.1f);
+				break;
 			case Motion.Cut:     // the blade forward and a little in
 				_tool.Position = new Vector3(0.0f, 0.0f, -0.02f);
 				_tool.Rotation = new Vector3(0f, Mathf.Pi * 0.5f - 0.4f, Mathf.Pi * 0.5f);
@@ -317,6 +327,19 @@ public partial class HeldUse : HeldItem
 				if (_flame != null) _flame.LightEnergy = lit ? 0.9f + 0.1f * Mathf.Sin(t * 23f) * Mathf.Sin(t * 7f) : 0f;
 				off += new Vector3(-0.08f * inOut, 0.1f * inOut, 0.02f * inOut);
 				rot.X = -0.08f * Mathf.SmoothStep(0f, 0.12f, u);   // (the thumb's flick: a small kick)
+				break;
+			}
+			case Motion.Slam:
+			{
+				// heaved up and back over the shoulder, a beat at the top, then down hard into the boards; the jar of it
+				// through the arm, and back to the carry (no dip between blows: the next call starts from here)
+				float up = Mathf.SmoothStep(0f, 0.5f, t) * (1f - Mathf.SmoothStep(SlamImpact - 0.14f, SlamImpact, t));
+				float down = Mathf.Clamp((t - (SlamImpact - 0.14f)) / 0.14f, 0f, 1f);
+				down = down * down * (1f - Mathf.SmoothStep(SlamImpact + 0.12f, len, t));
+				float jar = t > SlamImpact && t < SlamImpact + 0.18f ? Mathf.Sin((t - SlamImpact) * 70f) * (1f - (t - SlamImpact) / 0.18f) : 0f;
+				off = new Vector3(-0.03f * up - 0.05f * down, 0.1f * up - 0.12f * down + 0.006f * jar, 0.06f * up - 0.14f * down);
+				rot.X = 0.95f * up - 1.15f * down + 0.03f * jar;
+				rot.Z = -0.12f * up + 0.05f * down;
 				break;
 			}
 			case Motion.Cut:

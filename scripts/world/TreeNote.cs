@@ -123,7 +123,9 @@ public partial class TreeNote : Node3D
 		if (Arrow)
 		{
 			float y = NoteHeight;
-			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.5f, 0.66f, UvInk.Arrow(rng.RandiRange(0, 2)), UvInk.Cyan, 1.9f, false, 0f, ArrowTurn);
+			// (2026-10-29, the playtest: the brushed arrows "look like letters or notes") a small solid diamond now, its long point
+			// turned the way on; brighter than the arrow was, so a small mark still carries to the next tree
+			UvInk.OnTrunk(ink, y, MarkAngle, rAt(y), 0.24f, 0.32f, UvInk.Diamond(rng.RandiRange(0, 2)), UvInk.Cyan, 2.8f, false, 0f, ArrowTurn);
 			_sheetLocal = post * (new Vector3(Mathf.Sin(MarkAngle), 0, Mathf.Cos(MarkAngle)) * (rAt(y) + 0.02f) + Vector3.Up * y);
 			if (Trace || Notch) BuildTrace(post, rAt(y - 0.42f), y - 0.42f, rng, smear: Trace);
 		}
@@ -136,7 +138,8 @@ public partial class TreeNote : Node3D
 		// (2026-10-13, the owner: "too grouped up") one or two to a tree, never overlapping each other or his number;
 		// a hand is often the thing's (it climbs these, its long fingers round the bark), now and then a person's,
 		// at a hand's real size
-		int marks = Decoy ? rng.RandiRange(1, 2) : Arrow ? (rng.Randf() < 0.3f ? 1 : 0) : rng.RandiRange(0, 1);
+		// (2026-10-29: none on a diamond tree: a stray hand or scrawl by the marker read as writing)
+		int marks = Decoy ? rng.RandiRange(1, 2) : Arrow ? 0 : rng.RandiRange(0, 1);
 		var placed = new System.Collections.Generic.List<(float y, float a, float s)>();
 		if (!Decoy) placed.Add((NoteHeight, MarkAngle, 0.52f));
 		if (Trace || Notch) placed.Add((NoteHeight - 0.42f, MarkAngle, 0.3f));

@@ -189,6 +189,24 @@ public static partial class UvInk
 		}, 0.08f, 960 + v);
 	}
 
+	/// <summary>(2026-10-29, the playtest: the arrows on the trees "look like letters or notes") R.H.'s trail marker: a small
+	/// solid diamond, brushed, drawn longer above than below so its long point says which way (pointing up the mask; turned on
+	/// the trunk toward his next tree like the arrow was), its edge ragged as the rest of the ink. One of three hands.</summary>
+	public static Texture2D Diamond(int variant)
+	{
+		int v = ((variant % 3) + 3) % 3;
+		float lean = (v - 1) * 0.02f, mid = 0.6f + 0.02f * v;
+		Vector2 top = new(0.5f + lean, 0.05f), left = new(0.14f, mid), right = new(0.86f, mid + 0.01f * (v - 1)), bottom = new(0.5f - lean * 0.5f, 0.95f);
+		// filled: inside the four edges (a soft rim), the outline brushed over it so the edge reads as a hand's
+		float Fill(Vector2 p)
+		{
+			float Side(Vector2 a, Vector2 b) => ((b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X)) / a.DistanceTo(b);
+			float d = Mathf.Min(Mathf.Min(Side(top, right), Side(right, bottom)), Mathf.Min(Side(bottom, left), Side(left, top)));
+			return Mathf.SmoothStep(0f, 0.05f, d);
+		}
+		return Strokes($"uv_diamond{v}", 48, 64, new List<List<Vector2>> { new() { top, right, bottom, left, top } }, 0.05f, 970 + v, Fill);
+	}
+
 	/// <summary>(2026-10-22, the owner: the cryptex room needs a hint, "images of stairs all over the walls that you can only
 	/// see with the blacklight") A staircase, drawn quickly by hand: the steps rising from the lower left, in one of four
 	/// hands (plain; with a doorway at the top; with a figure climbing; with an arrow up them).</summary>

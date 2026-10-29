@@ -98,7 +98,10 @@ public static class HeldModels
 		// ahead, 8°, it was a sliver). The fist itself in the lower right, its knuckles in view, the same place for the
 		// axe, the hammer and the bar so switching between them doesn't jump
 		[ToolKind.Axe] = new(HandPose.Fist, new(0f, -0.19f, 0f), new(new(0.25f, -0.255f, -0.44f), 22f, 32f, 18f)),
-		[ToolKind.Hammer] = new(HandPose.Fist, new(0f, -0.05f, 0f), new(new(0.245f, -0.245f, -0.43f), 22f, 32f, 18f)),
+		// (2026-10-29, the playtest: "the hammer looks like a mini hammer") the sledge, choked up a hand under its head, the rest of
+		// its long handle hanging below out of the view; a little lower and more upright than the axe (the head's weight), the
+		// head across the view so it reads as a sledge
+		[ToolKind.Hammer] = new(HandPose.Fist, new(0f, 0f, 0f), new(new(0.25f, -0.29f, -0.46f), 14f, 34f, 12f)),
 		[ToolKind.Crowbar] = new(HandPose.Fist, new(0f, 0.128f, 0f), new(new(0.24f, -0.235f, -0.42f), 30f, 20f, 10f)),
 		// the knife: in a hammer grip, the guard down against the index finger (was 2.5 cm clear of it), the blade forward
 		// and up out of the top of the fist (45°; more swung the forearm and cuff up into the view), the edge underneath

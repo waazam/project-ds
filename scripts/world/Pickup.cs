@@ -146,7 +146,7 @@ public partial class Pickup : Area3D
 		ToolKind.Compass => "compass",
 		ToolKind.Axe => "axe",
 		ToolKind.Key => "key",
-		ToolKind.Hammer => "hammer",
+		ToolKind.Hammer => "sledgehammer",   // (2026-10-29: a sledge now)
 		ToolKind.Camera => "camera",
 		ToolKind.NewelPost => "newel post",
 		ToolKind.Radio => "walkie-talkie",

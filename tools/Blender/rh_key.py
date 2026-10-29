@@ -259,9 +259,13 @@ def hollow_stump():
 
 
 def cairn():
-    rock = M("rock", (0.8, 0.8, 0.76))
+    # (2026-10-29, the playtest: "the cairn should look older: greener mossy stones, the bottom stones sunk into the ground as
+    # if buried") the woods' mossy stone ("moss_rock": the moss on every upward face), the whole pile settled 5 cm (20 at the
+    # game's scale) so its foot is half under the ground, and three old stones round the foot almost buried
+    rock = M("moss_rock", (0.8, 0.8, 0.76))
     rnd = random.Random(12)
     stones = []
+    sink = 0.05
     # (centre, radii (x, y, z) in the game's frame) bottom up; the front (+Z) foot is left open under a flat stone
     spec = [((-0.2, 0.09, -0.05), (0.2, 0.11, 0.17)), ((0.19, 0.08, -0.08), (0.18, 0.1, 0.16)), ((0.0, 0.09, -0.24), (0.2, 0.1, 0.15)),
             ((-0.24, 0.07, 0.17), (0.12, 0.08, 0.11)), ((0.24, 0.07, 0.16), (0.12, 0.08, 0.12)),
@@ -269,6 +273,9 @@ def cairn():
             ((0.0, 0.21, 0.13), (0.28, 0.045, 0.16)),
             ((-0.06, 0.3, -0.08), (0.2, 0.09, 0.17)), ((0.08, 0.43, -0.04), (0.15, 0.08, 0.13)), ((-0.02, 0.54, -0.06), (0.11, 0.07, 0.1)),
             ((0.02, 0.63, -0.05), (0.07, 0.05, 0.07))]
+    spec = [((x, y - sink, z), r) for (x, y, z), r in spec]
+    # tumbled off it long ago and gone into the ground
+    spec += [((-0.38, -0.035, -0.22), (0.11, 0.06, 0.09)), ((0.36, -0.04, -0.3), (0.09, 0.055, 0.1)), ((0.12, -0.04, -0.42), (0.12, 0.06, 0.08))]
     for i, (c, r) in enumerate(spec):
         ob = lumpy_sphere(f"stone{i}", B(c), S(r), rock, 40 + i * 3, amp=0.07, freq=2.0, subdiv=3)
         stones.append(ob)

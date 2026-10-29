@@ -35,8 +35,10 @@ public partial class SurveyLot : Node3D
 {
 	/// <summary>Where each trail leaves the path, as a fraction of its stretch: camp -> cabin, then lookout -> bunker.</summary>
 	[Export] public float[] BranchFractions = { 0.45f, 0.5f };
-	[Export] public int TreesPerTrail = 7;
-	[Export] public float StepMin = 11f, StepMax = 15f;
+	/// <summary>(2026-10-29, the playtest: the stump's trail "took too long") eight trees 8-11 m apart (they were seven, 11-15: the
+	/// next tree stood at the very edge of the ink's reach, past where it fades, so each step was a search).</summary>
+	[Export] public int TreesPerTrail = 8;
+	[Export] public float StepMin = 8f, StepMax = 11f;
 	/// <summary>(2026-10-23, the owner: "finding the key to the bunker is way too hard I looked everywhere and couldnt find it.
 	/// add more blacklight clues") Decoy trees round the trails (off: they only hid the real ones).</summary>
 	[Export] public bool DecoyTrees = false;
@@ -280,7 +282,8 @@ public partial class SurveyLot : Node3D
 			if (i > 0) walk += Flat(at[i] - at[i - 1]).Length();
 			// the trunk's +Z toward the one coming from the last tree (or the path); the arrow a little way round from there
 			var basis = Basis.LookingAt(Flat(at[i] - from), Vector3.Up);
-			float markAngle = rng.RandfRange(-0.4f, 0.4f);
+			// (2026-10-29: squarer to the one coming, so the diamond is met face on, not round the trunk's side)
+			float markAngle = rng.RandfRange(-0.2f, 0.2f);
 			// the arrow's turn: where the next tree lies, as seen by someone facing the mark
 			Vector3 d = basis * new Vector3(Mathf.Sin(markAngle), 0, Mathf.Cos(markAngle));
 			Vector3 look = -Flat(d).Normalized();
@@ -429,7 +432,9 @@ public partial class SurveyLot : Node3D
 			float len = d.Length();
 			if (len < 0.5f) continue;
 			d /= len;
-			for (float x = 1.6f; x < len - 1.2f; x += 4f) line.Add(Mark(a + d * x, d));   // (every 4 m, was 2)
+			// (2026-10-29: every 3 m, was 4: with the trees closer, two or three between each, so the beam on the ground always
+			// has the next one in it)
+			for (float x = 1.6f; x < len - 1.2f; x += 3f) line.Add(Mark(a + d * x, d));
 		}
 		var ring = new List<Transform3D>();
 		for (int k = 0; k < 4; k++)   // (four, was eight)
@@ -438,10 +443,11 @@ public partial class SurveyLot : Node3D
 			Vector3 o = new(Mathf.Cos(ang), 0, Mathf.Sin(ang));
 			ring.Add(Mark(cachePos + o * (piece == 2 ? 3.2f : 1.7f), -o));   // (the cairn is big: the ring out round its foot)
 		}
-		UvInk.Scatter(this, $"LeadPath{piece}", path, new Vector2(0.7f, 0.92f), UvInk.Arrow(1), UvInk.Green, 2.4f);
-		UvInk.Scatter(this, $"LeadTurn{piece}", big, new Vector2(1.4f, 1.85f), UvInk.Arrow(0), UvInk.Green, 2.6f);
-		UvInk.Scatter(this, $"LeadLine{piece}", line, new Vector2(0.6f, 0.8f), UvInk.Arrow(2), UvInk.Cyan, 2.4f);
-		UvInk.Scatter(this, $"LeadRing{piece}", ring, new Vector2(0.55f, 0.72f), UvInk.Arrow(1), UvInk.Pale, 2.4f);
+		// (2026-10-29: the same pointing diamonds as on the trees, one mark for the whole trail; the arrows read as writing)
+		UvInk.Scatter(this, $"LeadPath{piece}", path, new Vector2(0.5f, 0.68f), UvInk.Diamond(1), UvInk.Green, 2.6f);
+		UvInk.Scatter(this, $"LeadTurn{piece}", big, new Vector2(1.0f, 1.35f), UvInk.Diamond(0), UvInk.Green, 2.8f);
+		UvInk.Scatter(this, $"LeadLine{piece}", line, new Vector2(0.42f, 0.56f), UvInk.Diamond(2), UvInk.Cyan, 2.6f);
+		UvInk.Scatter(this, $"LeadRing{piece}", ring, new Vector2(0.42f, 0.56f), UvInk.Diamond(1), UvInk.Pale, 2.6f);
 		LeadMarkCount += path.Count + big.Count + line.Count + ring.Count;
 	}
 	/// <summary>For tests: the arrows laid on the ground leading to the caches.</summary>

@@ -191,6 +191,7 @@ public partial class PlayerInventory : Node
 	public static string Label(ToolKind t) => t switch
 	{
 		ToolKind.None => "Empty Hand",
+		ToolKind.Hammer => "Sledgehammer",   // (2026-10-29: a sledge now)
 		ToolKind.NewelPost => "The Cap",
 		ToolKind.Radio => "Walkie-Talkie",
 		ToolKind.DeadEye => "The Eye",

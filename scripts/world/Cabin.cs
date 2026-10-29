@@ -1149,38 +1149,57 @@ public partial class Cabin : Node3D
 		if (_reopen != null && IsInstanceValid(_reopen)) { _reopen.QueueFree(); _reopen = null; }
 	}
 
+	/// <summary>The boards over the door, each its own node about its middle, in the order a sledge takes them off (the two
+	/// crossed over the front first, then top to bottom: <see cref="DoorBreakEvent"/>); empty unless boarded.</summary>
+	public IReadOnlyList<Node3D> DoorBoards => _doorBoards;
+	private readonly List<Node3D> _doorBoards = new();
+
 	private void BuildPlanks()
 	{
-		var k = new MeshKit();
 		var rng = new RandomNumberGenerator { Seed = (ulong)(Seed * 131 + 7) };
 		float z = FrontFace + 0.035f;
 		float span = DoorWidth + 0.55f;
 		float[] heights = { 0.28f, 0.62f, 0.98f, 1.34f, 1.7f };
-		foreach (float h in heights)
+		_planks = new Node3D { Name = "Planks" };
+		_gen.AddChild(_planks);
+		_doorBoards.Clear();
+		// (2026-10-29, the playtest: the sledge slams them off one by one, so each board is its own node about its middle)
+		var horizontal = new List<Node3D>();
+		for (int i = 0; i < heights.Length; i++)
 		{
+			float h = heights[i];
 			float tilt = rng.RandfRange(-0.06f, 0.06f);
 			float shade = rng.RandfRange(0.75f, 1.05f);
 			float off = rng.RandfRange(-0.08f, 0.08f);
+			var k = new MeshKit();
 			k.Mat(BuildingTextures.FreshPlankMat);
 			k.Color = new Color(shade, shade * 0.95f, shade * 0.88f);
 			var rot = Basis.FromEuler(new Vector3(0, 0, tilt));
-			BuildKit.Box(k, new Vector3(off, h, z), new Vector3(span, 0.19f, 0.035f), 1.4f, BuildKit.Face.None, rot);
+			BuildKit.Box(k, Vector3.Zero, new Vector3(span, 0.19f, 0.035f), 1.4f, BuildKit.Face.None, rot);
 			// nail heads at both ends
 			k.Mat(BuildingTextures.IronMat);
 			k.Color = new Color(0.3f, 0.3f, 0.3f);
 			foreach (int s in new[] { -1, 1 })
-				BuildKit.Box(k, new Vector3(off, h, z + 0.02f) + rot * new Vector3(s * (span * 0.5f - 0.08f), 0.03f * s, 0), new Vector3(0.018f, 0.018f, 0.01f), 1f);
+				BuildKit.Box(k, new Vector3(0, 0, 0.02f) + rot * new Vector3(s * (span * 0.5f - 0.08f), 0.03f * s, 0), new Vector3(0.018f, 0.018f, 0.01f), 1f);
+			var board = new Node3D { Name = $"Board{i}", Position = new Vector3(off, h, z) };
+			_planks.AddChild(board);
+			k.CommitTo(board, "PlanksMesh");
+			horizontal.Add(board);
 		}
-		k.Mat(BuildingTextures.FreshPlankMat);
 		foreach (float side in new[] { -1f, 1f })
 		{
+			var k = new MeshKit();
+			k.Mat(BuildingTextures.FreshPlankMat);
 			k.Color = new Color(0.72f, 0.65f, 0.56f);
 			var rot = Basis.FromEuler(new Vector3(0, 0, side * 0.6f));
-			BuildKit.Box(k, new Vector3(0, _doorTop * 0.5f, z + 0.035f), new Vector3(0.17f, _doorTop * 1.05f, 0.03f), 1.4f, BuildKit.Face.None, rot);
+			BuildKit.Box(k, Vector3.Zero, new Vector3(0.17f, _doorTop * 1.05f, 0.03f), 1.4f, BuildKit.Face.None, rot);
+			var board = new Node3D { Name = side < 0 ? "CrossL" : "CrossR", Position = new Vector3(0, _doorTop * 0.5f, z + 0.035f) };
+			_planks.AddChild(board);
+			k.CommitTo(board, "PlanksMesh");
+			_doorBoards.Add(board);
 		}
-		_planks = new Node3D { Name = "Planks" };
-		_gen.AddChild(_planks);
-		k.CommitTo(_planks, "PlanksMesh");
+		horizontal.Reverse();
+		_doorBoards.AddRange(horizontal);
 		ApplyChar();
 	}
 

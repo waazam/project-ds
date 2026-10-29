@@ -203,11 +203,11 @@ public partial class CabinFireEvent : Node
 			case Stage.PrintBurning:
 			case Stage.Spreading:
 			{
-				// (no softlock, no way round it) out at the door before the roof came down: they got out ahead of it; making
-				// for the door once the wall's alight: it comes down in front of them
+				// (2026-10-29, the playtest: someone "clipped straight out through the door when the fire started", skipping it all)
+				// making for the door once the print's alight, it comes down in front of them, every time: no getting out ahead
+				// of it (that was a way round the whole escape); anyone already in the doorway is thrown back into the room
 				float hd = _cabin.Depth * 0.5f;
-				if (local.Z > hd - 0.9f && Mathf.Abs(local.X) < _cabin.DoorWidth) BreakOut();
-				else if (_stage == Stage.Spreading && inside && local.Z > hd - 1.8f) CaveIn();
+				if (local.Z > hd - 2.0f && Mathf.Abs(local.X) < _cabin.Width * 0.5f + 0.5f && local.Y > -0.6f && local.Y < 2.5f) CaveIn();
 				break;
 			}
 			case Stage.CavedIn:
@@ -317,8 +317,8 @@ public partial class CabinFireEvent : Node
 		_ = Grow(v => Param("burn", v), 2.6f, ct);
 		await Cutscene.Wait(this, 1.2, ct);
 		if (Gone()) return;
-		_stage = Stage.Spreading;
-		_fireAt = _clock;
+		if (_stage >= Stage.CavedIn) _fireAt = _fireAt < 0 ? _clock : _fireAt;   // (it came down early: they made for the door)
+		else { _stage = Stage.Spreading; _fireAt = _clock; }
 		Sound("flame_ignite", 2, printLocal, -4f, 3f);
 		Ramp(f0, 0.8f, 2.5f);
 		StartCrackle();
@@ -389,12 +389,33 @@ public partial class CabinFireEvent : Node
 		if (_inside.GetParent() == null) _cabin.AddChild(_inside);
 		_stage = Stage.CavedIn;
 		_caveAt = _clock;
+		if (_fireAt < 0) _fireAt = _clock;
 		_deadline = _clock + SecondsToEscape;
 		var door = new Vector3(0, 1.4f, _cabin.Depth * 0.5f - 0.3f);
-		Sound("wall_burst", 3, door, 4f, 6f);
-		Sound("log_wall_shudder", 4, door + Vector3.Up * 0.8f, 0f, 6f);
-		_ = Cutscene.Run(this, async ct => { await Cutscene.Wait(this, 0.7, ct); Sound("dust_trickle", 3, door, -4f, 4f); });
+		Sound("wall_burst", 3, door, 6f, 6f);
+		Sound("log_wall_shudder", 4, door + Vector3.Up * 0.8f, 2f, 6f);
+		_ = Cutscene.Run(this, async ct =>
+		{
+			await Cutscene.Wait(this, 0.35, ct);
+			Sound("wall_burst", 3, door + Vector3.Up * 0.5f, 2f, 6f, 0.15f);   // (the rafters landing after the beams)
+			await Cutscene.Wait(this, 0.35, ct);
+			Sound("dust_trickle", 3, door, -2f, 4f);
+		});
 		_cabin.BuildFallenBeams(drop: true);
+		// (2026-10-29, the playtest: "make the cave-in over the door more dramatic") the room shakes with it, a burst of
+		// sparks and a gout of ash rolls in off the door; and nobody is left standing in the doorway, in or out: anyone
+		// caught in it is thrown back into the room (the plug is solid from this frame on)
+		if (_player != null && IsInstanceValid(_player))
+		{
+			if (_cabin.InFallenBlock(_cabin.ToLocal(_player.GlobalPosition)))
+			{
+				_player.GlobalPosition = _cabin.ToGlobal(_cabin.InsideTheBlock);
+				_player.Velocity = Vector3.Zero;
+				GD.Print("[story] Act 7: caught in the doorway as it came down: thrown back into the room");
+			}
+			if (_player.CameraRig is { } rig) _ = CaveShake(rig);
+		}
+		CaveBurst(_cabin.ToGlobal(door));
 		_cabin.InteriorLightOn = false;   // the lamp knocked out: the fire is the light now
 		var over = AddFire(new Vector3(0, _cabin.WallHeight - 0.1f, _cabin.Depth * 0.5f - 0.45f), new Vector3(1.6f, 0.8f, 0.6f), 0.9f, 0.8f, true, 6f, 2.4f, 4);
 		Ramp(over, 0.9f, 1.5f);
@@ -473,6 +494,73 @@ public partial class CabinFireEvent : Node
 		p.GlobalPosition = world;
 		p.Emitting = true;
 		GetTree().CreateTimer(1.6).Timeout += () => { if (IsInstanceValid(p)) p.QueueFree(); };
+	}
+
+	/// <summary>The roof coming down: a hard shake of the view, dying away over most of a second.</summary>
+	private async Task CaveShake(PlayerCameraRig rig)
+	{
+		double t = 0;
+		while (t < 0.9 && IsInstanceValid(rig))
+		{
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			t += GetProcessDeltaTime();
+			float k = 0.035f * Mathf.Pow(1f - (float)(t / 0.9), 1.6f);
+			rig.Shake = new Vector3(_rng.RandfRange(-1, 1), _rng.RandfRange(-1, 1), 0) * k;
+		}
+		if (IsInstanceValid(rig)) rig.Shake = Vector3.Zero;
+	}
+
+	/// <summary>Sparks thrown off the falling beams, and ash rolling in off the doorway.</summary>
+	private void CaveBurst(Vector3 world)
+	{
+		var sparks = new GpuParticles3D
+		{
+			Name = "CaveSparks", Amount = 90, Lifetime = 1.4, OneShot = true, Explosiveness = 0.9f, LocalCoords = false,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			ProcessMaterial = new ParticleProcessMaterial
+			{
+				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.7f, 0.9f, 0.2f),
+				Direction = _cabin.GlobalBasis * Vector3.Forward + Vector3.Up * 0.4f, Spread = 55f, InitialVelocityMin = 2f, InitialVelocityMax = 6.5f,
+				Gravity = new Vector3(0, -4f, 0), DampingMin = 1f, DampingMax = 2.5f, ScaleMin = 0.4f, ScaleMax = 1.2f,
+			},
+			DrawPass1 = new QuadMesh
+			{
+				Size = new Vector2(0.025f, 0.025f),
+				Material = new StandardMaterial3D
+				{
+					ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+					AlbedoColor = new Color(1f, 0.55f, 0.15f), BlendMode = BaseMaterial3D.BlendModeEnum.Add, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+				},
+			},
+		};
+		var ash = new GpuParticles3D
+		{
+			Name = "CaveAsh", Amount = 40, Lifetime = 2.6, OneShot = true, Explosiveness = 0.85f, LocalCoords = false,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			ProcessMaterial = new ParticleProcessMaterial
+			{
+				EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.8f, 1f, 0.2f),
+				Direction = _cabin.GlobalBasis * Vector3.Forward, Spread = 40f, InitialVelocityMin = 0.8f, InitialVelocityMax = 2.2f,
+				Gravity = new Vector3(0, 0.15f, 0), DampingMin = 0.8f, DampingMax = 1.4f, ScaleMin = 0.8f, ScaleMax = 1.8f,
+			},
+			DrawPass1 = new QuadMesh
+			{
+				Size = new Vector2(0.7f, 0.7f),
+				Material = new StandardMaterial3D
+				{
+					ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+					AlbedoColor = new Color(0.12f, 0.11f, 0.1f, 0.45f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+					AlbedoTexture = BuildingTextures.Puff(),
+				},
+			},
+		};
+		foreach (var p in new[] { sparks, ash })
+		{
+			AddChild(p);
+			p.GlobalPosition = world;
+			p.Emitting = true;
+			GetTree().CreateTimer(3.0).Timeout += () => { if (IsInstanceValid(p)) p.QueueFree(); };
+		}
 	}
 
 	/// <summary>The doorway's E-point: the beams. With the axe, held E is a blow; without, it only says what's there.</summary>
