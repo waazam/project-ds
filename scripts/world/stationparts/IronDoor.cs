@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Godot;
@@ -375,32 +376,73 @@ public partial class IronDoor : Node3D
 		_ = Cutscene.Run(this, ct => BurnWeb(ct), lockInput: true);
 	}
 
+	/// <summary>(2026-10-31, the owner: "the web in the forestry station burns and it looks like shit, we need to take a page
+	/// out of act 20's book and apply that spread of the fire on the webs ... contained to the webs with no random 3d models
+	/// of fire") It burns as the round room's does: every part of it (the cards, the drape of old silk, its guy lines, its
+	/// dead spider) takes web_burn's material, and from where the lighter touches a ragged front runs out across the silk,
+	/// its strands blackening and glowing a dull ember orange as they shrivel, the web gone behind it. The only fire is in
+	/// the web: a warm light rides with the front, breathing, and dies with it.</summary>
 	private async Task BurnWeb(CancellationToken ct)
 	{
 		WebBurned = true;
 		_webUse.Enabled = false;
-		PlaySfx("lighter_flick", 1, ToGlobal(new Vector3(0, 1.2f, -0.6f)), 0f, 1f);
+		var player = StoryBeat.Player(this);
+		if (player != null) Player.HeldUse.Do(player, ToolKind.Lighter, _webUse.GlobalPosition, 2.2f);
+		Vector3 touch = new(0.1f, 1.15f, -0.25f);
+		PlaySfx("lighter_flick", 1, ToGlobal(touch), 0f, 1f);
 		await Cutscene.Wait(this, 0.6, ct);
-		var fire = new FireVfx { Name = "WebFire", Extent = new Vector3(1.3f, 1.2f, 0.15f), FlameScale = 0.55f, Smoke = true, SmokeAmount = 0.6f, LightRange = 6f, LightEnergy = 2f, LightShadows = false, Position = new Vector3(0, 1.3f, -0.2f) };
-		AddChild(fire);
-		fire.Intensity = 0f;
-		PlaySfx("web_burn", 1, ToGlobal(new Vector3(0, 1.3f, -0.2f)), 2f, 1f);
+		var mats = new List<ShaderMaterial>();
+		Burnable(_web, mats);
+		Vector3 centre = ToGlobal(touch);
+		foreach (var m in mats) { m.SetShaderParameter("burn_centre", centre); m.SetShaderParameter("burn_radius", 0f); }
+		var glow = new OmniLight3D { Name = "WebGlow", Position = touch, LightColor = new Color(1f, 0.5f, 0.18f), LightEnergy = 0f, OmniRange = 5f, ShadowEnabled = false };
+		AddChild(glow);
+		PlaySfx("web_burn", 1, centre, 2f, 0.95f);
+		const double secs = 8.0;
+		const float reach = 3.4f;   // (the farthest of it from the touch, and a little)
 		double t = 0;
-		while (t < 3.2)
+		while (t < secs)
 		{
 			await Cutscene.Frame(this, ct);
 			t += GetProcessDeltaTime();
-			float u = (float)(t / 3.2);
-			fire.Intensity = Mathf.Sin(Mathf.Min(1f, u * 1.2f) * Mathf.Pi);
-			// the web shrivels from the middle out
-			_web.Scale = new Vector3(1f - 0.9f * u, 1f - 0.9f * u, 1f);
-			foreach (var n in _web.GetChildren()) if (n is GeometryInstance3D g) g.Transparency = Mathf.Clamp(u * 1.2f, 0f, 1f);
+			float u = (float)(t / secs);
+			// quick to catch, then a steady crawl outward
+			float r = reach * Mathf.Pow(u, 0.85f);
+			foreach (var m in mats) m.SetShaderParameter("burn_radius", r);
+			// the light rides out with the front (a ring: its middle drifting outward and up), breathing, fading as it runs out of web
+			glow.Position = touch + new Vector3(0, 0.25f * u, 0.15f);
+			float flick = 0.85f + 0.1f * Mathf.Sin((float)t * 9f) * Mathf.Sin((float)t * 4.3f + 1f);
+			glow.LightEnergy = 0.7f * Mathf.Sin(Mathf.Min(1f, u * 1.15f) * Mathf.Pi) * flick;
+			glow.OmniRange = 2.2f + 1.6f * u;
 		}
 		_web.Visible = false;
-		fire.QueueFree();
+		glow.QueueFree();
 		_doorUse.Enabled = true;
 		StoryManager.Instance?.SetFlag(StoryManager.Flag.StationWebBurned);
 		GD.Print("[story] Act 13: the web burns away - there is a door behind it");
+	}
+
+	private static ImageTexture _white;
+
+	/// <summary>Every drawn part under <paramref name="n"/> given web_burn's material: its own texture and colour (the guy
+	/// lines and the spider a plain white texture, their colour), collected so the front can be moved in all of them.</summary>
+	private static void Burnable(Node n, List<ShaderMaterial> into)
+	{
+		if (n is MeshInstance3D mi && mi.Mesh != null)
+		{
+			var src = mi.MaterialOverride as StandardMaterial3D ?? (mi.Mesh.GetSurfaceCount() > 0 ? mi.Mesh.SurfaceGetMaterial(0) as StandardMaterial3D : null);
+			_white ??= ImageTexture.CreateFromImage(Image.CreateFromData(1, 1, false, Image.Format.Rgba8, new byte[] { 255, 255, 255, 255 }));
+			var m = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/web_burn.gdshader"), RenderPriority = 2 };
+			m.SetShaderParameter("web_tex", src?.AlbedoTexture ?? _white);
+			var c = src?.AlbedoColor ?? new Color(0.8f, 0.79f, 0.75f, 0.85f);
+			if (src?.AlbedoTexture == null) c.A = 1f;
+			m.SetShaderParameter("tint", c);
+			m.SetShaderParameter("ember_band", 0.4f);
+			m.SetShaderParameter("ember_glow", 0.75f);
+			mi.MaterialOverride = m;
+			into.Add(m);
+		}
+		foreach (var c in n.GetChildren()) Burnable(c, into);
 	}
 
 	private void PlaySfx(string name, int variants, Vector3 at, float db, float pitch)

@@ -167,6 +167,11 @@ public partial class Playtest
 		// the web over the door behind the desk: burned
 		await _bot.Inside(station.ToGlobal(new Vector3(-1.4f, 0, 3.8f)), door3.GlobalPosition + Vector3.Up * 1.2f, ct);
 		await _bot.UseIt(door3.WebUse, ct);
+		// (2026-10-31) the burn's front running out through the silk, shot partway
+		await _bot.Seconds(2.2, ct);
+		Shot("web_burning");
+		await _bot.Seconds(2.6, ct);
+		Shot("web_burning_late");
 		using (Fast(2)) await _bot.WaitUntil(() => Story.HasFlag(StoryManager.Flag.StationWebBurned), 8, ct);
 		Check("the lighter burns the web away", door3.WebBurned);
 		await _bot.Inside(station.ToGlobal(new Vector3(0.6f, 0, 3.8f)), door3.GlobalPosition + Vector3.Up * 1.3f, ct);

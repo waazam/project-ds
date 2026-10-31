@@ -12,6 +12,8 @@ uniform vec3 burn_centre = vec3(0.0);
 uniform float burn_radius = -100.0;
 /// How wide the glowing band at the front is (metres).
 uniform float ember_band = 0.7;
+/// How brightly the ember band glows (the round room's 2.2; the station's smaller web, close up, less).
+uniform float ember_glow = 2.2;
 
 varying vec3 wpos;
 
@@ -34,7 +36,7 @@ void fragment() {
 	float gone = smoothstep(0.0, 0.35, behind);
 	float ember = smoothstep(-ember_band, 0.0, behind) * (1.0 - gone);
 	ALBEDO = mix(t.rgb, vec3(0.06, 0.04, 0.03), ember);
-	EMISSION = vec3(1.0, 0.42, 0.1) * ember * ember * 2.2;
+	EMISSION = vec3(1.0, 0.42, 0.1) * ember * ember * ember_glow;
 	ALPHA = t.a * (1.0 - gone);
 	ROUGHNESS = 0.55;
 	SPECULAR = 0.3;
