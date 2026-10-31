@@ -102,8 +102,12 @@ public partial class Compass : CanvasLayer
 			_player = GetTree().GetFirstNodeInGroup("player") as PlayerController;
 			_inv = _player?.GetNodeOrNull<PlayerInventory>("Inventory");
 		}
-		bool show = _inv != null && IsInstanceValid(_inv) && _inv.HasCompass;
+		// (2026-10-31, the owner: "make the compass stop appearing on top after we descend the stairwell and get to the red light
+		// green light section ... pop back up when the player leaves the church in act 21") gone from the hallway to the snow
+		bool hidden = Systems.StoryManager.Instance is { } sm0 && sm0.Current >= Systems.Checkpoint.Act14Finished && sm0.Current < Systems.Checkpoint.Act21Finished;
+		bool show = _inv != null && IsInstanceValid(_inv) && _inv.HasCompass && !hidden;
 		_draw.Visible = show;
+		Dead = Systems.StoryManager.Instance?.CompassDead ?? false;   // (kept up to date even while it's put away)
 		if (!show) return;
 
 		if (_clock >= _nextZoneRefresh)
@@ -136,7 +140,6 @@ public partial class Compass : CanvasLayer
 		bool wanted = true;
 		_presence = HudPresence.Ease(_presence, wanted, delta);
 		_draw.Modulate = new Color(1, 1, 1, _presence);
-		Dead = Systems.StoryManager.Instance?.CompassDead ?? false;
 		if (Dead) UpdateDead((float)delta);
 		UpdateShownBearing((float)delta);
 		// the heading, eased here once a frame (it was eased in the draw, with whatever delta the draw happened to see)
@@ -169,6 +172,7 @@ public partial class Compass : CanvasLayer
 	private float _markDeg, _markVel, _markAlpha;
 	private bool _markSet;
 	private static Texture2D _barTex, _pointerTex;
+	private static bool _barFrost;
 
 	private float SmoothYaw(float want, float dt)
 	{
@@ -183,7 +187,17 @@ public partial class Compass : CanvasLayer
 
 	private static readonly Color Engrave = new(0.86f, 0.79f, 0.62f);
 	private static readonly Color EngraveShadow = new(0f, 0f, 0f, 0.7f);
-	private static readonly Color NorthRed = new(0.82f, 0.22f, 0.15f);
+	// (2026-10-31, the owner: north "green instead of red" and the marker "Purple", the green a nebula's)
+	private static readonly Color NorthGreen = new(0.36f, 0.95f, 0.46f);
+	private static readonly Color MarkCore = new(0.9f, 0.78f, 1f), MarkGlow = new(0.62f, 0.25f, 1f);
+
+	/// <summary>A purple tube: the quest marker's (its own colour now, whatever the HUD's).</summary>
+	private void Purple(Vector2[] pts, float width, float lit, bool closed = false)
+	{
+		if (closed) { var p = new Vector2[pts.Length + 1]; pts.CopyTo(p, 0); p[^1] = pts[0]; pts = p; }
+		_draw.DrawPolyline(pts, new Color(MarkGlow, 0.35f * lit), width * 3f, true);
+		_draw.DrawPolyline(pts, new Color(MarkCore, 0.97f * lit), width, true);
+	}
 
 	private void OnDraw()
 	{
@@ -195,7 +209,16 @@ public partial class Compass : CanvasLayer
 		float t = (float)_clock;
 
 		// the instrument itself
-		_barTex ??= ResourceLoader.Exists("res://assets/ui/hud/compass_bar.png") ? GD.Load<Texture2D>("res://assets/ui/hud/compass_bar.png") : null;
+		// (2026-10-31, the owner: "give it a tree bark texture ... some of that mossy green texture on the bottom ... a frosted
+		// effect" in the snow) a length of mossy oak branch; frosted from the church's door to the maze's end
+		bool frost = Systems.StoryManager.Instance is { } sm1 && sm1.Current >= Systems.Checkpoint.Act21Finished && sm1.Current < Systems.Checkpoint.Act24Finished;
+		if (_barFrost != frost || _barTex == null)
+		{
+			_barFrost = frost;
+			string bar = frost ? "compass_bark_frost" : "compass_bark";
+			_barTex = ResourceLoader.Exists($"res://assets/ui/hud/{bar}.png") ? GD.Load<Texture2D>($"res://assets/ui/hud/{bar}.png")
+				: ResourceLoader.Exists("res://assets/ui/hud/compass_bar.png") ? GD.Load<Texture2D>("res://assets/ui/hud/compass_bar.png") : null;
+		}
 		_pointerTex ??= ResourceLoader.Exists("res://assets/ui/hud/compass_pointer.png") ? GD.Load<Texture2D>("res://assets/ui/hud/compass_pointer.png") : null;
 		if (_barTex != null) _draw.DrawTextureRect(_barTex, new Rect2(Vector2.Zero, size), false);
 
@@ -215,7 +238,7 @@ public partial class Compass : CanvasLayer
 			string label = null;
 			foreach (var (l, deg) in Ticks) if (Mathf.IsEqualApprox(deg, d)) label = l;
 			bool major = label is "N" or "S" or "E" or "W";
-			var ink = new Color(label == "N" ? NorthRed : Engrave, (major ? 0.95f : label != null ? 0.7f : 0.45f) * edge);
+			var ink = new Color(label == "N" ? NorthGreen : Engrave, (major ? 0.95f : label != null ? 0.7f : 0.45f) * edge);
 			if (label == null)
 			{
 				Mark(new Vector2(x, cy + 2.2f), new Vector2(x, BandBottom - 1.2f), 0.7f, ink);
@@ -244,15 +267,15 @@ public partial class Compass : CanvasLayer
 			{
 				var dia = new[] { new Vector2(bx, cy - 4.6f), new Vector2(bx + 3.4f, cy), new Vector2(bx, cy + 4.6f), new Vector2(bx - 3.4f, cy) };
 				_draw.DrawColoredPolygon(new[] { dia[0] + new Vector2(0, 0.8f), dia[1] + new Vector2(0.4f, 0.8f), dia[2] + new Vector2(0, 0.8f), dia[3] + new Vector2(-0.4f, 0.8f) }, new Color(0, 0, 0, 0.5f * mlit));
-				NeonKit.Line(_draw, dia, 0.8f, mlit, true);
-				_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 2.2f), new Vector2(bx + 1.6f, cy), new Vector2(bx, cy + 2.2f), new Vector2(bx - 1.6f, cy) }, new Color(NeonKit.Core, 0.85f * mlit));
+				Purple(dia, 0.8f, mlit, true);
+				_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 2.2f), new Vector2(bx + 1.6f, cy), new Vector2(bx, cy + 2.2f), new Vector2(bx - 1.6f, cy) }, new Color(MarkCore, 0.85f * mlit));
 			}
 			else
 			{
 				// behind them: a lit chevron in the point on that side
 				float dir = bx < cx ? -1f : 1f;
 				float ex = cx + dir * (half + 6f);
-				NeonKit.Line(_draw, new[] { new Vector2(ex - dir * 2.5f, cy - 3.5f), new Vector2(ex + dir * 1.5f, cy), new Vector2(ex - dir * 2.5f, cy + 3.5f) }, 0.8f, mlit);
+				Purple(new[] { new Vector2(ex - dir * 2.5f, cy - 3.5f), new Vector2(ex + dir * 1.5f, cy), new Vector2(ex - dir * 2.5f, cy + 3.5f) }, 0.8f, mlit);
 			}
 		}
 

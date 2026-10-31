@@ -267,3 +267,94 @@ check("check_off_dim", False, 0.4)
 check("check_on_dim", True, 0.4)
 knob("slider_knob", False)
 knob("slider_knob_hi", True)
+
+
+# ---- (2026-10-31, the owner: "retexture the compass ... give it a tree bark texture ... with some of that mossy green
+# texture on the bottom", with an oak's bark mossed over at its foot; "add a frosted effect to the compass tree bark
+# texture" for the snow, with bark under a dusting of snow and lichen) the band as a length of oak branch: deep-fissured
+# plates running along it, a darker smoothed channel down its middle where the marks are cut, moss thick along its
+# lower edge and climbing into the cracks; and its frosted twin
+def bark_field(H, W, seed):
+    """Oak bark's height: long ridged plates (stretched along the branch), broken across by cracks."""
+    ridges = noise(H * 4, W, 16, 4, seed)[::4]                          # long along u
+    plates = noise(H, W, 9, 3, seed + 1)
+    hgt = ridges * 0.7 + plates * 0.3
+    fiss = np.abs(noise(H * 3, W, 40, 2, seed + 2)[::3] - 0.5) < 0.05  # fissures
+    hgt = hgt - fiss * 0.35
+    return hgt
+
+
+def bark_rgb(hgt, H, W, seed):
+    gy, gx = np.gradient(hgt * 60)
+    shade = np.clip(1 + (-gx * 0.6 - gy * 0.9) * 0.8, 0.3, 1.7)
+    base = np.array([0.42, 0.38, 0.33])
+    tone = noise(H, W, 6, 3, seed + 3)
+    img = base * (0.7 + 0.5 * tone)[..., None] * shade[..., None]
+    deep = np.clip((0.42 - hgt) * 3, 0, 1)                               # the cracks: dark, a little red-brown
+    img = img * (1 - 0.75 * deep[..., None]) + np.array([0.12, 0.06, 0.04]) * 0.75 * deep[..., None]
+    lichen = (noise(H, W, 60, 2, seed + 4) > 0.78) & (hgt > 0.55)
+    img = np.where(lichen[..., None], img * 0.5 + np.array([0.55, 0.6, 0.45]) * 0.5, img)
+    return img, shade
+
+
+def compass_bark(name, frost=False):
+    W, H = 260 * S, 22 * S
+    cy = H / 2
+    tip, shoulder = 6, 46
+    top, bot = 6, H - 6
+    outline = [(tip, cy), (shoulder, top), (W - shoulder, top), (W - tip, cy), (W - shoulder, bot), (shoulder, bot)]
+    inset = 11
+    inner = [(tip + inset * 2.6, cy), (shoulder + inset * 0.4, top + inset), (W - shoulder - inset * 0.4, top + inset),
+             (W - tip - inset * 2.6, cy), (W - shoulder - inset * 0.4, bot - inset), (shoulder + inset * 0.4, bot - inset)]
+    outer_m = mask(W, H, lambda d: d.polygon(outline, fill=255))
+    inner_m = soft(mask(W, H, lambda d: d.polygon(inner, fill=255)), 1.2)
+    yy, xx = np.mgrid[0:H, 0:W].astype(float)
+    hgt = bark_field(H, W, 91)
+    img, shade = bark_rgb(hgt, H, W, 91)
+    # the channel: the bark worn smooth and dark where the marks are cut
+    img = img * (1 - 0.72 * inner_m[..., None])
+    # moss along the lower edge, climbing the cracks and the plates' undersides
+    v = yy / H
+    climb = noise(H, W, 10, 3, 96)
+    moss_m = np.clip((v - 0.68 - (climb - 0.5) * 0.35) * 7, 0, 1) * (1 - inner_m * 0.7)
+    moss_m = np.maximum(moss_m, ((hgt < 0.38) & (v > 0.5)).astype(float) * 0.5 * (1 - inner_m))
+    fuzz = noise(H, W, 160, 2, 97)
+    moss = np.array([0.26, 0.46, 0.1]) * (0.5 + 0.7 * fuzz)[..., None] * (0.7 + 0.3 * np.clip(shade, 0, 1.4))[..., None]
+    img = img * (1 - moss_m[..., None]) + moss * moss_m[..., None]
+    if frost:
+        # snow caught on every upward face and ridge, thickest on top; rime on the moss
+        snow_m = np.clip((hgt - 0.55) * 7 + (0.45 - v) * 2.2 + (noise(H, W, 80, 3, 98) - 0.5) * 1.2, 0, 1) * (1 - inner_m * 0.8)
+        speck = np.random.default_rng(99).random((H, W)) > 0.93
+        snow_m = np.maximum(snow_m, speck * 0.7 * (hgt > 0.45))
+        snow = np.array([0.9, 0.93, 0.97]) * (0.85 + 0.15 * noise(H, W, 80, 2, 100))[..., None]
+        img = img * (1 - snow_m[..., None]) + snow * snow_m[..., None]
+        rime = (np.random.default_rng(101).random((H, W)) > 0.9) * inner_m * 0.35   # a fine rime even in the channel
+        img = img * (1 - rime[..., None]) + np.array([0.8, 0.85, 0.9]) * rime[..., None]
+    edge = np.clip(outer_m - soft(outer_m, 2.5), 0, 1)
+    img = img * (1 - 0.5 * edge[..., None])
+    shadow = np.roll(soft(outer_m, 5), 3, axis=0) * 0.55
+    save(name, img * outer_m[..., None], np.maximum(outer_m, shadow * (1 - outer_m)))
+
+
+def keycap_square():
+    """A keyboard key cap: a square, sculpted top dished a little, a lighter lip all round, its skirt darker, worn
+    shiny in the middle (the owner: "make them look like keyboard key caps")."""
+    W = H = 24 * S
+    yy, xx = np.mgrid[0:H, 0:W].astype(float)
+    outer = mask(W, H, lambda d: d.rounded_rectangle((3, 4, W - 4, H - 2), radius=12, fill=255))
+    top = mask(W, H, lambda d: d.rounded_rectangle((12, 9, W - 13, H - 15), radius=10, fill=255))
+    skirt = np.array([0.16, 0.16, 0.17]) * (1.0 - 0.35 * (yy / H))[..., None]
+    face = np.array([0.27, 0.27, 0.29]) * (0.9 + 0.2 * noise(H, W, 30, 2, 111))[..., None]
+    cx, cyy = W / 2, H * 0.42
+    dish = np.clip(np.sqrt(((xx - cx) / (W * 0.36)) ** 2 + ((yy - cyy) / (H * 0.32)) ** 2), 0, 1)
+    face = face * (0.85 + 0.25 * dish)[..., None] + np.array([0.06, 0.06, 0.07]) * np.clip(1 - dish * 1.4, 0, 1)[..., None]
+    lip = np.clip(soft(top, 1.2) - top * 0.0, 0, 1) - top
+    img = skirt * (1 - top[..., None]) + face * top[..., None]
+    img = img + np.clip(lip, 0, 1)[..., None] * 0.12
+    shadow = np.roll(soft(outer, 3), 3, axis=0) * 0.6
+    save("keycap_square", img * outer[..., None], np.maximum(outer, shadow * (1 - outer)))
+
+
+compass_bark("compass_bark")
+compass_bark("compass_bark_frost", frost=True)
+keycap_square()

@@ -330,30 +330,33 @@ public partial class HintText : Control
 
 	private static Texture2D _keycap;
 
-	/// <summary>A key cap: (2026-10-25, the HUD's reskin) an old typewriter key, a nickel ring round a dished, yellowed
-	/// celluloid face (assets/ui/hud/keycap.png, tools/Textures/make_hud.py), drawn in three slices so a long key's name
-	/// fits (its round ends kept, its middle stretched), the letter inked dark into it. Without the painting, the old dark
-	/// cap edged in neon.</summary>
+	/// <summary>A key cap: (2026-10-31, the owner: "make them look like keyboard key caps and make sure the letter on the key
+	/// is centered") a keyboard's key, a dished dark face on a darker skirt (assets/ui/hud/keycap_square.png,
+	/// tools/Textures/make_hud.py), drawn in three slices so a long key's name fits, the letter centred on the face by its
+	/// glyphs' real height (Anton's capitals stand 0.86 of the size above the baseline: the old 0.74 set them high).
+	/// Without the painting, the old dark cap edged in neon.</summary>
 	private void DrawKey(Vector2 at, string key, float w, int size, float capH, Color ink)
 	{
 		float h = CapHeight(size);
 		int ks = Mathf.RoundToInt(KeySize(size));
 		string label = key.ToUpperInvariant();
 		var font = HintStyle.Font;
-		float tw = font.GetStringSize(label, HorizontalAlignment.Left, -1, ks).X;
-		_keycap ??= ResourceLoader.Exists("res://assets/ui/hud/keycap.png") ? GD.Load<Texture2D>("res://assets/ui/hud/keycap.png") : null;
+		// (the font's letter spacing pads each glyph's right: the ink is that much narrower than the advance)
+		float tw = font.GetStringSize(label, HorizontalAlignment.Left, -1, ks).X - (font is FontVariation fv ? fv.SpacingGlyph : 0);
+		_keycap ??= ResourceLoader.Exists("res://assets/ui/hud/keycap_square.png") ? GD.Load<Texture2D>("res://assets/ui/hud/keycap_square.png") : null;
 		if (_keycap != null)
 		{
-			// a little bigger than the text's cap height (the ring), at least round
-			float kh = h + 4f, kw = Mathf.Max(kh, w + 4f);
-			var r = new Rect2(at.X - (kw - w) * 0.5f, Mathf.Round(at.Y - capH * 0.5f - kh * 0.5f), kw, kh);
+			float kh = h + 5f, kw = Mathf.Max(kh, w + 4f);
+			var r = new Rect2(Mathf.Round(at.X + w * 0.5f - kw * 0.5f), Mathf.Round(at.Y - capH * 0.5f - kh * 0.5f), kw, kh);
 			float tex = _keycap.GetWidth(), half = tex * 0.5f, endW = kh * 0.5f;
 			var tint = new Color(1, 1, 1, ink.A);
 			DrawTextureRectRegion(_keycap, new Rect2(r.Position, new Vector2(endW, kh)), new Rect2(0, 0, half, tex), tint);
 			if (kw > kh) DrawTextureRectRegion(_keycap, new Rect2(r.Position + new Vector2(endW, 0), new Vector2(kw - kh, kh)), new Rect2(half - 1, 0, 2, tex), tint);
 			DrawTextureRectRegion(_keycap, new Rect2(r.Position + new Vector2(kw - endW, 0), new Vector2(endW, kh)), new Rect2(half, 0, half, tex), tint);
-			var lp = new Vector2(Mathf.Round(r.GetCenter().X - tw * 0.5f), Mathf.Round(r.GetCenter().Y + ks * 0.74f * 0.5f));
-			DrawString(font, lp, label, HorizontalAlignment.Left, -1, ks, new Color(0.13f, 0.1f, 0.08f, ink.A));
+			// the face's middle (the painting's face sits a touch above the cap's middle: its skirt is deeper at the front)
+			var face = r.GetCenter() + new Vector2(0, -kh * 0.03f);
+			var lp = new Vector2(face.X - tw * 0.5f, face.Y + ks * 0.43f);
+			DrawString(font, lp, label, HorizontalAlignment.Left, -1, ks, new Color(0.9f, 0.89f, 0.86f, ink.A));
 			return;
 		}
 		var rect = new Rect2(at.X, Mathf.Round(at.Y - capH * 0.5f - h * 0.5f), w, h);

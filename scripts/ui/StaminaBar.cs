@@ -87,18 +87,14 @@ public partial class StaminaBar : CanvasLayer
 			_draw.DrawLine(new Vector2(x0, cy), new Vector2(end, cy), new Color(1f, 0.45f, 0.4f, 0.8f * lo), 1.2f, true);
 			return;
 		}
-		NeonKit.Seg(_draw, new Vector2(x0, cy), new Vector2(end, cy), 1.3f, breath);
-		// a pulse running along it while running; a ripple up it while it fills
-		bool filling = !running && _stamina.Value < 0.999f;
-		if (running || filling)
-		{
-			float u = Mathf.PosMod(t * (filling ? 0.9f : 1.6f), 1f);
-			float px = filling ? x0 + (end - x0) * u : end - (end - x0) * u;
-			_draw.DrawCircle(new Vector2(px, cy), 1.9f, new Color(NeonKit.Glow, 0.12f * breath));
-			_draw.DrawCircle(new Vector2(px, cy), 1.1f, new Color(NeonKit.Core, 0.7f * breath));
-		}
-		// the bright head where it ends
-		_draw.DrawCircle(new Vector2(end, cy), 1.8f, new Color(NeonKit.Glow, 0.15f * breath));
-		_draw.DrawCircle(new Vector2(end, cy), 1.0f, new Color(NeonKit.Core, 0.95f * breath));
+		// (2026-10-31, the owner: "remove the ball at the far right end and make it pulsate a glowing green when you are
+		// sprinting", the green a nebula's) the tube in green, swelling and dimming in a pulse while they run; no head on it,
+		// no bead running along it
+		float pulse = running ? 0.72f + 0.28f * Mathf.Sin(t * 7.5f) : 0.8f;
+		var glow = new Color(0.25f, 0.9f, 0.4f);
+		var core = new Color(0.72f, 1f, 0.78f);
+		if (running) _draw.DrawLine(new Vector2(x0, cy), new Vector2(end, cy), new Color(glow, 0.22f * pulse), 5f, true);
+		_draw.DrawLine(new Vector2(x0, cy), new Vector2(end, cy), new Color(glow, 0.35f * pulse), 2.6f, true);
+		_draw.DrawLine(new Vector2(x0, cy), new Vector2(end, cy), new Color(core, 0.95f * pulse), 1.2f, true);
 	}
 }
