@@ -149,6 +149,12 @@ public partial class GraffitiDresser : Node3D
 			float floor = at.Y - 1.45f;
 			// the cluster's centre piece
 			Put(PickBig(), at, n, along, floor, _rng.RandfRange(-0.4f, 0.4f), 1.35f + _rng.RandfRange(-0.2f, 0.35f), 0f, 0);
+			// one cluster in six: a tag at eye height that will have changed when they look back at it (Changers)
+			if (_changers.Count < MaxChangers && _rng.Randf() < 0.17f)
+			{
+				var tag = Put(Arts[_rng.RandiRange(13, 22)], at, n, along, floor, _rng.RandfRange(-1.4f, 1.4f), _rng.RandfRange(1.3f, 1.8f), _rng.RandfRange(-5f, 5f), 9);
+				if (tag != null) _changers.Add(new Changer { Decal = tag, To = Fresh[_changers.Count % Fresh.Length] });
+			}
 			// and round it: the clutter
 			int extra = _rng.RandiRange(5, 10);
 			for (int i = 0; i < extra; i++)
@@ -173,10 +179,10 @@ public partial class GraffitiDresser : Node3D
 		return Arts[_rng.RandiRange(9, Arts.Length - 1)];
 	}
 
-	private void Put(Art art, Vector3 at, Vector3 n, Vector3 along, float floor, float x, float y, float tilt, int layer)
+	private Decal Put(Art art, Vector3 at, Vector3 n, Vector3 along, float floor, float x, float y, float tilt, int layer)
 	{
 		var tex = Tex(art.Name);
-		if (tex == null) return;
+		if (tex == null) return null;
 		float scale = _rng.RandfRange(0.8f, 1.15f) * (layer == 0 ? 1f : 0.85f);
 		float w = art.Width * scale, h = w * art.Aspect;
 		y = Mathf.Max(y, h * 0.5f + 0.05f);
@@ -202,6 +208,73 @@ public partial class GraffitiDresser : Node3D
 		AddChild(d);
 		d.GlobalTransform = new Transform3D(basis, centre);
 		Placed++;
+		return d;
+	}
+
+	// ------------------------------------------------------------------ the ones that change behind them
+
+	/// <summary>(2026-10-31, the owner: "Graffiti that changes behind you", and of 81' 83' 87' 92': "those are dates") A tag
+	/// they've had in view, and then turned their back on, close by: when they look again it's been painted over, fresh,
+	/// still running (HE HEARS YOU, TURN AROUND, the 19 crossed out for a 20, the dates with this year's added in red), and
+	/// they heard the can behind them while it was done. One at a time, never two within <see cref="ChangeGap"/> s.</summary>
+	private sealed class Changer
+	{
+		public Decal Decal;
+		public (string Name, float Aspect) To;
+		public double SeenAt = -1;
+		public bool Changed;
+	}
+
+	private static readonly (string, float)[] Fresh =
+	{
+		("fresh_hehears", 0.5f), ("fresh_dates", 0.375f), ("fresh_turn", 0.5f), ("fresh_20", 0.5f), ("fresh_notalone", 0.5f), ("fresh_ssh", 0.5f),
+	};
+	private const int MaxChangers = 8;
+	private const double ChangeGap = 25.0;
+	private static double _lastChange = -999;
+	private readonly List<Changer> _changers = new();
+	private double _look;
+	public int Changed { get; private set; }
+
+	public override void _Process(double delta)
+	{
+		if (!Finished || _changers.Count == 0 || (_look -= delta) > 0) return;
+		_look = 0.1;
+		var cam = GetViewport()?.GetCamera3D();
+		if (cam == null) return;
+		Vector3 eye = cam.GlobalPosition, fwd = -cam.GlobalBasis.Z;
+		if (!_bounds.Grow(4f).HasPoint(eye)) return;
+		double now = Time.GetTicksMsec() / 1000.0;
+		foreach (var c in _changers)
+		{
+			if (c.Changed || !IsInstanceValid(c.Decal)) continue;
+			Vector3 to = c.Decal.GlobalPosition - eye;
+			float dist = to.Length();
+			if (dist > 16f) continue;
+			float facing = fwd.Dot(to / Mathf.Max(dist, 0.01f));
+			if (facing > 0.82f)
+			{
+				// in view, and nothing between
+				var hit = GetWorld3D().DirectSpaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(eye, c.Decal.GlobalPosition + c.Decal.GlobalBasis.Y * 0.1f, 1));
+				if (hit.Count == 0 || ((Vector3)hit["position"]).DistanceTo(c.Decal.GlobalPosition) < 0.6f) c.SeenAt = now;
+				continue;
+			}
+			if (c.SeenAt < 0 || now - c.SeenAt < 1.2 || facing > -0.25f || dist > 14f || now - _lastChange < ChangeGap) continue;
+			var tex = Tex(c.To.Name);
+			if (tex == null) { c.Changed = true; continue; }
+			c.Decal.TextureAlbedo = tex;
+			var sz = c.Decal.Size;
+			float w = c.To.Name == "fresh_dates" ? 2.2f : 1.5f;
+			c.Decal.Size = new Vector3(w, sz.Y, w * c.To.Aspect);
+			c.Decal.Modulate = new Color(1f, 1f, 1f, 1f);
+			c.Decal.SortingOffset = 1f;
+			c.Changed = true;
+			_lastChange = now;
+			Changed++;
+			Audio.AudioDirector.OneShot(this, "spray_hiss", 3, c.Decal.GlobalPosition, -9f, "Events", 4f, 0.06f);
+			GD.Print($"[graffiti] behind them, {c.To.Name} painted over a tag ({dist:0.0} m back)");
+			break;
+		}
 	}
 
 	private static Texture2D Tex(string name)

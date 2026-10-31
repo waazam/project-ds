@@ -373,3 +373,61 @@ stencil("sten_speakeasy", "SPEAKEASY ->", (0.88, 0.88, 0.86), 34, fs=170)
 char_eyes("char_eyes", 41)
 char_shush("char_shush", 42)
 char_sleep("char_sleep", 43)
+
+
+# ---- (2026-10-31, the owner: "Graffiti that changes behind you", "those are dates") what a tag has become when they look
+# back at it: fresh paint, barely aged, still running wet (long drips, no flaking); the dates' list with one more on it,
+# this year's, in red
+def fresh_tag(name, word, col, seed, fnt="RockSalt-Regular.ttf", fs=170, slant=6):
+    W, H = 1200, 600
+    let = letters(word, font(fnt, min(fs, fit(word, fnt, W, 0.85, fs))), W, H, bounce=0.5, slant=slant, seed=seed)
+    let = grow(let, 6)
+    m = np.maximum(let, drips(let, 22, seed + 1, maxlen=170, width=6))
+    rgb, a = comp([(col, m)], H, W)
+    rgb, a = age(rgb, a, seed + 9, fade=0.05, flake=0.0, grime=0.05)
+    rgb = np.clip(rgb * 1.15 + 0.03, 0, 1)                       # (wet: a sheen on it)
+    save(name, rgb, a, (768, 384))
+
+
+def fresh_dates(name, seed):
+    """81' 83' 87' 92' as they were (old, faded) and 26' after them, fresh red, running."""
+    W, H = 1600, 600
+    Wo = int(W * 0.72)
+    old = letters("81' 83' 87' 92'", font(ANTON, fit("81' 83' 87' 92'", ANTON, Wo, 0.94, 220)), Wo, H, bounce=0.3, seed=seed, spacing=8)
+    old = np.concatenate([grow(old, 4), np.zeros((H, W - Wo))], axis=1)
+    rgb_o, a_o = comp([((0.85, 0.85, 0.82), old)], H, W)
+    rgb_o, a_o = age(rgb_o, a_o, seed + 3, fade=0.4, flake=0.12)
+    Wn = W - Wo
+    new = letters("26'", font(ANTON, fit("26'", ANTON, Wn, 0.85, 240)), Wn, H, bounce=0.2, seed=seed + 1)
+    new = np.concatenate([np.zeros((H, Wo)), grow(new, 5)], axis=1)
+    new = np.maximum(new, drips(new, 14, seed + 2, maxlen=200, width=6))
+    rgb, a = comp([(rgb_o, a_o), ((0.85, 0.04, 0.05), new)], H, W)
+    save(name, rgb, a, (1024, 384))
+
+
+def fresh_count(name, seed):
+    """The old count crossed out, the new one beside it, fresh and running: 19, struck through; 20."""
+    W, H = 1200, 600
+    old = letters("19", font(ANTON, 330), W // 2, H, bounce=0.2, seed=seed)
+    old = grow(old, 4)
+    st = Image.new("L", (W // 2, H), 0)
+    ImageDraw.Draw(st).line([(W * 0.06, H * 0.62), (W * 0.46, H * 0.4)], fill=255, width=26)
+    old_rgb, old_a = comp([((0.85, 0.85, 0.82), old)], H, W // 2)
+    old_rgb, old_a = age(old_rgb, old_a, seed + 3, fade=0.4, flake=0.12)
+    new = letters("20", font(ANTON, 330), W // 2, H, bounce=0.2, seed=seed + 1)
+    new = grow(new, 5)
+    new = np.maximum(new, drips(new, 12, seed + 2, maxlen=180, width=6))
+    red = (0.85, 0.04, 0.05)
+    left_rgb, left_a = comp([(old_rgb, old_a), (red, arr(st))], H, W // 2)
+    right_rgb, right_a = comp([(red, new)], H, W // 2)
+    rgb = np.concatenate([left_rgb, right_rgb], axis=1)
+    a = np.concatenate([left_a, right_a], axis=1)
+    save(name, rgb, a, (768, 384))
+
+
+fresh_tag("fresh_hehears", "HE HEARS YOU", (0.85, 0.04, 0.05), 51, fnt=ANTON, fs=230, slant=4)
+fresh_tag("fresh_turn", "TURN AROUND", (0.92, 0.92, 0.9), 52)
+fresh_tag("fresh_notalone", "not alone", (0.85, 0.04, 0.05), 53, fnt="ReenieBeanie.ttf", fs=300)
+fresh_count("fresh_20", 54)
+fresh_tag("fresh_ssh", "SSSHHHH", (0.85, 0.04, 0.05), 55, fnt="RockSalt-Regular.ttf", fs=150)
+fresh_dates("fresh_dates", 56)
