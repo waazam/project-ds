@@ -36,7 +36,7 @@ public partial class GraffitiDresser : Node3D
 	};
 
 	/// <summary>Metres between two on the same wall (measured between their middles).</summary>
-	public float Spacing = 3.4f;
+	public float Spacing = 1.7f;
 	/// <summary>The share of the found spots that get one.</summary>
 	public float Amount = 0.75f;
 	public int Placed { get; private set; }
@@ -52,7 +52,7 @@ public partial class GraffitiDresser : Node3D
 	private static readonly Dictionary<string, Texture2D> _tex = new();
 
 	/// <summary>Sprays <paramref name="root"/>'s walls (inside <paramref name="bounds"/>, or its meshes'), once.</summary>
-	public static void Dress(Node3D root, int seed, Aabb? bounds = null, float amount = 0.75f, float spacing = 3.4f)
+	public static void Dress(Node3D root, int seed, Aabb? bounds = null, float amount = 0.95f, float spacing = 1.7f)
 	{
 		if (root == null || !IsInstanceValid(root) || root.HasMeta("graffiti_dressed")) return;
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--no-graffiti") >= 0) return;
@@ -93,7 +93,7 @@ public partial class GraffitiDresser : Node3D
 	private void Plan()
 	{
 		_rng = new RandomNumberGenerator { Seed = (ulong)(_seed * 7349 + 5) };
-		const float step = 2.4f;
+		const float step = 1.6f;
 		var b = _bounds;
 		for (float x = b.Position.X + step * 0.5f; x < b.End.X; x += step)
 			for (float z = b.Position.Z + step * 0.5f; z < b.End.Z; z += step)
@@ -136,60 +136,72 @@ public partial class GraffitiDresser : Node3D
 		}
 	}
 
-	private float _total;
-
-	private Art PickArt(float room)
-	{
-		if (_total == 0) foreach (var a in Arts) _total += a.Weight;
-		for (int tries = 0; tries < 6; tries++)
-		{
-			float r = _rng.Randf() * _total;
-			foreach (var a in Arts)
-			{
-				r -= a.Weight;
-				if (r > 0) continue;
-				if (a.Width * a.Aspect <= room) return a;
-				break;
-			}
-		}
-		return Arts[13];   // (a small tag fits anywhere)
-	}
-
+	/// <summary>(2026-10-31, the owner: "way more graffiti ... way more clustered together and cluttered, way way too sparse")
+	/// Each spot a cluster, as walls really get done: one big piece (or a throw-up) and a crowd of tags, throw-ups,
+	/// stencils and the odd character round it, overlapping, from the knee to as high as an arm reaches, the newer over
+	/// the older.</summary>
 	private void Lay()
 	{
 		foreach (var (at, n) in _spots)
 		{
 			if (_rng.Randf() > Amount) continue;
-			var art = PickArt(2.4f);
-			var tex = Tex(art.Name);
-			if (tex == null) continue;
-			float scale = _rng.RandfRange(0.85f, 1.15f);
-			float w = art.Width * scale, h = w * art.Aspect;
-			// (tags anywhere from knee to reach; the big ones centred at eye height)
-			float y = art.Width < 1.3f ? _rng.RandfRange(0.7f, 2.0f) : 1.35f + _rng.RandfRange(-0.15f, 0.25f);
 			var along = Vector3.Up.Cross(n).Normalized();
-			var centre = new Vector3(at.X, at.Y - 1.45f + y, at.Z) + along * _rng.RandfRange(-0.6f, 0.6f);
-			// a decal projects down its local -Y: its Y out of the wall, its X along it, its Z down the picture
-			var basis = new Basis(along, n, Vector3.Down).Rotated(n, Mathf.DegToRad(_rng.RandfRange(-3f, 3f)));
-			var d = new Decal
+			float floor = at.Y - 1.45f;
+			// the cluster's centre piece
+			Put(PickBig(), at, n, along, floor, _rng.RandfRange(-0.4f, 0.4f), 1.35f + _rng.RandfRange(-0.2f, 0.35f), 0f, 0);
+			// and round it: the clutter
+			int extra = _rng.RandiRange(5, 10);
+			for (int i = 0; i < extra; i++)
 			{
-				Name = $"{art.Name}_{Placed}",
-				Size = new Vector3(w, 0.5f, h),
-				TextureAlbedo = tex,
-				Modulate = new Color(1f, 1f, 1f, _rng.RandfRange(0.72f, 0.95f)),
-				AlbedoMix = 1f,
-				NormalFade = 0.5f,
-				UpperFade = 0.05f,
-				LowerFade = 0.05f,
-				DistanceFadeEnabled = true,
-				DistanceFadeBegin = 30f,
-				DistanceFadeLength = 10f,
-				CullMask = DecalDresser.DecalMask,
-			};
-			AddChild(d);
-			d.GlobalTransform = new Transform3D(basis, centre);
-			Placed++;
+				var art = PickSmall();
+				float x = _rng.RandfRange(-1.9f, 1.9f);
+				float y = _rng.RandfRange(0.35f, 2.75f);
+				Put(art, at, n, along, floor, x, y, _rng.RandfRange(-8f, 8f), i + 1);
+			}
 		}
+	}
+
+	private Art PickBig()
+	{
+		// the pieces and throw-ups (indices 0..12)
+		return Arts[_rng.RandiRange(0, 12)];
+	}
+
+	private Art PickSmall()
+	{
+		// tags, stencils, characters, throw-ups (indices 9..)
+		return Arts[_rng.RandiRange(9, Arts.Length - 1)];
+	}
+
+	private void Put(Art art, Vector3 at, Vector3 n, Vector3 along, float floor, float x, float y, float tilt, int layer)
+	{
+		var tex = Tex(art.Name);
+		if (tex == null) return;
+		float scale = _rng.RandfRange(0.8f, 1.15f) * (layer == 0 ? 1f : 0.85f);
+		float w = art.Width * scale, h = w * art.Aspect;
+		y = Mathf.Max(y, h * 0.5f + 0.05f);
+		var centre = new Vector3(at.X, floor + y, at.Z) + along * x;
+		// a decal projects down its local -Y: its Y out of the wall, its X along it, its Z down the picture
+		var basis = new Basis(along, n, Vector3.Down).Rotated(n, Mathf.DegToRad(tilt + _rng.RandfRange(-3f, 3f)));
+		var d = new Decal
+		{
+			Name = $"{art.Name}_{Placed}",
+			Size = new Vector3(w, 0.5f, h),
+			TextureAlbedo = tex,
+			Modulate = new Color(1f, 1f, 1f, _rng.RandfRange(0.62f, 0.95f)),
+			AlbedoMix = 1f,
+			NormalFade = 0.5f,
+			UpperFade = 0.05f,
+			LowerFade = 0.05f,
+			DistanceFadeEnabled = true,
+			DistanceFadeBegin = 30f,
+			DistanceFadeLength = 8f,
+			CullMask = DecalDresser.DecalMask,
+			SortingOffset = layer * 0.01f,   // (the newer over the older)
+		};
+		AddChild(d);
+		d.GlobalTransform = new Transform3D(basis, centre);
+		Placed++;
 	}
 
 	private static Texture2D Tex(string name)

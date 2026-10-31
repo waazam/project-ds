@@ -102,8 +102,8 @@ public partial class BunkerInterior : Node3D
 		DecalDresser.Dress(Crt, DecalDresser.Theme.Bunker, 802);
 		// (2026-10-31) someone got in here before them, years back, and left their marks (GraffitiDresser): fewer than the
 		// tunnels', the bunker's sealed
-		World.GraffitiDresser.Dress(Hallway, 811, amount: 0.45f, spacing: 5f);
-		World.GraffitiDresser.Dress(Crt, 812, amount: 0.5f);
+		World.GraffitiDresser.Dress(Hallway, 811, amount: 0.7f, spacing: 3.5f);
+		World.GraffitiDresser.Dress(Crt, 812, amount: 0.8f);
 		GD.Print($"[bunker] interior built in {watch.ElapsedMilliseconds} ms");
 	}
 

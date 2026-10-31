@@ -59,6 +59,7 @@ project/assembly_name="ProjectDS"
 3d/physics_engine="Jolt Physics"
 
 [rendering]
+limits/cluster_builder/max_clustered_elements=2048.0
 
 rendering_device/driver.windows="d3d12"
 lights_and_shadows/directional_shadow/size=4096

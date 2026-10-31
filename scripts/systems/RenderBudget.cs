@@ -207,7 +207,7 @@ public partial class RenderBudget : Node
 		if (theme is { } t) DecalDresser.Dress(a.Root, t, 101 + index, a.Bounds, skip);
 		// (2026-10-31, the owner: graffiti "in the underground sections all over the walls and in the red light green light
 		// hallway") the tunnels' walls sprayed, old and flaking (GraffitiDresser)
-		if (a.Name is "stairwell" or "hallway" or "sewer") GraffitiDresser.Dress(a.Root, 501 + index, a.Bounds, a.Name == "hallway" ? 0.85f : 0.7f);
+		if (a.Name is "stairwell" or "hallway" or "sewer") GraffitiDresser.Dress(a.Root, 501 + index, a.Bounds, 1f);
 	}
 
 	private readonly List<DirectionalLight3D> _suns = new();
