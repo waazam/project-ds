@@ -208,6 +208,8 @@ public partial class RenderBudget : Node
 		// (2026-10-31, the owner: graffiti "in the underground sections all over the walls and in the red light green light
 		// hallway") the tunnels' walls sprayed, old and flaking (GraffitiDresser)
 		if (a.Name is "stairwell" or "hallway" or "sewer") GraffitiDresser.Dress(a.Root, 501 + index, a.Bounds, 1f);
+		// (2026-10-31) and down there, now and then, their footsteps answered from behind (PhantomSteps)
+		if (a.Name is "stairwell" or "hallway" or "sewer" && a.HasBounds) PhantomSteps.Haunt(a.Root, a.Bounds, 601 + index);
 	}
 
 	private readonly List<DirectionalLight3D> _suns = new();
