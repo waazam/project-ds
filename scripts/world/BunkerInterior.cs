@@ -100,6 +100,10 @@ public partial class BunkerInterior : Node3D
 		// its stains, its rot and its old blood (the fidelity pass): the hall and the CRT room (the looping rooms change)
 		DecalDresser.Dress(Hallway, DecalDresser.Theme.Bunker, 801);
 		DecalDresser.Dress(Crt, DecalDresser.Theme.Bunker, 802);
+		// (2026-10-31) someone got in here before them, years back, and left their marks (GraffitiDresser): fewer than the
+		// tunnels', the bunker's sealed
+		World.GraffitiDresser.Dress(Hallway, 811, amount: 0.45f, spacing: 5f);
+		World.GraffitiDresser.Dress(Crt, 812, amount: 0.5f);
 		GD.Print($"[bunker] interior built in {watch.ElapsedMilliseconds} ms");
 	}
 
