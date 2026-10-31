@@ -297,42 +297,84 @@ def bark_rgb(hgt, H, W, seed):
     return img, shade
 
 
+PH = os.path.join(ROOT, "build", "polyhaven")
+
+
+def photo_strip(name, W, H, scale, seed):
+    """A strip W x H cut from a Poly Haven photo (its colour and its normal map), the photo tiled (mirrored at the seams)
+    at scale px per photo-px."""
+    col = Image.open(os.path.join(PH, name + "_col.jpg")).convert("RGB")
+    nor = Image.open(os.path.join(PH, name + "_nor.jpg")).convert("RGB")
+    size = int(col.width * scale)
+    col, nor = col.resize((size, size), Image.LANCZOS), nor.resize((size, size), Image.LANCZOS)
+    def tile(im):
+        row = Image.new("RGB", (size * 2, size))
+        row.paste(im, (0, 0))
+        row.paste(im.transpose(Image.FLIP_LEFT_RIGHT), (size, 0))
+        while row.width < W:
+            wide = Image.new("RGB", (row.width * 2, size)); wide.paste(row, (0, 0)); wide.paste(row, (row.width, 0)); row = wide
+        y0 = np.random.default_rng(seed).integers(0, size - H)
+        return np.asarray(row.crop((0, y0, W, y0 + H))).astype(float) / 255.0
+    return tile(col), tile(nor)
+
+
 def compass_bark(name, frost=False):
-    W, H = 260 * S, 22 * S
+    """(2026-10-31, the owner, again: "make the texture look way more real like the reference materials", "less of the green
+    moss along the bottom, kind of segment it", the inside "veiny ... just make it opaque so its not as cluttered"; the
+    winter one "in a higher resolution ... remove the green moss") The band cut from a photographed bark (Poly Haven's,
+    CC0: brown oak-like for the woods, a grey willow for the snow), lit by its own normal map so the fissures go deep; a
+    plain, opaque channel of dark worn wood down its middle where the marks are cut; moss in a few separate clumps along its
+    foot (the woods' only); in the snow, snow caught on every upward ledge of the bark and rime on it. 6x the size it's
+    drawn at."""
+    R = 6
+    W, H = 260 * R, 26 * R
     cy = H / 2
-    tip, shoulder = 6, 46
-    top, bot = 6, H - 6
+    tip, shoulder = 9, 69
+    top, bot = 9, H - 9
     outline = [(tip, cy), (shoulder, top), (W - shoulder, top), (W - tip, cy), (W - shoulder, bot), (shoulder, bot)]
-    inset = 11
+    inset = 30
     inner = [(tip + inset * 2.6, cy), (shoulder + inset * 0.4, top + inset), (W - shoulder - inset * 0.4, top + inset),
              (W - tip - inset * 2.6, cy), (W - shoulder - inset * 0.4, bot - inset), (shoulder + inset * 0.4, bot - inset)]
     outer_m = mask(W, H, lambda d: d.polygon(outline, fill=255))
-    inner_m = soft(mask(W, H, lambda d: d.polygon(inner, fill=255)), 1.2)
+    inner_m = soft(mask(W, H, lambda d: d.polygon(inner, fill=255)), 1.5)
     yy, xx = np.mgrid[0:H, 0:W].astype(float)
-    hgt = bark_field(H, W, 91)
-    img, shade = bark_rgb(hgt, H, W, 91)
-    # the channel: the bark worn smooth and dark where the marks are cut
-    img = img * (1 - 0.72 * inner_m[..., None])
-    # moss along the lower edge, climbing the cracks and the plates' undersides
-    v = yy / H
-    climb = noise(H, W, 10, 3, 96)
-    moss_m = np.clip((v - 0.68 - (climb - 0.5) * 0.35) * 7, 0, 1) * (1 - inner_m * 0.7)
-    moss_m = np.maximum(moss_m, ((hgt < 0.38) & (v > 0.5)).astype(float) * 0.5 * (1 - inner_m))
-    fuzz = noise(H, W, 160, 2, 97)
-    moss = np.array([0.26, 0.46, 0.1]) * (0.5 + 0.7 * fuzz)[..., None] * (0.7 + 0.3 * np.clip(shade, 0, 1.4))[..., None]
-    img = img * (1 - moss_m[..., None]) + moss * moss_m[..., None]
-    if frost:
-        # snow caught on every upward face and ridge, thickest on top; rime on the moss
-        snow_m = np.clip((hgt - 0.55) * 7 + (0.45 - v) * 2.2 + (noise(H, W, 80, 3, 98) - 0.5) * 1.2, 0, 1) * (1 - inner_m * 0.8)
-        speck = np.random.default_rng(99).random((H, W)) > 0.93
-        snow_m = np.maximum(snow_m, speck * 0.7 * (hgt > 0.45))
-        snow = np.array([0.9, 0.93, 0.97]) * (0.85 + 0.15 * noise(H, W, 80, 2, 100))[..., None]
-        img = img * (1 - snow_m[..., None]) + snow * snow_m[..., None]
-        rime = (np.random.default_rng(101).random((H, W)) > 0.9) * inner_m * 0.35   # a fine rime even in the channel
-        img = img * (1 - rime[..., None]) + np.array([0.8, 0.85, 0.9]) * rime[..., None]
-    edge = np.clip(outer_m - soft(outer_m, 2.5), 0, 1)
-    img = img * (1 - 0.5 * edge[..., None])
-    shadow = np.roll(soft(outer_m, 5), 3, axis=0) * 0.55
+    bark, nor = photo_strip("bark_willow_02" if frost else "bark_brown_02", W, H, 0.42, 7 if frost else 3)
+    n = nor * 2 - 1
+    light = np.clip(0.75 + 0.55 * (-n[..., 0] * 0.4 + n[..., 1] * 0.75), 0.35, 1.5)   # (lit from above, a touch left)
+    img = np.clip(bark * light[..., None] * 1.05, 0, 1)
+    img = (img - 0.5) * 1.15 + 0.5                                              # (a little more bite)
+    # the channel: opaque, plain, dark worn wood (a faint grain, a shadow under its top lip)
+    grain = noise(H * 4, W, 60, 2, 41)[::4]
+    chan = np.array([0.075, 0.058, 0.045]) * (0.9 + 0.2 * grain)[..., None]
+    lip = np.clip((yy - (top + inset)) / 6.0, 0, 1)
+    chan = chan * (0.55 + 0.45 * lip)[..., None]
+    img = img * (1 - inner_m[..., None]) + chan * inner_m[..., None]
+    if not frost:
+        # moss: a few separate clumps along the foot, fuzzy-edged, not a strip
+        r = np.random.default_rng(11)
+        moss_m = np.zeros((H, W))
+        fuzz = noise(H, W, 220, 2, 12)
+        for _ in range(5):
+            cx = r.uniform(0.08, 0.92) * W
+            wdt = r.uniform(70, 200)
+            hgt = r.uniform(0.3, 0.55) * H
+            d = ((xx - cx) / wdt) ** 2 + ((yy - H) / hgt) ** 2
+            moss_m = np.maximum(moss_m, np.clip((1 - d) * 3 + (fuzz - 0.5) * 2.4, 0, 1))
+        moss_m *= (1 - inner_m)
+        mcol = np.array([0.24, 0.38, 0.09]) * (0.45 + 0.75 * fuzz)[..., None] * light[..., None]
+        mcol = mcol + np.array([0.08, 0.11, 0.0]) * (fuzz > 0.72)[..., None]
+        img = img * (1 - 0.85 * moss_m[..., None]) + mcol * 0.85 * moss_m[..., None]
+    else:
+        # snow on the ledges (the normal map's upward faces), heavier along the top edge, and rime on the rest
+        up = np.clip(n[..., 1] * 1.6 - 0.2, 0, 1)
+        sn = np.clip(up * 1.3 + np.clip((0.35 - yy / H) * 2.5, 0, 1) + (noise(H, W, 90, 3, 13) - 0.6) * 1.2, 0, 1) * (1 - inner_m)
+        snow = np.array([0.9, 0.93, 0.97]) * (0.85 + 0.15 * noise(H, W, 120, 2, 14))[..., None]
+        img = img * (1 - sn[..., None]) + snow * sn[..., None]
+        rime = (np.random.default_rng(15).random((H, W)) > 0.94) * 0.5 * (1 - inner_m)
+        img = img * (1 - rime[..., None]) + np.array([0.85, 0.9, 0.95]) * rime[..., None]
+    edge = np.clip(outer_m - soft(outer_m, 3.5), 0, 1)
+    img = img * (1 - 0.55 * edge[..., None])
+    shadow = np.roll(soft(outer_m, 7), 4, axis=0) * 0.55
     save(name, img * outer_m[..., None], np.maximum(outer_m, shadow * (1 - outer_m)))
 
 

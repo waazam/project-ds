@@ -27,9 +27,9 @@ namespace ProjectDS.UI;
 public partial class Compass : CanvasLayer
 {
 	[Export] public float StripWidth = 260f;
-	[Export] public float StripHeight = 22f;
+	[Export] public float StripHeight = 26f;
 	/// <summary>The band's inside, where the marks run (the painting's leather, inside the rim and short of the points).</summary>
-	private const float BandInset = 17f, BandTop = 4.5f, BandBottom = 17.5f;
+	private const float BandInset = 19f, BandTop = 5.5f, BandBottom = 20.5f;
 	/// <summary>Total degrees of heading shown across the strip.</summary>
 	[Export] public float VisibleDegrees = 140f;
 	/// <summary>Fastest the objective marker may sweep around the ribbon, in degrees per second.</summary>
