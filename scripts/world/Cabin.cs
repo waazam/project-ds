@@ -262,6 +262,8 @@ public partial class Cabin : Node3D
 			// the post by the steps
 			WeatheredProps.HangBells(_gen, _bellNail, 0f);
 			if (!Hub) WeatheredProps.Put(_gen, "Sign_Tin", _signNail, 0f, 0f, false);
+			// (2026-10-31) the Hollow's cabins creak and settle round them now and then (FalseScares; not the hub: it's safe)
+			if (!Hub) Callable.From(() => { if (IsInsideTree()) FalseScares.Haunt(this, GlobalTransform * new Aabb(new Vector3(-Hw, -0.5f, -Hd), new Vector3(Width, WallHeight + 2f, Depth)), Seed * 31 + 7, 0.3f); }).CallDeferred();
 		}
 		// (2026-10-16) Act 7's lit stove, Act 25's burned room (Cabin.Act7.cs)
 		if (_hearthLit && !BurnedOut) BuildHearth();

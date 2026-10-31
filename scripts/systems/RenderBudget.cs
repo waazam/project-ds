@@ -213,6 +213,9 @@ public partial class RenderBudget : Node
 		// (2026-10-31) and something standing far down a long view, now and then (Apparitions; not in the hallway: its own
 		// thing lives there)
 		if (a.Name is "station" or "stairwell" or "sewer" or "lodge" && a.HasBounds) Apparitions.Haunt(a.Root, a.Bounds, 701 + index, a.Name == "lodge" ? 4 : 3);
+		// (2026-10-31) and the false scares: everywhere indoors and under, thickest in the lodge (FalseScares)
+		if (a.HasBounds && a.Name is "station" or "stairwell" or "hallway" or "sewer" or "library" or "church" or "lodge")
+			FalseScares.Haunt(a.Root, a.Bounds, 801 + index, a.Name switch { "lodge" => 1f, "library" => 0.15f, "church" => 0.45f, _ => 0.35f });
 	}
 
 	private readonly List<DirectionalLight3D> _suns = new();
