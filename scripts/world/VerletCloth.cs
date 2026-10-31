@@ -25,6 +25,9 @@ public partial class VerletCloth : MeshInstance3D
 	private Node3D[] _pinTo;
 	private Vector3[] _pinOffset;
 	private readonly List<(int a, int b, float rest, float k)> _links = new();
+	private int[] _la, _lb;
+	private float[] _lr, _lk;
+	private bool[] _pinned;
 	private Vector2[] _uv;
 	private int[] _idx;
 	private ArrayMesh _mesh;
@@ -128,8 +131,18 @@ public partial class VerletCloth : MeshInstance3D
 
 	public override void _PhysicsProcess(double delta)
 	{
-		const int steps = 4, iterations = 6;
-		const float maxStep = 0.03f;   // (metres a step: about 4.8 m/s at most, so nothing is ever thrown)
+		// (2026-10-31, the hitch pass: 4 steps x 6 iterations a tick was 15 ms, and a long frame's catch-up ticks made it
+		// 130: now 2 x 5, the step's cap doubled to match, the links in flat arrays, who's pinned worked out once a tick)
+		const int steps = 2, iterations = 5;
+		const float maxStep = 0.06f;   // (metres a step: about 4.8 m/s at most, so nothing is ever thrown)
+		if (_la == null || _la.Length != _links.Count)
+		{
+			int n = _links.Count;
+			_la = new int[n]; _lb = new int[n]; _lr = new float[n]; _lk = new float[n];
+			for (int i = 0; i < n; i++) (_la[i], _lb[i], _lr[i], _lk[i]) = _links[i];
+		}
+		if (_pinned == null || _pinned.Length != _p.Length) _pinned = new bool[_p.Length];
+		for (int k = 0; k < _p.Length; k++) _pinned[k] = _pinTo[k] != null;
 		float h = (float)delta / steps;
 		var g = new Vector3(0, -9.0f, 0) * h * h;
 		bool held = false;
@@ -153,13 +166,14 @@ public partial class VerletCloth : MeshInstance3D
 			}
 			for (int it = 0; it < iterations; it++)
 			{
-				foreach (var (a, b, rest, stiff) in _links)
+				for (int li = 0; li < _la.Length; li++)
 				{
+					int a = _la[li], b = _lb[li];
 					var d = _p[b] - _p[a];
 					float len = d.Length();
 					if (len < 1e-5f) continue;
-					var corr = d * ((len - rest) / len) * 0.5f * stiff;
-					bool pa = _pinTo[a] != null, pb = _pinTo[b] != null;
+					var corr = d * ((len - _lr[li]) / len) * 0.5f * _lk[li];
+					bool pa = _pinned[a], pb = _pinned[b];
 					if (pa && pb) continue;
 					if (pa) _p[b] -= corr * 2f;
 					else if (pb) _p[a] += corr * 2f;

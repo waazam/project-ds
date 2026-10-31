@@ -30,8 +30,7 @@ public partial class BossRoom
 			{
 				var surface = Beast.ToGlobal(t.RootLocal with { Y = BloodY - PitFloor }) + Beast.GlobalBasis * (t.RootLocal with { Y = 0 }).Normalized() * 1.5f;
 				surface.Y = ToGlobal(new Vector3(0, BloodY, 0)).Y;
-				Blood.Burst(this, surface, GlobalBasis.Y, 70, 7.5f, 28f);
-				Blood.Burst(this, surface, GlobalBasis.Y, 30, 3.5f, 75f);
+				Blood.Burst(this, surface, GlobalBasis.Y, 80, 7.5f, 40f);
 				Sfx("boss_limb_rise", 3, surface, 2f, 8f);
 			}
 			// raised: running with it, dripping off the tip

@@ -600,6 +600,8 @@ public partial class Leviathan : Node3D
 		return p + side * Mathf.Sin(w) * amp + Vector3.Up * Mathf.Cos(w * 0.8f) * amp * 0.4f;
 	}
 
+	private int _poseFrame;
+
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
@@ -609,7 +611,15 @@ public partial class Leviathan : Node3D
 		// (out of sight across the world, nothing to move: its tentacles were 2 ms of every frame wherever the player was)
 		if (_cam != null && _cam.GlobalPosition.DistanceSquaredTo(GlobalPosition) > 300f * 300f) return;
 		foreach (var t in _tentacles) Step(t, dt);
-		foreach (var t in _tentacles) Pose(t);
+		// (2026-10-31, the hitch pass: posing all fourteen, seventy-three bones each, every frame was 20-40 ms) the ones
+		// coming down, every frame; the ones idling, swaying slowly, every other frame, alternate halves of them each frame
+		_poseFrame++;
+		for (int i = 0; i < _tentacles.Count; i++)
+		{
+			var t = _tentacles[i];
+			bool busy = t.State is not (Tentacle.S.Idle or Tentacle.S.Limp);
+			if (busy || ((i + _poseFrame) & 1) == 0) Pose(t);
+		}
 		LookAtCamera();
 	}
 
@@ -793,8 +803,7 @@ public partial class Leviathan : Node3D
 			Vector3 x = tan.Cross(z).Normalized();
 			t.Frames[r] = new Basis(x, tan, z);
 			zPrev = z;
-			t.Skel.SetBonePosePosition(r, t.Pts[r]);
-			t.Skel.SetBonePoseRotation(r, t.Frames[r].GetRotationQuaternion());
+			t.Skel.SetBonePose(r, new Transform3D(t.Frames[r].Orthonormalized(), t.Pts[r]));   // (one call, not two)
 		}
 		// the segments (the suckers, the eyes, the mouth) ride along it
 		float nominal = Length / Segments;

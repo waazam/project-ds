@@ -106,12 +106,24 @@ public partial class SkiLodge
 		var w = new Wendigo { Name = "WarmWendigo", Scale = Vector3.One * 0.001f };
 		_warm.AddChild(w);
 		w.Visible = true;
+		w.WearMitchell();
+		// (2026-10-31, the hitch pass: the warm-up's wendigo was freed after four frames and its models with it, and the
+		// finale's loaded them from disk again in the middle of the scene: a 2.9 s freeze as it appeared on the balcony)
+		// its models held while the lodge stands
+		_keep ??= new Resource[]
+		{
+			GD.Load<PackedScene>("res://assets/models/wendigo/wendigo.glb"),
+			ResourceLoader.Exists(Wendigo.StoryModel) ? GD.Load<PackedScene>(Wendigo.StoryModel) : null,
+			ResourceLoader.Exists("res://assets/models/wendigo/wendigo_arm.glb") ? GD.Load<PackedScene>("res://assets/models/wendigo/wendigo_arm.glb") : null,
+		};
 		var arm = new WendigoArm { Name = "WarmArm", Scale = Vector3.One * 0.001f };
 		_warm.AddChild(arm);
 		arm.Burst();
 		_warmFrames = 0;
 		GD.Print($"[perf] lodge warm-up: {mats.Count} materials, {particles.Count} particle systems");
 	}
+
+	private Resource[] _keep;
 
 	/// <summary>Holds the warm-up before the eyes for a few frames, then clears it (from _Process).</summary>
 	private void WarmProcess()

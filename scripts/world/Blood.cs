@@ -102,10 +102,15 @@ public static class Blood
 
 	/// <summary>Drops thrown off a blow at <paramref name="at"/>, outward round <paramref name="dir"/>: beads stretched
 	/// along their flight, and a few long slow strands (it's thick: it comes off in ropes as well as drops).</summary>
+	private static Mesh _beadMesh, _ropeMesh;
+
 	public static void Burst(Node parent, Vector3 at, Vector3 dir, int amount = 60, float speed = 6f, float spread = 65f)
 	{
-		Emit(parent, at, dir, amount, speed * 0.5f, speed, spread, new SphereMesh { Radius = 0.022f, Height = 0.075f, RadialSegments = 6, Rings = 3, Material = BeadMat }, 1.4, 0.35f, 1.5f);
-		Emit(parent, at, dir, Mathf.Max(4, amount / 6), speed * 0.35f, speed * 0.7f, spread * 0.7f, new CapsuleMesh { Radius = 0.012f, Height = 0.32f, RadialSegments = 5, Rings = 2, Material = BeadMat }, 1.2, 0.7f, 1.2f);
+		// (2026-10-31, the hitch pass: a new mesh each burst was 8-17 ms; made once)
+		_beadMesh ??= new SphereMesh { Radius = 0.022f, Height = 0.075f, RadialSegments = 6, Rings = 3, Material = BeadMat };
+		_ropeMesh ??= new CapsuleMesh { Radius = 0.012f, Height = 0.32f, RadialSegments = 5, Rings = 2, Material = BeadMat };
+		Emit(parent, at, dir, amount, speed * 0.5f, speed, spread, _beadMesh, 1.4, 0.35f, 1.5f);
+		Emit(parent, at, dir, Mathf.Max(4, amount / 6), speed * 0.35f, speed * 0.7f, spread * 0.7f, _ropeMesh, 1.2, 0.7f, 1.2f);
 	}
 
 	private static void Emit(Node parent, Vector3 at, Vector3 dir, int amount, float v0, float v1, float spread, Mesh mesh, double life, float s0, float s1)
