@@ -27,9 +27,9 @@ namespace ProjectDS.UI;
 public partial class Compass : CanvasLayer
 {
 	[Export] public float StripWidth = 260f;
-	[Export] public float StripHeight = 26f;
+	[Export] public float StripHeight = 17f;
 	/// <summary>The band's inside, where the marks run (the painting's leather, inside the rim and short of the points).</summary>
-	private const float BandInset = 19f, BandTop = 5.5f, BandBottom = 20.5f;
+	private const float BandInset = 13f, BandTop = 3.3f, BandBottom = 13.7f;
 	/// <summary>Total degrees of heading shown across the strip.</summary>
 	[Export] public float VisibleDegrees = 140f;
 	/// <summary>Fastest the objective marker may sweep around the ribbon, in degrees per second.</summary>
@@ -223,7 +223,8 @@ public partial class Compass : CanvasLayer
 		if (_barTex != null) _draw.DrawTextureRect(_barTex, new Rect2(Vector2.Zero, size), false);
 
 		float half = cx - BandInset;
-		var font = _font ??= new FontVariation { BaseFont = ChapterCard.Anton ?? UiKit.Serif, SpacingGlyph = 1 };
+		// (2026-10-31: "the lettering ... a little thinner it is too bold") Anton thinned
+		var font = _font ??= new FontVariation { BaseFont = ChapterCard.Anton ?? UiKit.Serif, SpacingGlyph = 1, VariationEmbolden = -0.45f };
 		// every 15 degrees a mark; the cardinals and the half-winds named, engraved: bone, a dark line under each
 		for (int d = 0; d < 360; d += 15)
 		{
@@ -241,13 +242,12 @@ public partial class Compass : CanvasLayer
 			var ink = new Color(label == "N" ? NorthGreen : Engrave, (major ? 0.95f : label != null ? 0.7f : 0.45f) * edge);
 			if (label == null)
 			{
-				Mark(new Vector2(x, cy + 2.2f), new Vector2(x, BandBottom - 1.2f), 0.7f, ink);
+				Mark(new Vector2(x, cy + 1.6f), new Vector2(x, BandBottom - 1.4f), 0.6f, ink);
 				continue;
 			}
-			if (!major) Mark(new Vector2(x, cy + 3.4f), new Vector2(x, BandBottom - 1.2f), 0.7f, ink);
-			int fs = major ? 10 : 7;
+			int fs = major ? 8 : 6;
 			var tsz = font.GetStringSize(label, HorizontalAlignment.Left, -1, fs);
-			var at = new Vector2(x - tsz.X * 0.5f, cy + fs * 0.36f - (major ? 0f : 1.5f));
+			var at = new Vector2(x - tsz.X * 0.5f, cy + fs * 0.43f);   // (the capitals centred on the band: Anton's stand 0.86 of the size)
 			_draw.DrawString(font, at + new Vector2(0, 0.6f), label, HorizontalAlignment.Left, -1, fs, new Color(EngraveShadow, EngraveShadow.A * edge));
 			_draw.DrawString(font, at, label, HorizontalAlignment.Left, -1, fs, ink);
 		}
@@ -265,7 +265,7 @@ public partial class Compass : CanvasLayer
 			float mlit = Mathf.Lerp(1f, 0.45f, jitter) * (0.88f + 0.12f * Mathf.Sin(t * 3.1f)) * _markAlpha;
 			if (Mathf.Abs(bx - cx) <= half)
 			{
-				var dia = new[] { new Vector2(bx, cy - 4.6f), new Vector2(bx + 3.4f, cy), new Vector2(bx, cy + 4.6f), new Vector2(bx - 3.4f, cy) };
+				var dia = new[] { new Vector2(bx, cy - 3.8f), new Vector2(bx + 2.8f, cy), new Vector2(bx, cy + 3.8f), new Vector2(bx - 2.8f, cy) };
 				_draw.DrawColoredPolygon(new[] { dia[0] + new Vector2(0, 0.8f), dia[1] + new Vector2(0.4f, 0.8f), dia[2] + new Vector2(0, 0.8f), dia[3] + new Vector2(-0.4f, 0.8f) }, new Color(0, 0, 0, 0.5f * mlit));
 				Purple(dia, 0.8f, mlit, true);
 				_draw.DrawColoredPolygon(new[] { new Vector2(bx, cy - 2.2f), new Vector2(bx + 1.6f, cy), new Vector2(bx, cy + 2.2f), new Vector2(bx - 1.6f, cy) }, new Color(MarkCore, 0.85f * mlit));
@@ -283,7 +283,7 @@ public partial class Compass : CanvasLayer
 		if (_pointerTex != null)
 		{
 			float sway = Mathf.Clamp(_yawVel * 0.004f, -1.2f, 1.2f);
-			_draw.DrawTextureRect(_pointerTex, new Rect2(cx - 5f + sway, -2.2f, 10f, 7.5f), false);
+			_draw.DrawTextureRect(_pointerTex, new Rect2(cx - 4f + sway, -2.4f, 8f, 6f), false);
 		}
 		else _draw.DrawColoredPolygon(new[] { new Vector2(cx - 3f, 0f), new Vector2(cx + 3f, 0f), new Vector2(cx, 4f) }, Engrave);
 	}

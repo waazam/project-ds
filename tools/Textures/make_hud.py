@@ -318,6 +318,23 @@ def photo_strip(name, W, H, scale, seed):
     return tile(col), tile(nor)
 
 
+def stylize(img):
+    """(2026-10-31, the owner: the bark "stylized with our games style to make it feel less real world and more of the
+    game") A photo brought into the game's look: its fine noise smoothed into painted patches (a median), the colour
+    stepped into a few bands (the PS2 era's posterized textures), the grade's lift and warmth, and the fissures inked
+    darker."""
+    im = Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.MedianFilter(5))
+    p = np.asarray(im).astype(float) / 255.0
+    levels = 9.0
+    p = np.floor(p * levels + 0.5) / levels
+    luma = p.mean(-1, keepdims=True)
+    p = p * 0.82 + luma * 0.18                                   # (a touch less colour)
+    p = p * np.array([1.05, 1.0, 0.92])                          # (warmer)
+    ink = luma[..., 0] < 0.16
+    p = np.where(ink[..., None], p * 0.55, p)
+    return np.clip(p, 0, 1)
+
+
 def compass_bark(name, frost=False):
     """(2026-10-31, the owner, again: "make the texture look way more real like the reference materials", "less of the green
     moss along the bottom, kind of segment it", the inside "veiny ... just make it opaque so its not as cluttered"; the
@@ -327,12 +344,12 @@ def compass_bark(name, frost=False):
     foot (the woods' only); in the snow, snow caught on every upward ledge of the bark and rime on it. 6x the size it's
     drawn at."""
     R = 6
-    W, H = 260 * R, 26 * R
+    W, H = 260 * R, 17 * R
     cy = H / 2
-    tip, shoulder = 9, 69
-    top, bot = 9, H - 9
+    tip, shoulder = 9, 52
+    top, bot = 7, H - 7
     outline = [(tip, cy), (shoulder, top), (W - shoulder, top), (W - tip, cy), (W - shoulder, bot), (shoulder, bot)]
-    inset = 30
+    inset = 13
     inner = [(tip + inset * 2.6, cy), (shoulder + inset * 0.4, top + inset), (W - shoulder - inset * 0.4, top + inset),
              (W - tip - inset * 2.6, cy), (W - shoulder - inset * 0.4, bot - inset), (shoulder + inset * 0.4, bot - inset)]
     outer_m = mask(W, H, lambda d: d.polygon(outline, fill=255))
@@ -357,7 +374,7 @@ def compass_bark(name, frost=False):
         for _ in range(5):
             cx = r.uniform(0.08, 0.92) * W
             wdt = r.uniform(70, 200)
-            hgt = r.uniform(0.3, 0.55) * H
+            hgt = r.uniform(0.35, 0.6) * H
             d = ((xx - cx) / wdt) ** 2 + ((yy - H) / hgt) ** 2
             moss_m = np.maximum(moss_m, np.clip((1 - d) * 3 + (fuzz - 0.5) * 2.4, 0, 1))
         moss_m *= (1 - inner_m)
@@ -372,6 +389,7 @@ def compass_bark(name, frost=False):
         img = img * (1 - sn[..., None]) + snow * sn[..., None]
         rime = (np.random.default_rng(15).random((H, W)) > 0.94) * 0.5 * (1 - inner_m)
         img = img * (1 - rime[..., None]) + np.array([0.85, 0.9, 0.95]) * rime[..., None]
+    img = stylize(img) * (1 - inner_m[..., None]) + img * inner_m[..., None]   # (the bark only: the channel stays plain)
     edge = np.clip(outer_m - soft(outer_m, 3.5), 0, 1)
     img = img * (1 - 0.55 * edge[..., None])
     shadow = np.roll(soft(outer_m, 7), 4, axis=0) * 0.55

@@ -15,12 +15,15 @@ uniform float opacity : hint_range(0.0, 1.0) = 0.6;
 uniform vec2 inflow = vec2(99.0, 99.0);
 uniform float inflow_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float viscous : hint_range(0.0, 1.0) = 0.0;
+/// (2026-10-31, the owner: the blood "a little too water ... make it feel more viscous") 0..1: the blood thick: its surface
+/// barely moving, slow heavy folds instead of ripples, a sticky skin with a sheen, and nearly opaque.
+uniform float thick : hint_range(0.0, 1.0) = 0.0;
 
 varying vec2 v_local;
 
 float rings(vec2 xz) {
 	float r = length(xz - inflow);
-	float sp = mix(5.0, 2.0, viscous);
+	float sp = mix(mix(5.0, 2.0, viscous), 0.7, thick);
 	return sin(r * 5.0 - TIME * sp) * exp(-r * 0.45) * inflow_strength;
 }
 
@@ -29,13 +32,15 @@ void vertex() {
 	// the funnel: the surface sags toward the drain as it spins
 	float r = length(VERTEX.xz - drain);
 	VERTEX.y -= swirl * 0.35 * exp(-r * r / 1.8);
-	VERTEX.y += rings(VERTEX.xz) * mix(0.03, 0.045, viscous);
+	VERTEX.y += rings(VERTEX.xz) * mix(mix(0.03, 0.045, viscous), 0.02, thick);
+	// thick: slow, heavy folds rolling across it
+	VERTEX.y += thick * 0.025 * sin(VERTEX.x * 1.3 + TIME * 0.35) * sin(VERTEX.z * 1.1 - TIME * 0.28);
 }
 
 void fragment() {
 	vec2 d = v_local - drain;
 	float r = length(d);
-	float slow = 1.0 - 0.6 * viscous;
+	float slow = (1.0 - 0.6 * viscous) * (1.0 - 0.75 * thick);
 	float ang = atan(d.y, d.x) + swirl * TIME * (2.5 / (r + 0.35));
 	vec2 p = drain + vec2(cos(ang), sin(ang)) * r;
 	// a current spreading out from where the torrent lands
@@ -61,7 +66,12 @@ void fragment() {
 	vec2 rg = fromIn / max(ri, 0.05) * (rings(v_local + fromIn / max(ri, 0.05) * 0.05) - ring) * 8.0;
 	NORMAL = normalize(NORMAL + (VIEW_MATRIX * vec4(dx * 1.5 + rg.x, 0.0, dy * 1.5 + rg.y, 0.0)).xyz);
 	ALBEDO = c;
-	ROUGHNESS = mix(mix(0.08, 0.6, scum), 0.04, viscous);
-	SPECULAR = mix(0.55, 0.85, viscous);
-	ALPHA = clamp(opacity + scum * 0.15 + viscous * 0.08, 0.0, 1.0);
+	// thick: a skin on it, dark and sticky, the light catching in a wet sheen along its folds
+	float skin = smoothstep(0.35, 0.75, n1 * 0.6 + n2 * 0.4);
+	c = mix(c, c * 0.55, thick * skin * 0.6);
+	ROUGHNESS = mix(mix(mix(0.08, 0.6, scum), 0.04, viscous), mix(0.02, 0.25, skin), thick);
+	SPECULAR = mix(mix(0.55, 0.85, viscous), 0.95, thick);
+	CLEARCOAT = thick;
+	CLEARCOAT_ROUGHNESS = 0.05;
+	ALPHA = clamp(opacity + scum * 0.15 + viscous * 0.08 + thick * 0.3, 0.0, 1.0);
 }

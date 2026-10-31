@@ -222,13 +222,16 @@ public partial class StationRoom2 : Node3D
 		// the shards it breaks into (hidden until then): they fly in, and later fly back
 		_shards = new Node3D { Name = "Shards", Visible = false };
 		AddChild(_shards);
-		var glass = new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.7f, 0.7f, 0.45f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.05f, MetallicSpecular = 0.9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+		// (2026-10-31, the owner: "floating white squares when the room is flooding ... remove those": they were these, lying
+		// flat on the floor, pale glass seen through the murk) dark dirty glass now, smaller, and hidden while the flood is over
+		// them (see Flood)
+		var glass = new StandardMaterial3D { AlbedoColor = new Color(0.16f, 0.19f, 0.18f, 0.5f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.1f, MetallicSpecular = 0.6f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
 		for (int i = 0; i < 14; i++)
 		{
 			var sk = new MeshKit();
 			sk.Mat(glass);
 			sk.Color = Colors.White;
-			float w = _rng.RandfRange(0.12f, 0.35f), h = _rng.RandfRange(0.12f, 0.35f);
+			float w = _rng.RandfRange(0.07f, 0.2f), h = _rng.RandfRange(0.07f, 0.2f);
 			sk.Tri(new Vector3(-w, -h, 0), new Vector3(w, -h * 0.3f, 0), new Vector3(0, h, 0), Vector3.Back, Vector2.Zero, Vector2.Right, Vector2.Down);
 			var shard = sk.CommitTo(_shards, $"Shard{i}", false);
 			shard.SetMeta("home", new Vector3(cx + _rng.RandfRange(-0.7f, 0.7f), cy + _rng.RandfRange(-0.6f, 0.6f), -Half + 0.02f));
@@ -432,6 +435,7 @@ public partial class StationRoom2 : Node3D
 			}
 		}
 		if (Flooding && !_winning) Flood(dt);
+		else if (_dragging && StoryBeat.Player(this) is { } dp) { dp.WadeScale = 1f; _dragging = false; }   // (the blood's drag let go)
 		TorrentTick();
 		MoveDrapes(dt);
 		// the scavenger staircase: only ever appears (or goes) while the player isn't in here to see it
@@ -551,6 +555,7 @@ public partial class StationRoom2 : Node3D
 		_peak = Mathf.Max(_peak, Level);
 		_water.Visible = Level > 0.01f;
 		_water.Position = _water.Position with { Y = Level };
+		if (Level > 0.08f && _shards.Visible && !_shardsReturning) _shards.Visible = false;
 		if (!Blood && Level >= KneeHeight)
 		{
 			Blood = true;
@@ -563,12 +568,18 @@ public partial class StationRoom2 : Node3D
 				_waterMat.SetShaderParameter("scum_color", c.Lerp(new Color(0.5f, 0.06f, 0.05f), 0.5f));
 				_torrentMat.SetShaderParameter("tint", c);
 				TorrentViscous(u, c);
+				_waterMat.SetShaderParameter("thick", u);
 			}), 0f, 1f, 3f);
 			GD.Print("[story] Act 13, room 2: the water turns to blood");
 		}
 		var player = StoryBeat.Player(this);
 		if (player == null) return;
 		// under it: the view goes red and muffled
+		// (2026-10-31: "more viscous") the blood drags at them: slower the deeper it is, slower than water at the same depth
+		float feet = player.GlobalPosition.Y - GlobalPosition.Y;
+		float depth = Mathf.Clamp(Level - feet, 0f, 1.4f);
+		player.WadeScale = 1f - depth * (Blood ? 0.42f : 0.2f);
+		_dragging = true;
 		float eye = player.CameraRig.Camera.GlobalPosition.Y - GlobalPosition.Y;
 		float under = Mathf.Clamp((Level - eye + 0.05f) / 0.15f, 0f, 1f);
 		// bent over the cryptex, keep the murk light enough to read the rings through (the red wash keeps the contrast: full)
@@ -583,6 +594,7 @@ public partial class StationRoom2 : Node3D
 		// see-through (the owner: the cryptex must stay readable under it)
 		_waterMat = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/shaders/flood_water.gdshader") };
 		_waterMat.SetShaderParameter("opacity", 0.5f);
+		_waterMat.SetShaderParameter("thick", 0f);
 		_waterMat.SetShaderParameter("noise_tex", ProcTextures.WaterNoise());
 		_waterMat.SetShaderParameter("drain", new Vector2(99f, 99f));
 		_waterMat.SetShaderParameter("water_color", Lake);
@@ -648,6 +660,7 @@ public partial class StationRoom2 : Node3D
 			float u = (float)(t / back);
 			Level = Mathf.Lerp(from, 0f, Mathf.SmoothStep(0f, 1f, u));
 			_water.Position = _water.Position with { Y = Level };
+		if (Level > 0.08f && _shards.Visible && !_shardsReturning) _shards.Visible = false;
 			_torrentMat.SetShaderParameter("opacity", 1f - Mathf.SmoothStep(0.6f, 1f, u));
 			if (player != null)
 			{
@@ -730,6 +743,7 @@ public partial class StationRoom2 : Node3D
 	}
 
 	private bool _shardsReturning;
+	private bool _dragging;
 
 	private void ReturnShards()
 	{
