@@ -755,6 +755,7 @@ public partial class Sewer : Node3D
 			else if (_drip.VolumeDb <= -79f && _drip.Playing) _drip.Stop();
 		}
 		ProcessWhispers(player, dt);
+		ProcessBloodTide(player, dt);
 		ProcessBrownOut(dt);
 	}
 
