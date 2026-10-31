@@ -210,6 +210,9 @@ public partial class RenderBudget : Node
 		if (a.Name is "stairwell" or "hallway" or "sewer") GraffitiDresser.Dress(a.Root, 501 + index, a.Bounds, 1f);
 		// (2026-10-31) and down there, now and then, their footsteps answered from behind (PhantomSteps)
 		if (a.Name is "stairwell" or "hallway" or "sewer" && a.HasBounds) PhantomSteps.Haunt(a.Root, a.Bounds, 601 + index);
+		// (2026-10-31) and something standing far down a long view, now and then (Apparitions; not in the hallway: its own
+		// thing lives there)
+		if (a.Name is "station" or "stairwell" or "sewer" or "lodge" && a.HasBounds) Apparitions.Haunt(a.Root, a.Bounds, 701 + index, a.Name == "lodge" ? 4 : 3);
 	}
 
 	private readonly List<DirectionalLight3D> _suns = new();

@@ -105,6 +105,7 @@ public partial class BunkerInterior : Node3D
 		World.GraffitiDresser.Dress(Hallway, 811, amount: 0.7f, spacing: 3.5f);
 		World.GraffitiDresser.Dress(Crt, 812, amount: 0.8f);
 		if (Hallway != null) World.PhantomSteps.Haunt(Hallway, new Aabb(Hallway.GlobalPosition - new Vector3(60, 10, 60), new Vector3(120, 20, 120)), 811);
+		if (Crt != null) World.Apparitions.Haunt(this, new Aabb(GlobalPosition - new Vector3(80, 15, 80), new Vector3(160, 30, 160)), 812, 2);
 		GD.Print($"[bunker] interior built in {watch.ElapsedMilliseconds} ms");
 	}
 
