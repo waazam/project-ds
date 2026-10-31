@@ -28,7 +28,7 @@ namespace ProjectDS.World;
 public partial class BossRoom : Node3D
 {
 	// the catwalk is 2.6 m wide; the blood starts about five feet under it, the monster just below
-	public const float Half = 19f, CatIn = 16.4f, PitFloor = -24f, Ceil = 16f, BloodStart = -1.5f;
+	public const float Half = 19f, CatIn = 16.4f, PitFloor = -24f, Ceil = 16f, BloodStart = -0.45f;   // (2026-10-31: "as high as we can get it ... right underneath the railing": a hand under the deck)
 	/// <summary>How far a slam reaches: 2 m at first, 3.2 m by the end (the late ones make you think twice).</summary>
 	public const float SlamRadiusStart = 2.0f, SlamRadiusEnd = 3.2f;
 	public float SlamRadius => Mathf.Lerp(SlamRadiusStart, SlamRadiusEnd, ValvesTurned / (float)ValvesToTurn);

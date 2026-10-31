@@ -206,6 +206,7 @@ public partial class BossRoom
 			&& player.GlobalPosition.DistanceTo(LandingWorld) < 6f)
 			Begin(player, sm.HasFlag(StoryManager.Flag.Act18IntroSeen));
 		UpdateTelegraphs(dt);
+		UpdateLimbBlood();
 		if (State is Phase.Fight or Phase.Draining && !_dying)
 		{
 			FightSeconds += dt;
