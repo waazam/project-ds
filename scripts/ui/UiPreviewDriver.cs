@@ -99,6 +99,16 @@ public partial class UiPreviewDriver : Node
 		}
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--hints") >= 0) { await HintShots(player, inv); return; }
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--notes") >= 0) { await NoteShots(player); return; }
+		// (2026-10-31) "-- --death": the death screen's blood, at 1, 3 and 6.5 s
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--death") >= 0)
+		{
+			StyleFx.DeathDrips();
+			await Seconds(1.0); Shot("death_1s");
+			await Seconds(2.0); Shot("death_3s");
+			await Seconds(3.5); Shot("death_6s");
+			GetTree().Quit(0);
+			return;
+		}
 		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--camera") >= 0) { await CameraShots(player, inv); return; }
 		inv.TryPickup(ToolKind.Compass);
 		inv.TryPickup(ToolKind.Lantern);

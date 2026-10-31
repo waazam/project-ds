@@ -30,10 +30,15 @@ public static class PlayerDeath
 		var fader = StoryBeat.Fader(owner);
 		if (fader != null)
 		{
-			if (!fader.IsBlack) await fader.Fade(1f, 1.2f, ct);
-			await Cutscene.Wait(owner, 0.8, ct);
+			// (2026-10-31, the owner: "the background should remain black") the drips paint their own black now, the blood
+			// running down it and pooling: the fader stands aside for them (a death that went to black first included), the
+			// line comes up over them, and the fader's black is only the cut to the reload
+			if (ProjectDS.UI.StyleFx.Instance != null) fader.SetBlack(false);
+			else if (!fader.IsBlack) await fader.Fade(1f, 1.2f, ct);   // (no drips here: plain black)
+			await Cutscene.Wait(owner, 2.0, ct);
 			if (!string.IsNullOrEmpty(line)) await fader.ShowCaption(line, "", 1.2f, 2.2f, 1.2f, ct);
 			await Cutscene.Wait(owner, 0.6, ct);
+			fader.SetBlack(true);
 		}
 		GD.Print($"[story] death: '{line}' - back to the last checkpoint");
 		ProjectDS.UI.StyleFx.Clear();
